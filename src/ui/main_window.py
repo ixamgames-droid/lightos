@@ -152,14 +152,17 @@ def _recovery_prompt_suppressed() -> bool:
 
     Zwei Netze (analog ``LIGHTOS_NO_OUTPUT_THREAD``):
     - ``LIGHTOS_NO_RECOVERY_PROMPT`` — tests/conftest.py setzt es explizit;
-    - ``QT_QPA_PLATFORM`` beginnt mit ``offscreen`` — faengt Tools/Skripte
-      ohne conftest ab (deckt auch Varianten wie ``offscreen:...``).
+    - Qt laeuft ohne Bildschirm (``qt_plattform.ohne_bildschirm``) — faengt
+      Tools/Skripte ohne conftest ab.
 
     In der echten App ist beides nie aktiv -> Live-Recovery unveraendert.
+    STAB-34: gefragt wird die Plattform, die Qt WIRKLICH benutzt — nicht die
+    Umgebungsvariable (siehe ``_exit_prompt_suppressed``).
     """
     if os.environ.get("LIGHTOS_NO_RECOVERY_PROMPT"):
         return True
-    return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+    from src.core.qt_plattform import ohne_bildschirm
+    return ohne_bildschirm()
 
 
 def _exit_prompt_suppressed() -> bool:
@@ -171,8 +174,15 @@ def _exit_prompt_suppressed() -> bool:
     setzt, will NICHT, dass beim Beenden ungespeicherte Arbeit kommentarlos
     verworfen wird. Hier zaehlt deshalb allein die headless-Plattform, auf der
     ein modaler Dialog schlicht niemanden erreicht.
+
+    STAB-34: „headless“ heisst die Plattform, auf der Qt WIRKLICH laeuft
+    (``qt_plattform.ohne_bildschirm``) — nicht die Umgebungsvariable
+    ``QT_QPA_PLATFORM``. Die las Qt nur beim Start; ein spaeter nachgeladenes
+    Modul hatte sie in der sichtbaren App auf „offscreen“ gestellt, und ab dem
+    ersten Laden einer Show wurde hier nie mehr gefragt.
     """
-    return os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+    from src.core.qt_plattform import ohne_bildschirm
+    return ohne_bildschirm()
 
 
 def _colored_icon(color: str, size: int = 16) -> QIcon:
@@ -1801,21 +1811,15 @@ class MainWindow(QMainWindow):
     def _refresh_validation_banner(self):
         """Laeuft Validation (ohne Fix) und aktualisiert Banner-Text."""
         try:
-            from src.core.sync import validate_and_repair
-            issues = validate_and_repair(self._state, fix=False)
-            errors = [i for i in issues if i.severity == "error"]
-            warns = [i for i in issues if i.severity == "warn"]
-            count = len(errors) + len(warns)
-            if count == 0:
+            from src.core import sync
+            issues = sync.validate_and_repair(self._state, fix=False)
+            # CDX-58: auch ein reiner Hinweis ('info') zeigt das Banner.
+            banner = sync.banner_zusammenfassung(issues)
+            if banner is None:
                 self._lbl_validation.hide()
                 return
-            if errors:
-                color = "#ff4444"
-                icon = "!"
-            else:
-                color = "#ffaa00"
-                icon = "*"
-            self._lbl_validation.setText(f" {icon} {count} Issues ")
+            text, color = banner
+            self._lbl_validation.setText(text)
             self._lbl_validation.setStyleSheet(
                 f"background:{color}; color:#000; font-weight:bold;"
                 f" border-radius:3px; padding:2px 8px;"
@@ -2783,7 +2787,10 @@ class MainWindow(QMainWindow):
         from src.core import diagnose_log as dl
         from src.ui import hilfe
         from PySide6.QtWidgets import QFileDialog
-        headless = os.environ.get("QT_QPA_PLATFORM", "").startswith("offscreen")
+        # STAB-34: die echte Plattform, nicht die Variable — sonst blieb in der
+        # sichtbaren App nach dem Laden einer Show „Gespeichert unter …“ aus.
+        from src.core.qt_plattform import ohne_bildschirm
+        headless = ohne_bildschirm()
         if ziel is None:
             antwort = QMessageBox.information(
                 self, "Diagnosepaket speichern",
@@ -3021,8 +3028,11 @@ class MainWindow(QMainWindow):
                 tip = ("Laser-NOT-AUS: alle Laser sofort dunkel — ein Klick, "
                        "keine Rückfrage (Strg+Umschalt+L).\n")
             tip += f"Erkannte Laser: {n}"
-            if not aktiv:
-                tip += " — der Knopf wirkt auch, wenn keiner erkannt ist."
+            if n == 0:
+                # LAS-37: ehrlich bleiben — ohne erkannten Laser ist die
+                # NOT-AUS-Maske leer, ueber DMX geht dann nichts dunkel.
+                tip += (" — über DMX schaltet der Knopf dann nichts dunkel: er "
+                        "deckt nur Geräte, die LightOS als Laser erkennt.")
             if btn.text() != text:
                 btn.setText(text)
             if btn.styleSheet() != stil:
@@ -3133,7 +3143,8 @@ class MainWindow(QMainWindow):
         """Wenn Show geladen wurde und Issues gefunden wurden, zeige Dialog."""
         try:
             issues = (data or {}).get("issues", []) if isinstance(data, dict) else []
-            # Nur Dialog wenn wirklich was zu berichten ist
+            # Nur Dialog wenn wirklich was zu berichten ist. Ein reiner Hinweis
+            # unterbricht das Laden nicht — er steht im Banner (CDX-58).
             relevant = [i for i in issues if getattr(i, "severity", "") in ('warn', 'error')
                         or getattr(i, "auto_fixed", False)]
             if relevant:

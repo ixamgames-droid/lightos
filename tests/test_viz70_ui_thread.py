@@ -231,6 +231,10 @@ class _CanvasCase(unittest.TestCase):
     def _canvas(self, zoom=1.0):
         c = live_view.StageCanvas()
         c._update_timer.stop()             # Takt hier von Hand
+        # UI-86: die Bildrate aus der Zeichenzeit hat ihren eigenen Test; hier
+        # darf ein zufaellig langsames Bild (ausgelasteter Rechner) nicht
+        # mitreden.
+        c.MAX_UI_ANTEIL = 0
         c.zoom = zoom
         c.world_w, c.world_h = 600, 400
         c.grid_visible, c.grid_size = True, 50
