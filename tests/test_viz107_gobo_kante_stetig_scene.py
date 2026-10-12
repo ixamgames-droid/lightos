@@ -19,6 +19,10 @@ hat (``builders.js#_oberseiteImKegel``): erste Scheibe auf der Oberseite,
 zweite am Boden; Kegelwinkel und Helligkeit gehen stufenlos ueber.
 
 Gemessen wird ueber die echte Seite (Produktiv-Push), Tilt in Einzelschritten.
+
+Weitere Lagen (Publikumsflaeche vor der Buehne, Geraet vor der Buehne, zweiter
+Koerper, Ecke) stehen in ``test_viz107_gobo_neben_der_buehne_scene.py`` — zwei
+Dateien, weil eine allein im vollen Gate ueber das Zeitlimit kaeme.
 """
 import json
 import os
@@ -61,11 +65,15 @@ _LAGE_JS = """
     zwei: zwei ? lage(b) : null,
     zweiDeck: zwei ? b.material.opacity : null,
     mitteOben: !!(kt && kt.oben && kt.kante),
+    mitteSeite: !!(kt && !kt.oben),
     ziel: [f.spotTarget.position.x, f.spotTarget.position.y, f.spotTarget.position.z],
     durchmesser: 2 * p.radius * f.beam.scale.x,
     laenge: f.baseBeamLength * f.beam.scale.y, grund: f.baseBeamLength,
     kegelGeschnitten: !!f._kegelSchnitt,
-    innen: (f._neben && typeof f._neben.innen === 'number') ? f._neben.innen : null,
+    fernQ: (typeof f._goboFernQ === 'number') ? f._goboFernQ : null,
+    // die Oberseite NEBEN der Strahlmitte, die gerade gilt (nicht bloss gefunden)
+    innen: f._nebenWirkt ? f._nebenWirkt.innen : null,
+    neben: f._nebenWirkt ? f._nebenWirkt.kante.id : null,
   });
   } catch (e) { return JSON.stringify({fehler: String(e && e.stack || e)}); }
 })()
@@ -90,13 +98,16 @@ class _KanteBasis(_Basis):
     GERAETE = [_geraet(tiltRange=270)]
     TILTS = list(range(128, 88, -1))      # von senkrecht ueber die Vorderkante hinaus
 
-    def _podest(self):
+    def _flaeche(self, sid, typ, mitte, groesse):
+        """Ein Buehnen-Element (Quader): Mitte (x, y, z), Groesse (x, y, z)."""
         self._bridge_obj.addStageObjectData.emit(json.dumps({
-            "id": "podest", "type": "platform",
-            "position": {"x": 0, "y": _OBEN / 2, "z": 0},
-            "size": {"x": 6, "y": _OBEN, "z": 2 * _KANTE_Z},
+            "id": sid, "type": typ,
+            "position": dict(zip("xyz", mitte)), "size": dict(zip("xyz", groesse)),
         }))
-        self._poll_until_true("!!window.__lightos.stageObjects['podest']")
+        self._poll_until_true(f"!!window.__lightos.stageObjects['{sid}']")
+
+    def _podest(self):
+        self._flaeche("podest", "platform", (0, _OBEN / 2, 0), (6, _OBEN, 2 * _KANTE_Z))
 
     def _lage(self):
         z = json.loads(self._eval(_LAGE_JS % _FID))
@@ -256,3 +267,11 @@ class Viz107HochTest(_KanteBasis):
         self.assertLess(max(rel), 0.06, f"Kegelweite springt: {list(zip(self.TILTS, weite))}")
         self.assertTrue(_auf_der_buehne(reihe[wechsel]))
         self.assertTrue(reihe[wechsel]["kegelGeschnitten"])
+        # Die Projektion blendet am Hallenboden mit dem Abstand aus (`_goboFernQ`
+        # = ferner Kegelrand auf der getroffenen Flaeche). Der Bezug wechselte
+        # im Schritt ueber die Kante von der Buehne zum Boden — der Bodenteil
+        # wurde in einem Bild von „gedaempft“ auf voll hell.
+        fern = [z["fernQ"] for z in reihe]
+        self.assertTrue(all(q is not None for q in fern), fern)
+        rel = [abs(b - a) / a for a, b in zip(fern, fern[1:])]
+        self.assertLess(max(rel), 0.06, f"Bezug der Projektion springt: {list(zip(self.TILTS, fern))}")
