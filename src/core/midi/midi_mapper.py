@@ -187,10 +187,12 @@ class MidiInBinding:
     trigger_id: int = 0
     message_type: str = "note"  # note or cc
 
-    def matches(self, msg: MidiMessage) -> bool:
+    def matches(self, msg: MidiMessage, geschwister=None) -> bool:
         # MIDI-3: ueber den Geraetenamen, nicht ueber die ALSA-Nummer.
+        # ``geschwister`` = Geraetenamen aller Mappings (CDX-58: zwei
+        # baugleiche Pulte mit Alt-Nummern bleiben getrennt).
         if self.device and not geraet_passt(self.device, msg.port_name,
-                                            _offene_eingaenge()):
+                                            _offene_eingaenge(), geschwister):
             return False
         if self.channel != 0 and self.channel != msg.channel:
             return False
@@ -543,9 +545,12 @@ class MidiMapper:
         # MIDI-4: jede Zeile einzeln absichern — eine kaputte Zeile darf die
         # anderen Zeilen derselben Note nicht abbrechen. Schnappschuss der
         # Liste, weil die UI sie parallel ersetzen kann.
-        for mapping in list(self._mappings):
+        mappings = list(self._mappings)
+        geraete = {m.midi_in.device for m in mappings
+                   if getattr(m.midi_in, "device", "")}
+        for mapping in mappings:
             try:
-                if not mapping.midi_in.matches(msg):
+                if not mapping.midi_in.matches(msg, geraete):
                     continue
                 self._handle_inbound_mapping(mapping, msg)
             except Exception as e:
