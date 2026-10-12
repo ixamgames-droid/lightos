@@ -88,7 +88,7 @@ Depending on the selected **Aktion**, the dialog only shows the fields that appl
 | Programmer leeren (Clear) | Clears the programmer (releases manual colors/snaps) |
 | Alles stoppen (stop all) | Stops all executors/playbacks (`stop_all`) |
 | Effekte stoppen (Tempo bleibt) (stop effects (tempo stays)) | Stops all running effect functions; tempo/BPM stay unchanged (pause/effect stop) |
-| Blackout | Switches blackout on while pressed (momentary override) — everything to 0, only position/gobo/optics of moving heads with a dimmer stay where they are; fog completely to 0, lasers to the off value of their profile (not always 0, see below). With **Blackout-Ziel** (blackout target), only the selected fixtures/groups (see below) |
+| Blackout | Switches blackout on while pressed (momentary override) — everything to 0, only position/gobo/optics of moving heads with a dimmer stay where they are; fog completely to 0, lasers to the off value of their profile (not always 0, see below). If blackout is already on (the button at the top right or another held key), it stays dark when you release: the key only takes back what it set itself. With **Blackout-Ziel** (blackout target), only the selected fixtures/groups (see below) |
 | Laser scharf/unscharf (laser armed/disarmed) | Arms/disarms the network laser output (disarmed = output blanked) — LAS-10 |
 | Laser NOT-AUS (laser EMERGENCY STOP) | Laser emergency stop: dark immediately + disarm |
 | Laser-Muster abrufen | Recalls a saved laser pattern (pattern palette) — LAS-18 |

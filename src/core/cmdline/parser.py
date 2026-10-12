@@ -557,6 +557,10 @@ class BlackoutCommand(Command):
             om = state.output_manager
             new_val = not bool(getattr(om, "_blackout", False))
             om.set_blackout(new_val)
+            if not new_val and bool(getattr(om, "blackout", False)):
+                # VCB-43: der Schalter ist aus, aber eine VC-Taste haelt noch.
+                return CommandResult(
+                    True, "Blackout AUS — eine gehaltene Taste hält noch dunkel")
             return CommandResult(True, "Blackout " + ("AN" if new_val else "AUS"))
         except Exception as e:
             return CommandResult(False, f"Blackout Fehler: {e}")
