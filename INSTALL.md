@@ -408,7 +408,10 @@ Python, kein venv und kein `install.py`**.
 - legt eine Startmenü-Verknüpfung an, auf Wunsch auch eine auf dem Desktop,
 - trägt einen Deinstaller ein (Einstellungen → Apps, oder Startmenü „LightOS
   deinstallieren“),
-- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`),
+- legt die Lizenzen der mitgelieferten Bibliotheken bei: `THIRD_PARTY_NOTICES.md` und der
+  Ordner `licenses\` neben `LightOS.exe` – darin die Lizenztexte und
+  `BUNDLE-KOMPONENTEN.txt` mit Name, Version, Lizenz und Bezugsquelle jeder Bibliothek
+  dieses Setups (Python, Qt/PySide6 unter LGPL, die Python-Pakete),
 - bringt fünf **Demo-Shows** mit: **Datei → Demo-Show öffnen**. Eine Demo öffnet sich als
   neue, ungespeicherte Show; **Speichern** fragt nach einem Namen und legt deine Kopie in
   `%APPDATA%\LightOS\shows` an. Das Original im Programmordner bleibt unverändert.

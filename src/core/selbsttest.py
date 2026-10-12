@@ -165,6 +165,69 @@ def pruefe_udmx_bibliothek(gefroren: bool | None = None,
     return []
 
 
+#: LIZ-2: Lizenzdateien, die ein gepackter Build mitbringen muss (relativ zu
+#: ``programm_dir()``, als Teile notiert wie ``PFLICHT_RESSOURCEN``). Die Liste
+#: und Pythons Lizenztext entstehen beim Bauen
+#: (``packaging/windows/fremdkomponenten.py``), die uebrigen liegen im Repo.
+PFLICHT_LIZENZDATEIEN: tuple[str, ...] = tuple("/".join(teile) for teile in (
+    ("licenses", "BUNDLE-KOMPONENTEN.txt"),
+    ("licenses", "Python-LICENSE.txt"),
+    ("licenses", "LGPL-3.0.txt"),
+    ("licenses", "GPL-3.0.txt"),
+))
+
+
+def pruefe_fremdlizenzen(wurzel: str | None = None,
+                         gefroren: bool | None = None) -> list[str]:
+    """LIZ-2: ein gepackter Build liefert die Lizenztexte der fremden
+    Bibliotheken mit — und von Qt nur, was in seiner eigenen Liste steht.
+
+    Geprueft wird das FERTIGE Paket, unabhaengig vom Bauwerkzeug:
+
+    * die Liste dieses Builds und die Lizenztexte liegen bei;
+    * jede ``Qt6*.dll`` im Programmordner steht in der Liste (eine Bibliothek,
+      die am Filter vorbei hineingeraten ist, faellt hier auf — Qt bietet
+      einige Module nur unter der GPL an);
+    * der QML-Ordner von Qt fehlt.
+
+    Im Quellbetrieb gibt es weder Liste noch Bundle: dort nichts.
+    """
+    gefroren = ist_gefroren() if gefroren is None else gefroren
+    if not gefroren:
+        return []
+    wurzel = wurzel or programm_dir()
+    fehler = [f"Lizenzen: fehlt {rel}" for rel in PFLICHT_LIZENZDATEIEN
+              if not os.path.isfile(os.path.join(wurzel, *rel.split("/")))]
+    if not _hat_datei(os.path.join(wurzel, "licenses", "pakete")):
+        fehler.append("Lizenzen: der Ordner mit den Lizenztexten der "
+                      "Python-Pakete ist leer oder fehlt")
+    liste = ""
+    try:
+        with open(os.path.join(wurzel, *PFLICHT_LIZENZDATEIEN[0].split("/")),
+                  encoding="utf-8") as f:
+            liste = f.read()
+    except OSError:
+        pass
+    qt_ordner = os.path.join(wurzel, "PySide6")
+    try:
+        namen = sorted(os.listdir(qt_ordner))
+    except OSError:
+        namen = []
+    if liste:
+        gelistet = {zeile.split("|")[0].strip().lower()
+                    for zeile in liste.splitlines() if "|" in zeile}
+        for name in namen:
+            klein = name.lower()
+            if (klein.startswith("qt6") and klein.endswith(".dll")
+                    and klein not in gelistet):
+                fehler.append(f"Lizenzen: {name} liegt im Programmordner, steht "
+                              "aber nicht in der Liste der Fremd-Komponenten")
+    if os.path.isdir(os.path.join(qt_ordner, "qml")):
+        fehler.append("Lizenzen: der QML-Ordner von Qt liegt im Programmordner "
+                      "(packaging/windows/qt_umfang.py laesst ihn weg)")
+    return fehler
+
+
 def pruefe_code_stand() -> list[str]:
     """Der Builtin-Fingerabdruck darf nicht leer sein (sonst laeuft der
     Abgleich nach einem Update nie wieder, s. ``fixture_db._code_stand``)."""
@@ -200,7 +263,8 @@ def bericht() -> tuple[int, list[str]]:
               f"programm_dir={programm_dir()}",
               f"Python {sys.version.split()[0]} ({sys.platform})"]
     fehler = (pruefe_module() + pruefe_ressourcen() + pruefe_code_stand()
-              + pruefe_build_info() + pruefe_udmx_bibliothek())
+              + pruefe_build_info() + pruefe_udmx_bibliothek()
+              + pruefe_fremdlizenzen())
     demo_fehler, demo_zeile = pruefe_demo_shows()
     fehler += demo_fehler
     zeilen.append(demo_zeile)

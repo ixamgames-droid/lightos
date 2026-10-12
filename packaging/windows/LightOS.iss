@@ -62,9 +62,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; Qt/QtWebEngine und den mitgelieferten Daten).
 Source: "{#DistDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; Lizenzen der Fremd-Komponenten sichtbar neben der exe (liegen zusaetzlich
-; im Bundle, wo die App sie findet).
+; im Bundle, wo die App sie findet). LIZ-2: der Ordner kommt aus dem BUNDLE,
+; nicht aus dem Repo - nur dort liegen die beim Bauen erzeugte Liste
+; (BUNDLE-KOMPONENTEN.txt), Pythons Lizenztext und die Texte der Python-Pakete.
 Source: "{#RepoDir}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#RepoDir}\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#DistDir}\_internal\licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\LightOS"; Filename: "{app}\LightOS.exe"; WorkingDir: "{app}"

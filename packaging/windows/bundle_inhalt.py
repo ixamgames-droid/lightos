@@ -169,6 +169,16 @@ DYNAMISCHE_BIBLIOTHEKEN: tuple[str, ...] = (
     "libusb_package",
 )
 
+#: LIZ-2: Pakete, deren Python-Module NICHT ins Archiv von LightOS.exe kommen,
+#: sondern als ``.py``-Dateien in den Programmordner (PyInstaller,
+#: ``module_collection_mode``). Qt und PySide6 stehen unter der LGPL; die
+#: verlangt, dass der Nutzer die Bibliothek austauschen kann. Die DLLs sind
+#: ohnehin eigene Dateien — so sind es die wenigen Python-Dateien auch.
+OFFEN_MITLIEFERN: tuple[tuple[str, str], ...] = (
+    ("PySide6", "py"),
+    ("shiboken6", "py"),
+)
+
 #: Grosse, nur optionale Pakete, die nie ins Setup sollen (BPM-Generator-
 #: Engines librosa/Beat This!, s. requirements.txt) plus Test-/Tk-Ballast.
 EXCLUDES: tuple[str, ...] = (
