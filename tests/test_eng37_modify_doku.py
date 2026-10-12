@@ -188,3 +188,39 @@ def test_tabelle_stimmt_mit_der_engine(monkeypatch, art, mode, staerke):
             assert ist == soll, (art, staerke, ist, soll)
             return
     pytest.fail(f"Das Lauflicht stand nie so wie in der Anleitung: {soll_betrag}")
+
+
+def test_nur_per_fader_bedienen_steht_drin_und_stimmt():
+    """Der Absatz „Nur per Fader bedienen“: drei Schritte, der Haken mit dem
+    Wortlaut aus dem Fader-Dialog, und die Tabelle gegen die Rechnung."""
+    from src.core.engine.modify import modify_wert
+    from src.ui.virtualconsole import vc_slider
+
+    a = _abschnitt()
+    m = re.search(r"^### Nur per Fader bedienen$.*?(?=^### )", a, flags=re.M | re.S)
+    assert m, "Absatz „### Nur per Fader bedienen“ fehlt"
+    t = m.group(0)
+    for schritt in ("1. ", "2. ", "3. "):
+        assert re.search(rf"^{re.escape(schritt)}", t, flags=re.M)
+    haken = "Effekt An/Aus (EFFECT-Modi): bei 0 wirklich stoppen"
+    assert haken in t
+    quelle = Path(vc_slider.__file__).read_text(encoding="utf-8")
+    # Im Dialog: Zeilen-Beschriftung + Text des Hakens.
+    for teil in ('"Effekt An/Aus (EFFECT-Modi):"', '"bei 0 wirklich stoppen'):
+        assert teil in quelle, (
+            f"der Haken heisst im Fader-Dialog anders als in der Anleitung: {teil}")
+    assert "Effekt-Helligkeit" in t and '"Effekt-Helligkeit"' in quelle
+    for wort in ("Show laden", "erste Bewegung", "Pickup", "Modify-Stärke",
+                 "Ohne den Haken", "Taste leuchtet"):
+        assert wort in t, f"„{wort}“ fehlt im Absatz „Nur per Fader bedienen“"
+
+    zeilen = {}
+    for z in t.splitlines():
+        teile = [x.strip() for x in z.strip().strip("|").split("|")]
+        if len(teile) == 5 and all(re.fullmatch(r"\d+ %", x) for x in teile[2:]):
+            zeilen[teile[0]] = [int(x.split()[0]) for x in teile[2:]]
+    assert set(zeilen) == {"0", "50 %", "100 %"}
+    for name, fader in (("0", 0), ("50 %", 128), ("100 %", 255)):
+        soll = [round(modify_wert(mode, 102, 255, fader / 255.0) * 100 / 255)
+                for mode in ("sub", "dim", "add")]
+        assert zeilen[name] == soll, f"Zeile „{name}“: {zeilen[name]} statt {soll}"

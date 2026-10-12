@@ -124,6 +124,43 @@ Cuelisten, Snap-Tasten, Programmer und die automatische Grundhelligkeit zusammen
    **Helligkeit** des Modify-Effekts und seine Ein-/Ausblendzeit wirken ebenfalls nur auf die
    Stärke — das Darunterliegende wird davon nie mitgedimmt.
 
+### Nur per Fader bedienen
+
+Ein Modify-Effekt braucht keine Taste. Ein Fader der Virtuellen Konsole kann ihn allein schalten
+und regeln: **Fader auf 0 = Effekt aus, Fader irgendwo darüber = Effekt läuft.**
+
+1. In der Virtuellen Konsole einen **Fader anlegen** und in seinen Eigenschaften als Ziel den
+   Modify-Effekt wählen.
+2. Als **Modus** *Effekt-Helligkeit* einstellen.
+3. Den Haken **„Effekt An/Aus (EFFECT-Modi): bei 0 wirklich stoppen“** setzen.
+
+Was man sieht (Untergrund auf 40 %, Werte der Läufer-Lampen):
+
+| Fader | Effekt | Abziehen | Abdunkeln | Addieren |
+|---|---|---|---|---|
+| 0 | gestoppt — das Bild ist exakt wie ohne den Effekt | 40 % | 40 % | 40 % |
+| 50 % | läuft, halbe Stärke | 0 % | 20 % | 90 % |
+| 100 % | läuft, volle Stärke | 0 % | 0 % | 100 % |
+
+- Schon der **kleinste Wert über 0** startet den Effekt; zurück auf 0 stoppt ihn wirklich.
+- **Ohne den Haken** regelt der Fader nur: an und aus bleibt dann bei der Taste, und Fader 0 heißt
+  „läuft mit Stärke 0“.
+- **Taste und Fader zusammen** auf demselben Effekt vertragen sich: die Taste leuchtet, sobald der
+  Fader den Effekt startet, und geht aus, wenn er ihn stoppt. Schaltet die Taste bei offenem Fader
+  aus, startet die nächste Fader-Bewegung wieder.
+- Statt *Effekt-Helligkeit* geht auch der Modus *Effekt-Parameter* mit **Modify-Stärke** — gleiches
+  Ergebnis, in ganzen Prozent. *Effekt-Tempo* mit dem Haken schaltet ebenfalls, regelt aber das
+  Tempo.
+- **Ein- und Ausblendzeit** des Effekts gelten auch beim Start und Stopp über den Fader; der
+  Untergrund springt dabei nie. Im Modus *Effekt-Helligkeit* ist der Effekt bei Fader 0 sofort
+  unsichtbar (Stärke 0); die Taste leuchtet noch für die Dauer der Ausblendzeit. Wer den Fader in
+  dieser Zeit wieder aufzieht, startet den Effekt neu.
+- **Show laden:** Ein gespeicherter Faderwert über 0 startet nichts. Nach dem Laden ist der Effekt
+  aus, der Fader zeigt nur seinen gespeicherten Stand; **erst die erste Bewegung** des Faders
+  schaltet ein. So verhält sich jeder Effekt-Fader, nicht nur bei Modify.
+- **Bankwechsel mit Pickup:** Der Hardware-Fader wirkt erst, wenn er den angezeigten Wert kreuzt —
+  vorher wird nichts gestartet und nichts gestoppt.
+
 ### Die drei Betriebsarten
 
 | Betriebsart | Rechnung je Lampe | Lampe im Modify-Effekt gerade nicht dran |
