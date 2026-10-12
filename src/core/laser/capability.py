@@ -63,7 +63,12 @@ def is_laser_fixture(fx) -> bool:
     """True, wenn das gepatchte Gerät als Laser steuerbar ist — entweder per
     ``fixture_type == 'laser'`` oder weil es ``laser_*``-Kanäle besitzt. Die
     kanonische Fassung; die UI (``laser_view.fixture_has_laser_capability``)
-    delegiert hierher."""
+    delegiert hierher.
+
+    LAS-37: das ist die Frage der BEDIENUNG (Laser-Tab, Musterkacheln). Ob in
+    einem Geraet ein Laser steckt, den NOT-AUS, Blackout und „Alles Weiss“
+    decken muessen, beantwortet die weitere Regel ``erkennung.ist_laser`` —
+    sie sieht zusaetzlich auf Kanal- und Geraetenamen."""
     if (getattr(fx, "fixture_type", "") or "").lower() == "laser":
         return True
     try:
