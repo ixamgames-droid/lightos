@@ -87,6 +87,7 @@
 | ENG-35 | A | - | 2026-10-12T18:15Z | - |
 | VCB-45 | A | - | 2026-10-12T18:15Z | - |
 | VCB-46 | A | - | 2026-10-12T18:15Z | - |
+| ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 
 ## Blocker & Fallen
 
@@ -260,7 +261,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:26Z B claim VIZ-106
 - 2026-10-12T15:27Z D claim VCB-44
 - 2026-10-12T15:41Z D claim UI-92
 - 2026-10-12T15:43Z A aktualisiert STAB-35: Branch - -> fix/stab36-absturz-auswahlwechsel
@@ -290,3 +290,4 @@
 - 2026-10-12T18:42Z D aktualisiert MIDI-15: Branch - -> feature/midi15-touch-sperre; Dateien - -> src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py
 - 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T18:42Z D done OUT-73
+- 2026-10-12T18:55Z A claim ENG-37
