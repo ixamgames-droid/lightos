@@ -97,6 +97,46 @@ class FrequenzAusProfilTest(unittest.TestCase):
         self.assertEqual(S.hz_spanne_aus_name("Strobe 0,5 bis 12,5 Hz"), (0.5, 12.5))
         self.assertEqual(S.hz_spanne_aus_name("1Hz - 20Hz"), (1.0, 20.0))
 
+    def test_shutter_ohne_bereiche_blitzt_nicht(self):
+        """Vorsichtige Regel (Nacharbeit 2026-10-12): ein reiner Shutter-Kanal
+        ohne Bereichsangaben blitzt bei KEINEM Wert — 255 heisst dort meist
+        „offen". Bis dahin galt pauschal „> 10 = Strobe"."""
+        for name in ("Shutter", "Verschluss", ""):
+            ch = _ch(attribute="shutter", name=name)
+            self.assertFalse(S.ist_ausdruecklicher_strobe_kanal(ch), name)
+            for val in (0, 10, 11, 128, 239, 255):
+                self.assertEqual(S.strobe_hz(ch, val), 0.0, (name, val))
+
+    def test_strobe_kanal_ohne_bereiche_blitzt(self):
+        for ch in (_ch(attribute="strobe", name="Strobe"),
+                   _ch(attribute="strobe", name="Kanal 7"),          # Typ genuegt
+                   _ch(attribute="shutter", name="Shutter/Strobe"),  # Name genuegt
+                   _ch(attribute="shutter", name="Flash"),
+                   _ch(attribute="shutter", name="Frequenz"),        # „Strobe 2ch"
+                   _ch(attribute="shutter", name="Blitz")):
+            self.assertTrue(S.ist_ausdruecklicher_strobe_kanal(ch), ch.name)
+            self.assertEqual(S.strobe_hz(ch, 0), 0.0)
+            self.assertGreater(S.strobe_hz(ch, 200), 0.0, ch.name)
+
+    def test_mit_bereichen_zaehlt_nur_der_bereich_auch_beim_strobe_kanal(self):
+        """„Offen" am oberen Ende (Wert 255) blitzt nicht — auch wenn der Kanal
+        „Strobe" heisst; und ein Wert im Strobe-Bereich blitzt auch dann, wenn
+        der Kanal nur „Shutter" heisst."""
+        ber = [_rng(0, 4, "Zu", "closed"), _rng(5, 250, "Strobe langsam -> schnell", "strobe"),
+               _rng(251, 255, "Offen", "open")]
+        for ch in (_ch(attribute="strobe", name="Strobe", ranges=ber),
+                   _ch(attribute="shutter", name="Shutter", ranges=ber)):
+            self.assertEqual(S.strobe_hz(ch, 255), 0.0)
+            self.assertEqual(S.strobe_hz(ch, 251), 0.0)
+            self.assertEqual(S.strobe_hz(ch, 0), 0.0)
+            self.assertAlmostEqual(S.strobe_hz(ch, 5), 0.5)
+            self.assertAlmostEqual(S.strobe_hz(ch, 250), 20.0)
+
+    def test_2d_ansicht_nutzt_dieselbe_vorsichtige_regel(self):
+        from src.ui.views import live_view
+        self.assertEqual(live_view._strobe_hz(_ch(attribute="shutter", name="Shutter"), 255), 0.0)
+        self.assertGreater(live_view._strobe_hz(_ch(attribute="strobe", name="Strobe"), 255), 0.0)
+
     def test_ohne_bereichsdaten_gilt_die_naeherung_der_2d_ansicht(self):
         ch = _ch(attribute="strobe", name="Strobe")
         for val in (0, 5, 10):
@@ -193,6 +233,30 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(S.strobe_hz_aus_attrs(attrs, [_SHUTTER, s2], "#2"), 0.0)
         self.assertTrue(S.hat_kopf_shutter([_SHUTTER, s2]))
         self.assertFalse(S.hat_kopf_shutter([_SHUTTER]))
+
+    def test_nur_kopf_1_oder_nur_kopf_2_oder_verschieden_schnell(self):
+        s2 = _ch(ranges=list(_SHUTTER.ranges))
+        kan = [_SHUTTER, s2]
+
+        def koepfe(a, b):
+            p = self._p({"intensity": 255, "shutter": a, "shutter#1": b,
+                         "color_r": 255, "color_r#1": 255}, kan)
+            return [h["strobe_hz"] for h in p["heads"]]
+        self.assertEqual(koepfe(219, 15), [20.0, 0.0])
+        self.assertEqual(koepfe(15, 219), [0.0, 20.0])
+        k = koepfe(20, 219)
+        self.assertEqual(k, [0.5, 20.0])
+
+    def test_gemeinsamer_strobe_neben_shutter_je_kopf_gilt_fuer_alle_koepfe(self):
+        s2 = _ch(ranges=list(_SHUTTER.ranges))
+        gemeinsam = _ch(attribute="strobe", name="Strobe")      # ohne Bereiche
+        kan = [_SHUTTER, s2, gemeinsam]
+        attrs = {"shutter": 15, "shutter#1": 15, "strobe": 255}
+        for sfx in ("", "#1"):
+            self.assertAlmostEqual(S.strobe_hz_aus_attrs(attrs, kan, sfx), 20.0)
+        attrs["strobe"] = 0
+        for sfx in ("", "#1"):
+            self.assertEqual(S.strobe_hz_aus_attrs(attrs, kan, sfx), 0.0)
 
 
 class PraeferenzTest(unittest.TestCase):
@@ -485,6 +549,17 @@ class VerdrahtungTest(unittest.TestCase):
         self.assertIn("strobeMode: 'flash'", self._lies("state.js"))
 
 
+class LiesmichHinweisTest(unittest.TestCase):
+    """Oeffentlicher Hinweis zu Lichtblitzen (Entscheidung des Projektinhabers)."""
+
+    def test_readme_nennt_strobe_epilepsie_und_die_einstellung(self):
+        with open(os.path.join(_REPO, "README.md"), encoding="utf-8") as fh:
+            text = fh.read()
+        for wort in ("photosensitiver Epilepsie", "Stroboskop", "Strobe im 3D zeigen",
+                     "Gedämpft", "Aus"):
+            self.assertIn(wort, text, wort)
+
+
 class AnleitungTest(unittest.TestCase):
     def test_abschnitt_strobe(self):
         with open(_ANLEITUNG, encoding="utf-8") as fh:
@@ -495,7 +570,8 @@ class AnleitungTest(unittest.TestCase):
         abschnitt = text[a:ende if ende > 0 else len(text)]
         for wort in ("Strobe im 3D zeigen", "Blitzen", "Gedämpft", "Dauerlicht",
                      f"{P.CAP_HZ} Blitze", "ein Drittel der Bildrate",
-                     "photosensitiver Epilepsie", "DMX-Ausgabe"):
+                     "photosensitiver Epilepsie", "DMX-Ausgabe",
+                     "eigenen Shutter je Kopf", "ohne Bereichsangaben"):
             self.assertIn(wort, abschnitt, wort)
 
 

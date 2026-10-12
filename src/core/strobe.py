@@ -13,14 +13,20 @@ Woher die Frequenz kommt, in dieser Reihenfolge:
    gilt diese Spanne. Sonst steigt die Frequenz innerhalb des Bereichs linear
    von :data:`HZ_MIN` auf :data:`HZ_MAX`. Heisst der Bereich erkennbar
    „schnell -> langsam", laeuft die Spanne rueckwaerts.
-2. **Ohne Bereichsdaten** die Naeherung der 2D-Ansicht seit FM-48:
-   Werte ueber 10 = Strobe, linear :data:`HZ_MIN` .. :data:`HZ_MAX`.
+2. **Ohne Bereichsdaten** die VORSICHTIGE Regel: geblitzt wird nur, wenn der
+   Kanal ausdruecklich ein Strobe-Kanal ist (Attribut ``strobe`` oder ein Name
+   mit „Strobe"/„Flash"/„Blitz"/„Frequenz"). Dort gilt die gaengige Belegung „0 = aus,
+   darueber langsam -> schnell": Werte ueber 10 linear :data:`HZ_MIN` ..
+   :data:`HZ_MAX`. Ein reiner „Shutter"-Kanal ohne Bereiche blitzt NICHT —
+   bei ihm heisst 255 meist „offen", und ein Dauerlicht als Strobe zu zeigen
+   waere schlimmer, als einen unbelegten Strobe nicht zu zeigen.
 
 Warum Bereichsdaten Vorrang haben (FM-48): bis 2026-09-28 galt pauschal
 „> 10 = Strobe" — damit blinkten Geraete mit OFFENEM Shutter (Spider 14ch
 „Offen" 8-15, Hero Spot 90 „Open" 251-255, ZQ02001 „Strobe aus (offen)"
-250-255). Die pauschale Regel gilt deshalb nur noch, wo das Profil gar keine
-Bereiche nennt.
+250-255). Bis 2026-10-12 galt die pauschale Regel noch fuer alle Kanaele ohne
+Bereiche; seither (Entscheidung des Projektinhabers: „anzeigen, wie es in echt
+ist") nur noch fuer ausdrueckliche Strobe-Kanaele.
 
 Das Ergebnis ist eine Naeherung fuer die ANZEIGE. An der DMX-Ausgabe aendert
 sich nichts, und Farbe/Dimmer bleiben davon unberuehrt.
@@ -38,6 +44,10 @@ OHNE_BEREICHE_SCHWELLE = 10
 HZ_NAME_MAX = 60.0
 
 _SHUTTER_ATTRS = ("shutter", "strobe")
+#: Namensteile, die einen Kanal ausdruecklich als Strobe-Kanal ausweisen.
+#: „frequen": ein Shutter-Kanal, der „Frequenz"/„Frequency" heisst, stellt die
+#: Blitzfrequenz (eingebautes Profil „Strobe 2ch").
+_STROBE_WORTE = ("strob", "stobe", "flash", "blitz", "frequen")
 
 _ZAHL = r"(\d+(?:[.,]\d+)?)"
 _HZ_SPANNE = re.compile(_ZAHL + r"\s*(?:hz)?\s*(?:-|–|—|\.\.+|bis|to)\s*" + _ZAHL + r"\s*hz",
@@ -96,9 +106,19 @@ def strobe_hz(ch, val) -> float:
                 von, bis = spanne if spanne else (HZ_MIN, HZ_MAX)
                 return von + (val - lo) / max(1, hi - lo) * (bis - von)
         return 0.0
-    if val <= OHNE_BEREICHE_SCHWELLE:
+    if not ist_ausdruecklicher_strobe_kanal(ch) or val <= OHNE_BEREICHE_SCHWELLE:
         return 0.0
     return HZ_MIN + (val - (OHNE_BEREICHE_SCHWELLE + 1)) / 244.0 * (HZ_MAX - HZ_MIN)
+
+
+def ist_ausdruecklicher_strobe_kanal(ch) -> bool:
+    """Ist der Kanal dem Profil nach ein STROBE-Kanal (nicht bloss ein Shutter)?
+    Attribut ``strobe`` oder ein Name mit „Strobe"/„Flash"/„Blitz"/„Frequenz". Nur dann
+    darf ein Kanal OHNE Bereichsdaten blitzen."""
+    if (getattr(ch, "attribute", "") or "").lower() == "strobe":
+        return True
+    n = (getattr(ch, "name", "") or "").lower()
+    return any(w in n for w in _STROBE_WORTE)
 
 
 def _kanaele_nach_schluessel(channels) -> dict:
@@ -122,14 +142,19 @@ def strobe_hz_aus_attrs(attrs, channels, sfx: str | None = None) -> float:
 
     ``sfx=None``: das ganze Geraet — die hoechste Frequenz ALLER Shutter-/
     Strobe-Kanaele (so rechnet auch die 2D-Ansicht). ``sfx=""`` / ``"#1"`` ...:
-    nur die Kanaele dieses Kopfes. Geraet ohne Shutter-Kanal -> ``0.0``."""
+    nur die Kanaele dieses Kopfes, plus ein Kanal, den alle Koepfe teilen. Geraet ohne Shutter-Kanal -> ``0.0``."""
     if not attrs or not channels:
         return 0.0
+    nach = _kanaele_nach_schluessel(channels)
+    # Ein Kanal, den es nur EINMAL gibt, waehrend ein anderer je Kopf vorkommt
+    # (z. B. Shutter je Kopf + ein gemeinsamer Strobe), gilt fuer alle Koepfe.
+    mehrfach = {k.partition("#")[0] for k in nach if "#" in k}
     hz = 0.0
-    for key, ch in _kanaele_nach_schluessel(channels).items():
+    for key, ch in nach.items():
         if key not in attrs:
             continue
-        if sfx is not None and key.partition("#")[1] + key.partition("#")[2] != sfx:
+        attr, raute, nr = key.partition("#")
+        if sfx is not None and attr in mehrfach and raute + nr != sfx:
             continue
         hz = max(hz, strobe_hz(ch, attrs[key]))
     return hz

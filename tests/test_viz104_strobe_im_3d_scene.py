@@ -269,3 +269,116 @@ class Viz104StrobeBehaeltSeinLichtTest(_Basis):
         for f in blitzer:
             self.assertIn(f, nachher["halter"], "der Strobe hat sein Licht verloren")
         self.assertEqual(nachher["vergaben"], vorher["vergaben"], "Lichter sind gewandert")
+
+
+# ── Je Kopf: eigener Shutter je Kopf -> jeder Kopf blitzt fuer sich ───────────
+
+_BAR = _FID + 500
+_SHUTTER_BEREICHE = _KANAELE[-1].ranges
+_BAR_EIGEN = [_Ch("intensity"),
+              _Ch("color_r"), _Ch("color_g"), _Ch("color_b"), _Ch("shutter", _SHUTTER_BEREICHE),
+              _Ch("color_r"), _Ch("color_g"), _Ch("color_b"), _Ch("shutter", _SHUTTER_BEREICHE)]
+_BAR_GEMEINSAM = _BAR_EIGEN[:-1]
+_STROBE_2HZ = 20 + round(199 * (2 - 1) / 19)
+
+
+def _bar_payload(kanaele, **attrs):
+    a = {"intensity": 255, "color_r": 255, "color_g": 255, "color_b": 255,
+         "color_r#1": 255, "color_g#1": 255, "color_b#1": 255, "shutter": _OFFEN}
+    if kanaele is _BAR_EIGEN:
+        a["shutter#1"] = _OFFEN
+    a.update(attrs)
+    return _build_fixture_payload(_fx(_BAR, "led_bar"), a, kanaele)
+
+
+_KOEPFE_JS = """
+(function(){
+  const L = window.__lightos, f = L.fixtures['%d'];
+  return JSON.stringify({
+    linsen: f.parHeads.map(p => p.lens.material.emissiveIntensity),
+    info: L.strobeInfo(%d),
+  });
+})()
+"""
+
+
+def _blitze(folge):
+    return sum(1 for i in range(1, len(folge)) if folge[i] > 0 and folge[i - 1] == 0)
+
+
+class Viz104StrobeJeKopfTest(_Basis):
+    GERAETE = [dict(_geraet(fid=_BAR, typ="par_bar"), nHeads=2)]
+
+    def _lauf_koepfe(self, start, dauer_ms):
+        bilder, t = [], start
+        while t < start + dauer_ms:
+            self._eval("(function(){ window.__t104 = %r; window.__lightos.__renderTick();"
+                       " return 1; })()" % float(t))
+            bilder.append(json.loads(self._eval(_KOEPFE_JS % (_BAR, _BAR))))
+            t += 1000 / 60
+        return bilder
+
+    def _start(self, payload):
+        self._load_and_wait()
+        self._eval("(function(){ window.__t104 = 0; window.__lightos.__strobeUhr("
+                   "() => window.__t104, 60); return 1; })()")
+        self._push(payload)
+
+    def test_payload_traegt_die_frequenz_je_kopf(self):
+        p = _bar_payload(_BAR_EIGEN, shutter=_STROBE_5HZ)
+        self.assertAlmostEqual(p["heads"][0]["strobe_hz"], 5.0, delta=0.06)
+        self.assertEqual(p["heads"][1]["strobe_hz"], 0.0)
+        for h in _bar_payload(_BAR_GEMEINSAM, shutter=_STROBE_5HZ)["heads"]:
+            self.assertNotIn("strobe_hz", h)
+
+    def test_nur_kopf_1_blitzt_kopf_2_bleibt_ruhig(self):
+        self._start(_bar_payload(_BAR_EIGEN, shutter=_STROBE_5HZ))
+        bilder = self._lauf_koepfe(2.0, 2000)
+        k1 = [b["linsen"][0] for b in bilder]
+        k2 = [b["linsen"][1] for b in bilder]
+        self.assertIn(0, k1)
+        self.assertTrue(9 <= _blitze(k1) <= 11, _blitze(k1))
+        self.assertTrue(all(v > 0 for v in k2), "Kopf 2 muss Dauerlicht zeigen")
+        self.assertEqual(len(set(k2)), 1)
+        self.assertEqual(max(k1), k2[0], "im Blitz so hell wie der ruhige Kopf")
+        self.assertTrue(bilder[0]["info"]["aktiv"])
+        self.assertEqual(bilder[0]["info"]["faktor"], 1, "das Geraet als Ganzes blitzt nicht")
+
+    def test_nur_kopf_2_blitzt(self):
+        self._start(_bar_payload(_BAR_EIGEN, **{"shutter#1": _STROBE_5HZ}))
+        bilder = self._lauf_koepfe(2.0, 1000)
+        self.assertTrue(all(b["linsen"][0] > 0 for b in bilder))
+        self.assertIn(0, [b["linsen"][1] for b in bilder])
+
+    def test_beide_koepfe_verschieden_schnell(self):
+        self._start(_bar_payload(_BAR_EIGEN, shutter=_STROBE_2HZ,
+                                 **{"shutter#1": _STROBE_5HZ}))
+        bilder = self._lauf_koepfe(2.0, 2000)
+        b1 = _blitze([b["linsen"][0] for b in bilder])
+        b2 = _blitze([b["linsen"][1] for b in bilder])
+        self.assertTrue(3 <= b1 <= 5, b1)
+        self.assertTrue(9 <= b2 <= 11, b2)
+        hz = bilder[0]["info"]["kopfHz"]
+        self.assertAlmostEqual(hz[0], 2.0, delta=0.06)
+        self.assertAlmostEqual(hz[1], 5.0, delta=0.06)
+
+    def test_ein_gemeinsamer_kanal_blitzt_alle_koepfe_zusammen(self):
+        self._start(_bar_payload(_BAR_GEMEINSAM, shutter=_STROBE_5HZ))
+        bilder = self._lauf_koepfe(2.0, 2000)
+        k1 = [b["linsen"][0] for b in bilder]
+        k2 = [b["linsen"][1] for b in bilder]
+        self.assertEqual([v > 0 for v in k1], [v > 0 for v in k2])
+        self.assertTrue(9 <= _blitze(k1) <= 11, _blitze(k1))
+        self.assertIsNone(bilder[0]["info"]["kopfHz"])
+
+    def test_aus_und_gedaempft_gelten_auch_je_kopf(self):
+        self._start(_bar_payload(_BAR_EIGEN, shutter=_STROBE_5HZ))
+        voll = max(b["linsen"][0] for b in self._lauf_koepfe(2.0, 400))
+        self._bridge_obj.settingsChanged.emit(json.dumps({"strobeMode": "soft"}))
+        self._poll_until_true("window.__lightos.strobeInfo(%d).modus === 'soft'" % _BAR)
+        weich = [b["linsen"][0] for b in self._lauf_koepfe(1000.0, 1000)]
+        self.assertGreater(min(weich), voll * 0.5)
+        self._bridge_obj.settingsChanged.emit(json.dumps({"strobeMode": "off"}))
+        self._poll_until_true("window.__lightos.strobeInfo(%d).modus === 'off'" % _BAR)
+        aus = [b["linsen"][0] for b in self._lauf_koepfe(3000.0, 400)]
+        self.assertTrue(all(abs(v - voll) < 1e-9 for v in aus))

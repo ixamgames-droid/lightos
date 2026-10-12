@@ -1347,6 +1347,14 @@ export function buildMatrixPanel(n, pixelOrder, elementRotation, elementFlip,
 // ── Spider: zwei parallele Bars, je 4 EINZELFARBEN-LEDs ────────────────────
 // Jede LED leuchtet einzeln nach ihrem eigenen Kanal (cr/cg/cb/cw der Bar);
 // Master-Dimmer (intensity) ist gemeinsam. Tilt je Bar -> Scheren-Look.
+// VIZ-104: Helligkeitsfaktor des Strobes fuer Kopf i (1 = kein Strobe). Nur bei
+// eigenem Shutter je Kopf gesetzt (fixtures.js#_strobeEinordnen); blitzt das
+// Geraet als Ganzes, steckt der Faktor schon in `dmx.intNorm`.
+function kopfStrobe(f, i) {
+  const k = f._kopfFak;
+  return (k && k[i] != null) ? k[i] : 1;
+}
+
 export function updateSpiderDmx(f, dmx) {
   // Durchfall-Semantik der alten if-Kette: ohne Multihead-Struktur lief das
   // Fixture im Monolith durch den generischen Single-Head-Pfad.
@@ -1372,7 +1380,7 @@ export function updateSpiderDmx(f, dmx) {
     for (let k = 0; k < bar.lenses.length; k++) {
       const lens = bar.lenses[k];
       const ledVal = (chan[lens.userData.ch] || 0) / 255;   // dieser LED-Kanal
-      const bright = ledVal * intNorm;                       // * Master-Dimmer
+      const bright = ledVal * intNorm * kopfStrobe(f, hs[i] ? i : 0);  // * Master-Dimmer
       if (lens.material) {
         lens.material.emissive = lens.userData.ledColor;
         lens.material.emissiveIntensity = bright * 1.9;
@@ -1404,7 +1412,7 @@ export function updateParBarDmx(f, dmx) {
     const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
     const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
     const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
-    const bright = intNorm;   // gemeinsamer Master-Dimmer
+    const bright = intNorm * kopfStrobe(f, i);   // gemeinsamer Master-Dimmer
     if (ph.lens && ph.lens.material) {
       ph.lens.material.color = col;
       ph.lens.material.emissive = col;
@@ -1437,7 +1445,7 @@ export function updateMoverBarDmx(f, dmx) {
     const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
     const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
     const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
-    const bright = intNorm;
+    const bright = intNorm * kopfStrobe(f, i);
     const hp = (h.pan == null) ? pan : h.pan;    // pro-Kopf-Pan (FM-2)
     const ht = (h.tilt == null) ? tilt : h.tilt; // pro-Kopf-Tilt
     mh.yoke.rotation.y = ((hp - pZero) / 128) * panHalf;
@@ -1477,7 +1485,7 @@ export function updateMatrixPanelDmx(f, dmx) {
     if (px.mesh && px.mesh.material) {
       px.mesh.material.color = col;
       px.mesh.material.emissive = col;
-      px.mesh.material.emissiveIntensity = intNorm * 1.6;   // Master-Dimmer skaliert alle Pixel
+      px.mesh.material.emissiveIntensity = intNorm * kopfStrobe(f, i) * 1.6;   // Master-Dimmer skaliert alle Pixel
     }
   }
   // ★ VIZ-50b: das Warmweiss-Band hat EIGENE Kanaele. Segment j haengt nach der

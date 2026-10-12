@@ -356,6 +356,12 @@ Mitgelieferte fremde Komponenten (three.js, Geräteprofile auf QLC+-Basis) stehe
 Lizenzen — siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Die 3D-Modelle im Visualizer
 sind eigene, im Code erzeugte Geometrie.
 
+**Hinweis zu Lichtblitzen:** LightOS steuert Stroboskop-Effekte und zeigt sie auch in der 2D- und
+3D-Vorschau. Schnelle Lichtblitze können bei photosensitiver Epilepsie Anfälle auslösen. In der
+3D-Ansicht lässt sich die Darstellung mit der Einstellung „Strobe im 3D zeigen" (Reiter
+„Einstellungen") auf **Gedämpft** oder **Aus** stellen — siehe
+[Anleitung 3D-Bühne](docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md).
+
 | | Stand |
 |---|---|
 | Engine, Programmer, Playback, VC, Visualizer | im Alltagsbetrieb, Testsuite grün |

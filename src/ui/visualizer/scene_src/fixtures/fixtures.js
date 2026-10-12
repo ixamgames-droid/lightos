@@ -672,6 +672,13 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   // (tickStrobe) wendet ihn mit dem jeweiligen Helligkeitsfaktor neu an.
   if (extra && (typeof extra.strobe_hz === 'number' || istVollerEintrag(extra))) {
     f.strobeHz = (extra.strobe_hz > 0) ? extra.strobe_hz : 0;
+    // Eigener Shutter je Kopf: Python haengt dann an JEDEN Kopf-Eintrag ein
+    // `strobe_hz` (visualizer_service.py). Nur dann blitzen die Koepfe einzeln
+    // — und nur, wenn das Modell seine Koepfe auch einzeln zeichnet; sonst
+    // blitzt das Geraet als Ganzes mit `strobe_hz` (der hoechsten Frequenz).
+    f.kopfHz = (heads && heads.length && typeof heads[0].strobe_hz === 'number'
+                && _zeichnetKoepfeEinzeln(f))
+      ? heads.map(h => (h && h.strobe_hz > 0) ? h.strobe_hz : 0) : null;
   }
   f._dmx = dmx;
   const fak = _strobeEinordnen(f, _strobeJetzt());
@@ -722,13 +729,34 @@ function _mitStrobe(dmx, fak) {
   return Object.assign({}, dmx, { intNorm: dmx.intNorm * fak, intensity: dmx.intensity * fak });
 }
 
-// Blitzt das Geraet gerade? Fuehrt die Menge nach und liefert den Faktor.
+// Modelle, deren Handler (builders.js) jeden Kopf einzeln zeichnen und
+// `f._kopfFak[i]` auswerten.
+function _zeichnetKoepfeEinzeln(f) {
+  return !!((f.isSpider && f.bars) || (f.isParBar && f.parHeads)
+            || (f.isMoverBar && f.moverHeads) || (f.isMatrix && f.pixels));
+}
+
+// Blitzt das Geraet gerade? Fuehrt die Menge nach und liefert den Faktor des
+// GANZEN Geraets. Bei eigenem Shutter je Kopf (`f.kopfHz`) bleibt der bei 1,
+// und `f._kopfFak[i]` traegt den Faktor je Kopf; `f._strobeSig` fasst beides
+// fuer die Wechsel-Erkennung zusammen.
 function _strobeEinordnen(f, jetzt) {
   const modus = strobeModus(settings.strobeMode);
-  const blitzt = f.strobeHz > 0 && modus !== 'off' && f._dmx && f._dmx.intNorm > 0;
-  if (!blitzt) { _strobeAktiv.delete(f); return 1; }
+  const hell = modus !== 'off' && f._dmx && f._dmx.intNorm > 0;
+  if (hell && f.kopfHz && f.kopfHz.some(h => h > 0)) {
+    _strobeAktiv.add(f);
+    f._kopfFak = f.kopfHz.map(h => strobeFaktor(jetzt, h, modus, _strobeFps));
+    f._strobeSig = 'k' + f._kopfFak.join(',');
+    return 1;
+  }
+  f._kopfFak = null;
+  if (!(hell && f.strobeHz > 0) || f.kopfHz) {
+    _strobeAktiv.delete(f); f._strobeSig = '1'; return 1;
+  }
   _strobeAktiv.add(f);
-  return strobeFaktor(jetzt, f.strobeHz, modus, _strobeFps);
+  const fak = strobeFaktor(jetzt, f.strobeHz, modus, _strobeFps);
+  f._strobeSig = '' + fak;
+  return fak;
 }
 
 /** Vor jedem Bild (app.js#perFrameUpdate). Kostet ohne Strobe eine Messung. */
@@ -742,8 +770,9 @@ export function tickStrobe(t) {
   let geaendert = false;
   for (const f of _strobeAktiv) {
     if (fixtures[f.fid] !== f) { _strobeAktiv.delete(f); continue; }   // entfernt/neu gebaut
+    const sig = f._strobeSig;
     const fak = _strobeEinordnen(f, jetzt);
-    if (fak === f._strobeFaktor) continue;
+    if (f._strobeSig === sig) continue;
     f._strobeFaktor = fak;
     updateFixtureDmx(f, fak === 1 ? f._dmx : _mitStrobe(f._dmx, fak));
     geaendert = true;
@@ -757,9 +786,10 @@ export function strobeNeuBewerten() {
   const jetzt = _strobeJetzt();
   for (const fid in fixtures) {
     const f = fixtures[fid];
-    if (!f || !f._dmx || !(f.strobeHz > 0)) continue;
+    if (!f || !f._dmx || !(f.strobeHz > 0 || f.kopfHz)) continue;
+    const sig = f._strobeSig;
     const fak = _strobeEinordnen(f, jetzt);
-    if (fak === f._strobeFaktor) continue;
+    if (f._strobeSig === sig) continue;
     f._strobeFaktor = fak;
     updateFixtureDmx(f, fak === 1 ? f._dmx : _mitStrobe(f._dmx, fak));
   }
@@ -776,6 +806,7 @@ export function strobeInfo(fid) {
     anzeigeHz: strobeAnzeigeHz(f.strobeHz || 0, _strobeFps),
     faktor: (f._strobeFaktor === undefined) ? 1 : f._strobeFaktor,
     modus, fps: _strobeFps, aktiv: _strobeAktiv.has(f), blitzend: _strobeAktiv.size,
+    kopfHz: f.kopfHz || null, kopfFaktor: f._kopfFak || null,
   };
 }
 

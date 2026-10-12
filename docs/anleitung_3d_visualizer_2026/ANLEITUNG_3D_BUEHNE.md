@@ -381,7 +381,20 @@ Frequenz blitzen gemeinsam.
 - **Wie schnell:** Die Frequenz kommt aus dem Geräteprofil. Nennt der
   Strobe-Bereich eine Frequenz („Strobe 1–25 Hz"), gilt sie; sonst steigt sie
   innerhalb des Bereichs von 0,5 auf 20 Blitze je Sekunde. Dieselbe Rechnung
-  nutzt die 2D-Ansicht der Live View. Shutter „offen" und „zu" blitzen nicht.
+  nutzt die 2D-Ansicht der Live View. Shutter „offen" und „zu" blitzen nicht —
+  auch nicht „offen" am oberen Ende (bei vielen Geräten 251–255).
+- **Profile ohne Bereichsangaben:** Nennt das Profil für den Kanal keine
+  Bereiche, blitzt nur ein Kanal, der ausdrücklich ein Strobe-Kanal ist (Typ
+  oder Name „Strobe"): 0 bis 10 = aus, darüber langsam bis schnell. Ein reiner
+  „Shutter"-Kanal ohne Bereichsangaben blitzt nicht — dort heißt 255 meist
+  „offen". Soll so ein Gerät blitzen, im Geräteprofil die Bereiche eintragen
+  (zu / Strobe / offen). Das gilt genauso für die 2D-Ansicht.
+- **Geräte mit mehreren Köpfen:** Hat das Gerät einen eigenen Shutter je Kopf,
+  blitzt jeder Kopf für sich mit seiner eigenen Frequenz — nur Kopf 1, nur
+  Kopf 2 oder beide verschieden schnell. Ein einziger Strobe-Kanal für alle
+  Köpfe lässt das ganze Gerät gemeinsam blitzen. Die 2D-Ansicht zeichnet ein
+  Gerät als ein Symbol und blinkt deshalb als Ganzes (mit der schnellsten
+  Frequenz seiner Köpfe).
 - **Begrenzung:** Gezeigt werden höchstens 12 Blitze je Sekunde und nie mehr
   als ein Drittel der Bildrate (ein Bild an, zwei aus). Läuft die Ansicht mit
   30 Bildern je Sekunde, sind es also höchstens 10, bei 15 Bildern höchstens 5.
