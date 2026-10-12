@@ -136,7 +136,7 @@ Bei der Aktion **Blackout** zeigt der Dialog die Liste **Blackout-Ziel**. Bleibt
 
 1. **Aktion:** auf **Blackout** stellen. Erst dann erscheint die Liste **Blackout-Ziel**.
 2. Die Liste **Blackout-Ziel** — hier mit der Gruppe „PAR links“ und dem einzelnen Gerät „Wash 1“ (dahinter die Geräte-Nummer `[#9]`). Mit **×** nimmst du einen Eintrag wieder heraus.
-3. **+ Gerät/Gruppe hinzufügen** hängt eine Zeile an; im Auswahlfeld stehen erst alle Gruppen („Gruppe: …“), dann alle gepatchten Geräte („Gerät: …“). Gruppen und einzelne Geräte lassen sich mischen.
+3. **+ Gerät/Gruppe hinzufügen** hängt eine Zeile an; im Auswahlfeld stehen erst alle Gruppen („Gruppe: …“), dann alle gepatchten Geräte („Gerät: …“). Gruppen und einzelne Geräte lassen sich mischen. Liegt eine Gruppe in einem Ordner, steht er in Klammern dahinter („Gruppe: PARs  (Front)“) — so bleiben zwei gleichnamige Gruppen unterscheidbar.
 4. **OK** übernimmt die Einstellung.
 
 Zwei Tasten nebeneinander — eine mit Ziel, eine ohne:
@@ -173,7 +173,8 @@ Derselbe Ablauf im 3D-Visualizer, von vorn auf die Bühne gesehen — PAR 1–4 
 - **Mehrere Tasten** überlagern sich: lässt man eine los, bleiben die Geräte der anderen dunkel.
 - **Loslassen, Taste löschen, Bank wechseln, Show laden** geben den Teil-Blackout frei — es bleibt nichts hängen. Wechselt nur die Hauptansicht oder wird das Fenster minimiert, während ein MIDI-Pad gehalten ist, bleibt es dunkel (wie beim globalen Blackout).
 - DMX-Monitor und Visualizer zeigen den Teil-Blackout wie den globalen. Der Laser-NOT-AUS bleibt unabhängig davon die letzte Ebene.
-- Gespeichert wird das Ziel in der Show (`blackout_fids`, `blackout_groups`); ältere Layouts ohne diese Felder laden als globaler Blackout.
+- Eine Gruppe ist über ihre **Nummer** gemerkt, nicht über ihren Namen: Umbenennen ändert das Ziel nicht, und zwei gleichnamige Gruppen (etwa „PARs“ in den Ordnern „Front“ und „Back“) sind zwei verschiedene Ziele. Wird die Gruppe gelöscht, steht in der Liste „Gruppe #… (nicht gefunden)“ — die Taste schaltet dann nichts dunkel, sie wird nicht zum globalen Blackout.
+- Gespeichert wird das Ziel in der Show (`blackout_fids`, `blackout_group_ids`); ältere Layouts ohne diese Felder laden als globaler Blackout. Layouts aus früheren Versionen trugen Gruppen-**Namen** (`blackout_groups`) und wirken unverändert weiter. Beim Öffnen der Einstellungen wird ein solcher Name zur Nummer, wenn genau eine Gruppe so heißt; heißen mehrere so, steht „mehrdeutig — bitte neu wählen“ dabei.
 
 ## Bindung an einen Effekt
 

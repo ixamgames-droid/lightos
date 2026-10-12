@@ -12,14 +12,16 @@ gäbe es ihn noch nicht. Für jedes andere Gerät gehst du genauso vor.
 > ungefährlich; sobald das echte Gerät am DMX hängt, gilt: Strahl nie auf
 > Menschen, eine Person schaut zu und hält den Schlüsselschalter bzw. das
 > Interlock in Reichweite. Mehr dazu unten unter
-> [Abgleich mit dem echten Gerät](#8-abgleich-mit-dem-echten-gerät).
+> [Abgleich mit dem echten Gerät](#9-abgleich-mit-dem-echten-gerät).
 
 Die Bilder stammen aus einem echten Durchlauf am Bildschirm: das Bild-Werkzeug
 (`tools/anleitungsbilder.py fixture_generator --bildschirm`) klickt und tippt
 in einer Sandbox mit der Doku-Demo-Show genau die Schritte dieser Anleitung —
 Generator öffnen, Felder, Kanäle und Bereiche eintippen, speichern, patchen,
 im Programmer bedienen. Das dabei gespeicherte Profil stimmt Feld für Feld mit
-dem Bibliotheksprofil überein.
+dem Bibliotheksprofil überein — bis auf die Laser-Angaben aus
+[Abschnitt 6](#6-laser-muster-farben-richtungen), die das Bibliotheksprofil
+zusätzlich trägt.
 
 ---
 
@@ -166,7 +168,118 @@ Der **Default** der Betriebsart (3) muss im Aus-Bereich liegen — hier 0. Sonst
 geht der Laser beim Patchen sofort an. Die Zeile darunter (4) zeigt, welche
 Kacheln die Bereiche später im Programmer ergeben.
 
-## 6. Prüfen, Live-Test, Speichern
+## 6. Laser: Muster, Farben, Richtungen
+
+Ein Laser wählt Muster und Farbe meist über **einen DMX-Wert**: Wert 192 ist
+ein Stern, Wert 12 ist rot. Im Kanal steht davon nichts — ohne weitere Angaben
+bleibt in der Bedienung nur ein Regler von 0 bis 255. Der Fixture Generator
+hat dafür bei einem Laser (Typ `laser` oder ein Kanal mit Laser-Attribut) drei
+weitere Seiten neben **Kanäle & Bereiche**. Was du dort einträgst, steht im
+Profil; die Laser-Bedienung baut daraus Musterbilder, Farbfelder und Regler,
+die richtig herum laufen. Alle drei Seiten sind freiwillig — ein Profil ohne
+diese Angaben funktioniert wie bisher.
+
+**Trage nur ein, was du am Gerät gesehen oder im Handbuch gelesen hast.** Ein
+Wert ohne Eintrag bleibt in der Bedienung ein Regler; ein geratener Eintrag
+zeigt ein falsches Bild.
+
+### Laser: Muster
+
+Oben den **Musterkanal** wählen (vorgewählt ist der Kanal mit dem Attribut
+`gobo_wheel` bzw. `laser_bank`). Jede Zeile der Tabelle ist ein Muster:
+
+| Spalte | Bedeutung |
+|---|---|
+| Bild | Schemazeichnung der Zeile |
+| Von / Bis | DMX-Bereich, in dem das Muster läuft. Ist nur ein einzelner Wert gemessen, steht er in beiden Feldern |
+| Name | so heißt das Muster später in der Bedienung |
+| Form | aus dem Baukasten: Kreis, Linie waagerecht/senkrecht, Dreieck, Quadrat, Stern, Punkte im Kreis, Punkte in einer Linie, Welle, Kreuz, Spirale, Mehrere Kreise — oder **Eigene Form** |
+| Anzahl | je nach Form: Zacken (Stern), Punkte, Wellen, Windungen (Spirale), Kreise, Linien. Bei Formen ohne Anzahl steht ein Strich |
+| Stil | Linie, gepunktet oder gefüllt |
+| bewegt | Haken für pulsierende oder animierte Muster |
+
+Rechts zeigt die **Vorschau** das Muster der gewählten Zeile groß; sie folgt
+jeder Änderung. Es ist eine Schemazeichnung — sie sagt, welches Muster gemeint
+ist, nicht, wie es am Gerät genau aussieht.
+
+* **+ Muster / - Muster** legt eine Zeile an bzw. entfernt die gewählte.
+* **Bereiche gleichmäßig aufteilen…** fragt nach der Zahl der Muster und
+  verteilt sie lückenlos über 0–255 (16 Muster = 0–15, 16–31, … 240–255).
+  Vorhandene Zeilen behalten Name und Form, fehlende kommen als „Muster N“
+  dazu. Praktisch, wenn das Handbuch nur „16 Muster“ sagt.
+* **Eigene Form zeichnen…** öffnet für die gewählte Zeile einen
+  Zeichenbereich: jeder Klick setzt einen Punkt, die Punkte werden in der
+  Reihenfolge verbunden. **Neuer Linienzug** (oder Rechtsklick) beendet die
+  Linie, **Schließen** verbindet den letzten Punkt mit dem ersten, **Letzten
+  Punkt entfernen** und **Alles löschen** korrigieren. So legst du auch ein
+  Muster an, das der Baukasten nicht hat.
+
+### Laser: Farben
+
+Den **Farbkanal** wählen (vorgewählt: `laser_color`). Jede Zeile: Farbfeld,
+Von/Bis, Name und die Farbe — Rot, Grün, Blau, Gelb, Cyan, Magenta, Weiß,
+**Mehrfarbig (bunt)** oder eine eigene Farbe. Die Leiste unter der Tabelle
+zeigt, wo die Farben auf 0–255 liegen. **Bereiche gleichmäßig aufteilen…**
+gibt es auch hier. Die Farbe ändert die Helligkeit nicht — Farbe und Dimmer
+bleiben getrennt.
+
+### Laser: Richtungen
+
+Links steht je Kanal eine Zeile:
+
+* **Enden des Reglers** — klein … groß, langsam … schnell, links … rechts oder
+  unten … oben.
+* **umgekehrt** — Haken setzen, wenn ein **hoher** DMX-Wert klein, langsam,
+  links oder unten bedeutet. Die Bedienung dreht den Regler dann um; die
+  Spalte **Am Gerät** sagt zur Kontrolle im Klartext, was niedrige und hohe
+  Werte bewirken. Am DMX-Signal ändert der Haken nichts (anders als „Invert“
+  auf der Kanalseite).
+* **Mitte von / Mitte bis** — ein Wertebereich, der die Mittelstellung
+  bedeutet (beim EL-400RGB MK2 0–10 an X und Y). „–“ heißt: keiner.
+
+Rechts die **Betriebsart**: je Bereich des Betriebsart-Kanals die Bedeutung
+(Aus, Musik, Auto, Statisch, Dynamisch) und der Haken **LightOS steuert** — ob
+Muster, Lage und Farbe aus LightOS in diesem Bereich wirken. In Musik und Auto
+läuft das Gerät selbst. **Aus Wertebereichen übernehmen** füllt die Liste aus
+den Bereichen von Abschnitt 5 vor; bitte prüfen.
+
+### Hinweise statt Sperren
+
+Überlappen sich zwei Bereiche oder bleiben Werte ohne Eintrag, steht das als
+gelber Hinweis unter der Tabelle und in der Hinweisliste des Dialogs.
+Speichern geht trotzdem: ein Laser, bei dem erst acht Muster gemessen sind,
+*hat* Lücken — dort zeigt die Bedienung den Regler. Nur ein Eintrag ohne Namen
+oder eine eigene Form ohne Zeichnung wird nicht gespeichert; auch das steht im
+Hinweis.
+
+### Beim EL-400RGB MK2
+
+Im Bibliotheksprofil stehen genau die Angaben, die am Gerät gemessen sind
+(siehe [Abschnitt 9](#9-abgleich-mit-dem-echten-gerät) und die Notizen des
+Profils):
+
+| Kanal | Angabe |
+|---|---|
+| 1 Betriebsart | 0–49 Aus · 50–99 Musik · 100–149 Auto · 150–199 Statisch · 200–255 Dynamisch; LightOS steuert bei Statisch und Dynamisch |
+| 2 Musterauswahl | 0 Kreis · 32 vier kleine Kreise · 64 Strich · 96 gepunkteter Kreis · 128 gepunktetes Dreieck · 160 Quadrat · 192 Stern · 240 pulsierender Kreis (bewegt) |
+| 3 Position X | umgekehrt: niedrig = rechts, hoch = links; 0–10 = Mitte |
+| 4 Position Y | umgekehrt: niedrig = oben, hoch = unten; 0–10 = Mitte |
+| 7 Zoom / Größe | umgekehrt: 0 = groß, 255 = klein |
+| 8 Farbe | 0–1 bunt · 2–3 weiß · 4–5 magenta · 8 gelb · 10 blau · 12 rot · 80 hellblau (Cyan) · 120 grün |
+
+Die Muster sind als Einzelwerte eingetragen, weil nur diese acht Werte
+gemessen sind — wo ein Muster anfängt und aufhört, ist noch offen. Scan- und
+Mustergeschwindigkeit und die Farbsegmente haben keine Angabe: ihre Richtung
+bzw. Wirkung ist am Gerät noch nicht bestätigt.
+
+**Ein vorhandenes Profil nachtragen:** im Fixture-Editor **Als LightOS-Profil
+exportieren…**, im Generator oben **LightOS-Profil (.json) laden…**, die
+Laser-Seiten ausfüllen und speichern. Der Generator legt immer ein **neues**
+eigenes Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage.
+Beim Export und Import eines Profils und beim Bearbeiten im Fixture-Editor
+bleiben die Laser-Angaben erhalten.
+
+## 7. Prüfen, Live-Test, Speichern
 
 ![Fixture Generator: Prüfen und Speichern](img/05_generator_pruefen.png)
 
@@ -176,10 +289,10 @@ dunkel schaltet — hier „Kanal 1 (Betriebsart) = 0“. Fehlt der Aus-Wert ode
 startet der Laser mit seinem Default eingeschaltet, kommt ein Hinweis.
 
 Der **Live-Test** (3) schreibt Werte direkt an das echte Gerät — beim Laser
-nur unter den Sicherheitsregeln aus Abschnitt 8. **Speichern** (4) legt das
+nur unter den Sicherheitsregeln aus Abschnitt 9. **Speichern** (4) legt das
 Profil in deiner Bibliothek an und bestätigt das mit einer kurzen Meldung.
 
-## 7. Patchen und bedienen
+## 8. Patchen und bedienen
 
 ### Patchen
 
@@ -235,7 +348,7 @@ echten Muster des Geräts kennt sie nicht, und weil das Handbuch für Kanal 8 nu
 
 ---
 
-## 8. Abgleich mit dem echten Gerät
+## 9. Abgleich mit dem echten Gerät
 
 Ein Profil aus dem Handbuch ist eine Behauptung über das Gerät — am Gerät
 prüfen, was das Handbuch offenlässt. Beim EL-400RGB MK2 sind das:
@@ -277,8 +390,13 @@ Enttec DMX USB Pro):
 * **Farbe (Kanal 8)**, gemessene Stützpunkte: 0 = bunt/Farbwechsel, 20 = weiß,
   40 = blau, 60 = weiß, 80 = hellblau (Cyan), 120 = grün, 160 = gelb,
   200 = weiß, 240 = weiß. Rot und Magenta lagen zwischen diesen Punkten —
-  die Stufen sind schmaler und noch feiner abzugleichen. Bis dahin hat
-  Kanal 8 im Profil keine Bereiche; die Punkte stehen in den Profil-Notizen.
+  die Stufen sind schmaler und noch feiner abzugleichen. Die später fein
+  gemessenen Punkte (0–1 bunt, 2–3 weiß, 4–5 magenta, 8 gelb, 10 blau,
+  12 rot) stehen zusammen mit 80 und 120 als Farbtabelle im Profil
+  ([Abschnitt 6](#6-laser-muster-farben-richtungen)); alle Messpunkte stehen
+  in den Profil-Notizen.
+* **Muster (Kanal 2), X, Y und Größe:** die acht gemessenen Muster und die
+  Laufrichtungen stehen ebenfalls als Laser-Angaben im Profil.
 
 Siehe auch: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md),
 [Geräte-Bibliothek & eigene Profile](../anleitung_geraete_bibliothek/ANLEITUNG.md).
