@@ -70,6 +70,7 @@
 | UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-11T20:42Z | - |
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-11T20:43Z | - |
 | OUT-72 | D | - | 2026-10-12T13:39Z | - |
+| OUT-73 | D | - | 2026-10-12T13:39Z | - |
 
 ## Blocker & Fallen
 
@@ -221,7 +222,6 @@
 
 ## Verlauf
 
-- 2026-10-11T18:11Z A aktualisiert LAS-35: Branch - -> feature/las35-zonen-planer
 - 2026-10-11T18:31Z D claim XPLAT-54
 - 2026-10-11T18:40Z A done STAB-32
 - 2026-10-11T18:40Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -251,3 +251,4 @@
 - 2026-10-11T22:18Z A done LAS-33
 - 2026-10-12T13:39Z D claim OUT-72
 - 2026-10-12T13:39Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-12T13:39Z D claim OUT-73
