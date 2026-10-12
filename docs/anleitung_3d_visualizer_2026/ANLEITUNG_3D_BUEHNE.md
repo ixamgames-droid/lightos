@@ -101,8 +101,8 @@ Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in d
 | **+ Podest mit Treppe** | 2,00 × 0,60 × 2,80 m | Treppe vorn mittig; Strahler lassen sich draufstellen |
 | **+ Mischpult-Tisch** | 1,80 × 0,90 × 0,90 m | Tisch mit Pult-Aufsatz (FOH) |
 
-**Mehrere auf einmal:** In der Zeile **„Anzahl: Reihen × Spalten — Abstand"** z. B.
-`2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
+**Mehrere auf einmal:** In den Zeilen **„Anzahl:" (Reihen × Spalten)** und **„Abstand:"**
+darunter z. B. `2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
 im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
 (`Strg+Z` nimmt alle zurück). Danach springt die Anzahl von selbst auf `1 × 1` zurück.
 Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
@@ -332,7 +332,8 @@ nötig, misst auf der echten Grafikkarte).
 Die Stufe gilt für **dieses Gerät**, nicht für die Show — sie hängt an der
 Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
 der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
-Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
+Unter der Auswahl steht, welche Stufe gerade **aktiv** ist (bei „Automatisch" das
+Ergebnis der Erkennung).
 
 | Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Gobo-Muster | Beim Drehen der Kamera |
 |---|---|---|---|---|---|---|

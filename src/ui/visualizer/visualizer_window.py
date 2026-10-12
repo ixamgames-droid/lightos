@@ -2563,6 +2563,13 @@ class FixtureDragList(QListWidget):
 
 # VIZ-68 (Review A): bei MEHR als so vielen Objekten auf einmal fragt der
 # Knopf nach (genau 200 laufen ohne Rueckfrage durch).
+# VIZ-108: Breite der rechten Spalte (Fixtures / Buehne / Einstellungen).
+RECHTE_SPALTE_MIN = 330
+RECHTE_SPALTE_MAX = 420
+# So viele Helligkeits-Knoepfe stehen nebeneinander. Fuenf in EINER Zeile
+# verlangten mehr Breite, als die Spalte hat.
+HELLIGKEIT_PRESETS_JE_ZEILE = 2
+
 RASTER_RUECKFRAGE_UEBER = 200
 # VIZ-68 (Review A2): Bereich der Positionsfelder X/Z (Buehnenelemente UND
 # Fixtures) in Metern. Ein Raster, das darueber hinaus reicht, wird nicht
@@ -2869,8 +2876,8 @@ class VisualizerWindow(QMainWindow):
         splitter.addWidget(self._view)
 
         right_panel = self._build_right_panel()
-        right_panel.setMinimumWidth(330)
-        right_panel.setMaximumWidth(420)
+        right_panel.setMinimumWidth(RECHTE_SPALTE_MIN)
+        right_panel.setMaximumWidth(RECHTE_SPALTE_MAX)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
@@ -3026,13 +3033,17 @@ class VisualizerWindow(QMainWindow):
         # Fixtures-Reiter hoeher als ein Laptop-Bildschirm (768 px); ohne Scroll-
         # bereich wurde das Ende still abgeschnitten — gerade die Knoepfe, die man
         # am Rig braucht.
+        # VIZ-108: dasselbe gilt waagerecht. Mit „Balken nie“ wurde alles, was
+        # breiter ist als die Spalte, rechts still abgeschnitten (Reiter
+        # Einstellungen: die Zeile „aktiv: …“). Der Balken „nach Bedarf“ ist
+        # das Netz fuer grosse Schriften — lieber rollen als nicht erreichen.
         for _w, _name in ((self._build_fixture_tab(), "Fixtures"),
                           (self._build_stage_tab(), "Bühne"),
                           (self._build_settings_tab(), "Einstellungen")):
             _sa = QScrollArea()
             _sa.setWidgetResizable(True)
             _sa.setFrameShape(QFrame.Shape.NoFrame)
-            _sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            _sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             _sa.setWidget(_w)
             self._tabs.addTab(_sa, _name)
         # VIZ-14: der Tab waehlt das BAU-WERKZEUG (Fixtures/Bühne), nicht den
@@ -3381,15 +3392,23 @@ class VisualizerWindow(QMainWindow):
         self._spin_spalten.setRange(1, 30)
         self._spin_spalten.setToolTip("Spalten (nebeneinander, entlang der Breite)")
         raster.addWidget(self._spin_spalten)
-        raster.addWidget(QLabel("Abstand:"))
+        raster.addStretch(1)
+        add_grid.addLayout(raster)
+        # VIZ-108: der Abstand in einer eigenen Zeile. In EINER Zeile mit der
+        # Anzahl war sie breiter als die Spalte in ihrer vollen Breite — das
+        # Abstand-Feld war rechts abgeschnitten.
+        abstand = QHBoxLayout()
+        abstand.setSpacing(4)
+        abstand.addWidget(QLabel("Abstand:"))
         self._spin_abstand = LocaleTolerantDoubleSpinBox()
         self._spin_abstand.setRange(0.0, RASTER_ABSTAND_MAX_M)
         self._spin_abstand.setSingleStep(0.25)
         self._spin_abstand.setValue(1.0)
         self._spin_abstand.setSuffix(" m")
         self._spin_abstand.setToolTip("Freier Abstand zwischen den Objekten")
-        raster.addWidget(self._spin_abstand)
-        add_grid.addLayout(raster)
+        abstand.addWidget(self._spin_abstand)
+        abstand.addStretch(1)
+        add_grid.addLayout(abstand)
         layout.addWidget(add_box)
 
         # Properties
@@ -3512,15 +3531,24 @@ class VisualizerWindow(QMainWindow):
         self._combo_quality.setCurrentIndex(
             {"auto": 0, "high": 1, "low": 2, "max": 3}.get(tier_pref, 0))
         self._combo_quality.currentIndexChanged.connect(self._on_quality_tier_changed)
+        # VIZ-108: die Auswahl darf schmaler werden als ihr laengster Eintrag
+        # (die aufgeklappte Liste zeigt ihn ganz) — sonst bestimmt „Niedrig
+        # (schwache/mobile GPU)“ die Breite des ganzen Reiters.
+        self._combo_quality.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo_quality.setMinimumContentsLength(12)
         q_row.addWidget(self._combo_quality, 1)
+        q_layout.addLayout(q_row)
         # Wird über den Bridge-Slot reportGpuTier befüllt — zeigt die AKTIVE
         # Stufe der laufenden Szene (bei "Automatisch" = das Probe-Ergebnis).
+        # VIZ-108: eigene Zeile. Am Ende der Stufen-Zeile war sie das Erste,
+        # was rechts aus der Spalte fiel.
         self._lbl_gpu_tier = QLabel("aktiv: –")
+        self._lbl_gpu_tier.setWordWrap(True)
         self._lbl_gpu_tier.setToolTip(
             "Die gerade aktive Stufe der 3D-Szene. Bei 'Automatisch' ist das\n"
             "das Ergebnis der GPU-Erkennung dieses Rechners.")
-        q_row.addWidget(self._lbl_gpu_tier)
-        q_layout.addLayout(q_row)
+        q_layout.addWidget(self._lbl_gpu_tier)
         layout.addWidget(quality_group)
 
         # ── Helligkeit (NEU) ────────────────────────────────────────────────
@@ -3544,7 +3572,8 @@ class VisualizerWindow(QMainWindow):
         b_row.addWidget(self._lbl_brightness)
         bg_layout.addLayout(b_row)
 
-        ab_row = QHBoxLayout()
+        # VIZ-108: Haken und Knopf untereinander — nebeneinander waren sie
+        # breiter als die schmale Spalte.
         self._chk_auto_brightness = QCheckBox("Auto-Helligkeit im Bauen-Modus")
         self._chk_auto_brightness.setChecked(True)
         self._chk_auto_brightness.setToolTip(
@@ -3552,23 +3581,28 @@ class VisualizerWindow(QMainWindow):
             "Bauen-Modus wechselst, und zurück auf 20% im Ansehen-Modus."
         )
         self._chk_auto_brightness.toggled.connect(self._on_auto_brightness_toggled)
-        ab_row.addWidget(self._chk_auto_brightness)
+        bg_layout.addWidget(self._chk_auto_brightness)
         btn_auto = QPushButton("Auto-Werte anwenden")
         btn_auto.setFixedHeight(22)
         btn_auto.clicked.connect(self._on_auto_brightness_apply)
-        ab_row.addWidget(btn_auto)
-        bg_layout.addLayout(ab_row)
+        bg_layout.addWidget(btn_auto)
 
-        # Quick-Presets
-        preset_row = QHBoxLayout()
-        for label, val in [("Konzert (10%)", 10), ("Standard (20%)", 20),
-                           ("Probe (50%)", 50), ("Bearbeiten (75%)", 75),
-                           ("Vollhell (100%)", 100)]:
+        # Quick-Presets — VIZ-108: als Raster. Fuenf Knoepfe in EINER Zeile
+        # machten den Reiter breiter als die Spalte; alles rechts davon (auch
+        # „aktiv: …“ oben) wurde abgeschnitten.
+        preset_grid = QGridLayout()
+        self._helligkeit_presets = []
+        for nr, (label, val) in enumerate(
+                [("Konzert (10%)", 10), ("Standard (20%)", 20),
+                 ("Probe (50%)", 50), ("Bearbeiten (75%)", 75),
+                 ("Vollhell (100%)", 100)]):
             btn = QPushButton(label)
             btn.setFixedHeight(22)
             btn.clicked.connect(weak_slot(self._sld_brightness.setValue, val))
-            preset_row.addWidget(btn)
-        bg_layout.addLayout(preset_row)
+            preset_grid.addWidget(btn, nr // HELLIGKEIT_PRESETS_JE_ZEILE,
+                                  nr % HELLIGKEIT_PRESETS_JE_ZEILE)
+            self._helligkeit_presets.append(btn)
+        bg_layout.addLayout(preset_grid)
 
         layout.addWidget(brightness_group)
 
