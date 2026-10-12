@@ -333,6 +333,11 @@ class _FakeState:
         self.aktiv = {}
         self.global_calls = []
         self.output_manager.set_blackout = self.global_calls.append
+        # VCB-43: die Taste ohne Ziel HAELT den globalen Blackout auf einem
+        # eigenen Platz, statt den Schalter zu stellen. Fuer diese Tests zaehlt
+        # weiter nur: globaler Blackout an beim Druecken, aus beim Loslassen.
+        self.output_manager.halte_blackout = (
+            lambda _slot, an: self.global_calls.append(bool(an)))
 
     def set_target_blackout(self, slot, fids=(), groups=()):
         self.aktiv[slot] = (list(fids), list(groups))

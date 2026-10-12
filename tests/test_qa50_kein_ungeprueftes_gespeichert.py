@@ -169,6 +169,8 @@ class SpeichernMitLueckenTest(unittest.TestCase):
         stub.setWindowTitle = lambda _t: None
         stub._rebuild_recent_menu = lambda: None
         stub._backup_pre_viz11_show = lambda _p: None
+        # STAB-32: die Sicherung vor dem Ueberschreiben ist hier nicht Thema.
+        stub._sicherung_vor_ueberschreiben = lambda _p: None
         stub._state = types.SimpleNamespace()
 
         def kaputt():
