@@ -85,8 +85,15 @@ class DokuTest(unittest.TestCase):
         self.assertIn("**nicht** ab", fragment)
 
     def test_backlog_zeile(self):
-        backlog = (_REPO / "BACKLOG.md").read_text(encoding="utf-8")
-        zeile = next(z for z in backlog.splitlines() if z.startswith("| LAS-35 |"))
+        # PROC-20: Der Eintrag liegt als Fragment unter backlog.d/, bis er
+        # gesammelt ist; danach steht er als Zeile in BACKLOG.md.
+        fragment = _REPO / "backlog.d" / "LAS-35.md"
+        if fragment.exists():
+            zeile = fragment.read_text(encoding="utf-8")
+        else:
+            backlog = (_REPO / "BACKLOG.md").read_text(encoding="utf-8")
+            zeile = next(z for z in backlog.splitlines()
+                         if z.startswith("| LAS-35 |"))
         self.assertIn("nur Anzeige", zeile)
         self.assertIn("Am echten Laser", zeile)
 
