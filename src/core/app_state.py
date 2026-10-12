@@ -16,6 +16,7 @@ from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
 from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
+from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -1474,6 +1475,7 @@ class AppState:
             self._patch_cache = list(fixtures)
             self._rebuild_universes()
             clear_channel_cache()
+            self._laser_profile_bestimmen()      # LAS-38
             self._rebuild_render_plan()
             self._emit("patch_changed")
             return
@@ -1685,7 +1687,34 @@ class AppState:
             )
         self._rebuild_universes()
         clear_channel_cache()
+        self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
+
+    def _laser_profile_bestimmen(self):
+        """LAS-38: je Profil der gepatchten Geraete EINMAL bestimmen, ob
+        irgendeiner seiner Modi einen Laserkanal hat — beim Patchen und Laden,
+        vor dem Render-Plan. Der Plan (und jede andere Sicherheits-Stelle)
+        liest danach nur noch die gemerkte Antwort aus ``laser.erkennung``.
+
+        Eine Abfrage fuer alle noch unbekannten Profile zusammen. Schlaegt sie
+        fehl, bleibt die Antwort offen: ``erkennung`` fragt dann beim ersten
+        Bedarf je Profil nach (``_profil_hat_laserkanal``) — der Patch darf an
+        dieser Stelle nie scheitern.
+        """
+        offen = set()
+        for fx in getattr(self, "_patch_cache", None) or ():
+            profil_id = getattr(fx, "fixture_profile_id", None)
+            if profil_id is not None and not laser_erkennung.profil_bekannt(profil_id):
+                offen.add(profil_id)
+        if not offen:
+            return
+        try:
+            antworten = _profile_mit_laserkanal(offen)
+        except Exception as e:
+            debug_swallow("app_state.laser_profile_bestimmen", e)
+            return
+        for profil_id, hat_laser in antworten.items():
+            laser_erkennung.merke_profil(profil_id, hat_laser)
 
     def profil_geaendert(self, profile_id=None) -> bool:
         """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
@@ -5568,6 +5597,62 @@ def clear_channel_cache():
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
     _head_map_cache.clear()
     _cached_channel_list_ids.clear()
+    # LAS-38: ob ein Profil in irgendeinem Modus einen Laser traegt, haengt an
+    # denselben Profildaten — ein im Editor ergaenzter Laserkanal muss gelten.
+    laser_erkennung.vergiss_profile()
+
+
+def _profile_mit_laserkanal(profil_ids) -> dict:
+    """LAS-38: ``{profil_id: bool}`` — hat das Profil in IRGENDEINEM Modus einen
+    Laserkanal (Attribut ``laser_*`` oder „Laser“ im Kanalnamen) oder den Typ
+    ``laser``?
+
+    Eine Sitzung, zwei Abfragen fuer alle gefragten Profile zusammen; gelesen
+    werden nur Name und Attribut der Kanaele. Ein Profil, das es in der
+    Geraete-Datenbank nicht gibt, bekommt ``False`` (es hat keine Kanaele).
+    """
+    ids = [i for i in profil_ids if i is not None]
+    if not ids:
+        return {}
+    from sqlalchemy import select
+    from .database.fixture_db import engine
+    from .database.models import FixtureChannel, FixtureMode, FixtureProfile
+    antwort = {i: False for i in ids}
+    with Session(engine()) as s:
+        for profil_id, typ in s.execute(
+                select(FixtureProfile.id, FixtureProfile.fixture_type)
+                .where(FixtureProfile.id.in_(ids))).all():
+            if (typ or "").strip().lower() == "laser":
+                antwort[profil_id] = True
+        for profil_id, name, attribute in s.execute(
+                select(FixtureMode.fixture_id, FixtureChannel.name,
+                       FixtureChannel.attribute)
+                .join(FixtureChannel, FixtureChannel.mode_id == FixtureMode.id)
+                .where(FixtureMode.fixture_id.in_(ids))).all():
+            if antwort.get(profil_id):
+                continue
+            if laser_erkennung.ist_laserkanal(
+                    _KanalAngabe(name or "", attribute or "")):
+                antwort[profil_id] = True
+    return antwort
+
+
+class _KanalAngabe:
+    """Name und Attribut eines Kanals — mehr braucht ``ist_laserkanal`` nicht."""
+
+    __slots__ = ("name", "attribute")
+
+    def __init__(self, name, attribute):
+        self.name = name
+        self.attribute = attribute
+
+
+def _profil_hat_laserkanal(profil_id):
+    """Quelle fuer ``laser.erkennung``: ein einzelnes, noch unbekanntes Profil."""
+    return _profile_mit_laserkanal([profil_id]).get(profil_id)
+
+
+laser_erkennung.setze_profil_quelle(_profil_hat_laserkanal)
 
 
 # FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der
