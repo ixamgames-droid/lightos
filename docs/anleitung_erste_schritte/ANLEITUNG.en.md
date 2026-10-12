@@ -242,8 +242,9 @@ restore it.
 `sicherungen` (backups) folder inside the LightOS data folder: on every auto-save, before
 every save that overwrites an existing file, and before you discard unsaved changes (new
 show, opening another show, quitting). **Datei → Ältere Version öffnen…** (open older
-version) lists the backups of the current show with date, time, reason, size and the
-number of fixtures and functions; tick **Sicherungen aller Shows anzeigen** (show backups
+version) lists the backups of the current show with date, time to the second (with a
+running number if several fall into the same second), reason, size and the number of
+fixtures and functions; tick **Sicherungen aller Shows anzeigen** (show backups
 of all shows) to see the others as well. **Öffnen** (open) loads the selected version as
 a new, unsaved show — the window title then reads `Name (Sicherung vom …)`. Your show
 file and the backup stay untouched; the old version is only kept once you store it with

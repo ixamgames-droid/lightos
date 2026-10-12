@@ -90,7 +90,8 @@ class SicherungenDialog(QDialog):
         t = self._tabelle
         t.setRowCount(len(self._eintraege))
         for zeile, e in enumerate(self._eintraege):
-            werte = (e.zeit_text, e.show, e.anlass_text, groesse_text(e.groesse), "…")
+            # UI-92: mit Sekunden (und laufender Nummer) — s. ``zeit_genau``.
+            werte = (e.zeit_genau, e.show, e.anlass_text, groesse_text(e.groesse), "…")
             for spalte, text in enumerate(werte):
                 item = QTableWidgetItem(text)
                 if spalte == _SP_GROESSE:

@@ -153,6 +153,14 @@ _STANDARD_AKTION = {
     "Ctrl+Shift+Z": "Wiederholen", "Del": "Löschen",
 }
 
+#: UI-92: Kuerzel, die als ``QShortcut`` OHNE Beschreibung angelegt sind und
+#: deren Quelltext gerade nicht angefasst werden soll (der Laser-NOT-AUS wird
+#: in LAS-36 umgebaut). Sobald das steht, gehoert die Beschreibung per
+#: ``setWhatsThis`` an das Kuerzel selbst — dann wird dieser Eintrag ueberfluessig.
+_BEKANNTE_KUERZEL = {
+    "Ctrl+Shift+L": "Laser NOT-AUS auslösen",
+}
+
 #: Aktionstexte, die fuer sich allein zu knapp sind.
 _AKTION_KLARTEXT = {
     ("Datei", "Speichern"): "Show speichern",
@@ -243,6 +251,7 @@ def sammle_tastenkuerzel(wurzeln, bereiche=None) -> list[Kuerzel]:
         for sc in wurzel.findChildren(QShortcut):
             portabel = sc.key().toString(QKeySequence.SequenceFormat.PortableText)
             aktion = (sc.whatsThis() or sc.objectName()
+                      or _BEKANNTE_KUERZEL.get(portabel)
                       or _STANDARD_AKTION.get(portabel, "(ohne Beschreibung)"))
             _dazu(tasten_text(sc.key()), _sauber(aktion),
                   _fenster_bereich(sc.parent(), bereiche))

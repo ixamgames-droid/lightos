@@ -2907,14 +2907,18 @@ class VisualizerWindow(QMainWindow):
             n = self._combo_edit.count()
             self._combo_edit.setCurrentIndex((self._combo_edit.currentIndex() + 1) % n)
 
-        for key, fn in (
-            ("V", _toggle_view),
-            ("E", _cycle_edit),
-            ("F", self._on_key_f),
-            ("S", lambda: self._tabs.setCurrentIndex(1)),
-            ("D", lambda: self._act_dock.toggle()),
+        # UI-92: mit Beschreibung — der Tastenkuerzel-Dialog (Hilfe) zeigte
+        # diese fuenf als „(ohne Beschreibung)“.
+        for key, fn, was in (
+            ("V", _toggle_view, "Ansicht umschalten: 3D / 2D"),
+            ("E", _cycle_edit, "Modus umschalten: Ansehen / Bauen"),
+            ("F", self._on_key_f,
+             "Auswahl einpassen (Fokus in der 3D-Ansicht), sonst Reiter Fixtures"),
+            ("S", lambda: self._tabs.setCurrentIndex(1), "Reiter Bühne zeigen"),
+            ("D", lambda: self._act_dock.toggle(), "Andocken ein/aus"),
         ):
             sc = QShortcut(QKeySequence(key), self)
+            sc.setWhatsThis(was)
             sc.activated.connect(fn)
 
         # VIZ-11 (Schritt 6): Strg+Z/Y muss auch im eigenstaendigen

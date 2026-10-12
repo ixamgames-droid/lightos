@@ -37,6 +37,47 @@ from src.ui.weak_slots import weak_slot
 
 
 # Recent files storage
+_QtMessageBox = QMessageBox
+
+
+class QMessageBox(_QtMessageBox):          # noqa: F811 — bewusst derselbe Name
+    """UI-92: ``question`` mit FESTEN Beschriftungen fuer Speichern / Verwerfen /
+    Abbrechen.
+
+    ``QMessageBox.question`` nimmt die Texte der Standard-Knoepfe vom
+    Betriebssystem. Unter Linux heisst „Discard“ je nach Oberflaeche
+    „Schließen ohne zu Speichern“ — der Knopf der Speichern-Frage war damit
+    abgeschnitten, und die Anleitung nennt ihn „Verwerfen“ (Bedientest QA-96).
+    Hier heissen die drei Knoepfe ueberall gleich, und zwar so wie in der
+    Anleitung.
+
+    Als Unterklasse unter demselben Namen, damit jede Frage des Hauptfensters
+    sie bekommt und die Stelle, an der Tests die Antwort einsetzen
+    (``main_window.QMessageBox.question``), dieselbe bleibt. Alles andere
+    (``information``, ``warning``, ``StandardButton`` …) ist unveraendert Qt.
+    """
+
+    FESTE_TEXTE = (
+        (_QtMessageBox.StandardButton.Save, "Speichern"),
+        (_QtMessageBox.StandardButton.Discard, "Verwerfen"),
+        (_QtMessageBox.StandardButton.Cancel, "Abbrechen"),
+    )
+
+    @staticmethod
+    def question(parent, title, text,
+                 buttons=(_QtMessageBox.StandardButton.Yes
+                          | _QtMessageBox.StandardButton.No),
+                 defaultButton=_QtMessageBox.StandardButton.NoButton):
+        box = _QtMessageBox(_QtMessageBox.Icon.Question, title, text, buttons, parent)
+        for knopf, beschriftung in QMessageBox.FESTE_TEXTE:
+            b = box.button(knopf)
+            if b is not None:
+                b.setText(beschriftung)
+        if defaultButton != _QtMessageBox.StandardButton.NoButton:
+            box.setDefaultButton(defaultButton)
+        return _QtMessageBox.StandardButton(box.exec())
+
+
 def _recent_files_path() -> str:
     base = app_data_dir()
     try:

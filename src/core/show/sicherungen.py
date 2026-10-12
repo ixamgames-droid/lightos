@@ -119,6 +119,9 @@ class Sicherung:
     zeit: datetime.datetime
     anlass: str
     groesse: int
+    #: UI-92: laufende Nummer innerhalb derselben Sekunde (aus dem Dateinamen,
+    #: ``…-2__anlass.lshow``); die erste hat 1.
+    nr: int = 1
 
     @property
     def anlass_text(self) -> str:
@@ -127,6 +130,16 @@ class Sicherung:
     @property
     def zeit_text(self) -> str:
         return self.zeit.strftime("%d.%m.%Y %H:%M")
+
+    @property
+    def zeit_genau(self) -> str:
+        """UI-92: fuer die Liste „Ältere Version öffnen“ — mit Sekunden, und
+        mit laufender Nummer, wenn mehrere Sicherungen in dieselbe Sekunde
+        fielen. Mit ``zeit_text`` (nur die Minute) waren zwei Sicherungen
+        derselben Minute — Speichern, gleich darauf Verwerfen — nicht zu
+        unterscheiden."""
+        text = self.zeit.strftime("%d.%m.%Y %H:%M:%S")
+        return f"{text} ({self.nr})" if self.nr > 1 else text
 
 
 def _lies_eintrag(ordner: str, name: str) -> Sicherung | None:
@@ -139,7 +152,8 @@ def _lies_eintrag(ordner: str, name: str) -> Sicherung | None:
     except (ValueError, OSError):
         return None
     return Sicherung(os.path.join(ordner, name), m.group("show"), zeit,
-                     m.group("anlass") or "", groesse)
+                     m.group("anlass") or "", groesse,
+                     int(m.group("nr") or 1))
 
 
 def liste_sicherungen(show: str | None = None,
@@ -159,7 +173,10 @@ def liste_sicherungen(show: str | None = None,
         e = _lies_eintrag(ordner, name)
         if e is not None and (stamm is None or e.show == stamm):
             raus.append(e)
-    raus.sort(key=lambda e: (e.zeit, e.pfad), reverse=True)
+    # UI-92: innerhalb derselben Sekunde nach der laufenden Nummer — der Pfad
+    # allein sortierte „…-2__“ VOR „…__“ (Bindestrich vor Unterstrich), die
+    # juengere Sicherung stand also unter der aelteren.
+    raus.sort(key=lambda e: (e.zeit, e.nr, e.pfad), reverse=True)
     return raus
 
 

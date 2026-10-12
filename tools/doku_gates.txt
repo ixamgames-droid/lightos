@@ -35,6 +35,7 @@ test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
 test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
 test_las25_doku_aus_werte.py
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
+test_ui92_kleinkram_qa96.py        # Speichern-Frage: Knopfnamen wie in anleitung_erste_schritte
 test_ui64_programmer_playback.py
 test_viz69_render_ruckler.py       # Wortlaut in ANLEITUNG_3D_BUEHNE.md
 test_viz71_qualitaetsstufen.py
