@@ -197,6 +197,36 @@ hier — ein Laser bekommt also nicht einfach überall 0:
   ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man
   bei Lasern deshalb nach einem Blackout nicht unbedingt überall 0.
 
+### Was als Laser gilt (für NOT-AUS, Blackout und „Alles Weiß“)
+
+An diesen Stellen behandelt LightOS ein Gerät als Laser, wenn **eines** davon
+zutrifft:
+
+- der Gerätetyp ist „Laser“,
+- es hat einen Laser-Kanal (Muster, X/Y, Laserfarbe …),
+- ein Kanal trägt „Laser“ im Namen – z. B. „Laser: Red“ an einem Lichtset oder
+  „Laser Helligkeit“ an einem Moving Head,
+- „Laser“ steht im Geräte-, Hersteller- oder Patch-Namen.
+
+Für alle gilt dasselbe: **LASER NOT-AUS** und **Blackout** schalten das
+**ganze** Gerät dunkel (bei einem Lichtset also auch Derby und Strahler),
+**„Alles Weiß“** lässt es aus. Wird ein Gerät nur über einen Namen erkannt, sagt
+LightOS das beim Patchen in der Statusleiste. Der Tooltip des NOT-AUS-Knopfs
+nennt die Zahl der erkannten Laser – steht dort **0**, schaltet der Knopf über
+DMX nichts dunkel.
+
+- **Lösen des NOT-AUS:** an keinem dieser Geräte durch einen Wert – weder ein
+  Muster-Abruf am Laser noch ein Gobo- oder Shutter-Wert an einem Moving Head
+  mit Laserdiode. Gelöst wird nur über den Knopf **LASER NOT-AUS** mit
+  Rückfrage.
+- **Grenze:** Erkannt wird am gepatchten Modus. Ein Kombigerät in einem
+  Kurz-Modus ohne eigenen Laserkanal (z. B. Chauvet GigBAR 2 im 3-Kanal-Modus,
+  Cameo Multi FX Bar im 2-Kanal-Modus – der Laser läuft dort über
+  Automatikprogramme) gilt nur als Laser, wenn Typ oder Name es sagen. Wer so
+  ein Gerät im Kurz-Modus betreibt, nimmt „Laser“ in den Patch-Namen auf.
+- Der **Laser-Tab** erscheint weiterhin nur für Geräte vom Typ „Laser“ oder mit
+  Laser-Kanälen.
+
 ### Laser-EFX (Bewegung)
 
 - Ein EFX bewegt bei Lasern die Achsen **„X-Bewegung“/„Y-Bewegung“**

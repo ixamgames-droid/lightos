@@ -15,6 +15,7 @@ from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
+from .laser.erkennung import ist_laser, ist_laserkanal
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -854,6 +855,17 @@ class AppState:
             bound = next(
                 (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
             )
+            # LAS-37: gilt das Geraet NUR ueber einen Namen als Laser (Lichtset
+            # mit „Laser: Red“, Moving Head mit Laserdiode), das beim Patchen
+            # sagen — NOT-AUS und Blackout schalten dann das GANZE Geraet dunkel.
+            try:
+                if bound is not None:
+                    from .laser.erkennung import hinweis_text
+                    laser_hinweis = hinweis_text(bound, get_channels_for_patched(bound))
+                    if laser_hinweis:
+                        self._emit("hinweis", laser_hinweis)
+            except Exception as e:
+                debug_swallow("app_state.add_fixture.laser_hinweis", e)
             # FM-HEADLAYOUT: head_mode == "single" ("als EINE Lampe") unterdrueckt
             # die automatische Kopf-Matrix-Gruppe. "auto" (Default, Alt-Shows) und
             # "heads" legen sie wie bisher an.
@@ -1698,12 +1710,13 @@ class AppState:
             # ihre Platzhalter-Adresse darf nie ins Live-Universe committen.
             if not fixture_uses_dmx(fx):
                 continue
-            # UXT-12: DMX-Laser erkennen (fixture_type 'laser' ODER laser_*-Kanäle
-            # — dieselbe Definition wie capability.is_laser_fixture, aber mit den
-            # schon geladenen chans, ohne Zweit-Load).
-            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
-                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
-                               for ch in chans))
+            # UXT-12/LAS-37: DMX-Laser erkennen — die EINE, weite Regel aller
+            # Sicherheits-Stellen (laser.erkennung: Typ, laser_*-Kanal, „Laser“
+            # im Kanal- oder Geraetenamen), mit den schon geladenen chans. Die
+            # NOT-AUS-Maske deckt ALLE Adressen eines erkannten Geraets — auch
+            # bei einem Lichtset, dessen Laser nur zwei Kanaele belegt: lieber
+            # das ganze Geraet dunkel als ein Laserkanal, den niemand kannte.
+            is_laser = ist_laser(fx, chans)
             if is_laser:
                 laser_fids.add(fx.fid)
             for ch in chans:
@@ -2569,6 +2582,13 @@ class AppState:
         except Exception:
             pass
         return len(fids)
+
+    def laser_universen(self) -> frozenset:
+        """LAS-37: die DMX-Universen, in denen ein als Laser erkanntes Geraet
+        steht (dieselbe Erkennung wie die NOT-AUS-Maske) — fuer Sperren, die ein
+        ganzes Universum betreffen, z. B. ein Testsignal."""
+        adressen = getattr(self, "_laser_estop_addrs", {}) or {}
+        return frozenset(u for u, a in adressen.items() if a)
 
     def _channels_for_fid(self, fid: int):
         """Kanalliste des gepatchten Fixtures — oder ``None``, wenn es (noch)
@@ -4979,6 +4999,18 @@ class AppState:
             return 0
         return None
 
+    @staticmethod
+    def _raw_laser_aus_wert(ch) -> int:
+        """LAS-37: „aus“ eines Roh-Kanals mit „Laser“ im Namen: die Untergrenze
+        eines Bereichs der Art ``closed``, sonst 0."""
+        for rg in getattr(ch, "ranges", None) or ():
+            if (getattr(rg, "kind", "") or "").lower() == "closed":
+                try:
+                    return max(0, min(255, int(rg.range_from)))
+                except (TypeError, ValueError):
+                    continue
+        return 0
+
     def _build_gm_laser_aus_mask(self, fix_index) -> dict[int, dict[int, int]]:
         """LAS-24: ``{universum: {adresse: aus_wert}}`` fuer DMX-Laser, die der
         Grand Master ueber Dimmer/Farbe nicht (sicher) erreicht.
@@ -4996,17 +5028,22 @@ class AppState:
         for _fid, (fx, chans) in fix_index.items():
             if not fixture_uses_dmx(fx):
                 continue
-            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
-                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
-                               for ch in chans))
-            if not is_laser:
+            if not ist_laser(fx, chans):           # LAS-37: dieselbe Regel wie der NOT-AUS
                 continue
             nur_eindeutig = bool(self._fixture_intensity_addrs(fx, chans))
             for ch in chans:
                 attr = (getattr(ch, "attribute", "") or "").lower()
-                if attr not in self._GM_LASER_AUS_ATTRS:
+                if attr in self._GM_LASER_AUS_ATTRS:
+                    wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
+                elif attr == "raw" and ist_laserkanal(ch):
+                    # LAS-37: ein Roh-Kanal, der „Laser“ im Namen traegt (KLS
+                    # Laser Bar „Laser: Red“, Multi FX Bar „Laser Red Strobe“),
+                    # ist Helligkeit oder Takt des Lasers — „aus“ ist dort 0,
+                    # sofern das Profil nicht ausdruecklich einen geschlossenen
+                    # Bereich nennt.
+                    wert = self._raw_laser_aus_wert(ch)
+                else:
                     continue
-                wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
                 if wert is None:
                     continue
                 try:
