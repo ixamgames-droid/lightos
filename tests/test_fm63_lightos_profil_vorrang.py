@@ -353,7 +353,9 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
         self._spielen(_datei())
         self.neu = self._lightos_id()
         show_file._ladeprobleme.clear()
+        show_file._ladehinweise.clear()     # STAB-37: Dubletten-Hinweise
         self.addCleanup(show_file._ladeprobleme.clear)
+        self.addCleanup(show_file._ladehinweise.clear)
 
     def _patch(self, pid: int) -> dict:
         return {"fid": 1, "label": "Par", "fixture_profile_id": pid,
@@ -365,6 +367,7 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
         pf = self.sf._patched_fixture_from_data(self._patch(self.alt), 1)
         self.assertEqual(pf.fixture_profile_id, self.alt)
         self.assertEqual(self.sf.letzte_ladeprobleme(), [])
+        self.assertEqual(self.sf.letzte_ladehinweise(), [])   # auch keine Dublette
         modi = {m.name: m for m in FDB.get_modes(self.alt)}
         self.assertIn("3 Kanal", modi)
         self.assertEqual([c.attribute for c in FDB.get_channels(modi["3 Kanal"].id)],
@@ -379,6 +382,7 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
         pf = self._fremd("4-Kanal", 4)
         self.assertEqual(pf.fixture_profile_id, self.neu)
         self.assertEqual(self.sf.letzte_ladeprobleme(), [])
+        self.assertEqual(self.sf.letzte_ladehinweise(), [])   # auch keine Dublette
 
     def test_fremde_id_mit_modus_nur_im_import_landet_beim_import(self):
         """Review FM-63 (HOCH): das LightOS-Profil hat „3 Kanal“ nicht —
@@ -386,6 +390,7 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
         pf = self._fremd("3 Kanal", 3)
         self.assertEqual(pf.fixture_profile_id, self.alt)
         self.assertEqual(self.sf.letzte_ladeprobleme(), [])
+        self.assertEqual(self.sf.letzte_ladehinweise(), [])   # auch keine Dublette
 
     def test_nur_kanalzahl_passt(self):
         pf = self._fremd("Anders benannt", 3)
@@ -407,8 +412,10 @@ class C_BestehenderPatchLaedtWeiter(_Basis):
                      attrs=("intensity", "color_r", "color_g", "color_b"))
         pf = self._fremd("4-Kanal", 4)
         self.assertEqual(pf.fixture_profile_id, self.neu)
-        self.assertTrue(any("Dublette" in p for p in self.sf.letzte_ladeprobleme()),
-                        self.sf.letzte_ladeprobleme())
+        # STAB-37: gewarnt wird als Hinweis — gelesen ist alles.
+        self.assertTrue(any("Dublette" in p for p in self.sf.letzte_ladehinweise()),
+                        self.sf.letzte_ladehinweise())
+        self.assertEqual(self.sf.letzte_ladeprobleme(), [])
 
 
 class E_ShowbuilderStrict(_Basis):

@@ -87,6 +87,38 @@ def _prune_ghost_placeholder_nodes(scene) -> None:
 # angefasst; hier reicht ein Ort. `load_show` leert die Liste am Anfang.
 _ladeprobleme: list[str] = []
 
+# ★ STAB-37: Hinweise zum Laden, bei denen von der Show NICHTS verworfen wurde.
+#
+# Der Sammler oben ist der fuer Verluste — die Oberflaeche haengt daran die
+# Warnung „Speichern schreibt den Verlust fest“. Ein Satz, der dort nicht
+# hingehoert, macht aus einer vollstaendig geladenen Show einen Schadensfall:
+# die Demo „Große Bühnen-Show“ meldete auf einem Rechner mit gewachsener
+# Geraete-Bibliothek „40 Teile konnten nicht gelesen werden“, vierzigmal
+# „… steht 2× in der Geraetebibliothek“ (einmal je PAR). Gelesen war alles, und
+# gewaehlt das richtige Profil.
+#
+# ``{Text: Anzahl}`` in Einfuegereihenfolge: derselbe Satz fuer vierzig Geraete
+# ist EIN Hinweis. ``load_show`` leert auch diesen Sammler am Anfang.
+_ladehinweise: dict[str, int] = {}
+
+
+def _ladehinweis(text: str) -> None:
+    """Einen Hinweis vormerken (STAB-37) — gleiche Texte zaehlen hoch."""
+    if text not in _ladehinweise:
+        print(f"[show_file] Hinweis: {text}")
+    _ladehinweise[text] = _ladehinweise.get(text, 0) + 1
+
+
+def letzte_ladehinweise() -> list[str]:
+    """Hinweise des letzten :func:`load_show`, bei denen nichts verloren ging
+    (STAB-37) — heute: ein Profil steht mehrfach in der Geraete-Bibliothek.
+
+    Einmal je Text; betrifft er mehrere Geraete, steht die Zahl dahinter. Die
+    Oberflaeche zeigt sie in der Statuszeile bzw. getrennt unter den echten
+    Ladeproblemen, nie als Verlust."""
+    return [text if anzahl == 1 else f"{text} (betrifft {anzahl} Geräte)"
+            for text, anzahl in _ladehinweise.items()]
+
 
 #: STAB-24 (c): Was ``save_show`` beim Einsammeln NICHT in die Datei bekam.
 #: Die Speichern-Aktion der Oberflaeche haengt es an ihre Lueckenliste
@@ -415,6 +447,13 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     Meldeweg: der Fall gehoert in denselben Dialog wie ein nicht lesbarer
     Show-Block, und ein zweiter Kanal waere ein zweiter, der uebersehen wird.
 
+    ★ **STAB-37: die Dublette selbst ist ein HINWEIS, kein Ladeproblem.** Wird
+    eindeutig und mit passendem Modus gewaehlt, ist von der Show nichts
+    verworfen — die Meldung „steht 2× in der Geraetebibliothek“ geht deshalb
+    in ``_ladehinweise`` (dieselbe Stelle der Oberflaeche, aber nicht unter
+    „Speichern schreibt den Verlust fest“). Die drei Ausgaenge oben bleiben
+    Ladeprobleme.
+
     ★★ **Und die Mehrdeutigkeit wird nicht mehr von der Einfuegereihenfolge
     entschieden.** Bisher gewann ``order_by(FixtureProfile.id).first()`` —
     also **immer der aeltere Import** statt des gepflegten Builtins. In der
@@ -550,7 +589,11 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     # Mehrdeutig: gemeldet, nicht verschwiegen. Der Mensch sieht
                     # sonst ein Geraet, das *fast* stimmt, und sucht den Fehler
                     # ueberall — nur nicht in der Bibliothek.
-                    _ladeprobleme.append(
+                    # STAB-37: als HINWEIS. Der Modus passt (sonst steht oben
+                    # ein Ladeproblem), von der Show ist nichts verworfen — im
+                    # Verlust-Sammler machte der Satz aus jeder Show mit einem
+                    # doppelt vorhandenen Profil einen Schadensfall.
+                    _ladehinweis(
                         f"„{_geraet}“ steht {len(andere) + 1}× in der Geraetebibliothek — "
                         f"genommen wurde Profil {resolved} "
                         f"({gewaehlt[1] or 'ohne Herkunft'}). Wenn das Geraet falsch "
@@ -1908,6 +1951,7 @@ def _load_show_impl(path: str | os.PathLike):
     from src.core.engine.cue_stack import CueStack
 
     _ladeprobleme.clear()   # QA-50: Sammler gehoert diesem Ladevorgang
+    _ladehinweise.clear()   # STAB-37: der fuer Hinweise ebenso
 
     try:
         with zipfile.ZipFile(path, "r") as zf:
