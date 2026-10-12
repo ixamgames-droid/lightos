@@ -155,8 +155,10 @@ sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
   im Programmer — **Assistent** („Effekt-Assistent…", „+ Szene", „+ Chaser",
   „Programmer → Szene" sowie eine Funktionsliste mit „Start"/„Stop"; mehr in §5),
   **EFX** (Pan/Tilt-Figuren für Moving Heads), **Matrix** (Pixel-/Farbeffekte)
-  und **Paletten** (gespeicherte Attributwerte). EFX und Matrix folgen der
-  aktuellen Auswahl — erst Geräte/Gruppe wählen, dann den Effekt. Schritt für
+  und **Paletten** (gespeicherte Attributwerte). Ein neuer EFX und eine neue
+  Matrix nehmen die aktuelle Auswahl — erst Geräte/Gruppe wählen, dann den
+  Effekt anlegen; ein gespeicherter Effekt ändert seine Geräte nur über
+  **Auswahl übernehmen**. Schritt für
   Schritt: [EFFEKTE.md](EFFEKTE.md).
 
 ![Programmer – Color-Editor mit Farbwähler](tutorial_matrix/web/m1_color_editor.png)
