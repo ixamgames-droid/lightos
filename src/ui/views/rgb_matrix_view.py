@@ -28,7 +28,10 @@ from src.ui.head_cell_colors import (
 # alle Farb-Sequenz-Steuerungen beieinander stehen (statt verstreut im Bewegungs-
 # Block). engineseitig (list_params/VC) bleiben sie unveraendert verfuegbar.
 _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
-                                  "color_order", "color_interval"})
+                                  "color_order", "color_interval",
+                                  # ENG-37: Schrittweite des Lauflichts — festes
+                                  # Feld neben der Richtung, nur ein-/ausgeblendet.
+                                  "runner_step"})
 
 
 def _show_laedt() -> bool:
@@ -1212,6 +1215,22 @@ class RgbMatrixView(QWidget):
         dir_form = QFormLayout()
         dir_form.setSpacing(6)
         dir_form.addRow(self._dir_label, self._dir_combo)
+        # ENG-37: Schrittweite des Lauflichts als FESTES Feld (wird nie neu
+        # gebaut, nur ein-/ausgeblendet — STAB-38). 1 = Lampe fuer Lampe wie
+        # bisher; 0 = „wie Breite“ (erst 1+2, dann 3+4 …).
+        self._runner_step_spin = QSpinBox()
+        self._runner_step_spin.setRange(0, 16)
+        self._runner_step_spin.setSpecialValueText("wie Breite")
+        self._runner_step_spin.setValue(1)
+        self._runner_step_spin.setToolTip(
+            "Um wie viele Lampen der Läufer je Schritt weiterspringt.\n"
+            "1 = Lampe für Lampe (wie bisher). „wie Breite“ = Block an Block: "
+            "bei Läufer-Breite 2 erst Lampe 1+2, dann 3+4, dann 5+6 …")
+        self._runner_step_spin.valueChanged.connect(self._param_change)
+        self._runner_step_label = QLabel("Schrittweite:")
+        dir_form.addRow(self._runner_step_label, self._runner_step_spin)
+        self._runner_step_label.setVisible(False)
+        self._runner_step_spin.setVisible(False)
         pbl.addLayout(dir_form)
         # STAB-38: die dynamischen Felder sitzen in einem eigenen Traeger-Widget,
         # das beim Neuaufbau als Ganzes ersetzt wird (_neues_param_formular).
@@ -1455,6 +1474,7 @@ class RgbMatrixView(QWidget):
         has_dir = richtung_wirkt(algo, cur_p)
         self._dir_label.setVisible(has_dir)
         self._dir_combo.setVisible(has_dir)
+        self._apply_runner_step_visibility(algo)
         # Style + aktuelle Werte bestimmen, welche Specs relevant sind.
         style_value = self._style_combo.currentText()
         cur_params = dict(self._current.params) if self._current is not None else {}
@@ -1519,6 +1539,20 @@ class RgbMatrixView(QWidget):
             self._param_widgets[spec.key] = w
         self._param_box.setVisible(True)
 
+    def _apply_runner_step_visibility(self, algo=None):
+        """ENG-37: Feld „Schrittweite“ nur beim Lauflicht mit linearer Bewegung
+        (normal/Ping-Pong) zeigen. Reines Ein-/Ausblenden eines festen Feldes."""
+        if algo is None:
+            try:
+                algo = RgbAlgorithm(self._algo_combo.currentText())
+            except ValueError:
+                algo = None
+        params = self._current.params if self._current is not None else {}
+        sichtbar = (algo == RgbAlgorithm.CHASE and
+                    str(params.get("movement", "normal")) in ("normal", "bounce"))
+        self._runner_step_label.setVisible(sichtbar)
+        self._runner_step_spin.setVisible(sichtbar)
+
     def _load_params_into_widgets(self, m):
         """Laedt die gespeicherten Param-Werte in die dynamisch erstellten Felder.
         Iteriert nur die tatsaechlich gebauten (style-/bedingungs-relevanten) Specs."""
@@ -1580,14 +1614,14 @@ class RgbMatrixView(QWidget):
         self._cb_modify.setEnabled(erlaubt)
         self._cb_modify.setToolTip(
             "Der Effekt setzt seine Werte nicht, sondern verrechnet sie mit dem, "
-            "was darunter läuft (addieren, abziehen, abdunkeln)."
+            "was die Lampe gerade tut (addieren, abziehen, abdunkeln)."
             if erlaubt else
             "Modify-Effekte gibt es bisher nur im Stil „Dimmer“.")
         aktiv = erlaubt and self._cb_modify.isChecked()
         self._grp_modify.setVisible(aktiv)
-        hinweis = ("Wirkt auf laufende Effekte gleicher oder niedrigerer "
-                   "Priorität — nicht auf Snaps und Programmer. Als Chaser-Schritt "
-                   "läuft er wie ein normaler Effekt.")
+        hinweis = ("Wirkt auf das, was die Lampe gerade tut — Effekte, Cuelisten, "
+                   "Snaps und Grundhelligkeit — und vor den Mastern (Fader, "
+                   "Grand Master, Blackout). Als Chaser-Schritt ist er gesperrt.")
         if aktiv and self._imin_spin.value() > 0:
             hinweis = ("Dimmer-Bereich „Min“ steht über 0: jede Lampe bekommt "
                        "diesen Grundbetrag ab. " + hinweis)
@@ -1748,6 +1782,13 @@ class RgbMatrixView(QWidget):
             self._color_interval_spin.blockSignals(True)
             self._color_interval_spin.setValue(int(m.params.get("color_interval", 1)))
             self._color_interval_spin.blockSignals(False)
+            # ENG-37: Schrittweite (festes Feld).
+            self._runner_step_spin.blockSignals(True)
+            try:
+                self._runner_step_spin.setValue(int(m.params.get("runner_step", 1)))
+            except (TypeError, ValueError):
+                self._runner_step_spin.setValue(1)
+            self._runner_step_spin.blockSignals(False)
             # ENG-08: Dimmer-Sequenz an die Draft-Sequence binden + Checkbox laden.
             self._dimmer_seq_editor.set_sequence(m.dimmer_levels)
             self._cb_dimmer_cycle.blockSignals(True)
@@ -1850,6 +1891,13 @@ class RgbMatrixView(QWidget):
         # Style + CHASE schreiben, damit fremde Algorithmen/Styles keinen toten Key
         # bekommen (und sich Farb-/Dimmer-Zyklus nicht gegenseitig setzen).
         if self._current.algorithm == RgbAlgorithm.CHASE:
+            # ENG-37: Schrittweite. Die Vorgabe 1 wird NICHT gespeichert — eine
+            # Show ohne Schrittweite bleibt auch nach dem Bearbeiten byte-gleich.
+            _sw = self._runner_step_spin.value()
+            if _sw == 1:
+                self._current.params.pop("runner_step", None)
+            else:
+                self._current.params["runner_step"] = _sw
             if self._current.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
                 self._current.params["color_cycle"] = self._cb_color_cycle.isChecked()
                 # #6: abhaengige Farb-Cycle-Regler (fest in der Farben-Gruppe).
@@ -1884,6 +1932,10 @@ class RgbMatrixView(QWidget):
         if new_keys != list(self._param_widgets.keys()):
             self._rebuild_param_fields(algo)
             self._load_params_into_widgets(self._current)
+        else:
+            # ENG-37: Bewegung kann wechseln, ohne dass sich die Feldmenge
+            # aendert (Ping-Pong <-> Ring) — die Schrittweite trotzdem nachziehen.
+            self._apply_runner_step_visibility(algo)
         # Color-Sequence vs. Einzelfarbe kann ebenfalls vom color_cycle abhaengen.
         self._apply_color_visibility()
 

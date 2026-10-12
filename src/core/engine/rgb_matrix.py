@@ -1401,12 +1401,43 @@ class RgbMatrixInstance(Function):
 
     def _render_chase(self, p: float, cols: int, rows: int, enabled: list) -> list[Color]:
         """Lauflicht. params: axis(H/V/Diag), movement(normal/bounce/center_out/
-        outside_in), runner_count, runner_width, fade(Schweif), color_cycle, invert."""
+        outside_in), runner_count, runner_width, runner_step(Schrittweite),
+        fade(Schweif), color_cycle, invert.
+
+        ENG-37 Schrittweite (``runner_step``, Vorgabe 1 = wie bisher, 0 = „wie
+        Breite“): bei Schrittweite > 1 springt der Laeufer je Schritt um so
+        viele Lampen und steht dazwischen still. Dann gilt die Block-Regel:
+
+          * Die Reihe ist in Bloecke geteilt, Block j beginnt bei Lampe
+            j * Schrittweite; je Runde ``ceil(Laenge / Schrittweite)`` Schritte,
+            jede Runde beginnt wieder bei Lampe 1.
+          * Der Laeufer belegt ``Breite`` Lampen AB dem Blockanfang (Breite 2,
+            Schrittweite 2 auf acht Lampen: 1+2, 3+4, 5+6, 7+8).
+          * Rueckwaerts: dieselben Bloecke in umgekehrter Folge (1+2, 7+8, 5+6,
+            3+4) — wie bei Schrittweite 1 startet der Lauf auf Lampe 1.
+          * Ping-Pong: die Bloecke hin und zurueck, am Rand abgeschnitten statt
+            umlaufend.
+          * Mehrere Laeufer: jeder weitere um Laenge/Anzahl versetzt (wie bisher).
+          * Schweif: bleibt RAEUMLICH und haengt an der Hinterkante des Blocks —
+            er liegt damit ueber den eben verlassenen bzw. uebersprungenen
+            Lampen und springt mit dem Laeufer (kein Nachlaufen zwischen zwei
+            Schritten).
+          * Ring (center_out/outside_in): Schrittweite wirkt dort nicht.
+        """
         params = self.params
         axis = str(params.get("axis", "H"))
         movement = str(params.get("movement", "normal"))
         width = max(1, int(params.get("runner_width", 1)))
         count = max(1, int(params.get("runner_count", 1)))
+        try:
+            stepw = int(params.get("runner_step", 1))
+        except (TypeError, ValueError):
+            stepw = 1
+        if stepw <= 0:                  # 0 = „wie Breite“
+            stepw = width
+        # Nur die linearen Bewegungen kennen Bloecke.
+        if movement not in ("normal", "bounce"):
+            stepw = 1
         # After Fade (Abschnitt 5): Nachfaden in % (0..100) -> 0..1. Alt-Shows mit
         # "fade" (0..1) werden in apply_dict migriert; hier nur der neue Key.
         fade = max(0.0, min(100.0, float(params.get("after_fade", 30.0)))) / 100.0
@@ -1423,6 +1454,8 @@ class RgbMatrixInstance(Function):
         if self.style == MatrixStyle.DIMMER and params.get("dimmer_cycle"):
             levels = self.dimmer_levels.enabled_levels()
             length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
+            if stepw > 1:               # ENG-37: Runde = Anzahl Bloecke
+                length_hint = -(-length_hint // stepw)
             interval = max(1, int(params.get("dimmer_interval", 1)))
             rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
             nl = len(levels)
@@ -1440,6 +1473,8 @@ class RgbMatrixInstance(Function):
         # Reihenfolge normal / zufällig / Ping-Pong (color_order).
         elif params.get("color_cycle") and enabled:
             length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
+            if stepw > 1:               # ENG-37: Runde = Anzahl Bloecke
+                length_hint = -(-length_hint // stepw)
             # MXP-01: Farbe erst alle N Durchlaeufe wechseln (Default 1 = jeder Lauf).
             interval = max(1, int(params.get("color_interval", 1)))
             rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
@@ -1476,7 +1511,13 @@ class RgbMatrixInstance(Function):
         for row in range(rows):
             for col in range(cols):
                 pos, length = _axis_coord(col, row, cols, rows, axis)
-                if movement == "bounce":
+                if movement == "bounce" and stepw > 1:
+                    # ENG-37: Bloecke hin und zurueck, am Rand abgeschnitten.
+                    span = -(-length // stepw) - 1
+                    blk = (span - abs((int(p) % (2 * span)) - span)) if span >= 1 else 0
+                    anfang = blk * stepw
+                    bright = 1.0 if anfang <= pos < anfang + width else 0.0
+                elif movement == "bounce":
                     span = max(1, length - 1)
                     head = span - abs((int(p) % (2 * span)) - span)
                     bright = 1.0 if abs(pos - head) < width else 0.0
@@ -1494,8 +1535,18 @@ class RgbMatrixInstance(Function):
                     # Schweif blieb auf derselben Seite und zog dem Laeufer damit
                     # VORAUS statt nach (Davids Befund 2026-08-01 im Live-Edit).
                     rueckwaerts = (self.direction == "reverse")
+                    pk = p
+                    if stepw > 1:
+                        # ENG-37: Kopf steht auf der VORDERKANTE des Blocks —
+                        # vorwaerts die letzte, rueckwaerts die erste Lampe.
+                        # ceil/floor wie der stufenlose Lauf: dort leuchtet
+                        # rueckwaerts ceil(Kopf), vorwaerts floor(Kopf).
+                        bloecke = -(-length // stepw)
+                        blk = (math.ceil(p) if rueckwaerts
+                               else math.floor(p)) % bloecke
+                        pk = blk * stepw + (0 if rueckwaerts else width - 1)
                     for k in range(count):
-                        head = (p + k * spacing) % length
+                        head = (pk + k * spacing) % length
                         dist = ((pos - head) if rueckwaerts
                                 else (head - pos)) % length
                         if dist < width:                  # solider Kopf
