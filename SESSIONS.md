@@ -71,7 +71,7 @@
 | OUT-73 | D | fix/out73-enttec-reiter-toter-anschluss | 2026-10-12T13:51Z | src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
-| STAB-35 | A | - | 2026-10-12T13:40Z | - |
+| STAB-35 | A | fix/stab36-absturz-auswahlwechsel | 2026-10-12T15:43Z | - |
 | STAB-36 | A | - | 2026-10-12T13:40Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | OUT-75 | D | fix/out75-dmx-monitor-eine-wahrheit | 2026-10-12T15:08Z | src/ui/views/dmx_monitor_view.py · src/core/dmx/output_manager.py · src/ui/widgets/output_config.py |
@@ -239,7 +239,6 @@
 
 ## Verlauf
 
-- 2026-10-11T20:28Z D claim STAB-34
 - 2026-10-11T20:38Z D aktualisiert LAS-37: Branch - -> fix/las37-eine-laser-erkennung
 - 2026-10-11T20:42Z A claim UI-91
 - 2026-10-11T20:43Z A claim FM-74
@@ -269,3 +268,4 @@
 - 2026-10-12T15:26Z B claim VIZ-106
 - 2026-10-12T15:27Z D claim VCB-44
 - 2026-10-12T15:41Z D claim UI-92
+- 2026-10-12T15:43Z A aktualisiert STAB-35: Branch - -> fix/stab36-absturz-auswahlwechsel
