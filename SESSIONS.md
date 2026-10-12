@@ -86,6 +86,7 @@
 | VCB-45 | A | - | 2026-10-12T18:15Z | - |
 | VCB-46 | A | - | 2026-10-12T18:15Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
+| LIZ-1 | A | feature/liz1-aktivierung-urhebervermerk | 2026-10-12T19:08Z | main.py · src/core/lizenz.py · LICENSE · README.md |
 
 ## Blocker & Fallen
 
@@ -261,7 +262,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:43Z A aktualisiert STAB-35: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:43Z A aktualisiert STAB-36: Branch - -> fix/stab36-absturz-auswahlwechsel
 - 2026-10-12T15:46Z B claim VIZ-108
 - 2026-10-12T15:46Z B claim VIZ-107
@@ -291,3 +291,4 @@
 - 2026-10-12T18:55Z A claim ENG-37
 - 2026-10-12T18:56Z A done ENG-34
 - 2026-10-12T19:03Z A done UI-89
+- 2026-10-12T19:08Z A claim LIZ-1
