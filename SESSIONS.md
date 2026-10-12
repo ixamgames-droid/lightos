@@ -83,6 +83,7 @@
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
 | LIZ-2 | D | fix/liz2-fremdlizenzen-windows-setup | 2026-10-12T20:56Z | THIRD_PARTY_NOTICES.md · licenses · packaging/windows/bundle_inhalt.py · packaging/windows/LightOS.spec · src/core/selbsttest.py · tests/test_liz2_fremdlizenzen_setup.py |
+| LIZ-1 | A | fix/liz1-lizenzdialog-hoehe | 2026-10-12T22:39Z | - |
 
 ## Blocker & Fallen
 
@@ -290,7 +291,6 @@
 
 ## Verlauf
 
-- 2026-10-12T16:44Z D done VCB-43
 - 2026-10-12T17:08Z D done XPLAT-36
 - 2026-10-12T17:12Z D claim OUT-76
 - 2026-10-12T17:33Z A claim STAB-38
@@ -320,3 +320,4 @@
 - 2026-10-12T21:34Z D done TOOL-18
 - 2026-10-12T22:00Z D done OUT-71
 - 2026-10-12T22:35Z D done VCB-42
+- 2026-10-12T22:39Z A claim LIZ-1
