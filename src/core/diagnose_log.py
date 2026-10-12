@@ -83,11 +83,43 @@ def _benutzername() -> str:
         return ""
 
 
+def kuerze_seriennummer(serie: str) -> str:
+    """OUT-77: ``"A6008isP"`` -> ``"…8isP"``.
+
+    Es bleiben hoechstens die letzten vier Zeichen und nie mehr als die halbe
+    Nummer — genug, um zwei Adapter im selben Paket auseinanderzuhalten, zu
+    wenig, um das Geraet zu benennen. Eine schon gekuerzte Nummer bleibt, wie
+    sie ist (die Texte des Pakets laufen zum Teil zweimal hier durch)."""
+    s = str(serie or "")
+    if not s or s.startswith("…"):
+        return s
+    bleibt = min(4, len(s) // 2)
+    return "…" + (s[-bleibt:] if bleibt else "")
+
+
+def _seriennummern_kuerzen(text: str) -> str:
+    """OUT-77: Seriennummern von USB-Adaptern unkenntlich machen.
+
+    Eine Seriennummer gehoert zu genau einem Geraet. Im Diagnosepaket stand sie
+    im Klartext, weil der Schluessel eines uDMX-Adapters sie traegt
+    (``16c0:05dc#Seriennummer``, OUT-68): in den Zeilen „Ausgabe“ und
+    „uDMX (USB)“ und in jeder Log-Zeile des Senders. Erfasst wird der
+    Schluessel in dieser Form und die Beschriftung „Seriennr. …“ der
+    Adapter-Liste. Ein Schluessel mit Anschluss (``2008:1066@1-2``) nennt
+    keine Seriennummer und bleibt unveraendert."""
+    import re
+    text = re.sub(r"(?i)\b([0-9a-f]{4}:[0-9a-f]{4}#)([^\s,;:()\[\]'\"]+)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+    return re.sub(r"(Seriennr\.\s+)([^\s,;:()\[\]'\"·]+)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+
+
 def anonymisiere(text: str, home: str | None = None,
                  user: str | None = None) -> str:
     """Ersetzt den Home-Pfad durch ``~`` und den Benutzernamen als Pfadteil durch
     ``%USERNAME%`` — in beiden Schreibweisen der Trenner, unter Windows ohne
-    Ruecksicht auf Gross-/Kleinschreibung."""
+    Ruecksicht auf Gross-/Kleinschreibung. Kuerzt ausserdem die Seriennummern
+    von USB-Adaptern (OUT-77)."""
     if not text:
         return text
     try:
@@ -104,6 +136,10 @@ def anonymisiere(text: str, home: str | None = None,
             # Name taucht sonst mitten in harmlosen Woertern auf.
             muster = r"(?<=[/\\])" + re.escape(user) + r"(?=[/\\]|$|\s|['\"])"
             text = re.sub(muster, "%USERNAME%", text, flags=flags)
+    except Exception:
+        pass
+    try:
+        text = _seriennummern_kuerzen(text)
     except Exception:
         pass
     return text
@@ -1061,7 +1097,8 @@ PAKET_INHALT = (
     "Geheimnisse nur als Platzhalter)\n"
     "• die Datei-NAMEN im Datenordner\n\n"
     "NICHT enthalten: Show-Dateien, Sicherungen, Datenbanken, Snaps, Buehnen. Dein "
-    "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt.")
+    "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt; Seriennummern "
+    "von USB-Adaptern werden gekuerzt.")
 
 _LIESMICH = ("LightOS-Diagnosepaket\n=====================\n\nEnthaelt:\n"
              + PAKET_INHALT + "\n\nlogs/      Sitzungs-Logs (lightos.log = letzte "

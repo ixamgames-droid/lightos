@@ -464,7 +464,7 @@ DMX-Ausgaenge, MIDI-Geraete), eine Liste der Einstellungen (nur Zahlen/Schalter 
 Texte, Pfade und Geheimnisse wie das Remote-Token nur als Platzhalter) und die
 Datei-Namen im Datenordner. **Nicht im Paket:** Show-Dateien, Datenbanken,
 Snaps, Buehnen. Dein Benutzername in Pfaden wird durch `~` bzw. `%USERNAME%`
-ersetzt.
+ersetzt; die Seriennummer eines uDMX-Adapters wird gekuerzt (`16c0:05dc#…8isP`).
 
 **`Windows fatal exception: code 0x8001010d` in `crash.log` ist kein Absturz.**
 Windows meldet damit intern einen abgelehnten COM-Aufruf (typisch, wenn ein
