@@ -250,13 +250,14 @@ def grund_text(code: int, schluessel: str = "") -> str:
     if code == G_PYUSB_FEHLT:
         if ist_installationspaket():
             # OUT-76: im gepackten LightOS gibt es kein pip — der Rat, etwas
-            # nachzuinstallieren, liefe ins Leere.
-            return ("Dieses LightOS aus dem Installationspaket enthält den "
-                    "Programmteil für uDMX-Adapter (pyusb) nicht, und er lässt "
-                    "sich dort nicht nachinstallieren. uDMX-Adapter laufen "
-                    "derzeit nur mit LightOS aus dem Quelltext (siehe "
-                    "INSTALL.md, „uDMX-Adapter“). Ohne das: einen ENTTEC DMX "
-                    "USB Pro oder einen Art-Net-/sACN-Node verwenden.")
+            # nachzuinstallieren, liefe ins Leere. Seit OUT-76 gehoert pyusb
+            # zum Windows-Setup (x64); aeltere Setups hatten es nicht.
+            return ("Diesem LightOS aus dem Installationspaket fehlt der "
+                    "Programmteil für uDMX-Adapter (pyusb); nachinstallieren "
+                    "lässt er sich dort nicht. Neuere Installationspakete für "
+                    "Windows (x64) bringen ihn mit — bitte LightOS "
+                    "aktualisieren. Bis dahin: einen ENTTEC DMX USB Pro oder "
+                    "einen Art-Net-/sACN-Node verwenden.")
         return ("Für uDMX-Adapter fehlt das Python-Paket pyusb. Nachinstallieren "
                 "mit: pip install pyusb (siehe INSTALL.md, „uDMX-Adapter“).")
     if code == G_LIBUSB_FEHLT:
@@ -332,7 +333,40 @@ def _usb_laden():
         backend = libusb_package.get_libusb1_backend()
     except Exception:                                    # noqa: BLE001
         backend = None
+    if backend is None:
+        backend = _backend_aus_bundle()
     return usb.core, usb.util, backend
+
+
+def bundle_dll_pfad(basis: str | None = None) -> str:
+    """OUT-76: Pfad der mit dem Installationspaket gelieferten
+    ``libusb-1.0.dll`` — leer, wenn LightOS nicht gepackt laeuft oder die
+    Datei fehlt. Gesucht wird im Ordner des Pakets (dorthin legt sie
+    ``LightOS.spec``) und im Programmordner (dorthin legt sie der Haken, den
+    libusb-package selbst mitbringt)."""
+    import os
+    basis = getattr(sys, "_MEIPASS", "") if basis is None else basis
+    if not basis:
+        return ""
+    for ordner in (os.path.join(basis, "libusb_package"), basis):
+        pfad = os.path.join(ordner, "libusb-1.0.dll")
+        if os.path.isfile(pfad):
+            return pfad
+    return ""
+
+
+def _backend_aus_bundle():
+    """Das pyusb-Backend mit GENAU der mitgelieferten DLL — oder ``None``.
+    Rueckfall, falls ``libusb_package`` sie im gepackten LightOS nicht selbst
+    findet; dann soll es nicht an der Suchreihenfolge von Windows haengen."""
+    pfad = bundle_dll_pfad()
+    if not pfad:
+        return None
+    try:
+        import usb.backend.libusb1
+        return usb.backend.libusb1.get_backend(find_library=lambda _name: pfad)
+    except Exception:                                    # noqa: BLE001
+        return None
 
 
 def bibliothek_status() -> dict:

@@ -680,9 +680,12 @@ def test_diagnosepaket_nennt_bibliothek_und_grund(monkeypatch):
     assert len(diagnose_log.udmx_infos()) == 1
 
 
-def test_requirements_fuehren_pyusb_nur_als_optionalen_eintrag():
+def test_requirements_fuehren_pyusb_nur_fuer_windows_x64_als_pflicht():
+    """OUT-76 (Entscheidung des Projektinhabers): ins Windows-Setup gehoert
+    pyusb; ueberall sonst bleibt es optional — also nie ohne Bedingung."""
     wurzel = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     zeilen = open(os.path.join(wurzel, "requirements.txt"),
                   encoding="utf-8").read().splitlines()
-    pyusb = [z for z in zeilen if "pyusb" in z.lower()]
-    assert pyusb and all(z.lstrip().startswith("#") for z in pyusb)
+    pyusb = [z for z in zeilen if z.strip().lower().startswith("pyusb")]
+    assert len(pyusb) == 1
+    assert 'sys_platform == "win32"' in pyusb[0], "Linux/macOS: weiter optional"

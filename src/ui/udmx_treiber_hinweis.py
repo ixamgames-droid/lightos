@@ -6,9 +6,11 @@ Ordnung; erst nach „Verbinden“ stand da „lässt sich nicht öffnen“ — 
 einzelnen Satz statt eines Wegs. Im LightOS aus dem Installationspaket hiess es
 sogar „pip install pyusb“, was dort niemand ausfuehren kann.
 
-**Die Regel des Projekts.** LightOS liefert und installiert NIE Treiber. Es
-erkennt, was fehlt, erklaert den Weg Schritt fuer Schritt und verlinkt die
-Seite des Anbieters. Geoeffnet wird ein Link nur durch einen Klick.
+**Stand OUT-76.** LightOS liefert und installiert keine Treiber. Es erkennt,
+was fehlt, erklaert den Weg Schritt fuer Schritt und verlinkt die Seite des
+Anbieters. Geoeffnet wird ein Link nur durch einen Klick. (Das
+Installationspaket bringt seit OUT-76 die BIBLIOTHEKEN pyusb und libusb mit;
+ob kuenftig auch Treiber mitkommen, wird getrennt geklaert.)
 
 Reine Texte ohne Widgets — die Schritte selbst stehen in
 ``udmx.windows_treiber_schritte`` (eine Quelle fuer Dialog, Diagnosepaket und

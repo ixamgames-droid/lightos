@@ -9,12 +9,19 @@ PySide6-Addons>=6.7.0    # WebEngine fuer 3D-Visualizer
 # ── DMX-Ausgabe ─────────────────────────────────────────────────────────────
 pyserial>=3.5            # Enttec Pro USB (pure Python)
 
-# ── Optional: uDMX-Adapter (rohes USB, z. B. Anyma uDMX, CYL-6602) ──────────
-#    NICHT erforderlich — ohne pyusb fehlt nur die Ausgabe-Art „uDMX (USB)",
-#    der Rest laeuft unveraendert. Braucht darunter libusb-1.0 (Linux: Paket
-#    libusb-1.0-0; Windows: libusb-package bringt die DLL mit). Siehe INSTALL.md.
-# pyusb>=1.2.1
-# libusb-package>=1.0.26  ; sys_platform == "win32"
+# ── uDMX-Adapter (rohes USB, z. B. Anyma uDMX, CYL-6602) ────────────────────
+#    Windows x64: gehoert zum Lieferumfang und damit ins Setup (OUT-76,
+#    Entscheidung des Projektinhabers vom 12.10.2026). Beides sind
+#    BIBLIOTHEKEN, keine Treiber: pyusb (BSD) und darunter libusb als eigene
+#    DLL aus libusb-package (LGPL 2.1 / Apache 2.0) — s. THIRD_PARTY_NOTICES.md.
+#    Den Windows-Treiber (WinUSB) weist der Nutzer weiterhin selbst zu.
+#    NICHT auf Windows-ARM64: libusb-package hat dort kein fertiges Paket
+#    (Stand 1.0.30.0: win32 und win_amd64, kein win_arm64, kein Quellpaket).
+pyusb>=1.2.1 ; sys_platform == "win32" and platform_machine != "ARM64"
+libusb-package>=1.0.26 ; sys_platform == "win32" and platform_machine != "ARM64"
+#    Linux/macOS: optional — ohne pyusb fehlt nur die Ausgabe-Art „uDMX (USB)",
+#    der Rest laeuft unveraendert:  pip install pyusb  (darunter libusb-1.0,
+#    Linux: Paket libusb-1.0-0). Siehe INSTALL.md.
 
 # ── Datenbank ───────────────────────────────────────────────────────────────
 SQLAlchemy>=2.0.0        # Fixture-DB (pure Python)

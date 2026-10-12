@@ -17,10 +17,10 @@
 - **Für USB:** einen ENTTEC DMX USB Pro. Den Treiber bringt Windows mit, Hinweise
   stehen in [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro).
 - **Für USB ohne COM-Port:** einen uDMX-Adapter, siehe
-  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` und
-  unter Linux einmalig ein Zugriffsrecht. **Unter Windows braucht er einen Treiber, den
-  weder Windows noch LightOS mitbringt** – du weist ihn einmalig von Hand zu. Im
-  LightOS aus dem Windows-Installationspaket läuft uDMX derzeit nicht.
+  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` (im
+  Windows-Installationspaket enthalten) und unter Linux einmalig ein Zugriffsrecht.
+  **Unter Windows braucht er einen Treiber, den weder Windows noch LightOS mitbringt** –
+  du weist ihn einmalig von Hand zu; danach läuft der Adapter.
 - **Für Netzwerk:** einen Art-Net- oder sACN-Node (oder ein Gerät mit eingebautem
   Netzwerkeingang) und einen Rechner **im selben Netz**, siehe
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
@@ -100,8 +100,8 @@ Reiter hat noch kein Bild.
 - Unter dem Status steht dann der **Grund** und was zu tun ist. Die häufigsten:
   - *Kein Zugriffsrecht* (Linux): einmalig eine udev-Regel einrichten.
   - *Treiber fehlt* (Windows): dem Adapter den WinUSB-Treiber zuweisen, siehe unten.
-  - *pyusb fehlt*: das Zusatzpaket nachinstallieren – das geht nur, wenn LightOS aus
-    dem Quelltext läuft.
+  - *pyusb fehlt*: läuft LightOS aus dem Quelltext, das Zusatzpaket nachinstallieren;
+    ein älteres Installationspaket aktualisieren (neuere bringen es mit).
 
   Alle drei Wege stehen in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
   installiert selbst keine Treiber und ändert keine Systemeinstellungen.
@@ -127,10 +127,11 @@ Links. LightOS öffnet dabei kein Gerät und ändert nichts – es fragt nur Win
 > sie im Geräte-Manager von Windows deinstallierst (mit „Treiber löschen“) und neu
 > einsteckst.
 
-Das LightOS aus dem **Windows-Installationspaket** enthält den Programmteil für uDMX
-(`pyusb`) derzeit nicht. Dort erkennt der Reiter einen angesteckten Adapter und sagt,
-was fehlt, kann ihn aber nicht ansteuern – uDMX läuft unter Windows nur mit LightOS aus
-dem Quelltext.
+Das **Windows-Installationspaket** (x64) bringt die nötigen Programmteile mit (`pyusb`
+und die Bibliothek libusb – Bibliotheken, keine Treiber): nach der Installation läuft
+uDMX, sobald der Treiber wie oben zugewiesen ist. Ein Installationspaket von vor dem
+12.10.2026 enthält sie noch nicht; der Reiter sagt das dann und rät zum Aktualisieren.
+Auf Windows-ARM64 ist uDMX nicht enthalten.
 
 Haben zwei gleiche Adapter keine Seriennummer, unterscheidet LightOS sie am
 USB-Anschluss. Steckst du einen davon um, wähle ihn im Reiter neu aus.

@@ -136,6 +136,35 @@ def pruefe_build_info(wurzel: str | None = None,
     return []
 
 
+def pruefe_udmx_bibliothek(gefroren: bool | None = None,
+                           plattform: str | None = None,
+                           maschine: str | None = None, laden=None) -> list[str]:
+    """OUT-76: das Windows-Setup (x64) liefert pyusb und libusb mit — fehlt im
+    gepackten Build eines davon, ist das ein Fehler (der Rauchtest der
+    Setup-Pipeline bricht dann ab). Im Quellbetrieb, unter Linux/macOS und auf
+    Windows-ARM64 bleibt uDMX optional: dort nur die Zeile ``optional uDMX``.
+
+    Geladen wird nur die Bibliothek; kein USB-Geraet wird angefasst.
+    ``laden`` (Tests) = Ersatz fuer ``udmx._usb_laden``.
+    """
+    import platform
+    gefroren = ist_gefroren() if gefroren is None else gefroren
+    plattform = sys.platform if plattform is None else plattform
+    maschine = platform.machine() if maschine is None else maschine
+    if not gefroren or not plattform.startswith("win") or maschine.upper() == "ARM64":
+        return []
+    try:
+        if laden is None:
+            from src.core.dmx.udmx import _usb_laden as laden
+        _core, _util, backend = laden()
+    except Exception as e:
+        return [f"uDMX: pyusb fehlt im Setup ({type(e).__name__}: {e})"]
+    if backend is None:
+        return ["uDMX: libusb-1.0.dll fehlt im Setup oder laesst sich nicht "
+                "laden (libusb-package, s. packaging/windows/bundle_inhalt.py)"]
+    return []
+
+
 def pruefe_code_stand() -> list[str]:
     """Der Builtin-Fingerabdruck darf nicht leer sein (sonst laeuft der
     Abgleich nach einem Update nie wieder, s. ``fixture_db._code_stand``)."""
@@ -171,7 +200,7 @@ def bericht() -> tuple[int, list[str]]:
               f"programm_dir={programm_dir()}",
               f"Python {sys.version.split()[0]} ({sys.platform})"]
     fehler = (pruefe_module() + pruefe_ressourcen() + pruefe_code_stand()
-              + pruefe_build_info())
+              + pruefe_build_info() + pruefe_udmx_bibliothek())
     demo_fehler, demo_zeile = pruefe_demo_shows()
     fehler += demo_fehler
     zeilen.append(demo_zeile)

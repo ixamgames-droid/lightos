@@ -1,10 +1,12 @@
 # Fremd-Komponenten in LightOS (Third-Party Notices)
 
 LightOS selbst steht unter **keiner** Open-Source-Lizenz (Entscheidung des
-Projektinhabers). Diese Datei betrifft nur die **fremden** Dateien, die im Repo
-mitgeliefert werden: Ihre Lizenzen erlauben die Weitergabe, verlangen aber, dass
-Lizenztext und Urheberhinweise beiliegen. Die Lizenztexte stehen unter
-[`licenses/`](licenses/).
+Projektinhabers). Diese Datei betrifft die **fremden** Dateien, die im Repo
+mitgeliefert werden, und – seit OUT-76 – die Bibliotheken für uDMX-Adapter, die
+nur im Windows-Installationspaket stecken (pyusb, libusb, libusb-package): Ihre
+Lizenzen erlauben die Weitergabe, verlangen aber, dass Lizenztext und
+Urheberhinweise beiliegen. Die Lizenztexte stehen unter [`licenses/`](licenses/);
+das Setup installiert diese Datei und den Ordner mit.
 
 Neue fremde Dateien nur mit Eintrag hier — `tests/test_proc18_fremd_lizenzhinweise.py`
 prüft, dass jede Datei in den unten genannten Ordnern aufgeführt ist.
@@ -58,6 +60,56 @@ ins Repo kommen.
 - **Warum im Repo:** Die Web-Remote läuft im lokalen Netz ohne Internet; die Seite lädt
   deshalb nichts von fremden Servern (WEB-06). Version passend zum Server
   (python-socketio 5.x / python-engineio 4.x, Socket.IO-Protokoll 5).
+
+## pyusb — USB-Zugriff für uDMX-Adapter (im Windows-Installationspaket)
+
+- **Herkunft:** pyusb (<https://github.com/pyusb/pyusb>), Version laut `requirements.txt`
+  (mindestens 1.2.1). Liegt **nicht im Repo**: das fertige Python-Paket kommt beim Bauen des
+  Windows-Setups von PyPI (<https://pypi.org/project/pyusb/>) und wird unverändert
+  mitgeliefert (Python-Modul `usb`).
+- **Urheber:** Copyright © 2009–2017 Wander Lairson Costa; Copyright © 2009–2021 PyUSB
+  contributors.
+- **Lizenz:** BSD 3-Clause — [`licenses/BSD-3-Clause-pyusb.txt`](licenses/BSD-3-Clause-pyusb.txt).
+- **Wofür:** die Ausgabe-Art „uDMX (USB)“ (OUT-68, OUT-76). Eine Bibliothek, kein Treiber.
+
+## libusb — USB-Bibliothek unter pyusb (im Windows-Installationspaket)
+
+- **Herkunft:** libusb (<https://libusb.info>, Quelltext
+  <https://github.com/libusb/libusb>). Liegt **nicht im Repo**: die fertige Bibliothek
+  `libusb-1.0.dll` kommt beim Bauen des Windows-Setups aus dem Python-Paket libusb-package
+  (siehe nächster Abschnitt) und wird unverändert mitgeliefert. Welche Fassung von libusb
+  das ist, sagt die Versionsnummer von libusb-package: `1.0.30.0` enthält libusb 1.0.30
+  (Quelltext dieser Fassung: <https://github.com/libusb/libusb/releases/tag/v1.0.30>).
+- **Urheber:** Copyright © 2001 Johannes Erdfelt; © 2007–2009 Daniel Drake; © 2010–2012
+  Peter Stuge; © 2008–2016 Nathan Hjelm; © 2009–2013 Pete Batard; © 2009–2013 Ludovic
+  Rousseau; © 2010–2012 Michael Plante; © 2011–2013 Hans de Goede; © 2012–2013 Martin
+  Pieuchot; © 2012–2013 Toby Gray; © 2013–2018 Chris Dickens und weitere Beitragende
+  (Datei `AUTHORS` im Quelltext).
+- **Lizenz:** GNU Lesser General Public License, Version 2.1 oder später —
+  [`licenses/LGPL-2.1-libusb.txt`](licenses/LGPL-2.1-libusb.txt) (die Datei `COPYING` aus
+  libusb 1.0.30).
+- **Was die LGPL verlangt und wie LightOS es erfüllt:**
+  - *Dynamisch gebunden:* libusb liegt als eigene Datei im Programmordner
+    (`_internal/libusb_package/libusb-1.0.dll`) und wird zur Laufzeit geladen; sie ist nicht
+    in `LightOS.exe` eingebaut. Das Bauwerkzeug legt dieselbe Datei ein zweites Mal direkt
+    nach `_internal/`; geladen wird die im Ordner `libusb_package`.
+  - *Austauschbar:* die Datei lässt sich durch eine andere, schnittstellengleiche Fassung
+    von libusb 1.0 ersetzen (gleicher Name, gleicher Ort) – LightOS lädt dann diese.
+  - *Unverändert:* LightOS ändert libusb nicht.
+  - *Quelltext:* unter den oben genannten Adressen; der Lizenztext liegt bei.
+- **Wofür:** wie pyusb. Eine Bibliothek, kein Treiber – einen Treiber liefert und installiert
+  LightOS nicht.
+
+## libusb-package — libusb als Python-Paket (im Windows-Installationspaket)
+
+- **Herkunft:** libusb-package (<https://github.com/pyocd/libusb-package>), Version laut
+  `requirements.txt` (mindestens 1.0.26). Liegt **nicht im Repo**: kommt beim Bauen des
+  Windows-Setups von PyPI (<https://pypi.org/project/libusb-package/>) und wird unverändert
+  mitgeliefert. Es bringt die Bibliothek aus dem vorigen Abschnitt mit und findet sie zur
+  Laufzeit; es selbst braucht das Python-Paket importlib_resources
+  (<https://github.com/python/importlib_resources>, ebenfalls Apache License 2.0).
+- **Urheber:** Copyright © 2021–2023 Chris Reed; Copyright © 2022 Mitchell Kline.
+- **Lizenz:** Apache License 2.0 — [`licenses/Apache-2.0.txt`](licenses/Apache-2.0.txt).
 
 ## Apache License 2.0 — für Geräteprofile auf QLC+-Basis
 

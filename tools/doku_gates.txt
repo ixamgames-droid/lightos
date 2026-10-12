@@ -29,6 +29,7 @@ test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
 test_xplat49_uninstall_datenschutz.py # INSTALL.md
 test_out76_udmx_windows_treiber.py # INSTALL.md + Anleitung Ausgabe: Weg zum WinUSB-Treiber
+test_out76_setup_bringt_usb_mit.py # THIRD_PARTY_NOTICES.md + licenses/: pyusb und libusb im Windows-Setup
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py

@@ -273,10 +273,12 @@ LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
 Gemeint sind Adapter ohne COM-Port, die direkt ueber USB angesprochen werden: der
 *Anyma uDMX* samt Nachbauten (USB-Kennung `16c0:05dc`) und der *CYL-6602 „USB-DMX512“*
 (meldet sich als „Sun-light USBDMX512“, Kennung `2008:1066`). In LightOS ist das die
-Ausgabe-Art **uDMX (USB)**. Drei Dinge sind einmalig noetig; LightOS richtet keines
-davon selbst ein (kein sudo, keine Treiber-Installation):
+Ausgabe-Art **uDMX (USB)**. Drei Dinge sind noetig; die Treiber-Zuweisung (Windows)
+und das Zugriffsrecht (Linux) richtet LightOS nicht selbst ein (kein sudo, keine
+Treiber-Installation):
 
-**1. Das Zusatzpaket `pyusb`** (optional — ohne es fehlt nur diese Ausgabe-Art):
+**1. Das Zusatzpaket `pyusb`** (im Windows-Installationspaket enthalten, sonst
+optional — ohne es fehlt nur diese Ausgabe-Art):
 
 ```bash
 # Linux
@@ -292,11 +294,18 @@ venv\Scripts\python -m pip install pyusb libusb-package
 Ob beides gefunden wird, zeigt der Selbsttest (Zeile `optional uDMX: …`) und das
 Diagnosepaket (Abschnitt „uDMX (USB)“).
 
-**Windows-Installationspaket:** das LightOS aus `LightOS-Setup.exe` enthaelt `pyusb`
-derzeit **nicht**, und dort laesst sich nichts nachinstallieren. Der Reiter erkennt
-einen angesteckten Adapter und sagt, was fehlt, kann ihn aber nicht ansteuern. uDMX
-laeuft unter Windows nur mit LightOS aus dem Quelltext (dieser Abschnitt). Ohne das:
-einen ENTTEC DMX USB Pro oder einen Art-Net-/sACN-Node verwenden.
+**Windows-Installationspaket (x64):** das LightOS aus `LightOS-Setup.exe` bringt
+`pyusb` und die Bibliothek libusb **mit** — dort ist fuer diesen Punkt nichts zu tun.
+uDMX laeuft nach der Installation, sobald dem Adapter der Windows-Treiber zugewiesen
+ist (Punkt 3). Beides sind Bibliotheken, keine Treiber; ihre Lizenzen stehen in
+`THIRD_PARTY_NOTICES.md`, das Setup installiert die Datei mit.
+- Installationspakete, die vor dem 12.10.2026 gebaut wurden, enthalten sie noch
+  nicht. Der Reiter **uDMX (USB)** sagt das dann und raet zum Aktualisieren;
+  nachinstallieren laesst sich in einem installierten LightOS nichts.
+- Windows auf ARM64: fuer libusb gibt es dort kein fertiges Python-Paket; uDMX ist
+  auf ARM64 nicht enthalten.
+- LightOS aus dem Quelltext unter Windows x64: `pip install -r requirements.txt`
+  installiert beides mit.
 
 **2. Linux: Zugriffsrecht per udev-Regel.** Ohne sie darf nur root den Adapter
 ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Die Regeldatei liegt im Repo:

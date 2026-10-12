@@ -20,10 +20,10 @@
 - **For USB:** an ENTTEC DMX USB Pro. Windows brings the driver along; notes are in
   [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro) (German).
 - **For USB without a COM port:** a uDMX adapter, see
-  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the optional package `pyusb` and,
-  on Linux, an access right once. **On Windows it needs a driver that neither Windows nor
-  LightOS ships** – you assign it once by hand. In the LightOS from the Windows setup
-  package, uDMX does not work at present.
+  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the package `pyusb` (included in
+  the Windows setup package) and, on Linux, an access right once. **On Windows it needs a
+  driver that neither Windows nor LightOS ships** – you assign it once by hand; after
+  that the adapter works.
 - **For network:** an Art-Net or sACN node (or a fixture with a built-in network input)
   and a computer **on the same network**, see
   [Network pitfall](#network-pitfall-with-art-net-and-sacn).
@@ -107,8 +107,8 @@ yet.
   - *No access rights* (Linux): set up a udev rule once.
   - *Treiber fehlt* (driver missing, Windows): assign the WinUSB driver to the adapter,
     see below.
-  - *pyusb missing*: install the optional package – only possible when LightOS runs
-    from source.
+  - *pyusb missing*: if LightOS runs from source, install the package; update an older
+    setup package (newer ones include it).
 
   All three are described in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
   installs no drivers itself and changes no system settings.
@@ -132,9 +132,11 @@ asks Windows.
 > selected device – a mouse or keyboard stops working afterwards until you uninstall it
 > in the Windows Device Manager (with "delete driver") and plug it in again.
 
-The LightOS from the **Windows setup package** does not contain the uDMX part (`pyusb`)
-at present. There the tab recognises a plugged-in adapter and says what is missing, but
-cannot drive it – on Windows, uDMX only works with LightOS run from source.
+The **Windows setup package** (x64) includes the parts needed (`pyusb` and the libusb
+library – libraries, not drivers): after installation uDMX works as soon as the driver
+is assigned as described above. A setup package built before 12 October 2026 does not
+contain them yet; the tab then says so and recommends updating. On Windows ARM64, uDMX
+is not included.
 
 If two identical adapters have no serial number, LightOS tells them apart by their USB
 port. If you move one of them, select it again in the tab.

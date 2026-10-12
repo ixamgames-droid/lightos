@@ -17,7 +17,7 @@
 import os
 import sys
 
-from PyInstaller.utils.hooks import collect_submodules
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
 
 REPO = os.path.abspath(os.path.join(SPECPATH, "..", ".."))  # noqa: F821 (SPECPATH kommt von PyInstaller)
 sys.path.insert(0, SPECPATH)  # noqa: F821
@@ -30,6 +30,21 @@ hiddenimports = list(bundle_inhalt.HIDDEN_IMPORTS)
 # auffiele.
 hiddenimports += collect_submodules("src")
 
+# OUT-76: mitgelieferte DLLs (libusb fuer uDMX-Adapter) in den Ordner ihres
+# Pakets. Fehlt das Paket beim Bauen, bleibt der Build moeglich — der
+# Selbsttest der gepackten exe meldet es als Fehler.
+binaries = []
+for paket in bundle_inhalt.DYNAMISCHE_BIBLIOTHEKEN:
+    try:
+        gefunden = collect_dynamic_libs(paket)
+    except Exception as e:  # noqa: BLE001
+        gefunden = []
+        print(f"WARNUNG (OUT-76): {paket}: {type(e).__name__}: {e}")
+    if not gefunden:
+        print(f"WARNUNG (OUT-76): keine DLL aus {paket} — uDMX-Adapter laufen "
+              "im Setup dann nicht (requirements.txt installiert?).")
+    binaries += gefunden
+
 if not bundle_inhalt.erzeugte_dateien(REPO):
     print("WARNUNG (DEMO-8): keine Demo-Shows in demo_shows/ — vorher "
           "'python packaging/demo_shows.py' ausfuehren. Der Selbsttest der "
@@ -38,7 +53,7 @@ if not bundle_inhalt.erzeugte_dateien(REPO):
 a = Analysis(  # noqa: F821
     [os.path.join(REPO, "main.py")],
     pathex=[REPO],
-    binaries=[],
+    binaries=binaries,
     datas=bundle_inhalt.datas(REPO),
     hiddenimports=hiddenimports,
     hookspath=[],

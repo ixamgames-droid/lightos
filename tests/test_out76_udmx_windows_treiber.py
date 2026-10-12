@@ -9,9 +9,10 @@ waere alles in Ordnung; erst nach „Verbinden“ stand da ein einzelner Satz. U
   ordnete das als „nimmt keine Daten an — Kabel und Adapter prüfen“ ein.
 * Im LightOS aus dem Installationspaket hiess der Rat „pip install pyusb“.
 
-**Regel des Projektinhabers:** Treiber NIE mitliefern oder installieren — nur
-erkennen, erklaeren und verlinken. Der erste Block unten haelt fest, dass die
-Abfrage nur liest.
+**Auftrag:** fehlenden Treiber erkennen, erklaeren und verlinken — LightOS
+liefert und installiert (Stand OUT-76) keine Treiber. Der erste Block unten
+haelt fest, dass die Abfrage nur liest; das gilt unabhaengig davon, ob spaeter
+Treiber mit dem Setup kommen.
 
 Es wird an kein Geraet gesendet; USB und Windows-Abfrage sind Attrappen (bis
 auf EINEN Lese-Test der echten Abfrage, nur unter Windows).
@@ -59,9 +60,8 @@ def _daten(*zeilen):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_die_abfrage_liest_nur():
-    """Regel des Projekts: LightOS installiert und aendert keine Treiber. Im
-    Modul steht deshalb kein Aufruf, der etwas schreibt, installiert oder ein
-    anderes Programm startet."""
+    """Die Abfrage ist eine Abfrage: im Modul steht kein Aufruf, der etwas
+    schreibt, installiert oder ein anderes Programm startet."""
     with io.open(os.path.join(_REPO, "src", "core", "dmx", "usb_treiber_windows.py"),
                  encoding="utf-8") as f:
         quelle = f.read()
@@ -243,7 +243,8 @@ def test_im_installationspaket_kein_rat_zu_pip(monkeypatch):
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     text = udmx.grund_text(udmx.G_PYUSB_FEHLT)
     assert "pip" not in text
-    assert "Installationspaket" in text and "nicht nachinstallieren" in text
+    assert "Installationspaket" in text and "nachinstallieren lässt er sich dort nicht" in text
+    assert "bitte LightOS aktualisieren" in text      # neuere Setups bringen pyusb mit
     assert "Art-Net" in text
 
 
@@ -273,7 +274,7 @@ def test_fehlt_dazu_pyusb_steht_beides_da(monkeypatch):
     _status, html = th.nach_suche({
         "treiber": _daten((CYL, "", 28, "", "")), "code": udmx.G_PYUSB_FEHLT,
         "text": udmx.grund_text(udmx.G_PYUSB_FEHLT)})
-    assert "Außerdem: Dieses LightOS aus dem Installationspaket" in html
+    assert "Außerdem: Diesem LightOS aus dem Installationspaket fehlt" in html
 
 
 def test_falscher_treiber_und_unsichere_kennung():

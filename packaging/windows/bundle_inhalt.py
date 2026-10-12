@@ -150,6 +150,23 @@ HIDDEN_IMPORTS: tuple[str, ...] = (
     "engineio.async_drivers.threading",
     "sqlalchemy.dialects.sqlite",
     "serial.tools.list_ports",
+    # OUT-76: uDMX-Adapter. ``udmx._usb_laden`` importiert pyusb und
+    # libusb_package erst bei Bedarf, in einer Funktion; pyusb waehlt sein
+    # Backend zur Laufzeit. Ausdruecklich genannt, damit ein Setup ohne sie
+    # schon am Manifest auffaellt und nicht erst beim Klick auf „Verbinden“.
+    "usb.core",
+    "usb.util",
+    "usb.backend.libusb1",
+    "libusb_package",
+)
+
+#: OUT-76: Pakete, deren mitgelieferte DLLs ins Bundle gehoeren — jeweils in
+#: den ORDNER DES PAKETS (``_internal/<paket>/``), dort sucht das Paket selbst.
+#: ``libusb_package`` bringt ``libusb-1.0.dll`` mit (LGPL 2.1): als eigene
+#: Datei, nicht in LightOS.exe eingebaut, also austauschbar — das verlangt die
+#: Lizenz. ★ Keine Treiber: eine DLL im Programmordner ist eine Bibliothek.
+DYNAMISCHE_BIBLIOTHEKEN: tuple[str, ...] = (
+    "libusb_package",
 )
 
 #: Grosse, nur optionale Pakete, die nie ins Setup sollen (BPM-Generator-

@@ -12,8 +12,10 @@ angesteckten USB-Geraet haengt — und sonst nichts:
 * **Nur lesen.** Benutzt werden die Abfragen der Geraeteverwaltung
   (``SetupDiGetClassDevs`` / ``SetupDiGetDeviceRegistryProperty`` /
   ``CM_Get_DevNode_Status``). Kein Geraet wird geoeffnet, nichts wird
-  installiert, zugewiesen oder geaendert. Regel des Projekts: LightOS liefert
-  und installiert NIE Treiber — es erkennt, erklaert und verlinkt.
+  installiert, zugewiesen oder geaendert. Stand OUT-76: LightOS liefert und
+  installiert keine Treiber — es erkennt, erklaert und verlinkt. (Ob kuenftig
+  Treiber mit dem Setup kommen duerfen, wird getrennt geklaert; DIESES Modul
+  bleibt in jedem Fall eine reine Abfrage.)
 * **Ohne pyusb.** Die Abfrage braucht nur ``ctypes``. Sie beantwortet „steckt
   ein bekannter Adapter?“ deshalb auch in einem LightOS ohne pyusb.
 * **Nie raten.** Laesst sich die Lage nicht feststellen (kein Windows, Abfrage
