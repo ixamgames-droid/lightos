@@ -188,7 +188,9 @@ def pruefe_fremdlizenzen(wurzel: str | None = None,
     * jede ``Qt6*.dll`` im Programmordner steht in der Liste (eine Bibliothek,
       die am Filter vorbei hineingeraten ist, faellt hier auf — Qt bietet
       einige Module nur unter der GPL an);
-    * der QML-Ordner von Qt fehlt.
+    * der QML-Ordner von Qt fehlt;
+    * keine Datei der Universal C Runtime liegt bei (sie gehoert zu Windows
+      und kaeme sonst aus einem zufaelligen Ordner des Bau-Rechners).
 
     Im Quellbetrieb gibt es weder Liste noch Bundle: dort nichts.
     """
@@ -225,6 +227,15 @@ def pruefe_fremdlizenzen(wurzel: str | None = None,
     if os.path.isdir(os.path.join(qt_ordner, "qml")):
         fehler.append("Lizenzen: der QML-Ordner von Qt liegt im Programmordner "
                       "(packaging/windows/qt_umfang.py laesst ihn weg)")
+    try:
+        oben = sorted(os.listdir(wurzel))
+    except OSError:
+        oben = []
+    fremd = [n for n in oben if n.lower() == "ucrtbase.dll"
+             or (n.lower().startswith("api-ms-win-") and n.lower().endswith(".dll"))]
+    if fremd:
+        fehler.append(f"Lizenzen: {len(fremd)} Datei(en) der Universal C Runtime im "
+                      f"Programmordner ({fremd[0]} …) — gehoeren zu Windows, nicht ins Setup")
     return fehler
 
 

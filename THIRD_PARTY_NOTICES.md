@@ -171,6 +171,10 @@ sie unverändert ein. LightOS ändert keine dieser Bibliotheken.
 | werkzeug | BSD-3-Clause | <https://github.com/pallets/werkzeug> |
 | wsproto | MIT | <https://github.com/python-hyper/wsproto> |
 
+**bidict** steht unter der Mozilla Public License 2.0: wer eine ihrer Dateien ändert und
+weitergibt, muss die geänderte Datei offenlegen. LightOS gibt bidict unverändert weiter; der
+Quelltext liegt unter der genannten Adresse, der Lizenztext im Setup.
+
 Die Abschnitte danach erklären, was über die Tabelle hinausgeht: Python, Qt mit PySide6
 (LGPL), Chromium und FFmpeg in Qt, weitere enthaltene Bibliotheken und der Startlader.
 Zu pyusb, libusb und libusb-package stehen eigene Abschnitte weiter oben.
@@ -264,6 +268,9 @@ Zu pyusb, libusb und libusb-package stehen eigene Abschnitte weiter oben.
   [`licenses/LGPL-2.1-libusb.txt`](licenses/LGPL-2.1-libusb.txt) (derselbe Lizenztext);
   einzelne Teile unter BSD-, ISC- und MIT-Lizenzen. Nach Angabe von Qt enthalten die
   mitgelieferten Bibliotheken keine der wahlweisen GPL- oder LGPLv3-Teile von FFmpeg.
+  Nachgelesen in den Dateien selbst (PySide6 6.12.0, `avutil`, `avcodec`): sie nennen als
+  Lizenz „LGPL version 2.1 or later“, und ihre Bau-Angaben enthalten weder `--enable-gpl`
+  noch `--enable-nonfree` noch `--enable-version3`.
 - **LGPL:** wie bei Qt – eigene Dateien, zur Laufzeit geladen, austauschbar, unverändert.
 
 ## Weitere enthaltene Bibliotheken (im Windows-Installationspaket)
@@ -281,12 +288,16 @@ in numpy. Das Bauwerkzeug erkennt sie an ihren Dateien.
   überwiegend unter der MIT-Lizenz (<https://docs.mesa3d.org/license.html>). Qt lädt die
   Datei nur, wenn Software-OpenGL verlangt wird. **Offen:** ein Lizenztext liegt der Datei
   nicht bei (LIZ-2, Rückfrage).
-- **Microsoft Visual C++ Laufzeit** (`VCRUNTIME140*.dll`, `MSVCP140*.dll`) und
-  **Universal C Runtime** (`ucrtbase.dll`, `api-ms-win-*.dll`) – von Microsoft, **nicht**
-  Open Source. Sie kommen mit Python und den PySide6-Paketen bzw. vom Bau-Rechner; ihre
-  Weitergabe richtet sich nach Microsofts Bedingungen für „Distributable Code“ (siehe den
-  Abschnitt „Additional Conditions for this Windows binary build“ in
-  `licenses/Python-LICENSE.txt`).
+- **Microsoft Visual C++ Laufzeit** (`VCRUNTIME140*.dll`, `MSVCP140*.dll`) – von Microsoft,
+  **nicht** Open Source. Sie kommt ausschließlich aus der Python-Installation und aus den
+  Paketen (PySide6, shiboken6, numpy), nie von anderswo auf dem Bau-Rechner – eine solche
+  Datei unbekannter Herkunft bricht den Bau ab. Ihre Weitergabe richtet sich nach Microsofts
+  Bedingungen für „Distributable Code“ (siehe den Abschnitt „Additional Conditions for this
+  Windows binary build“ in `licenses/Python-LICENSE.txt`).
+- **Nicht eingebaut – Universal C Runtime** (`ucrtbase.dll`, `api-ms-win-*.dll`): sie gehört
+  zu Windows 10 und 11, und das Setup verlangt Windows 10. Das Bauwerkzeug hätte sie aus
+  einem zufälligen Ordner des Bau-Rechners eingesammelt; sie entfällt, und der Bau wie der
+  Selbsttest des fertigen Programms melden, wenn doch eine dabei ist.
 
 ## PyInstaller — Startlader von LightOS.exe (im Windows-Installationspaket)
 

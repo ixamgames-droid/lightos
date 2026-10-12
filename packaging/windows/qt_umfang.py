@@ -52,6 +52,12 @@ ENTFAELLT_DATEIEN: tuple[str, ...] = (
     "PySide6/plugins/tls/qopensslbackend.dll",
     # Uebersetzungen von Modulen, die nicht mitkommen.
     "PySide6/translations/qtlocation_*.qm",
+    # Kein Qt, aber dieselbe Regel — nichts Zufaelliges vom Bau-Rechner: die
+    # Universal C Runtime gehoert zu Windows 10/11 (das Setup verlangt
+    # Windows 10). PyInstaller nimmt sie trotzdem mit, und zwar aus dem
+    # ERSTEN Ordner im PATH, der sie enthaelt (am Test-Rechner: der eines JDK).
+    "api-ms-win-*.dll",
+    "ucrtbase.dll",
 )
 
 #: Bibliotheken, die nur bleiben, wenn eine verbleibende Binaerdatei sie

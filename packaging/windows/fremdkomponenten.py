@@ -227,10 +227,12 @@ EINGEBETTET: tuple[tuple[str, str, str, str], ...] = (
     ("Microsoft Visual C++ Laufzeit", "Microsoft (nicht Open Source)",
      "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
      r"(^|/)(msvcp|vcruntime|concrt|vccorlib|vcomp)\d+[\w-]*\.dll$"),
-    ("Microsoft Universal C Runtime", "Microsoft (nicht Open Source)",
-     "https://learn.microsoft.com/cpp/windows/universal-crt-deployment",
-     r"^(api-ms-win-[\w-]+|ucrtbase)\.dll$"),
 )
+
+#: Gehoert zu Windows 10/11 und darf NICHT ins Bundle (``qt_umfang`` laesst es
+#: weg): die Universal C Runtime. PyInstaller sammelte sie aus dem PATH des
+#: Bau-Rechners ein.
+WINDOWS_EIGEN = r"^(api-ms-win-[\w-]+|ucrtbase)\.dll$"
 
 #: Python selbst: Lizenz, Bezugsquelle; den Text kopiert der Bau aus der
 #: Installation (``LICENSE.txt`` — enthaelt auch die Hinweise zu bzip2, libffi,
@@ -363,7 +365,9 @@ def erfasse(eintraege, besitzer, python_basis=None, eigene=()):
             pass
         elif _unter(quelle, python_basis):
             python.append(ziel)
-        elif not teil:
+        else:
+            # Auch eine Datei, die wie eine bekannte Bibliothek HEISST: kommt
+            # sie von irgendwo auf dem Bau-Rechner, ist ihre Herkunft unbekannt.
             ohne.append((ziel, quelle))
     return {"pakete": pakete, "python": python, "eingebettet": drin, "ohne": ohne}
 
@@ -458,8 +462,17 @@ def befunde(erfasst: dict, pakete_info: dict, texte,
                    "ohne sie fehlt dem Setup der Lizenztext von Python")
     for ziel, quelle in sorted(erfasst["ohne"]):
         aus.append(f"{ziel}: Herkunft unbekannt (kommt von {quelle}) — gehoert zu "
-                   "keinem installierten Paket, nicht zu Python und nicht zum Repo")
+                   "keinem installierten Paket, nicht zu Python und nicht zum Repo; "
+                   "das Setup darf nichts Zufaelliges vom Bau-Rechner enthalten")
     return aus
+
+
+def windows_eigene(ziele) -> list[str]:
+    """Dateien im Bundle, die zu Windows selbst gehoeren (Universal C Runtime)."""
+    return [f"{z}: gehoert zu Windows 10/11 und soll nicht ins Setup "
+            "(qt_umfang.ENTFAELLT_DATEIEN)"
+            for z in sorted({str(z).replace("\\", "/") for z in ziele})
+            if re.search(WINDOWS_EIGEN, z.lower())]
 
 
 # ── Schreiben ────────────────────────────────────────────────────────────────
@@ -605,7 +618,7 @@ def pruefe_und_schreibe(eintraege, repo: str, arbeitsordner: str,
     python_lizenz = os.path.join(python_basis, PYTHON_LIZENZDATEI)
     ziele = [str(e[0]) for e in eintraege]
     gefunden = befunde(erfasst, info, texte_im_bundle(ziele), python_lizenz)
-    gefunden += qt_befunde(ziele)
+    gefunden += qt_befunde(ziele) + windows_eigene(ziele)
     if gefunden:
         return [], gefunden
     datas = schreibe_lizenzen(arbeitsordner, erfasst, info, python_lizenz,

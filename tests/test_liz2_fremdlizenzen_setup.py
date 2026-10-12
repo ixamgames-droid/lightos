@@ -101,7 +101,8 @@ _BINAER = [
     "PySide6/opengl32sw.dll",
     "libcrypto-3-x64.dll", "libssl-3-x64.dll",       # OpenSSL vom Bau-Rechner
     "libcrypto-3.dll", "libssl-3.dll", "_ssl.pyd",   # OpenSSL von Python
-    "python312.dll",
+    "python312.dll", "VCRUNTIME140.dll",
+    "ucrtbase.dll", "api-ms-win-crt-runtime-l1-1-0.dll",   # gehoert zu Windows
 ]
 _IMPORTE = {
     "PySide6/QtCore.pyd": {"qt6core.dll", "python3.dll"},
@@ -214,6 +215,16 @@ def test_openssl_vom_bau_rechner_faellt_die_von_python_bleibt():
     assert {"libssl-3.dll", "libcrypto-3.dll", "_ssl.pyd"} <= ziele
 
 
+def test_universal_c_runtime_faellt_die_vc_laufzeit_bleibt():
+    """Entscheidung von Sitzung A (12.10.): was Windows 10/11 selbst mitbringt,
+    kommt nicht ins Setup — PyInstaller holte es aus dem PATH des Bau-Rechners."""
+    ziele, bericht = _auswahl()
+    assert "ucrtbase.dll" not in ziele
+    assert "api-ms-win-crt-runtime-l1-1-0.dll" not in ziele
+    assert "ucrtbase.dll" in bericht["entfernt"]
+    assert "VCRUNTIME140.dll" in ziele and "python312.dll" in ziele
+
+
 def test_openssl_bleibt_wenn_jemand_anderes_sie_braucht():
     """Kein blindes Loeschen nach Namen: importiert sie etwas Verbleibendes,
     bleibt sie (und ``fremdkomponenten`` meldet dann ihre unbekannte Herkunft)."""
@@ -275,7 +286,7 @@ def _bundle():
         ("PySide6\\avcodec-63.dll", os.path.join(_SITE, "PySide6", "avcodec-63.dll"), "BINARY"),
         ("json", os.path.join(_BASIS, "Lib", "json", "__init__.py"), "PYMODULE"),
         ("libcrypto-3.dll", os.path.join(_BASIS, "DLLs", "libcrypto-3.dll"), "BINARY"),
-        ("ucrtbase.dll", os.path.join("C:" + os.sep, "irgendwo", "ucrtbase.dll"), "BINARY"),
+        ("VCRUNTIME140.dll", os.path.join(_BASIS, "vcruntime140.dll"), "BINARY"),
         ("src.core.app_state", os.path.join(_EIGEN, "src", "core", "app_state.py"), "PYMODULE"),
         ("licenses\\LGPL-3.0.txt", os.path.join(_EIGEN, "licenses", "LGPL-3.0.txt"), "DATA"),
         ("winrt", "-", "PYMODULE"),                    # Namensraum-Paket ohne Datei
@@ -308,11 +319,11 @@ def test_jede_datei_bekommt_ihre_herkunft():
     erfasst = _erfasst()
     assert sorted(erfasst["pakete"]) == ["flask", "pyserial", "pyside6-addons",
                                          "pyside6-essentials"]
-    assert sorted(erfasst["python"]) == ["json", "libcrypto-3.dll"]
+    assert sorted(erfasst["python"]) == ["VCRUNTIME140.dll", "json", "libcrypto-3.dll"]
     assert erfasst["eingebettet"] == {
         "FFmpeg": ["PySide6/avcodec-63.dll"],
         "OpenSSL (in Python)": ["libcrypto-3.dll"],
-        "Microsoft Universal C Runtime": ["ucrtbase.dll"],
+        "Microsoft Visual C++ Laufzeit": ["VCRUNTIME140.dll"],
     }
     assert erfasst["ohne"] == [], "eigene Dateien und Namensraum-Pakete zaehlen nicht"
 
@@ -381,6 +392,29 @@ def test_datei_unbekannter_herkunft_bricht_den_bau(tmp_path):
     b = fk.befunde(_erfasst(eintraege, karte), _gute_info(), _TEXTE, str(lizenz))
     assert len(b) == 1, b
     assert "libcrypto-3-x64.dll" in b[0] and "Herkunft unbekannt" in b[0]
+
+
+def test_bekannter_name_aus_fremdem_ordner_bricht_den_bau(tmp_path):
+    """Nichts Zufaelliges vom Bau-Rechner: eine VC-Laufzeit, die nicht aus
+    Python oder einem Paket stammt, ist unbekannter Herkunft — auch wenn sie
+    heisst wie die richtige."""
+    eintraege, karte = _bundle()
+    fremd = os.path.join("C:" + os.sep, "Windows", "System32", "MSVCP140.dll")
+    eintraege.append(("MSVCP140.dll", fremd, "BINARY"))
+    lizenz = tmp_path / "LICENSE.txt"
+    lizenz.write_text("PSF", encoding="utf-8")
+    b = fk.befunde(_erfasst(eintraege, karte), _gute_info(), _TEXTE, str(lizenz))
+    assert len(b) == 1 and "MSVCP140.dll" in b[0] and "Herkunft unbekannt" in b[0], b
+    assert "nichts Zufaelliges vom Bau-Rechner" in b[0]
+
+
+def test_universal_c_runtime_im_bundle_bricht_den_bau():
+    b = fk.windows_eigene(["ucrtbase.dll", "api-ms-win-core-file-l1-1-0.dll",
+                           "VCRUNTIME140.dll", "PySide6\\Qt6Core.dll"])
+    assert len(b) == 2, b
+    assert all("gehoert zu Windows" in x for x in b)
+    ziele, _ = _auswahl()
+    assert fk.windows_eigene(ziele) == []
 
 
 @pytest.mark.parametrize("datei, wort", [
@@ -523,7 +557,8 @@ def test_lizenzdateien_und_liste_werden_geschrieben(tmp_path):
     assert "LGPL-3.0.txt, GPL-3.0.txt" in liste
     assert "\nQt6Core.dll | Qt Core\n" in liste
     assert "FFmpeg | LGPL-2.1-or-later |" in liste
-    assert "Microsoft Universal C Runtime | Microsoft (nicht Open Source) |" in liste
+    assert "Microsoft Visual C++ Laufzeit | Microsoft (nicht Open Source) |" in liste
+    assert "Universal C Runtime" not in liste, "wird nicht mehr mitgeliefert"
 
 
 def test_schreiben_raeumt_den_alten_stand_weg(tmp_path):
@@ -665,6 +700,23 @@ def test_eingebettete_bibliotheken_stehen_in_den_hinweisen():
     assert "**nicht** Open Source" in text
 
 
+def test_ffmpeg_variante_und_bidict_hinweis_stehen_da():
+    a = _glatt(_abschnitt("FFmpeg"))
+    assert "LGPL version 2.1 or later" in a
+    assert "`--enable-gpl`" in a and "`--enable-nonfree`" in a
+    w = _glatt(_abschnitt("Windows-Installationspaket"))
+    assert "**bidict** steht unter der Mozilla Public License 2.0" in w
+    assert "unverändert" in w
+
+
+def test_universal_c_runtime_steht_als_nicht_eingebaut_in_den_hinweisen():
+    a = _glatt(_abschnitt("Weitere enthaltene Bibliotheken"))
+    assert "Nicht eingebaut – Universal C Runtime" in a
+    assert "gehört zu Windows 10 und 11" in a
+    iss = _lies("packaging", "windows", "LightOS.iss")
+    assert "MinVersion=10.0" in iss, "darauf beruht das Weglassen"
+
+
 def test_offene_punkte_sind_als_offen_gekennzeichnet():
     """Was rechtlich nicht geklaert ist, steht als offen da — nicht als erledigt."""
     assert "**Offen:**" in _abschnitt("Chromium")
@@ -739,6 +791,15 @@ def test_selbsttest_findet_eine_qt_bibliothek_ausserhalb_der_liste(tmp_path):
     w = _programmordner(tmp_path, qt=("Qt6Core.dll", "Qt6Gui.dll", "Qt6Charts.dll"))
     f = selbsttest.pruefe_fremdlizenzen(w, gefroren=True)
     assert len(f) == 1 and "Qt6Charts.dll" in f[0], f
+
+
+def test_selbsttest_findet_die_universal_c_runtime(tmp_path):
+    w = _programmordner(tmp_path)
+    for name in ("ucrtbase.dll", "api-ms-win-crt-heap-l1-1-0.dll"):
+        with open(os.path.join(w, name), "wb"):
+            pass
+    f = selbsttest.pruefe_fremdlizenzen(w, gefroren=True)
+    assert len(f) == 1 and "Universal C Runtime" in f[0] and "2 Datei(en)" in f[0], f
 
 
 def test_selbsttest_findet_den_qml_ordner(tmp_path):
