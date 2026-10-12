@@ -28,7 +28,6 @@
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
-| FM-66 | D | fix/fm66-abgleich-modellname | 2026-10-10T22:54Z | src/core/database/bibliothek_format.py · tests/test_fm66_abgleich_modellname.py · docs/FIXTURE_LIBRARY.md |
 | LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T14:32Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
@@ -275,7 +274,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:49Z A done OUT-68
 - 2026-10-12T15:49Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T16:05Z B claim DOC-71
 - 2026-10-12T16:20Z B claim STAB-37
@@ -305,3 +303,4 @@
 - 2026-10-12T19:29Z A done VIZ-102
 - 2026-10-12T19:47Z A claim DOC-72
 - 2026-10-12T19:59Z D claim LIZ-2
+- 2026-10-12T20:02Z D done FM-66
