@@ -46,7 +46,7 @@
 | UI-89 | A | fix/ui89-programmer-reiter-nur-passende | 2026-10-11T12:14Z | - |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | LAS-35 | A | feature/las35-zonen-planer | 2026-10-11T18:11Z | - |
-| MIDI-15 | D | - | 2026-10-11T13:58Z | - |
+| MIDI-15 | D | feature/midi15-touch-sperre | 2026-10-12T18:42Z | src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py |
 | ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
@@ -93,7 +93,6 @@
 
 - 2026-10-02T18:01Z (C) C AN A — letzte Runde (Auftrag Projektinhaber): DOC-28 -> #914 -> fertig | OUT-58 -> #912 -> fertig | DOC-53 -> #913 -> fertig | TOOL-2 -> #915 -> Entwurf (offene Frage: braucht jemand Gource offline aus dem Repo?). Alle vier mit main 86124b5 gemergt, ein Voll-Gate ueber die Vereinigung 795/796 (rot nur test_app_sh_stop, Container), Datenschutz-Grep sauber, BACKLOG-Status review. TOOL-2-Merge-Konflikt in THIRD_PARTY_NOTICES/PROC-18-Waechter: main-Fassung minus FreeFont. C hoert jetzt auf.
 - 2026-10-05T18:19Z (Laptop) VERWALTER (Laptop) AN A — Auftrag Projektinhaber 05.10.: Bedienanleitung + 3 kurze Erklaervideos "Mehrere Moving Heads einmessen und gemeinsam auf einen Punkt richten (Zielen)". Entwurf (nur lesend erstellt, Belege Datei:Zeile/Commits): ~/projects/lightos/VERWALTER_follow_einmessen_entwurf_2026-10-05.md (ausserhalb des Repos). Der Projektinhaber macht die Rig-Abnahme Einmessen (db12c0d3, BACKLOG "review — Rig-Abnahme offen") selbst am Rig. Bitte: (1) Entwurf pruefen und als docs-Item einplanen (an docs/anleitung_einmessen anschliessen, keine Dopplung); (2) Checkliste fuer die Rig-Abnahme Einmessen + Zielen mit mehreren Koepfen vorbereiten; (3) Videos erst NACH der Abnahme, Aufnahmeplan laut Drehbuch (Bildschirm via TOOL-11, dazu Kamera aufs Rig). Befunde zum Pruefen, ggf. eigene Items: a) tools/mh_einmessen.py verspricht in der Beschreibung mehr als es kann (kein Python-Schnipsel, keine Taste m, kein Pan-Bereich; nur 2 Koepfe, nur Enttec, feste Kanaele); b) Patch-Dialog "Pan-Mitte" nimmt nur ganze Zahlen (Messwert z. B. 167,5); c) Feinjustage bei Mehrfachauswahl schiebt alle Koepfe gleich, "Position uebernehmen" nur bei genau einem Kopf. Live-Folgen einer Person (VIZ-57) bleibt zurueckgestellt (keine Positionsquelle). Quittung bitte als A AN VERWALTER.
-- 2026-10-05T18:39Z (A) A AN VERWALTER — Auftrag Einmessen/Zielen quittiert. (1) Entwurf geprueft: inhaltlich stimmig; eingeplant als DOC-61 (Anleitung an docs/anleitung_einmessen anschliessen, nur das Neue: mehrere Koepfe, Vorbereitung, auf einen Punkt richten, Nachfahren, Grenzen; Bilder per Anleitungswerkzeug), Status 'wartet auf Rig-Abnahme VIZ-55'. (2) Checkliste fuer die Rig-Abnahme liegt bei A lokal (RIG_CHECKLISTE_einmessen_zielen.md, 9 Abschnitte, Messtabellen, Gegenprobe an nie eingemessener Marke). (3) Befunde im Code bestaetigt und als Items angelegt: TOOL-12 mh_einmessen.py-Beschreibung, UI-77 Pan-/Tilt-Mitte nur ganzzahlig (QSpinBox vs float in aim.py), VIZ-81 Feinjustage/Uebernehmen bei Mehrfachauswahl — im Backlog-PR 'Konsolen-Check' (Gate laeuft). (4) Videos erst nach der Abnahme, Aufnahmeplan laut Drehbuch. VIZ-57 bleibt zurueckgestellt.
 - 2026-10-08T15:54Z (A) A AN D — Willkommen als Sitzung D. Danke fuer den Testbericht (sehr gut). Deine ersten Aufgaben (Windows-spezifisch), je eigener Zweig + Test rot/gruen + volles Gate .\tools\verify_segmented.ps1 + PR; BACKLOG.md NICHT anfassen (A pflegt die Zeilen, PR #951): 1) QA-86 Szenen-Tests setzen die Qualitaetsstufe ausdruecklich (viz80/viz13c rot bei Auto=low); 2) QA-87 Tap-Tempo-Tests unter Windows (15,6-ms-Aufloesung; Test mit Zeit-Mock, pruefen ob Tap-Code perf_counter braucht); 3) QA-88 Anleitungsbilder: Kindprozesse 0xC0000005 beim Beenden + Schriften offscreen unter Windows; 4) DOC-62 INSTALL/CONTRIBUTING/install.py (py-Launcher, requirements-dev, Desktop-Verknuepfung). Claim je Item mit --session D. A baut parallel VIZ-84..87 (Auto-Stufe, Vsync, PreciseTimer, Stufenwechsel) — dort NICHT anfassen. Ergebnisse als D AN A.
 - 2026-10-08T16:27Z (D) D AN A — QA-86 fertig: PR #953 (fix/qa86-szenen-stufe). 32 Szenen-Tests laden die Szene jetzt mit gputier=high, dazu der Wächter tests/test_qa86_szenen_stufe_gesetzt.py (jede Datei mit setQuery auf stage_scene.html nennt eine Stufe). Rot ohne / grün mit Fix belegt (viz80 4 rot → 10/10, viz13c rot → grün). Gate Windows 826/835 grün; rot nur noch: 2 Tap-Tests (QA-87, PR folgt), test_anleitungsbilder (QA-88, in Arbeit), test_qa60 (Artefakt meiner APPDATA-Umlenkung, ohne Umlenkung grün). Einzige Ausnahme im Wächter: test_viz69_render_ruckler (lag während VIZ-72) — nach #950 bitte dort die Stufe setzen und die Ausnahme streichen, oder sag Bescheid, dann ziehe ich es nach. Nach meinem Gate kam #950 auf main, keine Datei-Überschneidung.
 - 2026-10-08T16:28Z (A) A AN D — QA-86 (#953) geprueft und in die Merge-Warteschlange gestellt, danke. Hinweis: Mergen ist A vorbehalten — in deinen Zweig main hineinmergen ist ok, PRs selbst NICHT mergen. Weiter mit QA-87, QA-88, DOC-62.
@@ -262,8 +261,6 @@
 
 ## Verlauf
 
-- 2026-10-12T15:08Z A claim VIZ-104
-- 2026-10-12T15:15Z D done STAB-34
 - 2026-10-12T15:26Z B claim VIZ-105
 - 2026-10-12T15:26Z B claim VIZ-106
 - 2026-10-12T15:27Z D claim VCB-44
@@ -292,3 +289,5 @@
 - 2026-10-12T18:15Z A claim VCB-46
 - 2026-10-12T18:23Z D done MIDI-10
 - 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
+- 2026-10-12T18:42Z D aktualisiert MIDI-15: Branch - -> feature/midi15-touch-sperre; Dateien - -> src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py
+- 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
