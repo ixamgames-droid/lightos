@@ -81,6 +81,7 @@
 | DOC-71 | B | docs/doc71-laser-blackout-anleitungen | 2026-10-12T17:31Z | docs/anleitung_ausgabe_einrichten · docs/anleitung_vc_widgets/01_button.md · docs/anleitung_vc_widgets/01_button.en.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/components/engine/script.md · docs/anleitung_laser/ANLEITUNG_LASER.md · docs/OUTPUT_MERGE_CONTRACT.md · tests/test_doc71_laser_blackout_einheitlich.py · tools/doku_gates.txt |
 | STAB-37 | B | fix/stab37-bibliotheks-hinweis-ist-kein-verlust | 2026-10-12T17:31Z | src/core/show/show_file.py · src/ui/main_window.py · tests/test_stab37_bibliotheks_hinweis_kein_verlust.py · tests/test_fm43_fehlendes_profil_sichtbar.py · tests/test_fm63_lightos_profil_vorrang.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
+| STAB-38 | A | fix/stab38-absturz-matrix-pingpong | 2026-10-12T17:33Z | src/ui/views/rgb_matrix_view.py |
 
 ## Blocker & Fallen
 
@@ -246,7 +247,6 @@
 
 ## Verlauf
 
-- 2026-10-12T13:39Z D claim OUT-73
 - 2026-10-12T13:40Z D claim OUT-74
 - 2026-10-12T13:40Z D claim LAS-38
 - 2026-10-12T13:40Z A claim STAB-35
@@ -276,3 +276,4 @@
 - 2026-10-12T16:44Z D done VCB-43
 - 2026-10-12T17:08Z D done XPLAT-36
 - 2026-10-12T17:12Z D claim OUT-76
+- 2026-10-12T17:33Z A claim STAB-38
