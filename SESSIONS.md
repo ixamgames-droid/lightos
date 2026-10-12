@@ -76,6 +76,7 @@
 | STAB-36 | A | - | 2026-10-12T13:40Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | OUT-75 | D | fix/out75-dmx-monitor-eine-wahrheit | 2026-10-12T15:08Z | src/ui/views/dmx_monitor_view.py · src/core/dmx/output_manager.py · src/ui/widgets/output_config.py |
+| VIZ-104 | A | feature/viz104-strobe-im-3d | 2026-10-12T15:08Z | src/core/color_utils.py · src/ui/visualizer/dmx_push.py · src/ui/views/live_view.py |
 
 ## Blocker & Fallen
 
@@ -232,7 +233,6 @@
 
 ## Verlauf
 
-- 2026-10-11T19:35Z D done UI-80
 - 2026-10-11T19:55Z D done UI-78
 - 2026-10-11T20:18Z A claim WEB-13
 - 2026-10-11T20:28Z A done CDX-58
@@ -262,3 +262,4 @@
 - 2026-10-12T14:26Z A claim WEB-14
 - 2026-10-12T14:44Z D aktualisiert OUT-72: Branch - -> fix/out72-schlussbild-typwechsel-laser-nachlauf; Dateien - -> src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py
 - 2026-10-12T15:08Z D claim OUT-75
+- 2026-10-12T15:08Z A claim VIZ-104
