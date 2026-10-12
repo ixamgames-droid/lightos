@@ -49,7 +49,6 @@
 | MIDI-10 | D | feature/midi10-pitchbend-fader | 2026-10-11T14:47Z | src/core/midi/midi_manager.py · src/core/midi/midi_mapper.py · src/ui/virtualconsole/vc_widget.py · src/ui/virtualconsole/vc_slider.py · src/ui/views/midi_view.py · src/ui/widgets/midi_teach_dialog.py · src/ui/widgets/input_profile_editor.py · tests/test_midi10_pitchbend_fader.py · docs/anleitung_vc_widgets/02_fader.md · docs/anleitung_vc_widgets/02_fader.en.md |
 | MIDI-15 | D | - | 2026-10-11T13:58Z | - |
 | ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
-| XPLAT-36 | D | fix/xplat36-einzellauf-zeitlimit | 2026-10-11T16:30Z | tools/verify_segmented.ps1 · tools/verify_segmented.sh · tests/test_xplat36_einzellauf_zeitlimit.py |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
@@ -245,7 +244,6 @@
 
 ## Verlauf
 
-- 2026-10-12T13:39Z D claim OUT-72
 - 2026-10-12T13:39Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T13:39Z D claim OUT-73
 - 2026-10-12T13:40Z D claim OUT-74
@@ -275,3 +273,4 @@
 - 2026-10-12T16:20Z B claim STAB-37
 - 2026-10-12T16:22Z D done LAS-37
 - 2026-10-12T16:44Z D done VCB-43
+- 2026-10-12T17:08Z D done XPLAT-36
