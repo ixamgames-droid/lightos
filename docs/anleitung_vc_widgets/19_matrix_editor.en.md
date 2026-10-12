@@ -137,7 +137,7 @@ The **style** is a **channel mask**: for each style, only the matching channels 
 |---|---|---|
 | **RGB** | Red/green/blue channels. | Colors (C1–C3 or sequence) |
 | **RGBW** | Like RGB, plus real white on the W channel (white share = min(R,G,B)). | Colors |
-| **Dimmer** | Only the dimmer/intensity channel. The pixel brightness is mapped into the range Min…Max. **Color is switched off.** | Dimmer range (Min/Max) |
+| **Dimmer** | Only the dimmer/intensity channel. The pixel brightness is mapped between the **„Untergrund"** (background) level and **„Dimmer-Bereich" → Max**. **Color is switched off.** | „Dimmer-Bereich" (Max), group **„Untergrund"** (background: „Art", „Helligkeit" in %; see [dimmer matrix guide](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)) |
 | **Shutter** | Only the shutter channel. The pixel brightness is mapped into the shutter range Min…Max. **Color is switched off.** | Shutter range (Min/Max) |
 
 > **Important:** If you set the style to **Dimmer** or **Shutter**, the color selection disappears completely – the matrix then only controls brightness or the shutter. In the preview these styles are shown in greyscale.
