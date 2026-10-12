@@ -77,7 +77,7 @@ def hex_to_rgb(hexc: str) -> tuple[int, int, int]:
 _WHEEL_ATTRS = ("color_wheel", "colour_wheel", "color")
 
 
-def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
+def color_attrs_for_fixture(channels, rgb, *, cmy: bool = False) -> dict[str, int]:
     """Mappt eine Ziel-RGB-Farbe (r, g, b ints 0-255) auf die zu setzenden
     Attribut→Wert-Paare EINES Fixtures, anhand seiner echten Kanaele.
 
@@ -94,6 +94,13 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
          Mittelpunkt (range_from+range_to)//2. → {"color": wert}.
       3) sonst color_w/white-Kanal falls vorhanden → Helligkeit max(r,g,b).
       4) sonst {} (leer).
+
+    ``cmy=True`` (ENG-36, Klonen) schaltet zwischen 1 und 2 die subtraktive
+    Mischung ein: hat das Fixture ``cmy_c/m/y`` (bzw. ``cyan/magenta/yellow``),
+    wird ``c = 255 - r`` usw. geschrieben — die Umkehrung von ``visual_rgb``
+    Stufe 2. Bewusst NUR auf Wunsch: stuende es fest in der Kette, bekaeme ein
+    CMY-Mover in einer bestehenden Matrix oder am Farbwaehler ploetzlich Werte,
+    die er bisher nicht bekam (heute greift dort das Farbrad oder nichts).
 
     Hinweis: In Fall 1 ist ``color_w`` der ADDITIVE Weissanteil — die eigentliche
     RGBW-Reduktion (RGB minus Weiss; reines Weiss -> RGB=0, vgl. Modul-Doku) macht
@@ -119,6 +126,13 @@ def color_attrs_for_fixture(channels, rgb) -> dict[str, int]:
         if "color_w" in attrs:
             out["color_w"] = min(r, g, b)
         return out
+
+    # 1b) CMY, subtraktiv — nur auf Wunsch (s. Docstring) ----------------------
+    if cmy:
+        for tripel in _CMY_TRIPLES:
+            if set(tripel) & attrs:
+                return {name: 255 - wert
+                        for name, wert in zip(tripel, (r, g, b)) if name in attrs}
 
     # 2) Farbrad (color_wheel / colour_wheel / color) -------------------------
     color_ch = None
