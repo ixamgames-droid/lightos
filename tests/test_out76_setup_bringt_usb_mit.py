@@ -211,7 +211,8 @@ def test_im_repo_liegt_kein_treiber():
     dieser Test wird dann bewusst geaendert, nicht still gruen gehalten."""
     try:
         aus = subprocess.run(["git", "ls-files"], cwd=_REPO, capture_output=True,
-                             text=True, check=True).stdout.splitlines()
+                             text=True, encoding="utf-8", errors="replace",
+                             check=True).stdout.splitlines()
     except (OSError, subprocess.CalledProcessError):
         pytest.skip("kein Git")
     verdaechtig = [d for d in aus
