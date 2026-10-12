@@ -251,8 +251,13 @@ pressed in the header bar:
    the heads stay where they are and do not first drive back when you release the
    blackout.
 
-Fixtures without a dimmer channel, lasers and fog machines go completely off during a
-blackout.
+Fixtures without a dimmer channel and fog machines go completely to 0 during a
+blackout. **Lasers** get the **off value from their fixture profile** (for example the
+operating mode “Laser off”), all their other channels go to 0. The off value is not
+always 0 — so after a blackout the DMX monitor does not necessarily show 0 on every
+laser channel. If the profile knows no off value, a laser may keep emitting (details,
+including the **laser emergency stop** LASER NOT-AUS, in the
+[laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 ## 8. Reading warnings in the status bar
 

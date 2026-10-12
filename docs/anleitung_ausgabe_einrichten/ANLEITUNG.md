@@ -235,7 +235,12 @@ Kopfleiste gedrückt:
    Heads. Sie behalten ihre Werte (200 und 60), nur deren Dimmer geht auf 0. Die Köpfe
    bleiben also stehen und fahren beim Lösen nicht erst zurück.
 
-Geräte ohne Dimmerkanal, Laser und Nebel gehen beim Blackout ganz aus.
+Geräte ohne Dimmerkanal und Nebelmaschinen gehen beim Blackout ganz auf 0.
+**Laser** bekommen den **Aus-Wert aus ihrem Geräteprofil** (z. B. Betriebsart
+„Laser aus“), alle übrigen Laser-Kanäle gehen auf 0. Der Aus-Wert ist nicht immer 0 —
+im DMX-Monitor steht bei einem Laser nach dem Blackout also nicht unbedingt überall
+0. Kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich weiter (Einzelheiten,
+auch zum **Laser-NOT-AUS**: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 ## 8. Warnungen in der Statusleiste lesen
 

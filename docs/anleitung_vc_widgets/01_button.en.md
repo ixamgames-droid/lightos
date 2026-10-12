@@ -88,7 +88,7 @@ Depending on the selected **Aktion**, the dialog only shows the fields that appl
 | Programmer leeren (Clear) | Clears the programmer (releases manual colors/snaps) |
 | Alles stoppen (stop all) | Stops all executors/playbacks (`stop_all`) |
 | Effekte stoppen (Tempo bleibt) (stop effects (tempo stays)) | Stops all running effect functions; tempo/BPM stay unchanged (pause/effect stop) |
-| Blackout | Switches blackout on while pressed (momentary override) — everything to 0, only position/gobo/optics of moving heads with a dimmer stay where they are; lasers/fog completely off. With **Blackout-Ziel** (blackout target), only the selected fixtures/groups (see below) |
+| Blackout | Switches blackout on while pressed (momentary override) — everything to 0, only position/gobo/optics of moving heads with a dimmer stay where they are; fog completely to 0, lasers to the off value of their profile (not always 0, see below). With **Blackout-Ziel** (blackout target), only the selected fixtures/groups (see below) |
 | Laser scharf/unscharf (laser armed/disarmed) | Arms/disarms the network laser output (disarmed = output blanked) — LAS-10 |
 | Laser NOT-AUS (laser EMERGENCY STOP) | Laser emergency stop: dark immediately + disarm |
 | Laser-Muster abrufen | Recalls a saved laser pattern (pattern palette) — LAS-18 |
@@ -130,7 +130,7 @@ Depending on the selected **Aktion**, the dialog only shows the fields that appl
 
 ## Blackout with target (VCB-11)
 
-With the action **Blackout**, the dialog shows the **Blackout-Ziel** list. If it stays empty, the button is the global blackout as before. With **+ Gerät/Gruppe hinzufügen** (+ add fixture/group) you can enter individual fixtures and/or fixture groups — then, while pressed, the button blacks out **only these**; everything else keeps running. The same rule applies as for the global blackout: dimmer, color and intensity go to 0, pan/tilt/gobo/optics of lamps with a dimmer stay where they are, lamps without a dimmer as well as lasers and fog go completely off.
+With the action **Blackout**, the dialog shows the **Blackout-Ziel** list. If it stays empty, the button is the global blackout as before. With **+ Gerät/Gruppe hinzufügen** (+ add fixture/group) you can enter individual fixtures and/or fixture groups — then, while pressed, the button blacks out **only these**; everything else keeps running. The same rule applies as for the global blackout: dimmer, color and intensity go to 0, pan/tilt/gobo/optics of lamps with a dimmer stay where they are, lamps without a dimmer and fog go completely to 0. **Lasers** get the **off value from their fixture profile** (not always 0), their other channels go to 0; if the profile knows no off value, a laser may keep emitting (details, including the laser emergency stop LASER NOT-AUS, in the [laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 **How to set it up** (the pictures show the documentation demo show from [Anleitungsbilder aus dem Code erzeugen](../ANLEITUNGSBILDER.md) (German) with the group „PAR links“ (PAR left) = PAR 1–4): switch on **Bearbeiten**, create a button and double-click it.
 

@@ -22,7 +22,7 @@ Unterstützte Befehle:
 | `setfixture <fid> <attribute> <value>` | setzt einen Fixture-Kanal per Attribut |
 | `start function <fid>` | startet eine andere Funktion |
 | `stop function <fid>` | stoppt eine andere Funktion |
-| `blackout on\|off` | schaltet den globalen Blackout (wie der Knopf oben rechts): Dimmer/Farbe/Laser/Nebel auf 0, Pan/Tilt/Gobo/Optik von Lampen mit Dimmer bleiben stehen; `off` löst nur einen Blackout, den dieses Skript selbst eingeschaltet hat |
+| `blackout on\|off` | schaltet den globalen Blackout (wie der Knopf oben rechts): Dimmer/Farbe/Nebel auf 0, Laser auf den Aus-Wert ihres Geräteprofils (nicht immer 0; ohne Aus-Wert im Profil kann ein Laser weiterstrahlen, s. Laser-Anleitung zu Blackout und NOT-AUS), Pan/Tilt/Gobo/Optik von Lampen mit Dimmer bleiben stehen; `off` löst nur einen Blackout, den dieses Skript selbst eingeschaltet hat |
 
 Unbekannte Zeilen werden ignoriert (protokolliert). Pro Frame werden bis zu 50
 Zeilen abgearbeitet, bis ein `wait` oder das Skript-Ende erreicht ist.

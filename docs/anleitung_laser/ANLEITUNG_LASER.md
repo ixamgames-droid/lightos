@@ -186,10 +186,12 @@ hier — ein Laser bekommt also nicht einfach überall 0:
 - **Laser-NOT-AUS:** schreibt an jede Laser-Adresse mit bekanntem Aus-Wert
   diesen Wert, an alle übrigen Laser-Adressen 0 — und gewinnt immer (auch
   gegen Kanal-Modifier, Grand Master und Blackout).
-- Kennt das Profil **keinen** Aus-Wert (siehe oben), gibt es nichts zu
-  schreiben: Blackout und Ziel-Blackout setzen dann die Lichtkanäle auf 0,
-  ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man
-  bei Lasern deshalb nach einem Blackout nicht unbedingt überall 0.
+- Alle übrigen Kanäle eines Lasers gehen bei Blackout und Ziel-Blackout auf 0.
+  Im DMX-Monitor sieht man bei Lasern nach einem Blackout deshalb die
+  Aus-Werte und sonst 0 — nicht unbedingt überall 0.
+- Kennt das Profil **keinen** Aus-Wert (siehe oben), bleibt es bei der 0 auf
+  allen Kanälen. Bedeutet 0 an der Betriebsart dieses Lasers nicht „aus“
+  (sondern z. B. „Auto“), strahlt er trotz Blackout weiter.
 
 ### Laser-EFX (Bewegung)
 
