@@ -35,15 +35,98 @@
             {"von": 100, "bis": 149, "name": "Auto-Modus", "art": ""},
             {"von": 150, "bis": 199, "name": "Statische Muster (DMX)", "art": "open"},
             {"von": 200, "bis": 255, "name": "Dynamische Muster (DMX)", "art": "open"}
-          ]
+          ],
+          "laser": {
+            "version": 1,
+            "betriebsart": [
+              {"von": 0, "bis": 49, "art": "aus", "steuert": false},
+              {"von": 50, "bis": 99, "art": "musik", "steuert": false},
+              {"von": 100, "bis": 149, "art": "auto", "steuert": false},
+              {"von": 150, "bis": 199, "art": "statisch", "steuert": true},
+              {"von": 200, "bis": 255, "art": "dynamisch", "steuert": true}
+            ]
+          }
         },
-        {"name": "Musterauswahl", "attribut": "gobo_wheel", "default": 0, "highlight": 0},
-        {"name": "Position X (0-10 = Mitte)", "attribut": "laser_x", "default": 0, "highlight": 0},
-        {"name": "Position Y (0-10 = Mitte)", "attribut": "laser_y", "default": 0, "highlight": 0},
+        {
+          "name": "Musterauswahl",
+          "attribut": "gobo_wheel",
+          "default": 0,
+          "highlight": 0,
+          "laser": {
+            "version": 1,
+            "muster": [
+              {"von": 0, "bis": 0, "name": "Kreis", "form": "kreis"},
+              {"von": 32, "bis": 32, "name": "vier kleine Kreise", "form": "mehrere_kreise", "anzahl": 4},
+              {"von": 64, "bis": 64, "name": "Strich", "form": "linie_waagerecht"},
+              {"von": 96, "bis": 96, "name": "gepunkteter Kreis", "form": "kreis", "stil": "gepunktet"},
+              {"von": 128, "bis": 128, "name": "gepunktetes Dreieck", "form": "dreieck", "stil": "gepunktet"},
+              {"von": 160, "bis": 160, "name": "Quadrat", "form": "quadrat"},
+              {"von": 192, "bis": 192, "name": "Stern", "form": "stern"},
+              {"von": 240, "bis": 240, "name": "pulsierender Kreis", "form": "kreis", "bewegt": true}
+            ]
+          }
+        },
+        {
+          "name": "Position X (0-10 = Mitte)",
+          "attribut": "laser_x",
+          "default": 0,
+          "highlight": 0,
+          "laser": {
+            "version": 1,
+            "richtung": {
+              "umgekehrt": true,
+              "ende_niedrig": "rechts",
+              "ende_hoch": "links",
+              "mitte": {"von": 0, "bis": 10}
+            }
+          }
+        },
+        {
+          "name": "Position Y (0-10 = Mitte)",
+          "attribut": "laser_y",
+          "default": 0,
+          "highlight": 0,
+          "laser": {
+            "version": 1,
+            "richtung": {
+              "umgekehrt": true,
+              "ende_niedrig": "oben",
+              "ende_hoch": "unten",
+              "mitte": {"von": 0, "bis": 10}
+            }
+          }
+        },
         {"name": "Scangeschwindigkeit", "attribut": "laser_scan_rate", "default": 0, "highlight": 0},
         {"name": "Geschwindigkeit dynamische Muster", "attribut": "effect_speed", "default": 0, "highlight": 0},
-        {"name": "Zoom / Größe", "attribut": "zoom", "default": 128, "highlight": 128},
-        {"name": "Farbe", "attribut": "laser_color", "default": 0, "highlight": 0},
+        {
+          "name": "Zoom / Größe",
+          "attribut": "zoom",
+          "default": 128,
+          "highlight": 128,
+          "laser": {
+            "version": 1,
+            "richtung": {"umgekehrt": true, "ende_niedrig": "gross", "ende_hoch": "klein"}
+          }
+        },
+        {
+          "name": "Farbe",
+          "attribut": "laser_color",
+          "default": 0,
+          "highlight": 0,
+          "laser": {
+            "version": 1,
+            "farben": [
+              {"von": 0, "bis": 1, "name": "bunt", "farbe": "mehrfarbig"},
+              {"von": 2, "bis": 3, "name": "weiss", "farbe": "#ffffff"},
+              {"von": 4, "bis": 5, "name": "magenta", "farbe": "#ff3ad8"},
+              {"von": 8, "bis": 8, "name": "gelb", "farbe": "#ffe32a"},
+              {"von": 10, "bis": 10, "name": "blau", "farbe": "#3a6aff"},
+              {"von": 12, "bis": 12, "name": "rot", "farbe": "#ff2a2a"},
+              {"von": 80, "bis": 80, "name": "hellblau (cyan)", "farbe": "#2ae6ff"},
+              {"von": 120, "bis": 120, "name": "gruen", "farbe": "#2aff4a"}
+            ]
+          }
+        },
         {"name": "Farbsegmente", "attribut": "laser_color_change", "default": 0, "highlight": 0}
       ]
     }
