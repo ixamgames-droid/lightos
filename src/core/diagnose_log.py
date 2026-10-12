@@ -55,7 +55,7 @@ _LOCK_TIMEOUT = 0.25               # nie laenger auf das Log warten
 _PAKET_MAX_JE_DATEI = 8 * 1024 * 1024
 #: Was NIE ins Diagnosepaket darf (Shows, Datenbanken samt Begleitdateien).
 _VERBOTENE_ENDUNGEN = (".lshow", ".db", ".db-wal", ".db-shm", ".db-journal",
-                       ".sqlite", ".sqlite3")
+                       ".sqlite", ".sqlite3", ".lic")
 
 
 # ── Pfade ────────────────────────────────────────────────────────────────────
@@ -741,6 +741,31 @@ def _windows_architektur() -> str:
                                bits=bits)
 
 
+def _urheber_text() -> str:
+    """LIZ-1: Urheberangabe fuer Kopfblock und systeminfo.txt."""
+    from src.core import lizenz
+    return f"{lizenz.COPYRIGHT} | {lizenz.QUELLE}"
+
+
+def _lizenz_text() -> str:
+    """LIZ-1: Lizenzstatus OHNE den Namen des Lizenznehmers — das Paket geht an
+    Dritte, dort steht nur die gekuerzte Kennung der Lizenz."""
+    from src.core import lizenz
+    return lizenz.pruefe().log_text()
+
+
+def _vermerk(app_version: str = "?") -> str:
+    """LIZ-1: „erstellt mit LightOS … von …“ fuer LIESMICH.txt/systeminfo.txt."""
+    try:
+        from src.core import lizenz
+        version = app_version if app_version and app_version != "?" else None
+        zeile = lizenz.vermerk_zeile(version)
+        return (f"{zeile[:1].upper()}{zeile[1:]}\n"
+                f"Paketformat {lizenz.paket_kennzeichen()}\n")
+    except Exception as e:                          # noqa: BLE001
+        return f"Erstellt mit LightOS (? {type(e).__name__})\n"
+
+
 def basis_infos(app_version: str = "?", programm_dir: str | None = None
                 ) -> list[tuple[str, str]]:
     """Was schon VOR der QApplication feststeht. Jede Zeile einzeln abgesichert."""
@@ -754,6 +779,7 @@ def basis_infos(app_version: str = "?", programm_dir: str | None = None
         zeilen.append((name, anonymisiere(str(wert))))
 
     feld("LightOS", lambda: app_version)
+    feld("Urheber", _urheber_text)
     feld("Commit", lambda: commit_text(programm_dir) or "unbekannt")
     feld("Gefroren (Installer-Build)",
          lambda: "ja" if getattr(sys, "frozen", False) else "nein (Quellbetrieb)")
@@ -944,8 +970,13 @@ def melde_laufzeit_umgebung() -> None:
 
 
 def systeminfo_text(app_version: str = "?", programm_dir: str | None = None) -> str:
-    zeilen = [f"LightOS-Systeminfo, erstellt {_cl._ts()}", ""]
+    zeilen = [f"LightOS-Systeminfo, erstellt {_cl._ts()}",
+              _vermerk(app_version).rstrip("\n"), ""]
     zeilen += [f"{k}: {v}" for k, v in basis_infos(app_version, programm_dir)]
+    try:
+        zeilen.append(f"Lizenz: {_lizenz_text()}")
+    except Exception as e:                          # noqa: BLE001
+        zeilen.append(f"Lizenz: ? ({type(e).__name__})")
     for titel, werte in (("Bildschirme", bildschirm_infos()),
                          ("DMX-Ausgaenge", dmx_infos()),
                          ("uDMX (USB)", udmx_infos()), ("MIDI", midi_infos())):
@@ -1233,6 +1264,8 @@ def erstelle_diagnosepaket(ziel: str | None = None, app_version: str = "?",
         eintraege[0] = ("LIESMICH.txt", _LIESMICH + _liesmich_absturzhinweise(befunde))
     except Exception:
         pass
+    # LIZ-1: Herkunftsvermerk ans Ende der Uebersicht.
+    eintraege[0] = (eintraege[0][0], eintraege[0][1] + "\n" + _vermerk(app_version))
     tmp = ziel + ".tmp"
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for name, text in eintraege:
