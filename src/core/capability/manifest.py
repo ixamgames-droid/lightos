@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import os
 
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from ..qt_plattform import offscreen_fuer_werkzeuge
+
+offscreen_fuer_werkzeuge()      # STAB-34: nie in eine laufende App hinein
 
 from .reflect import get_capabilities
 
