@@ -82,6 +82,7 @@
 | STAB-37 | B | fix/stab37-bibliotheks-hinweis-ist-kein-verlust | 2026-10-12T17:31Z | src/core/show/show_file.py · src/ui/main_window.py · tests/test_stab37_bibliotheks_hinweis_kein_verlust.py · tests/test_fm43_fehlendes_profil_sichtbar.py · tests/test_fm63_lightos_profil_vorrang.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | STAB-38 | A | fix/stab38-absturz-matrix-pingpong | 2026-10-12T17:33Z | src/ui/views/rgb_matrix_view.py |
+| FM-75 | D | fix/fm75-live-test-laser-rueckfrage | 2026-10-12T17:35Z | src/ui/widgets/fixture_generator.py · tests/test_fm75_live_test_laser_rueckfrage.py · docs/anleitung_fixture_generator |
 
 ## Blocker & Fallen
 
@@ -248,7 +249,6 @@
 
 ## Verlauf
 
-- 2026-10-12T13:40Z D claim OUT-74
 - 2026-10-12T13:40Z D claim LAS-38
 - 2026-10-12T13:40Z A claim STAB-35
 - 2026-10-12T13:40Z A claim STAB-36
@@ -278,3 +278,4 @@
 - 2026-10-12T17:08Z D done XPLAT-36
 - 2026-10-12T17:12Z D claim OUT-76
 - 2026-10-12T17:33Z A claim STAB-38
+- 2026-10-12T17:35Z D claim FM-75
