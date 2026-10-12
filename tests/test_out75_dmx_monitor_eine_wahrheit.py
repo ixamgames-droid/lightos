@@ -354,6 +354,34 @@ class SperreJeAusgabewegTest(_MitAnsicht):
     def test_universum_ohne_ausgang_hat_keine_wege(self):
         self.assertEqual(self.om.gesendete_wege(2), [])
 
+    def test_udmx_ist_ein_eigener_weg_mit_eigener_sperre(self):
+        """OUT-68: alle uDMX-Ausgaenge teilen sich einen Ausgabeweg — auch
+        dessen Sperre muss der Monitor zeigen koennen."""
+        udmx = _Enttec("16c0:05dc@1-4")
+        self.om._udmx_outputs[1] = udmx
+        self.om._laser_estop_wege = {self.om._weg_udmx(): {10: 77}}
+        self.om._send_all()
+        wege = {w["weg"]: w for w in self.om.gesendete_wege(1)}
+        self.assertEqual(sorted(wege), ["Art-Net", "Enttec", "uDMX"])
+        self.assertEqual(wege["uDMX"]["ziel"], "16c0:05dc@1-4")
+        self.assertEqual(wege["uDMX"]["daten"][9], 77)
+        self.assertEqual(wege["Enttec"]["daten"][9], 120)
+        self.assertEqual(udmx.bilder[-1][9], 77, "und genau das ging hinaus")
+
+    def test_der_monitor_bietet_den_udmx_weg_an(self):
+        self.om._udmx_outputs[1] = _Enttec("16c0:05dc@1-4")
+        self.om._laser_estop_wege = {self.om._weg_udmx(): {10: 77}}
+        self.om._send_all()
+        self._waehle(1)
+        combo = self.ansicht._combo_weg
+        stelle = combo.findText("uDMX → 16c0:05dc@1-4")
+        self.assertGreaterEqual(stelle, 0, [combo.itemText(i) for i in range(combo.count())])
+        combo.setCurrentIndex(stelle)
+        self.ansicht._zeige_stand()
+        self.assertEqual(self._werte()[9], 77)
+        self.assertIn("NOT-AUS-Sperre auf diesem Ausgang: 1 Adresse",
+                      self.ansicht._lbl_ausgang.text())
+
     def test_manager_ohne_init_ueberlebt(self):
         om = OutputManager.__new__(OutputManager)
         self.assertEqual(om.gesendete_wege(1), [])
@@ -403,6 +431,9 @@ class _FakeOM:
 
     def add_sacn(self, u, ip=None, out_universe=None):
         self.rufe.append(("sacn", int(u), ip))
+
+    def add_udmx(self, u, schluessel=""):
+        self.rufe.append(("udmx", int(u), schluessel))
 
 
 class RueckfrageTest(unittest.TestCase):
@@ -533,6 +564,47 @@ class RueckfrageTest(unittest.TestCase):
         self.dlg._spin_sacn_univ.setValue(1)
         self.dlg._apply_sacn()
         self.assertEqual(self.fragen, [])
+
+    # ── uDMX (OUT-68) ──
+
+    def _udmx(self, schluessel="16c0:05dc@1-4", universum=1):
+        self.dlg._combo_udmx.clear()
+        self.dlg._combo_udmx.addItem(schluessel, schluessel)
+        self.dlg._spin_udmx_univ.setValue(universum)
+        self.dlg._connect_udmx()
+
+    def test_udmx_verbinden_fragt_bei_laufendem_enttec(self):
+        self._laeuft("Enttec", "COM3")
+        self._udmx()
+        self.assertEqual(len(self.fragen), 1)
+        self.assertIn("Enttec → COM3", self.fragen[0])
+        self.assertIn("uDMX → 16c0:05dc@1-4", self.fragen[0])
+        self.assertEqual(self.om.rufe, [], "nichts entfernt, nichts eingerichtet")
+        self.assertEqual(self._gespeichert(), [])
+        self.assertIn("Abgebrochen", self.dlg._lbl_udmx_status.text())
+
+    def test_udmx_ja_ersetzt(self):
+        self._laeuft("Enttec", "COM3")
+        self.antwort = oc.QMessageBox.StandardButton.Yes
+        self._udmx()
+        self.assertEqual(self.om.rufe, [("weg", 1), ("udmx", 1, "16c0:05dc@1-4")])
+
+    def test_udmx_unveraendert_keine_frage(self):
+        self._laeuft("uDMX", "16c0:05dc@1-4")
+        self._udmx()
+        self.assertEqual(self.fragen, [])
+        self.assertEqual(self.om.rufe, [("weg", 1), ("udmx", 1, "16c0:05dc@1-4")])
+
+    def test_anderer_udmx_adapter_wird_gefragt(self):
+        self._laeuft("uDMX", "16c0:05dc@1-5")
+        self._udmx()
+        self.assertEqual(len(self.fragen), 1)
+
+    def test_enttec_verbinden_fragt_bei_laufendem_udmx(self):
+        self._laeuft("uDMX", "16c0:05dc@1-4")
+        self._enttec()
+        self.assertEqual(len(self.fragen), 1)
+        self.assertIn("uDMX → 16c0:05dc@1-4", self.fragen[0])
 
     # ── Grundlage der Frage ──
 
