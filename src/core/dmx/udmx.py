@@ -71,6 +71,16 @@ G_NAME_UNKLAR = 9
 
 UDEV_REGEL = "60-lightos-udmx.rules"
 
+# ── OUT-76: Treiber unter Windows — erkennen, erklaeren, verlinken ───────────
+#: Lage des Treibers eines Adapters (``UdmxGeraet.treiber``); leer = nicht
+#: festgestellt (kein Windows, Abfrage nicht moeglich, mehrere gleiche Adapter
+#: mit verschiedener Lage).
+T_PASST, T_FEHLT, T_ANDERER = "passt", "fehlt", "anderer"
+#: Nur offizielle Seiten. LightOS oeffnet sie nie von selbst.
+LINK_ZADIG = "https://zadig.akeo.ie"
+LINK_WINUSB = ("https://learn.microsoft.com/windows-hardware/drivers/usbcon/"
+               "winusb-installation")
+
 
 @dataclass(frozen=True)
 class Kennung:
@@ -126,6 +136,12 @@ class UdmxGeraet:
     bestaetigt: bool = True
     hinweis: str = ""
     stall_ist_erfolg: bool = False
+    #: OUT-76 (nur Windows): ``T_PASST`` / ``T_FEHLT`` / ``T_ANDERER``, leer =
+    #: nicht festgestellt. ``treiber_dienst`` = Name des Treibers laut Windows.
+    #: Nur eine AUSKUNFT fuer Liste und Meldung — ob der Adapter sendet,
+    #: entscheidet weiterhin allein der Sendeversuch.
+    treiber: str = ""
+    treiber_dienst: str = ""
     _dev: object = field(default=None, repr=False, compare=False)
 
     @property
@@ -149,18 +165,74 @@ class UdmxGeraet:
         elif self.ort:
             teile.append(f"Anschluss {self.ort}")
         text = " · ".join(teile)
-        return text if self.bestaetigt else f"{text} — {self.hinweis or 'nicht bestätigt'}"
+        if not self.bestaetigt:
+            return f"{text} — {self.hinweis or 'nicht bestätigt'}"
+        zusatz = treiber_kurz(self.treiber, self.treiber_dienst)
+        return f"{text} — {zusatz}" if zusatz else text
 
 
 # ── Texte ────────────────────────────────────────────────────────────────────
 
+def treiber_kurz(lage: str, dienst: str = "") -> str:
+    """OUT-76: Zusatz in der Adapter-Liste, leer wenn nichts zu sagen ist."""
+    if lage == T_FEHLT:
+        return "Treiber fehlt (WinUSB zuweisen)"
+    if lage == T_ANDERER:
+        wer = f" „{dienst}“" if dienst else ""
+        return f"falscher Treiber{wer} (WinUSB nötig)"
+    return ""
+
+
+def windows_treiber_schritte(usb_id: str = "") -> list[str]:
+    """OUT-76: der Weg zum WinUSB-Treiber, Schritt fuer Schritt — EINE Quelle
+    fuer Dialog, Diagnosepaket und INSTALL.md (der Test vergleicht sie).
+
+    ``usb_id`` = Kennung des gefundenen Adapters (``"2008:1066"``); ohne sie
+    stehen beide bekannten Kennungen im Text.
+    """
+    if usb_id:
+        vid, _, pid = usb_id.partition(":")
+        welche = f"USB ID {vid.upper()} {pid.upper()}"
+    else:
+        welche = "USB ID 2008 1066 (CYL-6602) oder 16C0 05DC (Anyma uDMX)"
+    return [
+        f"Das Programm Zadig laden: {LINK_ZADIG} — ein freies Programm eines "
+        f"anderen Anbieters. LightOS liefert und installiert keine Treiber.",
+        "Den Adapter einstecken und Zadig starten (Windows fragt nach "
+        "Administratorrechten).",
+        f"In Zadig im Menü „Options“ den Punkt „List All Devices“ einschalten "
+        f"und in der Liste den Adapter wählen — zu erkennen an {welche}.",
+        "Als Treiber „WinUSB“ einstellen und auf „Install Driver“ (oder "
+        "„Replace Driver“) klicken; das dauert bis zu einer Minute.",
+        "Zurück in LightOS: im Reiter „uDMX (USB)“ auf „Adapter suchen“ und "
+        "dann auf „Verbinden“ klicken.",
+    ]
+
+
+def windows_treiber_achtung() -> str:
+    """Die eine Warnung, die zu den Schritten gehoert."""
+    return ("Achtung: in Zadig genau den Adapter wählen. Zadig ersetzt den "
+            "Treiber des gewählten Geräts — eine Maus, eine Tastatur oder ein "
+            "anderes Gerät funktioniert danach nicht mehr, bis man es im "
+            "Geräte-Manager von Windows deinstalliert (mit „Treiber löschen“) "
+            "und neu einsteckt.")
+
+
+def ist_installationspaket() -> bool:
+    """Laeuft LightOS aus dem Windows-Setup (gepackt), nicht aus dem Quelltext?
+    Dann laesst sich nichts mit ``pip`` nachinstallieren."""
+    return bool(getattr(sys, "frozen", False))
+
+
 def rechte_hinweis() -> str:
     """Was auf DIESEM Betriebssystem einmalig einzurichten ist."""
     if sys.platform.startswith("win"):
-        return ("Windows hat für uDMX-Adapter keinen eigenen Treiber. Dem Gerät "
-                "muss einmalig der WinUSB-Treiber zugewiesen werden (z. B. mit "
-                "dem Programm Zadig, Adminrechte nötig). LightOS installiert "
-                "keine Treiber — siehe INSTALL.md, Abschnitt „uDMX-Adapter“.")
+        return ("Windows hat für uDMX-Adapter keinen eigenen Treiber, und "
+                "LightOS liefert und installiert keine Treiber. Dem Gerät muss "
+                "einmalig von Hand der WinUSB-Treiber zugewiesen werden "
+                f"(z. B. mit dem Programm Zadig, {LINK_ZADIG}, Adminrechte "
+                "nötig). Schritt für Schritt: Reiter „uDMX (USB)“ → „Adapter "
+                "suchen“ oder INSTALL.md, Abschnitt „uDMX-Adapter“.")
     if sys.platform == "darwin":
         return "Unter macOS ist kein Treiber nötig; libusb muss installiert sein."
     return (f"Unter Linux darf ein normales Benutzerkonto USB-Geräte erst nach "
@@ -176,6 +248,15 @@ def grund_text(code: int, schluessel: str = "") -> str:
     if code == G_OK:
         return "uDMX-Adapter sendet"
     if code == G_PYUSB_FEHLT:
+        if ist_installationspaket():
+            # OUT-76: im gepackten LightOS gibt es kein pip — der Rat, etwas
+            # nachzuinstallieren, liefe ins Leere.
+            return ("Dieses LightOS aus dem Installationspaket enthält den "
+                    "Programmteil für uDMX-Adapter (pyusb) nicht, und er lässt "
+                    "sich dort nicht nachinstallieren. uDMX-Adapter laufen "
+                    "derzeit nur mit LightOS aus dem Quelltext (siehe "
+                    "INSTALL.md, „uDMX-Adapter“). Ohne das: einen ENTTEC DMX "
+                    "USB Pro oder einen Art-Net-/sACN-Node verwenden.")
         return ("Für uDMX-Adapter fehlt das Python-Paket pyusb. Nachinstallieren "
                 "mit: pip install pyusb (siehe INSTALL.md, „uDMX-Adapter“).")
     if code == G_LIBUSB_FEHLT:
@@ -210,7 +291,8 @@ _KURZ = {
     G_LIBUSB_FEHLT: "libusb-1.0 fehlt",
     G_NICHT_DA: "Adapter nicht gefunden — eingesteckt?",
     G_KEINE_BERECHTIGUNG: "kein Zugriffsrecht (Linux: udev-Regel, s. INSTALL.md)",
-    G_TREIBER_FEHLT: "Adapter lässt sich nicht öffnen (Windows: WinUSB-Treiber nötig)",
+    G_TREIBER_FEHLT: ("Adapter lässt sich nicht öffnen (Windows: WinUSB-Treiber "
+                      "fehlt — LightOS liefert keinen, s. Reiter „uDMX (USB)“)"),
     G_BELEGT: "Adapter von anderem Programm belegt",
     G_ANTWORTET_NICHT: "Adapter nimmt keine Daten an",
     G_MEHRDEUTIG: "mehrere Adapter — bitte einen auswählen",
@@ -312,6 +394,12 @@ def _fehler_code(exc: BaseException) -> int:
         return exc.code
     if type(exc).__name__ == "NoBackendError":
         return G_LIBUSB_FEHLT
+    if isinstance(exc, NotImplementedError):
+        # OUT-76: pyusb wirft fuer LIBUSB_ERROR_NOT_SUPPORTED kein USBError,
+        # sondern NotImplementedError — ohne errno und ohne libusb-Code. Genau
+        # so scheitert unter Windows ein Adapter ohne WinUSB-Treiber; bisher
+        # hiess das „nimmt keine Daten an — Kabel und Adapter prüfen“.
+        return G_TREIBER_FEHLT
     nr = getattr(exc, "errno", None)
     roh = getattr(exc, "backend_error_code", None)
     if nr == errno.EACCES or roh == _LIBUSB_ACCESS:
@@ -379,7 +467,79 @@ def _beschreibe(dev, zeile: Kennung) -> UdmxGeraet | None:
         hinweis=hinweis, stall_ist_erfolg=zeile.stall_ist_erfolg, _dev=dev)
 
 
-def liste_geraete(usb=None) -> list[UdmxGeraet]:
+def windows_treiber(_zeilen=None):
+    """OUT-76: Treiber-Lage der ANGESTECKTEN bekannten Adapter, wie Windows sie
+    fuehrt — ``[usb_treiber_windows.UsbTreiber]``, oder ``None`` wenn nicht
+    feststellbar (kein Windows, Abfrage gescheitert).
+
+    Nur lesen, kein Geraet wird geoeffnet; braucht kein pyusb. Den Namen aus
+    :data:`BEKANNTE_GERAETE` zu einem Befund liefert :func:`geraete_name`.
+    """
+    import os
+    from src.core.dmx import usb_treiber_windows
+    if _zeilen is None and os.environ.get("LIGHTOS_KEIN_USB"):
+        return None          # rohes USB ist abgeschaltet (Testlaeufe, Fehlersuche)
+    befunde = usb_treiber_windows.angesteckt(
+        [(k.vid, k.pid) for k in BEKANNTE_GERAETE], _zeilen=_zeilen)
+    if befunde is None:
+        return None
+    # ★ Geteilte Kennung (16c0:05dc): nennt sich das Geraet anders als ein
+    # uDMX, ist es keiner — es faellt heraus, damit nie jemand den Rat bekommt,
+    # einem FREMDEN Geraet den Treiber zu ersetzen.
+    return [b for b in befunde if _treiber_befund_passt(b)]
+
+
+def _treiber_befund_passt(befund) -> bool:
+    zeile = _tabellen_zeile(befund.vid, befund.pid)
+    if zeile is None:
+        return False
+    if zeile.produkt is None or not befund.name:
+        return True
+    return befund.name.strip().lower() == zeile.produkt
+
+
+def treiber_befund_sicher(befund) -> bool:
+    """Steht fest, dass der Befund einen uDMX-Adapter meint? Bei der geteilten
+    Kennung nur, wenn Windows den Produktnamen des Geraets kennt und er passt."""
+    zeile = _tabellen_zeile(befund.vid, befund.pid)
+    if zeile is None:
+        return False
+    if zeile.produkt is None:
+        return True
+    return bool(befund.name) and befund.name.strip().lower() == zeile.produkt
+
+
+def geraete_name(vid: int, pid: int) -> str:
+    zeile = _tabellen_zeile(vid, pid)
+    return zeile.name if zeile is not None else f"{vid:04x}:{pid:04x}"
+
+
+def mit_treiber(geraete, befunde) -> list[UdmxGeraet]:
+    """OUT-76: die Treiber-Lage in die Adapter-Liste eintragen.
+
+    Zugeordnet wird ueber die Kennung — und nur, wenn alle angesteckten Adapter
+    dieser Kennung dieselbe Lage haben (sonst bleibt sie leer: nie raten).
+    """
+    from dataclasses import replace
+    from src.core.dmx import usb_treiber_windows
+    if not befunde:
+        return list(geraete)
+    lage = usb_treiber_windows.lage_je_kennung(befunde)
+    dienste = {(b.vid, b.pid): b.dienst for b in befunde}
+    raus = []
+    for g in geraete:
+        l = lage.get((g.vid, g.pid), "")
+        if l and not g.bestaetigt and l != T_PASST:
+            # Der Name liess sich nicht lesen — unter Windows ist der fehlende
+            # Treiber der Grund, nicht eine Berechtigung.
+            g = replace(g, hinweis="Name nicht lesbar — " + treiber_kurz(
+                l, dienste.get((g.vid, g.pid), "")))
+        raus.append(replace(g, treiber=l,
+                            treiber_dienst=dienste.get((g.vid, g.pid), "") if l else ""))
+    return raus
+
+
+def liste_geraete(usb=None, treiber=None) -> list[UdmxGeraet]:
     """Alle uDMX-Adapter am Rechner. Wirft :class:`UdmxFehler`, wenn pyusb
     oder libusb fehlt.
 
@@ -387,7 +547,10 @@ def liste_geraete(usb=None) -> list[UdmxGeraet]:
     fremde USB-Geraete bleiben voellig unberuehrt. Gesendet wird hier nichts
     ausser den Standard-Abfragen, mit denen pyusb die Beschreibung holt.
 
-    ``usb`` = ``(core, util, backend)`` fuer Tests.
+    ``usb`` = ``(core, util, backend)`` fuer Tests. ``treiber`` (OUT-76) =
+    Befunde aus :func:`windows_treiber`; damit traegt jeder Adapter seine
+    Treiber-Lage. Ohne sie (Sender, der nur seinen Adapter sucht) wird Windows
+    nicht gefragt.
     """
     core, _util, backend = usb or _usb_laden()
     try:
@@ -408,7 +571,7 @@ def liste_geraete(usb=None) -> list[UdmxGeraet]:
         if g is not None:
             raus.append(g)
     raus.sort(key=lambda g: (g.kennung, g.seriennummer, g.ort))
-    return raus
+    return mit_treiber(raus, treiber) if treiber else raus
 
 
 def schluessel_lesen(text) -> tuple[int | None, int | None, str, str]:

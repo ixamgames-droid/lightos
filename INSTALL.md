@@ -292,6 +292,12 @@ venv\Scripts\python -m pip install pyusb libusb-package
 Ob beides gefunden wird, zeigt der Selbsttest (Zeile `optional uDMX: …`) und das
 Diagnosepaket (Abschnitt „uDMX (USB)“).
 
+**Windows-Installationspaket:** das LightOS aus `LightOS-Setup.exe` enthaelt `pyusb`
+derzeit **nicht**, und dort laesst sich nichts nachinstallieren. Der Reiter erkennt
+einen angesteckten Adapter und sagt, was fehlt, kann ihn aber nicht ansteuern. uDMX
+laeuft unter Windows nur mit LightOS aus dem Quelltext (dieser Abschnitt). Ohne das:
+einen ENTTEC DMX USB Pro oder einen Art-Net-/sACN-Node verwenden.
+
 **2. Linux: Zugriffsrecht per udev-Regel.** Ohne sie darf nur root den Adapter
 ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Die Regeldatei liegt im Repo:
 
@@ -306,9 +312,32 @@ Gruppe `plugdev` und das gerade angemeldete Konto frei — die geteilte Kennung
 `16c0:05dc` nur zusammen mit dem Produktnamen „uDMX“.
 
 **3. Windows: WinUSB-Treiber zuweisen.** Windows hat fuer diese Adapter keinen eigenen
-Treiber. Dem Geraet muss einmalig der generische WinUSB-Treiber zugewiesen werden, zum
-Beispiel mit dem Programm Zadig (https://zadig.akeo.ie, Adminrechte noetig): Adapter
-einstecken, in Zadig das Geraet waehlen, als Treiber „WinUSB“ einstellen, installieren.
+Treiber, und LightOS liefert und installiert keine Treiber. Dem Geraet muss einmalig
+von Hand der allgemeine Treiber „WinUSB“ zugewiesen werden. Ob er fehlt, sagt LightOS
+selbst: im Reiter **uDMX (USB)** steht nach **Adapter suchen** hinter dem Adapter
+`— Treiber fehlt (WinUSB zuweisen)`, darunter stehen dieselben Schritte wie hier; das
+Diagnosepaket nennt die Lage im Abschnitt „uDMX (USB)“.
+
+1. Das Programm Zadig laden: https://zadig.akeo.ie — ein freies Programm eines anderen
+   Anbieters.
+2. Den Adapter einstecken und Zadig starten (Windows fragt nach Administratorrechten).
+3. In Zadig im Menue „Options“ den Punkt „List All Devices“ einschalten und in der
+   Liste den Adapter waehlen — zu erkennen an der USB ID `2008 1066` (CYL-6602) oder
+   `16C0 05DC` (Anyma uDMX).
+4. Als Treiber „WinUSB“ einstellen und auf „Install Driver“ (oder „Replace Driver“)
+   klicken; das dauert bis zu einer Minute.
+5. Zurueck in LightOS: im Reiter **uDMX (USB)** auf **Adapter suchen** und dann auf
+   **Verbinden** klicken.
+
+**Achtung:** in Zadig genau den Adapter waehlen. Zadig ersetzt den Treiber des
+gewaehlten Geraets — eine Maus, eine Tastatur oder ein anderes Geraet funktioniert
+danach nicht mehr, bis man es im Geraete-Manager von Windows deinstalliert (mit
+„Treiber loeschen“) und neu einsteckt. Die Kennung `16C0 05DC` tragen auch andere
+Bastelgeraete: nur zuweisen, wenn es sicher der uDMX-Adapter ist.
+
+Hintergrund bei Microsoft:
+https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb-installation
+
 **Noch nicht am Geraet erprobt** — weder unter Windows x64 noch auf Windows-ARM. Wenn
 es nicht gelingt: einen Art-Net-Node verwenden.
 
@@ -498,7 +527,7 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
-| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber (Windows) |
+| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber von Hand zuweisen (Windows; LightOS liefert und installiert keine Treiber) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
 | `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
 | **Linux:** `pip install` bricht bei `python-rtmidi` ab | `sudo apt-get install build-essential libasound2-dev`, dann erneut installieren |

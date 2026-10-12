@@ -874,9 +874,22 @@ def udmx_infos(immer: bool = True) -> list[str]:
             grund = str(f() or "") if callable(f) else ""
             raus.append(f"U{u} Adapter {getattr(dev, 'port', '') or '(einziger)'}: "
                         f"{grund or 'kein Befund'}")
+        raus.extend(_udmx_windows_treiber())
         return raus
     except Exception as e:
         return [f"? ({type(e).__name__}: {e})"]
+
+
+def _udmx_windows_treiber() -> list[str]:
+    """OUT-76: was Windows ueber den Treiber angesteckter uDMX-Adapter sagt —
+    nur lesen, kein Geraet wird geoeffnet. Leer ausserhalb von Windows und
+    wenn keiner steckt."""
+    try:
+        from src.core.dmx import udmx
+        from src.core.dmx.udmx_treiber_text import befund_daten, diagnose_zeilen
+        return diagnose_zeilen([befund_daten(b) for b in udmx.windows_treiber() or []])
+    except Exception as e:
+        return [f"Windows-Treiber: ? ({type(e).__name__}: {e})"]
 
 
 def show_info() -> str:

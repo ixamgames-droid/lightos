@@ -43,6 +43,21 @@ Lässt er sich nicht lesen (fehlende Berechtigung), gilt das Gerät als unbestä
 wird nicht angesprochen. Texte werden nur von Geräten gelesen, deren Kennung in der
 Tabelle steht.
 
+**Treiber unter Windows (OUT-76).** `usb_treiber_windows.angesteckt()` fragt die
+Geräteverwaltung von Windows, welcher Treiber-Dienst an einem angesteckten USB-Gerät
+hängt (`SetupDiGetClassDevs` / `SetupDiGetDeviceRegistryProperty` /
+`CM_Get_DevNode_Status`) – nur lesen, ohne pyusb, ohne ein Gerät zu öffnen; `None`
+heißt „nicht feststellbar“. `udmx.windows_treiber()` schränkt auf die Gerätetabelle ein
+und wirft bei der geteilten Kennung alles heraus, was sich nicht „uDMX“ nennt.
+`liste_geraete(treiber=…)` trägt die Lage in `UdmxGeraet.treiber` ein
+(`T_PASST` / `T_FEHLT` / `T_ANDERER`, leer = offen); die Beschriftung der Liste nennt
+sie. Das ist nur eine Auskunft: ob ein Adapter sendet, entscheidet weiterhin der
+Sendeversuch. Der Sender selbst fragt Windows nicht. pyusb meldet den fehlenden Treiber
+als `NotImplementedError` – `_fehler_code` ordnet das `G_TREIBER_FEHLT` zu. Die Schritte
+zum Zuweisen stehen einmal in `udmx.windows_treiber_schritte()`; Reiter
+(`src/ui/udmx_treiber_hinweis.py`), Diagnosepaket (`udmx_treiber_text.diagnose_zeilen`)
+und INSTALL.md geben sie wieder. LightOS liefert und installiert keine Treiber.
+
 Adapter-Schlüssel (steht als `patch` in `universes.json`): `vid:pid#seriennummer`,
 sonst `vid:pid@anschluss` (z. B. `2008:1066@1-2`), sonst `vid:pid`. `waehle()` rät nie:
 mit Seriennummer nur genau dieser Adapter; mit Anschluss dieser Anschluss, ersatzweise
