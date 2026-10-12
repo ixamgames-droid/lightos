@@ -1,7 +1,7 @@
 # Fremd-Komponenten in LightOS (Third-Party Notices)
 
 LightOS selbst steht unter **keiner** Open-Source-Lizenz (Entscheidung des
-Projektinhabers). Diese Datei betrifft nur die **fremden** Dateien, die im Repo
+Projektinhabers): alle Rechte vorbehalten, siehe [`LICENSE`](LICENSE). Diese Datei betrifft nur die **fremden** Dateien, die im Repo
 mitgeliefert werden: Ihre Lizenzen erlauben die Weitergabe, verlangen aber, dass
 Lizenztext und Urheberhinweise beiliegen. Die Lizenztexte stehen unter
 [`licenses/`](licenses/).
