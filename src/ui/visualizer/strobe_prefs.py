@@ -13,9 +13,10 @@ Wert         Bedeutung
 ``off``      Aus: Dauerlicht wie vor VIZ-104
 ===========  ==========================================================
 
-Die Rechnung selbst (Tastverhaeltnis, Deckel, Bildraten-Grenze) steht in
-``scene_src/fixtures/strobe.js``. Die Zahlen hier sind deren Gegenstueck fuer
-Texte und Tests; ``tests/test_viz104_strobe_im_3d.py`` haelt beide gleich.
+Die Rechnung selbst (Periode und Blitzlaenge in ganzen Bildern, Deckel) steht
+in ``scene_src/fixtures/strobe.js`` und — fuer die 2D-Live-Ansicht — in
+``src/core/strobe.py``. Die Zahlen hier sind deren Gegenstueck fuer Texte und
+Tests; ``tests/test_viz104_strobe_im_3d.py`` haelt alle drei gleich.
 
 Die Einstellung aendert AUSSCHLIESSLICH die Darstellung im 3D-Fenster. An der
 DMX-Ausgabe aendert sich nichts.
@@ -26,12 +27,17 @@ PREF_KEY = "viz_strobe_mode"
 MODES = ("flash", "soft", "off")
 DEFAULT_MODE = "flash"
 
+from src.core.strobe import BILDER_JE_BLITZ, DECKEL_HZ, TAST
+
 #: Anteil der Periode, in dem ein blitzendes Geraet leuchtet.
-DUTY = 0.25
-#: Hoechste dargestellte Blitzfrequenz (Hz) ...
-CAP_HZ = 12
-#: ... und nie mehr als Bildrate / FRAMES_PER_FLASH (ein Bild an, zwei aus).
-FRAMES_PER_FLASH = 3
+DUTY = TAST
+#: Hoechste dargestellte Blitzfrequenz (Hz). 10, weil ein Blitz mindestens
+#: FRAMES_PER_FLASH Bilder braucht: das sind 30 Bilder/s — so viel liefert der
+#: bei der Sichtprobe gemessene Rechner (Intel UHD 630) beim Blitzen gerade
+#: noch; die frueheren 12 Hz hat er nie erreicht (gezeigt wurden 7-10).
+CAP_HZ = DECKEL_HZ
+#: Eine Periode hat mindestens so viele Bilder (ein Bild an, zwei aus).
+FRAMES_PER_FLASH = BILDER_JE_BLITZ
 #: ``soft``: hoechste Pulsfrequenz (Hz) und dunkelster Anteil der Helligkeit.
 SOFT_MAX_HZ = 2
 SOFT_MIN = 0.55

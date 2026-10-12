@@ -15,6 +15,17 @@
 * je Blitz entsteht keine neue Shadow-Map;
 * Dimmer auf 0 mit Strobe: dunkel, und das Geraet zaehlt nicht als blitzend.
 
+Nach der ersten Sichtprobe (2026-10-12, Intel UHD 630: stolpernder Takt, 7-10
+statt 12 Blitze/s, Bildrate faellt beim Blitzen):
+
+* der Takt laeuft ueber den BILDZAEHLER — die Folge ist exakt periodisch,
+  gleiche Frequenz blitzt gemeinsam, verschiedene laufen unabhaengig;
+* ein Blitz im An-Bild sieht genau so aus wie Dauerlicht (der billige Weg
+  verfaelscht nichts);
+* KOSTEN, gezaehlt ueber zehn Sekunden mit elf Geraeten: der Takt wendet keinen
+  DMX-Stand neu an, baut keine Shadow-Map, verteilt kein Pool-Licht um und
+  fordert hoechstens 2 * Deckel Bilder je Sekunde an (gedaempft: 16).
+
 Kein WebGL noetig: gemessen wird der Szenenzustand.
 """
 import json
@@ -382,3 +393,209 @@ class Viz104StrobeJeKopfTest(_Basis):
         self._poll_until_true("window.__lightos.strobeInfo(%d).modus === 'off'" % _BAR)
         aus = [b["linsen"][0] for b in self._lauf_koepfe(3000.0, 400)]
         self.assertTrue(all(abs(v - voll) < 1e-9 for v in aus))
+
+
+# ── Nach der Sichtprobe: Bildzaehler, billiger Weg, Kosten ───────────────────
+
+_STROBE_20HZ = 219                                   # oberes Ende des Bereichs
+_STROBE_2HZ_B = 20 + round(199 * (2 - 1) / 19)
+
+# Laeuft in EINEM Aufruf (kein fremder Tick dazwischen): `n` Bilder mit dem
+# echten Bildzaehler bei fester Bildrate; je Bild der Zustand aller Geraete.
+_FOLGE_JS = """
+(function(){
+  const L = window.__lightos, fids = %s, n = %d;
+  const folge = fids.map(() => []);
+  for (let i = 0; i < n; i++) {
+    L.__renderTick();
+    fids.forEach((fid, k) => folge[k].push(L.fixtures[String(fid)].spot.intensity > 0 ? 1 : 0));
+  }
+  return JSON.stringify(folge.map(f => f.join('')));
+})()
+"""
+
+_KOSTEN_JS = """
+(function(){
+  const L = window.__lightos, n = %d;
+  const vor = { s: L.strobeStats(), r: L.renderStats().count,
+                sch: L.shadowUpdateStats().neubauten, v: L.spotPoolInfo().vergaben };
+  for (let i = 0; i < n; i++) L.__renderTick();
+  const s = L.strobeStats();
+  return JSON.stringify({
+    anwendungen: s.anwendungen - vor.s.anwendungen, billig: s.billig - vor.s.billig,
+    voll: s.voll - vor.s.voll, bilder: s.bilder - vor.s.bilder,
+    gezeichnet: L.renderStats().count - vor.r,
+    schatten: L.shadowUpdateStats().neubauten - vor.sch,
+    vergaben: L.spotPoolInfo().vergaben - vor.v,
+  });
+})()
+"""
+
+
+class Viz104BildzaehlerTest(_Basis):
+    """Der Produktiv-Weg ohne Test-Uhr: Zaehler je Tick, feste Bildrate."""
+
+    GERAETE = [_geraet(fid=_FID + i, x=(i - 1) * 2.0) for i in range(3)]
+
+    def _start(self, fps):
+        self._load_and_wait()
+        self._eval("(function(){ window.__lightos.__strobeUhr(null, %r); return 1; })()"
+                   % float(fps))
+
+    def _folge(self, n):
+        fids = [_FID, _FID + 1, _FID + 2]
+        return json.loads(self._eval(_FOLGE_JS % (json.dumps(fids), n)))
+
+    def test_folge_ist_exakt_periodisch_und_gleiche_frequenz_laeuft_gemeinsam(self):
+        self._start(60)
+        self._push(_payload_fid(_FID, shutter=_STROBE_20HZ),
+                   _payload_fid(_FID + 1, shutter=_STROBE_20HZ),
+                   _payload_fid(_FID + 2, shutter=_STROBE_2HZ_B))
+        a, b, c = self._folge(240)
+        # 20 Hz gemeldet -> Deckel 10 Hz -> bei 60 Bildern/s: 6 Bilder, 2 an.
+        self.assertIn("110000110000110000", a)
+        self.assertEqual(a.count("1"), 80)
+        for i in range(len(a) - 6):
+            self.assertEqual(a[i], a[i + 6], "Takt stolpert bei Bild %d: %s" % (i, a))
+        self.assertEqual(a, b, "gleiche Frequenz muss gemeinsam blitzen")
+        # ~2 Hz: eigene Periode (rund 30 Bilder, ein Viertel an), unabhaengig.
+        info = json.loads(self._eval(
+            "JSON.stringify(window.__lightos.strobeInfo(%d))" % (_FID + 2)))
+        p, an = info["periode"], info["an"]
+        self.assertTrue(29 <= p <= 31, info)
+        self.assertEqual(an, round(p * 0.25))
+        for i in range(len(c) - p):
+            self.assertEqual(c[i], c[i + p])
+        self.assertEqual(c[:p * 7].count("1"), an * 7)
+        self.assertNotEqual(a, c)
+
+    def test_bei_30_bildern_ein_bild_an_zwei_aus(self):
+        self._start(30)
+        self._push(_payload_fid(_FID, shutter=_STROBE_20HZ))
+        a = self._folge(90)[0]
+        self.assertEqual(a.count("1"), 30)             # 10 Blitze je Sekunde
+        self.assertIn("#..#..#..#..", a.replace("1", "#").replace("0", "."))
+        self.assertNotIn("11", a)
+        self.assertNotIn("000", a)
+        info = json.loads(self._eval(
+            "JSON.stringify(window.__lightos.strobeInfo(%d))" % _FID))
+        self.assertEqual((info["periode"], info["an"]), (3, 1))
+        self.assertAlmostEqual(info["anzeigeHz"], 10.0)
+
+    def test_update_mitten_im_lauf_laesst_den_zaehler_in_ruhe(self):
+        self._start(60)
+        self._push(_payload_fid(_FID, shutter=_STROBE_20HZ),
+                   _payload_fid(_FID + 1, shutter=_STROBE_20HZ))
+        self._folge(7)                                 # krumme Stelle im Takt
+        self._push(_payload_fid(_FID + 1, shutter=_STROBE_20HZ, intensity=180,
+                                color_g=0))
+        a, b, _c = self._folge(60)
+        self.assertEqual(a, b, "ein Update hat die Phase verschoben")
+
+    def test_blitz_im_an_bild_sieht_aus_wie_dauerlicht(self):
+        """Der billige Weg setzt nur Helligkeiten — im An-Bild muss derselbe
+        Zustand stehen, den die volle Anwendung ohne Strobe erzeugt."""
+        self._start(60)
+        js = _ZUSTAND_JS % (_FID, _FID)
+        self._push(_payload_fid(_FID, intensity=200, color_b=0))
+        self._eval("(function(){ window.__lightos.__renderTick(); return 1; })()")
+        dauer = json.loads(self._eval(js))
+        self._push(_payload_fid(_FID, intensity=200, color_b=0, shutter=_STROBE_20HZ))
+        gesehen = {}
+        for _ in range(12):
+            self._eval("(function(){ window.__lightos.__renderTick(); return 1; })()")
+            z = json.loads(self._eval(js))
+            gesehen[z["info"]["faktor"]] = z
+        self.assertEqual(sorted(gesehen), [0, 1])
+        an, aus = gesehen[1], gesehen[0]
+        for feld in ("spot", "kegel", "kegelSichtbar", "fleck", "linse", "farbe"):
+            self.assertEqual(an[feld], dauer[feld], feld)
+        self.assertEqual((aus["spot"], aus["kegel"], aus["fleck"], aus["linse"]), (0, 0, 0, 0))
+        self.assertFalse(aus["kegelSichtbar"])
+        self.assertEqual(aus["farbe"], dauer["farbe"], "die Farbe bleibt auch im Dunkeln")
+        # Strobe weg (Shutter offen): wieder genau das Dauerlicht.
+        self._push(_payload_fid(_FID, intensity=200, color_b=0))
+        self._eval("(function(){ window.__lightos.__renderTick(); return 1; })()")
+        nach = json.loads(self._eval(js))
+        for feld in ("spot", "kegel", "kegelSichtbar", "fleck", "linse"):
+            self.assertEqual(nach[feld], dauer[feld], feld)
+
+    def test_abgeschaltete_kegel_bleiben_im_blitz_aus(self):
+        self._start(60)
+        self._push(_payload_fid(_FID, shutter=_STROBE_20HZ))
+        self._bridge_obj.settingsChanged.emit(json.dumps({"showCones": False}))
+        self._poll_until_true("window.__lightos.settings.showCones === false")
+        js = ("(function(){ const L = window.__lightos; let an = 0, sichtbar = 0;"
+              " for (let i = 0; i < 24; i++) { L.__renderTick();"
+              " const f = L.fixtures['%d']; if (f.spot.intensity > 0) an += 1;"
+              " if (f.beam.visible) sichtbar += 1; }"
+              " return JSON.stringify([an, sichtbar]); })()" % _FID)
+        an, sichtbar = json.loads(self._eval(js))
+        self.assertEqual(an, 8)
+        self.assertEqual(sichtbar, 0, "der Blitz hat den abgeschalteten Kegel eingeschaltet")
+
+
+class Viz104KostenTest(_Basis):
+    """Was kostet der Strobe? Gezaehlt, nicht geschaetzt: volle Anwendungen
+    eines DMX-Stands, Schatten-Neubauten, Umverteilungen im Spot-Pool und
+    angeforderte Bilder — ueber zehn Sekunden (600 Bilder bei 60/s) mit elf
+    Geraeten, mit und ohne Strobe. Die Obergrenzen stehen hier fest."""
+
+    GERAETE = [_geraet(fid=f, x=(i - _N // 2) * 1.5) for i, f in enumerate(_FIDS)]
+    BILDER = 600
+    SEKUNDEN = 10
+
+    def _start(self):
+        self._load_and_wait()
+        self._eval("(function(){ window.__lightos.__strobeUhr(null, 60); return 1; })()")
+
+    def _kosten(self, n=None):
+        return json.loads(self._eval(_KOSTEN_JS % (n or self.BILDER)))
+
+    def test_ohne_strobe_kostet_der_takt_nichts(self):
+        self._start()
+        self._push(*[_payload_fid(f) for f in _FIDS])
+        self._kosten(60)                               # einschwingen
+        k = self._kosten()
+        self.assertEqual((k["anwendungen"], k["billig"], k["voll"], k["bilder"]),
+                         (0, 0, 0, 0), k)
+        self.assertEqual(k["schatten"], 0, k)
+
+    def test_blitzen_wendet_nichts_neu_an_und_baut_keine_schatten(self):
+        self._start()
+        self._push(*[_payload_fid(f, shutter=_STROBE_20HZ) for f in _FIDS])
+        self._kosten(60)                               # einschwingen (Pool vergibt Lichter)
+        k = self._kosten()
+        # Volle Anwendungen eines DMX-Stands je Sekunde: 0 (vorher 2 je Blitz
+        # und Geraet = 220 je Sekunde in diesem Aufbau).
+        self.assertEqual(k["anwendungen"], 0, k)
+        self.assertEqual(k["voll"], 0, k)
+        # Je Wechsel eine Helligkeits-Schaltung je Geraet: 10 Blitze/s * 2.
+        self.assertEqual(k["billig"], _N * 2 * 10 * self.SEKUNDEN, k)
+        # Angeforderte Bilder: hoechstens 2 * Deckel je Sekunde.
+        self.assertEqual(k["bilder"], 2 * 10 * self.SEKUNDEN, k)
+        self.assertLessEqual(k["gezeichnet"], k["bilder"] + 5 * self.SEKUNDEN, k)
+        self.assertEqual(k["schatten"], 0, "Schatten-Neubau beim Blitzen: %r" % k)
+        self.assertEqual(k["vergaben"], 0, "Spot-Pool hat beim Blitzen umverteilt: %r" % k)
+
+    def test_gedaempft_aendert_achtmal_je_welle(self):
+        self._start()
+        self._push(*[_payload_fid(f, shutter=_STROBE_20HZ) for f in _FIDS])
+        self._bridge_obj.settingsChanged.emit(json.dumps({"strobeMode": "soft"}))
+        self._poll_until_true("window.__lightos.strobeInfo(%d).modus === 'soft'" % _FIDS[0])
+        self._kosten(64)                               # einschwingen
+        k = self._kosten(640)                          # 20 Wellen zu 32 Bildern
+        self.assertEqual(k["anwendungen"], 0, k)
+        self.assertEqual(k["bilder"], 20 * 8, k)       # 15 Bilder je Sekunde
+        self.assertEqual(k["billig"], _N * 20 * 8, k)
+        self.assertEqual(k["schatten"], 0, k)
+        self.assertEqual(k["vergaben"], 0, k)
+
+    def test_ein_update_kostet_eine_anwendung_je_geraet(self):
+        self._start()
+        self._push(*[_payload_fid(f, shutter=_STROBE_20HZ) for f in _FIDS])
+        self._kosten(60)
+        vor = json.loads(self._eval("JSON.stringify(window.__lightos.strobeStats())"))
+        self._push(*[_payload_fid(f, shutter=_STROBE_20HZ, intensity=128) for f in _FIDS])
+        nach = json.loads(self._eval("JSON.stringify(window.__lightos.strobeStats())"))
+        self.assertEqual(nach["anwendungen"] - vor["anwendungen"], _N)

@@ -3535,9 +3535,12 @@ class VisualizerWindow(QMainWindow):
             "Wie ein Gerät mit Shutter im Strobe-Bereich in der 3D-Szene\n"
             "gezeigt wird.\n\n"
             "Blitzen = kurz an, lange aus, im Takt des Shutters. Gezeigt werden\n"
-            f"höchstens {strobe_prefs.CAP_HZ} Blitze je Sekunde und nie mehr als ein Drittel\n"
-            "der Bildrate — ein schnellerer Strobe sieht 'schnell' aus, nicht exakt.\n"
-            "Gedämpft = langsames, flaches Pulsieren statt An/Aus.\n"
+            f"höchstens rund {strobe_prefs.CAP_HZ} Blitze je Sekunde — ein schnellerer Strobe\n"
+            "sieht 'schnell' aus, nicht exakt. Ein Blitz braucht mindestens drei\n"
+            "Bilder (eins an, zwei aus); auf einem langsamen Rechner sind es\n"
+            "deshalb weniger.\n"
+            f"Gedämpft = langsames, flaches Pulsieren statt An/Aus (höchstens {strobe_prefs.SOFT_MAX_HZ}-mal\n"
+            "je Sekunde).\n"
             "Aus = Dauerlicht wie bisher.\n\n"
             + strobe_prefs.WARNHINWEIS + "\n\n"
             "Ändert nur die Darstellung, nicht die DMX-Ausgabe.\n"
@@ -3546,6 +3549,14 @@ class VisualizerWindow(QMainWindow):
         self._combo_strobe.setCurrentIndex(
             max(0, self._combo_strobe.findData(strobe_prefs.strobe_mode_pref())))
         self._combo_strobe.currentIndexChanged.connect(self._on_strobe_mode_changed)
+        # Die Auswahl darf schmaler werden als ihr laengster Eintrag (die
+        # aufgeklappte Liste zeigt ihn ganz) — sonst macht „Gedämpft (weiches
+        # Pulsieren)“ die Zeile breiter als die Spalte, und die Auswahl ist
+        # rechts abgeschnitten (Sichtprobe 2026-10-12). Dasselbe Muster wie
+        # bei der Stufe (VIZ-108).
+        self._combo_strobe.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo_strobe.setMinimumContentsLength(12)
         s_row.addWidget(self._combo_strobe, 1)
         q_layout.addLayout(s_row)
         self._lbl_strobe_warnung = QLabel(strobe_prefs.WARNHINWEIS)

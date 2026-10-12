@@ -8,6 +8,7 @@ _PT_ATTRS = frozenset(("pan", "tilt", "pan_fine", "tilt_fine"))
 # VIZ-104: die Formel lebt in src/core/strobe.py — EINE Quelle fuer die 2D-
 # Ansicht hier und den 3D-Visualizer. Der Name bleibt als Alias bestehen.
 from src.core.strobe import strobe_hz as _strobe_hz   # noqa: E402
+from src.core.strobe import TAST as _STROBE_TAST, blitz_an as _blitz_an   # noqa: E402
 import math
 import os
 import time
@@ -1002,6 +1003,7 @@ class StageCanvas(QWidget):
         self._uhr = time.perf_counter
         self._zeichenzeiten: deque = deque(maxlen=self.ZEICHENZEIT_PROBEN)
         self._naechstes_bild: float = 0.0
+        self._strobe_bild: int = 0     # VIZ-104: Zaehler der Takt-Bilder
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
         self._tick_fp: dict | None = None
@@ -1225,6 +1227,10 @@ class StageCanvas(QWidget):
         # das gleich folgende Bild nimmt sie, statt sie erneut abzufragen.
         self._tick_fp = ({fp[0]: fp for fp in sig[3]} if sig is not None else None)
         self._bild_verbucht(jetzt)
+        # VIZ-104: ein Takt-Bild weiter — danach blinkt der Strobe (_blink_an).
+        # Bilder aus der Bedienung (Maus, Auswahl) zaehlen nicht mit: sie
+        # zeigen den Stand des laufenden Takt-Bildes noch einmal.
+        self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
         self.update()
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
@@ -1713,6 +1719,7 @@ class StageCanvas(QWidget):
             pass
 
         # 2. LayeredEffect mit Square-Wave auf Intensity
+        rechteck = freq_hz == 0.0
         if freq_hz == 0.0 and vorab is not None:
             freq_hz = vorab["square"].get(fid, 0.0)
         elif freq_hz == 0.0:
@@ -1734,10 +1741,7 @@ class StageCanvas(QWidget):
 
         if freq_hz == 0.0:
             return 0.0, True
-
-        # Aktueller On/Off-Zustand anhand Systemzeit berechnen
-        phase = (time.time() * freq_hz) % 1.0
-        return freq_hz, phase < 0.5
+        return freq_hz, self._blink_an(freq_hz, rechteck)
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
                             running=None, vorab: dict | None = None) -> list[str]:
@@ -2059,12 +2063,41 @@ class StageCanvas(QWidget):
                     freq_hz = max(freq_hz, hz)
         except Exception:
             pass
-        if freq_hz == 0.0:
+        rechteck = freq_hz == 0.0
+        if rechteck:
             freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
         if freq_hz == 0.0:
             return 0.0, True
-        phase = (time.time() * freq_hz) % 1.0
-        return freq_hz, phase < 0.5
+        return freq_hz, self._blink_an(freq_hz, rechteck)
+
+    # ── VIZ-104: Blinken im Bildtakt ─────────────────────────────────────────
+    # Bis zur Sichtprobe vom 2026-10-12 wurde die Phase je Bild aus der Uhr
+    # abgetastet (``time.time() * hz``). Bei 10 Bildern/s und einem Strobe von
+    # 5-20 Hz ist das eine Schwebung: die Ansicht blinkte langsam und
+    # unregelmaessig (~0,7 s an, lange aus), ohne Bezug zur gemeldeten
+    # Frequenz. Jetzt zaehlt die Ansicht ihre Takt-Bilder, und Periode und
+    # Blitzlaenge sind ganze Bilder (``core.strobe.blitz_bilder`` — dieselbe
+    # Rechnung und derselbe Deckel wie im 3D). Bei 10 Bildern/s heisst das:
+    # hoechstens 3,3 Blitze je Sekunde (ein Bild an, zwei aus), darunter die
+    # gemeldete Frequenz. Ein Zaehler fuer alle Geraete — gleiche Frequenz
+    # blinkt gemeinsam.
+
+    def _strobe_bildrate(self) -> float:
+        """Takt-Bilder je Sekunde: der Timer, gebremst durch UI-86."""
+        abstand = self.RENDER_INTERVAL_MS / 1000.0
+        try:
+            abstand = max(abstand, self._bild_abstand_s())
+        except Exception:
+            pass
+        return 1.0 / abstand
+
+    def _blink_an(self, freq_hz: float, rechteck: bool = False) -> bool:
+        """Leuchtet ein mit ``freq_hz`` blinkendes Geraet im laufenden Bild?
+        ``rechteck``: Rechteck-Effekt auf dem Dimmer (halb an, halb aus) statt
+        Shutter-Strobe (kurzer Blitz)."""
+        return _blitz_an(getattr(self, "_strobe_bild", 0), freq_hz,
+                         self._strobe_bildrate(),
+                         tast=0.5 if rechteck else _STROBE_TAST)
 
     # ── Paint ─────────────────────────────────────────────────────────────────
 

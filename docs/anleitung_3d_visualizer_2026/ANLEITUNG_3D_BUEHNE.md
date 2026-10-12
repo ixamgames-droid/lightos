@@ -395,11 +395,21 @@ Frequenz blitzen gemeinsam.
   Köpfe lässt das ganze Gerät gemeinsam blitzen. Die 2D-Ansicht zeichnet ein
   Gerät als ein Symbol und blinkt deshalb als Ganzes (mit der schnellsten
   Frequenz seiner Köpfe).
-- **Begrenzung:** Gezeigt werden höchstens 12 Blitze je Sekunde und nie mehr
-  als ein Drittel der Bildrate (ein Bild an, zwei aus). Läuft die Ansicht mit
-  30 Bildern je Sekunde, sind es also höchstens 10, bei 15 Bildern höchstens 5.
-  Ein schnellerer Strobe sieht damit „schnell" aus, aber nicht exakt so schnell
-  wie am Gerät — ohne diese Grenze würde das Bild unregelmäßig flackern.
+- **Begrenzung:** Gezeigt werden höchstens rund 10 Blitze je Sekunde. Ein Blitz
+  braucht mindestens drei Bilder (eins an, zwei aus) — bei 30 Bildern je Sekunde
+  sind das genau 10. Läuft die Ansicht langsamer, sind es entsprechend weniger
+  (bei 15 Bildern höchstens 5). Ein schnellerer Strobe sieht damit „schnell"
+  aus, aber nicht exakt so schnell wie am Gerät.
+- **Gleichmäßiger Takt:** Geschaltet wird in ganzen Bildern, nicht nach der
+  Uhr — jeder Blitz ist gleich lang, jede Pause auch. Die gezeigte Frequenz
+  ist deshalb auf ganze Bilder gerundet: 10 Blitze je Sekunde stimmen bei 30
+  und 60 Bildern genau, dazwischen können es 9 bis 11 sein.
+- **Rechenlast:** Eine ruhende Szene zeichnet nichts. Solange etwas blitzt,
+  entsteht bei jedem Wechsel ein neues Bild; auf schwacher Grafik sinkt die
+  Bildrate dabei spürbar. „Gedämpft" ändert die Helligkeit achtmal je Welle.
+- **2D-Ansicht der Live View:** Sie zeichnet zehn Bilder je Sekunde und blinkt
+  nach derselben Regel — also höchstens gut dreimal je Sekunde (ein Bild an,
+  zwei aus), bei langsamerem Strobe in dessen Frequenz, und gleichmäßig.
 - **Nur die Helligkeit** wird getaktet. Farbe und Dimmerwert bleiben, wie sie
   sind; ein Dimmer-Effekt, der selbst an- und ausschaltet, sieht aus wie bisher.
 - **Einstellung „Strobe im 3D zeigen":**

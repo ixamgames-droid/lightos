@@ -14,7 +14,9 @@ Geprueft wird hier ohne Seite:
 * der Payload traegt die Frequenz, 0 bei Dauerlicht, je Kopf bei eigenem Shutter;
 * die Einstellung „Strobe im 3D zeigen" wird gespeichert und gelesen;
 * die Blitz-Funktion der Szene (``scene_src/fixtures/strobe.js``, unter Node):
-  Tastverhaeltnis, Deckel, Bildraten-Grenze, gedaempfter Modus;
+  Periode und Blitzlaenge in ganzen Bildern, Folge exakt periodisch, Deckel,
+  traege Bildrate, gedaempfter Modus — und dieselbe Rechnung fuer die
+  2D-Live-Ansicht (``core.strobe.blitz_bilder``);
 * Python- und JS-Konstanten stimmen ueberein;
 * die Anleitung beschreibt Verhalten, Begrenzung, Einstellung und Warnhinweis.
 
@@ -338,55 +340,74 @@ _TREIBER = """
 import * as S from './strobe.mjs';
 const aus = {};
 aus.konst = { modi: S.STROBE_MODI, vorgabe: S.STROBE_MODUS_VORGABE, tast: S.STROBE_TAST,
-              deckel: S.STROBE_DECKEL_HZ, bilder: S.BILDER_JE_BLITZ, weichHz: S.WEICH_MAX_HZ, weichMin: S.WEICH_MIN };
-// Anteil „an" und Zahl der Blitze ueber `dauer` ms bei Abtastung alle `schritt` ms.
-function lauf(fn, dauer, schritt, start = 0) {
-  let an = 0, n = 0, blitze = 0, vor = false, laengsteAus = 0, ausLauf = 0;
-  for (let t = start; t < start + dauer; t += schritt) {
-    const a = fn(t);
-    n += 1;
-    if (a) { an += 1; ausLauf = 0; if (!vor) blitze += 1; }
-    else { ausLauf += 1; if (ausLauf > laengsteAus) laengsteAus = ausLauf; }
-    vor = a;
+              deckel: S.STROBE_DECKEL_HZ, bilder: S.BILDER_JE_BLITZ, weichHz: S.WEICH_MAX_HZ,
+              weichMin: S.WEICH_MIN, weichStufen: S.WEICH_STUFEN, traegheit: S.TAKT_TRAEGHEIT };
+const RATEN = [15, 24, 25, 30, 34, 38, 42, 45, 52, 60, 75, 120, 144];
+const FREQ = [0.5, 1, 2, 3.3, 5, 8, 10, 12, 20, 25];
+// Folge von An/Aus im Bildraster: exakt periodisch, EIN Blitz je Periode.
+aus.folgen = [];
+for (const fps of RATEN) for (const hz of FREQ) {
+  const b = S.strobeBilder(hz, fps);
+  const n = b.periode * 12;
+  const start = 7;                               // bewusst nicht bei 0
+  const folge = Array.from({length: n + b.periode}, (_, i) => S.strobeFaktor(start + i, hz, 'flash', fps));
+  let periodisch = true, werte = new Set(folge);
+  for (let i = 0; i < n; i++) if (folge[i] !== folge[i + b.periode]) periodisch = false;
+  let blitze = 0, an = 0;
+  for (let i = 0; i < n; i++) {
+    if (folge[i] > 0) an += 1;
+    if (folge[i] > 0 && folge[(i + n - 1) % n] === 0) blitze += 1;
   }
-  return { anteil: an / n, blitze, laengsteAus };
+  aus.folgen.push({ fps, hz, periode: b.periode, an: b.an, periodisch, blitze, anGezaehlt: an,
+                    perioden: 12, werte: [...werte].sort(), anzeige: S.strobeAnzeigeHz(hz, fps) });
 }
-aus.fein5 = lauf(t => S.strobeAn(t, 5), 10000, 0.5);
-aus.fein20 = lauf(t => S.strobeAn(t, 20), 10000, 0.5);
-aus.fein20ohneDeckel = lauf(t => S.strobeAn(t, 20, 0.25, 100), 10000, 0.5);
-aus.dauerlicht = [S.strobeAn(0, 0), S.strobeAn(123, 0), S.strobeAn(5, -1), S.strobeAn(77, NaN)];
-aus.eigenerTast = lauf(t => S.strobeAn(t, 4, 0.5), 10000, 0.5);
-aus.anzeige = {
-  normal: S.strobeAnzeigeHz(5, 60), deckel: S.strobeAnzeigeHz(20, 60),
-  langsam: S.strobeAnzeigeHz(20, 15), null: S.strobeAnzeigeHz(0, 60),
-  sehrLangsam: S.strobeAnzeigeHz(20, 8),
-};
-aus.tast = { normal: S.strobeTast(5, 60), langsam: S.strobeTast(5, 15), grenze: S.strobeTast(4, 8) };
-// Bildraster: 60, 30 und 15 Bilder/s, Strobe 20 Hz gemeldet. Start bewusst krumm.
-aus.raster = {};
-for (const fps of [60, 30, 15]) {
-  aus.raster[fps] = lauf(t => S.strobeFaktor(t, 20, 'flash', fps) > 0, 10000, 1000 / fps, 3.7);
+aus.muster = {};
+for (const fps of [30, 40, 60]) {
+  aus.muster[fps] = Array.from({length: 24}, (_, i) => S.strobeAn(i, 20, fps) ? '#' : '.').join('');
 }
+aus.dauerlicht = [S.strobeAn(0, 0), S.strobeAn(123, 0), S.strobeAn(5, -1), S.strobeAn(77, NaN),
+                  S.strobeBilder(0, 60).periode, S.strobeAnzeigeHz(0, 60)];
+aus.negativ = [S.strobeAn(-1, 20, 30), S.strobeAn(-3, 20, 30), S.strobeAn(-2, 20, 30)];
+// Gleiche Frequenz -> gleiche Folge (ein Zaehler fuer alle); andere Frequenz -> andere Periode.
+aus.gleich = Array.from({length: 60}, (_, i) => S.strobeAn(i, 5, 60) === S.strobeAn(i, 5.0, 60)).every(Boolean);
+aus.verschieden = [S.strobeBilder(2, 60).periode, S.strobeBilder(5, 60).periode];
 aus.faktor = {
   aus: [S.strobeFaktor(10, 20, 'off', 60), S.strobeFaktor(60, 20, 'off', 60)],
   keinStrobe: [S.strobeFaktor(10, 0, 'flash', 60), S.strobeFaktor(60, 0, 'soft', 60)],
-  blitzWerte: [...new Set(Array.from({length: 2000}, (_, i) => S.strobeFaktor(i, 9, 'flash', 60)))].sort(),
 };
-const weich = Array.from({length: 4000}, (_, i) => S.strobeFaktor(i, 20, 'soft', 60));
-let wechsel = 0, groessterSchritt = 0, maxima = 0;
-for (let i = 1; i < weich.length; i++) {
-  const d = Math.abs(weich[i] - weich[i - 1]);
-  if (d > 0) wechsel += 1;
-  if (d > groessterSchritt) groessterSchritt = d;
+aus.weich = {};
+for (const fps of [15, 30, 40, 60]) {
+  const p = S.weichBilder(20, fps);
+  const w = Array.from({length: p * 6 + 1}, (_, i) => S.strobeFaktor(3 + i, 20, 'soft', fps));
+  let wechsel = 0, groessterSchritt = 0, periodisch = true;
+  for (let i = 1; i < w.length; i++) {
+    const d = Math.abs(w[i] - w[i - 1]);
+    if (d > 0) wechsel += 1;
+    if (d > groessterSchritt) groessterSchritt = d;
+  }
+  for (let i = 0; i + p < w.length; i++) if (w[i] !== w[i + p]) periodisch = false;
+  aus.weich[fps] = { periode: p, hz: fps / p, min: Math.min(...w), max: Math.max(...w),
+                     wechselJeWelle: wechsel / 6, groessterSchritt, periodisch,
+                     stufen: new Set(w.map(v => v.toFixed(4))).size };
 }
-for (let i = 1; i < weich.length; i++) if (weich[i] === 1 && weich[i - 1] < 1) maxima += 1;
-aus.weich = { min: Math.min(...weich), max: Math.max(...weich), wechsel, groessterSchritt, maxima };
+aus.weichLangsam = S.weichBilder(0.5, 60);
 aus.modus = [S.strobeModus('soft'), S.strobeModus('x'), S.strobeModus(undefined), S.strobeModus('off')];
+// Bildrate: gemittelt wird der ABSTAND. Wechseln 33- und 17-ms-Bilder (zwei
+// gezeichnete, zwei uebersprungene), sind das 40 Bilder/s — nicht 45.
 let fps = 60;
 for (let i = 0; i < 200; i++) fps = S.fpsNachfuehren(fps, 50);
-aus.fps = { nach20: fps, pause: S.fpsNachfuehren(60, 5000), null: S.fpsNachfuehren(60, 0) };
-// Phase haengt an der Uhr, nicht am Aufruf: dieselbe Zeit -> dieselbe Antwort.
-aus.phase = [S.strobeAn(1234.5, 5), S.strobeAn(1234.5, 5), S.strobeAn(1234.5 + 200, 5)];
+let gemischt = 60;
+for (let i = 0; i < 400; i++) gemischt = S.fpsNachfuehren(gemischt, (i % 4 < 2) ? 33.3 : 16.7);
+aus.fps = { nach20: fps, gemischt, pause: S.fpsNachfuehren(60, 5000), null: S.fpsNachfuehren(60, 0) };
+// Traeger Takt: eine um +-5 % schwankende Messung schaltet die Periode nie um.
+let takt = 40, wechselTakt = 0;
+for (let i = 0; i < 500; i++) {
+  const neu = S.taktFps(takt, 40 + 2 * Math.sin(i * 1.7));
+  if (neu !== takt) wechselTakt += 1;
+  takt = neu;
+}
+aus.takt = { ruhig: wechselTakt, bleibt: S.taktFps(60, 55), folgt: S.taktFps(60, 40),
+             start: S.taktFps(0, 37), unsinn: S.taktFps(60, NaN) };
 console.log(JSON.stringify(aus));
 """
 
@@ -414,6 +435,9 @@ def _js():
 
 @unittest.skipUnless(_node_verfuegbar(), "node nicht installiert")
 class BlitzFunktionTest(unittest.TestCase):
+    """Die Blitz-Rechnung der Szene, im BILDRASTER (Sichtprobe 2026-10-12:
+    die Abtastung einer Uhr-Phase gab Doppelblitze mit ungleichen Luecken)."""
+
     def test_konstanten_gleich_python(self):
         k = _js()["konst"]
         self.assertEqual(tuple(k["modi"]), P.MODES)
@@ -423,87 +447,219 @@ class BlitzFunktionTest(unittest.TestCase):
         self.assertEqual(k["bilder"], P.FRAMES_PER_FLASH)
         self.assertEqual(k["weichHz"], P.SOFT_MAX_HZ)
         self.assertEqual(k["weichMin"], P.SOFT_MIN)
+        # ... und gleich der Rechnung der 2D-Ansicht.
+        self.assertEqual((k["tast"], k["deckel"], k["bilder"]),
+                         (S.TAST, S.DECKEL_HZ, S.BILDER_JE_BLITZ))
 
-    def test_tastverhaeltnis_zwischen_20_und_30_prozent(self):
+    def test_folge_ist_exakt_periodisch_mit_einem_blitz_je_periode(self):
+        folgen = _js()["folgen"]
+        self.assertGreater(len(folgen), 100)
+        for f in folgen:
+            with self.subTest(fps=f["fps"], hz=f["hz"]):
+                self.assertTrue(f["periodisch"], f)
+                self.assertEqual(f["werte"], [0, 1])
+                self.assertEqual(f["blitze"], f["perioden"], "ein Blitz je Periode")
+                self.assertEqual(f["anGezaehlt"], f["an"] * f["perioden"])
+
+    def test_periode_und_blitzlaenge_in_ganzen_bildern(self):
+        for f in _js()["folgen"]:
+            with self.subTest(fps=f["fps"], hz=f["hz"]):
+                ziel = min(f["hz"], P.CAP_HZ)
+                self.assertEqual(f["periode"],
+                                 max(int(f["fps"] / ziel + 0.5), P.FRAMES_PER_FLASH))
+                self.assertEqual(f["an"], max(1, int(f["periode"] * P.DUTY + 0.5)))
+                self.assertGreaterEqual(f["periode"] - f["an"], 2, "mindestens zwei Bilder dunkel")
+                # Gleiche Rechnung wie die 2D-Ansicht (src/core/strobe.py).
+                self.assertEqual(S.blitz_bilder(f["hz"], f["fps"]), (f["periode"], f["an"]))
+
+    def test_muster_bei_30_40_und_60_bildern(self):
+        m = _js()["muster"]
+        self.assertEqual(m["30"], "#..#..#..#..#..#..#..#..")
+        self.assertEqual(m["40"], "#...#...#...#...#...#...")
+        self.assertEqual(m["60"], "##....##....##....##....")
+
+    def test_deckel_wird_auf_30_bis_60_bildern_erreicht(self):
+        """Der Deckel ist so gewaehlt, dass er dort ankommt, wo gemessen wurde
+        (34-52 Bilder/s beim Blitzen): drei Bilder je Blitz * 10 Hz = 30."""
+        self.assertEqual(P.CAP_HZ, 10)
+        self.assertEqual(P.CAP_HZ * P.FRAMES_PER_FLASH, 30)
+        schnell = [f for f in _js()["folgen"] if f["hz"] >= P.CAP_HZ]
+        for f in schnell:
+            with self.subTest(fps=f["fps"], hz=f["hz"]):
+                if f["fps"] in (30, 60, 120):
+                    self.assertAlmostEqual(f["anzeige"], P.CAP_HZ)
+                if 30 <= f["fps"] <= 144:
+                    # Zwischen den glatten Bildraten: eine halbe Bildlaenge je Periode.
+                    self.assertTrue(8.5 <= f["anzeige"] <= 11.7, f)
+                if f["fps"] < 30:
+                    self.assertAlmostEqual(f["anzeige"], f["fps"] / 3)   # ehrlich weniger
+        # Gemeldete Frequenz unter dem Deckel: sie wird gezeigt (auf ganze Bilder gerundet).
+        for f in _js()["folgen"]:
+            if f["hz"] <= 5 and f["fps"] >= 30:
+                self.assertAlmostEqual(f["anzeige"], f["hz"], delta=f["hz"] * 0.1, msg=f)
+
+    def test_tastverhaeltnis_kurzer_blitz(self):
         self.assertTrue(0.20 <= P.DUTY <= 0.30)
-        e = _js()["fein5"]
-        self.assertAlmostEqual(e["anteil"], P.DUTY, delta=0.005)
-        self.assertEqual(e["blitze"], 50)               # 5 Hz ueber 10 s
-
-    def test_deckel_begrenzt_die_dargestellte_frequenz(self):
-        e = _js()
-        self.assertEqual(e["fein20"]["blitze"], P.CAP_HZ * 10)
-        self.assertAlmostEqual(e["fein20"]["anteil"], P.DUTY, delta=0.005)
-        self.assertEqual(e["fein20ohneDeckel"]["blitze"], 200)
-        self.assertTrue(10 <= P.CAP_HZ <= 12)
+        for f in _js()["folgen"]:
+            anteil = f["an"] / f["periode"]
+            self.assertTrue(0.16 <= anteil <= 0.34, f)
 
     def test_null_oder_unsinn_ist_dauerlicht(self):
-        self.assertEqual(_js()["dauerlicht"], [True, True, True, True])
+        self.assertEqual(_js()["dauerlicht"], [True, True, True, True, 0, 0])
 
-    def test_eigenes_tastverhaeltnis(self):
-        self.assertAlmostEqual(_js()["eigenerTast"]["anteil"], 0.5, delta=0.005)
+    def test_negativer_bildzaehler(self):
+        self.assertEqual(_js()["negativ"], [False, True, False])
 
-    def test_anzeigefrequenz_hoechstens_ein_drittel_der_bildrate(self):
-        a = _js()["anzeige"]
-        self.assertEqual(a["normal"], 5)
-        self.assertEqual(a["deckel"], P.CAP_HZ)
-        self.assertEqual(a["langsam"], 5)               # 15 Bilder/s
-        self.assertAlmostEqual(a["sehrLangsam"], 8 / 3)
-        self.assertGreaterEqual(P.FRAMES_PER_FLASH, 2)  # nie ueber der halben Bildrate
-        self.assertEqual(a["null"], 0)
+    def test_gleiche_frequenz_gleiche_phase_andere_frequenz_eigene_periode(self):
+        e = _js()
+        self.assertTrue(e["gleich"])
+        self.assertEqual(e["verschieden"], [30, 12])
 
-    def test_blitz_dauert_mindestens_ein_bild(self):
-        t = _js()["tast"]
-        self.assertEqual(t["normal"], P.DUTY)           # 60 Bilder/s: 25 % reichen
-        self.assertAlmostEqual(t["langsam"], 1 / 3)     # 5 Hz bei 15 Bildern/s
-        self.assertAlmostEqual(t["grenze"], 1 / 3)      # nie mehr als ein Drittel
-
-    def test_bildraster_trifft_jeden_blitz_und_jede_pause(self):
-        """Ehrlich bei niedriger Bildrate: im Raster der Bilder gezaehlt entsteht
-        genau die begrenzte Frequenz — kein Blitz geht verloren, keiner
-        verschmilzt mit dem naechsten (das waere die Schwebung)."""
-        r = _js()["raster"]
-        erwartet = {"60": 12.0, "30": 10.0, "15": 5.0}
-        for fps, hz in erwartet.items():
-            with self.subTest(fps=fps):
-                self.assertAlmostEqual(r[fps]["blitze"] / 10.0, hz, delta=0.15)
-                # Im Bildraster ist ein Blitz ein oder zwei Bilder lang (60 Bilder/s,
-                # 12 Hz: Periode genau 5 Bilder, je nach Phasenlage 1 oder 2 an).
-                self.assertTrue(0.2 <= r[fps]["anteil"] <= 0.41, r[fps])
-                # Laengste Dunkelphase in Bildern: nie mehr als eine Periode.
-                self.assertLessEqual(r[fps]["laengsteAus"], round(int(fps) / hz), r[fps])
-
-    def test_faktor_blitzen_kennt_nur_an_und_aus(self):
+    def test_faktor_aus_und_kein_strobe(self):
         f = _js()["faktor"]
-        self.assertEqual(f["blitzWerte"], [0, 1])
         self.assertEqual(f["aus"], [1, 1])
         self.assertEqual(f["keinStrobe"], [1, 1])
 
-    def test_gedaempft_pulsiert_langsam_und_flach(self):
-        w = _js()["weich"]
-        self.assertEqual(w["max"], 1)
-        self.assertAlmostEqual(w["min"], P.SOFT_MIN)
-        self.assertGreaterEqual(w["min"], 0.5)          # nie dunkel
-        # 20 Hz gemeldet, gezeigt hoechstens 2 Hz: 4 s -> 8 Wellen.
-        self.assertEqual(w["maxima"], P.SOFT_MAX_HZ * 4)
-        self.assertLessEqual(P.SOFT_MAX_HZ, 3)          # unter drei Wechseln je Sekunde
-        # Kleine Stufen (kein Sprung), und nur wenige Neuberechnungen je Welle.
-        self.assertLess(w["groessterSchritt"], 0.06)
-        self.assertLessEqual(w["wechsel"], 8 * 2 * 8 + 2)
+    def test_gedaempft_pulsiert_langsam_flach_und_in_wenigen_schritten(self):
+        for fps, w in _js()["weich"].items():
+            with self.subTest(fps=fps):
+                self.assertTrue(w["periodisch"])
+                self.assertEqual(w["max"], 1)
+                self.assertAlmostEqual(w["min"], P.SOFT_MIN)
+                self.assertGreaterEqual(w["min"], 0.5)          # nie dunkel
+                self.assertLessEqual(w["hz"], P.SOFT_MAX_HZ + 1e-9)
+                self.assertGreaterEqual(w["hz"], 1.4)
+                self.assertEqual(w["periode"] % 8, 0, "gleich lange Schritte")
+                # Acht Aenderungen je Welle — nicht eine je Bild (Sichtprobe: der
+                # gedaempfte Modus war der teuerste, bis zu 32 Aenderungen/s).
+                self.assertEqual(w["wechselJeWelle"], 8)
+                self.assertEqual(w["stufen"], 5)
+                self.assertLess(w["groessterSchritt"], 0.17)
+        self.assertLessEqual(P.SOFT_MAX_HZ, 3)                   # unter drei Wechseln je Sekunde
+        self.assertEqual(_js()["weichLangsam"], 120)             # 0,5 Hz bleibt 0,5 Hz
 
     def test_modus_normalisieren(self):
         self.assertEqual(_js()["modus"], ["soft", "flash", "flash", "off"])
 
-    def test_bildrate_wird_nachgefuehrt(self):
+    def test_bildrate_aus_dem_mittleren_bildabstand(self):
         f = _js()["fps"]
         self.assertAlmostEqual(f["nach20"], 20, delta=0.1)
+        self.assertAlmostEqual(f["gemischt"], 40, delta=1.5)
         self.assertEqual(f["pause"], 60)                # Tab im Hintergrund zaehlt nicht
         self.assertEqual(f["null"], 60)
 
-    def test_phase_haengt_an_der_uhr(self):
-        a, b, c = _js()["phase"]
-        self.assertEqual(a, b)
-        self.assertEqual(a, c)                          # eine ganze Periode spaeter
+    def test_takt_ist_traege(self):
+        t = _js()["takt"]
+        self.assertEqual(t["ruhig"], 0, "eine schwankende Messung schaltete die Periode um")
+        self.assertEqual(t["bleibt"], 60)
+        self.assertEqual(t["folgt"], 40)
+        self.assertEqual(t["start"], 37)
+        self.assertEqual(t["unsinn"], 60)
+
+
+class BildrechnungPythonTest(unittest.TestCase):
+    """Dieselbe Rechnung fuer die 2D-Live-Ansicht (``core.strobe.blitz_bilder``)."""
+
+    def test_periode_und_an(self):
+        self.assertEqual(S.blitz_bilder(20, 10), (3, 1))      # 2D: 10 Bilder/s
+        self.assertEqual(S.blitz_bilder(5, 10), (3, 1))
+        self.assertEqual(S.blitz_bilder(2, 10), (5, 1))
+        self.assertEqual(S.blitz_bilder(1, 10), (10, 3))
+        self.assertEqual(S.blitz_bilder(20, 60), (6, 2))
+        self.assertEqual(S.blitz_bilder(20, 30), (3, 1))
+        self.assertEqual(S.blitz_bilder(1, 10, tast=0.5), (10, 5))
+        self.assertEqual(S.blitz_bilder(20, 10, tast=0.5), (3, 2))
+
+    def test_kein_strobe_und_unsinn(self):
+        for hz, fps in ((0, 10), (-1, 10), (5, 0), (None, 10), ("x", 10)):
+            self.assertEqual(S.blitz_bilder(hz, fps), (0, 0))
+            self.assertTrue(S.blitz_an(3, hz, fps))
+
+    def test_folge_ist_periodisch(self):
+        for hz in (0.5, 1, 2, 5, 12, 20):
+            for fps in (1, 4, 10, 20):
+                periode, an = S.blitz_bilder(hz, fps)
+                folge = [S.blitz_an(i, hz, fps) for i in range(periode * 5)]
+                self.assertEqual(folge, folge[:periode] * 5)
+                self.assertEqual(sum(folge[:periode]), an)
+                self.assertTrue(folge[0] and not folge[periode - 1])
+
+
+class LiveView2dBlinktImBildtaktTest(unittest.TestCase):
+    """Sichtprobe 2026-10-12: die 2D-Ansicht blinkte langsam und unregelmaessig
+    (~0,7 s an, lange aus) — die Phase wurde je Bild aus der Uhr abgetastet.
+    Jetzt zaehlt die Ansicht ihre Takt-Bilder (ohne Fenster geprueft)."""
+
+    def _canvas(self, abstand_s=0.0):
+        import src.ui.views.live_view as LV
+        c = SimpleNamespace(RENDER_INTERVAL_MS=LV.StageCanvas.RENDER_INTERVAL_MS,
+                            _strobe_bild=0, _bild_abstand_s=lambda: abstand_s)
+        c._strobe_bildrate = lambda: LV.StageCanvas._strobe_bildrate(c)
+        c._blink_an = lambda hz, r=False: LV.StageCanvas._blink_an(c, hz, r)
+        return LV, c
+
+    def _folge(self, c, hz, n, rechteck=False):
+        aus = []
+        for i in range(n):
+            c._strobe_bild = i
+            aus.append("#" if c._blink_an(hz, rechteck) else ".")
+        return "".join(aus)
+
+    def test_bildrate_ist_der_takt_der_ansicht(self):
+        LV, c = self._canvas()
+        self.assertEqual(LV.StageCanvas.RENDER_INTERVAL_MS, 100)
+        self.assertAlmostEqual(c._strobe_bildrate(), 10.0)
+        _LV, gebremst = self._canvas(abstand_s=0.25)        # UI-86 bremst
+        self.assertAlmostEqual(gebremst._strobe_bildrate(), 4.0)
+
+    def test_schneller_strobe_ein_bild_an_zwei_aus(self):
+        _LV, c = self._canvas()
+        for hz in (5, 10, 20):
+            self.assertEqual(self._folge(c, hz, 12), "#..#..#..#..", hz)
+
+    def test_langsamer_strobe_in_seiner_frequenz(self):
+        _LV, c = self._canvas()
+        self.assertEqual(self._folge(c, 2, 15), "#....#....#....")
+        self.assertEqual(self._folge(c, 1, 20), "###.......###.......")
+
+    def test_rechteck_effekt_bleibt_halb_an_halb_aus(self):
+        _LV, c = self._canvas()
+        self.assertEqual(self._folge(c, 1, 20, rechteck=True), "#####.....#####.....")
+
+    def test_gebremste_ansicht_bleibt_gleichmaessig(self):
+        _LV, c = self._canvas(abstand_s=0.25)
+        self.assertEqual(self._folge(c, 20, 9), "#..#..#..")
+
+    def test_steckbrief_weg_nutzt_den_bildzaehler(self):
+        LV, c = self._canvas()
+        ch = _ch(ranges=[_rng(0, 9, "Zu", "closed"), _rng(10, 255, "Strobe 5 Hz", "strobe")])
+        sb = {"strobe": [(ch, 7, {})], "uni": 1, "fp": (42,)}
+        lese = lambda _uni, _addr: 100
+        folge = []
+        for i in range(6):
+            c._strobe_bild = i
+            hz, an = LV.StageCanvas._strobe_aus_steckbrief(c, sb, lese, {"square": {}})
+            self.assertAlmostEqual(hz, 5.0)
+            folge.append(an)
+        self.assertEqual(folge, [True, False, False, True, False, False])
+        # Rechteck-Effekt (kein Shutter-Strobe): halbe Periode an.
+        leer = {"strobe": [], "uni": 1, "fp": (42,)}
+        c._strobe_bild = 4
+        self.assertEqual(LV.StageCanvas._strobe_aus_steckbrief(
+            c, leer, lese, {"square": {42: 1.0}}), (1.0, True))
+        c._strobe_bild = 5
+        self.assertEqual(LV.StageCanvas._strobe_aus_steckbrief(
+            c, leer, lese, {"square": {42: 1.0}}), (1.0, False))
+
+    def test_keine_abtastung_der_uhr_mehr(self):
+        import src.ui.views.live_view as LV
+        with open(LV.__file__, encoding="utf-8") as fh:
+            quelle = fh.read()
+        self.assertNotIn("time.time() * freq_hz", quelle)
+        self.assertEqual(quelle.count("self._blink_an(freq_hz, rechteck)"), 2)
+        tick = quelle[quelle.index("    def _on_render_tick(self)"):]
+        tick = tick[:tick.index("\n    # ── VIZ-70")]
+        self.assertLess(tick.index("_strobe_bild"), tick.index("self.update()"))
 
 
 class VerdrahtungTest(unittest.TestCase):
@@ -535,12 +691,47 @@ class VerdrahtungTest(unittest.TestCase):
         for wort in ("color", "pan", "tilt", "heads", " r:", " g:", " b:"):
             self.assertNotIn(wort, m.group(1).split("return")[1])
 
-    def test_keine_erzwungene_schatten_neuberechnung(self):
+    def _strobe_block(self):
         fx = self._lies("fixtures", "fixtures.js")
-        a = fx.index("// ── VIZ-104: Strobe im Bildtakt")
-        b = fx.index("// ── Spaet-Bindung")
-        self.assertNotIn("requestShadowUpdate(", fx[a:b])
-        self.assertNotIn("needsUpdate", fx[a:b])
+        return fx[fx.index("// ── VIZ-104: Strobe im Bildtakt"):fx.index("// ── Spaet-Bindung")]
+
+    def test_keine_erzwungene_schatten_neuberechnung(self):
+        for quelle in (self._strobe_block(), self._lies("fixtures", "strobe_hell.js")):
+            self.assertNotIn("requestShadowUpdate(", quelle)
+            self.assertNotIn("needsUpdate", quelle)
+
+    def test_takt_zaehlt_bilder_statt_die_uhr_abzutasten(self):
+        block = self._strobe_block()
+        m = re.search(r"function _bildJetzt\(\) \{(.*?)\n\}", block, re.S)
+        self.assertIsNotNone(m)
+        self.assertIn("_strobeBild", m.group(1))
+        tick = block[block.index("export function tickStrobe()"):block.index("export function strobeNeuBewerten")]
+        self.assertIn("_strobeBild += 1;", tick)
+        self.assertIn("taktFps(_strobeTakt, _strobeFps)", tick)
+        # Die Uhr dient nur noch der Messung der Bildrate, nie der Phase.
+        self.assertNotIn("performance.now", block.replace(tick, ""))
+        self.assertNotIn("strobeFaktor(jetzt", block)
+
+    def test_takt_wendet_den_dmx_stand_nicht_neu_an(self):
+        """Je Wechsel nur Helligkeiten (strobe_hell.js) — die volle Anwendung
+        bleibt dem DMX-Update und, als Ausnahme, dem Laser."""
+        block = self._strobe_block()
+        tick = block[block.index("export function tickStrobe()"):block.index("export function strobeNeuBewerten")]
+        self.assertNotIn("updateFixtureDmx(", tick)
+        zeigen = block[block.index("function _strobeZeigen(f)"):block.index("/** Vor jedem Bild")]
+        self.assertLess(zeigen.index("hellSetzen("), zeigen.index("updateFixtureDmx("))
+        self.assertEqual(block.count("updateFixtureDmx("), 1)
+        hell = self._lies("fixtures", "strobe_hell.js")
+        code = "\n".join(z for z in hell.split('"use strict"')[1].splitlines()
+                         if not z.strip().startswith("//"))
+        for wort in ("updateFixtureDmx", "applyFloorAim", "applyGobo", "applyOptics",
+                     "applyPrism", "updateMatrixWorld", "new THREE", "needsUpdate",
+                     ".map =", "syncSpotPool", "requestRender"):
+            self.assertNotIn(wort, code, wort)
+
+    def test_spot_pool_haelt_licht_und_schatten_in_der_dunkelphase(self):
+        pool = self._lies("scene", "spot_pool.js")
+        self.assertEqual(pool.count("_strobeFaktor === 0"), 2)
 
     def test_einstellung_kommt_in_der_szene_an(self):
         br = self._lies("bridge", "bridge.js")
@@ -569,7 +760,7 @@ class AnleitungTest(unittest.TestCase):
         ende = text.find("\n## ", a + 5)
         abschnitt = text[a:ende if ende > 0 else len(text)]
         for wort in ("Strobe im 3D zeigen", "Blitzen", "Gedämpft", "Dauerlicht",
-                     f"{P.CAP_HZ} Blitze", "ein Drittel der Bildrate",
+                     f"{P.CAP_HZ} Blitze", "mindestens drei Bilder", "gleichmäßig",
                      "photosensitiver Epilepsie", "DMX-Ausgabe",
                      "eigenen Shutter je Kopf", "ohne Bereichsangaben"):
             self.assertIn(wort, abschnitt, wort)
@@ -637,3 +828,24 @@ class EinstellungenReiterTest(unittest.TestCase):
         win._on_settings_changed.assert_called_once()
         win._on_reload_scene.assert_not_called()                   # kein Neuladen
         self.assertEqual(VW.VisualizerWindow._collect_settings(win)["strobeMode"], "off")
+
+    def test_auswahl_passt_in_die_schmale_spalte(self):
+        """Sichtprobe 2026-10-12: die Auswahl war rechts abgeschnitten — ihr
+        laengster Eintrag bestimmte die Breite der Zeile. Jetzt darf sie
+        schmaler sein als ihr laengster Eintrag (Muster wie bei der Stufe)."""
+        from PySide6.QtWidgets import QComboBox, QLabel
+        win, tab = self._fenster({})
+        combo = win._combo_strobe
+        self.assertEqual(combo.sizeAdjustPolicy(),
+                         QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.assertEqual(combo.minimumContentsLength(), 12)
+        titel = [l for l in tab.findChildren(QLabel) if l.text() == "Strobe im 3D zeigen:"]
+        self.assertEqual(len(titel), 1)
+        # Schmalste Spalte 330 px; davon gehen Raender von Reiter, Gruppe und
+        # Rollbalken ab (grosszuegig 60).
+        zeile = titel[0].sizeHint().width() + combo.minimumSizeHint().width() + 12
+        self.assertLessEqual(zeile, 330 - 60, zeile)
+        laengster = max(combo.fontMetrics().horizontalAdvance(combo.itemText(i))
+                        for i in range(combo.count()))
+        self.assertLess(combo.minimumSizeHint().width(), laengster + 30)
+        self.assertTrue(win._lbl_strobe_warnung.wordWrap())

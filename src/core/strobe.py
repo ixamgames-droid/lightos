@@ -43,6 +43,15 @@ OHNE_BEREICHE_SCHWELLE = 10
 #: Obergrenze fuer Frequenzen aus Bereichsnamen (Tippfehler im Profil).
 HZ_NAME_MAX = 60.0
 
+#: Darstellung im Bildtakt (3D-Szene UND 2D-Live-Ansicht) — dieselben Zahlen
+#: wie ``ui/visualizer/scene_src/fixtures/strobe.js``; der Test haelt sie gleich.
+#: Anteil der Periode, in dem ein blitzendes Geraet leuchtet.
+TAST = 0.25
+#: Hoechste dargestellte Blitzfrequenz (Hz).
+DECKEL_HZ = 10
+#: So viele Bilder hat eine Periode mindestens (eins an, der Rest aus).
+BILDER_JE_BLITZ = 3
+
 _SHUTTER_ATTRS = ("shutter", "strobe")
 #: Namensteile, die einen Kanal ausdruecklich als Strobe-Kanal ausweisen.
 #: „frequen": ein Shutter-Kanal, der „Frequenz"/„Frequency" heisst, stellt die
@@ -164,3 +173,37 @@ def hat_kopf_shutter(channels) -> bool:
     """Hat das Geraet mehr als einen Shutter-/Strobe-Kanal derselben Art —
     also einen je Kopf?"""
     return any("#" in k for k in _kanaele_nach_schluessel(channels))
+
+
+def blitz_bilder(hz: float, fps: float, deckel_hz: float = DECKEL_HZ,
+                 tast: float = TAST) -> tuple[int, int]:
+    """Periode und Blitzlaenge in GANZEN Bildern: ``(periode, an)``.
+
+    Zielfrequenz = ``min(hz, deckel_hz)``; ``periode = max(runde(fps / ziel),
+    BILDER_JE_BLITZ)``; ``an = max(1, runde(periode * tast))``. Kein Strobe ->
+    ``(0, 0)``. Dieselbe Rechnung wie ``strobeBilder`` in der 3D-Szene.
+
+    Warum in Bildern: eine Phase aus der laufenden Uhr gegen ein Bildraster
+    abzutasten ergibt eine Schwebung — die 2D-Ansicht (10 Bilder/s) zeigte
+    einen 5-Hz-Strobe als unregelmaessiges, langsames Blinken. Im Bildraster
+    ist die Folge exakt periodisch. Gezeigt werden damit hoechstens
+    ``fps / BILDER_JE_BLITZ`` Blitze je Sekunde."""
+    try:
+        hz, fps = float(hz), float(fps)
+    except (TypeError, ValueError):
+        return 0, 0
+    if not (hz > 0 and fps > 0 and deckel_hz > 0):
+        return 0, 0
+    ziel = min(hz, float(deckel_hz))
+    periode = max(int(fps / ziel + 0.5), BILDER_JE_BLITZ)
+    an = min(periode - 1, max(1, int(periode * tast + 0.5)))
+    return periode, an
+
+
+def blitz_an(bild: int, hz: float, fps: float, deckel_hz: float = DECKEL_HZ,
+             tast: float = TAST) -> bool:
+    """Leuchtet das Geraet im Bild Nummer ``bild``? Ohne Strobe immer ``True``."""
+    periode, an = blitz_bilder(hz, fps, deckel_hz, tast)
+    if not periode:
+        return True
+    return int(bild) % periode < an
