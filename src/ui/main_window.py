@@ -3055,8 +3055,11 @@ class MainWindow(QMainWindow):
                 tip = ("Laser-NOT-AUS: alle Laser sofort dunkel — ein Klick, "
                        "keine Rückfrage (Strg+Umschalt+L).\n")
             tip += f"Erkannte Laser: {n}"
-            if not aktiv:
-                tip += " — der Knopf wirkt auch, wenn keiner erkannt ist."
+            if n == 0:
+                # LAS-37: ehrlich bleiben — ohne erkannten Laser ist die
+                # NOT-AUS-Maske leer, ueber DMX geht dann nichts dunkel.
+                tip += (" — über DMX schaltet der Knopf dann nichts dunkel: er "
+                        "deckt nur Geräte, die LightOS als Laser erkennt.")
             if btn.text() != text:
                 btn.setText(text)
             if btn.styleSheet() != stil:
