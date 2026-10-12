@@ -869,6 +869,11 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
             for nr, g in enumerate(zeilen, start=1):
                 try:
                     out.append({
+                        # VCB-36: die ID gehoert in die Datei. Ohne sie vergab
+                        # das Laden 1..n neu — wer eine Gruppe ueber ihre ID
+                        # meint (Blackout-Ziel einer VC-Taste), zeigte nach
+                        # Speichern/Laden auf eine andere oder keine.
+                        "id": int(g.id),
                         "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
                         "positions_json": g.positions_json or "{}",
                         "folder": g.folder or "",
@@ -882,6 +887,12 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
     return out
 
 
+# VCB-36: groesste Gruppen-ID, die aus einer Datei uebernommen wird — SQLites
+# Grenze fuer eine Ganzzahl. Genau die: jede ID, die die Datenbank halten (und
+# damit speichern) kann, bleibt lesbar; alles darueber kann sie nicht einfuegen.
+_GRUPPEN_ID_MAX = 2**63 - 1
+
+
 def _fixture_group_aus_daten(g):
     """EINEN Gruppen-Eintrag der .lshow uebersetzen; wirft bei unlesbarem
     Eintrag (der Aufrufer ueberspringt und meldet genau diesen, STAB-24).
@@ -889,13 +900,52 @@ def _fixture_group_aus_daten(g):
     from src.core.database.models import FixtureGroup
     if not isinstance(g, dict):
         raise TypeError(f"Eintrag ist kein Objekt, sondern {type(g).__name__}")
-    return FixtureGroup(
+    fg = FixtureGroup(
         name=_als_text(g.get("name", "Gruppe"), "name", "Gruppe"),
         cols=_raster_mass(g, "cols"), rows=_raster_mass(g, "rows"),
         positions_json=_als_text(g.get("positions_json", "{}"),
                                  "positions_json", "{}") or "{}",
         folder=_als_text(g.get("folder", ""), "folder", ""),
     )
+    # VCB-36: gespeicherte ID uebernehmen. Fehlt sie (Alt-Show) oder ist sie
+    # unlesbar, bleibt sie offen — ``_restore_fixture_groups`` vergibt dann eine.
+    # Eine unlesbare ID kostet die Gruppe nicht (nur ihre Nummer).
+    # Auch eine zu GROSSE Zahl gilt als unlesbar: an einer ID jenseits von
+    # SQLites 64 Bit scheitert das Einfuegen (OverflowError) — und mit ihm die
+    # ganze Transaktion, also ALLE Gruppen (STAB-24).
+    gid = g.get("id")
+    if (isinstance(gid, int) and not isinstance(gid, bool)
+            and 0 < gid <= _GRUPPEN_ID_MAX):
+        fg.id = gid
+    return fg
+
+
+def _gruppen_ids_vergeben(gebaut: list) -> None:
+    """VCB-36: jeder Gruppe genau eine ID geben, bevor sie in die DB geht.
+
+    ALLE IDs werden hier vergeben, keine von der Datenbank. Mischte man
+    gespeicherte und automatisch vergebene, koennte eine automatische genau
+    die treffen, die ein spaeterer Eintrag mitbringt — die Transaktion
+    scheiterte, und ALLE Gruppen waeren weg (der Fall, den STAB-24 beendet
+    hat). Steht dieselbe ID zweimal in der Datei, behaelt sie der erste
+    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge."""
+    vergeben: set[int] = set()
+    for fg in gebaut:
+        if fg.id is None:
+            continue
+        if fg.id in vergeben:
+            _lenient(f"Fixture-Gruppe '{fg.name}': ID {fg.id} steht doppelt in "
+                     f"der Datei — neue ID vergeben", ValueError("doppelte ID"))
+            fg.id = None
+        else:
+            vergeben.add(fg.id)
+    frei = 1
+    for fg in gebaut:
+        if fg.id is None:
+            while frei in vergeben:
+                frei += 1
+            fg.id = frei
+            vergeben.add(frei)
 
 
 def _restore_fixture_groups(state, groups: list) -> None:
@@ -912,6 +962,7 @@ def _restore_fixture_groups(state, groups: list) -> None:
                            f"erwartet Liste"))
         groups = []
     gebaut = _je_eintrag(groups, _fixture_group_aus_daten, "Fixture-Gruppe", "name")
+    _gruppen_ids_vergeben(gebaut)
     try:
         from sqlalchemy import delete
         from src.core.database.models import FixtureGroup
@@ -1091,6 +1142,13 @@ def _show_daten(state, probleme: list) -> dict:
         "music_autoshow": getattr(state, "music_autoshow", None)
         or {"enabled": False, "function_ids": [], "bank": 0},
     }
+    # LAS-32 (S1): Sperrzonen als EIGENER Abschnitt mit eigener Versionsnummer
+    # — bewusst kein Knoten im Szenengraph (ein aelterer Programmstand macht aus
+    # einer unbekannten Knotenart ein Geraet). Nur geschrieben, wenn es etwas
+    # gibt: eine Show ohne Zonen bleibt Byte fuer Byte wie bisher.
+    sperrzonen = getattr(state, "sperrzonen", None)
+    if sperrzonen is not None and not sperrzonen.ist_leer():
+        show["sperrzonen"] = sperrzonen.to_dict()
     if scene_graph_data is not None:
         show["scene_graph"] = scene_graph_data
     return show
@@ -1658,6 +1716,13 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     except Exception as e:
         print(f"[show_file] reset laser patterns error: {e}")
 
+    # LAS-32: Sperrzonen und Laser-Felder leeren.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        state.sperrzonen = SperrzonenDaten()
+    except Exception as e:
+        print(f"[show_file] reset sperrzonen error: {e}")
+
     pe = getattr(state, "playback_engine", None)
     if pe is not None:
         try:
@@ -1942,6 +2007,12 @@ def _load_show_impl(path: str | os.PathLike):
     # sonst nullt der Zwischenschritt mit dem leeren Patch alle alten Adressen im
     # Live-Universe und der Output-Thread sendet den Blackout-Puls, bis der neue
     # Patch gerendert ist.
+    # LAS-32 (G10): hatte die Show, die gleich ersetzt wird, Sperrzonen?
+    try:
+        _sz_hatte_zonen = bool(getattr(getattr(state, "sperrzonen", None), "zonen", None))
+    except Exception:
+        _sz_hatte_zonen = False
+    state.sperrzonen_wechsel_hinweis = False
     with _deferred_addr_release(state):
         _prev_suppress = getattr(state, "_suppress_emits", False)
         state._suppress_emits = True
@@ -2110,6 +2181,19 @@ def _load_show_impl(path: str | os.PathLike):
             PatternSlot.from_dict, "Laser-Muster", "name", "label")
     except Exception as e:
         _lenient("load laser patterns error", e)
+
+    # LAS-32 (S1): Sperrzonen (eigener Abschnitt). Alt-Show ohne Abschnitt ->
+    # leerer Bestand; die Anzeige meldet dann „keine Sperrzonen", nie einen
+    # Zustand, der nach Schutz aussieht.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten, daten_aus_abschnitt
+        state.sperrzonen, _sz_probleme = daten_aus_abschnitt(data.get("sperrzonen"))
+        for _p in _sz_probleme:
+            print(f"[show_file] {_p}")
+            _ladeprobleme.append(_p)
+    except Exception as e:
+        state.sperrzonen = SperrzonenDaten()
+        _lenient("load sperrzonen error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library
@@ -2507,6 +2591,22 @@ def _load_show_impl(path: str | os.PathLike):
     except Exception as e:
         _lenient("music_autoshow load error", e)
         state.music_autoshow = {"enabled": False, "function_ids": [], "bank": 0, "slots": {}}
+
+    # LAS-32 (G10): von einer Show MIT Sperrzonen auf eine OHNE gewechselt,
+    # waehrend DMX-Laser gepatcht sind -> das Hauptfenster meldet es einmal
+    # (es liest und loescht dieses Flag im show_loaded-Handler). Eine Show mit
+    # Zonen merkt ausserdem, dass die Funktion auf diesem Rechner benutzt wird.
+    try:
+        from src.core.laser import sperrzonen as _sz
+        from src.core.laser.sperrzonen_merker import merke_benutzt as _sz_merke
+        _sz_daten = state.sperrzonen
+        if _sz_daten.zonen:
+            _sz_merke()
+        state.sperrzonen_wechsel_hinweis = bool(
+            _sz_hatte_zonen and not _sz_daten.zonen and _sz_daten.fremd is None
+            and _sz.dmx_laser(state))
+    except Exception as e:
+        _lenient("sperrzonen wechsel-hinweis error", e)
 
     # Notify listeners after full replacement
     try:

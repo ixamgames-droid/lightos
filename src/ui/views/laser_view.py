@@ -186,6 +186,20 @@ SPRECH_REGLER: tuple[tuple[str, str, str, str, dict | None], ...] = (
 #: weg. Bewusst KEIN Import am Dateianfang.
 SPERRZONEN_MODUL = "src.core.laser.sperrzonen"
 NUR_ANZEIGE = "Nur Anzeige · schaltet nicht ab"
+#: Meldung je Laser (LAS-32) und Planer (LAS-35) — ebenfalls nur als Text
+#: genannt und erst zur Laufzeit gesucht: fehlt eines der Module, fehlt im
+#: Tab genau das zugehoerige Bedienelement (kein toter Knopf).
+SPERRZONEN_UI_MODUL = "src.ui.visualizer.sperrzonen_ui"
+SPERRZONEN_PLANER_MODUL = "src.ui.visualizer.sperrzonen_planer"
+
+
+def _modul_oder_none(name: str):
+    """Das Modul ``name`` oder ``None``, wenn es auf diesem Stand fehlt
+    oder sich nicht laden laesst."""
+    try:
+        return importlib.import_module(name)
+    except Exception:
+        return None
 
 
 def sperrzonen_hinweis(state, fids) -> tuple[str, str] | None:
@@ -548,6 +562,32 @@ class LaserView(QWidget):
             "border-radius:18px;padding:0 11px;font-size:12px;}")
         self._sperrzonen_abzeichen.setVisible(False)
         dsb.addWidget(self._sperrzonen_abzeichen)
+        # LAS-32/LAS-35 im neuen Tab: die Meldung je Laser klappt unter der
+        # Leiste auf (zu = der Tab passt weiter ohne Scrollen), der Planer
+        # hat einen eigenen Knopf. Beide gibt es nur, wenn ihr Modul da ist.
+        self._btn_sperrzonen_details = QToolButton()
+        self._btn_sperrzonen_details.setObjectName("laserSperrzonenDetails")
+        self._btn_sperrzonen_details.setText("Meldung ▾")
+        self._btn_sperrzonen_details.setCheckable(True)
+        self._btn_sperrzonen_details.setFixedHeight(TOUCH)
+        self._btn_sperrzonen_details.setToolTip(
+            "Sperrzonen-Meldung je Laser ein- oder ausblenden. "
+            f"{NUR_ANZEIGE}. Kein Laserschutz.")
+        self._btn_sperrzonen_details.toggled.connect(
+            weak_slot_fwd(self._sperrzonen_details_zeigen))
+        self._btn_sperrzonen_details.setVisible(False)
+        dsb.addWidget(self._btn_sperrzonen_details)
+        self._btn_sperrzonen_planen = QPushButton("Sperrzonen planen…")
+        self._btn_sperrzonen_planen.setObjectName("laserSperrzonenPlanen")
+        self._btn_sperrzonen_planen.setFixedHeight(TOUCH)
+        self._btn_sperrzonen_planen.setToolTip(
+            "Öffnet den Planer: Zonen ziehen, Laser-Felder eintragen oder "
+            f"einmessen. {NUR_ANZEIGE}. Kein Laserschutz.")
+        self._btn_sperrzonen_planen.clicked.connect(
+            weak_slot(self._sperrzonen_planer_oeffnen))
+        self._btn_sperrzonen_planen.setVisible(
+            _modul_oder_none(SPERRZONEN_PLANER_MODUL) is not None)
+        dsb.addWidget(self._btn_sperrzonen_planen)
         self._btn_dmx_estop = QPushButton("■ LASER NOT-AUS")
         self._btn_dmx_estop.setFixedHeight(TOUCH)
         self._btn_dmx_estop.setMinimumWidth(138)
@@ -564,6 +604,30 @@ class LaserView(QWidget):
         dsb.addWidget(self._btn_dmx_estop)
         self._dmx_safety_box.setVisible(False)
         root.addWidget(self._dmx_safety_box)
+
+        # LAS-32 (S1): Sperrzonen-Meldung je Laser — nur Anzeige, schaltet
+        # nichts ab. Das Widget kommt aus der Sperrzonen-Bedienung (weich
+        # angebunden, s. SPERRZONEN_UI_MODUL) und liegt eingeklappt unter der
+        # Sicherheitsleiste; „Meldung ▾“ klappt es auf. Es blendet sich selbst
+        # aus, wenn es nichts zu sagen hat — darum steckt es in einem eigenen
+        # Rahmen, dessen Sichtbarkeit allein der Knopf bestimmt.
+        self._sperrzonen_details = QWidget()
+        sdl = QVBoxLayout(self._sperrzonen_details)
+        sdl.setContentsMargins(0, 0, 0, 0)
+        self._sperrzonen_hinweis = None
+        ui_modul = _modul_oder_none(SPERRZONEN_UI_MODUL)
+        if ui_modul is not None:
+            try:
+                self._sperrzonen_hinweis = ui_modul.SperrzonenHinweis(
+                    get_state(), self._sperrzonen_details)
+                sdl.addWidget(self._sperrzonen_hinweis)
+            except Exception as e:                       # noqa: BLE001
+                self._sperrzonen_hinweis = None
+                print(f"[laser_view] Sperrzonen-Hinweis: {e}")
+        self._btn_sperrzonen_details.setVisible(
+            self._sperrzonen_hinweis is not None)
+        self._sperrzonen_details.setVisible(False)
+        root.addWidget(self._sperrzonen_details)
 
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
@@ -950,6 +1014,9 @@ class LaserView(QWidget):
         # (LAS-34: als Sicherheitsleiste; sie trägt dann auch Modell/Anzahl).
         hat_dmx = len(self._fixtures) > len(self._network_fids)
         self._dmx_safety_box.setVisible(hat_dmx)
+        # Aufgeklappte Sperrzonen-Meldung folgt der Leiste (ohne DMX-Laser zu).
+        self._sperrzonen_details_zeigen(
+            self._btn_sperrzonen_details.isChecked())
         self._info.setVisible(not hat_dmx)
         self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
@@ -1055,6 +1122,31 @@ class LaserView(QWidget):
             self._sperrzonen_abzeichen.setVisible(True)
         except RuntimeError:
             pass
+
+    def _sperrzonen_details_zeigen(self, an: bool):
+        """Meldung je Laser unter der Sicherheitsleiste auf-/zuklappen."""
+        try:
+            self._btn_sperrzonen_details.setText(
+                "Meldung ▴" if an else "Meldung ▾")
+            zeigen = bool(an) and self._sperrzonen_hinweis is not None \
+                and self._dmx_safety_box.isVisibleTo(self)
+            self._sperrzonen_details.setVisible(zeigen)
+            if zeigen:
+                self._sperrzonen_hinweis.aktualisieren()
+        except RuntimeError:
+            pass
+
+    def _sperrzonen_planer_oeffnen(self):
+        """Knopf „Sperrzonen planen…“: oeffnet den Planer (LAS-35). Der Knopf
+        ist nur sichtbar, wenn es den Planer auf diesem Stand gibt."""
+        modul = _modul_oder_none(SPERRZONEN_PLANER_MODUL)
+        if modul is None:
+            return None
+        try:
+            return modul.planer_oeffnen(get_state(), self.window())
+        except Exception as e:                           # noqa: BLE001
+            print(f"[laser_view] Sperrzonen-Planer: {e}")
+            return None
 
     def _update_arm_button(self):
         armed = self._btn_arm.isChecked()

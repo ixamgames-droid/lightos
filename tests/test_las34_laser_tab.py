@@ -279,6 +279,67 @@ def test_sperrzonen_abzeichen_mit_der_funktion(monkeypatch):
     assert abz.isHidden()
 
 
+def test_knopf_sperrzonen_planen_oeffnet_den_planer(monkeypatch):
+    """QA96-22: Der Knopf steht in der Sicherheitsleiste und oeffnet den
+    Planer (LAS-35) — ueber dessen eine Einstiegsfunktion."""
+    import src.ui.views.laser_view as lv
+    import src.ui.visualizer.sperrzonen_planer as planer
+    rufe = []
+    monkeypatch.setattr(planer, "planer_oeffnen",
+                        lambda state, elter=None: rufe.append((state, elter)))
+    v, st = _view(monkeypatch, [_FX(1, _el400())])
+    knopf = v._btn_sperrzonen_planen
+    assert knopf.text() == "Sperrzonen planen…"
+    assert knopf.parentWidget() is v._dmx_safety_box
+    assert not knopf.isHidden() and knopf.isEnabled()
+    assert "Nur Anzeige" in knopf.toolTip()
+    knopf.click()
+    assert len(rufe) == 1 and rufe[0][0] is lv.get_state()
+
+
+def test_kein_toter_knopf_ohne_planer_und_ohne_meldung(monkeypatch):
+    """Fehlt der Planer bzw. die Sperrzonen-Bedienung auf einem Stand, fehlen
+    genau deren Knoepfe — und nichts wirft."""
+    import src.ui.views.laser_view as lv
+    monkeypatch.setattr(lv, "SPERRZONEN_PLANER_MODUL", "src.ui.gibt_es_nicht")
+    monkeypatch.setattr(lv, "SPERRZONEN_UI_MODUL", "src.ui.gibt_es_auch_nicht")
+    v, _st = _view(monkeypatch, [_FX(1, _el400())])
+    assert v._btn_sperrzonen_planen.isHidden()
+    assert v._btn_sperrzonen_details.isHidden()
+    assert v._sperrzonen_hinweis is None
+    assert v._sperrzonen_planer_oeffnen() is None
+    v._sperrzonen_details_zeigen(True)
+    assert v._sperrzonen_details.isHidden()
+
+
+def test_sperrzonen_meldung_klappt_im_tab_auf(monkeypatch):
+    """Das Widget aus LAS-32 sitzt im neuen Tab direkt unter der
+    Sicherheitsleiste: eingeklappt (der Tab passt ohne Scrollen), „Meldung“
+    klappt es auf. Der Satz „Nur Anzeige … NICHT ab“ steht darin."""
+    import src.ui.views.laser_view as lv
+    import src.ui.visualizer.sperrzonen_ui as UI
+    monkeypatch.setattr(
+        UI, "hinweis_html",
+        lambda state: f"<b>Sperrzonen (Vorschau) — "
+                      f"{UI.S.HINWEIS_NUR_ANZEIGE}</b><br>Laser 1: erreicht keine Zone")
+    v, _st = _view(monkeypatch, [_FX(1, _el400())])
+    w = v._sperrzonen_hinweis
+    assert isinstance(w, UI.SperrzonenHinweis)
+    assert w.parentWidget() is v._sperrzonen_details
+    lay = v.layout()
+    assert lay.indexOf(v._sperrzonen_details) == lay.indexOf(v._dmx_safety_box) + 1
+    schalter = v._btn_sperrzonen_details
+    assert not schalter.isHidden() and not schalter.isChecked()
+    assert v._sperrzonen_details.isHidden()
+    schalter.click()
+    assert not v._sperrzonen_details.isHidden() and not w.isHidden()
+    assert "Nur Anzeige" in w.text() and "NICHT ab" in w.text()
+    # Der Knopf in der Meldung selbst fuehrt ebenfalls in den Planer.
+    assert w.findChild(lv.QPushButton, "sperrzonenHinweisPlaner") is not None
+    schalter.click()
+    assert v._sperrzonen_details.isHidden()
+
+
 def test_nur_netzwerk_laser_behaelt_die_scharfschaltung(monkeypatch):
     v, _st = _view(monkeypatch, [_FX(1, _el400(), protocol="etherdream")])
     assert v._safety_box.isVisibleTo(v)             # Scharf/Unscharf + NOT-AUS
@@ -970,6 +1031,42 @@ def _programmer(echt, vorher_zu=False):
             app.processEvents()
 
     return app, st, pvm, pv, waehle
+
+
+def test_sicherheitsleiste_hat_platz_fuer_die_sperrzonen_knoepfe(echt, monkeypatch):
+    """Abzeichen, „Meldung“, „Sperrzonen planen…“ und NOT-AUS passen im
+    echten Programmer nebeneinander — nichts wird abgeschnitten, und der Tab
+    passt mit zugeklappter Meldung weiter ohne Scrollen."""
+    import src.ui.views.laser_view as lvm
+    monkeypatch.setattr(
+        lvm, "sperrzonen_hinweis",
+        lambda state, fids: ("⚠ Sperrzonen: 2 Hinweise", "Laser 1: Publikum"))
+    app, st, pvm, pv, waehle = _programmer(echt)
+    try:
+        waehle(1)
+        lv = pv._embedded_laser
+        leiste = lv._dmx_safety_box
+        assert leiste.isVisible()
+        teile = (lv._sperrzonen_abzeichen, lv._btn_sperrzonen_details,
+                 lv._btn_sperrzonen_planen, lv._btn_dmx_estop)
+        for w in teile:
+            assert w.isVisible(), w.objectName()
+            assert w.width() >= w.sizeHint().width(), w.objectName()
+            assert leiste.rect().contains(w.geometry()), w.objectName()
+        assert lv._lbl_dmx_estop.width() >= lv._lbl_dmx_estop.sizeHint().width()
+        assert not lv._sperrzonen_details.isVisible()
+        assert lv._scroll.verticalScrollBar().maximum() == 0
+        assert lv._scroll.horizontalScrollBar().maximum() == 0
+        lv._btn_sperrzonen_details.click()
+        for _ in range(3):
+            app.processEvents()
+        assert lv._sperrzonen_details.isVisible()
+        assert lv._sperrzonen_hinweis.isVisible()
+        assert "NICHT ab" in lv._sperrzonen_hinweis.text()
+    finally:
+        pv.close()
+        pv.deleteLater()
+        app.processEvents()
 
 
 def test_tab_passt_ohne_scrollen(echt):
