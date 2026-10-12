@@ -524,6 +524,12 @@ export function syncSpotPool() {
     if (h > 0) {
       _dunkelSeit.delete(fid);
       if (h > sp) sp = h;
+    } else if (sp > 0 && _fixtures[fid] && _fixtures[fid]._strobeFaktor === 0) {
+      // VIZ-104: die Dunkelphase eines Strobes ist kein „ausgegangen". Das
+      // Geraet behaelt seinen Spitzenwert und damit sein Licht — sonst ginge
+      // es in der ersten Dunkelphase an einen wartenden Strahl, und der
+      // Strobe beleuchtete die Buehne danach nicht mehr (jeder Wechsel
+      // zeichnet ausserdem alle Shadow-Maps neu).
     } else if (sp > 0) {
       if (vorher >= sp * SCHLAGARTIG) sp = 0;
       else {

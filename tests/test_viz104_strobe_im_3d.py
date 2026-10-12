@@ -501,3 +501,63 @@ class AnleitungTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EinstellungenReiterTest(unittest.TestCase):
+    """Der ECHTE Reiter „Einstellungen" (ohne Seite, ohne Fenster auf dem
+    Bildschirm): die Auswahl steht bei der Render-Qualitaet, zeigt die
+    gespeicherte Einstellung, und ein Wechsel wird gemerkt und an die Szene
+    gegeben — ohne die Szene neu zu laden."""
+
+    @classmethod
+    def setUpClass(cls):
+        from PySide6.QtWidgets import QApplication
+        cls._app = QApplication.instance() or QApplication([])
+
+    def _fenster(self, prefs):
+        import src.ui.visualizer.visualizer_window as VW
+        from unittest.mock import MagicMock
+
+        class _Fenster(VW.VisualizerWindow):
+            def __init__(self):                       # ohne QWebEngineView
+                VW.QMainWindow.__init__(self)
+
+        with patch("src.ui.views.programmer_view._load_prefs", return_value=prefs):
+            win = _Fenster()
+            win._state = SimpleNamespace(show_fixture_labels=True)
+            win._bridge = MagicMock()
+            win._on_settings_changed = MagicMock()
+            win._on_reload_scene = MagicMock()
+            tab = VW.VisualizerWindow._build_settings_tab(win)
+        self.addCleanup(win.deleteLater)
+        self.addCleanup(tab.deleteLater)
+        return win, tab
+
+    def test_auswahl_steht_bei_der_render_qualitaet(self):
+        from PySide6.QtWidgets import QGroupBox
+        win, tab = self._fenster({})
+        gruppe = [g for g in tab.findChildren(QGroupBox) if g.title() == "Render-Qualität"]
+        self.assertEqual(len(gruppe), 1)
+        self.assertTrue(gruppe[0].isAncestorOf(win._combo_strobe))
+        self.assertTrue(gruppe[0].isAncestorOf(win._lbl_strobe_warnung))
+        combo = win._combo_strobe
+        self.assertEqual([combo.itemData(i) for i in range(combo.count())], list(P.MODES))
+        self.assertEqual([combo.itemText(i) for i in range(combo.count())],
+                         [t for _w, t in P.MODE_LABELS])
+        self.assertEqual(combo.currentData(), "flash")             # Vorgabe
+        self.assertIn("photosensitiver Epilepsie", win._lbl_strobe_warnung.text())
+        self.assertIn("photosensitiver Epilepsie", combo.toolTip())
+
+    def test_gespeicherte_einstellung_wird_gezeigt(self):
+        win, _tab = self._fenster({P.PREF_KEY: "soft"})
+        self.assertEqual(win._combo_strobe.currentData(), "soft")
+
+    def test_wechsel_wird_gemerkt_und_an_die_szene_gegeben(self):
+        import src.ui.visualizer.visualizer_window as VW
+        win, _tab = self._fenster({})
+        with patch("src.ui.views.programmer_view._save_prefs") as speichern:
+            win._combo_strobe.setCurrentIndex(win._combo_strobe.findData("off"))
+        speichern.assert_called_once_with({"viz_strobe_mode": "off"})
+        win._on_settings_changed.assert_called_once()
+        win._on_reload_scene.assert_not_called()                   # kein Neuladen
+        self.assertEqual(VW.VisualizerWindow._collect_settings(win)["strobeMode"], "off")

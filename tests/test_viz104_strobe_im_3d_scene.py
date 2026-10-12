@@ -213,3 +213,59 @@ class Viz104StrobeSzeneTest(_Basis):
         self.assertTrue(all(b["spot"] == 0 and b["kegel"] == 0 for b in bilder))
         self.assertFalse(bilder[0]["info"]["aktiv"])
         self.assertAlmostEqual(bilder[0]["info"]["hz"], 5.0, delta=0.06)
+
+
+_N = 11
+_FIDS = [_FID + i for i in range(_N)]
+
+
+def _payload_fid(fid, **attrs):
+    a = {"intensity": 255, "color_r": 255, "color_g": 255, "color_b": 255,
+         "pan": 128, "tilt": 128, "shutter": _OFFEN}
+    a.update(attrs)
+    return _build_fixture_payload(_fx(fid), a, _KANAELE)
+
+
+class Viz104StrobeBehaeltSeinLichtTest(_Basis):
+    """Mehr Strahlen als echte Lichter (Stufe Hoch: 8): ein Geraet, das zu
+    blitzen beginnt, gibt sein Licht in der Dunkelphase NICHT an einen
+    wartenden Strahl ab — sonst beleuchtete der Strobe die Buehne nach dem
+    ersten Blitz nicht mehr, und jeder Wechsel kostete einen Schattendurchlauf."""
+
+    GERAETE = [_geraet(fid=f, x=(i - _N // 2) * 1.5) for i, f in enumerate(_FIDS)]
+
+    def _pool(self):
+        return json.loads(self._eval("JSON.stringify(window.__lightos.spotPoolInfo())"))
+
+    def _bild_t(self, t):
+        self._eval("(function(){ window.__t104 = %r; window.__lightos.__renderTick();"
+                   " return 1; })()" % float(t))
+
+    def test_blitzender_halter_behaelt_sein_licht(self):
+        self._load_and_wait()
+        self._eval("(function(){ window.__t104 = 0; const L = window.__lightos;"
+                   " L.__strobeUhr(() => window.__t104, 60);"
+                   " L.__spotPoolUhr(() => window.__t104); return 1; })()")
+        self._push(*[_payload_fid(f) for f in _FIDS])
+        t = 0.0
+        for _ in range(60):                       # einschwingen
+            t += 1000 / 60
+            self._bild_t(t)
+        vorher = self._pool()
+        halter = [h for h in vorher["halter"] if h is not None]
+        self.assertEqual(len(halter), vorher["groesse"])
+        self.assertLess(len(halter), _N, "Vorbedingung: mehr Strahlen als Lichter")
+        blitzer = halter[:2]
+        self._push(*[_payload_fid(f, shutter=_STROBE_5HZ) for f in blitzer])
+        dunkel_gesehen = False
+        for _ in range(180):                      # 3 s, 15 Blitze
+            t += 1000 / 60
+            self._bild_t(t)
+            if json.loads(self._eval(
+                    "JSON.stringify(window.__lightos.strobeInfo(%d))" % blitzer[0]))["faktor"] == 0:
+                dunkel_gesehen = True
+        self.assertTrue(dunkel_gesehen)
+        nachher = self._pool()
+        for f in blitzer:
+            self.assertIn(f, nachher["halter"], "der Strobe hat sein Licht verloren")
+        self.assertEqual(nachher["vergaben"], vorher["vergaben"], "Lichter sind gewandert")
