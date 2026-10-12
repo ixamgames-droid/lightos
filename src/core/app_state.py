@@ -575,6 +575,10 @@ class AppState:
         # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
         # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
         self.laser_patterns: list = []
+        # LAS-32 (S1): Sperrzonen + Maximalfeld je Laser — NUR ANZEIGE. Die
+        # Ausgabe (OutputManager/Render-Pfad) liest dieses Feld nicht.
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        self.sperrzonen = SperrzonenDaten()
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
@@ -878,14 +882,16 @@ class AppState:
             # Die AKTUELLE fid wird mitgefuehrt: nach einem Redo kann das Geraet
             # per fid-Guard eine neue Nummer haben — ein Undo auf die alte
             # loeschte sonst ein FREMDES Geraet (Review FM-38, gemessen).
-            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": []}
+            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": [], "feld": None}
 
             def _undo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt   # LAS-32
 
             def _redo(s=snapshot, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -1376,6 +1382,12 @@ class AppState:
             s.commit()
         removed_group = bool(gruppen_snaps)
         self.programmer.pop(fid, None)
+        # LAS-32: die Randwinkel dieses Lasers gehen mit dem Geraet. Die Nummer
+        # wird neu vergeben — ein anderer Laser auf ihr erbte sonst ein fremdes
+        # Feld und koennte faelschlich „erreicht keine Zone" melden. Das
+        # Rueckgaengig (unten bzw. in add_fixture) holt sie wieder.
+        feld_snap = self._sperrzonen_feld_nehmen(fid)
+        self._sperrzonen_feld_entfernt = feld_snap
         self._reload_patch_cache()
         self._emit("patch_changed")
         if removed_group:
@@ -1387,14 +1399,17 @@ class AppState:
             # FM-38: aktuelle fid und JUENGSTE Gruppen-Schnappschuesse mitfuehren
             # (Undo kann umnummern; ein Redo auf die alte Nummer loeschte das
             # Fremdgeraet, und ein veralteter Schnappschuss verwarf Umbenennungen).
-            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps}
+            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps,
+                             "feld": feld_snap}
 
             def _undo(s=snap, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             def _redo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt
 
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
@@ -1403,6 +1418,28 @@ class AppState:
                 redo=_redo,
             )
         return gruppen_snaps
+
+    # ── LAS-32: Laser-Feld beim Loeschen/Zurueckholen eines Geraets ──────────
+    #: Das Feld, das der letzte ``remove_fixture`` herausgenommen hat (oder
+    #: ``None``) — fuer Aufrufer, die es selbst aufheben (Undo von add_fixture).
+    _sperrzonen_feld_entfernt = None
+
+    def _sperrzonen_feld_nehmen(self, fid: int):
+        try:
+            daten = getattr(self, "sperrzonen", None)
+            return daten.nimm_feld(fid) if daten is not None else None
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_nehmen", e)
+            return None
+
+    def _sperrzonen_feld_zurueck(self, fid, feld) -> None:
+        if feld is None or fid is None:
+            return
+        try:
+            self.sperrzonen.setze_feld(int(fid), feld)
+            self._emit("sperrzonen_changed", None)
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_zurueck", e)
 
     def clear_patch(self):
         """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
