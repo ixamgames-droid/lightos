@@ -68,6 +68,12 @@ nie angefasst.
 Bei Mitgliedschaften (Gruppen, Raster, Gerätelisten) gibt es keinen Unterschied: ist
 das Ziel schon dabei, bleibt es, wo es ist.
 
+**Gleiches mit Gleichem zählt nicht.** Hat das Ziel an einer Stelle schon genau den
+Wert der Quelle, steht die Stelle in der Vorschau grau unter **bleibt, wie es ist**
+(„das Ziel hat dort schon denselben Wert") — auch bei **Ersetzen**. Sie wird nicht
+geschrieben und nicht mitgezählt. Würde sich an der ganzen Show nichts ändern, bleibt
+**Anwenden** grau.
+
 ### Farbe zwischen verschiedenen Gerätetypen: ganze Farbe oder einzelner Kanal
 
 Sind Quelle und Ziel **derselbe Typ**, gilt die Tabelle oben Kanal für Kanal. Sind sie
@@ -111,7 +117,7 @@ Fokus, Prisma), Shutter/Strobe, Makros und Werte einzelner Köpfe.
   Schritt. Der Grund steht dabei.
 
 Grau (·) und mit eigenem Zähler **bleibt, wie es ist**: Stellen, an denen nichts
-geschieht, weil das Ziel dort schon steht.
+geschieht, weil das Ziel dort schon steht oder schon denselben Wert hat.
 
 Jede Zeile nennt den Ort beim Namen, zum Beispiel `Snap „Rot“ · 1 → 5`. Eine Cueliste
 oder Sequenz wird zu einer Zeile je Kennzeichen zusammengefasst („· 12 Stellen").

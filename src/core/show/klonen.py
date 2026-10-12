@@ -61,8 +61,10 @@ UNVERAENDERT = "unveraendert"
 UEBERSETZT = "uebersetzt"
 FAELLT_WEG = "faellt_weg"
 #: Kein viertes Ergebnis des Klonens, sondern „hier passiert nichts": das Ziel
-#: steht an der Stelle schon (Mitgliedschaft) bzw. hat dort schon einen Wert
-#: und es wurde „Hinzufügen" gewählt.
+#: steht an der Stelle schon (Mitgliedschaft), hat dort schon einen Wert und
+#: es wurde „Hinzufügen" gewählt — oder hat dort schon GENAU den Wert, der
+#: geschrieben würde („Ersetzen" von Gleichem mit Gleichem ist keine Änderung
+#: und wird weder gezählt noch geschrieben).
 BLEIBT = "bleibt"
 
 KENNZEICHEN_TEXT = {
@@ -1170,31 +1172,45 @@ class _Sammler:
         self.uebersetzt_texte: list = []
         self.weg: dict[str, list] = {}
         self.bleibt: list = []
+        #: Schlüssel, an denen das Ziel schon genau den Wert der Quelle hat.
+        self.schon_gleich: list = []
         self.ersetzt = False
         self.stellen = 0
         self.schritte: list = []
 
-    def nimm(self, u: Uebersetzung, vorhandene, schritt) -> None:
-        """``vorhandene``: Ziel-Schlüssel, die das Ziel an der Stelle schon hat."""
+    def nimm(self, u: Uebersetzung, vorhandene, schritt,
+             schon_gleich=()) -> None:
+        """``vorhandene``: Ziel-Schlüssel, die das Ziel an der Stelle schon hat.
+        ``schon_gleich``: davon die, deren Wert schon genau der ist, der
+        geschrieben würde — sie zählen als „bleibt" und lösen kein Schreiben
+        aus, auch bei „Ersetzen" nicht."""
         vorhandene = set(vorhandene or ())
+        schon_gleich = set(schon_gleich or ()) & vorhandene
         for key, grund in u.weg:
             self.weg.setdefault(grund, []).append(key)
-        schreibt = False
-        for key in u.gleich:
+
+        def bleibt(key) -> bool:
+            if key in schon_gleich:
+                self.schon_gleich.append(key)
+                return True
             if key in vorhandene and self.wie != ERSETZEN:
                 self.bleibt.append(key)
-            else:
+                return True
+            return False
+
+        schreibt = False
+        for key in u.gleich:
+            if not bleibt(key):
                 self.gleich.append(key)
                 schreibt = True
-        offen = [k for k in u.uebersetzt
-                 if not (k in vorhandene and self.wie != ERSETZEN)]
-        self.bleibt.extend(k for k in u.uebersetzt if k not in offen)
+        offen = [k for k in u.uebersetzt if not bleibt(k)]
         if offen:
             self.uebersetzt_texte.extend(u.texte)
             schreibt = True
         if schreibt:
             self.stellen += 1
-            if vorhandene & set(u.werte) and self.wie == ERSETZEN:
+            if ((vorhandene - schon_gleich) & set(u.werte)
+                    and self.wie == ERSETZEN):
                 self.ersetzt = True
             if schritt is not None:
                 self.schritte.append(schritt)
@@ -1224,6 +1240,9 @@ class _Sammler:
             neu(FAELLT_WEG, f"{_labels(keys)} — {grund}")
         if self.bleibt:
             neu(BLEIBT, f"{_labels(self.bleibt)} — das Ziel hat dort schon einen Wert")
+        if self.schon_gleich:
+            neu(BLEIBT, f"{_labels(self.schon_gleich)} — das Ziel hat dort "
+                        "schon denselben Wert")
         return out
 
 
@@ -1461,12 +1480,10 @@ def _plane_werte(sammler: _Sammler, behaelter: Callable, q: _Geraet, z: _Geraet,
     zk = _finde_schluessel(d, z.fid)
     if zk is None:
         zk = str(z.fid) if isinstance(qk, str) else z.fid
-    vorhandene = set(d.get(zk) or {}) if isinstance(d.get(zk), dict) else set()
+    am_ziel = d.get(zk) if isinstance(d.get(zk), dict) else {}
+    vorhandene = set(am_ziel)
     schritt = _werte_schritt(behaelter, zk, u.werte, wie) if u.werte else None
-    vorher = len(sammler.schritte)
-    sammler.nimm(u, vorhandene, schritt)
-    if len(sammler.schritte) == vorher:
-        return
+    neben_schritte = []
     for neben in zusatz:
         nd = neben()
         nqk = _finde_schluessel(nd, q.fid)
@@ -1477,7 +1494,23 @@ def _plane_werte(sammler: _Sammler, behaelter: Callable, q: _Geraet, z: _Geraet,
             nzk = _finde_schluessel(nd, z.fid)
             if nzk is None:
                 nzk = str(z.fid) if isinstance(nqk, str) else z.fid
-            sammler.schritte.append(_werte_schritt(neben, nzk, mit, wie))
+            neben_schritte.append(_werte_schritt(neben, nzk, mit, wie))
+    # Gleiches mit Gleichem ist keine Änderung. Würde aber ein Begleitwert
+    # (Verzögerung eines Cues) sich ändern, bleibt die Stelle eine Änderung.
+    schon_gleich = {k for k, v in u.werte.items()
+                    if k in am_ziel and am_ziel[k] == v}
+    if schon_gleich and any(_aendert(s) for s in neben_schritte):
+        schon_gleich = set()
+    vorher = len(sammler.schritte)
+    sammler.nimm(u, vorhandene, schritt, schon_gleich)
+    if len(sammler.schritte) == vorher:
+        return
+    sammler.schritte.extend(neben_schritte)
+
+
+def _aendert(schritt: Schritt) -> bool:
+    vor, nach = schritt.vorschau()
+    return vor != nach
 
 
 def _plane_snaps(plan, state, q, z, opt, snap_library, _pal) -> None:
@@ -1519,13 +1552,20 @@ def _plane_szene(plan, szene, q: _Geraet, z: _Geraet, opt) -> None:
     if not quell:
         return
     sm = _Sammler(BEREICH_SNAPS, f"Szene „{szene.name}“", q, z, opt.wie)
-    vorhandene_kanaele = {sv.channel for sv in szene._values if sv.fixture_id == z.fid}
+    am_ziel = {sv.channel: sv.value for sv in szene._values if sv.fixture_id == z.fid}
+    vorhandene_kanaele = set(am_ziel)
+    #: Schlüssel → sind ALLE seine Kanäle am Ziel schon auf dem neuen Wert?
+    selber_wert: dict = {}
     if _gleicher_typ(q, z):
         je_kanal = dict(quell)
         namen = {ch: key for ch, key in q.schluessel()}
         u = Uebersetzung(gleich={namen.get(ch, f"Kanal {ch}"): v
                                  for ch, v in quell.items()})
         vorhandene = {namen.get(ch, f"Kanal {ch}") for ch in vorhandene_kanaele}
+        for ch, v in quell.items():
+            key = namen.get(ch, f"Kanal {ch}")
+            selber_wert[key] = (selber_wert.get(key, True)
+                                and am_ziel.get(ch, _FEHLT) == v)
     else:
         namen = dict(q.schluessel())
         werte = {namen[ch]: v for ch, v in quell.items() if ch in namen}
@@ -1539,8 +1579,10 @@ def _plane_szene(plan, szene, q: _Geraet, z: _Geraet, opt) -> None:
             je_kanal[int(ch)] = _zahl(val)
             if int(ch) in vorhandene_kanaele:
                 vorhandene.add(key)
+            selber_wert[key] = (selber_wert.get(key, True)
+                                and am_ziel.get(int(ch), _FEHLT) == _zahl(val))
     schritt = _szenen_schritt(szene, z.fid, je_kanal, opt.wie) if je_kanal else None
-    sm.nimm(u, vorhandene, schritt)
+    sm.nimm(u, vorhandene, schritt, {k for k, ja in selber_wert.items() if ja})
     plan.eintraege.extend(sm.eintraege())
 
 
