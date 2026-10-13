@@ -1556,6 +1556,11 @@ class MainWindow(QMainWindow):
             return
         u = self._undo_stack.undo_label()
         r = self._undo_stack.redo_label()
+        # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
+        # ein einzelnes „&“ laese das Menue als Tastenkuerzel-Zeichen.
+        from src.ui.menue_text import menue_text
+        u = menue_text(u) if u else u
+        r = menue_text(r) if r else r
         self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
         self._act_undo.setEnabled(self._undo_stack.can_undo())
         self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")

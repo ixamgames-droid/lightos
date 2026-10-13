@@ -28,9 +28,9 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 
 ## 1. Matrix auf „Color Fade“ stellen
 
-1. Öffne **Programmer → Matrix**. Drücke vorher im Programmer **Keine** (Auswahl
-   leeren): Die eingebettete Matrix folgt der Programmer-Auswahl und übernimmt
-   gewählte Geräte **sofort** als Raster der markierten Matrix, auch ohne Speichern.
+1. Öffne **Programmer → Matrix**. Eine gespeicherte Matrix behält dabei ihr
+   Raster, egal was im Programmer gewählt ist — neue Geräte bekommt sie nur über
+   **Auswahl übernehmen**.
 2. Wähle den vorhandenen Effekt, beispielsweise **Farb wechsel**.
 3. Stelle **Algorithmus** auf **Color Fade**.
 4. Lasse den Stil auf **RGB** oder **RGBW**.
