@@ -39,6 +39,17 @@ Das war's. Das Script:
 Die Test-Abhaengigkeiten (pytest & Co.) installiert das Script **nicht** — wer
 die Testsuite fahren will, siehe [Entwickeln und Tests](#entwickeln-und-tests).
 
+## Lizenz und Testzugang
+
+LightOS ist in der Testphase und startet nur mit einer gueltigen **Lizenzdatei**
+(Urheber: [ixamgames-droid](https://github.com/ixamgames-droid/lightos), alle
+Rechte vorbehalten - siehe [LICENSE](LICENSE)). Beim ersten Start fragt LightOS
+danach: **Lizenzdatei auswaehlen…** anklicken und die erhaltene Datei waehlen.
+Von Hand gehoert sie als `lightos-lizenz.lic` in den App-Datenordner
+(`%APPDATA%\LightOS` bzw. `~/.local/share/LightOS`). Geprueft wird nur beim
+Start, ohne Internet; eine laufende Show wird nie unterbrochen. Testzugang und
+Einzelheiten: [docs/LIZENZ_UND_TESTZUGANG.md](docs/LIZENZ_UND_TESTZUGANG.md).
+
 ## Voraussetzungen
 
 | | x64 (AMD64) | ARM64 (Snapdragon) |
@@ -273,10 +284,12 @@ LightOS selbst installiert keine Treiber. Falls Hardware nicht erkannt wird:
 Gemeint sind Adapter ohne COM-Port, die direkt ueber USB angesprochen werden: der
 *Anyma uDMX* samt Nachbauten (USB-Kennung `16c0:05dc`) und der *CYL-6602 „USB-DMX512“*
 (meldet sich als „Sun-light USBDMX512“, Kennung `2008:1066`). In LightOS ist das die
-Ausgabe-Art **uDMX (USB)**. Drei Dinge sind einmalig noetig; LightOS richtet keines
-davon selbst ein (kein sudo, keine Treiber-Installation):
+Ausgabe-Art **uDMX (USB)**. Drei Dinge sind noetig; die Treiber-Zuweisung (Windows)
+und das Zugriffsrecht (Linux) richtet LightOS nicht selbst ein (kein sudo, keine
+Treiber-Installation):
 
-**1. Das Zusatzpaket `pyusb`** (optional — ohne es fehlt nur diese Ausgabe-Art):
+**1. Das Zusatzpaket `pyusb`** (im Windows-Installationspaket enthalten, sonst
+optional — ohne es fehlt nur diese Ausgabe-Art):
 
 ```bash
 # Linux
@@ -292,6 +305,19 @@ venv\Scripts\python -m pip install pyusb libusb-package
 Ob beides gefunden wird, zeigt der Selbsttest (Zeile `optional uDMX: …`) und das
 Diagnosepaket (Abschnitt „uDMX (USB)“).
 
+**Windows-Installationspaket (x64):** das LightOS aus `LightOS-Setup.exe` bringt
+`pyusb` und die Bibliothek libusb **mit** — dort ist fuer diesen Punkt nichts zu tun.
+uDMX laeuft nach der Installation, sobald dem Adapter der Windows-Treiber zugewiesen
+ist (Punkt 3). Beides sind Bibliotheken, keine Treiber; ihre Lizenzen stehen in
+`THIRD_PARTY_NOTICES.md`, das Setup installiert die Datei mit.
+- Installationspakete, die vor dem 12.10.2026 gebaut wurden, enthalten sie noch
+  nicht. Der Reiter **uDMX (USB)** sagt das dann und raet zum Aktualisieren;
+  nachinstallieren laesst sich in einem installierten LightOS nichts.
+- Windows auf ARM64: fuer libusb gibt es dort kein fertiges Python-Paket; uDMX ist
+  auf ARM64 nicht enthalten.
+- LightOS aus dem Quelltext unter Windows x64: `pip install -r requirements.txt`
+  installiert beides mit.
+
 **2. Linux: Zugriffsrecht per udev-Regel.** Ohne sie darf nur root den Adapter
 ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Die Regeldatei liegt im Repo:
 
@@ -306,9 +332,32 @@ Gruppe `plugdev` und das gerade angemeldete Konto frei — die geteilte Kennung
 `16c0:05dc` nur zusammen mit dem Produktnamen „uDMX“.
 
 **3. Windows: WinUSB-Treiber zuweisen.** Windows hat fuer diese Adapter keinen eigenen
-Treiber. Dem Geraet muss einmalig der generische WinUSB-Treiber zugewiesen werden, zum
-Beispiel mit dem Programm Zadig (https://zadig.akeo.ie, Adminrechte noetig): Adapter
-einstecken, in Zadig das Geraet waehlen, als Treiber „WinUSB“ einstellen, installieren.
+Treiber, und LightOS liefert und installiert keine Treiber. Dem Geraet muss einmalig
+von Hand der allgemeine Treiber „WinUSB“ zugewiesen werden. Ob er fehlt, sagt LightOS
+selbst: im Reiter **uDMX (USB)** steht nach **Adapter suchen** hinter dem Adapter
+`— Treiber fehlt (WinUSB zuweisen)`, darunter stehen dieselben Schritte wie hier; das
+Diagnosepaket nennt die Lage im Abschnitt „uDMX (USB)“.
+
+1. Das Programm Zadig laden: https://zadig.akeo.ie — ein freies Programm eines anderen
+   Anbieters.
+2. Den Adapter einstecken und Zadig starten (Windows fragt nach Administratorrechten).
+3. In Zadig im Menue „Options“ den Punkt „List All Devices“ einschalten und in der
+   Liste den Adapter waehlen — zu erkennen an der USB ID `2008 1066` (CYL-6602) oder
+   `16C0 05DC` (Anyma uDMX).
+4. Als Treiber „WinUSB“ einstellen und auf „Install Driver“ (oder „Replace Driver“)
+   klicken; das dauert bis zu einer Minute.
+5. Zurueck in LightOS: im Reiter **uDMX (USB)** auf **Adapter suchen** und dann auf
+   **Verbinden** klicken.
+
+**Achtung:** in Zadig genau den Adapter waehlen. Zadig ersetzt den Treiber des
+gewaehlten Geraets — eine Maus, eine Tastatur oder ein anderes Geraet funktioniert
+danach nicht mehr, bis man es im Geraete-Manager von Windows deinstalliert (mit
+„Treiber loeschen“) und neu einsteckt. Die Kennung `16C0 05DC` tragen auch andere
+Bastelgeraete: nur zuweisen, wenn es sicher der uDMX-Adapter ist.
+
+Hintergrund bei Microsoft:
+https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb-installation
+
 **Noch nicht am Geraet erprobt** — weder unter Windows x64 noch auf Windows-ARM. Wenn
 es nicht gelingt: einen Art-Net-Node verwenden.
 
@@ -370,7 +419,10 @@ Python, kein venv und kein `install.py`**.
 - legt eine Startmenü-Verknüpfung an, auf Wunsch auch eine auf dem Desktop,
 - trägt einen Deinstaller ein (Einstellungen → Apps, oder Startmenü „LightOS
   deinstallieren“),
-- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`),
+- legt die Lizenzen der mitgelieferten Bibliotheken bei: `THIRD_PARTY_NOTICES.md` und der
+  Ordner `licenses\` neben `LightOS.exe` – darin die Lizenztexte und
+  `BUNDLE-KOMPONENTEN.txt` mit Name, Version, Lizenz und Bezugsquelle jeder Bibliothek
+  dieses Setups (Python, Qt/PySide6 unter LGPL, die Python-Pakete),
 - bringt fünf **Demo-Shows** mit: **Datei → Demo-Show öffnen**. Eine Demo öffnet sich als
   neue, ungespeicherte Show; **Speichern** fragt nach einem Namen und legt deine Kopie in
   `%APPDATA%\LightOS\shows` an. Das Original im Programmordner bleibt unverändert.
@@ -498,7 +550,7 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
-| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber (Windows) |
+| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber von Hand zuweisen (Windows; LightOS liefert und installiert keine Treiber) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
 | `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
 | **Linux:** `pip install` bricht bei `python-rtmidi` ab | `sudo apt-get install build-essential libasound2-dev`, dann erneut installieren |
