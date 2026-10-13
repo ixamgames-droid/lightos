@@ -34,6 +34,15 @@ Gerundet, gekappt bei 0 und 255. In allen drei Arten ist Betrag 0 neutral —
   der er als Kind laeuft — skalieren die STAERKE, nie das Ergebnis. Das
   Darunterliegende wird also nie mitgedimmt.
 
+★ ENG-38, Stil FARBE (RGB/RGBW): dieselbe Rechnung, nur sind die Adressen die
+  Farbkanaele. Die Matrix schreibt im Modify-Betrieb ausschliesslich
+  color_r/g/b (bei RGBW den Weissanteil auf color_w) ins private Universum —
+  keinen Dimmer, kein Farbrad (``RgbMatrixInstance._farb_modify``). Jeder
+  Farbkanal wird damit EINZELN verrechnet und einzeln bei 0..255 gekappt; der
+  Farbton darf dabei kippen (Orange + Rot -> Rot voll). Ein Farb-Modify fasst
+  den Dimmer nie an und laeuft NACH der automatischen Grundhelligkeit: er kann
+  sie weder ausloesen noch zuruecknehmen — eine dunkle Lampe bleibt dunkel.
+
 ★ Kosten: laeuft kein Modify-Effekt, gibt es keinen Posten und der spaete
   Rechengang ist ein leerer Listen-Test.
 """
@@ -71,7 +80,8 @@ def ist_modify(f) -> bool:
     """True, wenn ``f`` in diesem Frame als Modify-Effekt verrechnet wird.
 
     Fragt ``modify_wirksam()`` der Funktion — der Haken allein genuegt nicht:
-    Schritt 1 kennt Modify nur fuer die Matrix im Stil Dimmer."""
+    Modify kennt nur die Matrix, in den Stilen Dimmer (ENG-37) und RGB/RGBW
+    (ENG-38); beim Stil Shutter laeuft sie trotz Haken normal."""
     fn = getattr(f, "modify_wirksam", None)
     if fn is None:
         return False

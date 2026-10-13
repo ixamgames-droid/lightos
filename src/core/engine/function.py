@@ -495,7 +495,7 @@ class Function:
 
         Basis-Fassung: nein. Der Haken ``modify`` allein genuegt nicht — nur
         Funktionstypen, die das Verrechnen ausdruecklich unterstuetzen,
-        ueberschreiben das (Schritt 1: Matrix im Stil Dimmer)."""
+        ueberschreiben das (Matrix in den Stilen Dimmer, RGB, RGBW)."""
         return False
 
     def to_dict(self) -> dict:

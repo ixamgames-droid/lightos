@@ -115,6 +115,8 @@ Cuelisten, Snap-Tasten, Programmer und die automatische Grundhelligkeit zusammen
 ### Einrichten
 
 1. Matrix wie in Abschnitt 2 anlegen: **Stil Dimmer**, Algorithmus z. B. *Chase*, Lampen zuweisen.
+   (Für Farbe statt Helligkeit: **Stil RGB** oder **RGBW** — siehe „Modify im Stil Farbe“ weiter
+   unten.)
 2. Unter **Stil** den Haken **Modify-Effekt** setzen. Darunter erscheint die Gruppe **Modify** mit
    **Betriebsart** (Addieren / Abziehen / Abdunkeln) und **Stärke** (0–100 %, Vorgabe 100 %).
    Haken raus = wieder ein ganz normaler Effekt; Betriebsart und Stärke bleiben gemerkt.
@@ -232,6 +234,58 @@ heißt der Parameter **Schrittweite**. So spielt sie mit den anderen Einstellung
 - Bei den Ring-Bewegungen (von der Mitte nach außen und umgekehrt) wirkt die Schrittweite nicht;
   das Feld ist dort ausgeblendet.
 
+### Modify im Stil Farbe (RGB / RGBW)
+
+Derselbe Haken **Modify-Effekt** gibt es auch bei den Stilen **RGB** und **RGBW**. Dann wird nicht
+die Helligkeit verrechnet, sondern die **Farbe** — und zwar **jeder Farbkanal einzeln**: Rot mit
+Rot, Grün mit Grün, Blau mit Blau, bei RGBW zusätzlich Weiß mit Weiß. Betriebsart und Stärke
+bedeuten dasselbe wie beim Dimmer; der **Betrag** ist die Farbe, die der Modify-Effekt für die
+Lampe ausrechnet.
+
+Einrichten wie oben, nur mit **Stil RGB** (oder RGBW) und einer Farbe: z. B. ein rotes Lauflicht
+als *Addieren* über einem blauen Hintergrund — unter dem Läufer wird es Magenta, dahinter wieder
+Blau.
+
+Durchgerechnet für eine Lampe, die gerade **Rot 200, Grün 100, Blau 50** zeigt (Werte 0–255);
+der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
+
+| | Rot | Grün | Blau |
+|---|---|---|---|
+| darunter | 200 | 100 | 50 |
+| Modify-Effekt (Betrag) | 100 | 200 | 0 |
+| **Addieren**, Stärke 100 % | 255 | 255 | 50 |
+| **Abziehen**, Stärke 100 % | 100 | 0 | 50 |
+| **Abdunkeln**, Stärke 100 % | 122 | 22 | 50 |
+| Addieren, Stärke 50 % | 250 | 200 | 50 |
+| Abziehen, Stärke 50 % | 150 | 0 | 50 |
+| Abdunkeln, Stärke 50 % | 161 | 61 | 50 |
+
+- **Gekappt wird je Farbkanal einzeln** bei 0 und 255. Der Farbton kann dabei kippen: Orange
+  plus Rot ergibt volles Rot mit unverändertem Grün. Blau bleibt im Beispiel stehen, weil der
+  Modify-Effekt dort den Betrag 0 hat.
+- **Der Dimmer wird nie angefasst.** Farbe und Dimmer bleiben getrennt: ein Farb-Modify schreibt
+  keinen Dimmer und zieht keinen auf. **Eine dunkle Lampe bleibt dunkel** — wer mit einem
+  Farb-Modify Licht sehen will, braucht darunter etwas, das die Lampe hell macht (Dimmer-Effekt,
+  Dimmer-Taste oder eine Farbe, die über die automatische Grundhelligkeit leuchtet).
+- **Automatische Grundhelligkeit:** Ein Farb-Modify löst sie nicht aus und nimmt sie nicht zurück.
+  Leuchtet eine Lampe nur wegen ihrer Farbe (Farb-Taste, kein Dimmer) und zieht ein Farb-Modify
+  diese Farbe ganz ab, bleibt der Dimmer offen — die Lampe ist dann dunkel, weil keine Farbe mehr
+  da ist, nicht weil der Dimmer zu wäre.
+- **RGBW:** Im Stil RGBW läuft der Weißanteil der Modify-Farbe über den **Weiß-Kanal**. Reines Weiß
+  verrechnet also nur den Weiß-Kanal; Rot, Grün und Blau der Lampe bleiben stehen. Eine Mischfarbe
+  teilt sich auf (Rot 255, Grün 128, Blau 128 = Weiß 128 und Rot 127). Im Stil RGB bleibt der
+  Weiß-Kanal unberührt.
+- **Lampen ohne Farbkanäle** (nur Farbrad) bleiben unberührt — eine Rad-Stellung ist keine Menge,
+  die sich addieren ließe. Amber-, UV- und CMY-Kanäle fasst die Matrix auch als normaler Effekt
+  nicht an, also auch nicht als Modify.
+- **Dimmer- und Farb-Modify zusammen:** beide können gleichzeitig laufen. Jeder rechnet nur auf
+  seinen Kanälen, die Reihenfolge ist dieselbe wie unter „Reihenfolge“.
+- **Master haben das letzte Wort** — wie beim Dimmer-Modify. Bei Lampen ohne eigenen Dimmer (reine
+  RGB-Geräte) dimmen Fader, Grand Master und Blackout die verrechnete Farbe.
+- Der Regler **Helligkeit** des Farb-Modify stellt wie beim Dimmer nur die Stärke ein.
+- Die Vorschau im Editor zeigt beim Farb-Modify die echten Farben; das Zeichen in der Ecke nennt
+  die Betriebsart (+ Addieren, − Abziehen, × Abdunkeln, dann schraffiert).
+
 ### Was mit Snaps, Grundhelligkeit und Mastern gilt
 
 - **Snap-Tasten und Programmer:** Steht der Dimmer über eine Snap-Taste auf 40 %, legt *Addieren*
@@ -261,12 +315,13 @@ heißt der Parameter **Schrittweite**. So spielt sie mit den anderen Einstellung
 
 ### Grenzen
 
-- Modify gibt es bisher nur im **Stil Dimmer**. Bei RGB, RGBW und Shutter ist der Haken gesperrt;
-  ein dort noch gesetzter Haken hat keine Wirkung. Farbe und Dimmer bleiben getrennt — ein
-  Dimmer-Modify fasst nie eine Farbe an.
-- Ein Modify-Effekt wirkt auf die **Dimmer-Kanäle seiner eigenen Lampen**. Lampen ohne
-  Dimmer-Kanal (reine RGB-Geräte, deren Helligkeit in der Farbe steckt) erreicht er in diesem
-  Stand nicht.
+- Modify gibt es im **Stil Dimmer** und in den Farb-Stilen **RGB** und **RGBW**. Beim Stil
+  **Shutter** ist der Haken gesperrt (eine Shutter-Stellung ist keine Menge); ein dort noch
+  gesetzter Haken hat keine Wirkung. Farbe und Dimmer bleiben getrennt — ein Dimmer-Modify fasst
+  nie eine Farbe an, ein Farb-Modify nie den Dimmer.
+- Ein Dimmer-Modify wirkt auf die **Dimmer-Kanäle seiner eigenen Lampen**. Lampen ohne
+  Dimmer-Kanal (reine RGB-Geräte, deren Helligkeit in der Farbe steckt) erreicht er nicht — dort
+  hilft ein Farb-Modify (weißes *Abdunkeln* oder *Abziehen* im Stil RGB).
 - Der Regler **Helligkeit** einer Sammlung (Collection) oder Show und ihre Ein-/Ausblendzeit
   stellen bei einem Modify-Effekt darin nur ein, wie kräftig er zugreift — das Darunterliegende
   wird nicht mitgedimmt.
@@ -278,8 +333,8 @@ heißt der Parameter **Schrittweite**. So spielt sie mit den anderen Einstellung
 - Der Schweif des Lauflichts hat eine Vorgabe von 30 %. Für harte Blöcke den **Schweif auf 0 %**
   stellen, sonst bekommen die Lampen hinter dem Läufer ebenfalls einen Anteil ab.
 - „Alles Weiß“ und die Szenen-Vorschau liegen über dem Modify-Effekt und werden nicht verrechnet.
-- Die Vorschau im Editor zeigt den Modify-Effekt allein, eingefärbt nach Betriebsart
-  (Bernstein = Addieren, Blau = Abziehen, schraffiert = Abdunkeln).
+- Die Vorschau im Editor zeigt den Modify-Effekt allein, im Stil Dimmer eingefärbt nach
+  Betriebsart (Bernstein = Addieren, Blau = Abziehen, schraffiert = Abdunkeln).
 
 ### Noch aufzunehmende Bilder
 
@@ -293,6 +348,8 @@ Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
 6. Kurzes GIF: Taste an/aus über einem laufenden Funkeln.
 7. Matrix-Editor, **Bewegung & Parameter** mit dem Feld **Schrittweite** auf „wie Breite“.
 8. Lampenreihe: Farb-Taste und Dimmer-Taste auf 40 %, darüber das Modify-Lauflicht in Zweierblöcken.
+9. Matrix-Editor, Stil RGB, Haken **Modify-Effekt** gesetzt, Gruppe **Modify** mit dem Hinweis zum Dimmer.
+10. Lampenreihe in Farbe: blauer Hintergrund / rotes Modify-Lauflicht allein / Ergebnis mit Addieren.
 
 ---
 

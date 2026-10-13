@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QColorDialog, QFrame, QSlider, QCheckBox, QDialog)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
-from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
+from src.core.engine.rgb_matrix import (RgbMatrixInstance, RgbAlgorithm, MatrixStyle,
+                                        Color, is_gap, _MODIFY_STILE)
 from src.core.engine.rgb_matrix_meta import ALGO_META
 from src.core.engine.modify import MODIFY_LABELS, MODIFY_MODES, normalize_mode
 from src.ui.virtualconsole.vc_effect_meta import option_label
@@ -242,6 +243,11 @@ class MatrixPreview(QWidget):
         _mw = getattr(self._matrix, "modify_wirksam", None)
         if _mw is not None and _mw():
             modify_art = normalize_mode(getattr(self._matrix, "modify_mode", "add"))
+        # ENG-38: ein Farb-Modify zeigt seine ECHTEN Farben (das ist der Betrag
+        # je Farbkanal); die Betriebsart steht als Zeichen in der Ecke,
+        # Abdunkeln bleibt schraffiert.
+        modify_farbe = modify_art is not None and getattr(
+            self._matrix, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW)
         for row in range(rows):
             for col in range(cols):
                 idx = row * cols + col
@@ -262,6 +268,13 @@ class MatrixPreview(QWidget):
                 r, g, b = self._grid[idx]
                 if modify_art is None:
                     p.fillRect(x, y, w, h, QColor(r, g, b))
+                elif modify_farbe:
+                    if modify_art == "dim":
+                        p.fillRect(x, y, w, h, QColor("#0d1117"))
+                        p.fillRect(x, y, w, h, QBrush(
+                            QColor(r, g, b), Qt.BrushStyle.BDiagPattern))
+                    else:
+                        p.fillRect(x, y, w, h, QColor(r, g, b))
                 else:
                     # ENG-37: Modify allein, nach Art eingefaerbt (Betrag = Helligkeit).
                     lvl = max(r, g, b) / 255.0
@@ -1592,7 +1605,7 @@ class RgbMatrixView(QWidget):
         self._shut_form_label.setVisible(is_shutter)
         self._smin_spin.setVisible(is_shutter)
         self._smax_spin.setVisible(is_shutter)
-        # ENG-37: Modify gibt es (Schritt 1) nur im Stil Dimmer.
+        # ENG-37/ENG-38: Modify gibt es in den Stilen Dimmer, RGB und RGBW.
         self._apply_modify_visibility(style)
         # Farben-Zeile (C1/C2/C3 bzw. Sequence): Anzahl haengt von Style UND
         # Algorithmus ab. ZULETZT aufrufen, damit die Sichtbarkeit der ganzen
@@ -1610,19 +1623,32 @@ class RgbMatrixView(QWidget):
                 style = MatrixStyle(self._style_combo.currentText())
             except ValueError:
                 style = MatrixStyle.RGB
-        erlaubt = style == MatrixStyle.DIMMER
+        erlaubt = style in _MODIFY_STILE
+        farbe = style in (MatrixStyle.RGB, MatrixStyle.RGBW)
         self._cb_modify.setEnabled(erlaubt)
         self._cb_modify.setToolTip(
             "Der Effekt setzt seine Werte nicht, sondern verrechnet sie mit dem, "
-            "was die Lampe gerade tut (addieren, abziehen, abdunkeln)."
+            "was die Lampe gerade tut (addieren, abziehen, abdunkeln).\n"
+            "Stil Dimmer: verrechnet die Helligkeit. Stil RGB/RGBW: verrechnet "
+            "jeden Farbkanal einzeln und fasst den Dimmer nie an."
             if erlaubt else
-            "Modify-Effekte gibt es bisher nur im Stil „Dimmer“.")
+            "Modify-Effekte gibt es in den Stilen „Dimmer“, „RGB“ und „RGBW“.\n"
+            "Ein Shutter ist eine Stellung, keine Menge — dort lässt sich nichts "
+            "addieren oder abziehen. Ein hier noch gesetzter Haken wirkt nicht.")
         aktiv = erlaubt and self._cb_modify.isChecked()
         self._grp_modify.setVisible(aktiv)
         hinweis = ("Wirkt auf das, was die Lampe gerade tut — Effekte, Cuelisten, "
                    "Snaps und Grundhelligkeit — und vor den Mastern (Fader, "
                    "Grand Master, Blackout). Als Chaser-Schritt ist er gesperrt.")
-        if aktiv and self._imin_spin.value() > 0:
+        if aktiv and farbe:
+            # ENG-38: Farbe und Dimmer bleiben getrennt.
+            hinweis = ("Verrechnet jeden Farbkanal einzeln (Rot, Grün, Blau"
+                       + (", Weiß" if style == MatrixStyle.RGBW else "")
+                       + "), jeder wird für sich bei 0 und 100 % gekappt. "
+                       "Der Dimmer wird nie angefasst: eine dunkle Lampe bleibt "
+                       "dunkel. Lampen nur mit Farbrad bleiben unberührt. "
+                       + hinweis)
+        elif aktiv and self._imin_spin.value() > 0:
             hinweis = ("Dimmer-Bereich „Min“ steht über 0: jede Lampe bekommt "
                        "diesen Grundbetrag ab. " + hinweis)
         self._modify_hint.setText(hinweis)
