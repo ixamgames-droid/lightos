@@ -98,6 +98,16 @@ jobs:
           if (Test-Path $bericht) { Get-Content $bericht } else { Write-Host "kein Bericht geschrieben" }
           if ($p.ExitCode -ne 0) { throw "Selbsttest der gepackten exe: Exit-Code $($p.ExitCode)" }
 
+      # LIZ-2: was dieser Build an fremden Bibliotheken enthaelt - die Liste
+      # entsteht beim Packen (packaging/windows/fremdkomponenten.py); passte
+      # das Bundle nicht zur Tabelle, waere der PyInstaller-Schritt gescheitert.
+      - name: Fremd-Komponenten dieses Builds
+        shell: pwsh
+        run: |
+          Get-Content dist\LightOS\_internal\licenses\BUNDLE-KOMPONENTEN.txt
+          Write-Host "Qt-Bibliotheken im Bundle:"
+          Get-ChildItem dist\LightOS\_internal\PySide6\Qt6*.dll | ForEach-Object { $_.Name }
+
       - name: Inno Setup installieren
         shell: pwsh
         run: choco install innosetup --no-progress -y
