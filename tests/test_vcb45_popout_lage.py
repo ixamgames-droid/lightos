@@ -182,6 +182,22 @@ def test_unbrauchbar_gemerktes_zaehlt_als_nichts_gemerkt(muell):
     assert PL.ziel_lage([OBEN, UNTEN], muell, 0).zustand == PL.MAXIMIERT
 
 
+def test_unendlich_in_der_datei_zaehlt_als_nichts_gemerkt():
+    # json liest ``Infinity`` als float('inf'); das darf die Rechnung nicht
+    # werfen lassen — sonst bliebe das Merken bis zum Loeschen der Datei tot.
+    muell = {"fenster": [0, 1080, float("inf"), 5], "bildschirm": "DP-2"}
+    assert PL.ziel_lage([OBEN], muell, 0).rechteck is None
+    assert PL.ziel_lage([OBEN, UNTEN], muell, 0).zustand == PL.MAXIMIERT
+
+
+def test_bildschirm_ohne_flaeche_gibt_nichts_vor():
+    # Platzhalter-Bildschirm des Systems: kein Fenster mit 0x0 vorgeben.
+    leer = Bildschirm("", Rechteck(0, 0, 0, 0))
+    g = _gemerkt(UNTEN, (200, 1180, 1400, 700))
+    assert PL.ziel_lage([leer], g, 0).rechteck is None
+    assert PL.ziel_lage([OBEN, leer], None, 0).rechteck is None
+
+
 def test_ohne_bildschirmliste_keine_vorgabe():
     assert PL.ziel_lage([], _gemerkt(UNTEN, (0, 0, 10, 10)), 0).rechteck is None
 
@@ -362,6 +378,29 @@ def test_popout_oeffnet_wieder_dort_wo_es_geschlossen_wurde(prefs, zwei_bildschi
     assert (win.x(), win.y(), win.width(), win.height()) == (300, 1250, 900, 600)
     win.close()
     assert v._canvas_alive()
+
+
+def test_schliessen_mit_laufendem_zeitgeber_stuerzt_nicht_ab(prefs, zwei_bildschirme):
+    """Verschieben und sofort schliessen: der entprellte Zeitgeber und der
+    500-ms-Zeitgeber der Ersatz-Lage duerfen nach dem Abbau nicht mehr feuern."""
+    from PySide6.QtTest import QTest
+    PL.speichere_gemerkt(_gemerkt(UNTEN, (150, 1200, 1000, 640)))
+    zwei_bildschirme(OBEN)                   # Ersatz-Lage -> 500-ms-Zeitgeber
+    v = _konsole()
+    for runde in range(3):
+        v._popout_canvas()
+        win = v._popout_window
+        merker = win._lage_merker
+        win.move(60 + runde, 80)
+        assert merker._timer.isActive()
+        win.close()
+        del win
+        QTest.qWait(650)                     # laenger als beide Zeitgeber
+        assert v._popout_window is None and v._canvas_alive()
+        with pytest.raises(RuntimeError):    # mit dem Fenster abgebaut
+            merker._timer.isActive()
+    # Unangefasste Ersatz-Lage hat den Platz auf dem Touch-Bildschirm behalten.
+    assert prefs()[PL.PREF_SCHLUESSEL]["bildschirm"] == "DP-2"
 
 
 def test_popout_bei_einem_bildschirm_wie_bisher(prefs, zwei_bildschirme):

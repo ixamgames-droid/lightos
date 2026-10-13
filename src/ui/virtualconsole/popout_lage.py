@@ -93,7 +93,8 @@ class Lage:
 def _als_rechteck(wert) -> Rechteck | None:
     try:
         x, y, w, h = (int(v) for v in wert)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
+        # OverflowError: ``Infinity`` in einer von Hand bearbeiteten Datei.
         return None
     if w <= 0 or h <= 0:
         return None
@@ -156,6 +157,17 @@ def mittig(groesse, bereich: Rechteck) -> Rechteck:
 
 def ziel_lage(bildschirme, gemerkt=None, haupt: int = 0,
               standard=STANDARD_GROESSE) -> Lage:
+    """Wie ``_ziel_lage``, aber nie mit leerem Rechteck: meldet das System
+    einen Bildschirm ohne Flaeche (Platzhalter, solange keiner angeschlossen
+    ist), wird nichts vorgegeben und das Fenster oeffnet wie bisher."""
+    lage = _ziel_lage(bildschirme, gemerkt, haupt, standard)
+    r = lage.rechteck
+    if r is not None and (r.w <= 0 or r.h <= 0):
+        return Lage(None)
+    return lage
+
+
+def _ziel_lage(bildschirme, gemerkt, haupt, standard) -> Lage:
     """Wo soll das Popout aufgehen?
 
     ``bildschirme``: Liste von ``Bildschirm``. ``gemerkt``: Rohwert aus den
