@@ -45,6 +45,7 @@ DATENORDNER: tuple[str, ...] = (
 #: Einzeldateien (relativ zum Repo).
 EINZELDATEIEN: tuple[str, ...] = (
     "THIRD_PARTY_NOTICES.md",
+    "LICENSE",                     # LIZ-1: Lizenztext (Dialog „Lizenztext anzeigen“)
     # main.py als DATEI: audio_recorder liest APP_VERSION daraus (Rueckfall
     # ueber ``__main__`` existiert, die Datei ist der Normalweg).
     "main.py",
@@ -150,6 +151,33 @@ HIDDEN_IMPORTS: tuple[str, ...] = (
     "engineio.async_drivers.threading",
     "sqlalchemy.dialects.sqlite",
     "serial.tools.list_ports",
+    # OUT-76: uDMX-Adapter. ``udmx._usb_laden`` importiert pyusb und
+    # libusb_package erst bei Bedarf, in einer Funktion; pyusb waehlt sein
+    # Backend zur Laufzeit. Ausdruecklich genannt, damit ein Setup ohne sie
+    # schon am Manifest auffaellt und nicht erst beim Klick auf „Verbinden“.
+    "usb.core",
+    "usb.util",
+    "usb.backend.libusb1",
+    "libusb_package",
+)
+
+#: OUT-76: Pakete, deren mitgelieferte DLLs ins Bundle gehoeren — jeweils in
+#: den ORDNER DES PAKETS (``_internal/<paket>/``), dort sucht das Paket selbst.
+#: ``libusb_package`` bringt ``libusb-1.0.dll`` mit (LGPL 2.1): als eigene
+#: Datei, nicht in LightOS.exe eingebaut, also austauschbar — das verlangt die
+#: Lizenz. ★ Keine Treiber: eine DLL im Programmordner ist eine Bibliothek.
+DYNAMISCHE_BIBLIOTHEKEN: tuple[str, ...] = (
+    "libusb_package",
+)
+
+#: LIZ-2: Pakete, deren Python-Module NICHT ins Archiv von LightOS.exe kommen,
+#: sondern als ``.py``-Dateien in den Programmordner (PyInstaller,
+#: ``module_collection_mode``). Qt und PySide6 stehen unter der LGPL; die
+#: verlangt, dass der Nutzer die Bibliothek austauschen kann. Die DLLs sind
+#: ohnehin eigene Dateien — so sind es die wenigen Python-Dateien auch.
+OFFEN_MITLIEFERN: tuple[tuple[str, str], ...] = (
+    ("PySide6", "py"),
+    ("shiboken6", "py"),
 )
 
 #: Grosse, nur optionale Pakete, die nie ins Setup sollen (BPM-Generator-

@@ -12,9 +12,13 @@
 Programmer → links unter **Gruppen** die Gruppe wählen (z. B. **Moving Heads (2)** bzw. **Alle
 Mover**). Der Gruppen-Klick springt in den Reiter **Matrix** — wechsle danach selbst in den Reiter
 **EFX** (er erscheint nur, wenn die Auswahl Geräte mit Pan/Tilt enthält) und drücke **+ Neu**. Der
-eingebettete EFX **folgt der Programmer-Auswahl LIVE**: der gerade angezeigte EFX bindet sich
-sofort an genau die ausgewählten Geräte. Das gilt, wenn du den EFX im sichtbaren Editor anklickst
-oder dort die Auswahl wechselst — beim Laden einer Show folgt kein EFX der Auswahl, die
+**neue EFX nimmt sofort die ausgewählten Geräte** und folgt der Programmer-Auswahl weiter, solange
+er ein Entwurf ist: Wechselst du die Auswahl, wechseln seine Geräte mit.
+
+Ein **gespeicherter EFX ändert seine Geräte nie von selbst** — nicht beim Öffnen des Reiters, nicht
+wenn du ihn in der Liste anklickst und nicht, wenn du die Auswahl wechselst oder leerst. Soll er
+andere Geräte bekommen: ihn anklicken, die Geräte im Programmer wählen und in der Geräte-Box
+**Auswahl übernehmen** drücken. Auch beim Laden einer Show folgt kein EFX der Auswahl, die
 gespeicherten Geräte bleiben, wie sie in der Datei stehen.
 
 **Wichtig — Speichern:** Ein neuer EFX ist zunächst ein **Entwurf** (in der Liste mit **●**
@@ -22,11 +26,12 @@ markiert). Erst **💾 Speichern** macht ihn dauerhaft und bindet ihn an die akt
 ungespeicherten Entwurf verwirft LightOS ohne Rückfrage, sobald du einen anderen Effekt anklickst,
 eine Gruppe anklickst (Sprung in den Reiter Matrix) oder den Reiter bzw. die Ansicht wechselst.
 
-Dass der EFX der Auswahl folgt, siehst du an der Geräte-Box im Editor: Sie heißt dynamisch
-**„Geräte (folgen der Auswahl)"** und zeigt bei aktiver Auswahl z. B. **„Geräte: 2 Gerät(e)
-(folgen der Auswahl)"** (bei reinen Spidern **„Geräte: 2 Spider (folgen der Auswahl)"**; bzw.
-**„Geräte: keine beweglichen Geräte in der Auswahl"**, falls nichts Passendes markiert ist — der
-EFX bindet nur Geräte mit Pan **und** Tilt bzw. Doppel-Tilt-Fixtures).
+Was gerade gilt, steht im Titel der Geräte-Box im Editor: Beim Entwurf z. B. **„Geräte: 2
+Gerät(e) (folgen der Auswahl)"** (bei reinen Spidern **„Geräte: 2 Spider (folgen der Auswahl)"**;
+bzw. **„Geräte: keine beweglichen Geräte in der Auswahl"**, falls nichts Passendes markiert ist —
+der EFX bindet nur Geräte mit Pan **und** Tilt bzw. Doppel-Tilt-Fixtures). Bei einem gespeicherten
+EFX steht dort **„Geräte: 2 gespeichert"** und, wenn im Programmer andere bewegliche Geräte gewählt
+sind, **„Geräte: 2 gespeichert – Auswahl weicht ab"**; nur dann ist **Auswahl übernehmen** aktiv.
 
 In der Gruppe **Form & Geometrie** stellst du ein:
 - **Algorithmus:** Die Namen erscheinen englisch — *Circle* (Kreis), *Eight* (Acht), *Line* (Linie),
@@ -43,9 +48,9 @@ Sind **nur Spider** ausgewählt, ersetzt der Editor *Form & Geometrie* durch **B
 ![EFX-Editor (Algorithmus Circle, Pan/Tilt-Hub)](img/01_efx_editor.png)
 
 > Merke: Im Programmer zeigt die EFX-Liste nur die Effekte der **aktiven Gruppe**; ein
-> gespeicherter Effekt gehört zu der Gruppe, die beim **💾 Speichern** aktiv war. Der gerade
-> angezeigte Effekt übernimmt sofort die aktuelle Auswahl — einen Effekt anklicken und Geräte
-> markieren heißt also, ihn an diese Geräte zu binden.
+> gespeicherter Effekt gehört zu der Gruppe, die beim **💾 Speichern** aktiv war. Einen
+> gespeicherten Effekt anzuklicken oder Geräte zu markieren ändert ihn nicht — an andere Geräte
+> bindest du ihn nur mit **Auswahl übernehmen**.
 
 ## 2. Die Köpfe „aufmachen" — „Dimmer/Shutter mit öffnen"
 
@@ -105,8 +110,8 @@ Den EFX **💾 Speichern** und mit **▶ Start** starten (**■ Stop** daneben).
 
 ---
 
-**Kurz:** Gruppe (Moving Heads) wählen → Reiter **EFX** → **+ Neu** (der EFX folgt der Auswahl
-live) → Algorithmus (Circle …) + Pan/Tilt-Hub (0–255) → **„Dimmer/Shutter mit öffnen" AN** (sonst
+**Kurz:** Gruppe (Moving Heads) wählen → Reiter **EFX** → **+ Neu** (der neue EFX nimmt die
+Auswahl) → Algorithmus (Circle …) + Pan/Tilt-Hub (0–255) → **„Dimmer/Shutter mit öffnen" AN** (sonst
 dunkel) → Verhältnis der Geräte zueinander (Verhältnis: Synchron/Fächer/Versatz, dazu
 Gegenläufig/Spiegeln) → **💾 Speichern** → **▶ Start**. Tempo: neue EFX folgen dem Bus **Global**
 (ein Umlauf pro Beat × **Tempo ×**); **Geschwindigkeit (Hz)** nur im Frei-Lauf. Farbe der MH
