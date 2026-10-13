@@ -55,7 +55,6 @@
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
-| OUT-75 | D | fix/out75-dmx-monitor-eine-wahrheit | 2026-10-12T15:08Z | src/ui/views/dmx_monitor_view.py · src/core/dmx/output_manager.py · src/ui/widgets/output_config.py |
 | VIZ-104 | A | feature/viz104-strobe-im-3d | 2026-10-13T14:32Z | src/core/color_utils.py · src/ui/visualizer/dmx_push.py · src/ui/views/live_view.py |
 | VIZ-105 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/visualizer/visualizer_window.py · tests/test_viz105_traverse_loeschen_undo_docks.py |
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
@@ -288,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T19:03Z A done UI-89
 - 2026-10-12T19:08Z A claim LIZ-1
 - 2026-10-12T19:29Z A done VIZ-102
 - 2026-10-12T19:47Z A claim DOC-72
@@ -318,3 +316,4 @@
 - 2026-10-13T17:01Z A claim PROC-22
 - 2026-10-13T17:04Z A claim ENG-39
 - 2026-10-13T18:06Z D done LAS-38
+- 2026-10-13T18:33Z D done OUT-75
