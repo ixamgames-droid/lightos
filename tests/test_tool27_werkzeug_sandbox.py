@@ -64,8 +64,8 @@ AUSNAHMEN = {
         "die hart setzt statt setdefault."),
 }
 #: Was eine Ausnahme mindestens selbst umlenken muss.
-AUSNAHME_MUSS_SETZEN = ("XDG_DATA_HOME", "LIGHTOS_SHOW_DB", "LIGHTOS_FIXTURE_DB",
-                        "LIGHTOS_UNIVERSES_JSON")
+AUSNAHME_MUSS_SETZEN = ("XDG_DATA_HOME", "APPDATA", "LIGHTOS_SHOW_DB",
+                        "LIGHTOS_FIXTURE_DB", "LIGHTOS_UNIVERSES_JSON")
 
 #: Werkzeuge, die ``src`` laden, die App aber NICHT bauen und mit Absicht am
 #: Bestand bzw. an der Hardware des Rechners arbeiten. Jedes braucht einen Grund
@@ -262,6 +262,47 @@ class JedesBauendeWerkzeugLaedtDieSandboxTest(unittest.TestCase):
             for var in AUSNAHME_MUSS_SETZEN:
                 with self.subTest(rel=rel, var=var):
                     self.assertIn(f'"{var}"', quelle)
+
+    def test_der_sichtproben_sandkasten_fasst_keine_geraete_an(self):
+        """``verify_stage_reload`` baut ein Hauptfenster im echten Fenster und
+        laesst die Ereignisschleife laufen: ohne diese Schalter oeffnete es die
+        MIDI-Eingaenge des Rechners und zaehlte USB-Geraete auf; unter Windows
+        (``APPDATA``) arbeitete es im echten Datenordner."""
+        import importlib
+        sys.path.insert(0, str(TOOLS))
+        try:
+            vsr = importlib.import_module("verify_stage_reload")
+        finally:
+            sys.path.remove(str(TOOLS))
+        namen = ("XDG_DATA_HOME", "APPDATA", "LIGHTOS_SHOW_DB", "LIGHTOS_FIXTURE_DB",
+                 "LIGHTOS_UNIVERSES_JSON", "LIGHTOS_NO_OUTPUT_THREAD",
+                 "LIGHTOS_NO_DATENUMZUG", "LIGHTOS_KEIN_USB", "LIGHTOS_SERIAL_INPROC",
+                 "LIGHTOS_NO_MIDI_AUTOCONNECT")
+        alt = {k: os.environ.get(k) for k in namen}
+        alt_sandbox = vsr._SANDBOX
+        with tempfile.TemporaryDirectory(prefix="lightos_tool27_") as tmp:
+            try:
+                for k in ("LIGHTOS_KEIN_USB", "LIGHTOS_SERIAL_INPROC",
+                          "LIGHTOS_NO_MIDI_AUTOCONNECT"):
+                    os.environ.pop(k, None)
+                os.environ["APPDATA"] = os.path.join(tmp, "echt", "Roaming")
+                vsr.sandbox_einrichten(os.path.join(tmp, "s"),
+                                       fixture_db=os.path.join(tmp, "fx.db"),
+                                       stages_quelle=os.path.join(tmp, "keine"))
+                for k in ("LIGHTOS_KEIN_USB", "LIGHTOS_SERIAL_INPROC",
+                          "LIGHTOS_NO_MIDI_AUTOCONNECT"):
+                    with self.subTest(k):
+                        self.assertEqual(os.environ.get(k), "1")
+                self.assertTrue(_innerhalb(os.environ["APPDATA"], os.path.join(tmp, "s")),
+                                os.environ["APPDATA"])
+                self.assertTrue(vsr.schutz_aktiv())
+            finally:
+                vsr._SANDBOX = alt_sandbox
+                for k, v in alt.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
 
     def test_die_bild_sandbox_lenkt_dieselben_orte_um(self):
         quelle = (TOOLS / "anleitungsbilder" / "sandbox.py").read_text(encoding="utf-8")
