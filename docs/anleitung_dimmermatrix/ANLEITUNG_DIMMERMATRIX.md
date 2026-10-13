@@ -101,6 +101,200 @@ Im Hardstyle-Look kombiniert: blauer Farb-Chase + schnellerer Dimmer-Puls, per V
 **Default-/Leader-Bus** gelegt und damit musik-synchron — zu sehen in der laufenden Show
 (siehe *Virtuelle Konsole*, GIF „Hardstyle-Show läuft").
 
+## 5. Modify-Effekt: auf laufende Effekte addieren, abziehen, abdunkeln
+
+Ein normaler Dimmer-Effekt **setzt** die Helligkeit seiner Lampen — läuft ein zweiter darüber,
+gewinnt der zuletzt gestartete. Ein **Modify-Effekt** setzt nichts: er wird mit dem **verrechnet**,
+was die Lampe gerade tut. Beispiel: Im Hintergrund funkelt es die ganze Zeit; ein Modify-Lauflicht
+legt auf zwei Lampen 100 % obendrauf, wandert weiter — und die Lampen dahinter funkeln wieder
+ganz normal.
+
+**Die Regel in einem Satz:** Modify rechnet auf das **fertige Bild** — auf das, was Effekte,
+Cuelisten, Snap-Tasten, Programmer und die automatische Grundhelligkeit zusammen ergeben — und
+**vor** den Mastern. Wo der Modify-Effekt gerade nichts ausgibt, bleibt alles unverändert.
+
+### Einrichten
+
+1. Matrix wie in Abschnitt 2 anlegen: **Stil Dimmer**, Algorithmus z. B. *Chase*, Lampen zuweisen.
+2. Unter **Stil** den Haken **Modify-Effekt** setzen. Darunter erscheint die Gruppe **Modify** mit
+   **Betriebsart** (Addieren / Abziehen / Abdunkeln) und **Stärke** (0–100 %, Vorgabe 100 %).
+   Haken raus = wieder ein ganz normaler Effekt; Betriebsart und Stärke bleiben gemerkt.
+3. **💾 Speichern** und den Effekt auf eine normale Taste der Virtuellen Konsole legen:
+   Taste an = der Modify-Effekt wirkt, Taste aus = alles läuft wie vorher weiter.
+4. Wer mag, legt einen Regler auf den Effekt-Parameter **Modify-Stärke**. Der Regler
+   **Helligkeit** des Modify-Effekts und seine Ein-/Ausblendzeit wirken ebenfalls nur auf die
+   Stärke — das Darunterliegende wird davon nie mitgedimmt.
+
+### Nur per Fader bedienen
+
+Ein Modify-Effekt braucht keine Taste. Ein Fader der Virtuellen Konsole kann ihn allein schalten
+und regeln: **Fader auf 0 = Effekt aus, Fader irgendwo darüber = Effekt läuft.**
+
+1. In der Virtuellen Konsole einen **Fader anlegen** und in seinen Eigenschaften als Ziel den
+   Modify-Effekt wählen.
+2. Als **Modus** *Effekt-Helligkeit* einstellen.
+3. Den Haken **„Effekt An/Aus (EFFECT-Modi): bei 0 wirklich stoppen“** setzen.
+
+Was man sieht (Untergrund auf 40 %, Werte der Läufer-Lampen):
+
+| Fader | Effekt | Abziehen | Abdunkeln | Addieren |
+|---|---|---|---|---|
+| 0 | gestoppt — das Bild ist exakt wie ohne den Effekt | 40 % | 40 % | 40 % |
+| 50 % | läuft, halbe Stärke | 0 % | 20 % | 90 % |
+| 100 % | läuft, volle Stärke | 0 % | 0 % | 100 % |
+
+- Schon der **kleinste Wert über 0** startet den Effekt; zurück auf 0 stoppt ihn wirklich.
+- **Ohne den Haken** regelt der Fader nur: an und aus bleibt dann bei der Taste, und Fader 0 heißt
+  „läuft mit Stärke 0“.
+- **Taste und Fader zusammen** auf demselben Effekt vertragen sich: die Taste leuchtet, sobald der
+  Fader den Effekt startet, und geht aus, wenn er ihn stoppt. Schaltet die Taste bei offenem Fader
+  aus, startet die nächste Fader-Bewegung wieder.
+- Statt *Effekt-Helligkeit* geht auch der Modus *Effekt-Parameter* mit **Modify-Stärke** — gleiches
+  Ergebnis, in ganzen Prozent. *Effekt-Tempo* mit dem Haken schaltet ebenfalls, regelt aber das
+  Tempo.
+- **Ein- und Ausblendzeit** des Effekts gelten auch beim Start und Stopp über den Fader; der
+  Untergrund springt dabei nie. Im Modus *Effekt-Helligkeit* ist der Effekt bei Fader 0 sofort
+  unsichtbar (Stärke 0); die Taste leuchtet noch für die Dauer der Ausblendzeit. Wer den Fader in
+  dieser Zeit wieder aufzieht, startet den Effekt neu.
+- **Show laden:** Ein gespeicherter Faderwert über 0 startet nichts. Nach dem Laden ist der Effekt
+  aus, der Fader zeigt nur seinen gespeicherten Stand; **erst die erste Bewegung** des Faders
+  schaltet ein. So verhält sich jeder Effekt-Fader, nicht nur bei Modify.
+- **Bankwechsel mit Pickup:** Der Hardware-Fader wirkt erst, wenn er den angezeigten Wert kreuzt —
+  vorher wird nichts gestartet und nichts gestoppt.
+
+### Die drei Betriebsarten
+
+| Betriebsart | Rechnung je Lampe | Lampe im Modify-Effekt gerade nicht dran |
+|---|---|---|
+| **Addieren** | unten + Betrag × Stärke | bleibt unverändert |
+| **Abziehen** | unten − Betrag × Stärke | bleibt unverändert |
+| **Abdunkeln** | unten × (1 − Betrag × Stärke) | bleibt unverändert |
+
+**Betrag** ist das, was der Modify-Effekt für die Lampe ausrechnet (Läufer an = 100 %, aus = 0 %,
+ein Schweif liegt dazwischen). Gekappt wird bei 0 % und 100 %. *Abdunkeln* heißt „um so viel
+Prozent dunkler" — 50 % halbiert die Helligkeit, egal wie hell es darunter gerade ist. Das ist der
+Unterschied zu *Abziehen*, das einen festen Betrag wegnimmt.
+
+### Durchgerechnet
+
+Darunter steht ein Dimmer-Effekt gerade auf 40 %. Das Modify-Lauflicht hat zwei Läufer auf acht
+Lampen, im Moment auf Lampe 3 und 7:
+
+| Lampe | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| Effekt darunter | 40 | 40 | 40 | 40 | 40 | 40 | 40 | 40 |
+| Modify-Lauflicht (Betrag) | 0 | 0 | 100 | 0 | 0 | 0 | 100 | 0 |
+| Addieren, Stärke 100 % | 40 | 40 | 100 | 40 | 40 | 40 | 100 | 40 |
+| Abziehen, Stärke 100 % | 40 | 40 | 0 | 40 | 40 | 40 | 0 | 40 |
+| Abdunkeln, Stärke 100 % | 40 | 40 | 0 | 40 | 40 | 40 | 0 | 40 |
+| Addieren, Stärke 50 % | 40 | 40 | 90 | 40 | 40 | 40 | 90 | 40 |
+| Abziehen, Stärke 50 % | 40 | 40 | 0 | 40 | 40 | 40 | 0 | 40 |
+| Abdunkeln, Stärke 50 % | 40 | 40 | 20 | 40 | 40 | 40 | 20 | 40 |
+
+(40 + 100 = 140 → gekappt auf 100. 40 − 50 = −10 → gekappt auf 0.) Im nächsten Schritt stehen die
+Läufer auf Lampe 4 und 8 — Lampe 3 und 7 sind dann wieder exakt bei den 40 % des Effekts darunter.
+
+### Zwei Lampen, dann die nächsten zwei: Schrittweite
+
+Beim Lauflicht (*Chase*) gibt es drei Stellschrauben, die leicht verwechselt werden:
+
+- **Läufer-Anzahl** 2 = zwei Läufer, die auf acht Lampen vier Lampen auseinander stehen (1 + 5,
+  dann 2 + 6 …).
+- **Läufer-Breite** 2 = ein Läufer, zwei Lampen breit. Er wandert trotzdem nur um **eine** Lampe.
+- **Schrittweite** = um wie viele Lampen der Läufer je Schritt weiterspringt. Vorgabe 1 (Lampe für
+  Lampe, wie bisher). Auf **„wie Breite“** gestellt (im Feld der Wert unter 1) springt er Block an
+  Block.
+
+Für „erst Lampe 1 + 2, dann 3 + 4, dann 5 + 6“ also: **Läufer-Anzahl 1, Läufer-Breite 2,
+Schrittweite „wie Breite“** (oder 2), **Schweif 0 %**. Als Modify-Effekt *Addieren* mit Stärke
+100 % über einem Funkeln, das gerade auf 40 % steht:
+
+| Lampe | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| Schritt 1 | 100 | 100 | 40 | 40 | 40 | 40 | 40 | 40 |
+| Schritt 2 | 40 | 40 | 100 | 100 | 40 | 40 | 40 | 40 |
+| Schritt 3 | 40 | 40 | 40 | 40 | 100 | 100 | 40 | 40 |
+| Schritt 4 | 40 | 40 | 40 | 40 | 40 | 40 | 100 | 100 |
+
+Danach beginnt es wieder bei Lampe 1 + 2. Die Schrittweite gibt es bei **jedem** Lauflicht, nicht
+nur bei Modify-Effekten; das Feld steht unter **Bewegung & Parameter**, an der Virtuellen Konsole
+heißt der Parameter **Schrittweite**. So spielt sie mit den anderen Einstellungen zusammen:
+
+- Zwischen zwei Schritten steht der Läufer still (bei Schrittweite 1 gleitet ein Schweif weich
+  mit, ab Schrittweite 2 springt alles im Takt).
+- **Rückwärts:** dieselben Blöcke in umgekehrter Folge — 1 + 2, dann 7 + 8, 5 + 6, 3 + 4.
+- **Ping-Pong:** die Blöcke hin und zurück — 1 + 2, 3 + 4, 5 + 6, 7 + 8, 5 + 6, 3 + 4 … Am Rand
+  wird ein Block abgeschnitten, er läuft nicht um.
+- **Mehrere Läufer:** jeder weitere um „Lampenzahl ÷ Anzahl“ versetzt, alle springen gemeinsam.
+- **Schweif:** hängt hinter dem Block über den eben verlassenen Lampen und springt mit. Ist die
+  Schrittweite größer als die Breite, liegen auch die übersprungenen Lampen im Schweif.
+- Geht die Lampenzahl nicht auf (acht Lampen, Schrittweite 3), beginnt jede Runde wieder bei
+  Lampe 1: 1, 4, 7, dann wieder 1.
+- Bei den Ring-Bewegungen (von der Mitte nach außen und umgekehrt) wirkt die Schrittweite nicht;
+  das Feld ist dort ausgeblendet.
+
+### Was mit Snaps, Grundhelligkeit und Mastern gilt
+
+- **Snap-Tasten und Programmer:** Steht der Dimmer über eine Snap-Taste auf 40 %, legt *Addieren*
+  unter dem Läufer obendrauf, *Abziehen* und *Abdunkeln* nehmen dort weg — alle anderen Lampen
+  bleiben exakt bei 40 %. Dasselbe gilt für Cuelisten.
+- **Nur Farbe, kein Dimmer** (Farb-Snap oder Farb-Effekt): die Lampen leuchten über die
+  automatische Grundhelligkeit mit 100 %. Ein Modify-Effekt schaltet sie **nicht** ab.
+  *Abziehen* und *Abdunkeln* machen die Lampen unter dem Läufer dunkler; *Addieren* sieht man
+  dann nicht, weil mehr als 100 % nicht geht.
+- **Gar nichts darunter:** *Addieren* rechnet auf 0 — es leuchtet dort, wo der Läufer ist.
+  *Abziehen* und *Abdunkeln* tun nichts.
+- **Master haben das letzte Wort.** Gruppen-Fader und Submaster, der DMX-Eingang, der Grand Master,
+  Blackout, gezielte Blackouts und der Laser-NOT-AUS greifen **nach** dem Modify-Effekt. Ein
+  Modify-Effekt kann einen zugezogenen Fader, einen Blackout oder einen NOT-AUS nie aufhellen.
+- Ein Modify-Effekt **besitzt** den Dimmer nicht. Ein normaler Dimmer-Effekt übernimmt den Dimmer
+  seiner Lampen (ein Snap-Dimmer zählt dann nicht mehr) — ein Modify-Effekt lässt ihn, wo er ist.
+
+### Reihenfolge
+
+- Ein Modify-Effekt rechnet immer **nach** allen normalen Effekten — egal, was zuerst gestartet
+  wurde und welche **Layer-Priorität** sie haben. Er wirkt also auch auf einen normalen Effekt
+  mit höherer Priorität: verrechnet wird mit dem, was am Ende gewinnt.
+- Mehrere Modify-Effekte wirken **nacheinander**, jeder kappt für sich: zuerst nach
+  Layer-Priorität (niedrige zuerst), bei gleicher Priorität in **Start-Reihenfolge**.
+  Beispiel auf 40 %: erst Addieren 50 %, dann Abziehen 100 % ergibt 0 %; umgekehrt gestartet
+  ergibt es 50 %.
+
+### Grenzen
+
+- Modify gibt es bisher nur im **Stil Dimmer**. Bei RGB, RGBW und Shutter ist der Haken gesperrt;
+  ein dort noch gesetzter Haken hat keine Wirkung. Farbe und Dimmer bleiben getrennt — ein
+  Dimmer-Modify fasst nie eine Farbe an.
+- Ein Modify-Effekt wirkt auf die **Dimmer-Kanäle seiner eigenen Lampen**. Lampen ohne
+  Dimmer-Kanal (reine RGB-Geräte, deren Helligkeit in der Farbe steckt) erreicht er in diesem
+  Stand nicht.
+- Der Regler **Helligkeit** einer Sammlung (Collection) oder Show und ihre Ein-/Ausblendzeit
+  stellen bei einem Modify-Effekt darin nur ein, wie kräftig er zugreift — das Darunterliegende
+  wird nicht mitgedimmt.
+- Als **Chaser-Schritt** ist ein Modify-Effekt gesperrt: der Schritt gibt nichts aus. Ein Chaser
+  blendet feste Bilder ineinander; ein Modify-Effekt hätte dort alle Lampen außerhalb des Läufers
+  überschrieben. Direkt gestartet, in einer Sammlung und in der Show-Zeitleiste funktioniert er.
+- Steht **Dimmer-Bereich Min** im Modify-Effekt über 0, bekommt **jede** Lampe diesen Grundbetrag
+  ab (der Editor weist darauf hin).
+- Der Schweif des Lauflichts hat eine Vorgabe von 30 %. Für harte Blöcke den **Schweif auf 0 %**
+  stellen, sonst bekommen die Lampen hinter dem Läufer ebenfalls einen Anteil ab.
+- „Alles Weiß“ und die Szenen-Vorschau liegen über dem Modify-Effekt und werden nicht verrechnet.
+- Die Vorschau im Editor zeigt den Modify-Effekt allein, eingefärbt nach Betriebsart
+  (Bernstein = Addieren, Blau = Abziehen, schraffiert = Abdunkeln).
+
+### Noch aufzunehmende Bilder
+
+Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
+
+1. Matrix-Editor, Stil Dimmer, Haken **Modify-Effekt** aus.
+2. Matrix-Editor mit gesetztem Haken und der Gruppe **Modify**.
+3. Lampenreihe: Effekt darunter allein / Modify-Lauflicht allein / Ergebnis mit Addieren.
+4. Dieselbe Reihe mit Abziehen und Abdunkeln nebeneinander.
+5. Virtuelle Konsole: Taste für den Modify-Effekt und Regler **Modify-Stärke**.
+6. Kurzes GIF: Taste an/aus über einem laufenden Funkeln.
+7. Matrix-Editor, **Bewegung & Parameter** mit dem Feld **Schrittweite** auf „wie Breite“.
+8. Lampenreihe: Farb-Taste und Dimmer-Taste auf 40 %, darüber das Modify-Lauflicht in Zweierblöcken.
+
 ---
 
 **Kurz:** Gruppe wählen → Matrix-Tab → **+ Neu** → **Stil Dimmer** + Algorithmus *Chase* (Raster
