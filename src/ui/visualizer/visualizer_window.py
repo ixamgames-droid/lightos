@@ -296,6 +296,9 @@ def max_beam_range_pref() -> float:
     return float(min(val, MAX_BEAM_RANGE_MAX))
 
 
+from src.ui.visualizer.strobe_prefs import strobe_mode_pref, strobe_mode_value  # noqa: E402,F401  VIZ-104
+
+
 def _bildschirm_hz(view) -> float:
     """VIZ-85: Bildwiederholrate des Bildschirms, auf dem die Ansicht liegt
     (sonst des Hauptbildschirms); 0.0, wenn unbekannt. Die dynamische
@@ -2953,14 +2956,18 @@ class VisualizerWindow(QMainWindow):
             n = self._combo_edit.count()
             self._combo_edit.setCurrentIndex((self._combo_edit.currentIndex() + 1) % n)
 
-        for key, fn in (
-            ("V", _toggle_view),
-            ("E", _cycle_edit),
-            ("F", self._on_key_f),
-            ("S", lambda: self._tabs.setCurrentIndex(1)),
-            ("D", lambda: self._act_dock.toggle()),
+        # UI-92: mit Beschreibung — der Tastenkuerzel-Dialog (Hilfe) zeigte
+        # diese fuenf als „(ohne Beschreibung)“.
+        for key, fn, was in (
+            ("V", _toggle_view, "Ansicht umschalten: 3D / 2D"),
+            ("E", _cycle_edit, "Modus umschalten: Ansehen / Bauen"),
+            ("F", self._on_key_f,
+             "Auswahl einpassen (Fokus in der 3D-Ansicht), sonst Reiter Fixtures"),
+            ("S", lambda: self._tabs.setCurrentIndex(1), "Reiter Bühne zeigen"),
+            ("D", lambda: self._act_dock.toggle(), "Andocken ein/aus"),
         ):
             sc = QShortcut(QKeySequence(key), self)
+            sc.setWhatsThis(was)
             sc.activated.connect(fn)
 
         # VIZ-11 (Schritt 6): Strg+Z/Y muss auch im eigenstaendigen
@@ -3567,6 +3574,45 @@ class VisualizerWindow(QMainWindow):
             "das Ergebnis der GPU-Erkennung dieses Rechners.")
         q_row.addWidget(self._lbl_gpu_tier)
         q_layout.addLayout(q_row)
+        # ── VIZ-104: Strobe im 3D zeigen (Blitzen / Gedaempft / Aus) ────────
+        from src.ui.visualizer import strobe_prefs
+        s_row = QHBoxLayout()
+        s_row.addWidget(QLabel("Strobe im 3D zeigen:"))
+        self._combo_strobe = QComboBox()
+        for wert, text in strobe_prefs.MODE_LABELS:
+            self._combo_strobe.addItem(text, wert)
+        self._combo_strobe.setToolTip(
+            "Wie ein Gerät mit Shutter im Strobe-Bereich in der 3D-Szene\n"
+            "gezeigt wird.\n\n"
+            "Blitzen = kurz an, lange aus, im Takt des Shutters. Gezeigt werden\n"
+            f"höchstens rund {strobe_prefs.CAP_HZ} Blitze je Sekunde — ein schnellerer Strobe\n"
+            "sieht 'schnell' aus, nicht exakt. Ein Blitz braucht mindestens drei\n"
+            "Bilder (eins an, zwei aus); auf einem langsamen Rechner sind es\n"
+            "deshalb weniger.\n"
+            f"Gedämpft = langsames, flaches Pulsieren statt An/Aus (höchstens {strobe_prefs.SOFT_MAX_HZ}-mal\n"
+            "je Sekunde).\n"
+            "Aus = Dauerlicht wie bisher.\n\n"
+            + strobe_prefs.WARNHINWEIS + "\n\n"
+            "Ändert nur die Darstellung, nicht die DMX-Ausgabe.\n"
+            "Gilt für dieses Gerät, nicht pro Show."
+        )
+        self._combo_strobe.setCurrentIndex(
+            max(0, self._combo_strobe.findData(strobe_prefs.strobe_mode_pref())))
+        self._combo_strobe.currentIndexChanged.connect(self._on_strobe_mode_changed)
+        # Die Auswahl darf schmaler werden als ihr laengster Eintrag (die
+        # aufgeklappte Liste zeigt ihn ganz) — sonst macht „Gedämpft (weiches
+        # Pulsieren)“ die Zeile breiter als die Spalte, und die Auswahl ist
+        # rechts abgeschnitten (Sichtprobe 2026-10-12). Dasselbe Muster wie
+        # bei der Stufe (VIZ-108).
+        self._combo_strobe.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo_strobe.setMinimumContentsLength(12)
+        s_row.addWidget(self._combo_strobe, 1)
+        q_layout.addLayout(s_row)
+        self._lbl_strobe_warnung = QLabel(strobe_prefs.WARNHINWEIS)
+        self._lbl_strobe_warnung.setWordWrap(True)
+        self._lbl_strobe_warnung.setStyleSheet("color: #d9a441; font-size: 11px;")
+        q_layout.addWidget(self._lbl_strobe_warnung)
         layout.addWidget(quality_group)
 
         # ── Helligkeit (NEU) ────────────────────────────────────────────────
@@ -5546,6 +5592,17 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] quality pref save error: {e}")
         self._on_reload_scene()
 
+    def _on_strobe_mode_changed(self, _idx: int = 0):
+        """VIZ-104: 'Strobe im 3D zeigen' geaendert — geraete-lokal merken und
+        an die Szene geben. KEIN Szenen-Neuladen: die Szene liest den Wert im
+        naechsten Bild (wie die Max-Strahllaenge)."""
+        from src.ui.visualizer import strobe_prefs
+        try:
+            strobe_prefs.save_strobe_mode(strobe_prefs.strobe_mode_value(self))
+        except Exception as e:
+            print(f"[Visualizer] strobe mode prefs error: {e}")
+        self._on_settings_changed()
+
     def _on_gpu_tier_reported(self, tier: str):
         """JS meldet die AKTIVE Stufe der laufenden Szene (Probe- oder
         Override-Ergebnis) — im Einstellungen-Tab anzeigen."""
@@ -5600,6 +5657,8 @@ class VisualizerWindow(QMainWindow):
                                     and self._chk_room.isChecked()),
             # VIZ-15: globale Max-Strahllaenge in Metern (0 = aus).
             "maxBeamRange":    beam_range_value(self),
+            # VIZ-104: Strobe im 3D zeigen ('flash' | 'soft' | 'off').
+            "strobeMode":      strobe_mode_value(self),
         }
 
     def _update_beam_range_label(self) -> None:
