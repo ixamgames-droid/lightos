@@ -99,6 +99,10 @@ class SpaltenKlappe(QObject):
         self._speicher_timer.setSingleShot(True)
         self._speicher_timer.setInterval(_SPEICHER_VERZUG_MS)
         self._speicher_timer.timeout.connect(self.sichern)
+        self._grenz_timer = QTimer(self)
+        self._grenz_timer.setSingleShot(True)
+        self._grenz_timer.setInterval(0)
+        self._grenz_timer.timeout.connect(self._auf_hoechstbreite_begrenzen)
 
         splitter.setCollapsible(self._idx, True)
         knopf.clicked.connect(self.umschalten)
@@ -135,9 +139,10 @@ class SpaltenKlappe(QObject):
         gesamt = sum(groessen)
         if eingeklappt:
             if groessen[self._idx] > 0:
-                self._breite = groessen[self._idx]
+                self._breite = self._begrenzt(groessen[self._idx])
             groessen[self._idx] = 0
             groessen[self._andere] = max(gesamt, 1)
+            self._fokus_aus_der_spalte()
         else:
             breite = self._wunsch_breite()
             groessen[self._idx] = breite
@@ -174,6 +179,31 @@ class SpaltenKlappe(QObject):
         # bei einem unbrauchbar grossen gemerkten Wert eine Ansicht ohne Breite.
         return max(1, min(breite, spalte.maximumWidth()))
 
+    def _begrenzt(self, breite: int) -> int:
+        """``breite``, hoechstens die Hoechstbreite der Spalte."""
+        spalte = self._splitter.widget(self._idx)
+        if spalte is None:
+            return breite
+        return min(breite, spalte.maximumWidth())
+
+    def _fokus_aus_der_spalte(self) -> None:
+        """Eine eingeklappte Spalte behaelt keinen Tastaturfokus.
+
+        Der Splitter versteckt die Spalte nicht, er schiebt sie nur aus dem
+        Bild — ein Eingabefeld darin behielte den Fokus. Buchstabentasten
+        (S, F …) gingen dann als Texteingabe in ein Feld, das niemand sieht,
+        statt die Spalte auszuklappen."""
+        spalte = self._splitter.widget(self._idx)
+        if spalte is None:
+            return
+        try:
+            fokus = spalte.window().focusWidget()
+            if fokus is not None and (fokus is spalte
+                                      or spalte.isAncestorOf(fokus)):
+                fokus.clearFocus()
+        except RuntimeError:          # Widget waehrend des Abbaus
+            pass
+
     def _zeige_zustand(self) -> None:
         zu = self._eingeklappt
         self._knopf.setText(PFEIL_AUSKLAPPEN if zu else PFEIL_EINKLAPPEN)
@@ -188,9 +218,11 @@ class SpaltenKlappe(QObject):
         breite = groessen[self._idx]
         zu = breite <= 0
         if not zu:
-            self._breite = breite
+            self._breite = self._begrenzt(breite)
         wechsel = zu != self._eingeklappt
         self._eingeklappt = zu
+        if zu:
+            self._fokus_aus_der_spalte()
         self._zeige_zustand()
         self._speicher_timer.start()
         if wechsel:
@@ -214,12 +246,44 @@ class SpaltenKlappe(QObject):
             ist = self._splitter.sizes()[self._idx]
             if ist > 0:
                 self._breite = ist
+        else:
+            self._auf_hoechstbreite_begrenzen()
         self._zeige_zustand()
 
+    def _auf_hoechstbreite_begrenzen(self) -> bool:
+        """Gibt der Splitter der offenen Spalte mehr, als sie fuellen darf,
+        geht der Ueberschuss an die andere Seite. Gibt zurueck, ob korrigiert
+        wurde.
+
+        Ohne gemerkte Breite verteilt ``QSplitter`` beim ersten Zeigen nach
+        dem ``sizeHint()`` der Spalte — und der liegt ueber ihrer
+        Hoechstbreite (558 gegen 420 px). Die Spalte selbst wird dann nur 420
+        px breit, die restlichen 138 px blieben als leerer Streifen rechts
+        stehen, bis man einmal ein- und ausklappte."""
+        spalte = self._splitter.widget(self._idx)
+        groessen = list(self._splitter.sizes())
+        if spalte is None or len(groessen) < 2:
+            return False
+        hoechst = spalte.maximumWidth()
+        if groessen[self._idx] <= hoechst:
+            return False
+        gesamt = sum(groessen)
+        groessen[self._idx] = hoechst
+        groessen[self._andere] = max(gesamt - hoechst, 1)
+        self._splitter.setSizes(groessen)
+        return True
+
     def eventFilter(self, obj, event):
-        if (obj is self._splitter and self._erst_anzeige_offen
-                and event.type() == QEvent.Type.Show):
+        if obj is not self._splitter:
+            return False
+        art = event.type()
+        if art == QEvent.Type.Show and self._erst_anzeige_offen:
             self._erst_anzeige_offen = False
             # Erst nach dem Show-Ereignis sind die Groessen verteilt.
             QTimer.singleShot(0, self._erste_anzeige)
+        elif (art == QEvent.Type.Resize and not self._eingeklappt
+                and not self._erst_anzeige_offen):
+            # Der Filter laeuft VOR dem Splitter; geprueft wird deshalb erst,
+            # wenn er die neue Breite verteilt hat.
+            self._grenz_timer.start()
         return False

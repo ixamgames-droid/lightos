@@ -382,3 +382,176 @@ def test_nur_die_reiter_taste_klappt_aus(prefs, monkeypatch):
     assert fenster._tabs.currentIndex() == 2
     assert sp.sizes()[1] == 0
     assert fenster._spalten_klappe.eingeklappt is True
+
+
+# ── Erster Start ohne gemerkte Breite: kein leerer Streifen ──────────────────
+
+class _BreiterWunsch(QWidget):
+    """Spalte, deren Wunschbreite ueber ihrer Hoechstbreite liegt — so wie die
+    echte Spalte mit ihren Reitern (558 gegen 420 px)."""
+
+    def sizeHint(self):
+        from PySide6.QtCore import QSize
+        return QSize(558, 400)
+
+
+def _aufbau_breiter_wunsch(breite=1400):
+    sp = QSplitter()
+    links, rechts = QWidget(), _BreiterWunsch()
+    rechts.setMinimumWidth(330)
+    rechts.setMaximumWidth(420)
+    sp.addWidget(links)
+    sp.addWidget(rechts)
+    sp.setStretchFactor(0, 1)
+    sp.setStretchFactor(1, 0)
+    sp.setCollapsible(0, False)
+    klappe = SE.SpaltenKlappe(sp, SE.baue_knopf(), 1)
+    sp.resize(breite, 600)
+    sp.show()
+    _app.processEvents()
+    _app.processEvents()
+    return sp, links, rechts, klappe
+
+
+def _kein_streifen(sp, spalte):
+    """Die Spalte fuellt, was der Splitter ihr gibt, und reicht bis zum Rand."""
+    _app.processEvents()
+    _app.processEvents()
+    assert sp.sizes()[1] == spalte.width(), (sp.sizes(), spalte.width())
+    assert sp.sizes()[1] <= spalte.maximumWidth()
+    assert spalte.geometry().right() == sp.contentsRect().right()
+    assert sum(sp.sizes()) + sp.handleWidth() == sp.contentsRect().width()
+
+
+def test_erster_start_ohne_gemerkte_breite_laesst_keinen_streifen(prefs):
+    sp, links, rechts, klappe = _aufbau_breiter_wunsch()
+    assert klappe.gemerkte_breite == 0          # wirklich der erste Start
+    assert sp.sizes()[1] == 420
+    _kein_streifen(sp, rechts)
+    assert links.width() == 1400 - 420 - sp.handleWidth()
+    # Beim Vergroessern und Verkleinern bekommt die Ansicht den Unterschied.
+    for breite in (1900, 2400, 1000, 1500):
+        sp.resize(breite, 600)
+        _kein_streifen(sp, rechts)
+        assert sp.sizes()[1] == 420, breite
+        assert links.width() == breite - 420 - sp.handleWidth()
+    # Einklappen merkt sich die Breite, die die Spalte wirklich hatte.
+    klappe.umschalten()
+    assert klappe.gemerkte_breite == 420
+    klappe.umschalten()
+    _kein_streifen(sp, rechts)
+
+
+def test_einklappen_aus_zu_breitem_stand_merkt_die_hoechstbreite(prefs):
+    """Auch wenn jemand einklappt, bevor die Korrektur gelaufen ist, darf sich
+    kein Wert ueber der Hoechstbreite festsetzen."""
+    sp, links, rechts, klappe = _aufbau_breiter_wunsch()
+    gesamt = sum(sp.sizes())
+    sp.setSizes([gesamt - 558, 558])             # der alte Fehlstand
+    klappe.umschalten()
+    assert klappe.gemerkte_breite == 420
+    assert prefs()[SE.PREF_BREITE] == 420
+    klappe.umschalten()
+    assert sp.sizes()[1] == 420
+    _kein_streifen(sp, rechts)
+
+
+def test_echtes_fenster_erster_start_ohne_streifen(prefs, monkeypatch):
+    fenster = _echtes_fenster(monkeypatch)
+    sp = fenster.centralWidget()
+    spalte = sp.widget(1)
+    # Voraussetzung des Befunds: die Spalte wuenscht sich mehr, als sie darf.
+    assert spalte.sizeHint().width() > spalte.maximumWidth() == 420
+    _kein_streifen(sp, spalte)
+    assert sp.sizes()[1] == 420
+    for breite in (1900, 1100, 1600):
+        fenster.resize(breite, 850)
+        _kein_streifen(sp, spalte)
+        assert sp.sizes()[1] == 420, breite
+    assert fenster._view.width() + fenster._btn_spalte.width() == sp.sizes()[0]
+
+
+# ── S und F gleich verlaesslich ──────────────────────────────────────────────
+
+def test_fokus_in_der_eingeklappten_spalte_schluckt_s_und_f_nicht(prefs, monkeypatch):
+    """Der Splitter schiebt die eingeklappte Spalte nur aus dem Bild. Stand der
+    Fokus in einem ihrer Eingabefelder, gingen S und F als Text dorthin — und
+    die Spalte blieb zu."""
+    from PySide6.QtWidgets import QAbstractSpinBox, QLineEdit
+    fenster = _echtes_fenster(monkeypatch)
+    fenster.activateWindow()
+    _app.processEvents()
+    sp = fenster.centralWidget()
+    spalte = sp.widget(1)
+    monkeypatch.setattr(fenster, "_on_fit_selected", lambda: None)
+
+    for taste, reiter in ((Qt.Key.Key_S, 1), (Qt.Key.Key_F, 0)):
+        fenster._tabs.setCurrentIndex(2 if reiter == 0 else 0)
+        _app.processEvents()
+        felder = [w for w in fenster._tabs.currentWidget().findChildren(QWidget)
+                  if isinstance(w, (QLineEdit, QAbstractSpinBox))
+                  and not isinstance(w.parentWidget(), QAbstractSpinBox)
+                  and w.isVisible() and w.isEnabled()
+                  and w.focusPolicy() != Qt.FocusPolicy.NoFocus]
+        assert felder, "kein Eingabefeld auf dem Reiter"
+        felder[0].setFocus()
+        _app.processEvents()
+        assert spalte.isAncestorOf(fenster.focusWidget())
+
+        fenster._btn_spalte.click()
+        _app.processEvents()
+        assert sp.sizes()[1] == 0
+        fokus = fenster.focusWidget()
+        assert fokus is None or not spalte.isAncestorOf(fokus)
+
+        QTest.keyClick(fenster, taste)
+        _app.processEvents()
+        assert fenster._tabs.currentIndex() == reiter, taste
+        assert sp.sizes()[1] == 420, taste
+        assert fenster._spalten_klappe.eingeklappt is False
+
+
+def test_von_hand_zugezogen_gibt_den_fokus_ebenfalls_ab(prefs):
+    from PySide6.QtWidgets import QLineEdit, QVBoxLayout
+    sp, links, rechts, knopf, klappe = _aufbau()
+    feld = QLineEdit()
+    QVBoxLayout(rechts).addWidget(feld)
+    feld.setFocus()
+    _app.processEvents()
+    assert sp.focusWidget() is feld
+    _von_hand(sp, [sum(sp.sizes()), 0])
+    assert klappe.eingeklappt
+    assert sp.focusWidget() is not feld
+
+
+def test_f_in_der_3d_ansicht_bleibt_fit_auswahl_und_sagt_es(prefs, monkeypatch):
+    """F hat in der 3D-Ansicht eine eigene Bedeutung (A3D-29, Kamera-Menue
+    „Fit Auswahl  (F)"). Die bleibt — bei eingeklappter Spalte nennt die
+    Statuszeile aber, womit man ausklappt."""
+    import src.ui.visualizer.visualizer_window as VW
+    fenster = _echtes_fenster(monkeypatch)
+    sp = fenster.centralWidget()
+    gerufen = []
+    monkeypatch.setattr(fenster, "_focus_is_in_3d", lambda: True)
+    monkeypatch.setattr(fenster, "_on_fit_selected", lambda: gerufen.append(1))
+
+    # Spalte offen: Fit Auswahl, kein Hinweis.
+    vorher = fenster._lbl_info.text()
+    QTest.keyClick(fenster, Qt.Key.Key_F)
+    _app.processEvents()
+    assert gerufen == [1] and fenster._lbl_info.text() == vorher
+
+    fenster._spalten_klappe.setze_eingeklappt(True)
+    QTest.keyClick(fenster, Qt.Key.Key_F)
+    _app.processEvents()
+    assert gerufen == [1, 1]
+    assert sp.sizes()[1] == 0
+    assert fenster._lbl_info.text() == VW.HINWEIS_F_IN_DER_ANSICHT
+    assert "F9" in VW.HINWEIS_F_IN_DER_ANSICHT and " S " in VW.HINWEIS_F_IN_DER_ANSICHT
+    # S hat in der 3D-Ansicht keine zweite Bedeutung und klappt immer aus.
+    QTest.keyClick(fenster, Qt.Key.Key_S)
+    _app.processEvents()
+    assert sp.sizes()[1] == 420 and fenster._tabs.currentIndex() == 1
+    with open(_ANLEITUNG, encoding="utf-8") as f:
+        anleitung = f.read()
+    assert "Fit Auswahl" in anleitung and "nur, solange der Fokus **nicht**" in anleitung

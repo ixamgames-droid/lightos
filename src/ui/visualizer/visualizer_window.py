@@ -2501,6 +2501,12 @@ _SINGLE_KEY_SHORTCUTS = frozenset({
 })
 
 
+#: VIZ-109: Statuszeile, wenn F bei eingeklappter Spalte „Fit Auswahl" war.
+HINWEIS_F_IN_DER_ANSICHT = (
+    "F hat die Kamera auf die Auswahl eingepasst, weil der Fokus in der "
+    "3D-Ansicht liegt. Die rechte Spalte klappt mit F9 oder S aus.")
+
+
 def _any_focused(*widgets) -> bool:
     """VIZ-10: True, wenn EINE der Spinboxen gerade den Tastatur-Fokus haelt.
     Schuetzt vor der Race: JS-Echo (fixturePositionChanged/-RotationChanged,
@@ -2990,6 +2996,13 @@ class VisualizerWindow(QMainWindow):
         """A3D-29: F bedeutet zweierlei — entschieden wird nach dem Fokus."""
         if self._focus_is_in_3d():
             self._on_fit_selected()
+            # VIZ-109: Wer bei eingeklappter Spalte F drueckt, um sie
+            # auszuklappen, sieht stattdessen die Kamera springen. Die
+            # Statuszeile sagt, was passiert ist und welche Taste ausklappt.
+            klappe = getattr(self, "_spalten_klappe", None)
+            info = getattr(self, "_lbl_info", None)
+            if klappe is not None and klappe.eingeklappt and info is not None:
+                info.setText(HINWEIS_F_IN_DER_ANSICHT)
         else:
             self._reiter_per_taste(0)
 

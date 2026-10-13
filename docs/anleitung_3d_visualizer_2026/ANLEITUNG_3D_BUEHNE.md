@@ -61,9 +61,12 @@ zieht, klappt die Spalte genauso ein — der Knopf zeigt dann „‹". Zustand u
 Breite merkt sich LightOS auf diesem Rechner, auch über einen Neustart. Die
 3D-Ansicht läuft beim Umschalten weiter, Kamera und Auswahl bleiben.
 
-Springt eine Taste auf einen Reiter der Spalte (`S` für „Bühne", `F` für
-„Fixtures"), während sie eingeklappt ist, klappt die Spalte von selbst in der
-gemerkten Breite aus — sonst wechselte der Reiter unsichtbar.
+Springt eine Taste auf einen Reiter der Spalte, während sie eingeklappt ist,
+klappt die Spalte von selbst in der gemerkten Breite aus — sonst wechselte der
+Reiter unsichtbar. `S` (Reiter „Bühne") tut das immer. `F` (Reiter „Fixtures")
+tut es nur, solange der Fokus **nicht** in der 3D-Ansicht liegt: Dort heißt `F`
+„Fit Auswahl" und rückt die Kamera auf die gewählten Geräte. Die Statuszeile
+unten sagt dann, dass `F9` oder `S` die Spalte ausklappt.
 
 ## Teil A — Bühne bauen (Reiter „Bühne")
 
@@ -427,8 +430,8 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
 |---|---|
 | `V` | 3D ↔ 2D Top-Down |
 | `E` | Ansehen ↔ Bauen |
-| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures |
-| `S` | Reiter Bühne |
+| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures (klappt die Spalte aus) |
+| `S` | Reiter Bühne (klappt die Spalte aus) |
 | `D` | Andocken an/aus |
 | `F9` | Rechte Spalte ein-/ausklappen |
 | `Strg+Z` / `Strg+Y` | Rückgängig / Wiederholen |
