@@ -258,6 +258,39 @@ class PrioritaetenView(QWidget):
                     liste.append(f.name)
         return aus
 
+    def _ueberschneidungs_tipps(self) -> dict[int, list[str]]:
+        """ENG-39: je Effekt, der auf einer Taste oder einem Fader der Virtual
+        Console liegt, dieselben Saetze wie die gelbe Hinweiszeile an der Taste
+        („Dieser Effekt und … steuern beide …“). Leer, wenn die Ansicht nicht
+        im selben Fenster wie eine Virtual Console steckt. Laeuft nur beim
+        Neuaufbau der Liste."""
+        try:
+            from src.core.engine import ueberschneidung
+            from src.ui.virtualconsole.vc_canvas import VCCanvas
+            from src.ui.widgets.ueberschneidung_hinweis import (
+                konsolen_funktions_ids, rechen_umgebung)
+            ids: list[int] = []
+            for flaeche in self.window().findChildren(VCCanvas):
+                for fid in konsolen_funktions_ids(flaeche):
+                    if fid not in ids:
+                        ids.append(fid)
+            if len(ids) < 2:
+                return {}
+            umgebung = rechen_umgebung()
+            funktionen = [f for f in (self._fm.get(i) for i in ids)
+                          if f is not None]
+            aus: dict[int, list[str]] = {}
+            for f in funktionen:
+                zeilen = ueberschneidung.hinweis_zeilen(
+                    ueberschneidung.ueberschneidungen(f, funktionen, **umgebung),
+                    "Effekt")
+                if zeilen:
+                    aus[int(f.id)] = zeilen
+            return aus
+        except Exception as e:
+            print(f"[prioritaeten_view] Überschneidungen: {e}")
+            return {}
+
     # ── Liste bauen ───────────────────────────────────────────────────────────
 
     def gruppen_zahlen(self, funktionen=None) -> list[int]:
@@ -305,6 +338,7 @@ class PrioritaetenView(QWidget):
             nachschlagen = self._kanal_attribut()
             mitglied = self._mitglied_von(funktionen)
             laufend = set(self._fm.running_ids())
+            self._ueberschn = self._ueberschneidungs_tipps()    # ENG-39
 
             self._baum.blockSignals(True)
             self._baum.clear()
@@ -369,6 +403,7 @@ class PrioritaetenView(QWidget):
         if int(f.id) in mitglied:
             tipps.append("Läuft auch in: " + ", ".join(mitglied[int(f.id)])
                          + " — dort gilt deren Stufe, nicht diese.")
+        tipps.extend(getattr(self, "_ueberschn", {}).get(int(f.id), ()))
         if tipps:
             for spalte in range(len(_SPALTEN)):
                 it.setToolTip(spalte, "\n".join(tipps))

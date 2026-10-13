@@ -116,7 +116,50 @@ Was der Haken **nicht** tut:
 Ohne Haken bleibt alles wie bisher. Die Alternative ohne Haken: den Blinder als **Effekt**
 bauen und auf die Stufe „Strobe & Blinder“ legen.
 
-## 7. Was die Stufen nicht regeln
+## 7. Hinweis bei Überschneidungen
+
+Beim Bauen der Virtual Console sagt dir LightOS, wenn zwei Tasten dasselbe anfassen.
+
+1. In der Virtual Console **Bearbeiten** einschalten und eine Taste mit der Aktion
+   **Funktion an/aus** oder **Funktion (nur gehalten)** anklicken.
+2. Steuert eine **andere Taste** (oder ein Fader, der seinen Effekt startet) an **denselben
+   Geräten denselben Baustein**, steht unter **Ziele** in der Zeile **Hinweis** ein gelber
+   Text, zum Beispiel:
+
+   > Diese Taste und „Lauflicht HG“ steuern beide den Dimmer von Hintergrund — gleiche Stufe,
+   > es gewinnt, wer zuletzt gestartet wurde.
+
+   oder
+
+   > Diese Taste und „Blinder“ steuern beide den Dimmer von Hintergrund — „Blinder“ liegt
+   > eine Stufe höher und gewinnt.
+
+3. Der Text nennt die Gruppe, wenn die gemeinsamen Geräte genau eine Gruppe sind, sonst die
+   Zahl der Geräte. Höchstens drei Treffer werden ausgeschrieben, danach steht
+   **… und n weitere**.
+4. Ändere die Stufe (Abschnitt 3 oder 4) oder das Ziel der Taste — der Hinweis zieht sofort
+   nach. Ohne Überschneidung ist die Zeile nicht da.
+
+Der Hinweis ist **nur eine Auskunft**: er ändert nichts, sperrt nichts und fragt nichts ab.
+Dieselben Sätze stehen im Reiter **Prioritäten** als Tooltip an der Zeile des Effekts
+(„Dieser Effekt und …“).
+
+Wann **kein** Hinweis kommt:
+
+- **Farbe gegen Dimmer** auf denselben Lampen — das sind getrennte Kanäle, da stört sich nichts.
+- Dieselbe **Geräteart**, aber andere Geräte.
+- Der andere Effekt liegt auf **keiner Taste** und keinem startenden Fader. Ein Effekt-Fader
+  startet seinen Effekt nur mit dem Haken **bei 0 wirklich stoppen (sonst nur runterregeln)**;
+  ohne den Haken regelt er bloß und zählt nicht.
+- Beide Tasten liegen im selben **Solo-Rahmen** — dort ist ohnehin nur eine aktiv.
+- Mehrere Funktionen **derselben** Taste: die startest du absichtlich gemeinsam.
+- Es lässt sich nicht sicher ablesen, was ein Effekt anfasst (Skript, **unbekannt** in der
+  Spalte **Fasst an**), oder es ist nur **Sonstiges** wie Shutter oder Zoom.
+
+Bei einer **Sammlung**, einem **Chaser** oder einer **Show** auf der Taste zählt das Ganze:
+alle Geräte der Mitglieder und die Stufe des Behälters.
+
+## 8. Was die Stufen nicht regeln
 
 - **Sammlung, Chaser, Show:** Was *in* einer Sammlung, einem Chaser oder einer Show läuft,
   läuft auf **deren** Stufe. Die eigene Stufe eines Mitglieds zählt nur, wenn du es einzeln
@@ -142,3 +185,4 @@ Diese Anleitung ist bewusst noch ohne Bilder; aufzunehmen sind:
 6. Eine alte Show mit „eigene Zahl (n)“ in der Liste.
 7. Eigenschaften einer Snap-Taste mit dem Haken „übersteuert laufende Dimmer-Effekte“.
 8. Blinder-Taste gegen ein Dimmer-Lauflicht, ohne und mit Haken (zwei Bilder).
+9. Eigenschaften einer Taste mit dem gelben Hinweis bei einer Überschneidung.

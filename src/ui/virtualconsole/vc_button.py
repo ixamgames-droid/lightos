@@ -2512,6 +2512,26 @@ class VCButton(VCWidget):
         long_press_cb.setToolTip("Im Live-Modus den Button lange halten, um die Effekt-"
                                  "Parameter zu bearbeiten (deferred apply). Bei Flash sinnlos.")
 
+        # ENG-39: gelbe Hinweiszeile, wenn eine andere Taste / ein Fader an
+        # denselben Geraeten denselben Baustein steuert. Reine Auskunft. Sie
+        # liest die Ziele aus den FELDERN (im Dialog ist noch nichts
+        # uebernommen) und rechnet nur beim Oeffnen und bei Aenderungen.
+        from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+
+        def _hinweis_ziele():
+            if act.currentData() not in (ButtonAction.FUNCTION_TOGGLE.value,
+                                         ButtonAction.FUNCTION_FLASH.value):
+                return []
+            return target_editor.ids()
+
+        ueberschn_hinweis = UeberschneidungsHinweis(self, _hinweis_ziele)
+        _hinweis_setzer = {"f": None}
+        ueberschn_hinweis.sichtbar_setzen = (
+            lambda an: _hinweis_setzer["f"](ueberschn_hinweis, an)
+            if _hinweis_setzer["f"] is not None else None)
+        target_editor.changed.connect(ueberschn_hinweis.veraltet)
+        act.currentIndexChanged.connect(ueberschn_hinweis.veraltet)
+
         # ── Aktions-Konstanten (Sichtbarkeit) ──
         FT, FF = ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH
         EA, SG = ButtonAction.EFFECT_ACTION, ButtonAction.SELECT_GROUP
@@ -2597,8 +2617,10 @@ class VCButton(VCWidget):
             a = act.currentData()        # roher Enum-Wert (str)
             func_like = a in (FT, FF, EA, TG, FL, AW)
             target_editor.set_title("Aktion auf" if a == EA else "Schaltet mit")
+            _hinweis_setzer["f"] = set_row_visible      # ENG-39
             rows = {
                 target_editor:    a in (FT, FF, EA, AW),
+                ueberschn_hinweis: ueberschn_hinweis.hat_hinweis(),
                 snap_combo:       a == SN,
                 snap_editor:      a == LS,
                 snap_mode_combo:  a == LS,
@@ -2657,10 +2679,12 @@ class VCButton(VCWidget):
             "update_visibility": update_visibility,
             "action_combo": act,
             "pad_combo": pad_style_combo,
+            "ueberschneidungs_hinweis": ueberschn_hinweis,
             "top": [("Beschriftung:", cap), ("Aktion:", act)],
             "sections": [
                 ("target", "Ziel und Verhalten", False, "vc_button_sec_target", [
                     ("Ziele:", target_editor),
+                    ("Hinweis:", ueberschn_hinweis),
                     ("Snapshot:", snap_combo),
                     ("Snap-Ziele:", snap_editor),
                     ("Tasten-Modus (Snap):", snap_mode_combo),
