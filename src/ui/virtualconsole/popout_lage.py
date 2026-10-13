@@ -437,6 +437,9 @@ class LageMerker(QObject):
         self._ausgang = None
         self._zuletzt = None
         self._sprung = None
+        # Rechteck des letzten Ruecksprungs (fuer genau einen neuen Versuch,
+        # wenn der Bildschirm danach noch an eine andere Stelle rueckt).
+        self._versucht = None
         # Beim Oeffnen hat ``ziel_lage`` schon sichtbar platziert.
         self._platziert = True
         # Ohne Rueckfall wird der Platz kurz nach dem Oeffnen einmal gemerkt:
@@ -502,12 +505,14 @@ class LageMerker(QObject):
         if daten is None:
             return False
         name, flaeche = daten["bildschirm"], daten["bildschirm_flaeche"]
-        if weg is not None and finde_bildschirm([weg], name, flaeche) is not None:
-            return True
         bildschirme = [b for b, _ in lies_bildschirme()]
-        if not bildschirme:
-            return False
-        return finde_bildschirm(bildschirme, name, flaeche) is None
+        if bildschirme:
+            # Die Liste entscheidet: ein weggefallener Bildschirm mit gleicher
+            # Flaeche (gespiegelt) ist nicht der gemerkte, solange dieser
+            # unter seinem Namen noch da ist.
+            return finde_bildschirm(bildschirme, name, flaeche) is None
+        return (weg is not None
+                and finde_bildschirm([weg], name, flaeche) is not None)
 
     # ── Ausgang / Beruhigung ─────────────────────────────────────────────────
 
@@ -580,7 +585,18 @@ class LageMerker(QObject):
         try:
             if self._offen() is None:
                 return
-            if self._gesperrt or self._sprung is not None:
+            if self._sprung is not None:
+                if self._gemerkter_bildschirm_fehlt(_als_bildschirm(weg)):
+                    # Der Bildschirm ist mitten im Ruecksprung wieder weg
+                    # (Wackeln beim Einschalten): Sprung abbrechen und wie bei
+                    # einem frischen Wegfall behandeln — sonst bliebe eine
+                    # gleich folgende „wieder da"-Meldung ohne Wirkung.
+                    self._sprung = None
+                    self._in_ersatz()
+                else:
+                    self._beruhigen()
+                return
+            if self._gesperrt:
                 # Das System raeumt womoeglich wieder um.
                 self._beruhigen()
                 return
@@ -630,6 +646,7 @@ class LageMerker(QObject):
             self._gesperrt = False
             self._sprung = bildschirme[lage.bildschirm]
             self._normal = lage.rechteck
+            self._versucht = lage.rechteck
             versetze(f, lage, paare[lage.bildschirm][1])
             self._timer.stop()
             self._ruhe.start(_BERUHIGUNG_MS)
@@ -655,6 +672,16 @@ class LageMerker(QObject):
             return
         self._gesperrt = True
         self._ausgang = ist
+        # Nicht angekommen. Liegt das Ziel inzwischen woanders (der Bildschirm
+        # wurde erst an vorlaeufiger Stelle gemeldet und ist dann an seinen
+        # Platz gerueckt), folgt ein neuer Versuch. Bei unveraendertem Ziel
+        # nicht — dann macht das System nicht mit, und es gaebe eine Schleife.
+        paare = lies_bildschirme()
+        lage = rueckkehr_lage(bildschirme, self._gemerkt(),
+                              self._haupt_index(paare))
+        if lage is not None and lage.rechteck != self._versucht:
+            self._ausgang = None
+            self._rueck.start()
 
     # ── Merken ───────────────────────────────────────────────────────────────
 
@@ -678,6 +705,15 @@ class LageMerker(QObject):
             return
         if self._gesperrt:
             if self._ausgang is None or ist == self._ausgang:
+                return
+            # Liegt das Fenster auf keinem bekannten Bildschirm, hat es das
+            # System schon auf den zurueckkehrenden gelegt, bevor dieser
+            # gemeldet ist — keine Wahl des Bedieners, also nichts merken.
+            try:
+                bekannt = [b for b, _ in lies_bildschirme()]
+            except Exception:
+                bekannt = []
+            if bekannt and not ueberwiegend_sichtbar(bekannt, Rechteck(*ist[:4])):
                 return
             self._gesperrt = False
         else:

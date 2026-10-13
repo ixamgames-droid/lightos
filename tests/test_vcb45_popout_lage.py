@@ -784,6 +784,130 @@ def test_popout_der_konsole_haengt_an_den_bildschirm_meldungen(prefs, zwei_bilds
     assert v._canvas_alive()
 
 
+# ── Gegenpruefung: Wackelkontakt, gespiegelte Bildschirme, vorlaeufige Lage ──
+
+def test_bildschirm_wackelt_waehrend_des_ruecksprungs_springt_am_ende_doch(
+        prefs, zwei_bildschirme, spruenge):
+    """Der Touch meldet sich beim Einschalten an, kurz ab und wieder an. Der
+    zweite Wegfall trifft den laufenden Ruecksprung — das Popout darf danach
+    nicht am Ersatzplatz haengen bleiben."""
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    assert len(spruenge) == 1 and _geometrie(w) == PLATZ
+    # Noch in der Beruhigungszeit des Sprungs: wieder weg, System raeumt um.
+    zwei_bildschirme(OBEN)
+    merker.bildschirm_weg(UNTEN)
+    w.move(60, 80)
+    _app.processEvents()
+    assert merker.im_ersatz()
+    # ... und gleich wieder da, bevor die Beruhigungszeit abgelaufen ist.
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    assert len(spruenge) == 2 and _geometrie(w) == PLATZ
+    _ruhe_vorbei(merker)
+    assert not merker.im_ersatz()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_wegfall_waehrend_des_ruecksprungs_holt_das_fenster_sichtbar(
+        prefs, zwei_bildschirme):
+    """Faellt der Touch mitten im Ruecksprung wieder weg und laesst das System
+    das Fenster liegen, wird es wie beim ersten Wegfall sichtbar geholt."""
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    assert _geometrie(w) == PLATZ
+    zwei_bildschirme(OBEN)
+    merker.bildschirm_weg(UNTEN)
+    _ruhe_vorbei(merker)
+    assert merker.im_ersatz()
+    assert PL.ueberwiegend_sichtbar([OBEN], Rechteck(*_geometrie(w)))
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_fremder_bildschirm_faellt_im_ruecksprung_weg_sprung_gilt_trotzdem(
+        prefs, zwei_bildschirme, spruenge):
+    zwei_bildschirme(OBEN, UNTEN, FREMD)
+    w, merker, g = _offen_auf_touch(prefs)
+    zwei_bildschirme(OBEN, FREMD)
+    merker.bildschirm_weg(UNTEN)
+    w.move(60, 80)
+    _app.processEvents()
+    _ruhe_vorbei(merker)
+    zwei_bildschirme(OBEN, UNTEN, FREMD)
+    merker.bildschirm_dazu(UNTEN)
+    merker._rueck.stop()
+    merker._rueck.timeout.emit()
+    zwei_bildschirme(OBEN, UNTEN)
+    merker.bildschirm_weg(FREMD)             # hat mit dem Popout nichts zu tun
+    _ruhe_vorbei(merker)
+    assert not merker.im_ersatz()
+    assert len(spruenge) == 1 and _geometrie(w) == PLATZ
+
+
+def test_gespiegelter_bildschirm_faellt_weg_der_gemerkte_ist_noch_da(
+        prefs, zwei_bildschirme):
+    """Zwei Bildschirme zeigen dasselbe Bild (gleiche Flaeche, anderer
+    Anschluss). Faellt der andere weg, ist der gemerkte nicht weg."""
+    spiegel = Bildschirm("HDMI-3", UNTEN.flaeche)
+    zwei_bildschirme(OBEN, UNTEN, spiegel)
+    w, merker, g = _offen_auf_touch(prefs)
+    zwei_bildschirme(OBEN, UNTEN)
+    merker.bildschirm_weg(spiegel)
+    assert not merker.im_ersatz()
+    w.move(200, 1300)
+    _app.processEvents()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL]["fenster"][:2] == [200, 1300]
+
+
+def test_system_legt_das_fenster_vor_der_meldung_zurueck(prefs, zwei_bildschirme,
+                                                         spruenge):
+    """Manche Systeme legen das Fenster selbst zurueck auf den wieder
+    angeschlossenen Bildschirm, bevor dieser gemeldet ist. Das Fenster liegt
+    dann kurz auf keinem bekannten Bildschirm — das ist keine Wahl des
+    Bedieners und darf nicht unter dem Namen des Hauptbildschirms landen."""
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    w.move(*PLATZ[:2])                       # das System, Liste noch alt
+    _app.processEvents()
+    merker.angestossen()
+    merker._timer.timeout.emit()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    assert merker.im_ersatz()
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    _ruhe_vorbei(merker)
+    assert _geometrie(w) == PLATZ and not merker.im_ersatz()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_bildschirm_kommt_erst_an_vorlaeufiger_stelle_wieder(
+        prefs, zwei_bildschirme, spruenge):
+    """Der Touch wird erst rechts neben dem Hauptbildschirm gemeldet und
+    rueckt dann an seinen Platz darunter. Das Popout folgt mit einem zweiten
+    Sprung, statt daneben liegen zu bleiben."""
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    vorlaeufig = Bildschirm("DP-2", Rechteck(1920, 0, 1920, 1080))
+    zwei_bildschirme(OBEN, vorlaeufig)
+    merker.bildschirm_dazu(vorlaeufig)
+    merker._rueck.stop()
+    merker._rueck.timeout.emit()
+    assert _geometrie(w) == (150 + 1920, 120, 1000, 640)
+    zwei_bildschirme(OBEN, UNTEN)            # endgueltige Anordnung
+    _ruhe_vorbei(merker)
+    assert merker._rueck.isActive()
+    merker._rueck.stop()
+    merker._rueck.timeout.emit()
+    assert len(spruenge) == 2 and _geometrie(w) == PLATZ
+    _ruhe_vorbei(merker)
+    assert not merker.im_ersatz() and not merker._rueck.isActive()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
 def test_anleitung_nennt_wegfall_und_rueckkehr_des_bildschirms():
     text = open(_ANLEITUNG, encoding="utf-8").read()
     assert "springt" in text and "wieder angeschlossen" in text
