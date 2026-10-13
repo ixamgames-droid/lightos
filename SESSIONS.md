@@ -69,7 +69,6 @@
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
 | IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
-| PROC-22 | A | chore/proc22-doku-gates-union | 2026-10-13T17:01Z | .gitattributes |
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
@@ -290,7 +289,6 @@
 
 ## Verlauf
 
-- 2026-10-13T15:27Z A done UI-91
 - 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
 - 2026-10-13T15:48Z A claim IMP-1
 - 2026-10-13T16:00Z A done FM-74
@@ -320,3 +318,4 @@
 - 2026-10-13T23:16Z A claim UI-94
 - 2026-10-13T23:16Z A claim ENG-41
 - 2026-10-13T23:17Z A claim LAS-40
+- 2026-10-13T23:56Z A done PROC-22
