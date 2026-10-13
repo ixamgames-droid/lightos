@@ -271,7 +271,7 @@ hilft **Kamera → Fit (alle)**.
 - **Show** (Geräte, Positionen, gespeicherte Kameras, Gruppen, Effekte, VC) im
   Hauptfenster über **Datei → Speichern** bzw. **Speichern unter…**.
 
-Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
+Rückgängig/Wiederholen (`Strg+Z` / `Strg+Y` oder `Strg+Umschalt+Z`) wirkt auch im Visualizer-Fenster.
 
 ## Was bei großen Rigs anders aussieht
 
@@ -411,7 +411,7 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
 | `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures |
 | `S` | Reiter Bühne |
 | `D` | Andocken an/aus |
-| `Strg+Z` / `Strg+Y` | Rückgängig / Wiederholen |
+| `Strg+Z` / `Strg+Y` oder `Strg+Umschalt+Z` | Rückgängig / Wiederholen |
 
 ## Früher bekannte Macken (alle erledigt)
 

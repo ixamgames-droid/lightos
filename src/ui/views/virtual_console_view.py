@@ -219,9 +219,11 @@ class VirtualConsoleView(QWidget):
             btn.setVisible(False)
             tb_layout.addWidget(btn)
 
-        # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only. Strg+Z / Strg+Y.
-        for _glyph, _tip, _slot in [("↶", "Rückgängig (Strg+Z)", self._vc_undo),
-                                    ("↷", "Wiederholen (Strg+Y)", self._vc_redo)]:
+        # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only.
+        from src.ui import undo_kuerzel
+        for _glyph, _tip, _slot in [
+                ("↶", f"Rückgängig ({undo_kuerzel.undo_text()})", self._vc_undo),
+                ("↷", f"Wiederholen ({undo_kuerzel.redo_text()})", self._vc_redo)]:
             ub = QPushButton(_glyph)
             ub.setFixedHeight(26)
             ub.setToolTip(_tip)
@@ -234,10 +236,15 @@ class VirtualConsoleView(QWidget):
             ub.setProperty("edit_only", True)
             ub.setVisible(False)
             tb_layout.addWidget(ub)
-        from PySide6.QtGui import QShortcut, QKeySequence
-        QShortcut(QKeySequence("Ctrl+Z"), self, activated=self._vc_undo)
-        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self._vc_redo)
-        QShortcut(QKeySequence("Ctrl+Shift+Z"), self, activated=self._vc_redo)
+        # UI-93: eigene Kuerzel nur fuer den Betrieb OHNE Hauptfenster. Im
+        # Hauptfenster liegen dieselben Folgen schon auf Bearbeiten →
+        # Rückgängig; doppelt belegt loest Qt keine von beiden aus. Dort
+        # verteilt das Fenster (MainWindow.event) und showEvent schaltet
+        # diese beiden ab.
+        self._undo_kuerzel = undo_kuerzel.kuerzel_anlegen(
+            self, self._vc_undo, self._vc_redo,
+            "Letzte Änderung am Layout zurücknehmen",
+            "Zurückgenommene Änderung am Layout wiederholen")
 
         # MIDI-Learn-Button
         self._btn_midi_learn = QPushButton("MIDI Lernen")
@@ -493,6 +500,16 @@ class VirtualConsoleView(QWidget):
         markierte Funktion verschwinden, sobald man kurz woanders nachsah.
         """
         super().showEvent(event)
+        # UI-93: verteilt das Fenster Rueckgaengig/Wiederholen selbst, ruhen
+        # die eigenen Kuerzel (sonst waeren die Folgen doppelt belegt).
+        try:
+            from src.ui import undo_kuerzel
+            zentral = bool(getattr(self.window(),
+                                   undo_kuerzel.MERKMAL_ZENTRAL, False))
+            for sc in getattr(self, "_undo_kuerzel", ()):
+                sc.setEnabled(not zentral)
+        except RuntimeError:
+            pass
         # Statusticker laeuft, solange die Ansicht benutzt wird. closeEvent
         # stoppt ihn; ein erneutes Anzeigen weckt ihn wieder auf.
         try:

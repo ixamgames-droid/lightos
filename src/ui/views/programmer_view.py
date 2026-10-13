@@ -125,15 +125,15 @@ _PROGRAMMER_HELP = {
     "Kopieren": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
     "Einfügen": "Fügt zuvor kopierte Programmer-Werte wieder ein.",
     # FM-52: eigener Programmer-Verlauf — Patch/Geraete gehoeren zu Strg+Z.
-    # Kuerzel nur fuer Rueckgaengig (Strg+Z ist ueberall gleich); Wiederherstellen
-    # ist plattformabhaengig (Linux Strg+Umschalt+Z, Windows Strg+Y) -> Menuepfad.
+    # UI-93: Wiederherstellen traegt auf jeder Plattform beide Folgen
+    # (Strg+Y und Strg+Umschalt+Z), siehe src/ui/undo_kuerzel.py.
     "Rückgängig": "Nimmt den letzten Programmer-Schritt zurück (Regler-Zug, "
                   "Kachel, Palette, Hervorheben, Löschen …). Geräte- und "
                   "Patch-Änderungen nimmt Bearbeiten → Rückgängig (Strg+Z) "
                   "zurück.",
     "Wiederholen": "Stellt einen im Programmer zurückgenommenen Schritt wieder "
                    "her. Geräte- und Patch-Änderungen stellt Bearbeiten → "
-                   "Wiederherstellen wieder her.",
+                   "Wiederherstellen (Strg+Y oder Strg+Umschalt+Z) wieder her.",
     "Farb-Werkzeug...": "Öffnet den Farbwähler als eigenes, frei platzierbares Fenster "
                      "für die ausgewählten Fixtures.",
     "Positions-Werkzeug...": "Öffnet das Pan/Tilt-Pad für Moving Heads als eigenes Fenster "

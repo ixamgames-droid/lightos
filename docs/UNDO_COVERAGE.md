@@ -2,7 +2,7 @@
 
 Diese Matrix listet die **mutierenden Kernaktionen** aus
 `src/core/app_state.py` und ob ihr Effekt ueber den globalen `UndoStack`
-(`src/core/undo.py`, Ctrl+Z / Ctrl+Y) rueckgaengig gemacht werden kann.
+(`src/core/undo.py`, Ctrl+Z / Ctrl+Y oder Ctrl+Shift+Z) rueckgaengig gemacht werden kann.
 
 Der begleitende headless-Test `tests/test_undo_coverage.py` faengt
 **Regressionen** ab (Aktion -> `undo()` -> Vorzustand exakt wiederhergestellt).

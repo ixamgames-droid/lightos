@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTabWidget, QSizePolicy, QFrame,
     QMenu, QSlider, QInputDialog,
 )
-from PySide6.QtCore import Qt, QSize, QTimer, Signal
+from PySide6.QtCore import Qt, QEvent, QSize, QTimer, Signal
 from PySide6.QtGui import (
     QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter, QShortcut,
 )
@@ -34,6 +34,7 @@ from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
 from src.ui.weak_slots import weak_slot
+from src.ui import undo_kuerzel
 
 
 # Recent files storage
@@ -451,6 +452,9 @@ class _SectionBar(QWidget):
 
 
 class MainWindow(QMainWindow):
+    # UI-93: dieses Fenster verteilt Rueckgaengig/Wiederholen selbst (event());
+    # eingebettete Ansichten schalten ihre eigenen Kuerzel dafuer ab.
+    UNDO_KUERZEL_ZENTRAL = True
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
     _bpm_changed_sig = Signal(float)
     # Modus/Quelle/Lock-Aenderung des BPM-Leaders -> Badge in der Top-Bar.
@@ -686,10 +690,12 @@ class MainWindow(QMainWindow):
         # Bearbeiten (Undo/Redo)
         em = mb.addMenu("&Bearbeiten")
         self._act_undo = em.addAction("Rückgängig")
-        self._act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        # UI-93: feste Belegung statt StandardKey — setShortcut(StandardKey.Redo)
+        # nahm nur die ERSTE Bindung der Plattform, unter X11 fehlte Strg+Y.
+        self._act_undo.setShortcuts(undo_kuerzel.undo_folgen())
         self._act_undo.triggered.connect(self._do_undo)
         self._act_redo = em.addAction("Wiederherstellen")
-        self._act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        self._act_redo.setShortcuts(undo_kuerzel.redo_folgen())
         self._act_redo.triggered.connect(self._do_redo)
         em.addSeparator()
         a = em.addAction("Verlauf löschen")
@@ -1566,6 +1572,35 @@ class MainWindow(QMainWindow):
             pass
 
     # ── Undo/Redo ─────────────────────────────────────────────────────────────
+
+    def event(self, ev):
+        # UI-93: Strg+Z / Strg+Y / Strg+Umschalt+Z gehen zuerst an ein
+        # Textfeld mit Fokus, dann an den Layout-Verlauf der sichtbaren
+        # Virtual Console — erst danach an Bearbeiten → Rückgängig. Vorher
+        # lagen dieselben Folgen doppelt im Fenster (Menue + VC-QShortcut);
+        # Qt wertet das als mehrdeutig und loest dann KEINE aus.
+        if (ev.type() == QEvent.Type.ShortcutOverride
+                and undo_kuerzel.vorrang(self, ev, self._lokales_undo)):
+            return True
+        return super().event(ev)
+
+    def _lokales_undo(self, wiederholen: bool) -> bool:
+        """Lokaler Verlauf fuer das Tastenkuerzel; True = war zustaendig.
+
+        Ist die Virtual Console die sichtbare Seite, gilt IHR Layout-Verlauf
+        (auch wenn er gerade leer ist — ein Strg+Z in der VC soll nie still
+        eine Patch-Aenderung zuruecknehmen). Die Zeichenflaeche nimmt keinen
+        Tastaturfokus, deshalb entscheidet die Sichtbarkeit, nicht der Fokus.
+        Die Menuepunkte unter „Bearbeiten“ bedienen weiter den App-Verlauf.
+        """
+        vc = getattr(self, "_vc_view", None)
+        try:
+            if vc is None or not vc.isVisible() or vc.window() is not self:
+                return False
+            (vc._vc_redo if wiederholen else vc._vc_undo)()
+        except RuntimeError:        # Ansicht schon abgebaut
+            return False
+        return True
 
     def _do_undo(self):
         if self._undo_stack:

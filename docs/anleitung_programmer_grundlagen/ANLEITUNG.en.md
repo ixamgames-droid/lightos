@@ -290,7 +290,7 @@ brightness ramp over eight PARs or a pan fan over moving heads.
    Changes to the patch and to fixture settings, such as the orientation checkboxes from
    step 5 (**Pan invertieren** …), are **not** in this history. You undo them via
    **Bearbeiten → Rückgängig** (**Strg+Z**) and redo them via
-   **Bearbeiten → Wiederherstellen**. **Neue Show** (new show) and **Show öffnen** (open
+   **Bearbeiten → Wiederherstellen** (**Strg+Y** or **Strg+Umschalt+Z**). **Neue Show** (new show) and **Show öffnen** (open
    show) empty both histories.
 
 **Kopieren** (copy) remembers the Programmer values of the selected fixtures, **Einfügen**

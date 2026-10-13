@@ -21,7 +21,11 @@ Knöpfe** für je einen Widget-Typ:
 **Chase-Liste**, **Effekt-Farben**, **Label**, **Frame**, **Musik**, **BPM**, **Tempo-Bus**,
 **Tempo-Controller**, **Live-Edit**.
 
-Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen, Strg+Z / Strg+Y). Eine fertige
+Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen; per Tastatur **Strg+Z** und **Strg+Y** oder
+**Strg+Umschalt+Z** – beide Wiederholen-Tasten gehen unter Windows wie unter Linux). Solange die
+Virtual Console zu sehen ist, gelten diese Tasten für ihr Layout; Geräte- und Patch-Änderungen nimmst
+du dann über das Menü **Bearbeiten → Rückgängig** zurück. In einem Textfeld mit Schreibmarke gelten
+sie für den getippten Text. Eine fertige
 **Controller-Vorlage** (etwa ein komplettes APC-mini-Layout) lässt sich derzeit **nicht** per Knopf in
 die VC einfügen; den Aufbau übernimmst du Widget für Widget (siehe *APC mini mappen*).
 

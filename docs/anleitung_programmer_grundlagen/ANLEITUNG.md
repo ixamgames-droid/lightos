@@ -274,7 +274,7 @@ Helligkeitsrampe über acht PARs oder einen Pan-Fächer über Moving Heads.
    Änderungen am Patch und an den Geräte-Einstellungen, etwa die Ausrichtungs-Haken
    aus Schritt 5 (**Pan invertieren** …), stehen **nicht** in diesem Verlauf. Die nimmst
    du über **Bearbeiten → Rückgängig** (**Strg+Z**) zurück und über **Bearbeiten →
-   Wiederherstellen** wieder her. **Neue Show** und **Show öffnen** leeren beide
+   Wiederherstellen** (**Strg+Y** oder **Strg+Umschalt+Z**) wieder her. **Neue Show** und **Show öffnen** leeren beide
    Verläufe.
 
 **Kopieren** merkt sich die Programmer-Werte der gewählten Geräte, **Einfügen** legt
