@@ -485,28 +485,68 @@ def test_im_sammeln_geloeschtes_geraet_ist_danach_aus_der_ausgabe(state, bib, mo
 
 
 def test_ausserhalb_des_sammelns_bekommen_funktionen_die_geraeteliste_selbst(state, bib, monkeypatch):
-    """Byte-gleich wie vorher: ohne Sammeln reicht der Renderer genau
-    ``_patch_cache`` durch — auch nach einem beendeten (und einem geplatzten)
-    Sammelblock."""
+    """Der Renderer reicht immer die Geräteliste des geltenden Plans durch.
+    Ohne Sammeln ist sie inhaltlich dieselbe wie ``_patch_cache`` und nach
+    jedem Einzelaufruf sofort aktuell — auch nach einem beendeten (und einem
+    geplatzten) Sammelblock."""
     gesehen = []
     monkeypatch.setattr(state.function_manager, "tick",
                         lambda universen, patch, dt: gesehen.append(patch))
+
+    def gleich_der_geraeteliste():
+        state._render_frame(0.02)
+        assert gesehen[-1] is state._plan_patch
+        assert len(gesehen[-1]) == len(state._patch_cache)
+        assert all(a is b for a, b in zip(gesehen[-1], state._patch_cache))
+
     state.add_fixture(_par(state, bib, 1, 1))
-    state._render_frame(0.02)
-    assert gesehen[-1] is state._patch_cache
+    gleich_der_geraeteliste()
+    state.add_fixture(_par(state, bib, 4, 25))
+    gleich_der_geraeteliste()
+    state.remove_fixture(4)
+    gleich_der_geraeteliste()
     with state.patch_sammeln():
         state.add_fixture(_par(state, bib, 2, 9))
         state._render_frame(0.02)
         assert [f.fid for f in gesehen[-1]] == [1]
-    state._render_frame(0.02)
-    assert gesehen[-1] is state._patch_cache
+    gleich_der_geraeteliste()
     with pytest.raises(RuntimeError):
         with state.patch_sammeln():
             state.add_fixture(_par(state, bib, 3, 17))
             raise RuntimeError("mitten im Block")
-    state._render_frame(0.02)
-    assert gesehen[-1] is state._patch_cache
+    gleich_der_geraeteliste()
     assert [f.fid for f in gesehen[-1]] == [1, 2, 3]
+
+
+def test_scheitert_der_neuaufbau_am_ende_rendert_der_alte_plan_stimmig_weiter(state, bib, monkeypatch):
+    """Wirft der eine Neuaufbau beim Verlassen, bleiben Plan UND Geräteliste
+    des Plans alt: eine laufende Funktion schreibt den importierten Laser
+    nicht, er bleibt im NOT-AUS dunkel — auch in allen Frames danach."""
+    monkeypatch.setattr(state.function_manager, "tick", _alles_voll)
+    state.add_fixture(_par(state, bib, 1, 1))
+    state.set_laser_estop(True)
+    echt = state._rebuild_render_plan
+
+    def kaputt(*a, **k):
+        raise RuntimeError("Neuaufbau gescheitert")
+
+    monkeypatch.setattr(state, "_rebuild_render_plan", kaputt)
+    with pytest.raises(RuntimeError):
+        with state.patch_sammeln():
+            state.add_fixture(_laser(state, bib, state.next_fid(), 10))
+    assert state._patch_sammel_tiefe == 0
+    assert [f.fid for f in state._plan_patch] == [1]
+    for _ in range(3):
+        state._render_frame(0.02)
+        assert _live(state, 3, 10, 5) == [0] * 5
+        assert _live(state, 1, 1, 8) == [255] * 8
+    # der nächste gelungene Neuaufbau bringt Plan und Liste zusammen nach
+    monkeypatch.setattr(state, "_rebuild_render_plan", echt)
+    state._reload_patch_cache()
+    state._render_frame(0.02)
+    assert state.laser_estop_active
+    assert [f.fid for f in state._plan_patch] == [f.fid for f in state._patch_cache]
+    assert _live(state, 3, 10, 5) == [0] * 5
 
 
 def test_echter_ausgabe_thread_waehrend_import_rueckgaengig_wiederholen(state, bib, monkeypatch):
@@ -544,7 +584,7 @@ def test_echter_ausgabe_thread_waehrend_import_rueckgaengig_wiederholen(state, b
         faden.join(timeout=10)
     assert not faden.is_alive() and frames[0] > 0
     assert fehler == [] and hell == []
-    assert not state._patch_sammel_render and state._patch_sammel_tiefe == 0
+    assert state._patch_sammel_tiefe == 0
     assert [f.fid for f in state._plan_patch] == [f.fid for f in state._patch_cache]
 
 
@@ -564,7 +604,6 @@ def test_einzelaufruf_ausserhalb_des_sammelns_wie_vorher(state, bib):
     assert get_undo_stack().undo()
     assert ohr.zahl("patch_changed") == 4 and sorted(state._fix_index) == [1, 2]
     assert plan_im_ereignis == [[1], [1, 2], [2], [1, 2]]
-    assert not state._patch_sammel_render
 
 
 # ── Zweite Prüfung: der Direkt-Schreibweg des Programmers ────────────────────

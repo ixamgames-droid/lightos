@@ -341,12 +341,12 @@ class AppState:
         self._patch_sammel_neuaufbau: bool = False
         self._patch_sammel_ereignisse: list[str] = []
         # Die Geraeteliste, aus der der GELTENDE Render-Plan gebaut wurde
-        # (unter _plan_lock mit ihm getauscht). Solange gesammelt wird
-        # (_patch_sammel_render), bekommen die Funktionen im Renderer DIESE
-        # Liste statt _patch_cache — sonst schriebe eine laufende Funktion ein
-        # Geraet, das der Plan (und die NOT-AUS-Maske) noch nicht kennt.
+        # (unter _plan_lock mit ihm getauscht). Die Funktionen im Renderer
+        # bekommen IMMER diese Liste statt _patch_cache — sonst schriebe eine
+        # laufende Funktion ein Geraet, das der Plan (und die NOT-AUS-Maske)
+        # noch nicht kennt: waehrend patch_sammeln(), nach einem gescheiterten
+        # Neuaufbau, im Augenblick zwischen Listen- und Plantausch.
         self._plan_patch: list | None = None
-        self._patch_sammel_render: bool = False
         # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
         # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
         # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
@@ -2221,8 +2221,8 @@ class AppState:
         auch wenn der Block wirft (``finally``); ein importierter Laser ist
         damit sofort in NOT-AUS und Blackout erfasst. WAEHREND des Blocks
         gilt der alte Plan MIT seiner Geraeteliste (``_plan_patch``): der
-        Ausgabe-Thread gibt den Funktionen nicht ``_patch_cache``, sondern
-        die Liste, aus der der geltende Plan gebaut wurde. Ein neues Geraet
+        Ausgabe-Thread gibt den Funktionen nie ``_patch_cache``, sondern
+        immer die Liste, aus der der geltende Plan gebaut wurde. Ein neues Geraet
         gibt damit noch nichts aus (kein Default, kein Span, keine Funktion
         schreibt es — sonst ginge sein Wert als „nicht gepatchte Roh-Adresse“
         an der NOT-AUS-Maske vorbei aufs Kabel), ein gerade entferntes wird
@@ -2231,6 +2231,10 @@ class AppState:
 
         Verschachtelbar (Tiefenzaehler); nur die aeusserste Ebene baut und
         sendet. Gilt nur fuer den Thread, der den Kontext geoeffnet hat.
+        NUR DER GUI-THREAD darf den Block oeffnen: Tiefenzaehler und
+        Besitzer-Thread sind nicht gesperrt — zwei Threads, die gleichzeitig
+        oeffnen und schliessen, koennten den abschliessenden Neuaufbau
+        verlieren.
         Wurde im Block nichts am Patch geaendert, passiert am Ende nichts."""
         if (getattr(self, "_patch_sammel_tiefe", 0) > 0
                 and getattr(self, "_patch_sammel_thread", None)
@@ -2242,13 +2246,13 @@ class AppState:
             self._patch_sammel_thread = threading.get_ident()
             self._patch_sammel_neuaufbau = False
             self._patch_sammel_ereignisse = []
-            # Ab jetzt rendert der Ausgabe-Thread die Funktionen mit der
-            # Geraeteliste des geltenden Plans (s. _render_frame) — BEVOR die
-            # erste Aenderung _patch_cache austauscht.
+            # Der Ausgabe-Thread rendert die Funktionen mit der Geraeteliste
+            # des geltenden Plans (s. _render_frame). Gibt es noch keinen
+            # Plan, die jetzige Liste festhalten — BEVOR die erste Aenderung
+            # _patch_cache austauscht.
             with self._get_plan_lock():
                 if getattr(self, "_plan_patch", None) is None:
                     self._plan_patch = list(getattr(self, "_patch_cache", None) or ())
-                self._patch_sammel_render = True
         self._patch_sammel_tiefe = getattr(self, "_patch_sammel_tiefe", 0) + 1
         try:
             yield
@@ -2272,9 +2276,9 @@ class AppState:
             if neuaufbau:
                 self._reload_patch_cache()
         finally:
-            # Erst NACH dem Neuaufbau (Plan und _plan_patch sind dort unter
-            # _plan_lock zusammen getauscht) wieder die Geraeteliste selbst.
-            self._patch_sammel_render = False
+            # Scheitert der Neuaufbau, bleiben Plan UND seine Geraeteliste
+            # (_plan_patch) alt — der Renderer rechnet stimmig mit dem alten
+            # Stand weiter, bis ein Neuaufbau gelingt.
             for ereignis in self._PATCH_SAMMEL_EREIGNISSE:
                 if ereignis in ereignisse:
                     self._emit(ereignis)
@@ -4415,11 +4419,12 @@ class AppState:
             patched_set = self._patched_set
             # _laser_estop_addrs wie zuvor defensiv (Test-Stubs ohne das Feld).
             laser_estop_addrs = getattr(self, "_laser_estop_addrs", {})
-            # IMP-3: waehrend patch_sammeln() die Geraeteliste DIESES Plans —
-            # _patch_cache ist dem Plan dann voraus (s. _plan_patch).
-            sammel_patch = (getattr(self, "_plan_patch", None)
-                            if getattr(self, "_patch_sammel_render", False)
-                            else None)
+            # IMP-3: die Geraeteliste DIESES Plans, im selben Schnappschuss —
+            # _patch_cache kann dem Plan voraus sein (s. _plan_patch). Nur
+            # ohne Plan (nackter Zustand) die Geraeteliste selbst.
+            plan_patch = getattr(self, "_plan_patch", None)
+            if plan_patch is None:
+                plan_patch = self._patch_cache
         # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
         scratch: dict[int, Universe] = {}
         for univ, _live in live_universes:
@@ -4445,9 +4450,7 @@ class AppState:
         for su in scratch.values():
             su.begin_write_log()
         try:
-            self.function_manager.tick(
-                scratch,
-                self._patch_cache if sammel_patch is None else sammel_patch, dt)
+            self.function_manager.tick(scratch, plan_patch, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
         func_touched: dict[int, set[int]] = {}
