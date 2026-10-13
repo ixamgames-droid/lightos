@@ -81,6 +81,7 @@
 | DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
 | LIZ-1 | A | fix/liz1-lizenzdialog-hoehe | 2026-10-12T22:39Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
+| ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 
 ## Blocker & Fallen
 
@@ -289,7 +290,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:15Z A claim ENG-34
 - 2026-10-12T18:15Z A claim ENG-36
 - 2026-10-12T18:15Z A claim ENG-35
 - 2026-10-12T18:15Z A claim VCB-45
@@ -319,3 +319,4 @@
 - 2026-10-13T13:54Z A aktualisiert VCB-46: Branch - -> feature/eng35-prioritaeten-stufen
 - 2026-10-13T14:18Z D done LIZ-2
 - 2026-10-13T14:46Z A claim VIZ-109
+- 2026-10-13T14:46Z A claim ENG-38
