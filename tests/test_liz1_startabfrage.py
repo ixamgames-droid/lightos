@@ -57,7 +57,7 @@ def test_dialog_titel_text_und_knoepfe(app):
         assert "keine Lizenzdatei" in dlg.grund.text()
         knoepfe = [b.text() for b in dlg.findChildren(QPushButton)]
         assert knoepfe == ["Lizenzdatei auswählen…", "Lizenztext anzeigen", "Beenden"]
-        assert lizenz.DATEINAME in dlg.ort.text()
+        assert lizenz.DATEINAME in dlg.ort_pfad.toolTip()
     finally:
         dlg.deleteLater()
 
