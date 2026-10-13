@@ -60,7 +60,6 @@
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 | VIZ-107 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | tests/test_viz107_gobo_niedrig_buehnenkante_scene.py |
 | DOC-71 | B | docs/doc71-laser-blackout-anleitungen | 2026-10-12T19:21Z | docs/anleitung_ausgabe_einrichten · docs/anleitung_vc_widgets/01_button.md · docs/anleitung_vc_widgets/01_button.en.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/components/engine/script.md · docs/anleitung_laser/ANLEITUNG_LASER.md · docs/OUTPUT_MERGE_CONTRACT.md · tests/test_doc71_laser_blackout_einheitlich.py · tools/doku_gates.txt |
-| STAB-37 | B | fix/stab37-bibliotheks-hinweis-ist-kein-verlust | 2026-10-12T19:21Z | src/core/show/show_file.py · src/ui/main_window.py · tests/test_stab37_bibliotheks_hinweis_kein_verlust.py · tests/test_fm43_fehlendes_profil_sichtbar.py · tests/test_fm63_lightos_profil_vorrang.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
@@ -286,7 +285,6 @@
 
 ## Verlauf
 
-- 2026-10-12T22:39Z A claim LIZ-1
 - 2026-10-13T00:13Z A done LAS-32
 - 2026-10-13T13:52Z A done STAB-35
 - 2026-10-13T13:52Z A done STAB-36
@@ -316,3 +314,4 @@
 - 2026-10-13T20:41Z A claim TOOL-27
 - 2026-10-13T20:44Z A done VIZ-104
 - 2026-10-13T21:06Z B done VIZ-105
+- 2026-10-13T21:45Z B done STAB-37
