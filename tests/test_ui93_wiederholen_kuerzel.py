@@ -63,6 +63,51 @@ def _taste(app, ziel, taste, mods=STRG):
     app.processEvents()
 
 
+class _FeldWieX11(QLineEdit):
+    """Stellt ein Textfeld unter X11 nach: dort ist Strg+Y KEIN Wiederholen des
+    Feldes — es nimmt weder den ShortcutOverride an noch den Tastendruck.
+    („offscreen“ kennt Strg+Y von sich aus, der Weg ueber ``vorrang`` liefe
+    im Test sonst nie mit echtem Tastendruck.)"""
+
+    @staticmethod
+    def _strg_y(ev) -> bool:
+        return (ev.key() == Qt.Key.Key_Y
+                and undo_kuerzel.kuerzel_art(ev) == "redo")
+
+    def event(self, ev):
+        if ev.type() == QEvent.Type.ShortcutOverride and self._strg_y(ev):
+            ev.ignore()
+            return False
+        return super().event(ev)
+
+    def keyPressEvent(self, ev):
+        if self._strg_y(ev):
+            ev.ignore()
+            return
+        super().keyPressEvent(ev)
+
+
+def _zwei_schritte_pruefen(test, app, feld):
+    """Zwei getrennte Schritte tippen; jeder Tastendruck nimmt GENAU EINEN
+    zurueck bzw. stellt genau einen wieder her (nicht zwei: einmal ueber
+    ``vorrang`` und noch einmal ueber das Feld selbst)."""
+    feld.setFocus()
+    app.processEvents()
+    test.assertIs(QApplication.focusWidget(), feld)
+    QTest.keyClicks(feld, "abc")
+    QTest.keyClick(feld, Qt.Key.Key_Home)
+    QTest.keyClicks(feld, "x")
+    test.assertEqual(feld.text(), "xabc")
+    _taste(app, feld, Qt.Key.Key_Z)
+    test.assertEqual(feld.text(), "abc", "Strg+Z nimmt nicht genau einen Schritt")
+    _taste(app, feld, Qt.Key.Key_Z)
+    test.assertEqual(feld.text(), "")
+    _taste(app, feld, Qt.Key.Key_Y)
+    test.assertEqual(feld.text(), "abc", "Strg+Y stellt nicht genau einen Schritt her")
+    _taste(app, feld, Qt.Key.Key_Z, STRG | UMSCHALT)
+    test.assertEqual(feld.text(), "xabc")
+
+
 class BelegungTest(unittest.TestCase):
     """Die feste Belegung — unabhaengig von der Plattform."""
 
@@ -287,6 +332,80 @@ class EigenesFensterTest(unittest.TestCase):
         # Nur ShortcutOverride — ein normaler Tastendruck loest nichts aus.
         druck = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Y, STRG)
         self.assertFalse(undo_kuerzel.vorrang(w, druck, lambda _w: True))
+
+    def test_laser_zeicheneditor_textfeld_hat_vorrang(self):
+        """Im Namensfeld des Zeicheneditors gehoeren die Folgen dem Feld — auch
+        Strg+Y unter X11, das dort sonst die Zeichnung wiederholt haette."""
+        from src.core.laser.figure import LaserFigure
+        from src.ui.widgets.laser_draw_editor import LaserDrawDialog
+        dlg = LaserDrawDialog(figure=LaserFigure(points=[]))
+        log = []
+        dlg._sc_undo.activated.disconnect()
+        dlg._sc_redo.activated.disconnect()
+        dlg._sc_undo.activated.connect(lambda: log.append("u"))
+        dlg._sc_redo.activated.connect(lambda: log.append("r"))
+        with mock.patch.object(LaserDrawDialog, "showEvent",
+                               lambda self, ev: None):
+            _zeigen(self.app, dlg)
+            for feld in (dlg._edit_name, _FeldWieX11(dlg)):
+                feld.clear()
+                feld.show()
+                _zwei_schritte_pruefen(self, self.app, feld)
+        self.assertEqual(log, [], "das Kürzel des Dialogs lief trotz Textfeld")
+
+    def test_3d_fenster_kuerzel_und_textfeld(self):
+        """Das 3D-Fenster ist ein eigenes Fenster: alle drei Folgen bedienen
+        dort den Verlauf; in einem Eingabefeld (Bühnenname, Drehfeld) gehoeren
+        sie dem Feld. Gebaut wird nur das Fenstergeruest, keine 3D-Ansicht."""
+        from PySide6.QtWidgets import QMainWindow
+        from src.ui.visualizer import visualizer_window as VW
+        log = []
+
+        class _Geruest(VW.VisualizerWindow):
+            def __init__(self):
+                QMainWindow.__init__(self)
+
+            def _do_undo(self):
+                log.append("u")
+
+            def _do_redo(self):
+                log.append("r")
+
+            def showEvent(self, ev):
+                QMainWindow.showEvent(self, ev)
+
+            def hideEvent(self, ev):
+                QMainWindow.hideEvent(self, ev)
+
+            def closeEvent(self, ev):
+                QMainWindow.closeEvent(self, ev)
+
+        w = _Geruest()
+        mitte = QWidget()
+        w.setCentralWidget(mitte)
+        knopf = QPushButton("x", mitte)
+        knopf.move(0, 0)
+        feld = QLineEdit(mitte)
+        feld.move(0, 40)
+        x11 = _FeldWieX11(mitte)
+        x11.move(0, 80)
+        w._setup_shortcuts()
+        folgen = []
+        for sc in w.findChildren(QShortcut):
+            folgen += [n for n in _namen(sc.keys()) if n in DREI]
+        self.assertEqual(sorted(folgen), sorted(DREI),
+                         "jede Folge genau einmal — sonst mehrdeutig")
+        _zeigen(self.app, w)
+        knopf.setFocus()
+        self.app.processEvents()
+        _taste(self.app, knopf, Qt.Key.Key_Z)
+        _taste(self.app, knopf, Qt.Key.Key_Y)
+        _taste(self.app, knopf, Qt.Key.Key_Z, STRG | UMSCHALT)
+        self.assertEqual(log, ["u", "r", "r"])
+        del log[:]
+        for f in (feld, x11):
+            _zwei_schritte_pruefen(self, self.app, f)
+        self.assertEqual(log, [], "das Kürzel des Fensters lief trotz Textfeld")
 
 
 class VirtualConsoleAlleinTest(unittest.TestCase):
@@ -563,6 +682,67 @@ class HauptfensterTest(unittest.TestCase):
                 feld.setParent(None)
                 feld.deleteLater()
                 self.app.processEvents()
+
+    def test_textfeld_genau_ein_schritt_je_tastendruck(self):
+        """Nachpruefung: ``vorrang`` und das Feld selbst duerfen denselben
+        Tastendruck nicht BEIDE ausfuehren. Mit einem einzigen getippten
+        Schritt fiele das nicht auf — deshalb zwei. Geprueft fuer ein Feld,
+        das die Folgen selbst kennt, und fuer eines wie unter X11."""
+        vc = self.win._vc_view
+        for seite in (self.andere_seite, vc):
+            for art in (QLineEdit, _FeldWieX11):
+                self.stapel.clear()
+                self.zaehler["n"] = 0
+                self._seite(seite)
+                self._schritt()
+                vc._canvas._add_widget("VCButton", QPoint(0, 0))
+                anzahl = self._vc_anzahl()
+                feld = art(seite)
+                feld.show()
+                try:
+                    _zwei_schritte_pruefen(self, self.app, feld)
+                    self.assertEqual(self.zaehler["n"], 1,
+                                     "Textfeld-Kürzel fasst den App-Verlauf an")
+                    self.assertEqual(self._vc_anzahl(), anzahl,
+                                     "Textfeld-Kürzel fasst das VC-Layout an")
+                finally:
+                    feld.setParent(None)
+                    feld.deleteLater()
+                    self.app.processEvents()
+
+    def test_andere_tasten_bleiben_unberuehrt(self):
+        """Sicherheitsrelevante Tasten (Leertaste GO, Umschalt+Leertaste,
+        Esc, NOT-AUS) und einfache Buchstaben: ``MainWindow.event`` nimmt sie
+        nicht an und fragt den lokalen Verlauf gar nicht erst — auch nicht bei
+        sichtbarer Virtual Console."""
+        ohne = Qt.KeyboardModifier.NoModifier
+        alt = Qt.KeyboardModifier.AltModifier
+        notaus = QKeySequence(self.win._NOTAUS_KUERZEL)[0]
+        tasten = [(Qt.Key.Key_Space, ohne), (Qt.Key.Key_Space, UMSCHALT),
+                  (Qt.Key.Key_Escape, ohne), (Qt.Key.Key_B, ohne),
+                  (notaus.key(), notaus.keyboardModifiers()),
+                  (Qt.Key.Key_Z, ohne), (Qt.Key.Key_Y, ohne),
+                  (Qt.Key.Key_Z, UMSCHALT), (Qt.Key.Key_Y, STRG | UMSCHALT),
+                  (Qt.Key.Key_Z, STRG | alt), (Qt.Key.Key_S, STRG)]
+        for seite in (self.andere_seite, self.win._vc_view):
+            self._seite(seite)
+            self.win.setFocus()
+            self.app.processEvents()
+            with mock.patch.object(self.win, "_lokales_undo") as lokal:
+                for taste, mods in tasten:
+                    ev = QKeyEvent(QEvent.Type.ShortcutOverride, taste, mods)
+                    ev.ignore()
+                    self.win.event(ev)
+                    self.assertFalse(ev.isAccepted(), (taste, mods))
+                lokal.assert_not_called()
+        # Die Kuerzel selbst stehen noch: Leertaste und NOT-AUS.
+        belegt = {n for a in self.win.findChildren(QAction)
+                  for n in _namen(a.shortcuts())}
+        self.assertIn("Space", belegt)
+        self.assertIn("Shift+Space", belegt)
+        self.assertTrue(any(
+            sc.isEnabled() and self.win._NOTAUS_KUERZEL in _namen(sc.keys())
+            for sc in self.win.findChildren(QShortcut)))
 
     # ── Hilfe → Tastenkürzel ────────────────────────────────────────────────
 
