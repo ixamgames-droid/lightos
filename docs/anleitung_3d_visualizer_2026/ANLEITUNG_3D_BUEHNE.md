@@ -272,6 +272,15 @@ hilft **Kamera → Fit (alle)**.
   Hauptfenster über **Datei → Speichern** bzw. **Speichern unter…**.
 
 Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
+Löschst du ein Bühnen-Element (über **Element LÖSCHEN** oder im Bild mit `Entf` bzw.
+dem runden Löschen-Knopf), bringt das Rückgängig es zurück und hängt die Geräte
+wieder an, die daran angedockt waren.
+
+**2D und 3D zeigen dieselbe Position.** Ein Gerät, das du in der 2D-Ansicht der
+Live View verschiebst, steht sofort auch im offenen 3D-Fenster am neuen Platz — und
+umgekehrt. Die 2D-Ansicht bestimmt nur links/rechts und vorne/hinten; Höhe, Drehung
+und Andockung bleiben, wie sie im 3D gesetzt sind. Auch das Verschieben in der
+2D-Ansicht ist ein Rückgängig-Schritt (mehrere gewählte Geräte zusammen: einer).
 
 ## Was bei großen Rigs anders aussieht
 

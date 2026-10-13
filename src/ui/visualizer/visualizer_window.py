@@ -716,6 +716,72 @@ def _drop_queued_stage_adds(bridge, sid: str) -> int:
     return entfernt
 
 
+def _stage_loesch_on_change(window, el):
+    """Was nach Loeschen/Undo/Redo eines Buehnen-Elements nachzuziehen ist —
+    EIN Abgleich fuer beide Loeschwege (Knopf und 3D-Bild, VIZ-105)."""
+    def _on_delete_change():
+        # Inkrementell statt Full-Reload (Gegenstück zum Add-Pfad aus
+        # b65eb9c): ein kompletter loadStageJson-Umbau pro Löschung
+        # re-armierte Pending-Gate, Repair-Ketten und 1200ms-Reassert —
+        # bei schnellen Folge-Löschungen die Hauptquelle für
+        # wiederauferstehende Elemente.
+        if window._current_stage.get(el.id) is None:
+            window._remove_stage_node_from_scene(el.id)
+            if window._selected_stage_id == el.id:
+                window._selected_stage_id = ""
+            try:
+                window._bridge.push_remove_stage_object(el.id)
+            except Exception as e:
+                print(f"[Visualizer] stage delete push error: {e}")
+        else:
+            window._sync_stage_node_to_scene(el)
+            try:
+                window._bridge.push_add_stage_object_data(el)
+            except Exception as e:
+                print(f"[Visualizer] stage undelete push error: {e}")
+        window._refresh_stage_tree()
+        window._update_status_counts()
+    return _on_delete_change
+
+
+def _positionen_melden(fids) -> None:
+    """VIZ-106: „die Weltposition dieser Geraete hat sich geaendert“ — dieselbe
+    Meldung wie aus der 2D-Ansicht (``live_view._positionen_melden``). Modul-
+    Funktion: ein Rueckgaengig-Schritt ruft sie spaeter und haelt dafuer kein
+    Fenster fest."""
+    try:
+        from src.core.sync import get_sync, SyncEvent
+        get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED,
+                        {"positionen": [int(f) for f in fids]})
+    except Exception as e:
+        print(f"[Visualizer] Positionen melden: {e}")
+
+
+def _docks_nach_undo_melden(window, sid: str, fids) -> None:
+    """VIZ-105: das Undo eines geloeschten Buehnen-Elements hat ``fids`` wieder
+    angehaengt — dem 3D-Bild sagen. Es fuehrt ``dockedTo`` selbst und bekommt
+    die Andockung nur in der Transform-Nachricht (A3D-10); ohne sie zoege die
+    Traverse dort beim naechsten Verschieben nichts mit und die haengende
+    Haltung (VIZ-100) bliebe aus."""
+    positions = window._state.visualizer_positions
+    rotations = window._state.visualizer_rotations
+    for fid in fids:
+        pos = positions.get(fid)
+        if pos is None:
+            continue
+        rot = rotations.get(fid, (0.0, 0.0, 0.0))
+        try:
+            window._bridge.push_apply_fixture_transform(
+                fid, pos[0], pos[1], pos[2], *rot, dock=sid)
+        except Exception as e:
+            print(f"[Visualizer] dock restore push error: {e}")
+    # Die Andockungen stehen in der Show — ohne Meldung bliebe sie „sauber".
+    try:
+        window._bridge._emit_live_view_changed()
+    except Exception as e:
+        print(f"[Visualizer] dock restore dirty error: {e}")
+
+
 class VisualizerBridge(QObject):
     """Kommunikationsbruecke Python <-> JavaScript (Three.js).
 
@@ -1179,6 +1245,15 @@ class VisualizerBridge(QObject):
         """Abonniere den State (idempotent — doppelt = No-Op)."""
         if not self._subscribed:
             self._state.subscribe(self._on_state)
+            # VIZ-106: Positionen, die ausserhalb dieser Seite gesetzt wurden
+            # (2D-Ansicht, deren Rueckgaengig). Gleicher Lebenszyklus wie das
+            # State-Abo — der Bus haelt den Callback sonst ueber das Fenster hinaus.
+            try:
+                from src.core.sync import get_sync, SyncEvent
+                get_sync().subscribe(SyncEvent.LIVE_VIEW_CHANGED,
+                                     self._on_live_view_changed)
+            except Exception as e:
+                print(f"[Visualizer] bridge sync subscribe error: {e}")
             self._subscribed = True
             VisualizerBridge._sync_sperrzonen(self)   # LAS-32: Stand beim Oeffnen
 
@@ -1193,7 +1268,39 @@ class VisualizerBridge(QObject):
                 self._state.unsubscribe(self._on_state)
             except Exception as e:
                 print(f"[Visualizer] bridge dispose error: {e}")
+            try:
+                from src.core.sync import get_sync, SyncEvent
+                get_sync().unsubscribe(SyncEvent.LIVE_VIEW_CHANGED,
+                                       self._on_live_view_changed)
+            except Exception as e:
+                print(f"[Visualizer] bridge sync unsubscribe error: {e}")
             self._subscribed = False
+
+    def _on_live_view_changed(self, _event, data) -> None:
+        """VIZ-106: die 2D-Ansicht hat Geraete verschoben (oder ein Rueckgaengig
+        hat es zurueckgenommen) — an die Seite schicken.
+
+        Die Seite holt ihre Geraete nur beim Laden; ohne diese Nachricht stand
+        ein in 2D verschobenes Geraet im offenen 3D-Fenster am alten Platz, bis
+        jemand „Szene neu laden“ drueckte. Reagiert NUR auf Meldungen, die
+        Geraete nennen: dasselbe Ereignis kommt ohne Daten auch von dieser
+        Seite selbst (jede 3D-Geste) und von Zoom/Raster der 2D-Ansicht — die
+        Seite kennt ihren eigenen Stand, ein Sammel-Push waere ein Echo. Die
+        Andockung bleibt unberuehrt (``dock`` fehlt in der Nachricht).
+        """
+        fids = (data or {}).get("positionen") if isinstance(data, dict) else None
+        if not fids:
+            return
+        positions = self._state.visualizer_positions
+        rotations = self._state.visualizer_rotations
+        for fid in fids:
+            pos = positions.get(fid)
+            if pos is None:
+                continue
+            rot = rotations.get(fid, (0.0, 0.0, 0.0))
+            self.push_apply_fixture_transform(fid, pos[0], pos[1], pos[2], *rot)
+            # Positionsfelder des Fensters (falls dieses Geraet gewaehlt ist).
+            self.pyFixtureMoved.emit(fid, float(pos[0]), float(pos[1]), float(pos[2]))
 
     # ── Slots aufgerufen durch JavaScript ───────────────────────────────────
 
@@ -1309,6 +1416,11 @@ class VisualizerBridge(QObject):
         self.pyFixtureMoved.emit(fid, float(x), float(y), float(z))
         _scmd.push_transform_fixtures(
             self._state, [(fid, old_pos, new_pos)], label="Fixture bewegen",
+            # VIZ-106: dieser Weg (Ausrichten, Verteilen, Anordnen im 3D) nahm
+            # sein Rueckgaengig nur im AppState zurueck — die 3D-Seite und die
+            # 2D-Ansicht blieben stehen. Die Meldung traegt die Geraete; jede
+            # offene Bridge (auch diese) und die 2D-Ansicht ziehen nach.
+            on_applied=_positionen_melden,
         )
 
     @Slot(str, float, float, float)
@@ -4992,35 +5104,13 @@ class VisualizerWindow(QMainWindow):
         el = self._selected_stage_element()
         if not el:
             return
-
-        def _on_delete_change():
-            # Inkrementell statt Full-Reload (Gegenstück zum Add-Pfad aus
-            # b65eb9c): ein kompletter loadStageJson-Umbau pro Löschung
-            # re-armierte Pending-Gate, Repair-Ketten und 1200ms-Reassert —
-            # bei schnellen Folge-Löschungen die Hauptquelle für
-            # wiederauferstehende Elemente.
-            if self._current_stage.get(el.id) is None:
-                self._remove_stage_node_from_scene(el.id)
-                if self._selected_stage_id == el.id:
-                    self._selected_stage_id = ""
-                try:
-                    self._bridge.push_remove_stage_object(el.id)
-                except Exception as e:
-                    print(f"[Visualizer] stage delete push error: {e}")
-            else:
-                self._sync_stage_node_to_scene(el)
-                try:
-                    self._bridge.push_add_stage_object_data(el)
-                except Exception as e:
-                    print(f"[Visualizer] stage undelete push error: {e}")
-            self._refresh_stage_tree()
-            self._update_status_counts()
-
+        _on_delete_change = _stage_loesch_on_change(self, el)
         # VIZ-11 (Schritt 6): RemoveNode-Undo — Snapshot VOR dem Loeschen.
         _scmd.push_remove_stage_element(
             self._state, self._current_stage, el,
             label=f"{el.name or el.id} löschen",
             on_change=_on_delete_change,
+            on_docks_restored=lambda fids: _docks_nach_undo_melden(self, el.id, fids),
         )
         self._current_stage.remove(el.id)
         self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
@@ -5332,6 +5422,20 @@ class VisualizerWindow(QMainWindow):
         # der Guard oben würde es beim nächsten Mal nicht einmal bemerken, weil
         # das Element dann gar nicht mehr in `_current_stage` steht.
         _drop_queued_stage_adds(bridge, sid)
+        # VIZ-105: auch dieser Loeschweg ist EIN Undo-Schritt. Vorher legte er
+        # keinen an — Strg+Z nahm die Aktion DAVOR zurueck. Snapshot (Element
+        # und wer daran haengt) VOR dem Entfernen; die Abdock-Echos, die das
+        # 3D-Bild gleich je Geraet nachschickt, finden dann nichts mehr zu tun.
+        # (``_state`` per getattr wie ``_bridge`` oben: die Guard-Tests fahren
+        # diese Methode auf einem Stellvertreter ohne Szene.)
+        state = getattr(self, "_state", None)
+        if state is not None:
+            _scmd.push_remove_stage_element(
+                state, self._current_stage, el,
+                label=f"{el.name or el.id} löschen",
+                on_change=_stage_loesch_on_change(self, el),
+                on_docks_restored=lambda fids: _docks_nach_undo_melden(self, sid, fids),
+            )
         self._current_stage.remove(sid)
         self._remove_stage_node_from_scene(sid)
         if self._selected_stage_id == sid:
