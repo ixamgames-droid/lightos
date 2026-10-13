@@ -59,6 +59,7 @@ PFLICHT_MODULE: tuple[str, ...] = (
 OPTIONALE_MODULE: tuple[str, ...] = (
     "rtmidi",
     "soundcard",
+    "usb.core",      # OUT-68: pyusb, nur fuer uDMX-Adapter (rohes USB)
 )
 
 #: Mitgelieferte Dateien/Ordner relativ zu ``programm_dir()``. Ordner muessen
@@ -80,6 +81,7 @@ PFLICHT_RESSOURCEN: tuple[str, ...] = tuple("/".join(teile) for teile in (
     ("fixtures", "bibliothek"),
     ("licenses",),
     ("THIRD_PARTY_NOTICES.md",),
+    ("LICENSE",),                                     # LIZ-1: Lizenztext
 ))
 
 
@@ -135,6 +137,109 @@ def pruefe_build_info(wurzel: str | None = None,
     return []
 
 
+def pruefe_udmx_bibliothek(gefroren: bool | None = None,
+                           plattform: str | None = None,
+                           maschine: str | None = None, laden=None) -> list[str]:
+    """OUT-76: das Windows-Setup (x64) liefert pyusb und libusb mit — fehlt im
+    gepackten Build eines davon, ist das ein Fehler (der Rauchtest der
+    Setup-Pipeline bricht dann ab). Im Quellbetrieb, unter Linux/macOS und auf
+    Windows-ARM64 bleibt uDMX optional: dort nur die Zeile ``optional uDMX``.
+
+    Geladen wird nur die Bibliothek; kein USB-Geraet wird angefasst.
+    ``laden`` (Tests) = Ersatz fuer ``udmx._usb_laden``.
+    """
+    import platform
+    gefroren = ist_gefroren() if gefroren is None else gefroren
+    plattform = sys.platform if plattform is None else plattform
+    maschine = platform.machine() if maschine is None else maschine
+    if not gefroren or not plattform.startswith("win") or maschine.upper() == "ARM64":
+        return []
+    try:
+        if laden is None:
+            from src.core.dmx.udmx import _usb_laden as laden
+        _core, _util, backend = laden()
+    except Exception as e:
+        return [f"uDMX: pyusb fehlt im Setup ({type(e).__name__}: {e})"]
+    if backend is None:
+        return ["uDMX: libusb-1.0.dll fehlt im Setup oder laesst sich nicht "
+                "laden (libusb-package, s. packaging/windows/bundle_inhalt.py)"]
+    return []
+
+
+#: LIZ-2: Lizenzdateien, die ein gepackter Build mitbringen muss (relativ zu
+#: ``programm_dir()``, als Teile notiert wie ``PFLICHT_RESSOURCEN``). Die Liste
+#: und Pythons Lizenztext entstehen beim Bauen
+#: (``packaging/windows/fremdkomponenten.py``), die uebrigen liegen im Repo.
+PFLICHT_LIZENZDATEIEN: tuple[str, ...] = tuple("/".join(teile) for teile in (
+    ("licenses", "BUNDLE-KOMPONENTEN.txt"),
+    ("licenses", "Python-LICENSE.txt"),
+    ("licenses", "LGPL-3.0.txt"),
+    ("licenses", "GPL-3.0.txt"),
+))
+
+
+def pruefe_fremdlizenzen(wurzel: str | None = None,
+                         gefroren: bool | None = None) -> list[str]:
+    """LIZ-2: ein gepackter Build liefert die Lizenztexte der fremden
+    Bibliotheken mit — und von Qt nur, was in seiner eigenen Liste steht.
+
+    Geprueft wird das FERTIGE Paket, unabhaengig vom Bauwerkzeug:
+
+    * die Liste dieses Builds und die Lizenztexte liegen bei;
+    * jede ``Qt6*.dll`` im Programmordner steht in der Liste (eine Bibliothek,
+      die am Filter vorbei hineingeraten ist, faellt hier auf — Qt bietet
+      einige Module nur unter der GPL an);
+    * der QML-Ordner von Qt fehlt;
+    * keine Datei der Universal C Runtime liegt bei (sie gehoert zu Windows
+      und kaeme sonst aus einem zufaelligen Ordner des Bau-Rechners).
+
+    Im Quellbetrieb gibt es weder Liste noch Bundle: dort nichts.
+    """
+    gefroren = ist_gefroren() if gefroren is None else gefroren
+    if not gefroren:
+        return []
+    wurzel = wurzel or programm_dir()
+    fehler = [f"Lizenzen: fehlt {rel}" for rel in PFLICHT_LIZENZDATEIEN
+              if not os.path.isfile(os.path.join(wurzel, *rel.split("/")))]
+    if not _hat_datei(os.path.join(wurzel, "licenses", "pakete")):
+        fehler.append("Lizenzen: der Ordner mit den Lizenztexten der "
+                      "Python-Pakete ist leer oder fehlt")
+    liste = ""
+    try:
+        with open(os.path.join(wurzel, *PFLICHT_LIZENZDATEIEN[0].split("/")),
+                  encoding="utf-8") as f:
+            liste = f.read()
+    except OSError:
+        pass
+    qt_ordner = os.path.join(wurzel, "PySide6")
+    try:
+        namen = sorted(os.listdir(qt_ordner))
+    except OSError:
+        namen = []
+    if liste:
+        gelistet = {zeile.split("|")[0].strip().lower()
+                    for zeile in liste.splitlines() if "|" in zeile}
+        for name in namen:
+            klein = name.lower()
+            if (klein.startswith("qt6") and klein.endswith(".dll")
+                    and klein not in gelistet):
+                fehler.append(f"Lizenzen: {name} liegt im Programmordner, steht "
+                              "aber nicht in der Liste der Fremd-Komponenten")
+    if os.path.isdir(os.path.join(qt_ordner, "qml")):
+        fehler.append("Lizenzen: der QML-Ordner von Qt liegt im Programmordner "
+                      "(packaging/windows/qt_umfang.py laesst ihn weg)")
+    try:
+        oben = sorted(os.listdir(wurzel))
+    except OSError:
+        oben = []
+    fremd = [n for n in oben if n.lower() == "ucrtbase.dll"
+             or (n.lower().startswith("api-ms-win-") and n.lower().endswith(".dll"))]
+    if fremd:
+        fehler.append(f"Lizenzen: {len(fremd)} Datei(en) der Universal C Runtime im "
+                      f"Programmordner ({fremd[0]} …) — gehoeren zu Windows, nicht ins Setup")
+    return fehler
+
+
 def pruefe_code_stand() -> list[str]:
     """Der Builtin-Fingerabdruck darf nicht leer sein (sonst laeuft der
     Abgleich nach einem Update nie wieder, s. ``fixture_db._code_stand``)."""
@@ -170,7 +275,8 @@ def bericht() -> tuple[int, list[str]]:
               f"programm_dir={programm_dir()}",
               f"Python {sys.version.split()[0]} ({sys.platform})"]
     fehler = (pruefe_module() + pruefe_ressourcen() + pruefe_code_stand()
-              + pruefe_build_info())
+              + pruefe_build_info() + pruefe_udmx_bibliothek()
+              + pruefe_fremdlizenzen())
     demo_fehler, demo_zeile = pruefe_demo_shows()
     fehler += demo_fehler
     zeilen.append(demo_zeile)
@@ -182,6 +288,12 @@ def bericht() -> tuple[int, list[str]]:
     for name in OPTIONALE_MODULE:
         rest = pruefe_module((name,))
         zeilen.append(f"optional {name}: {'fehlt — ' + rest[0] if rest else 'ok'}")
+    try:
+        # OUT-68: pyusb allein genuegt nicht — darunter braucht es libusb.
+        from src.core.dmx.udmx import bibliothek_status
+        zeilen.append(f"optional uDMX: {bibliothek_status()['text']}")
+    except Exception as e:
+        zeilen.append(f"optional uDMX: ? ({type(e).__name__}: {e})")
     try:
         from PySide6 import __version__ as pyside_version
         zeilen.append(f"PySide6 {pyside_version}")
