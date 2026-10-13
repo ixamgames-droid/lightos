@@ -178,6 +178,9 @@ class MitschnittDialog(QDialog):
         # nimmt das Feld die Taste und schreibt ein Leerzeichen).
         self._kuerzel = QShortcut(QKeySequence(Qt.Key.Key_Space), self)
         self._kuerzel.setContext(Qt.ShortcutContext.WindowShortcut)
+        # Ohne das wiederholt eine gehaltene Leertaste das Kuerzel im Takt der
+        # Tastenwiederholung — ein ruhiges Bild ergaebe dann Szene um Szene.
+        self._kuerzel.setAutoRepeat(False)
         self._kuerzel.activated.connect(self.festhalten)
 
         box = QGroupBox("Festgehaltene Szenen")

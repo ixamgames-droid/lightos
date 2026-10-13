@@ -269,6 +269,8 @@ def test_laufende_ueberblendung_wird_abgelehnt_bis_das_bild_steht(state, rig, au
 def test_leertaste_haelt_fest(state, rig, aufbau):
     dlg, art, sacn, uhr = aufbau
     assert dlg._kuerzel.key() == QKeySequence(Qt.Key.Key_Space)
+    # Gehaltene Leertaste darf nicht Szene um Szene anlegen.
+    assert not dlg._kuerzel.autoRepeat()
     _spiele_ruhig(art, uhr, _bild(rig["adressen"], 5))
     dlg._kuerzel.activated.emit()
     assert [f.name for f in state.function_manager.all()] == ["Mitschnitt 1"]
