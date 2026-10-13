@@ -5,29 +5,10 @@ from src.core.stage.einmessen import effektive_nullpunkte   # VIZ-55
 _PT_ATTRS = frozenset(("pan", "tilt", "pan_fine", "tilt_fine"))
 
 
-def _strobe_hz(ch, val: int) -> float:
-    """Blinkfrequenz der 2D-Anzeige fuer einen Shutter-/Strobe-Wert (FM-48).
-
-    Mit Bereichsdaten zaehlt NUR ein Strobe-Bereich; die Frequenz steigt innerhalb
-    dieses Bereichs von ~0,5 auf 20 Hz. Bis 2026-09-28 galt pauschal „> 10 =
-    Strobe" — gemessen blinkten damit Geraete mit offenem Shutter: Spider 14ch
-    („Offen" 8–15), Hero Spot 90 („Open" 251–255, Grundwert 253), ZQ02001/Conti
-    („Strobe aus (offen)" 250–255). Ohne Bereichsdaten bleibt die alte Regel."""
-    from src.core.app_state import shutter_bereich_art
-    try:
-        val = int(val)
-    except (TypeError, ValueError):
-        return 0.0
-    ranges = list(getattr(ch, "ranges", None) or ())
-    if ranges:
-        for r in ranges:
-            lo, hi = int(r.range_from), int(r.range_to)
-            if lo <= val <= hi:
-                if shutter_bereich_art(r) != "strobe":
-                    return 0.0
-                return 0.5 + (val - lo) / max(1, hi - lo) * 19.5
-        return 0.0
-    return 0.5 + (val - 11) / 244.0 * 19.5 if val > 10 else 0.0
+# VIZ-104: die Formel lebt in src/core/strobe.py — EINE Quelle fuer die 2D-
+# Ansicht hier und den 3D-Visualizer. Der Name bleibt als Alias bestehen.
+from src.core.strobe import strobe_hz as _strobe_hz   # noqa: E402
+from src.core.strobe import TAST as _STROBE_TAST, blitz_an as _blitz_an   # noqa: E402
 import math
 import os
 import time
@@ -53,6 +34,7 @@ from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
+from src.core.stage import scene_commands as _scmd
 
 
 # ── UI-Praeferenzen (analog zu programmer_view.py) ───────────────────────────
@@ -912,6 +894,22 @@ def _lod_for_screen_gap(screen_gap: float) -> int:
     return 2
 
 
+def _positionen_melden(fids) -> None:
+    """VIZ-106: „die Weltposition dieser Geraete hat sich geaendert“ — an alle,
+    die sie zeigen. Traegt die Geraete mit, damit eine offene 3D-Seite genau
+    die nachzieht (``VisualizerBridge._on_live_view_changed``); ohne Geraete
+    heisst dasselbe Ereignis nur „Layout geaendert“ (Zoom, Raster).
+
+    Bewusst eine Modul-Funktion: der Rueckgaengig-Schritt ruft sie spaeter
+    wieder und darf dafuer keine Ansicht festhalten."""
+    try:
+        from src.core.sync import get_sync, SyncEvent
+        get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED,
+                        {"positionen": [int(f) for f in fids]})
+    except Exception as e:
+        print(f"[live_view] Positionen melden: {e}")
+
+
 def _grid_positions(n: int, world_w: float, world_h: float,
                     min_step: float = 90.0,
                     margin: float = 60.0) -> list[tuple[float, float]]:
@@ -1029,6 +1027,11 @@ class StageCanvas(QWidget):
         self._multi_drag_start: dict[int, tuple] | None = None
         self._multi_mouse_start: QPointF | None = None
         self._multi_moved: bool = False
+        # VIZ-106: True, solange diese Ansicht selbst eine Aenderung meldet —
+        # ihre eigene Meldung ist kein Anlass, Positionen nachzuziehen.
+        self._meldet_selbst: bool = False
+        # ... und True, wenn waehrend eines Drags eine fremde Meldung kam.
+        self._nachziehen_offen: bool = False
 
         # Touch-Mehrfachauswahl-Modus: Antippen toggelt die Auswahl (kein Shift noetig)
         self._multi_select_mode: bool = False
@@ -1055,6 +1058,7 @@ class StageCanvas(QWidget):
         self._uhr = time.perf_counter
         self._zeichenzeiten: deque = deque(maxlen=self.ZEICHENZEIT_PROBEN)
         self._naechstes_bild: float = 0.0
+        self._strobe_bild: int = 0     # VIZ-104: Zaehler der Takt-Bilder
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
         self._tick_fp: dict | None = None
@@ -1082,6 +1086,10 @@ class StageCanvas(QWidget):
             # nach dem Sicherheitsnetz. An die Widget-Lebenszeit gebunden.
             sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self,
                                   weak_slot(self._patch_geaendert))
+            # VIZ-106: Verschieben im 3D und jedes Rueckgaengig melden dieses
+            # Ereignis — die 2D-Ansicht las ihre Positionen sonst nur beim Laden.
+            sync.subscribe_widget(SyncEvent.LIVE_VIEW_CHANGED, self,
+                                  weak_slot(self._positionen_nachziehen))
         except Exception as e:
             print(f"[live_view] sync subscribe error: {e}")
 
@@ -1283,6 +1291,10 @@ class StageCanvas(QWidget):
         # das gleich folgende Bild nimmt sie, statt sie erneut abzufragen.
         self._tick_fp = ({fp[0]: fp for fp in sig[3]} if sig is not None else None)
         self._bild_verbucht(jetzt)
+        # VIZ-104: ein Takt-Bild weiter — danach blinkt der Strobe (_blink_an).
+        # Bilder aus der Bedienung (Maus, Auswahl) zaehlen nicht mit: sie
+        # zeigen den Stand des laufenden Takt-Bildes noch einmal.
+        self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
         self.update()
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
@@ -1507,14 +1519,75 @@ class StageCanvas(QWidget):
         """Platziert ein Fixture an Position (x, y) — mit Snap und Persistenz."""
         x, y = self._snap(x, y)
         self._positions[fid] = (x, y)
-        try:
-            self._state.live_view_positions[fid] = (float(x), float(y))
-        except Exception:
-            pass
-        self._notify_layout_changed()
+        self._verschiebung_uebernehmen([fid])
         self.update()
 
-    def _notify_layout_changed(self) -> None:
+    def _verschiebung_uebernehmen(self, fids) -> None:
+        """VIZ-106: die frisch gesetzten 2D-Positionen von ``fids`` in die Show
+        schreiben — als EIN Rueckgaengig-Schritt und mit Meldung.
+
+        2D und 3D zeigen dieselbe Position (ein Szenengraph: X/Z gemeinsam, die
+        Hoehe gehoert dem 3D). Das Schreiben verstellte also schon immer die
+        3D-Position; nur erfuhr es weder die offene 3D-Seite (sie holt ihre
+        Geraete beim Laden) noch der Undo-Stack — Strg+Z nahm die Aktion DAVOR
+        zurueck. Der Schritt merkt sich Weltpositionen, nicht Pixel: so kommt
+        das Undo ohne Umrechnungs-Rest zurueck, auch bei angedockten Geraeten.
+        """
+        fids = [fid for fid in fids if fid in self._positions]
+        try:
+            alt = dict(self._state.visualizer_positions)
+        except Exception:
+            alt = {}
+        for fid in fids:
+            x, y = self._positions[fid]
+            try:
+                self._state.live_view_positions[fid] = (float(x), float(y))
+            except Exception:
+                pass
+        try:
+            neu = self._state.visualizer_positions
+            # Ohne alten Platz (erstes Platzieren) gibt es nichts zurueckzunehmen.
+            schritte = [(fid, alt[fid], neu[fid])
+                        for fid in fids if fid in alt and fid in neu]
+            _scmd.push_transform_fixtures(
+                self._state, schritte, label="Fixture bewegen (2D)",
+                on_applied=_positionen_melden)
+        except Exception as e:
+            print(f"[live_view] Rueckgaengig-Schritt fuer 2D-Verschieben: {e}")
+        self._notify_layout_changed(fids)
+
+    def _positionen_nachziehen(self) -> None:
+        """VIZ-106: Positionen aus dem gemeinsamen Stand uebernehmen (nach einem
+        Rueckgaengig oder einer Verschiebung im 3D). Ein laufender Drag gewinnt:
+        dessen Positionen stehen noch nicht in der Show."""
+        if self._meldet_selbst:
+            return
+        if self._drag_fid is not None or self._multi_drag_start is not None:
+            # Nach dem Loslassen nachholen — sonst blieben die ANDEREN Geraete
+            # stehen, bis irgendwann wieder jemand meldet.
+            self._nachziehen_offen = True
+            return
+        self._nachziehen_offen = False
+        try:
+            lv = self._state.live_view_positions
+        except Exception:
+            return
+        geaendert = False
+        for fid, (x, y) in list(self._positions.items()):
+            try:
+                nx, ny = float(lv[fid][0]), float(lv[fid][1])
+            except Exception:
+                continue
+            # Pixel -> Meter -> Pixel laesst einen Rundungsrest; der ist keine
+            # Aenderung und soll gerastete Werte nicht verwackeln.
+            if abs(nx - x) > 1e-6 or abs(ny - y) > 1e-6:
+                self._positions[fid] = (nx, ny)
+                geaendert = True
+        if geaendert:
+            self._compute_label_gaps()
+            self.update()
+
+    def _notify_layout_changed(self, positionen=None) -> None:
         """P4: Layout-Aenderung melden (Dirty-Flag fuer Auto-Save).
 
         UI-26: Dieser Hook laeuft nach JEDER Positions-Mutation ausserhalb von
@@ -1524,11 +1597,18 @@ class StageCanvas(QWidget):
         zeigten weiter volle, ueberlappende Labels (und auseinandergezogene blieben
         faelschlich abgekuerzt), bis erst der naechste Show-Reload korrigierte."""
         self._compute_label_gaps()
+        self._meldet_selbst = True
         try:
-            from src.core.sync import get_sync, SyncEvent
-            get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
+            if positionen:
+                # VIZ-106: mit Geraeten — offene 3D-Seiten ziehen genau die nach.
+                _positionen_melden(positionen)
+            else:
+                from src.core.sync import get_sync, SyncEvent
+                get_sync().emit(SyncEvent.LIVE_VIEW_CHANGED, None)
         except Exception:
             pass
+        finally:
+            self._meldet_selbst = False
 
     # ── Drag & Drop von der Fixture-Liste ─────────────────────────────────────
 
@@ -1771,6 +1851,7 @@ class StageCanvas(QWidget):
             pass
 
         # 2. LayeredEffect mit Square-Wave auf Intensity
+        rechteck = freq_hz == 0.0
         if freq_hz == 0.0 and vorab is not None:
             freq_hz = vorab["square"].get(fid, 0.0)
         elif freq_hz == 0.0:
@@ -1792,10 +1873,7 @@ class StageCanvas(QWidget):
 
         if freq_hz == 0.0:
             return 0.0, True
-
-        # Aktueller On/Off-Zustand anhand Systemzeit berechnen
-        phase = (time.time() * freq_hz) % 1.0
-        return freq_hz, phase < 0.5
+        return freq_hz, self._blink_an(freq_hz, rechteck)
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
                             running=None, vorab: dict | None = None) -> list[str]:
@@ -2130,12 +2208,41 @@ class StageCanvas(QWidget):
                     freq_hz = max(freq_hz, hz)
         except Exception:
             pass
-        if freq_hz == 0.0:
+        rechteck = freq_hz == 0.0
+        if rechteck:
             freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
         if freq_hz == 0.0:
             return 0.0, True
-        phase = (time.time() * freq_hz) % 1.0
-        return freq_hz, phase < 0.5
+        return freq_hz, self._blink_an(freq_hz, rechteck)
+
+    # ── VIZ-104: Blinken im Bildtakt ─────────────────────────────────────────
+    # Bis zur Sichtprobe vom 2026-10-12 wurde die Phase je Bild aus der Uhr
+    # abgetastet (``time.time() * hz``). Bei 10 Bildern/s und einem Strobe von
+    # 5-20 Hz ist das eine Schwebung: die Ansicht blinkte langsam und
+    # unregelmaessig (~0,7 s an, lange aus), ohne Bezug zur gemeldeten
+    # Frequenz. Jetzt zaehlt die Ansicht ihre Takt-Bilder, und Periode und
+    # Blitzlaenge sind ganze Bilder (``core.strobe.blitz_bilder`` — dieselbe
+    # Rechnung und derselbe Deckel wie im 3D). Bei 10 Bildern/s heisst das:
+    # hoechstens 3,3 Blitze je Sekunde (ein Bild an, zwei aus), darunter die
+    # gemeldete Frequenz. Ein Zaehler fuer alle Geraete — gleiche Frequenz
+    # blinkt gemeinsam.
+
+    def _strobe_bildrate(self) -> float:
+        """Takt-Bilder je Sekunde: der Timer, gebremst durch UI-86."""
+        abstand = self.RENDER_INTERVAL_MS / 1000.0
+        try:
+            abstand = max(abstand, self._bild_abstand_s())
+        except Exception:
+            pass
+        return 1.0 / abstand
+
+    def _blink_an(self, freq_hz: float, rechteck: bool = False) -> bool:
+        """Leuchtet ein mit ``freq_hz`` blinkendes Geraet im laufenden Bild?
+        ``rechteck``: Rechteck-Effekt auf dem Dimmer (halb an, halb aus) statt
+        Shutter-Strobe (kurzer Blitz)."""
+        return _blitz_an(getattr(self, "_strobe_bild", 0), freq_hz,
+                         self._strobe_bildrate(),
+                         tast=0.5 if rechteck else _STROBE_TAST)
 
     # ── Paint ─────────────────────────────────────────────────────────────────
 
@@ -2483,11 +2590,7 @@ class StageCanvas(QWidget):
                 x, y = self._positions[self._drag_fid]
                 x, y = self._snap(x, y)
                 self._positions[self._drag_fid] = (x, y)
-                try:
-                    self._state.live_view_positions[self._drag_fid] = (float(x), float(y))
-                except Exception:
-                    pass
-                self._notify_layout_changed()
+                self._verschiebung_uebernehmen([self._drag_fid])
             self._drag_fid = None
             self._drag_moved = False
         elif self._multi_drag_start is not None:
@@ -2495,13 +2598,8 @@ class StageCanvas(QWidget):
             if self._multi_moved:
                 for fid in self._multi_drag_start:
                     if fid in self._positions:
-                        x, y = self._snap(*self._positions[fid])
-                        self._positions[fid] = (x, y)
-                        try:
-                            self._state.live_view_positions[fid] = (float(x), float(y))
-                        except Exception:
-                            pass
-                self._notify_layout_changed()
+                        self._positions[fid] = self._snap(*self._positions[fid])
+                self._verschiebung_uebernehmen(list(self._multi_drag_start))
             self._multi_drag_start = None
             self._multi_mouse_start = None
             self._multi_moved = False
@@ -2514,6 +2612,8 @@ class StageCanvas(QWidget):
             self._band_origin = None
             self._band_rect = None
             self.update()
+        if self._nachziehen_offen:
+            self._positionen_nachziehen()      # VIZ-106: waehrend des Drags verpasst
 
     # ── Tastatur / Mausrad / Kontextmenue ─────────────────────────────────────
 
