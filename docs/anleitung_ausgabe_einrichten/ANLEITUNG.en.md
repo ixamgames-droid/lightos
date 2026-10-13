@@ -346,6 +346,16 @@ If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX ge
 (rehearsal mode — no DMX is being sent) is shown there; a click hides this hint until the
 next program start.
 
+The bar lies **on top of** the upper edge of the view currently shown, directly below the
+bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with the
+laser emergency stop). It does not push anything down: when it appears or disappears, all
+buttons of the Virtual Console and all other controls stay where they are. In return it
+covers a narrow line at the top of the view. A click on the bar does not trigger anything
+underneath it. The bar is always a single line high; a text that is too long is shortened
+with "…", and the full text is in the tooltip. The fault message cannot be clicked away
+while the fault persists. The popped-out Virtual Console window and the 3D window do not
+show the bar.
+
 ## 9. What goes out when you quit or remove an output
 
 Many adapters hold the last frame they received even when no program is sending

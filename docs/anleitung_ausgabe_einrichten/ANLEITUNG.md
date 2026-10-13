@@ -328,6 +328,16 @@ sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist *
 Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
 Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
 
+Der Balken liegt **über** dem oberen Rand der gerade gezeigten Ansicht, direkt unter der
+Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit dem
+Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
+Tasten der Virtual Console und alle anderen Bedienelemente an ihrem Platz. Dafür verdeckt
+er eine schmale Zeile am oberen Rand der Ansicht. Ein Klick auf den Balken löst nichts aus,
+was darunter liegt. Der Balken ist immer nur eine Zeile hoch; ein zu langer Text wird mit
+„…“ gekürzt, der volle Text steht im Tooltip. Die Störungsmeldung lässt sich nicht
+wegklicken, solange die Störung anliegt. Im ausgelagerten Fenster der Virtual Console
+(Popout) und im 3D-Fenster gibt es den Balken nicht.
+
 ## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
 
 Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
