@@ -59,7 +59,6 @@
 | VIZ-105 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/visualizer/visualizer_window.py · tests/test_viz105_traverse_loeschen_undo_docks.py |
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
 | VCB-44 | D | fix/vcb44-blackout-ziele-streng-dialog-pruefung | 2026-10-12T15:27Z | src/core/group_ref.py · src/ui/virtualconsole/vc_button.py · src/core/sync.py · src/ui/widgets/validation_dialog.py |
-| UI-92 | D | fix/ui92-kleinkram-kuerzel-speichernfrage-sicherungen | 2026-10-12T15:41Z | src/ui/hilfe.py · src/core/show/sicherungen.py · src/ui/visualizer/visualizer_window.py |
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 | VIZ-107 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | tests/test_viz107_gobo_niedrig_buehnenkante_scene.py |
 | DOC-71 | B | docs/doc71-laser-blackout-anleitungen | 2026-10-12T19:21Z | docs/anleitung_ausgabe_einrichten · docs/anleitung_vc_widgets/01_button.md · docs/anleitung_vc_widgets/01_button.en.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/components/engine/script.md · docs/anleitung_laser/ANLEITUNG_LASER.md · docs/OUTPUT_MERGE_CONTRACT.md · tests/test_doc71_laser_blackout_einheitlich.py · tools/doku_gates.txt |
@@ -287,7 +286,6 @@
 
 ## Verlauf
 
-- 2026-10-12T19:08Z A claim LIZ-1
 - 2026-10-12T19:29Z A done VIZ-102
 - 2026-10-12T19:47Z A claim DOC-72
 - 2026-10-12T19:59Z D claim LIZ-2
@@ -317,3 +315,4 @@
 - 2026-10-13T17:04Z A claim ENG-39
 - 2026-10-13T18:06Z D done LAS-38
 - 2026-10-13T18:33Z D done OUT-75
+- 2026-10-13T19:09Z D done UI-92
