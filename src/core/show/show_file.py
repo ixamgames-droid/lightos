@@ -874,6 +874,10 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
                         # meint (Blackout-Ziel einer VC-Taste), zeigte nach
                         # Speichern/Laden auf eine andere oder keine.
                         "id": int(g.id),
+                        # VCB-42: die Kennung auch. Die ID sagt nur „welche
+                        # Nummer“, die Kennung „welche Gruppe“ — ohne sie waere
+                        # nach dem Laden jede Gruppe fuer eine Taste eine neue.
+                        "uid": g.uid or "",
                         "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
                         "positions_json": g.positions_json or "{}",
                         "folder": g.folder or "",
@@ -917,6 +921,11 @@ def _fixture_group_aus_daten(g):
     if (isinstance(gid, int) and not isinstance(gid, bool)
             and 0 < gid <= _GRUPPEN_ID_MAX):
         fg.id = gid
+    # VCB-42: gespeicherte Kennung uebernehmen. Fehlt sie (Alt-Show) oder ist
+    # sie unlesbar, bleibt sie offen — ``_gruppen_ids_vergeben`` gibt dann eine
+    # neue. Auch hier kostet ein kaputter Wert nur sich selbst, nicht die Gruppe.
+    from ..group_ref import uid_lesbar
+    fg.uid = uid_lesbar(g.get("uid")) or None
     return fg
 
 
@@ -928,7 +937,21 @@ def _gruppen_ids_vergeben(gebaut: list) -> None:
     die treffen, die ein spaeterer Eintrag mitbringt — die Transaktion
     scheiterte, und ALLE Gruppen waeren weg (der Fall, den STAB-24 beendet
     hat). Steht dieselbe ID zweimal in der Datei, behaelt sie der erste
-    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge."""
+    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge.
+
+    VCB-42: dasselbe fuer die Kennung — jede Gruppe genau eine, keine doppelt
+    (der erste Eintrag behaelt sie). Zwei Gruppen mit derselben Kennung waeren
+    fuer eine Taste „dieselbe“."""
+    from ..group_ref import neue_uid
+    kennungen: set[str] = set()
+    for fg in gebaut:
+        if not fg.uid or fg.uid in kennungen:
+            if fg.uid:
+                _lenient(f"Fixture-Gruppe '{fg.name}': Kennung steht doppelt in "
+                         f"der Datei — neue Kennung vergeben",
+                         ValueError("doppelte Kennung"))
+            fg.uid = neue_uid()
+        kennungen.add(fg.uid)
     vergeben: set[int] = set()
     for fg in gebaut:
         if fg.id is None:
@@ -1142,6 +1165,13 @@ def _show_daten(state, probleme: list) -> dict:
         "music_autoshow": getattr(state, "music_autoshow", None)
         or {"enabled": False, "function_ids": [], "bank": 0},
     }
+    # LAS-32 (S1): Sperrzonen als EIGENER Abschnitt mit eigener Versionsnummer
+    # — bewusst kein Knoten im Szenengraph (ein aelterer Programmstand macht aus
+    # einer unbekannten Knotenart ein Geraet). Nur geschrieben, wenn es etwas
+    # gibt: eine Show ohne Zonen bleibt Byte fuer Byte wie bisher.
+    sperrzonen = getattr(state, "sperrzonen", None)
+    if sperrzonen is not None and not sperrzonen.ist_leer():
+        show["sperrzonen"] = sperrzonen.to_dict()
     if scene_graph_data is not None:
         show["scene_graph"] = scene_graph_data
     return show
@@ -1738,6 +1768,13 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     except Exception as e:
         print(f"[show_file] reset laser patterns error: {e}")
 
+    # LAS-32: Sperrzonen und Laser-Felder leeren.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        state.sperrzonen = SperrzonenDaten()
+    except Exception as e:
+        print(f"[show_file] reset sperrzonen error: {e}")
+
     pe = getattr(state, "playback_engine", None)
     if pe is not None:
         try:
@@ -2022,6 +2059,12 @@ def _load_show_impl(path: str | os.PathLike):
     # sonst nullt der Zwischenschritt mit dem leeren Patch alle alten Adressen im
     # Live-Universe und der Output-Thread sendet den Blackout-Puls, bis der neue
     # Patch gerendert ist.
+    # LAS-32 (G10): hatte die Show, die gleich ersetzt wird, Sperrzonen?
+    try:
+        _sz_hatte_zonen = bool(getattr(getattr(state, "sperrzonen", None), "zonen", None))
+    except Exception:
+        _sz_hatte_zonen = False
+    state.sperrzonen_wechsel_hinweis = False
     with _deferred_addr_release(state):
         _prev_suppress = getattr(state, "_suppress_emits", False)
         state._suppress_emits = True
@@ -2190,6 +2233,19 @@ def _load_show_impl(path: str | os.PathLike):
             PatternSlot.from_dict, "Laser-Muster", "name", "label")
     except Exception as e:
         _lenient("load laser patterns error", e)
+
+    # LAS-32 (S1): Sperrzonen (eigener Abschnitt). Alt-Show ohne Abschnitt ->
+    # leerer Bestand; die Anzeige meldet dann „keine Sperrzonen", nie einen
+    # Zustand, der nach Schutz aussieht.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten, daten_aus_abschnitt
+        state.sperrzonen, _sz_probleme = daten_aus_abschnitt(data.get("sperrzonen"))
+        for _p in _sz_probleme:
+            print(f"[show_file] {_p}")
+            _ladeprobleme.append(_p)
+    except Exception as e:
+        state.sperrzonen = SperrzonenDaten()
+        _lenient("load sperrzonen error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library
@@ -2587,6 +2643,22 @@ def _load_show_impl(path: str | os.PathLike):
     except Exception as e:
         _lenient("music_autoshow load error", e)
         state.music_autoshow = {"enabled": False, "function_ids": [], "bank": 0, "slots": {}}
+
+    # LAS-32 (G10): von einer Show MIT Sperrzonen auf eine OHNE gewechselt,
+    # waehrend DMX-Laser gepatcht sind -> das Hauptfenster meldet es einmal
+    # (es liest und loescht dieses Flag im show_loaded-Handler). Eine Show mit
+    # Zonen merkt ausserdem, dass die Funktion auf diesem Rechner benutzt wird.
+    try:
+        from src.core.laser import sperrzonen as _sz
+        from src.core.laser.sperrzonen_merker import merke_benutzt as _sz_merke
+        _sz_daten = state.sperrzonen
+        if _sz_daten.zonen:
+            _sz_merke()
+        state.sperrzonen_wechsel_hinweis = bool(
+            _sz_hatte_zonen and not _sz_daten.zonen and _sz_daten.fremd is None
+            and _sz.dmx_laser(state))
+    except Exception as e:
+        _lenient("sperrzonen wechsel-hinweis error", e)
 
     # Notify listeners after full replacement
     try:
