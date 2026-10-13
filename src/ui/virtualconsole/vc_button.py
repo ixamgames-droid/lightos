@@ -2773,7 +2773,11 @@ class VCButton(VCWidget):
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
 
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        angenommen = dlg.exec() == QDialog.DialogCode.Accepted
+        # ENG-39: der Dialog bleibt als Kind der Taste bestehen — seine
+        # Hinweiszeile soll danach nicht bei jeder Aenderung weiterrechnen.
+        S["ueberschneidungs_hinweis"].stilllegen()
+        if angenommen:
             S["apply"]()
 
     def build_inspector_body(self, host=None):

@@ -291,6 +291,38 @@ def test_hinweiszeile_haengt_an_keinem_dauer_zeitgeber(fm, flaeche):
         _zu(wirt)
 
 
+def test_geschlossener_dialog_rechnet_nicht_weiter(fm, flaeche, monkeypatch):
+    """Der Eigenschaften-Dialog bleibt nach dem Schliessen als Kind der Taste
+    bestehen. Seine Hinweiszeile darf dann nicht bei jeder Aenderung
+    weiterrechnen — sonst waechst die Arbeit mit jedem Oeffnen."""
+    from PySide6.QtWidgets import QDialog
+    from src.core.sync import get_sync, SyncEvent
+    from src.ui.widgets.stufe_auswahl import stufen_melder
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND)
+    _taste(flaeche, lauf)
+    taste = _taste(flaeche, puls)
+    gesehen = []
+
+    def _exec(dlg):
+        zeile = dlg.findChild(QLabel, NAME)
+        gesehen.append(zeile.text())        # solange offen: Hinweis steht da
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, "exec", _exec)
+    for _ in range(3):
+        taste._open_properties()
+    assert all("steuern beide den Dimmer" in t for t in gesehen) and len(gesehen) == 3
+
+    zeilen = taste.findChildren(H.UeberschneidungsHinweis)
+    assert len(zeilen) == 3, "Vorbedingung: die Dialoge leben an der Taste weiter"
+    get_sync().emit(SyncEvent.FUNCTION_CHANGED, None)
+    stufen_melder().geaendert.emit(frozenset({lauf.id}))
+    assert not any(z._sammler.isActive() for z in zeilen), (
+        "geschlossene Dialoge rechnen weiter")
+    _app().processEvents()
+
+
 # ── Ansicht „Prioritäten“ ────────────────────────────────────────────────────
 
 def test_ansicht_prioritaeten_zeigt_dieselben_saetze_als_tooltip(fm, flaeche):

@@ -213,6 +213,7 @@ class UeberschneidungsHinweis(QLabel):
         self._taste = taste
         self._quelle = quelle
         self.sichtbar_setzen = None
+        self._stillgelegt = False
         self.treffer: list = []
         self.setObjectName("vcUeberschneidungsHinweis")
         self.setStyleSheet(HINWEIS_STIL)
@@ -249,8 +250,20 @@ class UeberschneidungsHinweis(QLabel):
             print(f"[ueberschneidung_hinweis] sync subscribe error: {e}")
         self.neu_berechnen()
 
+    def stilllegen(self) -> None:
+        """Ab jetzt nicht mehr nachrechnen. Der Eigenschaften-Dialog ruft das
+        nach dem Schliessen: er bleibt als Kind der Taste bestehen, und ohne
+        das rechnete jede je geoeffnete Zeile bei jeder Aenderung weiter."""
+        self._stillgelegt = True
+        try:
+            self._sammler.stop()
+        except RuntimeError:
+            pass
+
     def veraltet(self, *_a) -> None:
         """Etwas hat sich geaendert — beim naechsten Umlauf neu rechnen."""
+        if self._stillgelegt:
+            return
         try:
             self._sammler.start()
         except RuntimeError:
