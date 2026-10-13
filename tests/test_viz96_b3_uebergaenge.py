@@ -11,11 +11,9 @@ offene Punkte. Die reine Rechnung dazu liegt in
   die Projektion angeglichen und traegt waehrend der Blende seinen Anteil.
 * **Schmale Buehnen-Elemente** (``goboSchmal``): Traverse/Stuetze tragen kein
   mehrere Meter grosses Muster; Wand und Buehnenplatte bleiben Ziel.
-* **Grenzebene** (``goboEbene``): die Projektion endet an der Flaeche, auf der
-  der Kegel endet — gerechnet in den Koordinaten des Schattenlichts, geprueft
-  mit der echten Schattenmatrix von three.
-* der Shader bekommt dafuer EIN weiteres Uniform-Feld und eine Multiplikation,
-  keinen Sampler; Ebene setzen/loeschen aendert nur Werte.
+* der Shader bekommt EIN weiteres Uniform-Feld (seit VIZ-102 die Reichweite
+  ``lightosGoboFern`` statt der Grenzebene aus B3 — die Projektion laeuft jetzt
+  ueber Kanten weiter, s. ``test_viz102_gobo_hallenboden.py``), keinen Sampler.
 
 Vergabe-Hysterese und der Ablauf im Spot-Pool: ``test_viz96_b3_uebergaenge_scene.py``.
 """
@@ -71,40 +69,16 @@ aus.schmal = {
   kaputt: G.goboSchmal({ x: NaN, y: 1, z: 1 }, 2.5),
 };
 
-// ── Grenzebene gegen die echte Schattenmatrix ──
-const l = new THREE.SpotLight(0xffffff, 1, 25, 0.5, 0.05, 1);
-l.castShadow = true;
-l.position.set(1, 5, -2);
-l.target.position.set(2.5, 1, 1.2);
-l.shadow.camera.near = 0.5;
-l.updateMatrixWorld(true); l.target.updateMatrixWorld(true);
-l.shadow.updateMatrices(l);
-const e = G.goboEbene(l.shadow.matrix.clone().invert().elements, 1.0);
-const grenze = 1.0 - G.GOBO_GRENZE_LUFT;
-aus.luft = G.GOBO_GRENZE_LUFT;
-aus.ebeneFalsch = 0;
-aus.ebenePunkte = 0;
-for (let x = -4; x <= 8; x += 1.5) for (let z = -4; z <= 10; z += 1.5) {
-  for (const y of [-0.5, 0, 0.5, 0.74, 0.76, 1.0, 1.5, 3]) {
-    const c = new THREE.Vector4(x, y, z, 1).applyMatrix4(l.shadow.matrix);
-    const d = e[0] * c.x + e[1] * c.y + e[2] * c.z + e[3] * c.w;
-    aus.ebenePunkte += 1;
-    if ((d >= 0) !== (y >= grenze)) aus.ebeneFalsch += 1;
-  }
-}
-aus.ebeneNorm = Math.max(...e.map(Math.abs));
-aus.ebeneKaputt = G.goboEbene(new Array(16).fill(0), 1.0);
-
 // ── Shader + Uniforms ──
 const chunk = THREE.ShaderChunk.lights_fragment_begin;
 const fs = G.patchFragmentShader(THREE.ShaderLib.standard.fragmentShader, chunk);
 aus.sampler = (fs.match(/uniform\s+sampler2D\s+lightos\w+/g) || []).length;
-aus.feld = fs.indexOf('uniform vec4 lightosGoboEbene[ NUM_SPOT_LIGHT_SHADOWS ];') >= 0;
-const iEbene = fs.indexOf('dot( lightosGoboEbene[ i ], vSpotShadowCoord[ i ] )');
+aus.feld = fs.indexOf('uniform vec2 lightosGoboFern[ NUM_SPOT_LIGHT_SHADOWS ];') >= 0;
+const iEbene = fs.indexOf('lightosGoboFern[ i ].x / lightosGw');
 const iMix = fs.indexOf('directLight.color *= mix( 1.0, lightosGm, lightosGp.x );');
 const iMaske = fs.indexOf('float lightosGm = texture2D( lightosGoboMap');
 aus.lage = iMaske >= 0 && iEbene > iMaske && iMix > iEbene;
-aus.einmal = fs.split('lightosGoboEbene[ i ]').length - 1;
+aus.einmal = fs.split('lightosGoboFern[ i ]').length - 1;   // x einmal, y zweimal
 
 class Mat {}
 aus.installiert = G.installGoboProjektion({
@@ -115,19 +89,19 @@ const hook = Mat.prototype.onBeforeCompile;
 const vorher = hook.toString();
 const sh = { fragmentShader: THREE.ShaderLib.standard.fragmentShader, uniforms: {} };
 hook.call(new Mat(), sh);
-aus.uniformDa = !!sh.uniforms.lightosGoboEbene
-  && sh.uniforms.lightosGoboEbene.value.length === G.GOBO_MAX_LICHTER;
-aus.grund = G.goboProjektionInfo().ebene.every(v => v.join() === '0,0,0,1');
-const feld = sh.uniforms.lightosGoboEbene.value;
+aus.uniformDa = !!sh.uniforms.lightosGoboFern
+  && sh.uniforms.lightosGoboFern.value.length === 2 * G.GOBO_MAX_LICHTER;
+aus.grund = G.goboProjektionInfo().fern.every(v => v[0] === G.GOBO_FERN_AUS && v[1] === G.GOBO_FERN_AUS);
+const feld = sh.uniforms.lightosGoboFern.value;
 G.setzeGoboLicht(2, 1, 1, 0, 0);
-G.setzeGoboEbene(2, e);
-aus.gesetzt = G.goboProjektionInfo().ebene[2];
-aus.gleichesFeld = sh.uniforms.lightosGoboEbene.value === feld;
+G.setzeGoboFern(2, [6, 7.5]);
+aus.gesetzt = G.goboProjektionInfo().fern[2];
+aus.gleichesFeld = sh.uniforms.lightosGoboFern.value === feld;
 G.loescheGoboLicht(2);
-aus.geloescht = G.goboProjektionInfo().ebene[2];
-aus.ausserhalb = G.setzeGoboEbene(99, e);
+aus.geloescht = G.goboProjektionInfo().fern[2][0] === G.GOBO_FERN_AUS
+  && G.goboProjektionInfo().fern[2][1] === G.GOBO_FERN_AUS;
+aus.ausserhalb = G.setzeGoboFern(99, [6, 7.5]);
 aus.hookGleich = Mat.prototype.onBeforeCompile === hook && hook.toString() === vorher;
-aus.e = e;
 """
 
 
@@ -196,32 +170,22 @@ class Viz96B3LogikTest(unittest.TestCase):
         self.assertFalse(s["ohneGobo"])
         self.assertFalse(s["kaputt"])
 
-    # ── Punkt 4: Grenzebene ──────────────────────────────────────────────────
-    def test_ebene_trennt_genau_an_der_flaeche_minus_luft(self):
-        r = self.r
-        self.assertGreater(r["ebenePunkte"], 400)
-        self.assertEqual(r["ebeneFalsch"], 0)
-        self.assertAlmostEqual(r["ebeneNorm"], 1.0, places=9)
-        self.assertEqual(r["ebeneKaputt"], [0, 0, 0, 1], "entartete Matrix: keine Grenze")
-        self.assertGreater(r["luft"], 0.05)
-        self.assertLess(r["luft"], 0.5)
-
+    # ── Shader ───────────────────────────────────────────────────────────────
     def test_shader_ein_feld_eine_multiplikation_kein_sampler(self):
         r = self.r
         self.assertEqual(r["sampler"], 1, "weiter genau EIN zusaetzlicher Sampler")
         self.assertTrue(r["feld"])
-        self.assertTrue(r["lage"], "Grenze wirkt auf die Maske, vor der Multiplikation aufs Licht")
-        self.assertEqual(r["einmal"], 1)
+        self.assertTrue(r["lage"], "Reichweite wirkt auf die Maske, vor der Multiplikation aufs Licht")
+        self.assertEqual(r["einmal"], 3)
 
-    def test_ebene_setzen_und_loeschen_aendert_nur_werte(self):
+    def test_reichweite_setzen_und_loeschen_aendert_nur_werte(self):
         r = self.r
         self.assertTrue(r["installiert"])
         self.assertTrue(r["uniformDa"])
-        self.assertTrue(r["grund"], "Grundstellung (0,0,0,1) = keine Grenze")
-        for a, b in zip(r["gesetzt"], r["e"]):
-            self.assertAlmostEqual(a, b, places=9)
+        self.assertTrue(r["grund"], "Grundstellung = keine Abschwaechung")
+        self.assertEqual(r["gesetzt"], [6, 7.5])
         self.assertTrue(r["gleichesFeld"])
-        self.assertEqual(r["geloescht"], [0, 0, 0, 1], "loescheGoboLicht nimmt die Grenze mit")
+        self.assertTrue(r["geloescht"], "loescheGoboLicht nimmt die Reichweite mit")
         self.assertFalse(r["ausserhalb"])
         self.assertTrue(r["hookGleich"], "Programmschluessel-Zusatz unveraendert (VIZ-69)")
 
