@@ -952,9 +952,16 @@ class PatchView(QWidget):
     def _import_knopf(self) -> QPushButton:
         """Knopf „Tabellen-Import“ mit zwei Eintraegen: Tabelle einlesen und
         Vorlage speichern. Die Vorlage haengt am selben Knopf, weil man sie
-        braucht, BEVOR man eine Tabelle hat."""
+        braucht, BEVOR man eine Tabelle hat.
+
+        STAB-33: ``MenueKnopf`` statt ``QPushButton.setMenu`` — der eingebaute
+        Menue-Pfeil loest unter Windows „QFont::setPointSize: Point size <= 0“
+        aus (s. widgets/menue_knopf.py). Der Pfeil steht als „▾“ im Text; das
+        Menue klappt beim Klick UND bei Leertaste/Eingabe auf dem Knopf auf und
+        laesst sich danach mit den Pfeiltasten bedienen."""
         from PySide6.QtWidgets import QMenu
-        self._btn_import = QPushButton("Tabellen-Import")
+        from src.ui.widgets.menue_knopf import MenueKnopf
+        self._btn_import = MenueKnopf("Tabellen-Import ▾")
         self._btn_import.setToolTip(
             "Geräteliste aus einer Tabelle (CSV) übernehmen — für den Umstieg "
             "von einem anderen Lichtprogramm. Mit Vorschau; vorhandene Geräte "

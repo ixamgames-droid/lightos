@@ -448,3 +448,154 @@ def test_patch_ansicht_hat_den_knopf_mit_beiden_eintraegen(tmp_path, state, bib,
     # die Patch-Tabelle hat sich über patch_changed selbst aufgefrischt
     assert view._table.rowCount() == 2
     assert [view._table.item(r, 1).text() for r in range(2)] == ["PAR 1", "PAR 2"]
+
+
+# ── Nachbesserungen: Menüknopf, Spaltenbreiten, Auswahlfeld ──────────────────
+
+LANG = (
+    "Name;Hersteller;Profil;Modus;Universum;Adresse;Anzahl\n"
+    f"Ein ziemlich langer Gerätename für die vordere Traverse links;Generic;{PAR};8-Kanal RGBW;1;1;3\n"
+    f"Kollision mit dem Altbestand;Generic;{PAR};8-Kanal RGBW;1;104;1\n"
+    "Unbekannt;;Quantum Wash XJ9000 Extended Professional Edition;;1;300;1\n"
+    f"Ohne Modus;U King;{MH};;1;400;1\n"
+    f"Ähnlich;;Stage Light ZQ0142;;1;450;1\n"
+)
+
+
+def _gezeigt(state, bib, breite, text=LANG):
+    dlg = _dialog(state, bib, text)
+    dlg.resize(breite, 600)
+    dlg.show()
+    _app.processEvents()
+    return dlg
+
+
+@pytest.mark.parametrize("breite", [900, 1100, 1400])
+def test_status_spalte_bleibt_im_bild(state, bib, breite):
+    """Bei 900 px rutschte „Status“ aus dem Bild — der Grund war nur über den
+    waagerechten Rollbalken zu lesen."""
+    _vorhandenes(state, bib)
+    dlg = _gezeigt(state, bib, breite)
+    tabelle, kopf = dlg._table, dlg._table.horizontalHeader()
+    assert dlg.width() == breite
+    assert kopf.length() <= tabelle.viewport().width()
+    assert tabelle.horizontalScrollBar().maximum() == 0
+    rechts = kopf.sectionViewportPosition(D.S_STATUS) + kopf.sectionSize(D.S_STATUS)
+    assert rechts <= tabelle.viewport().width()
+    assert kopf.sectionSize(D.S_STATUS) >= D.STATUS_MIN
+    for spalte, (kleinste, groesste) in D.BIEGSAM.items():
+        assert kleinste <= kopf.sectionSize(spalte) <= groesste
+    for spalte in (D.S_ZEILE, D.S_UNIV, D.S_ADRESSE, D.S_KANAELE):
+        assert kopf.sectionSize(spalte) <= D.SCHMAL_MAX
+
+
+def test_grund_bricht_um_statt_abgeschnitten_zu_werden(state, bib):
+    _vorhandenes(state, bib)
+    dlg = _gezeigt(state, bib, 900)
+    tabelle = dlg._table
+    zeile = next(z for z in range(tabelle.rowCount())
+                 if "Altbestand" in dlg.status_text(z))
+    item = tabelle.item(zeile, D.S_STATUS)
+    fm = tabelle.fontMetrics()
+    breite = tabelle.columnWidth(D.S_STATUS)
+    assert fm.horizontalAdvance(item.text()) > breite      # passt nicht in eine Zeile
+    assert tabelle.rowHeight(zeile) >= 2 * fm.height()      # also mehrzeilig
+    assert item.toolTip() == item.text()
+
+
+def test_breiter_dialog_gibt_den_textspalten_mehr_platz(state, bib):
+    schmal = _gezeigt(state, bib, 900)
+    breit = _gezeigt(state, bib, 1400)
+    assert breit._table.columnWidth(D.S_PROFIL) > schmal._table.columnWidth(D.S_PROFIL)
+    assert breit._table.columnWidth(D.S_NAME) > schmal._table.columnWidth(D.S_NAME)
+    # eng: zuerst bekommt das Auswahlfeld Platz (sein Text bricht nicht um)
+    assert schmal._table.columnWidth(D.S_NAME) == D.BIEGSAM[D.S_NAME][0]
+    assert schmal._table.columnWidth(D.S_PROFIL) > D.BIEGSAM[D.S_PROFIL][0]
+
+
+def test_mindestbreite_reicht_fuer_alle_spalten_und_den_grund(state, bib):
+    dlg = _gezeigt(state, bib, 400)                  # kleiner geht nicht
+    assert dlg.width() == dlg.minimumWidth() <= 900
+    kopf = dlg._table.horizontalHeader()
+    assert kopf.sectionSize(D.S_STATUS) >= D.STATUS_MIN
+    assert dlg._table.horizontalScrollBar().maximum() == 0
+
+
+def test_startgroesse_passt_zu_inhalt_und_bildschirm(state, bib):
+    dlg = _dialog(state, bib, LANG)
+    dlg.show()
+    _app.processEvents()
+    flaeche = _app.primaryScreen().availableGeometry()
+    assert dlg.width() <= flaeche.width() and dlg.height() <= flaeche.height()
+    assert dlg.width() >= min(D.START_BREITE[0], flaeche.width() - 16)
+    assert dlg._table.horizontalScrollBar().maximum() == 0
+    # wer vorher selbst eine Größe setzt, behält sie
+    eigen = _dialog(state, bib, LANG)
+    eigen.resize(950, 500)
+    eigen.show()
+    _app.processEvents()
+    assert (eigen.width(), eigen.height()) == (950, 500)
+
+
+def test_auswahlfeld_liste_ist_so_breit_wie_der_laengste_eintrag(state, bib):
+    """Im Feld stand „… 8-Kanal RGBW (8 Kanael“ — rechts abgeschnitten."""
+    dlg = _gezeigt(state, bib, 900)
+    for box in dlg._auswahl:
+        fm = box.fontMetrics()
+        laengster = max(fm.horizontalAdvance(box.itemText(i)) for i in range(box.count()))
+        assert box.view().minimumWidth() > laengster
+        assert box.toolTip().startswith(box.currentText())
+        assert len(box.toolTip()) > len(box.currentText()) + 20   # Erklärung bleibt
+
+
+def test_auswahlfeld_tooltip_folgt_der_wahl(state, bib):
+    dlg = _dialog(state, bib, f"Name;Profil;Adresse\nKopf;{MH};1\n")
+    box = dlg._auswahl[0]
+    assert box.toolTip().startswith(D.MODUS_WAEHLEN)
+    dlg.waehle(0, 1)
+    assert box.toolTip().startswith(box.itemText(1)) and "(" in box.itemText(1)
+    assert "Modus" in box.toolTip().split("\n\n", 1)[1]
+
+
+def test_import_knopf_ist_ein_menueknopf_und_per_tastatur_bedienbar(state, monkeypatch):
+    """STAB-33: kein QPushButton.setMenu. Leertaste auf dem Knopf klappt das
+    Menü auf, Pfeil-ab + Eingabe löst den ersten Eintrag aus."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QPushButton
+    import src.ui.views.patch_view as PV
+    from src.ui.widgets.menue_knopf import MenueKnopf
+    monkeypatch.setattr(PV, "get_state", lambda: state)
+    gerufen = []
+    monkeypatch.setattr(PV.PatchView, "_aus_tabelle_importieren",
+                        lambda self, pfad=None: gerufen.append("import"))
+    monkeypatch.setattr(PV.PatchView, "_import_vorlage_speichern",
+                        lambda self: gerufen.append("vorlage"))
+    view = PV.PatchView()
+    knopf = view._btn_import
+    assert isinstance(knopf, MenueKnopf) and knopf.text() == "Tabellen-Import ▾"
+    assert QPushButton.menu(knopf) is None            # Qt kennt das Menü nicht
+    assert knopf.focusPolicy() & Qt.FocusPolicy.TabFocus
+    menu = knopf.menu()
+    view.show()
+    _app.processEvents()
+    try:
+        assert not menu.isVisible()
+        knopf.setFocus()
+        QTest.keyClick(knopf, Qt.Key.Key_Space)
+        _app.processEvents()
+        assert menu.isVisible()
+        QTest.keyClick(menu, Qt.Key.Key_Down)
+        assert menu.activeAction() is view._act_import
+        QTest.keyClick(menu, Qt.Key.Key_Return)
+        _app.processEvents()
+        assert gerufen == ["import"] and not menu.isVisible()
+        knopf.click()
+        _app.processEvents()
+        QTest.keyClick(menu, Qt.Key.Key_Down)
+        QTest.keyClick(menu, Qt.Key.Key_Down)
+        QTest.keyClick(menu, Qt.Key.Key_Return)
+        _app.processEvents()
+        assert gerufen == ["import", "vorlage"]
+    finally:
+        menu.hide()

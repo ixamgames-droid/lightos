@@ -26,7 +26,7 @@ def test_knoepfe_und_eintraege_wie_in_der_app():
     text = _abschnitt()
     dialog = DIALOG.read_text(encoding="utf-8")
     patch = PATCH.read_text(encoding="utf-8")
-    for wort, quelle in (("Tabellen-Import", patch),
+    for wort, quelle in (("Tabellen-Import ▾", patch),
                          ("Aus Tabelle importieren …", patch),
                          ("Vorlage speichern …", patch),
                          ("Anwenden", dialog),

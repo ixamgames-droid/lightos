@@ -51,12 +51,12 @@ Wer von einem anderen Lichtprogramm umsteigt, muss seine Geräte nicht einzeln n
 Geräteliste als Tabelle aufschreiben (oder aus dem alten Programm exportieren), als **CSV**
 speichern, einlesen.
 
-1. Im Tab **Patch** auf **Tabellen-Import** → **Vorlage speichern …**. Das schreibt eine
+1. Im Tab **Patch** auf **Tabellen-Import ▾** → **Vorlage speichern …**. Das schreibt eine
    Beispiel-Tabelle mit Kopfzeile und zwei Zeilen.
 2. Die Vorlage im Tabellenprogramm öffnen, die Beispielzeilen durch die eigenen Geräte ersetzen
    und wieder als CSV speichern (in Excel: *Speichern unter…* → *CSV (Trennzeichen-getrennt)*;
    eine `.xlsx`-Arbeitsmappe liest LightOS nicht).
-3. **Tabellen-Import** → **Aus Tabelle importieren …**, Datei wählen. Es öffnet sich die Vorschau
+3. **Tabellen-Import ▾** → **Aus Tabelle importieren …**, Datei wählen. Es öffnet sich die Vorschau
    *Patch aus Tabelle importieren* — noch ist nichts angelegt.
 4. Vorschau prüfen, bei offenen Zeilen das Profil wählen, dann **Anwenden**.
 
