@@ -90,20 +90,34 @@ def _udmx_suchen() -> dict:
     Das Aufzaehlen liest USB-Beschreibungen (mit Zeitlimit) und gehoert deshalb
     nicht in den UI-Thread. Zurueck kommen nur einfache Daten, kein
     Geraete-Objekt: ``{"geraete": [(beschriftung, schluessel)], "unklar": n,
-    "code": G_*, "text": str}``.
+    "code": G_*, "text": str, "treiber": [...]}``.
+
+    OUT-76: ``treiber`` = was WINDOWS ueber die angesteckten bekannten Adapter
+    sagt (``udmx_treiber_text.befund_daten``; leer ausserhalb von Windows).
+    Die Frage braucht kein pyusb und oeffnet kein Geraet — ein Adapter ohne
+    Treiber wird so auch dann gefunden und erklaert, wenn die Suche ueber
+    pyusb gar nicht moeglich ist.
     """
     from src.core.dmx import udmx
+    from src.core.dmx.udmx_treiber_text import befund_daten
     try:
-        geraete = udmx.liste_geraete()
+        befunde = udmx.windows_treiber()
+    except Exception:                                    # noqa: BLE001
+        befunde = None
+    treiber = [befund_daten(b) for b in befunde or []]
+    try:
+        geraete = udmx.liste_geraete(treiber=befunde)
     except udmx.UdmxFehler as e:
-        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e)}
+        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e),
+                "treiber": treiber}
     except Exception as e:                               # noqa: BLE001
         return {"geraete": [], "unklar": 0, "code": udmx.G_ANTWORTET_NICHT,
-                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}"}
+                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}",
+                "treiber": treiber}
     return {"geraete": [(g.beschriftung(), g.schluessel)
                         for g in geraete if g.bestaetigt],
             "unklar": sum(1 for g in geraete if not g.bestaetigt),
-            "code": udmx.G_OK, "text": ""}
+            "code": udmx.G_OK, "text": "", "treiber": treiber}
 
 
 def _list_ifaces() -> list:
@@ -490,6 +504,31 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
     return _save_universe_config(rows)
 
 
+def _andere_ausgaben(om, universum: int, weg: str, ziel: str) -> list[dict]:
+    """OUT-75 (d): die Ausgaben dieses Universums, die ein „Verbinden“/
+    „Uebernehmen“ auf ``weg`` → ``ziel`` ERSETZEN wuerde — also alles, was dort
+    gerade laeuft und nicht genau dieser Weg mit genau diesem Ziel ist.
+
+    Gelesen aus ``ausgabe_status()``, derselben Quelle wie Statusleiste, Banner
+    und DMX-Monitor. Kann der Manager das nicht beantworten, gilt „nichts“ —
+    eine Rueckfrage ohne Grundlage waere schlimmer als keine.
+    """
+    status = getattr(om, "ausgabe_status", None)
+    if not callable(status):
+        return []
+    try:
+        eintraege = list(status() or [])
+    except Exception:
+        return []
+    return [e for e in eintraege
+            if e.get("universum") == universum
+            and not (e.get("weg") == weg and str(e.get("ziel") or "") == str(ziel or ""))]
+
+
+def _ausgabe_text(weg: str, ziel: str) -> str:
+    return f"{weg} → {ziel}" if ziel else weg
+
+
 class OutputConfigDialog(QDialog):
     # OUT-51: So oft wird nach „Verbinden" hoechstens nachgefragt, ob der Port
     # wirklich offen ist (je ~0,9 s). Der Serial-Worker wird als eigener Prozess
@@ -606,9 +645,30 @@ class OutputConfigDialog(QDialog):
             "uDMX-Adapter (z. B. Anyma uDMX, CYL-6602 „USB-DMX512“) hängen "
             "direkt am USB, ohne COM-Port. Ein Adapter trägt ein Universum.")
         self._lbl_udmx_hinweis.setWordWrap(True)
+        # OUT-76: die Schritte zum Windows-Treiber tragen Links (Zadig,
+        # Microsoft). Sie oeffnen sich nur auf einen Klick, nie von selbst.
+        self._lbl_udmx_hinweis.setOpenExternalLinks(True)
         self._lbl_udmx_hinweis.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        xf.addRow(self._lbl_udmx_hinweis)
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.LinksAccessibleByMouse
+            | Qt.TextInteractionFlag.LinksAccessibleByKeyboard)
+        # Die Schritte sind laenger, als der Reiter hoch ist: rollen statt
+        # unten abschneiden (das Fenster soll dafuer nicht wachsen).
+        from PySide6.QtWidgets import QFrame, QScrollArea
+        self._lbl_udmx_hinweis.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self._udmx_hinweis_rollen = QScrollArea()
+        self._udmx_hinweis_rollen.setWidgetResizable(True)
+        self._udmx_hinweis_rollen.setFrameShape(QFrame.Shape.NoFrame)
+        self._udmx_hinweis_rollen.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Kein eigener Hintergrund: der Bereich sieht aus wie der Reiter.
+        self._udmx_hinweis_rollen.setStyleSheet(
+            "QScrollArea { background: transparent; }")
+        self._udmx_hinweis_rollen.viewport().setStyleSheet(
+            "background: transparent;")
+        self._udmx_hinweis_rollen.setWidget(self._lbl_udmx_hinweis)
+        xf.addRow(self._udmx_hinweis_rollen)
         tabs.addTab(udmx_tab, "uDMX (USB)")
         self._udmx_tab_index = tabs.indexOf(udmx_tab)
         self._udmx_gesucht = False
@@ -1046,6 +1106,13 @@ class OutputConfigDialog(QDialog):
         state = get_state()
         om = state.output_manager
 
+        # OUT-75 (d): laeuft auf diesem Universum schon eine ANDERE Ausgabe,
+        # ersetzt „Verbinden“ sie. Bisher ohne ein Wort — vorher fragen.
+        if not self._ersetzen_bestaetigt(om, univ, "Enttec", port):
+            self._lbl_enttec_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
+
         # Sicherstellen dass das Universe existiert
         if univ not in state.universes:
             state.universes[univ] = om.add_universe(univ)
@@ -1078,6 +1145,31 @@ class OutputConfigDialog(QDialog):
             self._enttec_status_pruefen_spaeter()
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
+
+    # ── OUT-75: Rueckfrage vor dem Ersetzen einer laufenden Ausgabe ──────────
+
+    def _ersetzen_bestaetigt(self, om, univ: int, weg: str, ziel: str) -> bool:
+        """``True`` = es darf eingerichtet werden.
+
+        Gefragt wird nur, wenn auf diesem Universum gerade eine ANDERE Ausgabe
+        laeuft (anderer Weg oder anderes Ziel). Dieselbe Ausgabe noch einmal
+        einzurichten ist kein Ersetzen. Vorgabe ist „Nein“: ein versehentliches
+        Enter darf eine laufende Ausgabe nicht beenden.
+        """
+        andere = _andere_ausgaben(om, univ, weg, ziel)
+        if not andere:
+            return True
+        liste = "\n".join(
+            "  •  " + _ausgabe_text(str(e.get("weg") or ""), str(e.get("ziel") or ""))
+            for e in andere)
+        antwort = QMessageBox.question(
+            self, "Laufende Ausgabe ersetzen?",
+            f"Universe {univ} gibt gerade aus über:\n{liste}\n\n"
+            f"Soll das durch {_ausgabe_text(weg, ziel)} ersetzt werden? "
+            f"Die bisherige Ausgabe endet dann.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        return antwort == QMessageBox.StandardButton.Yes
 
     # ── OUT-51: den echten Verbindungsstatus nachtragen ──────────────────────
 
@@ -1206,6 +1298,17 @@ class OutputConfigDialog(QDialog):
         if aktuell:
             self._udmx_adapter_waehlen(aktuell, "derzeit nicht gefunden")
         code = int(ergebnis.get("code") or udmx.G_OK)
+        # OUT-76: steckt ein Adapter, dem unter Windows der Treiber fehlt, ist
+        # DAS die Auskunft — mit dem Weg dorthin, statt „eingesteckt?“ oder
+        # einer Liste, die aussieht, als waere alles in Ordnung.
+        from src.ui import udmx_treiber_hinweis
+        treiber = udmx_treiber_hinweis.nach_suche(ergebnis)
+        if treiber is not None:
+            if self._combo_udmx.count() == 0:
+                self._combo_udmx.addItem("Adapter ohne Treiber — siehe unten", "")
+            self._lbl_udmx_status.setText(treiber[0])
+            self._lbl_udmx_hinweis.setText(treiber[1])
+            return
         if code != udmx.G_OK:
             if self._combo_udmx.count() == 0:
                 self._combo_udmx.addItem("Keine Adapter-Suche möglich", "")
@@ -1249,6 +1352,12 @@ class OutputConfigDialog(QDialog):
         univ = self._spin_udmx_univ.value()
         state = get_state()
         om = state.output_manager
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(om, univ, "uDMX", schluessel):
+            self._lbl_udmx_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
+
         if univ not in state.universes:
             state.universes[univ] = om.add_universe(univ)
         try:
@@ -1317,6 +1426,25 @@ class OutputConfigDialog(QDialog):
             f"{wer} → Universe {univ}: sendet nicht — gespeichert, aber es "
             f"geht kein DMX raus")
         self._lbl_udmx_hinweis.setText(grund or "Adapter prüfen und neu einstecken.")
+        self._udmx_treiber_schritte_zeigen(dev, grund)
+
+    def _udmx_treiber_schritte_zeigen(self, dev, grund: str):
+        """OUT-76: scheitert der eingerichtete Adapter unter Windows am
+        Treiber, stehen unter dem Status die Schritte mit Links — nicht nur
+        der eine Satz aus ``grund_text``."""
+        from src.core.dmx import udmx, usb_treiber_windows
+        from src.ui import udmx_treiber_hinweis
+        try:
+            code = int(dev.grund())
+        except Exception:
+            return
+        if code != udmx.G_TREIBER_FEHLT or not usb_treiber_windows.ist_windows():
+            return
+        vid, pid, _serie, _ort = udmx.schluessel_lesen(getattr(dev, "port", ""))
+        kennung = f"{vid:04x}:{pid:04x}" if vid is not None else ""
+        self._lbl_udmx_hinweis.setText(udmx_treiber_hinweis.schritte_html(
+            kennung, "Der Adapter ist da, lässt sich aber nicht öffnen — unter "
+                     "Windows fehlt ihm der Treiber."))
 
     def _sync_artnet_start_univ_default(self):
         """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das
@@ -1356,6 +1484,11 @@ class OutputConfigDialog(QDialog):
             self._lbl_artnet_status.setText("Inaktiv")
             return
         ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(state.output_manager, univ, "Art-Net", ip):
+            self._lbl_artnet_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
         # OUT-04: NUR das gewählte Universum belegen. Die frühere Schleife über ALLE
         # Universen überschrieb jede andere Adapter-Zuweisung — live UND in
         # universes.json (`_persist_output` je Universum) → Mixed-Setups zerstört.
@@ -1573,6 +1706,12 @@ class OutputConfigDialog(QDialog):
             return
         ip_text = self._edit_sacn_ip.text().strip()
         target_ip = None if (self._check_sacn_multicast.isChecked() or not ip_text) else ip_text
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(state.output_manager, univ, "sACN",
+                                         target_ip or ""):
+            self._lbl_sacn_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
         try:
             # OUT-04: NUR das gewählte Universum belegen (nicht mehr alle über eine
             # Schleife überschreiben); andere universes.json-Zeilen bleiben erhalten.

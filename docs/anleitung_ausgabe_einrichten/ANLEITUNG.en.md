@@ -20,8 +20,10 @@
 - **For USB:** an ENTTEC DMX USB Pro. Windows brings the driver along; notes are in
   [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro) (German).
 - **For USB without a COM port:** a uDMX adapter, see
-  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the optional package `pyusb` and,
-  once, an access right or a driver.
+  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the package `pyusb` (included in
+  the Windows setup package) and, on Linux, an access right once. **On Windows it needs a
+  driver that neither Windows nor LightOS ships** – you assign it once by hand; after
+  that the adapter works.
 - **For network:** an Art-Net or sACN node (or a fixture with a built-in network input)
   and a computer **on the same network**, see
   [Network pitfall](#network-pitfall-with-art-net-and-sacn).
@@ -94,6 +96,13 @@ Tab **Enttec Pro USB**:
    (`Gespeichert: /dev/ttyUSB0 → Universe 1` = saved: …). Whether the adapter really
    sends is only shown by the status bar (step 8).
 
+**Question before replacing.** If a **different** output is already running on the
+chosen universe (another route, port or target IP), LightOS asks
+**Laufende Ausgabe ersetzen?** (replace the running output?) before setting it up – with
+**Nein** (no) everything stays as it is. This applies to **Verbinden** here and in the
+uDMX (USB) tab, and to **Übernehmen** in the Art-Net and sACN tabs. Setting up the same
+output again does not trigger a question.
+
 ## uDMX adapters (USB)
 
 Tab **uDMX (USB)** — for adapters that sit directly on USB and have **no COM port**:
@@ -111,11 +120,38 @@ yet.
   DMX is going out).
 - Below the status you then find the **reason** and what to do. The most common ones:
   - *No access rights* (Linux): set up a udev rule once.
-  - *Cannot be opened* (Windows): assign the WinUSB driver to the adapter.
-  - *pyusb missing*: install the optional package.
+  - *Treiber fehlt* (driver missing, Windows): assign the WinUSB driver to the adapter,
+    see below.
+  - *pyusb missing*: if LightOS runs from source, install the package; update an older
+    setup package (newer ones include it).
 
   All three are described in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
   installs no drivers itself and changes no system settings.
+
+**On Windows: "Treiber fehlt" (driver missing).** Windows ships no driver for uDMX
+adapters, and LightOS neither ships nor installs one. If an adapter without a driver is
+plugged in, the tab says so right after **Adapter suchen**: the list shows
+`— Treiber fehlt (WinUSB zuweisen)` behind the adapter, and below it you find the steps
+with clickable links. LightOS opens no device and changes nothing for this – it only
+asks Windows.
+
+1. Get the program Zadig: https://zadig.akeo.ie – a free program from another vendor.
+2. Plug in the adapter and start Zadig (Windows asks for administrator rights).
+3. In Zadig, switch on *List All Devices* in the *Options* menu and pick the adapter
+   from the list – recognisable by the USB ID `2008 1066` (CYL-6602) or `16C0 05DC`
+   (Anyma uDMX).
+4. Choose *WinUSB* as the driver and click *Install Driver* (or *Replace Driver*).
+5. Back in LightOS: **Adapter suchen**, then **Verbinden**.
+
+> **Careful:** pick exactly the adapter in Zadig. Zadig replaces the driver of the
+> selected device – a mouse or keyboard stops working afterwards until you uninstall it
+> in the Windows Device Manager (with "delete driver") and plug it in again.
+
+The **Windows setup package** (x64) includes the parts needed (`pyusb` and the libusb
+library – libraries, not drivers): after installation uDMX works as soon as the driver
+is assigned as described above. A setup package built before 12 October 2026 does not
+contain them yet; the tab then says so and recommends updating. On Windows ARM64, uDMX
+is not included.
 
 If two identical adapters have no serial number, LightOS tells them apart by their USB
 port. If you move one of them, select it again in the tab.
@@ -234,11 +270,22 @@ Tab **DMX Monitor** next to it — the same values, but with fixture names:
 1. **Universe:** — choice of `Universe 1` to `Universe 32`.
 2. **Hervorgehobene Kanäle:** (highlighted channels) — for example `1,5,10-20`; these
    channels get a yellow frame.
-3. The output display: `Universe 1 geht raus` (Universe 1 is going out) means this
-   universe has an output and is being sent. Otherwise it says
-   `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (Universe \<n> has no output —
-   only calculated) or `⚠ Universe <n>: <Weg> sendet NICHT` (Universe \<n>: \<route> is
-   NOT sending).
+3. The output display says the same as the status bar and the banner (step 8):
+
+   | Display | Meaning |
+   |---|---|
+   | `Universe 1 geht raus` (is going out; green) | The universe has an output, and it is sending. |
+   | `⚠ Universe <n>: <Weg> sendet NICHT` (\<route> is NOT sending; red) | The output is set up but is not sending – for example an ENTTEC whose port cannot be opened. The tooltip gives the reason. |
+   | `Universe <n>: <Weg> verbindet …` (is connecting; orange) | The port is being opened right now. |
+   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (has no output — only calculated; orange) | The values are calculated, but no adapter outputs them. |
+   | `Universe <n> ist nicht angelegt — keine Werte` (does not exist — no values; grey) | Nothing is patched in this universe and no output is set up. The grid is then dimmed and empty. |
+
+   If a universe has **several outputs** (for example ENTTEC and Art-Net), the choice
+   **Ausgang:** (output) appears next to it – the monitor shows what goes to the chosen
+   output. The outputs only send different data while the laser emergency stop locks
+   one of them; the display then adds
+   `· NOT-AUS-Sperre auf diesem Ausgang: <n> Adressen` (emergency-stop lock on this
+   output: \<n> addresses).
 4. The legend: blue frame = patched, yellow frame = highlighted. Each patched tile
    carries an abbreviation of fixture and channel, for example `PAR 1 R`.
 

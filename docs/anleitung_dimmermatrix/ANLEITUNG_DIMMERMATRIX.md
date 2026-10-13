@@ -24,10 +24,11 @@ Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
 
 - **Algorithmus: Chase** (Lauflicht; alternativ *Atmen (Puls)* = pulsierend, *Strobe* = hartes An/Aus)
 - **Stil: Dimmer**
-- **Spalten/Reihen** musst du nicht von Hand setzen: Der eingebettete Editor folgt automatisch
-  der **Programmer-Auswahl** (die manuellen Zuweisungs-Buttons sind ausgeblendet). Daraus ergibt
-  sich das Geräte-Grid von selbst — bei loser Auswahl als **Spalten = Anzahl der Geräte**
-  (hier 10 = PAR + Spider), **Reihen = 1**.
+- **Spalten/Reihen** musst du nicht von Hand setzen: Die mit **+ Neu** angelegte Matrix nimmt
+  die **Programmer-Auswahl** und folgt ihr, bis du sie speicherst. Daraus ergibt sich das
+  Geräte-Grid von selbst — bei loser Auswahl als **Spalten = Anzahl der Geräte**
+  (hier 10 = PAR + Spider), **Reihen = 1**. Eine schon gespeicherte Matrix ändert ihr Raster
+  nur über **Auswahl übernehmen**.
 - **💾 Speichern**, dann in der Liste links **▶ Start** — gestartet wird immer die gespeicherte
   Fassung.
 
@@ -104,7 +105,7 @@ Im Hardstyle-Look kombiniert: blauer Farb-Chase + schnellerer Dimmer-Puls, per V
 ---
 
 **Kurz:** Gruppe wählen → Matrix-Tab → **+ Neu** → **Stil Dimmer** + Algorithmus *Chase* (Raster
-folgt der Auswahl) → Helligkeit über **Dimmer-Bereich** (Min/Max) → **💾 Speichern** →
+kommt aus der Auswahl) → Helligkeit über **Dimmer-Bereich** (Min/Max) → **💾 Speichern** →
 **▶ Start**. Tempo: neue Matrizen hängen am Bus **Global** (folgt der Musik-BPM); schneller als
 die Farb-Matrix wird der Puls über **Tempo ×** — **Geschwindigkeit** wirkt nur ohne laufende BPM.
 Live umschalten in der **Virtuellen Konsole** (Speed-Rad, Element **Tempo-Bus**, Buttons

@@ -20,7 +20,7 @@ The editor is the workbench where you build and edit these looks.
 
 ## Where to find it
 
-- **In the programmer:** the **„Matrix"** tab. There the matrix automatically follows your fixture selection (see "follow mode" below), so you program directly on the fixtures currently selected.
+- **In the programmer:** the **„Matrix"** tab. There a new matrix automatically takes your fixture selection (see "follow mode" below), so you program directly on the fixtures currently selected.
 - **As its own sub-tab / manager:** the same interface, but with manual fixture assignment (buttons „Aus Auswahl" (from selection) and „Auto-Zuweisung aus Patch" (auto-assign from patch)).
 - **As a large window:** the **„⤢ Großes Fenster"** (large window) button at the top right undocks the complete editor into a freely resizable, scrollable window (good when there are many settings). Tapping it again or closing the window docks it back.
 
@@ -95,7 +95,7 @@ Depending on style and algorithm, it shows either fixed color buttons **C1/C2/C3
 | **Aus Auswahl** | Builds the grid from the fixtures selected on the left in the programmer – for a real group as a 2D grid including gaps, otherwise as 1 × N. |
 | **Auto-Zuweisung aus Patch** | Fills the current grid with fixtures from the active selection/group (fallback: the whole patch). |
 
-> In **follow mode** (programmer tab „Matrix") these buttons are hidden; the group is then called „Geräte (folgen der Programmer-Auswahl)" (fixtures (follow the programmer selection)) and takes over the selected group automatically whenever you change the selection. While loading a show the matrix does not follow the selection — the stored grid stays exactly as saved in the file.
+> In **follow mode** (programmer tab „Matrix") the group is called „Geräte" (fixtures); instead of the two buttons there is **Auswahl übernehmen** (take selection, same effect as „Aus Auswahl"). Only a matrix freshly created with **+ Neu** follows the selection by itself — until you save it, click another matrix or leave the tab. A saved matrix keeps its grid when you open the tab or change the selection; if the selection differs, the status line reads „… gespeichert – weicht von der Auswahl ab" (saved – differs from the selection) and **Auswahl übernehmen** sets the grid anew. While loading a show the matrix does not follow the selection — the stored grid stays exactly as saved in the file.
 
 ## Algorithms
 
