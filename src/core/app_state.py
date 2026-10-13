@@ -4292,10 +4292,26 @@ class AppState:
             print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
             su.begin_write_log()
+        # ENG-37: Modify-Effekte schreiben im Funktions-Durchlauf nichts — der
+        # Manager sammelt ihre Betraege, verrechnet wird in 4a²b auf das fertige
+        # Bild. ``tick`` wird bewusst mit denselben drei Argumenten gerufen wie
+        # immer (Manager-Ersatz und gepatchte ``tick`` in Tests kennen keinen
+        # Schalter); das Aufschieben wird vorher am Manager angemeldet.
+        _fm = self.function_manager
+        _modify_anwenden = getattr(_fm, "modify_anwenden", None)
+        _modify_aufschieben = getattr(_fm, "modify_aufschieben", None)
         try:
-            self.function_manager.tick(scratch, self._patch_cache, dt)
+            if _modify_aufschieben is not None and _modify_anwenden is not None:
+                _modify_aufschieben(True)
+            _fm.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        finally:
+            if _modify_aufschieben is not None:
+                try:
+                    _modify_aufschieben(False)
+                except Exception:
+                    pass
         func_touched: dict[int, set[int]] = {}
         for univ, su in scratch.items():
             func_touched[univ] = su.end_write_log()
@@ -4520,6 +4536,24 @@ class AppState:
                 continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
             for a in dims:
                 su.set_channel(a, 255)
+
+        # 4a²b. ENG-37: Modify-Effekte — der EINE spaete Rechengang. Verrechnet
+        #      wird mit dem FERTIGEN Wert der Schichten darunter: Effekte,
+        #      Cuelisten, Programmer/Snaps und die implizite Grundhelligkeit von
+        #      eben. Ein Modify-Effekt hat in Schritt 2 nichts geschrieben — er
+        #      steht in keinem Schreib-Protokoll, besitzt keinen Dimmer und
+        #      schaltet die Grundhelligkeit nicht ab; wo sein Betrag 0 ist,
+        #      bleibt der Wert unveraendert. Bewusst HIER, also VOR Szenen-
+        #      Vorschau, „Alles Weiss“, Submastern/Fixture-Dimmern (4b),
+        #      DMX-Eingang, Simple Desk und Laser-NOT-AUS (4d) sowie vor Grand
+        #      Master/Blackout im OutputManager: die behalten das letzte Wort,
+        #      ein Modify kann Blackout und NOT-AUS nie aufhellen.
+        #      Kosten ohne laufenden Modify-Effekt: ein leerer Listen-Test.
+        if _modify_anwenden is not None:
+            try:
+                _modify_anwenden(scratch)
+            except Exception as exc:
+                print(f"[AppState] render modify error: {exc}")
 
         # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
         # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen
