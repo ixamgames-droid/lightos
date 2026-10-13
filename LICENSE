@@ -1,0 +1,112 @@
+LightOS — Lizenz
+================
+
+Copyright (c) 2026 ixamgames-droid
+https://github.com/ixamgames-droid/lightos
+
+Alle Rechte vorbehalten. / All rights reserved.
+
+
+Deutsche Fassung
+----------------
+
+1. Ansehen ist erlaubt.
+   Der Quelltext von LightOS ist öffentlich einsehbar. Jede Person darf ihn
+   lesen und sich ansehen, wie das Programm aufgebaut ist.
+
+2. Alles Weitere nur mit Erlaubnis.
+   Ohne vorherige schriftliche Erlaubnis des Urhebers (ixamgames-droid) ist es
+   nicht gestattet,
+     - das Programm auszuführen oder zu benutzen,
+     - es zu vervielfältigen, soweit das über das für die Anzeige und das
+       Bereitstellen auf GitHub Nötige hinausgeht,
+     - es zu verändern oder abgeleitete Werke daraus zu erstellen,
+     - es weiterzugeben, zu veröffentlichen, zu vermieten oder zu verkaufen —
+       weder ganz noch in Teilen, weder im Quelltext noch in gebauter Form.
+
+3. Testlizenzen.
+   LightOS befindet sich in der Testphase. Die Erlaubnis zum Benutzen erteilt
+   der Urheber als Lizenzdatei. Eine solche Testlizenz ist persönlich, in der
+   Regel zeitlich begrenzt und nicht übertragbar; sie erlaubt das Ausführen und Benutzen des
+   Programms im vereinbarten Rahmen und nichts darüber hinaus. Die Lizenzdatei
+   selbst darf nicht weitergegeben werden. Einen Testzugang gibt es auf Anfrage
+   über GitHub (Adresse oben).
+
+4. GitHub.
+   Die Rechte, die GitHub und andere Nutzer nach den Nutzungsbedingungen von
+   GitHub an öffentlichen Repositories haben (insbesondere das Ansehen und das
+   Forken innerhalb von GitHub), bleiben unberührt. Darüber hinausgehende
+   Rechte entstehen daraus nicht.
+
+5. Bestandteile Dritter.
+   LightOS enthält Bestandteile anderer Urheber. Sie stehen unter ihren
+   eigenen Lizenzen; diese sind in THIRD_PARTY_NOTICES.md aufgeführt, die
+   Lizenztexte liegen im Ordner licenses/. Diese Lizenz gilt nur für die
+   eigenen Teile von LightOS und schränkt keine Rechte ein, die die Lizenzen
+   dieser Bestandteile gewähren.
+
+6. Keine Gewähr.
+   Das Programm wird so bereitgestellt, wie es ist — ohne Zusicherung einer
+   bestimmten Eignung und ohne Gewähr, soweit das Gesetz das zulässt. Wer
+   LightOS mit Erlaubnis einsetzt, tut das auf eigene Verantwortung; das gilt
+   besonders für den Betrieb von Bühnen-, Laser- und Lichttechnik.
+
+7. Urheberhinweise.
+   Urheberhinweise und Herkunftsangaben im Programm, in erzeugten Dateien und
+   in diesem Repository dürfen nicht entfernt oder verändert werden.
+
+Dieser Text ist bewusst schlicht gehalten. Er ist keine Rechtsberatung. Wer
+unsicher ist, ob eine Nutzung erlaubt ist, fragt vorher beim Urheber nach.
+
+
+English version
+---------------
+
+The German version above is the authoritative one; this translation is
+provided for convenience.
+
+1. Viewing is permitted.
+   The source code of LightOS is publicly visible. Anyone may read it and look
+   at how the program is built.
+
+2. Everything else requires permission.
+   Without prior written permission from the author (ixamgames-droid) you may
+   not
+     - run or use the program,
+     - copy it beyond what is necessary to display and host it on GitHub,
+     - modify it or create derivative works,
+     - distribute, publish, rent or sell it — in whole or in part, as source
+       code or in built form.
+
+3. Test licences.
+   LightOS is in its test phase. Permission to use it is granted by the author
+   in the form of a licence file. Such a test licence is personal, as a rule limited in
+   time and non-transferable; it permits running and using the program within
+   the agreed scope and nothing beyond that. The licence file itself must not
+   be passed on. Test access is available on request via GitHub (address
+   above).
+
+4. GitHub.
+   The rights that GitHub and other users have in public repositories under
+   the GitHub Terms of Service (in particular viewing and forking within
+   GitHub) remain unaffected. No further rights arise from them.
+
+5. Third-party components.
+   LightOS contains components by other authors. They are subject to their own
+   licences, which are listed in THIRD_PARTY_NOTICES.md; the licence texts are
+   in the licenses/ folder. This licence applies only to the original parts of
+   LightOS and does not restrict any rights granted by the licences of those
+   components.
+
+6. No warranty.
+   The program is provided as is — without any assurance of fitness for a
+   particular purpose and without warranty, to the extent permitted by law.
+   Anyone using LightOS with permission does so at their own risk; this
+   applies in particular to operating stage, laser and lighting equipment.
+
+7. Notices.
+   Copyright notices and statements of origin in the program, in files it
+   produces and in this repository must not be removed or altered.
+
+This text is deliberately plain. It is not legal advice. If you are unsure
+whether a use is permitted, ask the author first.

@@ -63,7 +63,7 @@ from PySide6.QtCore import Qt                                  # noqa: E402
 from PySide6.QtTest import QTest                               # noqa: E402
 from PySide6.QtWidgets import (                                # noqa: E402
     QApplication, QDialogButtonBox, QLabel, QLayout, QPushButton, QSpinBox,
-    QWidget)
+    QScrollArea, QWidget)
 from sqlalchemy import select                                  # noqa: E402
 from sqlalchemy.orm import Session, selectinload               # noqa: E402
 
@@ -110,6 +110,11 @@ def _in_layout_reihenfolge(w: QWidget) -> list[QWidget]:
                 out.append(kind)
                 if kind.layout() is not None:
                     rein(kind.layout())
+                elif (isinstance(kind, QScrollArea) and kind.widget() is not None
+                      and kind.widget().layout() is not None):
+                    # FM-74: der Inhalt des Dialogs liegt in einem Rollbereich
+                    # — der hat kein eigenes Layout, sein Inhalt schon.
+                    rein(kind.widget().layout())
             elif item.layout() is not None:
                 rein(item.layout())
 
