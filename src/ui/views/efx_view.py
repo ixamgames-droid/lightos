@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.widgets.flow_layout import FlowLayout
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
@@ -1329,15 +1330,12 @@ class EfxView(QWidget):
                                   "und hält am Endpunkt an")
         self._loop_chk.toggled.connect(self._on_param_change)
         tform.addRow("Loop:", self._loop_chk)
-        # F-17: Layer-Prioritaet beim Engine-Merge.
-        self._priority_spin = QSpinBox()
-        self._priority_spin.setRange(-99, 99)
-        self._priority_spin.setValue(0)
-        self._priority_spin.setToolTip(
-            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
-            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
-        self._priority_spin.valueChanged.connect(self._on_param_change)
-        tform.addRow("Layer-Priorität:", self._priority_spin)
+        # ENG-35: Stufe statt Zahlenfeld „Layer-Priorität“ (F-17). Lose
+        # Betriebsart — _on_param_change schreibt alle Felder gemeinsam.
+        self._stufe_combo = StufeAuswahl()
+        self._stufe_combo.stufe_gewaehlt.connect(self._on_param_change)
+        tform.addRow("Stufe:", self._stufe_combo)
+        stufen_melder().geaendert.connect(self._stufe_von_aussen)
         # ARC-04: Ein-/Ausblend-Hüllkurve (Sekunden, 0 = sofort).
         self._env_in_spin = QDoubleSpinBox()
         self._env_in_spin.setRange(0.0, 60.0)
@@ -1873,7 +1871,7 @@ class EfxView(QWidget):
             self._tempo_phase_spin.setValue(
                 float(getattr(efx, "phase_offset", 0.0)))
             self._tempo_align_check.setChecked(bool(getattr(efx, "align_on_start", True)))
-            self._priority_spin.setValue(int(getattr(efx, "priority", 0)))
+            self._stufe_combo.setze_zahl(getattr(efx, "priority", 0))
             self._env_in_spin.setValue(float(getattr(efx, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(efx, "env_fade_out", 0.0)))
             _ci = self._env_curve_combo.findData(getattr(efx, "env_curve", "linear"))
@@ -1921,6 +1919,19 @@ class EfxView(QWidget):
                 self._list.item(row).setText(text)
             self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
 
+    def _stufe_von_aussen(self, ids):
+        """ENG-35: Die Stufe des geoeffneten Effekts wurde anderswo geaendert
+        (Ansicht „Prioritäten“, Rueckgaengig) — nur das Feld nachziehen, kein
+        Neuaufbau. Sonst schriebe die naechste Parameter-Aenderung den alten
+        Feldwert zurueck."""
+        cur = getattr(self, "_current", None)
+        if cur is None or getattr(cur, "id", None) not in ids:
+            return
+        try:
+            self._stufe_combo.setze_zahl(getattr(cur, "priority", 0))
+        except RuntimeError:
+            pass
+
     def _on_param_change(self):
         if self._current is None or self._loading:
             return
@@ -1945,7 +1956,7 @@ class EfxView(QWidget):
         self._current.relative  = self._relative_chk.isChecked()
         self._current.bit16     = self._bit16_chk.isChecked()
         self._current.loop      = self._loop_chk.isChecked()
-        self._current.priority  = self._priority_spin.value()
+        self._current.priority  = self._stufe_combo.zahl()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"

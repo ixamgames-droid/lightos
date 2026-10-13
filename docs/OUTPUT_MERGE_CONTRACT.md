@@ -6,6 +6,14 @@
 > `tests/test_dimmer_master.py`, `tests/test_programmer_priority.py`,
 > `tests/test_function_layer_order.py`, `tests/test_iso_simple_desk.py`.
 
+> **Stand 2026-10-13 (ENG-35): Die Tabelle unten ist nicht mehr vollständig.**
+> Die aktuelle Reihenfolge aller Schichten steht in
+> [Wer gewinnt? Prioritäten für Effekte](anleitung_prioritaeten/ANLEITUNG.md), Abschnitt 1.
+> Seit dem Stand dieses Dokuments dazugekommen und hier **nicht** beschrieben:
+> automatische Helligkeit (4a²), Szenen-Vorschau, „Alles Weiß“, Feature-Dimmer (4b²),
+> DMX-Eingang je Universum (HTP oder ersetzen), Laser-NOT-AUS (4d) und Ziel-Blackout.
+> Nachgezogen ist Zeile 2 (Stufen) und die Dimmer-Regel unter „Sonderregeln“.
+
 ## Ein Renderer, ein Thread
 
 Es gibt **genau einen** Render-Pfad: `AppState._render_frame(dt)`, registriert als
@@ -18,7 +26,7 @@ werden mit dem Default-Frame vorbelegt) → keine hängenden Werte gestoppter Qu
 | # | Schicht | Quelle | Semantik |
 |---|---------|--------|----------|
 | 1 | **Default-Frame** | `base_levels` + Fixture-`default_value` | Basis jedes Frames (Per-Frame-Clear) |
-| 2 | **Funktionen** | `FunctionManager.tick` (Scene/Chaser/EFX/RGB-Matrix/…) | LTP in **Start-Reihenfolge** (`_start_order`): zuletzt gestartet gewinnt (LAYER-01) |
+| 2 | **Funktionen** | `FunctionManager.tick` (Scene/Chaser/EFX/RGB-Matrix/…) | LTP, sortiert nach `Function.priority` (höher schreibt später und gewinnt — in der Bedienung die fünf **Stufen**, `core/engine/stufen.py`), bei gleicher Zahl in **Start-Reihenfolge** (`_start_order`): zuletzt gestartet gewinnt (LAYER-01, F-17, ENG-35). Mitglieder einer Sammlung, eines Chasers oder einer Show laufen im Durchlauf des Behälters — dort zählt dessen `priority`. |
 | 3 | **Executoren** | `PlaybackEngine.compute_merged` (Cues) | LTP über Funktionen |
 | 4 | **Programmer** | `state.programmer` (inkl. Matrix-Programmer) | LTP, **eingeschränkt** durch WP-6 + EE-02 (s. u.) |
 | 4b | **Dimmer-Master** | `submaster_level` · `fixture_dimmers` · Programmer-Dimmer | multiplikativ auf Intensitäts-/Ersatz-Farbkanäle |
@@ -35,6 +43,11 @@ werden mit dem Default-Frame vorbelegt) → keine hängenden Werte gestoppter Qu
 - **EE-02 — Programmer-Dimmer multipliziert:** Läuft ein Effekt auf den Intensitäts-
   Kanälen eines Fixtures, **ersetzt** der Programmer-Dimmer ihn nicht per LTP, sondern
   **multipliziert** ihn (Faktor 0..1). Ohne Effekt: normaler LTP-Ersatz.
+- **ENG-02 — Funktions-Dimmer gehört der Funktion:** Schreibt eine laufende Funktion den
+  **echten Dimmer-Kanal** eines Geräts (Schreib-Protokoll, wert-unabhängig — auch bei 0),
+  fasst der Programmer ihn weder per LTP noch per EE-02-Multiply an. Ausnahme: Reiter
+  **Intensity** aktiv und Gerät ausgewählt — dann gewinnt die Programmer-Intensität absolut.
+  EE-02 gilt damit nur noch für Geräte **ohne** echten Dimmer-Kanal.
 - **Cues > Funktionen:** Executoren (Schicht 3) liegen bewusst über Funktionen; ein
   Cue ersetzt laufende Effektwerte per LTP (gewollt).
 

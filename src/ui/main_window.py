@@ -1233,6 +1233,14 @@ class MainWindow(QMainWindow):
             tabs.addTab(self._preset_browser_view, "Preset-Browser")
         except Exception as e:
             print(f"[main_window] PresetBrowserView init error: {e}")
+        # ENG-35: Uebersicht „welcher Effekt gewinnt“ — bei den Effekten, als
+        # weiterer Uebersichts-Reiter neben Snapshots und Preset-Browser.
+        try:
+            from src.ui.views.prioritaeten_view import PrioritaetenView
+            self._prioritaeten_view = PrioritaetenView()
+            tabs.addTab(self._prioritaeten_view, "Prioritäten")
+        except Exception as e:
+            print(f"[main_window] PrioritaetenView init error: {e}")
         return tabs
 
     def _build_section_playback(self) -> QWidget:

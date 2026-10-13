@@ -28,6 +28,7 @@ test_las32_*.py                    # Laser-Anleitung, Abschnitt Sperrzonen
 test_tool14_gen_tools_index_cli.py # tools/README.md
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
+test_eng35_doku.py                 # Anleitung „Wer gewinnt?“ (Stufen), Merge-Vertrag, Feld „Stufe“ in den Editor-Anleitungen
 test_xplat49_uninstall_datenschutz.py # INSTALL.md
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte

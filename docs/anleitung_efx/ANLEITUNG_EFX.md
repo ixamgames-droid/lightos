@@ -92,7 +92,7 @@ So laufen z. B. die beiden Hardstyle-MH gegenläufige Kreise: **Verhältnis** = 
 - **Geschwindigkeit (Hz)** gilt nur bei freiem Lauf — Tempo-Bus **Frei (nicht taktgebunden)** —
   oder solange noch keine BPM läuft. Läuft eine BPM, wirken Geschwindigkeit (Hz) und die
   Effekt-Tempo-Fader der VC nicht.
-- Die Gruppe *Tempo & Richtung* enthält außerdem **Richtung**, **Loop**, **Layer-Priorität**,
+- Die Gruppe *Tempo & Richtung* enthält außerdem **Richtung**, **Loop**, **Stufe** ([Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md)),
   **Einblenden**, **Ausblenden** und **Hüllkurven-Form**.
 - In der **Virtuellen Konsole** lässt sich die Bus-/Faktor-Umschaltung zusätzlich **live** steuern
   (**SpeedDial** / Element **Tempo-Bus** — siehe *Musik-Sync* / *Dimmer-Matrix*).

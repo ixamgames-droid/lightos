@@ -46,7 +46,7 @@ Die **Vorschau** zeigt die Helligkeit als Graustufen-Lauflicht (weiße Balken = 
 
 Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** jetzt direkt:
 **Geschwindigkeit**, **Tempo-Bus**, **Tempo ×**, **Tempo-Versatz**, **Taktgleich starten**
-(diese drei nur bei gewähltem Bus), **Layer-Priorität**, **Einblenden**, **Ausblenden** und
+(diese drei nur bei gewähltem Bus), **Stufe**, **Einblenden**, **Ausblenden** und
 **Hüllkurven-Form**.
 
 - **Geschwindigkeit** ist die eigene Rate der Matrix (Schritte pro Sekunde). Sie wirkt nur im
@@ -54,8 +54,9 @@ Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** jetzt direkt:
   eine BPM (Tap oder Musik), bestimmt **Tempo ×** das Tempo: für einen doppelt so schnellen
   Dimmer-Puls also bei der Dimmer-Matrix **Tempo × = 2** einstellen, die Farb-Matrix bleibt
   auf 1.
-- Mit **Layer-Priorität** entscheidest du, wer gewinnt, wenn zwei Effekte denselben Kanal
-  schreiben (höher gewinnt; bei gleicher Priorität der zuletzt gestartete Effekt).
+- Mit der **Stufe** entscheidest du, wer gewinnt, wenn zwei Effekte denselben Kanal
+  schreiben (die höhere Stufe gewinnt; bei gleicher Stufe der zuletzt gestartete Effekt).
+  Alle Stufen und die ganze Reihenfolge: [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md).
 - **Einblenden / Ausblenden** sind die Ein-/Ausblendzeiten (in Sekunden) beim Start/Stopp; die
   **Hüllkurven-Form** bestimmt deren Verlauf.
 

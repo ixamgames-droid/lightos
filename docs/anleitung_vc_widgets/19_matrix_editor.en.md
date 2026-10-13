@@ -71,7 +71,7 @@ Next to it is the **„Vorschau"** (preview) group with the live LED grid: each 
 | Field | Meaning |
 |---|---|
 | **Geschwindigkeit** (speed) | Animation rate in steps/s (0.01–20). The matrix's own speed, separate from the global speed master. |
-| **Layer-Priorität** (layer priority) | −99 … 99. Higher priority wins when two effects write the same channel. Equal priority → the most recently started effect wins. |
+| **Stufe** (level) | Grundlicht · Effekte · Akzente · Strobe & Blinder · Notfall. The higher level wins when two effects write the same channel. Same level → the most recently started effect wins. This field was formerly the number field „Layer-Priorität“; see [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md) (German). |
 | **Einblenden** (fade in) | Fade-in time on start, in seconds (0 = immediate). |
 | **Ausblenden** (fade out) | Fade-out time on stop, in seconds (0 = immediate). |
 | **Hüllkurven-Form** (envelope shape) | Shape of the fade-in/fade-out curve (linear, soft …). |
@@ -159,11 +159,11 @@ Special case: **Chase with „Farbe pro Runde wechseln"** switches to the multi-
 - **From a fixture group** with stored positions you get a real 2D grid including gaps; from a loose multiple selection you get a **1 × N** strip.
 - Fixtures without RGB but with a **color wheel** are driven via the matching color wheel slot; fixtures with a **dimmer** keep their dimmer free if the matrix doesn't drive it itself (so they can be combined as a pure color layer).
 
-## Tempo, fade & layer priority
+## Tempo, fade & level
 
 - **Geschwindigkeit** drives the animation (steps/s). Via parameters, a matrix can additionally be synchronized to a **tempo bus** (Global/A–D), with a freely selectable **multiplier** (×0.5, ×2, ×3 …) and **offset in beats** – this way several effects run together exactly on the beat.
 - **Einblenden/Ausblenden + Hüllkurven-Form** define the soft envelope on start/stop.
-- **Layer-Priorität** decides which effect wins when channels collide – important when, for example, you put a color matrix and a dimmer matrix over the same fixtures.
+- **Stufe** (level) decides which effect wins when two of them write the same channel – for example two dimmer matrices over the same fixtures. A color matrix and a dimmer matrix do not compete: they write separate channels.
 
 ## Live control from the VC
 
@@ -185,7 +185,7 @@ Available **live actions** (can be put on buttons/MIDI): Farbe +/− (color +/�
 - **Don't forget to save:** editor changes only reach the running function after **💾 Speichern**. Start/Stop only act on the saved state. (The grid assignment is the only exception – it takes effect immediately.)
 - **„Style = Dimmer/Shutter" switches color off.** If you want to program colors, you need the style **RGB** or **RGBW**.
 - **No color fields visible?** Either the algorithm generates its own colors (Rainbow) or the style is Dimmer/Shutter.
-- **Want a pure color layer?** Don't let the matrix drive the dimmer itself, and control the brightness via a separate fader/dimmer effect – thanks to the layer priority, the two layer cleanly.
+- **Want a pure color layer?** Don't let the matrix drive the dimmer itself, and control the brightness via a separate fader/dimmer effect – color and dimmer are separate channels, so the two do not compete.
 - **Gaps are intentional:** An empty, dotted cell in the preview is not an error but an unoccupied grid position.
 - **There are no dead controls:** Only parameters that actually have an effect in the current algorithm/style/mode appear (e.g. Strobe-Rate only in strobe mode, Läufer-Anzahl/Schweif (%) only with the Chase Bewegung „normal").
 - Use **Großes Fenster** when the editor gets cramped in the narrow tab – same content, freely resizable.

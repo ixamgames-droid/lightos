@@ -14,6 +14,7 @@ from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.head_cell_colors import (
     fixture_cell_color, head_count_suffix, head_counts,
 )
@@ -971,14 +972,12 @@ class RgbMatrixView(QWidget):
         self._tempo_align_check.toggled.connect(self._param_change)
         ft.addRow("", self._tempo_align_check)
 
-        self._priority_spin = QSpinBox()
-        self._priority_spin.setRange(-99, 99)
-        self._priority_spin.setValue(0)
-        self._priority_spin.setToolTip(
-            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
-            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
-        self._priority_spin.valueChanged.connect(self._param_change)
-        ft.addRow("Layer-Priorität:", self._priority_spin)
+        # ENG-35: Stufe statt Zahlenfeld „Layer-Priorität“. Lose Betriebsart —
+        # der Editor rechnet auf einer Arbeitskopie und schreibt beim Speichern.
+        self._stufe_combo = StufeAuswahl()
+        self._stufe_combo.stufe_gewaehlt.connect(self._param_change)
+        ft.addRow("Stufe:", self._stufe_combo)
+        stufen_melder().geaendert.connect(self._stufe_von_aussen)
 
         self._env_in_spin = QDoubleSpinBox()
         self._env_in_spin.setRange(0.0, 60.0)
@@ -1585,7 +1584,7 @@ class RgbMatrixView(QWidget):
             # Bus-spezifische Regler je nach geladenem Tempo-Bus ein-/ausblenden
             # (setCurrentIndex feuert das Signal nicht, wenn der Index gleich bleibt).
             self._update_tempo_mode_visibility()
-            self._priority_spin.setValue(int(getattr(m, "priority", 0)))
+            self._stufe_combo.setze_zahl(getattr(m, "priority", 0))
             self._env_in_spin.setValue(float(getattr(m, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(m, "env_fade_out", 0.0)))
             _ci = self._env_curve_combo.findData(getattr(m, "env_curve", "linear"))
@@ -1678,7 +1677,7 @@ class RgbMatrixView(QWidget):
         self._current.intensity_max = self._imax_spin.value()
         self._current.shutter_min = self._smin_spin.value()
         self._current.shutter_max = self._smax_spin.value()
-        self._current.priority = self._priority_spin.value()
+        self._current.priority = self._stufe_combo.zahl()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
@@ -1836,6 +1835,23 @@ class RgbMatrixView(QWidget):
     #: Effekt), aber sie zaehlen nicht als Aenderung und werden beim Speichern
     #: nicht zurueckgeschrieben (``apply_dict`` fasst sie nicht an).
     _FREMDE_BASISFELDER = ("speed", "intensity", "folder")
+
+    def _stufe_von_aussen(self, ids):
+        """ENG-35: Die Stufe der geoeffneten Matrix wurde anderswo geaendert
+        (Ansicht „Prioritäten“, Rueckgaengig). Arbeitskopie und Feld ziehen
+        nach — sonst schriebe das naechste Speichern die alte Stufe zurueck.
+        Kein Neuaufbau, nur dieser eine Wert."""
+        saved = getattr(self, "_saved", None)
+        if saved is None or getattr(saved, "id", None) not in ids:
+            return
+        try:
+            z = int(getattr(saved, "priority", 0))
+            if self._current is not None:
+                self._current.priority = z
+            self._stufe_combo.setze_zahl(z)
+            self._update_dirty()
+        except RuntimeError:
+            pass
 
     def _make_draft(self):
         """Erzeugt einen Draft (Arbeitskopie) aus self._saved."""
