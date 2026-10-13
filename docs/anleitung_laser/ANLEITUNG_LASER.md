@@ -187,10 +187,12 @@ hier — ein Laser bekommt also nicht einfach überall 0:
 - **Laser-NOT-AUS:** schreibt an jede Laser-Adresse mit bekanntem Aus-Wert
   diesen Wert, an alle übrigen Laser-Adressen 0 — und gewinnt immer (auch
   gegen Kanal-Modifier, Grand Master und Blackout).
-- Kennt das Profil **keinen** Aus-Wert (siehe oben), gibt es nichts zu
-  schreiben: Blackout und Ziel-Blackout setzen dann die Lichtkanäle auf 0,
-  ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man
-  bei Lasern deshalb nach einem Blackout nicht unbedingt überall 0.
+- Alle übrigen Kanäle eines Lasers gehen bei Blackout und Ziel-Blackout auf 0.
+  Im DMX-Monitor sieht man bei Lasern nach einem Blackout deshalb die
+  Aus-Werte und sonst 0 — nicht unbedingt überall 0.
+- Kennt das Profil **keinen** Aus-Wert (siehe oben), bleibt es bei der 0 auf
+  allen Kanälen. Bedeutet 0 an der Betriebsart dieses Lasers nicht „aus“
+  (sondern z. B. „Auto“), strahlt er trotz Blackout weiter.
 
 ### Was als Laser gilt (für NOT-AUS, Blackout und „Alles Weiß“)
 
@@ -201,23 +203,27 @@ zutrifft:
 - es hat einen Laser-Kanal (Muster, X/Y, Laserfarbe …),
 - ein Kanal trägt „Laser“ im Namen – z. B. „Laser: Red“ an einem Lichtset oder
   „Laser Helligkeit“ an einem Moving Head,
-- „Laser“ steht im Geräte-, Hersteller- oder Patch-Namen.
+- „Laser“ steht im Geräte-, Hersteller- oder Patch-Namen,
+- ein **anderer Modus** desselben Geräteprofils hat einen Laser-Kanal. Ein
+  Kombigerät im Kurz-Modus (z. B. Chauvet GigBAR 2 im 3-Kanal-Modus, Cameo
+  Multi FX Bar im 2-Kanal-Modus) führt den Laser nicht als eigenen Kanal – er
+  läuft dort über Automatikprogramme –, enthält ihn aber trotzdem.
 
 Für alle gilt dasselbe: **LASER NOT-AUS** und **Blackout** schalten das
 **ganze** Gerät dunkel (bei einem Lichtset also auch Derby und Strahler),
-**„Alles Weiß“** lässt es aus. Wird ein Gerät nur über einen Namen erkannt, sagt
-LightOS das beim Patchen in der Statusleiste. Der Tooltip des NOT-AUS-Knopfs
+**„Alles Weiß“** lässt es aus. Wird ein Gerät nur über einen Namen oder über
+einen anderen Modus erkannt, sagt LightOS das beim Patchen in der Statusleiste. Der Tooltip des NOT-AUS-Knopfs
 nennt die Zahl der erkannten Laser – steht dort **0**, schaltet der Knopf über
 DMX nichts dunkel.
 
 - **Lösen des NOT-AUS durch einen Muster-Abruf** gibt es nur an Geräten vom Typ
   „Laser“ oder mit Laser-Kanälen. Ein Gobo- oder Shutter-Wert an einem Moving
-  Head mit Laserdiode löst den NOT-AUS nicht.
-- **Grenze:** Erkannt wird am gepatchten Modus. Ein Kombigerät in einem
-  Kurz-Modus ohne eigenen Laserkanal (z. B. Chauvet GigBAR 2 im 3-Kanal-Modus,
-  Cameo Multi FX Bar im 2-Kanal-Modus – der Laser läuft dort über
-  Automatikprogramme) gilt nur als Laser, wenn Typ oder Name es sagen. Wer so
-  ein Gerät im Kurz-Modus betreibt, nimmt „Laser“ in den Patch-Namen auf.
+  Head mit Laserdiode löst den NOT-AUS nicht, ebenso wenig ein Wert an einem
+  Kombigerät im Kurz-Modus.
+- **Grenze:** Erkannt wird, was das Geräteprofil sagt. Führt ein Profil den
+  Laser in **keinem** Modus als Kanal und nennt ihn weder im Typ noch im Namen,
+  kennt LightOS ihn nicht. Wer so ein Gerät betreibt, nimmt „Laser“ in den
+  Patch-Namen auf.
 - Der **Laser-Tab** erscheint weiterhin nur für Geräte vom Typ „Laser“ oder mit
   Laser-Kanälen.
 

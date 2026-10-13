@@ -91,6 +91,12 @@ Reiter **Enttec Pro USB**:
    (`Gespeichert: /dev/ttyUSB0 → Universe 1`). Ob der Adapter wirklich sendet, zeigt
    erst die Statusleiste (Schritt 8).
 
+**Rückfrage vor dem Ersetzen.** Läuft auf dem gewählten Universum schon eine **andere**
+Ausgabe (anderer Weg, anderer Port, andere Ziel-IP), fragt LightOS vor dem Einrichten
+**Laufende Ausgabe ersetzen?** – mit **Nein** bleibt alles, wie es ist. Das gilt für
+**Verbinden** hier und im Reiter uDMX (USB) und für **Übernehmen** in den Reitern
+Art-Net und sACN. Dieselbe Ausgabe noch einmal einzurichten löst keine Frage aus.
+
 ## uDMX-Adapter (USB)
 
 Reiter **uDMX (USB)** — für Adapter, die direkt am USB hängen und **keinen COM-Port**
@@ -251,9 +257,21 @@ Reiter **DMX Monitor** daneben — dieselben Werte, aber mit Gerätenamen:
 1. **Universe:** — Auswahl `Universe 1` bis `Universe 32`.
 2. **Hervorgehobene Kanäle:** — zum Beispiel `1,5,10-20`; diese Kanäle bekommen einen
    gelben Rahmen.
-3. Die Ausgangs-Anzeige: `Universe 1 geht raus` heißt, dieses Universum hat einen
-   Ausgang und wird gesendet. Andernfalls steht dort `⚠ Universe <n> hat keinen
-   Ausgang — nur gerechnet` oder `⚠ Universe <n>: <Weg> sendet NICHT`.
+3. Die Ausgangs-Anzeige sagt dasselbe wie Statusleiste und Banner (Schritt 8):
+
+   | Anzeige | Bedeutung |
+   |---|---|
+   | `Universe 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
+   | `⚠ Universe <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
+   | `Universe <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
+   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
+   | `Universe <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
+
+   Hat ein Universum **mehrere Ausgänge** (zum Beispiel ENTTEC und Art-Net), erscheint
+   daneben die Auswahl **Ausgang:** – der Monitor zeigt, was an den gewählten Ausgang
+   geht. Die Ausgänge senden nur dann Verschiedenes, wenn der Laser-NOT-AUS einen von
+   ihnen sperrt; die Anzeige ergänzt dann
+   `· NOT-AUS-Sperre auf diesem Ausgang: <n> Adressen`.
 4. Die Legende: blauer Rahmen = gepatcht, gelber Rahmen = hervorgehoben. Jede
    gepatchte Kachel trägt ein Kürzel aus Gerät und Kanal, zum Beispiel `PAR 1 R`.
 
@@ -273,7 +291,12 @@ Kopfleiste gedrückt:
    Heads. Sie behalten ihre Werte (200 und 60), nur deren Dimmer geht auf 0. Die Köpfe
    bleiben also stehen und fahren beim Lösen nicht erst zurück.
 
-Geräte ohne Dimmerkanal, Laser und Nebel gehen beim Blackout ganz aus.
+Geräte ohne Dimmerkanal und Nebelmaschinen gehen beim Blackout ganz auf 0.
+**Laser** bekommen den **Aus-Wert aus ihrem Geräteprofil** (z. B. Betriebsart
+„Laser aus“), alle übrigen Laser-Kanäle gehen auf 0. Der Aus-Wert ist nicht immer 0 —
+im DMX-Monitor steht bei einem Laser nach dem Blackout also nicht unbedingt überall
+0. Kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich weiter (Einzelheiten,
+auch zum **Laser-NOT-AUS**: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 ## 8. Warnungen in der Statusleiste lesen
 

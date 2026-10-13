@@ -37,6 +37,47 @@ from src.ui.weak_slots import weak_slot
 
 
 # Recent files storage
+_QtMessageBox = QMessageBox
+
+
+class QMessageBox(_QtMessageBox):          # noqa: F811 — bewusst derselbe Name
+    """UI-92: ``question`` mit FESTEN Beschriftungen fuer Speichern / Verwerfen /
+    Abbrechen.
+
+    ``QMessageBox.question`` nimmt die Texte der Standard-Knoepfe vom
+    Betriebssystem. Unter Linux heisst „Discard“ je nach Oberflaeche
+    „Schließen ohne zu Speichern“ — der Knopf der Speichern-Frage war damit
+    abgeschnitten, und die Anleitung nennt ihn „Verwerfen“ (Bedientest QA-96).
+    Hier heissen die drei Knoepfe ueberall gleich, und zwar so wie in der
+    Anleitung.
+
+    Als Unterklasse unter demselben Namen, damit jede Frage des Hauptfensters
+    sie bekommt und die Stelle, an der Tests die Antwort einsetzen
+    (``main_window.QMessageBox.question``), dieselbe bleibt. Alles andere
+    (``information``, ``warning``, ``StandardButton`` …) ist unveraendert Qt.
+    """
+
+    FESTE_TEXTE = (
+        (_QtMessageBox.StandardButton.Save, "Speichern"),
+        (_QtMessageBox.StandardButton.Discard, "Verwerfen"),
+        (_QtMessageBox.StandardButton.Cancel, "Abbrechen"),
+    )
+
+    @staticmethod
+    def question(parent, title, text,
+                 buttons=(_QtMessageBox.StandardButton.Yes
+                          | _QtMessageBox.StandardButton.No),
+                 defaultButton=_QtMessageBox.StandardButton.NoButton):
+        box = _QtMessageBox(_QtMessageBox.Icon.Question, title, text, buttons, parent)
+        for knopf, beschriftung in QMessageBox.FESTE_TEXTE:
+            b = box.button(knopf)
+            if b is not None:
+                b.setText(beschriftung)
+        if defaultButton != _QtMessageBox.StandardButton.NoButton:
+            box.setDefaultButton(defaultButton)
+        return _QtMessageBox.StandardButton(box.exec())
+
+
 def _recent_files_path() -> str:
     base = app_data_dir()
     try:
@@ -163,6 +204,19 @@ def _recovery_prompt_suppressed() -> bool:
         return True
     from src.core.qt_plattform import ohne_bildschirm
     return ohne_bildschirm()
+
+
+def _ladehinweise_text(hinweise) -> str:
+    """STAB-37: Hinweise UNTER den Ladeproblemen desselben Dialogs — sichtbar
+    getrennt, damit sie nicht unter „konnten nicht gelesen werden“ stehen.
+    Leer, wenn es keine gibt."""
+    if not hinweise:
+        return ""
+    gekuerzt = list(hinweise)[:5]
+    rest = len(hinweise) - len(gekuerzt)
+    return ("\n\nAußerdem (kein Verlust, nur zur Kenntnis):\n\n  • "
+            + "\n  • ".join(gekuerzt)
+            + (f"\n  … und {rest} weitere" if rest else ""))
 
 
 def _exit_prompt_suppressed() -> bool:
@@ -2098,7 +2152,8 @@ class MainWindow(QMainWindow):
         (STAB-32): ``path`` ist eine versionierte Sicherung und oeffnet sich
         als NEUE ungespeicherte Show. ``demo`` (DEMO-8): ``path`` ist eine
         mitgelieferte Demo-Show."""
-        from src.core.show.show_file import load_show, letzte_ladeprobleme
+        from src.core.show.show_file import (load_show, letzte_ladeprobleme,
+                                              letzte_ladehinweise)
         ok, msg = load_show(path)
         if ok:
             self._demo_dateiname = None
@@ -2164,6 +2219,11 @@ class MainWindow(QMainWindow):
             # Verlust entsteht nicht beim Laden, sondern beim Speichern
             # danach** — und war bis dahin fuer niemanden sichtbar.
             probleme = letzte_ladeprobleme()
+            # STAB-37: Hinweise, bei denen von der Show nichts verworfen wurde
+            # (ein Profil steht doppelt in der Geraete-Bibliothek). Sie standen
+            # unter „konnten nicht gelesen werden … Verlust“ — eine vollstaendig
+            # geladene Demo-Show meldete so einen Schaden, den es nicht gab.
+            hinweise = letzte_ladehinweise()
             if probleme:
                 gekuerzt = probleme[:8]
                 rest = len(probleme) - len(gekuerzt)
@@ -2173,7 +2233,20 @@ class MainWindow(QMainWindow):
                     + "\n  • ".join(gekuerzt)
                     + (f"\n  … und {rest} weitere" if rest else "")
                     + "\n\n⚠ SPEICHERN SCHREIBT DEN VERLUST FEST. Wenn die "
-                      "Datei wichtig ist: erst eine Kopie sichern.")
+                      "Datei wichtig ist: erst eine Kopie sichern."
+                    + _ladehinweise_text(hinweise))
+            elif hinweise:
+                # Kein Dialog: gelesen ist alles. Der Hinweis kommt HINTER das,
+                # was die Statuszeile gerade sagt — „bitte speichern“ bzw.
+                # „Speichern legt deine eigene Kopie an“ ist das, wonach der
+                # Nutzer handeln muss, und darf nicht verdraengt werden.
+                leiste = self.statusBar()
+                bisher = leiste.currentMessage()
+                leiste.showMessage(
+                    (bisher + "  ·  " if bisher else "")
+                    + "Hinweis: " + hinweise[0]
+                    + (f" (und {len(hinweise) - 1} weitere)" if len(hinweise) > 1 else ""),
+                    15000)
         else:
             QMessageBox.warning(self, "Fehler", msg)
 
