@@ -80,6 +80,7 @@
 | IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
 | IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
 | PROC-22 | A | chore/proc22-doku-gates-union | 2026-10-13T17:01Z | .gitattributes |
+| ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 
 ## Blocker & Fallen
 
@@ -288,7 +289,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:55Z A claim ENG-37
 - 2026-10-12T18:56Z A done ENG-34
 - 2026-10-12T19:03Z A done UI-89
 - 2026-10-12T19:08Z A claim LIZ-1
@@ -318,3 +318,4 @@
 - 2026-10-13T16:35Z A done LIZ-1
 - 2026-10-13T16:59Z A done DOC-72
 - 2026-10-13T17:01Z A claim PROC-22
+- 2026-10-13T17:04Z A claim ENG-39
