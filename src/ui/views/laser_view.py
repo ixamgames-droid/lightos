@@ -77,6 +77,32 @@ _ADVANCED_GROUP = "Weitere Kanäle"
 _GROUPED_ATTRS = frozenset(a for _n, attrs in _ROW_GROUPS for a in attrs)
 
 
+# UI-89: Dimmer, RGB-Mischung und Strobe bedeuten an einem Laser dasselbe wie
+# an jedem anderen Geraet. Ein Laser, der sie mitbringt, ist ein Kombi-Geraet
+# und bekommt im Programmer zusaetzlich die allgemeinen Reiter (Intensity,
+# Color, Matrix). Alles andere, was der Laser-Reiter fuehrt, ist auf einem
+# Laser laser-eigen (``shutter`` = Betriebsart, ``gobo_wheel`` = Musterauswahl,
+# ``zoom`` = Bildgroesse …) und zaehlt dort NICHT als Intensity/Gobo/Weitere.
+LASER_KOMBI_ATTRS = frozenset(
+    {"intensity", "color_r", "color_g", "color_b", "strobe"})
+
+
+def im_laser_reiter(attr: str) -> bool:
+    """True, wenn der Laser-Reiter dieses Attribut eines Lasers bedient —
+    die EINE Regel fuer Regler-Aufbau, Kopf-Zaehlung und (UI-89) die
+    Reiter-Sichtbarkeit des Programmers."""
+    attr = attr or ""
+    return attr.startswith("laser_") or attr in LASER_EXTRA_ATTRS
+
+
+def nur_im_laser_reiter(attr: str) -> bool:
+    """True fuer Attribute, die auf einem Laser allein in den Laser-Reiter
+    gehoeren (siehe ``LASER_KOMBI_ATTRS``). Was hier False liefert, zaehlt
+    auch bei einem Laser fuer die allgemeinen Reiter des Programmers — so
+    verschwindet kein Kanal, den der Laser-Reiter nicht selbst traegt."""
+    return im_laser_reiter(attr) and (attr or "") not in LASER_KOMBI_ATTRS
+
+
 def fixture_has_laser_capability(fx) -> bool:
     """True, wenn das gepatchte Gerät als Laser steuerbar ist. Delegiert an den
     kanonischen Klassifikator (:func:`capability.is_laser_fixture`); der Name
@@ -366,6 +392,16 @@ class LaserView(QWidget):
         dsb.addWidget(self._lbl_dmx_estop, stretch=1)
         self._dmx_safety_box.setVisible(False)
         root.addWidget(self._dmx_safety_box)
+
+        # LAS-32 (S1): Sperrzonen-Meldung je Laser — nur Anzeige, schaltet
+        # nichts ab (eigenes Widget, unsichtbar ohne DMX-Laser).
+        try:
+            from src.ui.visualizer.sperrzonen_ui import SperrzonenHinweis
+            self._sperrzonen_hinweis = SperrzonenHinweis(get_state(), self)
+            root.addWidget(self._sperrzonen_hinweis)
+        except Exception as e:                           # noqa: BLE001
+            self._sperrzonen_hinweis = None
+            print(f"[laser_view] Sperrzonen-Hinweis: {e}")
 
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
@@ -755,7 +791,7 @@ class LaserView(QWidget):
                 continue
             for ch in channels:
                 attr = getattr(ch, "attribute", "") or ""
-                if not (attr.startswith("laser_") or attr in LASER_EXTRA_ATTRS):
+                if not im_laser_reiter(attr):
                     continue
                 prev = union.get(attr)
                 if prev is None or (not getattr(prev, "ranges", None)
@@ -778,7 +814,7 @@ class LaserView(QWidget):
             counts: dict[str, int] = {}
             for ch in channels:
                 attr = getattr(ch, "attribute", "") or ""
-                if attr.startswith("laser_") or attr in LASER_EXTRA_ATTRS:
+                if im_laser_reiter(attr):
                     counts[attr] = counts.get(attr, 0) + 1
             if counts:
                 best = max(best, max(counts.values()))
@@ -804,9 +840,14 @@ class LaserView(QWidget):
                 self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
 
         # Alles Übrige = technische Kanäle → eingeklappte „Weitere"-Gruppe.
+        # `shutter` steckt in den Betriebsart-Kacheln — aber nur, wenn der
+        # Kanal Wertebereiche hat. Ohne Bereiche gibt es keine Kacheln; dann
+        # bekommt er hier seinen Regler (UI-89: der Programmer zeigt ihn fuer
+        # einen Laser sonst nirgends mehr).
         rest = [ch for ch in template
                 if getattr(ch, "attribute", "") not in _GROUPED_ATTRS
-                and getattr(ch, "attribute", "") != "shutter"]
+                and not (getattr(ch, "attribute", "") == "shutter"
+                         and _sorted_ranges(ch))]
         if rest:
             box = self._make_row_group(_ADVANCED_GROUP, rest, collapsed=True)
             self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)

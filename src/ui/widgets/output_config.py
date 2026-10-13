@@ -13,6 +13,7 @@ import serial.tools.list_ports
 from src.core.app_state import get_state
 from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
+from src.core.dmx import anschluss_auswahl
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
@@ -89,20 +90,34 @@ def _udmx_suchen() -> dict:
     Das Aufzaehlen liest USB-Beschreibungen (mit Zeitlimit) und gehoert deshalb
     nicht in den UI-Thread. Zurueck kommen nur einfache Daten, kein
     Geraete-Objekt: ``{"geraete": [(beschriftung, schluessel)], "unklar": n,
-    "code": G_*, "text": str}``.
+    "code": G_*, "text": str, "treiber": [...]}``.
+
+    OUT-76: ``treiber`` = was WINDOWS ueber die angesteckten bekannten Adapter
+    sagt (``udmx_treiber_text.befund_daten``; leer ausserhalb von Windows).
+    Die Frage braucht kein pyusb und oeffnet kein Geraet — ein Adapter ohne
+    Treiber wird so auch dann gefunden und erklaert, wenn die Suche ueber
+    pyusb gar nicht moeglich ist.
     """
     from src.core.dmx import udmx
+    from src.core.dmx.udmx_treiber_text import befund_daten
     try:
-        geraete = udmx.liste_geraete()
+        befunde = udmx.windows_treiber()
+    except Exception:                                    # noqa: BLE001
+        befunde = None
+    treiber = [befund_daten(b) for b in befunde or []]
+    try:
+        geraete = udmx.liste_geraete(treiber=befunde)
     except udmx.UdmxFehler as e:
-        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e)}
+        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e),
+                "treiber": treiber}
     except Exception as e:                               # noqa: BLE001
         return {"geraete": [], "unklar": 0, "code": udmx.G_ANTWORTET_NICHT,
-                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}"}
+                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}",
+                "treiber": treiber}
     return {"geraete": [(g.beschriftung(), g.schluessel)
                         for g in geraete if g.bestaetigt],
             "unklar": sum(1 for g in geraete if not g.bestaetigt),
-            "code": udmx.G_OK, "text": ""}
+            "code": udmx.G_OK, "text": "", "treiber": treiber}
 
 
 def _list_ifaces() -> list:
@@ -516,8 +531,24 @@ class OutputConfigDialog(QDialog):
         ef = QFormLayout(enttec_tab)
 
         self._combo_port = QComboBox()
+        # OUT-73: Anschluesse ohne USB-Geraet (leere ttyS…, COM1, Bluetooth)
+        # stehen nur auf Wunsch in der Liste — der Haken und die Hinweiszeile
+        # muessen VOR dem ersten `_refresh_ports` existieren.
+        self._check_alle_ports = QCheckBox("Alle Anschlüsse zeigen")
+        self._check_alle_ports.setToolTip(
+            "Zeigt auch serielle Anschlüsse, hinter denen kein USB-Gerät\n"
+            "erkannt wird (eingebaute Schnittstelle, Bluetooth, leere\n"
+            "Anschlüsse). Ein Enttec Pro ist ein USB-Gerät und steht auch\n"
+            "ohne diesen Haken in der Liste.")
+        self._lbl_port_hinweis = QLabel("")
+        self._lbl_port_hinweis.setWordWrap(True)
         self._refresh_ports()
         ef.addRow("COM-Port:", self._combo_port)
+        ef.addRow("", self._check_alle_ports)
+        ef.addRow("", self._lbl_port_hinweis)
+        # Parameterlose Bound-Methods, s. Begruendung beim Knopf darunter.
+        self._check_alle_ports.toggled.connect(self._ports_neu_einlesen)
+        self._combo_port.currentIndexChanged.connect(self._port_hinweis_nachziehen)
 
         refresh_btn = QPushButton("Ports aktualisieren")
         # ★ Bewusst eine parameterlose Bound-Method statt eines Lambdas — aus
@@ -589,9 +620,30 @@ class OutputConfigDialog(QDialog):
             "uDMX-Adapter (z. B. Anyma uDMX, CYL-6602 „USB-DMX512“) hängen "
             "direkt am USB, ohne COM-Port. Ein Adapter trägt ein Universum.")
         self._lbl_udmx_hinweis.setWordWrap(True)
+        # OUT-76: die Schritte zum Windows-Treiber tragen Links (Zadig,
+        # Microsoft). Sie oeffnen sich nur auf einen Klick, nie von selbst.
+        self._lbl_udmx_hinweis.setOpenExternalLinks(True)
         self._lbl_udmx_hinweis.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        xf.addRow(self._lbl_udmx_hinweis)
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.LinksAccessibleByMouse
+            | Qt.TextInteractionFlag.LinksAccessibleByKeyboard)
+        # Die Schritte sind laenger, als der Reiter hoch ist: rollen statt
+        # unten abschneiden (das Fenster soll dafuer nicht wachsen).
+        from PySide6.QtWidgets import QFrame, QScrollArea
+        self._lbl_udmx_hinweis.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self._udmx_hinweis_rollen = QScrollArea()
+        self._udmx_hinweis_rollen.setWidgetResizable(True)
+        self._udmx_hinweis_rollen.setFrameShape(QFrame.Shape.NoFrame)
+        self._udmx_hinweis_rollen.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Kein eigener Hintergrund: der Bereich sieht aus wie der Reiter.
+        self._udmx_hinweis_rollen.setStyleSheet(
+            "QScrollArea { background: transparent; }")
+        self._udmx_hinweis_rollen.viewport().setStyleSheet(
+            "background: transparent;")
+        self._udmx_hinweis_rollen.setWidget(self._lbl_udmx_hinweis)
+        xf.addRow(self._udmx_hinweis_rollen)
         tabs.addTab(udmx_tab, "uDMX (USB)")
         self._udmx_tab_index = tabs.indexOf(udmx_tab)
         self._udmx_gesucht = False
@@ -944,20 +996,59 @@ class OutputConfigDialog(QDialog):
         Port da, und „Verbinden" nahm ihn. Jetzt gewinnt in dieser Reihenfolge:
         ein ausdruecklich uebergebener Port, sonst die aktuelle Auswahl, sonst
         der in ``universes.json`` gespeicherte.
+
+        OUT-73: und wenn es keinen davon gibt — frischer Datenordner — NICHT
+        mehr der erste Eintrag des Betriebssystems. Das war auf einem
+        Linux-Rechner ein ``/dev/ttyS…`` ohne Geraet, unter Windows ``COM1``:
+        „Verbinden" richtete einen toten Anschluss ein und speicherte ihn, der
+        eingesteckte Enttec blieb ohne Universum. Jetzt steht der erkannte
+        Adapter oben und ist vorgewaehlt; Anschluesse ohne USB-Geraet stehen nur
+        mit „Alle Anschlüsse zeigen" in der Liste. Ohne erkannten Adapter bleibt
+        die Auswahl leer (Regeln in ``anschluss_auswahl``).
         """
         aktuell = (bevorzugt or self._combo_port.currentData()
                    or _gespeicherter_enttec_port())
-        self._combo_port.clear()
-        for p in serial.tools.list_ports.comports():
-            label = f"{p.device}"
-            if p.description:
-                label += f"  —  {p.description}"
-            if p.vid == ENTTEC_VID and p.pid == ENTTEC_PID:
-                label += "  [Enttec Pro]"
-            self._combo_port.addItem(label, p.device)
-        self._enttec_port_waehlen(aktuell)
-        if self._combo_port.count() == 0:
-            self._combo_port.addItem("Kein Port gefunden", "")
+        alle_zeigen = self._check_alle_ports.isChecked()
+        anschluesse = anschluss_auswahl.ordnen(
+            serial.tools.list_ports.comports())
+        self._anschluesse = anschluesse
+        # Der Neuaufbau meldet jede Zwischenauswahl — die Hinweiszeile wird
+        # einmal am Ende gesetzt, nicht je Eintrag.
+        war_blockiert = self._combo_port.blockSignals(True)
+        try:
+            self._combo_port.clear()
+            for a in anschluss_auswahl.sichtbare(
+                    anschluesse, alle_zeigen, immer=(aktuell,)):
+                self._combo_port.addItem(a.text, a.device)
+            if aktuell:
+                self._enttec_port_waehlen(aktuell)
+            else:
+                vorschlag = anschluss_auswahl.vorschlag(anschluesse)
+                if vorschlag:
+                    self._enttec_port_waehlen(vorschlag)
+                elif self._combo_port.count():
+                    # Nur fremde USB-Geraete (oder, mit Haken, Anschluesse ohne
+                    # Geraet): keinen davon von selbst waehlen.
+                    self._combo_port.insertItem(0, "— Anschluss wählen —", "")
+                    self._combo_port.setCurrentIndex(0)
+            if self._combo_port.count() == 0:
+                self._combo_port.addItem("Kein Port gefunden", "")
+        finally:
+            self._combo_port.blockSignals(war_blockiert)
+        self._port_hinweis_nachziehen()
+
+    def _port_hinweis_nachziehen(self):
+        """OUT-73: die Zeile unter der Portliste (leer = unsichtbar).
+
+        Rechnet mit der zuletzt eingelesenen Liste — ein Wechsel der Auswahl
+        fragt das Betriebssystem nicht neu ab.
+        """
+        text = anschluss_auswahl.hinweis(
+            getattr(self, "_anschluesse", ()),
+            self._combo_port.currentData() or "",
+            self._check_alle_ports.isChecked())
+        self._lbl_port_hinweis.setText(text)
+        self._lbl_port_hinweis.setVisible(bool(text))
 
     def _enttec_port_waehlen(self, port: str | None):
         """Einen Port in der Liste auswaehlen; fehlt er, ihn sichtbar machen.
@@ -1150,6 +1241,17 @@ class OutputConfigDialog(QDialog):
         if aktuell:
             self._udmx_adapter_waehlen(aktuell, "derzeit nicht gefunden")
         code = int(ergebnis.get("code") or udmx.G_OK)
+        # OUT-76: steckt ein Adapter, dem unter Windows der Treiber fehlt, ist
+        # DAS die Auskunft — mit dem Weg dorthin, statt „eingesteckt?“ oder
+        # einer Liste, die aussieht, als waere alles in Ordnung.
+        from src.ui import udmx_treiber_hinweis
+        treiber = udmx_treiber_hinweis.nach_suche(ergebnis)
+        if treiber is not None:
+            if self._combo_udmx.count() == 0:
+                self._combo_udmx.addItem("Adapter ohne Treiber — siehe unten", "")
+            self._lbl_udmx_status.setText(treiber[0])
+            self._lbl_udmx_hinweis.setText(treiber[1])
+            return
         if code != udmx.G_OK:
             if self._combo_udmx.count() == 0:
                 self._combo_udmx.addItem("Keine Adapter-Suche möglich", "")
@@ -1261,6 +1363,25 @@ class OutputConfigDialog(QDialog):
             f"{wer} → Universe {univ}: sendet nicht — gespeichert, aber es "
             f"geht kein DMX raus")
         self._lbl_udmx_hinweis.setText(grund or "Adapter prüfen und neu einstecken.")
+        self._udmx_treiber_schritte_zeigen(dev, grund)
+
+    def _udmx_treiber_schritte_zeigen(self, dev, grund: str):
+        """OUT-76: scheitert der eingerichtete Adapter unter Windows am
+        Treiber, stehen unter dem Status die Schritte mit Links — nicht nur
+        der eine Satz aus ``grund_text``."""
+        from src.core.dmx import udmx, usb_treiber_windows
+        from src.ui import udmx_treiber_hinweis
+        try:
+            code = int(dev.grund())
+        except Exception:
+            return
+        if code != udmx.G_TREIBER_FEHLT or not usb_treiber_windows.ist_windows():
+            return
+        vid, pid, _serie, _ort = udmx.schluessel_lesen(getattr(dev, "port", ""))
+        kennung = f"{vid:04x}:{pid:04x}" if vid is not None else ""
+        self._lbl_udmx_hinweis.setText(udmx_treiber_hinweis.schritte_html(
+            kennung, "Der Adapter ist da, lässt sich aber nicht öffnen — unter "
+                     "Windows fehlt ihm der Treiber."))
 
     def _sync_artnet_start_univ_default(self):
         """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das
@@ -1293,7 +1414,9 @@ class OutputConfigDialog(QDialog):
             # (nicht den aktuellen Spin-Wert — der koennte inzwischen auf ein fremdes
             # Universum zeigen und dessen Adapter faelschlich killen).
             if self._artnet_active_univ is not None:
-                state.output_manager.remove_output(self._artnet_active_univ)
+                # OUT-71: abgewaehlt = der Ausgang geht wirklich -> dunkel enden.
+                state.output_manager.remove_output(self._artnet_active_univ,
+                                                   schlussbild=True)
                 self._artnet_active_univ = None
             self._lbl_artnet_status.setText("Inaktiv")
             return
@@ -1507,7 +1630,9 @@ class OutputConfigDialog(QDialog):
             # MU-02 (+Review): das beim Apply belegte Universum raeumen, nicht den
             # aktuellen Spin-Wert (koennte auf ein fremdes Universum zeigen).
             if self._sacn_active_univ is not None:
-                state.output_manager.remove_output(self._sacn_active_univ)
+                # OUT-71: abgewaehlt = der Ausgang geht wirklich -> dunkel enden.
+                state.output_manager.remove_output(self._sacn_active_univ,
+                                                   schlussbild=True)
                 self._sacn_active_univ = None
             self._lbl_sacn_status.setText("Inaktiv")
             return
