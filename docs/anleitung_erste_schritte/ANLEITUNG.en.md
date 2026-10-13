@@ -60,7 +60,9 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    (laser emergency stop; also top right in kiosk mode; shortcut `Ctrl+Shift+L`): one click
    makes all lasers dark at once, without a confirmation, and the button then flashes as
    **LASER NOT-AUS AKTIV**. It is released only deliberately — click it again and confirm
-   the prompt.
+   the prompt. Nothing else releases it: no slider, no Virtual Console button, no MIDI
+   controller, no keyboard shortcut. While it is active, laser values are remembered and
+   the laser stays dark; once released, the laser immediately outputs whatever is set.
 7. **Command line** — for keyboard commands such as `1 thru 5 @ 80`. Examples are shown as
    placeholder text in the field.
 8. **Status bar** — on the left the state of the ENTTEC adapter

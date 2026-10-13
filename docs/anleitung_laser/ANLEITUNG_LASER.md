@@ -187,6 +187,12 @@ hier — ein Laser bekommt also nicht einfach überall 0:
 - **Laser-NOT-AUS:** schreibt an jede Laser-Adresse mit bekanntem Aus-Wert
   diesen Wert, an alle übrigen Laser-Adressen 0 — und gewinnt immer (auch
   gegen Kanal-Modifier, Grand Master und Blackout).
+- **NOT-AUS lösen:** nur mit dem Knopf **LASER NOT-AUS** oben rechts im
+  Hauptfenster — klicken und die Rückfrage bestätigen. Der Knopf im Laser-Tab
+  und die VC-Taste „Laser NOT-AUS“ lösen nur aus. Solange der NOT-AUS aktiv
+  ist, werden Werte gemerkt, der Laser bleibt dunkel: Betriebsart, Muster,
+  Regler, Snaps und MIDI lösen ihn nicht. Nach dem Lösen gibt der Laser sofort
+  wieder aus, was eingestellt ist.
 - Kennt das Profil **keinen** Aus-Wert (siehe oben), gibt es nichts zu
   schreiben: Blackout und Ziel-Blackout setzen dann die Lichtkanäle auf 0,
   ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man
@@ -214,10 +220,10 @@ einen anderen Modus erkannt, sagt LightOS das beim Patchen in der Statusleiste. 
 nennt die Zahl der erkannten Laser – steht dort **0**, schaltet der Knopf über
 DMX nichts dunkel.
 
-- **Lösen des NOT-AUS durch einen Muster-Abruf** gibt es nur an Geräten vom Typ
-  „Laser“ oder mit Laser-Kanälen. Ein Gobo- oder Shutter-Wert an einem Moving
-  Head mit Laserdiode löst den NOT-AUS nicht, ebenso wenig ein Wert an einem
-  Kombigerät im Kurz-Modus.
+- **Lösen des NOT-AUS:** an keinem dieser Geräte durch einen Wert – weder ein
+  Muster-Abruf am Laser noch ein Gobo- oder Shutter-Wert an einem Moving Head
+  mit Laserdiode noch ein Wert an einem Kombigerät im Kurz-Modus. Gelöst wird
+  nur über den Knopf **LASER NOT-AUS** mit Rückfrage.
 - **Grenze:** Erkannt wird, was das Geräteprofil sagt. Führt ein Profil den
   Laser in **keinem** Modus als Kanal und nennt ihn weder im Typ noch im Namen,
   kennt LightOS ihn nicht. Wer so ein Gerät betreibt, nimmt „Laser“ in den

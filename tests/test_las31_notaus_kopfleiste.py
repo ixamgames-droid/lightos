@@ -24,6 +24,7 @@ import src.core.app_state as A                                       # noqa: E40
 from src.core.app_state import AppState                              # noqa: E402
 from src.core.dmx.output_manager import OutputManager                # noqa: E402
 import src.ui.main_window as MW                                      # noqa: E402
+from src.ui import laser_notaus                                      # noqa: E402
 
 
 def _app():
@@ -129,8 +130,12 @@ class _Basis(unittest.TestCase):
         self.w._notaus_sperre_bis = 0.0
         self.w._sync_notaus_button()
         self.btn = self.w._btn_laser_notaus
-        # Eine unerwartete Rueckfrage darf den Lauf nie blockieren.
-        p = mock.patch.object(MW.QMessageBox, "warning",
+        # Eine unerwartete Rueckfrage darf den Lauf nie blockieren. Ersetzt
+        # wird sie dort, wo sie gestellt wird (LAS-36: src/ui/laser_notaus.py).
+        # ``main_window.QMessageBox`` ist seit UI-92 eine Unterklasse — ein
+        # Ersatz dort erreicht die Rueckfrage des NOT-AUS nicht mehr; der
+        # Ersatz an der Qt-Klasse gilt dagegen auch fuer das Hauptfenster.
+        p = mock.patch.object(laser_notaus.QMessageBox, "warning",
                               side_effect=AssertionError("unerwartete Rueckfrage"))
         self.frage = p.start()
         self.addCleanup(p.stop)
@@ -222,9 +227,9 @@ class KnopfTest(_Basis):
         self.assertEqual(self.btn.text(), "LASER NOT-AUS AKTIV")
 
     def test_folgt_stillem_setzen_und_loesen(self):
-        """Der Latch kann ohne Ereignis wechseln (Muster-Abruf im Programmer
-        loest ihn). Der Knopf liest ihn darum im Takt nach — er fuehrt keinen
-        eigenen Zustand."""
+        """Der Latch kann ohne Ereignis wechseln (``set_laser_estop`` meldet
+        nichts; seit LAS-36 loest ihn kein Programmer-Wert mehr). Der Knopf
+        liest ihn darum im Takt nach — er fuehrt keinen eigenen Zustand."""
         self.st.set_laser_estop(True)
         self.w._notaus_tick()
         self.assertEqual(self.btn.text(), "LASER NOT-AUS AKTIV")

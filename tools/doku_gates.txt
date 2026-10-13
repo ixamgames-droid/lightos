@@ -42,6 +42,7 @@ test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
 test_tool18_bilder_hinweis_gpu.py  # Bild-Werkzeug: Fehlstand unter docs/<anleitung>/img (Zielpfad im Wegwerf-Ordner)
 test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
 test_las25_doku_aus_werte.py
+test_las36_doku_notaus_loesen.py   # Wortlaut NOT-AUS loesen: Erste Schritte, Laser, Buehnen-Show, Geraete-Generator
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
 test_ui92_kleinkram_qa96.py        # Speichern-Frage: Knopfnamen wie in anleitung_erste_schritte
 test_ui64_programmer_playback.py

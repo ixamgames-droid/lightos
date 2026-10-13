@@ -101,9 +101,8 @@ class _State:
         return [f.fid for f in self._fixtures]
 
     def set_programmer_value(self, fid, attr, value, undoable=False, head=0):
+        # LAS-36: ein Wert loest den NOT-AUS nicht (frueher A3D-02: „wieder an“).
         self.programmer.setdefault(fid, {})[attr] = int(value)
-        if attr in ("shutter", "gobo_wheel"):       # A3D-02: „wieder an“
-            self.laser_estop_active = False
 
     def get_programmer_value(self, fid, attr, head=0):
         return self.programmer.get(fid, {}).get(attr)
@@ -142,9 +141,22 @@ def test_not_aus_schaltet_und_zeigt_zustand(monkeypatch):
     assert st.laser_estop_active is True
     assert st.lo.armed is False
     assert "NOT-AUS aktiv" in v._lbl_dmx_estop.text()
-    # Betriebsart neu waehlen (Modus-Kachel) = bewusstes Wieder-Einschalten.
+    # LAS-36: Betriebsart neu waehlen (Modus-Kachel) loest NICHT mehr. Der Wert
+    # wird gemerkt, die Anzeige sagt weiter, warum der Laser dunkel bleibt und
+    # wo geloest wird; der alte Hinweis „Betriebsart neu wählen“ ist weg.
     v._on_mode_tile_clicked(175)
-    assert st.laser_estop_active is False
+    assert st.laser_estop_active is True
+    assert st.programmer[1]["shutter"] == 175
+    text = v._lbl_dmx_estop.text()
+    assert "NOT-AUS aktiv" in text
+    assert "Werte werden gemerkt, der Laser bleibt dunkel" in text
+    assert "Knopf oben rechts" in text
+    assert "neu wählen" not in text
+    assert "neu gewählt" not in v._btn_dmx_estop.toolTip()
+    # Geloest (oben rechts, mit Rueckfrage) -> das Ereignis zieht die Anzeige nach.
+    st.laser_estop_active = False
+    from src.core.sync import get_sync, SyncEvent
+    get_sync().emit(SyncEvent.LASER_ESTOP, False)
     assert "NOT-AUS aktiv" not in v._lbl_dmx_estop.text()
 
 

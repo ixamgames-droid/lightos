@@ -63,8 +63,8 @@ GRUND_ANDERER_MODUS = "anderer_modus"   # LAS-38: Laserkanal in einem anderen Mo
 
 #: Die Gruende, bei denen weder der Typ noch ein ``laser_*``-Kanal des
 #: gepatchten Modus „Laser“ sagen — das Geraet gilt ueber einen Namen oder ueber
-#: einen anderen Modus seines Profils als Laser (Hinweis beim Patchen; ein Wert
-#: an so einem Geraet ist kein „Laser wieder an“).
+#: einen anderen Modus seines Profils als Laser (Hinweis beim Patchen). Den
+#: NOT-AUS loest seit LAS-36 ohnehin kein Wert mehr, an keinem Geraet.
 NUR_NAME = frozenset((GRUND_KANALNAME, GRUND_NAME, GRUND_ANDERER_MODUS))
 
 _NAMENSFELDER = ("fixture_name", "label", "manufacturer_name")
