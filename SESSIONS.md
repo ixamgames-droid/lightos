@@ -65,7 +65,6 @@
 | ENG-35 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
 | VCB-46 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
-| ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
@@ -285,7 +284,6 @@
 
 ## Verlauf
 
-- 2026-10-13T13:52Z A done STAB-36
 - 2026-10-13T13:54Z A aktualisiert ENG-35: Branch - -> feature/eng35-prioritaeten-stufen
 - 2026-10-13T13:54Z A aktualisiert VCB-46: Branch - -> feature/eng35-prioritaeten-stufen
 - 2026-10-13T14:18Z D done LIZ-2
@@ -315,3 +313,4 @@
 - 2026-10-13T21:45Z B done STAB-37
 - 2026-10-13T22:21Z B done DOC-71
 - 2026-10-13T22:26Z A claim IMP-3
+- 2026-10-13T22:43Z A done ENG-37
