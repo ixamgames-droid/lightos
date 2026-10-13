@@ -169,3 +169,103 @@ def test_vorschau_zeigt_im_stil_farbe_die_echte_farbe(ansicht):
     m.modify_mode = "dim"
     schraffiert = farben()
     assert (200, 40, 90) in schraffiert and (13, 17, 23) in schraffiert
+
+
+# ── Schweif: gehoert zum Effekt, der Haken stellt ihn nicht um ───────────────
+
+_SCHWEIF_SATZ = ("Bei einem Modify-Effekt zieht auch der Schweif die Veränderung "
+                 "nach. Für einen scharfen Läufer den Schweif auf 0 % stellen.")
+
+
+@pytest.mark.parametrize("stil", ["Dimmer", "RGB", "RGBW"])
+def test_haken_laesst_den_schweif_stehen_und_weist_darauf_hin(ansicht, stil):
+    """Entscheidung des Betreibers: der Schweif gehoert zum Effekt und wird mit
+    verrechnet. Der Haken „Modify-Effekt" setzt ihn NICHT auf 0 % — weder im
+    Feld noch im Effekt, weder beim Setzen noch beim Entfernen."""
+    ansicht._style_combo.setCurrentText(stil)
+    feld = ansicht._param_widgets["after_fade"]
+    feld.setValue(45.0)
+    assert ansicht._current.params["after_fade"] == 45.0
+    assert _SCHWEIF_SATZ not in feld.toolTip()
+    ohne = feld.toolTip()
+    assert ohne, "Schweif-Feld hat seinen eigenen Tooltip verloren"
+
+    ansicht._cb_modify.setChecked(True)
+    feld = ansicht._param_widgets["after_fade"]
+    assert feld.value() == 45.0
+    assert ansicht._current.params["after_fade"] == 45.0
+    assert feld.toolTip() == ohne + "\n" + _SCHWEIF_SATZ
+    assert _SCHWEIF_SATZ in ansicht._cb_modify.toolTip()
+
+    ansicht._cb_modify.setChecked(False)
+    feld = ansicht._param_widgets["after_fade"]
+    assert feld.value() == 45.0
+    assert ansicht._current.params["after_fade"] == 45.0
+    assert feld.toolTip() == ohne
+
+
+def test_schweif_hinweis_ueberlebt_den_neuaufbau_der_felder(ansicht):
+    """Das Schweif-Feld wird je Algorithmus/Bewegung neu gebaut — der Hinweis
+    muss am NEUEN Feld wieder stehen, und im gesperrten Stil nicht."""
+    from src.core.engine.rgb_matrix import RgbAlgorithm
+    ansicht._cb_modify.setChecked(True)
+    ansicht._algo_combo.setCurrentText(RgbAlgorithm.WAVE.value)
+    ansicht._algo_combo.setCurrentText(RgbAlgorithm.CHASE.value)
+    assert _SCHWEIF_SATZ in ansicht._param_widgets["after_fade"].toolTip()
+    ansicht._style_combo.setCurrentText("Shutter")
+    feld = ansicht._param_widgets.get("after_fade")
+    if feld is not None:
+        assert _SCHWEIF_SATZ not in feld.toolTip()
+    assert _SCHWEIF_SATZ not in ansicht._cb_modify.toolTip()
+
+
+def test_schweif_wird_im_modify_mit_verrechnet(monkeypatch):
+    """Engine-Seite derselben Entscheidung: hinter dem Laeufer bekommt die
+    Lampe im Schweif einen ANTEIL ab, bei Schweif 0 % nichts."""
+    import src.core.app_state as A
+    from src.core.dmx.universe import Universe
+    from src.core.engine.function_manager import FunctionManager
+    from src.core.engine.rgb_matrix import (MatrixStyle, RgbAlgorithm,
+                                             RgbMatrixInstance)
+
+    class _Ch:
+        default_value, ranges = 0, []
+
+        def __init__(self, attribute, nr):
+            self.attribute, self.channel_number = attribute, nr
+
+    class _Fx:
+        universe = 1
+
+        def __init__(self, fid):
+            self.fid, self.address = fid, 1 + (fid - 1) * 3
+
+    kan = [_Ch("color_r", 1), _Ch("color_g", 2), _Ch("color_b", 3)]
+    monkeypatch.setattr(A, "get_channels_for_patched", lambda fx: kan)
+    patch = [_Fx(i) for i in range(1, 9)]
+
+    def rot_je_lampe(schweif):
+        m = RgbMatrixInstance("mod", cols=8, rows=1,
+                              fixture_grid=list(range(1, 9)),
+                              algorithm=RgbAlgorithm.CHASE, color1=(255, 0, 0))
+        m.style = MatrixStyle.RGB
+        m.tempo_bus_id = ""
+        m.matrix_speed = 0.0
+        m.params.update({"runner_count": 1, "runner_width": 1,
+                         "movement": "normal", "after_fade": schweif,
+                         "offset": 4.0})
+        m.modify, m.modify_mode = True, "add"
+        fm = FunctionManager()
+        fm.add(m)
+        fm.start(m.id)
+        u = Universe(1)
+        fm.tick({1: u}, patch, 0.02)
+        roh = u.get_all()
+        return [roh[i * 3] for i in range(8)]
+
+    scharf = rot_je_lampe(0.0)
+    assert sorted(scharf) == [0] * 7 + [255], scharf
+    weich = rot_je_lampe(60.0)
+    assert max(weich) == 255
+    assert any(0 < v < 255 for v in weich), (
+        "kein Anteil im Schweif — der Schweif wird nicht mit verrechnet", weich)

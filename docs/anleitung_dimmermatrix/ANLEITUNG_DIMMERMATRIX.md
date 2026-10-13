@@ -330,8 +330,11 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
   überschrieben. Direkt gestartet, in einer Sammlung und in der Show-Zeitleiste funktioniert er.
 - Steht **Dimmer-Bereich Min** im Modify-Effekt über 0, bekommt **jede** Lampe diesen Grundbetrag
   ab (der Editor weist darauf hin).
-- Der Schweif des Lauflichts hat eine Vorgabe von 30 %. Für harte Blöcke den **Schweif auf 0 %**
-  stellen, sonst bekommen die Lampen hinter dem Läufer ebenfalls einen Anteil ab.
+- **Der Schweif gehört zum Effekt und wird mit verrechnet.** Der Haken **Modify-Effekt** stellt
+  ihn nicht um: bei einem Modify-Effekt zieht auch der Schweif die Veränderung nach, die Lampen
+  hinter dem Läufer bekommen einen Anteil ab. Die Vorgabe des Lauflichts ist 30 %. Für einen
+  scharfen Läufer den **Schweif auf 0 %** stellen — der Hinweis steht auch am Haken und, solange
+  er gesetzt ist, am Feld **Schweif (%)**.
 - „Alles Weiß“ und die Szenen-Vorschau liegen über dem Modify-Effekt und werden nicht verrechnet.
 - Die Vorschau im Editor zeigt den Modify-Effekt allein, im Stil Dimmer eingefärbt nach
   Betriebsart (Bernstein = Addieren, Blau = Abziehen, schraffiert = Abdunkeln).

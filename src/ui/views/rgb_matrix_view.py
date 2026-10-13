@@ -35,6 +35,14 @@ _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
                                   "runner_step"})
 
 
+# Entscheidung des Betreibers (ENG-37/38): der Schweif gehoert zum Effekt und
+# wird mit verrechnet; der Haken „Modify-Effekt" stellt ihn nicht um. Der Satz
+# steht am Haken und — bei gesetztem Haken — am Feld „Schweif (%)“.
+_SCHWEIF_HINWEIS_MODIFY = (
+    "Bei einem Modify-Effekt zieht auch der Schweif die Veränderung nach. "
+    "Für einen scharfen Läufer den Schweif auf 0 % stellen.")
+
+
 def _show_laedt() -> bool:
     """UI-84: wird gerade eine Show geladen (``AppState.show_wird_geladen``)?
     Dann folgt der Editor der Auswahl NICHT mit Zuweisung — das Laden setzt
@@ -1551,6 +1559,7 @@ class RgbMatrixView(QWidget):
                 self._param_form.addRow(spec.label + ":", w)
             self._param_widgets[spec.key] = w
         self._param_box.setVisible(True)
+        self._apply_schweif_hinweis()
 
     def _apply_runner_step_visibility(self, algo=None):
         """ENG-37: Feld „Schrittweite“ nur beim Lauflicht mit linearer Bewegung
@@ -1630,7 +1639,8 @@ class RgbMatrixView(QWidget):
             "Der Effekt setzt seine Werte nicht, sondern verrechnet sie mit dem, "
             "was die Lampe gerade tut (addieren, abziehen, abdunkeln).\n"
             "Stil Dimmer: verrechnet die Helligkeit. Stil RGB/RGBW: verrechnet "
-            "jeden Farbkanal einzeln und fasst den Dimmer nie an."
+            "jeden Farbkanal einzeln und fasst den Dimmer nie an.\n"
+            + _SCHWEIF_HINWEIS_MODIFY
             if erlaubt else
             "Modify-Effekte gibt es in den Stilen „Dimmer“, „RGB“ und „RGBW“.\n"
             "Ein Shutter ist eine Stellung, keine Menge — dort lässt sich nichts "
@@ -1652,6 +1662,25 @@ class RgbMatrixView(QWidget):
             hinweis = ("Dimmer-Bereich „Min“ steht über 0: jede Lampe bekommt "
                        "diesen Grundbetrag ab. " + hinweis)
         self._modify_hint.setText(hinweis)
+        self._apply_schweif_hinweis()
+
+    def _apply_schweif_hinweis(self):
+        """Tooltip des Feldes „Schweif (%)“ an den Modify-Haken anpassen.
+
+        Entscheidung des Betreibers: der Schweif gehoert zum Effekt und wird
+        mit verrechnet — der Haken „Modify-Effekt" stellt ihn NICHT um. Damit
+        das nicht ueberrascht, steht es bei gesetztem Haken am Schweif-Feld.
+        Das Feld ist ein dynamisches (wird je Algorithmus neu gebaut), darum
+        laeuft diese Methode auch am Ende von ``_rebuild_param_fields``. Sie
+        setzt nur einen Tooltip — kein Wert, kein Bauen, kein Loeschen."""
+        w = getattr(self, "_param_widgets", {}).get("after_fade")
+        if w is None:
+            return
+        tip = next((s.tooltip for s in getattr(self, "_param_specs", ())
+                    if s.key == "after_fade"), "") or ""
+        if (self._cb_modify.isChecked() and self._cb_modify.isEnabled()):
+            tip = (tip + "\n" if tip else "") + _SCHWEIF_HINWEIS_MODIFY
+        w.setToolTip(tip)
 
     def _on_modify_toggled(self, _checked: bool = False):
         """Haken „Modify-Effekt": Gruppe ein-/ausblenden, Wert uebernehmen."""
