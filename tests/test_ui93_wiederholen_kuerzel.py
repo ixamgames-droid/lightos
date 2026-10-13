@@ -462,10 +462,13 @@ class HauptfensterTest(unittest.TestCase):
         cls.app.processEvents()
 
     def setUp(self):
+        if self.win._vc_view._edit_mode:
+            self.win._vc_view._toggle_edit(False)
         self.win._vc_view.from_dict({"widgets": []})
         self.win._vc_view._canvas._undo_stack.clear()
         self.win._vc_view._canvas._redo_stack.clear()
         self.stapel.clear()
+        self.log = []
         self.zaehler = {"n": 0}
         self._seite(self.andere_seite)
         self.win.setFocus()
@@ -486,6 +489,27 @@ class HauptfensterTest(unittest.TestCase):
 
     def _vc_anzahl(self) -> int:
         return len(self.win._vc_view._canvas.to_dict()["widgets"])
+
+    def _benannt(self, name):
+        """Ein benannter Eintrag im App-Verlauf — derselbe Stapel, auf dem
+        Patch-, Geraete- und Prioritaets-Aenderungen landen."""
+        log = self.log
+        self.stapel.push_simple(name, lambda: log.append(name),
+                                lambda: log.remove(name))
+        self.app.processEvents()
+
+    def _vc_knopf(self, x=0):
+        self.win._vc_view._canvas._add_widget("VCButton", QPoint(x, 0))
+        self.app.processEvents()
+
+    def _stand(self):
+        return (list(self.log), self._vc_anzahl())
+
+    def _menue(self):
+        """Bearbeiten-Menue aufklappen (ohne es zu zeigen) -> Texte aktuell."""
+        self.win._act_undo.parent().aboutToShow.emit()
+        self.app.processEvents()
+        return self.win._act_undo.text(), self.win._act_redo.text()
 
     # ── Belegung ────────────────────────────────────────────────────────────
 
@@ -577,19 +601,20 @@ class HauptfensterTest(unittest.TestCase):
 
     # ── Virtual Console sichtbar ────────────────────────────────────────────
 
-    def test_vc_sichtbar_gilt_der_layout_verlauf(self):
+    def test_vc_sichtbar_wirken_die_tasten(self):
         """★ Der Fall, in dem vorher GAR NICHTS geschah: App-Verlauf gefuellt
         und Virtual Console sichtbar -> Strg+Z war mehrdeutig."""
         self._schritt()
         vc = self.win._vc_view
         self._seite(vc)
+        self.assertFalse(vc._edit_mode, "Probe laeuft im Bedienmodus")
         vc._canvas._add_widget("VCButton", QPoint(0, 0))
         self.assertEqual(self._vc_anzahl(), 1)
 
         _taste(self.app, self.win, Qt.Key.Key_Z)
         self.assertEqual(self._vc_anzahl(), 0, "Strg+Z wirkt in der VC nicht")
         self.assertEqual(self.zaehler["n"], 1,
-                         "Strg+Z in der VC darf den App-Verlauf nicht anfassen")
+                         "der juengere Schritt (Layout) ist zuerst dran")
         _taste(self.app, self.win, Qt.Key.Key_Y)
         self.assertEqual(self._vc_anzahl(), 1, "Strg+Y wirkt in der VC nicht")
         _taste(self.app, self.win, Qt.Key.Key_Z)
@@ -599,11 +624,17 @@ class HauptfensterTest(unittest.TestCase):
                          "Strg+Umschalt+Z wirkt in der VC nicht")
         self.assertEqual(self.zaehler["n"], 1)
 
-        # Leerer Layout-Verlauf: weiter kein Griff in den App-Verlauf.
+        # Nachtrag (Entscheidung 13.10.): ist das Layout abgeraeumt, nimmt
+        # das naechste Strg+Z den aelteren Schritt aus dem App-Verlauf zurueck.
         _taste(self.app, self.win, Qt.Key.Key_Z)
         self.assertEqual(self._vc_anzahl(), 0)
-        _taste(self.app, self.win, Qt.Key.Key_Z)
         self.assertEqual(self.zaehler["n"], 1)
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self.zaehler["n"], 0,
+                         "Strg+Z muss bei sichtbarer VC auch den App-Verlauf "
+                         "erreichen")
+        _taste(self.app, self.win, Qt.Key.Key_Z)       # nichts mehr da
+        self.assertEqual((self.zaehler["n"], self._vc_anzahl()), (0, 0))
 
     def test_vc_mit_fokus_auf_einem_knopf_der_vc(self):
         self._schritt()
@@ -622,21 +653,192 @@ class HauptfensterTest(unittest.TestCase):
         self.assertEqual(self._vc_anzahl(), 1)
         self.assertEqual(self.zaehler["n"], 1)
 
-    def test_menue_bedient_auch_in_der_vc_den_app_verlauf(self):
-        """Der Menuepunkt nennt den Schritt beim Namen („Rückgängig: Probe“) —
-        ein Klick darauf nimmt genau den zurueck, auch wenn die VC offen ist."""
-        self._schritt()
+    # ── Ein Verlauf fuer den Bediener (Nachtrag, Entscheidung 13.10.) ───────
+
+    def _gemischt(self):
+        """Patch A -> Layout-Schritt -> Patch B, bei sichtbarer Konsole."""
+        self._seite(self.win._vc_view)
+        self._benannt("Patch A")
+        self._vc_knopf()
+        self._benannt("Patch B")
+        self.assertEqual(self._stand(), (["Patch A", "Patch B"], 1))
+
+    def _dreimal(self, drueck):
+        staende = []
+        for _ in range(3):
+            drueck()
+            self.app.processEvents()
+            staende.append(self._stand())
+        return staende
+
+    ZURUECK = [(["Patch A"], 1), (["Patch A"], 0), ([], 0)]
+    VOR = [(["Patch A"], 0), (["Patch A"], 1), (["Patch A", "Patch B"], 1)]
+
+    def test_gemischte_folge_per_taste(self):
+        """★ Patch, Layout, Patch -> dreimal Strg+Z nimmt in umgekehrter
+        Reihenfolge zurueck, dreimal Strg+Y holt in richtiger Reihenfolge."""
+        self._gemischt()
+        self.assertEqual(
+            self._dreimal(lambda: _taste(self.app, self.win, Qt.Key.Key_Z)),
+            self.ZURUECK)
+        self.assertEqual(
+            self._dreimal(lambda: _taste(self.app, self.win, Qt.Key.Key_Y)),
+            self.VOR)
+        # … und mit der zweiten Wiederholen-Taste genauso.
+        self._dreimal(lambda: _taste(self.app, self.win, Qt.Key.Key_Z))
+        self.assertEqual(
+            self._dreimal(lambda: _taste(self.app, self.win, Qt.Key.Key_Z,
+                                         STRG | UMSCHALT)),
+            self.VOR)
+        _taste(self.app, self.win, Qt.Key.Key_Y)        # nichts mehr da
+        self.assertEqual(self._stand(), self.VOR[-1])
+
+    def test_gemischte_folge_im_bearbeiten_modus(self):
         vc = self.win._vc_view
         self._seite(vc)
-        vc._canvas._add_widget("VCButton", QPoint(0, 0))
-        self.assertIn("Probe", self.win._act_undo.text())
+        vc._toggle_edit(True)
+        self.app.processEvents()
+        self._gemischt()
+        self.assertEqual(
+            self._dreimal(lambda: _taste(self.app, self.win, Qt.Key.Key_Z)),
+            self.ZURUECK)
+        self.assertEqual(
+            self._dreimal(lambda: _taste(self.app, self.win, Qt.Key.Key_Y)),
+            self.VOR)
+
+    def test_menue_und_taste_geben_dieselbe_antwort(self):
+        """Der Menuepunkt nennt den Schritt, der als naechster dran ist, und
+        ein Klick darauf tut dasselbe wie die Taste."""
+        self._gemischt()
+        self.assertEqual(self._menue(), ("Rückgängig: Patch B", "Wiederholen"))
+        self.assertFalse(self.win._act_redo.isEnabled())
         self.win._act_undo.trigger()
         self.app.processEvents()
-        self.assertEqual(self.zaehler["n"], 0)
-        self.assertEqual(self._vc_anzahl(), 1)
+        self.assertEqual(self._stand(), self.ZURUECK[0])
+        layout = self.win.VC_SCHRITT
+        self.assertEqual(self._menue(), (f"Rückgängig: {layout}",
+                                         "Wiederholen: Patch B"))
+        self.win._act_undo.trigger()
+        self.app.processEvents()
+        self.assertEqual(self._stand(), self.ZURUECK[1])
+        self.assertEqual(self._menue(), ("Rückgängig: Patch A",
+                                         f"Wiederholen: {layout}"))
+        self.win._act_undo.trigger()
+        self.app.processEvents()
+        self.assertEqual(self._stand(), self.ZURUECK[2])
+        self.assertEqual(self._menue(), ("Rückgängig",
+                                         "Wiederholen: Patch A"))
+        self.assertFalse(self.win._act_undo.isEnabled())
+        staende = []
+        for _ in range(3):
+            self.assertTrue(self.win._act_redo.isEnabled())
+            self.win._act_redo.trigger()
+            self.app.processEvents()
+            staende.append(self._stand())
+            self._menue()
+        self.assertEqual(staende, self.VOR)
+        # Taste und Menue gemischt: weiter ein und derselbe Verlauf.
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._menue(), (f"Rückgängig: {layout}",
+                                         "Wiederholen: Patch B"))
         self.win._act_redo.trigger()
         self.app.processEvents()
-        self.assertEqual(self.zaehler["n"], 1)
+        self.assertEqual(self._stand(), self.VOR[-1])
+
+    def test_menue_bei_leerem_app_verlauf_und_layout_schritt(self):
+        """Nur das Layout hat einen Schritt: der Menuepunkt ist trotzdem
+        bedienbar (frueher hing er allein am App-Verlauf)."""
+        self._seite(self.win._vc_view)
+        self._vc_knopf()
+        self.assertEqual(self._menue()[0],
+                         f"Rückgängig: {self.win.VC_SCHRITT}")
+        self.assertTrue(self.win._act_undo.isEnabled())
+        self.win._act_undo.trigger()
+        self.app.processEvents()
+        self.assertEqual(self._vc_anzahl(), 0)
+
+    def test_knoepfe_der_konsole_folgen_dem_gemeinsamen_verlauf(self):
+        """↶/↷ nennen im Tooltip die Tasten — sie tun deshalb dasselbe."""
+        vc = self.win._vc_view
+        self._gemischt()
+        knoepfe = {k.text(): k for k in vc.findChildren(QPushButton)
+                   if k.text() in ("↶", "↷")}
+        self.assertEqual(set(knoepfe), {"↶", "↷"})
+        self.assertIn("Bearbeiten → Rückgängig", knoepfe["↶"].toolTip())
+        self.assertIn("Bearbeiten → Wiederholen", knoepfe["↷"].toolTip())
+        self.assertEqual(self._dreimal(knoepfe["↶"].click), self.ZURUECK)
+        self.assertEqual(self._dreimal(knoepfe["↷"].click), self.VOR)
+
+    def test_neuer_layout_schritt_verwirft_das_wiederholen_beider(self):
+        self._gemischt()
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # Patch B zurueck
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # Layout zurueck
+        self.assertEqual(self._stand(), (["Patch A"], 0))
+        self._vc_knopf(40)                              # NEUER Schritt
+        self.assertEqual(self._menue()[1], "Wiederholen")
+        self.assertFalse(self.win._act_redo.isEnabled())
+        self.assertFalse(self.stapel.can_redo())
+        self.assertFalse(vc_redo := self.win._vc_view._canvas.can_redo(), vc_redo)
+        for taste, mods in ((Qt.Key.Key_Y, STRG), (Qt.Key.Key_Z, STRG | UMSCHALT)):
+            _taste(self.app, self.win, taste, mods)
+            self.assertEqual(self._stand(), (["Patch A"], 1),
+                             "verworfener Zweig darf nicht zurueckkommen")
+        self.win._act_redo.trigger()
+        self.app.processEvents()
+        self.assertEqual(self._stand(), (["Patch A"], 1))
+        # Rueckgaengig laeuft ueber den neuen Schritt weiter zurueck.
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), (["Patch A"], 0))
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), ([], 0))
+
+    def test_neuer_app_schritt_verwirft_das_wiederholen_beider(self):
+        self._gemischt()
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # Patch B zurueck
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # Layout zurueck
+        self._benannt("Patch C")                        # NEUER Schritt
+        self.assertEqual(self._menue(), ("Rückgängig: Patch C", "Wiederholen"))
+        self.assertFalse(self.win._vc_view._canvas.can_redo())
+        self.assertFalse(self.stapel.can_redo())
+        _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertEqual(self._stand(), (["Patch A", "Patch C"], 0))
+        # Auch der eigene Wiederholen-Weg der Konsole kennt den Zweig nicht mehr.
+        self.win._vc_view._vc_redo()
+        self.assertEqual(self._vc_anzahl(), 0)
+
+    def test_ausserhalb_der_konsole_bleibt_das_layout_stehen(self):
+        """Ist die Konsole nicht zu sehen, baut Strg+Z kein Layout um, das
+        gerade niemand sieht — auch wenn der Layout-Schritt der juengste ist."""
+        self._seite(self.win._vc_view)
+        self._benannt("Patch A")
+        self._vc_knopf()
+        self._seite(self.andere_seite)
+        self.assertEqual(self._menue()[0], "Rückgängig: Patch A")
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), ([], 1))
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), ([], 1))
+        _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertEqual(self._stand(), (["Patch A"], 1))
+        # Zurueck in der Konsole ist der Layout-Schritt wieder erreichbar —
+        # und weiter der juengere: „Patch A“ hat beim Wiederholen seinen
+        # alten Platz im Verlauf zurueckbekommen.
+        self._seite(self.win._vc_view)
+        self.assertEqual(self._menue()[0],
+                         f"Rückgängig: {self.win.VC_SCHRITT}")
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), (["Patch A"], 0))
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), ([], 0))
+
+    def test_verlauf_loeschen_leert_beide(self):
+        self._gemischt()
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.win._clear_undo_history()
+        self.assertEqual(self._menue(), ("Rückgängig", "Wiederholen"))
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertEqual(self._stand(), (["Patch A"], 1))
 
     def test_nach_der_vc_gilt_wieder_der_app_verlauf(self):
         self._schritt()
@@ -756,6 +958,113 @@ class HauptfensterTest(unittest.TestCase):
         self.assertEqual(vc, {"Strg+Z", "Strg+Y", "Strg+Umschalt+Z"})
         self.assertFalse([e for e in eintraege
                           if e.aktion == "(ohne Beschreibung)"])
+
+    def test_menue_und_tastenkuerzel_liste_sagen_wiederholen(self):
+        from src.ui.hilfe import sammle_tastenkuerzel
+        self.assertEqual(self.win._act_redo.text(), "Wiederholen")
+        self._schritt()
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self.win._act_redo.text(), "Wiederholen: Probe")
+        _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertIn("Wiederholt", self.win.statusBar().currentMessage())
+        aktionen = {e.aktion for e in sammle_tastenkuerzel([self.win])
+                    if e.tasten in ("Strg+Y", "Strg+Umschalt+Z")}
+        self.assertTrue(aktionen)
+        for aktion in aktionen:
+            self.assertNotIn("iederherstell", aktion)
+        self.assertTrue(any("iederhol" in a for a in aktionen), aktionen)
+
+
+class GemeinsamerVerlaufKernTest(unittest.TestCase):
+    """Die Schrittnummern selbst (ohne Fenster)."""
+
+    def test_stapel_tragen_fortlaufende_nummern(self):
+        from src.core import undo
+        a, b = undo.UndoStack(), undo.UndoStack()
+        a.push_simple("eins", lambda: None, lambda: None)
+        b.push_simple("zwei", lambda: None, lambda: None)
+        a.push_simple("drei", lambda: None, lambda: None)
+        self.assertLess(b.undo_schritt(), a.undo_schritt())
+        self.assertIsNone(a.redo_marke())
+        nummer = a.undo_schritt()
+        a.undo()
+        b.undo()
+        self.assertLess(a.redo_marke(), b.redo_marke(),
+                        "zuletzt zurueckgenommen = zuerst wiederholt")
+        b.redo()
+        a.redo()
+        self.assertEqual(a.undo_schritt(), nummer,
+                         "Wiederholen gibt dem Schritt seinen Platz zurueck")
+
+    def test_neuer_schritt_verwirft_fremdes_wiederholen(self):
+        from src.core import undo
+        a, b = undo.UndoStack(), undo.UndoStack()
+        a.push_simple("eins", lambda: None, lambda: None)
+        a.undo()
+        self.assertTrue(a.can_redo())
+        b.push_simple("zwei", lambda: None, lambda: None)
+        self.assertFalse(a.can_redo())
+        self.assertIsNone(a.redo_label())
+        self.assertFalse(a.redo())
+
+    def test_ruecknahme_allein_verwirft_nichts(self):
+        from src.core import undo
+        a, b = undo.UndoStack(), undo.UndoStack()
+        a.push_simple("eins", lambda: None, lambda: None)
+        b.push_simple("zwei", lambda: None, lambda: None)
+        b.undo()
+        a.undo()
+        self.assertTrue(a.can_redo() and b.can_redo())
+
+
+class WortWaechterTest(unittest.TestCase):
+    """Der Gegenschritt zu „Rückgängig“ heisst ueberall „Wiederholen“.
+    „Wiederherstellen“ bleibt Sicherungen, Auto-Save und der Kopf-Gruppe
+    vorbehalten — deshalb sucht der Waechter nur die Verbindung mit
+    Rückgängig, dem Menue Bearbeiten oder den Wiederholen-Tasten."""
+
+    MUSTER = re.compile(
+        r"Rückgängig\W{1,6}Wiederherstellen"
+        r"|Bearbeiten\W{1,12}Wiederherstellen"
+        r"|Wiederherstellen[^\n.]{0,40}(Strg|Ctrl)\+(Y|Umschalt\+Z|Shift\+Z)"
+        r"|[\"„]Wiederherstellen: ")
+
+    def _dateien(self):
+        yield WURZEL / "README.md"
+        for p in sorted((WURZEL / "src").rglob("*.py")):
+            yield p
+        for p in sorted((WURZEL / "docs").rglob("*.md")):
+            teile = p.relative_to(WURZEL).parts
+            if "_archiv" in teile or "AUDIT" in p.name.upper():
+                continue
+            yield p
+
+    def test_kein_wiederherstellen_fuer_redo(self):
+        funde = []
+        for p in self._dateien():
+            text = p.read_text(encoding="utf-8", errors="replace")
+            for m in self.MUSTER.finditer(text):
+                zeile = text.count("\n", 0, m.start()) + 1
+                funde.append(f"{p.relative_to(WURZEL)}:{zeile}: {m.group(0)!r}")
+        self.assertEqual(funde, [], "\n".join(funde))
+
+    def test_muster_erkennt_den_alten_wortlaut(self):
+        for alt in ("Rückgängig · Wiederherstellen · Verlauf löschen",
+                    "**Rückgängig/Wiederherstellen** (Menü Bearbeiten)",
+                    "Bearbeiten →\n   Wiederherstellen** (**Strg+Y**",
+                    'setText(f"Wiederherstellen: {r}")'):
+            self.assertTrue(self.MUSTER.search(alt), alt)
+        for erlaubt in ("Auto-Save Wiederherstellung", '"Wiederherstellen?"',
+                        'QPushButton("Wiederherstellen")',
+                        "Sicherung wiederherstellen"):
+            self.assertFalse(self.MUSTER.search(erlaubt), erlaubt)
+
+    def test_hilfetexte_des_programmers(self):
+        from src.ui.views.programmer_view import _PROGRAMMER_HELP
+        self.assertIn("Bearbeiten → Wiederholen",
+                      _PROGRAMMER_HELP["Wiederholen"])
+        for text in _PROGRAMMER_HELP.values():
+            self.assertNotIn("Wiederherstellen", text)
 
 
 if __name__ == "__main__":

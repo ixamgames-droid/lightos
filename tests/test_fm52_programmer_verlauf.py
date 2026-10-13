@@ -582,7 +582,7 @@ class ReviewTexteTest(unittest.TestCase):
         self.assertNotIn("Strg+Y", _PROGRAMMER_HELP["Rückgängig"])
         wdh = _PROGRAMMER_HELP["Wiederholen"]
         self.assertEqual("Strg+Y" in wdh, "Strg+Umschalt+Z" in wdh)
-        self.assertIn("Bearbeiten → Wiederherstellen", wdh)
+        self.assertIn("Bearbeiten → Wiederholen", wdh)
 
     def test_anleitung_beschreibt_eigenen_verlauf(self):
         pfad = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(

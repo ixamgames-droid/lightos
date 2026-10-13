@@ -316,7 +316,7 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   wie sie sind.
 - **STOP ALL** stoppt auch die Musik sofort; der **BLACKOUT**-Knopf zeigt den echten Zustand,
   auch wenn Blackout über VC, Web-Remote, OSC oder die Kommandozeile geschaltet wurde.
-- **Rückgängig/Wiederherstellen** (Menü Bearbeiten) für Patch-Änderungen, 3D-Gesten und
+- **Rückgängig/Wiederholen** (Menü Bearbeiten) für Patch-Änderungen, 3D-Gesten und
   Einmess-Korrekturen; ein gelöschtes Gerät kommt samt gepflegter Kopf-Gruppe zurück. Jede
   geöffnete oder neue Show beginnt mit leerem Verlauf.
 - Ein kaputter Eintrag in der Show-Datei kostet nur sich selbst und wird gemeldet; doppelte

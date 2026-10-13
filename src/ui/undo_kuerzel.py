@@ -28,10 +28,14 @@ Fensters, noch bevor Qt ein Kuerzel ausloest (``ShortcutOverride``):
    Rueckgaengig/Wiederholen. Qt macht das von sich aus nur fuer die Folgen der
    Plattform (unter X11 also nicht fuer Strg+Y) — die uebrigen reicht
    ``vorrang()`` an das Feld durch.
-2. Ein lokaler Verlauf des Fensters (im Hauptfenster: der Layout-Verlauf der
-   sichtbaren Virtual Console).
+2. Ein lokaler Verlauf des Fensters (im Hauptfenster bei sichtbarer Virtual
+   Console: der gemeinsame Verlauf aus Layout der Konsole und Bearbeiten →
+   Rueckgaengig, siehe ``MainWindow.verlauf_schritt``).
 3. Sonst laeuft der Tastendruck normal weiter und trifft das Kuerzel des
-   Fensters (im Hauptfenster: Bearbeiten → Rueckgaengig/Wiederherstellen).
+   Fensters (im Hauptfenster: Bearbeiten → Rueckgaengig/Wiederholen).
+
+Das Wort heisst in der Oberflaeche ueberall „Wiederholen“ (nicht
+„Wiederherstellen“ — das bleibt Sicherungen und dem Auto-Save vorbehalten).
 """
 from __future__ import annotations
 

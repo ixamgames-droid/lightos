@@ -269,12 +269,12 @@ Helligkeitsrampe über acht PARs oder einen Pan-Fächer über Moving Heads.
    **ein** Schritt, ebenso ein Knopfdruck, auch wenn er viele Geräte trifft.
    **Rückgängig** stellt den Stand vor diesem Schritt wieder her, **Wiederholen** holt
    ihn zurück. Beide Knöpfe sind nur aktiv, wenn es etwas zurückzunehmen bzw.
-   wiederherzustellen gibt; der Tooltip nennt den Schritt.
+   zu wiederholen gibt; der Tooltip nennt den Schritt.
 
    Änderungen am Patch und an den Geräte-Einstellungen, etwa die Ausrichtungs-Haken
    aus Schritt 5 (**Pan invertieren** …), stehen **nicht** in diesem Verlauf. Die nimmst
-   du über **Bearbeiten → Rückgängig** (**Strg+Z**) zurück und über **Bearbeiten →
-   Wiederherstellen** (**Strg+Y** oder **Strg+Umschalt+Z**) wieder her. **Neue Show** und **Show öffnen** leeren beide
+   du über **Bearbeiten → Rückgängig** (**Strg+Z**) zurück und holst sie über **Bearbeiten →
+   Wiederholen** (**Strg+Y** oder **Strg+Umschalt+Z**) wieder. **Neue Show** und **Show öffnen** leeren beide
    Verläufe.
 
 **Kopieren** merkt sich die Programmer-Werte der gewählten Geräte, **Einfügen** legt

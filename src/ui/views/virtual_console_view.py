@@ -221,9 +221,20 @@ class VirtualConsoleView(QWidget):
 
         # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only.
         from src.ui import undo_kuerzel
+        # UI-93: die Knoepfe tun dasselbe wie die Tasten, die ihr Tooltip
+        # nennt — im Hauptfenster also den gemeinsamen Verlauf (Layout UND
+        # Patch/Geraete in zeitlicher Reihenfolge), nicht nur das Layout.
         for _glyph, _tip, _slot in [
-                ("↶", f"Rückgängig ({undo_kuerzel.undo_text()})", self._vc_undo),
-                ("↷", f"Wiederholen ({undo_kuerzel.redo_text()})", self._vc_redo)]:
+                ("↶", f"Rückgängig ({undo_kuerzel.undo_text()}): nimmt den "
+                      "zuletzt gemachten Schritt zurück. Das ist derselbe "
+                      "Verlauf wie Bearbeiten → Rückgängig – Layout der "
+                      "Konsole und Änderungen an Patch und Geräten in der "
+                      "Reihenfolge, in der du sie gemacht hast.",
+                 self._knopf_rueckgaengig),
+                ("↷", f"Wiederholen ({undo_kuerzel.redo_text()}): holt den "
+                      "zuletzt zurückgenommenen Schritt wieder. Das ist "
+                      "derselbe Verlauf wie Bearbeiten → Wiederholen.",
+                 self._knopf_wiederholen)]:
             ub = QPushButton(_glyph)
             ub.setFixedHeight(26)
             ub.setToolTip(_tip)
@@ -853,6 +864,29 @@ class VirtualConsoleView(QWidget):
         # Neues Widget auswählen → Inspector bindet, sichtbare Bestätigung.
         if w is not None:
             self._canvas._on_widget_selected(w)
+
+    def _verlauf_knopf(self, wiederholen: bool):
+        """↶/↷ der Werkzeugleiste. Im Hauptfenster derselbe gemeinsame Verlauf
+        wie Strg+Z und Bearbeiten → Rückgängig (UI-93) — ein Knopf, dessen
+        Tooltip „Strg+Z“ nennt, darf nichts anderes tun als die Taste. Ohne
+        Hauptfenster (eigenes Fenster, Tests) bleibt es der Layout-Verlauf."""
+        from src.ui import undo_kuerzel
+        try:
+            fenster = self.window()
+        except RuntimeError:
+            fenster = None
+        schritt = getattr(fenster, "verlauf_schritt", None)
+        if (getattr(fenster, undo_kuerzel.MERKMAL_ZENTRAL, False)
+                and callable(schritt)):
+            schritt(wiederholen)
+            return
+        (self._vc_redo if wiederholen else self._vc_undo)()
+
+    def _knopf_rueckgaengig(self):
+        self._verlauf_knopf(False)
+
+    def _knopf_wiederholen(self):
+        self._verlauf_knopf(True)
 
     def _vc_undo(self):
         """Letzte VC-Bearbeitung rueckgaengig (Strg+Z / ↶-Knopf)."""
