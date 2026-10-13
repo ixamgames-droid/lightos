@@ -9,11 +9,19 @@ Dialog. Gerechnet wird nur beim Oeffnen der Eigenschaften und wenn sich die
 Funktion der Taste, eine Stufe oder eine Funktion aendert — nie im Bild-Takt.
 Die Rechnung selbst steht ohne Qt in ``src/core/engine/ueberschneidung.py``.
 
-Betrachtet werden nur Funktionen, die der Bediener gleichzeitig starten kann:
-solche, die auf einer anderen Taste („Funktion an/aus“, „Funktion (nur
-gehalten)“) oder auf einem Effekt-Fader liegen, der seinen Effekt auch startet
-und stoppt (Haken „bei 0 wirklich stoppen“). Tasten im selben Solo-Rahmen
-zaehlen nicht — dort ist immer nur eine aktiv.
+Betrachtet werden nur Funktionen, die auf einem anderen Bedienelement liegen:
+auf einer Taste („Funktion an/aus“, „Funktion (nur gehalten)“) oder auf einem
+Effekt-Fader. Ein Fader zaehlt IMMER mit — auch ohne den Haken „bei 0 wirklich
+stoppen“: dann laeuft sein Effekt bei 0 unsichtbar weiter und belegt die
+Geraete, und genau das sagt der Hinweis in einem eigenen Satz.
+
+Exklusiv-Gruppe = Solo-Frame (``VCFrame.is_solo``, gespeichert als ``solo``):
+Tasten, die DIREKT im selben Solo-Frame liegen, schalten sich gegenseitig aus
+— zwischen ihnen gibt es keinen Hinweis, gegen alles ausserhalb weiterhin.
+Das folgt genau dem, was ``VCFrame.on_child_activated`` tut: er schaltet nur
+seine direkten Kinder aus und nur solche mit ``deactivate_for_solo`` (Tasten).
+Ein Fader im Solo-Frame, eine Taste in einem Unter-Rahmen und Tasten zweier
+verschiedener Solo-Frames gehoeren deshalb NICHT zur selben Gruppe.
 """
 from __future__ import annotations
 
@@ -33,6 +41,11 @@ HINWEIS_TOOLTIP = (
     "Er erscheint, wenn eine andere Taste oder ein Fader der Virtual Console "
     "an denselben Geräten denselben Baustein steuert (Dimmer, Farbe, Bewegung "
     "oder Gobo). Farbe und Dimmer sind getrennt und stören sich nicht.\n"
+    "Ein Fader zählt immer mit. Stoppt er seinen Effekt bei 0 nicht wirklich, "
+    "läuft der Effekt dort weiter und belegt die Geräte — der Hinweis sagt "
+    "das dazu.\n"
+    "Tasten im selben Solo-Frame schalten sich gegenseitig aus; zwischen "
+    "ihnen gibt es keinen Hinweis.\n"
     "Die höhere Stufe gewinnt; bei gleicher Stufe gewinnt, wer zuletzt "
     "gestartet wurde. Die Stufe stellst du im Editor des Effekts oder im "
     "Reiter „Prioritäten“ ein.")
@@ -55,8 +68,13 @@ def wurzel_von(widget):
     return gefunden
 
 
-def _solo_rahmen(widget):
-    """Der Solo-Rahmen, in dem ``widget`` DIREKT liegt (sonst None)."""
+def exklusiv_gruppe(widget):
+    """Der Solo-Frame, dessen Exklusiv-Gruppe ``widget`` angehoert — sonst
+    None. Dazu gehoert nur, was DIREKT im Solo-Frame liegt und sich von ihm
+    ausschalten laesst (``deactivate_for_solo``, also Tasten): genau diese
+    Elemente schaltet ``VCFrame.on_child_activated`` gegenseitig aus."""
+    if not callable(getattr(widget, "deactivate_for_solo", None)):
+        return None
     try:
         eltern = widget.parentWidget()
     except RuntimeError:
@@ -68,51 +86,135 @@ def _solo_rahmen(widget):
         return None
 
 
-def _start_ids(widget) -> list[int]:
-    """Funktions-IDs, die ``widget`` STARTEN kann — leer fuer alles, was nur
-    regelt (Tempo, Parameter) oder gar keine Funktion traegt."""
-    from src.ui.virtualconsole.vc_button import ButtonAction, VCButton
+def _effekt_fader(widget) -> bool:
     from src.ui.virtualconsole.vc_slider import SliderMode, VCSlider
+    return (isinstance(widget, VCSlider)
+            and widget.mode in (SliderMode.EFFECT_INTENSITY,
+                                SliderMode.EFFECT_SPEED,
+                                SliderMode.EFFECT_PARAM))
+
+
+def _start_ids(widget) -> list[int]:
+    """Funktions-IDs, die ``widget`` fest steuert — leer fuer alles, was nur
+    Tempo, Programmer oder Pegel regelt oder gar keine Funktion traegt. Ein
+    Effekt-Fader zaehlt immer, mit und ohne „bei 0 wirklich stoppen“."""
+    from src.ui.virtualconsole.vc_button import ButtonAction, VCButton
     try:
         if isinstance(widget, VCButton):
             if widget.action in (ButtonAction.FUNCTION_TOGGLE,
                                  ButtonAction.FUNCTION_FLASH):
                 return list(widget._all_function_ids())
-        elif isinstance(widget, VCSlider):
-            if (widget.mode in (SliderMode.EFFECT_INTENSITY,
-                                SliderMode.EFFECT_SPEED,
-                                SliderMode.EFFECT_PARAM)
-                    and getattr(widget, "effect_autostart", False)):
-                return list(widget._all_target_fids())
+        elif _effekt_fader(widget):
+            return list(widget._all_target_fids())
     except Exception:
         return []
     return []
 
 
-def konsolen_funktions_ids(wurzel, ausser=None) -> list[int]:
-    """IDs aller Funktionen, die auf einer Taste oder einem Fader unter
-    ``wurzel`` liegen — ohne ``ausser`` selbst und ohne dessen Geschwister im
-    selben Solo-Rahmen. Reihenfolge stabil, ohne Doppelte."""
+def haelt_bei_null(widget) -> bool:
+    """Effekt-Fader OHNE „bei 0 wirklich stoppen“: sein Effekt laeuft bei 0
+    weiter."""
+    try:
+        return (_effekt_fader(widget)
+                and not getattr(widget, "effect_autostart", False))
+    except Exception:
+        return False
+
+
+def _bedienelemente(wurzel) -> list[tuple]:
+    """``(Element, Funktions-IDs, Exklusiv-Gruppe, haelt bei 0)`` fuer jedes
+    Bedienelement unter ``wurzel``, das eine Funktion fest steuert."""
     if wurzel is None:
         return []
     from src.ui.virtualconsole.vc_widget import VCWidget
-    solo = _solo_rahmen(ausser) if ausser is not None else None
-    ids: list[int] = []
-    gesehen: set[int] = set()
     try:
         alle = wurzel.findChildren(VCWidget)
     except RuntimeError:
         return []
+    aus = []
     for w in alle:
+        ids = _start_ids(w)
+        if ids:
+            aus.append((w, ids, exklusiv_gruppe(w), haelt_bei_null(w)))
+    return aus
+
+
+def konsolen_funktions_ids(wurzel, ausser=None) -> list[int]:
+    """IDs aller Funktionen, die auf einer Taste oder einem Fader unter
+    ``wurzel`` liegen — ohne ``ausser`` selbst und ohne die Tasten seiner
+    Exklusiv-Gruppe (selber Solo-Frame). Reihenfolge stabil, ohne Doppelte."""
+    gruppe = exklusiv_gruppe(ausser) if ausser is not None else None
+    ids: list[int] = []
+    gesehen: set[int] = set()
+    for w, eigene, ihre_gruppe, _haelt in _bedienelemente(wurzel):
         if w is ausser:
             continue
-        if solo is not None and _solo_rahmen(w) is solo:
+        if gruppe is not None and ihre_gruppe is gruppe:
             continue
-        for fid in _start_ids(w):
+        for fid in eigene:
             if fid not in gesehen:
                 gesehen.add(fid)
                 ids.append(fid)
     return ids
+
+
+def haltende_ids(wurzel, ausser=None) -> set[int]:
+    """IDs der Funktionen, die auf einem Fader ohne „bei 0 wirklich stoppen“
+    liegen (ohne ``ausser`` selbst)."""
+    return {int(fid) for w, ids, _g, haelt in _bedienelemente(wurzel)
+            if haelt and w is not ausser for fid in ids}
+
+
+def konsolen_beziehungen(flaechen) -> tuple[list[int], dict[int, set[int]], set[int]]:
+    """Fuer eine Sicht ueber ALLE Bedienelemente (Reiter „Prioritäten“):
+    ``(IDs, Gegenueber, haltend)``. ``Gegenueber[f]`` sind die Funktionen, die
+    auf einem ANDEREN Bedienelement liegen, das nicht zur selben
+    Exklusiv-Gruppe gehoert — nur gegen sie gibt es einen Hinweis. Dieselbe
+    Regel wie an der Taste: zwei Funktionen derselben Taste und zwei Tasten
+    desselben Solo-Frames melden sich nicht."""
+    elemente = []
+    for flaeche in flaechen or ():
+        elemente.extend(_bedienelemente(flaeche))
+    ids: list[int] = []
+    haltend: set[int] = set()
+    gegenueber: dict[int, set[int]] = {}
+    mengen = [frozenset(int(i) for i in eigene) for _w, eigene, _g, _h in elemente]
+    for (w, eigene, gruppe, haelt), menge in zip(elemente, mengen):
+        for fid in eigene:
+            if fid not in gegenueber:
+                gegenueber[int(fid)] = set()
+                ids.append(int(fid))
+        if haelt:
+            haltend |= menge
+    # Zaehlen statt jedes Element mit jedem zu vergleichen: wie viele Elemente
+    # tragen eine Funktion insgesamt, wie viele davon je Exklusiv-Gruppe?
+    gesamt: dict[int, int] = {}
+    je_gruppe: dict[int, dict[int, int]] = {}
+    for (_w, _eigene, gruppe, _haelt), menge in zip(elemente, mengen):
+        in_gruppe = (je_gruppe.setdefault(id(gruppe), {})
+                     if gruppe is not None else None)
+        for fid in menge:
+            gesamt[fid] = gesamt.get(fid, 0) + 1
+            if in_gruppe is not None:
+                in_gruppe[fid] = in_gruppe.get(fid, 0) + 1
+    alle = frozenset(gesamt)
+    ausserhalb: dict[int, frozenset] = {}       # je Gruppe: was draussen liegt
+    for (_w, _eigene, gruppe, _haelt), menge in zip(elemente, mengen):
+        if gruppe is None:
+            # alles, was (auch) auf einem ANDEREN Element liegt
+            andere = alle - {fid for fid in menge if gesamt[fid] == 1}
+        else:
+            schluessel = id(gruppe)
+            if schluessel not in ausserhalb:
+                drin = je_gruppe[schluessel]
+                ausserhalb[schluessel] = frozenset(
+                    fid for fid in alle if gesamt[fid] > drin.get(fid, 0))
+            andere = ausserhalb[schluessel]
+        for fid in menge:
+            gegenueber[fid] |= andere
+    for fid, menge in gegenueber.items():
+        menge.discard(fid)
+    return ids, gegenueber, haltend
 
 
 # ── Auskuenfte aus der Show ──────────────────────────────────────────────────
@@ -173,10 +275,12 @@ def rechen_umgebung() -> dict:
             "geraete_name": geraete_name, "cache": {}}
 
 
-def treffer_fuer(eigene_ids, andere_ids, umgebung: dict | None = None) -> list:
+def treffer_fuer(eigene_ids, andere_ids, umgebung: dict | None = None,
+                 haltend=None) -> list:
     """Alle Ueberschneidungen der Funktionen ``eigene_ids`` (einer Taste) mit
     den Funktionen ``andere_ids``. Die eigenen Funktionen untereinander zaehlen
-    nicht — die startet die Taste absichtlich gemeinsam."""
+    nicht — die startet die Taste absichtlich gemeinsam. ``haltend``: IDs der
+    Funktionen auf einem Fader ohne „bei 0 wirklich stoppen“."""
     umgebung = umgebung if umgebung is not None else rechen_umgebung()
     aufloesen = umgebung["aufloesen"]
     eigene_menge = set()
@@ -196,7 +300,8 @@ def treffer_fuer(eigene_ids, andere_ids, umgebung: dict | None = None) -> list:
         except (TypeError, ValueError):
             continue
         if f is not None:
-            treffer.extend(ueberschneidung.ueberschneidungen(f, andere, **umgebung))
+            treffer.extend(ueberschneidung.ueberschneidungen(
+                f, andere, haltend=haltend, **umgebung))
     # Ueber alle eigenen Funktionen hinweg: Verlierer-Faelle zuerst.
     treffer.sort(key=ueberschneidung.sortier_schluessel)
     return treffer
@@ -205,7 +310,12 @@ def treffer_fuer(eigene_ids, andere_ids, umgebung: dict | None = None) -> list:
 # ── Die Zeile ────────────────────────────────────────────────────────────────
 
 class UeberschneidungsHinweis(QLabel):
-    """Gelbe, mehrzeilige Hinweiszeile in den Eigenschaften einer Taste.
+    """Gelbe, mehrzeilige Hinweiszeile in den Eigenschaften einer Taste oder
+    eines Effekt-Faders.
+
+    ``subjekt``: „Taste“ oder „Fader“ — so beginnt der Satz. ``haelt_selbst()``
+    (nur Fader) sagt aus den FELDERN des Dialogs, ob der Haken „bei 0 wirklich
+    stoppen“ fehlt.
 
     ``quelle()`` liefert die Funktions-IDs, die die Taste gerade starten
     wuerde (aus den Feldern der Eigenschaften, nicht aus der Taste — im
@@ -223,10 +333,13 @@ class UeberschneidungsHinweis(QLabel):
     #: zusammengedrueckt.
     KLEINSTE_BREITE = 120
 
-    def __init__(self, taste, quelle, parent=None):
+    def __init__(self, taste, quelle, parent=None, subjekt: str = "Taste",
+                 haelt_selbst=None):
         super().__init__(parent)
         self._taste = taste
         self._quelle = quelle
+        self._subjekt = subjekt
+        self._haelt_selbst = haelt_selbst
         self.sichtbar_setzen = None
         self._stillgelegt = False
         self.treffer: list = []
@@ -349,20 +462,23 @@ class UeberschneidungsHinweis(QLabel):
         treffer: list = []
         if eigene:
             try:
-                andere = konsolen_funktions_ids(wurzel_von(self._taste),
-                                                ausser=self._taste)
+                wurzel = wurzel_von(self._taste)
+                andere = konsolen_funktions_ids(wurzel, ausser=self._taste)
                 if andere:
-                    treffer = treffer_fuer(eigene, andere)
+                    haltend = haltende_ids(wurzel, ausser=self._taste)
+                    if callable(self._haelt_selbst) and self._haelt_selbst():
+                        haltend |= {int(i) for i in eigene}
+                    treffer = treffer_fuer(eigene, andere, haltend=haltend)
             except Exception as e:
                 print(f"[ueberschneidung_hinweis] Rechnung: {e}")
                 treffer = []
         self.treffer = treffer
         mehrere = len(set(eigene)) > 1
-        zeilen = ueberschneidung.hinweis_zeilen(treffer, "Taste",
+        zeilen = ueberschneidung.hinweis_zeilen(treffer, self._subjekt,
                                                 nenne_eigene=mehrere)
         # Der Tooltip traegt IMMER die vollstaendige Liste — auch das, was die
         # Zeile in „… und n weitere“ zusammenfasst.
-        alle = ueberschneidung.hinweis_zeilen(treffer, "Taste",
+        alle = ueberschneidung.hinweis_zeilen(treffer, self._subjekt,
                                               nenne_eigene=mehrere,
                                               hoechstens=None)
         try:

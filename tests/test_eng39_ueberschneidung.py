@@ -388,3 +388,57 @@ def test_namen_von_gruppe_und_geraet_stehen_in_anfuehrungszeichen(fm):
     d.modify = True
     (t,) = _suche(fm, c, [d], gruppen=[("Vorne", [7])])
     assert "fassen beide den Dimmer der Gruppe „Vorne“ an — " in t.satz()
+
+
+# ── Nachtrag: Fader zaehlen immer mit ────────────────────────────────────────
+
+def test_fader_ohne_stopp_bei_null_steht_als_eigener_satz_dahinter(fm):
+    """Liegt der ANDERE Effekt auf einem Fader ohne „bei 0 wirklich stoppen“,
+    sagt der Hinweis ausdruecklich, dass er bei 0 weiterlaeuft."""
+    a = _matrix(fm, "Puls HG", HINTERGRUND)
+    b = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    (ohne,) = _suche(fm, a, [b])
+    assert not ohne.andere_haelt and not ohne.eigene_haelt
+    assert "am Laufen" not in ohne.satz()
+    (t,) = _suche(fm, a, [b], haltend=[b.id])
+    assert t.andere_haelt and not t.eigene_haelt
+    assert t.satz() == (
+        ohne.satz() + " Ein Fader hält „Lauflicht HG“ auch bei 0 am Laufen — "
+        "der Effekt belegt die Geräte dann weiter.")
+    assert U.hinweis_zeilen([t]) == [t.satz()], "keine Zusatzzeile fuer den anderen"
+
+
+def test_eigener_effekt_am_fader_ohne_stopp_bekommt_eine_zeile_fuer_alle(fm):
+    """Der Satz ueber den EIGENEN Effekt steht einmal am Ende — nicht hinter
+    jeder Ueberschneidung wieder."""
+    ich = _matrix(fm, "Wash", HINTERGRUND)
+    andere = [_matrix(fm, f"E{i}", HINTERGRUND) for i in range(5)]
+    treffer = _suche(fm, ich, andere, haltend={ich.id})
+    assert all(t.eigene_haelt and not t.andere_haelt for t in treffer)
+    assert all("am Laufen" not in t.satz("Fader") for t in treffer)
+    fader = U.hinweis_zeilen(treffer, "Fader")
+    assert fader[0].startswith("Dieser Fader und „E0“ steuern beide den Dimmer ")
+    assert fader[-2].startswith("… und 2 weitere Überschneidungen: ")
+    assert "Taste" not in "".join(fader)
+    assert fader[-1] == U.HALTE_SATZ_FADER == (
+        "Dieser Fader hält den Effekt auch bei 0 am Laufen — er belegt die "
+        "Geräte dann weiter.")
+    assert sum("am Laufen" in z for z in fader) == 1
+    assert U.hinweis_zeilen(treffer, "Effekt", hoechstens=None)[-1] == (
+        "Ein Fader hält diesen Effekt auch bei 0 am Laufen — er belegt die "
+        "Geräte dann weiter.")
+    assert U.hinweis_zeilen(treffer, "Taste")[-1] == (
+        "Ein Fader hält „Wash“ auch bei 0 am Laufen — der Effekt belegt die "
+        "Geräte dann weiter.")
+    assert U.hinweis_zeilen([], "Fader") == [], "ohne Ueberschneidung kein Satz"
+
+
+def test_fader_als_subjekt_sagt_wer_gewinnt(fm):
+    ich = _matrix(fm, "Wash", HINTERGRUND)
+    stark = _matrix(fm, "Blinder", HINTERGRUND, stufe=STROBE)
+    (t,) = _suche(fm, ich, [stark])
+    assert t.satz("Fader") == (
+        "Dieser Fader und „Blinder“ steuern beide den Dimmer von 4 Geräten — "
+        "„Blinder“ liegt zwei Stufen höher und gewinnt.")
+    (u,) = _suche(fm, stark, [ich])
+    assert u.satz("Fader").endswith("dieser Fader liegt zwei Stufen höher und gewinnt.")

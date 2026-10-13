@@ -234,7 +234,10 @@ def test_tasten_im_selben_solo_rahmen_zaehlen_nicht(fm, flaeche):
     assert H.konsolen_funktions_ids(flaeche, ausser=taste) == [lauf.id]
 
 
-def test_nur_tasten_und_startende_fader_zaehlen(fm, flaeche):
+def test_tasten_und_jeder_effekt_fader_zaehlen(fm, flaeche):
+    """Entscheidung der Leitung (Nachtrag): ein Effekt-Fader zaehlt IMMER mit
+    — frueher nur mit dem Haken „bei 0 wirklich stoppen“. Ohne den Haken
+    laeuft sein Effekt bei 0 weiter; das merkt sich ``haltende_ids``."""
     lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
     puls = _matrix(fm, "Puls HG", HINTERGRUND)
     tempo = _matrix(fm, "Tempo-Ziel", HINTERGRUND)
@@ -247,9 +250,211 @@ def test_nur_tasten_und_startende_fader_zaehlen(fm, flaeche):
     regler.mode = SliderMode.GROUP_DIMMER
     regler.function_id = tempo.id
     regler.effect_autostart = True          # ohne Effekt-Modus wirkungslos
-    assert H.konsolen_funktions_ids(flaeche) == [lauf.id], "Fader regelt nur"
+    frei = VCSlider("Aktiver Effekt", parent=flaeche)
+    frei.mode = SliderMode.EFFECT_SPEED     # ohne festes Ziel: nichts zu sagen
+    assert H.konsolen_funktions_ids(flaeche) == [lauf.id, puls.id], (
+        "auch der Fader, der nur regelt, zaehlt mit")
+    assert H.haltende_ids(flaeche) == {puls.id}
+    assert H.haltende_ids(flaeche, ausser=fader) == set()
     fader.effect_autostart = True
     assert H.konsolen_funktions_ids(flaeche) == [lauf.id, puls.id]
+    assert H.haltende_ids(flaeche) == set(), "stoppt bei 0 wirklich"
+    for modus in (SliderMode.EFFECT_SPEED, SliderMode.EFFECT_PARAM):
+        fader.mode = modus
+        assert H.konsolen_funktions_ids(flaeche) == [lauf.id, puls.id], modus
+
+
+def _fader(eltern, funktion, name="Fader", stoppt=False):
+    f = VCSlider(name, parent=eltern)
+    f.mode = SliderMode.EFFECT_INTENSITY
+    f.function_id = funktion.id
+    f.effect_autostart = stoppt
+    return f
+
+
+def test_taste_nennt_den_fader_der_bei_null_weiterlaufen_laesst(fm, flaeche):
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND)
+    fader = _fader(flaeche, lauf)
+    taste = _taste(flaeche, puls)
+    wirt, zeile = _eigenschaften(taste)
+    try:
+        assert zeile.text() == (
+            "Diese Taste und „Lauflicht HG“ steuern beide den Dimmer der "
+            "Gruppe „Hintergrund“ — gleiche Stufe, es gewinnt, wer zuletzt "
+            "gestartet wurde. Ein Fader hält „Lauflicht HG“ auch bei 0 am "
+            "Laufen — der Effekt belegt die Geräte dann weiter.")
+        fader.effect_autostart = True
+        zeile.neu_berechnen()
+        assert zeile.hat_hinweis() and "am Laufen" not in zeile.text(), (
+            "mit „bei 0 wirklich stoppen“ zaehlt der Fader weiter, ohne Zusatz")
+    finally:
+        _zu(wirt)
+
+
+def _fader_dialog(fader, monkeypatch, im_dialog):
+    """Oeffnet die Eigenschaften des Faders; ``im_dialog(dlg, zeile)`` laeuft,
+    solange er offen ist."""
+    from PySide6.QtWidgets import QDialog
+
+    def _exec(dlg):
+        zeile = dlg.findChild(QLabel, NAME)
+        assert zeile is not None, "die Hinweiszeile gehoert in die Fader-Eigenschaften"
+        im_dialog(dlg, zeile)
+        return QDialog.DialogCode.Rejected
+
+    monkeypatch.setattr(QDialog, "exec", _exec)
+    fader._open_properties()
+
+
+def test_fader_eigenschaften_zeigen_den_hinweis_und_den_satz_zu_null(
+        fm, flaeche, monkeypatch):
+    from PySide6.QtWidgets import QCheckBox
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND, stufe=STROBE)
+    _taste(flaeche, puls)
+    fader = _fader(flaeche, lauf)
+    gesehen = {}
+
+    def im_dialog(dlg, zeile):
+        gesehen["ohne Haken"] = zeile.text()
+        haken = next(c for c in dlg.findChildren(QCheckBox)
+                     if c.text().startswith("bei 0 wirklich stoppen"))
+        haken.setChecked(True)
+        _app().processEvents()
+        gesehen["mit Haken"] = zeile.text()
+        gesehen["Tooltip"] = zeile.toolTip()
+
+    _fader_dialog(fader, monkeypatch, im_dialog)
+    satz = ("Dieser Fader und „Puls HG“ steuern beide den Dimmer der Gruppe "
+            "„Hintergrund“ — „Puls HG“ liegt zwei Stufen höher und gewinnt.")
+    assert gesehen["ohne Haken"] == (
+        satz + "\nDieser Fader hält den Effekt auch bei 0 am Laufen — er "
+        "belegt die Geräte dann weiter.")
+    assert gesehen["mit Haken"] == satz, "die Zeile folgt dem Haken im Dialog"
+    assert gesehen["Tooltip"].endswith(H.HINWEIS_TOOLTIP)
+    assert fader.effect_autostart is False, "Abbrechen uebernimmt nichts"
+    # Geschlossen rechnet die Zeile nicht weiter.
+    zeilen = fader.findChildren(H.UeberschneidungsHinweis)
+    from src.core.sync import get_sync, SyncEvent
+    get_sync().emit(SyncEvent.FUNCTION_CHANGED, None)
+    assert zeilen and not any(z._sammler.isActive() for z in zeilen)
+    _app().processEvents()
+
+
+def test_fader_ohne_ueberschneidung_oder_in_anderem_modus_zeigt_nichts(
+        fm, flaeche, monkeypatch):
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    himmel = _matrix(fm, "Himmel", HIMMEL)
+    _taste(flaeche, himmel)
+    fader = _fader(flaeche, lauf)
+    texte = []
+    _fader_dialog(fader, monkeypatch, lambda dlg, zeile: texte.append(zeile.text()))
+    _taste(flaeche, _matrix(fm, "Puls HG", HINTERGRUND))
+    fader.mode = SliderMode.GROUP_DIMMER
+    _fader_dialog(fader, monkeypatch, lambda dlg, zeile: texte.append(zeile.text()))
+    assert texte == ["", ""]
+
+
+# ── Exklusiv-Gruppe (Solo-Frame) ─────────────────────────────────────────────
+
+def _solo(eltern, an=True):
+    rahmen = VCFrame(parent=eltern)
+    rahmen.set_solo(an)
+    return rahmen
+
+
+def test_exklusiv_gruppe_ist_nur_was_der_solo_frame_wirklich_ausschaltet(fm, flaeche):
+    """Die Regel folgt ``VCFrame.on_child_activated``: ausgeschaltet werden
+    nur die DIREKTEN Kinder mit ``deactivate_for_solo`` — also Tasten."""
+    a = _matrix(fm, "A", HINTERGRUND)
+    b = _matrix(fm, "B", HINTERGRUND)
+    c = _matrix(fm, "C", HINTERGRUND)
+    d = _matrix(fm, "D", HINTERGRUND)
+    gruppe_a = _solo(flaeche)
+    taste = _taste(gruppe_a, a)
+    _taste(gruppe_a, b, "Partner")
+    assert H.exklusiv_gruppe(taste) is gruppe_a
+    assert H.konsolen_funktions_ids(flaeche, ausser=taste) == []
+
+    # Fader im selben Solo-Frame: den schaltet der Rahmen NICHT aus.
+    fader = _fader(gruppe_a, c)
+    assert H.exklusiv_gruppe(fader) is None
+    assert H.konsolen_funktions_ids(flaeche, ausser=taste) == [c.id]
+    assert H.konsolen_funktions_ids(flaeche, ausser=fader) == [a.id, b.id]
+
+    # Taste in einem Unter-Rahmen des Solo-Frames: kein direktes Kind.
+    unter = VCFrame(parent=gruppe_a)
+    innen = _taste(unter, d, "innen")
+    assert H.exklusiv_gruppe(innen) is None
+    assert H.konsolen_funktions_ids(flaeche, ausser=taste) == [c.id, d.id]
+    assert H.konsolen_funktions_ids(flaeche, ausser=innen) == [a.id, b.id, c.id]
+
+
+def test_zwei_exklusiv_gruppen_und_verschachtelte_solo_frames(fm, flaeche):
+    a = _matrix(fm, "A", HINTERGRUND)
+    b = _matrix(fm, "B", HINTERGRUND)
+    c = _matrix(fm, "C", HINTERGRUND)
+    gruppe_a = _solo(flaeche)
+    gruppe_b = _solo(flaeche)
+    taste_a = _taste(gruppe_a, a)
+    _taste(gruppe_b, b)
+    assert H.konsolen_funktions_ids(flaeche, ausser=taste_a) == [b.id], (
+        "Gruppe A gegen Gruppe B: beide koennen gleichzeitig laufen")
+    # Solo-Frame im Solo-Frame: es zaehlt der innere, direkte Rahmen.
+    innen = _solo(gruppe_a)
+    taste_c = _taste(innen, c)
+    assert H.exklusiv_gruppe(taste_c) is innen
+    assert H.konsolen_funktions_ids(flaeche, ausser=taste_c) == [a.id, b.id]
+    assert sorted(H.konsolen_funktions_ids(flaeche, ausser=taste_a)) == [b.id, c.id]
+
+
+def test_sammlung_deren_mitglied_in_der_exklusiv_gruppe_liegt(fm, flaeche):
+    """Taste 1 startet eine Sammlung, Taste 2 im selben Solo-Frame deren
+    Mitglied: kein Hinweis zwischen den beiden. Eine Taste AUSSERHALB, die
+    das Mitglied startet, meldet sich gegen die Sammlung weiterhin."""
+    mitglied = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND)
+    sammlung = fm.new_collection("Bild 1")
+    sammlung.function_ids = [puls.id]
+    gruppe = _solo(flaeche)
+    taste = _taste(gruppe, sammlung, "Sammlung")
+    _taste(gruppe, mitglied, "Mitglied")
+    wirt, zeile = _eigenschaften(taste)
+    try:
+        assert not zeile.hat_hinweis()
+        _taste(flaeche, mitglied, "draussen")
+        zeile.neu_berechnen()
+        assert zeile.text().startswith(
+            "Diese Taste und „Lauflicht HG“ steuern beide den Dimmer der Gruppe "
+            "„Hintergrund“ — ")
+    finally:
+        _zu(wirt)
+
+
+def test_beziehungen_fuer_die_ansicht_prioritaeten(fm, flaeche):
+    a = _matrix(fm, "A", HINTERGRUND)
+    b = _matrix(fm, "B", HINTERGRUND)
+    c = _matrix(fm, "C", HINTERGRUND)
+    d = _matrix(fm, "D", HINTERGRUND)
+    e = _matrix(fm, "E", HINTERGRUND)
+    gruppe = _solo(flaeche)
+    _taste(gruppe, a)
+    _taste(gruppe, b)
+    doppelt = _taste(flaeche, c, "zwei Ziele")
+    doppelt.function_ids = [d.id]
+    _fader(flaeche, e)
+    ids, gegenueber, haltend = H.konsolen_beziehungen([flaeche])
+    assert ids == [a.id, b.id, c.id, d.id, e.id]
+    assert gegenueber[a.id] == {c.id, d.id, e.id}, "nicht gegen den Partner B"
+    assert gegenueber[b.id] == {c.id, d.id, e.id}
+    assert gegenueber[c.id] == {a.id, b.id, e.id}, "nicht gegen D derselben Taste"
+    assert gegenueber[e.id] == {a.id, b.id, c.id, d.id}
+    assert haltend == {e.id}
+    _taste(flaeche, b, "B draussen")
+    _ids, gegenueber, _h = H.konsolen_beziehungen([flaeche])
+    assert b.id in gegenueber[a.id], "B liegt jetzt auch ausserhalb der Gruppe"
+    assert a.id in gegenueber[b.id]
 
 
 def test_eigene_funktionen_einer_taste_melden_sich_nicht_gegenseitig(fm, flaeche):
@@ -340,19 +545,48 @@ def test_ansicht_prioritaeten_zeigt_dieselben_saetze_als_tooltip(fm, flaeche):
     _taste(flaeche, lauf)
     _taste(flaeche, puls)
     try:
+        def _tipps():
+            tipps = {}
+            wurzel = ansicht._baum.invisibleRootItem()
+            for i in range(wurzel.childCount()):
+                kopf = wurzel.child(i)
+                for j in range(kopf.childCount()):
+                    it = kopf.child(j)
+                    tipps[it.data(0, _ROLLE_FID)] = it.toolTip(0)
+            return tipps
+
         ansicht.neu_aufbauen()
-        tipps = {}
-        wurzel = ansicht._baum.invisibleRootItem()
-        for i in range(wurzel.childCount()):
-            kopf = wurzel.child(i)
-            for j in range(kopf.childCount()):
-                it = kopf.child(j)
-                tipps[it.data(0, _ROLLE_FID)] = it.toolTip(0)
+        tipps = _tipps()
         assert tipps[lauf.id] == (
             "Dieser Effekt und „Puls HG“ steuern beide den Dimmer der Gruppe "
             "„Hintergrund“ — „Puls HG“ liegt zwei Stufen höher und gewinnt.")
         assert "dieser Effekt liegt zwei Stufen höher und gewinnt" in tipps[puls.id]
         assert tipps[frei.id] == "", "liegt auf keiner Taste -> kein Hinweis"
+
+        # Nachtrag: dieselben Regeln wie an der Taste. Ein Fader ohne „bei 0
+        # wirklich stoppen“ zaehlt mit und wird genannt …
+        wash = _matrix(fm, "Wash HG", HINTERGRUND)
+        _fader(flaeche, wash)
+        ansicht.neu_aufbauen()
+        tipps = _tipps()
+        assert tipps[wash.id].endswith(
+            "\nEin Fader hält diesen Effekt auch bei 0 am Laufen — er belegt "
+            "die Geräte dann weiter.")
+        assert ("Ein Fader hält „Wash HG“ auch bei 0 am Laufen — der Effekt "
+                "belegt die Geräte dann weiter.") in tipps[lauf.id]
+        # … und Tasten desselben Solo-Frames melden sich untereinander nicht.
+        solo_a = _matrix(fm, "Solo A", HIMMEL)
+        solo_b = _matrix(fm, "Solo B", HIMMEL)
+        rahmen = VCFrame(parent=flaeche)
+        rahmen.set_solo(True)
+        _taste(rahmen, solo_a)
+        _taste(rahmen, solo_b)
+        ansicht.neu_aufbauen()
+        tipps = _tipps()
+        assert tipps[solo_a.id] == "" and tipps[solo_b.id] == ""
+        rahmen.set_solo(False)
+        ansicht.neu_aufbauen()
+        assert "„Solo B“" in _tipps()[solo_a.id]
     finally:
         flaeche.setParent(None)
         ansicht.close()

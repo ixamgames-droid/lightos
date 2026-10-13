@@ -1128,6 +1128,29 @@ class VCSlider(VCWidget):
         _EFFECT_MODES = (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
                          SliderMode.EFFECT_PARAM)
 
+        # ENG-39: gelbe Hinweiszeile gleich unter „Steuert“, wenn eine andere
+        # Taste / ein anderer Fader an denselben Geraeten denselben Baustein
+        # steuert. Reine Auskunft; liest Modus, Ziele und den Haken „bei 0
+        # wirklich stoppen“ aus den FELDERN (noch nichts uebernommen).
+        from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+
+        def _hinweis_ziele():
+            if (mode_cb.currentData() or self.mode) not in _EFFECT_MODES:
+                return []
+            return target_editor.ids()
+
+        ueberschn_hinweis = UeberschneidungsHinweis(
+            self, _hinweis_ziele, subjekt="Fader",
+            haelt_selbst=lambda: not autostart_cb.isChecked())
+        form.insertRow(form.getWidgetPosition(target_editor)[0] + 1,
+                       ueberschn_hinweis)
+        ueberschn_hinweis.sichtbar_setzen = (
+            lambda an: form.setRowVisible(ueberschn_hinweis, bool(an)))
+        ueberschn_hinweis.neu_berechnen()
+        target_editor.changed.connect(ueberschn_hinweis.veraltet)
+        mode_cb.currentIndexChanged.connect(ueberschn_hinweis.veraltet)
+        autostart_cb.toggled.connect(ueberschn_hinweis.veraltet)
+
         def _update_slider_fields():
             m = mode_cb.currentData() or self.mode
             eff = m in _EFFECT_MODES
@@ -1191,7 +1214,11 @@ class VCSlider(VCWidget):
         midi_ch_spin.setSpecialValueText("Alle")
         form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
 
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        angenommen = dlg.exec() == QDialog.DialogCode.Accepted
+        # ENG-39: der Dialog bleibt als Kind des Faders bestehen — seine
+        # Hinweiszeile soll danach nicht bei jeder Aenderung weiterrechnen.
+        ueberschn_hinweis.stilllegen()
+        if angenommen:
             self.caption = cap.text() or self.caption
             self.mode = mode_cb.currentData() or self.mode
             try:

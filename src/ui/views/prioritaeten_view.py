@@ -272,22 +272,26 @@ class PrioritaetenView(QWidget):
             from src.core.engine import ueberschneidung
             from src.ui.virtualconsole.vc_canvas import VCCanvas
             from src.ui.widgets.ueberschneidung_hinweis import (
-                konsolen_funktions_ids, rechen_umgebung)
-            ids: list[int] = []
-            for flaeche in self.window().findChildren(VCCanvas):
-                for fid in konsolen_funktions_ids(flaeche):
-                    if fid not in ids:
-                        ids.append(fid)
+                konsolen_beziehungen, rechen_umgebung)
+            # Dieselben Regeln wie an der Taste: Fader zaehlen immer mit,
+            # Tasten desselben Solo-Frames melden sich untereinander nicht.
+            ids, gegenueber, haltend = konsolen_beziehungen(
+                self.window().findChildren(VCCanvas))
             if len(ids) < 2:
                 return {}
             umgebung = rechen_umgebung()
-            funktionen = [f for f in (self._fm.get(i) for i in ids)
-                          if f is not None]
+            nach_id = {int(i): self._fm.get(i) for i in ids}
             aus: dict[int, list[str]] = {}
-            for f in funktionen:
+            for fid in ids:
+                f = nach_id.get(fid)
+                andere = [nach_id[g] for g in ids
+                          if g in gegenueber.get(fid, ()) and nach_id.get(g) is not None]
+                if f is None or not andere:
+                    continue
                 # Tooltip: die vollstaendige Liste, nichts zusammengefasst.
                 zeilen = ueberschneidung.hinweis_zeilen(
-                    ueberschneidung.ueberschneidungen(f, funktionen, **umgebung),
+                    ueberschneidung.ueberschneidungen(
+                        f, andere, haltend=haltend, **umgebung),
                     "Effekt", hoechstens=None)
                 if zeilen:
                     aus[int(f.id)] = zeilen

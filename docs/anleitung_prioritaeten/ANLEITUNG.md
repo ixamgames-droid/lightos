@@ -122,7 +122,7 @@ Beim Bauen der Virtual Console sagt dir LightOS, wenn zwei Tasten dasselbe anfas
 
 1. In der Virtual Console **Bearbeiten** einschalten und eine Taste mit der Aktion
    **Funktion an/aus** oder **Funktion (nur gehalten)** anklicken.
-2. Steuert eine **andere Taste** (oder ein Fader, der seinen Effekt startet) an **denselben
+2. Steuert eine **andere Taste** oder ein **Effekt-Fader** an **denselben
    Geräten denselben Baustein**, steht gleich unter **Aktion** ein gelber **Hinweis** über
    die ganze Breite, zum Beispiel:
 
@@ -145,6 +145,24 @@ Beim Bauen der Virtual Console sagt dir LightOS, wenn zwei Tasten dasselbe anfas
 5. Ändere die Stufe (Abschnitt 3 oder 4) oder das Ziel der Taste — der Hinweis zieht sofort
    nach. Ohne Überschneidung ist die Zeile nicht da.
 
+**Fader zählen immer mit.** Ein Fader in den Modi **Effekt-Helligkeit**, **Effekt-Tempo**
+oder **Effekt-Parameter** mit einem festen Ziel in der Liste **Steuert** zählt wie eine
+Taste — mit und ohne den Haken **bei 0 wirklich stoppen (sonst nur runterregeln)**. Ohne
+den Haken stoppt der Fader seinen Effekt bei 0 nicht: der Effekt läuft unsichtbar weiter
+und belegt die Geräte. Genau das überrascht auf der Bühne, deshalb steht es ausdrücklich
+dabei:
+
+> Diese Taste und „Wash HG“ steuern beide den Dimmer der Gruppe „Hintergrund“ — gleiche
+> Stufe, es gewinnt, wer zuletzt gestartet wurde. Ein Fader hält „Wash HG“ auch bei 0 am
+> Laufen — der Effekt belegt die Geräte dann weiter.
+
+Der Fader selbst zeigt denselben gelben **Hinweis** in seinen Eigenschaften, gleich unter
+**Steuert** („Dieser Fader und …“). Fehlt der Haken, endet er mit der Zeile:
+
+> Dieser Fader hält den Effekt auch bei 0 am Laufen — er belegt die Geräte dann weiter.
+
+Setzt du den Haken, verschwindet dieser Satz; die Überschneidung selbst bleibt gemeldet.
+
 Der Hinweis ist **nur eine Auskunft**: er ändert nichts, sperrt nichts und fragt nichts ab.
 Dieselben Sätze stehen im Reiter **Prioritäten** als Tooltip an der Zeile des Effekts
 („Dieser Effekt und …“) — dort immer vollständig.
@@ -153,10 +171,20 @@ Wann **kein** Hinweis kommt:
 
 - **Farbe gegen Dimmer** auf denselben Lampen — das sind getrennte Kanäle, da stört sich nichts.
 - Dieselbe **Geräteart**, aber andere Geräte.
-- Der andere Effekt liegt auf **keiner Taste** und keinem startenden Fader. Ein Effekt-Fader
-  startet seinen Effekt nur mit dem Haken **bei 0 wirklich stoppen (sonst nur runterregeln)**;
-  ohne den Haken regelt er bloß und zählt nicht.
-- Beide Tasten liegen im selben **Solo-Rahmen** — dort ist ohnehin nur eine aktiv.
+- Der andere Effekt liegt auf **keiner Taste** und keinem Effekt-Fader. Ein Fader, der nur
+  den „aktiven Effekt“ regelt (leere Liste **Steuert**), hat kein festes Ziel und zählt nicht.
+- Beide Tasten liegen im selben **Solo-Rahmen** (Rahmen mit dem Haken **Solo-Frame (nur 1
+  Button gleichzeitig aktiv)**) — sie schalten sich gegenseitig aus, es läuft immer nur eine.
+  Gegen Tasten und Fader **außerhalb** des Rahmens kommt der Hinweis weiterhin. Zur Gruppe
+  gehören nur die Tasten, die **direkt** im Solo-Rahmen liegen:
+  - Eine Taste in einem **Unter-Rahmen** des Solo-Rahmens gehört nicht dazu — der Solo-Rahmen
+    schaltet sie nicht aus.
+  - Ein **Fader** im Solo-Rahmen gehört nicht dazu — er wird nie ausgeschaltet.
+  - Zwei **verschiedene** Solo-Rahmen sind zwei Gruppen: eine Taste aus dem einen und eine aus
+    dem anderen können gleichzeitig laufen, also kommt der Hinweis.
+  - Liegt derselbe Effekt zusätzlich auf einer Taste außerhalb, zählt er über diese Taste.
+  - Startet eine Taste im Solo-Rahmen eine **Sammlung** oder einen **Chaser** und die
+    Nachbartaste eines der Mitglieder, gibt es zwischen den beiden ebenfalls keinen Hinweis.
 - Mehrere Funktionen **derselben** Taste: die startest du absichtlich gemeinsam.
 - Es lässt sich nicht sicher ablesen, was ein Effekt anfasst (Skript, **unbekannt** in der
   Spalte **Fasst an**), oder es ist nur **Sonstiges** wie Shutter oder Zoom.

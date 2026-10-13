@@ -90,3 +90,43 @@ def test_fragmente_liegen_vor():
     backlog = _text(REPO / "backlog.d" / "ENG-39.md")
     assert backlog.startswith("ID: ENG-39\n")
     assert list((REPO / "changelog.d").glob("*-ENG-39.md"))
+
+
+# ── Nachtrag: Fader zaehlen immer mit, Solo-Frame als Exklusiv-Gruppe ────────
+
+def test_anleitung_zitiert_die_saetze_zum_fader_bei_null():
+    flach = _flach(_text(ANLEITUNG).replace("> ", ""))
+    assert U.HALTE_SATZ_FADER in flach
+    assert U._halte_satz("„Wash HG“") in flach
+    assert "**Fader zählen immer mit.**" in _text(ANLEITUNG)
+    assert "ohne den Haken regelt er bloß und zählt nicht" not in _text(ANLEITUNG), (
+        "die alte Regel „ohne den Haken zaehlt der Fader nicht“ ist abgeloest")
+
+
+def test_anleitung_nennt_die_grenzen_der_exklusiv_gruppe():
+    text = _text(ANLEITUNG)
+    rahmen = _text(REPO / "src/ui/virtualconsole/vc_frame.py")
+    haken = "Solo-Frame (nur 1 Button gleichzeitig aktiv)"
+    assert f"**{haken}**" in _flach(text) and haken in rahmen
+    for wort in ("**Unter-Rahmen**", "**Fader** im Solo-Rahmen",
+                 "**verschiedene** Solo-Rahmen", "**außerhalb**",
+                 "**Sammlung**"):
+        assert wort in text, wort
+
+
+def test_fader_anleitung_nennt_die_hinweiszeile():
+    fader = _text(REPO / "src/ui/virtualconsole/vc_slider.py")
+    assert 'subjekt="Fader"' in fader
+    assert "form.insertRow(form.getWidgetPosition(target_editor)[0] + 1" in fader
+    for datei in ("docs/anleitung_vc_widgets/02_fader.md",
+                  "docs/anleitung_vc_widgets/02_fader.en.md"):
+        text = _text(REPO / datei)
+        assert "| **Hinweis**" in text, datei
+        assert "**Steuert**" in text, datei
+        assert U.HALTE_SATZ_FADER in text, datei
+        assert "anleitung_prioritaeten/ANLEITUNG.md#7-hinweis-bei-überschneidungen" in text, datei
+    for datei in ("docs/anleitung_vc_widgets/01_button.md",
+                  "docs/anleitung_vc_widgets/01_button.en.md"):
+        text = _text(REPO / datei)
+        assert "auch bei 0 am Laufen" in text, datei
+        assert "Solo-Frame" in text or "solo frame" in text, datei

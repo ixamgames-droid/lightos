@@ -21,6 +21,11 @@ Gegen Fehlalarme:
 - Ein Modify-Effekt (ENG-37) ersetzt nichts — er rechnet auf das fertige Bild.
   Dafuer gibt es nur einen neutralen Satz.
 
+Fader (Nachtrag): Ein Effekt-Fader zaehlt IMMER mit — auch ohne den Haken
+„bei 0 wirklich stoppen“. Gerade dann laeuft der Effekt bei 0 unsichtbar weiter
+und belegt die Geraete; der Hinweis sagt das in einem eigenen Satz
+(``haltend`` in :func:`ueberschneidungen`, :func:`halte_zeilen`).
+
 Die Baustein-Erkennung selbst stammt aus ``stufen.py`` (ENG-35) — hier wird sie
 nur je Geraet aufgeteilt. Leaf-Modul ohne Qt-/DB-Importe.
 """
@@ -193,6 +198,10 @@ class Treffer:
     geraete_text: str           # „der Gruppe „Hintergrund““ / „von 4 Geräten“
     verhaeltnis: str            # GLEICH / DIESE_HOEHER / DIESE_TIEFER / MODIFY
     stufen_abstand: int | None  # Zahl der Stufen dazwischen; None bei eigener Zahl
+    # Liegt der Effekt auf einem Fader OHNE „bei 0 wirklich stoppen“? Dann
+    # laeuft er bei 0 weiter und belegt die Geraete.
+    eigene_haelt: bool = False
+    andere_haelt: bool = False
 
     @property
     def gewinner(self):
@@ -211,9 +220,17 @@ class Treffer:
         return ", ".join(teile[:-1]) + " und " + teile[-1]
 
     def satz(self, subjekt: str = "Taste", nenne_eigene: bool = False) -> str:
-        """Der Hinweis in einem Satz. ``subjekt``: „Taste“ oder „Effekt“."""
-        gross, klein = (("Dieser Effekt", "dieser Effekt") if subjekt == "Effekt"
-                        else ("Diese Taste", "diese Taste"))
+        """Der Hinweis zu EINER Ueberschneidung. ``subjekt``: „Taste“, „Fader“
+        oder „Effekt“. Haelt ein Fader den ANDEREN Effekt bei 0 am Laufen,
+        steht das als zweiter Satz dahinter; fuer den eigenen Effekt sagt es
+        :func:`halte_zeilen` einmal fuer den ganzen Hinweis."""
+        text = self._satz(subjekt, nenne_eigene)
+        if self.andere_haelt:
+            text += " " + _halte_satz(f"„{getattr(self.andere, 'name', '') or '?'}“")
+        return text
+
+    def _satz(self, subjekt: str, nenne_eigene: bool) -> str:
+        gross, klein = _SUBJEKT.get(subjekt, _SUBJEKT["Taste"])
         name = f"„{getattr(self.andere, 'name', '') or '?'}“"
         selbst = gross
         if nenne_eigene:
@@ -229,6 +246,9 @@ class Treffer:
             elif subjekt == "Effekt":
                 rest = ("dieser Effekt ist ein Modify-Effekt: er rechnet auf "
                         "das fertige Bild und ersetzt nichts.")
+            elif subjekt == "Fader":
+                rest = ("dieser Fader steuert einen Modify-Effekt: er rechnet "
+                        "auf das fertige Bild und ersetzt nichts.")
             else:
                 rest = ("diese Taste startet einen Modify-Effekt: er rechnet "
                         "auf das fertige Bild und ersetzt nichts.")
@@ -249,6 +269,43 @@ class Treffer:
                        f"{stufen.stufen_name(getattr(unten, 'priority', 0))})")
         wer = klein if self.verhaeltnis == DIESE_HOEHER else name
         return kopf + f"{wer} liegt {abstand} und gewinnt."
+
+
+_SUBJEKT = {"Taste": ("Diese Taste", "diese Taste"),
+            "Fader": ("Dieser Fader", "dieser Fader"),
+            "Effekt": ("Dieser Effekt", "dieser Effekt")}
+
+HALTE_SATZ_FADER = ("Dieser Fader hält den Effekt auch bei 0 am Laufen — er "
+                    "belegt die Geräte dann weiter.")
+HALTE_SATZ_EFFEKT = ("Ein Fader hält diesen Effekt auch bei 0 am Laufen — er "
+                     "belegt die Geräte dann weiter.")
+
+
+def _halte_satz(name: str) -> str:
+    """Der Satz ueber einen Effekt, den ein Fader ohne „bei 0 wirklich
+    stoppen“ steuert. ``name`` steht schon in Anfuehrungszeichen."""
+    return (f"Ein Fader hält {name} auch bei 0 am Laufen — der Effekt belegt "
+            "die Geräte dann weiter.")
+
+
+def halte_zeilen(treffer: Iterable["Treffer"], subjekt: str = "Taste") -> list[str]:
+    """Die Zusatzzeilen „… haelt den Effekt auch bei 0 am Laufen“ fuer die
+    EIGENEN Effekte — je Effekt einmal, nicht hinter jedem Satz wieder. Leer,
+    wenn kein eigener Effekt auf einem Fader ohne „bei 0 wirklich stoppen“
+    liegt."""
+    zeilen: list[str] = []
+    for t in treffer:
+        if not t.eigene_haelt:
+            continue
+        if subjekt == "Fader":
+            zeile = HALTE_SATZ_FADER
+        elif subjekt == "Effekt":
+            zeile = HALTE_SATZ_EFFEKT
+        else:
+            zeile = _halte_satz(f"„{getattr(t.eigene, 'name', '') or '?'}“")
+        if zeile not in zeilen:
+            zeilen.append(zeile)
+    return zeilen
 
 
 def _stufen_abstand(a: int, b: int) -> int | None:
@@ -297,8 +354,13 @@ def ueberschneidungen(funktion, andere_funktionen: Iterable, *,
                       kanal_attribut: Callable[[int, int], str | None] | None = None,
                       gruppen: Iterable[tuple[str, Iterable[int]]] | None = None,
                       geraete_name: Callable[[int], str | None] | None = None,
-                      cache: dict | None = None) -> list[Treffer]:
+                      cache: dict | None = None,
+                      haltend: Iterable[int] | None = None) -> list[Treffer]:
     """Mit welchen der ``andere_funktionen`` ueberschneidet sich ``funktion``?
+
+    ``haltend``: IDs der Funktionen, die auf einem Fader OHNE „bei 0 wirklich
+    stoppen“ liegen — sie laufen bei 0 weiter. Die Treffer tragen das als
+    ``eigene_haelt`` / ``andere_haelt``.
 
     Der Aufrufer bestimmt, was „die anderen“ sind — fuer den Hinweis an einer
     Taste nur Funktionen, die selbst auf einer Taste oder einem Fader liegen.
@@ -318,6 +380,8 @@ def ueberschneidungen(funktion, andere_funktionen: Iterable, *,
     eigene_id = getattr(funktion, "id", None)
     eigene_zahl = stufen.zahl_von(getattr(funktion, "priority", 0))
     eigene_modify = stufen.ist_modify(funktion)
+    haltend = _als_menge(haltend)
+    eigene_haelt = _id_in(eigene_id, haltend)
     gesehen: set = set()
     treffer: list[Treffer] = []
     for andere in andere_funktionen or ():
@@ -360,9 +424,17 @@ def ueberschneidungen(funktion, andere_funktionen: Iterable, *,
             geraete_text=geraete_text(geraete, gruppen, geraete_name),
             verhaeltnis=verhaeltnis,
             stufen_abstand=(0 if eigene_zahl == ihre_zahl
-                            else _stufen_abstand(eigene_zahl, ihre_zahl))))
+                            else _stufen_abstand(eigene_zahl, ihre_zahl)),
+            eigene_haelt=eigene_haelt, andere_haelt=_id_in(aid, haltend)))
     treffer.sort(key=sortier_schluessel)
     return treffer
+
+
+def _id_in(fid, menge: frozenset) -> bool:
+    try:
+        return int(fid) in menge
+    except (TypeError, ValueError):
+        return False
 
 
 def sortier_schluessel(t: Treffer):
@@ -380,7 +452,7 @@ def _weitere(n: int) -> str:
 def _rest_zeile(rest: list, subjekt: str) -> str:
     """Die Zusammenfassung der nicht ausgeschriebenen Treffer. Sie sagt immer,
     wie es um die uebrigen steht — nie nur „und n weitere“."""
-    klein = "dieser Effekt" if subjekt == "Effekt" else "diese Taste"
+    klein = _SUBJEKT.get(subjekt, _SUBJEKT["Taste"])[1]
     zahl = {v: sum(1 for t in rest if t.verhaeltnis == v) for v in _RANG}
     teile = []
     if zahl[DIESE_TIEFER]:
@@ -407,14 +479,18 @@ def hinweis_zeilen(treffer: Iterable[Treffer], subjekt: str = "Taste",
     (bis ``MAX_VERLIERER_AUSGESCHRIEBEN``): der Effekt, gegen den die Taste
     verliert, verschwindet nie hinter „… und n weitere“. Der Rest steht in
     einer Zeile, die sagt, wie viele davon gewinnen, verlieren oder gleich
-    liegen. ``hoechstens=None`` schreibt alles aus (Tooltip)."""
+    liegen. ``hoechstens=None`` schreibt alles aus (Tooltip).
+
+    Liegt ein eigener Effekt auf einem Fader ohne „bei 0 wirklich stoppen“,
+    steht das als letzte Zeile (:func:`halte_zeilen`)."""
     treffer = sorted(treffer, key=sortier_schluessel)
+    halten = halte_zeilen(treffer, subjekt)
     if hoechstens is None:
-        return [t.satz(subjekt, nenne_eigene) for t in treffer]
+        return [t.satz(subjekt, nenne_eigene) for t in treffer] + halten
     verlierer = sum(1 for t in treffer if t.verhaeltnis == DIESE_TIEFER)
     anzahl = max(int(hoechstens), min(verlierer, MAX_VERLIERER_AUSGESCHRIEBEN))
     zeilen = [t.satz(subjekt, nenne_eigene) for t in treffer[:anzahl]]
     rest = treffer[anzahl:]
     if rest:
         zeilen.append(_rest_zeile(rest, subjekt))
-    return zeilen
+    return zeilen + halten
