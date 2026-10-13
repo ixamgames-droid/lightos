@@ -565,3 +565,95 @@ def test_einzelaufruf_ausserhalb_des_sammelns_wie_vorher(state, bib):
     assert ohr.zahl("patch_changed") == 4 and sorted(state._fix_index) == [1, 2]
     assert plan_im_ereignis == [[1], [1, 2], [2], [1, 2]]
     assert not state._patch_sammel_render
+
+
+# ── Zweite Prüfung: der Direkt-Schreibweg des Programmers ────────────────────
+#
+# ``set_programmer_value`` und ``clear_programmer`` schreiben die Kanäle eines
+# Geräts sofort ins Live-Universum. Nahm dieser Weg das Gerät aus der
+# Geräteliste statt aus dem geltenden Plan, gingen die Werte eines gerade
+# importierten Lasers hinaus: seine Adressen stehen noch in keinem Span und in
+# keiner NOT-AUS-Maske, der nächste Frame überschreibt sie also nicht.
+
+def _attribute(state, fid):
+    fx = next(f for f in state.get_patched_fixtures() if f.fid == fid)
+    return [c.attribute for c in A.get_channels_for_patched(fx)]
+
+
+def test_programmer_wert_auf_neuen_laser_im_sammeln_bleibt_im_not_aus_dunkel(state, bib):
+    state.set_laser_estop(True)
+    with state.patch_sammeln():
+        fid = state.next_fid()
+        state.add_fixture(_laser(state, bib, fid, 10))
+        for attribut in _attribute(state, fid):
+            state.set_programmer_value(fid, attribut, 200)
+        direkt = _live(state, 3, 10, 5)
+        state._render_frame(0.02)
+        im_block = _live(state, 3, 10, 5)
+        not_aus_im_block = state.laser_estop_active
+    state._render_frame(0.02)
+    assert not_aus_im_block and state.laser_estop_active
+    assert direkt == [0] * 5 and im_block == [0] * 5
+    assert _live(state, 3, 10, 5) == [0] * 5
+
+
+def test_programmer_leeren_im_sammeln_schreibt_keine_defaults_neuer_geraete(state, bib):
+    """Ein Profil mit Kanal-Default ungleich 0: ``clear_programmer`` darf den
+    Default eines Geräts, das der Plan noch nicht kennt, nicht hinausschreiben."""
+    state.set_laser_estop(True)
+    with state.patch_sammeln():
+        fid = state.next_fid()
+        state.add_fixture(_laser(state, bib, fid, 10))
+        fx = next(f for f in state.get_patched_fixtures() if f.fid == fid)
+        kanaele = A.get_channels_for_patched(fx)
+        alt = [c.default_value for c in kanaele]
+        try:
+            for c in kanaele:
+                c.default_value = 77
+            assert [c.default_value
+                    for c in A.get_channels_for_patched(fx)] == [77] * 5
+            state.clear_programmer()
+            direkt = _live(state, 3, 10, 5)
+            state._render_frame(0.02)
+            im_block = _live(state, 3, 10, 5)
+        finally:
+            for c, wert in zip(kanaele, alt):
+                c.default_value = wert
+    assert direkt == [0] * 5 and im_block == [0] * 5
+
+
+def test_programmer_wert_auf_im_sammeln_umadressierten_laser(state, bib):
+    """Der Plan kennt den Laser noch auf der alten Adresse: dorthin geht der
+    Wert (vom NOT-AUS gedeckt), die neue Adresse bleibt unberührt. Der Wert
+    kommt hier ohne ``set_programmer_value`` in den Programmer — das löste bei
+    einem dem Plan bekannten Laser den NOT-AUS (gewollt, anderes Thema)."""
+    fid = state.next_fid()
+    state.add_fixture(_laser(state, bib, fid, 10))
+    state.set_laser_estop(True)
+    with state.patch_sammeln():
+        assert state.update_fixture(fid, address=100)
+        with state._prog_lock:
+            state.programmer.setdefault(fid, {}).update(
+                {attribut: 200 for attribut in _attribute(state, fid)})
+        state._flush_programmer_to_dmx(fid)
+        direkt = _live(state, 3, 100, 5)
+        state._render_frame(0.02)
+        im_block = _live(state, 3, 100, 5) + _live(state, 3, 10, 5)
+    state._render_frame(0.02)
+    assert state.laser_estop_active
+    assert direkt == [0] * 5 and im_block == [0] * 10
+    assert _live(state, 3, 100, 5) + _live(state, 3, 10, 5) == [0] * 10
+
+
+def test_programmer_schreibt_ausserhalb_des_sammelns_sofort_wie_vorher(state, bib):
+    """Außerhalb des Blocks sind Plan und Geräteliste deckungsgleich: der Wert
+    steht ohne Frame sofort im Live-Universum, ``clear_programmer`` setzt die
+    Defaults."""
+    state.add_fixture(_par(state, bib, 1, 1))
+    state.add_fixture(_par(state, bib, 2, 9))
+    attribut = _attribute(state, 2)[0]
+    state.set_programmer_value(2, attribut, 123)
+    assert _live(state, 1, 9, 1) == [123]
+    assert _live(state, 1, 1, 8) == [0] * 8
+    state.clear_programmer()
+    assert _live(state, 1, 9, 1) == [0]

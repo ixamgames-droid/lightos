@@ -3913,7 +3913,27 @@ class AppState:
         return out
 
     def _flush_programmer_to_dmx(self, fid: int):
-        fixture = next((f for f in self._patch_cache if f.fid == fid), None)
+        # IMP-3 (zweite Pruefung): Geraet und Kanaele kommen aus dem GELTENDEN
+        # Render-Plan, nicht aus _patch_cache. Ein Geraet, das der Plan noch
+        # nicht kennt (gerade im Sammelblock angelegt oder umadressiert),
+        # steht in keinem Span und in keiner NOT-AUS-Maske — ein Direkt-
+        # Schreiben auf seine Adressen ginge an beiden NOT-AUS-Ebenen vorbei
+        # aufs Kabel. Der Wert bleibt im Programmer und kommt mit dem
+        # naechsten Frame nach dem Neuaufbau ueber den Renderer hinaus.
+        with self._get_plan_lock():
+            plan = getattr(self, "_fix_index", None)
+            eintrag = plan.get(fid) if plan is not None else None
+        if plan is None:
+            # Noch gar kein Plan (nackter Zustand ohne __init__, nur in
+            # Tests): wie frueher ueber die Geraeteliste. Ein echter AppState
+            # hat ab __init__ immer einen (anfangs leeren) Plan.
+            fixture = next((f for f in (getattr(self, "_patch_cache", None) or ())
+                            if f.fid == fid), None)
+            channels = get_channels_for_patched(fixture) if fixture else ()
+        elif eintrag is None:
+            return
+        else:
+            fixture, channels = eintrag
         if not fixture or fixture.universe not in self.universes:
             return
         # LAS-04: Netzwerk-Laser haben keinen DMX-Adressraum — ihre Werte
@@ -3922,7 +3942,6 @@ class AppState:
             return
         universe = self.universes[fixture.universe]
         prog = apply_pan_tilt_orientation(fixture, self.programmer.get(fid, {}))
-        channels = get_channels_for_patched(fixture)
         seen: dict[str, int] = {}
         for ch in channels:
             a = ch.attribute
@@ -3942,8 +3961,14 @@ class AppState:
                 universe.set_channel(dmx_addr, val)
 
     def _flush_all_to_dmx(self):
-        for f in self._patch_cache:
-            self._flush_programmer_to_dmx(f.fid)
+        # Ueber den geltenden Plan (s. _flush_programmer_to_dmx), in dessen
+        # Reihenfolge — die der Geraeteliste, aus der er gebaut wurde.
+        with self._get_plan_lock():
+            plan = getattr(self, "_fix_index", None)
+            fids = (list(plan) if plan is not None else
+                    [f.fid for f in (getattr(self, "_patch_cache", None) or ())])
+        for fid in fids:
+            self._flush_programmer_to_dmx(fid)
 
     # ── Simple Desk (manuelle Roh-Override-Ebene, ISO-03) ──────────────────────
 
