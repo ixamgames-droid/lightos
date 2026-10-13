@@ -334,6 +334,12 @@ class AppState:
         # add_fixture() nicht 1×/Fixture re-entrant patch_changed feuert; der
         # Aufrufer macht danach EINEN gebündelten Refresh.
         self._suppress_emits: bool = False
+        # IMP-3: Sammelweg fuer viele Patch-Aenderungen am Stueck (Tabellen-
+        # Import, sein Rueckgaengig/Wiederholen) — s. patch_sammeln().
+        self._patch_sammel_tiefe: int = 0
+        self._patch_sammel_thread: int | None = None
+        self._patch_sammel_neuaufbau: bool = False
+        self._patch_sammel_ereignisse: list[str] = []
         # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
         # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
         # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
@@ -1733,6 +1739,13 @@ class AppState:
                 s.execute(select(PatchedFixture).order_by(PatchedFixture.fid)).scalars()
             )
         self._rebuild_universes()
+        if self._patch_sammelt():
+            # IMP-3: Geraeteliste und Universen stimmen sofort (das naechste
+            # add_fixture braucht sie: freie Nummer, gebundenes Objekt fuer
+            # Kopf-Gruppe und Laser-Hinweis). Kanal-Cache, Laser-Profile und
+            # Render-Plan baut patch_sammeln() EINMAL am Ende neu.
+            self._patch_sammel_neuaufbau = True
+            return
         clear_channel_cache()
         self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
@@ -2156,6 +2169,90 @@ class AppState:
     # (der singleShot(0) unten feuert dann nie). In der App beendet der
     # singleShot den Nachlauf im naechsten Durchlauf der Ereignisschleife.
     _SHOW_LADE_NACHLAUF_S = 1.0
+
+    # ── IMP-3: viele Patch-Aenderungen, EIN Neuaufbau ────────────────────────
+
+    #: Ereignisse, die patch_sammeln() zurueckhaelt und am Ende je EINMAL
+    #: sendet — in dieser Reihenfolge. Alles andere (``hinweis`` mit dem
+    #: Laser-Hinweis, ``group_changed`` MIT Daten, …) geht sofort durch.
+    _PATCH_SAMMEL_EREIGNISSE = ("patch_changed", "group_changed")
+
+    def _patch_sammelt(self) -> bool:
+        """True nur im Thread, der patch_sammeln() geoeffnet hat — ein
+        anderer Thread (MIDI/OSC/Web) baut und sendet wie immer."""
+        return (getattr(self, "_patch_sammel_tiefe", 0) > 0
+                and getattr(self, "_patch_sammel_thread", None)
+                == threading.get_ident())
+
+    @contextlib.contextmanager
+    def patch_sammeln(self):
+        """IMP-3: Kontext um VIELE Patch-Aenderungen am Stueck (Tabellen-
+        Import mit N-mal ``add_fixture``, sein Rueckgaengig/Wiederholen).
+
+        Ohne ihn baut jede einzelne Aenderung Kanal-Cache, Laser-Profile und
+        Render-Plan neu und sendet ``patch_changed`` — jede Ansicht (Patch,
+        Programmer, 2D/3D, Live View) baut sich N-mal neu auf. Im Kontext:
+
+        * ``_reload_patch_cache`` laedt nur Geraeteliste und Universen; der
+          volle Neuaufbau (Kanal-Cache, Laser-Profile, RENDER-PLAN) laeuft
+          EINMAL beim Verlassen.
+        * ``patch_changed`` und ``group_changed`` (ohne Daten) werden
+          gemerkt und beim Verlassen je EINMAL gesendet — erst
+          ``patch_changed``, dann ``group_changed``, beide NACH dem
+          Neuaufbau. Jeder Empfaenger sieht also den fertigen Stand.
+        * Alles andere bleibt, wie es ist: Kopf-Gruppen werden je Geraet
+          angelegt, der Laser-Hinweis (``hinweis``) kommt je Geraet sofort,
+          Rueckgaengig-Schritte entstehen wie immer. Das ist der Unterschied
+          zu ``_suppress_emits`` (Show-Laden), das auch Kopf-Gruppen und
+          Laser-Hinweis abschaltet.
+
+        Sicherheit: beim Verlassen ist der Render-Plan garantiert aktuell —
+        auch wenn der Block wirft (``finally``); ein importierter Laser ist
+        damit sofort in NOT-AUS und Blackout erfasst. WAEHREND des Blocks
+        gilt der alte Plan: ein neues Geraet gibt noch nichts aus (kein
+        Default, kein Span — es bleibt dunkel), ein gerade entferntes wird
+        bis zum Ende weiter wie bisher gerendert und dann freigegeben. Der
+        Block laeuft im UI-Thread am Stueck; das Fenster ist kurz.
+
+        Verschachtelbar (Tiefenzaehler); nur die aeusserste Ebene baut und
+        sendet. Gilt nur fuer den Thread, der den Kontext geoeffnet hat.
+        Wurde im Block nichts am Patch geaendert, passiert am Ende nichts."""
+        if (getattr(self, "_patch_sammel_tiefe", 0) > 0
+                and getattr(self, "_patch_sammel_thread", None)
+                != threading.get_ident()):
+            # Ein zweiter Thread sammelt nicht mit (und stoert den ersten nicht).
+            yield
+            return
+        if getattr(self, "_patch_sammel_tiefe", 0) == 0:
+            self._patch_sammel_thread = threading.get_ident()
+            self._patch_sammel_neuaufbau = False
+            self._patch_sammel_ereignisse = []
+        self._patch_sammel_tiefe = getattr(self, "_patch_sammel_tiefe", 0) + 1
+        try:
+            yield
+        finally:
+            self._patch_sammel_tiefe = max(0, self._patch_sammel_tiefe - 1)
+            if self._patch_sammel_tiefe == 0:
+                self._patch_sammeln_abschliessen()
+
+    def _patch_sammeln_abschliessen(self) -> None:
+        """Aeusserste Ebene verlassen: einmal voll neu aufbauen, dann die
+        gemerkten Ereignisse je einmal senden. Scheitert der Neuaufbau, wird
+        trotzdem gesendet (die Ansichten zeigen dann wenigstens die
+        Geraeteliste) und der Fehler geht weiter nach oben — ein nicht
+        aktueller Render-Plan darf nicht still bleiben."""
+        self._patch_sammel_thread = None
+        neuaufbau = getattr(self, "_patch_sammel_neuaufbau", False)
+        ereignisse = list(getattr(self, "_patch_sammel_ereignisse", ()) or ())
+        self._patch_sammel_neuaufbau = False
+        self._patch_sammel_ereignisse = []
+        try:
+            if neuaufbau:
+                self._reload_patch_cache()
+        finally:
+            for ereignis in self._PATCH_SAMMEL_EREIGNISSE:
+                if ereignis in ereignisse:
+                    self._emit(ereignis)
 
     @contextlib.contextmanager
     def show_wird_geladen(self):
@@ -5599,6 +5696,8 @@ class AppState:
         # Ist das Sync-Abo aktiv, kommt der Refresh ueber GROUP_CHANGED (aus dem
         # _emit unten) — hier nicht zusaetzlich, sonst liefe er doppelt. Ein
         # unterdrueckter Emit (Bulk-Laden) erreicht das Abo nicht -> dann direkt.
+        # IMP-3: im Sammelweg kommt GROUP_CHANGED einmal am Ende — das Abo
+        # zieht die Blackout-Ziele dann nach.
         if not self._gruppen_sync_aktiv() or getattr(self, "_suppress_emits", False):
             self._refresh_target_blackouts()
         self._emit("group_changed", data)
@@ -5619,6 +5718,13 @@ class AppState:
         # QListWidget.clear() → AccessViolation). Der Aufrufer macht nach dem
         # vollständigen Aufbau EINEN gebündelten Refresh.
         if getattr(self, "_suppress_emits", False):
+            return
+        # IMP-3: im Sammelweg patch_changed/group_changed (ohne Daten) nur
+        # merken — patch_sammeln() sendet sie am Ende je einmal.
+        if (data is None and event in self._PATCH_SAMMEL_EREIGNISSE
+                and self._patch_sammelt()):
+            if event not in self._patch_sammel_ereignisse:
+                self._patch_sammel_ereignisse.append(event)
             return
         marshaller = self._ui_marshaller
         if marshaller is not None and threading.get_ident() != self._ui_thread_id:

@@ -102,13 +102,29 @@ Grund im Klartext, darunter eine Zählerzeile (zum Beispiel „12 Geräte werden
   Gerät oder mit einer anderen Zeile der Tabelle. Überschneiden sich zwei Zeilen der Tabelle,
   bleiben beide weg — welche stimmt, steht nur in der Tabelle.
 
-Ein doppelter Name ist nur ein Hinweis, kein Hindernis.
+**Doppelte Namen** sind kein Hindernis: jedes Gerät bekommt beim Import einen eigenen Namen. Steht
+ein Name mehrfach in der Tabelle oder gibt es ihn im Patch schon, hängt LightOS die nächste freie
+Nummer an — aus „PAR links“ wird „PAR links 2“, dann „PAR links 3“. Die Spalte **Name** zeigt den
+neuen Namen fett und farbig, im **Status** steht „wird angelegt — Name gab es schon, heißt jetzt
+„PAR links 2“.“, und die Zählerzeile nennt, wie viele Geräte umbenannt werden. Endet der Name schon
+auf eine abgesetzte Zahl, wird weitergezählt („PAR 3“ → „PAR 4“); klebt die Zahl am Wort
+(„PAR64“), gehört sie zur Typbezeichnung und es wird „PAR64 2“. Ein Name, der in der Tabelle nur
+einmal steht und im Patch frei ist, bleibt immer, wie er ist. Groß- und Kleinschreibung
+unterscheidet zwei Namen nicht.
+
+In der Vorschau erklärt jeder Spaltenkopf im Tooltip, was in der Spalte steht; die Spalte
+**Tabelle** zeigt Hersteller, Profil und Modus so, wie sie in der Datei geschrieben sind.
 
 **Anwenden** legt alle Zeilen an, bei denen „wird angelegt“ steht; der Rest bleibt weg. Der Knopf
 ist grau, solange keine Zeile angelegt werden kann. **Vorhandene Geräte werden nie verändert oder
 überschrieben** — wer dieselbe Tabelle zweimal einliest, bekommt beim zweiten Mal nur
 Überschneidungen. Die Geräte entstehen genau wie von Hand gepatcht (Mehrkopf-Geräte bekommen
 ihre Kopf-Gruppe). **Rückgängig** (Strg+Z) nimmt den ganzen Import in einem Schritt zurück.
+Der Patch und alle Ansichten bauen sich dabei **einmal** neu auf, nicht je Gerät — auch eine lange
+Liste ist in einem Augenblick da; ein importierter Laser ist sofort in NOT-AUS und Blackout erfasst.
+
+Mit der Tastatur: liegt der Fokus auf **Tabellen-Import ▾**, öffnet die **Eingabetaste** das Menü,
+die Pfeiltasten wählen den Eintrag. Die Leertaste öffnet es nicht — sie löst im Hauptfenster GO aus.
 
 Nicht übernommen werden Szenen, Abläufe, Gruppen und die Position auf der Bühne — nur der Patch.
 
