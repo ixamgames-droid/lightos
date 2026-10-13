@@ -79,6 +79,7 @@
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
+| VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 
 ## Blocker & Fallen
 
@@ -287,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T20:02Z D done FM-66
 - 2026-10-12T21:01Z A done LIZ-1
 - 2026-10-12T21:34Z D done TOOL-18
 - 2026-10-12T22:00Z D done OUT-71
@@ -317,3 +317,4 @@
 - 2026-10-13T19:31Z A claim ENG-40
 - 2026-10-13T19:44Z D done FM-75
 - 2026-10-13T20:18Z A claim UI-93
+- 2026-10-13T20:18Z A claim VCB-47
