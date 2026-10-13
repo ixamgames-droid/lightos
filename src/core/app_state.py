@@ -16,6 +16,7 @@ from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
 from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
+from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -582,6 +583,10 @@ class AppState:
         # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
         # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
         self.laser_patterns: list = []
+        # LAS-32 (S1): Sperrzonen + Maximalfeld je Laser — NUR ANZEIGE. Die
+        # Ausgabe (OutputManager/Render-Pfad) liest dieses Feld nicht.
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        self.sperrzonen = SperrzonenDaten()
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
@@ -896,14 +901,16 @@ class AppState:
             # Die AKTUELLE fid wird mitgefuehrt: nach einem Redo kann das Geraet
             # per fid-Guard eine neue Nummer haben — ein Undo auf die alte
             # loeschte sonst ein FREMDES Geraet (Review FM-38, gemessen).
-            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": []}
+            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": [], "feld": None}
 
             def _undo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt   # LAS-32
 
             def _redo(s=snapshot, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -1404,6 +1411,12 @@ class AppState:
             s.commit()
         removed_group = bool(gruppen_snaps)
         self.programmer.pop(fid, None)
+        # LAS-32: die Randwinkel dieses Lasers gehen mit dem Geraet. Die Nummer
+        # wird neu vergeben — ein anderer Laser auf ihr erbte sonst ein fremdes
+        # Feld und koennte faelschlich „erreicht keine Zone" melden. Das
+        # Rueckgaengig (unten bzw. in add_fixture) holt sie wieder.
+        feld_snap = self._sperrzonen_feld_nehmen(fid)
+        self._sperrzonen_feld_entfernt = feld_snap
         self._reload_patch_cache()
         self._emit("patch_changed")
         if removed_group:
@@ -1415,14 +1428,17 @@ class AppState:
             # FM-38: aktuelle fid und JUENGSTE Gruppen-Schnappschuesse mitfuehren
             # (Undo kann umnummern; ein Redo auf die alte Nummer loeschte das
             # Fremdgeraet, und ein veralteter Schnappschuss verwarf Umbenennungen).
-            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps}
+            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps,
+                             "feld": feld_snap}
 
             def _undo(s=snap, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             def _redo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt
 
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
@@ -1431,6 +1447,28 @@ class AppState:
                 redo=_redo,
             )
         return gruppen_snaps
+
+    # ── LAS-32: Laser-Feld beim Loeschen/Zurueckholen eines Geraets ──────────
+    #: Das Feld, das der letzte ``remove_fixture`` herausgenommen hat (oder
+    #: ``None``) — fuer Aufrufer, die es selbst aufheben (Undo von add_fixture).
+    _sperrzonen_feld_entfernt = None
+
+    def _sperrzonen_feld_nehmen(self, fid: int):
+        try:
+            daten = getattr(self, "sperrzonen", None)
+            return daten.nimm_feld(fid) if daten is not None else None
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_nehmen", e)
+            return None
+
+    def _sperrzonen_feld_zurueck(self, fid, feld) -> None:
+        if feld is None or fid is None:
+            return
+        try:
+            self.sperrzonen.setze_feld(int(fid), feld)
+            self._emit("sperrzonen_changed", None)
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_zurueck", e)
 
     def clear_patch(self):
         """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
@@ -1487,6 +1525,7 @@ class AppState:
             self._patch_cache = list(fixtures)
             self._rebuild_universes()
             clear_channel_cache()
+            self._laser_profile_bestimmen()      # LAS-38
             self._rebuild_render_plan()
             self._emit("patch_changed")
             return
@@ -1698,7 +1737,34 @@ class AppState:
             )
         self._rebuild_universes()
         clear_channel_cache()
+        self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
+
+    def _laser_profile_bestimmen(self):
+        """LAS-38: je Profil der gepatchten Geraete EINMAL bestimmen, ob
+        irgendeiner seiner Modi einen Laserkanal hat — beim Patchen und Laden,
+        vor dem Render-Plan. Der Plan (und jede andere Sicherheits-Stelle)
+        liest danach nur noch die gemerkte Antwort aus ``laser.erkennung``.
+
+        Eine Abfrage fuer alle noch unbekannten Profile zusammen. Schlaegt sie
+        fehl, bleibt die Antwort offen: ``erkennung`` fragt dann beim ersten
+        Bedarf je Profil nach (``_profil_hat_laserkanal``) — der Patch darf an
+        dieser Stelle nie scheitern.
+        """
+        offen = set()
+        for fx in getattr(self, "_patch_cache", None) or ():
+            profil_id = getattr(fx, "fixture_profile_id", None)
+            if profil_id is not None and not laser_erkennung.profil_bekannt(profil_id):
+                offen.add(profil_id)
+        if not offen:
+            return
+        try:
+            antworten = _profile_mit_laserkanal(offen)
+        except Exception as e:
+            debug_swallow("app_state.laser_profile_bestimmen", e)
+            return
+        for profil_id, hat_laser in antworten.items():
+            laser_erkennung.merke_profil(profil_id, hat_laser)
 
     def profil_geaendert(self, profile_id=None) -> bool:
         """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
@@ -5674,6 +5740,62 @@ def clear_channel_cache():
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
     _head_map_cache.clear()
     _cached_channel_list_ids.clear()
+    # LAS-38: ob ein Profil in irgendeinem Modus einen Laser traegt, haengt an
+    # denselben Profildaten — ein im Editor ergaenzter Laserkanal muss gelten.
+    laser_erkennung.vergiss_profile()
+
+
+def _profile_mit_laserkanal(profil_ids) -> dict:
+    """LAS-38: ``{profil_id: bool}`` — hat das Profil in IRGENDEINEM Modus einen
+    Laserkanal (Attribut ``laser_*`` oder „Laser“ im Kanalnamen) oder den Typ
+    ``laser``?
+
+    Eine Sitzung, zwei Abfragen fuer alle gefragten Profile zusammen; gelesen
+    werden nur Name und Attribut der Kanaele. Ein Profil, das es in der
+    Geraete-Datenbank nicht gibt, bekommt ``False`` (es hat keine Kanaele).
+    """
+    ids = [i for i in profil_ids if i is not None]
+    if not ids:
+        return {}
+    from sqlalchemy import select
+    from .database.fixture_db import engine
+    from .database.models import FixtureChannel, FixtureMode, FixtureProfile
+    antwort = {i: False for i in ids}
+    with Session(engine()) as s:
+        for profil_id, typ in s.execute(
+                select(FixtureProfile.id, FixtureProfile.fixture_type)
+                .where(FixtureProfile.id.in_(ids))).all():
+            if (typ or "").strip().lower() == "laser":
+                antwort[profil_id] = True
+        for profil_id, name, attribute in s.execute(
+                select(FixtureMode.fixture_id, FixtureChannel.name,
+                       FixtureChannel.attribute)
+                .join(FixtureChannel, FixtureChannel.mode_id == FixtureMode.id)
+                .where(FixtureMode.fixture_id.in_(ids))).all():
+            if antwort.get(profil_id):
+                continue
+            if laser_erkennung.ist_laserkanal(
+                    _KanalAngabe(name or "", attribute or "")):
+                antwort[profil_id] = True
+    return antwort
+
+
+class _KanalAngabe:
+    """Name und Attribut eines Kanals — mehr braucht ``ist_laserkanal`` nicht."""
+
+    __slots__ = ("name", "attribute")
+
+    def __init__(self, name, attribute):
+        self.name = name
+        self.attribute = attribute
+
+
+def _profil_hat_laserkanal(profil_id):
+    """Quelle fuer ``laser.erkennung``: ein einzelnes, noch unbekanntes Profil."""
+    return _profile_mit_laserkanal([profil_id]).get(profil_id)
+
+
+laser_erkennung.setze_profil_quelle(_profil_hat_laserkanal)
 
 
 # FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der
