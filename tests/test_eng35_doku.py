@@ -73,3 +73,32 @@ def test_editor_anleitungen_nennen_das_feld_stufe():
         text = _text(REPO / datei)
         assert "**Stufe**" in text, datei
         assert "**Layer-Priorität**" not in text, datei
+
+
+# ── VCB-46: Haken „übersteuert laufende Dimmer-Effekte“ ─────────────────────
+
+def test_anleitung_beschreibt_den_haken_mit_dem_wortlaut_der_taste():
+    text = _text(ANLEITUNG)
+    taste = _text(REPO / "src/ui/virtualconsole/vc_button.py")
+    for wort in ("übersteuert laufende Dimmer-Effekte", "Dimmer (Snap)",
+                 "Tasten-Modus (Snap)", "Ziel und Verhalten"):
+        assert wort in text, wort
+        assert wort in taste, f"„{wort}“ steht nicht mehr an der Taste"
+    assert "## 6. Blinder und Strobe als Snap-Taste" in text
+    assert "(#6-blinder-und-strobe-als-snap-taste)" in text
+    assert "Die Farbe bleibt getrennt" in text
+    assert "eigenem Dimmer-Kanal" in text
+    assert "Blackout und Laser-NOT-AUS" in text
+
+
+def test_button_anleitung_nennt_den_haken():
+    for datei in ("docs/anleitung_vc_widgets/01_button.md",
+                  "docs/anleitung_vc_widgets/01_button.en.md"):
+        text = _text(REPO / datei)
+        assert "| Dimmer (Snap) |" in text, datei
+        assert "übersteuert laufende Dimmer-Effekte" in text, datei
+
+
+def test_merge_vertrag_nennt_die_snap_ausnahme():
+    vertrag = _text(REPO / "docs" / "OUTPUT_MERGE_CONTRACT.md")
+    assert "VCB-46" in vertrag and "snap_dimmer_override" in vertrag

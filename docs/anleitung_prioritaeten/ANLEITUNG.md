@@ -16,7 +16,7 @@ der Tabelle steht, kommt später und setzt sich durch.
 | 1 | Grundwerte | Jedes Bild beginnt mit den Ruhewerten der Geräte — nichts „bleibt hängen“. |
 | 2 | **Effekte und Funktionen** (Szene, Chaser, Sequenz, Bewegung, Matrix …) | Schreiben zwei denselben Kanal, gewinnt die höhere **Stufe**; bei gleicher Stufe gewinnt, wer **zuletzt gestartet** wurde. Es gibt hier kein „höchster Wert gewinnt“ — auch nicht beim Dimmer. |
 | 3 | Cue-Listen (Wiedergabe) | Liegen über allen Effekten und ersetzen deren Werte. |
-| 4 | Programmer — dazu gehören **alle Snap-Tasten** der Virtual Console | Liegt über Effekten und Cue-Listen, mit zwei Ausnahmen: Einen Kanal für Farbe, Bewegung oder Gobo, den ein laufender Effekt gerade treibt, behält der Effekt. Und einen Dimmer, den ein laufender Effekt schreibt, behält ebenfalls der Effekt. |
+| 4 | Programmer — dazu gehören **alle Snap-Tasten** der Virtual Console | Liegt über Effekten und Cue-Listen, mit zwei Ausnahmen: Einen Kanal für Farbe, Bewegung oder Gobo, den ein laufender Effekt gerade treibt, behält der Effekt. Und einen Dimmer, den ein laufender Effekt schreibt, behält ebenfalls der Effekt — außer die Snap-Taste hat den Haken **übersteuert laufende Dimmer-Effekte** ([Abschnitt 6](#6-blinder-und-strobe-als-snap-taste)). |
 | 5 | Automatische Helligkeit | Leuchtet eine Farbe und treibt niemand den Dimmer, wird er von selbst geöffnet (abschaltbar über **Programmer → Farbe macht automatisch hell**). |
 | 6 | „Alles Weiß“ | Überschreibt alles darunter, auch laufende Farb-Effekte. |
 | 7 | Gruppen-Fader, Geräte-Dimmer, Submaster | Multiplizieren die Helligkeit, ersetzen nichts. |
@@ -84,12 +84,42 @@ schreiben getrennte Kanäle. Die Stufe spielt erst eine Rolle, wenn zwei Effekte
 Baustein derselben Lampe treiben — zwei Dimmer-Effekte, zwei Farb-Effekte, zwei Bewegungen.
 Die Spalte **Fasst an** zeigt dir das auf einen Blick.
 
-## 6. Was die Stufen nicht regeln
+## 6. Blinder und Strobe als Snap-Taste
+
+Eine Blinder- oder „Strobe Weiß“-Taste, die als **Snap** gebaut ist, kommt gegen ein
+laufendes Dimmer-Lauflicht zunächst **nicht** durch: der Effekt behält den Dimmer (Schicht 4).
+Dafür gibt es je Snap-Taste einen Haken:
+
+1. In der Virtual Console **Bearbeiten** einschalten und die Snap-Taste doppelt anklicken.
+2. Unter **Ziel und Verhalten**, direkt unter **Tasten-Modus (Snap)**, den Haken
+   **übersteuert laufende Dimmer-Effekte** setzen (Zeile **Dimmer (Snap)**).
+3. Solange die Taste aktiv ist — gehalten, umgeschaltet oder gesetzt —, gewinnt der
+   **Dimmer-Wert des Snaps** an genau den Lampen, für die der Snap einen Dimmer-Wert enthält.
+   Lampen, die der Snap nicht nennt, laufen im Effekt weiter.
+4. Nach dem Loslassen bzw. Ausschalten läuft der Effekt an diesen Lampen weiter, als wäre
+   nichts gewesen.
+
+Was der Haken **nicht** tut:
+
+- Er fasst nur den **Dimmer** an. Die Farbe bleibt getrennt: treibt ein Effekt die Farbe,
+  behält er sie; der Dimmer zieht keine Farbe nach.
+- Er wirkt nur an Lampen mit **eigenem Dimmer-Kanal**. Eine reine RGB-Lampe hat keinen
+  Dimmer, den die Taste übersteuern könnte.
+- **Master, Gruppen-Fader, Blackout und Laser-NOT-AUS** behalten das letzte Wort — eine
+  Blinder-Taste hellt einen Blackout nicht auf.
+- Drückst du danach eine zweite Snap-Taste auf dieselben Lampen, gilt deren Dimmer-Wert **und**
+  deren Haken (zuletzt gedrückt gewinnt); beim Loslassen geht beides an die erste zurück.
+
+Ohne Haken bleibt alles wie bisher. Die Alternative ohne Haken: den Blinder als **Effekt**
+bauen und auf die Stufe „Strobe & Blinder“ legen.
+
+## 7. Was die Stufen nicht regeln
 
 - **Sammlung, Chaser, Show:** Was *in* einer Sammlung, einem Chaser oder einer Show läuft,
   läuft auf **deren** Stufe. Die eigene Stufe eines Mitglieds zählt nur, wenn du es einzeln
   startest. Der Hinweis steht in der Ansicht als Tooltip an der Zeile („Läuft auch in: …“).
-- **Snap-Tasten:** liegen immer über den Effekten (Schicht 4), unabhängig von jeder Stufe.
+- **Snap-Tasten:** liegen immer über den Effekten (Schicht 4), unabhängig von jeder Stufe —
+  mit den dort genannten Ausnahmen für laufende Effekte.
 - **Kein „Untergrund“:** Ein Dimmer-Lauflicht schreibt für *jede* seiner Lampen einen Wert,
   auch 0 für die gerade dunklen. Liegt es über einem anderen Dimmer-Effekt, verdeckt es ihn
   auf diesen Lampen vollständig — eine höhere Stufe macht daraus keinen Läufer *über* einem
@@ -107,3 +137,5 @@ Diese Anleitung ist bewusst noch ohne Bilder; aufzunehmen sind:
 4. Feld **Stufe** im Matrix-Editor.
 5. Feld **Stufe** im Szenen-Editor.
 6. Eine alte Show mit „eigene Zahl (n)“ in der Liste.
+7. Eigenschaften einer Snap-Taste mit dem Haken „übersteuert laufende Dimmer-Effekte“.
+8. Blinder-Taste gegen ein Dimmer-Lauflicht, ohne und mit Haken (zwei Bilder).

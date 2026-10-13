@@ -191,6 +191,45 @@ def forget_snap_claims(owner) -> None:
             _snap_stack[key] = kept
         else:
             _snap_forsake(key, stack)
+    dimmer_override_abgleich()
+
+
+def dimmer_override_abgleich() -> None:
+    """VCB-46: sagt dem Renderer, wessen Dimmer gerade laufende Dimmer-Effekte
+    uebersteuert.
+
+    Abgeleitet aus dem Halter-Stapel oben, nicht aus einem zweiten Register: ein
+    Geraet zaehlt, solange der OBERSTE Halter seines Dimmer-Attributs eine Taste
+    mit dem Haken ``snap_dimmer_override`` ist. Damit gilt dieselbe Regel wie
+    fuer die Werte selbst — zuletzt gedrueckt gewinnt, und wer loslaesst, gibt
+    an die vorher gehaltene Taste zurueck (mit oder ohne Haken).
+
+    Wird nach jedem Setzen, Zuruecknehmen und Abmelden gerufen. Fehlt der Haken
+    ueberall, ist das Ergebnis leer und der Renderer rechnet wie bisher.
+    """
+    try:
+        from src.core.app_state import get_state, ist_dimmer_attribut
+        state = get_state()
+    except Exception:
+        return
+    setzen = getattr(state, "set_snap_dimmer_override", None)
+    if setzen is None:
+        return                      # Test-Stub ohne das Feld
+    ziel: dict[int, dict[str, int]] = {}
+    for (fid, attr), stack in list(_snap_stack.items()):
+        if not stack or not ist_dimmer_attribut(attr):
+            continue
+        ref, wert = stack[-1]
+        halter = ref()
+        if halter is None or not getattr(halter, "snap_dimmer_override", False):
+            continue
+        ziel.setdefault(int(fid), {})[attr] = int(wert)
+    if not ziel and not getattr(state, "snap_dimmer_override", None):
+        return                      # nichts an, nichts war an
+    try:
+        setzen(ziel)
+    except Exception as e:
+        print(f"[VCButton] Dimmer-Übersteuerung-Fehler: {e}")
 
 # Quadratische Standard-Groesse fuer NEU angelegte Buttons (Pad-Look wie im
 # Demo-Show-Generator, PAD=56 → hier etwas grosszuegiger fuer Hand-Platzierung).
@@ -382,6 +421,12 @@ class VCButton(VCWidget):
         # Analog function_ids: snap_id bleibt das Primaerziel, snap_ids sind Extras.
         self.snap_ids: list[int] = []
         self.snap_mode: str = "toggle"      # "set" | "flash" | "toggle"
+        # VCB-46: Haken „übersteuert laufende Dimmer-Effekte“. An = solange die
+        # Snap-Taste aktiv ist, gewinnen ihre DIMMER-Werte an ihren Geraeten
+        # gegen einen laufenden Dimmer-Effekt (sonst behaelt der Effekt den
+        # Dimmer). Nur der Dimmer — Farbe bleibt davon getrennt. Vorgabe aus;
+        # gespeichert wird das Feld nur, wenn es an ist.
+        self.snap_dimmer_override: bool = False
         self._snap_active: bool = False     # Laufzeit-Zustand fuer toggle
         # Vorherige Programmer-Werte (fuer Toggle/Flash-Ruecknahme):
         # {(fid, attr): alter_wert_oder_None}
@@ -774,6 +819,7 @@ class VCButton(VCWidget):
             self._snap_prev = prev
         except Exception as e:
             print(f"[VCButton] Snap-Apply-Fehler: {e}")
+        dimmer_override_abgleich()          # VCB-46
 
     def _snap_verlauf(self, state):
         """FM-52: Halten/Loslassen einer Flash-Snap-Taste ist Wiedergabe und
@@ -815,6 +861,7 @@ class VCButton(VCWidget):
             print(f"[VCButton] Snap-Restore-Fehler: {e}")
         finally:
             self._snap_prev = {}
+            dimmer_override_abgleich()      # VCB-46
 
     def release_if_held(self) -> bool:
         """UI-57: das verschluckte Loslassen nachholen.
@@ -2274,6 +2321,19 @@ class VCButton(VCWidget):
                 snap_mode_combo.setCurrentIndex(i)
                 break
 
+        # VCB-46: Haken je Snap-Taste — steht direkt beim Tasten-Modus.
+        snap_dim_ovr_cb = QCheckBox("übersteuert laufende Dimmer-Effekte")
+        snap_dim_ovr_cb.setChecked(bool(getattr(self, "snap_dimmer_override", False)))
+        snap_dim_ovr_cb.setToolTip(
+            "Aus (Vorgabe): Treibt ein laufender Effekt den Dimmer einer Lampe, "
+            "behält er ihn — der Dimmer-Wert dieses Snaps wird dort übergangen.\n"
+            "An: Solange die Taste aktiv ist, gewinnt der Dimmer-Wert des Snaps an "
+            "seinen Lampen gegen laufende Dimmer-Effekte (Blinder, Strobe Weiß). "
+            "Danach läuft der Effekt weiter.\n"
+            "Betrifft nur den Dimmer von Lampen mit eigenem Dimmer-Kanal — Farbe "
+            "bleibt unberührt. Master, Gruppen-Fader, Blackout und NOT-AUS "
+            "behalten das letzte Wort.")
+
         eff_action_combo = QComboBox()
         _eff_keys: list[str] = []
         for _k, _lbl in EFFECT_ACTION_LABELS:
@@ -2469,8 +2529,13 @@ class VCButton(VCWidget):
             _sids = snap_editor.ids() if self.action == LS else []
             self.snap_id, self.snap_ids = self._snap_binding_for_action(self.action, _sids)
             self.snap_mode = snap_mode_combo.currentData() or "toggle"
+            # VCB-46: der Haken gehoert zur Snap-Taste; bei jeder anderen Aktion
+            # faellt er weg (sonst wanderte ein unsichtbarer Haken in die Show).
+            self.snap_dimmer_override = (self.action == LS
+                                         and snap_dim_ovr_cb.isChecked())
             self._snap_active = False
             self._snap_prev = {}
+            dimmer_override_abgleich()
             self.effect_action_key = eff_action_combo.currentData() or self.effect_action_key
             self.group_name = group_combo.currentText().strip()
             self.laser_palette = laser_pal_combo.currentText().strip()
@@ -2510,6 +2575,7 @@ class VCButton(VCWidget):
                 snap_combo:       a == SN,
                 snap_editor:      a == LS,
                 snap_mode_combo:  a == LS,
+                snap_dim_ovr_cb:  a == LS,
                 eff_action_combo: a == EA,
                 group_combo:      a == SG,
                 blackout_editor:  a == BO,
@@ -2543,6 +2609,7 @@ class VCButton(VCWidget):
             snap_combo.currentIndexChanged.connect(lambda *_: _live())
             snap_editor.changed.connect(lambda *_: _live())
             snap_mode_combo.currentIndexChanged.connect(lambda *_: _live())
+            snap_dim_ovr_cb.toggled.connect(lambda *_: _live())
             eff_action_combo.currentIndexChanged.connect(lambda *_: _live())
             group_combo.currentTextChanged.connect(lambda *_: _live())
             blackout_editor.changed.connect(lambda *_: _live())
@@ -2570,6 +2637,7 @@ class VCButton(VCWidget):
                     ("Snapshot:", snap_combo),
                     ("Snap-Ziele:", snap_editor),
                     ("Tasten-Modus (Snap):", snap_mode_combo),
+                    ("Dimmer (Snap):", snap_dim_ovr_cb),
                     ("Effekt-Aktion:", eff_action_combo),
                     ("Gruppe (SelectGroup):", group_combo),
                     ("Blackout-Ziel:", blackout_editor),
@@ -2781,6 +2849,10 @@ class VCButton(VCWidget):
                 _save_sids.append(iv)
         d["snap_ids"] = _save_sids
         d["snap_mode"] = self.snap_mode
+        # VCB-46: nur schreiben, wenn an — eine Show ohne den Haken bleibt
+        # byte-gleich.
+        if getattr(self, "snap_dimmer_override", False):
+            d["snap_dimmer_override"] = True
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
         d["laser_palette"] = self.laser_palette
@@ -2866,6 +2938,7 @@ class VCButton(VCWidget):
                 _sids.append(iv)
         self.snap_ids = _sids
         self.snap_mode = d.get("snap_mode", "toggle")
+        self.snap_dimmer_override = bool(d.get("snap_dimmer_override", False))
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")
         self.laser_palette = d.get("laser_palette", "")

@@ -48,6 +48,11 @@ werden mit dem Default-Frame vorbelegt) → keine hängenden Werte gestoppter Qu
   fasst der Programmer ihn weder per LTP noch per EE-02-Multiply an. Ausnahme: Reiter
   **Intensity** aktiv und Gerät ausgewählt — dann gewinnt die Programmer-Intensität absolut.
   EE-02 gilt damit nur noch für Geräte **ohne** echten Dimmer-Kanal.
+- **VCB-46 — Snap-Taste mit Haken:** Zweite Ausnahme auf demselben Weg. Hält eine
+  Snap-Taste mit dem Haken „übersteuert laufende Dimmer-Effekte“ den Dimmer eines Geräts
+  (`AppState.snap_dimmer_override`, gepflegt aus dem Halter-Stapel in `vc_button.py`) und
+  steht ihr Wert noch im Programmer, wird er absolut geschrieben. Nur Dimmer-Attribute;
+  Farb-/Bewegungs-/Gobo-Kanäle bleiben über WP-6 beim Effekt.
 - **Cues > Funktionen:** Executoren (Schicht 3) liegen bewusst über Funktionen; ein
   Cue ersetzt laufende Effektwerte per LTP (gewollt).
 
