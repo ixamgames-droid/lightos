@@ -16,6 +16,7 @@ from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
 from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
+from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -1521,6 +1522,7 @@ class AppState:
             self._patch_cache = list(fixtures)
             self._rebuild_universes()
             clear_channel_cache()
+            self._laser_profile_bestimmen()      # LAS-38
             self._rebuild_render_plan()
             self._emit("patch_changed")
             return
@@ -1732,7 +1734,34 @@ class AppState:
             )
         self._rebuild_universes()
         clear_channel_cache()
+        self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
+
+    def _laser_profile_bestimmen(self):
+        """LAS-38: je Profil der gepatchten Geraete EINMAL bestimmen, ob
+        irgendeiner seiner Modi einen Laserkanal hat — beim Patchen und Laden,
+        vor dem Render-Plan. Der Plan (und jede andere Sicherheits-Stelle)
+        liest danach nur noch die gemerkte Antwort aus ``laser.erkennung``.
+
+        Eine Abfrage fuer alle noch unbekannten Profile zusammen. Schlaegt sie
+        fehl, bleibt die Antwort offen: ``erkennung`` fragt dann beim ersten
+        Bedarf je Profil nach (``_profil_hat_laserkanal``) — der Patch darf an
+        dieser Stelle nie scheitern.
+        """
+        offen = set()
+        for fx in getattr(self, "_patch_cache", None) or ():
+            profil_id = getattr(fx, "fixture_profile_id", None)
+            if profil_id is not None and not laser_erkennung.profil_bekannt(profil_id):
+                offen.add(profil_id)
+        if not offen:
+            return
+        try:
+            antworten = _profile_mit_laserkanal(offen)
+        except Exception as e:
+            debug_swallow("app_state.laser_profile_bestimmen", e)
+            return
+        for profil_id, hat_laser in antworten.items():
+            laser_erkennung.merke_profil(profil_id, hat_laser)
 
     def profil_geaendert(self, profile_id=None) -> bool:
         """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
@@ -4263,10 +4292,26 @@ class AppState:
             print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
             su.begin_write_log()
+        # ENG-37: Modify-Effekte schreiben im Funktions-Durchlauf nichts — der
+        # Manager sammelt ihre Betraege, verrechnet wird in 4a²b auf das fertige
+        # Bild. ``tick`` wird bewusst mit denselben drei Argumenten gerufen wie
+        # immer (Manager-Ersatz und gepatchte ``tick`` in Tests kennen keinen
+        # Schalter); das Aufschieben wird vorher am Manager angemeldet.
+        _fm = self.function_manager
+        _modify_anwenden = getattr(_fm, "modify_anwenden", None)
+        _modify_aufschieben = getattr(_fm, "modify_aufschieben", None)
         try:
-            self.function_manager.tick(scratch, self._patch_cache, dt)
+            if _modify_aufschieben is not None and _modify_anwenden is not None:
+                _modify_aufschieben(True)
+            _fm.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        finally:
+            if _modify_aufschieben is not None:
+                try:
+                    _modify_aufschieben(False)
+                except Exception:
+                    pass
         func_touched: dict[int, set[int]] = {}
         for univ, su in scratch.items():
             func_touched[univ] = su.end_write_log()
@@ -4491,6 +4536,24 @@ class AppState:
                 continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
             for a in dims:
                 su.set_channel(a, 255)
+
+        # 4a²b. ENG-37: Modify-Effekte — der EINE spaete Rechengang. Verrechnet
+        #      wird mit dem FERTIGEN Wert der Schichten darunter: Effekte,
+        #      Cuelisten, Programmer/Snaps und die implizite Grundhelligkeit von
+        #      eben. Ein Modify-Effekt hat in Schritt 2 nichts geschrieben — er
+        #      steht in keinem Schreib-Protokoll, besitzt keinen Dimmer und
+        #      schaltet die Grundhelligkeit nicht ab; wo sein Betrag 0 ist,
+        #      bleibt der Wert unveraendert. Bewusst HIER, also VOR Szenen-
+        #      Vorschau, „Alles Weiss“, Submastern/Fixture-Dimmern (4b),
+        #      DMX-Eingang, Simple Desk und Laser-NOT-AUS (4d) sowie vor Grand
+        #      Master/Blackout im OutputManager: die behalten das letzte Wort,
+        #      ein Modify kann Blackout und NOT-AUS nie aufhellen.
+        #      Kosten ohne laufenden Modify-Effekt: ein leerer Listen-Test.
+        if _modify_anwenden is not None:
+            try:
+                _modify_anwenden(scratch)
+            except Exception as exc:
+                print(f"[AppState] render modify error: {exc}")
 
         # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
         # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen
@@ -5666,6 +5729,62 @@ def clear_channel_cache():
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
     _head_map_cache.clear()
     _cached_channel_list_ids.clear()
+    # LAS-38: ob ein Profil in irgendeinem Modus einen Laser traegt, haengt an
+    # denselben Profildaten — ein im Editor ergaenzter Laserkanal muss gelten.
+    laser_erkennung.vergiss_profile()
+
+
+def _profile_mit_laserkanal(profil_ids) -> dict:
+    """LAS-38: ``{profil_id: bool}`` — hat das Profil in IRGENDEINEM Modus einen
+    Laserkanal (Attribut ``laser_*`` oder „Laser“ im Kanalnamen) oder den Typ
+    ``laser``?
+
+    Eine Sitzung, zwei Abfragen fuer alle gefragten Profile zusammen; gelesen
+    werden nur Name und Attribut der Kanaele. Ein Profil, das es in der
+    Geraete-Datenbank nicht gibt, bekommt ``False`` (es hat keine Kanaele).
+    """
+    ids = [i for i in profil_ids if i is not None]
+    if not ids:
+        return {}
+    from sqlalchemy import select
+    from .database.fixture_db import engine
+    from .database.models import FixtureChannel, FixtureMode, FixtureProfile
+    antwort = {i: False for i in ids}
+    with Session(engine()) as s:
+        for profil_id, typ in s.execute(
+                select(FixtureProfile.id, FixtureProfile.fixture_type)
+                .where(FixtureProfile.id.in_(ids))).all():
+            if (typ or "").strip().lower() == "laser":
+                antwort[profil_id] = True
+        for profil_id, name, attribute in s.execute(
+                select(FixtureMode.fixture_id, FixtureChannel.name,
+                       FixtureChannel.attribute)
+                .join(FixtureChannel, FixtureChannel.mode_id == FixtureMode.id)
+                .where(FixtureMode.fixture_id.in_(ids))).all():
+            if antwort.get(profil_id):
+                continue
+            if laser_erkennung.ist_laserkanal(
+                    _KanalAngabe(name or "", attribute or "")):
+                antwort[profil_id] = True
+    return antwort
+
+
+class _KanalAngabe:
+    """Name und Attribut eines Kanals — mehr braucht ``ist_laserkanal`` nicht."""
+
+    __slots__ = ("name", "attribute")
+
+    def __init__(self, name, attribute):
+        self.name = name
+        self.attribute = attribute
+
+
+def _profil_hat_laserkanal(profil_id):
+    """Quelle fuer ``laser.erkennung``: ein einzelnes, noch unbekanntes Profil."""
+    return _profile_mit_laserkanal([profil_id]).get(profil_id)
+
+
+laser_erkennung.setze_profil_quelle(_profil_hat_laserkanal)
 
 
 # FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der

@@ -672,7 +672,12 @@ class VCSlider(VCWidget):
             try:
                 fid = int(fid)
                 if on:
-                    if not fm.is_running(fid):
+                    # ENG-37: Ein Effekt mit Ausblendzeit „laeuft" nach dem Stopp
+                    # noch, waehrend er ausblendet. Zieht man den Fader in dieser
+                    # Zeit wieder auf, muss er neu starten — sonst blendet er zu
+                    # Ende aus und bleibt aus, obwohl der Fader oben steht.
+                    if (not fm.is_running(fid)
+                            or getattr(fm.get(fid), "_releasing", False)):
                         fm.start(fid)
                 elif fm.is_running(fid):
                     fm.stop(fid)

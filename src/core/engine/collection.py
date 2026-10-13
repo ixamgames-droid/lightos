@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType
+from .modify import write_child
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -110,7 +111,8 @@ class Collection(Function):
                 if fid not in self._started:
                     child.start()
                     self._started.add(fid)
-                child.write(universes, patch_cache, dt, function_registry)
+                # ENG-37: Modify-Kinder werden verrechnet statt gesetzt.
+                write_child(child, universes, patch_cache, dt, function_registry)
         finally:
             self._in_write = False
 
