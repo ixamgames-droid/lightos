@@ -448,3 +448,174 @@ def test_knopf_im_programmer_oeffnet_den_assistenten(state, monkeypatch):
         geoeffnet[0].reject()
     finally:
         view.deleteLater()
+
+
+# ── Startgröße: nichts gequetscht, nichts übereinander ───────────────────────
+#
+# Befund der Sichtprobe: der Dialog ging mit 560 x 620 px auf, brauchte aber
+# rund 900 px Höhe — Hilfetext abgeschnitten, Namensfeld 10 px hoch, die
+# Fehlermeldung lag über „Als Szene festhalten“, die Liste zeigte zwei Zeilen.
+# Geprüft wird die ECHTE Startgröße (kein resize() von Hand), auf einem großen
+# und auf einem 1366 x 768-Bildschirm, mit und ohne Signal.
+
+from PySide6.QtCore import QPoint, QRect                             # noqa: E402
+from PySide6.QtWidgets import (                                      # noqa: E402
+    QAbstractButton, QAbstractSpinBox, QComboBox, QGroupBox, QLabel, QLineEdit,
+    QListWidget, QWidget,
+)
+
+_LEISTE = 40
+_BILDSCHIRME = {"full-hd": QRect(0, 0, 1920, 1080 - _LEISTE),
+                "laptop": QRect(0, 0, 1366, 768 - _LEISTE)}
+_BLATT = (QLabel, QAbstractButton, QAbstractSpinBox, QComboBox, QLineEdit,
+          QListWidget)
+
+
+@pytest.fixture(params=sorted(_BILDSCHIRME))
+def bildschirm(request, monkeypatch):
+    from src.ui.widgets import dialog_groesse as DG
+    flaeche = _BILDSCHIRME[request.param]
+    monkeypatch.setattr(DG, "verfuegbare_flaeche", lambda _w=None: flaeche)
+    return flaeche
+
+
+def _zeige(dlg):
+    dlg.show()
+    for _ in range(4):
+        _app.processEvents()
+    return dlg
+
+
+def _teile(dlg):
+    """Sichtbare Bedienteile und Texte im Inhalt (ohne Qt-Innenleben wie
+    Rollbalken oder das Eingabefeld im Drehfeld)."""
+    aus = []
+    for w in dlg._inhalt.findChildren(QWidget):
+        if not isinstance(w, _BLATT) or not w.isVisibleTo(dlg._inhalt):
+            continue
+        eltern = w.parentWidget()
+        if isinstance(eltern, (QAbstractSpinBox, QComboBox, QListWidget)) \
+                or (w.objectName() or "").startswith("qt_"):
+            continue
+        aus.append(w)
+    return aus
+
+
+def _name(w):
+    text = getattr(w, "text", lambda: "")() if not isinstance(w, QListWidget) else ""
+    return f"{type(w).__name__}({text[:30]!r})"
+
+
+def _im_inhalt(dlg, w) -> QRect:
+    return QRect(w.mapTo(dlg._inhalt, QPoint(0, 0)), w.size())
+
+
+def _pruefe_layout(dlg):
+    """Kein Teil kleiner als sein Mindestmaß, kein umbrochener Text
+    abgeschnitten, nichts übereinander, nichts außerhalb des Inhalts."""
+    teile = _teile(dlg)
+    assert len(teile) >= 12, [_name(w) for w in teile]
+    for w in teile + [b for b in dlg._inhalt.findChildren(QGroupBox)]:
+        mindest = w.minimumSizeHint().expandedTo(w.minimumSize())
+        assert w.width() >= mindest.width(), (_name(w), w.size(), mindest)
+        assert w.height() >= mindest.height(), (_name(w), w.size(), mindest)
+        if isinstance(w, QLabel) and w.wordWrap() and w.text():
+            assert w.height() >= w.heightForWidth(w.width()), (
+                _name(w), w.size(), w.heightForWidth(w.width()))
+    flaeche = dlg._inhalt.rect()
+    lagen = [(_name(w), _im_inhalt(dlg, w)) for w in teile]
+    for name, lage in lagen:
+        assert flaeche.contains(lage), (name, lage, flaeche)
+    for i, (na, a) in enumerate(lagen):
+        for nb, b in lagen[i + 1:]:
+            assert not a.intersects(b), (na, a, nb, b)
+    # ausdrücklich das Paar aus dem Befund
+    knopf = _im_inhalt(dlg, dlg._btn_festhalten)
+    if not dlg._lbl_meldung.isHidden():
+        meldung = _im_inhalt(dlg, dlg._lbl_meldung)
+        assert not knopf.intersects(meldung)
+        assert meldung.top() >= knopf.bottom()
+    assert dlg._edit_name.height() >= dlg._edit_name.sizeHint().height()
+    assert dlg._liste.height() >= D.LISTENZEILEN * dlg._liste.fontMetrics().height()
+
+
+def _pruefe_fenster(dlg, flaeche):
+    from src.ui.widgets import dialog_groesse as DG
+    grenze = DG.groesste_fenstergroesse(dlg)
+    assert dlg.width() <= grenze.width() and dlg.height() <= grenze.height(), (
+        dlg.size(), grenze)
+    assert dlg.height() <= flaeche.height()
+    # „Fertig“ liegt außerhalb des Rollbereichs und ganz im Fenster.
+    fertig = QRect(dlg._btn_fertig.mapTo(dlg, QPoint(0, 0)), dlg._btn_fertig.size())
+    assert dlg.rect().contains(fertig), (fertig, dlg.rect())
+    assert not dlg._rollbereich.isAncestorOf(dlg._btn_fertig)
+    # Der Inhalt ist nie kleiner als sein Bedarf: was nicht passt, rollt.
+    balken = dlg._rollbereich.verticalScrollBar()
+    sicht = dlg._rollbereich.viewport().height()
+    assert dlg._inhalt.height() >= sicht
+    assert balken.maximum() == max(0, dlg._inhalt.height() - sicht)
+    assert dlg._rollbereich.horizontalScrollBar().maximum() == 0
+
+
+def test_startgroesse_ohne_signal_quetscht_und_ueberlagert_nichts(
+        state, rig, aufbau, bildschirm):
+    dlg, art, sacn, uhr = aufbau
+    _zeige(dlg)
+    assert not dlg._lbl_hilfe.isHidden()
+    _pruefe_layout(dlg)
+    _pruefe_fenster(dlg, bildschirm)
+    # Die lange Fehlermeldung (Grund + Wegbeschreibung) darf nichts verdecken.
+    assert dlg.festhalten() is None
+    for _ in range(4):
+        _app.processEvents()
+    assert "Art-Net Input aktivieren" in dlg._lbl_meldung.text()
+    _pruefe_layout(dlg)
+    _pruefe_fenster(dlg, bildschirm)
+    # … und ist nach dem Druck zu sehen, auch wenn der Inhalt rollt.
+    sicht = dlg._rollbereich.viewport().rect()
+    meldung = QRect(dlg._lbl_meldung.mapTo(dlg._rollbereich.viewport(), QPoint(0, 0)),
+                    dlg._lbl_meldung.size())
+    assert sicht.intersects(meldung)
+    if meldung.height() <= sicht.height():
+        assert sicht.contains(meldung), (meldung, sicht)
+
+
+def test_startgroesse_mit_signal_quetscht_und_ueberlagert_nichts(
+        state, rig, aufbau, bildschirm):
+    dlg, art, sacn, uhr = aufbau
+    _spiele_ruhig(art, uhr, _bild(rig["adressen"], 40))
+    dlg.aktualisiere()
+    _zeige(dlg)
+    assert dlg._lbl_hilfe.isHidden()
+    _pruefe_layout(dlg)
+    _pruefe_fenster(dlg, bildschirm)
+    for wert in (40, 90, 140):
+        _spiele_ruhig(art, uhr, _bild(rig["adressen"], wert))
+        assert dlg.festhalten() is not None
+    for _ in range(4):
+        _app.processEvents()
+    assert dlg._liste.count() == 3 and "festgehalten" in dlg._lbl_meldung.text()
+    _pruefe_layout(dlg)
+    _pruefe_fenster(dlg, bildschirm)
+
+
+def test_startgroesse_folgt_dem_inhalt_und_nicht_einer_festen_zahl(
+        state, rig, aufbau, monkeypatch):
+    from src.ui.widgets import dialog_groesse as DG
+    dlg, art, sacn, uhr = aufbau
+    monkeypatch.setattr(DG, "verfuegbare_flaeche",
+                        lambda _w=None: QRect(0, 0, 2560, 1400))
+    _zeige(dlg)
+    # Auf einem großen Bildschirm passt alles ohne Rollen …
+    assert dlg._rollbereich.verticalScrollBar().maximum() == 0
+    assert dlg.width() >= D.STARTBREITE
+    # … und das Mindestmaß des Fensters ist klein genug für einen Laptop.
+    assert dlg.minimumHeight() <= 400
+
+
+def test_eigene_groesse_vor_dem_zeigen_bleibt(state, rig, aufbau, bildschirm):
+    dlg, art, sacn, uhr = aufbau
+    dlg.resize(500, 400)
+    _zeige(dlg)
+    assert (dlg.width(), dlg.height()) == (500, 400)
+    _pruefe_layout(dlg)                  # klein heißt: rollen, nicht quetschen

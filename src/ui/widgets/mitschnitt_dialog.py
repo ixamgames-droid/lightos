@@ -12,18 +12,29 @@ noch laufende Funktionen an. Die Rechnung steht in ``src/core/mitschnitt.py``.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
-    QVBoxLayout,
+    QVBoxLayout, QWidget,
 )
 
 from src.core import mitschnitt as M
+from src.ui.widgets import dialog_groesse as DG
 
 TITEL = "Mitschnitt-Assistent"
 STAMM = "Mitschnitt"
+
+#: Breite, mit der der Dialog aufgeht, wenn der Bildschirm sie hergibt. Die
+#: HOEHE steht nirgends als Zahl: sie folgt dem umbrochenen Inhalt.
+STARTBREITE = 640
+#: Kleinstes Fenster. Darunter rollt der Inhalt, gequetscht wird nichts.
+MINDESTGROESSE = QSize(420, 320)
+#: Zeilen, die die Liste der festgehaltenen Szenen mindestens zeigt.
+LISTENZEILEN = 5
+#: Zeilen Luft fuer die Meldung unter dem Knopf (siehe `startgroesse`).
+MELDUNGSZEILEN = 4
 
 TEXT_FESTHALTEN = "Als Szene festhalten"
 TEXT_ENTFERNEN = "Entfernen"
@@ -78,7 +89,12 @@ class MitschnittDialog(QDialog):
     def __init__(self, parent=None, *, state=None, leser: M.EingangsLeser | None = None):
         super().__init__(parent)
         self.setWindowTitle(TITEL)
-        self.setMinimumSize(560, 620)
+        # Kleines Mindestmass: der Inhalt liegt in einem Rollbereich, die
+        # Startgroesse setzt `showEvent` aus dem Bedarf des Inhalts. Ein
+        # grosses festes Mindestmass (frueher 560 x 620 bei rund 900 px
+        # Bedarf) liess Qt die Teile ineinanderschieben.
+        self.setMinimumSize(MINDESTGROESSE)
+        self._groesse_gesetzt = False
         if state is None:
             from src.core.app_state import get_state
             state = get_state()
@@ -103,7 +119,15 @@ class MitschnittDialog(QDialog):
     # ── Aufbau ───────────────────────────────────────────────────────────────
 
     def _baue_oberflaeche(self):
-        root = QVBoxLayout(self)
+        # Alles ausser „Fertig“ liegt in einem Rollbereich (`root` = Layout
+        # des Inhalts). Reicht der Bildschirm nicht, rollt der Inhalt — der
+        # Knopf zum Schliessen bleibt immer sichtbar.
+        aussen = QVBoxLayout(self)
+        self._inhalt = QWidget()
+        root = QVBoxLayout(self._inhalt)
+        root.setContentsMargins(0, 0, 0, 0)
+        self._rollbereich = DG.InhaltsRollbereich(self._inhalt)
+        aussen.addWidget(self._rollbereich, 1)
 
         kopf = QLabel(HINWEIS_NUR_LESEN)
         kopf.setWordWrap(True)
@@ -129,6 +153,10 @@ class MitschnittDialog(QDialog):
 
         box = QGroupBox("Festhalten")
         form = QFormLayout(box)
+        # Lange Eintraege der Kanalauswahl duerfen das Feld nicht aus dem
+        # Fenster schieben; umbrochene Zeilen bekommen die volle Breite.
+        form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         self._edit_name = QLineEdit()
         self._edit_name.setToolTip("Name der nächsten Szene. Nach dem Festhalten "
                                    "zählt LightOS von selbst weiter.")
@@ -187,7 +215,10 @@ class MitschnittDialog(QDialog):
         box = QGroupBox("Festgehaltene Szenen")
         ll = QVBoxLayout(box)
         self._liste = QListWidget()
-        ll.addWidget(self._liste)
+        zeile_h = max(self._liste.fontMetrics().height() + 6, 20)
+        self._liste.setMinimumHeight(
+            LISTENZEILEN * zeile_h + 2 * self._liste.frameWidth())
+        ll.addWidget(self._liste, 1)
         zeile = QHBoxLayout()
         self._btn_entfernen = QPushButton(TEXT_ENTFERNEN)
         self._btn_entfernen.setToolTip("Löscht die markierte Szene wieder "
@@ -223,10 +254,64 @@ class MitschnittDialog(QDialog):
         self._btn_fertig.setAutoDefault(False)
         self._btn_fertig.clicked.connect(self.fertig)
         zeile.addWidget(self._btn_fertig)
-        root.addLayout(zeile)
+        aussen.addLayout(zeile)
+        # Rollt den Inhalt nach einer neuen Meldung so, dass man sie sieht —
+        # erst nach dem Umbruch, deshalb ueber einen Null-Timer.
+        self._sicht_timer = QTimer(self)
+        self._sicht_timer.setSingleShot(True)
+        self._sicht_timer.setInterval(0)
+        self._sicht_timer.timeout.connect(self._meldung_zeigen)
         for knopf in (self._btn_festhalten, self._btn_entfernen):
             knopf.setAutoDefault(False)
         self._btn_festhalten.setFocus()
+
+    # ── Groesse ──────────────────────────────────────────────────────────────
+
+    def startgroesse(self) -> QSize:
+        """Groesse, mit der der Dialog aufgeht: so breit wie `STARTBREITE`
+        (oder der Inhalt, wenn er mehr braucht), so hoch, wie der umbrochene
+        Inhalt bei DIESER Breite braucht — hoechstens die verfuegbare
+        Bildschirmflaeche. Reicht die nicht, rollt der Inhalt."""
+        aussen = self.layout()
+        aussen.activate()
+        self._inhalt.layout().activate()
+        grenze = DG.groesste_fenstergroesse(self)
+        raender = aussen.contentsMargins()
+        seiten = raender.left() + raender.right()
+        rahmen = 2 * self._rollbereich.frameWidth()
+        breite = max(STARTBREITE,
+                     self._inhalt.minimumSizeHint().width() + seiten + rahmen)
+        breite = min(breite, grenze.width())
+        fuss = (raender.top() + raender.bottom() + aussen.spacing()
+                + self._btn_fertig.sizeHint().height() + rahmen)
+
+        def bedarf(innen: int) -> int:
+            h = self._inhalt.heightForWidth(innen)
+            if h < 0:
+                h = self._inhalt.sizeHint().height()
+            return max(h, self._inhalt.minimumSizeHint().height())
+
+        innen = breite - seiten - rahmen
+        # Luft fuer die Meldungszeile: sie ist anfangs leer und waechst mit
+        # der laengsten Fehlermeldung auf mehrere Zeilen. Bis dahin bekommt
+        # die Liste den Platz.
+        luft = MELDUNGSZEILEN * self.fontMetrics().lineSpacing()
+        hoehe = min(bedarf(innen) + fuss + luft, grenze.height())
+        return QSize(breite, hoehe)
+
+    def showEvent(self, ev):
+        # VOR super(): Qt mittet den Dialog dann mit der endgueltigen Groesse
+        # ein. Wer vorher selbst resize() gerufen hat, behaelt seine Groesse.
+        if not self._groesse_gesetzt:
+            self._groesse_gesetzt = True
+            if not self.testAttribute(Qt.WidgetAttribute.WA_Resized):
+                self.resize(self.startgroesse())
+        super().showEvent(ev)
+
+    def _meldung_zeigen(self):
+        if self._lbl_meldung.text():
+            self._rollbereich.ensureWidgetVisible(self._lbl_meldung, 0, 12)
+            self._rollbereich.ensureWidgetVisible(self._btn_festhalten, 0, 12)
 
     # ── Abfragen ─────────────────────────────────────────────────────────────
 
@@ -332,6 +417,7 @@ class MitschnittDialog(QDialog):
     def _melde(self, text: str, fehler: bool = False):
         self._lbl_meldung.setStyleSheet("color:#e0705a;" if fehler else "color:#7fc98f;")
         self._lbl_meldung.setText(text)
+        self._sicht_timer.start()
 
     # ── Aktionen ─────────────────────────────────────────────────────────────
 
@@ -414,10 +500,12 @@ class MitschnittDialog(QDialog):
 
     def done(self, ergebnis):
         self._timer.stop()
+        self._sicht_timer.stop()
         self._leser.trennen()
         super().done(ergebnis)
 
     def closeEvent(self, ev):
         self._timer.stop()
+        self._sicht_timer.stop()
         self._leser.trennen()
         super().closeEvent(ev)
