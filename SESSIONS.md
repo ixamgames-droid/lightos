@@ -80,6 +80,7 @@
 | LIZ-1 | A | fix/liz1-lizenzdialog-hoehe | 2026-10-12T22:39Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
+| IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
 
 ## Blocker & Fallen
 
@@ -288,7 +289,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:15Z A claim VCB-46
 - 2026-10-12T18:23Z D done MIDI-10
 - 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
 - 2026-10-12T18:42Z D aktualisiert MIDI-15: Branch - -> feature/midi15-touch-sperre; Dateien - -> src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py
@@ -318,3 +318,4 @@
 - 2026-10-13T14:51Z A done STAB-38
 - 2026-10-13T15:27Z A done UI-91
 - 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
+- 2026-10-13T15:48Z A claim IMP-1
