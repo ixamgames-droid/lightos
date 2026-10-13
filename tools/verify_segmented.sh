@@ -52,9 +52,22 @@ fi
 JOBS=1
 if [ "${1:-}" = "-j" ]; then JOBS="${2:-1}"; shift 2; fi
 
-if [ "$#" -gt 0 ]; then FILES=("$@"); else
+# XPLAT-36: das Zeitlimit je Segment. 300 s sind am VOLL-Lauf bemessen; sind
+# Dateien genannt, gilt 600 s. Gemessen ist der Grund auf Windows (ruhiger
+# Rechner -> CPU im Spartakt -> wartende WebEngine-Dateien brauchen allein das
+# 1,5- bis 2,6-Fache ihrer Gate-Zeit; Zahlen im Kopf von verify_segmented.ps1).
+# Hier steht dieselbe Regel, damit die beiden Runner nicht auseinanderlaufen
+# (XPLAT-11) — auf Linux ist sie NICHT nachgemessen.
+SEG_LIMIT=300
+SEG_LIMIT_HINWEIS=""
+if [ "$#" -gt 0 ]; then
+  FILES=("$@")
+  SEG_LIMIT_HINWEIS=" (Dateien genannt; im Voll-Lauf ${SEG_LIMIT} s)"
+  SEG_LIMIT=600
+else
   mapfile -t FILES < <(find tests -name 'test_*.py' -type f | sort)
 fi
+export SEG_LIMIT
 
 OUTDIR="${LIGHTOS_SEG_OUT:-$REPO/.pytest_segments}"
 rm -rf "$OUTDIR"; mkdir -p "$OUTDIR"
@@ -76,6 +89,7 @@ export LIGHTOS_HARDEN_EXIT="${LIGHTOS_HARDEN_EXIT:-1}"
 export LIGHTOS_IM_SEGMENT=1
 
 echo "[seg] ${#FILES[@]} Testdateien, $JOBS parallel, Ausgabe: $OUTDIR"
+echo "[seg] Zeitlimit je Segment: ${SEG_LIMIT} s${SEG_LIMIT_HINWEIS}"
 
 # XPLAT-17 / PROC-02c: was vor einem WebEngine-Segment passiert.
 #
@@ -174,7 +188,7 @@ run_one() {
     # legt dafuer eine eigene an. `8>&-` schliesst den Sperr-Deskriptor im Kind:
     # sonst haelt ein geerbtes Duplikat die Sperre ueber das Segmentende hinaus
     # offen (flock loest erst, wenn die LETZTE Kopie zu ist).
-    timeout 300 "$PY" -m pytest "$f" -q --tb=short -rf -p no:cacheprovider \
+    timeout "${SEG_LIMIT:-300}" "$PY" -m pytest "$f" -q --tb=short -rf -p no:cacheprovider \
         8>&- 9>&- > "$log" 2>&1 &
     local seg_pid=$! pgid=""
     [ "$web" = "1" ] && pgid="$(webengine_pgid "$seg_pid")"
@@ -192,7 +206,7 @@ run_one() {
     printf '%s\t%s\n' "$rc" "$f" >> "$OUTDIR/results.tsv"
     case $rc in
         0)   printf '  \033[32m ok \033[0m %s\n' "$f" ;;
-        124) printf '  \033[33mZEIT\033[0m %s (>300s abgebrochen)\n' "$f" ;;
+        124) printf '  \033[33mZEIT\033[0m %s (>%ss abgebrochen)\n' "$f" "${SEG_LIMIT:-300}" ;;
         13[0-9]|139) printf '  \033[31mSEGV\033[0m %s (Signal %s)\n' "$f" "$rc" ;;
         *)   printf '  \033[31mROT \033[0m %s (exit %s)\n' "$f" "$rc" ;;
     esac
