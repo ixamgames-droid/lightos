@@ -52,7 +52,6 @@
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-12T18:55Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
-| FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-12T16:22Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
@@ -289,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:23Z D done MIDI-10
 - 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
 - 2026-10-12T18:42Z D aktualisiert MIDI-15: Branch - -> feature/midi15-touch-sperre; Dateien - -> src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py
 - 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -319,3 +317,4 @@
 - 2026-10-13T15:27Z A done UI-91
 - 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
 - 2026-10-13T15:48Z A claim IMP-1
+- 2026-10-13T16:00Z A done FM-74
