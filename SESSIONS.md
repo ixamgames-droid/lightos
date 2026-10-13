@@ -54,7 +54,6 @@
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
-| LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | OUT-75 | D | fix/out75-dmx-monitor-eine-wahrheit | 2026-10-12T15:08Z | src/ui/views/dmx_monitor_view.py · src/core/dmx/output_manager.py · src/ui/widgets/output_config.py |
 | VIZ-104 | A | feature/viz104-strobe-im-3d | 2026-10-13T14:32Z | src/core/color_utils.py · src/ui/visualizer/dmx_push.py · src/ui/views/live_view.py |
@@ -289,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:56Z A done ENG-34
 - 2026-10-12T19:03Z A done UI-89
 - 2026-10-12T19:08Z A claim LIZ-1
 - 2026-10-12T19:29Z A done VIZ-102
@@ -319,3 +317,4 @@
 - 2026-10-13T16:59Z A done DOC-72
 - 2026-10-13T17:01Z A claim PROC-22
 - 2026-10-13T17:04Z A claim ENG-39
+- 2026-10-13T18:06Z D done LAS-38
