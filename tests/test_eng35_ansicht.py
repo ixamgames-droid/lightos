@@ -365,3 +365,100 @@ def test_reiter_prioritaeten_im_programmer_bereich():
     abschnitt = quelle[a:b]
     assert 'tabs.addTab(self._prioritaeten_view, "Prioritäten")' in abschnitt
     assert abschnitt.index('"Preset-Browser"') < abschnitt.index('"Prioritäten"')
+
+
+# ── Nachtrag Sichtprobe: „&“ im Stufennamen, Spaltenbreite, Wiederholen ──────
+
+def _wie_qt_es_zeigt(text: str) -> str:
+    """Was ein Menue aus dem Text macht: ``&&`` wird ``&``, ein einzelnes
+    ``&`` verschwindet (es markiert nur das Tastenkuerzel)."""
+    return text.replace("&&", "\0").replace("&", "").replace("\0", "&")
+
+
+def test_menue_text_verdoppelt_das_kaufmannsund():
+    from src.ui.menue_text import menue_text
+    assert menue_text("Strobe & Blinder") == "Strobe && Blinder"
+    assert menue_text("Akzente") == "Akzente"
+    assert menue_text(None) == ""
+    for s in stufen.STUFEN:
+        assert _wie_qt_es_zeigt(menue_text(s.name)) == s.name
+
+
+def test_rechtsklick_menue_zeigt_strobe_und_blinder_vollstaendig(fm, ansicht):
+    """Sichtprobe: im Menue stand „Strobe _Blinder“ — das „&“ des Stufennamens
+    wurde als Tastenkuerzel-Zeichen gelesen."""
+    menue = ansicht._stufen_menue()
+    gezeigt = {akt.data(): _wie_qt_es_zeigt(akt.text())
+               for akt in menue.actions()}
+    assert gezeigt[STROBE] == "In Stufe „Strobe & Blinder“"
+    assert [akt.data() for akt in menue.actions()] == [
+        s.zahl for s in reversed(stufen.STUFEN)]
+    for s in stufen.STUFEN:
+        assert gezeigt[s.zahl] == f"In Stufe „{s.name}“"
+    menue.deleteLater()
+
+
+def test_rueckgaengig_menue_zeigt_das_kaufmannsund():
+    """Der Titel des Rueckgaengig-Schritts („… → Strobe & Blinder“) landet als
+    Menuetext unter „Bearbeiten“ — auch dort darf das „&“ nicht verschwinden."""
+    from types import SimpleNamespace
+    from PySide6.QtGui import QAction
+    from src.core.undo import UndoStack
+    from src.ui.main_window import MainWindow
+    _app()
+    stapel = UndoStack()
+    attrappe = SimpleNamespace(_undo_stack=stapel, _act_undo=QAction(),
+                               _act_redo=QAction())
+    stapel.push_simple("Stufe: Blitz → Strobe & Blinder",
+                       lambda: None, lambda: None)
+    MainWindow._refresh_undo_labels(attrappe)
+    assert _wie_qt_es_zeigt(attrappe._act_undo.text()) == \
+        "Rückgängig: Stufe: Blitz → Strobe & Blinder"
+    stapel.undo()
+    MainWindow._refresh_undo_labels(attrappe)
+    assert _wie_qt_es_zeigt(attrappe._act_redo.text()) == \
+        "Wiederherstellen: Stufe: Blitz → Strobe & Blinder"
+    assert attrappe._act_undo.text() == "Rückgängig"
+
+
+def test_nur_die_spalte_effekt_dehnt_sich(fm, ansicht):
+    """Sichtprobe: „Zustand“ war so breit wie „Effekt“. Der Platz gehoert dem
+    Namen; alle anderen Spalten sind so breit wie ihr Inhalt."""
+    from PySide6.QtWidgets import QHeaderView
+    s = fm.new_scene("ENG35 Breite")
+    s.start()
+    _neu(ansicht)
+    ansicht.resize(1600, 600)
+    _app().processEvents()
+    kopf = ansicht._baum.header()
+    assert not kopf.stretchLastSection()
+    assert kopf.sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
+    for spalte in (1, 2, 3):
+        assert (kopf.sectionResizeMode(spalte)
+                == QHeaderView.ResizeMode.ResizeToContents)
+    breiten = [kopf.sectionSize(i) for i in range(4)]
+    assert breiten[0] > 3 * breiten[3], breiten
+    assert breiten[3] < 200, breiten
+
+
+def test_ziehen_rueckgaengig_wiederholen(fm, ansicht):
+    """Ziehen, Rueckgaengig, Wiederholen: der Schritt liegt danach auf dem
+    Wiederholen-Stapel und stellt die Stufe wieder her — auch nachdem die
+    Ansicht sich zwischendurch neu aufgebaut hat."""
+    a, b = fm.new_scene("ENG35 Redo A"), fm.new_scene("ENG35 Redo B")
+    _neu(ansicht)
+    _app().processEvents()
+    ansicht.waehle([a.id, b.id])
+    assert ansicht.auswahl_in_stufe(AKZENTE) == 2     # derselbe Weg wie der Abwurf
+    _app().processEvents()
+    stapel = get_undo_stack()
+    assert stapel.undo()
+    _app().processEvents()
+    assert (a.priority, b.priority) == (0, 0)
+    assert _namen(_gruppe(ansicht, AKZENTE)) == []
+    assert stapel.can_redo(), "der Neuaufbau darf den Wiederholen-Stapel nicht leeren"
+    assert stapel.redo()
+    _app().processEvents()
+    assert (a.priority, b.priority) == (AKZENTE, AKZENTE)
+    assert _namen(_gruppe(ansicht, AKZENTE)) == ["ENG35 Redo A", "ENG35 Redo B"]
+    assert stapel.can_undo() and not stapel.can_redo()

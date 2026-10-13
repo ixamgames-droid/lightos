@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from src.core.engine import stufen
 from src.core.engine.function_manager import get_function_manager
+from src.ui.menue_text import menue_text
 from src.ui.widgets.stufe_auswahl import (StufeAuswahl, setze_stufen,
                                           stufen_melder)
 
@@ -172,6 +173,9 @@ class PrioritaetenView(QWidget):
         self._baum.customContextMenuRequested.connect(self._kontextmenue)
         self._baum.itemSelectionChanged.connect(self._auswahl_geaendert)
         kopfzeile = self._baum.header()
+        # Nur „Effekt“ dehnt sich. Ohne diese Zeile zieht Qt zusaetzlich die
+        # letzte Spalte („Zustand“) breit und teilt den Platz haelftig.
+        kopfzeile.setStretchLastSection(False)
         kopfzeile.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for spalte in (1, 2, 3):
             kopfzeile.setSectionResizeMode(
@@ -465,6 +469,21 @@ class PrioritaetenView(QWidget):
     def _tiefer(self):
         self._schieben(-1)
 
+    @staticmethod
+    def _menue_eintrag(stufe) -> str:
+        """Text des Rechtsklick-Eintrags. Der Stufenname geht durch
+        ``menue_text``: sonst verschluckt Qt das „&“ in „Strobe & Blinder“
+        als Tastenkuerzel-Zeichen."""
+        return f"In Stufe „{menue_text(stufe.name)}“"
+
+    def _stufen_menue(self) -> QMenu:
+        """Das Rechtsklick-Menue: ein Eintrag je Stufe, staerkste oben."""
+        menue = QMenu(self)
+        for s in reversed(stufen.STUFEN):
+            aktion = menue.addAction(self._menue_eintrag(s))
+            aktion.setData(s.zahl)
+        return menue
+
     def _kontextmenue(self, pos):
         it = self._baum.itemAt(pos)
         if it is None or it.data(0, _ROLLE_FID) is None:
@@ -472,10 +491,7 @@ class PrioritaetenView(QWidget):
         if not it.isSelected():
             self._baum.clearSelection()
             it.setSelected(True)
-        menue = QMenu(self)
-        for s in reversed(stufen.STUFEN):
-            aktion = menue.addAction(f"In Stufe „{s.name}“")
-            aktion.setData(s.zahl)
+        menue = self._stufen_menue()
         gewaehlt = menue.exec(self._baum.viewport().mapToGlobal(pos))
         if gewaehlt is not None and gewaehlt.data() is not None:
             self.auswahl_in_stufe(int(gewaehlt.data()))
