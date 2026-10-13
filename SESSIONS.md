@@ -78,6 +78,7 @@
 | PROC-22 | A | chore/proc22-doku-gates-union | 2026-10-13T17:01Z | .gitattributes |
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
+| UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
 
 ## Blocker & Fallen
 
@@ -286,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T19:59Z D claim LIZ-2
 - 2026-10-12T20:02Z D done FM-66
 - 2026-10-12T21:01Z A done LIZ-1
 - 2026-10-12T21:34Z D done TOOL-18
@@ -316,3 +316,4 @@
 - 2026-10-13T19:09Z D done UI-92
 - 2026-10-13T19:31Z A claim ENG-40
 - 2026-10-13T19:44Z D done FM-75
+- 2026-10-13T20:18Z A claim UI-93
