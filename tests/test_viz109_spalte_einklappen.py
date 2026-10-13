@@ -311,3 +311,74 @@ def test_echtes_fenster_knopf_und_f9(prefs, monkeypatch):
     assert sp.sizes()[1] == min(offen, spalte.maximumWidth())
     assert spalte.width() == sp.sizes()[1]
     assert prefs()[SE.PREF_EINGEKLAPPT] is False
+
+
+def _echtes_fenster(monkeypatch):
+    import src.ui.visualizer.visualizer_window as VW
+    monkeypatch.setattr(VW, "QWebEngineView", _AnsichtOhneWebEngine)
+    monkeypatch.setattr(VW.VisualizerWindow, "_setup_channel", lambda self: None)
+    monkeypatch.setattr(VW.VisualizerWindow, "_setup_service_target",
+                        lambda self: None)
+    fenster = VW.VisualizerWindow()
+    fenster._bridge = MagicMock()
+    fenster.show()
+    _app.processEvents()
+    _app.processEvents()
+    return fenster
+
+
+def test_reiter_taste_klappt_die_eingeklappte_spalte_aus(prefs, monkeypatch):
+    """S und F wechseln den Reiter — bei eingeklappter Spalte saehe man das
+    nicht. Die Taste holt die Spalte deshalb in der gemerkten Breite zurueck."""
+    fenster = _echtes_fenster(monkeypatch)
+    sp = fenster.centralWidget()
+    # Gemerkte Breite: hoechstens so viel, wie die Spalte fuellen kann.
+    offen = min(sp.sizes()[1], sp.widget(1).maximumWidth())
+    assert offen > 0
+    # F soll hier der Reiter-Sprung sein, nicht "Fit Auswahl".
+    monkeypatch.setattr(fenster, "_focus_is_in_3d", lambda: False)
+
+    for taste, reiter in ((Qt.Key.Key_S, 1), (Qt.Key.Key_F, 0)):
+        fenster._tabs.setCurrentIndex(2)
+        fenster._spalten_klappe.setze_eingeklappt(True)
+        _app.processEvents()
+        assert sp.sizes()[1] == 0
+
+        QTest.keyClick(fenster, taste)
+        _app.processEvents()
+        assert fenster._tabs.currentIndex() == reiter
+        assert sp.sizes()[1] == offen, taste
+        assert fenster._spalten_klappe.eingeklappt is False
+        assert fenster._btn_spalte.toolTip() == SE.TIPP_EINKLAPPEN
+    assert prefs()[SE.PREF_EINGEKLAPPT] is False
+
+
+def test_nur_die_reiter_taste_klappt_aus(prefs, monkeypatch):
+    """Andere Tasten und ein Reiterwechsel per Programm lassen die Spalte zu."""
+    fenster = _echtes_fenster(monkeypatch)
+    sp = fenster.centralWidget()
+    fenster._spalten_klappe.setze_eingeklappt(True)
+    _app.processEvents()
+    assert sp.sizes()[1] == 0
+
+    # Per Programm (Wiederherstellen, Sprung nach dem Anlegen): bleibt zu.
+    for reiter in (1, 2, 0):
+        fenster._tabs.setCurrentIndex(reiter)
+        _app.processEvents()
+        assert sp.sizes()[1] == 0
+
+    # Tasten ohne Bezug zur Spalte: bleibt zu.
+    for taste in (Qt.Key.Key_V, Qt.Key.Key_E):
+        QTest.keyClick(fenster, taste)
+        _app.processEvents()
+        assert sp.sizes()[1] == 0, taste
+
+    # F mit Fokus in der 3D-Ansicht heisst "Fit Auswahl" — kein Reiterwechsel.
+    monkeypatch.setattr(fenster, "_focus_is_in_3d", lambda: True)
+    monkeypatch.setattr(fenster, "_on_fit_selected", lambda: None)
+    fenster._tabs.setCurrentIndex(2)
+    QTest.keyClick(fenster, Qt.Key.Key_F)
+    _app.processEvents()
+    assert fenster._tabs.currentIndex() == 2
+    assert sp.sizes()[1] == 0
+    assert fenster._spalten_klappe.eingeklappt is True

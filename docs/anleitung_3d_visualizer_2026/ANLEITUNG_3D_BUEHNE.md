@@ -61,6 +61,10 @@ zieht, klappt die Spalte genauso ein — der Knopf zeigt dann „‹". Zustand u
 Breite merkt sich LightOS auf diesem Rechner, auch über einen Neustart. Die
 3D-Ansicht läuft beim Umschalten weiter, Kamera und Auswahl bleiben.
 
+Springt eine Taste auf einen Reiter der Spalte (`S` für „Bühne", `F` für
+„Fixtures"), während sie eingeklappt ist, klappt die Spalte von selbst in der
+gemerkten Breite aus — sonst wechselte der Reiter unsichtbar.
+
 ## Teil A — Bühne bauen (Reiter „Bühne")
 
 ![Modus Bauen, Reiter Bühne: die Front-Traverse ist gewählt und gelb hervorgehoben](img/02_buehne_bauen.png)

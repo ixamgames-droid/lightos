@@ -2970,7 +2970,7 @@ class VisualizerWindow(QMainWindow):
             ("V", _toggle_view),
             ("E", _cycle_edit),
             ("F", self._on_key_f),
-            ("S", lambda: self._tabs.setCurrentIndex(1)),
+            ("S", lambda: self._reiter_per_taste(1)),
             ("D", lambda: self._act_dock.toggle()),
             ("F9", lambda: self._spalten_klappe.umschalten()),   # VIZ-109
         ):
@@ -2991,7 +2991,19 @@ class VisualizerWindow(QMainWindow):
         if self._focus_is_in_3d():
             self._on_fit_selected()
         else:
-            self._tabs.setCurrentIndex(0)
+            self._reiter_per_taste(0)
+
+    def _reiter_per_taste(self, index: int) -> None:
+        """Reiter der rechten Spalte per Taste zeigen.
+
+        VIZ-109: Ist die Spalte eingeklappt, klappt sie dabei aus — sonst
+        wechselte die Taste den Reiter, ohne dass man etwas saehe. Nur dieser
+        Weg klappt aus; ein Reiterwechsel per Programm (Wiederherstellen,
+        Sprung nach dem Anlegen) laesst die Spalte, wie sie ist."""
+        self._tabs.setCurrentIndex(index)
+        klappe = getattr(self, "_spalten_klappe", None)
+        if klappe is not None and klappe.eingeklappt:
+            klappe.setze_eingeklappt(False)
 
     def _focus_is_in_3d(self) -> bool:
         """Liegt der Tastaturfokus in der 3D-Ansicht?
