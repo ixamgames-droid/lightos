@@ -28,7 +28,6 @@
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
 | OUT-67 | A | feature/out67-ausgabe-ausfall-banner | 2026-10-10T09:29Z | - |
-| LAS-32 | A | feature/las32-s1-sperrzonen-anzeige | 2026-10-11T14:32Z | - |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
@@ -292,7 +291,6 @@
 
 ## Verlauf
 
-- 2026-10-12T17:08Z D done XPLAT-36
 - 2026-10-12T17:12Z D claim OUT-76
 - 2026-10-12T17:33Z A claim STAB-38
 - 2026-10-12T17:35Z D claim FM-75
@@ -322,3 +320,4 @@
 - 2026-10-12T22:00Z D done OUT-71
 - 2026-10-12T22:35Z D done VCB-42
 - 2026-10-12T22:39Z A claim LIZ-1
+- 2026-10-13T00:13Z A done LAS-32
