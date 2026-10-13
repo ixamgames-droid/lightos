@@ -272,6 +272,15 @@ hilft **Kamera → Fit (alle)**.
   Hauptfenster über **Datei → Speichern** bzw. **Speichern unter…**.
 
 Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
+Löschst du ein Bühnen-Element (über **Element LÖSCHEN** oder im Bild mit `Entf` bzw.
+dem runden Löschen-Knopf), bringt das Rückgängig es zurück und hängt die Geräte
+wieder an, die daran angedockt waren.
+
+**2D und 3D zeigen dieselbe Position.** Ein Gerät, das du in der 2D-Ansicht der
+Live View verschiebst, steht sofort auch im offenen 3D-Fenster am neuen Platz — und
+umgekehrt. Die 2D-Ansicht bestimmt nur links/rechts und vorne/hinten; Höhe, Drehung
+und Andockung bleiben, wie sie im 3D gesetzt sind. Auch das Verschieben in der
+2D-Ansicht ist ein Rückgängig-Schritt (mehrere gewählte Geräte zusammen: einer).
 
 ## Was bei großen Rigs anders aussieht
 
@@ -401,6 +410,62 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
   Kamera-Ansicht (Oben, Vorne, …) zählt nicht als Fahrt.
 - **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
   Ansicht, zurück auf **Hoch**.
+
+## Strobe im 3D (Tab „Einstellungen" → „Render-Qualität")
+
+Steht der Shutter eines Geräts im Strobe-Bereich, **blitzt** es in der
+3D-Ansicht: Lichtkegel, Bodenfleck, Linse und das echte Licht gehen kurz an und
+bleiben den größeren Teil der Zeit dunkel (an für etwa ein Viertel der Zeit) —
+so wirkt ein Strobe, im Unterschied zu einem Blinker. Geräte mit derselben
+Frequenz blitzen gemeinsam.
+
+- **Wie schnell:** Die Frequenz kommt aus dem Geräteprofil. Nennt der
+  Strobe-Bereich eine Frequenz („Strobe 1–25 Hz"), gilt sie; sonst steigt sie
+  innerhalb des Bereichs von 0,5 auf 20 Blitze je Sekunde. Dieselbe Rechnung
+  nutzt die 2D-Ansicht der Live View. Shutter „offen" und „zu" blitzen nicht —
+  auch nicht „offen" am oberen Ende (bei vielen Geräten 251–255).
+- **Profile ohne Bereichsangaben:** Nennt das Profil für den Kanal keine
+  Bereiche, blitzt nur ein Kanal, der ausdrücklich ein Strobe-Kanal ist (Typ
+  oder Name „Strobe"): 0 bis 10 = aus, darüber langsam bis schnell. Ein reiner
+  „Shutter"-Kanal ohne Bereichsangaben blitzt nicht — dort heißt 255 meist
+  „offen". Soll so ein Gerät blitzen, im Geräteprofil die Bereiche eintragen
+  (zu / Strobe / offen). Das gilt genauso für die 2D-Ansicht.
+- **Geräte mit mehreren Köpfen:** Hat das Gerät einen eigenen Shutter je Kopf,
+  blitzt jeder Kopf für sich mit seiner eigenen Frequenz — nur Kopf 1, nur
+  Kopf 2 oder beide verschieden schnell. Ein einziger Strobe-Kanal für alle
+  Köpfe lässt das ganze Gerät gemeinsam blitzen. Die 2D-Ansicht zeichnet ein
+  Gerät als ein Symbol und blinkt deshalb als Ganzes (mit der schnellsten
+  Frequenz seiner Köpfe).
+- **Begrenzung:** Gezeigt werden höchstens rund 10 Blitze je Sekunde. Ein Blitz
+  braucht mindestens drei Bilder (eins an, zwei aus) — bei 30 Bildern je Sekunde
+  sind das genau 10. Läuft die Ansicht langsamer, sind es entsprechend weniger
+  (bei 15 Bildern höchstens 5). Ein schnellerer Strobe sieht damit „schnell"
+  aus, aber nicht exakt so schnell wie am Gerät.
+- **Gleichmäßiger Takt:** Geschaltet wird in ganzen Bildern, nicht nach der
+  Uhr — jeder Blitz ist gleich lang, jede Pause auch. Die gezeigte Frequenz
+  ist deshalb auf ganze Bilder gerundet: 10 Blitze je Sekunde stimmen bei 30
+  und 60 Bildern genau, dazwischen können es 9 bis 11 sein.
+- **Rechenlast:** Eine ruhende Szene zeichnet nichts. Solange etwas blitzt,
+  entsteht bei jedem Wechsel ein neues Bild; auf schwacher Grafik sinkt die
+  Bildrate dabei spürbar. „Gedämpft" ändert die Helligkeit achtmal je Welle.
+- **2D-Ansicht der Live View:** Sie zeichnet zehn Bilder je Sekunde und blinkt
+  nach derselben Regel — also höchstens gut dreimal je Sekunde (ein Bild an,
+  zwei aus), bei langsamerem Strobe in dessen Frequenz, und gleichmäßig.
+- **Nur die Helligkeit** wird getaktet. Farbe und Dimmerwert bleiben, wie sie
+  sind; ein Dimmer-Effekt, der selbst an- und ausschaltet, sieht aus wie bisher.
+- **Einstellung „Strobe im 3D zeigen":**
+  - **Blitzen** (Vorgabe) — wie oben beschrieben.
+  - **Gedämpft (weiches Pulsieren)** — statt An/Aus ein langsames, flaches
+    Pulsieren (höchstens zweimal je Sekunde, nie dunkler als gut die Hälfte).
+  - **Aus (Dauerlicht wie bisher)** — das Gerät leuchtet durchgehend.
+
+  Die Wahl gilt für **dieses Gerät**, nicht für die Show, und wirkt sofort —
+  im Vollfenster und in der 3D-Ansicht der Live View. An der DMX-Ausgabe ändert
+  sie nichts.
+
+> **Achtung:** Schnelle Lichtblitze können bei photosensitiver Epilepsie
+> Anfälle auslösen. Im Zweifel **Gedämpft** oder **Aus** wählen — auch für
+> Zuschauer und für Bildschirmaufnahmen.
 
 ## Tastenkürzel im Visualizer
 
