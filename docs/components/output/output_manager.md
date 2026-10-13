@@ -21,6 +21,11 @@ globale und zugewiesene Submaster) sowie Tick-Callbacks für die Engine.
 Universe-Mapping: Enttec sendet roh, Art-Net erhält `univ_num - 1` (0-basiert),
 sACN erhält `univ_num` (1-basiert). Siehe `_send_all`.
 
+Vier Adapter-Tabellen je Universum: `_enttec_outputs`, `_udmx_outputs` (OUT-68,
+`add_udmx` / `close_udmx_on_device`, siehe [`udmx`](udmx.md)), `_artnet_outputs`,
+`_sacn_outputs`. uDMX sendet wie Enttec roh, an derselben Stelle in `_send_all` —
+nach Blackout, Grand Master, Ziel-Blackout, Laser-Aus-Werten und NOT-AUS.
+
 ## Threading- / Prozessmodell
 
 - **Ein** Daemon-Thread `DMX-Output` (`_loop`) rendert und sendet bei 44 Hz.

@@ -34,4 +34,4 @@ Universell auf jeder Seite: Clear / Stop / Blackout / Tap, Dimmer-/Speed-/Master
 ```
 venv\Scripts\python.exe tools\build_movinghead_show.py
 ```
-Dann in LightOS laden, im Programmer die Gruppe **Moving Heads** wählen → Reiter **EFX** (folgt der Auswahl) → eine Bewegung starten; **Gobo**-Tab erscheint automatisch; **Position**-Tab hat Pan/Tilt-Pad (Live) + Invert/Swap-Toggles.
+Dann in LightOS laden, im Programmer die Gruppe **Moving Heads** wählen → Reiter **EFX** → eine Bewegung starten; **Gobo**-Tab erscheint automatisch; **Position**-Tab hat Pan/Tilt-Pad (Live) + Invert/Swap-Toggles.

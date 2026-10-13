@@ -118,8 +118,9 @@ def start_vorher(ui):
     ui.sektion("Programmer")
     ui.reiter("Attribute")
     pv = _pv(ui)
-    # ERST weg vom EFX-/Matrix-Reiter, DANN die Auswahl leeren: der gerade
-    # angezeigte Effekt folgt der Auswahl und verloere sonst seine Geraete.
+    # ERST weg vom EFX-/Matrix-Reiter, DANN die Auswahl leeren: ein noch
+    # folgender neuer Effekt (Entwurf) verloere sonst seine Geraete. Ein
+    # gespeicherter folgt seit UI-91 nicht mehr.
     pv._main_tabs.setCurrentIndex(0)
     ui.pump(0.2)
     ui.state.clear_programmer()

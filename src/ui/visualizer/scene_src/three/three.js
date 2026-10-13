@@ -88,6 +88,7 @@ export const {
   RingGeometry,
   Scene,
   ShaderChunk,
+  ShaderMaterial,
   Sphere,
   SpotLight,
   Sprite,

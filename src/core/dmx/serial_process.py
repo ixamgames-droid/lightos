@@ -46,8 +46,11 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                         frame_interval: float = FRAME_INTERVAL,
                         sleep=time.sleep, clock=time.perf_counter,
                         open_retry_s: float = OPEN_RETRY_S,
-                        parent_alive=None):
+                        parent_alive=None, log_name: str = "dmx.enttec"):
     """Reine Sende-Schleife (in-Prozess testbar; alles injizierbar).
+
+    ``log_name`` (OUT-68) ist nur der Schluessel der gedrosselten Logzeilen —
+    dieselbe Schleife traegt auch den uDMX-Sender (``udmx_process``).
 
     ``dev_factory()`` liefert ein EnttecPro-aehnliches Geraet (send_dmx / is_disabled
     / close) oder wirft, wenn der Port (noch) nicht da ist. ``buf`` ist ein shared
@@ -63,8 +66,10 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
     dev = None
     last_open_try = float("-inf")
     local = bytearray(DMX_BYTES)
+    eltern_weg = False
     while not stop_flag.value:
         if parent_alive is not None and not parent_alive():
+            eltern_weg = True
             break
         t0 = clock()
         if dev is None:
@@ -79,7 +84,7 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                     status.value = ST_DISABLED
                     # STAB-30: der GRUND (Zugriff verweigert, belegt, fehlt)
                     # war bisher nirgends zu sehen — je Fehlerart einmal.
-                    _melde_still("dmx.enttec.oeffnen", e)
+                    _melde_still(f"{log_name}.oeffnen", e)
         if dev is not None:
             try:
                 with buf.get_lock():
@@ -91,8 +96,26 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
                 status.value = ST_DISABLED if dev.is_disabled() else ST_OK
             except Exception as e:
                 # EnttecPro faengt Serial-Fehler selbst ab; hier nur ein Sicherheitsnetz.
-                _melde_still("dmx.enttec.senden", e)   # STAB-30, gedrosselt
+                _melde_still(f"{log_name}.senden", e)   # STAB-30, gedrosselt
         sleep(max(0.0, frame_interval - (clock() - t0)))
+    if dev is not None and not eltern_weg:
+        # OUT-71: geordneter Stopp. Das zuletzt veroeffentlichte Bild (beim
+        # Beenden das Schlussbild) kann NACH dem letzten Senden gekommen sein —
+        # noch einmal senden und ausschreiben lassen, bevor close() den Puffer
+        # verwirft. Der Elternprozess wartet darauf hoechstens 1 s (close()).
+        # Ist der Elternprozess weg (OUT-53), wird nur noch geschlossen.
+        try:
+            try:
+                with buf.get_lock():
+                    local[:] = bytes(buf.get_obj())
+            except AttributeError:
+                local[:] = bytes(buf[:])
+            dev.send_dmx(bytes(local))
+            ausschreiben = getattr(dev, "ausschreiben", None)
+            if callable(ausschreiben):
+                ausschreiben(0.3)
+        except Exception as e:
+            _melde_still(f"{log_name}.schlussbild", e)
     if dev is not None:
         try:
             dev.close()
@@ -282,6 +305,8 @@ class EnttecProcessProxy:
     # Memory, der potenziell blockierende serielle Write lebt im Kindprozess.
     # Direkte EnttecPro-Instanzen besitzen diesen Marker bewusst nicht.
     process_isolated = True
+    #: Schluessel der gedrosselten Logzeilen (OUT-68: Unterklasse fuer uDMX).
+    _LOG_NAME = "dmx.enttec"
 
     def __init__(self, port: str, frame_interval: float = FRAME_INTERVAL,
                  _process_factory=None, _clock=time.monotonic):
@@ -339,7 +364,7 @@ class EnttecProcessProxy:
         p = self._proc
         if p is None or not p.is_alive():
             # STAB-30: dass der Worker tot ist, war bisher unsichtbar.
-            _melde_still("dmx.enttec.worker",
+            _melde_still(f"{self._LOG_NAME}.worker",
                          text=f"Sende-Prozess fuer {self.port} "
                               f"nicht aktiv (Exitcode "
                               f"{getattr(p, 'exitcode', None)}) — Neustart")
@@ -349,7 +374,7 @@ class EnttecProcessProxy:
             with self._buf.get_lock():
                 ctypes.memmove(self._buf.get_obj(), dmx_data, DMX_BYTES)
         except Exception as e:
-            _melde_still("dmx.enttec.puffer", e)   # STAB-30, gedrosselt
+            _melde_still(f"{self._LOG_NAME}.puffer", e)   # STAB-30, gedrosselt
 
     def is_open(self) -> bool:
         """Worker-LEBENSZEICHEN: True, solange der Worker-Prozess laeuft. Das ist

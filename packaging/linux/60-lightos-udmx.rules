@@ -1,0 +1,17 @@
+# LightOS — Zugriff auf uDMX-Adapter (rohes USB) ohne root.
+#
+# Installation (einmalig, von Hand — LightOS aendert keine Systemeinstellungen):
+#
+#   sudo cp packaging/linux/60-lightos-udmx.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#   sudo usermod -aG plugdev "$USER"      # danach ab- und wieder anmelden
+#
+# Danach den Adapter einmal neu einstecken. Details: INSTALL.md, „uDMX-Adapter".
+
+# CYL-6602 „USB-DMX512" (meldet sich als Sun-light USBDMX512)
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2008", ATTRS{idProduct}=="1066", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+
+# Anyma uDMX und Klone. 16c0:05dc ist eine GETEILTE Kennung (V-USB) — deshalb
+# nur zusammen mit dem Produktnamen, sonst bekaeme jedes Bastelgeraet mit
+# dieser Kennung dieselben Rechte.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="16c0", ATTRS{idProduct}=="05dc", ATTRS{product}=="uDMX", MODE="0660", GROUP="plugdev", TAG+="uaccess"

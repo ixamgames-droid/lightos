@@ -44,6 +44,30 @@ def _make_enttec_device(port: str):
         return EnttecPro(port)
 
 
+def _make_udmx_device(schluessel: str, streng: bool = False):
+    """OUT-68: erzeugt das uDMX-Ausgabegeraet — nie eines, das den
+    Ausgabe-Thread blockieren kann.
+
+    Standard ist der PROZESS-Proxy (libusb ist nativer Code, Begruendung wie
+    STAB-08). Mit ``LIGHTOS_SERIAL_INPROC=1`` oder wenn sich kein Prozess
+    starten laesst, sendet ein eigener THREAD — auch dann legt ``send_dmx`` nur
+    das neueste Bild ab. pyusb wird erst im Sender geladen; fehlt es, bleibt
+    der Adapter „tot" mit erklaerendem Grund, die App laeuft weiter.
+
+    ``streng``: es gibt schon einen anderen uDMX-Ausgang — der Sender nimmt
+    dann von Anfang an nur genau seinen Adapter (``udmx.waehle``)."""
+    from .udmx_process import UdmxProcessProxy, UdmxThreadProxy
+    if os.environ.get("LIGHTOS_SERIAL_INPROC"):
+        return UdmxThreadProxy(schluessel, streng=streng)
+    try:
+        return UdmxProcessProxy(schluessel, streng=streng)
+    except Exception as e:
+        import sys
+        print(f"[OutputManager] uDMX-Prozess-Isolation nicht verfuegbar ({e}) "
+              f"-> Sende-Thread.", file=sys.stderr)
+        return UdmxThreadProxy(schluessel, streng=streng)
+
+
 # ── OUT-51: Sendefehler zaehlen statt schlucken ──────────────────────────────
 #
 # Vorher lagen um jeden ``send_dmx()`` drei blanke ``except Exception: pass``.
@@ -171,11 +195,22 @@ class OutputManager:
     #: „aus“ (Betriebsart auf den Aus-Wert). Darueber sind sie unveraendert an —
     #: eine Betriebsart laesst sich nicht stufenlos skalieren.
     GM_LASER_AUS_SCHWELLE = 0.01
+    #: OUT-71: so lange darf das Schlussbild beim Beenden brauchen (Senden und
+    #: Ausschreiben ALLER Ausgaenge). Danach geht das Beenden ohne es weiter —
+    #: ein abgezogener oder haengender Adapter haelt das Programm nicht fest.
+    SCHLUSSBILD_FRIST_S = 1.0
+    #: OUT-71: so lange wird je seriellem Ausgang gewartet, bis das Schlussbild
+    #: wirklich auf der Leitung ist (518 Bytes bei 57600 Baud sind rund 90 ms).
+    SCHLUSSBILD_AUSSCHREIBEN_S = 0.3
 
     def __init__(self):
         self.universes: dict[int, Universe] = {}
         self._enttec_outputs: dict[int, EnttecPro] = {}   # universe → device
         self._artnet_outputs: dict[int, ArtNetSender] = {}  # universe → sender
+        # OUT-68: uDMX-Adapter (rohes USB). Eigene Tabelle neben Enttec, damit
+        # bestehende Ausgaben und alle Stellen, die ``_enttec_outputs`` lesen,
+        # unveraendert bleiben. universe → Proxy (udmx_process).
+        self._udmx_outputs: dict = {}
         self._thread: threading.Thread | None = None
         self._running = False
         # Schuetzt den Zugriff auf die Ausgabe-Geraete (Enttec/ArtNet/sACN) gegen
@@ -188,6 +223,16 @@ class OutputManager:
         # geschlossen werden (testbar ueberschreibbar).
         self._stop_join_s = 2.0
         self._blackout = False
+        # VCB-43: Quellen, die den Blackout gerade HALTEN (gedrueckte VC-Taste,
+        # auch per MIDI/Tastatur) — je Quelle ein Platz. Dunkel ist es, solange
+        # der Schalter oben steht ODER irgendein Platz belegt ist; wer loslaesst,
+        # nimmt nur seinen Platz weg. Immer als Ganzes ersetzt (frozenset), damit
+        # der Sende-Thread nie eine halb geaenderte Menge sieht.
+        self._blackout_halter: frozenset = frozenset()
+        # Druecken/Loslassen kann aus mehreren Threads kommen (Oberflaeche,
+        # MIDI, Fernbedienung): Lesen-Aendern-Schreiben der Menge unter Lock,
+        # sonst ginge ein Loslassen verloren und es bliebe dunkel.
+        self._blackout_halter_lock = threading.Lock()
         # BUG-FBW Slice 3: eingefrorene Frames (None = laeuft normal), s. set_freeze.
         self._freeze_frames: dict[int, bytes] | None = None
         # OUT-60 (+Folgen): Zustand der Lade-Sperre als EIN Tupel
@@ -283,6 +328,11 @@ class OutputManager:
         # {universe:int -> bytes(512)}. Leer, solange noch kein Frame gesendet wurde
         # -> Konsumenten fallen dann sauber auf den Rohpuffer zurueck.
         self._display_frame: dict[int, bytes] = {}
+        # OUT-75: was im letzten Frame an JEDEN Ausgabeweg ging —
+        # {universe -> ((weg, ziel, bytes), ...)}. Unterscheidet sich vom
+        # Anzeige-Snapshot nur, wenn die NOT-AUS-Sperre eines Ausgabewegs
+        # (OUT-64) greift. Nur fuer die Anzeige, nie zurueckgeschrieben.
+        self._weg_gesendet: dict[int, tuple] = {}
         # OUT-51: Fehlerregister je Ausgabeweg. Schluessel (weg, universum), z. B.
         # ("Enttec", 3); ("Tick", 0) und ("Modifier", u) fuer die beiden anderen
         # Stellen, an denen der Frame-Pfad bisher still schluckte. Geschrieben
@@ -397,6 +447,25 @@ class OutputManager:
         return ("enttec", getattr(dev, "port", None))
 
     @staticmethod
+    def _weg_udmx(dev=None):
+        """OUT-68: ALLE uDMX-Ausgaenge teilen sich einen Weg-Schluessel.
+
+        uDMX-Adapter sind nicht sicher unterscheidbar (viele ohne Seriennummer;
+        der Schluessel „Kennung" und „Kennung@Anschluss" koennen denselben
+        Adapter meinen, und nach dem Umstecken ist es ein anderer Anschluss).
+        Ein Schluessel je Adapter haette deshalb genau die Luecke, die OUT-64
+        schliesst. Wie beim Netz gilt: lieber eine Adresse zu viel gesperrt
+        als ein Laser offen."""
+        return ("udmx", None)
+
+    def _udmx_tabelle(self) -> dict:
+        """``_udmx_outputs`` — auch fuer Test-Manager per ``__new__``."""
+        reg = getattr(self, "_udmx_outputs", None)
+        if reg is None:
+            reg = self._udmx_outputs = {}
+        return reg
+
+    @staticmethod
     def _weg_netz(protokoll: str, univ_num: int, ext):
         """Art-Net ``n-1`` und sACN ``n`` sind fuer LightOS dasselbe Universum
         (Default-Zuordnung in _send_all) — ein Knoten kann beide hoeren. Der
@@ -425,6 +494,8 @@ class OutputManager:
         dev = dict(getattr(self, "_enttec_outputs", None) or {}).get(univ_num)
         if dev is not None:
             wege.append(self._weg_enttec(dev))
+        if dict(getattr(self, "_udmx_outputs", None) or {}).get(univ_num) is not None:
+            wege.append(self._weg_udmx())
         if dict(getattr(self, "_artnet_outputs", None) or {}).get(univ_num) is not None:
             wege.append(self._weg_netz("artnet", univ_num, ext))
         if dict(getattr(self, "_sacn_outputs", None) or {}).get(univ_num) is not None:
@@ -532,7 +603,7 @@ class OutputManager:
         """
         return any(universe in reg for reg in
                    (self._enttec_outputs, self._artnet_outputs,
-                    self._sacn_outputs))
+                    self._sacn_outputs, self._udmx_tabelle()))
 
     # ── OUT-51: Sendefehler buchen und auslesen ──────────────────────────────
 
@@ -629,7 +700,10 @@ class OutputManager:
     def ausgabe_status(self) -> list[dict]:
         """Was gerade WIRKLICH sendet — pro Universum und Ausgabeweg.
 
-        Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem"}``.
+        Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem",
+        "zustand"}``. ``zustand`` (OUT-75) ist die Selbstauskunft des Geraets
+        (``ZUSTAND_*``) — damit laesst sich „verbindet gerade“ von „weiss es
+        nicht“ unterscheiden, die in ``verbunden`` beide ``None`` sind.
         ``verbunden`` ist dreiwertig: ``True`` sendet, ``False`` sendet nicht,
         ``None`` = das Geraet kann darueber keine Auskunft geben (UDP-Ausgaenge
         ohne Fehlerserie). Wer daraus eine gruene Anzeige baut, muss ``None``
@@ -649,7 +723,8 @@ class OutputManager:
         raus = []
         gruppen = (("Enttec", dict(self._enttec_outputs)),
                    ("Art-Net", dict(self._artnet_outputs)),
-                   ("sACN", dict(self._sacn_outputs)))
+                   ("sACN", dict(self._sacn_outputs)),
+                   ("uDMX", dict(self._udmx_tabelle())))
         paare = [(weg, u, dev) for weg, reg in gruppen
                  for u, dev in sorted(reg.items())]
         anhaltend = {(p["weg"], p["universum"]): p for p in self.sende_probleme()}
@@ -661,6 +736,17 @@ class OutputManager:
                 # Geraets: ein UDP-Socket meldet sich nie als kaputt, aber wenn
                 # 20 sendto() hintereinander geworfen haben, geht nichts raus.
                 verbunden = False
+            problem_text = problem["text"] if problem else ""
+            if not problem_text and verbunden is False:
+                # OUT-68: ein Geraet, das den GRUND seines Ausfalls kennt
+                # (uDMX: Berechtigung, Treiber, abgezogen), nennt ihn selbst —
+                # Banner und Statusleiste zeigen dann, was zu tun ist.
+                f = getattr(dev, "grund_kurz", None)
+                if callable(f):
+                    try:
+                        problem_text = str(f() or "")
+                    except Exception:
+                        problem_text = ""
             raus.append({
                 "universum": universum, "weg": weg,
                 # Jeder Sendertyp nennt sein Ziel anders: Enttec den `port`,
@@ -669,10 +755,26 @@ class OutputManager:
                             getattr(dev, "target_ip", "") or
                             getattr(dev, "_target_ip", "") or ""),
                 "verbunden": verbunden,
-                "problem": problem["text"] if problem else "",
+                "problem": problem_text,
+                "zustand": geraet_zustand(dev),
             })
         raus.sort(key=lambda d: (d["universum"], d["weg"]))
         return raus
+
+    def gesendete_wege(self, universe: int) -> list[dict]:
+        """OUT-75: was im letzten Frame an jeden Ausgabeweg dieses Universums
+        ging — ``[{"weg", "ziel", "daten"}]``, leer ohne Ausgang oder ohne
+        gesendeten Frame.
+
+        :meth:`get_display_frame` ist das Bild des UNIVERSUMS. Greift die
+        NOT-AUS-Sperre eines Ausgabewegs (OUT-64: ein anderes Universum teilt
+        sich den Weg mit einem gesperrten Laser), sendet dieser Weg auf den
+        gesperrten Adressen deren Aus-Werte — also etwas anderes, als der
+        Monitor bisher zeigte. Nur lesen.
+        """
+        return [{"weg": weg, "ziel": ziel, "daten": daten}
+                for weg, ziel, daten in
+                (getattr(self, "_weg_gesendet", None) or {}).get(universe, ())]
 
     def display_snapshot(self) -> dict[int, bytes]:
         """Flache Kopie des Anzeige-Snapshots {universe -> bytes(512)} (POST-
@@ -776,27 +878,78 @@ class OutputManager:
         lade = self._lade
         return lade[1] if lade is not None else None
 
-    def set_blackout(self, enabled: bool):
-        """Blackout an/aus. UI-58: jede Aenderung wird gemeldet — egal ob sie aus
-        der Kopfzeile, einem VC-Taster, Web, OSC oder der Kommandozeile kommt.
-        Ohne das zeigte der Kopfzeilen-Knopf nach einer fremden Aenderung den
-        alten Stand, und sein naechster Druck machte das Gegenteil (Blackout
-        „an" gedrueckt -> nichts wurde dunkel)."""
-        enabled = bool(enabled)
-        geaendert = enabled != self._blackout
-        self._blackout = enabled
-        if not geaendert:
+    def _blackout_wirksam(self) -> bool:
+        """VCB-43: ist es dunkel — durch den Schalter ODER eine haltende Quelle?
+        ``getattr``: Tests bauen den Manager teils per ``__new__`` ohne ``__init__``."""
+        return bool(self._blackout) or bool(getattr(self, "_blackout_halter", None))
+
+    def _blackout_melden(self, vorher: bool, erzwingen: bool = False):
+        """Abonnenten den WIRKSAMEN Zustand melden — bei jeder Aenderung, und
+        (``erzwingen``) wenn ein Wunsch nicht wirksam wurde: wer den Schalter bei
+        gehaltener Taste ausschaltet, soll sehen, dass es dunkel bleibt."""
+        jetzt = self._blackout_wirksam()
+        if jetzt == vorher and not erzwingen:
             return
-        # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
-        self._blackout_epoch = getattr(self, "_blackout_epoch", 0) + 1
         for cb in list(self._blackout_callbacks):
             try:
-                cb(enabled)
+                cb(jetzt)
             except Exception:
                 pass
 
+    def set_blackout(self, enabled: bool):
+        """Der Blackout-SCHALTER an/aus (Kopfzeile, Web, OSC, Kommandozeile,
+        Skript). UI-58: jede Aenderung wird gemeldet — egal woher sie kommt.
+        Ohne das zeigte der Kopfzeilen-Knopf nach einer fremden Aenderung den
+        alten Stand, und sein naechster Druck machte das Gegenteil (Blackout
+        „an" gedrueckt -> nichts wurde dunkel).
+
+        VCB-43: gemeldet wird, ob es WIRKLICH dunkel ist. Haelt gerade eine
+        Taste den Blackout (``halte_blackout``), macht „aus“ hier nicht hell —
+        die Abonnenten bekommen dann „dunkel“ zurueck."""
+        enabled = bool(enabled)
+        vorher = self._blackout_wirksam()
+        geaendert = enabled != self._blackout
+        self._blackout = enabled
+        if geaendert:
+            # getattr: Tests bauen den Manager teils per __new__ ohne __init__.
+            # Die Epoche zaehlt NUR den Schalter (OUT-57, Schutz der Skripte).
+            self._blackout_epoch = getattr(self, "_blackout_epoch", 0) + 1
+        self._blackout_melden(vorher, erzwingen=enabled != self._blackout_wirksam())
+
+    def halte_blackout(self, slot, an: bool) -> bool:
+        """VCB-43: Blackout HALTEN bzw. loslassen — fuer Quellen, die nur so
+        lange dunkel wollen, wie sie gedrueckt sind (VC-Blackout-Taste ohne Ziel;
+        Maus, MIDI und Tastatur loesen dieselbe Taste aus).
+
+        ``slot`` kennzeichnet die Quelle. Loslassen nimmt nur DIESEN Platz weg:
+        steht der Schalter oder haelt eine andere Quelle, bleibt es dunkel.
+        Doppeltes Druecken/Loslassen ist unschaedlich. Liefert den wirksamen
+        Zustand."""
+        lock = getattr(self, "_blackout_halter_lock", None)
+        if lock is None:                    # Manager per __new__ (Tests)
+            lock = self._blackout_halter_lock = threading.Lock()
+        with lock:
+            vorher = self._blackout_wirksam()
+            halter = getattr(self, "_blackout_halter", None) or frozenset()
+            self._blackout_halter = (halter | {slot}) if an else (halter - {slot})
+        self._blackout_melden(vorher)       # Abonnenten ausserhalb des Locks
+        return self._blackout_wirksam()
+
+    def loese_alle_halte_blackouts(self):
+        """VCB-43: alle gehaltenen Blackouts freigeben (Show-Wechsel) — der
+        Schalter bleibt, wie er ist."""
+        vorher = self._blackout_wirksam()
+        self._blackout_halter = frozenset()
+        self._blackout_melden(vorher)
+
     @property
     def blackout(self) -> bool:
+        """Ist es dunkel? (Schalter ODER gehaltene Quelle, VCB-43.)"""
+        return self._blackout_wirksam()
+
+    @property
+    def blackout_schalter(self) -> bool:
+        """Nur der Schalter — ohne gehaltene Quellen."""
         return bool(self._blackout)
 
     @property
@@ -1003,6 +1156,61 @@ class OutputManager:
             except Exception:
                 pass
 
+    def add_udmx(self, universe: int, schluessel: str = ""):
+        """OUT-68: uDMX-Adapter fuer ein Universum einrichten. ``schluessel`` =
+        ``udmx.UdmxGeraet.schluessel`` (leer = der einzige vorhandene Adapter).
+
+        Wie ``add_enttec``: haengt derselbe Schluessel schon an einem anderen
+        Universum, wird er dort zuerst geschlossen — ein Adapter hat einen
+        Ausgang. Oeffnen und Senden passieren im Sender (Prozess/Thread), nie
+        hier und nie im Ausgabe-Thread."""
+        schluessel = str(schluessel or "").strip()
+        self._estop_wege_nachfuehren()       # OUT-64, vor dem Schliessen
+        self.close_udmx_on_device(schluessel)
+        reg = self._udmx_tabelle()
+        # Gibt es schon einen ANDEREN uDMX-Ausgang, startet der neue Sender
+        # gleich streng — sonst griffe er, wenn sein Adapter gerade fehlt, den
+        # des anderen Universums (und hielte ihn).
+        streng = any(u != universe for u in list(reg))
+        self._swap_device(reg, universe,
+                          _make_udmx_device(schluessel, streng=streng))
+        self._udmx_streng_nachfuehren()
+        self._estop_wege_nachfuehren()
+        self._entfernte_wege_vergessen(universe)
+
+    def _udmx_streng_nachfuehren(self):
+        """Sagt jedem uDMX-Sender, ob er der einzige ist. Bei mehreren darf
+        keiner „den einzigen vorhandenen Adapter" nehmen: das waere, sobald ein
+        Adapter abgezogen ist, der eines anderen Universums — zwei Universen
+        sendeten abwechselnd auf denselben Ausgang."""
+        geraete = list(self._udmx_tabelle().values())
+        streng = len(geraete) > 1
+        for dev in geraete:
+            f = getattr(dev, "setze_streng", None)
+            if callable(f):
+                try:
+                    f(streng)
+                except Exception:
+                    pass
+
+    def close_udmx_on_device(self, schluessel: str):
+        """Schliesst einen evtl. offenen uDMX-Adapter mit diesem Schluessel
+        (thread-sicher), egal auf welchem Universum er haengt."""
+        reg = self._udmx_tabelle()
+        with self._io_lock:
+            victims = [(u, d) for u, d in reg.items()
+                       if getattr(d, "port", None) == schluessel]
+            for u, _ in victims:
+                reg.pop(u, None)
+                self._vergiss_fehler(u)
+        for _, dev in victims:
+            try:
+                dev.close()
+            except Exception:
+                pass
+        if victims:
+            self._udmx_streng_nachfuehren()
+
     def _set_out_universe(self, universe: int, out_universe):
         """OUT-03: merkt/loescht die konfigurierte externe Universe-Nummer fuer
         ein internes Universum. ``None`` (oder unparsbar) -> Default-Verhalten in
@@ -1050,9 +1258,10 @@ class OutputManager:
         self._entfernte_wege_vergessen(universe)
 
     #: NET-12: Registry-Name -> Registry-Attribut, fuer ``remove_output(ausser=…)``.
-    _REGISTRY_NAMEN = ("enttec", "artnet", "sacn")
+    _REGISTRY_NAMEN = ("enttec", "artnet", "sacn", "udmx")
 
-    def remove_output(self, universe: int, ausser: str | None = None):
+    def remove_output(self, universe: int, ausser: str | None = None,
+                      schlussbild: bool = False):
         """OUT-05: entfernt ALLE Ausgabe-Adapter (Enttec/ArtNet/sACN) fuer ein
         Universe thread-sicher und schliesst sie. Noetig fuer Output-Typ-Wechsel und
         "Disabled": frueher schrieben add_enttec/add_artnet/add_sacn nur in ihre
@@ -1085,10 +1294,18 @@ class OutputManager:
         ``add_sacn`` tauscht ihn ueber ``_swap_device`` MIT Uebergabe aus. Der
         Grund fuer den Aufruf (MU-01: bei einem Typ-Wechsel muessen die FREMDEN
         Adapter weg, sonst Doppel-Output) bleibt dabei vollstaendig erhalten.
+
+        ``schlussbild`` (OUT-71): der Ausgang geht WIRKLICH (Universum
+        geloescht, auf „Disabled“ gestellt, Art-Net/sACN abgewaehlt) — die
+        entfernten Adapter bekommen vorher EIN Blackout-Bild, sonst hielte
+        ein Adapter mit eigenem Prozessor das letzte Bild. NICHT setzen, wenn
+        gleich ein Nachfolger fuer dasselbe Universum kommt: das Bild waere
+        bei jedem „Uebernehmen“ ein Dunkel-Blitzer auf der Buehne.
         """
         registries = {"enttec": self._enttec_outputs,
                       "artnet": self._artnet_outputs,
-                      "sacn": self._sacn_outputs}
+                      "sacn": self._sacn_outputs,
+                      "udmx": self._udmx_tabelle()}
         if ausser is not None and ausser not in registries:
             raise ValueError(f"unbekannter Adaptertyp: {ausser!r}")
         # OUT-64 (Restluecke a): die Wege VOR dem Entfernen merken. Faellt der
@@ -1103,13 +1320,16 @@ class OutputManager:
                 self._entfernte_wege = ew
             self._estop_wege_nachfuehren()
         victims = []
+        # OUT-71: die externe Universe-Nummer VOR dem Entfernen lesen (unten
+        # wird sie geloescht) — das Schlussbild geht an dieselbe Nummer.
+        ext = self._out_universe.get(universe)
         with self._io_lock:
             for name, registry in registries.items():
                 if name == ausser:
                     continue
                 dev = registry.pop(universe, None)
                 if dev is not None:
-                    victims.append(dev)
+                    victims.append((name, dev))
             # OUT-03: eine evtl. konfigurierte externe Universe-Nummer mit
             # entfernen, damit ein spaeter neu angelegter Adapter nicht die alte
             # Nummer erbt.
@@ -1121,11 +1341,59 @@ class OutputManager:
             if ausser is None:
                 self._out_universe.pop(universe, None)
             self._vergiss_fehler(universe)
-        for dev in victims:
+        if schlussbild and victims:
+            self._schlussbild_an(universe, ext, victims)
+        for _name, dev in victims:
             try:
                 dev.close()
             except Exception:
                 pass
+        self._udmx_streng_nachfuehren()
+
+    def _schlussbild_an(self, universe: int, ext, victims) -> None:
+        """OUT-71: den schon aus der Registry genommenen Adaptern EINES
+        Universums ein Blackout-Bild senden. Sie gehoeren jetzt nur noch dem
+        Aufrufer (der Ausgabe-Thread sieht sie nicht mehr; das Herausnehmen
+        lief unter ``_io_lock``, ein laufendes Senden war also fertig).
+        Begrenzt durch den Schreib-Timeout des Geraets und
+        ``SCHLUSSBILD_AUSSCHREIBEN_S``."""
+        bilder: dict = {}
+        try:
+            self._send_all(schlussbild=True, _nur_rechnen=bilder)
+        except Exception as exc:
+            print(f"[OutputManager] Schlussbild U{universe}: {exc}")
+        data = bilder.get(universe)
+        if data is None:
+            data = bytes(512)       # Universum schon weg: dunkel ist dunkel
+        for name, dev in victims:
+            try:
+                if name == "enttec":
+                    dev.send_dmx(self._bild_fuer_weg(data, self._weg_enttec(dev)))
+                    self._ausschreiben(dev)
+                elif name == "udmx":
+                    # OUT-68: der Sender legt das Bild nur ab und schickt beim
+                    # Schliessen (gleich danach) das zuletzt abgelegte noch einmal.
+                    dev.send_dmx(self._bild_fuer_weg(data, self._weg_udmx()))
+                elif name == "artnet":
+                    dev.send_dmx(
+                        ext if ext is not None else universe - 1,
+                        self._bild_fuer_weg(
+                            data, self._weg_netz("artnet", universe, ext)))
+                else:
+                    dev.send_dmx(
+                        ext if ext is not None else universe,
+                        self._bild_fuer_weg(
+                            data, self._weg_netz("sacn", universe, ext)))
+            except Exception as exc:
+                print(f"[OutputManager] Schlussbild U{universe} ({name}): {exc}")
+
+    def _bild_fuer_weg(self, data: bytes, weg) -> bytes:
+        """OUT-71: ein Schlussbild, das an ``_send_all`` vorbei an EIN Geraet
+        geht, bekommt wie dort die je Ausgabeweg gesperrten Laser-Adressen
+        (OUT-64) obenauf — ein umgeroutetes Universum darf den verriegelten
+        Laser auch mit seinem letzten Bild nicht oeffnen."""
+        wege = getattr(self, "_laser_estop_wege", None)
+        return self._weg_nullen(data, wege.get(weg) if wege else None)
 
     def _entfernte_wege_vergessen(self, universe: int | None = None):
         """OUT-64: gemerkte Wege aus ``remove_output`` verwerfen — fuer ein
@@ -1171,7 +1439,16 @@ class OutputManager:
         self._thread = threading.Thread(target=self._loop, daemon=True, name="DMX-Output")
         self._thread.start()
 
-    def stop(self):
+    def stop(self, schlussbild: bool = False):
+        """Ausgabe anhalten und alle Ausgaenge schliessen.
+
+        ``schlussbild`` (OUT-71, vom Hauptfenster beim Beenden): vor dem
+        Schliessen geht je Ausgang EIN Bild hinaus, gerechnet wie ein Blackout im
+        laufenden Betrieb — alles ausser der Erhalten-Maske auf 0, Laser auf ihre
+        Aus-Werte, NOT-AUS obenauf. Adapter mit eigenem Prozessor (Enttec Pro,
+        uDMX) und viele Art-Net-/sACN-Nodes halten sonst das letzte Bild: ein
+        Laser, der beim Beenden lief, bliebe an. Mit Zeitlimit
+        (``SCHLUSSBILD_FRIST_S``)."""
         self._running = False
         t = self._thread
         if t is not None:
@@ -1180,38 +1457,7 @@ class OutputManager:
             # (0.5 s); die 2 s sind reichlich Reserve.
             t.join(timeout=self._stop_join_s)
             if t.is_alive():
-                # Thread haengt weiterhin (blockierender Treiber / totes Geraet).
-                # Geraete dann BEWUSST NICHT schliessen: ein CloseHandle() neben
-                # einem noch laufenden WriteFile loest unter Windows eine Access
-                # Violation aus (crash.log 21.+22.06.). Der Prozess endet ohnehin
-                # gleich -> das OS gibt den Port frei. Lieber "lecken" als crashen.
-                import sys
-                print("[OutputManager] DMX-Output-Thread reagiert nicht — direkte "
-                      "Geraete bleiben offen (Schutz vor Access Violation beim "
-                      "Beenden); prozessisolierte Serial-Worker werden beendet.",
-                      file=sys.stderr)
-                # STAB-09: Ein EnttecProcessProxy darf hier trotzdem geschlossen
-                # werden. Sein send_dmx() blockiert nie im Treiber, sondern
-                # schreibt nur in Shared Memory. Ohne diesen expliziten Close
-                # ueberlebt der per ``spawn`` gestartete Worker den anschliessenden
-                # os._exit()-Pfad als Waise und haelt den USB-Port weiter offen.
-                #
-                # Bewusst OHNE _io_lock: genau dieser kann vom haengenden Thread
-                # gehalten werden. Snapshot/Identity-Pop sind unter dem GIL
-                # konsistent; ein bereits gelesener Proxy ignoriert nach close()
-                # weitere send_dmx()-Aufrufe. Direkte Serial-/Socket-Geraete
-                # bleiben fuer den bisherigen Windows-AV-Schutz unangetastet.
-                isolated = []
-                for universe, dev in list(self._enttec_outputs.items()):
-                    if getattr(dev, "process_isolated", False):
-                        if self._enttec_outputs.get(universe) is dev:
-                            self._enttec_outputs.pop(universe, None)
-                            isolated.append(dev)
-                for dev in isolated:
-                    try:
-                        dev.close()
-                    except Exception:
-                        pass
+                self._haengend_abbauen(schlussbild)
                 # STAB-04: Referenz auf den noch lebenden Thread BEHALTEN (nicht
                 # auf None setzen). Sonst startet ein folgender start() einen
                 # zweiten DMX-Thread daneben, der gleichzeitig seriell schreibt
@@ -1220,9 +1466,19 @@ class OutputManager:
                 # erneut, sobald sein write() zurueckkommt.
                 return
         self._thread = None
+        if schlussbild:
+            haenger = self._sende_schlussbild()
+            if haenger is not None:
+                # Das Schlussbild selbst haengt in einem Schreiben: wie ein
+                # haengender Ausgabe-Thread behandeln (direkte Geraete NICHT
+                # schliessen) und als Zombie merken.
+                self._thread = haenger
+                self._haengend_abbauen(schlussbild)
+                return
         # Thread ist sicher beendet -> kein gleichzeitiges write() mehr moeglich.
         with self._io_lock:
-            for registry in (self._enttec_outputs, self._artnet_outputs, self._sacn_outputs):
+            for registry in (self._enttec_outputs, self._artnet_outputs,
+                             self._sacn_outputs, self._udmx_tabelle()):
                 for dev in registry.values():
                     try:
                         dev.close()
@@ -1233,6 +1489,124 @@ class OutputManager:
             # die Statusleiste nach dem Stoppen weiter Ausfaelle von Geraeten,
             # die es nicht mehr gibt.
             self._sende_fehler.clear()
+
+    def _hat_ausgaenge(self) -> bool:
+        return bool(self._enttec_outputs or self._artnet_outputs
+                    or self._sacn_outputs or self._udmx_tabelle())
+
+    def _sende_schlussbild(self):
+        """OUT-71: EIN Blackout-Bild an alle Ausgaenge, dann die seriellen
+        ausschreiben lassen. Laeuft in einem Hilfs-Thread mit Zeitlimit; liefert
+        ``None``, wenn er fertig wurde, sonst den noch laufenden Thread (ein
+        Ausgang haengt im Schreiben).
+
+        Nur aufrufen, wenn der Ausgabe-Thread sicher beendet ist."""
+        if not self._hat_ausgaenge():
+            return None
+
+        def lauf():
+            try:
+                self._send_all(schlussbild=True)
+            except Exception as exc:
+                print(f"[OutputManager] Schlussbild: {exc}")
+            # Bei seriellen Ausgaengen steht das Bild jetzt erst im Puffer des
+            # Treibers — und close() verwirft den Puffer (Schutz vor einer
+            # Zugriffsverletzung). Also warten, bis es auf der Leitung ist.
+            for dev in list(self._enttec_outputs.values()):
+                self._ausschreiben(dev)
+
+        th = threading.Thread(target=lauf, name="DMX-Schlussbild", daemon=True)
+        th.start()
+        th.join(timeout=self.SCHLUSSBILD_FRIST_S)
+        if th.is_alive():
+            import sys
+            print("[OutputManager] Schlussbild beim Beenden nicht fertig geworden "
+                  f"(>{self.SCHLUSSBILD_FRIST_S:.1f} s) — ein Ausgang reagiert nicht.",
+                  file=sys.stderr)
+            return th
+        return None
+
+    def _ausschreiben(self, dev) -> None:
+        """OUT-71: einen seriellen Ausgang sein letztes Bild fertig senden
+        lassen (Geraete ohne diese Faehigkeit: nichts zu tun)."""
+        fn = getattr(dev, "ausschreiben", None)
+        if callable(fn):
+            try:
+                fn(self.SCHLUSSBILD_AUSSCHREIBEN_S)
+            except Exception:
+                pass
+
+    def _haengend_abbauen(self, schlussbild: bool = False):
+        """Ein Thread haengt weiterhin in einem Schreiben (blockierender Treiber
+        / totes Geraet). Direkte Geraete dann BEWUSST NICHT schliessen: ein
+        CloseHandle() neben einem noch laufenden WriteFile loest unter Windows
+        eine Access Violation aus (crash.log 21.+22.06.). Der Prozess endet
+        ohnehin gleich -> das OS gibt den Port frei. Lieber "lecken" als crashen."""
+        import sys
+        print("[OutputManager] DMX-Output-Thread reagiert nicht — direkte "
+              "Geraete bleiben offen (Schutz vor Access Violation beim "
+              "Beenden); prozessisolierte Serial-Worker werden beendet.",
+              file=sys.stderr)
+        # STAB-09: Ein EnttecProcessProxy darf hier trotzdem geschlossen
+        # werden. Sein send_dmx() blockiert nie im Treiber, sondern
+        # schreibt nur in Shared Memory. Ohne diesen expliziten Close
+        # ueberlebt der per ``spawn`` gestartete Worker den anschliessenden
+        # os._exit()-Pfad als Waise und haelt den USB-Port weiter offen.
+        #
+        # Bewusst OHNE _io_lock: genau dieser kann vom haengenden Thread
+        # gehalten werden. Snapshot/Identity-Pop sind unter dem GIL
+        # konsistent; ein bereits gelesener Proxy ignoriert nach close()
+        # weitere send_dmx()-Aufrufe. Direkte Serial-/Socket-Geraete
+        # bleiben fuer den bisherigen Windows-AV-Schutz unangetastet.
+        bilder: dict = {}
+        if schlussbild:
+            # OUT-71: auch hier soll der Prozess-Ausgang dunkel enden. Das Bild
+            # nur AUSRECHNEN (kein Geraet, kein Lock) — sein Worker sendet das
+            # zuletzt veroeffentlichte Bild beim Stoppen noch einmal.
+            try:
+                self._send_all(schlussbild=True, _nur_rechnen=bilder)
+            except Exception as exc:
+                print(f"[OutputManager] Schlussbild (Prozess-Ausgaenge): {exc}")
+        if bilder:
+            # OUT-71: Art-Net/sACN senden per UDP und blockieren nicht — auch sie
+            # bekommen ihr Schlussbild, obwohl ein anderer Ausgang haengt. Nur
+            # senden, NICHT schliessen (der haengende Thread haelt evtl. den Lock).
+            for registry, artnet in ((self._artnet_outputs, True),
+                                     (self._sacn_outputs, False)):
+                for universe, dev in list(registry.items()):
+                    data = bilder.get(universe)
+                    if data is None:
+                        continue
+                    ext = self._out_universe.get(universe)
+                    weg = self._weg_netz("artnet" if artnet else "sacn",
+                                         universe, ext)
+                    if ext is None:
+                        ext = universe - 1 if artnet else universe
+                    try:
+                        dev.send_dmx(ext, self._bild_fuer_weg(data, weg))
+                    except Exception:
+                        pass
+        isolated = []
+        # OUT-68: gilt genauso fuer uDMX — beide Sender-Bauarten (Prozess und
+        # Thread) legen in send_dmx() nur ein Bild ab.
+        for registry in (self._enttec_outputs, self._udmx_tabelle()):
+            ist_enttec = registry is self._enttec_outputs
+            for universe, dev in list(registry.items()):
+                if getattr(dev, "process_isolated", False) or not ist_enttec:
+                    if registry.get(universe) is dev:
+                        registry.pop(universe, None)
+                        isolated.append((universe, dev, ist_enttec))
+        for universe, dev, ist_enttec in isolated:
+            if universe in bilder:
+                weg = self._weg_enttec(dev) if ist_enttec else self._weg_udmx()
+                try:
+                    dev.send_dmx(self._bild_fuer_weg(bilder[universe], weg))
+                except Exception:
+                    pass
+            try:
+                dev.close()
+            except Exception:
+                pass
 
     def _loop(self):
         while self._running:
@@ -1247,7 +1621,7 @@ class OutputManager:
             sleep = max(0.0, FRAME_INTERVAL - elapsed)
             time.sleep(sleep)
 
-    def _send_all(self):
+    def _send_all(self, schlussbild: bool = False, _nur_rechnen: dict | None = None):
         """Ein Ausgabe-Frame. Reihenfolge je Universum (verbindlich):
 
         1. Channel-Modifier (INVERSE, Range-Lock, Kanaltausch);
@@ -1277,9 +1651,16 @@ class OutputManager:
         # gesunder Nachbar die Serie des kranken bei jedem Frame wieder auf 0
         # setzen — der Zaehler pendelte zwischen 0 und 1 und erreichte die
         # Meldeschwelle nie. Ein Fehler in diesem Frame ist ein Fehler.
+        #
+        # OUT-71: ein Nur-Rechnen-Lauf (Schlussbild fuer EINEN Ausgang, der
+        # gerade geht) kommt aus dem UI-Thread, WAEHREND der Ausgabe-Thread
+        # laeuft. Die Tick-Callbacks (Function-Manager, Renderer) sind nicht
+        # fuer zwei Threads gebaut, und ein zusaetzlicher Tick liesse jede
+        # laufende Funktion einen Schritt springen. Das Bild wird deshalb aus
+        # dem zuletzt gerenderten Stand gerechnet, ohne zu ticken.
         tick_exc = None
         tick_name = ""
-        for cb in list(self._tick_callbacks):
+        for cb in (list(self._tick_callbacks) if _nur_rechnen is None else ()):
             try:
                 cb(FRAME_INTERVAL)
             except Exception as exc:
@@ -1287,7 +1668,9 @@ class OutputManager:
                 # Namen nur im Fehlerfall bestimmen — im Normalbetrieb kostet
                 # dieser Block nichts.
                 tick_name = getattr(cb, "__qualname__", None) or type(cb).__name__
-        if tick_exc is None:
+        if _nur_rechnen is not None:
+            pass                    # nicht getickt -> nichts zu buchen
+        elif tick_exc is None:
             self._buche_erfolg("Tick", 0)
         else:
             # Derselbe Schluessel wie beim Erfolg — der Name des Callbacks
@@ -1316,7 +1699,9 @@ class OutputManager:
         # sehen Blackout-, GM-, Laser-Aus- und Ziel-Pass womoeglich
         # verschiedene Staende (z. B. Blackout an im ersten, aus im
         # Laser-Aus-Pass -> Betriebsart 0 statt Aus-Wert).
-        blackout = bool(self._blackout)
+        # OUT-71: das Schlussbild beim Beenden ist ein Blackout-Bild — dieselbe
+        # Rechnung, ohne den Schalter anzufassen. VCB-43: Schalter ODER gehalten.
+        blackout = self._blackout_wirksam() or schlussbild
         gm = self.grand_master
         # OUT-65: klebrige NOT-AUS-Aus-Werte EINMAL je Frame lesen.
         estop_aus = getattr(self, "_laser_estop_aus", None)
@@ -1445,11 +1830,17 @@ class OutputManager:
             # GM/Blackout/Channel-Modifier). GIL-atomare dict-Zuweisung mit
             # immutable ``bytes`` — keine Sperre noetig, Anzeige-Leser sehen immer
             # einen vollstaendigen Frame. NUR fuer die Anzeige, nie zurueckgeschrieben.
+            if _nur_rechnen is not None:
+                # OUT-71: nur das Bild ausrechnen, nichts senden und die Anzeige
+                # nicht anfassen (fuer einen einzelnen Ausgang, der gleich geht).
+                _nur_rechnen[univ_num] = data
+                continue
             self._display_frame[univ_num] = data
             # Geraete-Zugriff unter Lock: verhindert, dass der UI-Thread ein
             # Geraet schliesst/austauscht, waehrend wir hier senden (Deadlock).
             with self._io_lock:
                 enttec = self._enttec_outputs.get(univ_num)
+                udmx = (getattr(self, "_udmx_outputs", None) or {}).get(univ_num)
                 artnet = self._artnet_outputs.get(univ_num)
                 sacn = self._sacn_outputs.get(univ_num)
                 # OUT-03: konfigurierte externe Universe-Nummer (falls gesetzt),
@@ -1465,29 +1856,57 @@ class OutputManager:
                 # Exception darf den Output-Thread nie beenden, sonst steht die
                 # ganze Ausgabe. Neu ist nur, dass der Fehler jetzt gezaehlt und
                 # bei anhaltendem Ausfall gemeldet wird, statt spurlos zu sein.
+                # OUT-75: je Weg festhalten, was wirklich hinausgeht (Anzeige).
+                gesendet = []
                 if enttec is not None:
                     try:
-                        enttec.send_dmx(self._weg_nullen(
-                            data, wege.get(self._weg_enttec(enttec)) if wege else None))
+                        bild = self._weg_nullen(
+                            data, wege.get(self._weg_enttec(enttec)) if wege else None)
+                        gesendet.append(
+                            ("Enttec", str(getattr(enttec, "port", "") or ""), bild))
+                        enttec.send_dmx(bild)
                     except Exception as exc:
                         self._buche_fehler("Enttec", univ_num, exc)
                     else:
                         self._buche_erfolg("Enttec", univ_num)
+                if udmx is not None:
+                    # OUT-68: gleiche Stelle, gleiche Reihenfolge wie Enttec —
+                    # ``data`` hat Blackout, Grand Master, Ziel-Blackout,
+                    # Laser-Aus-Werte und NOT-AUS bereits hinter sich; der
+                    # Treiber bekommt das fertige Bild und veraendert es nicht.
+                    try:
+                        bild = self._weg_nullen(
+                            data, wege.get(self._weg_udmx()) if wege else None)
+                        gesendet.append(
+                            ("uDMX", str(getattr(udmx, "port", "") or ""), bild))
+                        udmx.send_dmx(bild)
+                    except Exception as exc:
+                        self._buche_fehler("uDMX", univ_num, exc)
+                    else:
+                        self._buche_erfolg("uDMX", univ_num)
                 if artnet is not None:
                     try:
-                        artnet.send_dmx(ext if ext is not None else univ_num - 1,
-                                        self._weg_nullen(data, wege.get(self._weg_netz(
-                                            "artnet", univ_num, ext)) if wege else None))
+                        bild = self._weg_nullen(data, wege.get(self._weg_netz(
+                            "artnet", univ_num, ext)) if wege else None)
+                        gesendet.append(
+                            ("Art-Net", str(getattr(artnet, "target_ip", "") or ""), bild))
+                        artnet.send_dmx(ext if ext is not None else univ_num - 1, bild)
                     except Exception as exc:
                         self._buche_fehler("Art-Net", univ_num, exc)
                     else:
                         self._buche_erfolg("Art-Net", univ_num)
                 if sacn is not None:
                     try:
-                        sacn.send_dmx(ext if ext is not None else univ_num,
-                                      self._weg_nullen(data, wege.get(self._weg_netz(
-                                          "sacn", univ_num, ext)) if wege else None))
+                        bild = self._weg_nullen(data, wege.get(self._weg_netz(
+                            "sacn", univ_num, ext)) if wege else None)
+                        gesendet.append(
+                            ("sACN", str(getattr(sacn, "_target_ip", "") or ""), bild))
+                        sacn.send_dmx(ext if ext is not None else univ_num, bild)
                     except Exception as exc:
                         self._buche_fehler("sACN", univ_num, exc)
                     else:
                         self._buche_erfolg("sACN", univ_num)
+                merk = getattr(self, "_weg_gesendet", None)
+                if merk is None:                 # Manager per __new__ gebaut
+                    merk = self._weg_gesendet = {}
+                merk[univ_num] = tuple(gesendet)

@@ -55,7 +55,7 @@ _LOCK_TIMEOUT = 0.25               # nie laenger auf das Log warten
 _PAKET_MAX_JE_DATEI = 8 * 1024 * 1024
 #: Was NIE ins Diagnosepaket darf (Shows, Datenbanken samt Begleitdateien).
 _VERBOTENE_ENDUNGEN = (".lshow", ".db", ".db-wal", ".db-shm", ".db-journal",
-                       ".sqlite", ".sqlite3")
+                       ".sqlite", ".sqlite3", ".lic")
 
 
 # ── Pfade ────────────────────────────────────────────────────────────────────
@@ -83,11 +83,68 @@ def _benutzername() -> str:
         return ""
 
 
+def kuerze_seriennummer(serie: str) -> str:
+    """OUT-77: ``"A6008isP"`` -> ``"…8isP"``.
+
+    Es bleiben hoechstens die letzten vier Zeichen und nie mehr als die halbe
+    Nummer — genug, um zwei Adapter im selben Paket auseinanderzuhalten, zu
+    wenig, um das Geraet zu benennen. Eine schon gekuerzte Nummer bleibt, wie
+    sie ist (die Texte des Pakets laufen zum Teil zweimal hier durch)."""
+    s = str(serie or "")
+    if not s or s.startswith("…"):
+        return s
+    bleibt = min(4, len(s) // 2)
+    return "…" + (s[-bleibt:] if bleibt else "")
+
+
+def _seriennummern_kuerzen(text: str) -> str:
+    """OUT-77: Seriennummern von USB-Adaptern unkenntlich machen.
+
+    Eine Seriennummer gehoert zu genau einem Geraet. Im Diagnosepaket stand sie
+    im Klartext, weil der Schluessel eines uDMX-Adapters sie traegt
+    (``16c0:05dc#Seriennummer``, OUT-68): in den Zeilen „Ausgabe“ und
+    „uDMX (USB)“ und in jeder Log-Zeile des Senders. Erfasst wird der
+    Schluessel in dieser Form und die Beschriftung „Seriennr. …“ der
+    Adapter-Liste. Ein Schluessel mit Anschluss (``2008:1066@1-2``) nennt
+    keine Seriennummer und bleibt unveraendert."""
+    import re
+    text = re.sub(r"(?i)\b([0-9a-f]{4}:[0-9a-f]{4}#)([^\s,;:()\[\]'\"]+)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+    return re.sub(r"(Seriennr\.\s+)([^\s,;:()\[\]'\"·]+)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+
+
+def _lizenz_inhalt_entfernen(text: str) -> str:
+    """OUT-77 (zweite Sicherung zu LIZ-1): nichts durchlassen, was wie der
+    Inhalt einer Lizenzdatei aussieht.
+
+    Lizenzdateien kommen nie ins Paket, und ins Log schreibt LightOS nur eine
+    gekuerzte Kennung. Sollte der Inhalt einer solchen Datei trotzdem einmal in
+    einer Fehlermeldung oder einem Log landen, bleibt er hier haengen:
+
+    * ein JSON-Objekt, das ein Feld ``signatur`` enthaelt, wird als Ganzes
+      ersetzt (mit ihm der Name des Lizenznehmers und die Kennung);
+    * ein einzelnes Signaturfeld — ``"signatur": "…"`` oder ``signatur=…`` mit
+      einem langen Base64-Wert — verliert seinen Wert.
+
+    Nur lange Base64-Werte zaehlen (ab 43 Zeichen = 32 Bytes): das Wort
+    „Signatur“ kommt in Logs auch sonst vor (Absturz-Signatur ``Typ@datei``).
+    """
+    import re
+    wert = r"[A-Za-z0-9+/_-]{43,}={0,2}"
+    text = re.sub(r'(?is)\{[^{}]*"signatur"\s*:\s*"' + wert + r'"[^{}]*\}',
+                  "{Lizenzdatei: Inhalt entfernt}", text)
+    return re.sub(r'(?i)("?signatur"?\s*[:=]\s*"?)' + wert,
+                  lambda m: m.group(1) + "(entfernt)", text)
+
+
 def anonymisiere(text: str, home: str | None = None,
                  user: str | None = None) -> str:
     """Ersetzt den Home-Pfad durch ``~`` und den Benutzernamen als Pfadteil durch
     ``%USERNAME%`` — in beiden Schreibweisen der Trenner, unter Windows ohne
-    Ruecksicht auf Gross-/Kleinschreibung."""
+    Ruecksicht auf Gross-/Kleinschreibung. Kuerzt ausserdem die Seriennummern
+    von USB-Adaptern und entfernt, was wie der Inhalt einer Lizenzdatei
+    aussieht (OUT-77)."""
     if not text:
         return text
     try:
@@ -104,6 +161,14 @@ def anonymisiere(text: str, home: str | None = None,
             # Name taucht sonst mitten in harmlosen Woertern auf.
             muster = r"(?<=[/\\])" + re.escape(user) + r"(?=[/\\]|$|\s|['\"])"
             text = re.sub(muster, "%USERNAME%", text, flags=flags)
+    except Exception:
+        pass
+    try:
+        text = _seriennummern_kuerzen(text)
+    except Exception:
+        pass
+    try:
+        text = _lizenz_inhalt_entfernen(text)
     except Exception:
         pass
     return text
@@ -757,6 +822,31 @@ def _sitzungs_log_angabe(wird_geschrieben: bool) -> str:
     return pfad if wird_geschrieben or os.path.isfile(pfad) else KEIN_SITZUNGS_LOG
 
 
+def _urheber_text() -> str:
+    """LIZ-1: Urheberangabe fuer Kopfblock und systeminfo.txt."""
+    from src.core import lizenz
+    return f"{lizenz.COPYRIGHT} | {lizenz.QUELLE}"
+
+
+def _lizenz_text() -> str:
+    """LIZ-1: Lizenzstatus OHNE den Namen des Lizenznehmers — das Paket geht an
+    Dritte, dort steht nur die gekuerzte Kennung der Lizenz."""
+    from src.core import lizenz
+    return lizenz.pruefe().log_text()
+
+
+def _vermerk(app_version: str = "?") -> str:
+    """LIZ-1: „erstellt mit LightOS … von …“ fuer LIESMICH.txt/systeminfo.txt."""
+    try:
+        from src.core import lizenz
+        version = app_version if app_version and app_version != "?" else None
+        zeile = lizenz.vermerk_zeile(version)
+        return (f"{zeile[:1].upper()}{zeile[1:]}\n"
+                f"Paketformat {lizenz.paket_kennzeichen()}\n")
+    except Exception as e:                          # noqa: BLE001
+        return f"Erstellt mit LightOS (? {type(e).__name__})\n"
+
+
 def basis_infos(app_version: str = "?", programm_dir: str | None = None, *,
                 log_wird_geschrieben: bool = False) -> list[tuple[str, str]]:
     """Was schon VOR der QApplication feststeht. Jede Zeile einzeln abgesichert."""
@@ -770,6 +860,7 @@ def basis_infos(app_version: str = "?", programm_dir: str | None = None, *,
         zeilen.append((name, anonymisiere(str(wert))))
 
     feld("LightOS", lambda: app_version)
+    feld("Urheber", _urheber_text)
     feld("Commit", lambda: commit_text(programm_dir) or "unbekannt")
     feld("Gefroren (Installer-Build)",
          lambda: "ja" if getattr(sys, "frozen", False) else "nein (Quellbetrieb)")
@@ -869,6 +960,45 @@ def dmx_infos() -> list[str]:
         return [f"? ({type(e).__name__}: {e})"]
 
 
+def udmx_infos(immer: bool = True) -> list[str]:
+    """OUT-68: Ist pyusb/libusb fuer uDMX-Adapter da — und warum sendet ein
+    eingerichteter Adapter gerade nicht? Fasst kein USB-Geraet an.
+
+    ``immer=False`` (Sitzungs-Log beim Start): nur, wenn ein uDMX-Ausgang
+    eingerichtet ist — die Suche nach libusb kostet sonst unnoetig Startzeit.
+    """
+    try:
+        mod = sys.modules.get("src.core.app_state")
+        state = getattr(mod, "_state", None) if mod else None
+        om = getattr(state, "output_manager", None)
+        ausgaenge = dict(getattr(om, "_udmx_outputs", None) or {})
+        if not ausgaenge and not immer:
+            return []
+        from src.core.dmx.udmx import bibliothek_status
+        raus = [bibliothek_status()["text"]]
+        for u, dev in sorted(ausgaenge.items()):
+            f = getattr(dev, "grund_text", None)
+            grund = str(f() or "") if callable(f) else ""
+            raus.append(f"U{u} Adapter {getattr(dev, 'port', '') or '(einziger)'}: "
+                        f"{grund or 'kein Befund'}")
+        raus.extend(_udmx_windows_treiber())
+        return raus
+    except Exception as e:
+        return [f"? ({type(e).__name__}: {e})"]
+
+
+def _udmx_windows_treiber() -> list[str]:
+    """OUT-76: was Windows ueber den Treiber angesteckter uDMX-Adapter sagt —
+    nur lesen, kein Geraet wird geoeffnet. Leer ausserhalb von Windows und
+    wenn keiner steckt."""
+    try:
+        from src.core.dmx import udmx
+        from src.core.dmx.udmx_treiber_text import befund_daten, diagnose_zeilen
+        return diagnose_zeilen([befund_daten(b) for b in udmx.windows_treiber() or []])
+    except Exception as e:
+        return [f"Windows-Treiber: ? ({type(e).__name__}: {e})"]
+
+
 def show_info() -> str:
     """Geladene Show (Name, Geraeteanzahl) — leer ohne App-Zustand."""
     try:
@@ -925,6 +1055,8 @@ def melde_laufzeit_umgebung() -> None:
         merke(f"Bildschirm {i}", z)
     for i, z in enumerate(dmx_infos()):
         merke(f"DMX {i}", z)
+    for i, z in enumerate(udmx_infos(immer=False)):
+        merke(f"uDMX {i}", z)
     for z in midi_infos():
         k, _, v = z.partition(": ")
         merke(f"MIDI {k}", v)
@@ -934,10 +1066,16 @@ def melde_laufzeit_umgebung() -> None:
 
 
 def systeminfo_text(app_version: str = "?", programm_dir: str | None = None) -> str:
-    zeilen = [f"LightOS-Systeminfo, erstellt {_cl._ts()}", ""]
+    zeilen = [f"LightOS-Systeminfo, erstellt {_cl._ts()}",
+              _vermerk(app_version).rstrip("\n"), ""]
     zeilen += [f"{k}: {v}" for k, v in basis_infos(app_version, programm_dir)]
+    try:
+        zeilen.append(f"Lizenz: {_lizenz_text()}")
+    except Exception as e:                          # noqa: BLE001
+        zeilen.append(f"Lizenz: ? ({type(e).__name__})")
     for titel, werte in (("Bildschirme", bildschirm_infos()),
-                         ("DMX-Ausgaenge", dmx_infos()), ("MIDI", midi_infos())):
+                         ("DMX-Ausgaenge", dmx_infos()),
+                         ("uDMX (USB)", udmx_infos()), ("MIDI", midi_infos())):
         if werte:
             zeilen += ["", f"{titel}:"] + [f"  {anonymisiere(w)}" for w in werte]
     if show_info():
@@ -1050,7 +1188,8 @@ PAKET_INHALT = (
     "Geheimnisse nur als Platzhalter)\n"
     "• die Datei-NAMEN im Datenordner\n\n"
     "NICHT enthalten: Show-Dateien, Sicherungen, Datenbanken, Snaps, Buehnen. Dein "
-    "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt.")
+    "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt; Seriennummern "
+    "von USB-Adaptern werden gekuerzt.")
 
 _LIESMICH = ("LightOS-Diagnosepaket\n=====================\n\nEnthaelt:\n"
              + PAKET_INHALT + "\n\nlogs/      Sitzungs-Logs (lightos.log = letzte "
@@ -1222,6 +1361,8 @@ def erstelle_diagnosepaket(ziel: str | None = None, app_version: str = "?",
         eintraege[0] = ("LIESMICH.txt", _LIESMICH + _liesmich_absturzhinweise(befunde))
     except Exception:
         pass
+    # LIZ-1: Herkunftsvermerk ans Ende der Uebersicht.
+    eintraege[0] = (eintraege[0][0], eintraege[0][1] + "\n" + _vermerk(app_version))
     tmp = ziel + ".tmp"
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for name, text in eintraege:

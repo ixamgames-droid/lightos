@@ -114,7 +114,11 @@ export function applyOptics(f, dmx) {
   // updateDmx-Kette gerissen waere (und dazwischen haette der Kegel eine
   // Laenge und eine Position aus zwei verschiedenen Rechnungen gehabt).
   // Zoom/Iris/Frost aendern die WEITE, nie die Laenge — hier also nur X/Z.
-  if (f.beam) f.beam.scale.set(k, f.beam.scale.y, k);
+  // VIZ-102: `_optikK` ist die Weite aus Zoom/Iris allein; ein ueber eine Kante
+  // verlaengerter Kegel wird um `_kegelWeit` breiter gezeichnet, damit sein
+  // WINKEL gleich bleibt (builders.js#applyFloorAim).
+  f._optikK = k;
+  if (f.beam) { const w = k * (f._kegelWeit || 1); f.beam.scale.set(w, f.beam.scale.y, w); }
   if (f.spot && f.baseSpotAngle) {
     // Der SpotLight traegt die Ausleuchtung — ohne ihn wuerde nur der sichtbare
     // Kegel schmaler, der Bodenfleck aber gleich gross bleiben.
