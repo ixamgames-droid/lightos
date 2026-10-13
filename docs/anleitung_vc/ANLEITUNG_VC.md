@@ -153,6 +153,17 @@ wandert):
 
 ![Hardstyle-Show läuft (Live-Ansicht)](gif/hardstyle_show_live.gif)
 
+### Konsole auf einen zweiten Bildschirm legen (Popout)
+
+**⧉ Popout** in der Werkzeugleiste holt die ganze Konsole in ein eigenes Fenster, zum Beispiel
+auf einen Touch-Bildschirm; Schließen des Fensters holt sie ins Hauptfenster zurück. Das
+Fenster merkt sich Bildschirm, Lage, Größe und ob es maximiert war, und öffnet beim nächsten
+**Popout** wieder genau dort – auch nach einem Neustart. Beim allerersten Mal mit zwei
+Bildschirmen öffnet es von selbst maximiert auf dem Bildschirm, auf dem das Hauptfenster
+**nicht** liegt. Ist der gemerkte Bildschirm nicht angeschlossen, erscheint das Fenster beim
+Hauptfenster; sein Platz auf dem fehlenden Bildschirm bleibt dabei gemerkt, solange du das
+Ersatz-Fenster nicht verschiebst.
+
 ## 5. APC mini anbinden
 
 Es gibt **zwei Wege**, ein VC-Widget auf eine APC-mini-Taste/-Fader zu legen:
