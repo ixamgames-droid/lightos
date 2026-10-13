@@ -64,7 +64,6 @@
 | DOC-71 | B | docs/doc71-laser-blackout-anleitungen | 2026-10-12T19:21Z | docs/anleitung_ausgabe_einrichten · docs/anleitung_vc_widgets/01_button.md · docs/anleitung_vc_widgets/01_button.en.md · docs/anleitung_erste_schritte/ANLEITUNG.en.md · docs/components/engine/script.md · docs/anleitung_laser/ANLEITUNG_LASER.md · docs/OUTPUT_MERGE_CONTRACT.md · tests/test_doc71_laser_blackout_einheitlich.py · tools/doku_gates.txt |
 | STAB-37 | B | fix/stab37-bibliotheks-hinweis-ist-kein-verlust | 2026-10-12T19:21Z | src/core/show/show_file.py · src/ui/main_window.py · tests/test_stab37_bibliotheks_hinweis_kein_verlust.py · tests/test_fm43_fehlendes_profil_sichtbar.py · tests/test_fm63_lightos_profil_vorrang.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
-| FM-75 | D | fix/fm75-live-test-laser-rueckfrage | 2026-10-12T17:35Z | src/ui/widgets/fixture_generator.py · tests/test_fm75_live_test_laser_rueckfrage.py · docs/anleitung_fixture_generator |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
@@ -287,7 +286,6 @@
 
 ## Verlauf
 
-- 2026-10-12T19:47Z A claim DOC-72
 - 2026-10-12T19:59Z D claim LIZ-2
 - 2026-10-12T20:02Z D done FM-66
 - 2026-10-12T21:01Z A done LIZ-1
@@ -317,3 +315,4 @@
 - 2026-10-13T18:33Z D done OUT-75
 - 2026-10-13T19:09Z D done UI-92
 - 2026-10-13T19:31Z A claim ENG-40
+- 2026-10-13T19:44Z D done FM-75
