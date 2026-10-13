@@ -307,6 +307,10 @@ sACN-Eingang zu und hält den Stand auf Knopfdruck als Szene fest.
    Einen eigenen Namen trägst du vorher ins Feld **Name:** ein. Die Leertaste hält nur
    fest, solange das Fenster des Assistenten das aktive ist — im Hauptfenster bleibt
    sie **GO**, auch während der Assistent offen ist.
+   Weil die Leertaste hier festhält, bedienst du Knöpfe und Haken des Assistenten
+   per Tastatur mit der **Eingabetaste** (mit der Tabulatortaste hin, dann Eingabe).
+   Schaltest du den Eingang ab, während der Assistent offen ist, gibt es sofort kein
+   Bild mehr — aus dem zuletzt empfangenen entsteht dann keine Szene.
 5. Nächste Szene im alten Programm aufrufen, wieder festhalten — so oft wie nötig.
 6. Sollen die Szenen nacheinander ablaufen: **Am Ende als Chaser zusammenfassen**
    anhaken und die **Schrittzeit:** einstellen.

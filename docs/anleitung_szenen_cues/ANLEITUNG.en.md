@@ -299,7 +299,9 @@ LightOS — DMX monitor, 3D window and function list stay usable next to it, and
 click on the button brings the open window to the front. Recall a scene in the old
 program, wait until it stands still and press **Als Szene festhalten** (or the **space
 bar** while the assistant is the active window; in the main window the space bar stays
-GO). Repeat for each scene.
+GO). Repeat for each scene. Because the space bar captures here, buttons and check
+boxes of the assistant are operated from the keyboard with **Enter**. If you switch the
+input off while the assistant is open, there is no image any more at once.
 Tick **Am Ende als Chaser zusammenfassen** and set **Schrittzeit:** if the scenes should
 run one after another, then press **Fertig**.
 

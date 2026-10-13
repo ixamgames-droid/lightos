@@ -115,6 +115,12 @@ class Eingangspuffer:
         with self._lock:
             self._quellen.clear()
 
+    def vergiss(self, protokoll: str) -> None:
+        """Alle Bilder eines Protokolls verwerfen (sein Eingang ist aus)."""
+        with self._lock:
+            for schluessel in [k for k in self._quellen if k[0] == str(protokoll)]:
+                del self._quellen[schluessel]
+
     def stand(self) -> list[QuellenStand]:
         """Alle je gesehenen Quellen, sortiert nach Protokoll und Universum."""
         jetzt = self._uhr()
@@ -510,4 +516,12 @@ class EingangsLeser:
         return self.zuordnungen(protokoll).get(int(universum))
 
     def bild(self) -> Eingangsbild:
+        # Ein abgeschalteter Eingang liefert kein Bild. Der Puffer haelt das
+        # letzte sonst noch `SIGNAL_TIMEOUT` Sekunden — der Assistent ist nicht
+        # modal, der Eingang kann also abgeschaltet werden, waehrend er offen
+        # ist, und aus dem Bild von vorhin darf dann keine Szene mehr werden.
+        # Nach dem Wiedereinschalten zaehlt erst ein neues Paket.
+        for protokoll in self.empfaenger():
+            if not self.laeuft(protokoll):
+                self.puffer.vergiss(protokoll)
         return eingangsbild(self.puffer, self.ziel)

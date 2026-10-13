@@ -702,6 +702,7 @@ def test_schliessen_raeumt_zeitgeber_und_verbindungen_ab(state, rig, aufbau, weg
     _verarbeite()
     assert not dlg.isVisible()
     assert not dlg._timer.isActive() and not dlg._sicht_timer.isActive()
+    assert not dlg._markierung_timer.isActive()
     assert art.cbs == [] and sacn.cbs == []
     assert not dlg._lage.verbunden and not _lauscht(dlg._lage)
     assert not dlg._kuerzel.isEnabled()

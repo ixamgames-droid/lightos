@@ -447,12 +447,15 @@ def test_echtes_artnet_paket_ueber_loopback_wird_zur_szene(monkeypatch, fm):
         with _NurLoopback(socket.AF_INET, socket.SOCK_DGRAM) as sender:
             sender.sendto(_artdmx(0, daten), ("127.0.0.1", port))
             assert da.wait(3.0), "Paket kam nicht an"
+        # Gelesen wird, solange der Eingang laeuft: ein abgeschalteter Eingang
+        # liefert kein Bild mehr.
+        uhr.vor(0.6)
+        bild = leser.bild()
     finally:
         leser.trennen()
         rx.stop()
 
-    uhr.vor(0.6)
-    bild = leser.bild()
+    assert not leser.bild().hat_signal
     assert bild.quellen == [(M.ARTNET, 1, 2)]   # Draht-Universum 0 = Universum 1
     assert bild.ist_ruhig(0.5)
     patch = [_fx(1, 2, 1, PAR), _fx(2, 2, 200, KOPF)]

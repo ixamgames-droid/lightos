@@ -31,7 +31,7 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
+    QAbstractButton, QCheckBox, QComboBox, QDialog, QDoubleSpinBox, QFormLayout, QGroupBox,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
     QVBoxLayout, QWidget,
 )
@@ -95,7 +95,8 @@ HINWEIS_LASER = (
 
 TIPP_FESTHALTEN = (
     "Hält das gerade empfangene Bild als Szene fest. Die Leertaste tut "
-    "dasselbe, solange dieses Fenster das aktive ist.")
+    "dasselbe, solange dieses Fenster das aktive ist. Knöpfe und Haken "
+    "bedienst du hier per Tastatur deshalb mit der Eingabetaste.")
 
 GRUND_KEIN_SIGNAL = "Kein Signal — es gibt nichts festzuhalten."
 VERWEIS_HILFE = "Wie du den Eingang einschaltest, steht oben unter „Eingang“."
@@ -189,6 +190,10 @@ class MitschnittDialog(QDialog):
         #: … und die Objekte dazu. Eine ID allein reicht nicht: nach einem
         #: Show-Wechsel kann dieselbe Nummer eine FREMDE Funktion sein.
         self._szenen_obj: dict[int, object] = {}
+        #: … und was hinter dem Namen steht („3 Geräte, 12 Kanäle“). Der Name
+        #: selbst wird bei jeder Anzeige frisch gelesen: die Funktionsliste im
+        #: Hauptfenster kann eine Szene umbenennen, waehrend der Assistent
+        #: offen ist.
         self._szenen_text: dict[int, str] = {}
         self.chaser = None
 
@@ -252,7 +257,8 @@ class MitschnittDialog(QDialog):
         self._btn_hilfe.setAutoDefault(False)
         self._btn_hilfe.setToolTip(
             "Blendet die Wegbeschreibung ein oder aus, wie du den Art-Net- "
-            "oder sACN-Eingang einschaltest.")
+            "oder sACN-Eingang einschaltest. Mit der Tastatur: mit der "
+            "Tabulatortaste hierher, dann die Eingabetaste.")
         self._btn_hilfe.clicked.connect(self._hilfe_anwenden)
         zeile.addWidget(self._btn_hilfe)
         zeile.addStretch(1)
@@ -354,6 +360,9 @@ class MitschnittDialog(QDialog):
         self._liste.clear()
         self._liste.setMinimumHeight(
             MINDESTZEILEN * self._zeilenhoehe + 2 * self._liste.frameWidth())
+        # Wird die Liste niedriger (laengere Meldung, eingeblendete Hilfe),
+        # bleibt die markierte Szene zu sehen — siehe `eventFilter`.
+        self._liste.viewport().installEventFilter(self)
         ll.addWidget(self._liste, 1)
         zeile = QHBoxLayout()
         self._btn_entfernen = QPushButton(TEXT_ENTFERNEN)
@@ -397,6 +406,10 @@ class MitschnittDialog(QDialog):
         self._sicht_timer.setSingleShot(True)
         self._sicht_timer.setInterval(0)
         self._sicht_timer.timeout.connect(self._hilfe_zeigen)
+        self._markierung_timer = QTimer(self)
+        self._markierung_timer.setSingleShot(True)
+        self._markierung_timer.setInterval(0)
+        self._markierung_timer.timeout.connect(self._markierung_zeigen)
         for knopf in (self._btn_festhalten, self._btn_entfernen):
             knopf.setAutoDefault(False)
         self._btn_festhalten.setFocus()
@@ -511,7 +524,40 @@ class MitschnittDialog(QDialog):
         if (obj is getattr(self, "_hauptfenster", None)
                 and ev.type() == QEvent.Type.Hide and not ev.spontaneous()):
             self.close()
+        liste = getattr(self, "_liste", None)
+        if (liste is not None and ev.type() == QEvent.Type.Resize
+                and not getattr(self, "_abgebaut", True)
+                and getattr(self, "_markierung_timer", None) is not None
+                and obj is liste.viewport()):
+            # „Entfernen“ meint die markierte Zeile — sie darf nicht aus der
+            # Sicht rutschen, wenn die Liste Platz abgibt. Erst NACH dem
+            # Umbruch der Liste rollen, deshalb ueber einen Null-Timer.
+            self._markierung_timer.start()
         return super().eventFilter(obj, ev)
+
+    def _markierung_zeigen(self):
+        if self._abgebaut:
+            return
+        item = self._liste.currentItem()
+        if item is not None:
+            self._liste.scrollToItem(item)
+
+    def keyPressEvent(self, ev):
+        # Die Leertaste haelt fest und ist damit fuer Knoepfe und Haken nicht
+        # mehr frei (Qt bedient beide sonst NUR mit der Leertaste). Damit das
+        # Fenster ohne Maus bedienbar bleibt, loest die Eingabetaste das Teil
+        # aus, das den Fokus hat. Im Namensfeld und in den Zahlenfeldern tut
+        # sie nichts — es gibt keinen Vorgabe-Knopf.
+        if ev.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (
+                ev.modifiers() & ~Qt.KeyboardModifier.KeypadModifier):
+            teil = self.focusWidget()
+            if (isinstance(teil, QAbstractButton) and teil.isEnabled()
+                    and teil.isVisible() and not self._abgebaut):
+                if not ev.isAutoRepeat():
+                    teil.click()
+                ev.accept()
+                return
+        super().keyPressEvent(ev)
 
     # ── Abfragen ─────────────────────────────────────────────────────────────
 
@@ -578,6 +624,11 @@ class MitschnittDialog(QDialog):
         szene = self._szenen_obj.get(sid)
         return szene is not None and self._fm().get(sid) is szene
 
+    def _zeilentext(self, sid: int) -> str:
+        szene = self._szenen_obj.get(sid)
+        name = str(getattr(szene, "name", "") or sid)
+        return f"{name} — {self._szenen_text.get(sid, '')}"
+
     def _lage_pruefen(self) -> bool:
         """Hat sich die Show oder der Patch geaendert, seit zuletzt geprueft
         wurde? Gibt zurueck, ob die Show gewechselt wurde.
@@ -619,12 +670,16 @@ class MitschnittDialog(QDialog):
         ist = [self._liste.item(i).data(Qt.ItemDataRole.UserRole)
                for i in range(self._liste.count())]
         if soll == ist:
+            for i, sid in enumerate(soll):       # umbenannt? Text nachziehen
+                text = self._zeilentext(sid)
+                if self._liste.item(i).text() != text:
+                    self._liste.item(i).setText(text)
             return
         aktuell = self._liste.currentItem()
         gewaehlt = aktuell.data(Qt.ItemDataRole.UserRole) if aktuell else None
         self._liste.clear()
         for sid in soll:
-            item = QListWidgetItem(self._szenen_text.get(sid, str(sid)))
+            item = QListWidgetItem(self._zeilentext(sid))
             item.setData(Qt.ItemDataRole.UserRole, sid)
             self._liste.addItem(item)
             if sid == gewaehlt:
@@ -716,8 +771,8 @@ class MitschnittDialog(QDialog):
         self._szenen.append(szene.id)
         self._szenen_obj[szene.id] = szene
         self._szenen_text[szene.id] = (
-            f"{szene.name} — {len(m.geraete)} Geräte, {m.kanalzahl} Kanäle")
-        item = QListWidgetItem(self._szenen_text[szene.id])
+            f"{len(m.geraete)} Geräte, {m.kanalzahl} Kanäle")
+        item = QListWidgetItem(self._zeilentext(szene.id))
         item.setData(Qt.ItemDataRole.UserRole, szene.id)
         self._liste.addItem(item)
         self._liste.setCurrentItem(item)
@@ -793,6 +848,7 @@ class MitschnittDialog(QDialog):
         self._abgebaut = True
         self._timer.stop()
         self._sicht_timer.stop()
+        self._markierung_timer.stop()
         self._kuerzel.setEnabled(False)
         self._leser.trennen()
         self._lage.trennen()
