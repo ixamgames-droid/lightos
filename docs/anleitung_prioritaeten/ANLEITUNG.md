@@ -22,7 +22,10 @@ der Tabelle steht, kommt später und setzt sich durch.
 | 7 | Gruppen-Fader, Geräte-Dimmer, Submaster | Multiplizieren die Helligkeit, ersetzen nichts. |
 | 8 | Eingemischtes DMX von außen | Je Universum einstellbar: höchster Wert gewinnt oder ersetzt. |
 | 9 | Simple Desk mit „Manueller Override“ | Nur bei gesetztem Haken; dann gewinnen die dort gezogenen Kanäle. |
-| 10 | Laser-NOT-AUS, Grand Master, Blackout | Wirken ganz am Ende und behalten immer das letzte Wort. |
+| 10 | Laser-NOT-AUS, Grand Master, Blackout, Ziel-Blackout | Wirken ganz am Ende und behalten immer das letzte Wort. Ein Ziel-Blackout macht nur seine Geräte dunkel. |
+
+Nicht in der Tabelle: die **Szenen-Vorschau** aus dem Editor. Sie gilt für ein einzelnes Bild,
+liegt zwischen Schicht 5 und 6 und wird von Fadern, Master und Blackout genauso begrenzt.
 
 **Die Stufen ordnen nur Schicht 2.** Snap-Tasten, Cue-Listen, Fader und Master behalten
 ihren festen Platz.
