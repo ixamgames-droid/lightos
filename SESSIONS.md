@@ -78,6 +78,7 @@
 | IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
 | PROC-22 | A | chore/proc22-doku-gates-union | 2026-10-13T17:01Z | .gitattributes |
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
+| ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
 
 ## Blocker & Fallen
 
@@ -286,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T19:29Z A done VIZ-102
 - 2026-10-12T19:47Z A claim DOC-72
 - 2026-10-12T19:59Z D claim LIZ-2
 - 2026-10-12T20:02Z D done FM-66
@@ -316,3 +316,4 @@
 - 2026-10-13T18:06Z D done LAS-38
 - 2026-10-13T18:33Z D done OUT-75
 - 2026-10-13T19:09Z D done UI-92
+- 2026-10-13T19:31Z A claim ENG-40
