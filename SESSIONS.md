@@ -52,7 +52,6 @@
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-12T18:55Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
-| UI-91 | A | fix/ui91-efx-reiter-geraeteliste | 2026-10-12T16:01Z | - |
 | FM-74 | A | fix/fm74-generator-editor-startgroesse | 2026-10-12T16:22Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
@@ -289,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:15Z A claim ENG-35
 - 2026-10-12T18:15Z A claim VCB-45
 - 2026-10-12T18:15Z A claim VCB-46
 - 2026-10-12T18:23Z D done MIDI-10
@@ -319,3 +317,4 @@
 - 2026-10-13T14:46Z A claim VIZ-109
 - 2026-10-13T14:46Z A claim ENG-38
 - 2026-10-13T14:51Z A done STAB-38
+- 2026-10-13T15:27Z A done UI-91
