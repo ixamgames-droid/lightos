@@ -55,7 +55,6 @@
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
-| VIZ-104 | A | feature/viz104-strobe-im-3d | 2026-10-13T14:32Z | src/core/color_utils.py · src/ui/visualizer/dmx_push.py · src/ui/views/live_view.py |
 | VIZ-105 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/visualizer/visualizer_window.py · tests/test_viz105_traverse_loeschen_undo_docks.py |
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
 | VCB-44 | D | fix/vcb44-blackout-ziele-streng-dialog-pruefung | 2026-10-12T15:27Z | src/core/group_ref.py · src/ui/virtualconsole/vc_button.py · src/core/sync.py · src/ui/widgets/validation_dialog.py |
@@ -288,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T22:00Z D done OUT-71
 - 2026-10-12T22:35Z D done VCB-42
 - 2026-10-12T22:39Z A claim LIZ-1
 - 2026-10-13T00:13Z A done LAS-32
@@ -318,3 +316,4 @@
 - 2026-10-13T20:18Z A claim VCB-47
 - 2026-10-13T20:21Z D done OUT-77
 - 2026-10-13T20:41Z A claim TOOL-27
+- 2026-10-13T20:44Z A done VIZ-104
