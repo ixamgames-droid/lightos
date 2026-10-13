@@ -1,5 +1,9 @@
 """ENG-39: gelbe Hinweiszeile „diese Taste und … steuern beide …“.
 
+Reihenfolge der Saetze: zuerst alle, gegen die diese Taste VERLIERT, dann
+Gleichstand, dann die, gegen die sie gewinnt. Verlierer-Faelle verschwinden nie
+hinter „… und n weitere“; der Tooltip traegt immer die vollstaendige Liste.
+
 Reine Auskunft: die Zeile aendert nichts, blockiert nichts und oeffnet keinen
 Dialog. Gerechnet wird nur beim Oeffnen der Eigenschaften und wenn sich die
 Funktion der Taste, eine Stufe oder eine Funktion aendert — nie im Bild-Takt.
@@ -15,8 +19,8 @@ from __future__ import annotations
 
 import weakref
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QLabel, QSizePolicy
+from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer
+from PySide6.QtWidgets import QAbstractScrollArea, QLabel, QSizePolicy
 
 from src.core.engine import ueberschneidung
 
@@ -193,7 +197,8 @@ def treffer_fuer(eigene_ids, andere_ids, umgebung: dict | None = None) -> list:
             continue
         if f is not None:
             treffer.extend(ueberschneidung.ueberschneidungen(f, andere, **umgebung))
-    treffer.sort(key=lambda t: ueberschneidung._RANG[t.verhaeltnis])
+    # Ueber alle eigenen Funktionen hinweg: Verlierer-Faelle zuerst.
+    treffer.sort(key=ueberschneidung.sortier_schluessel)
     return treffer
 
 
@@ -206,7 +211,17 @@ class UeberschneidungsHinweis(QLabel):
     wuerde (aus den Feldern der Eigenschaften, nicht aus der Taste — im
     Dialog ist die Aenderung noch nicht uebernommen), oder eine leere Liste.
     ``sichtbar_setzen(bool)`` blendet die Zeile im umgebenden Formular ein/aus.
+
+    Breite: die Zeile bricht um und verlangt selbst keine Breite — sie macht
+    weder Dialog noch Inspector breiter. Steckt sie in einem Rollbereich, der
+    schmaler ist als sein Inhalt (Inspector bei 260 px), haelt sie sich an die
+    SICHTBARE Breite: der gelbe Text steht dann ganz im Bild, nicht halb
+    dahinter.
     """
+
+    #: Unter dieser Breite wird die Zeile auch im schmalsten Rollbereich nicht
+    #: zusammengedrueckt.
+    KLEINSTE_BREITE = 120
 
     def __init__(self, taste, quelle, parent=None):
         super().__init__(parent)
@@ -219,9 +234,12 @@ class UeberschneidungsHinweis(QLabel):
         self.setStyleSheet(HINWEIS_STIL)
         self.setWordWrap(True)
         self.setTextFormat(Qt.TextFormat.PlainText)
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
-        self.setMinimumWidth(160)
+        # Breite „Ignored“: der Wunsch der Zeile zaehlt nicht, sie nimmt, was
+        # das Formular hat. Hoehe folgt dem umbrochenen Text.
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Minimum)
+        self.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.setToolTip(HINWEIS_TOOLTIP)
+        self._rollflaeche = None        # beobachtete Sichtflaeche (oder None)
         # Kein Dauer-Zeitgeber: nur ein Sammler, der mehrere Meldungen im
         # selben Augenblick zu EINER Rechnung zusammenfasst.
         self._sammler = QTimer(self)
@@ -249,6 +267,60 @@ class UeberschneidungsHinweis(QLabel):
         except Exception as e:
             print(f"[ueberschneidung_hinweis] sync subscribe error: {e}")
         self.neu_berechnen()
+
+    # ── Breite ──────────────────────────────────────────────────────────────
+
+    def minimumSizeHint(self) -> QSize:
+        """Nie breiter als ``KLEINSTE_BREITE`` — auch nicht mit einem langen
+        Effektnamen ohne Leerzeichen."""
+        s = super().minimumSizeHint()
+        return QSize(min(s.width(), self.KLEINSTE_BREITE), s.height())
+
+    def heightForWidth(self, breite: int) -> int:
+        """Hoehe fuer die Breite, die die Zeile wirklich bekommt: das Formular
+        fragt mit SEINER Breite, im schmalen Rollbereich ist die Zeile aber
+        auf die sichtbare Breite begrenzt und braucht mehr Zeilen."""
+        return super().heightForWidth(min(int(breite), self.maximumWidth()))
+
+    def _rollbereich(self):
+        try:
+            w = self.parentWidget()
+            while w is not None:
+                if isinstance(w, QAbstractScrollArea):
+                    return w
+                w = w.parentWidget()
+        except RuntimeError:
+            pass
+        return None
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._an_sichtbare_breite_halten()
+
+    def _an_sichtbare_breite_halten(self) -> None:
+        """Im Rollbereich nie breiter als das, was zu sehen ist."""
+        try:
+            bereich = self._rollbereich()
+            if bereich is None:
+                return
+            flaeche = bereich.viewport()
+            if self._rollflaeche is not flaeche:
+                flaeche.installEventFilter(self)
+                self._rollflaeche = flaeche
+            inhalt = getattr(bereich, "widget", lambda: None)()
+            links = (self.mapTo(inhalt, QPoint(0, 0)).x()
+                     if inhalt is not None and inhalt.isAncestorOf(self) else 0)
+            breite = max(self.KLEINSTE_BREITE, flaeche.width() - max(0, links))
+            if self.maximumWidth() != breite:
+                self.setMaximumWidth(breite)
+                self.updateGeometry()
+        except RuntimeError:
+            pass                        # Zeile oder Rollbereich schon abgebaut
+
+    def eventFilter(self, obj, event):
+        if obj is self._rollflaeche and event.type() == QEvent.Type.Resize:
+            self._an_sichtbare_breite_halten()
+        return False
 
     def stilllegen(self) -> None:
         """Ab jetzt nicht mehr nachrechnen. Der Eigenschaften-Dialog ruft das
@@ -285,10 +357,19 @@ class UeberschneidungsHinweis(QLabel):
                 print(f"[ueberschneidung_hinweis] Rechnung: {e}")
                 treffer = []
         self.treffer = treffer
-        zeilen = ueberschneidung.hinweis_zeilen(
-            treffer, "Taste", nenne_eigene=len(set(eigene)) > 1)
+        mehrere = len(set(eigene)) > 1
+        zeilen = ueberschneidung.hinweis_zeilen(treffer, "Taste",
+                                                nenne_eigene=mehrere)
+        # Der Tooltip traegt IMMER die vollstaendige Liste — auch das, was die
+        # Zeile in „… und n weitere“ zusammenfasst.
+        alle = ueberschneidung.hinweis_zeilen(treffer, "Taste",
+                                              nenne_eigene=mehrere,
+                                              hoechstens=None)
         try:
             self.setText("\n".join(zeilen))
+            self.setToolTip("\n".join(alle) + "\n\n" + HINWEIS_TOOLTIP
+                            if alle else HINWEIS_TOOLTIP)
+            self.updateGeometry()
         except RuntimeError:
             return
         # Ein-/Ausblenden macht das umgebende Formular (ganze Zeile samt

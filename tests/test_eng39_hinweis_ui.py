@@ -111,8 +111,8 @@ def test_zeile_erscheint_bei_ueberschneidung_mit_dem_satz_des_konzepts(fm, flaec
     try:
         assert zeile.isVisible()
         assert zeile.text() == (
-            "Diese Taste und „Lauflicht HG“ steuern beide den Dimmer von "
-            "Hintergrund — gleiche Stufe, es gewinnt, wer zuletzt gestartet wurde.")
+            "Diese Taste und „Lauflicht HG“ steuern beide den Dimmer der Gruppe "
+            "„Hintergrund“ — gleiche Stufe, es gewinnt, wer zuletzt gestartet wurde.")
         assert zeile.wordWrap() and "background:#3a3214" in zeile.styleSheet()
         assert "ändert und sperrt nichts" in zeile.toolTip()
     finally:
@@ -208,7 +208,9 @@ def test_hoechstens_drei_treffer_ausgeschrieben_dann_rest(fm, flaeche):
     wirt, zeile = _eigenschaften(_taste(flaeche, ich))
     try:
         zeilen = zeile.text().split("\n")
-        assert len(zeilen) == 4 and zeilen[-1] == "… und 2 weitere"
+        assert len(zeilen) == 4 and zeilen[-1] == (
+            "… und 2 weitere Überschneidungen: bei 2 entscheidet, wer zuletzt "
+            "gestartet wurde.")
         assert len(zeile.treffer) == 5
     finally:
         _zu(wirt)
@@ -347,8 +349,8 @@ def test_ansicht_prioritaeten_zeigt_dieselben_saetze_als_tooltip(fm, flaeche):
                 it = kopf.child(j)
                 tipps[it.data(0, _ROLLE_FID)] = it.toolTip(0)
         assert tipps[lauf.id] == (
-            "Dieser Effekt und „Puls HG“ steuern beide den Dimmer von "
-            "Hintergrund — „Puls HG“ liegt zwei Stufen höher und gewinnt.")
+            "Dieser Effekt und „Puls HG“ steuern beide den Dimmer der Gruppe "
+            "„Hintergrund“ — „Puls HG“ liegt zwei Stufen höher und gewinnt.")
         assert "dieser Effekt liegt zwei Stufen höher und gewinnt" in tipps[puls.id]
         assert tipps[frei.id] == "", "liegt auf keiner Taste -> kein Hinweis"
     finally:
@@ -389,3 +391,135 @@ def test_leistung_200_funktionen_100_tasten(fm, flaeche):
     finally:
         zeile.deleteLater()
         _app().processEvents()
+
+
+# ── Nachtrag Sichtprobe: Reihenfolge, vollstaendiger Tooltip, Breite ─────────
+
+def test_verlierer_fall_steht_oben_und_der_tooltip_traegt_alles(fm, flaeche):
+    """Fuenf Effekte auf gleicher Stufe und einer, der staerker ist: der
+    staerkere steht in der ersten Zeile, nicht hinter „… und n weitere“. Der
+    Tooltip nennt alle sechs."""
+    ich = _matrix(fm, "Ich", HINTERGRUND)
+    for i in range(5):
+        _taste(flaeche, _matrix(fm, f"Effekt {i}", HINTERGRUND), f"T{i}")
+    _taste(flaeche, _matrix(fm, "Zzz Blinder", HINTERGRUND, stufe=STROBE), "B")
+    wirt, zeile = _eigenschaften(_taste(flaeche, ich))
+    try:
+        zeilen = zeile.text().split("\n")
+        assert zeilen[0] == (
+            "Diese Taste und „Zzz Blinder“ steuern beide den Dimmer der Gruppe "
+            "„Hintergrund“ — „Zzz Blinder“ liegt zwei Stufen höher und gewinnt.")
+        assert len(zeilen) == 4
+        assert zeilen[-1] == ("… und 3 weitere Überschneidungen: bei 3 "
+                              "entscheidet, wer zuletzt gestartet wurde.")
+        tipp = zeile.toolTip()
+        for name in ["Zzz Blinder"] + [f"Effekt {i}" for i in range(5)]:
+            assert f"„{name}“" in tipp, name
+        assert "… und" not in tipp, "der Tooltip fasst nichts zusammen"
+        assert tipp.index("„Zzz Blinder“") < tipp.index("„Effekt 0“")
+        assert "ändert und sperrt nichts" in tipp
+    finally:
+        _zu(wirt)
+
+
+def test_tooltip_ohne_treffer_ist_nur_die_erklaerung(fm, flaeche):
+    from src.ui.widgets.ueberschneidung_hinweis import HINWEIS_TOOLTIP
+    wirt, zeile = _eigenschaften(_taste(flaeche, _matrix(fm, "Allein", HIMMEL)))
+    try:
+        assert zeile.text() == "" and zeile.toolTip() == HINWEIS_TOOLTIP
+    finally:
+        _zu(wirt)
+
+
+def test_zeile_bricht_bei_240_px_um_und_verlangt_keine_breite(fm, flaeche):
+    """Die Zeile allein, 240 px breit: sie verlangt nicht mehr und wird
+    mehrzeilig. Auch ein langer Name ohne Leerzeichen macht sie nicht breiter."""
+    from PySide6.QtWidgets import QSizePolicy
+    from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+    lang = "Lauflicht_Hintergrund_sehr_langer_Name_ohne_Leerzeichen_0123456789"
+    ich = _matrix(fm, "Ich", HINTERGRUND)
+    _taste(flaeche, _matrix(fm, lang, HINTERGRUND), "L")
+    taste = _taste(flaeche, ich)
+    zeile = UeberschneidungsHinweis(taste, lambda: [ich.id])
+    try:
+        assert zeile.hat_hinweis() and "\n" not in zeile.text()
+        zeile.resize(240, 40)
+        assert zeile.wordWrap()
+        assert zeile.minimumSizeHint().width() <= 240
+        assert zeile.minimumWidth() == 0
+        assert (zeile.sizePolicy().horizontalPolicy()
+                == QSizePolicy.Policy.Ignored), "der Wunsch der Zeile zaehlt nicht"
+        einzeilig = zeile.fontMetrics().lineSpacing()
+        assert zeile.hasHeightForWidth()
+        assert zeile.heightForWidth(240) >= 3 * einzeilig, "ein Satz, mehrere Zeilen"
+        assert zeile.heightForWidth(240) > zeile.heightForWidth(900)
+    finally:
+        zeile.stilllegen()
+        zeile.deleteLater()
+        _app().processEvents()
+
+
+def _inspector(taste, breite):
+    from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
+    panel = VCInspectorPanel()
+    panel.resize(breite, 800)
+    panel.show()
+    panel.bind(taste)
+    for _ in range(3):
+        _app().processEvents()
+    inhalt = panel._scroll.widget()
+    return panel, inhalt, inhalt.findChild(QLabel, NAME)
+
+
+def _inspector_zu(panel):
+    panel._before = None            # keinen Rueckgaengig-Schritt fuer den Test
+    panel.close()
+    panel.deleteLater()
+    _app().processEvents()
+
+
+@pytest.mark.parametrize("breite", [260, 440])
+def test_zeile_liegt_im_inspector_ganz_im_sichtbaren_bereich(fm, flaeche, breite):
+    """Sichtprobe: im 260 px schmalen Inspector lag die gelbe Zeile grossteils
+    ausserhalb des Bildes. Jetzt steht sie oben links, gleich unter „Aktion“,
+    und ist nie breiter als das, was zu sehen ist."""
+    from src.ui.widgets.collapsible_section import CollapsibleSection
+    ich = _matrix(fm, "Ich", HINTERGRUND)
+    _taste(flaeche, _matrix(fm, "Lauflicht HG", HINTERGRUND), "L")
+    _taste(flaeche, _matrix(fm, "Blinder", HINTERGRUND, stufe=STROBE), "B")
+    panel, inhalt, zeile = _inspector(_taste(flaeche, ich), breite)
+    try:
+        sicht = panel._scroll.viewport()
+        assert zeile.isVisible() and zeile.hat_hinweis()
+        links = zeile.mapTo(inhalt, zeile.rect().topLeft()).x()
+        assert links == 0, "ganz links"
+        assert links + zeile.width() <= sicht.width(), (zeile.width(), sicht.width())
+        # Hoehe folgt dem umbrochenen Text — nichts ist abgeschnitten.
+        assert zeile.height() >= zeile.heightForWidth(zeile.width())
+        # Oben: ueber allen Klappbereichen.
+        bereiche = inhalt.findChildren(CollapsibleSection)
+        assert bereiche and all(
+            zeile.mapTo(inhalt, zeile.rect().topLeft()).y()
+            < b.mapTo(inhalt, b.rect().topLeft()).y() for b in bereiche)
+        # Die Zeile selbst erhoeht die Mindestbreite des Inhalts nicht.
+        ohne = max(b.minimumSizeHint().width() for b in bereiche)
+        assert inhalt.minimumSizeHint().width() <= ohne
+        if breite == 440:
+            assert inhalt.width() <= sicht.width(), (
+                "bei 440 px passt der ganze Inhalt ohne Querrollen")
+    finally:
+        _inspector_zu(panel)
+
+
+def test_zeile_bleibt_bei_zugeklapptem_bereich_ziel_und_verhalten(fm, flaeche):
+    from src.ui.widgets.collapsible_section import CollapsibleSection
+    ich = _matrix(fm, "Ich", HINTERGRUND)
+    _taste(flaeche, _matrix(fm, "Lauflicht HG", HINTERGRUND), "L")
+    panel, inhalt, zeile = _inspector(_taste(flaeche, ich), 440)
+    try:
+        for bereich in inhalt.findChildren(CollapsibleSection):
+            bereich._content.setVisible(False)       # ohne die Vorgabe zu speichern
+        _app().processEvents()
+        assert zeile.isVisible()
+    finally:
+        _inspector_zu(panel)

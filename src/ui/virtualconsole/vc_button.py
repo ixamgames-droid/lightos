@@ -2684,7 +2684,6 @@ class VCButton(VCWidget):
             "sections": [
                 ("target", "Ziel und Verhalten", False, "vc_button_sec_target", [
                     ("Ziele:", target_editor),
-                    ("Hinweis:", ueberschn_hinweis),
                     ("Snapshot:", snap_combo),
                     ("Snap-Ziele:", snap_editor),
                     ("Tasten-Modus (Snap):", snap_mode_combo),
@@ -2731,6 +2730,9 @@ class VCButton(VCWidget):
 
         for label, w in S["top"]:
             form.addRow(label, w)
+        # ENG-39: der gelbe Hinweis steht gleich unter „Aktion“, ueber die
+        # ganze Breite — nicht in einem Bereich, der zugeklappt sein kann.
+        form.addRow(S["ueberschneidungs_hinweis"])
 
         adv_section = None
         for key, title, _collapsed, prefs, rows in S["sections"]:
@@ -2802,6 +2804,11 @@ class VCButton(VCWidget):
         for label, w in S["top"]:
             top_form.addRow(label, w)
         v.addWidget(top_inner)
+        # ENG-39: der gelbe Hinweis steht gleich unter „Aktion“, ueber die
+        # ganze Breite und ausserhalb der Klappbereiche — er bleibt zu sehen,
+        # auch wenn „Ziel und Verhalten“ zugeklappt ist. Die Zeile bricht um
+        # und haelt sich im schmalen Inspector an die sichtbare Breite.
+        v.addWidget(S["ueberschneidungs_hinweis"])
 
         row_form_of = {}
         sections = []   # (key, CollapsibleSection, [row_widgets])
@@ -2809,6 +2816,10 @@ class VCButton(VCWidget):
             inner = _QWidget()
             f = QFormLayout(inner)
             f.setContentsMargins(0, 0, 0, 0)
+            # Im schmalen Inspector rutscht ein Feld, das neben seiner
+            # Beschriftung nicht passt, unter sie — statt den ganzen Inhalt
+            # breiter zu machen als das Panel (vorher 478 px Mindestbreite).
+            f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
             row_widgets = []
             for label, w in rows:
                 f.addRow(label, w)
@@ -2829,6 +2840,8 @@ class VCButton(VCWidget):
                     f.setRowVisible(w, bool(show))
                 except Exception:
                     w.setVisible(bool(show))
+            else:
+                w.setVisible(bool(show))    # ENG-39: Hinweis liegt in keinem Formular
 
         def set_section_visible(k, show):
             for key, sec, _rws in sections:

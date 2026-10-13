@@ -35,7 +35,10 @@ from src.core.engine import stufen
 _ZAEHLENDE = frozenset({stufen.DIMMER, stufen.FARBE, stufen.BEWEGUNG, stufen.GOBO})
 
 GLEICH, DIESE_HOEHER, DIESE_TIEFER, MODIFY = "gleich", "diese_hoeher", "diese_tiefer", "modify"
-_RANG = {GLEICH: 0, DIESE_TIEFER: 1, DIESE_HOEHER: 2, MODIFY: 3}
+# Reihenfolge im Hinweis: zuerst, wogegen man VERLIERT (das muss der Bediener
+# sehen), dann der Gleichstand, dann die Gewinne, zuletzt die neutralen
+# Modify-Saetze.
+_RANG = {DIESE_TIEFER: 0, GLEICH: 1, DIESE_HOEHER: 2, MODIFY: 3}
 
 _AKKUSATIV = {stufen.DIMMER: "den Dimmer", stufen.FARBE: "die Farbe",
               stufen.BEWEGUNG: "die Bewegung", stufen.GOBO: "das Gobo"}
@@ -43,6 +46,10 @@ _ZAHLWORT = {1: "eine Stufe", 2: "zwei Stufen", 3: "drei Stufen", 4: "vier Stufe
 
 _MAX_TIEFE = 8
 MAX_AUSGESCHRIEBEN = 3
+# Verlierer-Faelle stehen auch ueber MAX_AUSGESCHRIEBEN hinaus da. Erst weit
+# darueber fasst die Zeile zusammen — und sagt dann ausdruecklich, dass die
+# Taste gegen die uebrigen ebenfalls verliert.
+MAX_VERLIERER_AUSGESCHRIEBEN = 6
 
 
 def _typ(funktion) -> str:
@@ -183,7 +190,7 @@ class Treffer:
     andere: object
     bausteine: tuple            # in der Reihenfolge Dimmer, Farbe, Bewegung, Gobo
     geraete: frozenset          # die gemeinsamen Geraete, an denen es kollidiert
-    geraete_text: str           # „Hintergrund“ / „4 Geräten“ / „„Spot 1““
+    geraete_text: str           # „der Gruppe „Hintergrund““ / „von 4 Geräten“
     verhaeltnis: str            # GLEICH / DIESE_HOEHER / DIESE_TIEFER / MODIFY
     stufen_abstand: int | None  # Zahl der Stufen dazwischen; None bei eigener Zahl
 
@@ -226,9 +233,9 @@ class Treffer:
                 rest = ("diese Taste startet einen Modify-Effekt: er rechnet "
                         "auf das fertige Bild und ersetzt nichts.")
             return (f"{selbst} und {name} fassen beide {self.bausteine_text()} "
-                    f"von {self.geraete_text} an — {rest}")
+                    f"{self.geraete_text} an — {rest}")
         kopf = (f"{selbst} und {name} steuern beide {self.bausteine_text()} "
-                f"von {self.geraete_text} — ")
+                f"{self.geraete_text} — ")
         if self.verhaeltnis == GLEICH:
             return kopf + "gleiche Stufe, es gewinnt, wer zuletzt gestartet wurde."
         oben, unten = ((self.eigene, self.andere)
@@ -254,14 +261,15 @@ def _stufen_abstand(a: int, b: int) -> int | None:
 def geraete_text(geraete: Iterable[int],
                  gruppen: Iterable[tuple[str, Iterable[int]]] | None = None,
                  geraete_name: Callable[[int], str | None] | None = None) -> str:
-    """Die gemeinsamen Geraete in Worten (fuer „… von <Text>“): der
-    Gruppenname, wenn sie GENAU eine Gruppe bilden; bei einem einzelnen Geraet
-    dessen Name; sonst die Zahl."""
+    """Die gemeinsamen Geraete in Worten, fertig fuer den Satz „… steuern
+    beide den Dimmer <Text>“: ``der Gruppe „Alle PAR“``, wenn sie GENAU eine
+    Gruppe bilden; bei einem einzelnen Geraet ``des Geräts „Spot 1“``; sonst
+    die Zahl (``von 4 Geräten``). Namen stehen immer in Anfuehrungszeichen."""
     menge = frozenset(int(g) for g in geraete)
     passend = sorted(str(name) for name, fids in (gruppen or ())
                      if name and _als_menge(fids) == menge)
     if passend:
-        return passend[0]
+        return f"der Gruppe „{passend[0]}“"
     if len(menge) == 1:
         name = None
         if geraete_name is not None:
@@ -269,8 +277,8 @@ def geraete_text(geraete: Iterable[int],
                 name = geraete_name(next(iter(menge)))
             except Exception:
                 name = None
-        return f"„{name}“" if name else "1 Gerät"
-    return f"{len(menge)} Geräten"
+        return f"des Geräts „{name}“" if name else "eines Geräts"
+    return f"von {len(menge)} Geräten"
 
 
 def _als_menge(fids) -> frozenset:
@@ -294,8 +302,9 @@ def ueberschneidungen(funktion, andere_funktionen: Iterable, *,
 
     Der Aufrufer bestimmt, was „die anderen“ sind — fuer den Hinweis an einer
     Taste nur Funktionen, die selbst auf einer Taste oder einem Fader liegen.
-    Sortiert: zuerst gleiche Stufe, dann „die andere gewinnt“, dann „diese
-    gewinnt“, zuletzt die neutralen Modify-Saetze; darin nach Name.
+    Sortiert: zuerst „die andere gewinnt“ (dagegen verliert ``funktion``),
+    dann gleiche Stufe, dann „diese gewinnt“, zuletzt die neutralen
+    Modify-Saetze; darin nach Name.
     """
     if funktion is None:
         return []
@@ -352,19 +361,60 @@ def ueberschneidungen(funktion, andere_funktionen: Iterable, *,
             verhaeltnis=verhaeltnis,
             stufen_abstand=(0 if eigene_zahl == ihre_zahl
                             else _stufen_abstand(eigene_zahl, ihre_zahl))))
-    treffer.sort(key=lambda t: (_RANG[t.verhaeltnis],
-                                str(getattr(t.andere, "name", "")).lower()))
+    treffer.sort(key=sortier_schluessel)
     return treffer
+
+
+def sortier_schluessel(t: Treffer):
+    """Verlierer-Faelle zuerst, dann Gleichstand, Gewinne, Modify; darin nach
+    dem Namen des anderen Effekts."""
+    return (_RANG[t.verhaeltnis], str(getattr(t.andere, "name", "")).lower(),
+            str(getattr(t.eigene, "name", "")).lower())
+
+
+def _weitere(n: int) -> str:
+    return ("1 weitere Überschneidung" if n == 1
+            else f"{n} weitere Überschneidungen")
+
+
+def _rest_zeile(rest: list, subjekt: str) -> str:
+    """Die Zusammenfassung der nicht ausgeschriebenen Treffer. Sie sagt immer,
+    wie es um die uebrigen steht — nie nur „und n weitere“."""
+    klein = "dieser Effekt" if subjekt == "Effekt" else "diese Taste"
+    zahl = {v: sum(1 for t in rest if t.verhaeltnis == v) for v in _RANG}
+    teile = []
+    if zahl[DIESE_TIEFER]:
+        teile.append(f"gegen {zahl[DIESE_TIEFER]} verliert {klein}")
+    if zahl[GLEICH]:
+        teile.append(f"bei {zahl[GLEICH]} entscheidet, wer zuletzt gestartet wurde")
+    if zahl[DIESE_HOEHER]:
+        teile.append(f"gegen {zahl[DIESE_HOEHER]} gewinnt {klein}")
+    if zahl[MODIFY]:
+        teile.append(f"{zahl[MODIFY]} mit Modify-Effekt, dort wird nichts ersetzt"
+                     if zahl[MODIFY] > 1 else
+                     "1 mit Modify-Effekt, dort wird nichts ersetzt")
+    return f"… und {_weitere(len(rest))}: " + "; ".join(teile) + "."
 
 
 def hinweis_zeilen(treffer: Iterable[Treffer], subjekt: str = "Taste",
                    nenne_eigene: bool = False,
-                   hoechstens: int = MAX_AUSGESCHRIEBEN) -> list[str]:
-    """Die Saetze fuer die Hinweiszeile: hoechstens ``hoechstens``
-    ausgeschrieben, danach „… und n weitere“. Leer = kein Hinweis."""
-    treffer = list(treffer)
-    zeilen = [t.satz(subjekt, nenne_eigene) for t in treffer[:hoechstens]]
-    rest = len(treffer) - len(zeilen)
-    if rest > 0:
-        zeilen.append(f"… und {rest} weitere")
+                   hoechstens: int | None = MAX_AUSGESCHRIEBEN) -> list[str]:
+    """Die Saetze fuer die Hinweiszeile. Leer = kein Hinweis.
+
+    Reihenfolge: zuerst alle, gegen die man VERLIERT, dann Gleichstand, dann
+    die Gewinne, zuletzt Modify; darin nach Name. Ausgeschrieben werden
+    ``hoechstens`` Saetze — die Verlierer-Faelle aber auch darueber hinaus
+    (bis ``MAX_VERLIERER_AUSGESCHRIEBEN``): der Effekt, gegen den die Taste
+    verliert, verschwindet nie hinter „… und n weitere“. Der Rest steht in
+    einer Zeile, die sagt, wie viele davon gewinnen, verlieren oder gleich
+    liegen. ``hoechstens=None`` schreibt alles aus (Tooltip)."""
+    treffer = sorted(treffer, key=sortier_schluessel)
+    if hoechstens is None:
+        return [t.satz(subjekt, nenne_eigene) for t in treffer]
+    verlierer = sum(1 for t in treffer if t.verhaeltnis == DIESE_TIEFER)
+    anzahl = max(int(hoechstens), min(verlierer, MAX_VERLIERER_AUSGESCHRIEBEN))
+    zeilen = [t.satz(subjekt, nenne_eigene) for t in treffer[:anzahl]]
+    rest = treffer[anzahl:]
+    if rest:
+        zeilen.append(_rest_zeile(rest, subjekt))
     return zeilen

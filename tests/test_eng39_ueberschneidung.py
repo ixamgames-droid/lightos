@@ -79,7 +79,7 @@ def test_teilweise_gemeinsame_geraete_zaehlen_nur_die_gemeinsamen(fm):
     a = _matrix(fm, "A", [1, 2, 3, 4])
     b = _matrix(fm, "B", [3, 4, 5, 6])
     (t,) = _suche(fm, a, [b])
-    assert t.geraete == frozenset({3, 4}) and t.geraete_text == "2 Geräten"
+    assert t.geraete == frozenset({3, 4}) and t.geraete_text == "von 2 Geräten"
 
 
 def test_szene_wird_je_geraet_gelesen_nicht_ueber_alles_vereint(fm):
@@ -134,8 +134,8 @@ def test_gleiche_stufe_sagt_zuletzt_gestartet_gewinnt(fm):
     b = _matrix(fm, "Lauflicht HG", HINTERGRUND)
     (t,) = _suche(fm, a, [b], gruppen=[("Hintergrund", HINTERGRUND)])
     assert t.satz() == (
-        "Diese Taste und „Lauflicht HG“ steuern beide den Dimmer von "
-        "Hintergrund — gleiche Stufe, es gewinnt, wer zuletzt gestartet wurde.")
+        "Diese Taste und „Lauflicht HG“ steuern beide den Dimmer der Gruppe "
+        "„Hintergrund“ — gleiche Stufe, es gewinnt, wer zuletzt gestartet wurde.")
 
 
 def test_andere_liegt_eine_stufe_hoeher_und_gewinnt(fm):
@@ -167,29 +167,33 @@ def test_eigene_zahl_nennt_beide_namen_statt_einer_stufenzahl(fm):
         "— „Alt“ liegt höher (eigene Zahl (10) über Effekte) und gewinnt.")
 
 
-def test_reihenfolge_gleich_vor_verlieren_vor_gewinnen(fm):
+def test_reihenfolge_verlieren_vor_gleich_vor_gewinnen(fm):
+    """Seit der Sichtprobe: zuerst, wogegen man verliert (vorher stand der
+    Gleichstand vorn)."""
     ich = _matrix(fm, "Ich", HINTERGRUND, stufe=AKZENTE)
     unten = _matrix(fm, "Unten", HINTERGRUND, stufe=0)
     oben = _matrix(fm, "Oben", HINTERGRUND, stufe=STROBE)
     gleich = _matrix(fm, "Gleich", HINTERGRUND, stufe=AKZENTE)
     namen = [t.andere.name for t in _suche(fm, ich, [unten, oben, gleich])]
-    assert namen == ["Gleich", "Oben", "Unten"]
+    assert namen == ["Oben", "Gleich", "Unten"]
 
 
 # ── Geraete in Worten ────────────────────────────────────────────────────────
 
 def test_gruppenname_nur_wenn_die_gemeinsamen_geraete_genau_die_gruppe_sind():
     gruppen = [("Hintergrund", HINTERGRUND), ("Himmel", HIMMEL)]
-    assert U.geraete_text(HINTERGRUND, gruppen) == "Hintergrund"
-    assert U.geraete_text([1, 2, 3], gruppen) == "3 Geräten", "Teilmenge"
-    assert U.geraete_text([1, 2, 3, 4, 5], gruppen) == "5 Geräten", "mehr"
-    assert U.geraete_text(HINTERGRUND) == "4 Geräten"
+    assert U.geraete_text(HINTERGRUND, gruppen) == "der Gruppe „Hintergrund“"
+    assert U.geraete_text([1, 2, 3], gruppen) == "von 3 Geräten", "Teilmenge"
+    assert U.geraete_text([1, 2, 3, 4, 5], gruppen) == "von 5 Geräten", "mehr"
+    assert U.geraete_text(HINTERGRUND) == "von 4 Geräten"
 
 
 def test_ein_einzelnes_geraet_heisst_beim_namen():
-    assert U.geraete_text([7], geraete_name=lambda f: "Spot links") == "„Spot links“"
-    assert U.geraete_text([7]) == "1 Gerät"
-    assert U.geraete_text([7], [("Solo", [7])]) == "Solo"
+    assert (U.geraete_text([7], geraete_name=lambda f: "Spot links")
+            == "des Geräts „Spot links“")
+    assert U.geraete_text([7]) == "eines Geräts"
+    assert U.geraete_text([7], [("Solo", [7])]) == "der Gruppe „Solo“"
+    assert U.geraete_text([1, 2, 3]) == "von 3 Geräten"
 
 
 def test_mehrere_bausteine_werden_aufgezaehlt(fm):
@@ -268,7 +272,8 @@ def test_hoechstens_drei_ausgeschrieben_dann_und_n_weitere(fm):
     zeilen = U.hinweis_zeilen(_suche(fm, ich, andere))
     assert len(zeilen) == 4
     assert all(z.startswith("Diese Taste und „Effekt") for z in zeilen[:3])
-    assert zeilen[3] == "… und 2 weitere"
+    assert zeilen[3] == ("… und 2 weitere Überschneidungen: bei 2 entscheidet, "
+                         "wer zuletzt gestartet wurde.")
     assert len(U.hinweis_zeilen(_suche(fm, ich, andere[:3]))) == 3
     assert U.hinweis_zeilen([]) == []
 
@@ -286,3 +291,100 @@ def test_die_rechnung_veraendert_keine_funktion(fm):
     vorher = (a.to_dict(), b.to_dict())
     _suche(fm, a, [b])[0].satz()
     assert (a.to_dict(), b.to_dict()) == vorher
+
+
+# ── Nachtrag Sichtprobe: Reihenfolge, Verlierer nie abgeschnitten, Wortlaut ──
+
+def test_verlierer_zuerst_dann_gleichstand_dann_gewinne(fm):
+    """Die Zeile beginnt mit dem, wogegen die Taste verliert — nicht mehr
+    alphabetisch ueber alles."""
+    ich = _matrix(fm, "Ich", HINTERGRUND, stufe=AKZENTE)
+    andere = [
+        _matrix(fm, "Aaa Grundlicht", HINTERGRUND),                 # ich gewinne
+        _matrix(fm, "Bbb Gleich", HINTERGRUND, stufe=AKZENTE),      # Gleichstand
+        _matrix(fm, "Zzz Strobe", HINTERGRUND, stufe=STROBE),       # ich verliere
+        _matrix(fm, "Yyy Notfall", HINTERGRUND, stufe=NOTFALL),     # ich verliere
+        _matrix(fm, "Abc Gleich", HINTERGRUND, stufe=AKZENTE),      # Gleichstand
+    ]
+    treffer = _suche(fm, ich, andere)
+    assert [t.andere.name for t in treffer] == [
+        "Yyy Notfall", "Zzz Strobe", "Abc Gleich", "Bbb Gleich", "Aaa Grundlicht"]
+    assert [t.verhaeltnis for t in treffer] == [
+        U.DIESE_TIEFER, U.DIESE_TIEFER, U.GLEICH, U.GLEICH, U.DIESE_HOEHER]
+    # hinweis_zeilen sortiert selbst — auch eine unsortierte Liste.
+    zeilen = U.hinweis_zeilen(list(reversed(treffer)))
+    assert "„Yyy Notfall“ liegt" in zeilen[0] and "„Zzz Strobe“ liegt" in zeilen[1]
+    assert "„Abc Gleich“" in zeilen[2]
+    assert zeilen[3] == ("… und 2 weitere Überschneidungen: bei 1 entscheidet, "
+                         "wer zuletzt gestartet wurde; gegen 1 gewinnt diese Taste.")
+
+
+def test_der_verlierer_fall_verschwindet_nie_hinter_und_n_weitere(fm):
+    """Sichtprobe: drei Eintraege alphabetisch, dann „… und 3 weitere“ — und
+    genau der Effekt, gegen den die Taste verliert, stand nicht mehr da."""
+    ich = _matrix(fm, "Ich", HINTERGRUND)
+    gleiche = [_matrix(fm, f"Effekt {i}", HINTERGRUND) for i in range(5)]
+    staerker = _matrix(fm, "Zzz Blinder", HINTERGRUND, stufe=STROBE)
+    zeilen = U.hinweis_zeilen(_suche(fm, ich, gleiche + [staerker]))
+    assert "„Zzz Blinder“ liegt zwei Stufen höher und gewinnt." in zeilen[0]
+    assert len(zeilen) == 4
+    assert zeilen[-1] == ("… und 3 weitere Überschneidungen: bei 3 entscheidet, "
+                          "wer zuletzt gestartet wurde.")
+
+
+def test_mehr_verlierer_als_drei_stehen_alle_da(fm):
+    ich = _matrix(fm, "Ich", HINTERGRUND, stufe=GRUNDLICHT)
+    staerker = [_matrix(fm, f"Stark {i}", HINTERGRUND, stufe=STROBE)
+                for i in range(5)]
+    schwach = _matrix(fm, "Aaa Schwach", HINTERGRUND, stufe=GRUNDLICHT)
+    zeilen = U.hinweis_zeilen(_suche(fm, ich, staerker + [schwach]))
+    assert len(zeilen) == 6, "fuenf Verlierer ausgeschrieben + eine Restzeile"
+    assert all(f"„Stark {i}“ liegt" in zeilen[i] for i in range(5))
+    assert zeilen[-1] == ("… und 1 weitere Überschneidung: bei 1 entscheidet, "
+                          "wer zuletzt gestartet wurde.")
+
+
+def test_sehr_viele_verlierer_die_restzeile_sagt_es_ausdruecklich(fm):
+    """Ueber ``MAX_VERLIERER_AUSGESCHRIEBEN`` hinaus fasst die Zeile zusammen —
+    nennt dann aber, dass die Taste gegen die uebrigen ebenfalls verliert."""
+    ich = _matrix(fm, "Ich", HINTERGRUND, stufe=GRUNDLICHT)
+    n = U.MAX_VERLIERER_AUSGESCHRIEBEN + 3
+    staerker = [_matrix(fm, f"Stark {i:02d}", HINTERGRUND, stufe=AKZENTE)
+                for i in range(n)]
+    gleich = _matrix(fm, "Gleich", HINTERGRUND, stufe=GRUNDLICHT)
+    treffer = _suche(fm, ich, staerker + [gleich])
+    zeilen = U.hinweis_zeilen(treffer)
+    assert len(zeilen) == U.MAX_VERLIERER_AUSGESCHRIEBEN + 1
+    assert zeilen[-1] == ("… und 4 weitere Überschneidungen: gegen 3 verliert "
+                          "diese Taste; bei 1 entscheidet, wer zuletzt gestartet "
+                          "wurde.")
+    # Vollstaendig (Tooltip): jeder Treffer ein Satz, keine Restzeile.
+    alle = U.hinweis_zeilen(treffer, hoechstens=None)
+    assert len(alle) == n + 1 and not any(z.startswith("…") for z in alle)
+    assert alle[:len(zeilen) - 1] == zeilen[:-1]
+
+
+def test_restzeile_fuer_die_ansicht_spricht_vom_effekt(fm):
+    ich = _matrix(fm, "Ich", HINTERGRUND, stufe=STROBE)
+    schwach = [_matrix(fm, f"Schwach {i}", HINTERGRUND) for i in range(4)]
+    zeilen = U.hinweis_zeilen(_suche(fm, ich, schwach), "Effekt")
+    assert zeilen[-1] == ("… und 1 weitere Überschneidung: gegen 1 gewinnt "
+                          "dieser Effekt.")
+
+
+def test_namen_von_gruppe_und_geraet_stehen_in_anfuehrungszeichen(fm):
+    """Sichtprobe: „… den Dimmer von Alle PAR“ klang holprig."""
+    a = _matrix(fm, "Puls", HINTERGRUND)
+    b = _matrix(fm, "Lauflicht", HINTERGRUND)
+    (t,) = _suche(fm, a, [b], gruppen=[("Alle PAR", HINTERGRUND)])
+    assert "steuern beide den Dimmer der Gruppe „Alle PAR“ — " in t.satz()
+    assert "von Alle PAR" not in t.satz()
+    c = _matrix(fm, "Solo A", [7])
+    d = _matrix(fm, "Solo B", [7])
+    (t,) = _suche(fm, c, [d], geraete_name=lambda fid: "Spot links")
+    assert "steuern beide den Dimmer des Geräts „Spot links“ — " in t.satz()
+    (t,) = _suche(fm, c, [d])
+    assert "steuern beide den Dimmer eines Geräts — " in t.satz()
+    d.modify = True
+    (t,) = _suche(fm, c, [d], gruppen=[("Vorne", [7])])
+    assert "fassen beide den Dimmer der Gruppe „Vorne“ an — " in t.satz()

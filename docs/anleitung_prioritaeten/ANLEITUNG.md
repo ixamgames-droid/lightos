@@ -123,26 +123,31 @@ Beim Bauen der Virtual Console sagt dir LightOS, wenn zwei Tasten dasselbe anfas
 1. In der Virtual Console **Bearbeiten** einschalten und eine Taste mit der Aktion
    **Funktion an/aus** oder **Funktion (nur gehalten)** anklicken.
 2. Steuert eine **andere Taste** (oder ein Fader, der seinen Effekt startet) an **denselben
-   Geräten denselben Baustein**, steht unter **Ziele** in der Zeile **Hinweis** ein gelber
-   Text, zum Beispiel:
+   Geräten denselben Baustein**, steht gleich unter **Aktion** ein gelber **Hinweis** über
+   die ganze Breite, zum Beispiel:
 
-   > Diese Taste und „Lauflicht HG“ steuern beide den Dimmer von Hintergrund — gleiche Stufe,
-   > es gewinnt, wer zuletzt gestartet wurde.
+   > Diese Taste und „Lauflicht HG“ steuern beide den Dimmer der Gruppe „Hintergrund“ —
+   > gleiche Stufe, es gewinnt, wer zuletzt gestartet wurde.
 
    oder
 
-   > Diese Taste und „Blinder“ steuern beide den Dimmer von Hintergrund — „Blinder“ liegt
-   > eine Stufe höher und gewinnt.
+   > Diese Taste und „Blinder“ steuern beide den Dimmer der Gruppe „Hintergrund“ —
+   > „Blinder“ liegt eine Stufe höher und gewinnt.
 
-3. Der Text nennt die Gruppe, wenn die gemeinsamen Geräte genau eine Gruppe sind, sonst die
-   Zahl der Geräte. Höchstens drei Treffer werden ausgeschrieben, danach steht
-   **… und n weitere**.
-4. Ändere die Stufe (Abschnitt 3 oder 4) oder das Ziel der Taste — der Hinweis zieht sofort
+3. Der Text nennt die Gruppe, wenn die gemeinsamen Geräte genau eine Gruppe sind, bei einem
+   einzelnen Gerät dessen Namen, sonst die Zahl der Geräte.
+4. **Reihenfolge:** zuerst alle Effekte, gegen die diese Taste **verliert**, dann die auf
+   gleicher Stufe, dann die, gegen die sie gewinnt. Höchstens drei Treffer werden
+   ausgeschrieben — die Effekte, gegen die die Taste verliert, aber immer (auch wenn es mehr
+   als drei sind). Der Rest steht in einer Zeile, die sagt, wie es um ihn steht, zum Beispiel
+   **… und 3 weitere Überschneidungen: bei 1 entscheidet, wer zuletzt gestartet wurde; gegen
+   2 gewinnt diese Taste.** Die **vollständige Liste** zeigt der Tooltip der gelben Zeile.
+5. Ändere die Stufe (Abschnitt 3 oder 4) oder das Ziel der Taste — der Hinweis zieht sofort
    nach. Ohne Überschneidung ist die Zeile nicht da.
 
 Der Hinweis ist **nur eine Auskunft**: er ändert nichts, sperrt nichts und fragt nichts ab.
 Dieselben Sätze stehen im Reiter **Prioritäten** als Tooltip an der Zeile des Effekts
-(„Dieser Effekt und …“).
+(„Dieser Effekt und …“) — dort immer vollständig.
 
 Wann **kein** Hinweis kommt:
 

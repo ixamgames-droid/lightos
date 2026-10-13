@@ -285,9 +285,10 @@ class PrioritaetenView(QWidget):
                           if f is not None]
             aus: dict[int, list[str]] = {}
             for f in funktionen:
+                # Tooltip: die vollstaendige Liste, nichts zusammengefasst.
                 zeilen = ueberschneidung.hinweis_zeilen(
                     ueberschneidung.ueberschneidungen(f, funktionen, **umgebung),
-                    "Effekt")
+                    "Effekt", hoechstens=None)
                 if zeilen:
                     aus[int(f.id)] = zeilen
             return aus
