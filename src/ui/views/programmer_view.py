@@ -678,6 +678,20 @@ class ProgrammerView(QWidget):
         create_row.addWidget(b_capture)
         create_row.addStretch(1)
         v.addLayout(create_row)
+        # IMP-2: Szenen aus einem anderen Lichtprogramm ueber den DMX-Eingang
+        # mitschneiden. Eigene Zeile, damit die obere nicht breiter wird.
+        import_row = QHBoxLayout()
+        b_mitschnitt = QPushButton("Mitschnitt-Assistent...")
+        b_mitschnitt.setToolTip(
+            "Szenen aus einem anderen Lichtprogramm übernehmen: LightOS hält das "
+            "über Art-Net/sACN empfangene DMX auf Knopfdruck als Szene fest.\n"
+            "Der Assistent liest nur den Eingang und gibt selbst nichts aus."
+        )
+        b_mitschnitt.clicked.connect(self._open_mitschnitt)
+        import_row.addWidget(b_mitschnitt)
+        import_row.addStretch(1)
+        v.addLayout(import_row)
+        self._btn_mitschnitt = b_mitschnitt
         self._effects_list = QListWidget()
         self._effects_list.itemDoubleClicked.connect(self._on_effect_toggle)
         v.addWidget(self._effects_list, stretch=1)
@@ -814,6 +828,16 @@ class ProgrammerView(QWidget):
                 self._refresh_effects_list()
         except Exception as e:
             QMessageBox.warning(self, "Effekt-Assistent", str(e))
+
+    def _open_mitschnitt(self):
+        """IMP-2: Mitschnitt-Assistent — legt Szenen (und auf Wunsch einen
+        Chaser) aus dem empfangenen DMX an."""
+        try:
+            from src.ui.widgets.mitschnitt_dialog import MitschnittDialog
+            MitschnittDialog(self).exec()
+        except Exception as e:
+            QMessageBox.warning(self, "Mitschnitt-Assistent", str(e))
+        self._refresh_effects_list()
 
     def _new_effect(self, kind: str):
         """Legt eine Szene/einen Chaser an und öffnet direkt den Editor."""

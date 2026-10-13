@@ -281,6 +281,38 @@ detail: [Button](../anleitung_vc_widgets/01_button.md) and
 
 ---
 
+## 11. Take over scenes from another program (capture)
+
+If you switch from another lighting program you do not have to rebuild your scenes:
+the old program outputs them one after another, LightOS listens on its Art-Net or sACN
+input and stores the current state as a scene at the press of a button.
+
+**Before you start:** the patch exists in LightOS (same fixtures on the same addresses),
+the input is switched on (menu **Ausgabe → Konfigurieren...**, tab **DMX Input**:
+tick **Art-Net Input aktivieren** or **sACN Input aktivieren**, set **Eingehendes
+Universe** and **Merge in Universe**, press **Übernehmen**), and the other program
+sends to this computer.
+
+**Capture:** in the Programmer open the tab **Assistent** and choose
+**Mitschnitt-Assistent...**. Recall a scene in the old program, wait until it stands
+still and press **Als Szene festhalten** (or the **space bar**). Repeat for each scene.
+Tick **Am Ende als Chaser zusammenfassen** and set **Schrittzeit:** if the scenes should
+run one after another, then press **Fertig**.
+
+- Only a steady picture is taken (unchanged for 0.5 s, field **Ruhig nach:**); during a
+  running crossfade the button declines and says so.
+- Default is **Alle gepatchten Kanäle** (the whole picture). Lasers are left out as a
+  safety default unless you tick **Laser mit aufnehmen**.
+- Every captured scene is one undo step (**Ctrl+Z**), the chaser another one.
+- The assistant only reads the input. It outputs nothing and changes neither the
+  Programmer nor running functions.
+
+**Limits:** channel values only; no effects as effects (a chase becomes still
+pictures); no buttons, faders or pages; one universe per protocol; times have to be set
+by hand.
+
+---
+
 ## If something does not fit
 
 | Observation | Cause | What to do |
