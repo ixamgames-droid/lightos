@@ -23,6 +23,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, Qt                                # noqa: E402
+from PySide6.QtGui import QFont                                      # noqa: E402
 from PySide6.QtTest import QTest                                     # noqa: E402
 from PySide6.QtWidgets import QApplication                           # noqa: E402
 
@@ -222,6 +223,330 @@ class WerkzeugleisteBleibtGleichHochTest(_MitAnsicht):
                 self.app.processEvents()
                 self.assertEqual(v._splitter.geometry().top(), oben, f"Breite {breite}")
             self.assertEqual(self._lage_taste().y(), lage)
+
+
+class SchwierigeEffektnamenTest(_MitAnsicht):
+    """Gegenpruefung: Namen, die eine Zeile hoeher machen koennten (Zeilenumbruch,
+    HTML-Markup, sehr lang), und mehrere gleichzeitig laufende Effekte."""
+
+    NAMEN = (
+        "Sehr langer Effektname " * 40,
+        "Zeile 1\nZeile 2\nZeile 3",
+        "<h1>Gross</h1><br><br><table><tr><td>a</td></tr><tr><td>b</td></tr></table>",
+    )
+
+    def test_kein_name_veraendert_hoehe_oder_lage(self):
+        vorher = (self._lage_taste(), self._lage_konsole())
+        for name in self.NAMEN:
+            self.fn.name = name
+            self.fm.start(self.fn.id)
+            self._takt()
+            lbl = self.view._lbl_active_fx
+            self.assertIn("Aktiver Effekt", lbl.text())
+            self.assertEqual(lbl.height(), self.view._ZEILE_AKTIVER_EFFEKT_H, name[:20])
+            self.assertEqual((self._lage_taste(), self._lage_konsole()), vorher, name[:20])
+            self.fm.stop(self.fn.id)
+            self._takt()
+            self.assertEqual((self._lage_taste(), self._lage_konsole()), vorher, name[:20])
+
+    def test_name_wird_als_reiner_text_in_einer_zeile_gezeigt(self):
+        """Ein Effektname ist kein Markup: „<h1>…“ darf nicht als Ueberschrift
+        gesetzt werden, und ein Zeilenumbruch im Namen darf die (22 px hohe)
+        Zeile nicht auf ihre mittlere Textzeile verkuerzen."""
+        lbl = self.view._lbl_active_fx
+        self.assertEqual(lbl.textFormat(), Qt.TextFormat.PlainText)
+        self.assertFalse(lbl.wordWrap())
+        self.fn.name = "Zeile 1\nZeile 2\tZeile 3"
+        self.fm.start(self.fn.id)
+        self._takt()
+        self.assertNotIn("\n", lbl.text())
+        self.assertNotIn("\t", lbl.text())
+        self.assertIn("Zeile 1 Zeile 2 Zeile 3", lbl.text())
+
+    def test_mehrere_effekte_nacheinander_verschieben_nichts(self):
+        weitere = [self.fm.new_efx(f"VCB47-weiterer-{i}") for i in range(3)]
+        try:
+            vorher = (self._lage_taste(), self._lage_konsole())
+            for fn in [self.fn] + weitere:
+                self.fm.start(fn.id)
+                self._takt()
+                self.assertEqual((self._lage_taste(), self._lage_konsole()), vorher)
+            self.assertIn("(+3 weitere)", self.view._lbl_active_fx.text())
+            for fn in weitere + [self.fn]:
+                self.fm.stop(fn.id)
+                self._takt()
+                self.assertEqual((self._lage_taste(), self._lage_konsole()), vorher)
+            self.assertEqual(self.view._lbl_active_fx.text(), self.view._TEXT_KEIN_EFFEKT)
+        finally:
+            for fn in weitere:
+                self.fm.stop(fn.id)
+                self.fm.remove(fn.id)
+
+
+class WechselUndFensterTest(_MitAnsicht):
+    """Gegenpruefung: Wechsel Bearbeiten/Bedienen, Bank-Wechsel, Bibliothek,
+    Popout und Zurueckholen, groessere Programmschrift — jeweils mit laufendem
+    Effekt, in vielen Fensterbreiten."""
+
+    # Unterhalb davon waechst das freistehende Testfenster im Bearbeiten-Modus
+    # von selbst (Mindestbreite der Bearbeiten-Leiste); das Hauptfenster ist
+    # ohnehin mindestens 900 px breit.
+    BREITEN = range(540, 1500, 16)
+
+    def _oben(self):
+        return (self.view._splitter.geometry().top(), self._lage_taste())
+
+    def test_bearbeiten_und_zurueck_landet_an_derselben_stelle(self):
+        v = self.view
+        for breite in self.BREITEN:
+            v.resize(breite, self.HOEHE)
+            self.app.processEvents()
+            self.app.processEvents()
+            vorher = self._oben()
+            v._btn_edit.setChecked(True)
+            self.app.processEvents()
+            self.fm.start(self.fn.id)
+            self._takt()
+            v._btn_edit.setChecked(False)
+            self.app.processEvents()
+            self._takt()
+            self.assertEqual(self._oben(), vorher, f"Breite {breite}")
+            self.fm.stop(self.fn.id)
+            self._takt()
+            self.assertEqual(self._oben(), vorher, f"Breite {breite}")
+
+    def test_effekt_start_und_stopp_in_jeder_fensterbreite(self):
+        v = self.view
+        for breite in range(280, 1500, 9):
+            v.resize(breite, self.HOEHE)
+            self.app.processEvents()
+            self.app.processEvents()
+            vorher = self._oben()
+            self.fm.start(self.fn.id)
+            self._takt()
+            self.assertEqual(self._oben(), vorher, f"Breite {breite}")
+            self.fm.stop(self.fn.id)
+            self._takt()
+            self.assertEqual(self._oben(), vorher, f"Breite {breite}")
+
+    def test_bank_wechsel_und_bibliothek_verschieben_die_konsole_nicht(self):
+        v = self.view
+        for breite in self.BREITEN:
+            v.resize(breite, self.HOEHE)
+            self.app.processEvents()
+            self.app.processEvents()
+            oben = v._splitter.geometry().top()
+            links = v._main_scroll.mapTo(v, QPoint(0, 0))
+            for bank in (9, 0):
+                v._canvas.set_active_bank(bank)
+                self.app.processEvents()
+                self.assertEqual(v._splitter.geometry().top(), oben, f"Breite {breite}")
+            for sichtbar in (False, True):
+                v._btn_sidebar.setChecked(sichtbar)
+                self.app.processEvents()
+                self.app.processEvents()
+                self.assertEqual(v._splitter.geometry().top(), oben, f"Breite {breite}")
+                self.assertEqual(v._main_scroll.mapTo(v, QPoint(0, 0)), links)
+        self.assertEqual(v._lbl_bank.width(), v._lbl_bank.minimumWidth())
+
+    def test_popout_und_zurueckholen(self):
+        v = self.view
+        vorher = (self._lage_taste(), self._lage_konsole())
+        v._popout_canvas()
+        self.app.processEvents()
+        fenster = v._popout_window
+        try:
+            lage_im_popout = self.taste.mapTo(fenster, QPoint(0, 0))
+            self.fm.start(self.fn.id)
+            self._takt()
+            self.assertEqual(self.taste.mapTo(fenster, QPoint(0, 0)), lage_im_popout)
+            self.fm.stop(self.fn.id)
+            self._takt()
+            self.assertEqual(self.taste.mapTo(fenster, QPoint(0, 0)), lage_im_popout)
+            self.fm.start(self.fn.id)
+            self._takt()
+        finally:
+            fenster.close()
+            self.app.processEvents()
+        self._takt()
+        self.assertIsNone(v._popout_window)
+        self.assertEqual((self._lage_taste(), self._lage_konsole()), vorher)
+        self.fm.stop(self.fn.id)
+        self._takt()
+        self.assertEqual((self._lage_taste(), self._lage_konsole()), vorher)
+
+    def test_groessere_programmschrift_aendert_nichts(self):
+        v = self.view
+        alt = self.app.font()
+        gross = QFont(alt)
+        gross.setPointSize(max(1, alt.pointSize()) * 2)
+        self.app.setFont(gross)
+        try:
+            self.app.processEvents()
+            for breite in range(540, 1500, 40):
+                v.resize(breite, self.HOEHE)
+                self.app.processEvents()
+                self.app.processEvents()
+                vorher = self._oben()
+                for knopf in (v._btn_pickup, v._btn_touch_lock):
+                    for zustand in (True, False):
+                        knopf.setChecked(zustand)
+                        self.app.processEvents()
+                        self.app.processEvents()
+                        self.assertEqual(self._oben(), vorher, f"Breite {breite}")
+                self.fm.start(self.fn.id)
+                self._takt()
+                self.assertEqual(self._oben(), vorher, f"Breite {breite}")
+                self.assertEqual(v._lbl_active_fx.height(), v._ZEILE_AKTIVER_EFFEKT_H)
+                self.fm.stop(self.fn.id)
+                self._takt()
+        finally:
+            self.app.setFont(alt)
+            self.app.processEvents()
+
+
+class _ImHauptfenster(unittest.TestCase):
+    """Die Konsole im echten Hauptfenster (Thema, Kopfleisten, Kiosk-Streifen).
+    Gemessen wird in Fensterkoordinaten — dort, wo der Finger tippt."""
+
+    KIOSK = False
+    __test__ = False
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = _app()
+        import src.ui.main_window as MW
+        cls.fm = get_state().function_manager
+        cls.fm.stop_all()
+        cls.fn = cls.fm.new_efx("VCB47-Hauptfenster")
+        cls._lock_vorher = VCWidget.input_locked
+        cls._pickup_vorher = VCSlider.soft_takeover
+        cls.w = MW.MainWindow(kiosk=cls.KIOSK)
+        cls.w.resize(1100, 700)
+        cls.w.show()
+        cls.view = cls.w._vc_view
+        cls.w._stack.setCurrentIndex(cls.w._stack.indexOf(cls.view))
+        cls.app.processEvents()
+        cls.view._active_fx_timer.stop()
+        cls.taste = cls.view._canvas._add_widget("VCButton", QPoint(120, 80))
+        cls.taste.action = ButtonAction.FUNCTION_TOGGLE
+        cls.taste.function_id = cls.fn.id
+        cls.app.processEvents()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.fm.stop(cls.fn.id)
+        cls.fm.remove(cls.fn.id)
+        VCWidget.input_locked = cls._lock_vorher
+        VCSlider.soft_takeover = cls._pickup_vorher
+        cls.w._state.laser_estop_active = cls._estop_vorher
+        cls.w.hide()
+        cls.w.deleteLater()
+        cls.app.processEvents()
+
+    def setUp(self):
+        type(self)._estop_vorher = getattr(type(self), "_estop_vorher", bool(
+            getattr(self.w._state, "laser_estop_active", False)))
+        self.view._active_fx_timer.stop()
+        self.fm.stop(self.fn.id)
+        self._takt()
+
+    def _takt(self):
+        self.view._update_active_fx()
+        self.app.processEvents()
+        self.app.processEvents()
+
+    def _lage(self):
+        return self.taste.mapTo(self.w, QPoint(0, 0))
+
+    def test_erster_klick_verschiebt_die_taste_im_fenster_nicht(self):
+        vorher = self._lage()
+        mitte = self.taste.mapTo(self.w, self.taste.rect().center())
+        self.assertIs(self.w.childAt(mitte), self.taste)
+        QTest.mouseClick(self.taste, Qt.MouseButton.LeftButton)
+        self.assertTrue(self.fn.is_running)
+        self._takt()
+        self.assertEqual(self._lage(), vorher)
+        self.assertIs(self.w.childAt(mitte), self.taste)
+        self.fm.stop(self.fn.id)
+        self._takt()
+        self.assertEqual(self._lage(), vorher)
+
+    def test_umschaltknoepfe_behalten_ihre_breite_auch_mit_programmthema(self):
+        """Die Mindestbreite wird beim Bau gemessen, bevor der Knopf im Fenster
+        sitzt. Das Programmthema darf die Messung nicht entwerten."""
+        v = self.view
+        vorher_lage = self._lage()
+        for knopf in (v._btn_pickup, v._btn_touch_lock, v._btn_midi_learn):
+            breite = knopf.width()
+            knopf.setChecked(True)
+            self.app.processEvents()
+            self.app.processEvents()
+            self.assertEqual(knopf.width(), breite, knopf.text())
+            self.assertLessEqual(knopf.sizeHint().width(), knopf.minimumWidth(), knopf.text())
+            self.assertEqual(self._lage(), vorher_lage, knopf.text())
+            knopf.setChecked(False)
+            self.app.processEvents()
+            self.app.processEvents()
+            self.assertEqual(knopf.width(), breite, knopf.text())
+            self.assertLessEqual(knopf.sizeHint().width(), knopf.minimumWidth(), knopf.text())
+            self.assertEqual(self._lage(), vorher_lage, knopf.text())
+
+    def test_laser_notaus_und_kopfzeilen_verschieben_die_konsole_nicht(self):
+        """Sicherheitsanzeigen bleiben sichtbar und unveraendert — sie duerfen
+        nur die Tasten nicht verschieben (Blinken, Text „… AKTIV“, Sperrzonen-
+        Hinweis, Validierungs- und Fremdwert-Hinweis in der Sektionsleiste)."""
+        w = self.w
+        vorher = self._lage()
+        knopf = w._btn_laser_notaus
+        self.assertTrue(knopf.isVisible(), "Der Laser-NOT-AUS muss sichtbar sein.")
+        groesse = knopf.size()
+        w._state.laser_estop_active = True
+        try:
+            for _ in range(3):
+                w._notaus_tick()
+                self.app.processEvents()
+                self.assertEqual(self._lage(), vorher)
+                self.assertEqual(knopf.size(), groesse)
+        finally:
+            w._state.laser_estop_active = self._estop_vorher
+            w._sync_notaus_button()
+            self.app.processEvents()
+        self.assertEqual(self._lage(), vorher)
+        zeile = getattr(w, "_sperrzonen_kopfzeile", None)
+        if zeile is not None:
+            war_sichtbar, text = not zeile.isHidden(), zeile.text()
+            zeile.setText("Sperrzonen: 3 aktiv")
+            zeile.setVisible(True)
+            self.app.processEvents()
+            self.assertEqual(self._lage(), vorher)
+            zeile.setText(text)
+            zeile.setVisible(war_sichtbar)
+            self.app.processEvents()
+        for lbl in (w._lbl_validation, w._lbl_foreign):
+            war_versteckt, text = lbl.isHidden(), lbl.text()
+            lbl.setText("⚠ 12 Hinweise in dieser Show")
+            lbl.show()
+            self.app.processEvents()
+            self.assertEqual(self._lage(), vorher)
+            lbl.setText(text)
+            lbl.setHidden(war_versteckt)
+            self.app.processEvents()
+        self.assertEqual(self._lage(), vorher)
+
+
+class ImHauptfensterTest(_ImHauptfenster):
+    __test__ = True
+
+
+class ImKioskFensterTest(_ImHauptfenster):
+    KIOSK = True
+    __test__ = True
+
+    def test_kiosk_zeigt_die_statuszeile_ebenfalls_fest(self):
+        self.assertTrue(self.view._lbl_active_fx.isVisible())
+        self.assertEqual(self.view._lbl_active_fx.height(),
+                         self.view._ZEILE_AKTIVER_EFFEKT_H)
 
 
 if __name__ == "__main__":

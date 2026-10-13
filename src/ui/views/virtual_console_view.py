@@ -450,6 +450,10 @@ class VirtualConsoleView(QWidget):
         # der Ansicht hochtreiben noch irgendetwas zur Seite schieben.
         self._lbl_active_fx.setSizePolicy(
             QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        # Ein Effektname ist kein Markup: „<h1>…" im Namen wuerde sonst als
+        # Ueberschrift gesetzt. Umbrochen wird nie — die Zeile bleibt einzeilig.
+        self._lbl_active_fx.setTextFormat(Qt.TextFormat.PlainText)
+        self._lbl_active_fx.setWordWrap(False)
         self._lbl_active_fx.setToolTip(
             "Zeigt den zuletzt gestarteten, noch laufenden Effekt und wie viele "
             "weitere gerade laufen.")
@@ -624,8 +628,11 @@ class VirtualConsoleView(QWidget):
                                 pass
             if active is not None:
                 extra = f"  (+{running - 1} weitere)" if running > 1 else ""
+                # Zeilenumbrueche/Tabulatoren im Namen zu Leerzeichen: in der
+                # 22 px hohen Zeile waere sonst nur die mittlere Textzeile zu sehen.
+                name = " ".join(str(active.name).split())
                 self._zeige_aktiven_effekt(
-                    f"Aktiver Effekt: {active.function_type.value} · {active.name}{extra}",
+                    f"Aktiver Effekt: {active.function_type.value} · {name}{extra}",
                     self._STIL_ZEILE_AKTIV)
             else:
                 self._zeige_aktiven_effekt(self._TEXT_KEIN_EFFEKT, self._STIL_ZEILE_LEER)
