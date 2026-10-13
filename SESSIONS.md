@@ -74,7 +74,7 @@
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
-| ENG-35 | A | - | 2026-10-12T18:15Z | - |
+| ENG-35 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | VCB-45 | A | - | 2026-10-12T18:15Z | - |
 | VCB-46 | A | - | 2026-10-12T18:15Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
@@ -289,7 +289,6 @@
 
 ## Verlauf
 
-- 2026-10-12T17:35Z D claim FM-75
 - 2026-10-12T17:48Z D claim PROC-21
 - 2026-10-12T17:50Z D done XPLAT-53
 - 2026-10-12T18:00Z D claim OUT-77
@@ -319,3 +318,4 @@
 - 2026-10-13T00:13Z A done LAS-32
 - 2026-10-13T13:52Z A done STAB-35
 - 2026-10-13T13:52Z A done STAB-36
+- 2026-10-13T13:54Z A aktualisiert ENG-35: Branch - -> feature/eng35-prioritaeten-stufen
