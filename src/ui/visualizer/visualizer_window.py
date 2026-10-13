@@ -296,6 +296,9 @@ def max_beam_range_pref() -> float:
     return float(min(val, MAX_BEAM_RANGE_MAX))
 
 
+from src.ui.visualizer.strobe_prefs import strobe_mode_pref, strobe_mode_value  # noqa: E402,F401  VIZ-104
+
+
 def _bildschirm_hz(view) -> float:
     """VIZ-85: Bildwiederholrate des Bildschirms, auf dem die Ansicht liegt
     (sonst des Hauptbildschirms); 0.0, wenn unbekannt. Die dynamische
@@ -1012,6 +1015,37 @@ class VisualizerBridge(QObject):
             fids = []
         self._poll_set("beamsOff", fids)
 
+    def _sync_sperrzonen(self) -> None:
+        """LAS-32 (S1): Sperrzonen + Laser-Felder an die Szene reichen — reine
+        Anzeige. Ein JSON-Text mit sortierten Schluesseln, damit derselbe
+        Bestand denselben Text ergibt (der Poll schickt nur Geaendertes)."""
+        # Alles im try: eine reine Anzeige darf den Aufrufer (_on_state raeumt
+        # danach geloeschte Geraete aus der Szene) nie abbrechen.
+        try:
+            from src.core.laser.sperrzonen import szenen_daten
+            from src.core.laser import sperrzonen_merker
+            daten = szenen_daten(self._state)
+            # Fenster „Sicht des Lasers": gemerkte Vorliebe dieses Rechners.
+            daten["lasersicht"] = sperrzonen_merker.lasersicht_zeigen()
+            text = json.dumps(daten, sort_keys=True)
+            VisualizerBridge._poll_set(self, "sperrzonen", text)
+        except Exception as e:                           # noqa: BLE001
+            print(f"[Visualizer] Sperrzonen-Abgleich: {e}")
+
+    @Slot(bool)
+    @_bridge_slot_guard
+    def sperrzonenLasersicht(self, an: bool):
+        """LAS-32: das Fenster „Sicht des Lasers" wurde IM 3D ein- oder
+        ausgeblendet (Kreuz am Fenster bzw. Knopf unten links). Nur merken und
+        weitersagen — reine Anzeige, an der Ausgabe aendert sich nichts."""
+        from src.core.laser import sperrzonen_merker
+        sperrzonen_merker.merke_lasersicht(bool(an))
+        VisualizerBridge._sync_sperrzonen(self)
+        try:
+            self._state._emit("sperrzonen_anzeige_changed", bool(an))
+        except Exception as e:                           # noqa: BLE001
+            print(f"[Visualizer] Sperrzonen-Anzeige: {e}")
+
     def _sync_placeable(self) -> None:
         """Zahl offener Platzierungen in den Poll stellen (idempotent)."""
         try:
@@ -1221,6 +1255,7 @@ class VisualizerBridge(QObject):
             except Exception as e:
                 print(f"[Visualizer] bridge sync subscribe error: {e}")
             self._subscribed = True
+            VisualizerBridge._sync_sperrzonen(self)   # LAS-32: Stand beim Oeffnen
 
     def dispose(self):
         """Melde den State-Subscriber wieder ab (idempotent). Vom Owner beim
@@ -2522,6 +2557,11 @@ class VisualizerBridge(QObject):
         ]
 
     def _on_state(self, event: str, data):
+        # LAS-32 (S1): Zonen/Felder gehoeren zur Show und haengen am Patch
+        # (welche Geraete Laser sind) -> bei allen dreien neu in den Poll.
+        if event in ("sperrzonen_changed", "sperrzonen_anzeige_changed",
+                     "show_loaded", "patch_changed"):
+            VisualizerBridge._sync_sperrzonen(self)
         if event == "show_loaded":
             # Review VIZ-71: zuerst die Show-Generation, damit schon der erste
             # Batch der neuen Show sie traegt.
@@ -2886,6 +2926,15 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
+        # LAS-32 (S1): Sperrzonen anlegen/bearbeiten und Laser-Felder eintragen.
+        act_sperrzonen = QAction("Sperrzonen…", self)
+        act_sperrzonen.setToolTip(
+            "Sperrzonen (rote Quader) und das Maximalfeld je Laser eintragen.\n"
+            "Nur Anzeige — schaltet den Laser NICHT ab.")
+        act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
+        tb.addAction(act_sperrzonen)
+        self._act_sperrzonen = act_sperrzonen
+
         tb.addSeparator()
 
         # Ausrichten/Verteilen der AUSGEWAEHLTEN Fixtures (Multi-Select per Marquee).
@@ -3019,14 +3068,18 @@ class VisualizerWindow(QMainWindow):
             n = self._combo_edit.count()
             self._combo_edit.setCurrentIndex((self._combo_edit.currentIndex() + 1) % n)
 
-        for key, fn in (
-            ("V", _toggle_view),
-            ("E", _cycle_edit),
-            ("F", self._on_key_f),
-            ("S", lambda: self._tabs.setCurrentIndex(1)),
-            ("D", lambda: self._act_dock.toggle()),
+        # UI-92: mit Beschreibung — der Tastenkuerzel-Dialog (Hilfe) zeigte
+        # diese fuenf als „(ohne Beschreibung)“.
+        for key, fn, was in (
+            ("V", _toggle_view, "Ansicht umschalten: 3D / 2D"),
+            ("E", _cycle_edit, "Modus umschalten: Ansehen / Bauen"),
+            ("F", self._on_key_f,
+             "Auswahl einpassen (Fokus in der 3D-Ansicht), sonst Reiter Fixtures"),
+            ("S", lambda: self._tabs.setCurrentIndex(1), "Reiter Bühne zeigen"),
+            ("D", lambda: self._act_dock.toggle(), "Andocken ein/aus"),
         ):
             sc = QShortcut(QKeySequence(key), self)
+            sc.setWhatsThis(was)
             sc.activated.connect(fn)
 
         # VIZ-11 (Schritt 6): Strg+Z/Y muss auch im eigenstaendigen
@@ -3633,6 +3686,45 @@ class VisualizerWindow(QMainWindow):
             "das Ergebnis der GPU-Erkennung dieses Rechners.")
         q_row.addWidget(self._lbl_gpu_tier)
         q_layout.addLayout(q_row)
+        # ── VIZ-104: Strobe im 3D zeigen (Blitzen / Gedaempft / Aus) ────────
+        from src.ui.visualizer import strobe_prefs
+        s_row = QHBoxLayout()
+        s_row.addWidget(QLabel("Strobe im 3D zeigen:"))
+        self._combo_strobe = QComboBox()
+        for wert, text in strobe_prefs.MODE_LABELS:
+            self._combo_strobe.addItem(text, wert)
+        self._combo_strobe.setToolTip(
+            "Wie ein Gerät mit Shutter im Strobe-Bereich in der 3D-Szene\n"
+            "gezeigt wird.\n\n"
+            "Blitzen = kurz an, lange aus, im Takt des Shutters. Gezeigt werden\n"
+            f"höchstens rund {strobe_prefs.CAP_HZ} Blitze je Sekunde — ein schnellerer Strobe\n"
+            "sieht 'schnell' aus, nicht exakt. Ein Blitz braucht mindestens drei\n"
+            "Bilder (eins an, zwei aus); auf einem langsamen Rechner sind es\n"
+            "deshalb weniger.\n"
+            f"Gedämpft = langsames, flaches Pulsieren statt An/Aus (höchstens {strobe_prefs.SOFT_MAX_HZ}-mal\n"
+            "je Sekunde).\n"
+            "Aus = Dauerlicht wie bisher.\n\n"
+            + strobe_prefs.WARNHINWEIS + "\n\n"
+            "Ändert nur die Darstellung, nicht die DMX-Ausgabe.\n"
+            "Gilt für dieses Gerät, nicht pro Show."
+        )
+        self._combo_strobe.setCurrentIndex(
+            max(0, self._combo_strobe.findData(strobe_prefs.strobe_mode_pref())))
+        self._combo_strobe.currentIndexChanged.connect(self._on_strobe_mode_changed)
+        # Die Auswahl darf schmaler werden als ihr laengster Eintrag (die
+        # aufgeklappte Liste zeigt ihn ganz) — sonst macht „Gedämpft (weiches
+        # Pulsieren)“ die Zeile breiter als die Spalte, und die Auswahl ist
+        # rechts abgeschnitten (Sichtprobe 2026-10-12). Dasselbe Muster wie
+        # bei der Stufe (VIZ-108).
+        self._combo_strobe.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo_strobe.setMinimumContentsLength(12)
+        s_row.addWidget(self._combo_strobe, 1)
+        q_layout.addLayout(s_row)
+        self._lbl_strobe_warnung = QLabel(strobe_prefs.WARNHINWEIS)
+        self._lbl_strobe_warnung.setWordWrap(True)
+        self._lbl_strobe_warnung.setStyleSheet("color: #d9a441; font-size: 11px;")
+        q_layout.addWidget(self._lbl_strobe_warnung)
         layout.addWidget(quality_group)
 
         # ── Helligkeit (NEU) ────────────────────────────────────────────────
@@ -5604,6 +5696,17 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] quality pref save error: {e}")
         self._on_reload_scene()
 
+    def _on_strobe_mode_changed(self, _idx: int = 0):
+        """VIZ-104: 'Strobe im 3D zeigen' geaendert — geraete-lokal merken und
+        an die Szene geben. KEIN Szenen-Neuladen: die Szene liest den Wert im
+        naechsten Bild (wie die Max-Strahllaenge)."""
+        from src.ui.visualizer import strobe_prefs
+        try:
+            strobe_prefs.save_strobe_mode(strobe_prefs.strobe_mode_value(self))
+        except Exception as e:
+            print(f"[Visualizer] strobe mode prefs error: {e}")
+        self._on_settings_changed()
+
     def _on_gpu_tier_reported(self, tier: str):
         """JS meldet die AKTIVE Stufe der laufenden Szene (Probe- oder
         Override-Ergebnis) — im Einstellungen-Tab anzeigen."""
@@ -5658,6 +5761,8 @@ class VisualizerWindow(QMainWindow):
                                     and self._chk_room.isChecked()),
             # VIZ-15: globale Max-Strahllaenge in Metern (0 = aus).
             "maxBeamRange":    beam_range_value(self),
+            # VIZ-104: Strobe im 3D zeigen ('flash' | 'soft' | 'off').
+            "strobeMode":      strobe_mode_value(self),
         }
 
     def _update_beam_range_label(self) -> None:
@@ -5751,7 +5856,38 @@ class VisualizerWindow(QMainWindow):
         except Exception as e:
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 
+    def _on_sperrzonen_dialog(self):
+        """LAS-32 (S1): den Sperrzonen-Dialog zeigen (nicht modal — das 3D
+        dahinter zeichnet jede Aenderung sofort)."""
+        from src.ui.visualizer.sperrzonen_ui import SperrzonenDialog
+        dlg = getattr(self, "_sperrzonen_dlg", None)
+        if dlg is None:
+            dlg = SperrzonenDialog(self._state, self)
+            self._sperrzonen_dlg = dlg
+        else:
+            dlg.neu_laden()
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
     def _on_state(self, event: str, _data):
+        if event == "sperrzonen_anzeige_changed":
+            # LAS-32: Fenster „Sicht des Lasers" im 3D geschlossen/geoeffnet ->
+            # der Haken im Sperrzonen-Dialog zieht nach.
+            dlg = getattr(self, "_sperrzonen_dlg", None)
+            if dlg is not None:
+                try:
+                    dlg.lasersicht_nachziehen()
+                except Exception as e:                   # noqa: BLE001
+                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+        if event in ("patch_changed", "show_loaded"):
+            # LAS-32: ein offener Sperrzonen-Dialog zeigt sonst die alte Show.
+            dlg = getattr(self, "_sperrzonen_dlg", None)
+            if dlg is not None and dlg.isVisible():
+                try:
+                    dlg.neu_laden()
+                except Exception as e:                   # noqa: BLE001
+                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
         if event == "patch_changed":
             self._refresh_patch_list()
         elif event == "show_loaded":
