@@ -39,6 +39,8 @@ class MatrixStyle(str, Enum):
 # Farbe sind MENGEN (lassen sich addieren/abziehen/abdunkeln); eine
 # Shutter-Stellung ist keine. EINE Liste — Engine und Editor fragen sie beide.
 _MODIFY_STILE = frozenset({MatrixStyle.DIMMER, MatrixStyle.RGB, MatrixStyle.RGBW})
+# ENG-40: „keine Kanalwahl" — EIN Objekt statt einer neuen leeren Menge je Frame.
+_KEINE_KANALWAHL: frozenset = frozenset()
 
 
 class RgbAlgorithm(str, Enum):
@@ -856,7 +858,7 @@ class RgbMatrixInstance(Function):
         # ENG-40: Kanalwahl („Wirkt auf"). Leer = Vorgabe, dann bleibt alles
         # unten Zeichen fuer Zeichen beim ENG-38-Verhalten. Sonst die Menge der
         # Kanal-Attribute, die dieser Modify-Effekt als EINZIGE schreibt.
-        kanalwahl = self._modify_kanalwahl() if farb_modify else frozenset()
+        kanalwahl = self._modify_kanalwahl() if farb_modify else _KEINE_KANALWAHL
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -1016,6 +1018,9 @@ class RgbMatrixInstance(Function):
             else:
                 cw = 0
                 cr, cg, cb = r, g, b
+            # ENG-40: Betrag der Kanalwahl EINMAL je Zelle, nicht je Kanal.
+            _kanal_betrag = (max(0, min(255, int(round(
+                self._pixel_brightness(rgb) * 255)))) if kanalwahl else 0)
             for ch in target_chans:      # FM-16: ganzes Fixture ODER nur ein Kopf
                 attr = (ch.attribute or "").lower()
                 # ── Style-Kanalmaske ────────────────────────────────────────
@@ -1030,8 +1035,7 @@ class RgbMatrixInstance(Function):
                                 attr == "color_w"
                                 and not _weiss_gehoert_zur_zelle):
                             continue
-                        val = max(0, min(255, int(round(
-                            self._pixel_brightness(rgb) * 255))))
+                        val = _kanal_betrag
                     elif attr == "color_r":
                         val = cr
                     elif attr == "color_g":
@@ -2352,10 +2356,24 @@ class RgbMatrixInstance(Function):
         Farb-Modify: im Stil Dimmer wird der Dimmer verrechnet, die Auswahl
         bleibt dort gemerkt, wirkt aber nicht — Farbe und Dimmer sind getrennt."""
         if not self._farb_modify():
-            return frozenset()
+            return _KEINE_KANALWAHL
+        roh = getattr(self, "modify_channels", ())
+        if not roh:
+            return _KEINE_KANALWAHL
+        # ENG-30: nicht in jedem Frame neu bauen. Die Menge haengt allein an
+        # der Auswahl; gemerkt wird sie zusammen mit dem Objekt, aus dem sie
+        # entstand. Der Editor weist bei jeder Aenderung ein NEUES Tupel zu —
+        # der Identitaetsvergleich genuegt also und kostet einen Zeiger-Test.
+        # Gemerkt wird nur ein Tupel: eine Liste liesse sich an Ort und Stelle
+        # aendern, ohne dass der Vergleich es saehe.
+        merker = getattr(self, "_kanalwahl_merker", None)
+        if merker is not None and merker[0] is roh:
+            return merker[1]
         from .modify import MODIFY_KANAL_ATTR, normalize_channels
-        return frozenset(MODIFY_KANAL_ATTR[k] for k in normalize_channels(
-            getattr(self, "modify_channels", ())))
+        menge = frozenset(MODIFY_KANAL_ATTR[k] for k in normalize_channels(roh))
+        if isinstance(roh, tuple):
+            self._kanalwahl_merker = (roh, menge)
+        return menge
 
     def to_dict(self) -> dict:
         d = super().to_dict()  # id, name, type, intensity, speed, folder
