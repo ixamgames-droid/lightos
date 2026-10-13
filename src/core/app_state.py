@@ -2813,6 +2813,7 @@ class AppState:
             # FM-52: mitgezogene Master-/Anker-Schluessel gehoeren zum Schritt.
             aenderungen = self._prog_unterschied(fid, vorher, self.programmer.get(fid, {}))
         self._verlauf_notiere(aenderungen, attr_label(key))
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
         # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
@@ -2875,6 +2876,7 @@ class AppState:
                 self.programmer.pop(fid, None)
         if alt is not None:
             self._verlauf_notiere([(fid, attribute, alt, None)], "Wert entfernen")
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
 
@@ -2909,6 +2911,9 @@ class AppState:
                 self.clear_remote_input()
             except Exception as e:
                 print(f"[app_state] clear_remote_input error: {e}")
+        # VCB-46: mit dem Wert geht auch sein Vorrang vor Dimmer-Effekten —
+        # auch wenn die Snap-Taste noch gehalten ist.
+        self._snap_dimmer_override_pruefen()
         if flush:
             self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
@@ -2988,6 +2993,7 @@ class AppState:
                     else:
                         self.programmer.setdefault(fid, {})[key] = int(wert)
                     betroffen.add(fid)
+            self._snap_dimmer_override_pruefen()                # VCB-46
             for fid in betroffen:
                 self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", None)
@@ -4855,6 +4861,35 @@ class AppState:
             if eintrag:
                 neu[fidi] = eintrag
         self.snap_dimmer_override = neu
+
+    def _snap_dimmer_override_pruefen(self) -> None:
+        """VCB-46: streicht jeden Eintrag aus ``snap_dimmer_override``, dessen
+        Wert NICHT mehr im Programmer steht.
+
+        Laeuft nach jeder Aenderung am Programmer. Ohne das bliebe der Eintrag
+        einer noch gehaltenen Taste nach „Programmer leeren“ (oder nachdem
+        jemand den Wert ueberschrieben hat) stehen — und ein spaeter von Hand
+        gezogener, zufaellig gleicher Dimmerwert uebersteuerte den Effekt, obwohl
+        er gar nicht von der Taste kommt. Was hier gestrichen wurde, kommt erst
+        zurueck, wenn eine Taste ihren Wert neu schreibt
+        (``dimmer_override_abgleich``). Ohne Eintraege ein einziger Vergleich.
+        """
+        alt = getattr(self, "snap_dimmer_override", None)
+        if not alt:
+            return
+        neu: dict[int, dict[str, int]] = {}
+        with self._prog_lock:
+            for fidi, erwartet in alt.items():
+                pa = self.programmer.get(fidi)
+                if pa is None:
+                    pa = self.programmer.get(str(fidi))
+                if not pa:
+                    continue
+                bleibt = {k: v for k, v in erwartet.items() if pa.get(k) == v}
+                if bleibt:
+                    neu[fidi] = bleibt
+        if neu != alt:
+            self.snap_dimmer_override = neu
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,

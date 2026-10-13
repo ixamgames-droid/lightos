@@ -5,19 +5,23 @@ Zwei Betriebsarten:
 * **gebunden** (``StufeAuswahl(funktion)``) — das Feld schreibt die Stufe direkt
   in die Funktion, als EIN Rueckgaengig-Schritt, und zieht nach, wenn die Stufe
   anderswo geaendert wird (Ansicht „Prioritäten“). So steckt es in Szene,
-  Chaser, Sequenz, Sammlung, Audio, Skript, Ebenen-Effekt und Carousel.
+  Chaser, Sequenz, Sammlung, Skript, Ebenen-Effekt und Carousel. (Der
+  Audio-Editor hat kein Feld „Stufe“.)
 * **lose** (``StufeAuswahl()``) — das Feld haelt nur die Zahl; der Editor liest
   sie mit ``zahl()`` und setzt sie mit ``setze_zahl()``. So steckt es im Matrix-
   und im Bewegungs-Editor, die auf einer Arbeitskopie rechnen.
 
-Die Eintraege werden einmal gebaut und danach nie im eigenen Signal veraendert.
-Passt eine Zahl aus einer alten Show auf keine Stufe, steht sie als eigener
-Eintrag „eigene Zahl (n)“ in der Liste und bleibt gespeichert, bis der Nutzer
-bewusst eine Stufe waehlt.
+Die fuenf Stufen werden einmal gebaut und danach nie im eigenen Signal
+veraendert. Passt eine Zahl aus einer alten Show auf keine Stufe, steht sie als
+eigener Eintrag „eigene Zahl (n)“ in der Liste und bleibt gespeichert, bis der
+Nutzer bewusst eine Stufe waehlt. Diesen Eintrag gibt es NUR, solange das Feld
+gerade diese Zahl zeigt: zeigt es danach eine benannte Stufe (anderer Effekt
+geladen, Stufe gewaehlt), verschwindet er — sonst liesse sich die fremde Zahl
+versehentlich fuer einen Effekt waehlen, der sie nie hatte.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtWidgets import QComboBox
 
 from src.core.engine import stufen
@@ -108,6 +112,7 @@ class StufeAuswahl(QComboBox):
         super().__init__(parent)
         self._funktion = funktion
         self._eigene: int | None = None
+        self._im_signal = False
         for s in reversed(stufen.STUFEN):
             self.addItem(s.name, s.zahl)
             self.setItemData(self.count() - 1, s.hinweis,
@@ -157,15 +162,47 @@ class StufeAuswahl(QComboBox):
                          "passt. Sie bleibt erhalten, bis du eine Stufe wählst.",
                     Qt.ItemDataRole.ToolTipRole)
             self.setCurrentIndex(idx)
+            if not self._im_signal:
+                self._eigene_aufraeumen()
         finally:
             self.blockSignals(False)
+
+    def _eigene_aufraeumen(self) -> None:
+        """Entfernt den Eintrag „eigene Zahl (n)“ samt Trennlinie, sobald das
+        Feld ihn nicht mehr zeigt. Nie aus dem eigenen Signal heraus — dort
+        wird es nur vorgemerkt (siehe ``_gewaehlt``)."""
+        try:
+            if self._eigene is None or self.currentData() == self._eigene:
+                return
+            idx = self.findData(self._eigene)
+            self._eigene = None
+            if idx < 0:
+                return
+            gesperrt = self.blockSignals(True)
+            try:
+                self.removeItem(idx)
+                if idx > 0 and not self.itemText(idx - 1) \
+                        and self.itemData(idx - 1) is None:
+                    self.removeItem(idx - 1)          # die Trennlinie davor
+            finally:
+                self.blockSignals(gesperrt)
+        except RuntimeError:
+            pass            # Feld schon abgebaut
 
     def _gewaehlt(self, _index: int) -> None:
         z = self.zahl()
         f = self._funktion
-        if f is not None:
-            setze_stufe([f], z)
-        self.stufe_gewaehlt.emit(z)
+        self._im_signal = True
+        try:
+            if f is not None:
+                setze_stufe([f], z)
+            self.stufe_gewaehlt.emit(z)
+        finally:
+            self._im_signal = False
+        if self._eigene is not None and z != self._eigene:
+            # Erst nach dem Signal aufraeumen: die Liste wird nie veraendert,
+            # waehrend Qt noch in ``activated`` steckt.
+            QTimer.singleShot(0, self._eigene_aufraeumen)
 
     def _nachziehen(self, ids) -> None:
         f = self._funktion

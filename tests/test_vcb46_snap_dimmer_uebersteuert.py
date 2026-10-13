@@ -408,8 +408,98 @@ class TasteTest(unittest.TestCase):
         btn._trigger(True)
         self.assertEqual(self._ovr(), {})
         btn.snap_dimmer_override = True
-        dimmer_override_abgleich()
+        dimmer_override_abgleich(halter=btn)       # wie der Eigenschaften-Dialog
         self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+
+    # ── der Vorrang verfaellt mit dem Wert / mit der Taste ───────────────────
+
+    def test_programmer_leeren_bei_gehaltener_taste_nimmt_den_vorrang(self):
+        """Gegenpruefung: nach „Programmer leeren“ blieb der Eintrag der noch
+        gehaltenen Taste stehen — ein danach von Hand gezogener, exakt gleicher
+        Dimmerwert uebersteuerte den Effekt, obwohl er nicht von der Taste kam."""
+        btn = self._taste({FID_A: {"intensity": 255},
+                           FID_B: {"intensity": 255}}, haken=True)
+        btn._apply_library_snap()                  # gehalten
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255},
+                                       FID_B: {"intensity": 255}})
+        self.state.clear_programmer()
+        self.assertEqual(self._ovr(), {}, "mit dem Wert geht der Vorrang")
+        self.state.set_programmer_value(FID_A, "intensity", 255)   # von Hand
+        self.assertEqual(self._ovr(), {}, "ein Handwert uebersteuert nicht")
+        # Auch eine ANDERE Taste, die jetzt abgleicht, belebt ihn nicht wieder.
+        andere = self._taste({9103: {"intensity": 10}}, haken=True)
+        andere._apply_library_snap()
+        self.assertEqual(self._ovr(), {9103: {"intensity": 10}})
+        andere._restore_library_snap()
+        btn._restore_library_snap()                # spaetes Loslassen
+        self.assertEqual(self._ovr(), {})
+
+    def test_leeren_eines_geraets_nimmt_nur_dessen_vorrang(self):
+        btn = self._taste({FID_A: {"intensity": 255},
+                           FID_B: {"intensity": 255}}, haken=True)
+        btn._apply_library_snap()
+        self.state.clear_programmer(FID_A)
+        self.assertEqual(self._ovr(), {FID_B: {"intensity": 255}})
+
+    def test_ueberschriebener_wert_verliert_den_vorrang_dauerhaft(self):
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True)
+        btn._apply_library_snap()
+        self.state.set_programmer_value(FID_A, "intensity", 90)    # von Hand
+        self.assertEqual(self._ovr(), {})
+        self.state.set_programmer_value(FID_A, "intensity", 255)   # wieder hoch
+        self.assertEqual(self._ovr(), {}, "kommt nicht von der Taste")
+        self.state.clear_programmer_value(FID_A, "intensity")
+        self.assertEqual(self._ovr(), {})
+
+    def test_erneuter_druck_stellt_den_vorrang_wieder_her(self):
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True)
+        btn._apply_library_snap()
+        self.state.clear_programmer()
+        self.assertEqual(self._ovr(), {})
+        btn._apply_library_snap()                  # neu gedrueckt
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+
+    def _auf_flaeche(self, btn):
+        from src.ui.virtualconsole.vc_canvas import VCCanvas
+        canvas = VCCanvas()
+        self.addCleanup(canvas.deleteLater)
+        btn.setParent(canvas)
+        return canvas
+
+    def test_loeschen_einer_aktiven_taste_nimmt_den_vorrang(self):
+        """Gegenpruefung: eine AKTIVE Taste mit Haken wird geloescht — ihr
+        Eintrag blieb stehen (das Python-Objekt lebt weiter, der Halter-Stapel
+        auch). Der Wert bleibt im Programmer, aber ohne Vorrang."""
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True, mode="toggle")
+        canvas = self._auf_flaeche(btn)
+        btn._trigger(True)
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+        canvas._remove_widget(btn)
+        self.assertEqual(self._ovr(), {})
+        self.state.set_programmer_value(FID_A, "intensity", 255)   # von Hand
+        dimmer_override_abgleich()
+        self.assertEqual(self._ovr(), {})
+
+    def test_loeschen_eines_rahmens_meldet_auch_seine_tasten_ab(self):
+        from src.ui.virtualconsole.vc_frame import VCFrame
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True, mode="toggle")
+        canvas = self._auf_flaeche(btn)
+        rahmen = VCFrame(parent=canvas)
+        btn.setParent(rahmen)
+        btn._trigger(True)
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+        canvas._remove_widget(rahmen)
+        self.assertEqual(self._ovr(), {})
+
+    def test_konsole_neu_laden_nimmt_den_vorrang(self):
+        """Show-Wechsel / Rueckgaengig in der Konsole: alle Tasten werden
+        abgebaut und neu angelegt — die neuen sind nicht aktiv."""
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True, mode="toggle")
+        canvas = self._auf_flaeche(btn)
+        btn._trigger(True)
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+        canvas.from_dict({"widgets": []})
+        self.assertEqual(self._ovr(), {})
 
     # ── Speichern ────────────────────────────────────────────────────────────
 

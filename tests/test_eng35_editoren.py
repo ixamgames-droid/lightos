@@ -82,6 +82,35 @@ def test_feld_fuehrt_eigene_zahl_als_eigenen_eintrag(fm):
     assert feld.currentText() == "Akzente"
 
 
+def test_eigene_zahl_verschwindet_sobald_das_feld_eine_stufe_zeigt(fm):
+    """Loses Feld (Matrix, EFX, „Auswahl in Stufe“): nach einem Effekt mit
+    eigener Zahl wird einer mit benannter Stufe geladen — die fremde Zahl darf
+    dann nicht mehr waehlbar in der Liste stehen."""
+    feld = StufeAuswahl()
+    feld.setze_zahl(50)
+    assert feld.currentText() == "eigene Zahl (50)"
+    feld.setze_zahl(AKZENTE)                 # naechster Effekt geladen
+    assert [feld.itemText(i) for i in range(feld.count())] == [
+        "Notfall", "Strobe & Blinder", "Akzente", "Effekte", "Grundlicht"]
+    assert feld.findData(50) < 0 and feld.zahl() == AKZENTE
+    feld.setze_zahl(50)                      # und wieder zurueck: genau einmal
+    texte = [feld.itemText(i) for i in range(feld.count())]
+    assert texte.count("eigene Zahl (50)") == 1 and feld.count() == 7
+    assert feld.zahl() == 50
+
+
+def test_eigene_zahl_verschwindet_nach_bewusster_wahl(fm):
+    feld = StufeAuswahl()
+    feld.setze_zahl(50)
+    waehrend = []
+    feld.stufe_gewaehlt.connect(lambda _z: waehrend.append(feld.count()))
+    _waehle(feld, GRUNDLICHT)
+    assert waehrend == [7], "im eigenen Signal bleibt die Liste unveraendert"
+    _app().processEvents()
+    assert feld.count() == 5 and feld.findData(50) < 0
+    assert feld.zahl() == GRUNDLICHT
+
+
 def test_laden_loest_kein_signal_aus(fm):
     feld = StufeAuswahl()
     gesehen = []

@@ -194,7 +194,7 @@ def forget_snap_claims(owner) -> None:
     dimmer_override_abgleich()
 
 
-def dimmer_override_abgleich() -> None:
+def dimmer_override_abgleich(frisch=(), halter=None) -> None:
     """VCB-46: sagt dem Renderer, wessen Dimmer gerade laufende Dimmer-Effekte
     uebersteuert.
 
@@ -206,6 +206,18 @@ def dimmer_override_abgleich() -> None:
 
     Wird nach jedem Setzen, Zuruecknehmen und Abmelden gerufen. Fehlt der Haken
     ueberall, ist das Ergebnis leer und der Renderer rechnet wie bisher.
+
+    Der Stapel allein genuegt nicht: er merkt nicht, wenn jemand ANDERES den
+    Kanal uebernimmt („Programmer leeren“, Handwert) — die gehaltene Taste
+    bliebe oberster Halter. Deshalb zaehlt ein Halter nur, wenn (1) sein Wert
+    wirklich im Programmer steht UND (2) er ihn gerade selbst geschrieben hat
+    (``frisch`` = die Schluessel ``(fid, attr)`` dieses Aufrufers) oder sein
+    Eintrag bis jetzt unveraendert galt. Den zweiten Teil haelt der AppState
+    nach: er streicht einen Eintrag, sobald der Wert im Programmer weg ist. So
+    kann ein von Hand gezogener, zufaellig gleicher Wert den Vorrang nicht
+    wiederbeleben. ``halter`` = eine Taste, deren Haken gerade in den
+    Eigenschaften eingeschaltet wurde: ihre gehaltenen Werte zaehlen wie frisch
+    geschrieben.
     """
     try:
         from src.core.app_state import get_state, ist_dimmer_attribut
@@ -215,16 +227,26 @@ def dimmer_override_abgleich() -> None:
     setzen = getattr(state, "set_snap_dimmer_override", None)
     if setzen is None:
         return                      # Test-Stub ohne das Feld
+    bisher = getattr(state, "snap_dimmer_override", None) or {}
+    frisch = set(frisch or ())
     ziel: dict[int, dict[str, int]] = {}
     for (fid, attr), stack in list(_snap_stack.items()):
         if not stack or not ist_dimmer_attribut(attr):
             continue
         ref, wert = stack[-1]
-        halter = ref()
-        if halter is None or not getattr(halter, "snap_dimmer_override", False):
+        oben = ref()
+        if oben is None or not getattr(oben, "snap_dimmer_override", False):
+            continue
+        if ((fid, attr) not in frisch and oben is not halter
+                and (bisher.get(int(fid)) or {}).get(attr) != int(wert)):
+            continue                # Vorrang inzwischen verfallen
+        try:
+            if state.get_programmer_value(int(fid), attr) != int(wert):
+                continue            # der Wert steht gar nicht (mehr) da
+        except Exception:
             continue
         ziel.setdefault(int(fid), {})[attr] = int(wert)
-    if not ziel and not getattr(state, "snap_dimmer_override", None):
+    if not ziel and not bisher:
         return                      # nichts an, nichts war an
     try:
         setzen(ziel)
@@ -819,7 +841,7 @@ class VCButton(VCWidget):
             self._snap_prev = prev
         except Exception as e:
             print(f"[VCButton] Snap-Apply-Fehler: {e}")
-        dimmer_override_abgleich()          # VCB-46
+        dimmer_override_abgleich(frisch=prev)   # VCB-46
 
     def _snap_verlauf(self, state):
         """FM-52: Halten/Loslassen einer Flash-Snap-Taste ist Wiedergabe und
@@ -842,6 +864,7 @@ class VCButton(VCWidget):
         prev = getattr(self, "_snap_prev", None) or {}
         if not prev:
             return
+        zurueck: set = set()        # VCB-46: an die vorige Taste zurueckgegeben
         try:
             from src.core.app_state import get_state
             state = get_state()
@@ -853,6 +876,7 @@ class VCButton(VCWidget):
                         continue          # Kanal gehoert inzwischen jemand anderem
                     if what == "reapply":
                         state.set_programmer_value(fid, attr, int(value))
+                        zurueck.add((fid, attr))
                     elif value is None:
                         state.clear_programmer_value(fid, attr)
                     else:
@@ -861,7 +885,7 @@ class VCButton(VCWidget):
             print(f"[VCButton] Snap-Restore-Fehler: {e}")
         finally:
             self._snap_prev = {}
-            dimmer_override_abgleich()      # VCB-46
+            dimmer_override_abgleich(frisch=zurueck)    # VCB-46
 
     def release_if_held(self) -> bool:
         """UI-57: das verschluckte Loslassen nachholen.
@@ -2531,11 +2555,14 @@ class VCButton(VCWidget):
             self.snap_mode = snap_mode_combo.currentData() or "toggle"
             # VCB-46: der Haken gehoert zur Snap-Taste; bei jeder anderen Aktion
             # faellt er weg (sonst wanderte ein unsichtbarer Haken in die Show).
+            _haken_alt = bool(getattr(self, "snap_dimmer_override", False))
             self.snap_dimmer_override = (self.action == LS
                                          and snap_dim_ovr_cb.isChecked())
             self._snap_active = False
             self._snap_prev = {}
-            dimmer_override_abgleich()
+            dimmer_override_abgleich(
+                halter=self if self.snap_dimmer_override and not _haken_alt
+                else None)
             self.effect_action_key = eff_action_combo.currentData() or self.effect_action_key
             self.group_name = group_combo.currentText().strip()
             self.laser_palette = laser_pal_combo.currentText().strip()
