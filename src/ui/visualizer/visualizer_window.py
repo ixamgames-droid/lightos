@@ -2912,7 +2912,18 @@ class VisualizerWindow(QMainWindow):
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, False)
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        splitter.addWidget(self._view)
+        # VIZ-109: Ansicht + schmaler Klapp-Knopf teilen sich die linke Seite —
+        # der Knopf sitzt so direkt an der Spalte und bleibt sichtbar, wenn
+        # sie zu ist. Die Ansicht selbst bleibt dasselbe Objekt.
+        from src.ui.visualizer.spalte_einklappen import SpaltenKlappe, baue_knopf
+        left_side = QWidget()
+        left_lay = QHBoxLayout(left_side)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(0)
+        left_lay.addWidget(self._view, 1)
+        self._btn_spalte = baue_knopf(left_side)
+        left_lay.addWidget(self._btn_spalte)
+        splitter.addWidget(left_side)
 
         right_panel = self._build_right_panel()
         right_panel.setMinimumWidth(330)
@@ -2920,6 +2931,8 @@ class VisualizerWindow(QMainWindow):
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
+        splitter.setCollapsible(0, False)   # der Knopf darf nie mit verschwinden
+        self._spalten_klappe = SpaltenKlappe(splitter, self._btn_spalte, 1, self)
 
         self.setCentralWidget(splitter)
 
@@ -2959,6 +2972,7 @@ class VisualizerWindow(QMainWindow):
             ("F", self._on_key_f),
             ("S", lambda: self._tabs.setCurrentIndex(1)),
             ("D", lambda: self._act_dock.toggle()),
+            ("F9", lambda: self._spalten_klappe.umschalten()),   # VIZ-109
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.activated.connect(fn)
