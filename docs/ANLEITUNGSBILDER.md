@@ -262,6 +262,12 @@ venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbild
 
   Unter Windows ohne `DISPLAY`: `venv\Scripts\python tools\anleitungsbilder.py 3d_buehne --bildschirm`.
 
+  Fehlt einer übersprungenen Szene im Repo das Bild oder der Eintrag in `bilder.json`
+  (etwa eine neue 3D-Szene, die noch nie am Bildschirm aufgenommen wurde), sagt die
+  Meldung das dazu und nennt den Aufruf, der es nachholt; am Ende des Laufs steht eine
+  Sammelzeile `HINWEIS: … übersprungene Szene(n) ohne Bild bzw. Manifest-Eintrag`.
+  Umgekehrt meldet ein `--bildschirm`-Lauf Offscreen-Szenen, denen etwas fehlt.
+
   Die Sandbox bleibt dabei genauso aktiv. Das Werkzeug zeichnet dann statt `offscreen`
   über `xcb` (Windows: `windows`), das Fenster erscheint für die Dauer des Laufs auf dem Bildschirm (ohne
   den Fokus zu nehmen) und es entstehen **nur** die Szenen mit `braucht_gpu` — alle

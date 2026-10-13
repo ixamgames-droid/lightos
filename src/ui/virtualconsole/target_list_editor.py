@@ -348,14 +348,20 @@ def _blackout_choices() -> list[tuple[str, str]]:
     return out
 
 
-def blackout_ziel_schluessel(fids, groups, group_ids=()) -> list[str]:
+def blackout_ziel_schluessel(fids, groups, group_ids=(), verloren=()) -> list[str]:
     """VCB-11: Ziel einer Taste -> Zeilen-Schluessel des BlackoutTargetEditor
     (Gruppen-IDs, dann Gruppennamen aus alten Layouts, dann Geraete).
 
     VCB-36: ein alter NAME wird zur ID, wenn genau eine Gruppe so heisst —
     gemeint war dann immer diese, und mit dem naechsten OK speichert die Taste
     die ID. Heissen mehrere so (oder keine), bleibt der Name stehen: welche
-    gemeint war, kann nur der Bediener sagen."""
+    gemeint war, kann nur der Bediener sagen.
+
+    VCB-42: IDs in ``verloren`` bekommen den Schluessel ``gx:<id>`` statt
+    ``gi:<id>``. Die Nummer kann inzwischen einer ANDEREN Gruppe gehoeren — mit
+    ``gi:`` stuende diese fremde Gruppe als gewaehlt im Dialog, und OK baende
+    die Taste an sie."""
+    verloren = set(verloren or ())
     je_name: dict[str, list[int]] = {}
     for gid, name, _ordner in _blackout_gruppen():
         je_name.setdefault(name, []).append(gid)
@@ -367,7 +373,7 @@ def blackout_ziel_schluessel(fids, groups, group_ids=()) -> list[str]:
 
     for g in (group_ids or []):
         try:
-            dazu(f"gi:{int(g)}")
+            dazu(f"gx:{int(g)}" if int(g) in verloren else f"gi:{int(g)}")
         except (TypeError, ValueError):
             continue
     for name in (groups or []):
@@ -390,11 +396,17 @@ class BlackoutTargetEditor(TargetListEditor):
     Gleiche kleine API wie ``TargetListEditor``; die Zeilen-Schluessel sind
     Strings: ``"f:<fid>"``, ``"gi:<Gruppen-ID>"`` und — nur noch fuer Namen aus
     alten Layouts, die sich nicht eindeutig zuordnen lassen — ``"g:<Gruppe>"``.
-    ``fids()``/``group_ids()``/``groups()`` liefern die getrennten Listen."""
+    ``fids()``/``group_ids()``/``groups()`` liefern die getrennten Listen.
+
+    VCB-42: ``"gx:<Gruppen-ID>"`` ist ein VERLORENES Gruppen-Ziel (die Gruppe
+    gibt es nicht mehr, oder die Nummer gehoert jetzt einer anderen). Es steht
+    nicht in der Auswahl, nur als Zeile einer Taste, die es noch traegt —
+    ``set_verlorene`` liefert dazu, wie die Gruppe hiess."""
 
     def __init__(self, title: str = "Blackout-Ziel", parent=None):
         super().__init__(with_params=False, title=title, parent=parent)
         self._func_choices = _blackout_choices()
+        self._verlorene: dict[int, tuple[str, str]] = {}
         try:
             self.findChild(QPushButton).setText("+ Gerät/Gruppe hinzufügen")
             self._empty_lbl.setText("(kein Ziel = globaler Blackout)")
@@ -404,13 +416,31 @@ class BlackoutTargetEditor(TargetListEditor):
     @staticmethod
     def _key(value):
         v = str(value)
-        for vorsatz in ("gi:", "f:", "g:"):
+        for vorsatz in ("gi:", "gx:", "f:", "g:"):
             if v.startswith(vorsatz) and len(v) > len(vorsatz):
                 return v
         raise ValueError(v)
 
+    def set_verlorene(self, gruppen: dict):
+        """VCB-42: ``{Gruppen-ID: (Name, Ordner)}`` der verlorenen Ziele — fuer
+        die Beschriftung ihrer ``gx:``-Zeilen. VOR ``set_targets`` aufrufen."""
+        self._verlorene = {int(g): (str(n or ""), str(o or ""))
+                           for g, (n, o) in (gruppen or {}).items()}
+
     def _fehlt_label(self, value) -> str:
         v = str(value)
+        if v.startswith("gx:"):
+            # VCB-42: mit dem Namen, den die Gruppe HATTE — nicht mit dem der
+            # Gruppe, die die Nummer jetzt traegt.
+            try:
+                name, ordner = self._verlorene.get(int(v[3:]), ("", ""))
+            except ValueError:
+                name, ordner = "", ""
+            text = f"Gruppe: {name}" if name else f"Gruppe #{v[3:]}"
+            if ordner:
+                text += f"  ({ordner})"
+            return (f"{text} — verloren (gelöscht oder aus einer anderen Show), "
+                    f"bitte neu wählen")
         if v.startswith("gi:"):
             return f"Gruppe #{v[3:]} (nicht gefunden)"
         if v.startswith("g:"):
@@ -440,6 +470,18 @@ class BlackoutTargetEditor(TargetListEditor):
         out: list[int] = []
         for k in self.ids():
             if k.startswith("gi:"):
+                try:
+                    out.append(int(k[3:]))
+                except ValueError:
+                    continue
+        return out
+
+    def verlorene_ids(self) -> list[int]:
+        """VCB-42: die verlorenen Gruppen-Ziele, die als Zeile stehen geblieben
+        sind — die Taste behaelt sie (und bleibt damit ein Ziel-Blackout)."""
+        out: list[int] = []
+        for k in self.ids():
+            if k.startswith("gx:"):
                 try:
                     out.append(int(k[3:]))
                 except ValueError:

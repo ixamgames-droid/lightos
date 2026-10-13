@@ -11,6 +11,7 @@ import { applyDmx } from './dmx_apply.js';                                // VIZ
 import { forgetDmx, noteShowGen, pruneDmxCache } from '../fixtures/dmx_cache.js';      // VIZ-71
 import { resyncBeamVisibility, fleckSichtbar } from '../fixtures/builders.js';   // VIZ-98
 import { setBeamsOff } from '../state.js';   // VIZ-15
+import { setSperrzonen, sperrzonenAbgleich, setLasersichtMelder } from '../safety/sperrzonen.js';   // LAS-32 (nur Anzeige)
 import { setViewMode } from '../stage/view_mode.js';
 import { setEditMode, setBrightnessManual, resetBrightnessAuto, updateOutlines, jsApplyExternalSelection } from '../interaction/tools.js';
 import { setFpsVisible } from '../camera/presets.js';
@@ -308,6 +309,12 @@ export function removeFixturesNotIn(fids) {
 // ============================================================================
 export let bridge = null;
 
+// LAS-32: Fenster „Sicht des Lasers" im 3D ein-/ausgeblendet -> Python merkt
+// es sich (ui_prefs). Ohne Bruecke/Slot bleibt es bei dieser Sitzung.
+setLasersichtMelder(an => {
+  if (bridge && bridge.sperrzonenLasersicht) bridge.sperrzonenLasersicht(!!an);
+});
+
 export function tryChannel() {
   if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {
     new QWebChannel(qt.webChannelTransport, function(channel) {
@@ -397,6 +404,7 @@ export function tryChannel() {
           let _pPlace = null;   // VIZ-14: Zahl offener Platzierungen
           let _pBeamsOff = null;   // VIZ-15 (JSON-Signatur, s. Poll unten)
           let _pPR = null;         // VIZ-71: Pixeldichte des Bildschirms
+          let _pSperr = null;      // LAS-32: Sperrzonen + Laser-Felder (JSON-Text)
           // VIZ-71 (S5): zuletzt gesehene Revisionen je Zustands-Schluessel.
           // Python antwortet nur mit Geaendertem (pollControlRev) — vorher ging
           // die volle Geraeteliste und die Buehne bei JEDEM Poll mit.
@@ -501,6 +509,13 @@ export function tryChannel() {
                       _pFix = s.fixtures;
                     });
                   }
+                  // LAS-32 (S1): Sperrzonen + Laser-Felder — reine Anzeige. Nach
+                  // der Geraeteliste, damit die Felder ihre Geraete schon finden;
+                  // der Abgleich laeuft bei jedem Poll (Geraet verschoben/neu gebaut).
+                  if (typeof s.sperrzonen === 'string' && s.sperrzonen !== _pSperr) {
+                    _block('sperrzonen', () => { setSperrzonen(s.sperrzonen); _pSperr = s.sperrzonen; });
+                  }
+                  try { sperrzonenAbgleich(); } catch (eS) { console.log('sperrzonen: Abgleich', eS); }
                   // VIZ-14 (Slice 1b): globale/Programmer-Auswahl -> Outlines im
                   // 3D. Idempotent (nur bei geaenderter Liste), OHNE Echo zurueck
                   // (jsApplyExternalSelection ruft updateOutlines(false)).
