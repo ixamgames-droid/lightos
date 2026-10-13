@@ -79,6 +79,7 @@
 | LAS-39 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | QA-97 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | QA-98 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
+| UI-94 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 
 ## Blocker & Fallen
 
@@ -287,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-13T14:46Z A claim VIZ-109
 - 2026-10-13T14:46Z A claim ENG-38
 - 2026-10-13T14:51Z A done STAB-38
 - 2026-10-13T15:27Z A done UI-91
@@ -317,3 +317,4 @@
 - 2026-10-13T23:16Z A claim LAS-39
 - 2026-10-13T23:16Z A claim QA-97
 - 2026-10-13T23:16Z A claim QA-98
+- 2026-10-13T23:16Z A claim UI-94
