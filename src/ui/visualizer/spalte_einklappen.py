@@ -162,12 +162,17 @@ class SpaltenKlappe(QObject):
     # ── intern ──────────────────────────────────────────────────────────────
 
     def _wunsch_breite(self) -> int:
-        if self._breite > 0:
-            return self._breite
         spalte = self._splitter.widget(self._idx)
         if spalte is None:
-            return 1
-        return max(spalte.minimumWidth(), spalte.sizeHint().width(), 1)
+            return max(self._breite, 1)
+        if self._breite > 0:
+            breite = self._breite
+        else:
+            breite = max(spalte.minimumWidth(), spalte.sizeHint().width(), 1)
+        # Nie breiter als die Spalte werden darf: ``setSizes`` nimmt mehr an,
+        # als das Widget fuellt — das gaebe einen leeren Streifen daneben und
+        # bei einem unbrauchbar grossen gemerkten Wert eine Ansicht ohne Breite.
+        return max(1, min(breite, spalte.maximumWidth()))
 
     def _zeige_zustand(self) -> None:
         zu = self._eingeklappt
@@ -202,8 +207,9 @@ class SpaltenKlappe(QObject):
             groessen[self._andere] = gesamt
             self._splitter.setSizes(groessen)
         elif self._breite > 0:
-            groessen[self._idx] = self._breite
-            groessen[self._andere] = max(gesamt - self._breite, 1)
+            breite = self._wunsch_breite()
+            groessen[self._idx] = breite
+            groessen[self._andere] = max(gesamt - breite, 1)
             self._splitter.setSizes(groessen)
             ist = self._splitter.sizes()[self._idx]
             if ist > 0:

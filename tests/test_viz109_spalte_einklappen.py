@@ -211,6 +211,41 @@ def test_kaputte_ablage_stoert_nicht(prefs):
     assert sp.sizes()[1] >= 330
 
 
+def test_gemerkte_breite_ueber_der_hoechstbreite_wird_begrenzt(prefs):
+    """Ein zu grosser gemerkter Wert darf weder einen leeren Streifen neben
+    der Spalte lassen noch der Ansicht die Breite nehmen."""
+    def aufbau_mit_hoechstbreite():
+        sp = QSplitter()
+        links, rechts = QWidget(), QWidget()
+        rechts.setMinimumWidth(330)
+        rechts.setMaximumWidth(420)
+        sp.addWidget(links)
+        sp.addWidget(rechts)
+        sp.setStretchFactor(0, 1)
+        sp.setCollapsible(0, False)
+        klappe = SE.SpaltenKlappe(sp, SE.baue_knopf(), 1)
+        sp.resize(1200, 600)
+        sp.show()
+        _app.processEvents()
+        _app.processEvents()
+        return sp, links, rechts, klappe
+
+    PV._save_prefs({SE.PREF_EINGEKLAPPT: False, SE.PREF_BREITE: 5000})
+    sp, links, rechts, klappe = aufbau_mit_hoechstbreite()
+    assert sp.sizes()[1] == 420 and rechts.width() == 420
+    assert links.width() > 600
+    assert klappe.gemerkte_breite == 420
+
+    sp.close()
+    PV._save_prefs({SE.PREF_EINGEKLAPPT: True, SE.PREF_BREITE: 5000})
+    sp, links, rechts, klappe = aufbau_mit_hoechstbreite()
+    assert sp.sizes()[1] == 0
+    klappe.umschalten()
+    assert sp.sizes()[1] == 420 and rechts.width() == 420
+    assert links.width() > 600
+    assert prefs()[SE.PREF_BREITE] == 420
+
+
 def test_fenster_haengt_knopf_und_taste_an_den_vorhandenen_splitter():
     with open(_FENSTER, encoding="utf-8") as f:
         quelle = f.read()
@@ -270,5 +305,9 @@ def test_echtes_fenster_knopf_und_f9(prefs, monkeypatch):
 
     QTest.keyClick(fenster, Qt.Key.Key_F9)
     _app.processEvents()
-    assert sp.sizes()[1] == offen
+    # Zurueck kommt die vorherige Breite, hoechstens aber so viel, wie die
+    # Spalte fuellen kann (kein leerer Streifen daneben).
+    spalte = sp.widget(1)
+    assert sp.sizes()[1] == min(offen, spalte.maximumWidth())
+    assert spalte.width() == sp.sizes()[1]
     assert prefs()[SE.PREF_EINGEKLAPPT] is False
