@@ -294,17 +294,23 @@ sACN-Eingang zu und hält den Stand auf Knopfdruck als Szene fest.
 **Mitschneiden:**
 
 1. Im Programmer den Reiter **Assistent** öffnen und **Mitschnitt-Assistent...** wählen.
+   Der Assistent ist ein eigenes Fenster über LightOS und sperrt nichts: DMX-Monitor,
+   3D-Fenster und Funktionsliste bleiben daneben bedienbar. Es gibt ihn nur einmal —
+   ein zweiter Klick auf den Knopf holt das offene Fenster nach vorn.
 2. Oben steht je Protokoll, was ankommt: „Signal seit …“ oder „kein Signal“, dazu
    welches Universum in welches LightOS-Universum geht und wie viele gepatchte Geräte
-   gerade Werte bekommen.
+   gerade Werte bekommen. Ohne Signal zeigt **Hilfe zum Eingang einblenden** den Weg
+   zur Eingangs-Einstellung.
 3. Im alten Programm die erste Szene aufrufen und warten, bis sie steht.
 4. **Als Szene festhalten** drücken (oder die **Leertaste**). Die Szene erscheint in
    der Liste, der Name zählt von selbst weiter: „Mitschnitt 1“, „Mitschnitt 2“ …
-   Einen eigenen Namen trägst du vorher ins Feld **Name:** ein.
+   Einen eigenen Namen trägst du vorher ins Feld **Name:** ein. Die Leertaste hält nur
+   fest, solange das Fenster des Assistenten das aktive ist — im Hauptfenster bleibt
+   sie **GO**, auch während der Assistent offen ist.
 5. Nächste Szene im alten Programm aufrufen, wieder festhalten — so oft wie nötig.
 6. Sollen die Szenen nacheinander ablaufen: **Am Ende als Chaser zusammenfassen**
    anhaken und die **Schrittzeit:** einstellen.
-7. **Fertig** schließt den Assistenten. Die Szenen (und der Chaser) stehen im Reiter
+7. **Fertig** schließt den Assistenten (er schließt auch mit dem Hauptfenster). Die Szenen (und der Chaser) stehen im Reiter
    **Assistent** in der Liste und in der Bibliothek.
 
 **Was der Assistent dabei beachtet:**
@@ -322,7 +328,18 @@ sACN-Eingang zu und hält den Stand auf Knopfdruck als Szene fest.
 - **Laser werden ausgelassen.** Das ist eine Sicherheitsvorgabe; nur mit dem Haken
   **Laser mit aufnehmen** kommen ihre Kanäle mit in die Szene.
 - **Rückgängig:** Jede festgehaltene Szene ist ein eigener Schritt für **Strg+Z**, der
-  Chaser am Ende ein weiterer. **Entfernen** löscht die markierte Szene wieder.
+  Chaser am Ende ein weiterer. **Entfernen** löscht die markierte Szene wieder. Nimmst
+  du im Hauptfenster eine Szene mit **Strg+Z** zurück, verschwindet sie auch aus der
+  Liste des Assistenten und kommt nicht in den Chaser.
+- **Show oder Patch geändert, während der Assistent offen ist?** Er bleibt offen und
+  zieht nach. Den Patch liest er bei jedem Festhalten neu — eine neue Szene enthält
+  nur Geräte, die es jetzt gibt; bereits festgehaltene Szenen bleiben, wie sie sind.
+  Nach einem Show-Wechsel beginnt die Liste neu, und der Assistent sagt es: Was vorher
+  festgehalten wurde, gehört zur vorherigen Show und kommt nicht in den Chaser.
+- **Kleine Bildschirme:** Name, **Als Szene festhalten**, die Meldung darunter, die
+  Liste mit **Entfernen**, die Chaser-Zeile und **Fertig** stehen fest im Fenster.
+  Reicht die Höhe nicht, rollt nur der obere Teil mit Eingang und Einstellungen, und
+  die Wegbeschreibung zum Eingang startet eingeklappt.
 - **Der Assistent liest nur.** Er gibt selbst nichts aus und ändert weder den
   Programmer noch laufende Funktionen. Unverändert bleibt auch, was der Eingang ohnehin
   tut: Mit eingeschaltetem Eingang mischt LightOS das empfangene DMX in das

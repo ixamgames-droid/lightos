@@ -294,8 +294,12 @@ Universe** and **Merge in Universe**, press **Übernehmen**), and the other prog
 sends to this computer.
 
 **Capture:** in the Programmer open the tab **Assistent** and choose
-**Mitschnitt-Assistent...**. Recall a scene in the old program, wait until it stands
-still and press **Als Szene festhalten** (or the **space bar**). Repeat for each scene.
+**Mitschnitt-Assistent...**. The assistant is a separate, non-modal window on top of
+LightOS — DMX monitor, 3D window and function list stay usable next to it, and a second
+click on the button brings the open window to the front. Recall a scene in the old
+program, wait until it stands still and press **Als Szene festhalten** (or the **space
+bar** while the assistant is the active window; in the main window the space bar stays
+GO). Repeat for each scene.
 Tick **Am Ende als Chaser zusammenfassen** and set **Schrittzeit:** if the scenes should
 run one after another, then press **Fertig**.
 
@@ -304,6 +308,10 @@ run one after another, then press **Fertig**.
 - Default is **Alle gepatchten Kanäle** (the whole picture). Lasers are left out as a
   safety default unless you tick **Laser mit aufnehmen**.
 - Every captured scene is one undo step (**Ctrl+Z**), the chaser another one.
+- If the show is switched or reloaded while the assistant is open, its list starts
+  again and it says so; after a patch change new scenes follow the new patch.
+- On a low screen only the upper part (input and settings) scrolls; name, capture
+  button, message, list and **Fertig** always stay visible.
 - The assistant only reads the input. It outputs nothing and changes neither the
   Programmer nor running functions.
 

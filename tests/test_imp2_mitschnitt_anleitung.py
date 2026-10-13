@@ -73,3 +73,25 @@ def test_englische_fassung_hat_den_abschnitt_mit_den_deutschen_knopfnamen():
 def test_fragmente_liegen_bei():
     assert (ROOT / "backlog.d" / "IMP-2.md").read_text(encoding="utf-8").startswith("ID: IMP-2\n")
     assert list((ROOT / "changelog.d").glob("*-IMP-2.md"))
+
+
+def test_anleitung_beschreibt_das_eigene_fenster_und_die_leertaste():
+    """Der Assistent ist nicht modal. Was daraus folgt, steht in der Anleitung
+    — und nirgends mehr, dass er die App sperrt."""
+    text = " ".join(_abschnitt().split())
+    assert f"**{D.TEXT_HILFE_ZEIGEN}**" in text
+    for satz in ("ist ein eigenes Fenster über LightOS und sperrt nichts",
+                 "holt das offene Fenster nach vorn",
+                 "solange das Fenster des Assistenten das aktive ist",
+                 "im Hauptfenster bleibt sie **GO**",
+                 "Nach einem Show-Wechsel beginnt die Liste neu",
+                 "Den Patch liest er bei jedem Festhalten neu",
+                 "rollt nur der obere Teil"):
+        assert satz in text, satz
+    assert "modal" not in text.lower()
+    englisch = " ".join(_abschnitt(
+        "ANLEITUNG.en.md",
+        "## 11. Take over scenes from another program (capture)").split())
+    assert "non-modal window" in englisch and "space bar stays GO" in englisch
+    programmer = (ROOT / "src" / "ui" / "views" / "programmer_view.py").read_text(encoding="utf-8")
+    assert "zeige_assistent(self)" in programmer and "MitschnittDialog(self).exec()" not in programmer
