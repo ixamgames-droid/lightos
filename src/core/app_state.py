@@ -580,6 +580,10 @@ class AppState:
         # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
         # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
         self.laser_patterns: list = []
+        # LAS-32 (S1): Sperrzonen + Maximalfeld je Laser — NUR ANZEIGE. Die
+        # Ausgabe (OutputManager/Render-Pfad) liest dieses Feld nicht.
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        self.sperrzonen = SperrzonenDaten()
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
@@ -894,14 +898,16 @@ class AppState:
             # Die AKTUELLE fid wird mitgefuehrt: nach einem Redo kann das Geraet
             # per fid-Guard eine neue Nummer haben — ein Undo auf die alte
             # loeschte sonst ein FREMDES Geraet (Review FM-38, gemessen).
-            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": []}
+            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": [], "feld": None}
 
             def _undo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt   # LAS-32
 
             def _redo(s=snapshot, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -917,7 +923,9 @@ class AppState:
     # Zeile einfach mitgibt — die Nummer kann inzwischen belegt sein). Seit
     # VCB-36 haengt aber eine Bindung an ihr (Blackout-Ziel einer VC-Taste):
     # der Schnappschuss merkt sie unter ``id`` und das Undo gibt sie zurueck,
-    # wenn sie frei ist (``_restore_fixture_with_groups``).
+    # wenn sie frei ist (``_restore_fixture_with_groups``). Dasselbe gilt seit
+    # VCB-42 fuer die Kennung (``uid``): ohne sie waere die zurueckgeholte
+    # Gruppe fuer die Taste eine andere, sobald ihr Name nicht mehr stimmt.
     _GROUP_SNAP_FIELDS = ("name", "cols", "rows", "positions_json", "folder")
 
     @staticmethod
@@ -949,6 +957,7 @@ class AppState:
     def _group_to_dict(cls, g) -> dict:
         d = {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
         d["id"] = getattr(g, "id", None)        # VCB-36, s. _GROUP_SNAP_FIELDS
+        d["uid"] = getattr(g, "uid", None)      # VCB-42, dito
         return d
 
     @staticmethod
@@ -990,6 +999,7 @@ class AppState:
             return neu_fid
         from sqlalchemy import select as _select
         from src.core.database.models import FixtureGroup as _FG
+        from .group_ref import uid_lesbar as _uid_lesbar
         gescheitert: list[str] = []
         with self._session() as s:
             eingefuegt: list = []
@@ -1000,6 +1010,12 @@ class AppState:
                         felder = {k: gd[k] for k in self._GROUP_SNAP_FIELDS if k in gd}
                         felder["positions_json"] = self._zellen_umschreiben(
                             felder.get("positions_json") or "{}", alt_fid, neu_fid)
+                        # VCB-42: die Kennung zurueckgeben, wenn sie frei ist
+                        # (sonst vergibt das Modell eine neue — nie doppelt).
+                        uid = _uid_lesbar(gd.get("uid"))
+                        if uid and s.execute(_select(_FG.id).where(
+                                _FG.uid == uid)).first() is None:
+                            felder["uid"] = uid
                         g_neu = _FG(**felder)
                         s.add(g_neu)
                     eingefuegt.append(g_neu)
@@ -1392,6 +1408,12 @@ class AppState:
             s.commit()
         removed_group = bool(gruppen_snaps)
         self.programmer.pop(fid, None)
+        # LAS-32: die Randwinkel dieses Lasers gehen mit dem Geraet. Die Nummer
+        # wird neu vergeben — ein anderer Laser auf ihr erbte sonst ein fremdes
+        # Feld und koennte faelschlich „erreicht keine Zone" melden. Das
+        # Rueckgaengig (unten bzw. in add_fixture) holt sie wieder.
+        feld_snap = self._sperrzonen_feld_nehmen(fid)
+        self._sperrzonen_feld_entfernt = feld_snap
         self._reload_patch_cache()
         self._emit("patch_changed")
         if removed_group:
@@ -1403,14 +1425,17 @@ class AppState:
             # FM-38: aktuelle fid und JUENGSTE Gruppen-Schnappschuesse mitfuehren
             # (Undo kann umnummern; ein Redo auf die alte Nummer loeschte das
             # Fremdgeraet, und ein veralteter Schnappschuss verwarf Umbenennungen).
-            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps}
+            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps,
+                             "feld": feld_snap}
 
             def _undo(s=snap, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             def _redo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt
 
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
@@ -1419,6 +1444,28 @@ class AppState:
                 redo=_redo,
             )
         return gruppen_snaps
+
+    # ── LAS-32: Laser-Feld beim Loeschen/Zurueckholen eines Geraets ──────────
+    #: Das Feld, das der letzte ``remove_fixture`` herausgenommen hat (oder
+    #: ``None``) — fuer Aufrufer, die es selbst aufheben (Undo von add_fixture).
+    _sperrzonen_feld_entfernt = None
+
+    def _sperrzonen_feld_nehmen(self, fid: int):
+        try:
+            daten = getattr(self, "sperrzonen", None)
+            return daten.nimm_feld(fid) if daten is not None else None
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_nehmen", e)
+            return None
+
+    def _sperrzonen_feld_zurueck(self, fid, feld) -> None:
+        if feld is None or fid is None:
+            return
+        try:
+            self.sperrzonen.setze_feld(int(fid), feld)
+            self._emit("sperrzonen_changed", None)
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_zurueck", e)
 
     def clear_patch(self):
         """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
@@ -2286,7 +2333,10 @@ class AppState:
         try:
             for eintrag in self.output_manager.ausgabe_status():
                 if eintrag["universum"] not in konfiguriert:
-                    self.output_manager.remove_output(eintrag["universum"])
+                    # OUT-71: dieses Universum gibt es nicht mehr — sein Adapter
+                    # soll dunkel enden, nicht das letzte Bild halten.
+                    self.output_manager.remove_output(eintrag["universum"],
+                                                      schlussbild=True)
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
 
@@ -2315,7 +2365,13 @@ class AppState:
                 # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
-                self.output_manager.remove_output(num)
+                # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
+                # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
+                # „Uebernehmen“ die Buehne dunkel.
+                if output == "Disabled":
+                    self.output_manager.remove_output(num, schlussbild=True)
+                else:
+                    self.output_manager.remove_output(num)
                 if output == "Enttec" and patch:
                     # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
                     # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit
@@ -3524,6 +3580,23 @@ class AppState:
                 return g.id, (json.loads(g.positions_json or "{}") or {})
         except Exception:
             return None, {}
+
+    def gruppen_steckbriefe(self) -> dict | None:
+        """VCB-42: ``{id: (Name, Ordner, Kennung)}`` aller Fixture-Gruppen —
+        woran ``group_ref.ziel_gilt`` eine Gruppe wiedererkennt.
+
+        ``None``, wenn die Show-DB nicht lesbar ist. Das ist NICHT „es gibt
+        keine Gruppen“: wer daraus „Ziel verloren“ schloesse, meldete bei jedem
+        Lesefehler einen Verlust (und ein Aufrufer, der nachzieht, vergaesse)."""
+        try:
+            from sqlalchemy import select
+            from .database.models import FixtureGroup
+            with self._session() as s:
+                return {int(g.id): (g.name or "", g.folder or "", g.uid or "")
+                        for g in s.execute(select(FixtureGroup)).scalars().all()}
+        except Exception as e:
+            debug_swallow("app_state.gruppen_steckbriefe", e)
+            return None
 
     def _group_lookup(self, name_or_ref):
         """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe; (None, []) wenn
@@ -5233,7 +5306,12 @@ class AppState:
 
         VCB-36: ein Eintrag in ``groups`` ist ein Name (alte Layouts) ODER ein
         ``(gid, name)``-Ref — der meint genau EINE Gruppe, auch wenn zwei gleich
-        heissen (``_group_positions`` loest einen Ref ueber die ID auf)."""
+        heissen (``_group_positions`` loest einen Ref ueber die ID auf).
+
+        VCB-42: ODER ein ``(gid, name, ordner, kennung)``-Ref mit Steckbrief. Der
+        wird bei JEDEM Aufloesen geprueft (``group_ref.ziel_gilt``): traegt die
+        Nummer inzwischen eine andere Gruppe, schaltet das Ziel nichts — auch
+        nicht bei einer schon gedrueckten Taste."""
         spec = (tuple(int(f) for f in (fids or ()) if f is not None),
                 tuple(z for z in (self._blackout_gruppen_ziel(g)
                                   for g in (groups or ())) if z is not None))
@@ -5250,6 +5328,11 @@ class AppState:
         fuer Leeres und Unlesbares (kein Ziel ist NICHT „alle Gruppen“)."""
         if isinstance(g, (tuple, list)):
             try:
+                if len(g) >= 4:
+                    # VCB-42: Ref mit Steckbrief. Ein Name ``None`` bleibt
+                    # ``None`` (= die Gruppe gab es beim Uebernehmen nicht).
+                    return (int(g[0]), None if g[1] is None else str(g[1]),
+                            str(g[2] or ""), str(g[3] or ""))
                 return (int(g[0]), str(g[1] if len(g) > 1 else ""))
             except (TypeError, ValueError, IndexError):
                 return None
@@ -5284,10 +5367,19 @@ class AppState:
         dasselbe Geraet auch als ganze Zelle oder als direktes fid-Ziel da,
         gewinnt das ganze Geraet."""
         from .group_cells import base_fids_in_cells, head_restrictions
+        from .group_ref import ziel_gilt
         fids, groups = spec
         ganz: set = set(fids)
         koepfe: dict = {}
+        steckbriefe = None
         for g in groups:
+            if isinstance(g, tuple) and len(g) == 4:
+                # VCB-42: ist die Gruppe mit dieser Nummer noch die gemeinte?
+                if steckbriefe is None:
+                    steckbriefe = self.gruppen_steckbriefe() or {}
+                if not ziel_gilt(g[1:], steckbriefe.get(g[0])):
+                    continue
+                g = (g[0], "")
             try:
                 cells = list(self.group_cells_by_name(g) or [])
             except Exception:
