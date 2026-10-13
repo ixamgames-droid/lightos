@@ -75,7 +75,6 @@
 | VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
 | VCB-46 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
-| DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
@@ -288,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T18:42Z D done OUT-73
 - 2026-10-12T18:55Z A claim ENG-37
 - 2026-10-12T18:56Z A done ENG-34
@@ -318,3 +316,4 @@
 - 2026-10-13T16:00Z A done FM-74
 - 2026-10-13T16:14Z A claim IMP-2
 - 2026-10-13T16:35Z A done LIZ-1
+- 2026-10-13T16:59Z A done DOC-72
