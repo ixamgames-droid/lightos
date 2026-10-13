@@ -41,8 +41,11 @@ Laufs wieder verschwindet):
 
 Was abgeschaltet wird: der Ausgabe-Thread (``LIGHTOS_NO_OUTPUT_THREAD``), der
 Kindprozess fuer serielle Ports (``LIGHTOS_SERIAL_INPROC``), rohes USB
-(``LIGHTOS_KEIN_USB``), die Audio-Aufnahme, der Datenumzug und die
-Wiederherstellungsfrage.
+(``LIGHTOS_KEIN_USB``), die Audio-Aufnahme, der Datenumzug, die
+Wiederherstellungsfrage und das automatische Oeffnen der MIDI-Eingaenge durch
+ein Hauptfenster (``LIGHTOS_NO_MIDI_AUTOCONNECT``). Netz-Ausgaenge (Art-Net,
+sACN) entstehen nur aus der Ausgabe-Konfiguration — die ist leer; die
+Web-Fernbedienung startet nur auf Klick.
 
 Regeln:
 
@@ -110,6 +113,7 @@ _AN = (
     "LIGHTOS_KEIN_USB",             # kein rohes USB (uDMX)
     "LIGHTOS_NO_DATENUMZUG",        # kein Uebernehmen alter data/-Dateien
     "LIGHTOS_NO_RECOVERY_PROMPT",   # keine Wiederherstellungsfrage
+    "LIGHTOS_NO_MIDI_AUTOCONNECT",  # ein Hauptfenster oeffnet keine MIDI-Eingaenge
 )
 
 #: Variablen, deren Stand VOR der Umlenkung festgehalten wird.
@@ -138,8 +142,10 @@ def _im_temp_bereich(pfad: str | None) -> bool:
     if not pfad:
         return False
     try:
-        echt = os.path.realpath(pfad)
-        wurzel = os.path.realpath(tempfile.gettempdir())
+        # normcase: unter Windows unterscheiden sich Schreibweisen desselben
+        # Ordners in Gross-/Kleinschreibung (Laufwerksbuchstabe, %TEMP%).
+        echt = os.path.normcase(os.path.realpath(pfad))
+        wurzel = os.path.normcase(os.path.realpath(tempfile.gettempdir()))
     except OSError:
         return False
     return echt == wurzel or echt.startswith(wurzel + os.sep)
@@ -182,6 +188,24 @@ def _alte_reste_entfernen(basis: str) -> None:
             pass
 
 
+def _datenbanken_schliessen() -> None:
+    """Ruhende SQLite-Verbindungen der App schliessen, bevor der Ordner geht —
+    unter Windows liesse sich die Datei sonst nicht loeschen. Ohne ``src`` zu
+    kennen: alle SQLAlchemy-Engines des Prozesses, und nur, wenn SQLAlchemy
+    ueberhaupt geladen ist. Bestmoeglich; ein Fehler bleibt folgenlos."""
+    sa_engine = sys.modules.get("sqlalchemy.engine")
+    engine_typ = getattr(sa_engine, "Engine", None)
+    if engine_typ is None:
+        return
+    import gc
+    for obj in gc.get_objects():
+        try:
+            if isinstance(obj, engine_typ):
+                obj.dispose()
+        except Exception:                               # noqa: BLE001
+            pass
+
+
 def _aufraeumen() -> None:
     """Am Prozessende: den Wegwerf-Ordner entfernen. Unter Windows haelt eine
     noch offene Datei (SQLite, Log) das Loeschen kurz auf — deshalb mehrere
@@ -192,6 +216,7 @@ def _aufraeumen() -> None:
         return
     try:
         import gc
+        _datenbanken_schliessen()
         for _ in range(5):
             gc.collect()
             shutil.rmtree(wurzel, ignore_errors=True)

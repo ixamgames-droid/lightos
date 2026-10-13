@@ -478,7 +478,8 @@ Deshalb gilt:
   Ende des Laufs verschwindet. Die Geraete-Bibliothek bekommt das Werkzeug als
   Kopie — gleicher Bestand, gleiche Profil-IDs, aber kein Schreiben ins Original.
   Ausgabe-Thread, serieller Kindprozess, rohes USB, Audio-Aufnahme und
-  Datenumzug sind aus.
+  Datenumzug sind aus; ein Hauptfenster oeffnet die MIDI-Eingaenge des Rechners
+  nicht von selbst (`LIGHTOS_NO_MIDI_AUTOCONNECT`).
 - **Bewusste Vorgaben bleiben stehen.** Wer eine der Variablen selbst setzt
   (Testlauf, Bild-Sandbox, Sichtproben-Sandkasten), behaelt seinen Wert. Fuer den
   Datenordner zaehlt nur eine Vorgabe im Temp-Bereich als bewusst — `APPDATA` ist
@@ -499,15 +500,22 @@ Deshalb gilt:
 - **Nicht gemeint** sind Werkzeuge, die die App nicht bauen und deren Zweck der
   Bestand ist: `library_testreste.py`, `bibliothek_profil.py`,
   `fixture_herkunft.py` (Geraete-Bibliothek), `collect_crash_report.py`
-  (Absturzprotokoll), `hw5_longrun.py` und `mh_einmessen.py` (senden mit Absicht
-  an den genannten Port).
+  (Absturzprotokoll), `import_qlc_input_profile.py` (Controller-Profil ablegen),
+  `hw5_longrun.py` und `mh_einmessen.py` (senden mit Absicht an den echten
+  Port — **nie nebenbei starten**: `hw5_longrun.py` sucht sich ohne `--port`
+  selbst den Enttec und sendet Blackout). Die Liste steht mit Begruendung im
+  Waechter (`AM_BESTAND`); **jedes** Skript, das `src` laedt, muss geschuetzt
+  sein oder dort stehen — und ein Bestands-Werkzeug darf weder den `AppState`
+  noch die Show noch die Oberflaeche laden.
 - **Inventar-Listen nachziehen**, ohne ins Repo zu schreiben:
   `tools/audit_tooltip_coverage.py --ausgabe DATEI` und
   `tools/ui_verification_checklist.py --ausgabe DATEI`.
 
 Waechter: `tests/test_tool27_werkzeug_sandbox.py` (statisch ueber alle Skripte,
-dazu beide Inventar-Werkzeuge im echten Lauf gegen einen nachgestellten
-Datenordner samt Gegenprobe) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
+dazu beide Inventar-Werkzeuge nackt gestartet — `python tools/<name>.py` aus
+einem fremden Arbeitsordner — gegen einen nachgestellten Datenordner samt
+Gegenprobe; serielle Ports, USB, MIDI, Netz-Sockets und Kindprozesse werden
+dabei mitgeschrieben) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
 
 ## Token-schonende Regeln fuer Agents
 
