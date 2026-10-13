@@ -109,8 +109,10 @@ neuen Namen fett und farbig, im **Status** steht „wird angelegt — Name gab e
 „PAR links 2“.“, und die Zählerzeile nennt, wie viele Geräte umbenannt werden. Endet der Name schon
 auf eine abgesetzte Zahl, wird weitergezählt („PAR 3“ → „PAR 4“); klebt die Zahl am Wort
 („PAR64“), gehört sie zur Typbezeichnung und es wird „PAR64 2“. Ein Name, der in der Tabelle nur
-einmal steht und im Patch frei ist, bleibt immer, wie er ist. Groß- und Kleinschreibung
-unterscheidet zwei Namen nicht.
+einmal steht und im Patch frei ist, bleibt immer, wie er ist. Groß- und Kleinschreibung und
+zusätzliche Leerzeichen unterscheiden zwei Namen nicht. Eine Zeile mit **Anzahl** zählt
+aufsteigend weiter: gibt es „PAR 1“ und „PAR 2“ schon, heißen drei neue „PAR 3“, „PAR 4“ und
+„PAR 5“.
 
 In der Vorschau erklärt jeder Spaltenkopf im Tooltip, was in der Spalte steht; die Spalte
 **Tabelle** zeigt Hersteller, Profil und Modus so, wie sie in der Datei geschrieben sind.
@@ -122,6 +124,7 @@ ist grau, solange keine Zeile angelegt werden kann. **Vorhandene Geräte werden 
 ihre Kopf-Gruppe). **Rückgängig** (Strg+Z) nimmt den ganzen Import in einem Schritt zurück.
 Der Patch und alle Ansichten bauen sich dabei **einmal** neu auf, nicht je Gerät — auch eine lange
 Liste ist in einem Augenblick da; ein importierter Laser ist sofort in NOT-AUS und Blackout erfasst.
+Bis der Import fertig ist, gibt keines der neuen Geräte etwas aus.
 
 Mit der Tastatur: liegt der Fokus auf **Tabellen-Import ▾**, öffnet die **Eingabetaste** das Menü,
 die Pfeiltasten wählen den Eintrag. Die Leertaste öffnet es nicht — sie löst im Hauptfenster GO aus.

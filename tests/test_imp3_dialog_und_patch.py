@@ -128,6 +128,33 @@ def test_name_der_zwischen_vorschau_und_anwenden_vergeben_wurde(state, bib):
     assert _namen(state) == ["Front", "Front 2"] and ergebnis.umbenannt == 1
 
 
+def test_vorschau_und_angelegte_namen_sind_dieselben_und_ein_schritt_zurueck(state, bib):
+    """Gegenprüfung: was die Vorschau je Gerät verspricht, steht danach im
+    Patch — auch bei Anzahl > 1, Groß/Klein, Leerzeichen und einem Namen, der
+    erst durch die Nummer kollidiert. Strg+Z nimmt alles in EINEM Schritt."""
+    for i, name in enumerate(["PAR 1", "PAR 2", "Spot  links ", "Wash 2"]):
+        _von_hand(state, bib, name, 100 + 10 * i)
+    vorher = _namen(state)
+    text = ("Name;Hersteller;Profil;Modus;Universum;Adresse;Anzahl\n"
+            f"PAR;Generic;{PAR};8-Kanal RGBW;1;1;3\n"
+            f"spot LINKS;Generic;{PAR};8-Kanal RGBW;1;25;1\n"
+            f"Wash;Generic;{PAR};8-Kanal RGBW;1;33;1\n"
+            f"Wash;Generic;{PAR};8-Kanal RGBW;1;41;1\n")
+    dlg = _dialog(state, bib, text)
+    versprochen = [g.name for pz in dlg.plan.zeilen for g in pz.geraete]
+    assert versprochen == ["PAR 3", "PAR 4", "PAR 5", "spot LINKS 2", "Wash", "Wash 3"]
+    assert dlg._table.item(0, D.S_NAME).text() == "PAR 3 … PAR 5  ×3"
+    assert dlg._table.item(3, D.S_NAME).text() == "Wash 3"
+    schritte = len(get_undo_stack()._undo)
+    dlg._anwenden()
+    assert _namen(state) == vorher + versprochen
+    assert len(get_undo_stack()._undo) == schritte + 1
+    assert get_undo_stack().undo()
+    assert _namen(state) == vorher
+    assert get_undo_stack().redo()
+    assert _namen(state) == vorher + versprochen
+
+
 def test_wahl_im_dialog_rechnet_die_namen_neu(state, bib):
     """Zeile 1 ist offen (kein Modus genannt) und belegt noch keinen Namen;
     nach der Wahl ist Zeile 1 die erste „Kopf“ und Zeile 2 bekommt die Nummer."""

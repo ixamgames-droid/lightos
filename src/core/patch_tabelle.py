@@ -864,26 +864,43 @@ def _pruefe_ueberschneidungen(zeilen: list[PlanZeile], vorhandene) -> None:
 _NAME_MIT_NUMMER = re.compile(r"^(.*\S)\s+(\d+)$")
 
 
-def naechster_freier_name(name: str, belegt) -> str:
+def namens_schluessel(name: str) -> str:
+    """Vergleichsform eines Geraetenamens: Gross/Klein und die Menge der
+    Leerzeichen unterscheiden zwei Namen nicht („PAR  links “ = „par links“) —
+    in einer Auswahlliste sind sie nicht auseinanderzuhalten."""
+    return " ".join((name or "").split()).casefold()
+
+
+def naechster_freier_name(name: str, belegt, merker: dict | None = None) -> str:
     """IMP-3: ``name`` mit der naechsten freien Nummer — „PAR links“ ->
-    „PAR links 2“, „PAR links 3“ … ``belegt``: vergebene Namen, klein
-    geschrieben (``casefold``); Gross/Klein unterscheidet zwei Namen nicht.
+    „PAR links 2“, „PAR links 3“ … ``belegt``: vergebene Namen in der Form
+    von :func:`namens_schluessel`; Gross/Klein unterscheidet zwei Namen nicht.
 
     Endet der Name schon auf eine ABGESETZTE Zahl („PAR 3“), ist das ein
     Zaehler: es wird weitergezaehlt („PAR 4“), nicht „PAR 3 2“ angehaengt —
     das laese sich wie eine Unternummer und sortiert falsch. Klebt die Zahl
     am Wort („ZQ01424“, „PAR64“, „LED-PAR-56“), gehoert sie zur
     Typbezeichnung und bleibt stehen: „PAR64“ -> „PAR64 2“. Fuehrende Nullen
-    bleiben erhalten („Spot 01“ -> „Spot 02“)."""
+    bleiben erhalten („Spot 01“ -> „Spot 02“).
+
+    ``merker`` (optional, vom Aufrufer ueber viele Aufrufe gehalten): merkt
+    je Stamm und Startnummer, bis wohin schon gesucht wurde — tausend gleiche
+    Namen suchen so nicht tausendmal von vorn."""
+    name = " ".join((name or "").split())
     treffer = _NAME_MIT_NUMMER.match(name)
     if treffer:
         stamm, ziffern = treffer.group(1), treffer.group(2)
         nummer, stellen = int(ziffern) + 1, len(ziffern)
     else:
         stamm, nummer, stellen = name, 2, 1
+    marke = (namens_schluessel(stamm), nummer, stellen)
+    if merker is not None:
+        nummer = max(nummer, merker.get(marke, nummer))
     while True:
         kandidat = f"{stamm} {nummer:0{stellen}d}" if stamm else str(nummer)
-        if kandidat.casefold() not in belegt:
+        if namens_schluessel(kandidat) not in belegt:
+            if merker is not None:
+                merker[marke] = nummer
             return kandidat
         nummer += 1
 
@@ -895,26 +912,38 @@ def _vergib_namen(zeilen: list[PlanZeile], vorhandene) -> None:
     Vorher war das nur ein Hinweis und beide Geraete hiessen gleich — in
     Auswahllisten, Gruppen und der Befehlszeile nicht zu unterscheiden.
 
-    Zwei Durchgaenge: zuerst behaelt jeder Name, der noch frei ist, seinen
-    Platz (auch ein ausdruecklich so genanntes „PAR 2“ weiter unten in der
-    Tabelle), erst danach bekommen die Doppelten ihre Nummer. So benennt der
+    Zwei Durchgaenge: zuerst behaelt jeder AUSDRUECKLICHE Name (Zeile mit
+    einem Geraet), der noch frei ist, seinen Platz — auch ein „PAR 2“ weiter
+    unten in der Tabelle. Erst danach kommen die Doppelten und die Zeilen mit
+    Anzahl > 1 an die Reihe, in Tabellenreihenfolge: deren Namen („PAR 1“ …
+    „PAR n“) hat der Import selbst erzeugt, sie behalten sie, wenn sie frei
+    sind, und zaehlen sonst AUFSTEIGEND weiter („PAR 1“/„PAR 2“ vergeben ->
+    „PAR 3, PAR 4, PAR 5“, nicht „PAR 4, PAR 5, PAR 3“). So benennt der
     Import nie ein Geraet um, dessen Name in der Tabelle eindeutig war."""
-    belegt = {b.name.casefold() for b in vorhandene if b.name}
-    doppelt: list[tuple[PlanZeile, int]] = []
+    belegt = {namens_schluessel(b.name) for b in vorhandene if b.name}
+    spaeter: list[tuple[PlanZeile, int]] = []
     for pz in zeilen:
         pz.umbenannt = []
         if pz.status != ANLEGBAR:
             continue
-        for k, g in enumerate(pz.geraete):
-            schluessel = g.name.casefold()
-            if schluessel in belegt:
-                doppelt.append((pz, k))
-            else:
-                belegt.add(schluessel)
-    for pz, k in doppelt:
+        if len(pz.geraete) != 1:
+            spaeter.extend((pz, k) for k in range(len(pz.geraete)))
+            continue
+        schluessel = namens_schluessel(pz.geraete[0].name)
+        if schluessel in belegt:
+            spaeter.append((pz, 0))
+        else:
+            belegt.add(schluessel)
+    # Tabellenreihenfolge (der erste Durchgang haengt Zeile fuer Zeile an).
+    merker: dict = {}
+    for pz, k in spaeter:
         alt = pz.geraete[k]
-        neu = naechster_freier_name(alt.name, belegt)
-        belegt.add(neu.casefold())
+        schluessel = namens_schluessel(alt.name)
+        if schluessel not in belegt:
+            belegt.add(schluessel)
+            continue
+        neu = naechster_freier_name(alt.name, belegt, merker)
+        belegt.add(namens_schluessel(neu))
         pz.geraete[k] = replace(alt, name=neu)
         pz.umbenannt.append((alt.name, neu))
 

@@ -340,6 +340,13 @@ class AppState:
         self._patch_sammel_thread: int | None = None
         self._patch_sammel_neuaufbau: bool = False
         self._patch_sammel_ereignisse: list[str] = []
+        # Die Geraeteliste, aus der der GELTENDE Render-Plan gebaut wurde
+        # (unter _plan_lock mit ihm getauscht). Solange gesammelt wird
+        # (_patch_sammel_render), bekommen die Funktionen im Renderer DIESE
+        # Liste statt _patch_cache — sonst schriebe eine laufende Funktion ein
+        # Geraet, das der Plan (und die NOT-AUS-Maske) noch nicht kennt.
+        self._plan_patch: list | None = None
+        self._patch_sammel_render: bool = False
         # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
         # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
         # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
@@ -1821,7 +1828,10 @@ class AppState:
         laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
         laser_fids: set = set()
         laser_rearm_fids: set = set()
-        for fx in self._patch_cache:
+        # IMP-3: die Liste, aus der DIESER Plan entsteht — wird unten mit ihm
+        # getauscht (s. _plan_patch).
+        plan_patch = list(self._patch_cache)
+        for fx in plan_patch:
             chans = get_channels_for_patched(fx)
             # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
             # der Channel-Cache nach clear_channel_cache wieder befuellt wird) —
@@ -1978,6 +1988,7 @@ class AppState:
                 # wirft unten etwas, bezoege sich der naechste Uebergang sonst
                 # auf die Maske des vorigen Plans.
                 self._blackout_keep_gesetzt = new_keep_mask
+                self._plan_patch = plan_patch
                 self._fix_index = fix_index
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
@@ -2209,8 +2220,12 @@ class AppState:
         Sicherheit: beim Verlassen ist der Render-Plan garantiert aktuell —
         auch wenn der Block wirft (``finally``); ein importierter Laser ist
         damit sofort in NOT-AUS und Blackout erfasst. WAEHREND des Blocks
-        gilt der alte Plan: ein neues Geraet gibt noch nichts aus (kein
-        Default, kein Span — es bleibt dunkel), ein gerade entferntes wird
+        gilt der alte Plan MIT seiner Geraeteliste (``_plan_patch``): der
+        Ausgabe-Thread gibt den Funktionen nicht ``_patch_cache``, sondern
+        die Liste, aus der der geltende Plan gebaut wurde. Ein neues Geraet
+        gibt damit noch nichts aus (kein Default, kein Span, keine Funktion
+        schreibt es — sonst ginge sein Wert als „nicht gepatchte Roh-Adresse“
+        an der NOT-AUS-Maske vorbei aufs Kabel), ein gerade entferntes wird
         bis zum Ende weiter wie bisher gerendert und dann freigegeben. Der
         Block laeuft im UI-Thread am Stueck; das Fenster ist kurz.
 
@@ -2227,6 +2242,13 @@ class AppState:
             self._patch_sammel_thread = threading.get_ident()
             self._patch_sammel_neuaufbau = False
             self._patch_sammel_ereignisse = []
+            # Ab jetzt rendert der Ausgabe-Thread die Funktionen mit der
+            # Geraeteliste des geltenden Plans (s. _render_frame) — BEVOR die
+            # erste Aenderung _patch_cache austauscht.
+            with self._get_plan_lock():
+                if getattr(self, "_plan_patch", None) is None:
+                    self._plan_patch = list(getattr(self, "_patch_cache", None) or ())
+                self._patch_sammel_render = True
         self._patch_sammel_tiefe = getattr(self, "_patch_sammel_tiefe", 0) + 1
         try:
             yield
@@ -2250,6 +2272,9 @@ class AppState:
             if neuaufbau:
                 self._reload_patch_cache()
         finally:
+            # Erst NACH dem Neuaufbau (Plan und _plan_patch sind dort unter
+            # _plan_lock zusammen getauscht) wieder die Geraeteliste selbst.
+            self._patch_sammel_render = False
             for ereignis in self._PATCH_SAMMEL_EREIGNISSE:
                 if ereignis in ereignisse:
                     self._emit(ereignis)
@@ -4365,6 +4390,11 @@ class AppState:
             patched_set = self._patched_set
             # _laser_estop_addrs wie zuvor defensiv (Test-Stubs ohne das Feld).
             laser_estop_addrs = getattr(self, "_laser_estop_addrs", {})
+            # IMP-3: waehrend patch_sammeln() die Geraeteliste DIESES Plans —
+            # _patch_cache ist dem Plan dann voraus (s. _plan_patch).
+            sammel_patch = (getattr(self, "_plan_patch", None)
+                            if getattr(self, "_patch_sammel_render", False)
+                            else None)
         # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
         scratch: dict[int, Universe] = {}
         for univ, _live in live_universes:
@@ -4390,7 +4420,9 @@ class AppState:
         for su in scratch.values():
             su.begin_write_log()
         try:
-            self.function_manager.tick(scratch, self._patch_cache, dt)
+            self.function_manager.tick(
+                scratch,
+                self._patch_cache if sammel_patch is None else sammel_patch, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
         func_touched: dict[int, set[int]] = {}

@@ -375,3 +375,193 @@ def test_sechzig_geraete_deutlich_schneller_als_einzeln(tmp_path, bib):
     print(f"\n60 Geräte: einzeln {dauer['alt']:.2f} s, gesammelt {dauer['neu']:.2f} s")
     assert dauer["neu"] < dauer["alt"] * 0.75, dauer
     assert dauer["neu"] < 20.0, dauer
+
+
+# ── Gegenprüfung: der Ausgabe-Thread WÄHREND des Sammelns ────────────────────
+#
+# Die Geräteliste wechselt im Block sofort, der Render-Plan erst am Ende. Der
+# Renderer gab den Funktionen die NEUE Liste, rechnete aber mit dem ALTEN Plan:
+# eine laufende Funktion, die ein gerade angelegtes Gerät kennt (Wiederholen
+# eines Imports, wiedervergebene Gerätenummer), schrieb dessen Adressen — für
+# den alten Plan „nicht gepatcht“, also über den Roh-Kanal-Weg hinaus aufs
+# Kabel, an der NOT-AUS-Maske vorbei (die kennt den neuen Laser noch nicht).
+
+def _alles_voll(universen, patch, dt):
+    """Stellvertreter für eine laufende Funktion, die JEDES Gerät der
+    übergebenen Geräteliste auf allen Kanälen voll aufdreht."""
+    for fx in patch:
+        su = universen.get(fx.universe)
+        if su is None:
+            continue
+        for k in range(int(fx.channel_count)):
+            su.set_channel(fx.address + k, 255)
+
+
+def _laser(state, bib, fid, adresse, universum=3):
+    profil = bib.finde("American DJ", LASER).profil
+    return PatchedFixture(
+        fid=fid, label="Laser", fixture_profile_id=profil.id,
+        mode_name="DMX Mode", universe=universum, address=adresse,
+        channel_count=5, manufacturer_name="American DJ",
+        fixture_name=LASER, fixture_type="laser")
+
+
+def _live(state, universum, adresse, anzahl):
+    daten = state.universes[universum].get_all()
+    return list(daten[adresse - 1:adresse - 1 + anzahl])
+
+
+def test_laser_bleibt_im_not_aus_dunkel_auch_mitten_im_sammeln(state, bib, monkeypatch):
+    monkeypatch.setattr(state.function_manager, "tick", _alles_voll)
+    state.add_fixture(_par(state, bib, 1, 1))
+    state.set_laser_estop(True)
+    with state.patch_sammeln():
+        state.add_fixture(_laser(state, bib, state.next_fid(), 10))
+        state.add_fixture(_par(state, bib, state.next_fid(), 9))
+        state._render_frame(0.02)          # ein Frame mitten im Sammeln
+        assert _live(state, 3, 10, 5) == [0] * 5
+        # der neue PAR gibt noch nichts aus, der alte läuft unverändert weiter
+        assert _live(state, 1, 9, 8) == [0] * 8
+        assert _live(state, 1, 1, 8) == [255] * 8
+    state._render_frame(0.02)
+    assert state.laser_estop_active
+    assert _live(state, 3, 10, 5) == [0] * 5          # NOT-AUS deckt den Laser
+    assert _live(state, 1, 9, 8) == [255] * 8         # der neue PAR ist jetzt da
+
+
+def test_jeder_frame_waehrend_des_imports_haelt_den_laser_dunkel(state, bib, monkeypatch):
+    """Der ganze Import, nach JEDEM angelegten Gerät ein Frame — und dasselbe
+    beim Rückgängig und Wiederholen."""
+    monkeypatch.setattr(state.function_manager, "tick", _alles_voll)
+    state.set_laser_estop(True)
+    hell: list = []
+    echt_add, echt_weg = state.add_fixture, state.remove_fixture
+
+    def _pruefe():
+        state._render_frame(0.02)
+        uni = state.universes.get(3)
+        if uni is not None and any(uni.get_all()[9:14]):
+            hell.append(list(uni.get_all()[9:14]))
+
+    def add(*a, **k):
+        try:
+            return echt_add(*a, **k)
+        finally:
+            _pruefe()
+
+    def weg(*a, **k):
+        try:
+            return echt_weg(*a, **k)
+        finally:
+            _pruefe()
+
+    monkeypatch.setattr(state, "add_fixture", add)
+    monkeypatch.setattr(state, "remove_fixture", weg)
+    T.wende_an(state, _plan(state, bib, _tabelle(3)), bib)
+    _pruefe()
+    get_undo_stack().undo()
+    _pruefe()
+    get_undo_stack().redo()
+    _pruefe()
+    assert state.laser_estop_active and hell == []
+
+
+def test_im_sammeln_geloeschtes_geraet_ist_danach_aus_der_ausgabe(state, bib, monkeypatch):
+    monkeypatch.setattr(state.function_manager, "tick", _alles_voll)
+    state.add_fixture(_par(state, bib, 1, 1))
+    state.add_fixture(_par(state, bib, 2, 9))
+    state._render_frame(0.02)
+    assert _live(state, 1, 1, 16) == [255] * 16
+    with state.patch_sammeln():
+        state.remove_fixture(2)
+        state._render_frame(0.02)
+        # im Block gilt Plan UND Geräteliste des alten Stands — zusammen
+        assert _live(state, 1, 1, 16) == [255] * 16
+    assert _live(state, 1, 9, 8) == [0] * 8           # schon vor dem nächsten Frame
+    state._render_frame(0.02)
+    assert _live(state, 1, 1, 8) == [255] * 8
+    assert _live(state, 1, 9, 8) == [0] * 8
+    assert 2 not in state._fix_index
+
+
+def test_ausserhalb_des_sammelns_bekommen_funktionen_die_geraeteliste_selbst(state, bib, monkeypatch):
+    """Byte-gleich wie vorher: ohne Sammeln reicht der Renderer genau
+    ``_patch_cache`` durch — auch nach einem beendeten (und einem geplatzten)
+    Sammelblock."""
+    gesehen = []
+    monkeypatch.setattr(state.function_manager, "tick",
+                        lambda universen, patch, dt: gesehen.append(patch))
+    state.add_fixture(_par(state, bib, 1, 1))
+    state._render_frame(0.02)
+    assert gesehen[-1] is state._patch_cache
+    with state.patch_sammeln():
+        state.add_fixture(_par(state, bib, 2, 9))
+        state._render_frame(0.02)
+        assert [f.fid for f in gesehen[-1]] == [1]
+    state._render_frame(0.02)
+    assert gesehen[-1] is state._patch_cache
+    with pytest.raises(RuntimeError):
+        with state.patch_sammeln():
+            state.add_fixture(_par(state, bib, 3, 17))
+            raise RuntimeError("mitten im Block")
+    state._render_frame(0.02)
+    assert gesehen[-1] is state._patch_cache
+    assert [f.fid for f in gesehen[-1]] == [1, 2, 3]
+
+
+def test_echter_ausgabe_thread_waehrend_import_rueckgaengig_wiederholen(state, bib, monkeypatch):
+    """Ein Thread rendert pausenlos, während importiert, zurückgenommen und
+    wiederholt wird: kein Fehler im Renderer, der Laser im NOT-AUS nie hell."""
+    monkeypatch.setattr(state.function_manager, "tick", _alles_voll)
+    state.set_laser_estop(True)
+    stopp = threading.Event()
+    fehler: list = []
+    hell: list = []
+    frames = [0]
+
+    def ausgabe():
+        while not stopp.is_set():
+            try:
+                state._render_frame(0.02)
+                frames[0] += 1
+                uni = state.universes.get(3)
+                if uni is not None and any(uni.get_all()[9:14]):
+                    hell.append(list(uni.get_all()[9:14]))
+            except Exception as e:                     # pragma: no cover
+                fehler.append(repr(e))
+
+    faden = threading.Thread(target=ausgabe, daemon=True)
+    faden.start()
+    try:
+        T.wende_an(state, _plan(state, bib, _tabelle(12)), bib)
+        time.sleep(0.05)
+        get_undo_stack().undo()
+        time.sleep(0.05)
+        get_undo_stack().redo()
+        time.sleep(0.05)
+    finally:
+        stopp.set()
+        faden.join(timeout=10)
+    assert not faden.is_alive() and frames[0] > 0
+    assert fehler == [] and hell == []
+    assert not state._patch_sammel_render and state._patch_sammel_tiefe == 0
+    assert [f.fid for f in state._plan_patch] == [f.fid for f in state._patch_cache]
+
+
+def test_einzelaufruf_ausserhalb_des_sammelns_wie_vorher(state, bib):
+    """Wer ``add_fixture``/``remove_fixture`` ohne Sammelblock ruft, bekommt
+    je Aufruf EIN ``patch_changed`` und sofort den fertigen Plan."""
+    ohr = Mithoerer(state)
+    plan_im_ereignis: list = []
+    state.subscribe(lambda e, d=None: plan_im_ereignis.append(sorted(state._fix_index))
+                    if e == "patch_changed" else None)
+    state.add_fixture(_par(state, bib, 1, 1))
+    assert ohr.zahl("patch_changed") == 1 and sorted(state._fix_index) == [1]
+    state.add_fixture(_laser(state, bib, 2, 10))
+    assert ohr.zahl("patch_changed") == 2 and 2 in state._laser_fids
+    state.remove_fixture(1)
+    assert ohr.zahl("patch_changed") == 3 and sorted(state._fix_index) == [2]
+    assert get_undo_stack().undo()
+    assert ohr.zahl("patch_changed") == 4 and sorted(state._fix_index) == [1, 2]
+    assert plan_im_ereignis == [[1], [1, 2], [2], [1, 2]]
+    assert not state._patch_sammel_render
