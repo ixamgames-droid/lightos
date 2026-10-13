@@ -68,6 +68,11 @@ def _show_laden(basis: str):
     # Schalter umbenannt), liefe das Werkzeug sonst auf der echten
     # current_show.db (STAB-CURSHOW; tests/test_tools_db_isolation.py).
     os.environ["LIGHTOS_SHOW_DB"] = os.path.join(basis, "show.db")
+    # Ebenso die Ausgabe-Konfiguration (TOOL-19): get_state() richtet ein, was
+    # in universes.json steht. Die Sandbox lenkt gleich auf ihre eigene, leere
+    # Datei um; bis dahin zeigt der Pin auf eine Datei, die es nicht gibt —
+    # am Rig oeffnet die Messung so in keinem Fall den echten Ausgang.
+    os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(basis, "universes_gibt_es_nicht.json")
     from anleitungsbilder import sandbox
 
     sandbox.einrichten(basis)
