@@ -76,6 +76,7 @@
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
 | VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 | TOOL-27 | A | fix/tool27-pruefwerkzeuge-eigene-sandbox | 2026-10-13T20:41Z | - |
+| IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
 
 ## Blocker & Fallen
 
@@ -284,7 +285,6 @@
 
 ## Verlauf
 
-- 2026-10-13T13:52Z A done STAB-35
 - 2026-10-13T13:52Z A done STAB-36
 - 2026-10-13T13:54Z A aktualisiert ENG-35: Branch - -> feature/eng35-prioritaeten-stufen
 - 2026-10-13T13:54Z A aktualisiert VCB-46: Branch - -> feature/eng35-prioritaeten-stufen
@@ -314,3 +314,4 @@
 - 2026-10-13T21:06Z B done VIZ-105
 - 2026-10-13T21:45Z B done STAB-37
 - 2026-10-13T22:21Z B done DOC-71
+- 2026-10-13T22:26Z A claim IMP-3
