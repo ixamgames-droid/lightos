@@ -55,12 +55,29 @@ NUR_UEBER_NAMEN = {
     ("eurolite/led-kls-laser-bar-fx-light-set.json", "27 Channels"): "kanalname",
     ("u-king/mini-double-sided-moving-head.json", "15 Channel"): "kanalname",
 }
-#: Die Grenze der Regel (steht im Modulkopf von ``erkennung``): Kurz-Modi von
-#: Kombigeraeten ohne eigenen Laserkanal. Bewusst festgehalten, nicht geloest.
+#: Was die Regel JE MODUS nicht sieht: Kurz-Modi von Kombigeraeten ohne eigenen
+#: Laserkanal. LAS-38 schliesst das ueber die anderen Modi des Profils
+#: (``tests/test_las38_laser_erkennung_alle_modi.py``); diese Datei prueft die
+#: Regel je Modus und schaltet die Profil-Auskunft dafuer ab (s. Fixture unten).
 KURZMODI_OHNE_LASERKANAL = {
     ("cameo/multi-fx-bar.json", "2 Channel"),
     ("chauvet/gigbar-2.json", "3-channel"),
 }
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _ohne_profil_auskunft():
+    """LAS-38: die Attrappen dieser Datei tragen alle dieselbe Profil-Nummer.
+    Die Auskunft „ein anderer Modus des Profils hat einen Laserkanal“ wuerde
+    sonst fuer alle dasselbe (und aus der Geraete-Datenbank etwas Fremdes)
+    antworten. Modulweit und ``autouse``: sie muss stehen, bevor ``bib`` den
+    Render-Plan baut."""
+    alt = erkennung._profil_quelle
+    erkennung.setze_profil_quelle(None)
+    erkennung.vergiss_profile()
+    yield
+    erkennung.setze_profil_quelle(alt)
+    erkennung.vergiss_profile()
 
 
 class _Bereich:
