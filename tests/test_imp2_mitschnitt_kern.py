@@ -153,7 +153,7 @@ def test_16_bit_paar_bleibt_bei_jeder_regel_zusammen():
     # Nur der Fein-Kanal ändert sich: der Grob-Kanal kommt trotzdem mit.
     m = _lies({1: _bild(a3=10, a4=7)}, patch, auswahl=M.AUSWAHL_GEAENDERT,
               bezug={1: _bild(a3=10, a4=6)})
-    assert m.szenenwerte() == [(1, 3, 10), (1, 4, 7)]
+    assert m.szenenwerte() == [(1, 3, 10), (1, 4, 7), (1, 5, 0)]
 
 
 def test_unbekannte_auswahl_wird_abgelehnt():
