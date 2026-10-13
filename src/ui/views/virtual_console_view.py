@@ -653,6 +653,14 @@ class VirtualConsoleView(QWidget):
         except Exception:
             pass
 
+    def ausgabe_chip_platz(self):
+        """VCB-47 (Nachtrag 2): wo der eingeklappte Hinweis „Ausgabe gestört“
+        des Hauptfensters (``ausgabe_banner.AusgabeChip``) nichts verdeckt — das
+        rechte Ende der Zeile „Aktiver Effekt“. Sie liegt zwischen Werkzeugleiste
+        und Konsole, hat einen festen Platz und traegt keine Bedienung; der Chip
+        beruehrt dort in keiner Fensterbreite einen Knopf oder eine Taste."""
+        return self._lbl_active_fx
+
     def _zeige_aktiven_effekt(self, text: str, stil: str) -> None:
         """VCB-47: nur Text und Farbe der Statuszeile wechseln — nie ihre Sichtbarkeit
         oder Hoehe (sonst verschiebt sich die Konsole unter dem Finger). Unveraenderte

@@ -113,6 +113,7 @@ class _ImHauptfenster(unittest.TestCase):
         self.w._stack.setCurrentIndex(self.w._stack.indexOf(self.view))
         if self.w.size().width() != 1100 or self.w.size().height() != 700:
             self.w.resize(1100, 700)
+        self.steuerung.klappe_aus()             # nichts eingeklappt uebernehmen
         self.steuerung.probe_aus = False
         self.steuerung.bei_stoerung_klick = self._klick_vorher
         self._zeige(ART_KEIN)
@@ -301,6 +302,10 @@ class _ImHauptfenster(unittest.TestCase):
             self.steuerung.bei_stoerung_klick = lambda: geklickt.append(1)
             lage = self._lage()
             for knopf, punkt in stellen.items():
+                # Nachtrag 2: ein Klick kann die Meldung einklappen (Knopf
+                # „▴ einklappen“, Probenhinweis ueberall) — fuer den naechsten
+                # Punkt wieder das volle Banner herstellen.
+                self.steuerung.klappe_aus()
                 self.steuerung.probe_aus = False
                 self._zeige(art)
                 ziel = self.w.childAt(punkt)
@@ -358,23 +363,60 @@ class _ImHauptfenster(unittest.TestCase):
 
     # -- eine Zeile, langer Text gekuerzt ------------------------------------
 
-    def test_stoerung_laesst_sich_nicht_wegklicken(self):
+    def test_stoerung_laesst_sich_nicht_entfernen_nur_einklappen(self):
+        """Nachtrag 2: die Stoerung laesst sich nicht ENTFERNEN, nur
+        einklappen — der rote Chip bleibt, solange sie anliegt."""
         self._zeige(ART_STOERUNG)
         self.steuerung.bei_stoerung_klick = lambda: None
+        chip = self.steuerung.chip
+        # Klick auf den Text: klappt nicht ein (oeffnet die Einstellungen).
         QTest.mouseClick(self.banner, Qt.MouseButton.LeftButton)
         self._lauf()
         self.assertTrue(self.banner.isVisible())
+        self.assertFalse(chip.isVisible())
         self._pruefe_lage_des_banners()
+        # Klick auf „▴ einklappen“: das Banner geht, der Chip steht.
+        vorher = self._lage()
+        QTest.mouseClick(self.banner, Qt.MouseButton.LeftButton,
+                         pos=self.banner.knopf_rechteck().center())
+        self._lauf()
+        self.assertFalse(self.banner.isVisible())
+        self.assertTrue(chip.isVisible(), "Der Chip muss stehen bleiben.")
+        self.assertEqual(self.steuerung.zustand.art, ART_STOERUNG)
+        self.assertEqual(self._lage(), vorher)
+        self.assertIn("Ausgabe gestört: U1 Enttec", chip.toolTip())
+        # Auch der naechste Takt mit derselben Stoerung entfernt nichts.
+        with redirect_stdout(io.StringIO()):
+            self.steuerung.aktualisiere(self.om)
+        self._lauf()
+        self.assertTrue(chip.isVisible())
+        # Klick auf den Chip: das volle Banner ist wieder da.
+        QTest.mouseClick(chip, Qt.MouseButton.LeftButton)
+        self._lauf()
+        self.assertFalse(chip.isVisible())
+        self._pruefe_lage_des_banners()
+        self.assertEqual(self._lage(), vorher)
 
     def test_probenhinweis_laesst_sich_wegklicken(self):
+        """Nachtrag 2: der Klick klappt den Hinweis auf einen gedeckten Chip
+        ein (gleiche Bedienung wie bei der Stoerung), statt ihn zu streichen."""
         self._zeige(ART_PROBE)
-        self.assertIn("Klick blendet den Hinweis", self.banner.toolTip())
+        self.assertIn("Ein Klick klappt den Hinweis", self.banner.toolTip())
         vorher = self._lage()
         with redirect_stdout(io.StringIO()):
             QTest.mouseClick(self.banner, Qt.MouseButton.LeftButton)
         self._lauf()
         self.assertFalse(self.banner.isVisible())
         self.assertTrue(self.steuerung.probe_aus)
+        self.assertEqual(self._lage(), vorher)
+        chip = self.steuerung.chip
+        self.assertTrue(chip.isVisible())
+        self.assertIn("Probenmodus", chip.text())
+        with redirect_stdout(io.StringIO()):
+            QTest.mouseClick(chip, Qt.MouseButton.LeftButton)
+        self._lauf()
+        self.assertTrue(self.banner.isVisible())
+        self.assertFalse(chip.isVisible())
         self.assertEqual(self._lage(), vorher)
 
     def test_langer_text_bleibt_eine_zeile_und_steht_im_tooltip(self):

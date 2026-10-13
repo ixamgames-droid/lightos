@@ -1129,14 +1129,16 @@ class MainWindow(QMainWindow):
         self._ausgabe_banner = AusgabeBannerSteuerung(
             kiosk=self._kiosk_mode, parent=central)
         if not self._kiosk_mode:
-            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen.
+            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen;
+            # dort klappt ein Klick auf den Balken die Meldung ein.
             self._ausgabe_banner.bei_stoerung_klick = self._open_output_config
         root.addWidget(self._section_bar)
 
         # ── Stacked Widget ─────────────────────────────────────────────────────
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
-        self._ausgabe_banner.widget.ueberlagere(self._stack)
+        # Nachtrag 2: Banner UND eingeklappter Chip haengen am Stapel.
+        self._ausgabe_banner.ueberlagere(self._stack)
 
         # ── Command-Line (T1.1, MA-/Avolites-Style) ───────────────────────────
         try:

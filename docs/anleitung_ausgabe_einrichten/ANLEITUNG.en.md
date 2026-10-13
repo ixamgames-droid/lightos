@@ -341,10 +341,9 @@ A click on the Enttec indicator opens the dialog from step 1 directly.
 unplugged, network gone), a red bar `Ausgabe gestört: U<n> <Weg> — <Grund>` (output
 disturbed: universe, path, reason) also appears at the top of the main window — in kiosk
 mode too, where the status bar is hidden. It disappears by itself once the output has been
-sending again for a few seconds; a click opens the dialog from step 1 (not in kiosk mode).
-If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX gesendet`
-(rehearsal mode — no DMX is being sent) is shown there; a click hides this hint until the
-next program start.
+sending again for a few seconds; a click on the text opens the dialog from step 1 (not in
+kiosk mode). If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX
+gesendet` (rehearsal mode — no DMX is being sent) is shown there.
 
 The bar lies **on top of** the upper edge of the view currently shown, directly below the
 bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with the
@@ -352,9 +351,31 @@ laser emergency stop). It does not push anything down: when it appears or disapp
 buttons of the Virtual Console and all other controls stay where they are. In return it
 covers a narrow line at the top of the view. A click on the bar does not trigger anything
 underneath it. The bar is always a single line high; a text that is too long is shortened
-with "…", and the full text is in the tooltip. The fault message cannot be clicked away
-while the fault persists. The popped-out Virtual Console window and the 3D window do not
+with "…", and the full text is in the tooltip. The fault message can be collapsed
+(next paragraph) but not clicked away while the fault persists. The popped-out Virtual
+Console window and the 3D window do not
 show the bar.
+
+**Collapsing the bar.** The bar covers the top row of the view. So that you can keep working
+during a fault, it can be made smaller – the fault message cannot be removed completely
+while the fault persists:
+
+- Click `▴ einklappen` (collapse) at the right end of the bar. In kiosk mode and for the
+  rehearsal hint, a click anywhere on the bar is enough. By keyboard: move to the bar with
+  the Tab key and press Enter.
+- Instead of the bar there is then a small chip: red `⚠ Ausgabe gestört ▾`, or a subdued
+  `Probenmodus ▾` for the rehearsal hint. In the Virtual Console it sits at the right end of
+  the "Aktiver Effekt" (active effect) line between the toolbar and the buttons and covers
+  neither a toolbar button nor a console button there; in the other views it lies in the top
+  right corner. The tooltip gives the full text of the fault.
+- A click on the chip (or Enter) expands the bar again.
+- On a **new** fault the bar expands by itself: when a different or an additional output
+  fails, when the reason changes, or when the same fault was gone for more than 10 seconds
+  and returns. A loose contact that returns within 10 seconds counts as the same fault – the
+  chip then stays small so that the bar does not keep jumping over the buttons.
+- When the fault ends, bar and chip disappear by themselves.
+- The collapsed state is not saved: after a restart the full bar is shown again. Status bar
+  and DMX monitor show the fault unchanged.
 
 ## 9. What goes out when you quit or remove an output
 

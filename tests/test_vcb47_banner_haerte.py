@@ -11,9 +11,10 @@ typischerweise verloren geht:
 * 1024x600 und 1920x1080: die Sicherheitsknoepfe bleiben frei,
 * die Stoerung kommt und geht schnell hintereinander,
 * ein anderes Kind des Zentralbereichs legt sich obenauf,
-* Klicks, Doppelklicks und Tasten bekommen die Stoerung nicht weg,
-* der weggeklickte Probenhinweis gibt den Streifen wirklich frei — und eine
-  Stoerung kommt danach trotzdem.
+* Klicks, Doppelklicks und Tasten bekommen die Stoerung nicht weg — seit
+  Nachtrag 2 laesst sie sich einklappen, dann steht der rote Chip,
+* der weggeklickte (eingeklappte) Probenhinweis gibt den Streifen wirklich
+  frei — und eine Stoerung kommt danach trotzdem.
 
 Der Ausgang ist eine Attrappe — kein Port, kein Netz, es wird nichts gesendet.
 """
@@ -90,6 +91,7 @@ class _Haerte(unittest.TestCase):
         self.w._hw_timer.stop()
         self.w.showNormal()
         self.w.resize(1100, 700)
+        self.steuerung.klappe_aus()             # nichts eingeklappt uebernehmen
         self.steuerung.probe_aus = False
         self._lauf()
 
@@ -275,30 +277,66 @@ class _Haerte(unittest.TestCase):
 
     # -- Klicks und Tasten ---------------------------------------------------
 
-    def test_stoerung_ist_durch_nichts_wegzubekommen(self):
+    def _pruefe_meldung_steht(self, hinweis=""):
+        """Die Stoerung ist zu sehen: als volles Banner ODER als roter Chip."""
+        chip = self.steuerung.chip
+        self.assertEqual(self.steuerung.zustand.art, ART_STOERUNG, hinweis)
+        self.assertNotEqual(self.banner.isVisible(), chip.isVisible(), hinweis)
+        if chip.isVisible():
+            self.assertTrue(self.steuerung.eingeklappt, hinweis)
+            rechteck = self._im_fenster(chip)
+            self.assertTrue(self._im_fenster(self.w._stack).contains(rechteck),
+                            hinweis)
+            self.assertIs(self.w.childAt(rechteck.center()), chip, hinweis)
+            self.assertIn("Ausgabe gestört", chip.text(), hinweis)
+        else:
+            self._pruefe_sichtbar(hinweis)
+
+    def test_stoerung_ist_nicht_zu_entfernen_nur_einzuklappen(self):
+        """Seit Nachtrag 2 laesst sich die Stoerung EINKLAPPEN — entfernen
+        laesst sie sich weiterhin durch nichts: nach jedem Klick und jeder
+        Taste steht entweder das Banner oder der rote Chip."""
         self._zeige(ART_STOERUNG)
         del self.geklickt[:]
-        banner = self.banner
-        for knopf in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton,
-                      Qt.MouseButton.MiddleButton):
-            for _ in range(5):
-                QTest.mouseClick(banner, knopf)
-                QTest.mouseDClick(banner, knopf)
-        for taste in (Qt.Key.Key_Escape, Qt.Key.Key_Return, Qt.Key.Key_Space,
-                      Qt.Key.Key_Delete):
-            QTest.keyClick(banner, taste)
-        self._lauf()
-        self.assertEqual(self.steuerung.zustand.art, ART_STOERUNG)
+        banner, chip = self.banner, self.steuerung.chip
+        eingeklappt = []
+        for ziel in (banner, chip):
+            for knopf in (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton,
+                          Qt.MouseButton.MiddleButton):
+                for _ in range(5):
+                    for klick in (QTest.mouseClick, QTest.mouseDClick):
+                        for stelle in (QPoint(40, 4),
+                                       QPoint(max(ziel.width() - 20, 0), 4)):
+                            if ziel.isVisible():
+                                klick(ziel, knopf, pos=stelle)
+                            self._lauf()
+                            self._pruefe_meldung_steht("nach Klick")
+                            eingeklappt.append(chip.isVisible())
+            for taste in (Qt.Key.Key_Escape, Qt.Key.Key_Return,
+                          Qt.Key.Key_Space, Qt.Key.Key_Delete,
+                          Qt.Key.Key_Backspace):
+                for w in (banner, chip):
+                    if w.isVisible():
+                        QTest.keyClick(w, taste)
+                    self._lauf()
+                    self._pruefe_meldung_steht("nach Taste")
+                    eingeklappt.append(chip.isVisible())
+        self.assertIn(True, eingeklappt, "Einklappen muss möglich sein.")
+        self.assertIn(False, eingeklappt, "Ausklappen muss möglich sein.")
         self.assertFalse(self.steuerung.probe_aus)
-        self._pruefe_sichtbar("nach Klicks und Tasten")
         if self.KIOSK:
             self.assertIsNone(self.steuerung.bei_stoerung_klick)
         else:
             self.assertTrue(self.geklickt)
-        # Und der naechste Takt mit Ausfall laesst sie stehen.
-        self._takt([dict(_AUSFALL)])
-        self._lauf()
-        self._pruefe_sichtbar("naechster Takt")
+        # Und der naechste Takt mit Ausfall laesst sie stehen — eingeklappt
+        # wie ausgeklappt.
+        for _ in range(2):
+            self._takt([dict(_AUSFALL)])
+            self._lauf()
+            self._pruefe_meldung_steht("naechster Takt")
+            self.steuerung.klappe_ein()
+            self._lauf()
+            self.assertTrue(chip.isVisible())
 
     def test_weggeklickter_probenhinweis_gibt_den_streifen_frei(self):
         self._zeige(ART_PROBE)
@@ -322,12 +360,21 @@ class _Haerte(unittest.TestCase):
         self.assertEqual(self.steuerung.zustand.art, ART_STOERUNG)
         self._pruefe_sichtbar("Störung nach weggeklicktem Probenhinweis")
 
-    def test_banner_nimmt_keinen_tastaturfokus(self):
-        """Wie vor VCB-47: die Zeile ist kein Halt in der Tab-Reihenfolge und
-        nimmt verdeckten Bedienelementen den Fokus nicht weg."""
+    def test_banner_nimmt_per_klick_keinen_tastaturfokus(self):
+        """Ein Mausklick nimmt verdeckten Bedienelementen den Fokus nicht weg.
+        Seit Nachtrag 2 sind Banner und Chip aber ein Halt in der
+        Tab-Reihenfolge (einklappen/ausklappen per Tastatur). Das Banner hat
+        weiterhin keine Kind-Widgets — der Knopf „▴ einklappen“ ist gemalt."""
         self._zeige(ART_STOERUNG)
-        self.assertEqual(self.banner.focusPolicy(), Qt.FocusPolicy.NoFocus)
-        self.assertEqual(self.banner.findChildren(QWidget), [])
+        for w in (self.banner, self.steuerung.chip):
+            self.assertEqual(w.focusPolicy(), Qt.FocusPolicy.TabFocus)
+            self.assertFalse(w.focusPolicy() & Qt.FocusPolicy.ClickFocus)
+            self.assertEqual(w.findChildren(QWidget), [])
+        vorher = self.w.focusWidget()
+        QTest.mouseClick(self.banner, Qt.MouseButton.LeftButton,
+                         pos=QPoint(40, 4))
+        self._lauf()
+        self.assertIs(self.w.focusWidget(), vorher)
 
 
 class HaerteImHauptfensterTest(_Haerte):
