@@ -79,7 +79,6 @@
 | VCB-46 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
-| LIZ-2 | D | fix/liz2-fremdlizenzen-windows-setup | 2026-10-12T20:56Z | THIRD_PARTY_NOTICES.md · licenses · packaging/windows/bundle_inhalt.py · packaging/windows/LightOS.spec · src/core/selbsttest.py · tests/test_liz2_fremdlizenzen_setup.py |
 | LIZ-1 | A | fix/liz1-lizenzdialog-hoehe | 2026-10-12T22:39Z | - |
 
 ## Blocker & Fallen
@@ -289,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T17:50Z D done XPLAT-53
 - 2026-10-12T18:00Z D claim OUT-77
 - 2026-10-12T18:15Z A claim ENG-34
 - 2026-10-12T18:15Z A claim ENG-36
@@ -319,3 +317,4 @@
 - 2026-10-13T13:52Z A done STAB-36
 - 2026-10-13T13:54Z A aktualisiert ENG-35: Branch - -> feature/eng35-prioritaeten-stufen
 - 2026-10-13T13:54Z A aktualisiert VCB-46: Branch - -> feature/eng35-prioritaeten-stufen
+- 2026-10-13T14:18Z D done LIZ-2
