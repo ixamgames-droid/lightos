@@ -65,7 +65,6 @@
 | STAB-37 | B | fix/stab37-bibliotheks-hinweis-ist-kein-verlust | 2026-10-12T19:21Z | src/core/show/show_file.py · src/ui/main_window.py · tests/test_stab37_bibliotheks_hinweis_kein_verlust.py · tests/test_fm43_fehlendes_profil_sichtbar.py · tests/test_fm63_lightos_profil_vorrang.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
-| OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 | ENG-35 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
@@ -288,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-12T21:01Z A done LIZ-1
 - 2026-10-12T21:34Z D done TOOL-18
 - 2026-10-12T22:00Z D done OUT-71
 - 2026-10-12T22:35Z D done VCB-42
@@ -318,3 +316,4 @@
 - 2026-10-13T19:44Z D done FM-75
 - 2026-10-13T20:18Z A claim UI-93
 - 2026-10-13T20:18Z A claim VCB-47
+- 2026-10-13T20:21Z D done OUT-77
