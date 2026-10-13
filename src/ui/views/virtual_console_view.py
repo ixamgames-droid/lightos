@@ -832,7 +832,7 @@ class VirtualConsoleView(QWidget):
             paare = pl.lies_bildschirme()
             lage = pl.ziel_lage([b for b, _ in paare], pl.lade_gemerkt(),
                                 pl.haupt_index(paare, self))
-            win._lage_merker = pl.baue_merker(win, lage)
+            win._lage_merker = pl.baue_merker(win, lage, self)
             qscreen = paare[lage.bildschirm][1] if paare else None
             pl.oeffne(win, lage, qscreen)
         except Exception as e:

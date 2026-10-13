@@ -441,3 +441,350 @@ def test_anleitung_nennt_das_gemerkte_popout():
     text = open(_ANLEITUNG, encoding="utf-8").read()
     assert "Popout" in text
     assert "merkt sich" in text
+
+
+# ── Bildschirm faellt weg und kommt wieder (Popout bleibt offen) ────────────
+#
+# Die Bildschirm-Ereignisse werden nachgestellt: ``zwei_bildschirme(...)``
+# aendert die Liste, die der Kleber sieht, ``bildschirm_weg`` / ``bildschirm_dazu``
+# stehen fuer ``screenRemoved`` / ``screenAdded``. Die Zeitgeber werden von Hand
+# ausgeloest — kein Test wartet auf die Uhr.
+
+PLATZ = (150, 1200, 1000, 640)
+FREMD = Bildschirm("HDMI-3", Rechteck(1920, 0, 1280, 720))
+
+
+def _geometrie(w):
+    return (w.x(), w.y(), w.width(), w.height())
+
+
+def _normal_lage_passt(w):
+    """Die Lage, auf die ein maximiertes/Vollbild-Fenster zurueckgeht. Die
+    Testplattform rechnet dabei ein paar Pixel Rahmen ein."""
+    n = w.normalGeometry()
+    return (abs(n.x() - PLATZ[0]) <= 4 and abs(n.y() - PLATZ[1]) <= 4
+            and (n.width(), n.height()) == PLATZ[2:])
+
+
+def _ruhe_vorbei(merker):
+    """Die Beruhigungszeit ablaufen lassen (auch die zweite nach einem
+    Sichtbar-Holen)."""
+    for _ in range(3):
+        if not merker._ruhe.isActive():
+            break
+        merker._ruhe.stop()
+        merker._ruhe.timeout.emit()
+
+
+def _offen_auf_touch(prefs, zustand=PL.NORMAL):
+    g = _gemerkt(UNTEN, PLATZ, zustand)
+    PL.speichere_gemerkt(g)
+    w, merker = _fenster(PL.ziel_lage([OBEN, UNTEN], PL.lade_gemerkt(), 0))
+    if zustand == PL.NORMAL:
+        _ruhe_vorbei(merker)
+    else:
+        # Die Testplattform maximiert auf ihrem einzigen echten Bildschirm
+        # bei (0, 0); das Merken kurz nach dem Oeffnen saehe das Fenster
+        # deshalb oben statt auf dem nachgestellten Touch.
+        merker._ruhe.stop()
+        merker._erst = False
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    return w, merker, g
+
+
+def _touch_faellt_weg(zwei_bildschirme, w, merker, system_schiebt=(60, 80)):
+    zwei_bildschirme(OBEN)
+    merker.bildschirm_weg(UNTEN)
+    if system_schiebt is not None:           # das System raeumt das Fenster um
+        w.showNormal()
+        w.move(*system_schiebt)
+        _app.processEvents()
+        merker.angestossen()
+        merker._timer.timeout.emit()
+    _ruhe_vorbei(merker)
+
+
+def _touch_kommt_wieder(zwei_bildschirme, merker, meldungen=1):
+    zwei_bildschirme(OBEN, UNTEN)
+    for _ in range(meldungen):
+        merker.bildschirm_dazu(UNTEN)
+    if merker._rueck.isActive():
+        merker._rueck.stop()
+        merker._rueck.timeout.emit()
+    _app.processEvents()
+
+
+@pytest.fixture
+def spruenge(monkeypatch):
+    """Zaehlt, wie oft das Fenster versetzt wird."""
+    gezaehlt = []
+    echt = PL.versetze
+    monkeypatch.setattr(PL, "versetze",
+                        lambda f, lage, qs=None: (gezaehlt.append(lage),
+                                                  echt(f, lage, qs)))
+    return gezaehlt
+
+
+def test_rueckkehr_lage_nur_wenn_der_gemerkte_bildschirm_da_ist():
+    g = _gemerkt(UNTEN, PLATZ, PL.MAXIMIERT)
+    assert PL.rueckkehr_lage([OBEN], g, 0) is None
+    assert PL.rueckkehr_lage([OBEN, FREMD], g, 0) is None
+    assert PL.rueckkehr_lage([OBEN, UNTEN], None, 0) is None
+    lage = PL.rueckkehr_lage([OBEN, FREMD, UNTEN], g, 0)
+    assert (lage.rechteck, lage.zustand, lage.bildschirm) == (
+        Rechteck(*PLATZ), PL.MAXIMIERT, 2)
+    # Unter anderem Namen wiedergekommen (Windows/Wayland): Geometrie zaehlt.
+    anders = Bildschirm("DISPLAY7", UNTEN.flaeche)
+    assert PL.rueckkehr_lage([OBEN, anders], g, 0).bildschirm == 1
+
+
+def test_ueberwiegend_sichtbar():
+    assert PL.ueberwiegend_sichtbar([OBEN], Rechteck(100, 100, 800, 600))
+    assert not PL.ueberwiegend_sichtbar([OBEN], Rechteck(*PLATZ))
+    assert PL.ueberwiegend_sichtbar([OBEN, UNTEN], Rechteck(100, 800, 800, 560))
+
+
+def test_wegfall_behaelt_den_gemerkten_platz(prefs, zwei_bildschirme):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    assert merker.im_ersatz()
+    assert _geometrie(w)[:2] == (60, 80)     # wo das System es hingelegt hat
+    merker.sichern()                         # auch beim Schliessen
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_wegfall_holt_ein_liegengebliebenes_fenster_sichtbar_zum_hauptfenster(
+        prefs, zwei_bildschirme, spruenge):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker, system_schiebt=None)
+    x, y, b, h = _geometrie(w)
+    assert PL.ueberwiegend_sichtbar([OBEN], Rechteck(x, y, b, h))
+    assert (b, h) == PLATZ[2:]
+    assert len(spruenge) == 1
+    assert merker.im_ersatz() and merker._ausgang is not None
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g  # das eigene Holen zaehlt nicht
+
+
+def test_wegfall_ohne_signal_merkt_den_ersatzplatz_nicht(prefs, zwei_bildschirme):
+    """Der Fenstermanager verschiebt, bevor Qt den Wegfall meldet."""
+    w, merker, g = _offen_auf_touch(prefs)
+    zwei_bildschirme(OBEN)
+    w.move(60, 80)
+    _app.processEvents()
+    merker.angestossen()
+    merker._timer.timeout.emit()
+    assert merker.im_ersatz()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    merker.bildschirm_weg(UNTEN)             # das Signal kommt nach
+    _ruhe_vorbei(merker)
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+@pytest.mark.parametrize("zustand", [PL.NORMAL, PL.MAXIMIERT, PL.VOLLBILD])
+def test_rueckkehr_springt_an_den_gemerkten_platz(prefs, zwei_bildschirme,
+                                                  spruenge, zustand):
+    w, merker, g = _offen_auf_touch(prefs, zustand)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    assert spruenge == []
+    _touch_kommt_wieder(zwei_bildschirme, merker, meldungen=3)
+
+    assert len(spruenge) == 1                # drei Meldungen, ein Sprung
+    assert PL._zustand_von(w) == zustand
+    merker.sichern()                         # waehrend des Sprungs: nichts
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    if zustand != PL.NORMAL:
+        # Ob das Fenster angekommen ist, laesst sich hier nur im
+        # Normalzustand pruefen (siehe ``_offen_auf_touch``).
+        assert _normal_lage_passt(w)
+        return
+    assert _geometrie(w) == PLATZ
+    _ruhe_vorbei(merker)
+    assert not merker.im_ersatz()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    # Weitere Meldungen loesen nichts mehr aus.
+    merker.bildschirm_dazu(UNTEN)
+    assert not merker._rueck.isActive() and len(spruenge) == 1
+
+
+def test_nach_der_rueckkehr_wird_wieder_normal_gemerkt(prefs, zwei_bildschirme):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    _ruhe_vorbei(merker)
+    w.move(200, 1300)
+    _app.processEvents()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL]["fenster"] == [200, 1300, 1000, 640]
+    assert prefs()[PL.PREF_SCHLUESSEL]["bildschirm"] == "DP-2"
+
+
+def test_bediener_verschiebt_am_ersatzplatz_gilt_als_neue_wahl(
+        prefs, zwei_bildschirme, spruenge):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    w.move(300, 200)                         # der Bediener
+    _app.processEvents()
+    merker.angestossen()
+    merker._timer.timeout.emit()
+    neu = prefs()[PL.PREF_SCHLUESSEL]
+    assert neu["bildschirm"] == "HDMI-1" and neu["fenster"][:2] == [300, 200]
+    assert not merker.im_ersatz()
+
+    _touch_kommt_wieder(zwei_bildschirme, merker, meldungen=2)
+    assert spruenge == []
+    assert _geometrie(w)[:2] == (300, 200)
+    assert prefs()[PL.PREF_SCHLUESSEL] == neu
+
+
+def test_bediener_aendert_die_groesse_am_ersatzplatz_gilt_als_neue_wahl(
+        prefs, zwei_bildschirme, spruenge):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    w.resize(700, 500)
+    _app.processEvents()
+    # Der Bildschirm kommt wieder, bevor das entprellte Schreiben dran war.
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    assert spruenge == []
+    assert prefs()[PL.PREF_SCHLUESSEL]["fenster"] == [60, 80, 700, 500]
+    assert prefs()[PL.PREF_SCHLUESSEL]["bildschirm"] == "HDMI-1"
+
+
+def test_fremder_neuer_bildschirm_loest_nichts_aus(prefs, zwei_bildschirme, spruenge):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    zwei_bildschirme(OBEN, FREMD)
+    merker.bildschirm_dazu(FREMD)
+    merker._rueck.stop()
+    merker._rueck.timeout.emit()
+    _ruhe_vorbei(merker)
+    assert spruenge == []
+    assert _geometrie(w)[:2] == (60, 80)
+    assert merker.im_ersatz()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    # Der richtige kommt spaeter doch noch.
+    zwei_bildschirme(OBEN, FREMD, UNTEN)
+    merker.bildschirm_dazu(UNTEN)
+    merker._rueck.stop()
+    merker._rueck.timeout.emit()
+    assert len(spruenge) == 1 and _geometrie(w) == PLATZ
+
+
+def test_fremder_bildschirm_faellt_weg_aendert_nichts(prefs, zwei_bildschirme):
+    zwei_bildschirme(OBEN, UNTEN, FREMD)
+    w, merker, g = _offen_auf_touch(prefs)
+    zwei_bildschirme(OBEN, UNTEN)
+    merker.bildschirm_weg(FREMD)
+    assert not merker.im_ersatz()
+    w.move(200, 1300)
+    _app.processEvents()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL]["fenster"][:2] == [200, 1300]
+
+
+def test_sprung_der_nicht_ankommt_bleibt_im_ersatz_ohne_schleife(
+        prefs, zwei_bildschirme, monkeypatch):
+    """Das System versetzt das Fenster nicht (etwa Wayland): kein zweiter
+    Versuch, der gemerkte Platz bleibt."""
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    versuche = []
+    monkeypatch.setattr(PL, "versetze", lambda *a, **k: versuche.append(a))
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    _ruhe_vorbei(merker)
+    assert len(versuche) == 1
+    assert merker.im_ersatz() and not merker._rueck.isActive()
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_geschlossenes_popout_reagiert_nicht_und_oeffnet_am_gemerkten_platz(
+        prefs, zwei_bildschirme, spruenge):
+    w, merker, g = _offen_auf_touch(prefs)
+    _touch_faellt_weg(zwei_bildschirme, w, merker)
+    merker.sichern()                         # wie closeEvent
+    w.hide()
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    assert spruenge == [] and not merker._rueck.isActive()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+    # Bildschirm fehlt noch: Ersatzplatz, Gemerktes bleibt.
+    zwei_bildschirme(OBEN)
+    ersatz = PL.ziel_lage([OBEN], PL.lade_gemerkt(), 0)
+    assert ersatz.rueckfall and ersatz.bildschirm == 0
+    w2, m2 = _fenster(ersatz)
+    _ruhe_vorbei(m2)
+    m2.sichern()
+    w2.hide()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+    # Bildschirm wieder da: am gemerkten Platz.
+    lage = PL.ziel_lage([OBEN, UNTEN], PL.lade_gemerkt(), 0)
+    assert (lage.rechteck, lage.bildschirm, lage.rueckfall) == (
+        Rechteck(*PLATZ), 1, False)
+
+
+def test_am_ersatzplatz_geoeffnet_springt_zurueck_wenn_der_bildschirm_kommt(
+        prefs, zwei_bildschirme):
+    g = _gemerkt(UNTEN, PLATZ, PL.MAXIMIERT)
+    PL.speichere_gemerkt(g)
+    zwei_bildschirme(OBEN)
+    w, merker = _fenster(PL.ziel_lage([OBEN], PL.lade_gemerkt(), 0))
+    _ruhe_vorbei(merker)
+    assert merker.im_ersatz() and not w.isMaximized()
+    _touch_kommt_wieder(zwei_bildschirme, merker)
+    assert w.isMaximized() and _normal_lage_passt(w)
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_nie_angefasstes_popout_hat_trotzdem_einen_gemerkten_platz(
+        prefs, zwei_bildschirme):
+    """Erstes Oeffnen (maximiert auf dem Touch), nie angefasst: der Platz
+    wird kurz nach dem Oeffnen gemerkt. Faellt der Touch danach weg, gibt es
+    etwas, wohin das Fenster zurueckspringen kann."""
+    w, merker = _fenster(PL.ziel_lage([OBEN, UNTEN], None, 0))
+    assert PL.PREF_SCHLUESSEL not in prefs()
+    _ruhe_vorbei(merker)
+    g = prefs()[PL.PREF_SCHLUESSEL]
+    assert g["zustand"] == "maximized"
+    assert g["fenster"][1] >= 1080           # unten, auf dem Touch
+    merker.sichern()                         # unveraendert -> bleibt so
+    assert prefs()[PL.PREF_SCHLUESSEL] == g
+
+
+def test_popout_der_konsole_haengt_an_den_bildschirm_meldungen(prefs, zwei_bildschirme):
+    """Das echte Popout: Wegfall und Rueckkehr ueber die Signale der Anwendung."""
+    PL.speichere_gemerkt(_gemerkt(UNTEN, PLATZ))
+    v = _konsole()
+    v._popout_canvas()
+    _app.processEvents()
+    win = v._popout_window
+    merker = win._lage_merker
+    _ruhe_vorbei(merker)
+    assert _geometrie(win) == PLATZ
+
+    zwei_bildschirme(OBEN)
+    _app.screenRemoved.emit(_app.primaryScreen())
+    assert merker.im_ersatz()
+    _ruhe_vorbei(merker)
+    assert PL.ueberwiegend_sichtbar([OBEN], Rechteck(*_geometrie(win)))
+
+    zwei_bildschirme(OBEN, UNTEN)
+    _app.screenAdded.emit(_app.primaryScreen())
+    assert merker._rueck.isActive()
+    merker._rueck.stop()
+    merker._rueck.timeout.emit()
+    assert _geometrie(win) == PLATZ
+    win.close()
+    _app.processEvents()
+    assert prefs()[PL.PREF_SCHLUESSEL]["fenster"] == list(PLATZ)
+    assert v._canvas_alive()
+
+
+def test_anleitung_nennt_wegfall_und_rueckkehr_des_bildschirms():
+    text = open(_ANLEITUNG, encoding="utf-8").read()
+    assert "springt" in text and "wieder angeschlossen" in text
+    assert "neue Wahl" in text

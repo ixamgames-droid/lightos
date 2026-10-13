@@ -1,5 +1,6 @@
 """VCB-45 (Schritt 1): das Popout der Virtual Console merkt sich Bildschirm,
-Lage, Groesse und Zustand.
+Lage, Groesse und Zustand — und behaelt den Platz, wenn sein Bildschirm
+zwischendurch wegfaellt.
 
 Zwei Teile, bewusst getrennt:
 
@@ -12,12 +13,28 @@ Zwei Teile, bewusst getrennt:
   die uebrigen geraetegebundenen Fenster-Einstellungen
   (``programmer_view._load_prefs`` / ``_save_prefs``).
 
+**Bildschirm faellt weg, waehrend das Popout offen ist** (Touch-Bildschirm
+ausgeschaltet oder abgezogen): Das System schiebt das Fenster auf einen
+verbleibenden Bildschirm. Der gemerkte Platz bleibt der alte; der Merker ist
+dann „im Ersatz" und schreibt nichts. Kommt der Bildschirm wieder, springt das
+Fenster von selbst zurueck. Hat der Bediener das Ersatz-Fenster inzwischen
+selbst verschoben oder in der Groesse geaendert, gilt das als neue Wahl: der
+Platz wird gemerkt, zurueckgesprungen wird nicht.
+
+Wie Bediener und System auseinandergehalten werden: Ein Fenster meldet nicht,
+*wer* es bewegt hat. Deshalb gilt nach jedem Bildschirm-Ereignis eine
+Beruhigungszeit, in der jede Bewegung dem System zugeschrieben wird. Erst an
+ihrem Ende wird der Stand als Ausgang festgehalten; nur was danach von diesem
+Ausgang abweicht, ist eine Bewegung des Bedieners. Das ist unabhaengig davon,
+ob der Fenstermanager das Fenster vor oder nach dem Qt-Signal verschiebt.
+
 Gemerkt werden nur der Anschlussname des Bildschirms (``QScreen.name()``, etwa
 ``HDMI-1``) und seine Geometrie als Rueckfall — **keine** Seriennummer, kein
 Hersteller, kein Modell.
 """
 from __future__ import annotations
 
+import weakref
 from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, QTimer
@@ -38,6 +55,12 @@ _MIN_HOEHE = 200
 _SPEICHER_VERZUG_MS = 300
 # So lange nach dem Oeffnen gilt eine Lage noch als „vom Programm gesetzt".
 _SCHARF_NACH_MS = 500
+# Beruhigungszeit nach einem Bildschirm-Ereignis: was sich in dieser Zeit am
+# Fenster bewegt, kommt vom System (Fenstermanager raeumt um), nicht vom Bediener.
+_BERUHIGUNG_MS = 1200
+# Mehrere „Bildschirm dazu"-Meldungen kurz hintereinander zaehlen als eine;
+# erst nach dieser Ruhe wird geprueft, ob zurueckgesprungen wird.
+_RUECKKEHR_VERZUG_MS = 400
 
 
 # ── Rechnung (ohne Qt) ───────────────────────────────────────────────────────
@@ -223,6 +246,27 @@ def _ziel_lage(bildschirme, gemerkt, haupt, standard) -> Lage:
     return Lage(None, NORMAL, haupt)
 
 
+def rueckkehr_lage(bildschirme, gemerkt, haupt: int = 0) -> Lage | None:
+    """Wohin springt ein Popout zurueck, das am Ersatzplatz liegt?
+
+    ``None``, solange der gemerkte Bildschirm nicht (wieder) da ist oder das
+    Fenster dort nicht laege — ein fremder neuer Bildschirm loest also nichts
+    aus. Wiedererkannt wird der Bildschirm wie beim Oeffnen: ueber den Namen,
+    sonst ueber die Geometrie."""
+    if lies_gemerkt(gemerkt) is None:
+        return None
+    lage = ziel_lage(bildschirme, gemerkt, haupt)
+    if lage.rueckfall or lage.rechteck is None:
+        return None
+    return lage
+
+
+def ueberwiegend_sichtbar(bildschirme, fenster: Rechteck) -> bool:
+    """Liegt mindestens die Haelfte des Fensters auf den Bildschirmen?"""
+    flaeche = sum(fenster.schnittflaeche(b.flaeche) for b in bildschirme)
+    return 2 * flaeche >= fenster.w * fenster.h
+
+
 def als_gemerkt(bildschirm: Bildschirm, fenster: Rechteck, zustand: str) -> dict:
     """Das, was in den Einstellungen landet — nur Name, Rechtecke, Zustand."""
     return {
@@ -325,15 +369,63 @@ def oeffne(fenster, lage: Lage, qscreen=None) -> None:
         fenster.show()
 
 
+def versetze(fenster, lage: Lage, qscreen=None) -> None:
+    """Ein schon sichtbares Fenster nach ``lage`` bringen — samt Zustand.
+
+    Ein maximiertes oder Vollbild-Fenster laesst sich nicht verschieben; es
+    wird deshalb erst normal, dann versetzt, dann wieder in seinen Zustand
+    gebracht. Das Fenster wird dabei nicht nach vorn geholt."""
+    r = lage.rechteck
+    if r is None:
+        return
+    if fenster.isFullScreen() or fenster.isMaximized():
+        fenster.showNormal()
+    if qscreen is not None:
+        try:
+            fenster.setScreen(qscreen)
+        except Exception:
+            pass
+    fenster.resize(r.w, r.h)
+    fenster.move(r.x, r.y)
+    if lage.zustand == VOLLBILD:
+        fenster.showFullScreen()
+    elif lage.zustand == MAXIMIERT:
+        fenster.showMaximized()
+
+
+def _als_bildschirm(wert) -> Bildschirm | None:
+    """``QScreen`` (aus dem Qt-Signal) oder ``Bildschirm`` (Test) annehmen."""
+    if wert is None or isinstance(wert, Bildschirm):
+        return wert
+    try:
+        g = wert.geometry()
+        return Bildschirm(wert.name(),
+                          Rechteck(g.x(), g.y(), g.width(), g.height()))
+    except Exception:
+        return None
+
+
 class LageMerker(QObject):
-    """Merkt Lage/Groesse/Zustand eines Fensters, entprellt.
+    """Merkt Lage/Groesse/Zustand eines Fensters, entprellt, und haelt den
+    gemerkten Platz fest, solange dessen Bildschirm fehlt.
 
     Das Fenster ruft ``angestossen()`` aus Move-/Resize-/Zustands-Ereignis
-    und ``sichern()`` beim Schliessen. Der Merker selbst haengt als Kind am
-    Fenster und stirbt mit ihm.
+    und ``sichern()`` beim Schliessen. ``bildschirm_weg`` / ``bildschirm_dazu``
+    haengen an ``QGuiApplication.screenRemoved`` / ``screenAdded``; Tests rufen
+    sie direkt. Der Merker selbst haengt als Kind am Fenster und stirbt mit ihm.
+
+    Drei Zustaende:
+
+    * **normal** — jede Aenderung wird (entprellt) gemerkt.
+    * **im Ersatz** (``_gesperrt``) — der gemerkte Bildschirm fehlt, das
+      Fenster liegt woanders. Gemerkt wird erst, wenn der Bediener das Fenster
+      gegenueber dem Ausgang (``_ausgang``, nach der Beruhigungszeit
+      festgehalten) veraendert; das beendet den Ersatz.
+    * **im Sprung** (``_sprung``) — das Fenster wird gerade an den gemerkten
+      Platz zurueckgebracht; bis es dort angekommen ist, wird nichts gemerkt.
     """
 
-    def __init__(self, fenster, lage: Lage):
+    def __init__(self, fenster, lage: Lage, haupt=None):
         super().__init__(fenster)
         r = lage.rechteck
         # Lage im Normalzustand; bei maximiert/Vollbild bleibt sie stehen.
@@ -344,23 +436,227 @@ class LageMerker(QObject):
         self._gesperrt = bool(lage.rueckfall)
         self._ausgang = None
         self._zuletzt = None
+        self._sprung = None
+        # Beim Oeffnen hat ``ziel_lage`` schon sichtbar platziert.
+        self._platziert = True
+        # Ohne Rueckfall wird der Platz kurz nach dem Oeffnen einmal gemerkt:
+        # faellt der Bildschirm weg, bevor das Fenster je angefasst wurde,
+        # gaebe es sonst nichts, wohin es zurueckspringen koennte.
+        self._erst = not self._gesperrt
+        self._haupt = None
+        if haupt is not None:
+            try:
+                self._haupt = weakref.ref(haupt)
+            except TypeError:
+                self._haupt = None
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.setInterval(_SPEICHER_VERZUG_MS)
         self._timer.timeout.connect(self.sichern)
-        if self._gesperrt:
-            QTimer.singleShot(_SCHARF_NACH_MS, self, self._scharf_stellen)
+        self._ruhe = QTimer(self)
+        self._ruhe.setSingleShot(True)
+        self._ruhe.timeout.connect(self._nach_ruhe)
+        self._rueck = QTimer(self)
+        self._rueck.setSingleShot(True)
+        self._rueck.setInterval(_RUECKKEHR_VERZUG_MS)
+        self._rueck.timeout.connect(self._rueckkehr_pruefen)
+        self._ruhe.start(_SCHARF_NACH_MS)
+        try:
+            from PySide6.QtGui import QGuiApplication
+            app = QGuiApplication.instance()
+            if app is not None:
+                app.screenRemoved.connect(self.bildschirm_weg)
+                app.screenAdded.connect(self.bildschirm_dazu)
+        except Exception as e:
+            print(f"[VC] Popout folgt Bildschirmwechseln nicht: {e}")
+
+    # ── Lesen ────────────────────────────────────────────────────────────────
+
+    def im_ersatz(self) -> bool:
+        return self._gesperrt
 
     def _ist(self):
         # Kein eigener Verweis aufs Fenster (kein Python-Zyklus Fenster <-> Merker).
         f = self.parent()
         return (f.x(), f.y(), f.width(), f.height(), _zustand_von(f))
 
+    def _offen(self):
+        """Das Fenster, sofern es sichtbar ist — sonst ``None``."""
+        f = self.parent()
+        if f is None or not f.isVisible():
+            return None
+        return f
+
+    def _gemerkt(self):
+        return self._zuletzt or lade_gemerkt()
+
+    def _haupt_index(self, paare) -> int:
+        widget = self._haupt() if self._haupt is not None else None
+        try:
+            return haupt_index(paare, widget)
+        except Exception:
+            return 0
+
+    def _gemerkter_bildschirm_fehlt(self, weg: Bildschirm | None = None) -> bool:
+        daten = lies_gemerkt(self._gemerkt())
+        if daten is None:
+            return False
+        name, flaeche = daten["bildschirm"], daten["bildschirm_flaeche"]
+        if weg is not None and finde_bildschirm([weg], name, flaeche) is not None:
+            return True
+        bildschirme = [b for b, _ in lies_bildschirme()]
+        if not bildschirme:
+            return False
+        return finde_bildschirm(bildschirme, name, flaeche) is None
+
+    # ── Ausgang / Beruhigung ─────────────────────────────────────────────────
+
     def _scharf_stellen(self):
         try:
             self._ausgang = self._ist()
         except RuntimeError:
             pass
+
+    def _beruhigen(self):
+        """Ab jetzt gilt eine Weile jede Bewegung als vom System ausgeloest."""
+        self._timer.stop()
+        self._ausgang = None
+        self._ruhe.start(_BERUHIGUNG_MS)
+
+    def _in_ersatz(self):
+        self._gesperrt = True
+        self._erst = False
+        self._platziert = False
+        self._beruhigen()
+
+    def _nach_ruhe(self):
+        try:
+            if self._sprung is not None:
+                self._sprung_abschliessen()
+            elif self._gesperrt:
+                if not self._platziert:
+                    self._platziert = True
+                    if self._hole_sichtbar():
+                        # Die eigene Verschiebung erst setzen lassen.
+                        self._ruhe.start(_BERUHIGUNG_MS)
+                        return
+                self._ausgang = self._ist()
+            elif self._erst:
+                self._erst = False
+                self.sichern()
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"[VC] Popout-Lage: {e}")
+
+    def _hole_sichtbar(self) -> bool:
+        """Hat das System das Fenster nicht (ganz) auf einen verbleibenden
+        Bildschirm geholt, kommt es sichtbar zum Hauptfenster. True, wenn
+        dafuer verschoben wurde."""
+        f = self._offen()
+        if f is None:
+            return False
+        paare = lies_bildschirme()
+        bildschirme = [b for b, _ in paare]
+        if not bildschirme:
+            return False
+        ist = self._ist()
+        fenster = Rechteck(*ist[:4])
+        if ueberwiegend_sichtbar(bildschirme, fenster):
+            return False
+        haupt = self._haupt_index(paare)
+        if not 0 <= haupt < len(paare):
+            haupt = 0
+        ziel = mittig((fenster.w, fenster.h), bildschirme[haupt].nutzbar)
+        if ziel.w <= 0 or ziel.h <= 0:
+            return False
+        versetze(f, Lage(ziel, NORMAL, haupt), paare[haupt][1])
+        return True
+
+    # ── Bildschirm-Ereignisse ────────────────────────────────────────────────
+
+    def bildschirm_weg(self, weg=None) -> None:
+        """Ein Bildschirm ist weggefallen (``screenRemoved``)."""
+        try:
+            if self._offen() is None:
+                return
+            if self._gesperrt or self._sprung is not None:
+                # Das System raeumt womoeglich wieder um.
+                self._beruhigen()
+                return
+            if self._gemerkter_bildschirm_fehlt(_als_bildschirm(weg)):
+                self._in_ersatz()
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"[VC] Popout-Lage: {e}")
+
+    def bildschirm_dazu(self, _neu=None) -> None:
+        """Ein Bildschirm ist dazugekommen (``screenAdded``).
+
+        Entschieden wird erst nach kurzer Ruhe und ueber die ganze
+        Bildschirmliste — Name und Geometrie eines frisch gemeldeten
+        Bildschirms sind nicht auf jedem System sofort endgueltig."""
+        try:
+            if self._offen() is None or not self._gesperrt:
+                return
+            if self._ausgang is not None and self._ist() != self._ausgang:
+                # Der Bediener hat das Ersatz-Fenster schon angefasst (das
+                # Schreiben stand nur noch aus): seine Wahl gilt.
+                self.sichern()
+                return
+            self._timer.stop()
+            self._ruhe.stop()
+            self._ausgang = None
+            self._rueck.start()
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"[VC] Popout-Lage: {e}")
+
+    def _rueckkehr_pruefen(self):
+        try:
+            f = self._offen()
+            if f is None or not self._gesperrt:
+                return
+            paare = lies_bildschirme()
+            bildschirme = [b for b, _ in paare]
+            lage = rueckkehr_lage(bildschirme, self._gemerkt(),
+                                  self._haupt_index(paare))
+            if lage is None:
+                # Fremder Bildschirm: nichts tun, nur den Ausgang neu nehmen.
+                self._beruhigen()
+                return
+            self._gesperrt = False
+            self._sprung = bildschirme[lage.bildschirm]
+            self._normal = lage.rechteck
+            versetze(f, lage, paare[lage.bildschirm][1])
+            self._timer.stop()
+            self._ruhe.start(_BERUHIGUNG_MS)
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"[VC] Popout springt nicht zurueck: {e}")
+            self._sprung = None
+            self._gesperrt = True
+            self._beruhigen()
+
+    def _sprung_abschliessen(self):
+        """Nach dem Sprung: liegt das Fenster wirklich auf dem gemerkten
+        Bildschirm? Sonst (System hat nicht mitgemacht) bleibt es im Ersatz —
+        ohne neuen Versuch, bis wieder ein Bildschirm dazukommt."""
+        ziel, self._sprung = self._sprung, None
+        self._timer.stop()
+        bildschirme = [b for b, _ in lies_bildschirme()]
+        idx = finde_bildschirm(bildschirme, ziel.name, ziel.flaeche)
+        ist = self._ist()
+        if idx is not None and bildschirm_von(
+                bildschirme, Rechteck(*ist[:4]), vorgabe=-1) == idx:
+            return
+        self._gesperrt = True
+        self._ausgang = ist
+
+    # ── Merken ───────────────────────────────────────────────────────────────
 
     def angestossen(self) -> None:
         try:
@@ -378,10 +674,24 @@ class LageMerker(QObject):
             ist = self._ist()
         except RuntimeError:
             return
+        if self._sprung is not None:
+            return
         if self._gesperrt:
             if self._ausgang is None or ist == self._ausgang:
                 return
             self._gesperrt = False
+        else:
+            # Der gemerkte Bildschirm ist weg, ohne dass das Signal schon da
+            # war (der Fenstermanager war schneller): nicht den Ersatzplatz
+            # merken, sondern in den Ersatz gehen.
+            try:
+                fehlt = self._gemerkter_bildschirm_fehlt()
+            except Exception:
+                fehlt = False
+            if fehlt:
+                self._in_ersatz()
+                return
+        self._erst = False
         zustand = ist[4]
         if zustand == NORMAL:
             self._normal = Rechteck(*ist[:4])
@@ -406,5 +716,7 @@ class LageMerker(QObject):
         speichere_gemerkt(wert)
 
 
-def baue_merker(fenster, lage: Lage):
-    return LageMerker(fenster, lage)
+def baue_merker(fenster, lage: Lage, haupt=None):
+    """``haupt``: ein Widget des Hauptfensters — bestimmt, auf welchen
+    Bildschirm das Popout ausweicht."""
+    return LageMerker(fenster, lage, haupt)
