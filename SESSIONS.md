@@ -80,6 +80,7 @@
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
+| IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
 
 ## Blocker & Fallen
 
@@ -288,7 +289,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
 - 2026-10-12T18:42Z D aktualisiert MIDI-15: Branch - -> feature/midi15-touch-sperre; Dateien - -> src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py
 - 2026-10-12T18:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-12T18:42Z D done OUT-73
@@ -318,3 +318,4 @@
 - 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
 - 2026-10-13T15:48Z A claim IMP-1
 - 2026-10-13T16:00Z A done FM-74
+- 2026-10-13T16:14Z A claim IMP-2
