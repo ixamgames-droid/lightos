@@ -557,20 +557,33 @@ class AusgabeChip(QLabel):
         platz = self._suche_platz()
         self._merke_platz(platz)
         wunsch = self.sizeHint()
+        bereich = QRect(anker.mapTo(eltern, QPoint(0, 0)), anker.size())
+        ziel = None
         if platz is not None:
             feld = QRect(platz.mapTo(eltern, QPoint(0, 0)), platz.size())
             hoehe = min(wunsch.height(), feld.height())
             oben = feld.top() + (feld.height() - hoehe) // 2
-        else:
-            feld = QRect(anker.mapTo(eltern, QPoint(0, 0)), anker.size())
-            hoehe = min(wunsch.height(), max(feld.height() - CHIP_RAND, 0))
-            oben = feld.top() + CHIP_RAND
-        breite = min(wunsch.width(), max(feld.width() - 2 * CHIP_RAND, 0))
-        links = feld.left() + feld.width() - CHIP_RAND - breite
-        ziel = QRect(links, oben, breite, hoehe)
+            ziel = self._rechts_in(feld, oben, hoehe, wunsch.width())
+            # Der Chip ist kein Kind des Inhaltsbereichs und wird von ihm
+            # nicht beschnitten. Liegt der genannte Platz (bei zu kleinem
+            # Fenster) ausserhalb, stuende der Chip ueber fremden Leisten oder
+            # jenseits des Fensterrands — dann lieber die sichere Ecke.
+            if (not bereich.contains(ziel) or ziel.width() < wunsch.width()
+                    or ziel.height() < wunsch.height()):
+                ziel = None
+        if ziel is None:
+            hoehe = min(wunsch.height(), max(bereich.height() - CHIP_RAND, 0))
+            ziel = self._rechts_in(bereich, bereich.top() + CHIP_RAND, hoehe,
+                                   wunsch.width())
         if self.geometry() != ziel:
             self.setGeometry(ziel)
         self.raise_()
+
+    @staticmethod
+    def _rechts_in(feld: QRect, oben: int, hoehe: int, wunsch_b: int) -> QRect:
+        breite = min(wunsch_b, max(feld.width() - 2 * CHIP_RAND, 0))
+        links = feld.left() + feld.width() - CHIP_RAND - breite
+        return QRect(links, oben, breite, hoehe)
 
     def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
         if ((obj is self._anker and ev.type() in _ANKER_EREIGNISSE)
@@ -660,8 +673,14 @@ class AusgabeBannerSteuerung:
             roh = ausgabe_banner(wege, kiosk=self.kiosk)
             jetzt = self._uhr()
             if roh.art == ART_STOERUNG:
-                self._schluessel = stoer_schluessel(wege)
-                self._pruefe_neue_stoerung(jetzt)
+                # ★ Steht VOR dem Anzeigen und darf es nie verhindern: kann
+                # die Stoerung nicht wiedererkannt werden, ist sie neu.
+                try:
+                    self._schluessel = stoer_schluessel(wege)
+                    self._pruefe_neue_stoerung(jetzt)
+                except Exception:
+                    self._schluessel = frozenset()
+                    self._gesehen.clear()
             self._zeige(self._drossel.schritt(roh, jetzt))
         except Exception as exc:
             try:
@@ -676,7 +695,9 @@ class AusgabeBannerSteuerung:
             return
         for ausfall in self._schluessel:
             zuletzt = self._gesehen.get(ausfall)
-            if zuletzt is None or jetzt - zuletzt > NACHSICHT_S:
+            # Auch ein „zuletzt“ in der Zukunft (Uhr lief rueckwaerts) ist
+            # nicht frisch — im Zweifel aufklappen.
+            if zuletzt is None or not 0.0 <= jetzt - zuletzt <= NACHSICHT_S:
                 self._gesehen.clear()
                 self._logge_ansicht("Neue Störung — Meldung klappt wieder auf")
                 return
@@ -722,11 +743,20 @@ class AusgabeBannerSteuerung:
             self.widget.setFocus(Qt.FocusReason.TabFocusReason)
 
     def _zeige(self, z: BannerZustand, log_text: str = "") -> None:
-        if z.art and self.eingeklappt:
+        if z.art and self.eingeklappt and self._zeige_chip(z):
             self.widget.zeige(KEIN_BANNER)
-            self.chip.zeige(z)
         else:
-            self.chip.verstecke()
+            if z.art and self.eingeklappt:
+                # Der Chip waere die einzige Anzeige — steht er nicht, gilt
+                # die Meldung als ausgeklappt.
+                self.probe_aus = False
+                self._gesehen.clear()
+                self._logge_ansicht("Chip nicht darstellbar — Meldung "
+                                    "klappt wieder auf")
+            try:
+                self.chip.verstecke()
+            except Exception:
+                pass
             self.widget.zeige(z)
         vorher, self._letzte_art = self._letzte_art, z.art
         if z.art == ART_STOERUNG:
@@ -741,6 +771,16 @@ class AusgabeBannerSteuerung:
         elif vorher == ART_PROBE:
             self._logge(log_text or "Probenmodus beendet — ein Ausgang ist "
                         "eingerichtet")
+
+    def _zeige_chip(self, z: BannerZustand) -> bool:
+        """Den Chip zeigen. ``False``, wenn er danach nicht wirklich steht
+        (Fehler, versteckt oder ohne Flaeche) — dann muss das Banner her."""
+        try:
+            self.chip.zeige(z)
+            return (not self.chip.isHidden() and self.chip.width() > 0
+                    and self.chip.height() > 0)
+        except Exception:
+            return False
 
     @staticmethod
     def _logge(text: str) -> None:
