@@ -316,7 +316,9 @@ sACN-Eingang zu und hält den Stand auf Knopfdruck als Szene fest.
 - **Welche Kanäle:** Vorgabe ist **Alle gepatchten Kanäle** — die Szene ist dann das
   ganze Bild, auch was dunkel war, bleibt dunkel. **Nur Kanäle ungleich 0** und **Nur
   was sich seit dem letzten Festhalten geändert hat** lassen Kanäle weg; solche Szenen
-  lassen andere Funktionen auf diesen Kanälen durch.
+  lassen andere Funktionen auf diesen Kanälen durch. Die Dimmer-Kanäle eines
+  aufgenommenen Geräts kommen dabei immer mit, auch mit Wert 0 — eine Farbe ohne
+  Dimmer bleibt so dunkel wie im alten Programm.
 - **Laser werden ausgelassen.** Das ist eine Sicherheitsvorgabe; nur mit dem Haken
   **Laser mit aufnehmen** kommen ihre Kanäle mit in die Szene.
 - **Rückgängig:** Jede festgehaltene Szene ist ein eigener Schritt für **Strg+Z**, der

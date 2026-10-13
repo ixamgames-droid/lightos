@@ -35,6 +35,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
+from src.core.dimmer_segmente import ist_dimmer
+
 #: Vorgabe der Ruhe-Erkennung: so lange darf sich das Bild nicht geaendert haben.
 RUHEZEIT_VORGABE = 0.5
 #: Nach so vielen Sekunden ohne Paket gilt eine Quelle als „kein Signal“.
@@ -373,6 +375,11 @@ def lies_abbild(abbild: dict[int, bytes], patch: Iterable, *,
                 gewaehlt.update((grob, fein))
         if not gewaehlt:
             continue
+        # Farbe und Dimmer bleiben getrennt: Wird ein Geraet aufgenommen, gehen
+        # seine Dimmer-Kanaele immer mit — auch mit Wert 0. Sonst zoege die
+        # Grundhelligkeit aelterer Shows eine Farbe ohne Dimmer auf Voll.
+        gewaehlt.update(nr for nr in werte
+                        if ist_dimmer(str(schluessel[nr]).split("#", 1)[0]))
         bild = GeraeteBild(fid=int(fx.fid), name=name, universum=uni)
         for nr in sorted(gewaehlt):
             bild.kanaele.append(KanalWert(kanal=nr, schluessel=schluessel[nr],

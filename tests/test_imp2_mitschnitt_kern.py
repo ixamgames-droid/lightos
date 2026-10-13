@@ -137,8 +137,9 @@ def test_nur_geaendert_vergleicht_mit_dem_bezugsbild():
     bezug = {1: _bild(a1=255, a2=100, a10=40)}
     jetzt = {1: _bild(a1=255, a2=0, a10=40, a11=8)}
     m = _lies(jetzt, patch, auswahl=M.AUSWAHL_GEAENDERT, bezug=bezug)
-    # a2 fiel auf 0 (geändert, obwohl 0), a11 kam dazu; a1/a10 blieben.
-    assert m.szenenwerte() == [(1, 2, 0), (2, 2, 8)]
+    # a2 fiel auf 0 (geändert, obwohl 0), a11 kam dazu. Die Dimmer a1/a10
+    # blieben gleich, gehen bei einem aufgenommenen Gerät aber immer mit.
+    assert m.szenenwerte() == [(1, 1, 255), (1, 2, 0), (2, 1, 40), (2, 2, 8)]
     # Ohne Bezugsbild wirkt die Regel wie „ungleich 0“.
     ohne = _lies(jetzt, patch, auswahl=M.AUSWAHL_GEAENDERT)
     assert ohne.szenenwerte() == [(1, 1, 255), (2, 1, 40), (2, 2, 8)]
@@ -148,7 +149,7 @@ def test_16_bit_paar_bleibt_bei_jeder_regel_zusammen():
     patch = [_fx(1, 1, 1, KOPF)]
     # Pan grob 0, fein 5: „ungleich 0“ träfe nur den Fein-Kanal.
     m = _lies({1: _bild(a2=5)}, patch, auswahl=M.AUSWAHL_UNGLEICH_NULL)
-    assert m.szenenwerte() == [(1, 1, 0), (1, 2, 5)]
+    assert m.szenenwerte() == [(1, 1, 0), (1, 2, 5), (1, 5, 0)]
     # Nur der Fein-Kanal ändert sich: der Grob-Kanal kommt trotzdem mit.
     m = _lies({1: _bild(a3=10, a4=7)}, patch, auswahl=M.AUSWAHL_GEAENDERT,
               bezug={1: _bild(a3=10, a4=6)})
@@ -458,3 +459,17 @@ def test_echtes_artnet_paket_ueber_loopback_wird_zur_szene(monkeypatch, fm):
     szene = M.baue_szene(fm, "Vom Draht", _lies(bild.abbild, patch))
     aus = _spiele(szene, patch)[2].get_all()
     assert aus[0:4] == daten[0:4] and aus[199:204] == daten[199:204]
+
+
+
+def test_sparregeln_nehmen_den_dimmer_eines_aufgenommenen_geraets_immer_mit():
+    """Farbe ohne Dimmer: der Dimmer muss mit 0 in der Szene stehen — sonst
+    zieht die Grundhelligkeit aelterer Shows ihn beim Abspielen auf Voll."""
+    patch = [_fx(1, 1, 1, PAR), _fx(2, 1, 10, PAR)]
+    # Geraet 1: nur Rot (Adresse 2), Dimmer 0. Geraet 2: ganz dunkel.
+    m = _lies({1: _bild(a2=200)}, patch, auswahl=M.AUSWAHL_UNGLEICH_NULL)
+    assert m.szenenwerte() == [(1, 1, 0), (1, 2, 200)]
+    # Dasselbe bei „nur geaendert“: Rot aendert sich, der Dimmer (0) geht mit.
+    g = _lies({1: _bild(a2=200)}, patch, auswahl=M.AUSWAHL_GEAENDERT,
+              bezug={1: _bild(a2=100)})
+    assert g.szenenwerte() == [(1, 1, 0), (1, 2, 200)]

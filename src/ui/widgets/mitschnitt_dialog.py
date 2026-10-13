@@ -141,7 +141,8 @@ class MitschnittDialog(QDialog):
             "Welche Kanäle in die Szene kommen. „Alle gepatchten Kanäle“ hält "
             "das ganze Bild fest — auch, was dunkel ist. Die anderen beiden "
             "Regeln lassen Kanäle weg; solche Szenen lassen andere Funktionen "
-            "auf diesen Kanälen durch.")
+            "auf diesen Kanälen durch. Die Dimmer-Kanäle eines aufgenommenen "
+            "Geräts kommen immer mit, damit eine Farbe ohne Dimmer dunkel bleibt.")
         form.addRow("Kanäle:", self._combo_auswahl)
         self._check_laser = QCheckBox(TEXT_LASER)
         self._check_laser.setToolTip(HINWEIS_LASER)
