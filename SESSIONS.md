@@ -57,7 +57,6 @@
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | OUT-74 | D | fix/out74-adapter-umzug-alte-zeile | 2026-10-12T14:06Z | src/ui/widgets/output_config.py · src/core/app_state.py |
 | LAS-38 | D | fix/las38-laser-erkennung-alle-modi | 2026-10-12T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py |
-| STAB-35 | A | fix/stab36-absturz-auswahlwechsel | 2026-10-12T15:43Z | - |
 | STAB-36 | A | fix/stab36-absturz-auswahlwechsel | 2026-10-12T15:43Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | OUT-75 | D | fix/out75-dmx-monitor-eine-wahrheit | 2026-10-12T15:08Z | src/ui/views/dmx_monitor_view.py · src/core/dmx/output_manager.py · src/ui/widgets/output_config.py |
@@ -291,7 +290,6 @@
 
 ## Verlauf
 
-- 2026-10-12T17:12Z D claim OUT-76
 - 2026-10-12T17:33Z A claim STAB-38
 - 2026-10-12T17:35Z D claim FM-75
 - 2026-10-12T17:48Z D claim PROC-21
@@ -321,3 +319,4 @@
 - 2026-10-12T22:35Z D done VCB-42
 - 2026-10-12T22:39Z A claim LIZ-1
 - 2026-10-13T00:13Z A done LAS-32
+- 2026-10-13T13:52Z A done STAB-35
