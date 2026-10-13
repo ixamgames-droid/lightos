@@ -92,6 +92,34 @@
 #
 # Und sie schrumpft weiter: die serielle WebEngine-Spur ist von 208 s/29
 # Dateien (alter Kommentar) auf gemessene 501 s/42 Dateien gewachsen.
+#
+# ── XPLAT-36: GENANNTE DATEIEN BEKOMMEN 600 s ───────────────────────────────
+# Die 300 s sind am VOLL-Lauf bemessen. Dort laeuft neben der seriellen
+# WebEngine-Spur immer die parallele Spur, und die haelt die CPU auf vollem
+# Takt. Ein Lauf mit wenigen genannten Dateien hat diese Nachbarn nicht - und
+# ist fuer WARTENDE Dateien (WebEngine-Szenentests: Seite laden, Abfragen im
+# 50-ms-Takt, Nachrichten zwischen Python, Renderer und GPU-Prozess) der
+# LANGSAMERE Fall, nicht der leichtere: auf einem sonst ruhigen Rechner holt so
+# eine Datei die CPU nie aus dem Spartakt, und jeder kleine Schritt dauert
+# laenger.
+#
+# Gemessen am 11.10.2026 (Windows x64, 4 Kerne, Energieplan "Ausbalanciert")
+# an tests/test_viz13_scene_modules_smoke.py, alles ohne Fenster:
+#
+#   im Voll-Gate (30 Laeufe)                  137-151 s
+#   allein                                    223-250 s   CPU-Takt 22 % vom Maximum
+#   allein + 4 rechnende Prozesse daneben     148-151 s   CPU-Takt 100 %
+#   allein + ein Prozess mit 1-ms-Timer       250 s       (keine Wirkung)
+#
+# Auf dem zweiten Windows-Rechner lagen die Einzellaeufe derselben Datei bei
+# 269-309 s, im Voll-Gate bei 114 s. Mit 300 s riss dort also der EINZELLAUF
+# das Limit, waehrend die Datei im Gate die Haelfte der Zeit hat. Der fruehere
+# Verdacht (ein Cache, den die WebEngine-Segmente davor waermen) ist damit
+# widerlegt: die Gate-Zeit kommt auch ganz ohne vorherige Segmente zustande.
+#
+# Deshalb: sind Dateien genannt, gilt 600 s. Der Voll-Lauf bleibt bei 300 s,
+# und ein ausdruecklich gesetztes -TimeoutSec gilt immer.
+#
 # PositionalBinding=$false ist Pflicht, nicht Stil: sonst schnappt sich
 # -TimeoutSec das erste freie Argument, und `verify_segmented.ps1 -j 3
 # tests\test_x.py` stirbt mit "Der Wert tests\test_x.py kann nicht in den Typ
@@ -106,6 +134,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $laufStart = Get-Date    # XPLAT-43: fuer dauer_s in summary.json
+
+# XPLAT-36: genannte Dateien -> 600 s (Begruendung und Messung im Kopf). Wer
+# -TimeoutSec ausdruecklich setzt, behaelt seinen Wert.
+$EinzelTimeoutSec = 600
+$zeitlimitHinweis = ""
+if (-not $PSBoundParameters.ContainsKey('TimeoutSec') -and $Targets -and $Targets.Count) {
+    $zeitlimitHinweis = " (Dateien genannt; im Voll-Lauf {0} s)" -f $TimeoutSec
+    $TimeoutSec = $EinzelTimeoutSec
+}
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
 # venv-Python: identische Kandidaten-Reihenfolge wie tools/verify_loop.ps1
@@ -276,6 +313,7 @@ foreach ($f in $files) {
 
 Write-Host ("[seg] {0} Testdateien, {1} parallel + 1 WebEngine-Spur, Ausgabe: {2}" -f $files.Count, $Jobs, $outDir) -ForegroundColor Cyan
 Write-Host ("[seg] Spuren: {0} parallel, {1} WebEngine seriell" -f $rest.Count, $web.Count) -ForegroundColor Cyan
+Write-Host ("[seg] Zeitlimit je Segment: {0} s{1}" -f $TimeoutSec, $zeitlimitHinweis) -ForegroundColor Cyan
 
 # XPLAT-17: vor einem WebEngine-Segment warten, bis die Chromium-Kindprozesse
 # des vorigen wirklich weg sind. Gedeckelt (3 s), damit es nie haengt - laeuft
@@ -613,6 +651,8 @@ if ($last.Count) {
     Write-Host "[seg]   gruen, war es die Last. Ein FAILURE bleibt trotzdem rot;" -ForegroundColor DarkYellow
     Write-Host "[seg]   ein ZEITLIMIT faerbt nicht rot (Exit-Vertrag, s. Skriptkopf)." -ForegroundColor DarkYellow
     Write-Host "[seg]   Dauerhaft? LIGHTOS_VERIFY_JOBS kleiner setzen (Default 4)." -ForegroundColor DarkYellow
+    Write-Host "[seg]   Die Gegenprobe darf INSGESAMT laenger dauern als das Segment im Gate:" -ForegroundColor DarkYellow
+    Write-Host "[seg]   auf einem ruhigen Rechner bleibt die CPU im Spartakt (XPLAT-36)." -ForegroundColor DarkYellow
 }
 
 # Wichtig fuer die Triage: steht hier nichts, ist KEIN Test fehlgeschlagen -

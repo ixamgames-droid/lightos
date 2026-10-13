@@ -149,6 +149,10 @@ _KOPF_FELDER = {
     "format_version", "hersteller", "hersteller_kurz", "modell", "kurzname",
     "typ", "leistung_w", "notizen", "viz_model", "quelle", "herkunft", "autor",
     "geprueft", "modi",
+    # LAS-32: Abstrahlwinkel eines Lasers laut Handbuch/Datenblatt — nur
+    # eintragen, wenn dort belegt. Wird aus der Datei gelesen
+    # (laser/sperrzonen.winkel_aus_bibliothek), nicht in die Datenbank gespielt.
+    "laser_abstrahlwinkel", "laser_randwinkel",
 }
 _KOPF_PFLICHT = ("format_version", "hersteller", "modell", "kurzname", "typ",
                  "quelle", "herkunft", "autor", "geprueft", "modi")
@@ -228,6 +232,33 @@ def _form(v, wo: str, out: list[str]) -> None:
             out.append(f"{wo}.{k}: ganze Zahl 0..{GEO_MAX} erwartet (ist {n!r})")
 
 
+def _laser_winkel_pruefen(daten: dict, p: str, out: list[str]) -> None:
+    """LAS-32: ``laser_abstrahlwinkel`` = voller Winkel in Grad, eine Zahl
+    (beide Achsen) oder ``[waagerecht, senkrecht]``, je > 0 und <= 170;
+    ``laser_randwinkel`` = ``{links, rechts, oben, unten}`` je 0..85."""
+    def _zahl(v, lo, hi, offen):
+        return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                and (lo < v if offen else lo <= v) and v <= hi)
+
+    if "laser_abstrahlwinkel" in daten:
+        aw = daten["laser_abstrahlwinkel"]
+        werte = aw if isinstance(aw, list) else [aw]
+        if len(werte) not in (1, 2) or (isinstance(aw, list) and len(aw) != 2) \
+                or not all(_zahl(v, 0, 170, True) for v in werte):
+            out.append(f"{p}laser_abstrahlwinkel: Zahl oder [waagerecht, "
+                       f"senkrecht] in Grad (> 0, hoechstens 170) erwartet")
+    if "laser_randwinkel" in daten:
+        rw = daten["laser_randwinkel"]
+        seiten = ("links", "rechts", "oben", "unten")
+        if not isinstance(rw, dict) or set(rw) != set(seiten) \
+                or not all(_zahl(rw[k], 0, 85, False) for k in seiten):
+            out.append(f"{p}laser_randwinkel: links/rechts/oben/unten je "
+                       f"0..85 Grad erwartet")
+    if ("laser_abstrahlwinkel" in daten or "laser_randwinkel" in daten) \
+            and daten.get("typ") != "laser":
+        out.append(f"{p}laser_abstrahlwinkel/laser_randwinkel: nur bei typ 'laser'")
+
+
 def pruefe(daten, datei: str = "") -> list[str]:
     """Alle Befunde einer geladenen Datei; leer = gueltig."""
     from src.core.dimmer_segmente import ist_dimmer
@@ -256,6 +287,7 @@ def pruefe(daten, datei: str = "") -> list[str]:
     lw = daten.get("leistung_w", 0)
     if not _ist_int(lw) or lw < 0:
         out.append(f"{p}leistung_w: ganze Zahl >= 0 erwartet (ist {lw!r})")
+    _laser_winkel_pruefen(daten, p, out)
     for f, n in (("notizen", None), ("viz_model", 40)):
         if f in daten and (not isinstance(daten[f], str)
                            or (n and len(daten[f]) > n)):
@@ -985,20 +1017,36 @@ def _abgleichen(s, daten: dict) -> str:
     from sqlalchemy.orm import selectinload
     from .models import (ABLOESBARE_QUELLEN, FixtureChannel, FixtureMode, FixtureProfile,
                          Manufacturer)
+    from .fixture_db import ist_bearbeitet, profil_schluessel
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
+    # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand eine
+    # korrigierte Schreibweise das schon eingespielte Profil nicht wieder und
+    # legte es ein zweites Mal an.
+    hersteller_ids = [m.id for m in hersteller_ohne_gross_klein(s, name_h)]
+    # ★ FM-66: dasselbe gilt fuer das MODELL. Der Abgleich verglich es roh
+    # (`FixtureProfile.name == modell`): „PAR 7“ in der Datei fand ein „Par 7“
+    # in der DB nicht — die Datei legte ein zweites Profil an, statt das
+    # vorhandene zu pflegen, und ein gleichnamiges eigenes Profil oder Builtin
+    # verdeckte sie nicht mehr (zwei Eintraege fuer ein Geraet, FM-43).
+    # Verglichen wird ueber `fixture_db.profil_schluessel` — dieselbe
+    # Gleichheit wie beim Abloesen (FM-63) und im Dubletten-Riegel des Editors:
+    # Gross/klein und Leerzeichen zaehlen nicht, Satzzeichen SCHON („PAR-56“
+    # und „PAR 56“ sind zwei Geraete). In Python statt in SQL, weil SQLite nur
+    # ASCII faltet (s. `hersteller_ohne_gross_klein`). Erst die Namen, dann nur
+    # die Treffer mit Modi/Kanaelen laden — ein Hersteller aus einem
+    # QLC+-Import hat schnell mehrere hundert Profile.
+    ziel = profil_schluessel("", modell)[1]
+    treffer_ids = [pid for pid, pname in s.execute(
+        select(FixtureProfile.id, FixtureProfile.name)
+        .where(FixtureProfile.manufacturer_id.in_(hersteller_ids)))
+        if profil_schluessel("", pname)[1] == ziel] if hersteller_ids else []
     vorhanden = s.execute(
         select(FixtureProfile)
-        .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
         .options(selectinload(FixtureProfile.modes)
                  .selectinload(FixtureMode.channels)
                  .selectinload(FixtureChannel.ranges))
-        # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
-        # eine korrigierte Schreibweise das schon eingespielte Profil nicht
-        # wieder und legte es ein zweites Mal an.
-        .where(Manufacturer.id.in_(
-                   [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
-               FixtureProfile.name == modell)
-        .order_by(FixtureProfile.id)).scalars().all()
+        .where(FixtureProfile.id.in_(treffer_ids))
+        .order_by(FixtureProfile.id)).scalars().all() if treffer_ids else []
     if any(p.source not in (SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN) for p in vorhanden):
         return "verdeckt"
     eigene = [p for p in vorhanden if p.source == SOURCE_LIGHTOS]
@@ -1008,12 +1056,14 @@ def _abgleichen(s, daten: dict) -> str:
         # daneben waere also ein dauerhaftes Doppel. Steht das LightOS-Profil
         # schon in der DB (Import erst danach bearbeitet), wird es weiter
         # gepflegt statt still zu veralten.
-        from .fixture_db import ist_bearbeitet
         if any(ist_bearbeitet(p.herkunft) for p in vorhanden):
             return "verdeckt"
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
-    prof = eigene[0]
+    # FM-66: die exakte Schreibweise gewinnt, sonst der aelteste Eintrag (wie
+    # beim Hersteller). `_kopf_setzen` uebernimmt danach die Schreibweise der
+    # Datei; die Profil-ID bleibt.
+    prof = next((p for p in eigene if p.name == modell), eigene[0])
     # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
     # (alter Datenfehler), zieht es zum richtigen Hersteller um.
     hersteller = _hersteller(s, daten)
@@ -1058,12 +1108,15 @@ def einspielen(s, verzeichnis: str | None = None,
     EINER Datei — werden gemeldet und uebersprungen, nie halb eingespielt; die
     uebrigen Dateien laufen weiter. Liefert, ob die DB geaendert wurde."""
     from sqlalchemy import select
+    from .fixture_db import profil_schluessel
     from .models import FixtureProfile, Manufacturer
     wurzel = verzeichnis or BIBLIOTHEK_DIR
     stempel = stempel or {}
     bericht: dict = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": [],
                      "stempel": {}}
-    da = {(m.casefold(), n.casefold()) for m, n in s.execute(
+    # FM-66: dieselbe Gleichheit wie `_abgleichen` — sonst hielte die
+    # Stempel-Abkuerzung ein Profil fuer fehlend, das der Abgleich findet.
+    da = {profil_schluessel(m, n) for m, n in s.execute(
         select(Manufacturer.name, FixtureProfile.name)
         .join(FixtureProfile, FixtureProfile.manufacturer_id == Manufacturer.id)
         .where(FixtureProfile.source == SOURCE_LIGHTOS))}
@@ -1080,7 +1133,7 @@ def einspielen(s, verzeichnis: str | None = None,
             else:
                 daten = lade_datei(pfad)
             name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
-            schluessel = (name_h.casefold(), modell.casefold())
+            schluessel = profil_schluessel(name_h, modell)
             if schluessel in gesehen:
                 bericht["fehler"].append(f"{pfad}: {name_h} / {modell} doppelt in der "
                                          f"Bibliothek (schon in {gesehen[schluessel]})")
