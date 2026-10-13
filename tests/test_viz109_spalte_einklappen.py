@@ -252,7 +252,7 @@ def test_fenster_haengt_knopf_und_taste_an_den_vorhandenen_splitter():
     assert "SpaltenKlappe(splitter, self._btn_spalte, 1, self)" in quelle
     assert "left_lay.addWidget(self._view, 1)" in quelle
     # Die Ansicht wird weiterhin genau einmal gebaut.
-    assert quelle.count("self._view = QWebEngineView()") == 1
+    assert quelle.count("self._view = QWebEngineView" + "()") == 1
     # F9 ist im Fenster nur einmal belegt.
     assert len(re.findall(r'\("F9",', quelle)) == 1
     assert SE.TASTE == "F9"
