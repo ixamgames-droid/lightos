@@ -20,8 +20,10 @@
 - **For USB:** an ENTTEC DMX USB Pro. Windows brings the driver along; notes are in
   [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro) (German).
 - **For USB without a COM port:** a uDMX adapter, see
-  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the optional package `pyusb` and,
-  once, an access right or a driver.
+  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the package `pyusb` (included in
+  the Windows setup package) and, on Linux, an access right once. **On Windows it needs a
+  driver that neither Windows nor LightOS ships** – you assign it once by hand; after
+  that the adapter works.
 - **For network:** an Art-Net or sACN node (or a fixture with a built-in network input)
   and a computer **on the same network**, see
   [Network pitfall](#network-pitfall-with-art-net-and-sacn).
@@ -111,11 +113,38 @@ yet.
   DMX is going out).
 - Below the status you then find the **reason** and what to do. The most common ones:
   - *No access rights* (Linux): set up a udev rule once.
-  - *Cannot be opened* (Windows): assign the WinUSB driver to the adapter.
-  - *pyusb missing*: install the optional package.
+  - *Treiber fehlt* (driver missing, Windows): assign the WinUSB driver to the adapter,
+    see below.
+  - *pyusb missing*: if LightOS runs from source, install the package; update an older
+    setup package (newer ones include it).
 
   All three are described in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
   installs no drivers itself and changes no system settings.
+
+**On Windows: "Treiber fehlt" (driver missing).** Windows ships no driver for uDMX
+adapters, and LightOS neither ships nor installs one. If an adapter without a driver is
+plugged in, the tab says so right after **Adapter suchen**: the list shows
+`— Treiber fehlt (WinUSB zuweisen)` behind the adapter, and below it you find the steps
+with clickable links. LightOS opens no device and changes nothing for this – it only
+asks Windows.
+
+1. Get the program Zadig: https://zadig.akeo.ie – a free program from another vendor.
+2. Plug in the adapter and start Zadig (Windows asks for administrator rights).
+3. In Zadig, switch on *List All Devices* in the *Options* menu and pick the adapter
+   from the list – recognisable by the USB ID `2008 1066` (CYL-6602) or `16C0 05DC`
+   (Anyma uDMX).
+4. Choose *WinUSB* as the driver and click *Install Driver* (or *Replace Driver*).
+5. Back in LightOS: **Adapter suchen**, then **Verbinden**.
+
+> **Careful:** pick exactly the adapter in Zadig. Zadig replaces the driver of the
+> selected device – a mouse or keyboard stops working afterwards until you uninstall it
+> in the Windows Device Manager (with "delete driver") and plug it in again.
+
+The **Windows setup package** (x64) includes the parts needed (`pyusb` and the libusb
+library – libraries, not drivers): after installation uDMX works as soon as the driver
+is assigned as described above. A setup package built before 12 October 2026 does not
+contain them yet; the tab then says so and recommends updating. On Windows ARM64, uDMX
+is not included.
 
 If two identical adapters have no serial number, LightOS tells them apart by their USB
 port. If you move one of them, select it again in the tab.

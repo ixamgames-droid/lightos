@@ -29,6 +29,9 @@ test_tool14_gen_tools_index_cli.py # tools/README.md
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
 test_xplat49_uninstall_datenschutz.py # INSTALL.md
+test_out76_udmx_windows_treiber.py # INSTALL.md + Anleitung Ausgabe: Weg zum WinUSB-Treiber
+test_out76_setup_bringt_usb_mit.py # THIRD_PARTY_NOTICES.md + licenses/: pyusb und libusb im Windows-Setup
+test_liz2_fremdlizenzen_setup.py   # THIRD_PARTY_NOTICES.md + licenses/ + requirements.txt: Fremdlizenzen im Windows-Setup
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
