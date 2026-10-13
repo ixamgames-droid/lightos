@@ -109,14 +109,29 @@ def build_art() -> str:
     return "Setup-Build" if ist_gefroren() else "Quellbetrieb (kein Setup-Build)"
 
 
+def lizenz_zeile() -> str:
+    """LIZ-1: Lizenzstatus fuer „Über LightOS“ — bei jedem Oeffnen frisch
+    gelesen (ein Ablauf waehrend der Sitzung zeigt sich NUR hier; die laufende
+    App bleibt davon unberuehrt)."""
+    try:
+        from src.core import lizenz
+        return lizenz.pruefe().text()
+    except Exception:
+        return "unbekannt"
+
+
 def ueber_text() -> str:
     """HTML fuer „Über LightOS“."""
     from html import escape
+    from src.core.lizenz import COPYRIGHT, QUELLE
     daten = datenordner()
     return (
         f"<b>LightOS {escape(app_version())}</b><br>"
-        "Professionelle DMX-Lichtsteuerung<br><br>"
+        "Professionelle DMX-Lichtsteuerung<br>"
+        f"{escape(COPYRIGHT)}<br>"
+        f"<a href='{QUELLE}'>{QUELLE}</a><br><br>"
         "<table cellspacing='4'>"
+        f"<tr><td>Lizenz:</td><td>{escape(lizenz_zeile())}</td></tr>"
         f"<tr><td>Version:</td><td>{escape(app_version())}</td></tr>"
         f"<tr><td>Build:</td><td>{escape(build_art())}</td></tr>"
         f"<tr><td>Datenordner:</td><td>{escape(daten)}</td></tr>"
