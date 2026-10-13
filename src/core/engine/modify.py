@@ -43,6 +43,16 @@ Gerundet, gekappt bei 0 und 255. In allen drei Arten ist Betrag 0 neutral —
   den Dimmer nie an und laeuft NACH der automatischen Grundhelligkeit: er kann
   sie weder ausloesen noch zuruecknehmen — eine dunkle Lampe bleibt dunkel.
 
+★ ENG-40, Kanalwahl („Wirkt auf"): ``modify_channels`` leer = Vorgabe, die
+  Modify-FARBE bestimmt die Kanaele (genau ENG-38, byte-gleich). Sind Kanaele
+  angekreuzt (Rot, Gruen, Blau, Weiss, Amber, UV), schreibt die Matrix im
+  Farb-Modify NUR diese Farbkanaele — und zwar je Kanal die HELLIGKEIT des
+  Effekts an der Lampe (groesster Farbanteil), nicht mehr den Anteil der
+  Farbe. „Nur Weiss" trifft also allein color_w; ein Geraet ohne diesen Kanal
+  bekommt keinen Posten (kein Umrechnen von Weiss auf RGB). Der Dimmer gehoert
+  nicht zur Auswahl: er wird ueber den Stil DIMMER verrechnet (ENG-37) —
+  Farbe und Dimmer bleiben getrennt.
+
 ★ Kosten: laeuft kein Modify-Effekt, gibt es keinen Posten und der spaete
   Rechengang ist ein leerer Listen-Test.
 """
@@ -59,6 +69,48 @@ MODIFY_LABELS: dict[str, str] = {
     MODIFY_SUB: "Abziehen",
     MODIFY_DIM: "Abdunkeln",
 }
+
+
+# ENG-40: Kanalwahl eines Farb-Modify. Kurzzeichen (so stehen sie in der Show)
+# -> Kanal-Attribut des Geraets. Die Reihenfolge ist die der Oberflaeche und
+# der gespeicherten Liste. Amber und UV kennt die Engine als Farbkanaele
+# (app_state._DIM_COLOR_ATTRS); CMY ist subtraktiv und bleibt draussen.
+MODIFY_KANAL_ATTR: dict[str, str] = {
+    "r": "color_r",
+    "g": "color_g",
+    "b": "color_b",
+    "w": "color_w",
+    "a": "color_a",
+    "uv": "color_uv",
+}
+MODIFY_KANAELE: tuple[str, ...] = tuple(MODIFY_KANAL_ATTR)
+MODIFY_KANAL_LABELS: dict[str, str] = {
+    "r": "Rot",
+    "g": "Grün",
+    "b": "Blau",
+    "w": "Weiß",
+    "a": "Amber",
+    "uv": "UV",
+}
+
+
+def normalize_channels(value) -> tuple[str, ...]:
+    """Kanalwahl als Tupel der Kurzzeichen in fester Reihenfolge.
+
+    Leer = Vorgabe („Kanaele der Modify-Farbe"). Fehlendes, Unlesbares und
+    unbekannte Zeichen fallen weg — eine Alt-Show ohne das Feld bleibt damit
+    beim bisherigen Verhalten."""
+    if not value:
+        return ()
+    if isinstance(value, str):
+        teile = value.replace(";", ",").split(",")
+    else:
+        try:
+            teile = list(value)
+        except TypeError:
+            return ()
+    gewaehlt = {str(t or "").strip().lower() for t in teile}
+    return tuple(k for k in MODIFY_KANAELE if k in gewaehlt)
 
 
 def normalize_mode(value) -> str:

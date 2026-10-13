@@ -853,6 +853,10 @@ class RgbMatrixInstance(Function):
         #   * ein Farbrad wird nicht angefasst (eine Stellung ist keine Menge).
         # Einmal je Frame bestimmt; ohne Haken ist es ein Attribut-Test.
         farb_modify = self._farb_modify()
+        # ENG-40: Kanalwahl („Wirkt auf"). Leer = Vorgabe, dann bleibt alles
+        # unten Zeichen fuer Zeichen beim ENG-38-Verhalten. Sonst die Menge der
+        # Kanal-Attribute, die dieser Modify-Effekt als EINZIGE schreibt.
+        kanalwahl = self._modify_kanalwahl() if farb_modify else frozenset()
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -978,7 +982,11 @@ class RgbMatrixInstance(Function):
             # jetzt ausdruecklich da, statt sich auf `max(_n_c, 1)` zu
             # verlassen — das deckte zufaellig nur den Ein-Kanal-Fall ab.
             _weiss_gehoert_zur_zelle = True
-            if self.style == MatrixStyle.RGBW:
+            # ENG-40: die Frage stellt sich auch, wenn „Weiss" ausdruecklich
+            # angekreuzt ist — unabhaengig vom Stil. Dieselbe Regel: gehoert
+            # das Weiss nicht zur Farbzelle (eigene Leiste), faehrt es die
+            # Weiss-ZELLE, nicht die Farbzelle.
+            if self.style == MatrixStyle.RGBW or "color_w" in kanalwahl:
                 _achsen = _achsen_cache.get(fid)
                 if _achsen is None:
                     # FM-41: EINE Zaehl-Regel — dieselbe, die der Gruppen-Editor
@@ -1012,7 +1020,19 @@ class RgbMatrixInstance(Function):
                 attr = (ch.attribute or "").lower()
                 # ── Style-Kanalmaske ────────────────────────────────────────
                 if self.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
-                    if attr == "color_r":
+                    if kanalwahl:
+                        # ENG-40: NUR die angekreuzten Farbkanaele, je Kanal
+                        # die Helligkeit der Zelle (dieselbe Groesse wie im
+                        # Dimmer-Stil und auf der Weiss-Achse). Kein Split,
+                        # kein Umrechnen: hat das Geraet den Kanal nicht,
+                        # entsteht kein Betrag. Dimmer/Farbrad nie.
+                        if attr not in kanalwahl or (
+                                attr == "color_w"
+                                and not _weiss_gehoert_zur_zelle):
+                            continue
+                        val = max(0, min(255, int(round(
+                            self._pixel_brightness(rgb) * 255))))
+                    elif attr == "color_r":
                         val = cr
                     elif attr == "color_g":
                         val = cg
@@ -1089,6 +1109,10 @@ class RgbMatrixInstance(Function):
         # Weissanteil aus R/G/B ziehen). Das ist eine ANDERE Frage als „diese
         # Zelle IST ein Weiss-Segment". Die zweite mit der Antwort der ersten
         # zu beantworten waere genau der Fehler, aus dem ENG-25 entstanden ist.
+        # ENG-40: ist eine Kanalwahl getroffen und Weiss NICHT dabei, bleibt
+        # auch die eigene Weiss-Leiste unberuehrt.
+        if kanalwahl and "color_w" not in kanalwahl:
+            return
         self._weiss_achse_schreiben(universes, patch_cache, grid, farb_modify)
 
     def _weiss_achse_schreiben(self, universes, patch_cache, grid,
@@ -2321,6 +2345,18 @@ class RgbMatrixInstance(Function):
         return (bool(getattr(self, "modify", False))
                 and self.style in (MatrixStyle.RGB, MatrixStyle.RGBW))
 
+    def _modify_kanalwahl(self) -> frozenset:
+        """ENG-40: die Kanal-Attribute, auf die ein Farb-Modify ALLEIN wirkt.
+
+        Leer = Vorgabe („Kanaele der Modify-Farbe", ENG-38). Gilt nur im
+        Farb-Modify: im Stil Dimmer wird der Dimmer verrechnet, die Auswahl
+        bleibt dort gemerkt, wirkt aber nicht — Farbe und Dimmer sind getrennt."""
+        if not self._farb_modify():
+            return frozenset()
+        from .modify import MODIFY_KANAL_ATTR, normalize_channels
+        return frozenset(MODIFY_KANAL_ATTR[k] for k in normalize_channels(
+            getattr(self, "modify_channels", ())))
+
     def to_dict(self) -> dict:
         d = super().to_dict()  # id, name, type, intensity, speed, folder
         d.update({
@@ -2440,10 +2476,13 @@ class RgbMatrixInstance(Function):
         # die Schluessel bei Vorgabewerten WEG — ein fehlender Schluessel heisst
         # hier deshalb „Vorgabe", nicht „aktuellen Wert behalten" (sonst bliebe
         # ein im Editor entfernter Haken beim Speichern stehen).
-        from .modify import normalize_mode, normalize_strength
+        from .modify import (normalize_channels, normalize_mode,
+                             normalize_strength)
         self.modify = bool(d.get("modify", False))
         self.modify_mode = normalize_mode(d.get("modify_mode", "add"))
         self.modify_strength = normalize_strength(d.get("modify_strength", 100))
+        # ENG-40: Kanalwahl. Fehlt der Schluessel -> Vorgabe (leer).
+        self.modify_channels = normalize_channels(d.get("modify_channels"))
         # ARC-04: Hüllkurven-Zeiten ebenfalls im Draft-Roundtrip erhalten.
         try:
             self.env_fade_in = max(0.0, float(d.get("env_fade_in",

@@ -276,8 +276,9 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
   teilt sich auf (Rot 255, Grün 128, Blau 128 = Weiß 128 und Rot 127). Im Stil RGB bleibt der
   Weiß-Kanal unberührt.
 - **Lampen ohne Farbkanäle** (nur Farbrad) bleiben unberührt — eine Rad-Stellung ist keine Menge,
-  die sich addieren ließe. Amber-, UV- und CMY-Kanäle fasst die Matrix auch als normaler Effekt
-  nicht an, also auch nicht als Modify.
+  die sich addieren ließe. Amber-, UV- und CMY-Kanäle fasst die Matrix als normaler Effekt nicht
+  an, als Modify mit der Vorgabe also auch nicht. Amber und UV lassen sich über **Wirkt auf**
+  (nächster Abschnitt) ausdrücklich ankreuzen.
 - **Dimmer- und Farb-Modify zusammen:** beide können gleichzeitig laufen. Jeder rechnet nur auf
   seinen Kanälen, die Reihenfolge ist dieselbe wie unter „Reihenfolge“.
 - **Master haben das letzte Wort** — wie beim Dimmer-Modify. Bei Lampen ohne eigenen Dimmer (reine
@@ -285,6 +286,52 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
 - Der Regler **Helligkeit** des Farb-Modify stellt wie beim Dimmer nur die Stärke ein.
 - Die Vorschau im Editor zeigt beim Farb-Modify die echten Farben; das Zeichen in der Ecke nennt
   die Betriebsart (+ Addieren, − Abziehen, × Abdunkeln, dann schraffiert).
+
+### Nur bestimmte Kanäle verändern: „Wirkt auf“
+
+In der Gruppe **Modify** steht bei den Stilen **RGB** und **RGBW** die Zeile **Wirkt auf**.
+
+- **Kanäle der Modify-Farbe** (Vorgabe, Haken gesetzt): alles wie oben beschrieben — die Farbe des
+  Modify-Effekts bestimmt, welche Farbkanäle er verändert. Shows von vorher verhalten sich
+  unverändert.
+- Darunter lassen sich **Rot, Grün, Blau, Weiß, Amber** und **UV** einzeln ankreuzen. Dann
+  verändert der Modify-Effekt **nur diese Kanäle** — mit der eingestellten Betriebsart und Stärke.
+  Alle anderen Kanäle bleiben stehen.
+- Der **Betrag** ist dann die **Helligkeit** des Effekts an der Lampe (Läufer an = 100 %, aus = 0 %,
+  ein Schweif liegt dazwischen). Der **Farbton** des Effekts zählt nicht mehr: ein rotes und ein
+  weißes Lauflicht tun bei „nur Weiß“ dasselbe. Eine halb helle Farbe gibt den halben Betrag.
+- **Lampen ohne einen angekreuzten Kanal bleiben unberührt.** Es wird nichts umgerechnet: „nur
+  Weiß“ tut an einem RGB-Strahler ohne Weiß-Kanal nichts, es wird nicht auf Rot, Grün und Blau
+  verteilt.
+- Der Haken **Kanäle der Modify-Farbe** setzt die Auswahl zurück. Wird der letzte Kanal
+  abgewählt, steht er von selbst wieder.
+- **Der Dimmer steht nicht in der Auswahl.** Farbe und Dimmer bleiben getrennt: „nur den Dimmer“
+  verrechnet ein Modify-Effekt im **Stil Dimmer** (siehe oben). Im Stil Dimmer gibt es die Zeile
+  nicht; eine dort gemerkte Auswahl wirkt nicht.
+
+Durchgerechnet für eine RGBW-Lampe, die gerade **Rot 30, Grün 60, Blau 250, Weiß 180** zeigt, der
+Dimmer steht auf 77 (Werte 0–255). Der Modify-Effekt ist an dieser Lampe voll an:
+
+| | Dimmer | Rot | Grün | Blau | Weiß |
+|---|---|---|---|---|---|
+| darunter | 77 | 30 | 60 | 250 | 180 |
+| nur Weiß, **Abziehen**, Stärke 50 % | 77 | 30 | 60 | 250 | 52 |
+| nur Weiß, **Abziehen**, Stärke 100 % | 77 | 30 | 60 | 250 | 0 |
+| nur Rot, **Addieren**, Stärke 100 % | 77 | 255 | 60 | 250 | 180 |
+| nur Rot, **Addieren**, Stärke 40 % | 77 | 132 | 60 | 250 | 180 |
+| Rot und Weiß, **Abdunkeln**, Stärke 50 % | 77 | 15 | 60 | 250 | 90 |
+
+- Die Auswahl wird mit dem Effekt gespeichert und beim Kopieren mitgenommen; **Verwerfen** im
+  Editor nimmt sie zurück wie jede andere Änderung.
+- **Eigene Weiß-Leiste** (Geräte, deren Weiß-Segmente nicht zu den Farb-Zellen gehören): „Weiß“
+  verändert dort die Segmente der **Weiß-Zellen** der Matrix, nicht die Farb-Zellen. Ohne „Weiß“
+  in der Auswahl bleiben die Segmente stehen.
+- **Amber und UV** erreicht ein Modify-Effekt nur über diese Auswahl — als Vorgabe (Modify-Farbe)
+  schreibt die Matrix sie nicht.
+- Die Vorschau im Editor malt die Lampen in der Mischfarbe der angekreuzten Kanäle; neben dem
+  Zeichen der Betriebsart steht z. B. „− nur Weiß“.
+- An der Virtuellen Konsole gibt es für die Kanalwahl keinen eigenen Regler; sie wird im Editor
+  eingestellt. **Modify-Stärke** und **Modify-Art** wirken wie gewohnt.
 
 ### Was mit Snaps, Grundhelligkeit und Mastern gilt
 
@@ -353,6 +400,7 @@ Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
 8. Lampenreihe: Farb-Taste und Dimmer-Taste auf 40 %, darüber das Modify-Lauflicht in Zweierblöcken.
 9. Matrix-Editor, Stil RGB, Haken **Modify-Effekt** gesetzt, Gruppe **Modify** mit dem Hinweis zum Dimmer.
 10. Lampenreihe in Farbe: blauer Hintergrund / rotes Modify-Lauflicht allein / Ergebnis mit Addieren.
+11. Gruppe **Modify** mit der Zeile **Wirkt auf**, „Weiß“ angekreuzt, Vorschau mit „− nur Weiß“.
 
 ---
 
