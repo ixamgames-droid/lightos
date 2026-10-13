@@ -73,7 +73,7 @@
 | OUT-77 | D | fix/out77-diagnose-udmx-seriennummer | 2026-10-12T18:00Z | src/core/diagnose_log.py · tests/test_out77_diagnose_seriennummer.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 | ENG-35 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
-| VCB-45 | A | - | 2026-10-12T18:15Z | - |
+| VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
 | VCB-46 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | ENG-37 | A | feature/eng37-modify-effekte | 2026-10-12T18:55Z | src/core/engine/function_manager.py · src/core/engine/rgb_matrix.py · src/ui/views/rgb_matrix_view.py |
 | DOC-72 | A | docs/doc72-externe-pulte | 2026-10-12T19:47Z | - |
@@ -288,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-12T18:15Z A claim VCB-45
 - 2026-10-12T18:15Z A claim VCB-46
 - 2026-10-12T18:23Z D done MIDI-10
 - 2026-10-12T18:32Z D aktualisiert MIDI-14: Branch - -> feature/midi14-motorfader-rueckmeldung; Dateien - -> src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py
@@ -318,3 +317,4 @@
 - 2026-10-13T14:46Z A claim ENG-38
 - 2026-10-13T14:51Z A done STAB-38
 - 2026-10-13T15:27Z A done UI-91
+- 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
