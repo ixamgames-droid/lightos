@@ -81,6 +81,7 @@
 | QA-98 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | UI-94 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | ENG-41 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
+| LAS-40 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:17Z | - |
 
 ## Blocker & Fallen
 
@@ -289,7 +290,6 @@
 
 ## Verlauf
 
-- 2026-10-13T14:51Z A done STAB-38
 - 2026-10-13T15:27Z A done UI-91
 - 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
 - 2026-10-13T15:48Z A claim IMP-1
@@ -319,3 +319,4 @@
 - 2026-10-13T23:16Z A claim QA-98
 - 2026-10-13T23:16Z A claim UI-94
 - 2026-10-13T23:16Z A claim ENG-41
+- 2026-10-13T23:17Z A claim LAS-40
