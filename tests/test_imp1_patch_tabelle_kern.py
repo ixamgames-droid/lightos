@@ -451,3 +451,27 @@ def test_aehnlichkeitssuche_bleibt_bei_grosser_bibliothek_schnell():
     for i in range(20):
         bib.finde("", f"Model {i} Wash Beam")
     assert time.perf_counter() - start < 6.0
+
+
+# ── Gegenprüfung: nichts still umdeuten, nichts werfen ───────────────────────
+
+@pytest.mark.parametrize("universum", ["-1", "-3", "+2", "1-2", "1.5", "2 (alt)", "#-2"])
+def test_universum_mit_vorzeichen_oder_rechenzeichen_ist_ein_fehler(universum):
+    """„-1“ wurde als Universum 1 gelesen und die Zeile angelegt."""
+    z = T.lies_tabelle(f"Profil;Universum;Adresse\nDimmer;{universum};4\n").zeilen[0]
+    assert z.universum is None
+    assert z.fehler == [f"Das Universum „{universum}“ ist keine Zahl."]
+
+
+@pytest.mark.parametrize("universum, erwartet", [
+    ("2", 2), ("U2", 2), ("Univ. 2", 2), ("Universum 2", 2), ("Linie#3", 3)])
+def test_universum_mit_wort_davor(universum, erwartet):
+    z = T.lies_tabelle(f"Profil;Universum;Adresse\nDimmer;{universum};4\n").zeilen[0]
+    assert (z.universum, z.fehler) == (erwartet, [])
+
+
+def test_riesiges_feld_wird_zum_satz_statt_zur_ausnahme():
+    """Ein Feld über der Größengrenze des CSV-Lesers warf schon beim Erkennen
+    des Trennzeichens — im Programm wäre das ein Fehlerdialog statt eines Satzes."""
+    tab = T.lies_tabelle("Name;Profil;Adresse\n" + "X" * 200_000 + ";Dimmer;1\n")
+    assert tab.zeilen == [] and tab.fehler.startswith("Die Tabelle lässt sich nicht lesen")

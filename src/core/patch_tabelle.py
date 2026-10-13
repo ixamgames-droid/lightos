@@ -158,8 +158,13 @@ def erkenne_trennzeichen(text: str) -> str:
     proben = [z for z in text.splitlines() if z.strip()][:20]
     bestes, beste_wertung = ";", (0, 0)
     for zeichen in (";", "\t", ","):
-        breiten = [len(next(csv.reader([z], delimiter=zeichen), []))
-                   for z in proben]
+        try:
+            breiten = [len(next(csv.reader([z], delimiter=zeichen), []))
+                       for z in proben]
+        except csv.Error:
+            # z. B. ein Feld ueber der Groessengrenze — den Satz dazu liefert
+            # ``lies_tabelle`` beim eigentlichen Lesen.
+            continue
         mehr = [b for b in breiten if b > 1]
         if not mehr:
             continue
@@ -171,7 +176,9 @@ def erkenne_trennzeichen(text: str) -> str:
 
 
 _ADRESSE = re.compile(r"^(?:(\d+)\s*[./:]\s*)?(\d+)$")
-_UNIVERSUM = re.compile(r"^[^\d]*(\d+)$")
+#: „2“, „U2“, „Univ. 2“, „Universum 2“ — ein Wort davor ist erlaubt, ein
+#: Vorzeichen oder Rechenzeichen nicht: „-1“ darf nicht still Universum 1 werden.
+_UNIVERSUM = re.compile(r"^(?:[^\W\d_]+[\s.:#]*)?(\d+)$")
 
 
 def _zahl(text: str) -> int | None:
