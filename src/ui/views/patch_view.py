@@ -802,6 +802,7 @@ class PatchView(QWidget):
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
         toolbar.addWidget(btn_copy)
+        toolbar.addWidget(self._import_knopf())   # IMP-1
         toolbar.addWidget(btn_autopatch)
         toolbar.addWidget(btn_generator)
         toolbar.addStretch()
@@ -946,6 +947,40 @@ class PatchView(QWidget):
                 "Diese Geräte hätten über Kanal 512 hinausgereicht und liegen "
                 "deshalb im nächsten Universe:\n\n" + "\n".join(zeilen[:12])
                 + (f"\n… und {len(zeilen) - 12} weitere" if len(zeilen) > 12 else ""))
+
+    # ── IMP-1: Patch aus einer Tabelle ──────────────────────────────────────
+    def _import_knopf(self) -> QPushButton:
+        """Knopf „Tabellen-Import“ mit zwei Eintraegen: Tabelle einlesen und
+        Vorlage speichern. Die Vorlage haengt am selben Knopf, weil man sie
+        braucht, BEVOR man eine Tabelle hat."""
+        from PySide6.QtWidgets import QMenu
+        self._btn_import = QPushButton("Tabellen-Import")
+        self._btn_import.setToolTip(
+            "Geräteliste aus einer Tabelle (CSV) übernehmen — für den Umstieg "
+            "von einem anderen Lichtprogramm. Mit Vorschau; vorhandene Geräte "
+            "bleiben unverändert.")
+        menu = QMenu(self._btn_import)
+        menu.setToolTipsVisible(True)
+        self._act_import = menu.addAction("Aus Tabelle importieren …")
+        self._act_import.setToolTip(
+            "CSV-Tabelle wählen (Name; Profil; Universum; Adresse). Es folgt "
+            "eine Vorschau — angelegt wird erst mit „Anwenden“.")
+        self._act_import.triggered.connect(lambda: self._aus_tabelle_importieren())
+        self._act_vorlage = menu.addAction("Vorlage speichern …")
+        self._act_vorlage.setToolTip(
+            "Beispiel-Tabelle mit Kopfzeile und zwei Zeilen zum Ausfüllen "
+            "im Tabellenprogramm.")
+        self._act_vorlage.triggered.connect(lambda: self._import_vorlage_speichern())
+        self._btn_import.setMenu(menu)
+        return self._btn_import
+
+    def _aus_tabelle_importieren(self, pfad: str | None = None):
+        from src.ui.widgets.patch_import_dialog import importieren_starten
+        return importieren_starten(self, self._state, pfad)
+
+    def _import_vorlage_speichern(self):
+        from src.ui.widgets.patch_import_dialog import vorlage_speichern
+        return vorlage_speichern(self)
 
     def _open_generator(self):
         """Oeffnet den Fixture Generator. Nach erfolgreichem Speichern

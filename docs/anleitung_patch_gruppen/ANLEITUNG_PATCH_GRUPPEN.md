@@ -45,6 +45,73 @@ Hilfen:
   *Adresskonflikte auflösen*, dort legst du die betroffenen Geräte mit **Auf Vorschlag
   verschieben** bzw. **Alle verschieben** auf freie Adressen.
 
+### Geräteliste aus einer Tabelle übernehmen
+
+Wer von einem anderen Lichtprogramm umsteigt, muss seine Geräte nicht einzeln neu patchen:
+Geräteliste als Tabelle aufschreiben (oder aus dem alten Programm exportieren), als **CSV**
+speichern, einlesen.
+
+1. Im Tab **Patch** auf **Tabellen-Import** → **Vorlage speichern …**. Das schreibt eine
+   Beispiel-Tabelle mit Kopfzeile und zwei Zeilen.
+2. Die Vorlage im Tabellenprogramm öffnen, die Beispielzeilen durch die eigenen Geräte ersetzen
+   und wieder als CSV speichern (in Excel: *Speichern unter…* → *CSV (Trennzeichen-getrennt)*;
+   eine `.xlsx`-Arbeitsmappe liest LightOS nicht).
+3. **Tabellen-Import** → **Aus Tabelle importieren …**, Datei wählen. Es öffnet sich die Vorschau
+   *Patch aus Tabelle importieren* — noch ist nichts angelegt.
+4. Vorschau prüfen, bei offenen Zeilen das Profil wählen, dann **Anwenden**.
+
+So sieht eine Tabelle aus:
+
+```
+Name;Hersteller;Profil;Modus;Universum;Adresse;Anzahl
+PAR vorne;Generic;Stage Light ZQ01424;8-Kanal RGBW;1;1;4
+Moving Head links;U King;ZQ02001 Mini Moving Head;11-Kanal;1;101;1
+```
+
+| Spalte | Pflicht | Bedeutung | Heißt auch |
+|---|---|---|---|
+| **Profil** | ja | Modellname, wie er in der Geräte-Bibliothek steht | Modell, Gerät, Fixture, Typ, Model |
+| **Adresse** | ja | DMX-Startadresse 1 bis 512; mit Universum davor geht auch `2.101` oder `2/101` | DMX, DMX-Adresse, Address |
+| **Name** | nein | Bezeichnung im Patch; ohne Angabe der Profilname | Label, Bezeichnung |
+| **Hersteller** | nein | hilft, wenn zwei Hersteller ein gleichnamiges Modell haben | Manufacturer, Marke |
+| **Modus** | nein | Kanalmodus, entweder mit Namen (`11-Kanal`) oder als Kanalzahl (`11ch`) | Mode |
+| **Universum** | nein | 1 bis 32; ohne Angabe Universum 1 | Universe, Univ. |
+| **Anzahl** | nein | so viele gleiche Geräte dicht hintereinander ab der Adresse; sie heißen dann *Name 1*, *Name 2* … | Count, Menge |
+| **Kanäle** | nein | Kanalzahl — damit findet LightOS den Modus, wenn die Spalte Modus leer ist | Channels |
+
+Die Reihenfolge der Spalten ist egal, Groß- und Kleinschreibung der Überschriften auch. Als
+Trennzeichen gehen Semikolon, Komma und Tabulator; Umlaute werden aus UTF-8 und aus der
+Windows-Kodierung richtig gelesen. Leere Zeilen und Zeilen, die mit `#` beginnen, werden
+übersprungen. Ohne Kopfzeile versteht LightOS nur genau drei Spalten (Name; Profil; Adresse) oder
+vier (Name; Profil; Universum; Adresse).
+
+**Die Vorschau** zeigt je Tabellenzeile, was passieren wird — in der Spalte **Status** steht der
+Grund im Klartext, darunter eine Zählerzeile (zum Beispiel „12 Geräte werden angelegt, 2 offen,
+1 Überschneidung“):
+
+- **wird angelegt** — Profil und Modus sind sicher erkannt, die Adresse ist frei.
+- **offen** — LightOS ist sich beim Profil oder beim Modus nicht sicher und **rät nicht**. In der
+  Spalte **Profil / Modus** stehen die ähnlichsten Profile der Bibliothek zur Wahl; nach der Wahl
+  wird die Zeile angelegt. Sicher erkannt heißt: der Name stimmt genau, oder er stimmt bis auf
+  Groß-/Kleinschreibung und Leerzeichen und es gibt nur ein solches Profil. Hat ein Profil mehrere
+  Modi und die Tabelle nennt keinen, bleibt die Zeile ebenfalls offen. Steht bei einer Zeile
+  „— kein passendes Profil —“, fehlt das Gerät in der Bibliothek: Namen in der Tabelle berichtigen
+  oder das Profil zuerst mit **Gerät erstellen…** anlegen.
+- **wird nicht angelegt** — die Adresse liegt nicht in 1 bis 512, das Gerät reicht über Kanal 512
+  hinaus, das Universum gibt es nicht, oder die Zeile **überschneidet** sich mit einem vorhandenen
+  Gerät oder mit einer anderen Zeile der Tabelle. Überschneiden sich zwei Zeilen der Tabelle,
+  bleiben beide weg — welche stimmt, steht nur in der Tabelle.
+
+Ein doppelter Name ist nur ein Hinweis, kein Hindernis.
+
+**Anwenden** legt alle Zeilen an, bei denen „wird angelegt“ steht; der Rest bleibt weg. Der Knopf
+ist grau, solange keine Zeile angelegt werden kann. **Vorhandene Geräte werden nie verändert oder
+überschrieben** — wer dieselbe Tabelle zweimal einliest, bekommt beim zweiten Mal nur
+Überschneidungen. Die Geräte entstehen genau wie von Hand gepatcht (Mehrkopf-Geräte bekommen
+ihre Kopf-Gruppe). **Rückgängig** (Strg+Z) nimmt den ganzen Import in einem Schritt zurück.
+
+Nicht übernommen werden Szenen, Abläufe, Gruppen und die Position auf der Bühne — nur der Patch.
+
 ### Laser-Ausrichtung (hängend/stehend)
 
 Ein Laser, der **hängend** statt stehend montiert ist (oder um 90° gedreht), fährt dieselbe
