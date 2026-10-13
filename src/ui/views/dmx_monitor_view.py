@@ -9,6 +9,7 @@ from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from src.core.app_state import get_state
 # U-4/SD-03: Kanal-Funktion (Kürzel + Farbe) — dieselben Helfer wie der Simple Desk.
 from src.ui.views.simple_desk import channel_function_color, channel_function_abbrev
+from src.ui import monitor_ausgang
 
 
 COLS = 32
@@ -27,6 +28,9 @@ class DmxGrid(QWidget):
         self._highlighted: set[int] = set()    # filter highlights
         # U-4/SD-03: addr -> (Geräte-Kürzel, Attribut, voller Tooltip-Text)
         self._cell_info: dict[int, tuple[str, str, str]] = {}
+        # OUT-75: Text ueber dem Raster, wenn es nichts zu zeigen gibt
+        # (Universum nicht angelegt). Leer = normales Raster.
+        self._leer_text = ""
         self.setMinimumSize(COLS * CELL_W, ROWS * CELL_H)
         self.setSizePolicy(self.sizePolicy().horizontalPolicy(),
                            self.sizePolicy().verticalPolicy())
@@ -37,6 +41,19 @@ class DmxGrid(QWidget):
         else:
             self._values = list(values) + [0] * (512 - len(values))
         self.update()
+
+    def set_leer(self, text: str = ""):
+        """OUT-75: das Raster als leer kennzeichnen (``text`` quer darueber) —
+        oder mit ``""`` wieder normal zeigen. Die Werte setzt der Aufrufer
+        selbst auf 0; hier geht es nur darum, dass ein leeres Raster nicht wie
+        eines aussieht, in dem alle Kanaele auf 0 STEHEN."""
+        text = str(text or "")
+        if text != self._leer_text:
+            self._leer_text = text
+            self.update()
+
+    def leer_text(self) -> str:
+        return self._leer_text
 
     def set_patched_addrs(self, addrs):
         self._patched_addrs = set(addrs)
@@ -142,6 +159,14 @@ class DmxGrid(QWidget):
                 p.drawText(int(x) + 1, int(y) + int(ch) - 11, int(cw) - 2, 10,
                            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
                            text)
+        if self._leer_text:
+            # OUT-75: abdunkeln und sagen, warum hier nichts steht.
+            p.fillRect(self.rect(), QColor(12, 12, 16, 200))
+            hinweis = QFont("Segoe UI", 13)
+            hinweis.setBold(True)
+            p.setFont(hinweis)
+            p.setPen(QColor("#b0b6c0"))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, self._leer_text)
         p.end()
 
 
@@ -201,6 +226,21 @@ class DmxMonitorView(QWidget):
         # gibt. Ohne diesen Hinweis sieht ein Universum ohne Ausgang exakt so
         # aus wie eines, das sendet; genau diese Verwechslung hat am
         # 2026-08-05 die Fehlersuche verlaengert.
+        # OUT-75 (c): hat das Universum mehrere Ausgabewege, zeigt der Monitor
+        # EINEN davon — den hier gewaehlten. Sie senden nur dann Verschiedenes,
+        # wenn die NOT-AUS-Sperre eines Wegs greift (OUT-64); die Auswahl
+        # erscheint deshalb erst bei mehr als einem Weg.
+        self._lbl_weg = QLabel("Ausgang:")
+        self._combo_weg = QComboBox()
+        self._combo_weg.setToolTip(
+            "Welcher Ausgabeweg dieses Universums gezeigt wird. Die Wege senden\n"
+            "nur dann Verschiedenes, wenn der Laser-NOT-AUS einen von ihnen sperrt.")
+        self._lbl_weg.setVisible(False)
+        self._combo_weg.setVisible(False)
+        top.addSpacing(12)
+        top.addWidget(self._lbl_weg)
+        top.addWidget(self._combo_weg)
+
         self._lbl_ausgang = QLabel("")
         self._lbl_ausgang.setStyleSheet("font-size: 11px;")
         top.addWidget(self._lbl_ausgang)
@@ -289,57 +329,123 @@ class DmxMonitorView(QWidget):
         # dem Einblenden holt den Stand nach.
         if not self.isVisible() or self.window().isMinimized():
             return
+        self._zeige_stand()
+
+    def _zeige_stand(self):
+        """Raster und Ausgangs-Zeile fuer das gewaehlte Universum fuellen."""
         univ = self._combo_univ.currentData() or 1
+        om = getattr(self._state, "output_manager", None)
         if univ not in self._state.universes:
+            # ★ OUT-75 (b): hier stand ein nacktes ``return`` — das Raster
+            # zeigte dann die Werte des VORHER gewaehlten Universums weiter,
+            # unter der Ueberschrift des neuen. Leeren und sagen, warum.
+            self._grid.set_values([0] * 512)
+            self._grid.set_leer(f"Universe {univ} ist nicht angelegt")
+            self._wege_zeigen([])
+            self._update_ausgang_label(om, univ, False, angelegt=False)
             return
+        self._grid.set_leer("")
         try:
             # WYSIWYG: den GESENDETEN Output zeigen (POST Grand-Master/Blackout).
             # Fallback auf den Rohpuffer, solange noch kein Frame gesendet wurde.
             data = None
-            om = getattr(self._state, "output_manager", None)
             if om is not None:
                 data = om.get_display_frame(univ)
             gesendet = data is not None
             if data is None:
                 data = self._state.universes[univ].get_all()
+            # OUT-75 (c): was an den gewaehlten Ausgabeweg WIRKLICH ging. Das
+            # Bild des Universums stimmt damit ueberein, solange keine
+            # NOT-AUS-Sperre des Wegs greift.
+            gesperrt = 0
+            wege = []
+            holen = getattr(om, "gesendete_wege", None)
+            if gesendet and callable(holen):
+                wege = list(holen(univ) or [])
+            weg = self._wege_zeigen(wege)
+            if weg is not None:
+                bild = weg.get("daten")
+                if bild is not None and bild != data:
+                    gesperrt = sum(1 for a, b in zip(bild, data) if a != b)
+                    data = bild
             self._grid.set_values(data)
-            self._update_ausgang_label(om, univ, gesendet)
+            self._update_ausgang_label(om, univ, gesendet, gesperrt=gesperrt)
         except Exception:
             pass
 
-    def _update_ausgang_label(self, om, univ: int, gesendet: bool):
-        """OUT-52: kennzeichnet, ob das gezeigte Bild wirklich rausgeht.
+    def _wege_zeigen(self, wege: list) -> dict | None:
+        """Die Auswahl „Ausgang“ nachfuehren; liefert den gewaehlten Weg.
 
-        Drei Faelle, weil es drei gibt: es geht raus · es wird nur gerechnet
-        (kein Adapter) · es wird zwar gerechnet und ein Adapter ist da, aber
-        der sendet nicht (OUT-51-Fehlerserie/toter Port).
+        Die Liste wird nur neu aufgebaut, wenn sich die Wege geaendert haben —
+        sie laeuft im 30-Hz-Takt, und ein Neuaufbau klappte eine offene
+        Auswahl sonst jedes Mal zu.
+        """
+        combo = getattr(self, "_combo_weg", None)
+        if combo is None:
+            return wege[0] if wege else None
+        texte = [monitor_ausgang.weg_text(w) for w in wege]
+        if texte != [combo.itemText(i) for i in range(combo.count())]:
+            vorher = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(texte)
+            if vorher in texte:
+                combo.setCurrentIndex(texte.index(vorher))
+            combo.blockSignals(False)
+        mehrere = len(wege) > 1
+        combo.setVisible(mehrere)
+        self._lbl_weg.setVisible(mehrere)
+        if not wege:
+            return None
+        i = combo.currentIndex()
+        return wege[i] if 0 <= i < len(wege) else wege[0]
+
+    @staticmethod
+    def _wege_status(om, univ: int) -> list:
+        """Zustand der Ausgabewege dieses Universums — ``ausgabe_status()``,
+        dieselbe Quelle wie Statusleiste und Banner.
+
+        Kennt der Manager sie nicht (aeltere Attrappe mit nur der
+        OUT-52-Auskunft), bleibt die Fehlerserie des Sendens: eine laufende
+        Serie heisst „sendet nicht“, sonst ist es ungewiss.
+        """
+        status = getattr(om, "ausgabe_status", None)
+        if callable(status):
+            return list(status() or [])
+        wege = [{"universum": univ, "weg": p.get("weg", ""), "ziel": "",
+                 "verbunden": False, "problem": p.get("text", "")}
+                for p in (om.sende_probleme() or [])
+                if p.get("universum") == univ]
+        return wege or [{"universum": univ, "weg": "", "ziel": "",
+                         "verbunden": None, "problem": ""}]
+
+    def _update_ausgang_label(self, om, univ: int, gesendet: bool,
+                              angelegt: bool = True, gesperrt: int = 0):
+        """OUT-52/OUT-75: kennzeichnet, ob das gezeigte Bild wirklich rausgeht.
+
+        Die Regel steht in ``monitor_ausgang.aussage`` und liest dieselbe
+        Quelle wie Statusleiste und Banner (``ausgabe_status``). Bis OUT-75
+        fragte diese Methode nur „ist ein Adapter registriert?“ und die
+        Fehlerserie des Sendens — ein Enttec auf einem toten Anschluss stand
+        hier gruen als „geht raus“, waehrend das Banner „sendet NICHT“ zeigte.
         """
         lbl = getattr(self, "_lbl_ausgang", None)
         if lbl is None:
             return
-        if om is None or not getattr(om, "sendet_wirklich", None):
-            lbl.setText("")
-            return
-        if not om.sendet_wirklich(univ):
-            lbl.setText(f"⚠ Universe {univ} hat keinen Ausgang — nur gerechnet")
-            lbl.setStyleSheet("color: #ffb454; font-size: 11px;")
-            lbl.setToolTip(
-                "Diese Werte berechnet LightOS, aber kein Adapter gibt sie "
-                "aus. In den Output-Einstellungen einen Ausgang zuweisen.")
-            return
-        problem = next((p for p in om.sende_probleme()
-                        if p.get("universum") == univ), None)
-        if problem:
-            lbl.setText(f"⚠ Universe {univ}: {problem['weg']} sendet NICHT")
-            lbl.setStyleSheet("color: #ff4444; font-size: 11px;")
-            lbl.setToolTip(problem.get("text", ""))
-            return
-        if not gesendet:
-            # Adapter da, aber noch kein Frame gesendet (Output-Thread aus).
-            lbl.setText(f"Universe {univ}: Rohwerte (noch kein Frame gesendet)")
-            lbl.setStyleSheet("color: #b0b6c0; font-size: 11px;")
-            lbl.setToolTip("")
-            return
-        lbl.setText(f"Universe {univ} geht raus")
-        lbl.setStyleSheet("color: #9DFF52; font-size: 11px;")
-        lbl.setToolTip("")
+        if not angelegt:
+            a = monitor_ausgang.aussage(univ, [], gesendet, angelegt=False)
+        elif om is None or not getattr(om, "sendet_wirklich", None):
+            a = monitor_ausgang.KEINE
+        elif not om.sendet_wirklich(univ):
+            # ★ OUT-56: „hat dieses Universum einen Ausgang?“ beantwortet
+            # weiter genau EINE Funktion — dieselbe wie in der Statusleiste.
+            a = monitor_ausgang.aussage(univ, [], gesendet)
+        else:
+            a = monitor_ausgang.aussage(univ, DmxMonitorView._wege_status(om, univ), gesendet)
+        text = a.text
+        if a.art == monitor_ausgang.ART_GEHT_RAUS or (
+                a.art == monitor_ausgang.ART_SENDET_NICHT and gesperrt):
+            text += monitor_ausgang.sperre_text(gesperrt)
+        lbl.setText(text)
+        lbl.setStyleSheet(a.stil)
+        lbl.setToolTip(a.tooltip)

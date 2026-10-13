@@ -11,6 +11,7 @@ from PySide6.QtGui import (
     QPainter, QPen, QColor, QBrush, QFont, QPainterPath,
 )
 from src.core.engine.function_manager import get_function_manager
+from src.ui.layout_leeren import layout_leeren
 from src.core.engine.function import FunctionType
 from src.core.engine.show_engine import Show, ShowTrack, ShowFunction
 
@@ -279,16 +280,14 @@ class TrackLabelPanel(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
 
     def refresh(self):
-        # Remove old widgets. itemAt(i).widget() kann None sein (Layout-Item ist
-        # ein Spacer/Stretch oder ein Sub-Layout, kein Widget) -> ohne Guard warf
-        # das AttributeError: 'NoneType' has no attribute 'deleteLater' und liess
-        # z. B. "+ Neue Show" / "+ Track" abstuerzen (live gefunden 2026-07-09).
-        lay = self.layout()
-        for i in reversed(range(lay.count() if lay else 0)):
-            item = lay.itemAt(i)
-            w = item.widget() if item is not None else None
-            if w is not None:
-                w.deleteLater()
+        # Remove old widgets. Ein Layout-Eintrag kann auch ein Abstandhalter
+        # oder ein Unter-Layout sein (kein Widget) -- ``layout_leeren`` kennt
+        # alle drei (live gefunden 2026-07-09: "+ Neue Show" / "+ Track"
+        # stuerzten an einem Eintrag ohne Widget ab).
+        # STAB-36: die Eintraege wirklich aus dem Layout NEHMEN (auch den
+        # Abstandhalter, der sich sonst je Aufruf ansammelte) — nur das Widget
+        # zu loeschen liess tote Layout-Eintraege in PySide zurueck.
+        layout_leeren(self.layout())
 
         if self.layout() is None:
             layout = QVBoxLayout(self)

@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QPainter, QFont
 from src.core.engine.palette import PaletteManager, Palette, PaletteType, get_palette_manager
+from src.ui.layout_leeren import layout_leeren
 from src.ui.weak_slots import weak_slot
 
 
@@ -106,11 +107,11 @@ class PalettePage(QWidget):
         self._refresh()
 
     def _refresh(self, _=None):
-        # Clear grid
-        for i in reversed(range(self._grid.count())):
-            item = self._grid.itemAt(i)
-            if item and item.widget():
-                item.widget().deleteLater()
+        # Clear grid. STAB-36: die Eintraege wirklich aus dem Raster NEHMEN —
+        # ``itemAt(i).widget().deleteLater()`` liess je Kachel einen toten
+        # Layout-Eintrag in PySide zurueck (siehe ``layout_leeren``); bei jedem
+        # Auswahlwechsel und jedem Show-Laden kamen neue dazu.
+        layout_leeren(self._grid)
         # FLD-01c: nach Ordner + Name sortieren und je Ordner eine Überschrift zeigen.
         palettes = list(self.manager.get_by_type(self.ptype))
         palettes.sort(key=lambda p: ((getattr(p, "folder", "") or "").lower(),

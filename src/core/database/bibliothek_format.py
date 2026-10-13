@@ -149,6 +149,10 @@ _KOPF_FELDER = {
     "format_version", "hersteller", "hersteller_kurz", "modell", "kurzname",
     "typ", "leistung_w", "notizen", "viz_model", "quelle", "herkunft", "autor",
     "geprueft", "modi",
+    # LAS-32: Abstrahlwinkel eines Lasers laut Handbuch/Datenblatt — nur
+    # eintragen, wenn dort belegt. Wird aus der Datei gelesen
+    # (laser/sperrzonen.winkel_aus_bibliothek), nicht in die Datenbank gespielt.
+    "laser_abstrahlwinkel", "laser_randwinkel",
 }
 _KOPF_PFLICHT = ("format_version", "hersteller", "modell", "kurzname", "typ",
                  "quelle", "herkunft", "autor", "geprueft", "modi")
@@ -228,6 +232,33 @@ def _form(v, wo: str, out: list[str]) -> None:
             out.append(f"{wo}.{k}: ganze Zahl 0..{GEO_MAX} erwartet (ist {n!r})")
 
 
+def _laser_winkel_pruefen(daten: dict, p: str, out: list[str]) -> None:
+    """LAS-32: ``laser_abstrahlwinkel`` = voller Winkel in Grad, eine Zahl
+    (beide Achsen) oder ``[waagerecht, senkrecht]``, je > 0 und <= 170;
+    ``laser_randwinkel`` = ``{links, rechts, oben, unten}`` je 0..85."""
+    def _zahl(v, lo, hi, offen):
+        return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                and (lo < v if offen else lo <= v) and v <= hi)
+
+    if "laser_abstrahlwinkel" in daten:
+        aw = daten["laser_abstrahlwinkel"]
+        werte = aw if isinstance(aw, list) else [aw]
+        if len(werte) not in (1, 2) or (isinstance(aw, list) and len(aw) != 2) \
+                or not all(_zahl(v, 0, 170, True) for v in werte):
+            out.append(f"{p}laser_abstrahlwinkel: Zahl oder [waagerecht, "
+                       f"senkrecht] in Grad (> 0, hoechstens 170) erwartet")
+    if "laser_randwinkel" in daten:
+        rw = daten["laser_randwinkel"]
+        seiten = ("links", "rechts", "oben", "unten")
+        if not isinstance(rw, dict) or set(rw) != set(seiten) \
+                or not all(_zahl(rw[k], 0, 85, False) for k in seiten):
+            out.append(f"{p}laser_randwinkel: links/rechts/oben/unten je "
+                       f"0..85 Grad erwartet")
+    if ("laser_abstrahlwinkel" in daten or "laser_randwinkel" in daten) \
+            and daten.get("typ") != "laser":
+        out.append(f"{p}laser_abstrahlwinkel/laser_randwinkel: nur bei typ 'laser'")
+
+
 def pruefe(daten, datei: str = "") -> list[str]:
     """Alle Befunde einer geladenen Datei; leer = gueltig."""
     from src.core.dimmer_segmente import ist_dimmer
@@ -256,6 +287,7 @@ def pruefe(daten, datei: str = "") -> list[str]:
     lw = daten.get("leistung_w", 0)
     if not _ist_int(lw) or lw < 0:
         out.append(f"{p}leistung_w: ganze Zahl >= 0 erwartet (ist {lw!r})")
+    _laser_winkel_pruefen(daten, p, out)
     for f, n in (("notizen", None), ("viz_model", 40)):
         if f in daten and (not isinstance(daten[f], str)
                            or (n and len(daten[f]) > n)):
