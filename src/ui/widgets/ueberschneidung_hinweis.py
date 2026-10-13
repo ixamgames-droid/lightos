@@ -460,14 +460,19 @@ class UeberschneidungsHinweis(QLabel):
         except Exception:
             eigene = []
         treffer: list = []
+        # Nur der Fader weiss, ob ER den Effekt bei 0 weiterlaufen laesst —
+        # sonst haelt ihn (wenn ueberhaupt) ein anderer Fader.
+        selbst_haelt = None
         if eigene:
             try:
                 wurzel = wurzel_von(self._taste)
                 andere = konsolen_funktions_ids(wurzel, ausser=self._taste)
                 if andere:
                     haltend = haltende_ids(wurzel, ausser=self._taste)
-                    if callable(self._haelt_selbst) and self._haelt_selbst():
-                        haltend |= {int(i) for i in eigene}
+                    if callable(self._haelt_selbst):
+                        selbst_haelt = bool(self._haelt_selbst())
+                        if selbst_haelt:
+                            haltend |= {int(i) for i in eigene}
                     treffer = treffer_fuer(eigene, andere, haltend=haltend)
             except Exception as e:
                 print(f"[ueberschneidung_hinweis] Rechnung: {e}")
@@ -475,12 +480,14 @@ class UeberschneidungsHinweis(QLabel):
         self.treffer = treffer
         mehrere = len(set(eigene)) > 1
         zeilen = ueberschneidung.hinweis_zeilen(treffer, self._subjekt,
-                                                nenne_eigene=mehrere)
+                                                nenne_eigene=mehrere,
+                                                selbst_haelt=selbst_haelt)
         # Der Tooltip traegt IMMER die vollstaendige Liste — auch das, was die
         # Zeile in „… und n weitere“ zusammenfasst.
         alle = ueberschneidung.hinweis_zeilen(treffer, self._subjekt,
                                               nenne_eigene=mehrere,
-                                              hoechstens=None)
+                                              hoechstens=None,
+                                              selbst_haelt=selbst_haelt)
         try:
             self.setText("\n".join(zeilen))
             self.setToolTip("\n".join(alle) + "\n\n" + HINWEIS_TOOLTIP

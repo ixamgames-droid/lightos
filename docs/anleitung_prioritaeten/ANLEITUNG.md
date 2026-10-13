@@ -162,6 +162,10 @@ Der Fader selbst zeigt denselben gelben **Hinweis** in seinen Eigenschaften, gle
 > Dieser Fader hält den Effekt auch bei 0 am Laufen — er belegt die Geräte dann weiter.
 
 Setzt du den Haken, verschwindet dieser Satz; die Überschneidung selbst bleibt gemeldet.
+Liegt derselbe Effekt noch auf einem zweiten Fader ohne den Haken (zum Beispiel einem
+Tempo-Fader), steht stattdessen da, dass ein anderer Fader ihn hält:
+
+> Ein anderer Fader hält „Wash HG“ auch bei 0 am Laufen — der Effekt belegt die Geräte dann weiter.
 
 Der Hinweis ist **nur eine Auskunft**: er ändert nichts, sperrt nichts und fragt nichts ab.
 Dieselben Sätze stehen im Reiter **Prioritäten** als Tooltip an der Zeile des Effekts

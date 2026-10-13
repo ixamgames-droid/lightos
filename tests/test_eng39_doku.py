@@ -98,6 +98,8 @@ def test_anleitung_zitiert_die_saetze_zum_fader_bei_null():
     flach = _flach(_text(ANLEITUNG).replace("> ", ""))
     assert U.HALTE_SATZ_FADER in flach
     assert U._halte_satz("„Wash HG“") in flach
+    assert U._halte_satz("„Wash HG“", "Ein anderer Fader") in flach, (
+        "stoppt der Fader selbst, haelt den Effekt ein ANDERER Fader")
     assert "**Fader zählen immer mit.**" in _text(ANLEITUNG)
     assert "ohne den Haken regelt er bloß und zählt nicht" not in _text(ANLEITUNG), (
         "die alte Regel „ohne den Haken zaehlt der Fader nicht“ ist abgeloest")
@@ -124,6 +126,7 @@ def test_fader_anleitung_nennt_die_hinweiszeile():
         assert "| **Hinweis**" in text, datei
         assert "**Steuert**" in text, datei
         assert U.HALTE_SATZ_FADER in text, datei
+        assert "Ein anderer Fader hält „…“ auch bei 0 am Laufen" in text, datei
         assert "anleitung_prioritaeten/ANLEITUNG.md#7-hinweis-bei-überschneidungen" in text, datei
     for datei in ("docs/anleitung_vc_widgets/01_button.md",
                   "docs/anleitung_vc_widgets/01_button.en.md"):

@@ -442,3 +442,21 @@ def test_fader_als_subjekt_sagt_wer_gewinnt(fm):
         "„Blinder“ liegt zwei Stufen höher und gewinnt.")
     (u,) = _suche(fm, stark, [ich])
     assert u.satz("Fader").endswith("dieser Fader liegt zwei Stufen höher und gewinnt.")
+
+
+def test_halte_zeile_des_faders_nennt_den_anderen_fader_wenn_er_selbst_stoppt(fm):
+    """Stoppt DIESER Fader bei 0 wirklich und haelt ein zweiter Fader denselben
+    Effekt, darf nicht „Dieser Fader hält …“ dastehen."""
+    ich = _matrix(fm, "Wash", HINTERGRUND)
+    treffer = _suche(fm, ich, [_matrix(fm, "Puls", HINTERGRUND)],
+                     haltend={ich.id})
+    assert U.halte_zeilen(treffer, "Fader", selbst_haelt=False) == [
+        "Ein anderer Fader hält „Wash“ auch bei 0 am Laufen — der Effekt "
+        "belegt die Geräte dann weiter."]
+    assert U.halte_zeilen(treffer, "Fader", selbst_haelt=True) == [U.HALTE_SATZ_FADER]
+    assert U.halte_zeilen(treffer, "Fader") == [U.HALTE_SATZ_FADER]
+    assert U.hinweis_zeilen(treffer, "Fader", selbst_haelt=False)[-1].startswith(
+        "Ein anderer Fader hält „Wash“")
+    # Fuer Taste und Effekt aendert die Angabe nichts.
+    assert U.halte_zeilen(treffer, "Taste", selbst_haelt=False) == U.halte_zeilen(
+        treffer, "Taste")

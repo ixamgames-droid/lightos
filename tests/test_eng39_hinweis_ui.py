@@ -757,3 +757,224 @@ def test_zeile_bleibt_bei_zugeklapptem_bereich_ziel_und_verhalten(fm, flaeche):
         assert zeile.isVisible()
     finally:
         _inspector_zu(panel)
+
+
+# ── Gegenpruefung Nachtrag: die Regel gegen das echte Schaltverhalten ────────
+
+def _druck(taste):
+    taste._trigger(True)
+    taste._trigger(False)
+
+
+def _gegenseitig_sichtbar(flaeche, a, b) -> bool:
+    """Meldet der Hinweis an ``a`` die Funktionen von ``b`` — und umgekehrt?"""
+    hin = set(H._start_ids(b)) <= set(H.konsolen_funktions_ids(flaeche, ausser=a))
+    her = set(H._start_ids(a)) <= set(H.konsolen_funktions_ids(flaeche, ausser=b))
+    assert hin == her, "die Regel muss in beide Richtungen dasselbe sagen"
+    return hin
+
+
+@pytest.mark.parametrize("aktion", [ButtonAction.FUNCTION_TOGGLE,
+                                    ButtonAction.FUNCTION_FLASH])
+def test_kein_hinweis_nur_wo_der_solo_frame_wirklich_ausschaltet(fm, flaeche, aktion):
+    """Verschwiegen wird ein Paar nur, wenn es NIE gleichzeitig laufen kann.
+    Geprueft am echten Tastendruck — auch fuer gehaltene Flash-Tasten: die
+    zweite gehaltene Taste stoppt im Solo-Frame die erste."""
+    a = _matrix(fm, "A", HINTERGRUND)
+    b = _matrix(fm, "B", HINTERGRUND)
+    gruppe = _solo(flaeche)
+    ta = _taste(gruppe, a, "A", aktion)
+    tb = _taste(gruppe, b, "B", aktion)
+    for erst, dann in ((ta, tb), (tb, ta)):
+        fm.stop_all()
+        erst._trigger(True)                 # halten bzw. einschalten
+        dann._trigger(True)
+        assert not (fm.is_running(a.id) and fm.is_running(b.id)), (
+            "Vorbedingung: der Solo-Frame laesst nur eine Taste laufen")
+        erst._trigger(False)
+        dann._trigger(False)
+    assert not _gegenseitig_sichtbar(flaeche, ta, tb)
+
+    # Ohne Solo-Haken steht der Rahmen nur optisch zusammen: beide laufen.
+    gruppe.set_solo(False)
+    fm.stop_all()
+    ta._trigger(True)
+    tb._trigger(True)
+    assert fm.is_running(a.id) and fm.is_running(b.id)
+    assert _gegenseitig_sichtbar(flaeche, ta, tb), (
+        "ein Rahmen ohne Solo-Haken schliesst nichts aus")
+    fm.stop_all()
+
+
+def test_hinweis_bleibt_wo_trotz_solo_frame_beides_laufen_kann(fm, flaeche):
+    """Fader im Solo-Frame, Taste im Unter-Rahmen, zweiter Solo-Frame: dort
+    laufen beide Effekte wirklich gleichzeitig — der Hinweis muss kommen."""
+    a = _matrix(fm, "A", HINTERGRUND)
+    b = _matrix(fm, "B", HINTERGRUND)
+    c = _matrix(fm, "C", HINTERGRUND)
+    d = _matrix(fm, "D", HINTERGRUND)
+    gruppe = _solo(flaeche)
+    ta = _taste(gruppe, a, "A")
+    fader = _fader(gruppe, b, stoppt=True)
+    innen = _taste(VCFrame(parent=gruppe), c, "innen")
+    andere = _taste(_solo(flaeche), d, "andere Gruppe")
+
+    # Fader im Solo-Frame: er startet seinen Effekt, die Taste stoppt ihn nicht.
+    fm.start(b.id)                      # wie der Fader mit Wert > 0
+    _druck(ta)
+    assert fm.is_running(a.id) and fm.is_running(b.id), (
+        "Vorbedingung: der Solo-Frame schaltet den Fader nicht aus")
+    assert _gegenseitig_sichtbar(flaeche, ta, fader)
+
+    # Taste im Unter-Rahmen: erst sie, dann die Taste direkt im Solo-Frame.
+    fm.stop_all()
+    _druck(innen)
+    _druck(ta)
+    assert fm.is_running(a.id) and fm.is_running(c.id), (
+        "Vorbedingung: der Solo-Frame schaltet nur seine direkten Tasten aus")
+    assert _gegenseitig_sichtbar(flaeche, ta, innen)
+
+    # Zwei Solo-Frames nebeneinander.
+    fm.stop_all()
+    _druck(ta)
+    _druck(andere)
+    assert fm.is_running(a.id) and fm.is_running(d.id)
+    assert _gegenseitig_sichtbar(flaeche, ta, andere)
+    fm.stop_all()
+
+
+NICHT_EFFEKT_MODI = [SliderMode.LEVEL, SliderMode.PLAYBACK, SliderMode.SUBMASTER,
+                     SliderMode.GRANDMASTER, SliderMode.PROGRAMMER, SliderMode.BPM,
+                     SliderMode.SPEED, SliderMode.GROUP_DIMMER,
+                     SliderMode.FEATURE_DIMMER, SliderMode.TEMPO_BUS]
+
+
+@pytest.mark.parametrize("modus", NICHT_EFFEKT_MODI)
+def test_fader_die_keinen_effekt_steuern_zaehlen_nie(fm, flaeche, modus):
+    """Grand Master, Tempo, Submaster, Gruppen-Dimmer, Pegel … sind kein
+    Effekt — auch dann nicht, wenn aus einem frueheren Modus noch ein Ziel im
+    Fader steht."""
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    rest = _matrix(fm, "Rest HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND)
+    fader = VCSlider("Master", parent=flaeche)
+    fader.mode = modus
+    fader.function_id = lauf.id             # Altlast aus einem Effekt-Modus
+    fader.function_ids = [rest.id]
+    assert H.konsolen_funktions_ids(flaeche) == []
+    assert H.haltende_ids(flaeche) == set()
+    assert not H.haelt_bei_null(fader)
+    ids, _gegenueber, haltend = H.konsolen_beziehungen([flaeche])
+    assert ids == [] and haltend == set()
+    wirt, zeile = _eigenschaften(_taste(flaeche, puls))
+    try:
+        assert not zeile.hat_hinweis(), modus
+    finally:
+        _zu(wirt)
+
+
+def test_fader_ohne_ziel_zaehlt_nicht_und_haelt_nichts(fm, flaeche):
+    """Effekt-Fader ohne festes Ziel („aktiver Effekt“) und einer, dessen Ziel
+    es nicht mehr gibt: kein Hinweis, kein Halte-Satz."""
+    puls = _matrix(fm, "Puls HG", HINTERGRUND)
+    leer = VCSlider("leer", parent=flaeche)
+    leer.mode = SliderMode.EFFECT_INTENSITY
+    weg = VCSlider("weg", parent=flaeche)
+    weg.mode = SliderMode.EFFECT_INTENSITY
+    weg.function_id = 987654                # gibt es nicht (mehr)
+    assert H.haltende_ids(flaeche) == {987654}
+    wirt, zeile = _eigenschaften(_taste(flaeche, puls))
+    try:
+        assert not zeile.hat_hinweis()
+    finally:
+        _zu(wirt)
+
+
+def test_fader_der_selbst_stoppt_behauptet_nicht_er_halte_den_effekt(
+        fm, flaeche, monkeypatch):
+    """Zwei Fader am selben Effekt (Helligkeit mit „bei 0 wirklich stoppen“,
+    Tempo ohne): in den Eigenschaften des Helligkeits-Faders darf nicht stehen,
+    DIESER Fader halte den Effekt am Laufen — das tut der andere."""
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND)
+    _taste(flaeche, puls)
+    hell = _fader(flaeche, lauf, "Helligkeit", stoppt=True)
+    tempo = _fader(flaeche, lauf, "Tempo", stoppt=False)
+    tempo.mode = SliderMode.EFFECT_SPEED
+    texte = []
+    _fader_dialog(hell, monkeypatch, lambda dlg, zeile: texte.append(zeile.text()))
+    _fader_dialog(tempo, monkeypatch, lambda dlg, zeile: texte.append(zeile.text()))
+    satz = ("Dieser Fader und „Puls HG“ steuern beide den Dimmer der Gruppe "
+            "„Hintergrund“ — gleiche Stufe, es gewinnt, wer zuletzt gestartet "
+            "wurde.")
+    assert texte[0] == (
+        satz + "\nEin anderer Fader hält „Lauflicht HG“ auch bei 0 am Laufen — "
+        "der Effekt belegt die Geräte dann weiter.")
+    assert texte[1] == (
+        satz + "\nDieser Fader hält den Effekt auch bei 0 am Laufen — er "
+        "belegt die Geräte dann weiter.")
+
+
+def test_farbe_gegen_dimmer_bleibt_auch_mit_fader_ohne_hinweis(fm, flaeche, monkeypatch):
+    """Farbe und Dimmer sind getrennt: ein Farb-Fader und eine Dimmer-Taste auf
+    denselben Lampen ueberschneiden sich nicht — in keiner Richtung, und der
+    Halte-Satz steht dann auch nicht allein da."""
+    farbe = _matrix(fm, "Farbe HG", HINTERGRUND, MatrixStyle.RGB)
+    dimmer = _matrix(fm, "Puls HG", HINTERGRUND, MatrixStyle.DIMMER)
+    fader = _fader(flaeche, farbe)
+    taste = _taste(flaeche, dimmer)
+    texte = []
+    _fader_dialog(fader, monkeypatch, lambda dlg, zeile: texte.append(zeile.text()))
+    wirt, zeile = _eigenschaften(taste)
+    try:
+        texte.append(zeile.text())
+    finally:
+        _zu(wirt)
+    assert texte == ["", ""]
+
+
+def test_leistung_300_bedienelemente_mit_fadern_und_solo_frames(fm, flaeche):
+    """300 Bedienelemente (Tasten frei und in Solo-Frames, Fader mit und ohne
+    „bei 0 wirklich stoppen“): Ziel unter 50 ms je Rechnung. Grenze
+    grosszuegig, die gemessene Zahl steht in der Ausgabe (``-s``)."""
+    funktionen = []
+    for i in range(300):
+        start = 9000 + (i % 25) * 4
+        stil = (MatrixStyle.DIMMER, MatrixStyle.RGB)[i % 2]
+        funktionen.append(_matrix(fm, f"L{i:03d}", range(start, start + 8), stil,
+                                  stufe=(0, 20, 40)[i % 3]))
+    rahmen = [_solo(flaeche) for _ in range(6)]
+    for i in range(150):
+        _taste(flaeche, funktionen[i], f"T{i}")
+    for i in range(150, 210):
+        _taste(rahmen[i % 6], funktionen[i], f"S{i}")
+    for i in range(210, 299):
+        _fader(flaeche, funktionen[i], f"F{i}", stoppt=bool(i % 2))
+    taste = _taste(rahmen[0], funktionen[299], "Neu")
+    fader = _fader(flaeche, funktionen[298], "Neu F")
+    assert len(H._bedienelemente(flaeche)) == 301
+    zeilen = [H.UeberschneidungsHinweis(taste, lambda: [funktionen[299].id]),
+              H.UeberschneidungsHinweis(fader, lambda: [funktionen[298].id],
+                                        subjekt="Fader", haelt_selbst=lambda: True)]
+    try:
+        for zeile, was in zip(zeilen, ("Taste im Solo-Frame", "Fader")):
+            zeiten = []
+            for _ in range(5):
+                t0 = time.perf_counter()
+                zeile.neu_berechnen()
+                zeiten.append(time.perf_counter() - t0)
+            assert zeile.treffer, "die Messung soll echte Treffer rechnen"
+            beste = min(zeiten) * 1000.0
+            print(f"\nENG-39 Leistung ({was}): {beste:.1f} ms (beste von 5), "
+                  f"{len(zeile.treffer)} Treffer, 300 Funktionen, 301 Bedienelemente")
+            assert beste < 250.0, f"{was}: {beste:.1f} ms"
+        t0 = time.perf_counter()
+        ids, gegenueber, _haltend = H.konsolen_beziehungen([flaeche])
+        dauer = (time.perf_counter() - t0) * 1000.0
+        print(f"ENG-39 Leistung (Beziehungen fuer „Prioritäten“): {dauer:.1f} ms, "
+              f"{len(ids)} Funktionen")
+        assert len(ids) == 300 and dauer < 250.0, f"{dauer:.1f} ms"
+    finally:
+        for zeile in zeilen:
+            zeile.deleteLater()
+        _app().processEvents()

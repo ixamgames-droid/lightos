@@ -281,23 +281,31 @@ HALTE_SATZ_EFFEKT = ("Ein Fader hält diesen Effekt auch bei 0 am Laufen — er 
                      "belegt die Geräte dann weiter.")
 
 
-def _halte_satz(name: str) -> str:
+def _halte_satz(name: str, wer: str = "Ein Fader") -> str:
     """Der Satz ueber einen Effekt, den ein Fader ohne „bei 0 wirklich
     stoppen“ steuert. ``name`` steht schon in Anfuehrungszeichen."""
-    return (f"Ein Fader hält {name} auch bei 0 am Laufen — der Effekt belegt "
+    return (f"{wer} hält {name} auch bei 0 am Laufen — der Effekt belegt "
             "die Geräte dann weiter.")
 
 
-def halte_zeilen(treffer: Iterable["Treffer"], subjekt: str = "Taste") -> list[str]:
+def halte_zeilen(treffer: Iterable["Treffer"], subjekt: str = "Taste",
+                 selbst_haelt: bool | None = None) -> list[str]:
     """Die Zusatzzeilen „… haelt den Effekt auch bei 0 am Laufen“ fuer die
     EIGENEN Effekte — je Effekt einmal, nicht hinter jedem Satz wieder. Leer,
     wenn kein eigener Effekt auf einem Fader ohne „bei 0 wirklich stoppen“
-    liegt."""
+    liegt.
+
+    ``selbst_haelt`` (nur Subjekt „Fader“): ``False`` heisst, DIESER Fader
+    stoppt bei 0 wirklich — den Effekt haelt dann ein ANDERER Fader, und so
+    steht es da. Ohne Angabe gilt der Fader selbst als der haltende."""
     zeilen: list[str] = []
     for t in treffer:
         if not t.eigene_haelt:
             continue
-        if subjekt == "Fader":
+        if subjekt == "Fader" and selbst_haelt is False:
+            zeile = _halte_satz(f"„{getattr(t.eigene, 'name', '') or '?'}“",
+                                "Ein anderer Fader")
+        elif subjekt == "Fader":
             zeile = HALTE_SATZ_FADER
         elif subjekt == "Effekt":
             zeile = HALTE_SATZ_EFFEKT
@@ -470,7 +478,8 @@ def _rest_zeile(rest: list, subjekt: str) -> str:
 
 def hinweis_zeilen(treffer: Iterable[Treffer], subjekt: str = "Taste",
                    nenne_eigene: bool = False,
-                   hoechstens: int | None = MAX_AUSGESCHRIEBEN) -> list[str]:
+                   hoechstens: int | None = MAX_AUSGESCHRIEBEN,
+                   selbst_haelt: bool | None = None) -> list[str]:
     """Die Saetze fuer die Hinweiszeile. Leer = kein Hinweis.
 
     Reihenfolge: zuerst alle, gegen die man VERLIERT, dann Gleichstand, dann
@@ -482,9 +491,10 @@ def hinweis_zeilen(treffer: Iterable[Treffer], subjekt: str = "Taste",
     liegen. ``hoechstens=None`` schreibt alles aus (Tooltip).
 
     Liegt ein eigener Effekt auf einem Fader ohne „bei 0 wirklich stoppen“,
-    steht das als letzte Zeile (:func:`halte_zeilen`)."""
+    steht das als letzte Zeile (:func:`halte_zeilen`, dort auch
+    ``selbst_haelt``)."""
     treffer = sorted(treffer, key=sortier_schluessel)
-    halten = halte_zeilen(treffer, subjekt)
+    halten = halte_zeilen(treffer, subjekt, selbst_haelt)
     if hoechstens is None:
         return [t.satz(subjekt, nenne_eigene) for t in treffer] + halten
     verlierer = sum(1 for t in treffer if t.verhaeltnis == DIESE_TIEFER)
