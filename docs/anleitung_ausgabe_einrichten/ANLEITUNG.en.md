@@ -19,6 +19,11 @@
   [Erste Schritte](../anleitung_erste_schritte/ANLEITUNG.md) (German).
 - **For USB:** an ENTTEC DMX USB Pro. Windows brings the driver along; notes are in
   [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro) (German).
+- **For USB without a COM port:** a uDMX adapter, see
+  [uDMX adapters (USB)](#udmx-adapters-usb). It needs the package `pyusb` (included in
+  the Windows setup package) and, on Linux, an access right once. **On Windows it needs a
+  driver that neither Windows nor LightOS ships** – you assign it once by hand; after
+  that the adapter works.
 - **For network:** an Art-Net or sACN node (or a fixture with a built-in network input)
   and a computer **on the same network**, see
   [Network pitfall](#network-pitfall-with-art-net-and-sacn).
@@ -41,7 +46,7 @@ the pictures are made on a computer without a connected ENTTEC, which is why it 
 2. Or: click the Enttec indicator at the bottom left of the status bar
    (`Enttec: …`). It opens the same dialog.
 
-The dialog **Ausgabe konfigurieren** has five tabs: **Enttec Pro USB**, **Art-Net**,
+The dialog **Ausgabe konfigurieren** has six tabs: **Enttec Pro USB**, **uDMX (USB)**, **Art-Net**,
 **sACN (E1.31)**, **DMX Input** and **Universen** (universes). There are two ways:
 
 - **Individual tabs** (steps 2–4): put one universe on one output and connect right
@@ -63,12 +68,20 @@ Tab **Enttec Pro USB**:
 
 ![The Enttec Pro USB tab](img/02_enttec.png)
 
-1. **COM-Port:** — all serial ports of the computer. A detected ENTTEC carries the
-   suffix `[Enttec Pro]`. If the saved port is not there at the moment, it is listed with
-   `— derzeit nicht gefunden` (currently not found) instead of silently jumping to
-   another port. Without any port it says `Kein Port gefunden` (no port found).
+1. **COM-Port:** — the serial ports that have a **USB device** behind them. A detected
+   ENTTEC carries the suffix `[Enttec Pro]`, is listed **first** and is **preselected**
+   on a fresh computer. Ports without a USB device (the built-in port `COM1`,
+   Bluetooth, empty `/dev/ttyS…`) are hidden; the checkbox **Alle Anschlüsse zeigen**
+   (show all ports) below brings them into the list. If no ENTTEC is detected, the
+   selection stays empty — LightOS then does not pick a port by itself. If the saved
+   port is not there at the moment, it is listed with `— derzeit nicht gefunden`
+   (currently not found) instead of silently jumping to another port; if nothing is
+   connected to it, it is marked `(kein USB-Gerät erkannt)` (no USB device detected).
+   In both cases the line below the list names the detected adapter. Without any port
+   it says `Kein Port gefunden` (no port found).
 2. **Ports aktualisieren** (refresh ports) — read the list in again after plugging in.
-   The selection is kept.
+   The selection is kept; if nothing was selected yet, the ENTTEC you just plugged in
+   is preselected.
 3. **Universe:** — which LightOS universe goes out through this adapter. The field is
    pre-filled with the saved value; set it deliberately **before** you click
    **Verbinden** (connect).
@@ -82,6 +95,78 @@ Tab **Enttec Pro USB**:
 5. **Status:** — when the dialog opens, this shows what is **saved**
    (`Gespeichert: /dev/ttyUSB0 → Universe 1` = saved: …). Whether the adapter really
    sends is only shown by the status bar (step 8).
+
+**Question before replacing.** If a **different** output is already running on the
+chosen universe (another route, port or target IP), LightOS asks
+**Laufende Ausgabe ersetzen?** (replace the running output?) before setting it up – with
+**Nein** (no) everything stays as it is. This applies to **Verbinden** here and in the
+uDMX (USB) tab, and to **Übernehmen** in the Art-Net and sACN tabs. Setting up the same
+output again does not trigger a question.
+
+## uDMX adapters (USB)
+
+Tab **uDMX (USB)** — for adapters that sit directly on USB and have **no COM port**:
+the *Anyma uDMX* and its clones, and the *CYL-6602 "USB-DMX512"* (reports itself as
+"Sun-light USBDMX512"). One adapter carries **one** universe. This tab has no picture
+yet.
+
+- **Adapter:** — the adapters found, with name, USB ID and serial number or port.
+  LightOS searches when the tab is first opened and on **Adapter suchen** (search
+  adapters). The saved adapter stays in the list even when it is missing
+  (`— derzeit nicht gefunden` = currently not found).
+- **Universe:** and **Verbinden** (connect) — as with the ENTTEC. The status first says
+  `Eingerichtet: … (gespeichert), verbinde …` and then `Verbunden: …` (connected) or
+  `sendet nicht — gespeichert, aber es geht kein DMX raus` (not sending — saved, but no
+  DMX is going out).
+- Below the status you then find the **reason** and what to do. The most common ones:
+  - *No access rights* (Linux): set up a udev rule once.
+  - *Treiber fehlt* (driver missing, Windows): assign the WinUSB driver to the adapter,
+    see below.
+  - *pyusb missing*: if LightOS runs from source, install the package; update an older
+    setup package (newer ones include it).
+
+  All three are described in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
+  installs no drivers itself and changes no system settings.
+
+**On Windows: "Treiber fehlt" (driver missing).** Windows ships no driver for uDMX
+adapters, and LightOS neither ships nor installs one. If an adapter without a driver is
+plugged in, the tab says so right after **Adapter suchen**: the list shows
+`— Treiber fehlt (WinUSB zuweisen)` behind the adapter, and below it you find the steps
+with clickable links. LightOS opens no device and changes nothing for this – it only
+asks Windows.
+
+1. Get the program Zadig: https://zadig.akeo.ie – a free program from another vendor.
+2. Plug in the adapter and start Zadig (Windows asks for administrator rights).
+3. In Zadig, switch on *List All Devices* in the *Options* menu and pick the adapter
+   from the list – recognisable by the USB ID `2008 1066` (CYL-6602) or `16C0 05DC`
+   (Anyma uDMX).
+4. Choose *WinUSB* as the driver and click *Install Driver* (or *Replace Driver*).
+5. Back in LightOS: **Adapter suchen**, then **Verbinden**.
+
+> **Careful:** pick exactly the adapter in Zadig. Zadig replaces the driver of the
+> selected device – a mouse or keyboard stops working afterwards until you uninstall it
+> in the Windows Device Manager (with "delete driver") and plug it in again.
+
+The **Windows setup package** (x64) includes the parts needed (`pyusb` and the libusb
+library – libraries, not drivers): after installation uDMX works as soon as the driver
+is assigned as described above. A setup package built before 12 October 2026 does not
+contain them yet; the tab then says so and recommends updating. On Windows ARM64, uDMX
+is not included.
+
+If two identical adapters have no serial number, LightOS tells them apart by their USB
+port. If you move one of them, select it again in the tab.
+
+> **Test status.** Tested on the CYL-6602 device: communication yes; output with a
+> connected fixture not yet confirmed; OUT2 untested. The Anyma uDMX is built to the
+> specification and tested with a mock only. On Windows the WinUSB route has not been
+> tried on a device yet.
+
+> **Important for lasers and blackout.** Blackout, grand master and the laser emergency
+> stop take effect before LightOS hands the frame to the adapter — as with every other
+> output. A uDMX adapter has its own small processor, though, and probably **keeps
+> sending its last frame** when the USB cable is pulled or the PC crashes (not
+> measured). The emergency stop in LightOS only works while computer, cable and adapter
+> work. Key switch and interlock on the laser remain the real safeguard.
 
 ## 3. Art-Net
 
@@ -137,10 +222,11 @@ Tab **Universen** — here you see and edit all outputs in one table:
 
 Each row is one universe: **#** (1–32), **Name** (free to choose) and:
 
-1. **Output** — `Disabled`, `Enttec`, `sACN` or `ArtNet`.
+1. **Output** — `Disabled`, `Enttec`, `uDMX`, `sACN` or `ArtNet`.
 2. **Patch (Port/IP)** — depending on the output: for `Enttec` the port (`COM3`,
    `/dev/ttyUSB0`), for `ArtNet` the target IP (empty = `255.255.255.255`), for `sACN` a
-   unicast IP (empty = multicast).
+   unicast IP (empty = multicast), for `uDMX` the adapter key (for example
+   `2008:1066@1-2`; easiest to have the **uDMX (USB)** tab enter it).
 3. **Ext-Universe** — optionally the universe number on the network. If empty, the
    default applies: Art-Net `#` minus 1, sACN `#`.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
@@ -184,11 +270,22 @@ Tab **DMX Monitor** next to it — the same values, but with fixture names:
 1. **Universe:** — choice of `Universe 1` to `Universe 32`.
 2. **Hervorgehobene Kanäle:** (highlighted channels) — for example `1,5,10-20`; these
    channels get a yellow frame.
-3. The output display: `Universe 1 geht raus` (Universe 1 is going out) means this
-   universe has an output and is being sent. Otherwise it says
-   `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (Universe \<n> has no output —
-   only calculated) or `⚠ Universe <n>: <Weg> sendet NICHT` (Universe \<n>: \<route> is
-   NOT sending).
+3. The output display says the same as the status bar and the banner (step 8):
+
+   | Display | Meaning |
+   |---|---|
+   | `Universe 1 geht raus` (is going out; green) | The universe has an output, and it is sending. |
+   | `⚠ Universe <n>: <Weg> sendet NICHT` (\<route> is NOT sending; red) | The output is set up but is not sending – for example an ENTTEC whose port cannot be opened. The tooltip gives the reason. |
+   | `Universe <n>: <Weg> verbindet …` (is connecting; orange) | The port is being opened right now. |
+   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (has no output — only calculated; orange) | The values are calculated, but no adapter outputs them. |
+   | `Universe <n> ist nicht angelegt — keine Werte` (does not exist — no values; grey) | Nothing is patched in this universe and no output is set up. The grid is then dimmed and empty. |
+
+   If a universe has **several outputs** (for example ENTTEC and Art-Net), the choice
+   **Ausgang:** (output) appears next to it – the monitor shows what goes to the chosen
+   output. The outputs only send different data while the laser emergency stop locks
+   one of them; the display then adds
+   `· NOT-AUS-Sperre auf diesem Ausgang: <n> Adressen` (emergency-stop lock on this
+   output: \<n> addresses).
 4. The legend: blue frame = patched, yellow frame = highlighted. Each patched tile
    carries an abbreviation of fixture and channel, for example `PAR 1 R`.
 
@@ -248,6 +345,32 @@ sending again for a few seconds; a click opens the dialog from step 1 (not in ki
 If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX gesendet`
 (rehearsal mode — no DMX is being sent) is shown there; a click hides this hint until the
 next program start.
+
+## 9. What goes out when you quit or remove an output
+
+Many adapters hold the last frame they received even when no program is sending
+any more – an ENTTEC DMX USB Pro or a uDMX adapter as well as most Art-Net and
+sACN nodes. So that
+nothing keeps shining after LightOS is closed, LightOS sends **one last frame**
+first:
+
+- **On quit:** every output gets a frame like a blackout – all light channels to
+  0, lasers to their **off values** (not simply 0, see the laser guide).
+  Pan/tilt, gobo and optics of moving heads with a dimmer stay where they are, so
+  the heads do not travel to their home position.
+- **When an output is removed** (universe deleted, output set to „Disabled“,
+  Art-Net or sACN unticked): the same frame to exactly that output.
+- **Not on „Übernehmen“** (apply): the new output follows immediately there, and a
+  dark frame would be a flash on stage.
+
+If an adapter does not respond (unplugged, driver hanging), LightOS waits about
+one second at most and then quits anyway. That one adapter gets no last frame –
+all others do.
+
+> **Important:** the last frame is no substitute for a main switch. If the
+> computer crashes or the power fails, nobody sends anything any more, and an
+> adapter holds whatever it received last. Lasers therefore belong on their own
+> reachable switch at the device.
 
 ## Network pitfall with Art-Net and sACN
 
