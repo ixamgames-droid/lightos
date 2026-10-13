@@ -3016,7 +3016,7 @@ class VisualizerWindow(QMainWindow):
     def _do_redo(self):
         ok = get_undo_stack().redo()
         if ok and hasattr(self, "_lbl_info"):
-            self._lbl_info.setText("Wiederhergestellt")
+            self._lbl_info.setText("Wiederholt")
 
     def event(self, e):
         # Einzelbuchstaben-Shortcuts (V/E/F/S/D) duerfen die Texteingabe in

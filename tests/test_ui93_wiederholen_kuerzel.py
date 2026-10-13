@@ -840,6 +840,144 @@ class HauptfensterTest(unittest.TestCase):
         _taste(self.app, self.win, Qt.Key.Key_Y)
         self.assertEqual(self._stand(), (["Patch A"], 1))
 
+    # ── Gegenpruefung des Nachtrags ─────────────────────────────────────────
+
+    def _fids(self):
+        from src.core.app_state import get_state
+        return sorted(f.fid for f in get_state().get_patched_fixtures())
+
+    def _geraet(self, fid):
+        """ECHTER Patch-Schritt ueber AppState (nicht nur ein benannter Eintrag)."""
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from src.core.app_state import get_state
+        from src.core.database.fixture_db import engine, ensure_builtins
+        from src.core.database.models import FixtureProfile, PatchedFixture
+        ensure_builtins()
+        with Session(engine()) as s:
+            pid = int(s.execute(select(FixtureProfile.id)).scalars().first())
+        get_state().add_fixture(PatchedFixture(
+            fid=fid, label=f"Probe {fid}", fixture_profile_id=pid, mode_name="",
+            universe=1, address=fid * 10, channel_count=1,
+            manufacturer_name="Test", fixture_name="Test",
+            fixture_type="dimmer"))
+        self.app.processEvents()
+
+    def test_echte_patch_schritte_und_layout_in_einer_folge(self):
+        """Geraet anlegen -> Layout -> Geraet anlegen ueber den echten Weg:
+        weder das Zuruecknehmen im Patch noch das Zurueckbauen des Layouts
+        darf nebenbei einen NEUEN Schritt erzeugen (der verwuerfe das
+        Wiederholen)."""
+        self.addCleanup(SF.reset_show)
+        self._seite(self.win._vc_view)
+        self._geraet(1)
+        self._vc_knopf()
+        self._geraet(2)
+        stand = lambda: (self._fids(), self._vc_anzahl())      # noqa: E731
+        self.assertEqual(stand(), ([1, 2], 1))
+        zurueck = []
+        for _ in range(3):
+            _taste(self.app, self.win, Qt.Key.Key_Z)
+            zurueck.append(stand())
+        self.assertEqual(zurueck, [([1], 1), ([1], 0), ([], 0)])
+        vor = []
+        for _ in range(3):
+            _taste(self.app, self.win, Qt.Key.Key_Y)
+            vor.append(stand())
+        self.assertEqual(vor, [([1], 0), ([1], 1), ([1, 2], 1)])
+
+    def test_showwechsel_laesst_keinen_schritt_zurueck(self):
+        """Neue Show: beide Verlaeufe sind leer — auch der Wiederholen-Zweig
+        und die Marken des Layout-Verlaufs."""
+        self._gemischt()
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # Patch B zurueck
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # Layout zurueck
+        SF.reset_show()
+        self.app.processEvents()
+        canvas = self.win._vc_view._canvas
+        self.assertEqual((canvas._undo_stack, canvas._redo_stack,
+                          canvas._undo_marken, canvas._redo_marken),
+                         ([], [], [], []))
+        self.assertEqual(self._menue(), ("Rückgängig", "Wiederholen"))
+        self.assertFalse(self.win._act_undo.isEnabled())
+        self.assertFalse(self.win._act_redo.isEnabled())
+        vorher = (list(self.log), self._vc_anzahl())
+        for taste in (Qt.Key.Key_Z, Qt.Key.Key_Y):
+            _taste(self.app, self.win, taste)
+            self.assertEqual(self._stand(), vorher)
+        # Danach zaehlt der Verlauf ganz normal weiter.
+        self._vc_knopf()
+        self._benannt("Patch N")
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._vc_anzahl(), 0)
+        self.assertNotIn("Patch N", self.log)
+
+    def test_stapelgrenze_haelt_die_reihenfolge(self):
+        """Mehr Layout-Schritte als der Layout-Verlauf fasst: die Marken
+        bleiben deckungsgleich, die juengsten Schritte in richtiger Folge."""
+        canvas = self.win._vc_view._canvas
+        self._seite(self.win._vc_view)
+        self._benannt("ganz alt")
+        grenze = canvas._UNDO_MAX
+        for i in range(grenze + 5):
+            self._vc_knopf(i)
+        self._benannt("ganz neu")
+        self.assertEqual(len(canvas._undo_stack), grenze)
+        self.assertEqual(len(canvas._undo_marken), grenze)
+        self.assertEqual(canvas._undo_marken, sorted(canvas._undo_marken))
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), (["ganz alt"], grenze + 5))
+        for i in range(grenze):
+            _taste(self.app, self.win, Qt.Key.Key_Z)
+            self.assertEqual(self._stand(), (["ganz alt"], grenze + 4 - i))
+        _taste(self.app, self.win, Qt.Key.Key_Z)        # jetzt der aelteste
+        self.assertEqual(self._stand(), ([], 5))
+        for i in range(grenze + 2):
+            _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertEqual(self._stand(), (["ganz alt", "ganz neu"], grenze + 5))
+
+    def test_schritt_waehrend_des_zuruecknehmens(self):
+        """Ein App-Schritt, dessen Ruecknahme selbst das Layout aendert (und
+        dort einen Eintrag ablegt): das Wiederholen des eben
+        zurueckgenommenen Schritts bleibt erhalten."""
+        self._seite(self.win._vc_view)
+        canvas = self.win._vc_view._canvas
+        log = self.log
+        self.stapel.push_simple(
+            "Koppel", lambda: log.append("Koppel"),
+            lambda: (log.remove("Koppel"),
+                     canvas._add_widget("VCButton", QPoint(0, 0))))
+        self.app.processEvents()
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self._stand(), ([], 1))
+        self.assertEqual(self._menue()[1], "Wiederholen: Koppel")
+        _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertEqual(self._stand(), (["Koppel"], 1))
+
+    def test_menuetext_folgt_dem_wechsel_der_ansicht(self):
+        """Der Text der Menuepunkte (auch Quelle fuer Hilfe → Tastenkürzel)
+        stimmt nach dem Wechsel der Ansicht, ohne dass jemand das Menue
+        aufklappt."""
+        self._seite(self.win._vc_view)
+        self._benannt("Patch A")
+        self._vc_knopf()
+        self._seite(self.andere_seite)
+        self.assertEqual(self.win._act_undo.text(), "Rückgängig: Patch A")
+        self._seite(self.win._vc_view)
+        self.assertEqual(self.win._act_undo.text(),
+                         f"Rückgängig: {self.win.VC_SCHRITT}")
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        _taste(self.app, self.win, Qt.Key.Key_Z)
+        self.assertEqual(self.win._act_redo.text(), "Wiederholen: Patch A")
+        self.assertFalse(self.win._act_undo.isEnabled())
+        self._seite(self.andere_seite)
+        self.assertEqual(self.win._act_redo.text(), "Wiederholen: Patch A")
+        self._seite(self.win._vc_view)
+        _taste(self.app, self.win, Qt.Key.Key_Y)
+        self.assertEqual(self.win._act_redo.text(),
+                         f"Wiederholen: {self.win.VC_SCHRITT}")
+
     def test_nach_der_vc_gilt_wieder_der_app_verlauf(self):
         self._schritt()
         self._seite(self.win._vc_view)
@@ -1058,6 +1196,16 @@ class WortWaechterTest(unittest.TestCase):
                         'QPushButton("Wiederherstellen")',
                         "Sicherung wiederherstellen"):
             self.assertFalse(self.MUSTER.search(erlaubt), erlaubt)
+
+    def test_meldung_nach_dem_wiederholen(self):
+        """Auch die Rueckmeldung nach dem Schritt sagt „Wiederholt“ — im
+        Hauptfenster (Statuszeile) wie im 3D-Fenster (Infozeile)."""
+        for datei in ("src/ui/main_window.py",
+                      "src/ui/visualizer/visualizer_window.py"):
+            text = (WURZEL / datei).read_text(encoding="utf-8")
+            self.assertIsNone(
+                re.search(r"[\"„]Wiederhergestellt[\"“]", text), datei)
+            self.assertIn("Wiederholt", text, datei)
 
     def test_hilfetexte_des_programmers(self):
         from src.ui.views.programmer_view import _PROGRAMMER_HELP

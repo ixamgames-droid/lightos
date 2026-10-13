@@ -1142,6 +1142,11 @@ class MainWindow(QMainWindow):
         # ── Stacked Widget ─────────────────────────────────────────────────────
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
+        # UI-93: welcher Schritt als naechster dran ist, haengt davon ab, ob die
+        # Virtual Console zu sehen ist — beim Wechsel der Ansicht nachziehen
+        # (der Text der Menuepunkte steht auch in Hilfe → Tastenkürzel).
+        self._stack.currentChanged.connect(
+            lambda _i: self._refresh_undo_labels())
 
         # ── Command-Line (T1.1, MA-/Avolites-Style) ───────────────────────────
         try:
