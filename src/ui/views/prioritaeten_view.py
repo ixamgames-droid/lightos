@@ -308,7 +308,7 @@ class PrioritaetenView(QWidget):
             funktionen = self._funktionen()
             nachschlagen = self._kanal_attribut()
             mitglied = self._mitglied_von(funktionen)
-            laufend = set(self._fm.running_ids())
+            laufend = self._laufende_ids(funktionen)
 
             self._baum.blockSignals(True)
             self._baum.clear()
@@ -395,12 +395,26 @@ class PrioritaetenView(QWidget):
             for j in range(kopf.childCount()):
                 yield kopf.child(j)
 
+    def _laufende_ids(self, funktionen) -> set:
+        """Was gerade laeuft — auch Kinder, die ein Container (Sammlung)
+        selbst gestartet hat. Codex-Review #1081: ``collection.write`` startet
+        seine Kinder per ``child.start()`` am FunctionManager vorbei; in
+        ``running_ids()`` fehlen sie, ``f.is_running`` sagt es richtig."""
+        laufend = set(self._fm.running_ids())
+        for f in funktionen or ():
+            try:
+                if getattr(f, "is_running", False):
+                    laufend.add(f.id)
+            except Exception:
+                continue
+        return laufend
+
     def _laufzustand_nachziehen(self):
         if not self.isVisible() or self.window().isMinimized():
             return
         if self._veraltet:
             return
-        laufend = set(self._fm.running_ids())
+        laufend = self._laufende_ids(self._fm.all())
         for it in self._effekt_zeilen():
             fid = it.data(0, _ROLLE_FID)
             laeuft = fid in laufend
