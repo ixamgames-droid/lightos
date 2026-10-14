@@ -184,6 +184,65 @@ class SammlerTests(_MitDubletten):
                          "Hinweise der vorigen Show duerfen nicht stehen bleiben")
 
 
+class FolgenVergleichTests(unittest.TestCase):
+    """Codex-Review #1072 (CDX-59): gleich ist mehr als Typ + Attributfolge.
+    Default-, Highlight- und Bereichswerte, Segmente und Laser-Angaben liest
+    der Render-Plan, die Shutter- und die Laser-Aus-Logik; das 3D-Modell das
+    Bild. Unterscheiden sich zwei Dubletten nur dort, bleibt es eine Warnung."""
+
+    @classmethod
+    def setUpClass(cls):
+        from src.core.database.models import (ChannelRange, FixtureChannel,
+                                              FixtureMode, FixtureProfile,
+                                              Manufacturer)
+        cls._eng = frische_library(cls)
+        cls.ids = {}
+        with Session(cls._eng) as s:
+            m = Manufacturer(name="Folgen AG", short_name="FOLG")
+            s.add(m)
+            s.flush()
+
+            def profil(name, *, viz="", default=0, kind="open", laser="", segment=None):
+                p = FixtureProfile(manufacturer=m, name=name, fixture_type="par",
+                                   short_name=name[:6].upper(), power_w=10,
+                                   source="builtin", viz_model=viz)
+                mo = FixtureMode(fixture=p, name=MODUS, channel_count=len(RGBD))
+                for i, a in enumerate(RGBD, start=1):
+                    ch = FixtureChannel(channel_number=i, name=f"K{i}", attribute=a,
+                                        default_value=default if i == 1 else 0,
+                                        laser_angaben=laser if i == 1 else "",
+                                        segment=segment if i == 1 else None)
+                    if i == 1:
+                        ch.ranges.append(ChannelRange(range_from=0, range_to=255,
+                                                      name=f"Name {name}", kind=kind))
+                    mo.channels.append(ch)
+                s.add(p)
+                s.flush()
+                cls.ids[name] = p.id
+
+            profil("basis")
+            profil("basis_umbenannte_bereiche")     # nur der Bereichsname anders
+            profil("default", default=255)
+            profil("bereich", kind="strobe")
+            profil("laser", laser='{"version": 1}')
+            profil("segment", segment=0)
+            profil("modell", viz="moving_head")
+            s.commit()
+
+    def _gleich(self, a, b):
+        with Session(self._eng) as s:
+            return SF._dublette_ohne_folgen(s, self.ids[a], [self.ids[b]],
+                                            MODUS, KANAELE)
+
+    def test_nur_der_name_eines_bereichs_anders_ist_gleich(self):
+        self.assertTrue(self._gleich("basis", "basis_umbenannte_bereiche"))
+
+    def test_was_die_ausgabe_liest_macht_den_unterschied(self):
+        for anders in ("default", "bereich", "laser", "segment", "modell"):
+            with self.subTest(anders):
+                self.assertFalse(self._gleich("basis", anders))
+
+
 class LadenTests(_MitDubletten):
     """Der ganze Weg: eine gespeicherte Show mit drei Geraeten, deren
     Profil-Nummer auf diesem Rechner ins Leere zeigt — wie bei einer Demo-Show,

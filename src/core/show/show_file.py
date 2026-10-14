@@ -429,19 +429,39 @@ def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
     Kanal-Attributen. Dann faehrt in jedem Fall dasselbe Geraet, und die
     Dublette ist eine Sache der Bibliothek. Laesst sich das nicht nachsehen,
     gilt ``False`` — im Zweifel wird gewarnt.
+
+    Codex-Review #1072: zur Folge gehoert alles, was Render-Plan, Shutter-
+    und Laser-Aus-Logik und das 3D-Bild am Kanal lesen — Default-, Highlight-
+    und Invert-Wert, Aufloesung, Segment, Laser-Angaben und die Bereiche
+    (Grenzen und Art; ihr Name ist nur Beschriftung) — und das 3D-Modell des
+    Profils. Unterschieden sich zwei Dubletten nur dort, wurde die Warnung
+    sonst zum blossen Statusleisten-Hinweis heruntergestuft.
     """
     if not rivalen:
         return True
     try:
         from sqlalchemy import select
-        from src.core.database.models import (FixtureChannel, FixtureMode,
-                                              FixtureProfile)
+        from src.core.database.models import (ChannelRange, FixtureChannel,
+                                              FixtureMode, FixtureProfile)
         from src.core.database.modus_wahl import ist_zwilling
 
+        def _kanal(zeile) -> tuple:
+            (cid, attr, default, highlight, invert, aufl, segment, laser) = zeile
+            bereiche = tuple(sorted(
+                (int(a or 0), int(b or 0), str(k or ""))
+                for a, b, k in session.execute(
+                    select(ChannelRange.range_from, ChannelRange.range_to,
+                           ChannelRange.kind)
+                    .where(ChannelRange.channel_id == cid)).all()))
+            return (attr, int(default or 0), int(highlight or 0), bool(invert),
+                    str(aufl or ""), segment, str(laser or ""), bereiche)
+
         def _bild(pid: int):
-            typ = session.execute(
-                select(FixtureProfile.fixture_type)
-                .where(FixtureProfile.id == pid)).scalar_one_or_none()
+            kopf = session.execute(
+                select(FixtureProfile.fixture_type, FixtureProfile.viz_model)
+                .where(FixtureProfile.id == pid)).one_or_none()
+            typ = kopf[0] if kopf is not None else None
+            modell = (kopf[1] or "") if kopf is not None else ""
             modi = session.execute(
                 select(FixtureMode.id, FixtureMode.name, FixtureMode.channel_count)
                 .where(FixtureMode.fixture_id == pid)
@@ -455,11 +475,14 @@ def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
                          and ist_zwilling(m[1], mode_name)]
             if not passt:
                 return None
-            kanaele = tuple(session.execute(
-                select(FixtureChannel.attribute)
+            kanaele = tuple(_kanal(z) for z in session.execute(
+                select(FixtureChannel.id, FixtureChannel.attribute,
+                       FixtureChannel.default_value, FixtureChannel.highlight_value,
+                       FixtureChannel.invert, FixtureChannel.resolution,
+                       FixtureChannel.segment, FixtureChannel.laser_angaben)
                 .where(FixtureChannel.mode_id == passt[0][0])
-                .order_by(FixtureChannel.channel_number)).scalars())
-            return (typ or "", kanaele)
+                .order_by(FixtureChannel.channel_number)).all())
+            return (typ or "", modell, kanaele)
 
         eigen = _bild(int(gewaehlt))
         return eigen is not None and all(_bild(int(r)) == eigen for r in rivalen)
