@@ -63,7 +63,6 @@
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 | VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
-| VCB-46 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
@@ -288,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-13T15:48Z A claim IMP-1
 - 2026-10-13T16:00Z A done FM-74
 - 2026-10-13T16:14Z A claim IMP-2
 - 2026-10-13T16:35Z A done LIZ-1
@@ -318,3 +316,4 @@
 - 2026-10-13T23:17Z A claim LAS-40
 - 2026-10-13T23:56Z A done PROC-22
 - 2026-10-14T13:52Z A done ENG-35
+- 2026-10-14T13:52Z A done VCB-46
