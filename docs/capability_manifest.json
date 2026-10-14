@@ -411,6 +411,15 @@
           ]
         },
         {
+          "key": "runner_step",
+          "label": "Schrittweite",
+          "kind": "int",
+          "range": [
+            0,
+            16
+          ]
+        },
+        {
           "key": "after_fade",
           "label": "Schweif (%)",
           "kind": "float",

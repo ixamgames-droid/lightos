@@ -35,6 +35,10 @@ from src.ui.weak_slots import weak_slot
 _SRC_LABELS = {SOURCE_TILT: "Tilt (Y)", SOURCE_PAN: "Pan (X)", SOURCE_XY: "X-Y (2D)"}
 
 
+# ENG-35: feste Zahl der Kanal-Kopplung im Engine-Merge (siehe _build_function).
+KANAL_KOPPLUNG_ZAHL = 10
+
+
 class _LivePreview(QWidget):
     """Moving-Head mit kippendem, gefaerbtem Beam + grosses Farb-Feld rechts.
     ``on=False`` (Strobe-Aus-Phase) dimmt die Ausgabe stark ab."""
@@ -676,7 +680,11 @@ class MappedChannelEditor(QWidget):
         fn = MappedChannelChange(name=name)
         fn.fids = list(self._fids)
         fn.rules = [MappedRule.from_dict(r.to_dict()) for r in self._rules]
-        fn.priority = 10   # tickt nach Bewegungs-EFX (liest deren Tilt-Ausgang)
+        # Tickt nach den Bewegungs-EFX der Stufe „Effekte“ (liest deren
+        # Tilt-Ausgang). ENG-35: die 10 ist bewusst KEINE Stufe — sie liegt
+        # zwischen „Effekte“ (0) und „Akzente“ (20) und erscheint in der Ansicht
+        # „Prioritäten“ als „eigene Zahl (10)“; siehe core/engine/stufen.py.
+        fn.priority = KANAL_KOPPLUNG_ZAHL
         return fn
 
     def _save_as_function(self):

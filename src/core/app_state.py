@@ -17,6 +17,7 @@ from .dmx import adapter_zeilen
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
 from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
+from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -215,6 +216,14 @@ INPUT_SOURCE_TIMEOUT_S = 2.5
 # Drift mehr): genau diese Gruppe MINUS shutter/strobe. Die Beziehung lockt
 # tests/test_dim_intensity_sentinel.py -> aendert jemand attr_groups, schlaegt er an.
 _DIM_INTENSITY_ATTRS = frozenset(ATTR_GROUPS["Intensity"]) - frozenset({"shutter", "strobe"})
+
+
+def ist_dimmer_attribut(attr) -> bool:
+    """Ist ``attr`` ein Dimmer-/Intensitaets-Attribut im Sinne des Renderers
+    (ohne Shutter/Strobe, Mehrkopf-Zusatz ``#N`` zaehlt mit)?"""
+    return str(attr or "").lower().split("#", 1)[0] in _DIM_INTENSITY_ATTRS
+
+
 _DIM_COLOR_ATTRS = frozenset({
     "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
     "red", "green", "blue", "white", "amber", "uv",
@@ -370,6 +379,12 @@ class AppState:
         # None = kein Fokus -> Funktion besitzt einen direkt getriebenen Dimmer
         # (Default). Wird nur lesend im Output-Thread benutzt -> einfaches Attribut.
         self.programmer_focus: str | None = None
+        # VCB-46: Geraete, deren Programmer-DIMMER gerade von einer Snap-Taste mit
+        # dem Haken „übersteuert laufende Dimmer-Effekte“ gehalten wird:
+        # {fid: {attribut: wert}}. Gepflegt von den VC-Tasten (vc_button.py),
+        # gelesen vom Renderer; wird immer als Ganzes ersetzt (eine Zuweisung).
+        # Leer = Verhalten wie bisher.
+        self.snap_dimmer_override: dict[int, dict[str, int]] = {}
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # VIZ-11 (Schritt 3+4): kanonischer Store ist ab jetzt der SceneGraph
         # (state._scene); die 5 Legacy-Felder darunter sind schreibende
@@ -585,6 +600,10 @@ class AppState:
         # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
         # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
         self.laser_patterns: list = []
+        # LAS-32 (S1): Sperrzonen + Maximalfeld je Laser — NUR ANZEIGE. Die
+        # Ausgabe (OutputManager/Render-Pfad) liest dieses Feld nicht.
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        self.sperrzonen = SperrzonenDaten()
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
@@ -899,14 +918,16 @@ class AppState:
             # Die AKTUELLE fid wird mitgefuehrt: nach einem Redo kann das Geraet
             # per fid-Guard eine neue Nummer haben — ein Undo auf die alte
             # loeschte sonst ein FREMDES Geraet (Review FM-38, gemessen).
-            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": []}
+            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": [], "feld": None}
 
             def _undo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt   # LAS-32
 
             def _redo(s=snapshot, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -922,7 +943,9 @@ class AppState:
     # Zeile einfach mitgibt — die Nummer kann inzwischen belegt sein). Seit
     # VCB-36 haengt aber eine Bindung an ihr (Blackout-Ziel einer VC-Taste):
     # der Schnappschuss merkt sie unter ``id`` und das Undo gibt sie zurueck,
-    # wenn sie frei ist (``_restore_fixture_with_groups``).
+    # wenn sie frei ist (``_restore_fixture_with_groups``). Dasselbe gilt seit
+    # VCB-42 fuer die Kennung (``uid``): ohne sie waere die zurueckgeholte
+    # Gruppe fuer die Taste eine andere, sobald ihr Name nicht mehr stimmt.
     _GROUP_SNAP_FIELDS = ("name", "cols", "rows", "positions_json", "folder")
 
     @staticmethod
@@ -954,6 +977,7 @@ class AppState:
     def _group_to_dict(cls, g) -> dict:
         d = {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
         d["id"] = getattr(g, "id", None)        # VCB-36, s. _GROUP_SNAP_FIELDS
+        d["uid"] = getattr(g, "uid", None)      # VCB-42, dito
         return d
 
     @staticmethod
@@ -995,6 +1019,7 @@ class AppState:
             return neu_fid
         from sqlalchemy import select as _select
         from src.core.database.models import FixtureGroup as _FG
+        from .group_ref import uid_lesbar as _uid_lesbar
         gescheitert: list[str] = []
         with self._session() as s:
             eingefuegt: list = []
@@ -1005,6 +1030,12 @@ class AppState:
                         felder = {k: gd[k] for k in self._GROUP_SNAP_FIELDS if k in gd}
                         felder["positions_json"] = self._zellen_umschreiben(
                             felder.get("positions_json") or "{}", alt_fid, neu_fid)
+                        # VCB-42: die Kennung zurueckgeben, wenn sie frei ist
+                        # (sonst vergibt das Modell eine neue — nie doppelt).
+                        uid = _uid_lesbar(gd.get("uid"))
+                        if uid and s.execute(_select(_FG.id).where(
+                                _FG.uid == uid)).first() is None:
+                            felder["uid"] = uid
                         g_neu = _FG(**felder)
                         s.add(g_neu)
                     eingefuegt.append(g_neu)
@@ -1397,6 +1428,12 @@ class AppState:
             s.commit()
         removed_group = bool(gruppen_snaps)
         self.programmer.pop(fid, None)
+        # LAS-32: die Randwinkel dieses Lasers gehen mit dem Geraet. Die Nummer
+        # wird neu vergeben — ein anderer Laser auf ihr erbte sonst ein fremdes
+        # Feld und koennte faelschlich „erreicht keine Zone" melden. Das
+        # Rueckgaengig (unten bzw. in add_fixture) holt sie wieder.
+        feld_snap = self._sperrzonen_feld_nehmen(fid)
+        self._sperrzonen_feld_entfernt = feld_snap
         self._reload_patch_cache()
         self._emit("patch_changed")
         if removed_group:
@@ -1408,14 +1445,17 @@ class AppState:
             # FM-38: aktuelle fid und JUENGSTE Gruppen-Schnappschuesse mitfuehren
             # (Undo kann umnummern; ein Redo auf die alte Nummer loeschte das
             # Fremdgeraet, und ein veralteter Schnappschuss verwarf Umbenennungen).
-            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps}
+            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps,
+                             "feld": feld_snap}
 
             def _undo(s=snap, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             def _redo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt
 
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
@@ -1424,6 +1464,28 @@ class AppState:
                 redo=_redo,
             )
         return gruppen_snaps
+
+    # ── LAS-32: Laser-Feld beim Loeschen/Zurueckholen eines Geraets ──────────
+    #: Das Feld, das der letzte ``remove_fixture`` herausgenommen hat (oder
+    #: ``None``) — fuer Aufrufer, die es selbst aufheben (Undo von add_fixture).
+    _sperrzonen_feld_entfernt = None
+
+    def _sperrzonen_feld_nehmen(self, fid: int):
+        try:
+            daten = getattr(self, "sperrzonen", None)
+            return daten.nimm_feld(fid) if daten is not None else None
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_nehmen", e)
+            return None
+
+    def _sperrzonen_feld_zurueck(self, fid, feld) -> None:
+        if feld is None or fid is None:
+            return
+        try:
+            self.sperrzonen.setze_feld(int(fid), feld)
+            self._emit("sperrzonen_changed", None)
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_zurueck", e)
 
     def clear_patch(self):
         """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
@@ -1480,6 +1542,7 @@ class AppState:
             self._patch_cache = list(fixtures)
             self._rebuild_universes()
             clear_channel_cache()
+            self._laser_profile_bestimmen()      # LAS-38
             self._rebuild_render_plan()
             self._emit("patch_changed")
             return
@@ -1691,7 +1754,34 @@ class AppState:
             )
         self._rebuild_universes()
         clear_channel_cache()
+        self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
+
+    def _laser_profile_bestimmen(self):
+        """LAS-38: je Profil der gepatchten Geraete EINMAL bestimmen, ob
+        irgendeiner seiner Modi einen Laserkanal hat — beim Patchen und Laden,
+        vor dem Render-Plan. Der Plan (und jede andere Sicherheits-Stelle)
+        liest danach nur noch die gemerkte Antwort aus ``laser.erkennung``.
+
+        Eine Abfrage fuer alle noch unbekannten Profile zusammen. Schlaegt sie
+        fehl, bleibt die Antwort offen: ``erkennung`` fragt dann beim ersten
+        Bedarf je Profil nach (``_profil_hat_laserkanal``) — der Patch darf an
+        dieser Stelle nie scheitern.
+        """
+        offen = set()
+        for fx in getattr(self, "_patch_cache", None) or ():
+            profil_id = getattr(fx, "fixture_profile_id", None)
+            if profil_id is not None and not laser_erkennung.profil_bekannt(profil_id):
+                offen.add(profil_id)
+        if not offen:
+            return
+        try:
+            antworten = _profile_mit_laserkanal(offen)
+        except Exception as e:
+            debug_swallow("app_state.laser_profile_bestimmen", e)
+            return
+        for profil_id, hat_laser in antworten.items():
+            laser_erkennung.merke_profil(profil_id, hat_laser)
 
     def profil_geaendert(self, profile_id=None) -> bool:
         """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
@@ -2263,7 +2353,10 @@ class AppState:
         try:
             for eintrag in self.output_manager.ausgabe_status():
                 if eintrag["universum"] not in konfiguriert:
-                    self.output_manager.remove_output(eintrag["universum"])
+                    # OUT-71: dieses Universum gibt es nicht mehr — sein Adapter
+                    # soll dunkel enden, nicht das letzte Bild halten.
+                    self.output_manager.remove_output(eintrag["universum"],
+                                                      schlussbild=True)
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
 
@@ -2331,8 +2424,18 @@ class AppState:
                 # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
-                self.output_manager.remove_output(num)
                 konflikt = doppelt.get(adapter_zeilen.schluessel(output, patch))
+                # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
+                # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
+                # „Uebernehmen“ die Buehne dunkel.
+                # OUT-74: dasselbe gilt fuer eine Zeile mit doppeltem Adapter —
+                # der Adapter wird fuer KEINE der Zeilen eingerichtet, es kommt
+                # also kein Nachfolger. Ohne Schlussbild hielte er sein letztes
+                # Bild und die Buehne bliebe stehen, obwohl nichts mehr sendet.
+                if output == "Disabled" or konflikt is not None:
+                    self.output_manager.remove_output(num, schlussbild=True)
+                else:
+                    self.output_manager.remove_output(num)
                 if konflikt is not None:
                     # OUT-74: nicht einrichten, s. o. — der Ausgang ist
                     # entfernt, das Universum bleibt ohne Adapter.
@@ -2795,6 +2898,7 @@ class AppState:
             # FM-52: mitgezogene Master-/Anker-Schluessel gehoeren zum Schritt.
             aenderungen = self._prog_unterschied(fid, vorher, self.programmer.get(fid, {}))
         self._verlauf_notiere(aenderungen, attr_label(key))
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
         # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
@@ -2857,6 +2961,7 @@ class AppState:
                 self.programmer.pop(fid, None)
         if alt is not None:
             self._verlauf_notiere([(fid, attribute, alt, None)], "Wert entfernen")
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
 
@@ -2891,6 +2996,9 @@ class AppState:
                 self.clear_remote_input()
             except Exception as e:
                 print(f"[app_state] clear_remote_input error: {e}")
+        # VCB-46: mit dem Wert geht auch sein Vorrang vor Dimmer-Effekten —
+        # auch wenn die Snap-Taste noch gehalten ist.
+        self._snap_dimmer_override_pruefen()
         if flush:
             self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
@@ -2970,6 +3078,7 @@ class AppState:
                     else:
                         self.programmer.setdefault(fid, {})[key] = int(wert)
                     betroffen.add(fid)
+            self._snap_dimmer_override_pruefen()                # VCB-46
             for fid in betroffen:
                 self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", None)
@@ -3547,6 +3656,23 @@ class AppState:
                 return g.id, (json.loads(g.positions_json or "{}") or {})
         except Exception:
             return None, {}
+
+    def gruppen_steckbriefe(self) -> dict | None:
+        """VCB-42: ``{id: (Name, Ordner, Kennung)}`` aller Fixture-Gruppen —
+        woran ``group_ref.ziel_gilt`` eine Gruppe wiedererkennt.
+
+        ``None``, wenn die Show-DB nicht lesbar ist. Das ist NICHT „es gibt
+        keine Gruppen“: wer daraus „Ziel verloren“ schloesse, meldete bei jedem
+        Lesefehler einen Verlust (und ein Aufrufer, der nachzieht, vergaesse)."""
+        try:
+            from sqlalchemy import select
+            from .database.models import FixtureGroup
+            with self._session() as s:
+                return {int(g.id): (g.name or "", g.folder or "", g.uid or "")
+                        for g in s.execute(select(FixtureGroup)).scalars().all()}
+        except Exception as e:
+            debug_swallow("app_state.gruppen_steckbriefe", e)
+            return None
 
     def _group_lookup(self, name_or_ref):
         """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe; (None, []) wenn
@@ -4242,10 +4368,26 @@ class AppState:
             print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
             su.begin_write_log()
+        # ENG-37: Modify-Effekte schreiben im Funktions-Durchlauf nichts — der
+        # Manager sammelt ihre Betraege, verrechnet wird in 4a²b auf das fertige
+        # Bild. ``tick`` wird bewusst mit denselben drei Argumenten gerufen wie
+        # immer (Manager-Ersatz und gepatchte ``tick`` in Tests kennen keinen
+        # Schalter); das Aufschieben wird vorher am Manager angemeldet.
+        _fm = self.function_manager
+        _modify_anwenden = getattr(_fm, "modify_anwenden", None)
+        _modify_aufschieben = getattr(_fm, "modify_aufschieben", None)
         try:
-            self.function_manager.tick(scratch, self._patch_cache, dt)
+            if _modify_aufschieben is not None and _modify_anwenden is not None:
+                _modify_aufschieben(True)
+            _fm.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        finally:
+            if _modify_aufschieben is not None:
+                try:
+                    _modify_aufschieben(False)
+                except Exception:
+                    pass
         func_touched: dict[int, set[int]] = {}
         for univ, su in scratch.items():
             func_touched[univ] = su.end_write_log()
@@ -4375,6 +4517,25 @@ class AppState:
             if getattr(self, "selected_cells", None):
                 sel.update(self.auswahl_referenzierte_fids())
             intensity_wins = func_inten_fids & sel
+        # VCB-46: Snap-Taste mit Haken „übersteuert laufende Dimmer-Effekte“.
+        # Solange die Taste aktiv ist, gewinnt IHR Dimmer-Wert an IHREN Geraeten
+        # gegen einen laufenden Dimmer-Effekt — derselbe Weg wie der Intensity-
+        # Reiter eine Zeile hoeher (Programmer-Dimmer absolut statt uebergangen),
+        # also keine zweite Schicht. Nur der Dimmer: Farb-, Bewegungs- und
+        # Gobo-Kanaele eines Effekts bleiben ueber ``protect`` beim Effekt.
+        # Es zaehlt nur, was WIRKLICH noch im Programmer steht: hat jemand den
+        # Wert inzwischen ueberschrieben oder den Programmer geleert, gilt wieder
+        # die alte Regel. Master, Fader, Blackout und NOT-AUS liegen dahinter.
+        _snap_ovr = getattr(self, "snap_dimmer_override", None)
+        if _snap_ovr and func_inten_fids:
+            for fidi, erwartet in list(_snap_ovr.items()):
+                if fidi not in func_inten_fids or fidi in intensity_wins:
+                    continue
+                pa = programmer.get(fidi)
+                if pa is None:
+                    pa = programmer.get(str(fidi))
+                if pa and any(pa.get(k) == v for k, v in erwartet.items()):
+                    intensity_wins = intensity_wins | {fidi}
         owned_by_func = func_inten_fids - intensity_wins   # hier wirkt Programmer NICHT
 
         prog_factor: dict[int, float] = {}
@@ -4470,6 +4631,24 @@ class AppState:
                 continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
             for a in dims:
                 su.set_channel(a, 255)
+
+        # 4a²b. ENG-37: Modify-Effekte — der EINE spaete Rechengang. Verrechnet
+        #      wird mit dem FERTIGEN Wert der Schichten darunter: Effekte,
+        #      Cuelisten, Programmer/Snaps und die implizite Grundhelligkeit von
+        #      eben. Ein Modify-Effekt hat in Schritt 2 nichts geschrieben — er
+        #      steht in keinem Schreib-Protokoll, besitzt keinen Dimmer und
+        #      schaltet die Grundhelligkeit nicht ab; wo sein Betrag 0 ist,
+        #      bleibt der Wert unveraendert. Bewusst HIER, also VOR Szenen-
+        #      Vorschau, „Alles Weiss“, Submastern/Fixture-Dimmern (4b),
+        #      DMX-Eingang, Simple Desk und Laser-NOT-AUS (4d) sowie vor Grand
+        #      Master/Blackout im OutputManager: die behalten das letzte Wort,
+        #      ein Modify kann Blackout und NOT-AUS nie aufhellen.
+        #      Kosten ohne laufenden Modify-Effekt: ein leerer Listen-Test.
+        if _modify_anwenden is not None:
+            try:
+                _modify_anwenden(scratch)
+            except Exception as exc:
+                print(f"[AppState] render modify error: {exc}")
 
         # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
         # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen
@@ -4778,6 +4957,58 @@ class AppState:
                     for a in rel:
                         if 1 <= a <= 512 and a not in patched:
                             live.set_channel(a, 0)
+
+    def set_snap_dimmer_override(self, ziel: dict | None) -> None:
+        """VCB-46: setzt, wessen Programmer-Dimmer laufende Dimmer-Effekte
+        uebersteuert — ``{fid: {attribut: wert}}`` der gerade aktiven Snap-Tasten
+        mit Haken. Ersetzt den bisherigen Stand als Ganzes (der Renderer liest
+        im Ausgabe-Thread; eine einzelne Zuweisung ist dafuer atomar)."""
+        neu: dict[int, dict[str, int]] = {}
+        for fid, attrs in (ziel or {}).items():
+            try:
+                fidi = int(fid)
+            except (TypeError, ValueError):
+                continue
+            eintrag = {}
+            for attr, wert in (attrs or {}).items():
+                if not ist_dimmer_attribut(attr):
+                    continue
+                try:
+                    eintrag[str(attr)] = int(wert)
+                except (TypeError, ValueError):
+                    continue
+            if eintrag:
+                neu[fidi] = eintrag
+        self.snap_dimmer_override = neu
+
+    def _snap_dimmer_override_pruefen(self) -> None:
+        """VCB-46: streicht jeden Eintrag aus ``snap_dimmer_override``, dessen
+        Wert NICHT mehr im Programmer steht.
+
+        Laeuft nach jeder Aenderung am Programmer. Ohne das bliebe der Eintrag
+        einer noch gehaltenen Taste nach „Programmer leeren“ (oder nachdem
+        jemand den Wert ueberschrieben hat) stehen — und ein spaeter von Hand
+        gezogener, zufaellig gleicher Dimmerwert uebersteuerte den Effekt, obwohl
+        er gar nicht von der Taste kommt. Was hier gestrichen wurde, kommt erst
+        zurueck, wenn eine Taste ihren Wert neu schreibt
+        (``dimmer_override_abgleich``). Ohne Eintraege ein einziger Vergleich.
+        """
+        alt = getattr(self, "snap_dimmer_override", None)
+        if not alt:
+            return
+        neu: dict[int, dict[str, int]] = {}
+        with self._prog_lock:
+            for fidi, erwartet in alt.items():
+                pa = self.programmer.get(fidi)
+                if pa is None:
+                    pa = self.programmer.get(str(fidi))
+                if not pa:
+                    continue
+                bleibt = {k: v for k, v in erwartet.items() if pa.get(k) == v}
+                if bleibt:
+                    neu[fidi] = bleibt
+        if neu != alt:
+            self.snap_dimmer_override = neu
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,
@@ -5256,7 +5487,12 @@ class AppState:
 
         VCB-36: ein Eintrag in ``groups`` ist ein Name (alte Layouts) ODER ein
         ``(gid, name)``-Ref — der meint genau EINE Gruppe, auch wenn zwei gleich
-        heissen (``_group_positions`` loest einen Ref ueber die ID auf)."""
+        heissen (``_group_positions`` loest einen Ref ueber die ID auf).
+
+        VCB-42: ODER ein ``(gid, name, ordner, kennung)``-Ref mit Steckbrief. Der
+        wird bei JEDEM Aufloesen geprueft (``group_ref.ziel_gilt``): traegt die
+        Nummer inzwischen eine andere Gruppe, schaltet das Ziel nichts — auch
+        nicht bei einer schon gedrueckten Taste."""
         spec = (tuple(int(f) for f in (fids or ()) if f is not None),
                 tuple(z for z in (self._blackout_gruppen_ziel(g)
                                   for g in (groups or ())) if z is not None))
@@ -5273,6 +5509,11 @@ class AppState:
         fuer Leeres und Unlesbares (kein Ziel ist NICHT „alle Gruppen“)."""
         if isinstance(g, (tuple, list)):
             try:
+                if len(g) >= 4:
+                    # VCB-42: Ref mit Steckbrief. Ein Name ``None`` bleibt
+                    # ``None`` (= die Gruppe gab es beim Uebernehmen nicht).
+                    return (int(g[0]), None if g[1] is None else str(g[1]),
+                            str(g[2] or ""), str(g[3] or ""))
                 return (int(g[0]), str(g[1] if len(g) > 1 else ""))
             except (TypeError, ValueError, IndexError):
                 return None
@@ -5307,10 +5548,19 @@ class AppState:
         dasselbe Geraet auch als ganze Zelle oder als direktes fid-Ziel da,
         gewinnt das ganze Geraet."""
         from .group_cells import base_fids_in_cells, head_restrictions
+        from .group_ref import ziel_gilt
         fids, groups = spec
         ganz: set = set(fids)
         koepfe: dict = {}
+        steckbriefe = None
         for g in groups:
+            if isinstance(g, tuple) and len(g) == 4:
+                # VCB-42: ist die Gruppe mit dieser Nummer noch die gemeinte?
+                if steckbriefe is None:
+                    steckbriefe = self.gruppen_steckbriefe() or {}
+                if not ziel_gilt(g[1:], steckbriefe.get(g[0])):
+                    continue
+                g = (g[0], "")
             try:
                 cells = list(self.group_cells_by_name(g) or [])
             except Exception:
@@ -5626,6 +5876,62 @@ def clear_channel_cache():
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
     _head_map_cache.clear()
     _cached_channel_list_ids.clear()
+    # LAS-38: ob ein Profil in irgendeinem Modus einen Laser traegt, haengt an
+    # denselben Profildaten — ein im Editor ergaenzter Laserkanal muss gelten.
+    laser_erkennung.vergiss_profile()
+
+
+def _profile_mit_laserkanal(profil_ids) -> dict:
+    """LAS-38: ``{profil_id: bool}`` — hat das Profil in IRGENDEINEM Modus einen
+    Laserkanal (Attribut ``laser_*`` oder „Laser“ im Kanalnamen) oder den Typ
+    ``laser``?
+
+    Eine Sitzung, zwei Abfragen fuer alle gefragten Profile zusammen; gelesen
+    werden nur Name und Attribut der Kanaele. Ein Profil, das es in der
+    Geraete-Datenbank nicht gibt, bekommt ``False`` (es hat keine Kanaele).
+    """
+    ids = [i for i in profil_ids if i is not None]
+    if not ids:
+        return {}
+    from sqlalchemy import select
+    from .database.fixture_db import engine
+    from .database.models import FixtureChannel, FixtureMode, FixtureProfile
+    antwort = {i: False for i in ids}
+    with Session(engine()) as s:
+        for profil_id, typ in s.execute(
+                select(FixtureProfile.id, FixtureProfile.fixture_type)
+                .where(FixtureProfile.id.in_(ids))).all():
+            if (typ or "").strip().lower() == "laser":
+                antwort[profil_id] = True
+        for profil_id, name, attribute in s.execute(
+                select(FixtureMode.fixture_id, FixtureChannel.name,
+                       FixtureChannel.attribute)
+                .join(FixtureChannel, FixtureChannel.mode_id == FixtureMode.id)
+                .where(FixtureMode.fixture_id.in_(ids))).all():
+            if antwort.get(profil_id):
+                continue
+            if laser_erkennung.ist_laserkanal(
+                    _KanalAngabe(name or "", attribute or "")):
+                antwort[profil_id] = True
+    return antwort
+
+
+class _KanalAngabe:
+    """Name und Attribut eines Kanals — mehr braucht ``ist_laserkanal`` nicht."""
+
+    __slots__ = ("name", "attribute")
+
+    def __init__(self, name, attribute):
+        self.name = name
+        self.attribute = attribute
+
+
+def _profil_hat_laserkanal(profil_id):
+    """Quelle fuer ``laser.erkennung``: ein einzelnes, noch unbekanntes Profil."""
+    return _profile_mit_laserkanal([profil_id]).get(profil_id)
+
+
+laser_erkennung.setze_profil_quelle(_profil_hat_laserkanal)
 
 
 # FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der

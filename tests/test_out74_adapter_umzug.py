@@ -108,8 +108,13 @@ class _FakeOutputManager:
             reg.pop(int(universe), None)
 
     def ausgabe_status(self):
-        return ([{"universum": u, "weg": "Enttec"} for u in self._enttec_outputs]
-                + [{"universum": u, "weg": "Art-Net"} for u in self._artnet_outputs])
+        # Wie der echte Manager seit OUT-75: mit Ziel (Anschluss bzw. Adresse).
+        # Ohne Ziel hielte der Dialog jedes Wieder-Verbinden fuer ein Ersetzen
+        # und fragte nach („Laufende Ausgabe ersetzen?“).
+        return ([{"universum": u, "weg": "Enttec", "ziel": d.port}
+                 for u, d in self._enttec_outputs.items()]
+                + [{"universum": u, "weg": "Art-Net", "ziel": str(ip)}
+                   for u, ip in self._artnet_outputs.items()])
 
     def enttec_ports(self):
         return {u: d.port for u, d in self._enttec_outputs.items()}
@@ -363,6 +368,34 @@ class DoppelterAdapterBeimLadenTest(_MitKonfig):
                          "Neustart stehen")
         self.assertEqual(self._neustart().output_manager.enttec_ports(), {2: USB0})
         self.assertFalse(any(self._neustart().enttec_port_notes.values()))
+
+
+class DoppelterAdapterSchlussbildTest(_MitKonfig):
+    """Naht OUT-71 x OUT-74 (Zusammenfuehrung 14.10.2026): eine Zeile mit
+    doppeltem Adapter wird entfernt, und es kommt KEIN Nachfolger — der Adapter
+    wird fuer keine der Zeilen eingerichtet. Dann endet er wie bei „Disabled“
+    mit dem Schlussbild, statt sein letztes Bild zu halten."""
+
+    zeilen = [{"num": 1, "name": "Bühne", "output": "Enttec", "patch": USB0},
+              {"num": 2, "name": "Traverse", "output": "Enttec", "patch": USB0},
+              {"num": 3, "name": "Netz", "output": "ArtNet", "patch": "2.0.0.9"}]
+
+    def test_doppelte_zeilen_bekommen_das_schlussbild_die_anderen_nicht(self):
+        frisch = _FakeState()
+        aufrufe = []
+        alt = frisch.output_manager.remove_output
+
+        def merke(universe, ausser=None, **kw):
+            aufrufe.append((int(universe), bool(kw.get("schlussbild"))))
+            return alt(universe, ausser, **kw)
+
+        frisch.output_manager.remove_output = merke
+        AppState.apply_output_config(frisch, path=self._pfad)
+        self.assertIn((1, True), aufrufe)
+        self.assertIn((2, True), aufrufe)
+        self.assertIn((3, False), aufrufe, "der Netz-Ausgang bekommt seinen Nachfolger")
+        self.assertNotIn((3, True), aufrufe)
+        self.assertEqual(frisch.output_manager.enttec_ports(), {})
 
 
 class DreiZeilenTest(_MitKonfig):

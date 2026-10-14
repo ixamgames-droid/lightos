@@ -11,11 +11,11 @@ import { disposeObj } from '../scene/grid_floor.js';
 // VIZ-13 3c Teil 2: build UND DMX-Update dispatchen ueber die FixtureType-
 // Registry; die pro-Typ-Handler leben bei ihren Buildern (builders.js), wo
 // auch tintTopDownIcon konsumiert wird — nicht mehr hier.
-import { buildFixtureModel, updateFixtureDmx } from './registry.js';
+import { buildFixtureModel, updateFixtureDmx, dmxAnwendungen } from './registry.js';
 import { ohneZielrechnung } from './builders.js';   // VIZ-98
 import { buildTopDownIcon } from './topdown_icons.js';
 import { applyPoolFalloff } from './floor_pool.js';   // VIZ-15
-import { applyBeamGoboBase } from './gobo_textures.js';   // VIZ-83
+import { applyBeamGoboBase, neueKantenEbenen, neueKegelEbenen, entferneGoboUnterScheibe } from './gobo_textures.js';   // VIZ-83, VIZ-102
 import { fixtures, topDownIcons, settings, view } from '../state.js';
 import { deg2rad } from '../scene/renderer.js';
 // VIZ-13 3c-2: On-Demand-Rendering — jede DMX-/Bestands-Aenderung an
@@ -29,6 +29,10 @@ import { syncMountPose } from './mount_pose.js';   // VIZ-100
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
+import {
+  FPS_VORGABE, fpsNachfuehren, strobeBilder, strobeFaktor, strobeModus, taktFps,
+} from './strobe.js';   // VIZ-104
+import { hellMerken, hellSchnell, hellSetzen } from './strobe_hell.js';   // VIZ-104
 
 initSpotPool(fixtures);
 
@@ -284,6 +288,10 @@ export function createBeamCone(color, intensity, angle, length) {
     side: THREE.DoubleSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    // VIZ-102: fuenf Clipping-Ebenen ab dem Bau (Grundstellung: schneiden
+    // nichts) — der Kegel wird im Schattenraum unter einer getroffenen
+    // Oberseite nicht gezeichnet (gobo_textures.js#kegelSchnittAbgleichen).
+    clippingPlanes: neueKegelEbenen(), clipIntersection: true,
   });
   const cone = new THREE.Mesh(geo, mat);
   applyBeamFalloff(cone);          // VIZ-15: Laengs-Falloff (s. o.)
@@ -308,6 +316,10 @@ export function createFloorSpot(color, intensity, radius) {
     side: THREE.DoubleSide,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
+    // VIZ-102: vier Clipping-Ebenen ab dem Bau (Grundstellung: schneiden
+    // nichts) — der Fleck wird an der Kante der getroffenen Oberseite
+    // beschnitten, ohne dass sich das Programm je aendert.
+    clippingPlanes: neueKantenEbenen(),
   });
   const disc = new THREE.Mesh(geo, mat);
   disc.rotation.x = -Math.PI / 2;
@@ -580,6 +592,7 @@ export function removeFixture(fid) {
   if (!f) return;
   scene.remove(f.group);
   if (f.spotTarget) scene.remove(f.spotTarget);
+  entferneGoboUnterScheibe(f);      // VIZ-102 (vor der ersten: geteilte Geometrie)
   if (f.floorSpot) { scene.remove(f.floorSpot); disposeObj(f.floorSpot); }
   if (f.icon) { scene.remove(f.icon); f.icon.traverse(disposeObj); }
   // VIZ-14: Label-Sprite explizit freigeben (Textur-Map; disposeObj disposed nur
@@ -663,6 +676,21 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
 
   if (heads) f.lastHeads = heads;
 
+  // VIZ-104: Blitzfrequenz des Shutters (0 = Dauerlicht). Ein voller Eintrag
+  // ohne das Feld heisst „kein Strobe"; ein Teil-Aufruf (Alt-Aufrufer, Tests)
+  // laesst den Stand stehen.
+  if (extra && (typeof extra.strobe_hz === 'number' || istVollerEintrag(extra))) {
+    f.strobeHz = (extra.strobe_hz > 0) ? extra.strobe_hz : 0;
+    // Eigener Shutter je Kopf: Python haengt dann an JEDEN Kopf-Eintrag ein
+    // `strobe_hz` (visualizer_service.py). Nur dann blitzen die Koepfe einzeln
+    // — und nur, wenn das Modell seine Koepfe auch einzeln zeichnet; sonst
+    // blitzt das Geraet als Ganzes mit `strobe_hz` (der hoechsten Frequenz).
+    f.kopfHz = (heads && heads.length && typeof heads[0].strobe_hz === 'number'
+                && _zeichnetKoepfeEinzeln(f))
+      ? heads.map(h => (h && h.strobe_hz > 0) ? h.strobe_hz : 0) : null;
+  }
+  f._dmx = dmx;
+
   // Dispatch ueber die FixtureType-Registry (Design (e)) — ersetzt die alte
   // if-Kette (Spider/ParBar/MoverBar -> Rest) verhaltens-identisch:
   // f.type ist das Render-Modell aus addFixture (data.model || data.type),
@@ -670,12 +698,182 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   // den generischen Pfad), unbekannte Typen fallen wie beim build auf den
   // PAR-Eintrag zurueck. Belegt durch tests/test_viz13c_updatedmx_registry.py
   // (Golden-Parity gegen den eingefrorenen Monolith-Zustand).
+  // VIZ-104: angewandt wird IMMER der Stand OHNE Strobe. Blitzt das Geraet,
+  // legt `_strobeZeigen` danach nur die Helligkeit des laufenden Bildes
+  // darueber (fixtures/strobe_hell.js) — der Takt selbst wendet nie wieder an.
   updateFixtureDmx(f, dmx);
+  f._hellOk = false;      // gemerkte Helligkeiten gelten fuer den alten Stand
+  f._gezeigt = 1;
+  _strobeEinordnen(f);
+  if (f._strobeFaktor !== 1 || f._kopfFak) _strobeZeigen(f);
   // 3c-2 Dirty-Quelle 1 (dmxBatch): der Batch-Handler in bridge.js ruft pro
   // Element dieses updateFixture — der Aufruf HIER deckt damit den ganzen
   // Batch UND den addFixture-Initialaufruf ab (reiner Flag-Setter, N-fach
   // billig; rAF coalesced auf einen Frame).
   requestRender();
+}
+
+// ── VIZ-104: Strobe im Bildtakt ─────────────────────────────────────────────
+// Regeln und Rechnung: fixtures/strobe.js. Hier nur der Zustand: welche
+// Geraete gerade blitzen, der BILDZAEHLER (einer fuer alle — gleiche Frequenz
+// heisst gleiche Phase), die gemessene Bildrate und das Schalten.
+//
+// Kosten (Sichtprobe 2026-10-12, Intel UHD 630): geschaltet wird NUR bei einem
+// Wechsel des Faktors — zweimal je Blitz, achtmal je weicher Welle — und dann
+// allein die Helligkeit (fixtures/strobe_hell.js): keine Neuanwendung des
+// DMX-Stands, keine Zielrechnung, kein Material, keine Textur. Eine Shadow-Map
+// kostet das nicht: sie haengt an der Lage der Lichter, nicht an ihrer
+// Helligkeit (scene/shadow_update.js), und der Spot-Pool haelt Platz und
+// Schatten eines kurz dunklen Strobes (scene/spot_pool.js). Was bleibt, ist
+// das Bild selbst: Bilder entstehen nur auf Anforderung, eine ruhende Szene
+// zeichnet nichts — ein Strobe fordert je Wechsel eines an.
+const _strobeAktiv = new Set();
+let _strobeBild = 0;              // laufender Bildzaehler (ein rAF-Tick = ein Bild)
+let _strobeFps = FPS_VORGABE;     // gemessen
+let _strobeTakt = FPS_VORGABE;    // traege nachgefuehrt — daraus entstehen die Perioden
+let _strobeLetzt = -1;
+let _strobeUhr = null;
+let _strobeFest = false;
+const _strobeStat = { billig: 0, voll: 0, bilder: 0 };
+/**
+ * Test-Seam. `fn` = eigene Uhr (ms): der Bildzaehler folgt dann dieser Uhr
+ * (Bild = Zeit * fps), unabhaengig davon, wie oft getickt wird. Ohne `fn`,
+ * aber mit `fps`: echter Zaehler bei fester Bildrate. Beides leer: Betrieb
+ * (Zaehler je Tick, Bildrate gemessen).
+ */
+export function setStrobeUhr(fn, fps) {
+  _strobeUhr = (typeof fn === 'function') ? fn : null;
+  _strobeFest = fps > 0;
+  _strobeLetzt = -1;
+  _strobeBild = 0;
+  _strobeFps = _strobeTakt = (fps > 0) ? fps : FPS_VORGABE;
+}
+function _bildJetzt() {
+  return _strobeUhr ? Math.round(_strobeUhr() * _strobeTakt / 1000) : _strobeBild;
+}
+
+function _mitStrobe(dmx, fak) {
+  // Nur die Helligkeit: Farbe, Kopf-Farben, Pan/Tilt, Optik bleiben wie gemeldet.
+  return Object.assign({}, dmx, { intNorm: dmx.intNorm * fak, intensity: dmx.intensity * fak });
+}
+
+// Modelle, deren Koepfe einzeln gezeichnet werden (und in strobe_hell.js je
+// Kopf eine eigene Stelle haben).
+function _zeichnetKoepfeEinzeln(f) {
+  return !!((f.isSpider && f.bars) || (f.isParBar && f.parHeads)
+            || (f.isMoverBar && f.moverHeads) || (f.isMatrix && f.pixels));
+}
+
+// Blitzt das Geraet gerade? Fuehrt die Menge nach, setzt `f._strobeFaktor`
+// (das GANZE Geraet) und bei eigenem Shutter je Kopf `f._kopfFak[i]` (dann
+// bleibt der Faktor des Ganzen 1). Liefert true, wenn sich etwas geaendert hat.
+function _strobeEinordnen(f) {
+  const modus = strobeModus(settings.strobeMode);
+  const hell = modus !== 'off' && f._dmx && f._dmx.intNorm > 0;
+  const vorFak = (f._strobeFaktor === undefined) ? 1 : f._strobeFaktor;
+  const vorKopf = f._kopfFak || null;
+  const bild = _bildJetzt();
+  if (hell && f.kopfHz && f.kopfHz.some(h => h > 0)) {
+    _strobeAktiv.add(f);
+    let geaendert = !vorKopf || vorKopf.length !== f.kopfHz.length || vorFak !== 1;
+    const kf = geaendert ? new Array(f.kopfHz.length) : vorKopf;
+    for (let i = 0; i < f.kopfHz.length; i++) {
+      const v = strobeFaktor(bild, f.kopfHz[i], modus, _strobeTakt);
+      if (kf[i] !== v) { kf[i] = v; geaendert = true; }
+    }
+    f._kopfFak = kf;
+    f._strobeFaktor = 1;
+    return geaendert;
+  }
+  f._kopfFak = null;
+  let fak = 1;
+  if (hell && f.strobeHz > 0 && !f.kopfHz) {
+    _strobeAktiv.add(f);
+    fak = strobeFaktor(bild, f.strobeHz, modus, _strobeTakt);
+  } else {
+    _strobeAktiv.delete(f);
+  }
+  f._strobeFaktor = fak;
+  return fak !== vorFak || !!vorKopf;
+}
+
+// Den laufenden Faktor zeigen. Vertrag: wer hier ankommt, dessen Stand OHNE
+// Strobe ist voll angewandt (updateFixture) — `f._hellOk === false` heisst
+// „seither nichts darueber gelegt", die Helligkeiten lassen sich also direkt
+// vom Geraet ablesen.
+function _strobeZeigen(f) {
+  const fak = f._strobeFaktor;
+  if (hellSchnell(f)) {
+    if (!f._hellOk) { hellMerken(f, f._dmx); f._hellOk = true; }
+    hellSetzen(f, fak, f._kopfFak);
+    _strobeStat.billig += 1;
+  } else if (fak !== f._gezeigt) {
+    // Laser: volle Anwendung mit skalierter Helligkeit (strobe_hell.js, Kopf).
+    updateFixtureDmx(f, fak === 1 ? f._dmx : _mitStrobe(f._dmx, fak));
+    _strobeStat.voll += 1;
+  }
+  f._gezeigt = fak;
+}
+
+/** Vor jedem Bild (app.js#perFrameUpdate). Kostet ohne Strobe eine Messung. */
+export function tickStrobe() {
+  if (!_strobeUhr) {
+    _strobeBild += 1;
+    if (!_strobeFest) {
+      const jetzt = performance.now();
+      if (_strobeLetzt >= 0) _strobeFps = fpsNachfuehren(_strobeFps, jetzt - _strobeLetzt);
+      _strobeLetzt = jetzt;
+      _strobeTakt = taktFps(_strobeTakt, _strobeFps);
+    }
+  }
+  if (!_strobeAktiv.size) return false;
+  let geaendert = false;
+  for (const f of _strobeAktiv) {
+    if (fixtures[f.fid] !== f) { _strobeAktiv.delete(f); continue; }   // entfernt/neu gebaut
+    if (!_strobeEinordnen(f)) continue;
+    _strobeZeigen(f);
+    geaendert = true;
+  }
+  if (geaendert) { _strobeStat.bilder += 1; requestRender(); }
+  return geaendert;
+}
+
+/** Einstellung geaendert (bridge.js#applySettings): alle Geraete neu bewerten. */
+export function strobeNeuBewerten() {
+  for (const fid in fixtures) {
+    const f = fixtures[fid];
+    if (!f || !f._dmx || !(f.strobeHz > 0 || f.kopfHz)) continue;
+    if (_strobeEinordnen(f)) _strobeZeigen(f);
+  }
+  requestRender();
+}
+
+/** Test-/Diagnose-Seam: Strobe-Zustand eines Geraets als reine Zahlen. */
+export function strobeInfo(fid) {
+  const f = fixtures[fid];
+  if (!f) return null;
+  const modus = strobeModus(settings.strobeMode);
+  const b = strobeBilder(f.strobeHz || 0, _strobeTakt);
+  return {
+    hz: f.strobeHz || 0,
+    anzeigeHz: b.periode ? _strobeFps / b.periode : 0,
+    periode: b.periode, an: b.an,
+    faktor: (f._strobeFaktor === undefined) ? 1 : f._strobeFaktor,
+    modus, fps: _strobeFps, taktFps: _strobeTakt, bild: _bildJetzt(),
+    aktiv: _strobeAktiv.has(f), blitzend: _strobeAktiv.size,
+    kopfHz: f.kopfHz || null, kopfFaktor: f._kopfFak ? f._kopfFak.slice() : null,
+  };
+}
+
+/**
+ * Messbarkeit (Tests/Abnahme): was hat der Strobe seit Start gekostet?
+ * billig = Helligkeits-Schaltungen (strobe_hell.js), voll = volle Anwendungen
+ * aus dem Takt (nur Laser), bilder = vom Takt angeforderte Bilder,
+ * anwendungen = ALLE vollen Anwendungen eines DMX-Stands (registry.js).
+ */
+export function strobeStats() {
+  return { billig: _strobeStat.billig, voll: _strobeStat.voll,
+           bilder: _strobeStat.bilder, anwendungen: dmxAnwendungen() };
 }
 
 // ── Spaet-Bindung (zirkulaere Abhaengigkeit: removeFixture() ruft im

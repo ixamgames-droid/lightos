@@ -46,10 +46,17 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    taps in time set the tempo.
 5. **STOP ALL** — stops everything that is running: cue lists on all pages and all started
    functions (scenes, chasers, effects).
-6. **BLACKOUT** — makes everything dark: all channels go to 0, only moving heads with a
+6. **BLACKOUT** — makes everything dark: all channels go to 0 (lasers: off value, see
+   below), only moving heads with a
    dimmer channel keep their position (including gobo/prism/zoom) — so they do not drive
    to their home position and back again when you release the blackout. Unpatched
-   channels, fixtures without a dimmer, lasers and fog machines go completely off. The
+   channels, fixtures without a dimmer and fog machines go completely off. **Lasers**
+   get the **off value from their fixture profile** instead of 0 (for example the
+   operating mode “Laser off”) — it is not always 0, because on some lasers DMX 0
+   means “Auto” and would switch them on. If the profile knows no off value, a laser
+   without a dimmer may keep emitting; a laser is reliably off only with the **laser
+   emergency stop** (LASER NOT-AUS; details in the
+   [laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). The
    button latches; a second click releases the blackout.
    What this looks like in the DMX monitor is shown in
    [Ausgabe einrichten, step 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
@@ -242,8 +249,9 @@ restore it.
 `sicherungen` (backups) folder inside the LightOS data folder: on every auto-save, before
 every save that overwrites an existing file, and before you discard unsaved changes (new
 show, opening another show, quitting). **Datei → Ältere Version öffnen…** (open older
-version) lists the backups of the current show with date, time, reason, size and the
-number of fixtures and functions; tick **Sicherungen aller Shows anzeigen** (show backups
+version) lists the backups of the current show with date, time to the second (with a
+running number if several fall into the same second), reason, size and the number of
+fixtures and functions; tick **Sicherungen aller Shows anzeigen** (show backups
 of all shows) to see the others as well. **Öffnen** (open) loads the selected version as
 a new, unsaved show — the window title then reads `Name (Sicherung vom …)`. Your show
 file and the backup stay untouched; the old version is only kept once you store it with

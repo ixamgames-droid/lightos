@@ -46,6 +46,28 @@ Ein Klick auf einen Reiter schaltet den Modus **nicht** um. Wer im Ansehen-Modus
 die Liste ansehen will, macht damit nichts versehentlich anfassbar. Im Bauen-Modus
 hellt **Auto-Helligkeit** die Szene auf (siehe [Teil D](#teil-d--darstellung-reiter-einstellungen)).
 
+### Rechte Spalte ein- und ausklappen
+
+Zwischen der 3D-Ansicht und der Spalte mit den Reitern sitzt ein schmaler Knopf
+über die ganze Höhe. Der Pfeil zeigt, was der Klick tut:
+
+- **›** — „Rechte Spalte einklappen": die Spalte verschwindet, die 3D-Ansicht
+  bekommt die volle Fensterbreite.
+- **‹** — „Rechte Spalte ausklappen": die Spalte kommt in ihrer vorherigen Breite
+  zurück.
+
+Dasselbe macht die Taste `F9`. Wer die Trennleiste von Hand ganz nach rechts
+zieht, klappt die Spalte genauso ein — der Knopf zeigt dann „‹". Zustand und
+Breite merkt sich LightOS auf diesem Rechner, auch über einen Neustart. Die
+3D-Ansicht läuft beim Umschalten weiter, Kamera und Auswahl bleiben.
+
+Springt eine Taste auf einen Reiter der Spalte, während sie eingeklappt ist,
+klappt die Spalte von selbst in der gemerkten Breite aus — sonst wechselte der
+Reiter unsichtbar. `S` (Reiter „Bühne") tut das immer. `F` (Reiter „Fixtures")
+tut es nur, solange der Fokus **nicht** in der 3D-Ansicht liegt: Dort heißt `F`
+„Fit Auswahl" und rückt die Kamera auf die gewählten Geräte. Die Statuszeile
+unten sagt dann, dass `F9` oder `S` die Spalte ausklappt.
+
 ## Teil A — Bühne bauen (Reiter „Bühne")
 
 ![Modus Bauen, Reiter Bühne: die Front-Traverse ist gewählt und gelb hervorgehoben](img/02_buehne_bauen.png)
@@ -101,8 +123,8 @@ Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in d
 | **+ Podest mit Treppe** | 2,00 × 0,60 × 2,80 m | Treppe vorn mittig; Strahler lassen sich draufstellen |
 | **+ Mischpult-Tisch** | 1,80 × 0,90 × 0,90 m | Tisch mit Pult-Aufsatz (FOH) |
 
-**Mehrere auf einmal:** In der Zeile **„Anzahl: Reihen × Spalten — Abstand"** z. B.
-`2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
+**Mehrere auf einmal:** In den Zeilen **„Anzahl:" (Reihen × Spalten)** und **„Abstand:"**
+darunter z. B. `2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
 im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
 (`Strg+Z` nimmt alle zurück). Danach springt die Anzahl von selbst auf `1 × 1` zurück.
 Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
@@ -272,6 +294,15 @@ hilft **Kamera → Fit (alle)**.
   Hauptfenster über **Datei → Speichern** bzw. **Speichern unter…**.
 
 Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
+Löschst du ein Bühnen-Element (über **Element LÖSCHEN** oder im Bild mit `Entf` bzw.
+dem runden Löschen-Knopf), bringt das Rückgängig es zurück und hängt die Geräte
+wieder an, die daran angedockt waren.
+
+**2D und 3D zeigen dieselbe Position.** Ein Gerät, das du in der 2D-Ansicht der
+Live View verschiebst, steht sofort auch im offenen 3D-Fenster am neuen Platz — und
+umgekehrt. Die 2D-Ansicht bestimmt nur links/rechts und vorne/hinten; Höhe, Drehung
+und Andockung bleiben, wie sie im 3D gesetzt sind. Auch das Verschieben in der
+2D-Ansicht ist ein Rückgängig-Schritt (mehrere gewählte Geräte zusammen: einer).
 
 ## Was bei großen Rigs anders aussieht
 
@@ -300,6 +331,43 @@ Licht ihr Gobo in den Raum (Muster auf Hindernissen, Schatten dahinter). Alle
 übrigen Gobo-Geräte zeigen das Muster als flachen Fleck am Boden. Wechselt ein
 echtes Licht zu einem anderen Strahl, wechselt das Gerät zwischen beiden
 Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
+
+#### Gobo-Projektion im Einzelnen
+
+- **Wechsel ohne Sprung:** Wandert ein echtes Licht zu einem helleren Gerät,
+  blendet das alte Gerät in knapp 0,2 Sekunden auf sein flaches Muster über;
+  danach blendet das neue Gerät seine Projektion ein. Ein Gerät, das gerade
+  projiziert, behält sein Licht etwas länger, damit der Wechsel nicht an einem
+  knappen Helligkeitsunterschied hängt. Ein Blackout ist sofort dunkel.
+- **Traverse, Stütze, kleines Podest im Strahl:** Trifft die Strahlmitte ein
+  Element, das schmaler ist als das Muster, laufen Muster und Kegel bis zur
+  Fläche dahinter. Die Projektion legt ihr Motiv zusätzlich auf das Element,
+  dahinter bleibt sein Schatten.
+- **Bühnenkante:** Ragt ein Muster über die Kante einer Bühnenplatte oder eines
+  Podests, liegt der Teil dahinter auf dem Boden darunter. Direkt vor der Kante
+  bleibt der Schatten der Platte frei, und der Lichtkegel reicht bis zum Boden.
+  Der Kegel selbst endet auf der Platte, wo er auftrifft; nur der Teil, der an
+  der Kante vorbeigeht, läuft weiter. An der Schattengrenze läuft das Muster
+  weich aus.
+  Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
+  Fleck und auf der Stufe Niedrig.
+  Schwenkt der Kopf über die Kante hinaus, bleibt der Teil des Musters auf der
+  Platte liegen, solange der Kegel sie noch trifft. Er wird dabei kleiner, der
+  Teil am Boden größer und heller; nichts springt. Das gilt auch, wenn vor der
+  Bühne eine Publikumsfläche liegt, und für ein Gerät, das vor der Bühne hängt
+  und ihre Vorderseite anstrahlt.
+- **Das Gobo-Bild liegt im Strahl:** Das Motiv füllt den Lichtkegel bis zu
+  seinem Rand und endet dort mit weicher Kante; außerhalb des Kegels (Zoom)
+  liegt kein Muster. Hinter einer Bühnenkante reicht die Projektion so weit wie
+  der Kegel und wird mit dem Abstand dunkler. Ein schräg nach vorn gerichteter
+  Kopf zieht die Teile am Hallenboden länger als auf der Bühne; das ist die
+  echte Geometrie des Strahls.
+- **Helligkeit:** Flacher Fleck und Projektion sind bei gleichem Dimmer etwa
+  gleich hell. Die Projektion nimmt die Farbe der beleuchteten Fläche an, der
+  flache Fleck bleibt etwas weißer.
+- **Bildrate:** Eine Gobo-Projektion kostet so viel wie ein offener Strahl mit
+  echtem Licht. Gobo-Wechsel und Gobo-Drehung lösen keine Neuberechnung der
+  Schatten aus; eine Kopfbewegung schon.
 
 **Warum das so ist:** jedes echte Licht rechnet die Grafikkarte für **jeden
 Bildpunkt jeder beleuchteten Fläche** einmal durch. Mit 68 Lichtern brauchte ein
@@ -332,7 +400,8 @@ nötig, misst auf der echten Grafikkarte).
 Die Stufe gilt für **dieses Gerät**, nicht für die Show — sie hängt an der
 Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
 der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
-Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
+Unter der Auswahl steht, welche Stufe gerade **aktiv** ist (bei „Automatisch" das
+Ergebnis der Erkennung).
 
 | Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Gobo-Muster | Beim Drehen der Kamera |
 |---|---|---|---|---|---|---|
@@ -370,15 +439,72 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
 - **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
   Ansicht, zurück auf **Hoch**.
 
+## Strobe im 3D (Tab „Einstellungen" → „Render-Qualität")
+
+Steht der Shutter eines Geräts im Strobe-Bereich, **blitzt** es in der
+3D-Ansicht: Lichtkegel, Bodenfleck, Linse und das echte Licht gehen kurz an und
+bleiben den größeren Teil der Zeit dunkel (an für etwa ein Viertel der Zeit) —
+so wirkt ein Strobe, im Unterschied zu einem Blinker. Geräte mit derselben
+Frequenz blitzen gemeinsam.
+
+- **Wie schnell:** Die Frequenz kommt aus dem Geräteprofil. Nennt der
+  Strobe-Bereich eine Frequenz („Strobe 1–25 Hz"), gilt sie; sonst steigt sie
+  innerhalb des Bereichs von 0,5 auf 20 Blitze je Sekunde. Dieselbe Rechnung
+  nutzt die 2D-Ansicht der Live View. Shutter „offen" und „zu" blitzen nicht —
+  auch nicht „offen" am oberen Ende (bei vielen Geräten 251–255).
+- **Profile ohne Bereichsangaben:** Nennt das Profil für den Kanal keine
+  Bereiche, blitzt nur ein Kanal, der ausdrücklich ein Strobe-Kanal ist (Typ
+  oder Name „Strobe"): 0 bis 10 = aus, darüber langsam bis schnell. Ein reiner
+  „Shutter"-Kanal ohne Bereichsangaben blitzt nicht — dort heißt 255 meist
+  „offen". Soll so ein Gerät blitzen, im Geräteprofil die Bereiche eintragen
+  (zu / Strobe / offen). Das gilt genauso für die 2D-Ansicht.
+- **Geräte mit mehreren Köpfen:** Hat das Gerät einen eigenen Shutter je Kopf,
+  blitzt jeder Kopf für sich mit seiner eigenen Frequenz — nur Kopf 1, nur
+  Kopf 2 oder beide verschieden schnell. Ein einziger Strobe-Kanal für alle
+  Köpfe lässt das ganze Gerät gemeinsam blitzen. Die 2D-Ansicht zeichnet ein
+  Gerät als ein Symbol und blinkt deshalb als Ganzes (mit der schnellsten
+  Frequenz seiner Köpfe).
+- **Begrenzung:** Gezeigt werden höchstens rund 10 Blitze je Sekunde. Ein Blitz
+  braucht mindestens drei Bilder (eins an, zwei aus) — bei 30 Bildern je Sekunde
+  sind das genau 10. Läuft die Ansicht langsamer, sind es entsprechend weniger
+  (bei 15 Bildern höchstens 5). Ein schnellerer Strobe sieht damit „schnell"
+  aus, aber nicht exakt so schnell wie am Gerät.
+- **Gleichmäßiger Takt:** Geschaltet wird in ganzen Bildern, nicht nach der
+  Uhr — jeder Blitz ist gleich lang, jede Pause auch. Die gezeigte Frequenz
+  ist deshalb auf ganze Bilder gerundet: 10 Blitze je Sekunde stimmen bei 30
+  und 60 Bildern genau, dazwischen können es 9 bis 11 sein.
+- **Rechenlast:** Eine ruhende Szene zeichnet nichts. Solange etwas blitzt,
+  entsteht bei jedem Wechsel ein neues Bild; auf schwacher Grafik sinkt die
+  Bildrate dabei spürbar. „Gedämpft" ändert die Helligkeit achtmal je Welle.
+- **2D-Ansicht der Live View:** Sie zeichnet zehn Bilder je Sekunde und blinkt
+  nach derselben Regel — also höchstens gut dreimal je Sekunde (ein Bild an,
+  zwei aus), bei langsamerem Strobe in dessen Frequenz, und gleichmäßig.
+- **Nur die Helligkeit** wird getaktet. Farbe und Dimmerwert bleiben, wie sie
+  sind; ein Dimmer-Effekt, der selbst an- und ausschaltet, sieht aus wie bisher.
+- **Einstellung „Strobe im 3D zeigen":**
+  - **Blitzen** (Vorgabe) — wie oben beschrieben.
+  - **Gedämpft (weiches Pulsieren)** — statt An/Aus ein langsames, flaches
+    Pulsieren (höchstens zweimal je Sekunde, nie dunkler als gut die Hälfte).
+  - **Aus (Dauerlicht wie bisher)** — das Gerät leuchtet durchgehend.
+
+  Die Wahl gilt für **dieses Gerät**, nicht für die Show, und wirkt sofort —
+  im Vollfenster und in der 3D-Ansicht der Live View. An der DMX-Ausgabe ändert
+  sie nichts.
+
+> **Achtung:** Schnelle Lichtblitze können bei photosensitiver Epilepsie
+> Anfälle auslösen. Im Zweifel **Gedämpft** oder **Aus** wählen — auch für
+> Zuschauer und für Bildschirmaufnahmen.
+
 ## Tastenkürzel im Visualizer
 
 | Taste | Wirkung |
 |---|---|
 | `V` | 3D ↔ 2D Top-Down |
 | `E` | Ansehen ↔ Bauen |
-| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures |
-| `S` | Reiter Bühne |
+| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures (klappt die Spalte aus) |
+| `S` | Reiter Bühne (klappt die Spalte aus) |
 | `D` | Andocken an/aus |
+| `F9` | Rechte Spalte ein-/ausklappen |
 | `Strg+Z` / `Strg+Y` | Rückgängig / Wiederholen |
 
 ## Früher bekannte Macken (alle erledigt)

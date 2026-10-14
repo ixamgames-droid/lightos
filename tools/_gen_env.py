@@ -59,6 +59,17 @@ import os
 import sys
 import tempfile
 
+# TOOL-27: zuerst die gemeinsame Sandbox aller Werkzeuge — Datenordner,
+# Geraete-Bibliothek (als Kopie), Absturzprotokoll, USB. Sie haelt ausserdem
+# fest, was VOR der Umlenkung galt (``echte_universes_json()`` unten). Was hier
+# folgt, bleibt als zweite Lage stehen; ``setdefault`` macht es wirkungslos, wo
+# die Sandbox schon gesetzt hat. Beide Schreibweisen, weil dieses Modul als
+# ``_gen_env`` (Skript-Start) wie als ``tools._gen_env`` geladen wird.
+try:
+    import _werkzeug_sandbox
+except ImportError:                                    # pragma: no cover
+    from tools import _werkzeug_sandbox
+
 # Robust gegen verschobene Imports: setzt die Schalter sofort beim Import dieses
 # Moduls. setdefault -> eine bereits gesetzte (bewusste) Umgebung gewinnt.
 os.environ.setdefault("LIGHTOS_SERIAL_INPROC", "1")
@@ -74,10 +85,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # laufende Generatoren sich keine Temp-DB teilen.
 _stem = os.path.splitext(os.path.basename(sys.argv[0] or ""))[0] or "interactive"
 _stem = "".join(c if (c.isalnum() or c in "-_") else "_" for c in _stem)
-os.environ.setdefault(
-    "LIGHTOS_SHOW_DB",
-    os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}.db"),
-)
+# TOOL-27: mit ``--echte-daten`` (nur fuer die Werkzeuge in
+# ``_werkzeug_sandbox.ECHTE_DATEN_ERLAUBT``) bleibt die Show-DB die des Bedieners.
+if not _werkzeug_sandbox.ECHTE_DATEN:
+    os.environ.setdefault(
+        "LIGHTOS_SHOW_DB",
+        os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}.db"),
+    )
 # QA-83: dasselbe fuer den VC-Asset-Cache. ``import_to_cache`` (Galerie-Bilder,
 # z. B. build_mega_arena_2026.py) und das Selbstpruef-Laden der fertigen Show
 # legten die Bilder sonst in den ECHTEN Datenordner. Die Show bettet sie beim
@@ -92,7 +106,9 @@ os.environ.setdefault(
 # ``setdefault`` wie bei den Schaltern oben: ein schon gesetzter Wert ist eine
 # bewusste Umlenkung (Testlauf, Bild-Sandbox, ``verify_stage_reload``) und
 # gewinnt. Die Startskripte setzen die Variable nicht.
-_UNIVERSES_VOR_DER_UMLENKUNG = os.environ.get("LIGHTOS_UNIVERSES_JSON") or None
+# TOOL-27: die Sandbox hat die Variable inzwischen selbst gesetzt — der Stand
+# davor steht in ihren ``VORGABEN``.
+_UNIVERSES_VOR_DER_UMLENKUNG = _werkzeug_sandbox.VORGABEN.get("LIGHTOS_UNIVERSES_JSON")
 os.environ.setdefault(
     "LIGHTOS_UNIVERSES_JSON",
     os.path.join(tempfile.gettempdir(),
@@ -116,5 +132,5 @@ def echte_universes_json() -> str:
     SEIN Wert die gemeinte Konfiguration."""
     if _UNIVERSES_VOR_DER_UMLENKUNG:
         return _UNIVERSES_VOR_DER_UMLENKUNG
-    from src.core.paths import app_data_dir
-    return os.path.join(app_data_dir(), "universes.json")
+    # TOOL-27: nicht mehr ``app_data_dir()`` — der Datenordner ist umgelenkt.
+    return os.path.join(_werkzeug_sandbox.ECHTER_DATENORDNER, "universes.json")
