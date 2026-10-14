@@ -68,6 +68,8 @@ class TastenWeicheTest(unittest.TestCase):
     def _fake(self, im_3d: bool):
         f = SimpleNamespace(_tabs=MagicMock(), _on_fit_selected=MagicMock())
         f._focus_is_in_3d = lambda: im_3d
+        # VIZ-109: der Tab-Sprung laeuft ueber die echte Methode des Fensters.
+        f._reiter_per_taste = lambda i: VW.VisualizerWindow._reiter_per_taste(f, i)
         return f
 
     def test_f_in_der_szene_ist_fit_auswahl(self):
