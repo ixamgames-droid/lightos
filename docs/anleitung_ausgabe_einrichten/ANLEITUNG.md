@@ -392,6 +392,59 @@ dann kein letztes Bild – alle anderen schon.
 > was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
 > Schalter am Gerät.
 
+## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
+
+Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
+sendet – ein ENTTEC DMX USB Pro oder ein uDMX-Adapter ebenso wie die meisten
+Art-Net- und sACN-Nodes.
+Damit nach dem Schließen von LightOS nichts weiterleuchtet, sendet LightOS
+vorher **ein letztes Bild**:
+
+- **Beim Beenden:** jede Ausgabe bekommt ein Bild wie bei einem Blackout – alle
+  Lichtkanäle auf 0, Laser auf ihre **Aus-Werte** (nicht einfach 0, siehe
+  Laser-Anleitung). Pan/Tilt, Gobo und Optik von Moving Heads mit Dimmer bleiben
+  stehen; die Köpfe fahren also nicht in die Grundstellung.
+- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
+  gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
+- **Beim Wechsel auf einen anderen Adapter:** stellst du ein Universum von
+  ENTTEC auf Art-Net um, auf einen anderen Port, einen anderen uDMX-Adapter,
+  eine andere Ziel-IP oder eine andere Universumsnummer im Netzwerk, bekommt der
+  **bisherige** Adapter bzw. Node dasselbe letzte Bild – er hielte sonst, was er
+  zuletzt bekam.
+- **Nicht beim „Übernehmen“ ohne Änderung:** dort folgt sofort dieselbe Ausgabe,
+  ein dunkles Bild wäre ein Blitzer auf der Bühne.
+
+Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
+rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
+dann kein letztes Bild – alle anderen schon.
+
+**Laser, die aus dem Patch genommen werden.** Entfernst du einen Laser aus dem
+Patch, gibst ihm eine andere Adresse oder lädst eine Show ohne ihn, hört das
+Gerät weiter auf seine bisherige Adresse. Fiele sie auf 0, schaltete das manchen
+Laser **ein** (bei vielen heißt DMX 0 „Auto run“) – und LightOS könnte ihn nicht
+mehr steuern. Deshalb bleibt der **Aus-Wert** des Lasers auf seiner bisherigen
+Adresse stehen, auch im Blackout und im letzten Bild beim Beenden, bis
+
+- die Adresse wieder gepatcht ist (dann bestimmt das neue Gerät), oder
+- LightOS beendet wird.
+
+Das gilt nur für Adressen, deren Aus-Wert nicht 0 ist. Solange so ein Wert
+gehalten wird, kommt auf dieser Adresse nichts anderes hinaus – auch kein Wert
+aus einem Skript oder vom Simple Desk. Der DMX Monitor zeigt den gehaltenen
+Wert.
+
+**So bekommst du die Adresse wieder frei:** Patche ein Gerät auf diese Adresse –
+ab dann bestimmt es, was dort hinausgeht (nimmst du es wieder aus dem Patch,
+ist die Adresse frei und steht auf 0). Oder beende LightOS und starte es neu:
+nach dem Neustart wird nichts mehr gehalten. Einen eigenen Knopf zum Freigeben
+gibt es mit Absicht nicht. Schalte den Laser vorher am Gerät aus oder gib ihm
+dort eine andere Adresse – er hört sonst weiter auf die alte.
+
+> **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
+> ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
+> was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
+> Schalter am Gerät.
+
 ## Netzwerk-Falle bei Art-Net und sACN
 
 Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.168.1.50`,

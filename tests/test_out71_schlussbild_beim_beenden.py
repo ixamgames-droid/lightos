@@ -305,12 +305,18 @@ class AusgabeEntfernenTest(unittest.TestCase):
     def test_aufrufer_setzen_das_bild_nur_wenn_der_ausgang_wirklich_geht(self):
         with open(os.path.join(_REPO, "src", "core", "app_state.py"), encoding="utf-8") as f:
             zustand = f.read()
-        # geloeschtes Universum und „Disabled“: ja. Typwechsel/Neuaufbau: nein.
+        # geloeschtes Universum und „Disabled“: ja, ausdruecklich. Kommt ein
+        # Nachfolger, entscheidet seit OUT-72 der Manager anhand der Ansage:
+        # der unveraenderte Adapter bekommt kein Bild (kein Dunkel-Blitzer),
+        # ein anderer Typ oder ein anderes Ziel schon.
         self.assertEqual(zustand.count("schlussbild=True)"), 2)
         self.assertIn('if output == "Disabled":\n'
                       '                    self.output_manager.remove_output(num, schlussbild=True)\n'
-                      '                else:\n'
-                      '                    self.output_manager.remove_output(num)\n', zustand)
+                      '                else:\n', zustand)
+        ansage = zustand.index("ansagen(num, *nachfolger)\n")
+        entfernen = zustand.index("self.output_manager.remove_output(num)\n", ansage)
+        self.assertEqual(zustand[ansage:entfernen].strip(), "ansagen(num, *nachfolger)",
+                         "zwischen Ansage und Entfernen darf nichts stehen")
         with open(os.path.join(_REPO, "src", "ui", "widgets", "output_config.py"),
                   encoding="utf-8") as f:
             dialog = f.read()
