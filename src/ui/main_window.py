@@ -3444,7 +3444,8 @@ class MainWindow(QMainWindow):
                        SyncEvent.FUNCTION_CHANGED, SyncEvent.GROUP_CHANGED,
                        SyncEvent.CUE_STACK_CHANGED, SyncEvent.PALETTE_CHANGED,
                        SyncEvent.OUTPUT_CONFIG_CHANGED,
-                       SyncEvent.LIVE_VIEW_CHANGED):
+                       SyncEvent.LIVE_VIEW_CHANGED,
+                       SyncEvent.SHOW_INHALT_CHANGED):
                 sync.subscribe(ev, self._mark_autosave_dirty)
             # Codex-Review #1081: eine geaenderte Stufe (Prioritaet) meldet sich
             # bewusst NICHT ueber FUNCTION_CHANGED, sondern ueber den eigenen

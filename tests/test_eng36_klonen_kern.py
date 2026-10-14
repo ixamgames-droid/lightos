@@ -719,3 +719,54 @@ def test_begleitwerte_unterschiedliche_farbverzoegerung_nimmt_die_groesste():
     out = K._begleitwerte({"color_r": 0.2, "color_g": 0.9, "intensity": 1},
                           {"cmy_c": 1, "cmy_m": 2, "dimmer": 3, "pan": 4})
     assert out == {"cmy_c": 0.9, "cmy_m": 0.9, "dimmer": 1}
+
+
+def test_klonen_von_grundwerten_markiert_den_autosave(show):
+    """Codex-Review #1078 (CDX-59): fuer Grundwerte (und Konsolen-Tasten) gab
+    es kein Event, an dem der Auto-Save haengt — ein solcher Klon ging bei
+    einem Absturz verloren. Geprueft am echten ``_setup_autosave`` auf einem
+    schlanken Stellvertreter (kein Hauptfenster)."""
+    from PySide6.QtCore import QObject
+    from PySide6.QtWidgets import QApplication
+    from src.core.sync import SyncEvent, get_sync
+    from src.ui.main_window import MainWindow
+
+    QApplication.instance() or QApplication([])
+
+    class _Fenster(QObject):
+        _autosave_minutes = lambda self: 60             # noqa: E731
+        _autosave_path = lambda self: "unbenutzt"      # noqa: E731
+        _do_autosave = lambda self: None               # noqa: E731
+        _mark_autosave_dirty = MainWindow._mark_autosave_dirty
+        _setup_autosave = MainWindow._setup_autosave
+
+    show.patch(1, RGB)
+    show.patch(2, RGB)
+    st = show.state
+    st.base_levels = {1: {"intensity": 255}}
+    w = _Fenster()
+    gesehen = []
+    rec = lambda ev, data: gesehen.append(data)         # noqa: E731
+    get_sync().subscribe(SyncEvent.SHOW_INHALT_CHANGED, rec)
+    try:
+        w._setup_autosave()
+        w._autosave_timer.stop()
+        w._autosave_dirty = False
+        plan = show.plane([1], [2])
+        plan.anwenden(st)
+        assert st.base_levels[2] == {"intensity": 255}
+        assert w._autosave_dirty is True
+        assert gesehen and "grundwerte" in gesehen[-1]["klonen"]
+        w._autosave_dirty = False
+        plan.zuruecknehmen(st)
+        assert w._autosave_dirty is True, "auch Rueckgaengig"
+    finally:
+        get_sync().unsubscribe(SyncEvent.SHOW_INHALT_CHANGED, rec)
+        for ev in SyncEvent:
+            get_sync().unsubscribe(ev, w._mark_autosave_dirty)
+        try:
+            from src.ui.widgets.stufe_auswahl import stufen_melder
+            stufen_melder().geaendert.disconnect(w._mark_autosave_dirty)
+        except (RuntimeError, TypeError):
+            pass
+        w.deleteLater()

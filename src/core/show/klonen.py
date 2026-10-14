@@ -1770,6 +1770,16 @@ def _benachrichtigen(state, bereiche: set, palette_manager=None) -> None:
             from ..engine.palette import PaletteManager
             PaletteManager._notify_palettes_changed()
         still(_pal)
+    if bereiche:
+        # Codex-Review #1078: Grundwerte und Konsolen-Tasten haben kein eigenes
+        # Event, an dem der Auto-Save haengt — ein solcher Klon ging bei einem
+        # Absturz verloren. Dieses Event sagt dem Auto-Save „es hat sich etwas
+        # geaendert“ (fuer jeden Klon, auch Rueckgaengig).
+        def _inhalt():
+            from ..sync import SyncEvent, get_sync
+            get_sync().emit(SyncEvent.SHOW_INHALT_CHANGED,
+                            {"klonen": sorted(bereiche)})
+        still(_inhalt)
 
 
 # ── Sicherung und der eine Rückgängig-Schritt ───────────────────────────────
