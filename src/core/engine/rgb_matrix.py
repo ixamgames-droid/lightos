@@ -1401,12 +1401,43 @@ class RgbMatrixInstance(Function):
 
     def _render_chase(self, p: float, cols: int, rows: int, enabled: list) -> list[Color]:
         """Lauflicht. params: axis(H/V/Diag), movement(normal/bounce/center_out/
-        outside_in), runner_count, runner_width, fade(Schweif), color_cycle, invert."""
+        outside_in), runner_count, runner_width, runner_step(Schrittweite),
+        fade(Schweif), color_cycle, invert.
+
+        ENG-37 Schrittweite (``runner_step``, Vorgabe 1 = wie bisher, 0 = „wie
+        Breite“): bei Schrittweite > 1 springt der Laeufer je Schritt um so
+        viele Lampen und steht dazwischen still. Dann gilt die Block-Regel:
+
+          * Die Reihe ist in Bloecke geteilt, Block j beginnt bei Lampe
+            j * Schrittweite; je Runde ``ceil(Laenge / Schrittweite)`` Schritte,
+            jede Runde beginnt wieder bei Lampe 1.
+          * Der Laeufer belegt ``Breite`` Lampen AB dem Blockanfang (Breite 2,
+            Schrittweite 2 auf acht Lampen: 1+2, 3+4, 5+6, 7+8).
+          * Rueckwaerts: dieselben Bloecke in umgekehrter Folge (1+2, 7+8, 5+6,
+            3+4) — wie bei Schrittweite 1 startet der Lauf auf Lampe 1.
+          * Ping-Pong: die Bloecke hin und zurueck, am Rand abgeschnitten statt
+            umlaufend.
+          * Mehrere Laeufer: jeder weitere um Laenge/Anzahl versetzt (wie bisher).
+          * Schweif: bleibt RAEUMLICH und haengt an der Hinterkante des Blocks —
+            er liegt damit ueber den eben verlassenen bzw. uebersprungenen
+            Lampen und springt mit dem Laeufer (kein Nachlaufen zwischen zwei
+            Schritten).
+          * Ring (center_out/outside_in): Schrittweite wirkt dort nicht.
+        """
         params = self.params
         axis = str(params.get("axis", "H"))
         movement = str(params.get("movement", "normal"))
         width = max(1, int(params.get("runner_width", 1)))
         count = max(1, int(params.get("runner_count", 1)))
+        try:
+            stepw = int(params.get("runner_step", 1))
+        except (TypeError, ValueError):
+            stepw = 1
+        if stepw <= 0:                  # 0 = „wie Breite“
+            stepw = width
+        # Nur die linearen Bewegungen kennen Bloecke.
+        if movement not in ("normal", "bounce"):
+            stepw = 1
         # After Fade (Abschnitt 5): Nachfaden in % (0..100) -> 0..1. Alt-Shows mit
         # "fade" (0..1) werden in apply_dict migriert; hier nur der neue Key.
         fade = max(0.0, min(100.0, float(params.get("after_fade", 30.0)))) / 100.0
@@ -1423,6 +1454,8 @@ class RgbMatrixInstance(Function):
         if self.style == MatrixStyle.DIMMER and params.get("dimmer_cycle"):
             levels = self.dimmer_levels.enabled_levels()
             length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
+            if stepw > 1:               # ENG-37: Runde = Anzahl Bloecke
+                length_hint = -(-length_hint // stepw)
             interval = max(1, int(params.get("dimmer_interval", 1)))
             rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
             nl = len(levels)
@@ -1440,6 +1473,8 @@ class RgbMatrixInstance(Function):
         # Reihenfolge normal / zufällig / Ping-Pong (color_order).
         elif params.get("color_cycle") and enabled:
             length_hint = cols if axis == "H" else (rows if axis == "V" else max(1, cols + rows - 1))
+            if stepw > 1:               # ENG-37: Runde = Anzahl Bloecke
+                length_hint = -(-length_hint // stepw)
             # MXP-01: Farbe erst alle N Durchlaeufe wechseln (Default 1 = jeder Lauf).
             interval = max(1, int(params.get("color_interval", 1)))
             rnd = int(p) // max(1, length_hint * interval)   # Runden-Index (×Intervall)
@@ -1476,7 +1511,13 @@ class RgbMatrixInstance(Function):
         for row in range(rows):
             for col in range(cols):
                 pos, length = _axis_coord(col, row, cols, rows, axis)
-                if movement == "bounce":
+                if movement == "bounce" and stepw > 1:
+                    # ENG-37: Bloecke hin und zurueck, am Rand abgeschnitten.
+                    span = -(-length // stepw) - 1
+                    blk = (span - abs((int(p) % (2 * span)) - span)) if span >= 1 else 0
+                    anfang = blk * stepw
+                    bright = 1.0 if anfang <= pos < anfang + width else 0.0
+                elif movement == "bounce":
                     span = max(1, length - 1)
                     head = span - abs((int(p) % (2 * span)) - span)
                     bright = 1.0 if abs(pos - head) < width else 0.0
@@ -1494,8 +1535,18 @@ class RgbMatrixInstance(Function):
                     # Schweif blieb auf derselben Seite und zog dem Laeufer damit
                     # VORAUS statt nach (Davids Befund 2026-08-01 im Live-Edit).
                     rueckwaerts = (self.direction == "reverse")
+                    pk = p
+                    if stepw > 1:
+                        # ENG-37: Kopf steht auf der VORDERKANTE des Blocks —
+                        # vorwaerts die letzte, rueckwaerts die erste Lampe.
+                        # ceil/floor wie der stufenlose Lauf: dort leuchtet
+                        # rueckwaerts ceil(Kopf), vorwaerts floor(Kopf).
+                        bloecke = -(-length // stepw)
+                        blk = (math.ceil(p) if rueckwaerts
+                               else math.floor(p)) % bloecke
+                        pk = blk * stepw + (0 if rueckwaerts else width - 1)
                     for k in range(count):
-                        head = (p + k * spacing) % length
+                        head = (pk + k * spacing) % length
                         dist = ((pos - head) if rueckwaerts
                                 else (head - pos)) % length
                         if dist < width:                  # solider Kopf
@@ -1871,6 +1922,17 @@ class RgbMatrixInstance(Function):
                 ParamSpec("intensity_max", "Dimmer max", "int", 255, 0, 255, 1,
                           "Obergrenze des Dimmer-Styles"),
             ])
+            # ENG-37: nur bei gesetztem Haken — ein normaler Effekt bietet der
+            # Konsole exakt dieselbe Parameterliste an wie bisher.
+            if self.modify_wirksam():
+                from .modify import MODIFY_MODES
+                specs.extend([
+                    ParamSpec("modify_strength", "Modify-Stärke", "int", 100, 0, 100, 1,
+                              "Wie kräftig der Modify-Effekt zugreift (Prozent)"),
+                    ParamSpec("modify_mode", "Modify-Art", "select", "add",
+                              options=MODIFY_MODES,
+                              tooltip="Addieren, Abziehen oder Abdunkeln"),
+                ])
         elif self.style == MatrixStyle.SHUTTER:
             specs.extend([
                 ParamSpec("shutter_min", "Shutter min", "int", 0, 0, 255, 1,
@@ -1937,6 +1999,10 @@ class RgbMatrixInstance(Function):
             return float(self.params.get("offset", 0.0))
         if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             return getattr(self, key)
+        if key == "modify_strength":
+            return int(getattr(self, "modify_strength", 100))
+        if key == "modify_mode":
+            return getattr(self, "modify_mode", "add")
         if key == "tempo_bus_id":
             return getattr(self, "tempo_bus_id", "")
         if key == "tempo_multiplier":
@@ -2005,6 +2071,15 @@ class RgbMatrixInstance(Function):
         if key in ("white_amount", "intensity_min", "intensity_max", "shutter_min", "shutter_max"):
             hi = 100 if key == "white_amount" else 255
             setattr(self, key, max(0, min(hi, int(round(float(value)))))); return True
+        if key == "modify_strength":
+            from .modify import normalize_strength
+            self.modify_strength = normalize_strength(value); return True
+        if key == "modify_mode":
+            from .modify import MODIFY_MODES
+            s = str(value or "").strip().lower()
+            if s not in MODIFY_MODES:
+                return False
+            self.modify_mode = s; return True
         if key == "tempo_bus_id":
             self.tempo_bus_id = str(value or "").strip(); return True
         if key == "tempo_multiplier":
@@ -2206,6 +2281,14 @@ class RgbMatrixInstance(Function):
         """Freeze-Auftauen: eigener monotonic-Anker mit (s. Function.shift_clock)."""
         self._last_tick += float(seconds)
 
+    def modify_wirksam(self) -> bool:
+        """ENG-37 Schritt 1: Modify gibt es nur im Stil Dimmer.
+
+        Steht der Haken bei einem anderen Stil (z. B. nach einem Stilwechsel),
+        laeuft der Effekt als ganz normaler Effekt — Farbe wird nie verrechnet
+        und zieht den Dimmer nie mit."""
+        return bool(getattr(self, "modify", False)) and self.style == MatrixStyle.DIMMER
+
     def to_dict(self) -> dict:
         d = super().to_dict()  # id, name, type, intensity, speed, folder
         d.update({
@@ -2321,6 +2404,14 @@ class RgbMatrixInstance(Function):
             self.priority = int(d.get("priority", getattr(self, "priority", 0)))
         except (TypeError, ValueError):
             self.priority = 0
+        # ENG-37: Modify-Kennzeichnung im Draft-/Preset-Roundtrip. to_dict laesst
+        # die Schluessel bei Vorgabewerten WEG — ein fehlender Schluessel heisst
+        # hier deshalb „Vorgabe", nicht „aktuellen Wert behalten" (sonst bliebe
+        # ein im Editor entfernter Haken beim Speichern stehen).
+        from .modify import normalize_mode, normalize_strength
+        self.modify = bool(d.get("modify", False))
+        self.modify_mode = normalize_mode(d.get("modify_mode", "add"))
+        self.modify_strength = normalize_strength(d.get("modify_strength", 100))
         # ARC-04: Hüllkurven-Zeiten ebenfalls im Draft-Roundtrip erhalten.
         try:
             self.env_fade_in = max(0.0, float(d.get("env_fade_in",
