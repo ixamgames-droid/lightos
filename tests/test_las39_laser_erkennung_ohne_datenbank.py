@@ -41,10 +41,10 @@ _LAMPE_PROFIL = 939002       # PAR: kein Laser in keinem Modus
 @pytest.fixture(autouse=True)
 def _frische_auskunft():
     alt = getattr(erkennung, "_profil_quelle", None)
-    erkennung.vergiss_profile()
+    erkennung.zuruecksetzen()
     yield
     erkennung.setze_profil_quelle(alt)
-    erkennung.vergiss_profile()
+    erkennung.zuruecksetzen()
 
 
 class _Bereich:
@@ -326,11 +326,31 @@ def test_antwort_nimmt_das_profil_aus_der_offenen_liste():
     assert erkennung.offene_profile() == frozenset()
 
 
-def test_verwerfen_leert_auch_die_offene_liste():
+def test_verwerfen_laesst_offene_profile_offen():
+    """Codex-Review #1095: ``vergiss_profile`` (vom Kanal-Cache gerufen)
+    verwirft die bekannten Antworten — eine FEHLENDE Auskunft fehlt danach
+    weiterhin. Nur ``zuruecksetzen`` leert alles."""
     erkennung.setze_profil_quelle(lambda _pid: None)
     erkennung.profil_auskunft(_kombi())
     assert erkennung.offene_profile()
     erkennung.vergiss_profile()
+    assert erkennung.offene_profile() == {_KOMBI_PROFIL}
+    erkennung.zuruecksetzen()
+    assert erkennung.offene_profile() == frozenset()
+
+
+def test_kanal_cache_verwerfen_laesst_das_nachholen_stehen(rig):
+    """Codex-Review #1095: ``clear_channel_cache`` leerte die offene Liste —
+    ``laser_erkennung_nachholen`` kehrte danach sofort zurueck, der Hinweis
+    verschwand, der alte Plan fuehrte die Lampe weiter als Laser."""
+    st = rig.st
+    _patchen(st)                                       # Datenbank weg
+    assert st._laser_fids == frozenset({1, 2})
+    A.clear_channel_cache()
+    assert erkennung.offene_profile() == {_KOMBI_PROFIL, _LAMPE_PROFIL}
+    rig.db.da = True
+    st.laser_erkennung_nachholen()
+    assert st._laser_fids == frozenset({1}), "die Lampe ist kein Laser mehr"
     assert erkennung.offene_profile() == frozenset()
 
 

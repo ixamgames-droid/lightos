@@ -138,7 +138,19 @@ def profil_bekannt(profil_id) -> bool:
 
 
 def vergiss_profile() -> None:
-    """Alle gemerkten Antworten verwerfen (Profil geaendert, Patch neu geladen)."""
+    """Alle gemerkten Antworten verwerfen (Profil geaendert, Patch neu geladen).
+
+    Codex-Review #1095: OFFENE Profile bleiben offen — ihre Auskunft fehlt ja
+    weiterhin. ``clear_channel_cache`` ruft das hier; leerte es auch
+    ``_profil_offen``, kehrte ``laser_erkennung_nachholen`` sofort zurueck, und
+    der Hinweis verschwand, waehrend der alte Plan das Geraet weiter als Laser
+    fuehrte — ohne Rueckweg bis zum naechsten Neuaufbau."""
+    _profil_laser.clear()
+
+
+def zuruecksetzen() -> None:
+    """Alles vergessen, auch die offenen Profile — fuer einen frischen Anfang
+    (Testlauf), nicht fuer den Kanal-Cache (dort :func:`vergiss_profile`)."""
     _profil_laser.clear()
     _profil_offen.clear()
 
