@@ -65,7 +65,6 @@
 | VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
-| IMP-1 | A | feature/imp1-patch-aus-tabelle | 2026-10-13T15:48Z | - |
 | IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
@@ -287,7 +286,6 @@
 
 ## Verlauf
 
-- 2026-10-13T16:35Z A done LIZ-1
 - 2026-10-13T16:59Z A done DOC-72
 - 2026-10-13T17:01Z A claim PROC-22
 - 2026-10-13T17:04Z A claim ENG-39
@@ -317,3 +315,4 @@
 - 2026-10-14T13:52Z A done VCB-46
 - 2026-10-14T14:16Z A aktualisiert LAS-39: Branch chore/backlog-nachtrag-2026-10-14 -> fix/las39-laser-erkennung-ohne-datenbank
 - 2026-10-14T14:24Z A aktualisiert LAS-39: Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py
+- 2026-10-14T14:28Z A done IMP-1
