@@ -487,8 +487,20 @@ def befunde(erfasst: dict, pakete_info: dict, texte,
 
 def pe_dateiversion(daten: bytes) -> str | None:
     """Dateiversion ``a.b.c`` aus der Versionsressource einer Windows-DLL
-    (``VS_FIXEDFILEINFO``, erkannt an ihrer Signatur ``0xFEEF04BD``)."""
-    i = daten.find(b"\xbd\x04\xef\xfe")
+    (``VS_FIXEDFILEINFO``, erkannt an ihrer Signatur ``0xFEEF04BD``).
+
+    Gesucht wird die Signatur direkt hinter dem Schluessel ``VS_VERSION_INFO``
+    (UTF-16) — in einer DLL von 200 MB koennen dieselben vier Bytes auch
+    zufaellig im Code stehen. Ohne Schluessel: erstes Vorkommen."""
+    sig = b"\xbd\x04\xef\xfe"
+    i = -1
+    k = daten.find("VS_VERSION_INFO\0".encode("utf-16-le"))
+    while k >= 0 and i < 0:
+        j = daten.find(sig, k, k + 48)
+        i = j
+        k = daten.find("VS_VERSION_INFO\0".encode("utf-16-le"), k + 1)
+    if i < 0:
+        i = daten.find(sig)
     if i < 0 or len(daten) < i + 16:
         return None
     ms, ls = int.from_bytes(daten[i + 8:i + 12], "little"), \

@@ -192,6 +192,13 @@ def _pe(version=(6, 140, 0, 0)):
 def test_versionen_aus_den_dlls():
     assert fk.pe_dateiversion(_pe()) == "6.140.0"
     assert fk.pe_dateiversion(b"MZ ohne Ressource") is None
+    # Dieselben vier Bytes zufaellig im Code VOR der Versionsressource: es
+    # zaehlt die Signatur hinter dem Schluessel VS_VERSION_INFO.
+    falsch = b"\xbd\x04\xef\xfe" + b"\0\0\x01\0" + (99 << 16).to_bytes(4, "little") * 2
+    echt = _pe()[2:]
+    daten = (b"MZ" + falsch + b"\0" * 64 + b"\0" * 6
+             + "VS_VERSION_INFO\0".encode("utf-16-le") + b"\0\0" + echt[100:])
+    assert fk.pe_dateiversion(daten) == "6.140.0"
     assert fk.mesa_version(b"\0%s%u.%u%s Mesa 11.2.2\0") == "11.2.2"
     assert fk.mesa_version(b"kein mesa") is None
 
