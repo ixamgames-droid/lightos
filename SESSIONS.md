@@ -75,7 +75,6 @@
 | QA-98 | A | fix/qa98-weissband-test-schneller | 2026-10-14T14:50Z | - |
 | UI-94 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | ENG-41 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
-| LAS-40 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:17Z | - |
 
 ## Blocker & Fallen
 
@@ -284,7 +283,6 @@
 
 ## Verlauf
 
-- 2026-10-13T18:33Z D done OUT-75
 - 2026-10-13T19:09Z D done UI-92
 - 2026-10-13T19:31Z A claim ENG-40
 - 2026-10-13T19:44Z D done FM-75
@@ -314,3 +312,4 @@
 - 2026-10-14T14:50Z A aktualisiert QA-98: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa98-weissband-test-schneller
 - 2026-10-14T15:06Z A done VCB-45
 - 2026-10-14T15:10Z A done LAS-39
+- 2026-10-14T15:10Z A done LAS-40
