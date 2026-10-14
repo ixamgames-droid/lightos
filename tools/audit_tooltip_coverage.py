@@ -15,11 +15,18 @@ hinzugefuegter textloser Button ohne Tooltip macht das Gate rot
 CLI:
   python tools/audit_tooltip_coverage.py            # Report -> stdout + docs/
   python tools/audit_tooltip_coverage.py --check    # nur Exit-Code (CI)
+  python tools/audit_tooltip_coverage.py --ausgabe DATEI   # Report woandershin
+
+Das Werkzeug baut ``AppState`` und alle Ansichten. Es laeuft deshalb in einer
+eigenen Sandbox (``tools/_werkzeug_sandbox.py``, TOOL-27): Show-DB,
+Einstellungen und Geraete-Bibliothek des Rechners bleiben unberuehrt, kein
+Ausgang wird geoeffnet.
 
 Exit 0 = keine Regression, Exit 1 = neue textlose Buttons ohne Tooltip.
 """
 from __future__ import annotations
 
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import importlib
 import inspect
 import os
@@ -58,6 +65,7 @@ BASELINE: dict[str, int] = {
     "patch_view": 1,
     "playback_view": 1,
     "preset_browser_view": 1,
+    "prioritaeten_view": 0,
     "programmer_view": 14,
     "rgb_matrix_view": 3,
     "show_manager_view": 0,
@@ -224,14 +232,27 @@ def render_report(result: dict[str, dict]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _ausgabe_ziel(argv: list[str], vorgabe: Path) -> Path:
+    """``--ausgabe DATEI`` (TOOL-27): den Report an einen anderen Ort schreiben
+    — der Waechter laesst das Werkzeug so wirklich laufen, ohne ins Repo zu
+    schreiben."""
+    if "--ausgabe" not in argv:
+        return vorgabe
+    i = argv.index("--ausgabe")
+    if i + 1 >= len(argv):
+        raise SystemExit("--ausgabe braucht einen Dateinamen.")
+    return Path(argv[i + 1]).resolve()
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     check_only = "--check" in argv
+    ziel = _ausgabe_ziel(argv, REPORT_PATH)
     result = audit()
     regs = regressions(result)
     if not check_only:
-        REPORT_PATH.write_text(render_report(result), encoding="utf-8")
-        print(f"Report geschrieben: {REPORT_PATH.relative_to(REPO)}")
+        ziel.write_text(render_report(result), encoding="utf-8")
+        print(f"Report geschrieben: {ziel.relative_to(REPO) if ziel.is_relative_to(REPO) else ziel}")
         for module_name in sorted(result):
             rec = result[module_name]
             print(

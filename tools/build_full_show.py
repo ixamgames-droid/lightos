@@ -11,7 +11,10 @@ APC-Pads (Note=Reihe*8+Spalte, Reihe 0 unten; untere 2 Reihen = MIDI-Mapper):
   R3 (16-23) EFFEKTE 1 | R4 (24-31) LOOKS | R5 (32-39) SNAPSHOTS
   R6 (40-47) FARBEN | R7 (48-49) CLEAR+TAP | R8 (56-61) EFFEKTE 2
 
-Aufruf: venv/Scripts/python.exe tools/build_full_show.py
+Aufruf: venv/Scripts/python.exe tools/build_full_show.py --echte-daten
+        (TOOL-27: baut auf dem vorhandenen Patch auf und schreibt MIDI-Zuordnungen
+        und Snapshots des Rechners — deshalb nur mit dem ausdruecklichen Schalter;
+        ohne ihn laeuft es in einer leeren Sandbox und bricht ab.)
         (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
 import os, sys, json
@@ -53,11 +56,9 @@ if not fixtures:
     sys.exit(
         "Kein Fixture gepatcht (isolierte Wegwerf-DB ist leer).\n"
         "Dieses Alt-Skript baut auf dem Bestands-Patch auf. Bewusster Lauf gegen die "
-        "echte DB (App vorher schliessen!):\n"
-        "  Windows:     $env:LIGHTOS_SHOW_DB=\"$env:APPDATA/LightOS/current_show.db\"; "
-        "venv/Scripts/python.exe tools/build_full_show.py" + "\n" +
-        "  Linux:       LIGHTOS_SHOW_DB=~/.local/share/LightOS/current_show.db "
-        "./venv/bin/python tools/build_full_show.py"
+        "echten Daten dieses Rechners (App vorher schliessen!):\n"
+        "  Windows:     venv/Scripts/python.exe tools/build_full_show.py --echte-daten\n"
+        "  Linux:       ./venv/bin/python tools/build_full_show.py --echte-daten"
     )
 fids = [f.fid for f in fixtures]
 chan = {c.attribute: c.channel_number for c in get_channels_for_patched(fixtures[0])}

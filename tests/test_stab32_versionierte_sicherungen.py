@@ -589,9 +589,11 @@ class HauptfensterSicherungenTest(unittest.TestCase):
             dlg.kurzinfos_fertig_laden()
             zeilen = dlg.zeilen_text()
             self.assertEqual(
-                [["10.10.2026 08:30", "Sommerfest", "vor dem Überschreiben",
+                # UI-92: die Liste zeigt die Sekunden (zwei Sicherungen
+                # derselben Minute waren sonst nicht zu unterscheiden).
+                [["10.10.2026 08:30:00", "Sommerfest", "vor dem Überschreiben",
                   groesse_text(os.path.getsize(self.pfad)), "0 Geräte · 0 Funktionen"],
-                 ["09.10.2026 20:15", "Sommerfest", "Auto-Save",
+                 ["09.10.2026 20:15:00", "Sommerfest", "Auto-Save",
                   zeilen[1][3], "4 Geräte · 7 Funktionen"]], zeilen)
             self.assertRegex(zeilen[1][3], r"^\d+(,\d)? (KB|MB)$")
             self.assertEqual(dlg.eintraege()[0], dlg.auswahl(), "neueste vorgewaehlt")

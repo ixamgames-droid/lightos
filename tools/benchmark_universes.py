@@ -17,6 +17,7 @@ universes.json an und oeffnete den dort eingetragenen Enttec-/sACN-Ausgang — f
 eine Messung ohne Ausgabe unnoetig und am Rig ein Griff nach dem echten Port.
 """
 from __future__ import annotations
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import os
 import sys
 import time

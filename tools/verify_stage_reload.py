@@ -77,6 +77,15 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
     os.environ["LIGHTOS_FIXTURE_DB"] = fixture_db or os.path.expanduser(
         "~/.local/share/LightOS/fixtures.db")
     os.environ["LIGHTOS_NO_OUTPUT_THREAD"] = "1"
+    # TOOL-27 (Gegenpruefung): das Hauptfenster laeuft hier mit Ereignisschleife.
+    # Ohne diese Schalter oeffnete es nach 800 ms die MIDI-Eingaenge des
+    # Rechners und zaehlte USB-Geraete auf; unter Windows leitet sich der
+    # Datenordner aus APPDATA ab, nicht aus XDG_DATA_HOME.
+    # Gesetzt, nicht aufgeloest (Waechter XPLAT-04/-10 in test_app_data_dir).
+    os.environ.update({"APPDATA": os.path.join(tmp, "appdata")})
+    os.environ["LIGHTOS_KEIN_USB"] = "1"
+    os.environ["LIGHTOS_SERIAL_INPROC"] = "1"
+    os.environ["LIGHTOS_NO_MIDI_AUTOCONNECT"] = "1"
     # TOOL-16: ohne diesen Pin uebernimmt get_state() ein altes
     # data/universes.json (Arbeitsverzeichnis/Repo) in den Sandkasten und ruft
     # danach apply_output_config() — mit einem Enttec-Eintrag oeffnete das den

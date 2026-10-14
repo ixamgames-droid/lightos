@@ -18,6 +18,7 @@
 | `_showcase.py` | DEMO-07: gemeinsame Bausteine der Showcase-Generatoren (``build_showcase_*.py``). |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
 | `_shutter.py` | ENG-28: Shutter in Generatoren nur mit Beleg oeffnen — nie mit dem Vorgabewert 255. |
+| `_werkzeug_sandbox.py` | TOOL-27: Eigene Sandbox fuer jedes Werkzeug, das die App oder Teile davon baut. |
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
 | `app.ps1` | LightOS App-Treiber — App starten/stoppen/warten/screenshotten aus EINEM Skript. |
 | `app.sh` | tools/app.sh — Linux-Pendant zu tools/app.ps1 (App-Steuerung fuer UI-Verifikation). |

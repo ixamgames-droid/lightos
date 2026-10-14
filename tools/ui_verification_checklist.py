@@ -23,11 +23,18 @@ GENERATED-Markern wird ueberschrieben (bzw. angehaengt, wenn noch nicht da).
 CLI:
   python tools/ui_verification_checklist.py           # Report schreiben/aktualisieren
   python tools/ui_verification_checklist.py --check   # nur Drift-Exit-Code (CI)
+  python tools/ui_verification_checklist.py --ausgabe DATEI   # Report woandershin
+
+Das Werkzeug baut ``AppState``, alle Ansichten und alle VC-Widgets. Es laeuft
+deshalb in einer eigenen Sandbox (``tools/_werkzeug_sandbox.py``, TOOL-27):
+Show-DB, Einstellungen und Geraete-Bibliothek des Rechners bleiben unberuehrt,
+kein Ausgang wird geoeffnet.
 
 Exit 0 = Report ist aktuell / geschrieben, Exit 1 (--check) = Report driftet.
 """
 from __future__ import annotations
 
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import importlib
 import inspect
 import os
@@ -382,8 +389,16 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print("OK — Checkliste ist aktuell.")
         return 0
-    REPORT_PATH.write_text(composed, encoding="utf-8")
-    print(f"Report geschrieben: {REPORT_PATH.relative_to(REPO)}")
+    # TOOL-27: ``--ausgabe DATEI`` schreibt woandershin; der handgepflegte Teil
+    # wird weiter aus dem Report im Repo uebernommen.
+    ziel = REPORT_PATH
+    if "--ausgabe" in argv:
+        i = argv.index("--ausgabe")
+        if i + 1 >= len(argv):
+            raise SystemExit("--ausgabe braucht einen Dateinamen.")
+        ziel = Path(argv[i + 1]).resolve()
+    ziel.write_text(composed, encoding="utf-8")
+    print(f"Report geschrieben: {ziel.relative_to(REPO) if ziel.is_relative_to(REPO) else ziel}")
     print(f"  Views:   {len(view_rows)} ({sum(r['headless'] for r in view_rows)} headless)")
     print(f"  Widgets: {len(widget_rows)} ({sum(r['headless'] for r in widget_rows)} headless)")
     failed = [r for r in view_rows + widget_rows if not r["headless"]]

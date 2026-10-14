@@ -57,6 +57,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Snapshot | Welcher gespeicherte Snapshot abgerufen wird | Dropdown `N: Name`, `(keiner)` |
 | Bibliothek-Farbe/Snap | Welcher Snap (Farbe/Look) aus der Show-Bibliothek gesetzt wird | Dropdown `Ordner/Name`, `(keiner)` |
 | Tasten-Modus (Snap) | Verhalten des Bibliothek-Snaps | `Umschalten (an/aus)` · `Setzen (bleibt)` · `Halten (nur gedrückt)` |
+| Dimmer (Snap) | Haken **übersteuert laufende Dimmer-Effekte**. Aus (Vorgabe): Treibt ein laufender Effekt den Dimmer einer Lampe, behält er ihn — der Dimmer-Wert des Snaps wird dort übergangen. An: Solange die Taste aktiv ist, gewinnt der Dimmer-Wert des Snaps an seinen Lampen (Blinder, Strobe Weiß); danach läuft der Effekt weiter. Nur der Dimmer von Lampen mit eigenem Dimmer-Kanal, die Farbe bleibt unberührt. Siehe [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md) | Haken an/aus |
 | Effekt-Aktion (EffectAction) | Welche Live-Aktion der gebundene Effekt ausführt | siehe Effekt-Aktionen unten; bei gebundenem Effekt zusätzlich dessen eigene Aktionen |
 | Gruppe (SelectGroup) | Fixture-Gruppe, die in den Programmer gewählt wird | Dropdown vorhandener Gruppen, editierbar |
 | Laser-Muster (Palette) | **Pflichtfeld für die Aktion `Laser-Muster abrufen`** — welches gespeicherte Muster der Button abruft. Ohne Auswahl tut der Button beim Drücken **nichts** (stilles No-Op). Muster legst du im Programmer-Tab „Laser" per *Muster speichern* an, siehe [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md) | Dropdown der gespeicherten Laser-Muster, editierbar (Name tippbar) |
@@ -86,7 +87,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Programmer leeren (Clear) | Leert den Programmer (gibt manuelle Farben/Snaps frei) |
 | Alles stoppen | Stoppt alle Executors/Playbacks (`stop_all`) |
 | Effekte stoppen (Tempo bleibt) | Stoppt alle laufenden Effekt-Funktionen; Tempo/BPM bleiben unverändert (Pause/Effekt-Stop) |
-| Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) — alles auf 0, nur Position/Gobo/Optik von Moving Heads mit Dimmer bleiben stehen; Laser/Nebel ganz aus. Steht der Blackout schon (Knopf oben rechts oder eine andere gehaltene Taste), bleibt es beim Loslassen dunkel: die Taste nimmt nur zurück, was sie selbst gesetzt hat. Mit **Blackout-Ziel** nur die gewählten Geräte/Gruppen (s. u.) |
+| Blackout | Schaltet Blackout an, solange gedrückt (Moment-Override) — alles auf 0, nur Position/Gobo/Optik von Moving Heads mit Dimmer bleiben stehen; Nebel ganz auf 0, Laser auf den Aus-Wert ihres Profils (nicht immer 0, s. u.). Steht der Blackout schon (Knopf oben rechts oder eine andere gehaltene Taste), bleibt es beim Loslassen dunkel: die Taste nimmt nur zurück, was sie selbst gesetzt hat. Mit **Blackout-Ziel** nur die gewählten Geräte/Gruppen (s. u.) |
 | Laser scharf/unscharf | Schaltet den Netzwerk-Laser-Ausgang scharf/unscharf (unscharf = Ausgabe geblankt) — LAS-10 |
 | Laser NOT-AUS | Laser-Not-Aus: sofort dunkel + entwaffnen |
 | Laser-Muster abrufen | Ruft ein gespeichertes Laser-Muster (Muster-Palette) ab — LAS-18 |
@@ -128,7 +129,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 
 ## Blackout mit Ziel (VCB-11)
 
-Bei der Aktion **Blackout** zeigt der Dialog die Liste **Blackout-Ziel**. Bleibt sie leer, ist die Taste der globale Blackout wie bisher. Mit **+ Gerät/Gruppe hinzufügen** lassen sich einzelne Geräte und/oder Fixture-Gruppen eintragen — dann schaltet die Taste, solange sie gedrückt ist, **nur diese** dunkel; alles andere läuft weiter. Es gilt dieselbe Regel wie beim globalen Blackout: Dimmer, Farbe und Intensität gehen auf 0, Pan/Tilt/Gobo/Optik von Lampen mit Dimmer bleiben stehen, Lampen ohne Dimmer sowie Laser und Nebel gehen ganz aus.
+Bei der Aktion **Blackout** zeigt der Dialog die Liste **Blackout-Ziel**. Bleibt sie leer, ist die Taste der globale Blackout wie bisher. Mit **+ Gerät/Gruppe hinzufügen** lassen sich einzelne Geräte und/oder Fixture-Gruppen eintragen — dann schaltet die Taste, solange sie gedrückt ist, **nur diese** dunkel; alles andere läuft weiter. Es gilt dieselbe Regel wie beim globalen Blackout: Dimmer, Farbe und Intensität gehen auf 0, Pan/Tilt/Gobo/Optik von Lampen mit Dimmer bleiben stehen, Lampen ohne Dimmer und Nebel gehen ganz auf 0. **Laser** bekommen den **Aus-Wert aus ihrem Geräteprofil** (nicht immer 0), ihre übrigen Kanäle gehen auf 0; kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich weiter (Einzelheiten, auch zum Laser-NOT-AUS: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 **So richtest du sie ein** (die Bilder zeigen die Doku-Demo-Show aus [Anleitungsbilder aus dem Code erzeugen](../ANLEITUNGSBILDER.md) mit der Gruppe „PAR links“ = PAR 1–4): **Bearbeiten** einschalten, eine Taste anlegen und doppelt anklicken.
 
