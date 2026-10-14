@@ -681,3 +681,41 @@ def test_sicherung_scheitert_still(monkeypatch):
 
     monkeypatch.setattr(SF, "save_show", _kaputt)
     assert K.sicherung_anlegen("Abend") is None
+
+
+# ── Codex-Review #1078 (CDX-59): Verzoegerungen folgen der Uebersetzung ─────
+
+def test_cue_verzoegerungen_folgen_uebersetzten_attributen(show):
+    """``intensity`` → ``dimmer`` und RGB → RGBW: die Verzoegerungen je
+    Attribut gingen still verloren (Schnittmenge der Schluessel leer), der
+    geklonte Cue lief mit anderem Timing."""
+    show.patch(1, RGB)
+    show.patch(2, RGBW)
+    st = show.state
+    stack = CueStack("Haupt")
+    cue = Cue(number=1, label="eins",
+              values={1: {"intensity": 50, "color_r": 255, "color_g": 0,
+                          "color_b": 0}})
+    cue.attr_delays = {1: {"intensity": 0.7, "color_r": 0.3, "color_g": 0.3,
+                           "color_b": 0.3}}
+    cue.attr_delays_out = {1: {"intensity": 1.5}}
+    stack.cues.append(cue)
+    st.cue_stacks = [stack]
+
+    plan = show.plane([1], [2])
+    plan.anwenden(st)
+    werte = cue.values[2]
+    assert werte.get("dimmer") == 50
+    verz = cue.attr_delays[2]
+    assert verz.get("dimmer") == 0.7, verz
+    assert {k: verz.get(k) for k in werte if k.startswith("color_")} == {
+        k: 0.3 for k in werte if k.startswith("color_")}, (werte, verz)
+    assert cue.attr_delays_out[2] == {"dimmer": 1.5}
+    plan.zuruecknehmen(st)
+    assert 2 not in cue.attr_delays and 2 not in cue.attr_delays_out
+
+
+def test_begleitwerte_unterschiedliche_farbverzoegerung_nimmt_die_groesste():
+    out = K._begleitwerte({"color_r": 0.2, "color_g": 0.9, "intensity": 1},
+                          {"cmy_c": 1, "cmy_m": 2, "dimmer": 3, "pan": 4})
+    assert out == {"cmy_c": 0.9, "cmy_m": 0.9, "dimmer": 1}
