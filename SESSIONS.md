@@ -38,7 +38,6 @@
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T14:27Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
-| LAS-35 | A | feature/las35-zonen-planer | 2026-10-11T18:11Z | - |
 | MIDI-15 | D | feature/midi15-touch-sperre | 2026-10-12T18:42Z | src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py |
 | ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
@@ -280,7 +279,6 @@
 
 ## Verlauf
 
-- 2026-10-14T14:16Z A aktualisiert LAS-39: Branch chore/backlog-nachtrag-2026-10-14 -> fix/las39-laser-erkennung-ohne-datenbank
 - 2026-10-14T14:24Z A aktualisiert LAS-39: Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py
 - 2026-10-14T14:28Z A done IMP-1
 - 2026-10-14T14:50Z A aktualisiert QA-97: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa97-reihenfolge-laser-und-ui69
@@ -310,3 +308,4 @@
 - 2026-10-14T19:45Z A done ENG-36
 - 2026-10-14T20:14Z D done VCB-44
 - 2026-10-14T21:35Z A done ENG-39
+- 2026-10-14T22:23Z A done LAS-35
