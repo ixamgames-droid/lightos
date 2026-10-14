@@ -73,6 +73,15 @@ def _runner_width(label="Läufer-Breite"):
     return ParamSpec("runner_width", label, "int", 1, 1, 16, 1,
                      "Breite in Zellen (1..16)")
 
+def _runner_step(when=()):
+    # ENG-37: 1 = wie bisher (der Laeufer wandert Lampe fuer Lampe).
+    # 0 = „wie Breite“ (Block an Block). Der Editor fuehrt das Feld als FESTES
+    # Feld (rgb_matrix_view._PROMOTED_PARAM_KEYS), die Konsole als Parameter.
+    return ParamSpec("runner_step", "Schrittweite", "int", 1, 0, 16, 1,
+                     "Um wie viele Lampen der Läufer je Schritt weiterspringt "
+                     "(1 = Lampe für Lampe, 0 = wie Läufer-Breite: erst 1+2, "
+                     "dann 3+4 …)", when=when)
+
 def _invert():
     return ParamSpec("invert", "Invertieren", "bool", False)
 
@@ -315,6 +324,8 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
          # (bounce/center_out/outside_in ignorieren sie) -> nur dann anzeigen,
          # statt tote Regler zu zeigen.
          _runner_count(when=(("movement", ("normal",)),)), _runner_width(),
+         # ENG-37: Schrittweite — nur die linearen Bewegungen kennen Bloecke.
+         _runner_step(when=(("movement", ("normal", "bounce")),)),
          _after_fade(when=(("movement", ("normal",)),)),
          # Farb-Styles: Farbwechsel pro Runde. Dimmer-Style: Dimmerwert pro Runde
          # (ENG-08) — style-gefiltert, daher nie beide gleichzeitig sichtbar.
