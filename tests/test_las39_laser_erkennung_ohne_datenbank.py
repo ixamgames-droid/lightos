@@ -430,3 +430,71 @@ def test_notaus_bestaetigung_nennt_die_unvollstaendige_erkennung():
         text = f.read()
     rumpf = text.split("def _on_laser_estop(self", 1)[1].split("\n    def ", 1)[0]
     assert "laser_erkennung_hinweis()" in rumpf
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# F) Codex-Review #1095: die Bestaetigung wartet nicht auf die Datenbank
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _bestaetigung_mitschreiben(reihenfolge):
+    from src.core.sync import SyncEvent, get_sync
+
+    def gesehen(_ev, _d):
+        reihenfolge.append("bestaetigung")
+    get_sync().subscribe(SyncEvent.LASER_ESTOP, gesehen)
+    return lambda: get_sync().unsubscribe(SyncEvent.LASER_ESTOP, gesehen)
+
+
+def test_bestaetigung_vor_der_datenbank(rig, monkeypatch):
+    from src.core.laser.laser_output import LaserOutputManager
+    st = rig.st
+    _patchen(st)
+    rig.db.da = True
+    reihenfolge, frage = _mit_reihenfolge(rig)
+    monkeypatch.setattr(A, "_profile_mit_laserkanal", frage)
+    weg = _bestaetigung_mitschreiben(reihenfolge)
+    try:
+        LaserOutputManager(st).estop_all()
+    finally:
+        weg()
+    assert reihenfolge.index("bestaetigung") < reihenfolge.index("db"), reihenfolge
+
+
+def test_gesperrte_datenbank_haelt_den_aufrufer_nicht_auf(rig, monkeypatch):
+    """In der App (UI-Marshaller registriert) laeuft die Abfrage im
+    Hintergrund: ``estop_all`` kehrt zurueck, waehrend die Datenbank noch
+    haengt; Neuaufbau kommt danach ueber den Marshaller (UI-Faden)."""
+    from src.core.laser.laser_output import LaserOutputManager
+    st = rig.st
+    _patchen(st)
+    rig.db.da = True
+    frei = threading.Event()
+    gefragt = threading.Event()
+    echt = rig.db
+
+    def haengt(ids):
+        gefragt.set()
+        assert frei.wait(10), "Test haengt"
+        return echt(ids)
+    monkeypatch.setattr(A, "_profile_mit_laserkanal", haengt)
+    auftraege = []
+    st._ui_marshaller = auftraege.append
+    st._ui_thread_id = threading.get_ident()
+    reihenfolge = []
+    weg = _bestaetigung_mitschreiben(reihenfolge)
+    try:
+        LaserOutputManager(st).estop_all()            # darf nicht warten
+        assert st.laser_estop_active is True
+        assert reihenfolge == ["bestaetigung"]
+        assert gefragt.wait(5), "die Abfrage laeuft im Hintergrund"
+        assert auftraege == [], "noch nichts zurueck im UI-Faden"
+    finally:
+        frei.set()
+        weg()
+    for _ in range(100):
+        if auftraege:
+            break
+        threading.Event().wait(0.05)
+    assert len(auftraege) == 1
+    auftraege[0]()                                     # „im UI-Faden“
+    assert st._laser_fids == frozenset({1}), "Neuaufbau mit der Auskunft"

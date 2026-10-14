@@ -1835,11 +1835,49 @@ class AppState:
         DMX-Latch UND dem Netzwerk-NOT-AUS (``conn.estop()``) — nie aus
         ``set_laser_estop``: eine gesperrte Datenbank antwortet erst nach dem
         SQLite-Timeout (Sekunden), und darauf darf kein Teil des NOT-AUS warten
-        (CDX-25: das Billige zuerst, das Teure danach)."""
+        (CDX-25: das Billige zuerst, das Teure danach).
+
+        Codex-Review #1095: und es blockiert den Aufrufer nicht. Mit
+        registriertem UI-Marshaller (die App) laeuft die Datenbank-Abfrage in
+        einem eigenen Faden; Neuaufbau bzw. Hinweis kommen danach im UI-Faden
+        — die Oberflaeche friert waehrend eines SQLite-Timeouts nicht ein.
+        Ohne Marshaller (Werkzeuge, Tests) laeuft alles wie bisher sofort."""
         if not laser_erkennung.offene_profile():
             return
+        marshaller = getattr(self, "_ui_marshaller", None)
+        if marshaller is None:
+            self._laser_erkennung_abschliessen(self._laser_erkennung_fragen())
+            return
+        if getattr(self, "_laser_nachholen_laeuft", False):
+            return                       # eine Abfrage laeuft schon
+        self._laser_nachholen_laeuft = True
+
+        def faden():
+            try:
+                bekannt = self._laser_erkennung_fragen()
+            finally:
+                self._laser_nachholen_laeuft = False
+            try:
+                marshaller(lambda: self._laser_erkennung_abschliessen(bekannt))
+            except Exception as e:
+                debug_swallow("app_state.laser_erkennung_nachholen", e)
+
+        threading.Thread(target=faden, name="laser-erkennung-nachholen",
+                         daemon=True).start()
+
+    def _laser_erkennung_fragen(self) -> bool:
+        """Der langsame Teil des Nachholens (Datenbank). Wirft nie."""
         try:
-            if self._laser_profile_bestimmen():
+            return bool(self._laser_profile_bestimmen())
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_nachholen", e)
+            return False
+
+    def _laser_erkennung_abschliessen(self, bekannt: bool) -> None:
+        """Nach der Abfrage: Neuaufbau, wenn eine Auskunft da ist, sonst den
+        Hinweis erneut zeigen."""
+        try:
+            if bekannt:
                 self._rebuild_render_plan()
                 return
         except Exception as e:
