@@ -90,6 +90,9 @@ ATTR_LABELS: dict[str, str] = {
     "color_r": "Rot", "color_g": "Grün", "color_b": "Blau", "color_w": "Weiß",
     "color_a": "Amber", "color_uv": "UV",
     "cyan": "Cyan", "magenta": "Magenta", "yellow": "Gelb",
+    # Die real emittierten CMY-Namen (s. o. bei ATTR_GROUPS) — ohne sie stand
+    # in der Klon-Vorschau und im Snap-Editor der rohe Name „cmy_c".
+    "cmy_c": "Cyan", "cmy_m": "Magenta", "cmy_y": "Gelb",
     "color_wheel": "Farbrad", "colour_wheel": "Farbrad", "color": "Farbe",
     "pan": "Pan", "tilt": "Tilt", "pan_fine": "Pan (fein)", "tilt_fine": "Tilt (fein)",
     "pan_speed": "Pan-Speed", "tilt_speed": "Tilt-Speed",
