@@ -335,7 +335,7 @@ gesendet`.
 
 Der Balken liegt **über** dem oberen Rand der gerade gezeigten Ansicht, direkt unter der
 Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit
-BLACKOUT und Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
+Grand Master, STOP ALL, BLACKOUT und Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
 Tasten der Virtual Console und alle anderen Bedienelemente an ihrem Platz. Dafür verdeckt
 er eine schmale Zeile am oberen Rand der Ansicht. Ein Klick auf den Balken löst nichts aus,
 was darunter liegt. Der Balken ist immer nur eine Zeile hoch; ein zu langer Text wird mit
