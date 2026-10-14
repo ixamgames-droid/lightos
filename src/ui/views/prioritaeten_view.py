@@ -107,6 +107,12 @@ class PrioritaetenView(QWidget):
         self._lauf_timer.setInterval(500)
         self._lauf_timer.timeout.connect(self._laufzustand_nachziehen)
         self._lauf_timer.start()
+        # Codex-Review #1087: alle 2 s nachsehen, ob die Konsole umbelegt wurde
+        # (die Tooltips der Ueberschneidungen haengen daran) — nur sichtbar.
+        self._vc_timer = QTimer(self)
+        self._vc_timer.setInterval(2000)
+        self._vc_timer.timeout.connect(self._vc_takt)
+        self._vc_timer.start()
 
         stufen_melder().geaendert.connect(self._melde_veraltet)
         try:
@@ -277,6 +283,7 @@ class PrioritaetenView(QWidget):
             # Tasten desselben Solo-Frames melden sich untereinander nicht.
             ids, gegenueber, haltend = konsolen_beziehungen(
                 self.window().findChildren(VCCanvas))
+            self._vc_stand_gebaut = self._vc_stand_aus(ids, gegenueber, haltend)
             if len(ids) < 2:
                 return {}
             umgebung = rechen_umgebung()
@@ -311,6 +318,38 @@ class PrioritaetenView(QWidget):
         zahlen |= {stufen.zahl_von(getattr(f, "priority", 0)) for f in funktionen}
         return sorted(zahlen, reverse=True)
 
+    @staticmethod
+    def _vc_stand_aus(ids, gegenueber, haltend) -> tuple:
+        return (tuple(ids),
+                tuple(sorted((k, tuple(sorted(v))) for k, v in gegenueber.items())),
+                tuple(sorted(haltend)))
+
+    def _vc_stand(self):
+        """Codex-Review #1087: die Beziehungen der Konsole, aus denen die
+        Ueberschneidungs-Tooltips entstehen. Fuer ein Umbelegen einer Taste gibt
+        es kein Event, an dem die Ansicht haengt — sie vergleicht deshalb beim
+        Zeigen (und im Lauf-Takt) diesen Stand mit dem des letzten Aufbaus.
+        ``None``: nicht bestimmbar (dann nichts tun)."""
+        try:
+            from src.ui.virtualconsole.vc_canvas import VCCanvas
+            from src.ui.widgets.ueberschneidung_hinweis import konsolen_beziehungen
+            return self._vc_stand_aus(*konsolen_beziehungen(
+                self.window().findChildren(VCCanvas)))
+        except Exception:
+            return None
+
+    def _vc_takt(self) -> None:
+        if not self.isVisible() or self.window().isMinimized():
+            return
+        self._vc_geaendert_pruefen()
+
+    def _vc_geaendert_pruefen(self) -> None:
+        if self._veraltet:
+            return
+        stand = self._vc_stand()
+        if stand is not None and stand != getattr(self, "_vc_stand_gebaut", None):
+            self._melde_veraltet()
+
     def _melde_veraltet(self, *_a):
         self._veraltet = True
         try:
@@ -324,6 +363,7 @@ class PrioritaetenView(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._vc_geaendert_pruefen()
         if self._veraltet:
             self._neu_timer.start()
 

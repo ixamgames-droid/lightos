@@ -595,6 +595,57 @@ def test_ansicht_prioritaeten_zeigt_dieselben_saetze_als_tooltip(fm, flaeche):
         _app().processEvents()
 
 
+def test_ansicht_prioritaeten_folgt_einer_umbelegten_taste(fm, flaeche):
+    """Codex-Review #1087: das Umbelegen einer VC-Taste sendet keines der
+    Events, an denen die Ansicht haengt — ``_veraltet`` blieb False, und
+    ``showEvent`` baute nicht neu. Jetzt vergleicht die Ansicht beim Zeigen
+    (und im Lauf-Takt) die Beziehungen der Konsole mit dem letzten Aufbau."""
+    from src.ui.views.prioritaeten_view import PrioritaetenView, _ROLLE_FID
+    lauf = _matrix(fm, "Lauflicht HG", HINTERGRUND)
+    puls = _matrix(fm, "Puls HG", HINTERGRUND, stufe=STROBE)
+    frei = _matrix(fm, "Wash HG", HINTERGRUND)
+    fenster = QWidget()
+    lay = QVBoxLayout(fenster)
+    lay.addWidget(flaeche)
+    ansicht = PrioritaetenView()
+    lay.addWidget(ansicht)
+    _taste(flaeche, lauf)
+    zweite = _taste(flaeche, puls)
+
+    def _tipp(fid):
+        wurzel = ansicht._baum.invisibleRootItem()
+        for i in range(wurzel.childCount()):
+            kopf = wurzel.child(i)
+            for j in range(kopf.childCount()):
+                it = kopf.child(j)
+                if it.data(0, _ROLLE_FID) == fid:
+                    return it.toolTip(0)
+        return None
+    try:
+        fenster.show()
+        _app().processEvents()
+        ansicht.neu_aufbauen()
+        assert "„Puls HG“" in _tipp(lauf.id)
+        ansicht.hide()
+        zweite.function_id = frei.id                  # Taste umbelegt
+        ansicht.show()
+        _app().processEvents()
+        assert "„Puls HG“" not in _tipp(lauf.id), "Tooltip nicht nachgezogen"
+        assert "„Wash HG“" in _tipp(lauf.id)
+        # Auch sichtbar: der Lauf-Takt merkt es spaetestens nach 2 s.
+        zweite.function_id = puls.id
+        assert ansicht._vc_timer.interval() == 2000 and ansicht._vc_timer.isActive()
+        ansicht._vc_timer.timeout.emit()
+        _app().processEvents()
+        assert "„Puls HG“" in _tipp(lauf.id)
+    finally:
+        flaeche.setParent(None)
+        ansicht.close()
+        fenster.close()
+        fenster.deleteLater()
+        _app().processEvents()
+
+
 # ── Leistung ─────────────────────────────────────────────────────────────────
 
 def test_leistung_200_funktionen_100_tasten(fm, flaeche):
