@@ -62,7 +62,6 @@
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
-| IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
@@ -279,7 +278,6 @@
 
 ## Verlauf
 
-- 2026-10-13T23:16Z A claim QA-97
 - 2026-10-13T23:16Z A claim QA-98
 - 2026-10-13T23:16Z A claim UI-94
 - 2026-10-13T23:16Z A claim ENG-41
@@ -309,3 +307,4 @@
 - 2026-10-14T18:14Z A claim XPLAT-23
 - 2026-10-14T18:14Z A claim LIZ-2
 - 2026-10-14T18:14Z A claim DOC-16
+- 2026-10-14T18:41Z A done IMP-2
