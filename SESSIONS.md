@@ -66,7 +66,6 @@
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
-| VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 
@@ -277,7 +276,6 @@
 
 ## Verlauf
 
-- 2026-10-13T21:06Z B done VIZ-105
 - 2026-10-13T21:45Z B done STAB-37
 - 2026-10-13T22:21Z B done DOC-71
 - 2026-10-13T22:26Z A claim IMP-3
@@ -307,3 +305,4 @@
 - 2026-10-14T16:17Z B done VIZ-107
 - 2026-10-14T16:29Z A claim QA-97
 - 2026-10-14T16:55Z A done TOOL-27
+- 2026-10-14T17:18Z A done VCB-47
