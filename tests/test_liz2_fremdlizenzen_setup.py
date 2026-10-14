@@ -724,7 +724,9 @@ def test_offene_punkte_sind_als_offen_gekennzeichnet():
     assert "**Offen:**" not in _abschnitt("Chromium")
     assert "licenses/QtWebEngine-THIRD-PARTY.txt" in _abschnitt("Chromium")
     assert "**Offen:**" not in _abschnitt("Weitere enthaltene Bibliotheken")
-    assert "licenses/Mesa-opengl32sw.txt" in _abschnitt("Weitere enthaltene Bibliotheken")
+    # Mesa hat einen eigenen Abschnitt mit Herkunft/Urheber/Lizenz (PROC-18-Waechter).
+    assert "**Offen:**" not in _abschnitt("Mesa llvmpipe")
+    assert "licenses/Mesa-opengl32sw.txt" in _abschnitt("Mesa llvmpipe")
 
 
 # ── Spec, Setup-Skript, Selbsttest ───────────────────────────────────────────
