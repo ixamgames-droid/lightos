@@ -62,7 +62,6 @@
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
-| ENG-35 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
 | VCB-46 | A | feature/eng35-prioritaeten-stufen | 2026-10-13T13:54Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
@@ -289,7 +288,6 @@
 
 ## Verlauf
 
-- 2026-10-13T15:34Z A aktualisiert VCB-45: Branch - -> feature/vcb45-popout-merkt-bildschirm
 - 2026-10-13T15:48Z A claim IMP-1
 - 2026-10-13T16:00Z A done FM-74
 - 2026-10-13T16:14Z A claim IMP-2
@@ -319,3 +317,4 @@
 - 2026-10-13T23:16Z A claim ENG-41
 - 2026-10-13T23:17Z A claim LAS-40
 - 2026-10-13T23:56Z A done PROC-22
+- 2026-10-14T13:52Z A done ENG-35
