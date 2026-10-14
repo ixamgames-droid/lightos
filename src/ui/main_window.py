@@ -3198,6 +3198,15 @@ class MainWindow(QMainWindow):
                 # NOT-AUS-Maske leer, ueber DMX geht dann nichts dunkel.
                 tip += (" — über DMX schaltet der Knopf dann nichts dunkel: er "
                         "deckt nur Geräte, die LightOS als Laser erkennt.")
+            # LAS-39: fehlt die Profil-Auskunft (Geraete-Datenbank nicht
+            # erreichbar), gelten die betroffenen Geraete vorerst als Laser —
+            # das muss der Betreiber am Knopf sehen.
+            try:
+                unvollstaendig = str(self._state.laser_erkennung_hinweis() or "")
+            except Exception:
+                unvollstaendig = ""
+            if unvollstaendig:
+                tip += "\n" + unvollstaendig
             if btn.text() != text:
                 btn.setText(text)
             if btn.styleSheet() != stil:

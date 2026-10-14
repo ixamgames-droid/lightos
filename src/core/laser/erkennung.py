@@ -41,6 +41,17 @@ laeuft dort ueber Automatikprogramme) fiel durch, wenn weder Typ noch Name
 ein Profil in irgendeinem Modus einen Laserkanal hat, wird je Profil EINMAL
 bestimmt und hier gemerkt (``merke_profil``); der Render-Plan liest nur noch.
 
+**Fehlende Auskunft (LAS-39).** Ist die Geraete-Datenbank beim Patchen nicht
+erreichbar, fehlt die Antwort fuer Regel 5. Bis LAS-38 galt dann „nein“ — ein
+Kombigeraet im Kurz-Modus lief bei einem DANACH ausgeloesten NOT-AUS weiter.
+Jetzt gilt: Auskunft fehlt -> das Geraet gilt VORERST als Laser
+(``GRUND_PROFIL_UNBEKANNT``) und das Profil steht in der Liste der offenen
+Profile (``offene_profile``). Gemerkt wird nichts; die Auskunft wird bei der
+naechsten Gelegenheit nachgeholt (naechster Plan-Neubau, naechstes Ausloesen
+des NOT-AUS — kein Abfragen im Takt). Eine normale Lampe ist damit nur so
+lange mit dunkel, wie die Datenbank fehlt; ``hinweis_unvollstaendig`` liefert
+den Satz, der das dem Betreiber sagt.
+
 Blattmodul: kein Qt, keine Abhaengigkeit auf ``app_state`` — und die Datenbank
 fragt es nicht selbst. Wer die Profile kennt (``app_state``), traegt die Antwort
 ein oder meldet eine Quelle an (``setze_profil_quelle``), die fuer ein noch
@@ -60,12 +71,16 @@ GRUND_KANAL = "kanal"               # Attribut laser_*
 GRUND_KANALNAME = "kanalname"       # „Laser“ im Namen eines Kanals
 GRUND_NAME = "name"                 # „Laser“ im Geraete-/Hersteller-/Patch-Namen
 GRUND_ANDERER_MODUS = "anderer_modus"   # LAS-38: Laserkanal in einem anderen Modus
+#: LAS-39: die Profil-Auskunft fehlt (Geraete-Datenbank nicht erreichbar) —
+#: im Zweifel Laser, bis sie nachgeholt ist.
+GRUND_PROFIL_UNBEKANNT = "profil_unbekannt"
 
 #: Die Gruende, bei denen weder der Typ noch ein ``laser_*``-Kanal des
 #: gepatchten Modus „Laser“ sagen — das Geraet gilt ueber einen Namen oder ueber
 #: einen anderen Modus seines Profils als Laser (Hinweis beim Patchen; ein Wert
 #: an so einem Geraet ist kein „Laser wieder an“).
-NUR_NAME = frozenset((GRUND_KANALNAME, GRUND_NAME, GRUND_ANDERER_MODUS))
+NUR_NAME = frozenset((GRUND_KANALNAME, GRUND_NAME, GRUND_ANDERER_MODUS,
+                      GRUND_PROFIL_UNBEKANNT))
 
 _NAMENSFELDER = ("fixture_name", "label", "manufacturer_name")
 
@@ -87,6 +102,9 @@ def ist_laserkanal(ch) -> bool:
 #: bestimmt (beim Patchen/Laden) und zusammen mit dem Kanal-Cache verworfen.
 _profil_laser: dict = {}
 _profil_quelle = None
+#: LAS-39: Profile, deren Auskunft zuletzt FEHLTE (Quelle warf oder wusste es
+#: nicht). Sie gelten vorerst als Laser; beantwortet -> wieder heraus.
+_profil_offen: set = set()
 
 
 def setze_profil_quelle(quelle) -> None:
@@ -100,6 +118,19 @@ def merke_profil(profil_id, hat_laser: bool) -> None:
     """Traegt die Antwort fuer ein Profil ein."""
     if profil_id is not None:
         _profil_laser[profil_id] = bool(hat_laser)
+        _profil_offen.discard(profil_id)
+
+
+def merke_offen(profil_id) -> None:
+    """LAS-39: die Auskunft fuer dieses Profil fehlt (Abfrage gescheitert) —
+    nichts merken, aber als offen fuehren."""
+    if profil_id is not None and profil_id not in _profil_laser:
+        _profil_offen.add(profil_id)
+
+
+def offene_profile() -> frozenset:
+    """LAS-39: Profile, deren Auskunft fehlt (sie gelten vorerst als Laser)."""
+    return frozenset(_profil_offen)
 
 
 def profil_bekannt(profil_id) -> bool:
@@ -109,6 +140,7 @@ def profil_bekannt(profil_id) -> bool:
 def vergiss_profile() -> None:
     """Alle gemerkten Antworten verwerfen (Profil geaendert, Patch neu geladen)."""
     _profil_laser.clear()
+    _profil_offen.clear()
 
 
 def kanaele_tragen_laser(kanaele) -> bool:
@@ -116,13 +148,16 @@ def kanaele_tragen_laser(kanaele) -> bool:
     return any(ist_laserkanal(ch) for ch in kanaele or ())
 
 
-def profil_traegt_laser(fx) -> bool:
-    """Hat das Profil von ``fx`` in IRGENDEINEM Modus einen Laserkanal?
+def profil_auskunft(fx):
+    """Was sagt das Profil von ``fx``: ``True`` (ein Modus hat einen
+    Laserkanal), ``False`` (keiner) oder ``None`` (LAS-39: Auskunft fehlt).
 
     Liest die gemerkte Antwort. Ist das Profil noch unbekannt, wird die
-    angemeldete Quelle einmal gefragt und die Antwort gemerkt; ohne Quelle, bei
-    einem Fehler oder bei „weiss nicht“ gilt „nein“, ohne es zu merken — die
-    naechste Frage versucht es erneut.
+    angemeldete Quelle gefragt und die Antwort gemerkt. Bei einem Fehler oder
+    bei „weiss nicht“ wird NICHTS gemerkt, das Profil aber als offen gefuehrt
+    (``None``) — die naechste Frage versucht es erneut. Ohne Geraet-Profil
+    oder ohne angemeldete Quelle (Blattmodul allein, keine Datenbank im Spiel)
+    bleibt es bei der Regel je Modus (``False``).
     """
     profil_id = getattr(fx, "fixture_profile_id", None)
     if profil_id is None:
@@ -136,11 +171,20 @@ def profil_traegt_laser(fx) -> bool:
     try:
         antwort = quelle(profil_id)
     except Exception:
-        return False
+        antwort = None
     if antwort is None:
-        return False
-    _profil_laser[profil_id] = bool(antwort)
+        _profil_offen.add(profil_id)
+        return None
+    merke_profil(profil_id, antwort)
     return bool(antwort)
+
+
+def profil_traegt_laser(fx) -> bool:
+    """Hat das Profil von ``fx`` BEKANNTERMASSEN in irgendeinem Modus einen
+    Laserkanal? Eine fehlende Auskunft ist hier „nein“ — wer im Zweifel
+    vorsichtig sein muss, fragt ``laser_grund`` (das macht daraus
+    ``GRUND_PROFIL_UNBEKANNT``)."""
+    return profil_auskunft(fx) is True
 
 
 def laser_grund(fx, channels=()) -> str:
@@ -160,8 +204,12 @@ def laser_grund(fx, channels=()) -> str:
         return GRUND_NAME
     # LAS-38: zuletzt, damit ein schon erkanntes Geraet seinen Grund behaelt und
     # fuer es kein Profil nachgeschlagen wird.
-    if profil_traegt_laser(fx):
+    auskunft = profil_auskunft(fx)
+    if auskunft is True:
         return GRUND_ANDERER_MODUS
+    if auskunft is None:
+        # LAS-39: Sicherheit vor Bequemlichkeit — ohne Auskunft vorerst Laser.
+        return GRUND_PROFIL_UNBEKANNT
     return ""
 
 
@@ -184,8 +232,31 @@ def hinweis_text(fx, channels=()) -> str:
         return ""
     name = (str(getattr(fx, "label", "") or "")
             or str(getattr(fx, "fixture_name", "") or "") or "Das Gerät")
+    if grund == GRUND_PROFIL_UNBEKANNT:
+        return (f"„{name}“ gilt vorerst als Laser: {UNVOLLSTAENDIG} — LASER "
+                f"NOT-AUS und Blackout schalten das ganze Gerät dunkel, bis die "
+                f"Auskunft des Profils nachgeholt ist.")
     woran = {GRUND_KANALNAME: "an einem Kanalnamen",
              GRUND_ANDERER_MODUS: "an einem Laserkanal in einem anderen Modus "
                                   "des Profils"}.get(grund, "am Namen")
     return (f"„{name}“ gilt als Laser (erkannt {woran}): LASER NOT-AUS und "
             f"Blackout schalten das ganze Gerät dunkel, „Alles Weiß“ lässt es aus.")
+
+
+#: LAS-39: der Satz fuer Statuszeile und NOT-AUS-Knopf.
+UNVOLLSTAENDIG = "Laser-Erkennung unvollständig: Geräte-Datenbank nicht erreichbar"
+
+
+def hinweis_unvollstaendig(anzahl: int) -> str:
+    """LAS-39: Hinweis, wenn fuer ``anzahl`` gepatchte Geraete die
+    Profil-Auskunft fehlt — leer bei 0."""
+    if anzahl <= 0:
+        return ""
+    wort = "Gerät gilt" if anzahl == 1 else "Geräte gelten"
+    return (f"{UNVOLLSTAENDIG} — {anzahl} {wort} bis dahin als Laser "
+            f"(LASER NOT-AUS und Blackout schalten sie dunkel).")
+
+
+def hinweis_vollstaendig() -> str:
+    """LAS-39: Rueckmeldung, sobald die fehlende Auskunft nachgeholt ist."""
+    return "Laser-Erkennung wieder vollständig: Geräte-Datenbank antwortet."
