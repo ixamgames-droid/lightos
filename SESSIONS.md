@@ -60,7 +60,6 @@
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
-| VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | ENG-39 | A | feature/eng39-ueberschneidungs-hinweis | 2026-10-13T17:04Z | - |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
@@ -278,7 +277,6 @@
 
 ## Verlauf
 
-- 2026-10-13T23:16Z A claim QA-98
 - 2026-10-13T23:16Z A claim UI-94
 - 2026-10-13T23:16Z A claim ENG-41
 - 2026-10-13T23:17Z A claim LAS-40
@@ -308,3 +306,4 @@
 - 2026-10-14T18:14Z A claim LIZ-2
 - 2026-10-14T18:14Z A claim DOC-16
 - 2026-10-14T18:41Z A done IMP-2
+- 2026-10-14T19:05Z A done VIZ-109
