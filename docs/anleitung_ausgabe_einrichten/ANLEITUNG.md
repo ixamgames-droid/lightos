@@ -17,8 +17,10 @@
 - **Für USB:** einen ENTTEC DMX USB Pro. Den Treiber bringt Windows mit, Hinweise
   stehen in [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro).
 - **Für USB ohne COM-Port:** einen uDMX-Adapter, siehe
-  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` und
-  einmalig ein Zugriffsrecht bzw. einen Treiber.
+  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` (im
+  Windows-Installationspaket enthalten) und unter Linux einmalig ein Zugriffsrecht.
+  **Unter Windows braucht er einen Treiber, den weder Windows noch LightOS mitbringt** –
+  du weist ihn einmalig von Hand zu; danach läuft der Adapter.
 - **Für Netzwerk:** einen Art-Net- oder sACN-Node (oder ein Gerät mit eingebautem
   Netzwerkeingang) und einen Rechner **im selben Netz**, siehe
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
@@ -89,6 +91,12 @@ Reiter **Enttec Pro USB**:
    (`Gespeichert: /dev/ttyUSB0 → Universe 1`). Ob der Adapter wirklich sendet, zeigt
    erst die Statusleiste (Schritt 8).
 
+**Rückfrage vor dem Ersetzen.** Läuft auf dem gewählten Universum schon eine **andere**
+Ausgabe (anderer Weg, anderer Port, andere Ziel-IP), fragt LightOS vor dem Einrichten
+**Laufende Ausgabe ersetzen?** – mit **Nein** bleibt alles, wie es ist. Das gilt für
+**Verbinden** hier und im Reiter uDMX (USB) und für **Übernehmen** in den Reitern
+Art-Net und sACN. Dieselbe Ausgabe noch einmal einzurichten löst keine Frage aus.
+
 ## uDMX-Adapter (USB)
 
 Reiter **uDMX (USB)** — für Adapter, die direkt am USB hängen und **keinen COM-Port**
@@ -105,11 +113,39 @@ Reiter hat noch kein Bild.
   `sendet nicht — gespeichert, aber es geht kein DMX raus`.
 - Unter dem Status steht dann der **Grund** und was zu tun ist. Die häufigsten:
   - *Kein Zugriffsrecht* (Linux): einmalig eine udev-Regel einrichten.
-  - *Lässt sich nicht öffnen* (Windows): dem Adapter den WinUSB-Treiber zuweisen.
-  - *pyusb fehlt*: das Zusatzpaket nachinstallieren.
+  - *Treiber fehlt* (Windows): dem Adapter den WinUSB-Treiber zuweisen, siehe unten.
+  - *pyusb fehlt*: läuft LightOS aus dem Quelltext, das Zusatzpaket nachinstallieren;
+    ein älteres Installationspaket aktualisieren (neuere bringen es mit).
 
   Alle drei Wege stehen in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
   installiert selbst keine Treiber und ändert keine Systemeinstellungen.
+
+**Unter Windows: „Treiber fehlt“.** Windows bringt für uDMX-Adapter keinen Treiber mit,
+und LightOS liefert und installiert keinen. Steckt ein Adapter ohne Treiber, sagt der
+Reiter das schon nach **Adapter suchen**: in der Liste steht hinter dem Adapter
+`— Treiber fehlt (WinUSB zuweisen)`, und darunter stehen die Schritte mit anklickbaren
+Links. LightOS öffnet dabei kein Gerät und ändert nichts – es fragt nur Windows.
+
+1. Das Programm Zadig laden: https://zadig.akeo.ie – ein freies Programm eines anderen
+   Anbieters.
+2. Den Adapter einstecken und Zadig starten (Windows fragt nach Administratorrechten).
+3. In Zadig im Menü *Options* den Punkt *List All Devices* einschalten und in der
+   Liste den Adapter wählen – zu erkennen an der USB ID `2008 1066` (CYL-6602) oder
+   `16C0 05DC` (Anyma uDMX).
+4. Als Treiber *WinUSB* einstellen und auf *Install Driver* (oder *Replace Driver*)
+   klicken.
+5. Zurück in LightOS: **Adapter suchen**, dann **Verbinden**.
+
+> **Achtung:** Wähle in Zadig genau den Adapter. Zadig ersetzt den Treiber des
+> gewählten Geräts – eine Maus oder Tastatur funktioniert danach nicht mehr, bis du
+> sie im Geräte-Manager von Windows deinstallierst (mit „Treiber löschen“) und neu
+> einsteckst.
+
+Das **Windows-Installationspaket** (x64) bringt die nötigen Programmteile mit (`pyusb`
+und die Bibliothek libusb – Bibliotheken, keine Treiber): nach der Installation läuft
+uDMX, sobald der Treiber wie oben zugewiesen ist. Ein Installationspaket von vor dem
+12.10.2026 enthält sie noch nicht; der Reiter sagt das dann und rät zum Aktualisieren.
+Auf Windows-ARM64 ist uDMX nicht enthalten.
 
 Haben zwei gleiche Adapter keine Seriennummer, unterscheidet LightOS sie am
 USB-Anschluss. Steckst du einen davon um, wähle ihn im Reiter neu aus.
@@ -221,9 +257,21 @@ Reiter **DMX Monitor** daneben — dieselben Werte, aber mit Gerätenamen:
 1. **Universe:** — Auswahl `Universe 1` bis `Universe 32`.
 2. **Hervorgehobene Kanäle:** — zum Beispiel `1,5,10-20`; diese Kanäle bekommen einen
    gelben Rahmen.
-3. Die Ausgangs-Anzeige: `Universe 1 geht raus` heißt, dieses Universum hat einen
-   Ausgang und wird gesendet. Andernfalls steht dort `⚠ Universe <n> hat keinen
-   Ausgang — nur gerechnet` oder `⚠ Universe <n>: <Weg> sendet NICHT`.
+3. Die Ausgangs-Anzeige sagt dasselbe wie Statusleiste und Banner (Schritt 8):
+
+   | Anzeige | Bedeutung |
+   |---|---|
+   | `Universe 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
+   | `⚠ Universe <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
+   | `Universe <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
+   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
+   | `Universe <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
+
+   Hat ein Universum **mehrere Ausgänge** (zum Beispiel ENTTEC und Art-Net), erscheint
+   daneben die Auswahl **Ausgang:** – der Monitor zeigt, was an den gewählten Ausgang
+   geht. Die Ausgänge senden nur dann Verschiedenes, wenn der Laser-NOT-AUS einen von
+   ihnen sperrt; die Anzeige ergänzt dann
+   `· NOT-AUS-Sperre auf diesem Ausgang: <n> Adressen`.
 4. Die Legende: blauer Rahmen = gepatcht, gelber Rahmen = hervorgehoben. Jede
    gepatchte Kachel trägt ein Kürzel aus Gerät und Kanal, zum Beispiel `PAR 1 R`.
 
@@ -243,7 +291,12 @@ Kopfleiste gedrückt:
    Heads. Sie behalten ihre Werte (200 und 60), nur deren Dimmer geht auf 0. Die Köpfe
    bleiben also stehen und fahren beim Lösen nicht erst zurück.
 
-Geräte ohne Dimmerkanal, Laser und Nebel gehen beim Blackout ganz aus.
+Geräte ohne Dimmerkanal und Nebelmaschinen gehen beim Blackout ganz auf 0.
+**Laser** bekommen den **Aus-Wert aus ihrem Geräteprofil** (z. B. Betriebsart
+„Laser aus“), alle übrigen Laser-Kanäle gehen auf 0. Der Aus-Wert ist nicht immer 0 —
+im DMX-Monitor steht bei einem Laser nach dem Blackout also nicht unbedingt überall
+0. Kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich weiter (Einzelheiten,
+auch zum **Laser-NOT-AUS**: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 ## 8. Warnungen in der Statusleiste lesen
 
@@ -279,6 +332,32 @@ ausgeblendet ist. Er verschwindet von selbst, sobald der Ausgang einige Sekunden
 sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist **gar kein**
 Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
 Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
+
+## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
+
+Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
+sendet – ein ENTTEC DMX USB Pro oder ein uDMX-Adapter ebenso wie die meisten
+Art-Net- und sACN-Nodes.
+Damit nach dem Schließen von LightOS nichts weiterleuchtet, sendet LightOS
+vorher **ein letztes Bild**:
+
+- **Beim Beenden:** jede Ausgabe bekommt ein Bild wie bei einem Blackout – alle
+  Lichtkanäle auf 0, Laser auf ihre **Aus-Werte** (nicht einfach 0, siehe
+  Laser-Anleitung). Pan/Tilt, Gobo und Optik von Moving Heads mit Dimmer bleiben
+  stehen; die Köpfe fahren also nicht in die Grundstellung.
+- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
+  gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
+- **Nicht beim „Übernehmen“** einer Einstellung: dort folgt sofort die neue
+  Ausgabe, ein dunkles Bild wäre ein Blitzer auf der Bühne.
+
+Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
+rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
+dann kein letztes Bild – alle anderen schon.
+
+> **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
+> ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
+> was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
+> Schalter am Gerät.
 
 ## Netzwerk-Falle bei Art-Net und sACN
 

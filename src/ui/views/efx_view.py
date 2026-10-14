@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QTimer, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.widgets.flow_layout import FlowLayout
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
@@ -727,11 +728,6 @@ class EfxView(QWidget):
         self._loading = False
         # M0.1: im Programmer eingebettet folgt EFX automatisch der Auswahl
         self._follow = bool(follow_selection)
-        # UI-84: >0, solange das PROGRAMM die Listenzeile setzt (Laden, Refresh,
-        # Gruppenwechsel in _rebuild_from_state). Dann ist die Selektion keine
-        # Benutzeraktion -> _select_efx darf die Geraeteliste NICHT aus der
-        # Auswahl neu bilden (Laden/Refresh veraendert nie Funktionsdaten).
-        self._programm_waehlt = 0
         # E2: EFX editiert die Live-Instanz direkt (gewollt fuer Live-Programming),
         # informiert aber Bibliothek/andere EFX-Ansicht ueber Aenderungen —
         # entprellt, damit Spin-/Tipp-Folgen nicht je Tick FUNCTION_CHANGED feuern.
@@ -955,8 +951,9 @@ class EfxView(QWidget):
         self._rebuild_from_state()
 
     def _on_group_changed(self):
-        """GROUP_CHANGED: im Folgemodus die gefilterte Liste + Geraete-Zuweisung
-        aus der (ggf. geaenderten) aktiven Gruppe neu ableiten."""
+        """GROUP_CHANGED: im Folgemodus die gefilterte Liste aus der (ggf.
+        geaenderten) aktiven Gruppe neu ableiten; Geraete bekommt dabei nur der
+        eigene Entwurf (UI-91)."""
         if self._follow:
             try:
                 self._sync_follow_selection()
@@ -999,12 +996,9 @@ class EfxView(QWidget):
             # currentRowChanged -> _select_efx setzt _current auf die richtige
             # (gefilterte) Instanz, auch wenn der Index gleich bleibt.
             target = next((i for i, e in enumerate(vis) if e.id == prev_id), -1)
-            # UI-84: programmatische Selektion — keine Folge-Zuweisung.
-            self._programm_waehlt += 1
-            try:
-                self._list.setCurrentRow(target if target >= 0 else 0)
-            finally:
-                self._programm_waehlt -= 1
+            # UI-84/UI-91: _select_efx weist nie Geraete zu — die vom Programm
+            # vorgewaehlte Zeile wird nur angezeigt.
+            self._list.setCurrentRow(target if target >= 0 else 0)
             self._update_group_header()
             self._update_save_state()
         except RuntimeError:
@@ -1015,9 +1009,10 @@ class EfxView(QWidget):
         # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
         super().showEvent(event)
         self._rebuild_from_state()
-        # Folgemodus: die gefilterte Liste + Geraete-Zuweisung sofort aus der
-        # aktiven Gruppe ableiten, sobald die EFX-Ansicht sichtbar wird (analog
-        # rgb_matrix_view.showEvent — set_selected_group_id feuert kein Event).
+        # Folgemodus: die Liste sofort auf die aktive Gruppe filtern, sobald die
+        # EFX-Ansicht sichtbar wird (analog rgb_matrix_view.showEvent —
+        # set_selected_group_id feuert kein Event). UI-91: Sichtbarwerden weist
+        # keinem gespeicherten EFX Geraete zu.
         if self._follow:
             try:
                 self._sync_follow_selection()
@@ -1329,15 +1324,12 @@ class EfxView(QWidget):
                                   "und hält am Endpunkt an")
         self._loop_chk.toggled.connect(self._on_param_change)
         tform.addRow("Loop:", self._loop_chk)
-        # F-17: Layer-Prioritaet beim Engine-Merge.
-        self._priority_spin = QSpinBox()
-        self._priority_spin.setRange(-99, 99)
-        self._priority_spin.setValue(0)
-        self._priority_spin.setToolTip(
-            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
-            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
-        self._priority_spin.valueChanged.connect(self._on_param_change)
-        tform.addRow("Layer-Priorität:", self._priority_spin)
+        # ENG-35: Stufe statt Zahlenfeld „Layer-Priorität“ (F-17). Lose
+        # Betriebsart — _on_param_change schreibt alle Felder gemeinsam.
+        self._stufe_combo = StufeAuswahl()
+        self._stufe_combo.stufe_gewaehlt.connect(self._on_param_change)
+        tform.addRow("Stufe:", self._stufe_combo)
+        stufen_melder().geaendert.connect(self._stufe_von_aussen)
         # ARC-04: Ein-/Ausblend-Hüllkurve (Sekunden, 0 = sofort).
         self._env_in_spin = QDoubleSpinBox()
         self._env_in_spin.setRange(0.0, 60.0)
@@ -1542,6 +1534,18 @@ class EfxView(QWidget):
             fx_btns.addWidget(b)
         btn_fx_add.clicked.connect(self._add_fixture)
         btn_fx_rem.clicked.connect(self._remove_fixture)
+        # UI-91: im Programmer (Folgemodus) die EINE ausdrueckliche Handlung, mit
+        # der ein gespeicherter EFX die aktuelle Auswahl als Geraete bekommt.
+        self._btn_fx_take = QPushButton("Auswahl übernehmen")
+        self._btn_fx_take.setFixedHeight(24)
+        self._btn_fx_take.setStyleSheet(btn_fx_add.styleSheet())
+        self._btn_fx_take.setToolTip(
+            "Setzt die Geräte dieses EFX auf die im Programmer gewählten "
+            "beweglichen Geräte. Ein gespeicherter EFX ändert seine Geräte nur "
+            "über diesen Knopf.")
+        self._btn_fx_take.setVisible(False)
+        self._btn_fx_take.clicked.connect(self._auswahl_uebernehmen)
+        fx_btns.addWidget(self._btn_fx_take)
         fx_l.addLayout(fx_btns)
         body.addWidget(fx_box)
 
@@ -1597,10 +1601,10 @@ class EfxView(QWidget):
         # UI-04: Im Standalone-EFX-Tab bekommt eine frische Bewegung sofort
         # Geraete (aktuelle Auswahl, sonst alle gepatchten Movingheads) — sonst
         # laeuft ein spaeteres ▶ Start stumm (write() bricht bei leerer Liste ab).
-        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung. UI-84:
-        # ausdruecklich hier — die Zeilenwahl laeuft ueber _rebuild_from_state
-        # (programmatisch, also ohne Folge-Zuweisung in _select_efx), und ein
-        # zweites setCurrentRow auf dieselbe Zeile feuert kein Signal mehr.
+        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung —
+        # ausdruecklich hier, denn die Zeilenwahl (_select_efx) weist nie
+        # Geraete zu (UI-84/UI-91). Danach folgt der Entwurf der Auswahl, bis er
+        # gespeichert ist (_folgt_auswahl).
         if self._follow:
             if self._current is efx and self._editor_sichtbar():
                 self._assign_from_selection()
@@ -1702,18 +1706,17 @@ class EfxView(QWidget):
         self._load_to_ui(self._current)
         if self._popout is not None:
             self._popout.bind(self._current)
-        # Im Follow-Modus uebernimmt die neu gewaehlte EFX sofort die Auswahl —
-        # UI-84: aber NUR, wenn der Benutzer die Zeile im sichtbaren Editor
-        # waehlt. Setzt das Programm die Zeile (Show laden, REFRESH_ALL,
-        # FUNCTION_CHANGED, Gruppenwechsel), bleibt die Geraeteliste der EFX
-        # unangetastet; sonst wurde beim Laden im Hauptfenster die erste EFX auf
-        # die gerade aktuelle (oft leere) Auswahl umgeschrieben und danach von
-        # der Auto-Zuweisung mit ALLEN Movern gefuellt. Die gewollte Folge-
-        # Zuweisung bei Auswahl-/Gruppenwechsel macht _sync_follow_selection
-        # (dort ebenfalls nur bei sichtbarem Editor).
-        if (self._follow and self._programm_waehlt == 0
-                and self._editor_sichtbar() and not _show_laedt()):
-            self._assign_from_selection()
+        # UI-91: Eine Zeile anzuzeigen ist KEINE Zuweisung — egal ob das
+        # Programm sie setzt (Reiter oeffnen, Laden, Refresh, Gruppenwechsel)
+        # oder der Benutzer sie anklickt. Frueher band ein Klick den EFX an die
+        # Programmer-Auswahl, und showEvent/_sync_follow_selection taten
+        # dasselbe mit der vom Programm vorgewaehlten Zeile 1: Reiter „EFX"
+        # oeffnen genuegte, und der erste EFX hatte statt 20 nur noch die 2
+        # gewaehlten Geraete. Die Liste aendert sich nur noch ueber „Auswahl
+        # übernehmen" oder am eigenen Entwurf (_folgt_auswahl); hier wird nur
+        # angezeigt.
+        if self._follow:
+            self._geraete_anzeige_aktualisieren()
         self._update_save_state()
 
     def _editor_sichtbar(self) -> bool:
@@ -1725,13 +1728,16 @@ class EfxView(QWidget):
     # ── Follow-Selection (M0.1, eingebettet im Programmer) ────────────────────
 
     def _enable_follow_selection(self):
-        """EFX folgt automatisch der Programmer-Geraeteauswahl; manuelle
-        Fixture-Zuweisung wird ausgeblendet. Die Liste ist auf die aktive Gruppe
-        gefiltert (siehe _visible_instances)."""
+        """Programmer-Einbettung: die Liste ist auf die aktive Gruppe gefiltert
+        (siehe _visible_instances); statt „+ Fixture/Entfernen" gibt es den Knopf
+        „Auswahl übernehmen". Der Auswahl FOLGT nur der eigene, noch nicht
+        gespeicherte Entwurf (UI-91, siehe _folgt_auswahl)."""
         try:
             self._btn_fx_add.setVisible(False)
             self._btn_fx_rem.setVisible(False)
-            self._fx_box.setTitle("Geräte (folgen der Auswahl)")
+            self._btn_fx_take.setVisible(True)
+            self._btn_fx_take.setEnabled(False)
+            self._fx_box.setTitle("Geräte")
         except Exception:
             pass
         # KEIN Auto-Anlegen mehr: frueher wurde hier eine Standard-EFX erzeugt.
@@ -1751,12 +1757,10 @@ class EfxView(QWidget):
         self._sync_follow_selection()
 
     def _sync_follow_selection(self):
-        """Folgt der Programmer-Auswahl: Liste auf die aktive Gruppe filtern und der
-        ausgewaehlten EFX die Geraete der Auswahl/Gruppe zuweisen.
-
-        Die Liste zeigt nur EFX der aktiven Gruppe (+ ungebundene/verwaiste); die
-        ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
-        sodass die Geraete-Zuweisung korrekt ist. Spiegelt
+        """Auswahl-/Gruppenwechsel im Programmer: Liste auf die aktive Gruppe
+        filtern. Nur der eigene ENTWURF bekommt dabei die Auswahl als Geraete
+        (UI-91, _folgt_auswahl); an einem gespeicherten EFX wird nur angezeigt,
+        ob seine Geraete von der Auswahl abweichen. Spiegelt
         rgb_matrix_view._sync_follow_selection."""
         # WURZEL-FIX (2026-06-24): Follow-Assignment NUR, waehrend diese
         # eingebettete EFX-Editor-Seite wirklich sichtbar/aktiv ist. Sonst wuerde
@@ -1783,50 +1787,120 @@ class EfxView(QWidget):
             # Auswahl als Nebenwirkung neu (Live View bei patch_changed ->
             # SELECTION_CHANGED). Das ist kein Benutzer-Auswahlwechsel: nur die
             # Anzeige neu aufbauen, die geladene Geraeteliste nicht anfassen.
-            if not _show_laedt():
+            if self._folgt_auswahl() and not _show_laedt():
                 self._assign_from_selection()
+            else:
+                self._geraete_anzeige_aktualisieren()
             self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel geloescht
 
+    def _folgt_auswahl(self) -> bool:
+        """UI-91: Folgt der gerade angezeigte EFX der Programmer-Auswahl?
+
+        Nur der in DIESEM Editor frisch angelegte, noch nicht gespeicherte
+        Entwurf („+ Neu" bis „💾 Speichern"). Ein gespeicherter EFX aendert
+        seine Geraeteliste nie von selbst — nicht beim Oeffnen des Reiters,
+        nicht bei einer vom Programm gesetzten Zeile, nicht beim Anklicken und
+        nicht beim Auswahlwechsel —, sondern nur ueber „Auswahl übernehmen"."""
+        cur = self._current
+        return bool(self._follow and cur is not None
+                    and self._draft_id is not None
+                    and getattr(cur, "id", None) == self._draft_id)
+
+    def _auswahl_bewegliche(self):
+        """(movers, spiders, laser): bewegliche Geraete der Programmer-Auswahl in
+        Auswahl-/Gruppenreihenfolge (wichtig fuer Fan/Spread) samt Anzahl der
+        Spider und Laser darunter. Nur lesend."""
+        from src.core.app_state import (get_state, get_channels_for_patched,
+                                        is_dual_tilt_fixture)
+        state = get_state()
+        try:
+            fids = [int(f) for f in state.get_selected_fids()]
+        except Exception:
+            fids = []
+        patched = {f.fid: f for f in state.get_patched_fixtures()}
+        movers = []
+        spiders = 0
+        laser = 0
+        for fid in fids:
+            fx = patched.get(fid)
+            if fx is None:
+                continue
+            attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
+            # Moving Heads: Pan UND Tilt. Spider/Doppeltilter: >=2 Tilts, KEIN
+            # Pan — die wuerden sonst durchs Raster fallen, obwohl die EFX-
+            # Engine ihren Tilt (mit Auto-Schere) bewegen kann.
+            if "pan" in attrs and "tilt" in attrs:
+                movers.append(fid)
+            elif is_dual_tilt_fixture(fx):
+                movers.append(fid)
+                spiders += 1
+            elif laser_achsen_attrs(attrs):
+                # LAS-22: Laser-Bild ueber laser_x/laser_y.
+                movers.append(fid)
+                laser += 1
+        return movers, spiders, laser
+
+    def _geraete_anzeige_aktualisieren(self):
+        """UI-91: Geraete-Box eines NICHT folgenden EFX im Programmer — zeigt die
+        gespeicherten Geraete und sagt, ob die Auswahl davon abweicht. Schreibt
+        nichts in den EFX."""
+        if not self._follow:
+            return
+        try:
+            cur = self._current
+            if cur is None:
+                self._fx_box.setTitle("Geräte")
+                self._btn_fx_take.setEnabled(False)
+                return
+            if self._folgt_auswahl():
+                # Der Entwurf haelt seine Liste selbst aktuell
+                # (_assign_from_selection setzt Titel und Liste).
+                self._btn_fx_take.setEnabled(False)
+                return
+            try:
+                movers, _sp, _la = self._auswahl_bewegliche()
+                ziel = [(t.fid, getattr(t, "head", None))
+                        for t in self._targets_for(movers)]
+            except Exception:
+                ziel = []
+            ist = [(f.fid, getattr(f, "head", None)) for f in cur.fixtures]
+            n = len(ist)
+            weicht_ab = bool(ziel) and ziel != ist
+            if not n:
+                title = "Geräte: keine zugewiesen"
+            else:
+                title = f"Geräte: {n} gespeichert"
+            if weicht_ab:
+                title += " – Auswahl weicht ab"
+            self._fx_box.setTitle(title)
+            self._btn_fx_take.setEnabled(weicht_ab)
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel geloescht
+
+    def _auswahl_uebernehmen(self):
+        """UI-91: Knopf „Auswahl übernehmen" — die ausdrueckliche Handlung, mit
+        der ein (auch gespeicherter) EFX die aktuelle Auswahl als Geraete
+        bekommt."""
+        if self._current is None:
+            return
+        self._assign_from_selection()
+        self._notify_timer.start()      # Bibliothek/2. Ansicht aktualisieren
+        self._geraete_anzeige_aktualisieren()
+
     def _assign_from_selection(self):
         """Baut die Fixture-Liste der aktiven EFX aus der aktuellen Auswahl —
         nur Geraete mit Pan UND Tilt (Moving Heads). Reihenfolge = Auswahl-/
-        Gruppenreihenfolge (wichtig fuer Fan/Spread)."""
+        Gruppenreihenfolge (wichtig fuer Fan/Spread).
+
+        UI-91: SCHREIBT in den EFX. Aufrufer sind nur ausdrueckliche Handlungen
+        („+ Neu", „Auswahl übernehmen") und der eigene Entwurf, solange er der
+        Auswahl folgt — nie eine blosse Anzeige."""
         try:
             if self._current is None:
-                if self._visible_instances():
-                    self._list.setCurrentRow(0)
-                if self._current is None:
-                    return
-            from src.core.app_state import (get_state, get_channels_for_patched,
-                                            is_dual_tilt_fixture)
-            state = get_state()
-            try:
-                fids = [int(f) for f in state.get_selected_fids()]
-            except Exception:
-                fids = []
-            patched = {f.fid: f for f in state.get_patched_fixtures()}
-            movers = []
-            spiders = 0
-            laser = 0
-            for fid in fids:
-                fx = patched.get(fid)
-                if fx is None:
-                    continue
-                attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
-                # Moving Heads: Pan UND Tilt. Spider/Doppeltilter: >=2 Tilts, KEIN
-                # Pan — die wuerden sonst durchs Raster fallen, obwohl die EFX-
-                # Engine ihren Tilt (mit Auto-Schere) bewegen kann.
-                if "pan" in attrs and "tilt" in attrs:
-                    movers.append(fid)
-                elif is_dual_tilt_fixture(fx):
-                    movers.append(fid)
-                    spiders += 1
-                elif laser_achsen_attrs(attrs):
-                    # LAS-22: Laser-Bild ueber laser_x/laser_y.
-                    movers.append(fid)
-                    laser += 1
+                return
+            movers, spiders, laser = self._auswahl_bewegliche()
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
             _kopf = _head_beschriftung()
@@ -1835,12 +1909,13 @@ class EfxView(QWidget):
             if not movers:
                 title = "Geräte: keine beweglichen Geräte in der Auswahl"
             elif spiders == len(movers):
-                title = f"Geräte: {len(movers)} Spider (folgen der Auswahl)"
+                title = f"Geräte: {len(movers)} Spider"
             elif laser == len(movers):
-                title = (f"Geräte: {len(movers)} Laser — bewegt X/Y "
-                         "(folgen der Auswahl)")
+                title = f"Geräte: {len(movers)} Laser — bewegt X/Y"
             else:
-                title = f"Geräte: {len(movers)} Gerät(e) (folgen der Auswahl)"
+                title = f"Geräte: {len(movers)} Gerät(e)"
+            if movers and self._folgt_auswahl():
+                title += " (folgen der Auswahl)"
             self._fx_box.setTitle(title)
             # Editor-Modus (Moving Head vs. Spider) an die neue Auswahl anpassen.
             self._update_spider_mode()
@@ -1873,7 +1948,7 @@ class EfxView(QWidget):
             self._tempo_phase_spin.setValue(
                 float(getattr(efx, "phase_offset", 0.0)))
             self._tempo_align_check.setChecked(bool(getattr(efx, "align_on_start", True)))
-            self._priority_spin.setValue(int(getattr(efx, "priority", 0)))
+            self._stufe_combo.setze_zahl(getattr(efx, "priority", 0))
             self._env_in_spin.setValue(float(getattr(efx, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(efx, "env_fade_out", 0.0)))
             _ci = self._env_curve_combo.findData(getattr(efx, "env_curve", "linear"))
@@ -1921,6 +1996,19 @@ class EfxView(QWidget):
                 self._list.item(row).setText(text)
             self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
 
+    def _stufe_von_aussen(self, ids):
+        """ENG-35: Die Stufe des geoeffneten Effekts wurde anderswo geaendert
+        (Ansicht „Prioritäten“, Rueckgaengig) — nur das Feld nachziehen, kein
+        Neuaufbau. Sonst schriebe die naechste Parameter-Aenderung den alten
+        Feldwert zurueck."""
+        cur = getattr(self, "_current", None)
+        if cur is None or getattr(cur, "id", None) not in ids:
+            return
+        try:
+            self._stufe_combo.setze_zahl(getattr(cur, "priority", 0))
+        except RuntimeError:
+            pass
+
     def _on_param_change(self):
         if self._current is None or self._loading:
             return
@@ -1945,7 +2033,7 @@ class EfxView(QWidget):
         self._current.relative  = self._relative_chk.isChecked()
         self._current.bit16     = self._bit16_chk.isChecked()
         self._current.loop      = self._loop_chk.isChecked()
-        self._current.priority  = self._priority_spin.value()
+        self._current.priority  = self._stufe_combo.zahl()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
@@ -2363,6 +2451,8 @@ class EfxView(QWidget):
                 self._fx_list.addItem(self._target_label(_t, _kopf))
             if not self._follow:
                 self._fx_box.setTitle(f"Geräte: {len(movers)} automatisch zugewiesen")
+            else:
+                self._geraete_anzeige_aktualisieren()
             self._notify_timer.start()  # Bibliothek/2. Ansicht aktualisieren
         return len(self._current.fixtures)
 
