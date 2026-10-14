@@ -47,6 +47,8 @@ OPTION_LABELS = {
 # hoechste Praezedenz (VCL-03: loop_mode="reverse" = "rueckwaerts LEEREN").
 OPTION_LABELS_BY_KEY = {
     "loop_mode": {"reverse": "Rückwärts leeren"},
+    # ENG-37: Betriebsart eines Modify-Effekts.
+    "modify_mode": {"add": "Addieren", "sub": "Abziehen", "dim": "Abdunkeln"},
 }
 
 

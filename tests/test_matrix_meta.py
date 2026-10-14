@@ -20,7 +20,7 @@ from src.core.engine.rgb_matrix_meta import ALGO_META, AlgoMeta, ParamSpec, meta
 # Erlaubte Param-Keys = exakt die, die _render()/die Render-Helfer auswerten.
 ALLOWED_KEYS = {
     # klassische
-    "runner_count", "runner_width", "invert", "beam_width", "fade", "turns",
+    "runner_count", "runner_width", "runner_step", "invert", "beam_width", "fade", "turns",
     # konsolidierte Grundalgorithmen (Phase 3)
     "axis", "movement", "origin", "blend", "edge_fade", "density", "spread", "color_cycle",
     # Phase-4-Algorithmen (Fill / Random / ColorFade / Rainbow)
@@ -68,7 +68,7 @@ def test_chase_params():
     meta = ALGO_META[RgbAlgorithm.CHASE]
     assert meta.direction is True
     keys = {s.key for s in meta.params}
-    assert keys == {"axis", "movement", "runner_count", "runner_width",
+    assert keys == {"axis", "movement", "runner_count", "runner_width", "runner_step",
                     "after_fade", "color_cycle", "color_order", "color_interval",
                     "dimmer_cycle", "dimmer_order", "dimmer_interval", "invert"}
 

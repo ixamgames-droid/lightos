@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt
 from src.core.engine.collection import Collection
 from src.core.engine.function_manager import get_function_manager
 from src.ui.weak_slots import weak_slot
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufe_zeile
 
 
 class CollectionEditor(QWidget):
@@ -35,6 +36,15 @@ class CollectionEditor(QWidget):
         self._edit_name.editingFinished.connect(self._on_name_changed)
         name_row.addWidget(self._edit_name, 1)
         root.addLayout(name_row)
+
+        # ENG-35: Stufe (welcher Effekt gewinnt). Gilt fuer die Sammlung als
+        # Ganzes — ihre Mitglieder laufen in IHREM Durchlauf mit.
+        _zeile, self._stufe_combo = stufe_zeile(self._coll)
+        self._stufe_combo.setToolTip(
+            StufeAuswahl.TOOLTIP + "\nDie Stufe der Sammlung gilt für alle "
+            "ihre Mitglieder; deren eigene Stufe zählt nur, wenn sie einzeln "
+            "gestartet werden.")
+        root.addWidget(_zeile)
 
         # Member list
         list_box = QGroupBox("Enthaltene Funktionen (parallel)")

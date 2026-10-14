@@ -199,6 +199,7 @@ _ITEMAT_ERLAUBT = {
     "src/ui/views/efx_view.py": "liest nur; das Formular lebt so lang wie seine Zeilen",
     "src/ui/views/snap_file_panel.py": "Listen-Eintrag unter dem Mauszeiger, kein Layout",
     "src/ui/views/function_manager_view.py": "Baum-Eintrag unter dem Mauszeiger, kein Layout",
+    "src/ui/views/prioritaeten_view.py": "Baum-Eintrag unter dem Mauszeiger, kein Layout",
     "src/ui/widgets/flow_layout.py": "eigenes Layout, definiert itemAt selbst",
 }
 

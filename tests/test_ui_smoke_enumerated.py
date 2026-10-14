@@ -43,6 +43,7 @@ PUBLIC_NO_ARG_VIEWS = {
     "patch_view": "PatchView",
     "playback_view": "PlaybackView",
     "preset_browser_view": "PresetBrowserView",
+    "prioritaeten_view": "PrioritaetenView",
     "programmer_view": "ProgrammerView",
     "rgb_matrix_view": "RgbMatrixView",
     "show_manager_view": "ShowManagerView",
