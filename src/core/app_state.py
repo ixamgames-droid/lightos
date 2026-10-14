@@ -1902,6 +1902,17 @@ class AppState:
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
+        # OUT-72: Aus-Werte von Lasern, die mit diesem Plan aus dem Patch
+        # gefallen sind, stehen lassen — sonst faellt ihre Adresse auf 0, und
+        # 0 heisst bei manchem Laser „an“.
+        # ★ Codex-Review #1056: VOR der Freigabe. ``_release_now`` schreibt die
+        # alten Laser-Adressen sofort auf 0, und gegen ``_send_all`` gibt es
+        # ausserhalb von ``_plan_lock`` keine Sperre — stand die Maske erst
+        # danach, konnte dazwischen ein Frame mit 0 („Auto run“) hinausgehen.
+        try:
+            self._laser_aus_verwaist_nachfuehren(new_laser_aus, new_patched_set)
+        except Exception as e:
+            print(f"[AppState] laser aus verwaist error: {e}")
         self._release_unpatched_addrs(old_patched, new_patched_set,
                                      never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
@@ -1920,13 +1931,6 @@ class AppState:
                           else self._build_gm_laser_aus_mask(fix_index))
         except Exception as e:
             print(f"[AppState] set gm laser mask error: {e}")
-        # OUT-72: Aus-Werte von Lasern, die mit diesem Plan aus dem Patch
-        # gefallen sind, stehen lassen — sonst faellt ihre Adresse auf 0, und
-        # 0 heisst bei manchem Laser „an“.
-        try:
-            self._laser_aus_verwaist_nachfuehren(new_laser_aus, new_patched_set)
-        except Exception as e:
-            print(f"[AppState] laser aus verwaist error: {e}")
         # OUT-57: Blackout-ERHALTEN-Maske — nur Position/Gobo/Prisma/Optik gepatchter
         # Lampen mit echtem Dimmer bleiben beim Blackout stehen, alles andere geht
         # auf 0 (auch ungepatchte Roh-Adressen im selben Universum).

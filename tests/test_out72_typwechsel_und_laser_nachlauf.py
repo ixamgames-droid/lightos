@@ -789,6 +789,26 @@ class _MitZustand(unittest.TestCase):
 
 class LaserEntpatchtTest(_MitZustand):
 
+    def test_kein_frame_mit_null_zwischen_freigabe_und_maske(self):
+        """Codex-Review #1056: ``_release_now`` schreibt die alte Laser-Adresse
+        sofort auf 0; gegen ``_send_all`` gibt es dabei keine Sperre. Ein Frame,
+        der genau DANN hinausgeht, muss schon den Aus-Wert tragen — die Maske
+        wird vor der Freigabe gesetzt."""
+        self._patch(_laser(), programmer={7: {"shutter": 120}})
+        self.assertEqual(self._gesendet()[9], 120)
+        mitten: list = []
+        echt = self.st._release_now
+
+        def freigeben_und_senden(alt, neu):
+            echt(alt, neu)
+            bilder: dict = {}
+            self.om._send_all(_nur_rechnen=bilder)     # Sende-Thread dazwischen
+            mitten.append(bilder[1][9])
+        self.st._release_now = freigeben_und_senden
+        self._patch()
+        self.assertEqual(mitten, [AUS], "Frame mit 0 („Auto run“) zwischen "
+                                        "Freigabe und Maske")
+
     def test_der_fall_aus_dem_befund(self):
         """Laser laeuft auf „Manual“ (120), wird aus dem Patch genommen: die
         Adresse darf nicht auf 0 („Auto run“) fallen."""
