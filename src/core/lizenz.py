@@ -350,22 +350,33 @@ def installiere(quelle, heute: _dt.date | None = None
 
 # ── Wann fragt der Start? (reine Funktionen, ohne Qt) ────────────────────────
 
-def testlauf(env=None, module=None) -> bool:
+def testlauf(env=None, module=None, gepackt: bool | None = None) -> bool:
     """True, wenn die Testsuite die Abfrage ausdruecklich abgeschaltet hat.
 
     Der Schalter ``LIGHTOS_LIZENZ_TESTLAUF=1`` wirkt NUR unter pytest: entweder
     laeuft pytest in diesem Prozess, oder der Prozess wurde von einem Test
     gestartet (pytest setzt ``PYTEST_CURRENT_TEST`` und vererbt es). Ausserhalb
-    davon ist er wirkungslos."""
+    davon ist er wirkungslos.
+
+    Codex-Review #1076: beide Angaben stammen nur aus der Umgebung — zwei
+    gesetzte Variablen umgingen so die Lizenzabfrage auch beim gepackten
+    Programm. Im gepackten Programm (``sys.frozen``, PyInstaller) gibt es keine
+    Testsuite; dort wirkt der Schalter deshalb nie. Wer aus dem Quelltext
+    startet, kann den Code ohnehin aendern — dort bleibt es beim Schalter."""
     env = os.environ if env is None else env
     module = sys.modules if module is None else module
+    if gepackt is None:
+        gepackt = bool(getattr(sys, "frozen", False))
+    if gepackt:
+        return False
     if env.get(ENV_TESTLAUF) != "1":
         return False
     return "PYTEST_CURRENT_TEST" in env or "pytest" in module
 
 
 def abfrage_noetig(status: Lizenzstatus, *, selbsttest: bool = False,
-                   diagnose: bool = False, env=None, module=None) -> bool:
+                   diagnose: bool = False, env=None, module=None,
+                   gepackt: bool | None = None) -> bool:
     """Muss der GUI-Start nach einer Lizenzdatei fragen?
 
     Nie bei ``--selbsttest`` und ``--diagnose`` (beide oeffnen kein Fenster),
@@ -373,7 +384,7 @@ def abfrage_noetig(status: Lizenzstatus, *, selbsttest: bool = False,
     und ``--touch`` aendern daran nichts."""
     if selbsttest or diagnose:
         return False
-    if testlauf(env, module):
+    if testlauf(env, module, gepackt):
         return False
     return not status.ist_gueltig
 
