@@ -69,6 +69,7 @@
 | VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 | TOOL-27 | A | fix/tool27-pruefwerkzeuge-eigene-sandbox | 2026-10-13T20:41Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
+| QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 
 ## Blocker & Fallen
 
@@ -277,7 +278,6 @@
 
 ## Verlauf
 
-- 2026-10-13T20:41Z A claim TOOL-27
 - 2026-10-13T20:44Z A done VIZ-104
 - 2026-10-13T21:06Z B done VIZ-105
 - 2026-10-13T21:45Z B done STAB-37
@@ -307,3 +307,4 @@
 - 2026-10-14T15:10Z A done ENG-41
 - 2026-10-14T15:39Z D done UI-87
 - 2026-10-14T16:17Z B done VIZ-107
+- 2026-10-14T16:29Z A claim QA-97
