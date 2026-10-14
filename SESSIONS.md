@@ -71,7 +71,6 @@
 | VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 | TOOL-27 | A | fix/tool27-pruefwerkzeuge-eigene-sandbox | 2026-10-13T20:41Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
-| ENG-41 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 
 ## Blocker & Fallen
 
@@ -280,7 +279,6 @@
 
 ## Verlauf
 
-- 2026-10-13T20:18Z A claim UI-93
 - 2026-10-13T20:18Z A claim VCB-47
 - 2026-10-13T20:21Z D done OUT-77
 - 2026-10-13T20:41Z A claim TOOL-27
@@ -310,3 +308,4 @@
 - 2026-10-14T15:10Z A done QA-97
 - 2026-10-14T15:10Z A done QA-98
 - 2026-10-14T15:10Z A done UI-94
+- 2026-10-14T15:10Z A done ENG-41
