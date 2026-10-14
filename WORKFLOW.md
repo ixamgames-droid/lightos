@@ -453,6 +453,70 @@ gemessen werden dadurch drei kerngesunde Dateien rot (`test_vc_asset_gc`,
 `test_janitor`, `test_qa58_bibliothek_schema_unberuehrt`), bei null
 zusaetzlichen Funden.
 
+## Werkzeuge starten gefahrlos (TOOL-27)
+
+Viele Skripte unter `tools/` bauen die App oder Teile davon (`QApplication`,
+`AppState`, Ansichten, das Hauptfenster). Ohne Schutz arbeiten sie dabei auf dem
+Bestand des Rechners: der Show-Datenbank, den Einstellungen, der
+Geraete-Bibliothek — und sie richten die gespeicherten DMX-Ausgaenge ein. Am
+13.10.2026 hat ein direkt gestartetes Inventar-Werkzeug genau das getan.
+
+Deshalb gilt:
+
+- **Jedes Werkzeug, das die App baut, laedt als erste Import-Zeile die gemeinsame
+  Sandbox** — vor jedem `src`-Import, weil viele Module ihre Pfade beim Import
+  einfrieren:
+
+  ```python
+  import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
+  ```
+
+  Generatoren, die `_gen_env` oder `_builder` laden, haben sie damit schon.
+- **Was die Sandbox tut** (`tools/_werkzeug_sandbox.py`): Sie lenkt den
+  Datenordner der App (`XDG_DATA_HOME` bzw. `APPDATA`), die Show-Datenbank, die
+  Ausgabe-Konfiguration und das Absturzprotokoll in einen Wegwerf-Ordner, der am
+  Ende des Laufs verschwindet. Die Geraete-Bibliothek bekommt das Werkzeug als
+  Kopie — gleicher Bestand, gleiche Profil-IDs, aber kein Schreiben ins Original.
+  Ausgabe-Thread, serieller Kindprozess, rohes USB, Audio-Aufnahme und
+  Datenumzug sind aus; ein Hauptfenster oeffnet die MIDI-Eingaenge des Rechners
+  nicht von selbst (`LIGHTOS_NO_MIDI_AUTOCONNECT`).
+- **Bewusste Vorgaben bleiben stehen.** Wer eine der Variablen selbst setzt
+  (Testlauf, Bild-Sandbox, Sichtproben-Sandkasten), behaelt seinen Wert. Fuer den
+  Datenordner zaehlt nur eine Vorgabe im Temp-Bereich als bewusst — `APPDATA` ist
+  unter Windows immer gesetzt.
+- **Echte Daten nur auf Ansage.** Zwei Werkzeuge sollen am Bestand des Bedieners
+  arbeiten und bekommen ihn nur mit `--echte-daten` (mit Warnzeile, App vorher
+  schliessen, Ausgaenge bleiben auch dann zu): `tools/patch_quarantaene.py`
+  (verwaiste Patch-Zeilen der eigenen Show) und `tools/build_full_show.py`
+  (Alt-Generator auf dem vorhandenen Patch). Die Liste steht in
+  `_werkzeug_sandbox.ECHTE_DATEN_ERLAUBT`; jedes andere Werkzeug bricht bei dem
+  Schalter ab.
+- **Nur lesen geht weiter:** `_werkzeug_sandbox.ECHTER_DATENORDNER` und
+  `_gen_env.echte_universes_json()` nennen, was ohne Umlenkung gaelte
+  (`build_spot90_testshow.py` waehlt so das Universum mit Ausgang).
+- **Eigene Sandbox statt der gemeinsamen** haben `tools/app_messung.py`,
+  `tools/verify_stage_reload.py` und das Bild-Werkzeug (`tools/anleitungsbilder/`)
+  — sie setzen hart und pruefen sich selbst.
+- **Nicht gemeint** sind Werkzeuge, die die App nicht bauen und deren Zweck der
+  Bestand ist: `library_testreste.py`, `bibliothek_profil.py`,
+  `fixture_herkunft.py` (Geraete-Bibliothek), `collect_crash_report.py`
+  (Absturzprotokoll), `import_qlc_input_profile.py` (Controller-Profil ablegen),
+  `hw5_longrun.py` und `mh_einmessen.py` (senden mit Absicht an den echten
+  Port — **nie nebenbei starten**: `hw5_longrun.py` sucht sich ohne `--port`
+  selbst den Enttec und sendet Blackout). Die Liste steht mit Begruendung im
+  Waechter (`AM_BESTAND`); **jedes** Skript, das `src` laedt, muss geschuetzt
+  sein oder dort stehen — und ein Bestands-Werkzeug darf weder den `AppState`
+  noch die Show noch die Oberflaeche laden.
+- **Inventar-Listen nachziehen**, ohne ins Repo zu schreiben:
+  `tools/audit_tooltip_coverage.py --ausgabe DATEI` und
+  `tools/ui_verification_checklist.py --ausgabe DATEI`.
+
+Waechter: `tests/test_tool27_werkzeug_sandbox.py` (statisch ueber alle Skripte,
+dazu beide Inventar-Werkzeuge nackt gestartet — `python tools/<name>.py` aus
+einem fremden Arbeitsordner — gegen einen nachgestellten Datenordner samt
+Gegenprobe; serielle Ports, USB, MIDI, Netz-Sockets und Kindprozesse werden
+dabei mitgeschrieben) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
+
 ## Token-schonende Regeln fuer Agents
 
 - Bei groesseren Implementierungen **Sub-Tasks parallelisieren**

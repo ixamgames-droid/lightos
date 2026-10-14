@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from src.core.app_state import get_state, get_channels_for_patched, resolve_attr_channels
 from src.core.engine.scene import Scene
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufe_zeile
 
 
 class SceneEditor(QWidget):
@@ -61,6 +62,10 @@ class SceneEditor(QWidget):
         self._name_edit.textChanged.connect(self._on_name_changed)
         name_row.addWidget(self._name_edit, 1)
         basics_layout.addLayout(name_row)
+
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        _zeile, self._stufe_combo = stufe_zeile(self._scene)
+        basics_layout.addWidget(_zeile)
 
         # Timing
         timing_row = QHBoxLayout()
@@ -181,6 +186,7 @@ class SceneEditor(QWidget):
     def _load_scene(self):
         self._building = True
         self._name_edit.setText(self._scene.name)
+        self._stufe_combo.binde(self._scene)
         self._spin_fade_in.setValue(self._scene.fade_in)
         self._spin_fade_out.setValue(self._scene.fade_out)
         self._spin_hold.setValue(self._scene.hold)

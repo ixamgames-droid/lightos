@@ -1945,9 +1945,28 @@ class VCCanvas(QWidget):
             except Exception:
                 pass
 
+    @staticmethod
+    def _snap_ansprueche_abmelden(widget) -> None:
+        """VCB-46: eine Taste, die von der Flaeche verschwindet, meldet ihre
+        Snap-Ansprueche ab — auch Tasten IN einem geloeschten Rahmen. Sonst
+        bliebe eine aktive Taste mit Haken „übersteuert laufende Dimmer-Effekte“
+        als Halter stehen und ihr Vorrang gaelte ohne Taste weiter. Geschrieben
+        wird dabei nichts (wie beim Show-Neuladen)."""
+        from .vc_button import VCButton, forget_snap_claims
+        try:
+            betroffen = [widget] + list(widget.findChildren(VCButton))
+        except RuntimeError:
+            return                      # schon abgebaut
+        for w in betroffen:
+            if isinstance(w, VCButton):
+                w._snap_active = False
+                w._snap_prev = {}
+                forget_snap_claims(w)
+
     def _remove_widget(self, widget: VCWidget):
         if not self._restoring:
             self._push_undo()      # Widget geloescht -> per Strg+Z wiederherstellbar
+        self._snap_ansprueche_abmelden(widget)
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
@@ -1956,6 +1975,7 @@ class VCCanvas(QWidget):
     def _clear(self):
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
+            self._snap_ansprueche_abmelden(child)
             child.setParent(None)
             child.deleteLater()
         self.setMinimumSize(QSize(self.BASE_W, self.BASE_H))

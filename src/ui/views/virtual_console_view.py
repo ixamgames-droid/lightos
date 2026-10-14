@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QPushButton,
     QLabel, QSizePolicy, QSplitter,
 )
-from PySide6.QtCore import Qt, QPoint, QSize, QTimer
+from PySide6.QtCore import Qt, QEvent, QPoint, QSize, QTimer
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
 from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
@@ -119,6 +119,16 @@ class SnapshotSidebar(QWidget):
 
 class VirtualConsoleView(QWidget):
     """Full Virtual Console tab: Toolbar + Canvas + Snapshot-Sidebar."""
+
+    # VCB-47: Statuszeile „Aktiver Effekt" — fester Platz, wechselnder Inhalt.
+    _ZEILE_AKTIVER_EFFEKT_H = 22
+    _TEXT_KEIN_EFFEKT = "Kein Effekt aktiv"
+    _STIL_ZEILE_AKTIV = (
+        "background:#0d1117; color:#9DFF52; border-bottom:1px solid #21262d;"
+        " padding:2px 10px; font-size:11px;")
+    _STIL_ZEILE_LEER = (
+        "background:#0d1117; color:#666; border-bottom:1px solid #21262d;"
+        " padding:2px 10px; font-size:11px;")
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -272,6 +282,7 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover { background:#30363d; }
         """)
         self._btn_midi_learn.toggled.connect(self._toggle_midi_learn)
+        self._breite_festhalten(self._btn_midi_learn, (self._btn_midi_learn.text(),))
         tb_layout.addWidget(self._btn_midi_learn)
 
         # APC LEDs Toggle
@@ -289,6 +300,7 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover { background:#30363d; }
         """)
         self._btn_apc_leds.toggled.connect(self._toggle_apc_leds)
+        self._breite_festhalten(self._btn_apc_leds, (self._btn_apc_leds.text(),))
         tb_layout.addWidget(self._btn_apc_leds)
 
         # Touch-Lock (Display-only): nur Anzeige, keine Steuerung per Touchscreen
@@ -306,6 +318,7 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover { background:#30363d; }
         """)
         self._btn_touch_lock.toggled.connect(self._toggle_touch_lock)
+        self._breite_festhalten(self._btn_touch_lock, ("🔒 Touch-Lock", "🔒 Gesperrt"))
         tb_layout.addWidget(self._btn_touch_lock)
 
         # Soft-Takeover / „Pickup": für nicht-motorisierte Controller (APC mini & Co.).
@@ -327,6 +340,7 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover { background:#30363d; }
         """)
         self._btn_pickup.toggled.connect(self._toggle_soft_takeover)
+        self._breite_festhalten(self._btn_pickup, ("🎚 Pickup", "🎚 Pickup AN"))
         tb_layout.addWidget(self._btn_pickup)
 
         # Bank-Umschaltung (= Executor-Page): bestimmt, welche Widgets/Pads aktiv
@@ -417,6 +431,7 @@ class VirtualConsoleView(QWidget):
             QPushButton:hover { background:#30363d; }
         """)
         self._btn_sidebar.toggled.connect(self._toggle_sidebar)
+        self._breite_festhalten(self._btn_sidebar, ("◀ Bibliothek", "▶ Bibliothek"))
         tb_layout.addWidget(self._btn_sidebar)
 
         # Inspector-Panel ein-/ausblenden (nur im Bearbeiten-Modus sichtbar).
@@ -439,13 +454,28 @@ class VirtualConsoleView(QWidget):
         self._toolbar_widget = toolbar
 
         # ── Status-Zeile: aktiver Effekt ──────────────────────────────────────
-        self._lbl_active_fx = QLabel("Aktiver Effekt: —")
+        # VCB-47: Die Zeile hat einen FESTEN, immer reservierten Platz. Sie wurde
+        # frueher (UIC-04) nur bei laufendem Effekt eingeblendet — dadurch rutschte
+        # die ganze Konsole beim ersten Tastendruck um 22 px nach unten, und der
+        # zweite Tipp an derselben Bildschirmstelle ging daneben. Bedienflaechen
+        # einer Live-Konsole duerfen sich durch Statusanzeigen nie verschieben:
+        # die Zeile wird NIE ein-/ausgeblendet, nur Text und Farbe wechseln.
+        self._lbl_active_fx = QLabel(self._TEXT_KEIN_EFFEKT)
         # Feste, schmale Hoehe: sonst dehnt sich das Label vertikal auf und
         # verdeckt die halbe Canvas-Flaeche.
-        self._lbl_active_fx.setFixedHeight(22)
-        self._lbl_active_fx.setStyleSheet(
-            "background:#0d1117; color:#9DFF52; border-bottom:1px solid #21262d;"
-            " padding:2px 10px; font-size:11px;")
+        self._lbl_active_fx.setFixedHeight(self._ZEILE_AKTIVER_EFFEKT_H)
+        # Breite ignorieren: ein langer Effektname darf weder die Mindestbreite
+        # der Ansicht hochtreiben noch irgendetwas zur Seite schieben.
+        self._lbl_active_fx.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        # Ein Effektname ist kein Markup: „<h1>…" im Namen wuerde sonst als
+        # Ueberschrift gesetzt. Umbrochen wird nie — die Zeile bleibt einzeilig.
+        self._lbl_active_fx.setTextFormat(Qt.TextFormat.PlainText)
+        self._lbl_active_fx.setWordWrap(False)
+        self._lbl_active_fx.setToolTip(
+            "Zeigt den zuletzt gestarteten, noch laufenden Effekt und wie viele "
+            "weitere gerade laufen.")
+        self._lbl_active_fx.setStyleSheet(self._STIL_ZEILE_LEER)
         layout.addWidget(self._lbl_active_fx)
         self._active_fx_timer = QTimer(self)
         self._active_fx_timer.setInterval(400)
@@ -626,18 +656,14 @@ class VirtualConsoleView(QWidget):
                                 pass
             if active is not None:
                 extra = f"  (+{running - 1} weitere)" if running > 1 else ""
-                self._lbl_active_fx.setText(
-                    f"Aktiver Effekt: {active.function_type.value} · {active.name}{extra}")
-                self._lbl_active_fx.setStyleSheet(
-                    "background:#0d1117; color:#9DFF52; border-bottom:1px solid #21262d;"
-                    " padding:2px 10px; font-size:11px;")
-                self._lbl_active_fx.setVisible(True)   # UIC-04: nur bei laufendem Effekt sichtbar
+                # Zeilenumbrueche/Tabulatoren im Namen zu Leerzeichen: in der
+                # 22 px hohen Zeile waere sonst nur die mittlere Textzeile zu sehen.
+                name = " ".join(str(active.name).split())
+                self._zeige_aktiven_effekt(
+                    f"Aktiver Effekt: {active.function_type.value} · {name}{extra}",
+                    self._STIL_ZEILE_AKTIV)
             else:
-                self._lbl_active_fx.setVisible(False)
-                self._lbl_active_fx.setText("Aktiver Effekt: —")
-                self._lbl_active_fx.setStyleSheet(
-                    "background:#0d1117; color:#666; border-bottom:1px solid #21262d;"
-                    " padding:2px 10px; font-size:11px;")
+                self._zeige_aktiven_effekt(self._TEXT_KEIN_EFFEKT, self._STIL_ZEILE_LEER)
         except Exception:
             pass
         # To-Do #9: Farb-Kacheln (Programmer/Alle) ausgrauen, sobald eine RGB-/
@@ -654,6 +680,46 @@ class VirtualConsoleView(QWidget):
                         w.update()
         except Exception:
             pass
+
+    def ausgabe_chip_platz(self):
+        """VCB-47 (Nachtrag 2): wo der eingeklappte Hinweis „Ausgabe gestört“
+        des Hauptfensters (``ausgabe_banner.AusgabeChip``) nichts verdeckt — das
+        rechte Ende der Zeile „Aktiver Effekt“. Sie liegt zwischen Werkzeugleiste
+        und Konsole, hat einen festen Platz und traegt keine Bedienung; der Chip
+        beruehrt dort in keiner Fensterbreite einen Knopf oder eine Taste."""
+        return self._lbl_active_fx
+
+    def _zeige_aktiven_effekt(self, text: str, stil: str) -> None:
+        """VCB-47: nur Text und Farbe der Statuszeile wechseln — nie ihre Sichtbarkeit
+        oder Hoehe (sonst verschiebt sich die Konsole unter dem Finger). Unveraenderte
+        Werte werden nicht neu gesetzt: der 400-ms-Takt soll nicht staendig neu stylen."""
+        lbl = self._lbl_active_fx
+        if lbl.text() != text:
+            lbl.setText(text)
+        if lbl.styleSheet() != stil:
+            lbl.setStyleSheet(stil)
+
+    @staticmethod
+    def _breite_festhalten(btn: QPushButton, texte) -> None:
+        """VCB-47: Mindestbreite eines Umschaltknopfs auf seinen breitesten Zustand
+        legen (alle Texte, gedrueckt = fett). Sonst aendert der Knopf beim Umschalten
+        seine Breite, die umbrechende Werkzeugleiste bricht in schmalen Fenstern
+        anders um, wird eine Zeile hoeher oder niedriger — und die Konsole rutscht."""
+        ruhetext, gedrueckt = btn.text(), btn.isChecked()
+        alt = btn.blockSignals(True)
+        try:
+            breite = 0
+            for zustand in (False, True):
+                btn.setChecked(zustand)
+                for text in texte:
+                    btn.setText(text)
+                    btn.ensurePolished()
+                    breite = max(breite, btn.sizeHint().width())
+            btn.setText(ruhetext)
+            btn.setChecked(gedrueckt)
+        finally:
+            btn.blockSignals(alt)
+        btn.setMinimumWidth(breite + 2)
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
@@ -787,7 +853,37 @@ class VirtualConsoleView(QWidget):
         view = self
 
         class _PopoutWindow(QWidget):
+            # VCB-45: Lage/Groesse/Zustand merken. Die drei Ereignisse stossen
+            # nur das entprellte Schreiben an; am Umhaengen des Canvas und an
+            # der Reihenfolge beim Schliessen aendert das nichts.
+            _lage_merker = None
+
+            def _lage_anstossen(self):
+                m = self._lage_merker
+                if m is not None:
+                    m.angestossen()
+
+            def moveEvent(self, event):  # noqa: N802 (Qt-API)
+                super().moveEvent(event)
+                self._lage_anstossen()
+
+            def resizeEvent(self, event):  # noqa: N802 (Qt-API)
+                super().resizeEvent(event)
+                self._lage_anstossen()
+
+            def changeEvent(self, event):  # noqa: N802 (Qt-API)
+                super().changeEvent(event)
+                if event.type() == QEvent.Type.WindowStateChange:
+                    self._lage_anstossen()
+
             def closeEvent(self, event):
+                # VCB-45: letzten Stand festhalten, solange das Fenster noch
+                # steht (liest nur Lage und Zustand).
+                try:
+                    if self._lage_merker is not None:
+                        self._lage_merker.sichern()
+                except Exception as e:
+                    print(f"[VC] Popout-Lage nicht gemerkt: {e}")
                 # Beim Schließen des Popout-Fensters den Canvas zurück in die
                 # Haupt-Ansicht holen — sonst bleibt er im (versteckten) Fenster
                 # hängen und die Virtual Console verschwindet aus LightOS.
@@ -819,7 +915,23 @@ class VirtualConsoleView(QWidget):
 
         self._pop_scroll = pop_scroll
         self._popout_window = win
-        win.show()
+        self._zeige_popout(win)
+
+    def _zeige_popout(self, win):
+        """VCB-45: Popout dort oeffnen, wo es zuletzt lag — sonst (mehrere
+        Bildschirme, nichts gemerkt) maximiert auf dem anderen Bildschirm.
+        Geht dabei etwas schief, oeffnet es wie frueher."""
+        try:
+            from src.ui.virtualconsole import popout_lage as pl
+            paare = pl.lies_bildschirme()
+            lage = pl.ziel_lage([b for b, _ in paare], pl.lade_gemerkt(),
+                                pl.haupt_index(paare, self))
+            win._lage_merker = pl.baue_merker(win, lage, self)
+            qscreen = paare[lage.bildschirm][1] if paare else None
+            pl.oeffne(win, lage, qscreen)
+        except Exception as e:
+            print(f"[VC] Popout-Lage nicht wiederhergestellt: {e}")
+            win.show()
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 

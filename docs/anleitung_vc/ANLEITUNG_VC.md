@@ -164,6 +164,30 @@ wandert):
 
 ![Hardstyle-Show läuft (Live-Ansicht)](gif/hardstyle_show_live.gif)
 
+### Konsole auf einen zweiten Bildschirm legen (Popout)
+
+**⧉ Popout** in der Werkzeugleiste holt die ganze Konsole in ein eigenes Fenster, zum Beispiel
+auf einen Touch-Bildschirm; Schließen des Fensters holt sie ins Hauptfenster zurück. Das
+Fenster merkt sich Bildschirm, Lage, Größe und ob es maximiert war, und öffnet beim nächsten
+**Popout** wieder genau dort – auch nach einem Neustart. Beim allerersten Mal mit zwei
+Bildschirmen öffnet es von selbst maximiert auf dem Bildschirm, auf dem das Hauptfenster
+**nicht** liegt. Ist der gemerkte Bildschirm nicht angeschlossen, erscheint das Fenster beim
+Hauptfenster; sein Platz auf dem fehlenden Bildschirm bleibt dabei gemerkt, solange du das
+Ersatz-Fenster nicht verschiebst.
+
+**Der Bildschirm fällt weg, während das Popout offen ist** (Touch-Bildschirm ausgeschaltet
+oder abgezogen): Das Fenster rutscht auf den verbleibenden Bildschirm, die Konsole bleibt
+bedienbar. Gemerkt bleibt der alte Platz. Wird der Bildschirm wieder angeschlossen, springt
+das Popout nach einem Augenblick von selbst dorthin zurück – in derselben Größe und wieder
+maximiert oder im Vollbild, wenn es das vorher war. Ein anderer, neu angesteckter Bildschirm
+löst nichts aus.
+
+Eine Ausnahme, damit dir das Fenster nicht wegspringt: Verschiebst du das Popout am
+Ersatzplatz selbst oder änderst seine Größe, gilt das als deine neue Wahl. Dann wird dieser
+Platz gemerkt, und das Fenster bleibt dort, auch wenn der Bildschirm zurückkommt. In der
+ersten guten Sekunde nach dem Wegfall zählt eine Bewegung noch nicht als deine – in dieser
+Zeit räumt das Betriebssystem die Fenster um.
+
 ## 5. APC mini anbinden
 
 Es gibt **zwei Wege**, ein VC-Widget auf eine APC-mini-Taste/-Fader zu legen:
