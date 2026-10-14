@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from src.core.engine.carousel import Carousel, CarouselPattern
+from src.ui.widgets.stufe_auswahl import StufeAuswahl
 
 
 class CarouselEditor(QWidget):
@@ -49,6 +50,9 @@ class CarouselEditor(QWidget):
         self._name_edit = QLineEdit(self._c.name)
         self._name_edit.textChanged.connect(self._on_name_changed)
         form_basic.addRow("Name:", self._name_edit)
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        self._stufe_combo = StufeAuswahl(self._c)
+        form_basic.addRow("Stufe:", self._stufe_combo)
 
         self._pattern_combo = QComboBox()
         for p in CarouselPattern:

@@ -36,6 +36,8 @@ _UNIVERSAL_MATRIX_PARAMS: frozenset[str] = frozenset({
     "tempo_bus_id", "tempo_multiplier", "phase_offset",
     "env_fade_in", "env_fade_out", "env_fade",
     "direction", "colors",
+    # ENG-37: nur bei gesetztem Modify-Haken (Stil Dimmer) in list_params.
+    "modify_strength", "modify_mode",
     # Legacy-/Sonder-Keys, die get_param/set_param real verarbeiten, aber NICHT
     # mehr in list_params auftauchen (rgb_matrix.py:1285-1290) — sonst falsch als
     # unbekannt gemeldet (z. B. ein white_amount-Fader in einer Alt-Show).
