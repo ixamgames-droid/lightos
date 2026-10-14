@@ -74,7 +74,7 @@
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
 | LAS-39 | A | fix/las39-laser-erkennung-ohne-datenbank | 2026-10-14T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T14:50Z | - |
-| QA-98 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
+| QA-98 | A | fix/qa98-weissband-test-schneller | 2026-10-14T14:50Z | - |
 | UI-94 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | ENG-41 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | LAS-40 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:17Z | - |
@@ -286,7 +286,6 @@
 
 ## Verlauf
 
-- 2026-10-13T17:01Z A claim PROC-22
 - 2026-10-13T17:04Z A claim ENG-39
 - 2026-10-13T18:06Z D done LAS-38
 - 2026-10-13T18:33Z D done OUT-75
@@ -316,3 +315,4 @@
 - 2026-10-14T14:24Z A aktualisiert LAS-39: Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py
 - 2026-10-14T14:28Z A done IMP-1
 - 2026-10-14T14:50Z A aktualisiert QA-97: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa97-reihenfolge-laser-und-ui69
+- 2026-10-14T14:50Z A aktualisiert QA-98: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa98-weissband-test-schneller
