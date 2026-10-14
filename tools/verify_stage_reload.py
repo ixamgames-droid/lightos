@@ -81,7 +81,8 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
     # Ohne diese Schalter oeffnete es nach 800 ms die MIDI-Eingaenge des
     # Rechners und zaehlte USB-Geraete auf; unter Windows leitet sich der
     # Datenordner aus APPDATA ab, nicht aus XDG_DATA_HOME.
-    os.environ["APPDATA"] = os.path.join(tmp, "appdata")
+    # Gesetzt, nicht aufgeloest (Waechter XPLAT-04/-10 in test_app_data_dir).
+    os.environ.update({"APPDATA": os.path.join(tmp, "appdata")})
     os.environ["LIGHTOS_KEIN_USB"] = "1"
     os.environ["LIGHTOS_SERIAL_INPROC"] = "1"
     os.environ["LIGHTOS_NO_MIDI_AUTOCONNECT"] = "1"
