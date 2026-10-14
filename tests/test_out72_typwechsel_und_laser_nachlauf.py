@@ -163,6 +163,29 @@ class NachfolgerAngesagtTest(_MitAttrappen):
         self.assertEqual(alt.bilder, [], "„Uebernehmen“ ohne Aenderung darf nicht blitzen")
         self.assertTrue(alt.zu)
 
+    def test_artnet_broadcast_bei_gewaehlter_nic_kein_dunkel_blitzer(self):
+        """Codex-Review #1056: bei gewaehlter NIC fuehrt der Sender den
+        gerichteten Broadcast, angesagt wird die konfigurierte Adresse
+        255.255.255.255. Das ist derselbe Knoten — kein Schlussbild."""
+        from unittest import mock
+        om = _manager()
+        alt = _ArtNet("192.168.178.255")                 # so fuehrt ihn der Sender
+        om._artnet_outputs[1] = alt
+        with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
+                        return_value="192.168.178.255"):
+            om.nachfolger_ansagen(1, "artnet", "255.255.255.255")
+            om.remove_output(1)
+        self.assertEqual(alt.bilder, [], "unveraendert uebernommen darf nicht blitzen")
+        self.assertTrue(alt.zu)
+        # Ein wirklich anderes Ziel endet weiter dunkel.
+        alt2 = _ArtNet("192.168.178.255")
+        om._artnet_outputs[1] = alt2
+        with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
+                        return_value="192.168.178.255"):
+            om.nachfolger_ansagen(1, "artnet", "10.0.0.5")
+            om.remove_output(1)
+        self.assertEqual(alt2.bilder, [(0, DUNKEL)])
+
     def test_anderer_anschluss_der_alte_adapter_endet_dunkel(self):
         om = _manager()
         alt = _Enttec("COM3")

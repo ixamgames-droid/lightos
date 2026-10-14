@@ -1130,6 +1130,25 @@ class OutputManager:
         return str(getattr(dev, "_target_ip", None) or "")
 
     @staticmethod
+    def _ziel_wie_gesendet(name: str, ziel: str) -> str:
+        """Ein angesagtes Ziel so, wie der Sender es fuehren wird.
+
+        Codex-Review #1056: ``ArtNetSender`` rechnet den Limited Broadcast
+        ``255.255.255.255`` bei gewaehlter NIC in deren gerichteten Broadcast um
+        (NET-04); ``_ziel_von`` liefert dieses umgerechnete Ziel, die Ansage
+        aber die konfigurierte Adresse. Woertlich verglichen galt ein
+        unveraendertes Uebernehmen als Adapterwechsel — und der Knoten bekam
+        sein Schlussbild (der Dunkel-Blitzer, den OUT-72 vermeiden will)."""
+        ziel = str(ziel or "")
+        if name == "artnet" and ziel == "255.255.255.255":
+            try:
+                from src.core.dmx.output_iface import artnet_broadcast_target
+                return str(artnet_broadcast_target(ziel))
+            except Exception:
+                return ziel
+        return ziel
+
+    @staticmethod
     def _netz_universum(name: str, universe: int, ext):
         """Die Nummer, unter der ein Netz-Adapter sendet (wie in ``_send_all``:
         Art-Net ab 0, sACN ab 1); Enttec und uDMX haben keine."""
@@ -1174,7 +1193,8 @@ class OutputManager:
         if nachfolger is None:
             return False
         n_name, n_ziel, n_ext = nachfolger
-        if name != n_name or self._ziel_von(name, dev) != n_ziel:
+        if name != n_name or self._ziel_von(name, dev) != self._ziel_wie_gesendet(
+                name, n_ziel):
             return False
         return (self._netz_universum(name, universe, ext)
                 == self._netz_universum(name, universe, n_ext))
