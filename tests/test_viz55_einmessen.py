@@ -522,6 +522,9 @@ class DatenbankTest(unittest.TestCase):
         from src.core.show.show_file import reset_show
         ensure_builtins()
         reset_show()
+        # QA-97: das Geraet fid=1 nicht im globalen State stehen lassen — ein
+        # spaeterer Test (test_fm9_cmdline_head_syntax) patcht dieselbe fid.
+        self.addCleanup(reset_show)
         self.state = get_state()
         from src.core.database.models import PatchedFixture
         self.state.add_fixture(PatchedFixture(
@@ -779,6 +782,7 @@ class PatchDialogNullpunktTest(unittest.TestCase):
         from src.ui.views.patch_view import PatchFixtureEditDialog
         ensure_builtins()
         reset_show()
+        self.addCleanup(reset_show)          # QA-97: fid=1 nicht vererben
         st = get_state()
         st.add_fixture(PatchedFixture(fid=1, label="MH", fixture_profile_id=9, mode_name="",
                                       universe=1, address=1, channel_count=16,

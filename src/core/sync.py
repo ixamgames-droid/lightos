@@ -44,6 +44,24 @@ def _ist_umbenennung(alt: str | None, neu: str | None) -> bool:
     return a in b or b in a
 
 
+def _cb_name(cb) -> str:
+    """Name eines Subscribers fuer die Fehlermeldung — wirft nie.
+
+    QA-97: Frueher stand hier ``getattr(cb, "__name__", repr(cb))``. Das
+    ``repr`` wird dabei IMMER ausgewertet, und das ``repr`` einer gebundenen
+    Methode eines zerstoerten Qt-Objekts wirft selbst ``RuntimeError``. Der
+    Fehler entkam damit aus dem ``except``-Zweig von ``emit()`` — alle
+    nachfolgenden Subscriber gingen leer aus (so verlor ``estop_all()`` seine
+    NOT-AUS-Bestaetigung, sobald ein totes Hauptfenster vorn im Bus stand)."""
+    try:
+        name = getattr(cb, "__name__", None)
+        if name:
+            return str(name)
+        return repr(cb)
+    except Exception:
+        return type(cb).__name__
+
+
 # =============================================================================
 # Event Bus
 # =============================================================================
@@ -142,15 +160,16 @@ class StateSync:
                 # Selbstheilung: abmelden, damit kein weiterer Emit ins
                 # geloeschte Objekt laeuft (Vorstufe der Access-Violation-
                 # Crashes aus crash.log).
-                if "already deleted" in str(e).lower():
+                # QA-97: ein Signal eines zerstoerten Objekts meldet sich als
+                # "Signal source has been deleted" — derselbe Zombie.
+                text = str(e).lower()
+                if "already deleted" in text or "has been deleted" in text:
                     self.unsubscribe(event, cb)
                     print(f"[StateSync] toter Subscriber entfernt ({event.value}): {e}")
                 else:
-                    name = getattr(cb, "__name__", repr(cb))
-                    print(f"[StateSync] error in {name} for {event.value}: {e}")
+                    print(f"[StateSync] error in {_cb_name(cb)} for {event.value}: {e}")
             except Exception as e:
-                name = getattr(cb, "__name__", repr(cb))
-                print(f"[StateSync] error in {name} for {event.value}: {e}")
+                print(f"[StateSync] error in {_cb_name(cb)} for {event.value}: {e}")
 
     def refresh_all(self):
         """Broadcast: alle Views sollen sich frisch aus dem State aufbauen."""

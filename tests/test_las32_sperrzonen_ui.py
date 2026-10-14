@@ -381,8 +381,14 @@ class EinbauTest(unittest.TestCase):
             self.assertEqual(dlg._liste.count(), 1)
             dlg.close()
         finally:
+            # QA-97: das Rumpf-Fenster wirklich abbauen. Es blieb sonst als
+            # Top-Level-Widget stehen; der Aufraeumer einer spaeteren Datei rief
+            # close() -> closeEvent scheiterte am fehlenden ``_stage_dirty``.
+            from _qt_lifecycle import flush_deferred_deletes
             win.deleteLater()
+            flush_deferred_deletes()
             _app.processEvents()
+            flush_deferred_deletes()
 
     def test_werkzeugleiste_hat_den_eintrag(self):
         quelle = (pathlib.Path(__file__).resolve().parent.parent / "src" / "ui"
