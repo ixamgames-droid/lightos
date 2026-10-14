@@ -826,6 +826,9 @@ class SperrzonenPlaner(QDialog):
             h.setProperty("rolle", "blass")
             kopf.addWidget(h)
         lay.addLayout(kopf)
+        # Kopfzeile merken, damit Aufrufer etwas anhaengen koennen, ohne
+        # per itemAt im Layout zu suchen (STAB-36).
+        tafel.kopfzeile = kopf
         return tafel, lay, t
 
     def _baue_links(self) -> QWidget:
@@ -934,8 +937,7 @@ class SperrzonenPlaner(QDialog):
         self._chk_einrasten = QCheckBox(f"Einrasten auf {_m(RASTER_M)} m (beim Ziehen)")
         self._chk_einrasten.setObjectName("sperrzonenEinrasten")
         self._chk_einrasten.setChecked(True)
-        kopfzeile = tafel.layout().itemAt(0).layout()
-        kopfzeile.addWidget(self._chk_einrasten)
+        tafel.kopfzeile.addWidget(self._chk_einrasten)
         return tafel
 
     def _baue_rechts(self) -> QWidget:
