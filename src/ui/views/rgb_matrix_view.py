@@ -7,9 +7,12 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QColorDialog, QFrame, QSlider, QCheckBox, QDialog)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
-from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
+from src.core.engine.rgb_matrix import (RgbMatrixInstance, RgbAlgorithm, MatrixStyle,
+                                        Color, is_gap, _MODIFY_STILE)
 from src.core.engine.rgb_matrix_meta import ALGO_META
-from src.core.engine.modify import MODIFY_LABELS, MODIFY_MODES, normalize_mode
+from src.core.engine.modify import (MODIFY_LABELS, MODIFY_MODES, MODIFY_KANAELE,
+                                    MODIFY_KANAL_LABELS, normalize_channels,
+                                    normalize_mode)
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
@@ -33,6 +36,31 @@ _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
                                   # ENG-37: Schrittweite des Lauflichts — festes
                                   # Feld neben der Richtung, nur ein-/ausgeblendet.
                                   "runner_step"})
+
+
+# Entscheidung des Betreibers (ENG-37/38): der Schweif gehoert zum Effekt und
+# wird mit verrechnet; der Haken „Modify-Effekt" stellt ihn nicht um. Der Satz
+# steht am Haken und — bei gesetztem Haken — am Feld „Schweif (%)“.
+_SCHWEIF_HINWEIS_MODIFY = (
+    "Bei einem Modify-Effekt zieht auch der Schweif die Veränderung nach. "
+    "Für einen scharfen Läufer den Schweif auf 0 % stellen.")
+
+
+# ENG-40: Vorschau-Farbe je angekreuztem Kanal eines Farb-Modify. Mehrere
+# Kanaele mischen sich additiv (Rot + Blau = Magenta), je Anteil bei 255 gekappt.
+_MODIFY_KANAL_FARBE = {
+    "r": (255, 0, 0), "g": (0, 255, 0), "b": (0, 0, 255),
+    "w": (255, 255, 255), "a": (255, 160, 0), "uv": (140, 0, 255),
+}
+
+
+def modify_kanal_vorschaufarbe(kanaele) -> tuple[int, int, int]:
+    """Mischfarbe der angekreuzten Kanaele fuer die Vorschau (volle Helligkeit)."""
+    r = g = b = 0
+    for k in normalize_channels(kanaele):
+        fr, fg, fb = _MODIFY_KANAL_FARBE[k]
+        r, g, b = r + fr, g + fg, b + fb
+    return (min(255, r), min(255, g), min(255, b))
 
 
 def _show_laedt() -> bool:
@@ -66,6 +94,22 @@ class MatrixPreview(QWidget):
     Rahmen je Zelle in derselben Farbsprache — Farbton je Geraet, Helligkeit je
     Kopf, aus ``src.ui.head_cell_colors`` und damit garantiert identisch zum
     Gruppen-Editor. Der Rahmen liegt UEBER der Effektfarbe, nimmt ihr also nichts."""
+
+    def modify_eckentext(self) -> str:
+        """Text in der Ecke der Vorschau: Zeichen der Betriebsart (ENG-37) und,
+        bei getroffener Kanalwahl im Farb-Modify, die betroffenen Kanaele
+        (ENG-40). Leer, wenn der Effekt kein Modify-Effekt ist."""
+        m = getattr(self, "_matrix", None)
+        mw = getattr(m, "modify_wirksam", None)
+        if mw is None or not mw():
+            return ""
+        text = {"add": "+", "sub": "−", "dim": "×"}[
+            normalize_mode(getattr(m, "modify_mode", "add"))]
+        if getattr(m, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW):
+            kan = normalize_channels(getattr(m, "modify_channels", ()))
+            if kan:
+                text += " nur " + ", ".join(MODIFY_KANAL_LABELS[k] for k in kan)
+        return text
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -243,6 +287,17 @@ class MatrixPreview(QWidget):
         _mw = getattr(self._matrix, "modify_wirksam", None)
         if _mw is not None and _mw():
             modify_art = normalize_mode(getattr(self._matrix, "modify_mode", "add"))
+        # ENG-38: ein Farb-Modify zeigt seine ECHTEN Farben (das ist der Betrag
+        # je Farbkanal); die Betriebsart steht als Zeichen in der Ecke,
+        # Abdunkeln bleibt schraffiert.
+        modify_farbe = modify_art is not None and getattr(
+            self._matrix, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW)
+        # ENG-40: mit Kanalwahl zeigt die Vorschau, WELCHE Kanaele betroffen
+        # sind — die Zelle in der Mischfarbe der angekreuzten Kanaele, so hell
+        # wie der Betrag; die Namen stehen neben dem Zeichen der Betriebsart.
+        modify_kanaele = (normalize_channels(getattr(
+            self._matrix, "modify_channels", ())) if modify_farbe else ())
+        kanal_farbe = modify_kanal_vorschaufarbe(modify_kanaele)
         for row in range(rows):
             for col in range(cols):
                 idx = row * cols + col
@@ -261,8 +316,20 @@ class MatrixPreview(QWidget):
                     p.drawLine(x, y, x + w - 1, y + h - 1)
                     continue
                 r, g, b = self._grid[idx]
+                if modify_kanaele:
+                    _lvl = max(r, g, b) / 255.0
+                    r, g, b = (int(kanal_farbe[0] * _lvl),
+                               int(kanal_farbe[1] * _lvl),
+                               int(kanal_farbe[2] * _lvl))
                 if modify_art is None:
                     p.fillRect(x, y, w, h, QColor(r, g, b))
+                elif modify_farbe:
+                    if modify_art == "dim":
+                        p.fillRect(x, y, w, h, QColor("#0d1117"))
+                        p.fillRect(x, y, w, h, QBrush(
+                            QColor(r, g, b), Qt.BrushStyle.BDiagPattern))
+                    else:
+                        p.fillRect(x, y, w, h, QColor(r, g, b))
                 else:
                     # ENG-37: Modify allein, nach Art eingefaerbt (Betrag = Helligkeit).
                     lvl = max(r, g, b) / 255.0
@@ -279,7 +346,7 @@ class MatrixPreview(QWidget):
                             QColor(g_, g_, g_), Qt.BrushStyle.BDiagPattern))
         if modify_art is not None:
             p.setPen(QColor("#e6edf3"))
-            p.drawText(8, 18, {"add": "+", "sub": "−", "dim": "×"}[modify_art])
+            p.drawText(8, 18, self.modify_eckentext())
         # Zuordnungs-Overlay ZULETZT und nur als Rahmen: die Effektfarbe darunter
         # bleibt vollstaendig sichtbar (sie ist der Zweck der Vorschau).
         if self._show_assignment:
@@ -1205,6 +1272,41 @@ class RgbMatrixView(QWidget):
             "ebenfalls nur auf diese Stärke.")
         self._modify_strength_spin.valueChanged.connect(self._param_change)
         fm_.addRow("Stärke:", self._modify_strength_spin)
+        # ENG-40: Kanalwahl „Wirkt auf" — feste Felder, nur im Stil RGB/RGBW
+        # sichtbar. Vorgabe: die Modify-Farbe bestimmt die Kanaele (ENG-38).
+        from PySide6.QtWidgets import QGridLayout
+        self._modify_kanal_box = QWidget()
+        _kg = QGridLayout(self._modify_kanal_box)
+        _kg.setContentsMargins(0, 0, 0, 0)
+        _kg.setHorizontalSpacing(10)
+        _kg.setVerticalSpacing(2)
+        self._cb_modify_standard = QCheckBox("Kanäle der Modify-Farbe")
+        self._cb_modify_standard.setChecked(True)
+        self._cb_modify_standard.setToolTip(
+            "Vorgabe: Die Farbe des Modify-Effekts bestimmt, welche Farbkanäle "
+            "er verändert — Rot verändert Rot, bei RGBW läuft der Weißanteil "
+            "über den Weiß-Kanal.\n"
+            "Soll der Effekt nur bestimmte Kanäle verändern, darunter die "
+            "Kanäle ankreuzen. Dieser Haken setzt die Auswahl zurück.")
+        self._cb_modify_standard.toggled.connect(self._on_modify_standard_toggled)
+        _kg.addWidget(self._cb_modify_standard, 0, 0, 1, 3)
+        self._modify_kanal_cbs: dict[str, QCheckBox] = {}
+        for _i, _k in enumerate(MODIFY_KANAELE):
+            _cb = QCheckBox(MODIFY_KANAL_LABELS[_k])
+            _cb.setToolTip(
+                f"Der Modify-Effekt verändert nur den Kanal "
+                f"„{MODIFY_KANAL_LABELS[_k]}“ (und weitere angekreuzte) — mit "
+                "Betriebsart und Stärke von oben. Wie kräftig, bestimmt die "
+                "Helligkeit des Effekts an der Lampe; sein Farbton zählt dann "
+                "nicht mehr.\n"
+                "Lampen ohne diesen Kanal bleiben unberührt, es wird nichts "
+                "auf andere Kanäle umgerechnet. Der Dimmer gehört nicht dazu: "
+                "ihn verrechnet ein Modify-Effekt im Stil „Dimmer“.")
+            _cb.toggled.connect(self._on_modify_kanal_toggled)
+            _kg.addWidget(_cb, 1 + _i // 3, _i % 3)
+            self._modify_kanal_cbs[_k] = _cb
+        self._modify_kanal_label = QLabel("Wirkt auf:")
+        fm_.addRow(self._modify_kanal_label, self._modify_kanal_box)
         self._modify_hint = QLabel("")
         self._modify_hint.setWordWrap(True)
         self._modify_hint.setStyleSheet("color:#8b949e; font-size:11px;")
@@ -1561,6 +1663,7 @@ class RgbMatrixView(QWidget):
                 self._param_form.addRow(spec.label + ":", w)
             self._param_widgets[spec.key] = w
         self._param_box.setVisible(True)
+        self._apply_schweif_hinweis()
 
     def _apply_runner_step_visibility(self, algo=None):
         """ENG-37: Feld „Schrittweite“ nur beim Lauflicht mit linearer Bewegung
@@ -1615,7 +1718,7 @@ class RgbMatrixView(QWidget):
         self._shut_form_label.setVisible(is_shutter)
         self._smin_spin.setVisible(is_shutter)
         self._smax_spin.setVisible(is_shutter)
-        # ENG-37: Modify gibt es (Schritt 1) nur im Stil Dimmer.
+        # ENG-37/ENG-38: Modify gibt es in den Stilen Dimmer, RGB und RGBW.
         self._apply_modify_visibility(style)
         # Farben-Zeile (C1/C2/C3 bzw. Sequence): Anzahl haengt von Style UND
         # Algorithmus ab. ZULETZT aufrufen, damit die Sichtbarkeit der ganzen
@@ -1633,22 +1736,103 @@ class RgbMatrixView(QWidget):
                 style = MatrixStyle(self._style_combo.currentText())
             except ValueError:
                 style = MatrixStyle.RGB
-        erlaubt = style == MatrixStyle.DIMMER
+        erlaubt = style in _MODIFY_STILE
+        farbe = style in (MatrixStyle.RGB, MatrixStyle.RGBW)
         self._cb_modify.setEnabled(erlaubt)
         self._cb_modify.setToolTip(
             "Der Effekt setzt seine Werte nicht, sondern verrechnet sie mit dem, "
-            "was die Lampe gerade tut (addieren, abziehen, abdunkeln)."
+            "was die Lampe gerade tut (addieren, abziehen, abdunkeln).\n"
+            "Stil Dimmer: verrechnet die Helligkeit. Stil RGB/RGBW: verrechnet "
+            "jeden Farbkanal einzeln und fasst den Dimmer nie an.\n"
+            + _SCHWEIF_HINWEIS_MODIFY
             if erlaubt else
-            "Modify-Effekte gibt es bisher nur im Stil „Dimmer“.")
+            "Modify-Effekte gibt es in den Stilen „Dimmer“, „RGB“ und „RGBW“.\n"
+            "Ein Shutter ist eine Stellung, keine Menge — dort lässt sich nichts "
+            "addieren oder abziehen. Ein hier noch gesetzter Haken wirkt nicht.")
         aktiv = erlaubt and self._cb_modify.isChecked()
         self._grp_modify.setVisible(aktiv)
+        # ENG-40: die Kanalwahl gibt es nur fuer die Farbkanaele. Im Stil
+        # Dimmer ist die Zeile weg — den Dimmer verrechnet der Stil selbst.
+        self._modify_kanal_label.setVisible(farbe)
+        self._modify_kanal_box.setVisible(farbe)
+        kanaele = self._modify_kanalwahl_aus_feldern() if farbe else ()
         hinweis = ("Wirkt auf das, was die Lampe gerade tut — Effekte, Cuelisten, "
                    "Snaps und Grundhelligkeit — und vor den Mastern (Fader, "
                    "Grand Master, Blackout). Als Chaser-Schritt ist er gesperrt.")
-        if aktiv and self._imin_spin.value() > 0:
+        # ENG-40: „nur Dimmer" ist keine Kanalwahl, sondern der Stil Dimmer.
+        nur_dimmer = ("Nur den Dimmer verrechnet ein Modify-Effekt im Stil "
+                      "„Dimmer“ — er steht deshalb nicht bei „Wirkt auf“. ")
+        if aktiv and farbe and kanaele:
+            namen = ", ".join(MODIFY_KANAL_LABELS[k] for k in kanaele)
+            hinweis = (f"Verändert nur: {namen}. Jeder dieser Kanäle wird um "
+                       "die Helligkeit des Effekts an der Lampe verrechnet und "
+                       "für sich bei 0 und 100 % gekappt; der Farbton des "
+                       "Effekts zählt nicht. Alle anderen Kanäle bleiben "
+                       "stehen. Lampen ohne einen angekreuzten Kanal bleiben "
+                       "unberührt — es wird nichts umgerechnet. "
+                       "Der Dimmer wird nie angefasst: eine dunkle Lampe bleibt "
+                       "dunkel. " + nur_dimmer + hinweis)
+        elif aktiv and farbe:
+            # ENG-38: Farbe und Dimmer bleiben getrennt.
+            hinweis = ("Verrechnet jeden Farbkanal einzeln (Rot, Grün, Blau"
+                       + (", Weiß" if style == MatrixStyle.RGBW else "")
+                       + "), jeder wird für sich bei 0 und 100 % gekappt. "
+                       "Der Dimmer wird nie angefasst: eine dunkle Lampe bleibt "
+                       "dunkel. Lampen nur mit Farbrad bleiben unberührt. "
+                       + nur_dimmer + hinweis)
+        elif aktiv and self._imin_spin.value() > 0:
             hinweis = ("Dimmer-Bereich „Min“ steht über 0: jede Lampe bekommt "
                        "diesen Grundbetrag ab. " + hinweis)
         self._modify_hint.setText(hinweis)
+        self._apply_schweif_hinweis()
+
+    def _apply_schweif_hinweis(self):
+        """Tooltip des Feldes „Schweif (%)“ an den Modify-Haken anpassen.
+
+        Entscheidung des Betreibers: der Schweif gehoert zum Effekt und wird
+        mit verrechnet — der Haken „Modify-Effekt" stellt ihn NICHT um. Damit
+        das nicht ueberrascht, steht es bei gesetztem Haken am Schweif-Feld.
+        Das Feld ist ein dynamisches (wird je Algorithmus neu gebaut), darum
+        laeuft diese Methode auch am Ende von ``_rebuild_param_fields``. Sie
+        setzt nur einen Tooltip — kein Wert, kein Bauen, kein Loeschen."""
+        w = getattr(self, "_param_widgets", {}).get("after_fade")
+        if w is None:
+            return
+        tip = next((s.tooltip for s in getattr(self, "_param_specs", ())
+                    if s.key == "after_fade"), "") or ""
+        if (self._cb_modify.isChecked() and self._cb_modify.isEnabled()):
+            tip = (tip + "\n" if tip else "") + _SCHWEIF_HINWEIS_MODIFY
+        w.setToolTip(tip)
+
+    def _modify_kanalwahl_aus_feldern(self) -> tuple:
+        """ENG-40: die angekreuzten Kanaele in fester Reihenfolge (leer = Vorgabe)."""
+        return tuple(k for k in MODIFY_KANAELE
+                     if self._modify_kanal_cbs[k].isChecked())
+
+    def _setze_modify_kanalwahl(self, kanaele) -> None:
+        """Felder der Kanalwahl ohne Signale auf ``kanaele`` stellen."""
+        gewaehlt = set(normalize_channels(kanaele))
+        for k, cb in self._modify_kanal_cbs.items():
+            cb.blockSignals(True)
+            cb.setChecked(k in gewaehlt)
+            cb.blockSignals(False)
+        self._cb_modify_standard.blockSignals(True)
+        self._cb_modify_standard.setChecked(not gewaehlt)
+        self._cb_modify_standard.blockSignals(False)
+
+    def _on_modify_kanal_toggled(self, _checked: bool = False):
+        """Ein Kanal wurde an-/abgekreuzt: der Vorgabe-Haken folgt (an, sobald
+        kein Kanal mehr angekreuzt ist), dann den Wert uebernehmen."""
+        self._setze_modify_kanalwahl(self._modify_kanalwahl_aus_feldern())
+        self._param_change()
+
+    def _on_modify_standard_toggled(self, checked: bool = False):
+        """Haken „Kanäle der Modify-Farbe": setzen = Auswahl zuruecksetzen.
+        Abwaehlen ohne angekreuzten Kanal gibt es nicht — dann gilt die
+        Vorgabe ohnehin, der Haken springt zurueck."""
+        self._setze_modify_kanalwahl(
+            () if checked else self._modify_kanalwahl_aus_feldern())
+        self._param_change()
 
     def _on_modify_toggled(self, _checked: bool = False):
         """Haken „Modify-Effekt": Gruppe ein-/ausblenden, Wert uebernehmen."""
@@ -1830,6 +2014,7 @@ class RgbMatrixView(QWidget):
             self._modify_strength_spin.setValue(
                 int(getattr(m, "modify_strength", 100)))
             self._modify_strength_spin.blockSignals(False)
+            self._setze_modify_kanalwahl(getattr(m, "modify_channels", ()))
             self._apply_style_visibility(m.style)
             # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
             self._dir_combo.blockSignals(True)
@@ -1888,6 +2073,9 @@ class RgbMatrixView(QWidget):
         self._current.modify = self._cb_modify.isChecked()
         self._current.modify_mode = self._modify_mode_combo.currentData() or "add"
         self._current.modify_strength = self._modify_strength_spin.value()
+        # ENG-40: Kanalwahl; bleibt wie Art und Staerke auch ohne Haken und
+        # im Stil Dimmer gemerkt.
+        self._current.modify_channels = self._modify_kanalwahl_aus_feldern()
         self._apply_modify_visibility()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
