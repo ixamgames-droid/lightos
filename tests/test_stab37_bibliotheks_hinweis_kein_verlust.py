@@ -404,3 +404,19 @@ class OberflaecheTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DokuTests(unittest.TestCase):
+    """Codex-Review #1072 (CDX-59): die geaenderte Meldung beim Oeffnen (Hinweis
+    in der Statusleiste statt Fenster) steht in der Anleitung „Erste Schritte“,
+    deutsch und englisch."""
+
+    def test_anleitung_erste_schritte_nennt_beide_meldungen(self):
+        from pathlib import Path
+        ordner = Path(__file__).resolve().parents[1] / "docs" / "anleitung_erste_schritte"
+        for datei in ("ANLEITUNG.md", "ANLEITUNG.en.md"):
+            with self.subTest(datei):
+                text = (ordner / datei).read_text(encoding="utf-8")
+                self.assertIn("Show unvollstaendig geladen", text)
+                self.assertIn("Hinweis: …", text)
+                self.assertIn("15", text)
