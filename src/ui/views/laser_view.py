@@ -661,21 +661,24 @@ class LaserView(QWidget):
         self._update_arm_button()
 
     def _on_estop(self):
-        lo = self._laser_output()
-        if lo is not None:
-            # Reihenfolge ist sicherheitskritisch: (1) estop_all() setzt sofort
-            # das Verriegelungs-Flag (Tick sendet nichts mehr), (2) EXPLIZIT
-            # entwaffnen — NICHT nur implizit über setChecked→toggled, damit die
-            # Sicherheit nicht an der Qt-Signal-Synchronität hängt, (3) erst
-            # DANACH die Geräte-Verriegelung lösen. So bleibt der Laser dunkel
-            # (unscharf), auch nachdem clear_estop_all die Session wieder öffnet.
-            lo.estop_all()
-            lo.set_armed(False)
-        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten nötig.
+        # LAS-31: derselbe EINE Weg wie Kopfleiste, Tastenkuerzel und VC-Taste.
+        # AppState.laser_notaus_ausloesen haelt die sicherheitskritische
+        # Reihenfolge: (1) estop_all() verriegelt sofort (DMX-Latch + Tick sendet
+        # nichts mehr), (2) EXPLIZIT entwaffnen — nicht ueber setChecked->toggled,
+        # damit die Sicherheit nicht an der Qt-Signal-Synchronitaet haengt,
+        # (3) erst danach die Geraete-Verriegelung loesen (armed=False haelt
+        # dunkel). Der Knopf loest nur aus.
+        try:
+            get_state().laser_notaus_ausloesen()
+        except Exception as e:
+            print(f"[laser_view] Laser-NOT-AUS Fehler: {e}")
+        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten
+        # nötig. Der Manager ist bereits unscharf; Signale gesperrt, damit kein
+        # zweites set_armed ueber toggled laeuft.
+        self._btn_arm.blockSignals(True)
         self._btn_arm.setChecked(False)
+        self._btn_arm.blockSignals(False)
         self._update_arm_button()
-        if lo is not None:
-            lo.clear_estop_all()
         self._update_dmx_estop_label()
 
     def _on_figure_changed(self):

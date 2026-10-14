@@ -57,7 +57,8 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    without a dimmer may keep emitting; a laser is reliably off only with the **laser
    emergency stop** (LASER NOT-AUS; details in the
    [laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). The
-   button latches; a second click releases the blackout.
+   button latches; a second click releases the blackout. In kiosk mode, where this bar is
+   hidden, **BLACKOUT** sits top right, directly left of **LASER NOT-AUS**, and shows the same state.
    What this looks like in the DMX monitor is shown in
    [Ausgabe einrichten, step 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    To black out only some fixtures or groups, use a
