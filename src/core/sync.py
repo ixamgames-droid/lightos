@@ -222,7 +222,8 @@ def banner_zusammenfassung(issues) -> tuple[str, str] | None:
     return None
 
 
-def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
+def validate_and_repair(state, fix: bool = True,
+                        vc_layout: dict | None = None) -> list[ValidationIssue]:
     """Pruefe und repariere den App-State.
 
     Pruefungen:
@@ -236,6 +237,11 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     8. Function-Manager Functions referenzieren nur gepatchte Fixtures
     9. VC-Knoepfe verweisen nur auf vorhandene Bibliothek-Snaps (nur Meldung)
     10. Blackout-Tasten haben ein gueltiges Ziel (VCB-44, nur Meldung)
+
+    ``vc_layout``: das LIVE-Layout der Virtual Console (``to_dict`` des
+    Canvas) fuer die Schritte 9 und 10. Ohne Angabe gilt ``state._vc_layout`` —
+    das ist aber der Stand vom Laden bzw. letzten Speichern (Codex-Review
+    #1058): eine danach angelegte oder umgezielte Taste sah die Pruefung nicht.
 
     Returns: Liste von Issues. Wenn fix=True werden auto-fixable Issues behoben.
     Validation darf NIE crashen - alle Fehler werden abgefangen.
@@ -617,7 +623,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     #    NUR melden — nie reparieren (welcher Snap gemeint war, weiss nur der
     #    Nutzer). Eigener try: unabhaengig von DB/Patch oben.
     try:
-        vc = getattr(state, "_vc_layout", None)
+        vc = vc_layout if vc_layout is not None else getattr(state, "_vc_layout", None)
         widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
         if widgets:
             from src.core.capability.validate import (
@@ -635,7 +641,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     #     zeigte (und damit nichts schaltete). NUR melden. Ist die Show-DB
     #     nicht lesbar (``None``), wird nichts behauptet.
     try:
-        vc = getattr(state, "_vc_layout", None)
+        vc = vc_layout if vc_layout is not None else getattr(state, "_vc_layout", None)
         widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
         lesen = getattr(state, "gruppen_steckbriefe", None)
         gruppen = lesen() if (widgets and callable(lesen)) else None

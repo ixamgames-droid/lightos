@@ -1895,7 +1895,8 @@ class MainWindow(QMainWindow):
         """Laeuft Validation (ohne Fix) und aktualisiert Banner-Text."""
         try:
             from src.core import sync
-            issues = sync.validate_and_repair(self._state, fix=False)
+            issues = sync.validate_and_repair(self._state, fix=False,
+                                              vc_layout=self._vc_layout_live())
             # CDX-58: auch ein reiner Hinweis ('info') zeigt das Banner.
             banner = sync.banner_zusammenfassung(issues)
             if banner is None:
@@ -1920,7 +1921,8 @@ class MainWindow(QMainWindow):
             issues = getattr(self._lbl_validation, "_cached_issues", None)
             if issues is None:
                 from src.core.sync import validate_and_repair
-                issues = validate_and_repair(self._state, fix=False)
+                issues = validate_and_repair(self._state, fix=False,
+                                             vc_layout=self._vc_layout_live())
             ValidationDialog(issues, self).exec()
             # Nach Dialog ggf. neu pruefen (User koennte Auto-Repair gestartet haben)
             self._refresh_validation_banner()
@@ -3377,6 +3379,20 @@ class MainWindow(QMainWindow):
 
     # ── Validation / Refresh ─────────────────────────────────────────────────
 
+    def _vc_layout_live(self) -> dict | None:
+        """Codex-Review #1058: das Layout, wie es JETZT im Canvas steht — die
+        Show-Pruefung sah sonst nur ``state._vc_layout`` (Stand vom Laden bzw.
+        letzten Speichern). ``None``: kein Canvas, dann gilt der State."""
+        try:
+            vc = getattr(self, "_vc_view", None)
+            if vc is None:
+                return None
+            d = vc.to_dict()
+            return d if isinstance(d, dict) else None
+        except Exception as e:
+            print(f"[main_window] vc layout live error: {e}")
+            return None
+
     def _validate_show(self):
         """Menue 'Show pruefen & reparieren...' - laeuft Validator + zeigt Dialog."""
         try:
@@ -3385,10 +3401,12 @@ class MainWindow(QMainWindow):
             # VCB-44: erst NUR pruefen. Repariert wird, wenn der Bediener im
             # Dialog „Reparieren“ waehlt — vorher lief die Reparatur ungefragt,
             # noch bevor der Dialog erschien.
-            issues = validate_and_repair(self._state, fix=False)
+            issues = validate_and_repair(self._state, fix=False,
+                                         vc_layout=self._vc_layout_live())
             dlg = ValidationDialog(
                 issues, self,
-                reparieren=lambda: validate_and_repair(self._state, fix=True))
+                reparieren=lambda: validate_and_repair(
+                    self._state, fix=True, vc_layout=self._vc_layout_live()))
             dlg.exec()
             # Trigger Refresh-All danach
             try:

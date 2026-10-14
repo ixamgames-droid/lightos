@@ -150,8 +150,9 @@ class BannerTest(unittest.TestCase):
         from src.core import sync
         from src.ui.main_window import MainWindow
         alt = sync.validate_and_repair
-        fenster = types.SimpleNamespace(_state=object(), _lbl_validation=_Etikett())
-        sync.validate_and_repair = lambda state, fix=True: list(issues)
+        fenster = types.SimpleNamespace(_state=object(), _lbl_validation=_Etikett(),
+                                        _vc_layout_live=lambda: None)
+        sync.validate_and_repair = lambda state, fix=True, **_kw: list(issues)
         try:
             MainWindow._refresh_validation_banner(fenster)
         finally:

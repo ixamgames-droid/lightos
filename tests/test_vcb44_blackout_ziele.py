@@ -282,6 +282,36 @@ class ShowPruefungTest(_MitState):
         self.assertFalse(treffer[0].auto_fixed, "nur melden, nie raten")
         self.assertIsNotNone(sync.banner_zusammenfassung(issues))
 
+    def test_die_pruefung_liest_das_live_layout(self):
+        """Codex-Review #1058: ``state._vc_layout`` ist der Stand vom Laden bzw.
+        letzten Speichern. Eine DANACH angelegte Taste mit inzwischen
+        geloeschter Gruppe muss die Pruefung trotzdem melden — das
+        Hauptfenster reicht dafuer das Live-Layout des Canvas herein."""
+        alt = getattr(self.state, "_vc_layout", None)
+        self.state._vc_layout = {"widgets": []}            # Stand vom Laden
+        self.addCleanup(setattr, self.state, "_vc_layout", alt)
+        live = self._layout(self._taste(self.back))         # danach angelegt
+        _loeschen(self.state, self.back)
+        ohne = sync.validate_and_repair(self.state, fix=False)
+        self.assertFalse([i for i in ohne if "Blackout-Ziel" in i.message])
+        mit = sync.validate_and_repair(self.state, fix=False, vc_layout=live)
+        self.assertEqual(
+            len([i for i in mit if "Blackout-Ziel verloren" in i.message]), 1)
+
+    def test_das_hauptfenster_reicht_ueberall_das_live_layout(self):
+        import inspect
+        import re
+        from src.ui import main_window
+        quelle = inspect.getsource(main_window)
+        aufrufe = re.findall(r"validate_and_repair\((.*?)\)\n", quelle, re.S)
+        self.assertGreaterEqual(len(aufrufe), 4)
+        for a in aufrufe:
+            self.assertIn("vc_layout=self._vc_layout_live()", a, a)
+        w = types.SimpleNamespace(
+            _vc_view=types.SimpleNamespace(to_dict=lambda: {"widgets": [1]}))
+        self.assertEqual(main_window.MainWindow._vc_layout_live(w), {"widgets": [1]})
+        self.assertIsNone(main_window.MainWindow._vc_layout_live(types.SimpleNamespace()))
+
     def test_unlesbare_show_db_behauptet_keinen_verlust(self):
         layout = self._layout(self._taste(self.back))
         stub = types.SimpleNamespace(
@@ -354,8 +384,8 @@ class ErstPruefenDannReparierenTest(unittest.TestCase):
         import inspect
         from src.ui import main_window
         quelle = inspect.getsource(main_window.MainWindow._validate_show)
-        erst = quelle.index("validate_and_repair(self._state, fix=False)")
-        dann = quelle.index("validate_and_repair(self._state, fix=True)")
+        erst = quelle.index("fix=False")
+        dann = quelle.index("fix=True")
         self.assertLess(erst, dann)
         self.assertIn("reparieren=lambda", quelle)
 
