@@ -27,6 +27,7 @@ test_xplat46_*.py                  # ARM-Empfehlung/venv-Architektur: lesen INST
 test_las30_laser_achsen.py         # Patch-Anleitung nennt die Achsen-Haken
 test_imp1_patch_tabelle_anleitung.py # Patch-Anleitung, Abschnitt Tabellen-Import: Wortlaut wie im Dialog
 test_las32_*.py                    # Laser-Anleitung, Abschnitt Sperrzonen
+test_vcb45_popout_lage.py          # VC-Anleitung nennt das gemerkte Popout
 test_tool14_gen_tools_index_cli.py # tools/README.md
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
