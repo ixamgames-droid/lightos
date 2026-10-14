@@ -338,9 +338,16 @@ class Doc72ExternePulteTest(unittest.TestCase):
                 if "get_artnet_receiver(" in quelle or "get_sacn_receiver(" in quelle:
                     nutzer.append(os.path.relpath(pfad, REPO).replace(os.sep, "/"))
                 self.assertNotIn("ArtPollReply", quelle, pfad)
+        # IMP-2: der Mitschnitt-Assistent holt sich die Empfaenger ebenfalls —
+        # aber nur zum Zuhoeren. Er startet, stoppt und verstellt nichts.
         self.assertEqual(sorted(nutzer), ["src/core/dmx/artnet_input.py",
                                           "src/core/dmx/sacn_input.py",
+                                          "src/core/mitschnitt.py",
                                           "src/ui/widgets/output_config.py"])
+        mitschnitt = _lies("src", "core", "mitschnitt.py")
+        for eingriff in (".start(", ".stop(", ".set_merge(", ".add_merge(",
+                         ".remove_merge(", ".clear_merges("):
+            self.assertNotIn(eingriff, mitschnitt, eingriff)
         self.assertIn("Der DMX-Eingang wird nicht gespeichert.", self.text)
         self.assertIn("ArtPoll", self.text)
 
