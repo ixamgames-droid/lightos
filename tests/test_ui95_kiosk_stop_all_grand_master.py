@@ -142,6 +142,54 @@ class KioskStopAllUndGrandMasterTest(unittest.TestCase):
         self.assertEqual(aufrufe, [0.6])
         self.assertEqual(self.gm.value(), 60)
 
+    def test_kiosk_start_setzt_den_grand_master_nicht(self):
+        """Gegenpruefung: das Bauen des Kiosk-Fensters schreibt den GM nicht
+        (kein Sprung auf einen Standardwert); der Regler zeigt den echten
+        Wert."""
+        self.om.set_grand_master(0.37)
+        _app().processEvents()
+        aufrufe = []
+        orig = self.om.set_grand_master
+
+        def mitschreiber(val):
+            aufrufe.append(val)
+            orig(val)
+        self.om.set_grand_master = mitschreiber
+        w = None
+        try:
+            w = MW.MainWindow(kiosk=True, touch=True)
+            w._hw_timer.stop()
+            w.resize(1024, 600)
+            w.show()
+            _app().processEvents()
+            self.assertEqual(aufrufe, [], "Kiosk-Start schrieb den Grand Master")
+            self.assertAlmostEqual(self.om.grand_master, 0.37, places=3)
+            self.assertEqual(w._slider_gm_kiosk.value(), 37)
+            self.assertEqual(w._lbl_gm_val_kiosk.text(), "37%")
+        finally:
+            del self.om.set_grand_master
+            if w is not None:
+                w.hide()
+                w.deleteLater()
+                _app().processEvents()
+
+    def test_kiosk_regler_schreibt_genau_einmal(self):
+        """Ein Zug am Kiosk-Regler fuehrt zu genau einem ``set_grand_master``
+        — das Nachziehen des zweiten Reglers schreibt nicht noch einmal."""
+        aufrufe = []
+        orig = self.om.set_grand_master
+
+        def mitschreiber(val):
+            aufrufe.append(round(val, 3))
+            orig(val)
+        self.om.set_grand_master = mitschreiber
+        try:
+            self.gm.setValue(33)
+            _app().processEvents()
+        finally:
+            del self.om.set_grand_master
+        self.assertEqual(aufrufe, [0.33])
+
     def test_mausrad_verstellt_den_regler_nicht(self):
         self.gm.setValue(50)
         _app().processEvents()
@@ -226,7 +274,7 @@ class KioskStopAllUndGrandMasterTest(unittest.TestCase):
         """1024x600 (kleines Touch-Pult) und 1920x1080: alles ganz im Fenster,
         nebeneinander, nicht gequetscht."""
         try:
-            for breite, hoehe in ((1024, 600), (1920, 1080)):
+            for breite, hoehe in ((900, 600), (1024, 600), (1920, 1080)):
                 self.w.resize(breite, hoehe)
                 _app().processEvents()
                 fenster = QRect(0, 0, self.w.width(), self.w.height())
@@ -243,6 +291,14 @@ class KioskStopAllUndGrandMasterTest(unittest.TestCase):
                     for b in rects[i + 1:]:
                         self.assertFalse(a.intersects(b),
                                          f"Ueberlappung bei {breite}x{hoehe}")
+                # NOT-AUS ganz frei und nicht kleiner als sein voller Text
+                self.assertGreaterEqual(
+                    self.notaus.width(), self.notaus.minimumWidth(),
+                    f"NOT-AUS bei {breite}x{hoehe} schmaler geworden")
+                self.assertGreaterEqual(
+                    self.notaus.height(), self.notaus.minimumHeight())
+                self.assertGreaterEqual(
+                    self.notaus.width(), self.notaus.sizeHint().width())
                 self.assertGreaterEqual(self.gm.width(), 100)
                 self.assertGreaterEqual(
                     self.gm_wert.width(),
