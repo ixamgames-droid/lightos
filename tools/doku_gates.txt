@@ -29,6 +29,7 @@ test_las30_laser_achsen.py         # Patch-Anleitung nennt die Achsen-Haken
 test_imp2_mitschnitt_anleitung.py  # Szenen-Anleitung, Schritt 11 Mitschnitt: Wortlaut wie im Dialog
 test_imp1_patch_tabelle_anleitung.py # Patch-Anleitung, Abschnitt Tabellen-Import: Wortlaut wie im Dialog
 test_las32_*.py                    # Laser-Anleitung, Abschnitt Sperrzonen
+test_las35_*.py                    # Laser-Anleitung: Planer und Einmess-Assistent
 test_viz109_spalte_einklappen.py   # 3D-Anleitung nennt Klapp-Knopf und F9
 test_vcb45_popout_lage.py          # VC-Anleitung nennt das gemerkte Popout
 test_tool14_gen_tools_index_cli.py # tools/README.md
@@ -36,6 +37,7 @@ test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
 test_eng36_klonen_anleitung.py     # Anleitung Klonen: Wortlaut wie im Dialog, Eintrag in ANLEITUNGEN.md
 test_eng35_doku.py                 # Anleitung „Wer gewinnt?“ (Stufen, Snap-Haken VCB-46), Merge-Vertrag, Feld „Stufe“ in den Editor-Anleitungen, Button-Anleitung
+test_eng39_doku.py                 # Anleitung „Wer gewinnt?“, Abschnitt „Hinweis bei Überschneidungen“; Button-Anleitung; Fragmente
 test_eng37_modify_doku.py          # Dimmer-Matrix-Anleitung, Abschnitt Modify-Effekt: Tabelle gegen die Engine
 test_eng38_modify_farbe_doku.py    # Dimmer-Matrix-Anleitung, Modify im Stil Farbe: Tabelle gegen die Engine
 test_eng40_modify_kanalwahl_doku.py # Dimmer-Matrix-Anleitung, „Wirkt auf“: Tabelle gegen die Engine
