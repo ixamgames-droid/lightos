@@ -69,6 +69,7 @@
 | LIZ-2 | A | - | 2026-10-14T18:14Z | - |
 | DOC-16 | A | - | 2026-10-14T18:14Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-14T19:22Z | - |
+| CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-14T19:43Z | - |
 
 ## Blocker & Fallen
 
@@ -278,7 +279,6 @@
 
 ## Verlauf
 
-- 2026-10-13T23:17Z A claim LAS-40
 - 2026-10-13T23:56Z A done PROC-22
 - 2026-10-14T13:52Z A done ENG-35
 - 2026-10-14T13:52Z A done VCB-46
@@ -308,3 +308,4 @@
 - 2026-10-14T19:05Z A done VIZ-109
 - 2026-10-14T19:07Z A done ENG-38
 - 2026-10-14T19:22Z A claim UI-95
+- 2026-10-14T19:43Z A claim CDX-59
