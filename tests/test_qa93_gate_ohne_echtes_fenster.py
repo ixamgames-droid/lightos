@@ -35,8 +35,12 @@ WERKZEUG = TOOLS / "viz_render_benchmark.py"
 #: Kind: das Werkzeug als ``__main__`` ausfuehren und danach nachsehen, ob dabei
 #: eine Qt-Anwendung entstanden ist. Ohne Anwendung gibt es kein Fenster.
 _KIND = r"""
-import json, runpy, sys
+import json, os, runpy, sys
 sys.argv = [sys.argv[1]] + sys.argv[2:]
+# Wie beim Skript-Start: der Ordner des Werkzeugs liegt vorn auf sys.path
+# (runpy.run_path tut das fuer eine Datei NICHT) - das Werkzeug laedt von dort
+# seine Sandbox (TOOL-27: import _werkzeug_sandbox).
+sys.path.insert(0, os.path.dirname(os.path.abspath(sys.argv[0])))
 code = 0
 try:
     runpy.run_path(sys.argv[0], run_name="__main__")
@@ -103,6 +107,11 @@ class KeinTestMisstImEchtenFensterTest(unittest.TestCase):
             "vor dem Fenster",
         "test_qa58_bibliothek_schema_unberuehrt.py":
             "nennt verify_stage_reload nur in einem Kommentar",
+        "test_tool27_werkzeug_sandbox.py":
+            "nennt verify_stage_reload in der Ausnahmeliste und laedt es als Modul, "
+            "um nur sandbox_einrichten() zu rufen; viz_render_benchmark wird nur "
+            "statisch gelesen. Gestartet werden allein die beiden Inventar-"
+            "Werkzeuge, und die laufen offscreen",
     }
 
     def _echte_fenster_werkzeuge(self) -> list[str]:
