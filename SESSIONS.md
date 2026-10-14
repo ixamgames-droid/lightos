@@ -62,7 +62,6 @@
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
-| VCB-45 | A | feature/vcb45-popout-merkt-bildschirm | 2026-10-13T15:34Z | - |
 | VIZ-109 | A | feature/viz109-3d-spalte-einklappen | 2026-10-13T14:46Z | src/ui/visualizer/visualizer_window.py |
 | ENG-38 | A | feature/eng38-modify-farbe | 2026-10-13T14:46Z | src/core/engine/modify.py |
 | IMP-2 | A | feature/imp2-mitschnitt-assistent | 2026-10-13T16:14Z | - |
@@ -286,7 +285,6 @@
 
 ## Verlauf
 
-- 2026-10-13T17:04Z A claim ENG-39
 - 2026-10-13T18:06Z D done LAS-38
 - 2026-10-13T18:33Z D done OUT-75
 - 2026-10-13T19:09Z D done UI-92
@@ -316,3 +314,4 @@
 - 2026-10-14T14:28Z A done IMP-1
 - 2026-10-14T14:50Z A aktualisiert QA-97: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa97-reihenfolge-laser-und-ui69
 - 2026-10-14T14:50Z A aktualisiert QA-98: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa98-weissband-test-schneller
+- 2026-10-14T15:06Z A done VCB-45
