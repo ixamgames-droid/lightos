@@ -2616,6 +2616,12 @@ _SINGLE_KEY_SHORTCUTS = frozenset({
 })
 
 
+#: VIZ-109: Statuszeile, wenn F bei eingeklappter Spalte „Fit Auswahl" war.
+HINWEIS_F_IN_DER_ANSICHT = (
+    "F hat die Kamera auf die Auswahl eingepasst, weil der Fokus in der "
+    "3D-Ansicht liegt. Die rechte Spalte klappt mit F9 oder S aus.")
+
+
 def _any_focused(*widgets) -> bool:
     """VIZ-10: True, wenn EINE der Spinboxen gerade den Tastatur-Fokus haelt.
     Schuetzt vor der Race: JS-Echo (fixturePositionChanged/-RotationChanged,
@@ -3036,7 +3042,18 @@ class VisualizerWindow(QMainWindow):
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, False)
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        splitter.addWidget(self._view)
+        # VIZ-109: Ansicht + schmaler Klapp-Knopf teilen sich die linke Seite —
+        # der Knopf sitzt so direkt an der Spalte und bleibt sichtbar, wenn
+        # sie zu ist. Die Ansicht selbst bleibt dasselbe Objekt.
+        from src.ui.visualizer.spalte_einklappen import SpaltenKlappe, baue_knopf
+        left_side = QWidget()
+        left_lay = QHBoxLayout(left_side)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(0)
+        left_lay.addWidget(self._view, 1)
+        self._btn_spalte = baue_knopf(left_side)
+        left_lay.addWidget(self._btn_spalte)
+        splitter.addWidget(left_side)
 
         right_panel = self._build_right_panel()
         right_panel.setMinimumWidth(RECHTE_SPALTE_MIN)
@@ -3044,6 +3061,8 @@ class VisualizerWindow(QMainWindow):
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
+        splitter.setCollapsible(0, False)   # der Knopf darf nie mit verschwinden
+        self._spalten_klappe = SpaltenKlappe(splitter, self._btn_spalte, 1, self)
 
         self.setCentralWidget(splitter)
 
@@ -3084,8 +3103,10 @@ class VisualizerWindow(QMainWindow):
             ("E", _cycle_edit, "Modus umschalten: Ansehen / Bauen"),
             ("F", self._on_key_f,
              "Auswahl einpassen (Fokus in der 3D-Ansicht), sonst Reiter Fixtures"),
-            ("S", lambda: self._tabs.setCurrentIndex(1), "Reiter Bühne zeigen"),
+            ("S", lambda: self._reiter_per_taste(1), "Reiter Bühne zeigen"),
             ("D", lambda: self._act_dock.toggle(), "Andocken ein/aus"),
+            ("F9", lambda: self._spalten_klappe.umschalten(),          # VIZ-109
+             "Rechte Spalte ein-/ausklappen"),
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.setWhatsThis(was)
@@ -3104,8 +3125,27 @@ class VisualizerWindow(QMainWindow):
         """A3D-29: F bedeutet zweierlei — entschieden wird nach dem Fokus."""
         if self._focus_is_in_3d():
             self._on_fit_selected()
+            # VIZ-109: Wer bei eingeklappter Spalte F drueckt, um sie
+            # auszuklappen, sieht stattdessen die Kamera springen. Die
+            # Statuszeile sagt, was passiert ist und welche Taste ausklappt.
+            klappe = getattr(self, "_spalten_klappe", None)
+            info = getattr(self, "_lbl_info", None)
+            if klappe is not None and klappe.eingeklappt and info is not None:
+                info.setText(HINWEIS_F_IN_DER_ANSICHT)
         else:
-            self._tabs.setCurrentIndex(0)
+            self._reiter_per_taste(0)
+
+    def _reiter_per_taste(self, index: int) -> None:
+        """Reiter der rechten Spalte per Taste zeigen.
+
+        VIZ-109: Ist die Spalte eingeklappt, klappt sie dabei aus — sonst
+        wechselte die Taste den Reiter, ohne dass man etwas saehe. Nur dieser
+        Weg klappt aus; ein Reiterwechsel per Programm (Wiederherstellen,
+        Sprung nach dem Anlegen) laesst die Spalte, wie sie ist."""
+        self._tabs.setCurrentIndex(index)
+        klappe = getattr(self, "_spalten_klappe", None)
+        if klappe is not None and klappe.eingeklappt:
+            klappe.setze_eingeklappt(False)
 
     def _focus_is_in_3d(self) -> bool:
         """Liegt der Tastaturfokus in der 3D-Ansicht?
