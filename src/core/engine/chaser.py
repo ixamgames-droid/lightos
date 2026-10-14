@@ -341,6 +341,14 @@ class Chaser(Function):
         from src.core.dmx.universe import Universe
         if child is None:
             return {}
+        # ENG-37: Ein Modify-Effekt als Chaser-Schritt ist GESPERRT — der
+        # Schritt gibt nichts aus. Der Chaser rendert Schritte mit angehaltener
+        # Zeit und ueberblendet ABSOLUTE Werte; ein Modify-Effekt wuerde hier
+        # setzen statt verrechnen und alle Lampen ausserhalb des Laeufers
+        # ueberschreiben. Lieber nichts als das Falsche.
+        from .modify import ModifySammler, ist_modify, setze_sammler
+        if ist_modify(child):
+            return {}
 
         def _render(bg: int) -> dict[int, bytes]:
             temp = {}
@@ -366,8 +374,16 @@ class Chaser(Function):
                     child.fade_in = saved_fade_in
             return {u: tu.get_all() for u, tu in temp.items()}
 
-        a = _render(0x00)
-        b = _render(0xFF)
+        # ENG-37: dieselbe Sperre fuer Modify-Effekte TIEFER im Schritt (Schritt
+        # ist eine Sammlung/Show mit Modify-Kind): waehrend der zwei Probe-
+        # Renderings sammelt ein Wegwerf-Sammler deren Posten ein — sie wuerden
+        # sonst doppelt und an der Ueberblendung vorbei im Bild landen.
+        sammler_alt = setze_sammler(ModifySammler())
+        try:
+            a = _render(0x00)
+            b = _render(0xFF)
+        finally:
+            setze_sammler(sammler_alt)
         target: dict[tuple[int, int], int] = {}
         for u, av in a.items():
             bv = b.get(u, av)

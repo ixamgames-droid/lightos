@@ -857,6 +857,15 @@ def main(argv=None) -> int:
     # in die Sandbox schreiben. Fruehe Ausstiege und der Zeitlimit-Waechter
     # rufen aufraeumen() ausdruecklich.
     atexit.register(aufraeumen)
+    # LIZ-1: main.main() verlangt eine Testlizenz und sucht sie im Datenordner —
+    # der ist gleich die leere Sandbox. Deshalb den Ort der Lizenz DIESES
+    # Rechners merken, solange der echte Datenordner noch gilt (nur lesen).
+    if not os.environ.get("LIGHTOS_LIZENZ"):
+        if repo not in sys.path:
+            sys.path.insert(0, repo)
+        from src.core.paths import app_data_dir as _echter_datenordner
+        os.environ["LIGHTOS_LIZENZ"] = os.path.join(
+            _echter_datenordner(), "lightos-lizenz.lic")
     env = sandbox_umgebung(wurzel)
     os.environ.update(env)
     # Ausdruecklich und fuer den Waechter tests/test_tools_db_isolation.py lesbar:

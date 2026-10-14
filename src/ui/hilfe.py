@@ -109,14 +109,29 @@ def build_art() -> str:
     return "Setup-Build" if ist_gefroren() else "Quellbetrieb (kein Setup-Build)"
 
 
+def lizenz_zeile() -> str:
+    """LIZ-1: Lizenzstatus fuer „Über LightOS“ — bei jedem Oeffnen frisch
+    gelesen (ein Ablauf waehrend der Sitzung zeigt sich NUR hier; die laufende
+    App bleibt davon unberuehrt)."""
+    try:
+        from src.core import lizenz
+        return lizenz.pruefe().text()
+    except Exception:
+        return "unbekannt"
+
+
 def ueber_text() -> str:
     """HTML fuer „Über LightOS“."""
     from html import escape
+    from src.core.lizenz import COPYRIGHT, QUELLE
     daten = datenordner()
     return (
         f"<b>LightOS {escape(app_version())}</b><br>"
-        "Professionelle DMX-Lichtsteuerung<br><br>"
+        "Professionelle DMX-Lichtsteuerung<br>"
+        f"{escape(COPYRIGHT)}<br>"
+        f"<a href='{QUELLE}'>{QUELLE}</a><br><br>"
         "<table cellspacing='4'>"
+        f"<tr><td>Lizenz:</td><td>{escape(lizenz_zeile())}</td></tr>"
         f"<tr><td>Version:</td><td>{escape(app_version())}</td></tr>"
         f"<tr><td>Build:</td><td>{escape(build_art())}</td></tr>"
         f"<tr><td>Datenordner:</td><td>{escape(daten)}</td></tr>"
@@ -151,6 +166,14 @@ _TASTEN_DE = {
 _STANDARD_AKTION = {
     "Ctrl+Z": "Rückgängig", "Ctrl+Y": "Wiederholen",
     "Ctrl+Shift+Z": "Wiederholen", "Del": "Löschen",
+}
+
+#: UI-92: Kuerzel, die als ``QShortcut`` OHNE Beschreibung angelegt sind und
+#: deren Quelltext gerade nicht angefasst werden soll (der Laser-NOT-AUS wird
+#: in LAS-36 umgebaut). Sobald das steht, gehoert die Beschreibung per
+#: ``setWhatsThis`` an das Kuerzel selbst — dann wird dieser Eintrag ueberfluessig.
+_BEKANNTE_KUERZEL = {
+    "Ctrl+Shift+L": "Laser NOT-AUS auslösen",
 }
 
 #: Aktionstexte, die fuer sich allein zu knapp sind.
@@ -243,6 +266,7 @@ def sammle_tastenkuerzel(wurzeln, bereiche=None) -> list[Kuerzel]:
         for sc in wurzel.findChildren(QShortcut):
             portabel = sc.key().toString(QKeySequence.SequenceFormat.PortableText)
             aktion = (sc.whatsThis() or sc.objectName()
+                      or _BEKANNTE_KUERZEL.get(portabel)
                       or _STANDARD_AKTION.get(portabel, "(ohne Beschreibung)"))
             _dazu(tasten_text(sc.key()), _sauber(aktion),
                   _fenster_bereich(sc.parent(), bereiche))

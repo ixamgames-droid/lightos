@@ -601,7 +601,13 @@ function _syncFootprintOutline(so, is2D) {
   so._outline2d = line;
 }
 
-export function removeStageObject(id) {
+// `vonPython` (VIZ-105): das Entfernen kommt von der Python-Seite (Loeschen-
+// Knopf, Undo eines Hinzufuegens, Redo eines Loeschens). Dann wird es NICHT
+// als Loeschung zurueckgemeldet — Python weiss es schon, und die Rueckmeldung
+// ist nicht bloss ueberfluessig: holt ein Rueckgaengig das Element im selben
+// Poll-Takt zurueck, trifft sie das wiederhergestellte Element und loescht es
+// im Python-Modell ein zweites Mal (samt Undo-Schritt und Andockungen).
+export function removeStageObject(id, vonPython = false) {
   const so = stageObjects[id];
   if (!so) return;
   // BoxHelper + Label entfernen
@@ -636,7 +642,7 @@ export function removeStageObject(id) {
   if (!_isLoadingStage) {
     _userRemovedIds.add(id);
     const bridge = bridgeRef.get();
-    if (bridge && bridge.stageObjectDeleted) {
+    if (!vonPython && bridge && bridge.stageObjectDeleted) {
       try { bridge.stageObjectDeleted(id); } catch (e) {}
     }
   }
