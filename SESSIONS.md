@@ -69,6 +69,7 @@
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 | LAS-31 | A | - | 2026-10-14T18:14Z | - |
 | XPLAT-23 | A | - | 2026-10-14T18:14Z | - |
+| LIZ-2 | A | - | 2026-10-14T18:14Z | - |
 
 ## Blocker & Fallen
 
@@ -277,7 +278,6 @@
 
 ## Verlauf
 
-- 2026-10-13T22:43Z A done ENG-37
 - 2026-10-13T23:16Z A claim LAS-39
 - 2026-10-13T23:16Z A claim QA-97
 - 2026-10-13T23:16Z A claim QA-98
@@ -307,3 +307,4 @@
 - 2026-10-14T18:02Z A done ENG-40
 - 2026-10-14T18:14Z A claim LAS-31
 - 2026-10-14T18:14Z A claim XPLAT-23
+- 2026-10-14T18:14Z A claim LIZ-2
