@@ -1533,9 +1533,19 @@ class _LiveTestPanel(QGroupBox):
             self._btn_start.setChecked(False)
             return
 
+        ist_laser = _ist_laser_modell(self._modell(), mode)
+        # Codex-Review #1064: die Rueckfrage ist modal — waehrend sie offen
+        # steht, kann der NOT-AUS ueber MIDI/OSC/Web kommen. Deshalb hier,
+        # direkt vor dem ersten gesendeten Wert, noch einmal nachsehen.
+        if ist_laser and self._notaus_aktiv():
+            self._btn_start.setChecked(False)
+            self._info.setText(
+                "Nicht gestartet — der Laser-NOT-AUS wurde während der "
+                "Rückfrage ausgelöst. Es wurde nichts gesendet.")
+            return
         self._tester = LiveTester(universe, self._spin_addr.value())
         self._aus_werte = live_test_aus_werte(self._modell(), mode)
-        if _ist_laser_modell(self._modell(), mode):
+        if ist_laser:
             self._notaus_timer.start(self.NOTAUS_PRUEFEN_MS)
         self._build_faders(mode)
         self._spin_univ.setEnabled(False)

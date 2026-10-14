@@ -313,7 +313,8 @@ gesendet wird und ob der Laser mit den Default-Werten **sofort strahlt**. Mit
   stand – der Kanal bleibt dann auf dem Aus-Wert stehen.
 - Der **Laser-NOT-AUS** beendet einen laufenden Laser-Test und lässt den Laser
   auf „aus“. Solange der NOT-AUS aktiv ist, startet kein Live-Test mit einem
-  Laser.
+  Laser – auch dann nicht, wenn er ausgelöst wird, während die Rückfrage noch
+  offen ist.
 - Kennt das Profil noch **keinen Aus-Wert**, sagt die Rückfrage das: LightOS
   weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt.
 
