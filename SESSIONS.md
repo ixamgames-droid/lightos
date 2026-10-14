@@ -70,6 +70,7 @@
 | LAS-31 | A | - | 2026-10-14T18:14Z | - |
 | XPLAT-23 | A | - | 2026-10-14T18:14Z | - |
 | LIZ-2 | A | - | 2026-10-14T18:14Z | - |
+| DOC-16 | A | - | 2026-10-14T18:14Z | - |
 
 ## Blocker & Fallen
 
@@ -278,7 +279,6 @@
 
 ## Verlauf
 
-- 2026-10-13T23:16Z A claim LAS-39
 - 2026-10-13T23:16Z A claim QA-97
 - 2026-10-13T23:16Z A claim QA-98
 - 2026-10-13T23:16Z A claim UI-94
@@ -308,3 +308,4 @@
 - 2026-10-14T18:14Z A claim LAS-31
 - 2026-10-14T18:14Z A claim XPLAT-23
 - 2026-10-14T18:14Z A claim LIZ-2
+- 2026-10-14T18:14Z A claim DOC-16
