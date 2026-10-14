@@ -16,7 +16,7 @@ from src.core.midi.midi_manager import (
 from src.core.midi.midi_mapper import (
     MidiMapping, MidiOutFeedback, get_midi_mapper,
     BUTTON_TOGGLE, BUTTON_FLASH, BUTTON_CONTINUOUS, BUTTON_PRESS,
-    normalize_button_mode,
+    normalize_button_mode, ist_motorfader, motor_rueckmeldung,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
     ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE,
     _binding_type_from_msg_type,
@@ -482,7 +482,11 @@ class MidiView(QWidget):
         for row, m in enumerate(mappings):
             on_val = ""
             off_val = ""
-            if m.midi_out:
+            if ist_motorfader(m):
+                # MIDI-14: ein Motorfader hat keine Velocity — er wird
+                # nachgefuehrt. Die Zellen sagen das, statt 127/0 zu zeigen.
+                on_val = "Motor"
+            elif m.midi_out:
                 on_val = str(m.midi_out.state_on)
                 off_val = str(m.midi_out.state_off)
             vals = [
@@ -526,6 +530,12 @@ class MidiView(QWidget):
                 m.data1 = int(txt or "0")
             elif col == 5:
                 m.button_mode = txt.strip().lower()
+            elif col in (6, 7) and m.msg_type == "pitchbend":
+                # MIDI-14: ein Pitchbend-Fader hat keine Velocity. Die Zelle
+                # zeigt wieder, was gilt; geschaltet wird ueber „Feedback...“.
+                self._map_table.blockSignals(True)
+                item.setText("Motor" if (col == 6 and ist_motorfader(m)) else "")
+                self._map_table.blockSignals(False)
             elif col == 6:
                 if m.midi_out is None:
                     m.midi_out = MidiOutFeedback()
@@ -551,6 +561,8 @@ class MidiView(QWidget):
             m.midi_in.trigger_id = m.data1
             # MIDI-10: "pitchbend" in der Spalte Typ bleibt Pitchbend.
             m.midi_in.message_type = _binding_type_from_msg_type(m.msg_type)
+            if ist_motorfader(m):
+                m.midi_out.channel = m.channel      # MIDI-14: derselbe Fader
             if m.midi_out and m.msg_type != "pitchbend":
                 # (MIDI-10: ein Pitchbend-Fader hat keine LED mit seiner Nummer)
                 if m.midi_out.trigger_id < 0:
@@ -589,7 +601,8 @@ class MidiView(QWidget):
             # Velocity ON/OFF; der Typ in der Tabelle heisst "pitchbend".
             self._refresh_map_table()
             self._append_log(
-                f"✓ Learn: Pitchbend-Fader CH{msg.channel} (14 Bit)")
+                f"✓ Learn: Pitchbend-Fader CH{msg.channel} (14 Bit) — "
+                f"Motorfader nachführen: Zeile wählen und „Feedback...“")
             return
         self._prompt_feedback_values(m)
         self._refresh_map_table()
@@ -604,15 +617,47 @@ class MidiView(QWidget):
         mappings = self._mapper.get_mappings()
         if row < 0 or row >= len(mappings):
             return
-        if mappings[row].msg_type == "pitchbend":      # MIDI-10
-            QMessageBox.information(
-                self, "Feedback",
-                "Ein Pitchbend-Fader hat keine LED, die sich über Velocity "
-                "schalten lässt.\nDas Nachführen von Motorfadern ist ein "
-                "eigener Punkt (MIDI-14).")
+        if mappings[row].msg_type == "pitchbend":      # MIDI-10 / MIDI-14
+            self._motor_rueckmeldung_fragen(mappings[row])
+            self._refresh_map_table()
             return
         self._prompt_feedback_values(mappings[row])
         self._refresh_map_table()
+
+    def _motor_rueckmeldung_fragen(self, mapping: MidiMapping):
+        """MIDI-14: das Nachfuehren des Motorfaders ein- oder ausschalten.
+        Ein Pitchbend-Fader hat keine LED mit Velocity — seine „Rueckmeldung“
+        ist die Stellung selbst, als Pitchbend auf demselben Kanal."""
+        out_port = self._combo_out.currentText()
+        geraet = out_port if out_port and not out_port.startswith("(") else ""
+        if ist_motorfader(mapping):
+            antwort = QMessageBox.question(
+                self, "Motorfader",
+                f"Der Motorfader auf Kanal {mapping.channel} wird nachgeführt "
+                f"(Ausgang: {mapping.midi_out.device or 'gemeinsamer Ausgang'})."
+                f"\n\nNachführen ausschalten?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort == QMessageBox.StandardButton.Yes:
+                mapping.midi_out = None
+                self._append_log(f"Motorfader CH{mapping.channel}: Nachführen aus")
+            return
+        antwort = QMessageBox.question(
+            self, "Motorfader",
+            f"Motorfader auf Kanal {mapping.channel} nachführen?\n\n"
+            f"LightOS sendet die Stellung dann als Pitchbend an das Pult "
+            f"zurück (Ausgang: {geraet or 'gemeinsamer Ausgang'}): der Fader "
+            f"fährt mit, wenn sich der Wert anderswo ändert — am Bildschirm, "
+            f"durch einen Seitenwechsel oder von einem zweiten Pult.\n\n"
+            f"Solange du den Fader bewegst, sendet LightOS nichts an seinen "
+            f"Motor.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes)
+        if antwort == QMessageBox.StandardButton.Yes:
+            mapping.midi_out = motor_rueckmeldung(mapping, geraet)
+            self._append_log(
+                f"✓ Motorfader CH{mapping.channel}: wird nachgeführt"
+                + (f" über {geraet}" if geraet else ""))
 
     def _prompt_feedback_values(self, mapping: MidiMapping):
         if mapping.midi_out is None:
