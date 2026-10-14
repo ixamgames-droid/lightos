@@ -311,15 +311,16 @@ def test_ohne_modify_kein_posten_und_kein_aufwand(rig):
 
 
 def test_haken_bei_anderem_stil_laeuft_normal(rig):
-    """Stil RGB mit gesetztem Haken: kein Modify, kein Posten."""
-    m = _matrix("rgb")
-    m.style = MatrixStyle.RGB
+    """Stil Shutter mit gesetztem Haken: kein Modify, kein Posten.
+    (Stil RGB/RGBW verrechnet seit ENG-38 — tests/test_eng38_modify_farbe.py.)"""
+    m = _matrix("shutter", grid=[LASER_FID])
+    m.style = MatrixStyle.SHUTTER
     m.modify = True
     fm = _fm(m)
     u = Universe(1)
-    fm.tick({1: u}, rig, DT, modify_spaeter=True)
+    fm.tick({1: u}, _patch(mit_laser=True), DT, modify_spaeter=True)
     assert fm._modify_posten == []
-    assert u.get_channel(_adr(0) + 1) == 255          # Rot wurde gesetzt
+    assert u.get_channel(100 + 3) == 255              # Shutter wurde gesetzt
 
 
 # ── (2) Master, Eingang, Blackout, NOT-AUS haben das letzte Wort ─────────────
