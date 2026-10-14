@@ -83,11 +83,68 @@ def _benutzername() -> str:
         return ""
 
 
+def kuerze_seriennummer(serie: str) -> str:
+    """OUT-77: ``"A6008isP"`` -> ``"…8isP"``.
+
+    Es bleiben hoechstens die letzten vier Zeichen und nie mehr als die halbe
+    Nummer — genug, um zwei Adapter im selben Paket auseinanderzuhalten, zu
+    wenig, um das Geraet zu benennen. Eine schon gekuerzte Nummer bleibt, wie
+    sie ist (die Texte des Pakets laufen zum Teil zweimal hier durch)."""
+    s = str(serie or "")
+    if not s or s.startswith("…"):
+        return s
+    bleibt = min(4, len(s) // 2)
+    return "…" + (s[-bleibt:] if bleibt else "")
+
+
+def _seriennummern_kuerzen(text: str) -> str:
+    """OUT-77: Seriennummern von USB-Adaptern unkenntlich machen.
+
+    Eine Seriennummer gehoert zu genau einem Geraet. Im Diagnosepaket stand sie
+    im Klartext, weil der Schluessel eines uDMX-Adapters sie traegt
+    (``16c0:05dc#Seriennummer``, OUT-68): in den Zeilen „Ausgabe“ und
+    „uDMX (USB)“ und in jeder Log-Zeile des Senders. Erfasst wird der
+    Schluessel in dieser Form und die Beschriftung „Seriennr. …“ der
+    Adapter-Liste. Ein Schluessel mit Anschluss (``2008:1066@1-2``) nennt
+    keine Seriennummer und bleibt unveraendert."""
+    import re
+    text = re.sub(r"(?i)\b([0-9a-f]{4}:[0-9a-f]{4}#)([^\s,;:()\[\]'\"]+)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+    return re.sub(r"(Seriennr\.\s+)([^\s,;:()\[\]'\"·]+)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+
+
+def _lizenz_inhalt_entfernen(text: str) -> str:
+    """OUT-77 (zweite Sicherung zu LIZ-1): nichts durchlassen, was wie der
+    Inhalt einer Lizenzdatei aussieht.
+
+    Lizenzdateien kommen nie ins Paket, und ins Log schreibt LightOS nur eine
+    gekuerzte Kennung. Sollte der Inhalt einer solchen Datei trotzdem einmal in
+    einer Fehlermeldung oder einem Log landen, bleibt er hier haengen:
+
+    * ein JSON-Objekt, das ein Feld ``signatur`` enthaelt, wird als Ganzes
+      ersetzt (mit ihm der Name des Lizenznehmers und die Kennung);
+    * ein einzelnes Signaturfeld — ``"signatur": "…"`` oder ``signatur=…`` mit
+      einem langen Base64-Wert — verliert seinen Wert.
+
+    Nur lange Base64-Werte zaehlen (ab 43 Zeichen = 32 Bytes): das Wort
+    „Signatur“ kommt in Logs auch sonst vor (Absturz-Signatur ``Typ@datei``).
+    """
+    import re
+    wert = r"[A-Za-z0-9+/_-]{43,}={0,2}"
+    text = re.sub(r'(?is)\{[^{}]*"signatur"\s*:\s*"' + wert + r'"[^{}]*\}',
+                  "{Lizenzdatei: Inhalt entfernt}", text)
+    return re.sub(r'(?i)("?signatur"?\s*[:=]\s*"?)' + wert,
+                  lambda m: m.group(1) + "(entfernt)", text)
+
+
 def anonymisiere(text: str, home: str | None = None,
                  user: str | None = None) -> str:
     """Ersetzt den Home-Pfad durch ``~`` und den Benutzernamen als Pfadteil durch
     ``%USERNAME%`` — in beiden Schreibweisen der Trenner, unter Windows ohne
-    Ruecksicht auf Gross-/Kleinschreibung."""
+    Ruecksicht auf Gross-/Kleinschreibung. Kuerzt ausserdem die Seriennummern
+    von USB-Adaptern und entfernt, was wie der Inhalt einer Lizenzdatei
+    aussieht (OUT-77)."""
     if not text:
         return text
     try:
@@ -104,6 +161,14 @@ def anonymisiere(text: str, home: str | None = None,
             # Name taucht sonst mitten in harmlosen Woertern auf.
             muster = r"(?<=[/\\])" + re.escape(user) + r"(?=[/\\]|$|\s|['\"])"
             text = re.sub(muster, "%USERNAME%", text, flags=flags)
+    except Exception:
+        pass
+    try:
+        text = _seriennummern_kuerzen(text)
+    except Exception:
+        pass
+    try:
+        text = _lizenz_inhalt_entfernen(text)
     except Exception:
         pass
     return text
@@ -741,6 +806,22 @@ def _windows_architektur() -> str:
                                bits=bits)
 
 
+#: Zeile ``Sitzungs-Log:``, wenn es die Datei nicht gibt (UI-87).
+KEIN_SITZUNGS_LOG = "keins (in diesem Datenordner liegt kein Sitzungs-Log)"
+
+
+def _sitzungs_log_angabe(wird_geschrieben: bool) -> str:
+    """Pfad des Sitzungs-Logs — oder die Auskunft, dass es keins gibt.
+
+    UI-87: ``systeminfo.txt`` nannte den Pfad auch, wenn dort nie eine Datei
+    entstanden ist (Start ohne Mitschrift, etwa aus einem Werkzeug; frischer
+    Datenordner bei ``--diagnose``). Wer das Paket liest, sucht dann ein Log,
+    das es nicht gibt. Der Kopfblock des Logs selbst entsteht, BEVOR die Datei
+    geoeffnet wird — dort gilt der Pfad (``wird_geschrieben``)."""
+    pfad = log_path()
+    return pfad if wird_geschrieben or os.path.isfile(pfad) else KEIN_SITZUNGS_LOG
+
+
 def _urheber_text() -> str:
     """LIZ-1: Urheberangabe fuer Kopfblock und systeminfo.txt."""
     from src.core import lizenz
@@ -766,8 +847,8 @@ def _vermerk(app_version: str = "?") -> str:
         return f"Erstellt mit LightOS (? {type(e).__name__})\n"
 
 
-def basis_infos(app_version: str = "?", programm_dir: str | None = None
-                ) -> list[tuple[str, str]]:
+def basis_infos(app_version: str = "?", programm_dir: str | None = None, *,
+                log_wird_geschrieben: bool = False) -> list[tuple[str, str]]:
     """Was schon VOR der QApplication feststeht. Jede Zeile einzeln abgesichert."""
     zeilen: list[tuple[str, str]] = []
 
@@ -796,7 +877,7 @@ def basis_infos(app_version: str = "?", programm_dir: str | None = None
                            f"({platform.python_implementation()}) {sys.executable}")
     feld("PySide6/Qt", _qt_versionen)
     feld("Datenordner", app_data_dir)
-    feld("Sitzungs-Log", log_path)
+    feld("Sitzungs-Log", lambda: _sitzungs_log_angabe(log_wird_geschrieben))
     feld("Arbeitsordner", os.getcwd)
     feld("Sprache/Codierung", lambda: f"{_locale()} | stdout "
                                       f"{getattr(sys.__stdout__, 'encoding', None)}")
@@ -958,7 +1039,9 @@ def midi_infos() -> list[str]:
 
 def kopfblock(app_version: str = "?", programm_dir: str | None = None) -> str:
     zeilen = [f"\n=== LightOS-Sitzung {_cl._ts()} | PID {os.getpid()} ==="]
-    zeilen += [f"  {k}: {v}" for k, v in basis_infos(app_version, programm_dir)]
+    # Das Log, in dem dieser Kopf steht, wird gleich geoeffnet: Pfad nennen (UI-87).
+    zeilen += [f"  {k}: {v}" for k, v in
+               basis_infos(app_version, programm_dir, log_wird_geschrieben=True)]
     zeilen.append("  (Bildschirme, GPU, DMX, MIDI und Show folgen als "
                   "[diagnose]-Zeilen, sobald bekannt)")
     zeilen.append("=" * 60)
@@ -1105,7 +1188,8 @@ PAKET_INHALT = (
     "Geheimnisse nur als Platzhalter)\n"
     "• die Datei-NAMEN im Datenordner\n\n"
     "NICHT enthalten: Show-Dateien, Sicherungen, Datenbanken, Snaps, Buehnen. Dein "
-    "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt.")
+    "Benutzername in Pfaden wird durch ~ bzw. %USERNAME% ersetzt; Seriennummern "
+    "von USB-Adaptern werden gekuerzt.")
 
 _LIESMICH = ("LightOS-Diagnosepaket\n=====================\n\nEnthaelt:\n"
              + PAKET_INHALT + "\n\nlogs/      Sitzungs-Logs (lightos.log = letzte "

@@ -54,7 +54,11 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
   nur Position, Gobo, Prisma, Fokus/Zoom und Farbrad von Moving Heads mit
   Dimmerkanal bleiben stehen, damit sie beim Lösen nicht sichtbar zurückfahren.
   Ungepatchte Kanäle (z. B. ein Dimmerpack übers Simple Desk), Geräte ohne
-  Dimmerkanal, Laser und Nebelmaschinen gehen komplett aus.
+  Dimmerkanal und Nebelmaschinen gehen komplett aus. **Laser** bekommen den
+  **Aus-Wert aus ihrem Geräteprofil** (nicht immer 0), ihre übrigen Kanäle
+  gehen auf 0; kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich
+  weiter (Einzelheiten, auch zum Laser-NOT-AUS:
+  [Laser-Anleitung](anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 > Der frühere **Snap**-Button in der Leiste ist entfallen — Snapshots nimmst du
 > jetzt über **Programmer → Snapshots** oder das Menü **Programmer → Snapshot

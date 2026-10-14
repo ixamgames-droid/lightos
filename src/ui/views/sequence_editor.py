@@ -13,6 +13,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.core.app_state import get_state
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 from src.ui.weak_slots import weak_slot
+from src.ui.widgets.stufe_auswahl import StufeAuswahl
 from PySide6.QtWidgets import QDialog
 
 
@@ -71,6 +72,13 @@ class SequenceEditor(QWidget):
         self._edit_name = QLineEdit(self._seq.name)
         self._edit_name.editingFinished.connect(self._on_name_changed)
         prop_row.addWidget(self._edit_name, 1)
+
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        _stufe_lbl = QLabel("Stufe:")
+        _stufe_lbl.setToolTip(StufeAuswahl.TOOLTIP)
+        prop_row.addWidget(_stufe_lbl)
+        self._stufe_combo = StufeAuswahl(self._seq)
+        prop_row.addWidget(self._stufe_combo)
 
         prop_row.addWidget(QLabel("Order:"))
         self._cb_order = QComboBox()

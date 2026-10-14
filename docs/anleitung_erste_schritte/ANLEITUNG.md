@@ -236,8 +236,8 @@ wiederherzustellen.
 `sicherungen` im LightOS-Datenordner auf: bei jedem Auto-Save, vor jedem Speichern, das
 eine vorhandene Datei überschreibt, und bevor du ungespeicherte Änderungen verwirfst
 (Neue Show, andere Show öffnen, Beenden). Über **Datei → Ältere Version öffnen…** siehst
-du die Sicherungen der aktuellen Show mit Datum, Uhrzeit, Anlass, Größe und Geräte- und
-Funktionszahl; mit dem Haken **Sicherungen aller Shows anzeigen** auch die der anderen.
+du die Sicherungen der aktuellen Show mit Datum, Uhrzeit auf die Sekunde (fallen mehrere in
+dieselbe Sekunde, mit laufender Nummer), Anlass, Größe und Geräte- und Funktionszahl; mit dem Haken **Sicherungen aller Shows anzeigen** auch die der anderen.
 **Öffnen** lädt die gewählte Version als neue, ungespeicherte Show — im Fenstertitel
 steht dann `Name (Sicherung vom …)`. Deine Show-Datei und die Sicherung bleiben dabei
 unverändert; behalten willst du die alte Version erst, wenn du sie mit *Speichern

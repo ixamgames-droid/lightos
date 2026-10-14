@@ -1,11 +1,18 @@
 """STAB-DEDUP-OPT: verwaiste Patch-Zeilen anzeigen und (nur auf Ansage) in
 Quarantäne verschieben.
 
-    venv/bin/python tools/patch_quarantaene.py                  # nur anzeigen
-    venv/bin/python tools/patch_quarantaene.py --anwenden       # verschieben
-    venv/bin/python tools/patch_quarantaene.py --liste          # Quarantäne zeigen
-    venv/bin/python tools/patch_quarantaene.py --zurueck 42     # zurückholen
+    venv/bin/python tools/patch_quarantaene.py --echte-daten                 # nur anzeigen
+    venv/bin/python tools/patch_quarantaene.py --echte-daten --anwenden      # verschieben
+    venv/bin/python tools/patch_quarantaene.py --echte-daten --liste         # Quarantäne zeigen
+    venv/bin/python tools/patch_quarantaene.py --echte-daten --zurueck 42    # zurückholen
+    venv/bin/python tools/patch_quarantaene.py --show datei.lshow            # Probe in der Sandbox
     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
+
+**``--echte-daten`` (TOOL-27):** Wie jedes Werkzeug läuft auch dieses zunächst in
+einer eigenen Sandbox und sieht die Show-Datenbank des Rechners gar nicht. Erst
+mit ``--echte-daten`` arbeitet es an der echten Show (App vorher schließen) —
+mit Warnzeile, und auch dann ohne einen Ausgang zu öffnen. Ohne den Schalter
+lässt sich mit ``--show`` eine Show-Datei gefahrlos durchsehen.
 
 **Ohne ``--anwenden`` wird nichts verändert.** Das ist keine Höflichkeit,
 sondern die Absicherung: der Befund hängt an einem Scan über ein Dutzend
@@ -15,6 +22,7 @@ bevor es sich bewegt.
 Adress-Überlappungen werden mit ausgewiesen, sind aber **nie** ein Grund zur
 Quarantäne — zwei Geräte auf derselben Adresse können beide gewollt sein.
 """
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import argparse
 import os
 import sys
@@ -61,7 +69,23 @@ def main() -> int:
     ap.add_argument("--auch-ohne-show", action="store_true",
                     help="den Unbeladen-Riegel bewusst übergehen (nur, wenn die "
                          "Show wirklich keine Funktionen/Cues/VC/Snaps hat)")
+    ap.add_argument(_werkzeug_sandbox.SCHALTER_ECHTE_DATEN, dest="echte_daten",
+                    action="store_true",
+                    help="an der ECHTEN Show-Datenbank dieses Rechners arbeiten "
+                         "(App vorher schließen); ohne den Schalter läuft das "
+                         "Werkzeug in einer Sandbox")
     args = ap.parse_args()
+
+    if not args.echte_daten:
+        if args.anwenden or args.liste or args.zurueck is not None or not args.show:
+            print("ABBRUCH: Dieses Werkzeug läuft ohne --echte-daten in einer Sandbox")
+            print("und sieht die Show-Datenbank dieses Rechners nicht.")
+            print()
+            print("  an der echten Show arbeiten:      --echte-daten  (App vorher schließen)")
+            print("  eine Show-Datei nur durchsehen:   --show <datei.lshow>")
+            return 2
+        print("Sandbox: Die Show wird in eine Wegwerf-Datenbank geladen, an der "
+              "echten Show ändert sich nichts.")
 
     from src.core.app_state import get_state
     state = get_state()
