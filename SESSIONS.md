@@ -71,7 +71,6 @@
 | VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 | TOOL-27 | A | fix/tool27-pruefwerkzeuge-eigene-sandbox | 2026-10-13T20:41Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
-| LAS-39 | A | fix/las39-laser-erkennung-ohne-datenbank | 2026-10-14T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T14:50Z | - |
 | QA-98 | A | fix/qa98-weissband-test-schneller | 2026-10-14T14:50Z | - |
 | UI-94 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
@@ -285,7 +284,6 @@
 
 ## Verlauf
 
-- 2026-10-13T18:06Z D done LAS-38
 - 2026-10-13T18:33Z D done OUT-75
 - 2026-10-13T19:09Z D done UI-92
 - 2026-10-13T19:31Z A claim ENG-40
@@ -315,3 +313,4 @@
 - 2026-10-14T14:50Z A aktualisiert QA-97: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa97-reihenfolge-laser-und-ui69
 - 2026-10-14T14:50Z A aktualisiert QA-98: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa98-weissband-test-schneller
 - 2026-10-14T15:06Z A done VCB-45
+- 2026-10-14T15:10Z A done LAS-39
