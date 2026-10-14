@@ -433,9 +433,17 @@ def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
     Codex-Review #1072: zur Folge gehoert alles, was Render-Plan, Shutter-
     und Laser-Aus-Logik und das 3D-Bild am Kanal lesen — Default-, Highlight-
     und Invert-Wert, Aufloesung, Segment, Laser-Angaben und die Bereiche
-    (Grenzen und Art; ihr Name ist nur Beschriftung) — und das 3D-Modell des
-    Profils. Unterschieden sich zwei Dubletten nur dort, wurde die Warnung
+    (Grenzen und Art; ihr Name nur, soweit er gedeutet wird, s. u.) — und
+    das 3D-Modell des Profils. Unterschieden sich zwei Dubletten nur dort, wurde die Warnung
     sonst zum blossen Statusleisten-Hinweis heruntergestuft.
+
+    ★ Namen sind nicht nur Beschriftung, wo die Ausgabe sie deutet: ein
+    Kanalname mit „Laser“ macht den Kanal zum Laserkanal (NOT-AUS, Laser-Aus-
+    Logik, LAS-38 ueber ALLE Modi des Profils), „Strobe“/„Flash“ im Namen
+    einen Kanal ohne Bereiche zum Strobe-Kanal, ein Bereich ohne Art namens
+    „Open“ zum Offen-Bereich, „1-25 Hz“ im Bereichsnamen gibt die Frequenz.
+    Verglichen wird deshalb diese DEUTUNG — ein bloss anders geschriebener
+    Name bleibt gleich, ein anders gedeuteter nicht.
     """
     if not rivalen:
         return True
@@ -443,18 +451,44 @@ def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
         from sqlalchemy import select
         from src.core.database.models import (ChannelRange, FixtureChannel,
                                               FixtureMode, FixtureProfile)
+        from types import SimpleNamespace
+        from src.core.app_state import (ist_strobe_kanal_ohne_bereiche,
+                                        shutter_bereich_art)
         from src.core.database.modus_wahl import ist_zwilling
+        from src.core.laser.erkennung import ist_laserkanal
+        from src.core.strobe import (hz_spanne_aus_name,
+                                     ist_ausdruecklicher_strobe_kanal)
+
+        def _bereich(a, b, k, n) -> tuple:
+            r = SimpleNamespace(kind=k or "", name=n or "")
+            return (int(a or 0), int(b or 0), shutter_bereich_art(r),
+                    hz_spanne_aus_name(n))
 
         def _kanal(zeile) -> tuple:
-            (cid, attr, default, highlight, invert, aufl, segment, laser) = zeile
+            (cid, name, attr, default, highlight, invert, aufl, segment,
+             laser) = zeile
             bereiche = tuple(sorted(
-                (int(a or 0), int(b or 0), str(k or ""))
-                for a, b, k in session.execute(
+                (_bereich(a, b, k, n) for a, b, k, n in session.execute(
                     select(ChannelRange.range_from, ChannelRange.range_to,
-                           ChannelRange.kind)
-                    .where(ChannelRange.channel_id == cid)).all()))
+                           ChannelRange.kind, ChannelRange.name)
+                    .where(ChannelRange.channel_id == cid)).all()),
+                key=repr))
+            k = SimpleNamespace(name=name or "", attribute=attr or "",
+                                ranges=bereiche)
+            # Was die Ausgabe aus dem NAMEN liest (s. Docstring).
+            gedeutet = (ist_laserkanal(k), ist_ausdruecklicher_strobe_kanal(k),
+                        ist_strobe_kanal_ohne_bereiche(k))
             return (attr, int(default or 0), int(highlight or 0), bool(invert),
-                    str(aufl or ""), segment, str(laser or ""), bereiche)
+                    str(aufl or ""), segment, str(laser or ""), bereiche,
+                    gedeutet)
+
+        def _profil_mit_laser(pid: int) -> bool:
+            """LAS-38: hat IRGENDEIN Modus des Profils einen Laserkanal?"""
+            return any(ist_laserkanal(SimpleNamespace(name=n or "", attribute=a or ""))
+                       for n, a in session.execute(
+                           select(FixtureChannel.name, FixtureChannel.attribute)
+                           .join(FixtureMode, FixtureChannel.mode_id == FixtureMode.id)
+                           .where(FixtureMode.fixture_id == pid)).all())
 
         def _bild(pid: int):
             kopf = session.execute(
@@ -476,13 +510,14 @@ def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
             if not passt:
                 return None
             kanaele = tuple(_kanal(z) for z in session.execute(
-                select(FixtureChannel.id, FixtureChannel.attribute,
-                       FixtureChannel.default_value, FixtureChannel.highlight_value,
+                select(FixtureChannel.id, FixtureChannel.name,
+                       FixtureChannel.attribute, FixtureChannel.default_value,
+                       FixtureChannel.highlight_value,
                        FixtureChannel.invert, FixtureChannel.resolution,
                        FixtureChannel.segment, FixtureChannel.laser_angaben)
                 .where(FixtureChannel.mode_id == passt[0][0])
                 .order_by(FixtureChannel.channel_number)).all())
-            return (typ or "", modell, kanaele)
+            return (typ or "", modell, _profil_mit_laser(pid), kanaele)
 
         eigen = _bild(int(gewaehlt))
         return eigen is not None and all(_bild(int(r)) == eigen for r in rivalen)
