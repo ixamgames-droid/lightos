@@ -114,6 +114,11 @@ class ArtNetReceiver:
     def clear_merges(self):
         self._merges.clear()
 
+    def merges(self) -> dict[int, tuple[int, str]]:
+        """Kopie der Merge-Zuordnung ``{in_universe: (out_universe, mode)}`` —
+        nur zum Lesen (IMP-2, Mitschnitt-Assistent)."""
+        return dict(self._merges)
+
     def _install_merge_handler(self):
         """Subscriber, der nach Merge-Konfiguration ins lokale Universe schreibt."""
         if getattr(self, "_merge_cb_installed", False):
