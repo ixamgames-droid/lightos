@@ -175,11 +175,16 @@ def get_sync() -> StateSync:
 class ValidationIssue:
     """Ein gefundenes Problem mit Severity, Ort und Nachricht."""
 
-    def __init__(self, severity: str, location: str, message: str, auto_fixed: bool = False):
+    def __init__(self, severity: str, location: str, message: str,
+                 auto_fixed: bool = False, reparierbar: bool = False):
         self.severity = severity   # 'info', 'warn', 'error'
         self.location = location
         self.message = message
         self.auto_fixed = auto_fixed
+        # VCB-44: nur gemeldet (``fix=False``), liesse sich aber reparieren —
+        # der Dialog „Show prüfen“ bietet dafuer „Reparieren“ an, statt es
+        # ungefragt zu tun.
+        self.reparierbar = reparierbar
 
     def __str__(self):
         prefix = '[OK]' if self.auto_fixed else f'[{self.severity.upper()}]'
@@ -230,6 +235,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     7. CueStack-Cues referenzieren nur gepatchte Fixtures
     8. Function-Manager Functions referenzieren nur gepatchte Fixtures
     9. VC-Knoepfe verweisen nur auf vorhandene Bibliothek-Snaps (nur Meldung)
+    10. Blackout-Tasten haben ein gueltiges Ziel (VCB-44, nur Meldung)
 
     Returns: Liste von Issues. Wenn fix=True werden auto-fixable Issues behoben.
     Validation darf NIE crashen - alle Fehler werden abgefangen.
@@ -383,6 +389,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                      if _renamed else
                                      f"Mode '{mode_name}' fehlt - wäre ersetzt "
                                      f"durch '{fallback.name}'"),
+                                    reparierbar=True,
                                 ))
                         else:
                             issues.append(ValidationIssue(
@@ -431,6 +438,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                             'info', location,
                                             f"fixture_type '{current_type}' wäre -> '{profile_type}' "
                                             f"(aus FixtureProfile {profile_id})",
+                                            reparierbar=True,
                                         ))
                     except Exception as e_type:
                         # Defensive: profile lookup failure must not interrupt validation.
@@ -526,6 +534,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     issues.append(ValidationIssue(
                         'info', 'Programmer',
                         f"{len(stale_progs)} verwaiste fids: {stale_progs}",
+                        reparierbar=True,
                     ))
         except Exception as e:
             issues.append(ValidationIssue('error', 'Programmer', f"Fehler: {e}"))
@@ -558,6 +567,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                 f"Cue {getattr(cue, 'number', '?')} '{getattr(cue, 'label', '')}' "
                                 f"(Stack '{stack_name}')",
                                 f"{len(stale_in_cue)} verwaiste fids",
+                                reparierbar=True,
                             ))
         except Exception as e:
             issues.append(ValidationIssue('error', 'CueStacks', f"Fehler: {e}"))
@@ -585,6 +595,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                 issues.append(ValidationIssue(
                                     'info', f"Scene '{getattr(func, 'name', '?')}'",
                                     f"{len(stale_vals)} verwaiste SceneValues",
+                                    reparierbar=True,
                                 ))
                 except Exception as e_func:
                     issues.append(ValidationIssue(
@@ -618,5 +629,21 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     f"VC {b.where}", b.message))
     except Exception as e:
         issues.append(ValidationIssue('error', 'VC-Snap-Verweise', f"Fehler: {e}"))
+
+    # 10. VCB-44: Blackout-Tasten mit verlorenem Ziel. Bis hierhin meldete die
+    #     Pruefung „sauber“, waehrend eine Taste auf eine geloeschte Gruppe
+    #     zeigte (und damit nichts schaltete). NUR melden. Ist die Show-DB
+    #     nicht lesbar (``None``), wird nichts behauptet.
+    try:
+        vc = getattr(state, "_vc_layout", None)
+        widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
+        lesen = getattr(state, "gruppen_steckbriefe", None)
+        gruppen = lesen() if (widgets and callable(lesen)) else None
+        if gruppen is not None:
+            from src.core.capability.validate import blackout_ziel_befunde
+            for b in blackout_ziel_befunde(widgets, gruppen):
+                issues.append(ValidationIssue('warn', f"VC {b.where}", b.message))
+    except Exception as e:
+        issues.append(ValidationIssue('error', 'VC-Blackout-Ziele', f"Fehler: {e}"))
 
     return issues
