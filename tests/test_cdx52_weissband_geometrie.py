@@ -415,6 +415,46 @@ class NachtragTest(_LibraryCase):
                 "der Nachtrag meldet Arbeit, obwohl die Leiste schon steht")
 
 
+class NachtragNachUpdateTest(NachtragTest):
+    """★★ Dieselben Aussagen fuer den ersten Start NACH einem Update — der Weg,
+    auf dem eine nachgereichte Leiste tatsaechlich ankommt. Dann passt der
+    gestempelte Builtin-Stand (FM-50) nicht mehr zum Code, und im selben
+    ``ensure_builtins`` laeuft nach dem Nachtrag auch ``_builtins_abgleichen``.
+    Ein Abgleich, der die Leiste wieder verliert, nahme sie genau diesem
+    Rechner.
+
+    QA-98: Bis dahin lief jeder ``NachtragTest`` auf einer nur geseedeten
+    Bibliothek und damit (bei kopierter Nutzer-DB im Testprozess) zufaellig
+    auch durch den Abgleich. Mit der Vorlage „gestartet" steht der Stand schon —
+    hier wird er deshalb ausdruecklich geloescht und ``_FRISCH_GESEEDET``
+    abgeschaltet, damit der Abgleich unabhaengig von der Testumgebung laeuft.
+    Gegenprobe: ein Abgleich, der ``white_rows``/``white_cols`` nullt, macht
+    hier fuenf Tests rot."""
+
+    def setUp(self):
+        super().setUp()
+        from unittest import mock
+        from src.core.database import fixture_db as FDB
+        with Session(self._eng) as s:
+            FDB._stand_schreiben(s, "vor-dem-update")
+            s.commit()
+        patcher = mock.patch.object(FDB, "_FRISCH_GESEEDET", False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_der_abgleich_laeuft_hier_wirklich(self):
+        """Vorbedingung dieser Klasse: ohne Abgleich waere sie eine Kopie von
+        ``NachtragTest``."""
+        from src.core.database import fixture_db as FDB
+        aufrufe = []
+        echt = FDB._builtins_abgleichen
+        from unittest import mock
+        with mock.patch.object(FDB, "_builtins_abgleichen",
+                               side_effect=lambda s: aufrufe.append(1) or echt(s)):
+            FDB.ensure_builtins()
+        self.assertEqual(aufrufe, [1])
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 3. Auflesen: white_grid_for
 # ════════════════════════════════════════════════════════════════════════════
