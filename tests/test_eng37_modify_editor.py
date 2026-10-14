@@ -136,7 +136,7 @@ class TestFelder:
                          ansicht._modify_hint)
         assert all(shiboken6.isValid(t) for t in teile)
 
-    @pytest.mark.parametrize("stil", ["RGB", "RGBW", "Shutter"])
+    @pytest.mark.parametrize("stil", ["Shutter"])     # RGB/RGBW: frei seit ENG-38
     def test_andere_stile_sperren_den_haken(self, ansicht, stil):
         ansicht._cb_modify.setChecked(True)
         assert not ansicht._grp_modify.isHidden()
@@ -309,7 +309,7 @@ def test_arbeiter():
         ansicht._modify_strength_spin.setValue(10 + (nr * 7) % 90)
         if nr % 4 == 3:
             # Stilwechsel baut die Parameterfelder neu — der Modify-Block bleibt
-            ansicht._style_combo.setCurrentText("RGB")
+            ansicht._style_combo.setCurrentText("Shutter")
             QTest.qWait(15)
             assert not ansicht._grp_modify.isVisible()
             ansicht._style_combo.setCurrentText("Dimmer")
