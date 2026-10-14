@@ -23,6 +23,7 @@ test_doc72_externe_pulte.py        # Anleitung Externe Pulte: Ports/Beschriftung
 test_ui85_hilfe_menue.py           # Hilfe-Menue oeffnet docs/ANLEITUNGEN.md + Erste Schritte (Pfade muessen existieren)
 test_cdx58_codex_nachlese.py       # liest docs/ (Solo-Ausnahme, Lint-Meldungen)
 test_web06_socketio_lokal.py       # liest THIRD_PARTY_NOTICES.md (Lizenzhinweis Socket.IO)
+test_web11_qr_startbildschirm.py   # Web-Remote-Anleitung: Abschnitt „Handy verbinden" (QR-Code, Startbildschirm)
 test_xplat46_*.py                  # ARM-Empfehlung/venv-Architektur: lesen INSTALL.md
 test_las30_laser_achsen.py         # Patch-Anleitung nennt die Achsen-Haken
 test_las32_*.py                    # Laser-Anleitung, Abschnitt Sperrzonen

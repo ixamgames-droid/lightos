@@ -16,6 +16,11 @@ _socketio: Any = None
 _thread: threading.Thread | None = None
 _server: Any = None   # NET-09: Werkzeug-Server-Handle fuer thread-safen shutdown()
 _running = False
+# WEB-11: woran der laufende Server gebunden ist. Der QR-Code der Handy-Konsole
+# darf nur erscheinen, wenn das Handy ihn auch erreicht — „nur dieser PC"
+# (127.0.0.1) heisst: kein Code, sondern der noetige Schritt.
+_bind_host = ""
+_port = 5000
 
 
 def _get_state():
@@ -105,7 +110,8 @@ def remote_url(port: int = 5000) -> str:
     return f"http://{get_lan_ip()}:{port}"
 
 
-def cors_allowlist(port: int = 5000, lan_ip: str | None = None) -> list[str]:
+def cors_allowlist(port: int = 5000, lan_ip: str | None = None,
+                   weitere=()) -> list[str]:
     """NET-03: konkrete CORS-Origin-Allowlist statt ``"*"``.
 
     Frueher stand ``cors_allowed_origins="*"`` — JEDE Website im Browser des
@@ -118,7 +124,84 @@ def cors_allowlist(port: int = 5000, lan_ip: str | None = None) -> list[str]:
     origins = [f"http://127.0.0.1:{port}", f"http://localhost:{port}"]
     if ip and ip not in ("127.0.0.1", "localhost"):
         origins.insert(0, f"http://{ip}:{port}")
+    # WEB-11: ``weitere`` = die uebrigen eigenen Adressen dieses Rechners. Mit
+    # mehreren Netzwerkkarten (WLAN + Kabel) ist die Adresse der Standard-Route
+    # nicht unbedingt die, unter der das Handy den PC sieht; waehlt der Nutzer
+    # im QR-Dialog die andere Karte, kaeme die Seite von einem Ursprung, den
+    # die Liste nicht kennt — der Socket wuerde abgewiesen. Es bleiben eigene
+    # Adressen dieses Rechners, also weiterhin kein fremder Ursprung.
+    for andere in weitere or ():
+        eintrag = f"http://{andere}:{port}"
+        if andere and eintrag not in origins:
+            origins.append(eintrag)
     return origins
+
+
+def _eigene_adressen() -> list[str]:
+    """WEB-11: alle brauchbaren IPv4-Adressen der aktiven Netzwerkkarten (nur
+    gelesen). Nie eine Ausnahme — im Zweifel leer, dann gilt die bisherige
+    Liste aus ``get_lan_ip``."""
+    try:
+        from src.web import handy_verbindung
+        return [a.ip for a in handy_verbindung.brauchbare_adressen(
+            handy_verbindung.lese_schnittstellen())]
+    except Exception as e:
+        print(f"[web] own addresses error: {type(e).__name__}")
+        return []
+
+
+def bind_host() -> str:
+    """WEB-11: die Adresse, an die der LAUFENDE Server gebunden ist
+    (``0.0.0.0`` = alle Karten, ``127.0.0.1`` = nur dieser PC); leer, wenn er
+    nicht laeuft."""
+    return _bind_host if _running else ""
+
+
+def server_port() -> int:
+    """WEB-11: der Port des laufenden Servers (sonst der Standard 5000)."""
+    return int(_port or 5000)
+
+
+def erlaubte_hosts() -> set[str] | None:
+    """WEB-11: die Adressen, von denen der laufende Server eine Seite samt
+    Socket annimmt (aus der Origin-Liste). ``None``, wenn kein Server laeuft
+    oder die Liste nicht lesbar ist — dann wird nichts ausgesiebt."""
+    app = _flask_app
+    if app is None:
+        return None
+    try:
+        from urllib.parse import urlsplit
+        return {urlsplit(o).hostname or "" for o in
+                app.config.get("CORS_ALLOWED_ORIGINS") or []}
+    except Exception:
+        return None
+
+
+# WEB-11: Web-App-Manifest der Handy-Konsole. Farben wie die Seite selbst
+# (Hintergrund des Pult-Designs). Bewusst OHNE Service Worker / Offline-Cache:
+# der braeuchte HTTPS, das es im Heimnetz ohne Zertifikat nicht gibt — und die
+# Seite ist ohne laufende Verbindung zum Pult ohnehin nutzlos.
+KONSOLE_MANIFEST = {
+    "name": "LightOS Handy-Konsole",
+    "short_name": "LightOS",
+    "description": "Fernbedienung für das LightOS-Lichtpult im eigenen Netz.",
+    "lang": "de",
+    "id": "/konsole",
+    "start_url": "/konsole",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#0d1117",
+    "theme_color": "#0d1117",
+    "icons": [
+        {"src": "/static/icons/konsole-192.png", "sizes": "192x192",
+         "type": "image/png", "purpose": "any"},
+        {"src": "/static/icons/konsole-512.png", "sizes": "512x512",
+         "type": "image/png", "purpose": "any"},
+        {"src": "/static/icons/konsole-maskable-512.png", "sizes": "512x512",
+         "type": "image/png", "purpose": "maskable"},
+    ],
+}
 
 
 def _num(data, key, default, cast):
@@ -196,7 +279,7 @@ def create_app(port: int = 5000) -> tuple:
         _flask_app.config["LIGHTOS_REMOTE_TOKEN"] = ""
     # NET-03: konkrete Origin-Allowlist statt "*" (Drive-by-CSRF/-WebSocket). Die
     # Liste auch in der App-Config ablegen, damit UI/Tests sie einsehen koennen.
-    origins = cors_allowlist(port)
+    origins = cors_allowlist(port, weitere=_eigene_adressen())
     _flask_app.config["CORS_ALLOWED_ORIGINS"] = origins
     _socketio = SocketIO(_flask_app, cors_allowed_origins=origins, async_mode="threading")
 
@@ -292,7 +375,15 @@ def _register_auth(app):
         try:
             path = request.path or "/"
             # Allowlist: Startseite (macht den Handshake) + statische Assets.
-            if path == "/" or path.startswith("/static/"):
+            # WEB-09: die Seite der Handy-Konsole macht denselben Handshake —
+            # so taugt ihr Link mit Schluessel als Lesezeichen auf dem
+            # Startbildschirm. Ausgeliefert wird dort nur die leere Huelle;
+            # jeder Inhalt kommt ueber /api/ bzw. den Socket, also hinter dem Gate.
+            # WEB-11: das Manifest fuer „Zum Startbildschirm" liegt ebenfalls
+            # davor — der Browser holt es ohne Sitzung, und es enthaelt nichts
+            # Geheimes (kein Schluessel, keine Daten der Show).
+            if path in ("/", "/konsole", "/konsole/manifest.webmanifest") \
+                    or path.startswith("/static/"):
                 return None
             if session.get("authed") is True:
                 # Security-Review: die Session muss zur AKTUELLEN Auth-Epoche passen
@@ -307,8 +398,7 @@ def _register_auth(app):
 
 def _register_routes(app):
 
-    @app.route("/")
-    def index():
+    def _handshake():
         # NET-01: Token-Handshake. ``?k=<token>`` per constant-time-Vergleich gegen
         # das persistierte Token; bei Treffer die Session als authed markieren.
         try:
@@ -326,7 +416,45 @@ def _register_routes(app):
                     session["epoch"] = remote_settings.get_auth_epoch()
         except Exception as e:
             print(f"[web] handshake error: {e}")
-        return render_template("index.html")
+
+    def _konsole_an() -> bool:
+        try:
+            from src.web import vc_remote
+            return bool(vc_remote.ist_aktiv())
+        except Exception:
+            return False
+
+    @app.route("/")
+    def index():
+        _handshake()
+        # WEB-09: die feste Seite verlinkt auf die Handy-Konsole, wenn sie
+        # eingeschaltet ist.
+        return render_template("index.html", konsole_an=_konsole_an())
+
+    @app.route("/konsole")
+    def konsole_seite():
+        # WEB-09: die Handy-Konsole. Die Seite selbst traegt keine Daten der
+        # Show — Seiten und Zustand holt sie ueber /api/vc/konsole und den Socket.
+        _handshake()
+        antwort = app.make_response(render_template("konsole.html"))
+        # Nie aus dem Zwischenspeicher: nach einem Update soll das Handy nicht
+        # mit einer alten Seite gegen eine neue Schnittstelle sprechen.
+        antwort.headers["Cache-Control"] = "no-store"
+        return antwort
+
+    @app.route("/konsole/manifest.webmanifest")
+    def konsole_manifest():
+        # WEB-11: Web-App-Manifest fuer „Zum Startbildschirm hinzufuegen".
+        # ★ ``start_url`` traegt KEINEN Schluessel: das Manifest ist ohne
+        # Anmeldung abrufbar. Die Seite kommt vom Startbildschirm ueber ihre
+        # bestehende Sitzung bzw. den im Handy gemerkten Schluessel wieder
+        # hinein (s. konsole.html).
+        import json as _json
+        antwort = app.response_class(
+            _json.dumps(KONSOLE_MANIFEST, ensure_ascii=False, indent=1),
+            mimetype="application/manifest+json")
+        antwort.headers["Cache-Control"] = "no-cache"
+        return antwort
 
     @app.route("/api/status")
     def status():
@@ -421,6 +549,49 @@ def _register_routes(app):
         _get_state().clear_programmer()
         return jsonify({"ok": True})
 
+    # ── WEB-08: VC-Widgets ueber ihre Kennung ─────────────────────────────────
+    # Grundlage der Handy-Konsole (WEB-07). Beide Routen liegen hinter demselben
+    # Schluessel-Gate wie alles unter /api/ (``_auth_gate`` kennt nur '/' und
+    # '/static/' als Ausnahmen). Zusaetzlich standardmaessig AUS
+    # (``remote_settings.vc_remote_enabled``): ohne Auswahl, welche Widgets aufs
+    # Handy duerfen, gaebe die Schnittstelle sonst jedes fernbedienbare frei.
+    # Die Aktion laeuft im UI-Thread (``VCFernbedienung``), nie hier.
+
+    @app.route("/api/vc/widgets")
+    def api_vc_widgets():
+        from src.web import vc_remote
+        return jsonify(vc_remote.widget_liste())
+
+    @app.route("/api/vc/widget/<kennung>/aktion", methods=["POST"])
+    def api_vc_widget_aktion(kennung: str):
+        from src.web import vc_remote
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            antwort = {"ok": False, "fehler": "anfrage_ungueltig"}
+        else:
+            antwort = vc_remote.widget_aktion(kennung, data.get("aktion"),
+                                              data.get("wert"))
+        return jsonify(antwort), vc_remote.status_fuer(antwort)
+
+    # ── WEB-09: Handy-Konsole ─────────────────────────────────────────────────
+    # Seiten + Zustand in einem Abruf (erster Aufbau der Seite, Rueckfall ohne
+    # Socket) und Grand Master/Blackout der festen Leiste.
+
+    @app.route("/api/vc/konsole")
+    def api_vc_konsole():
+        from src.web import vc_remote
+        return jsonify(vc_remote.konsole())
+
+    @app.route("/api/vc/pult", methods=["POST"])
+    def api_vc_pult():
+        from src.web import vc_remote
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            antwort = {"ok": False, "fehler": "anfrage_ungueltig"}
+        else:
+            antwort = vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"))
+        return jsonify(antwort), vc_remote.status_fuer(antwort)
+
 
 def _register_socketio(sio):
 
@@ -477,6 +648,119 @@ def _register_socketio(sio):
         enabled = bool(data.get("enabled", False))
         _get_state().output_manager.set_blackout(enabled)
 
+    # ── WEB-09: Handy-Konsole ueber den Socket ────────────────────────────────
+    #
+    # Rueckmeldung Pult -> Handy: die Bruecke der Konsole gibt Aenderungen an
+    # ``vc_remote.melde`` ab; von hier gehen sie an den Raum der Zuschauer.
+    # Aktionen Handy -> Pult: dieselbe Pruefkette wie ueber HTTP
+    # (``vc_remote.widget_aktion``), nur ohne den Aufbau einer Anfrage je
+    # Fader-Schritt.
+    #
+    # ⚠️ Der Schluessel wird beim Verbinden geprueft (``on_connect``) — eine
+    # offene Verbindung laeuft danach aber nicht mehr durch das HTTP-Gate. Jedes
+    # Ereignis der Handy-Konsole prueft deshalb selbst noch einmal Anmeldung UND
+    # Epoche und trennt die Verbindung, wenn sie nicht (mehr) gilt.
+    from flask_socketio import join_room, disconnect
+    from src.web import vc_remote
+
+    RAUM = "vc_konsole"
+    # Je Verbindung und Widget die Nummer des letzten Fader-Werts. Socket.IO
+    # arbeitet die Ereignisse einer Verbindung in eigenen Threads ab: ohne die
+    # Nummer koennte ein aelterer Wert den neueren ueberholen und der Fader am
+    # Ende auf einem Zwischenstand stehen.
+    folge: dict = {}
+    folge_lock = threading.Lock()
+
+    def _senden(ereignis, daten):
+        sio.emit(ereignis, daten, to=RAUM)
+
+    vc_remote.setze_sender(_senden)
+
+    def _berechtigt() -> bool:
+        try:
+            from src.web import remote_settings
+            if (session.get("authed") is True
+                    and session.get("epoch") == remote_settings.get_auth_epoch()):
+                return True
+        except Exception as e:
+            print(f"[web] socket gate error: {e}")
+        try:
+            disconnect()
+        except Exception:
+            pass
+        return False
+
+    def _veraltet(sid, schluessel, nummer) -> bool:
+        """True, wenn zu ``schluessel`` schon ein Wert mit hoeherer Nummer kam."""
+        if isinstance(nummer, bool) or not isinstance(nummer, (int, float)):
+            return False                    # ohne Nummer: immer ausfuehren
+        with folge_lock:
+            je_sid = folge.setdefault(sid, {})
+            if nummer <= je_sid.get(schluessel, float("-inf")):
+                return True
+            je_sid[schluessel] = nummer
+            return False
+
+    @sio.on("vc_hallo")
+    def on_vc_hallo(data=None):
+        """Das Handy zeigt die Konsole an: als Zuschauer fuehren und den ganzen
+        Stand schicken. Kommt nach JEDEM Verbinden — das ist der vollstaendige
+        Abgleich nach einer Wiederverbindung."""
+        if not _berechtigt():
+            return {"ok": False, "fehler": "kein_zugang"}
+        join_room(RAUM)
+        vc_remote.zuschauer_dazu(request.sid)   # VOR dem Abgleich, s. Bruecke
+        stand = vc_remote.konsole()
+        emit("vc_konsole", stand)
+        return {"ok": True}
+
+    @sio.on("vc_aktion")
+    def on_vc_aktion(data=None):
+        if not _berechtigt():
+            return {"ok": False, "fehler": "kein_zugang"}
+        if not isinstance(data, dict):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        kennung, aktion = data.get("id"), data.get("aktion")
+        # Nur Text kommt weiter: eine Liste oder ein Objekt als Kennung taugte
+        # nicht einmal als Schluessel der Folgenummern (TypeError im Handler).
+        if not isinstance(kennung, str) or not isinstance(aktion, str):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        if aktion == "setzen" and _veraltet(request.sid, kennung, data.get("n")):
+            return {"ok": True, "veraltet": True}
+        antwort = vc_remote.widget_aktion(kennung, aktion, data.get("wert"))
+        if aktion == "druecken" and antwort.get("ok"):
+            vc_remote.gehalten_merken(request.sid, kennung, True)
+        elif aktion == "loslassen":
+            hielt = kennung in vc_remote.gehaltene(request.sid)
+            vc_remote.gehalten_merken(request.sid, kennung, False)
+            if hielt and not antwort.get("ok"):
+                # Das Loslassen kam nicht an (Oberflaeche antwortete nicht
+                # rechtzeitig, Widget inzwischen von der Seite genommen) — die
+                # Taste gilt hier aber nicht mehr als gehalten, ein spaeterer
+                # Verbindungsabbruch liesse sie also auch nicht mehr los.
+                # Deshalb jetzt ueber den Weg, der nicht verfaellt.
+                vc_remote.loslassen([kennung])
+        return antwort
+
+    @sio.on("vc_pult")
+    def on_vc_pult(data=None):
+        if not _berechtigt():
+            return {"ok": False, "fehler": "kein_zugang"}
+        if not isinstance(data, dict):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        if "gm" in data and _veraltet(request.sid, "#gm", data.get("n")):
+            return {"ok": True, "veraltet": True}
+        return vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"))
+
+    @sio.on("disconnect")
+    def on_disconnect(*_args):
+        # Verbindung weg — egal warum (WLAN, Seite geschlossen, Schluessel
+        # gewechselt, Server aus): gehaltene Tasten loslassen.
+        sid = request.sid
+        with folge_lock:
+            folge.pop(sid, None)
+        vc_remote.zuschauer_weg(sid)
+
 
 def _halter_hinweis(port: int) -> str:
     """Der Befehl, mit dem man den Halter des Ports findet — je Plattform.
@@ -492,7 +776,7 @@ def _halter_hinweis(port: int) -> str:
 
 def start_server(port: int = 5000):
     """Start the web server in a background thread."""
-    global _thread, _running, _server
+    global _thread, _running, _server, _bind_host, _port
     if _running:
         return
     if not HAS_FLASK:
@@ -571,6 +855,7 @@ def start_server(port: int = 5000):
     finally:
         BaseWSGIServer.allow_reuse_address = _reuse_alt
     _running = True
+    _bind_host, _port = host, int(port)
     _thread = threading.Thread(
         target=_server.serve_forever,
         daemon=True,
@@ -585,8 +870,9 @@ def stop_server():
     # thread-safe und unterbricht ``serve_forever()``; ``server_close()`` gibt den
     # Listen-Socket frei -> :5000 ist SOFORT beim Toggle 'aus' frei (frueher blieb
     # er bis App-Ende offen). Idempotent + fehlertolerant.
-    global _running, _server, _thread, _flask_app, _socketio
+    global _running, _server, _thread, _flask_app, _socketio, _bind_host, _port
     _running = False
+    _bind_host, _port = "", 5000
     # CDX-24 (Safety): BESTEHENDE Verbindungen ZUERST kappen — `server_close()`
     # gibt nur den LISTEN-Socket frei. Werkzeugs `ThreadedWSGIServer` laeuft mit
     # `daemon_threads = True`, deshalb sammelt `ThreadingMixIn` seine Handler-
@@ -611,6 +897,15 @@ def stop_server():
     t, _thread = _thread, None
     if t is not None and t.is_alive():
         t.join(timeout=3.0)
+    # WEB-09: was jetzt noch als gehalten gefuehrt wird, loslassen, und die
+    # Rueckmeldung abmelden — die Bruecke der Konsole soll nicht in einen
+    # abgebauten Server senden.
+    try:
+        from src.web import vc_remote
+        vc_remote.alle_loslassen()
+        vc_remote.setze_sender(None)
+    except Exception as e:
+        print(f"[web] vc_remote shutdown error: {e}")
     # CDX-24: Globals mit abraeumen — sonst meldet `refresh_running_token()` auch
     # nach dem Ausschalten noch Erfolg (`_flask_app` blieb gesetzt), und der Dialog
     # behauptet „Neues Token aktiv" fuer einen Server, der gar nicht laeuft.
