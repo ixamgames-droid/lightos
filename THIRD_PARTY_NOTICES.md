@@ -251,9 +251,13 @@ Zu pyusb, libusb und libusb-package stehen eigene Abschnitte weiter oben.
   Die Aufstellung aller enthaltenen Bibliotheken mit ihren Lizenztexten führt die
   Qt-Dokumentation: „Qt WebEngine Licensing“,
   <https://doc.qt.io/qt-6/qtwebengine-licensing.html>.
-- **Offen:** Die PySide6-Pakete bringen diese Aufstellung nicht als Datei mit. Ob und in
-  welcher Form sie dem Setup beigelegt wird, ist noch zu entscheiden (LIZ-2, Rückfrage an
-  den Projektinhaber).
+- **Im Setup:** [`licenses/QtWebEngine-THIRD-PARTY.txt`](licenses/QtWebEngine-THIRD-PARTY.txt)
+  – alle dort genannten Bibliotheken (125) mit Lizenz, Projektseite und Lizenztext, für
+  Qt WebEngine 6.140.0 (Chromium 140), die Fassung in PySide6 6.12.0. Die PySide6-Pakete
+  bringen diese Aufstellung nicht mit (auch nicht in `qtwebengine_resources.pak`); die Datei
+  entsteht aus den Seiten der Qt-Dokumentation mit
+  `packaging/windows/fremdlizenzen_sammeln.py webengine`. Der Bau liest die Version aus
+  `Qt6WebEngineCore.dll` und bricht ab, wenn die Datei eine andere beschreibt.
 
 ## FFmpeg — in Qt Multimedia (im Windows-Installationspaket)
 
@@ -287,8 +291,15 @@ in numpy. Das Bauwerkzeug erkennt sie an ihren Dateien.
   fertige Datei beigelegt
   (<https://download.qt.io/development_releases/prebuilt/llvmpipe/windows/>); Mesa steht
   überwiegend unter der MIT-Lizenz (<https://docs.mesa3d.org/license.html>). Qt lädt die
-  Datei nur, wenn Software-OpenGL verlangt wird. **Offen:** ein Lizenztext liegt der Datei
-  nicht bei (LIZ-2, Rückfrage).
+  Datei nur, wenn Software-OpenGL verlangt wird. Die Datei in PySide6 6.12.0 ist Mesa
+  11.2.2 mit statisch eingebundenem LLVM 3.6.2 (Versionskennung in der Datei; bis auf die
+  Signatur gleich Qts Archiv `opengl32sw-64-mesa_11_2_2-signed_sha256.7z`). Lizenztexte:
+  [`licenses/Mesa-opengl32sw.txt`](licenses/Mesa-opengl32sw.txt) – Mesas MIT-Lizenz, die
+  Boost-Lizenz der C11-Thread-Emulation, die BSD-Lizenz von Jimenez's MLAA, die Lizenz von
+  LLVM 3.6.2 (University of Illinois/NCSA) mit den Hinweisen zu regex und MD5; alles aus den
+  Original-Quellarchiven (<https://archive.mesa3d.org/>, <https://releases.llvm.org/>),
+  erzeugt mit `packaging/windows/fremdlizenzen_sammeln.py mesa`. Der Bau prüft die
+  Mesa-Version der Datei gegen die Lizenzdatei.
 - **Microsoft Visual C++ Laufzeit** (`VCRUNTIME140*.dll`, `MSVCP140*.dll`) – von Microsoft,
   **nicht** Open Source. Sie kommt ausschließlich aus der Python-Installation und aus den
   Paketen (PySide6, shiboken6, numpy), nie von anderswo auf dem Bau-Rechner – eine solche

@@ -194,7 +194,6 @@ Gilt nur fuer **natives** ARM64-Python - mit dem empfohlenen x64-Python
 | python-osc | OK (pure-Python) |
 | pyserial | OK (pure-Python) |
 | SQLAlchemy | OK (pure-Python) |
-| mido | OK (pure-Python) |
 | **python-rtmidi** | optional, Build noetig (MSVC Build Tools) |
 
 Stand: 2026-05-25 (PyPI Latest Stable), QtWebEngine-Befund 2026-10 (XPLAT-45)
@@ -552,7 +551,6 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
 | uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber von Hand zuweisen (Windows; LightOS liefert und installiert keine Treiber) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
-| `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
 | **Linux:** `pip install` bricht bei `python-rtmidi` ab | `sudo apt-get install build-essential libasound2-dev`, dann erneut installieren |
 | **Linux:** kein MIDI trotz angeschlossenem Geraet | `python-rtmidi` fehlt (kein WinMM-Fallback auf Linux) → wie oben nachinstallieren |
 | **Linux:** 3D-Visualizer bleibt schwarz | QtWebEngine-Sandbox — LightOS setzt automatisch `--no-sandbox`; falls doch: sicherstellen, dass `LIGHTOS_WEBENGINE_NO_SANDBOX` nicht auf `0` steht; ggf. `QT_QPA_PLATFORM` pruefen |
