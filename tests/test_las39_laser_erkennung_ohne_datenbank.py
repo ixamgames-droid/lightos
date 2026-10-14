@@ -151,6 +151,13 @@ def _patchen(st):
     st._rebuild_render_plan()
 
 
+def _notaus(st):
+    """Der echte Ausloese-Weg (Kopfleiste, VC-Taste, Laser-Seite): DMX-Latch,
+    Netzwerk-NOT-AUS, dann das Nachholen (``LaserOutputManager.estop_all``)."""
+    from src.core.laser.laser_output import LaserOutputManager
+    LaserOutputManager(st).estop_all()
+
+
 def _werte(st):
     st._render_frame(0.02)
     live = st.universes[1]
@@ -219,7 +226,7 @@ def test_frischer_notaus_zeigt_den_hinweis_erneut(rig):
     st = rig.st
     _patchen(st)
     rig.hinweise.clear()
-    st.set_laser_estop(True)
+    _notaus(st)
     assert any(erkennung.UNVOLLSTAENDIG in h for h in rig.hinweise)
 
 
@@ -256,7 +263,7 @@ def test_naechster_notaus_holt_nach_erst_nach_dem_verriegeln(rig):
     rig.db.da = True
     rig.db.fragen.clear()
     rig.hinweise.clear()
-    st.set_laser_estop(True)
+    _notaus(st)
     assert st.laser_estop_active is True
     assert rig.db.fragen, "der NOT-AUS muss die fehlende Auskunft nachholen"
     assert all(verriegelt for _ids, verriegelt in rig.db.fragen), \
@@ -267,7 +274,7 @@ def test_naechster_notaus_holt_nach_erst_nach_dem_verriegeln(rig):
     # naechste die Lampe frei.
     assert _werte(st)[0] == [0, 0, 0]
     st.set_laser_estop(False)
-    st.set_laser_estop(True)
+    _notaus(st)
     kombi, lampe = _werte(st)
     assert kombi == [0, 0, 0]
     assert lampe[0] == 200
@@ -276,7 +283,7 @@ def test_naechster_notaus_holt_nach_erst_nach_dem_verriegeln(rig):
 def test_notaus_bei_weiter_fehlender_datenbank_bleibt_dunkel(rig):
     st = rig.st
     _patchen(st)
-    st.set_laser_estop(True)            # Nachholen scheitert erneut
+    _notaus(st)                         # Nachholen scheitert erneut
     assert st.laser_estop_active is True
     kombi, lampe = _werte(st)
     assert kombi == [0, 0, 0]
@@ -289,7 +296,7 @@ def test_ohne_offene_profile_fragt_der_notaus_nicht(rig):
     rig.db.da = True
     _patchen(st)
     rig.db.fragen.clear()
-    st.set_laser_estop(True)
+    _notaus(st)
     assert rig.db.fragen == []
 
 
@@ -349,3 +356,77 @@ def test_anleitung_nennt_die_grenze():
     with open(pfad, encoding="utf-8") as f:
         text = f.read()
     assert erkennung.UNVOLLSTAENDIG in text
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# E) Gegenpruefung: der NOT-AUS wartet nie auf die Datenbank
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Eine gesperrte Geraete-Datenbank antwortet erst nach dem SQLite-Timeout
+# (Sekunden). Das Nachholen lief zuerst IN ``set_laser_estop`` — also in
+# ``LaserOutputManager.estop_all`` VOR dem Netzwerk-NOT-AUS der Ether-Dream-/
+# IDN-Laser (``conn.estop()``) und vor der Bestaetigung. CDX-25 legt fest: die
+# billige lokale Verriegelung zuerst, dann der Netzwerk-NOT-AUS — eine
+# Datenbank-Abfrage gehoert dahinter.
+
+class _Netz:
+    def __init__(self, reihenfolge):
+        self._r = reihenfolge
+
+    def estop(self):
+        self._r.append("netz")
+
+    def clear_estop(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def _mit_reihenfolge(rig):
+    reihenfolge = []
+    db = rig.db
+
+    def frage(ids):
+        reihenfolge.append("db")
+        return db(ids)
+
+    return reihenfolge, frage
+
+
+def test_netzwerk_notaus_vor_der_datenbank(rig, monkeypatch):
+    from src.core.laser.laser_output import LaserOutputManager
+    st = rig.st
+    _patchen(st)
+    rig.db.da = True
+    reihenfolge, frage = _mit_reihenfolge(rig)
+    monkeypatch.setattr(A, "_profile_mit_laserkanal", frage)
+    lo = LaserOutputManager(st)
+    lo._connections = {7: _Netz(reihenfolge)}
+    lo.estop_all()
+    assert st.laser_estop_active is True
+    assert reihenfolge and reihenfolge[0] == "netz", \
+        f"Netzwerk-NOT-AUS muss vor jeder Datenbank-Abfrage laufen: {reihenfolge}"
+    assert "db" in reihenfolge, "das Nachholen muss trotzdem laufen"
+    assert st._laser_fids == frozenset({1})
+
+
+def test_der_latch_allein_fragt_die_datenbank_nicht(rig):
+    st = rig.st
+    _patchen(st)
+    rig.db.da = True
+    rig.db.fragen.clear()
+    st.set_laser_estop(True)
+    assert st.laser_estop_active is True
+    assert rig.db.fragen == [], "set_laser_estop darf nie auf die Datenbank warten"
+
+
+def test_notaus_bestaetigung_nennt_die_unvollstaendige_erkennung():
+    """Die NOT-AUS-Bestaetigung ersetzt die Statuszeile — der Hinweis muss in
+    ihr stehen, sonst ueberschreibt sie ihn sofort."""
+    pfad = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                        "src", "ui", "main_window.py")
+    with open(pfad, encoding="utf-8") as f:
+        text = f.read()
+    rumpf = text.split("def _on_laser_estop(self", 1)[1].split("\n    def ", 1)[0]
+    assert "laser_erkennung_hinweis()" in rumpf

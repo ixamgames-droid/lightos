@@ -233,7 +233,9 @@ DMX nichts dunkel.
   „Laser-Erkennung unvollständig: Geräte-Datenbank nicht erreichbar“, und der
   Tooltip des NOT-AUS-Knopfs nennt die Zahl der betroffenen Geräte. LightOS
   fragt beim nächsten Patchen oder Laden und beim nächsten Auslösen des
-  NOT-AUS nach (erst nachdem der NOT-AUS verriegelt hat). Antwortet die
+  NOT-AUS nach (erst nachdem der NOT-AUS DMX- und Netzwerk-Laser verriegelt
+  hat; die Bestätigung in der Statusleiste nennt die unvollständige Erkennung
+  dann mit). Antwortet die
   Datenbank wieder, meldet die Statusleiste „Laser-Erkennung wieder
   vollständig“ und normale Lampen sind wieder frei – eine Lampe, die der gerade
   stehende NOT-AUS schon dunkel hält, bleibt es bis zum Lösen.

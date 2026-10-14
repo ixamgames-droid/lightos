@@ -1824,13 +1824,18 @@ class AppState:
         except Exception as e:
             debug_swallow("app_state.laser_erkennung_melden", e)
 
-    def _laser_erkennung_nachholen(self):
-        """LAS-39: beim frisch ausgeloesten NOT-AUS (NACH dem Verriegeln — der
-        NOT-AUS wartet nie auf die Datenbank) fehlende Profil-Auskuenfte
+    def laser_erkennung_nachholen(self):
+        """LAS-39: beim ausgeloesten NOT-AUS fehlende Profil-Auskuenfte
         nachholen. Ist eine da, wird der Render-Plan neu gebaut: eine normale
         Lampe faellt dann aus der Laser-Menge (die klebrige Maske haelt sie bis
         zum Loesen dunkel, der naechste NOT-AUS laesst sie frei). Ohne offene
-        Profile kostet das nichts."""
+        Profile kostet das nichts.
+
+        Aufgerufen wird es von ``LaserOutputManager.estop_all`` erst NACH dem
+        DMX-Latch UND dem Netzwerk-NOT-AUS (``conn.estop()``) — nie aus
+        ``set_laser_estop``: eine gesperrte Datenbank antwortet erst nach dem
+        SQLite-Timeout (Sekunden), und darauf darf kein Teil des NOT-AUS warten
+        (CDX-25: das Billige zuerst, das Teure danach)."""
         if not laser_erkennung.offene_profile():
             return
         try:
@@ -2714,10 +2719,10 @@ class AppState:
         # CDX-12: Reihenfolge ist ASYMMETRISCH und failt in beide Richtungen sicher.
         # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
         # und die OutputManager-Maske (Ebene 2) wird separat angewandt.
-        frisch = False
+        # LAS-39: KEIN Nachholen der Profil-Auskunft hier — das macht
+        # ``estop_all`` nach dem Netzwerk-NOT-AUS (``laser_erkennung_nachholen``).
         with self._get_estop_lock():
             if active and not getattr(self, "laser_estop_active", False):
-                frisch = True
                 # OUT-63: frischer Latch -> klebrige Maske neu beginnen (nur
                 # Adressen SEIT dieser Aktivierung; Defensive gegen einen Rest,
                 # falls ein Loesen den Push umgangen hat).
@@ -2740,12 +2745,6 @@ class AppState:
                 # Frame extra dunkel. Nie ein offenes Fenster.
                 self.laser_estop_active = False
                 self._push_laser_estop_mask(target_active=False)
-        if frisch:
-            # LAS-39: erst verriegelt, dann fehlende Profil-Auskunft nachholen.
-            try:
-                self._laser_erkennung_nachholen()
-            except Exception as e:
-                debug_swallow("app_state.set_laser_estop.nachholen", e)
 
     def laser_notaus_ausloesen(self):
         """LAS-31: Laser-NOT-AUS ausloesen — EIN Weg fuer Kopfleiste und
@@ -2768,6 +2767,11 @@ class AppState:
             # Latch notfalls direkt (estop_all setzt ihn als Erstes — steht er
             # schon, ist das ein No-Op) und die Anzeige trotzdem benachrichtigen.
             self.set_laser_estop(True)
+            # LAS-39: auch hier erst nach dem Verriegeln nachholen.
+            try:
+                self.laser_erkennung_nachholen()
+            except Exception as e2:
+                debug_swallow("app_state.laser_notaus.nachholen", e2)
             try:
                 from .sync import get_sync, SyncEvent
                 get_sync().emit(SyncEvent.LASER_ESTOP, None)
