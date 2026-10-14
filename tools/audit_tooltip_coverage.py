@@ -58,6 +58,7 @@ BASELINE: dict[str, int] = {
     "patch_view": 1,
     "playback_view": 1,
     "preset_browser_view": 1,
+    "prioritaeten_view": 0,
     "programmer_view": 14,
     "rgb_matrix_view": 3,
     "show_manager_view": 0,

@@ -125,6 +125,13 @@ class Function:
         # Kanal-/Attribut-Ueberschneidung (tickt zuletzt -> LTP). Gleiche Prioritaet
         # faellt auf die Start-Reihenfolge zurueck (Verhalten wie bisher, Default 0).
         self.priority: int = 0
+        # ENG-37: Modify-Effekt. Statt seine Kanaele zu SETZEN, wird der Effekt mit
+        # dem verrechnet, was darunter laeuft (core/engine/modify.py). Die drei
+        # Felder werden nur gespeichert, wenn sie von der Vorgabe abweichen — eine
+        # Show ohne Modify bleibt damit byte-gleich.
+        self.modify: bool = False
+        self.modify_mode: str = "add"        # "add" | "sub" | "dim"
+        self.modify_strength: int = 100      # Prozent 0..100
         # ARC-04: zeitbasierte Ein-/Ausblend-Huellkurve (Sekunden, 0 = aus). Wirkt als
         # Output-Multiplikator ueber ALLE Kanaele der Funktion (nicht nur Dimmer),
         # angewandt im FunctionManager.tick. Eigene Namen (env_*), um Scene.fade_in
@@ -483,8 +490,16 @@ class Function:
         """
         return
 
+    def modify_wirksam(self) -> bool:
+        """ENG-37: Wird diese Funktion als Modify-Effekt verrechnet?
+
+        Basis-Fassung: nein. Der Haken ``modify`` allein genuegt nicht — nur
+        Funktionstypen, die das Verrechnen ausdruecklich unterstuetzen,
+        ueberschreiben das (Schritt 1: Matrix im Stil Dimmer)."""
+        return False
+
     def to_dict(self) -> dict:
-        return {
+        d = {
             "id": self.id,
             "name": self.name,
             "type": self.function_type.value,
@@ -501,6 +516,15 @@ class Function:
             "sync_group": self.sync_group,
             "align_on_start": self.align_on_start,
         }
+        # ENG-37: nur bei Abweichung von der Vorgabe schreiben (Alt-Shows
+        # bleiben byte-gleich). Mode/Staerke bleiben auch ohne Haken gemerkt.
+        if getattr(self, "modify", False):
+            d["modify"] = True
+        if getattr(self, "modify_mode", "add") != "add":
+            d["modify_mode"] = self.modify_mode
+        if getattr(self, "modify_strength", 100) != 100:
+            d["modify_strength"] = self.modify_strength
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Function":

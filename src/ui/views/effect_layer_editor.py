@@ -11,6 +11,7 @@ from src.core.engine.effect_layers import (EffectLayer, LayerType,
                                            offered_types, used_fields)
 from src.core.engine.effect_func import LayeredEffect
 from src.ui.weak_slots import weak_slot_fwd
+from src.ui.widgets.stufe_auswahl import StufeAuswahl
 
 
 # UI-59: ``min_val``/``max_val`` bedeuten JE NACH LAYER-TYP etwas anderes. An
@@ -88,6 +89,9 @@ class EffectLayerEditor(QWidget):
         self._name_edit = QLineEdit(self._effect.name)
         self._name_edit.textChanged.connect(self._on_name_changed)
         top.addRow("Name:", self._name_edit)
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        self._stufe_combo = StufeAuswahl(self._effect)
+        top.addRow("Stufe:", self._stufe_combo)
 
         self._target_combo = QComboBox()
         for a in ["intensity", "color_r", "color_g", "color_b", "color_w",

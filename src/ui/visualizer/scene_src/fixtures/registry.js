@@ -53,5 +53,12 @@ export function buildFixtureModel(type, opts) {
 // Pfad — exakt der Zweig, den der Monolith fuer solche Fixtures nahm.
 export function updateFixtureDmx(f, dmx) {
   const entry = REGISTRY[f.type] || REGISTRY.par;
+  _anwendungen += 1;
   entry.updateDmx(f, dmx);
 }
+
+// VIZ-104 Messbarkeit: wie oft wurde ein DMX-Stand VOLL angewandt? Der teure
+// Aufruf der Szene (Gobo, Farbe, Optik, Prisma, Pan/Tilt, Zielrechnung) — der
+// Strobe-Takt darf ihn nicht ausloesen (tests/test_viz104_strobe_im_3d_scene.py).
+let _anwendungen = 0;
+export function dmxAnwendungen() { return _anwendungen; }
