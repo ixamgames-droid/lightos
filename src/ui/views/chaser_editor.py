@@ -13,6 +13,7 @@ from src.core.engine.function import RunOrder, Direction
 from src.core.engine.function_manager import get_function_manager
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 from src.ui.weak_slots import weak_slot
+from src.ui.widgets.stufe_auswahl import StufeAuswahl
 
 
 class FunctionSelectorDialog(QDialog):
@@ -68,6 +69,7 @@ class ChaserEditor(QWidget):
 
     def set_chaser(self, chaser: Chaser):
         self._chaser = chaser
+        self._stufe_combo.binde(chaser)
         self._load_chaser()
 
     # ── UI ────────────────────────────────────────────────────────────────────
@@ -101,6 +103,9 @@ class ChaserEditor(QWidget):
         self._name_edit = QLineEdit()
         self._name_edit.textChanged.connect(self._on_name_changed)
         basic_form.addRow("Name:", self._name_edit)
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        self._stufe_combo = StufeAuswahl(self._chaser)
+        basic_form.addRow("Stufe:", self._stufe_combo)
         root.addWidget(grp_basic)
 
         # Wiedergabe & Tempo — vorher eine schmale prop_row (clippte horizontal)

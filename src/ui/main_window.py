@@ -206,6 +206,19 @@ def _recovery_prompt_suppressed() -> bool:
     return ohne_bildschirm()
 
 
+def _ladehinweise_text(hinweise) -> str:
+    """STAB-37: Hinweise UNTER den Ladeproblemen desselben Dialogs — sichtbar
+    getrennt, damit sie nicht unter „konnten nicht gelesen werden“ stehen.
+    Leer, wenn es keine gibt."""
+    if not hinweise:
+        return ""
+    gekuerzt = list(hinweise)[:5]
+    rest = len(hinweise) - len(gekuerzt)
+    return ("\n\nAußerdem (kein Verlust, nur zur Kenntnis):\n\n  • "
+            + "\n  • ".join(gekuerzt)
+            + (f"\n  … und {rest} weitere" if rest else ""))
+
+
 def _exit_prompt_suppressed() -> bool:
     """"Show speichern?"-Abfrage beim Schliessen unterdruecken — NUR headless.
 
@@ -589,7 +602,14 @@ class MainWindow(QMainWindow):
     def _auto_connect_midi(self):
         """Öffnet automatisch alle verfügbaren MIDI-Eingänge, damit Controller
         (z.B. APC mini) ohne manuelles 'Input öffnen' in der MIDI-Ansicht
-        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC."""
+        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC.
+
+        TOOL-27: ``LIGHTOS_NO_MIDI_AUTOCONNECT=1`` schaltet das ab. Werkzeuge,
+        die ein Hauptfenster in ihrer Sandbox bauen, sollen die MIDI-Geräte des
+        Rechners nicht von selbst öffnen (unter Windows sind Eingänge exklusiv
+        — die laufende App bekäme ihren Controller nicht mehr)."""
+        if os.environ.get("LIGHTOS_NO_MIDI_AUTOCONNECT"):
+            return
         try:
             from src.core.midi.midi_manager import get_midi_manager
             mm = get_midi_manager()
@@ -1280,6 +1300,14 @@ class MainWindow(QMainWindow):
             tabs.addTab(self._preset_browser_view, "Preset-Browser")
         except Exception as e:
             print(f"[main_window] PresetBrowserView init error: {e}")
+        # ENG-35: Uebersicht „welcher Effekt gewinnt“ — bei den Effekten, als
+        # weiterer Uebersichts-Reiter neben Snapshots und Preset-Browser.
+        try:
+            from src.ui.views.prioritaeten_view import PrioritaetenView
+            self._prioritaeten_view = PrioritaetenView()
+            tabs.addTab(self._prioritaeten_view, "Prioritäten")
+        except Exception as e:
+            print(f"[main_window] PrioritaetenView init error: {e}")
         return tabs
 
     def _build_section_playback(self) -> QWidget:
@@ -1595,6 +1623,11 @@ class MainWindow(QMainWindow):
             return
         u = self._undo_stack.undo_label()
         r = self._undo_stack.redo_label()
+        # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
+        # ein einzelnes „&“ laese das Menue als Tastenkuerzel-Zeichen.
+        from src.ui.menue_text import menue_text
+        u = menue_text(u) if u else u
+        r = menue_text(r) if r else r
         self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
         self._act_undo.setEnabled(self._undo_stack.can_undo())
         self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")
@@ -2145,7 +2178,8 @@ class MainWindow(QMainWindow):
         (STAB-32): ``path`` ist eine versionierte Sicherung und oeffnet sich
         als NEUE ungespeicherte Show. ``demo`` (DEMO-8): ``path`` ist eine
         mitgelieferte Demo-Show."""
-        from src.core.show.show_file import load_show, letzte_ladeprobleme
+        from src.core.show.show_file import (load_show, letzte_ladeprobleme,
+                                              letzte_ladehinweise)
         ok, msg = load_show(path)
         if ok:
             self._demo_dateiname = None
@@ -2211,6 +2245,11 @@ class MainWindow(QMainWindow):
             # Verlust entsteht nicht beim Laden, sondern beim Speichern
             # danach** — und war bis dahin fuer niemanden sichtbar.
             probleme = letzte_ladeprobleme()
+            # STAB-37: Hinweise, bei denen von der Show nichts verworfen wurde
+            # (ein Profil steht doppelt in der Geraete-Bibliothek). Sie standen
+            # unter „konnten nicht gelesen werden … Verlust“ — eine vollstaendig
+            # geladene Demo-Show meldete so einen Schaden, den es nicht gab.
+            hinweise = letzte_ladehinweise()
             if probleme:
                 gekuerzt = probleme[:8]
                 rest = len(probleme) - len(gekuerzt)
@@ -2220,7 +2259,20 @@ class MainWindow(QMainWindow):
                     + "\n  • ".join(gekuerzt)
                     + (f"\n  … und {rest} weitere" if rest else "")
                     + "\n\n⚠ SPEICHERN SCHREIBT DEN VERLUST FEST. Wenn die "
-                      "Datei wichtig ist: erst eine Kopie sichern.")
+                      "Datei wichtig ist: erst eine Kopie sichern."
+                    + _ladehinweise_text(hinweise))
+            elif hinweise:
+                # Kein Dialog: gelesen ist alles. Der Hinweis kommt HINTER das,
+                # was die Statuszeile gerade sagt — „bitte speichern“ bzw.
+                # „Speichern legt deine eigene Kopie an“ ist das, wonach der
+                # Nutzer handeln muss, und darf nicht verdraengt werden.
+                leiste = self.statusBar()
+                bisher = leiste.currentMessage()
+                leiste.showMessage(
+                    (bisher + "  ·  " if bisher else "")
+                    + "Hinweis: " + hinweise[0]
+                    + (f" (und {len(hinweise) - 1} weitere)" if len(hinweise) > 1 else ""),
+                    15000)
         else:
             QMessageBox.warning(self, "Fehler", msg)
 

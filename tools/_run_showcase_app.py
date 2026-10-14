@@ -5,6 +5,7 @@ VC-Widgets-Showcase-Show (kein fragiles Menue-Klicken). Fenster-Titel bleibt
 Aufruf:  venv/Scripts/python.exe tools/_run_showcase_app.py
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 """
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")

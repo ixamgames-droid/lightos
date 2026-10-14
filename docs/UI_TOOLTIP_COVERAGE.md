@@ -10,30 +10,31 @@ dokumentierte Baseline: es wird rot, sobald eine View NEUE textlose
 Buttons ohne Tooltip bekommt (Regressionsschutz). Bestehende Verstoesse
 abzubauen ist jederzeit erlaubt (Baseline in der Skript-Datei nachziehen).
 
-**Stand:** 24 no-arg Views geprueft, 35 Verstoesse in der aktuellen Baseline.
+**Stand:** 25 no-arg Views geprueft, 35 Verstoesse in der aktuellen Baseline.
 
 ## Uebersicht
 
 | View (`src/ui/views/…`) | Klasse | Buttons | textlos & tooltiplos | Baseline |
 |---|---|---:|---:|---:|
 | `bpm_generator_view.py` | `BpmGeneratorView` | 13 | 0 | 0 |
-| `bpm_manager_view.py` | `BpmManagerView` | 13 | 0 | 0 |
+| `bpm_manager_view.py` | `BpmManagerView` | 14 | 0 | 0 |
 | `channel_groups_view.py` | `ChannelGroupsView` | 4 | 1 | 1 |
 | `curve_library_view.py` | `CurveLibraryView` | 5 | 0 | 0 |
 | `dmx_monitor_view.py` | `DmxMonitorView` | 0 | 0 | 0 |
 | `efx_view.py` | `EfxView` | 25 | 0 | 0 |
 | `fixture_group_view.py` | `FixtureGroupView` | 12 | 0 | 0 |
 | `function_manager_view.py` | `FunctionManagerView` | 14 | 0 | 0 |
-| `laser_view.py` | `LaserView` | 8 | 0 | 0 |
+| `laser_view.py` | `LaserView` | 9 | 0 | 0 |
 | `live_view.py` | `LiveView` | 17 | 4 | 4 |
-| `midi_view.py` | `MidiView` | 19 | 1 | 1 |
+| `midi_view.py` | `MidiView` | 23 | 1 | 1 |
 | `music_view.py` | `MusicView` | 10 | 1 | 1 |
 | `output_view.py` | `OutputView` | 0 | 0 | 0 |
 | `palette_view.py` | `PaletteView` | 27 | 7 | 7 |
 | `patch_view.py` | `PatchView` | 7 | 1 | 1 |
 | `playback_view.py` | `PlaybackView` | 61 | 1 | 1 |
 | `preset_browser_view.py` | `PresetBrowserView` | 1 | 1 | 1 |
-| `programmer_view.py` | `ProgrammerView` | 122 | 14 | 14 |
+| `prioritaeten_view.py` | `PrioritaetenView` | 2 | 0 | 0 |
+| `programmer_view.py` | `ProgrammerView` | 123 | 14 | 14 |
 | `rgb_matrix_view.py` | `RgbMatrixView` | 21 | 3 | 3 |
 | `show_manager_view.py` | `ShowManagerView` | 6 | 0 | 0 |
 | `simple_desk.py` | `SimpleDeskView` | 5 | 0 | 0 |

@@ -516,6 +516,12 @@ export function syncSpotPool() {
     if (h > 0) {
       _dunkelSeit.delete(fid);
       if (h > sp) sp = h;
+    } else if (sp > 0 && _fixtures[fid] && _fixtures[fid]._strobeFaktor === 0) {
+      // VIZ-104: die Dunkelphase eines Strobes ist kein „ausgegangen". Das
+      // Geraet behaelt seinen Spitzenwert und damit sein Licht — sonst ginge
+      // es in der ersten Dunkelphase an einen wartenden Strahl, und der
+      // Strobe beleuchtete die Buehne danach nicht mehr (jeder Wechsel
+      // zeichnet ausserdem alle Shadow-Maps neu).
     } else if (sp > 0) {
       if (vorher >= sp * SCHLAGARTIG) sp = 0;
       else {
@@ -642,7 +648,11 @@ export function syncSpotPool() {
     // Dunkles Pool-Licht: seine Shadow-Map nicht neu zeichnen (es traegt nichts
     // bei). Lief waehrenddessen ein Schattendurchlauf, ist seine Map veraltet
     // (noteShadowPass) — dann wird sie beim Wiederaufleuchten erneuert.
-    const aktiv = leuchtet && l.intensity > 0;
+    // VIZ-104: die Dunkelphase eines Strobes zaehlt als „leuchtet weiter" —
+    // sonst gaelte die Map nach jedem Schattendurchlauf in einer Dunkelphase
+    // als veraltet, und jeder Blitz eines bewegten Kopfes erzwaenge einen
+    // eigenen Durchlauf.
+    const aktiv = (leuchtet && l.intensity > 0) || (!!s && f._strobeFaktor === 0);
     if (l.castShadow && l.shadow.autoUpdate !== aktiv) {
       l.shadow.autoUpdate = aktiv;
       if (aktiv && p.veraltet) { l.shadow.needsUpdate = true; requestShadowUpdate(); }

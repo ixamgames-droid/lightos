@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QPushButton,
     QLabel, QSizePolicy, QSplitter,
 )
-from PySide6.QtCore import Qt, QPoint, QSize, QTimer
+from PySide6.QtCore import Qt, QEvent, QPoint, QSize, QTimer
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
 from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
@@ -825,7 +825,37 @@ class VirtualConsoleView(QWidget):
         view = self
 
         class _PopoutWindow(QWidget):
+            # VCB-45: Lage/Groesse/Zustand merken. Die drei Ereignisse stossen
+            # nur das entprellte Schreiben an; am Umhaengen des Canvas und an
+            # der Reihenfolge beim Schliessen aendert das nichts.
+            _lage_merker = None
+
+            def _lage_anstossen(self):
+                m = self._lage_merker
+                if m is not None:
+                    m.angestossen()
+
+            def moveEvent(self, event):  # noqa: N802 (Qt-API)
+                super().moveEvent(event)
+                self._lage_anstossen()
+
+            def resizeEvent(self, event):  # noqa: N802 (Qt-API)
+                super().resizeEvent(event)
+                self._lage_anstossen()
+
+            def changeEvent(self, event):  # noqa: N802 (Qt-API)
+                super().changeEvent(event)
+                if event.type() == QEvent.Type.WindowStateChange:
+                    self._lage_anstossen()
+
             def closeEvent(self, event):
+                # VCB-45: letzten Stand festhalten, solange das Fenster noch
+                # steht (liest nur Lage und Zustand).
+                try:
+                    if self._lage_merker is not None:
+                        self._lage_merker.sichern()
+                except Exception as e:
+                    print(f"[VC] Popout-Lage nicht gemerkt: {e}")
                 # Beim Schließen des Popout-Fensters den Canvas zurück in die
                 # Haupt-Ansicht holen — sonst bleibt er im (versteckten) Fenster
                 # hängen und die Virtual Console verschwindet aus LightOS.
@@ -857,7 +887,23 @@ class VirtualConsoleView(QWidget):
 
         self._pop_scroll = pop_scroll
         self._popout_window = win
-        win.show()
+        self._zeige_popout(win)
+
+    def _zeige_popout(self, win):
+        """VCB-45: Popout dort oeffnen, wo es zuletzt lag — sonst (mehrere
+        Bildschirme, nichts gemerkt) maximiert auf dem anderen Bildschirm.
+        Geht dabei etwas schief, oeffnet es wie frueher."""
+        try:
+            from src.ui.virtualconsole import popout_lage as pl
+            paare = pl.lies_bildschirme()
+            lage = pl.ziel_lage([b for b, _ in paare], pl.lade_gemerkt(),
+                                pl.haupt_index(paare, self))
+            win._lage_merker = pl.baue_merker(win, lage, self)
+            qscreen = paare[lage.bildschirm][1] if paare else None
+            pl.oeffne(win, lage, qscreen)
+        except Exception as e:
+            print(f"[VC] Popout-Lage nicht wiederhergestellt: {e}")
+            win.show()
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
