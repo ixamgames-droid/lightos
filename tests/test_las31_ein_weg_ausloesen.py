@@ -215,5 +215,54 @@ class EinWegTest(unittest.TestCase):
             self.assertNotIn(schritt, block, f"VC-Taste: {schritt}")
 
 
+class AusnahmeImSchrittTest(unittest.TestCase):
+    """Gegenpruefung: wirft ein Schritt des einen Weges, laufen die anderen
+    trotzdem — vorher sprang eine Ausnahme in ``estop_all`` ueber das
+    Entwaffnen hinweg, ein Netzwerk-Laser blieb scharf."""
+
+    def setUp(self):
+        _app()
+        self.st, self.om = _make_state()
+        self.lo = self.st.ensure_laser_output()
+        self.lo.set_armed(True)
+
+    def test_estop_all_wirft_trotzdem_unscharf_und_latch(self):
+        def wirft():
+            self.lo._estopped = True
+            raise RuntimeError("Netzwerk weg")
+        self.lo.estop_all = wirft
+        self.st.laser_notaus_ausloesen()
+        self.assertFalse(self.lo.armed, "Netzwerk-Laser muss unscharf sein")
+        self.assertTrue(self.st.laser_estop_active, "DMX-Latch muss stehen")
+
+    def test_entwaffnen_wirft_verriegelung_bleibt(self):
+        def wirft(_wert):
+            raise RuntimeError("kaputt")
+        self.lo.set_armed = wirft
+        self.st.laser_notaus_ausloesen()
+        self.assertTrue(self.lo._estopped,
+                        "bleibt der Manager scharf, wird die Verriegelung "
+                        "nicht geloest — im Zweifel dunkel")
+        self.assertTrue(self.st.laser_estop_active)
+
+    def test_laser_seite_zeigt_echten_stand(self):
+        import src.ui.views.laser_view as lv
+        with mock.patch.object(lv, "get_state", lambda: self.st):
+            view = lv.LaserView(follow_selection=False)
+            try:
+                view._btn_arm.setChecked(True)
+                self.lo.set_armed(True)
+                echt = self.lo.set_armed
+                self.lo.set_armed = lambda w: (None if not w else echt(w))
+                view._btn_dmx_estop.click()
+                self.assertTrue(self.lo.armed)
+                self.assertTrue(view._btn_arm.isChecked(),
+                                "der Knopf darf nicht unscharf zeigen, "
+                                "waehrend der Manager scharf ist")
+            finally:
+                view.deleteLater()
+                _app().processEvents()
+
+
 if __name__ == "__main__":
     unittest.main()

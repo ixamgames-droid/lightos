@@ -175,6 +175,44 @@ class BlackoutImKioskTest(unittest.TestCase):
         from PySide6.QtCore import Qt
         self.assertEqual(self.bo.focusPolicy(), Qt.FocusPolicy.NoFocus)
 
+    def test_groesse_und_lage_bei_kleinem_und_grossem_bildschirm(self):
+        """Gegenpruefung: 1024x600 (kleines Touch-Pult) und 1920x1080 —
+        beide Knoepfe ganz im Fenster, nebeneinander, nicht gequetscht."""
+        fenster = QRect(0, 0, 0, 0)
+        try:
+            for breite, hoehe in ((1024, 600), (1920, 1080)):
+                self.w.resize(breite, hoehe)
+                _app().processEvents()
+                fenster = QRect(0, 0, self.w.width(), self.w.height())
+                r_bo, r_na = _rect(self.bo, self.w), _rect(self.notaus, self.w)
+                for r, name in ((r_bo, "BLACKOUT"), (r_na, "NOT-AUS")):
+                    self.assertTrue(fenster.contains(r),
+                                    f"{name} ragt bei {breite}x{hoehe} hinaus")
+                self.assertFalse(r_bo.intersects(r_na))
+                self.assertLess(r_bo.right(), r_na.left())
+                self.assertGreaterEqual(self.bo.width(),
+                                        self.bo.minimumSizeHint().width())
+                self.assertGreaterEqual(self.notaus.width(),
+                                        self.notaus.minimumSizeHint().width())
+        finally:
+            self.w.resize(1280, 800)
+            _app().processEvents()
+
+    def test_leertaste_loest_keinen_blackout_aus(self):
+        """Leertaste ist GO — sie darf den Kiosk-BLACKOUT nie schalten."""
+        from PySide6.QtCore import Qt
+        from PySide6.QtTest import QTest
+        self.bo.click()
+        self.bo.click()                      # einmal an, einmal aus
+        _app().processEvents()
+        self.assertFalse(self.om.blackout)
+        self.assertIsNot(QApplication.focusWidget(), self.bo)
+        ziel = QApplication.focusWidget() or self.w
+        QTest.keyClick(ziel, Qt.Key.Key_Space)
+        _app().processEvents()
+        self.assertFalse(self.om.blackout, "Leertaste schaltete BLACKOUT")
+        self.assertFalse(self.bo.isChecked())
+
 
 class OhneKioskKeinZweiterKnopf(unittest.TestCase):
     """Ausserhalb des Kiosk steht BLACKOUT nur in der Sektionsleiste."""

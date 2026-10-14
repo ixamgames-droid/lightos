@@ -673,11 +673,14 @@ class LaserView(QWidget):
         except Exception as e:
             print(f"[laser_view] Laser-NOT-AUS Fehler: {e}")
         # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten
-        # nötig. Der Manager ist bereits unscharf; Signale gesperrt, damit kein
-        # zweites set_armed ueber toggled laeuft.
-        self._btn_arm.blockSignals(True)
+        # nötig. Signale NICHT gesperrt: toggled -> set_armed(False) ist ein
+        # zweites, harmloses Netz (idempotent, meldet nichts doppelt), falls der
+        # Manager im einen Weg nicht entwaffnet werden konnte — die Anzeige
+        # darf nie „unscharf“ zeigen, waehrend der Manager scharf ist.
         self._btn_arm.setChecked(False)
-        self._btn_arm.blockSignals(False)
+        # Danach den ECHTEN Stand des Managers spiegeln (blieb er wider
+        # Erwarten scharf, zeigt der Knopf das auch).
+        self._sync_arm_from_manager()
         self._update_arm_button()
         self._update_dmx_estop_label()
 
