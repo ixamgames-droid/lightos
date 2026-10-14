@@ -358,6 +358,31 @@ def test_entfernen_loescht_die_szene_und_laesst_sie_aus_dem_chaser(state, rig, a
     assert stack.undo() and fm.get(ids[1]) is not None      # Entfernen zurück
 
 
+def test_rueckgaengig_von_entfernen_bringt_die_szene_in_liste_und_chaser(
+        state, rig, aufbau):
+    """Codex-Review #1085 (CDX-59): Rueckgaengig holte die Szene in die Show
+    zurueck, in der Liste und im spaeter erzeugten Chaser fehlte sie aber."""
+    dlg, art, sacn, uhr = aufbau
+    fm = state.function_manager
+    ids = _drei_szenen(dlg, art, uhr, rig["adressen"])
+    dlg._liste.setCurrentRow(1)
+    dlg.entferne_markierte()
+    assert dlg.szenen_ids == [ids[0], ids[2]] and dlg._liste.count() == 2
+    assert get_undo_stack().undo() and fm.get(ids[1]) is not None
+    dlg.aktualisiere()
+    assert dlg.szenen_ids == ids, "wieder an ihrem Platz"
+    assert [dlg._liste.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(dlg._liste.count())] == ids
+    # Wiederholen nimmt sie wieder heraus.
+    assert get_undo_stack().redo() and fm.get(ids[1]) is None
+    dlg.aktualisiere()
+    assert dlg.szenen_ids == [ids[0], ids[2]]
+    assert get_undo_stack().undo()
+    dlg._check_chaser.setChecked(True)
+    dlg.fertig()
+    assert [s.function_id for s in dlg.chaser.steps] == ids
+
+
 # ── Auswahl und Laser ────────────────────────────────────────────────────────
 
 def test_auswahl_vorgabe_und_die_beiden_anderen_regeln(state, rig, aufbau):
