@@ -286,9 +286,19 @@ class Strobe2DTest(unittest.TestCase):
     def test_speider_an_ohne_art_blinkt_nicht(self):
         self.assertEqual(self._hz([_bereich(8, 15, "An"), _bereich(16, 131, "Strobe", "strobe")], 11), 0.0)
 
-    def test_ohne_bereiche_alte_regel(self):
+    def test_ohne_bereiche_blitzt_nur_ein_ausdruecklicher_strobe_kanal(self):
+        """Bis VIZ-104 (Nacharbeit 2026-10-12) stand hier die alte Regel fest:
+        „Shutter ohne Bereiche, Wert > 10 = Strobe". Entscheidung des
+        Projektinhabers: die Ansicht zeigt, was das echte Geraet tut — bei einem
+        reinen Shutter-Kanal ohne Bereichsangaben heisst 255 meist „offen",
+        also blitzt er nicht mehr. Ein Kanal, der „Strobe" heisst, blitzt weiter."""
+        from src.ui.views.live_view import _strobe_hz
         self.assertEqual(self._hz([], 5), 0.0)
-        self.assertGreater(self._hz([], 200), 0.0)
+        self.assertEqual(self._hz([], 200), 0.0)
+        self.assertEqual(self._hz([], 255), 0.0)
+        self.assertEqual(_strobe_hz(_kanal("Strobe"), 5), 0.0)
+        self.assertGreater(_strobe_hz(_kanal("Strobe"), 200), 0.0)
+        self.assertGreater(_strobe_hz(_kanal("Kanal 3", attribute="strobe"), 200), 0.0)
 
 
 if __name__ == "__main__":

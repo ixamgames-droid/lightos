@@ -72,6 +72,9 @@ export const settings = {
   // 0 = aus, also die Grundlaenge des jeweiligen Geraetetyps (6-8 m).
   // Deckelt NUR die Darstellung — an der DMX-Ausgabe aendert sich nichts.
   maxBeamRange: 0,
+  // VIZ-104: Strobe im 3D zeigen: 'flash' (Blitzen) | 'soft' (gedaempft,
+  // weiches Pulsieren) | 'off' (Dauerlicht). Regeln: fixtures/strobe.js.
+  strobeMode: 'flash',
   showRoom: false,         // VIZ-14: neutrale Raum-Huelle (Default AUS — der Visualizer
                            // startet bewusst leer, s. scene/room_shell.js)
 };
