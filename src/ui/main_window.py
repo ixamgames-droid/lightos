@@ -1287,6 +1287,14 @@ class MainWindow(QMainWindow):
             tabs.addTab(self._preset_browser_view, "Preset-Browser")
         except Exception as e:
             print(f"[main_window] PresetBrowserView init error: {e}")
+        # ENG-35: Uebersicht „welcher Effekt gewinnt“ — bei den Effekten, als
+        # weiterer Uebersichts-Reiter neben Snapshots und Preset-Browser.
+        try:
+            from src.ui.views.prioritaeten_view import PrioritaetenView
+            self._prioritaeten_view = PrioritaetenView()
+            tabs.addTab(self._prioritaeten_view, "Prioritäten")
+        except Exception as e:
+            print(f"[main_window] PrioritaetenView init error: {e}")
         return tabs
 
     def _build_section_playback(self) -> QWidget:
@@ -1602,6 +1610,11 @@ class MainWindow(QMainWindow):
             return
         u = self._undo_stack.undo_label()
         r = self._undo_stack.redo_label()
+        # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
+        # ein einzelnes „&“ laese das Menue als Tastenkuerzel-Zeichen.
+        from src.ui.menue_text import menue_text
+        u = menue_text(u) if u else u
+        r = menue_text(r) if r else r
         self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
         self._act_undo.setEnabled(self._undo_stack.can_undo())
         self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")
