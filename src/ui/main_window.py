@@ -3449,8 +3449,14 @@ class MainWindow(QMainWindow):
                        SyncEvent.FUNCTION_CHANGED, SyncEvent.GROUP_CHANGED,
                        SyncEvent.CUE_STACK_CHANGED, SyncEvent.PALETTE_CHANGED,
                        SyncEvent.OUTPUT_CONFIG_CHANGED,
-                       SyncEvent.LIVE_VIEW_CHANGED):
+                       SyncEvent.LIVE_VIEW_CHANGED,
+                       SyncEvent.SHOW_INHALT_CHANGED):
                 sync.subscribe(ev, self._mark_autosave_dirty)
+            # Codex-Review #1081: eine geaenderte Stufe (Prioritaet) meldet sich
+            # bewusst NICHT ueber FUNCTION_CHANGED, sondern ueber den eigenen
+            # Stufen-Melder — ohne ihn blieb sie als einzige Aenderung ungesichert.
+            from src.ui.widgets.stufe_auswahl import stufen_melder
+            stufen_melder().geaendert.connect(self._mark_autosave_dirty)
             print(f"[autosave] aktiv ({mins} min, dirty-basiert) -> {self._autosave_path()}")
         except Exception as e:
             print(f"[autosave] setup error: {e}")

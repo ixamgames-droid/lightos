@@ -226,6 +226,15 @@ LightOS-Datenordner (Linux: `~/.local/share/LightOS/shows`, Windows:
 `%APPDATA%\LightOS\shows`). Nach dem Speichern steht der Pfad im Fenstertitel und kurz
 in der Statusleiste (`Gespeichert: …`).
 
+**Meldungen beim Öffnen.** Konnte LightOS Teile einer Show nicht lesen, erscheint das
+Fenster **Show unvollstaendig geladen** mit der Liste dieser Teile — wer dann speichert,
+schreibt den Verlust fest, also vorher eine Kopie der Datei sichern. Steht dagegen nur
+ein Geräteprofil zweimal in der Geräte-Bibliothek und ist es für die Show gleich, welches
+genommen wurde (gleicher Modus mit denselben Kanälen und Werten), ist nichts verloren:
+dann kommt kein Fenster, sondern für 15 Sekunden ein **Hinweis: …** in der Statusleiste,
+hinter der Meldung, die dort gerade steht. Unterscheiden sich die beiden Profile, bleibt
+es beim Fenster.
+
 **Automatisch gesichert** wird zusätzlich alle 5 Minuten in die Datei `auto_save.lshow`
 im LightOS-Datenordner. Das Intervall stellst du unter **Datei → Auto-Save-Intervall...**
 ein (1–60 Minuten). Ist beim nächsten Start diese Sicherung neuer als deine zuletzt
