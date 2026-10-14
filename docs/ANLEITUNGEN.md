@@ -67,6 +67,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | [Farb-Matrix](anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md) | RGB/RGBW-Farbeffekte über eine Gruppe: Algorithmen, Raster. | Beispiel-Show nicht im Repo |
 | [Farbchase frei zusammenstellen](anleitung_farbchase/ANLEITUNG_FARBCHASE.md) | Chase mit frei wählbarer Farbfolge, z. B. Blau-Weiß, auch beat-synchron. | Beispiel-Show nicht im Repo |
 | [Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md) | Helligkeits-Lauflicht als eigene Ebene, phasengekoppelt zur Farbe. | Beispiel-Show nicht im Repo |
+| [Wer gewinnt? Prioritäten für Effekte](anleitung_prioritaeten/ANLEITUNG.md) | Die Schichten von den Grundwerten bis zum NOT-AUS, die fünf Stufen für Effekte, die Ansicht **Prioritäten** und das Feld **Stufe** in jedem Editor. | Keine Show nötig |
 | [EFX — Moving-Head-Bewegung](anleitung_efx/ANLEITUNG_EFX.md) | Pan/Tilt-Bahnen (Kreis, Acht …), „Dimmer/Shutter mit öffnen“, Geräte-Verhältnis. | Beispiel-Show nicht im Repo |
 | [Matrix-Effekte](anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md) | Feuer, Regen, Radar, Spirale, Wisch und Welle. | Generator `build_event_demo_2026.py` |
 | [Abläufe & Mischen](anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md) | Collections, Chaser, Cue-Listen und Live-Chase: Farbe × Bewegung × Strobo kombinieren. | Generator `build_event_demo_2026.py` |

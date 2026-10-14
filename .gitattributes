@@ -11,3 +11,7 @@
 *.png binary
 *.ico binary
 *.db  binary
+
+# PROC-22: Listen, an die jeder Zweig eine eigene Zeile haengt. „union“ behaelt
+# beim Mergen die Zeilen beider Seiten, statt an derselben Stelle zu kollidieren.
+tools/doku_gates.txt merge=union
