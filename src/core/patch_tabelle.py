@@ -1007,6 +1007,25 @@ def wende_an(state, plan: Plan, bibliothek: Bibliothek) -> Ergebnis:
     # Schritts (``rahmen``). Kopf-Gruppen, Laser-Hinweis und die Einzelschritte
     # laufen unveraendert ueber add_fixture.
     sammeln = getattr(state, "patch_sammeln", None) or nullcontext
+    try:
+        _anlegen(state, anlegbar, ergebnis, sammeln, etikett, PatchedFixture,
+                 get_undo_stack)
+    except Exception as e:
+        # Codex-Review #1093: der EINE Neuaufbau am Ende (``patch_sammeln``)
+        # kann scheitern, NACHDEM Geraete und Rueckgaengig-Schritt schon
+        # angelegt sind. Die Ausnahme lief bis in den Dialog: kein Ergebnis,
+        # der Dialog blieb offen, und „Abbrechen“ sah aus wie ein verworfener
+        # Import. Ist schon etwas angelegt, steht es im Ergebnis — samt Fehler.
+        if not ergebnis.fids:
+            raise
+        ergebnis.fehler.append(
+            f"Die Geräte sind angelegt (Rückgängig nimmt sie zurück), aber der "
+            f"Neuaufbau danach schlug fehl: {e}")
+    return ergebnis
+
+
+def _anlegen(state, anlegbar, ergebnis, sammeln, etikett, PatchedFixture,
+             get_undo_stack) -> None:
     with sammeln(), get_undo_stack().gruppe(etikett, rahmen=sammeln):
         for pz in anlegbar:
             dual = _auto_dual_tilt(pz.profil.id, pz.modus.name)
@@ -1031,4 +1050,3 @@ def wende_an(state, plan: Plan, bibliothek: Bibliothek) -> Ergebnis:
                 ergebnis.fehler.append(
                     f"Zeile {pz.zeile.nr} („{pz.name}“) ließ sich nicht "
                     f"anlegen: {e}")
-    return ergebnis

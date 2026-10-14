@@ -454,10 +454,21 @@ class PatchImportDialog(QDialog):
         if not self.plan.anlegbare():
             return
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        fehler = None
         try:
             self.ergebnis = T.wende_an(self._state, self.plan, self._bibliothek)
+        except Exception as e:
+            fehler = e
         finally:
             QApplication.restoreOverrideCursor()
+        if fehler is not None:
+            # Codex-Review #1093: nichts angelegt (sonst stuende es im
+            # Ergebnis) — ehrlich sagen statt still offen zu bleiben.
+            print(f"[patch_import_dialog] ERROR: Import fehlgeschlagen: {fehler}")
+            QMessageBox.warning(self, "Patch-Import",
+                                "Der Import ist fehlgeschlagen, es wurde nichts "
+                                f"angelegt:\n{fehler}")
+            return
         self.accept()
 
 

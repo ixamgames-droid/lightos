@@ -730,3 +730,59 @@ def test_scheitert_schon_der_erste_neuaufbau_rechnen_funktionen_mit_dem_leeren_p
             assert _live(st, 3, 10, 5) == [0] * 5
     finally:
         _schliesse(st)
+
+
+# ── Codex-Review #1093: Neuaufbau am Ende scheitert ─────────────────────────
+
+def _end_neuaufbau_scheitert(state, monkeypatch):
+    """``_reload_patch_cache`` wirft nur beim EINEN Neuaufbau am Ende
+    (Tiefe schon 0); im Block (leichter Weg) laeuft es normal."""
+    echt = state._reload_patch_cache
+
+    def neu_laden():
+        if getattr(state, "_patch_sammel_tiefe", 0) == 0:
+            raise RuntimeError("Render-Plan kaputt")
+        return echt()
+    monkeypatch.setattr(state, "_reload_patch_cache", neu_laden)
+
+
+def test_scheiternder_end_neuaufbau_steht_im_ergebnis(state, bib, monkeypatch):
+    """Die Geraete und der Rueckgaengig-Schritt sind schon angelegt — die
+    Ausnahme darf das nicht verschweigen: sie steht im Ergebnis."""
+    plan = _plan(state, bib, _tabelle(3))
+    _end_neuaufbau_scheitert(state, monkeypatch)
+    erg = T.wende_an(state, plan, bib)
+    assert erg.geraete == 3 + 1 + 2 + 1
+    assert any("Neuaufbau" in f and "Render-Plan kaputt" in f for f in erg.fehler)
+    assert len(state.get_patched_fixtures()) == erg.geraete
+    assert get_undo_stack().can_undo()
+
+
+def test_dialog_schliesst_mit_ergebnis_statt_offen_zu_bleiben(state, bib, monkeypatch):
+    from PySide6.QtWidgets import QApplication, QMessageBox
+    from src.ui.widgets import patch_import_dialog as D
+    QApplication.instance() or QApplication([])
+    _end_neuaufbau_scheitert(state, monkeypatch)
+    dlg = D.PatchImportDialog(state, T.lies_tabelle(_tabelle(2)), bib, "liste.csv")
+    try:
+        dlg._anwenden()
+        assert dlg.ergebnis is not None, "Dialog blieb ohne Ergebnis offen"
+        assert dlg.ergebnis.fehler
+    finally:
+        dlg.deleteLater()
+    # Scheitert schon das Anlegen (nichts angelegt): Meldung, Dialog bleibt.
+    meldungen = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        staticmethod(lambda *a, **k: meldungen.append(a[2])))
+    monkeypatch.setattr(T, "wende_an", lambda *a, **k: (_ for _ in ()).throw(
+        RuntimeError("Datenbank weg")))
+    frei = ("Name;Hersteller;Profil;Modus;Universum;Adresse;Anzahl\n"
+            f"Neu;Generic;{PAR};8-Kanal RGBW;4;1;1\n")
+    dlg2 = D.PatchImportDialog(state, T.lies_tabelle(frei), bib, "liste.csv")
+    assert dlg2.plan.anlegbare(), "Vorbedingung"
+    try:
+        dlg2._anwenden()
+        assert dlg2.ergebnis is None
+        assert meldungen and "nichts" in meldungen[0] and "Datenbank weg" in meldungen[0]
+    finally:
+        dlg2.deleteLater()
