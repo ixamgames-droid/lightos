@@ -329,9 +329,42 @@ Ein Klick auf die Enttec-Anzeige öffnet direkt den Dialog aus Schritt 1.
 Netzwerk weg), erscheint zusätzlich oben im Hauptfenster ein roter Balken
 `Ausgabe gestört: U<n> <Weg> — <Grund>` — auch im Kiosk-Modus, in dem die Statusleiste
 ausgeblendet ist. Er verschwindet von selbst, sobald der Ausgang einige Sekunden wieder
-sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist **gar kein**
-Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
-Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
+sendet; ein Klick auf den Text öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist
+**gar kein** Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX
+gesendet`.
+
+Der Balken liegt **über** dem oberen Rand der gerade gezeigten Ansicht, direkt unter der
+Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit dem
+Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
+Tasten der Virtual Console und alle anderen Bedienelemente an ihrem Platz. Dafür verdeckt
+er eine schmale Zeile am oberen Rand der Ansicht. Ein Klick auf den Balken löst nichts aus,
+was darunter liegt. Der Balken ist immer nur eine Zeile hoch; ein zu langer Text wird mit
+„…“ gekürzt, der volle Text steht im Tooltip. Die Störungsmeldung lässt sich
+einklappen (nächster Absatz), aber nicht wegklicken, solange die Störung anliegt. Im
+ausgelagerten Fenster der Virtual Console
+(Popout) und im 3D-Fenster gibt es den Balken nicht.
+
+**Balken einklappen.** Der Balken verdeckt die oberste Zeile der Ansicht. Damit du während
+einer Störung weiterarbeiten kannst, lässt er sich verkleinern – ganz entfernen lässt sich
+die Störungsmeldung nicht, solange die Störung anliegt:
+
+- Klicke rechts im Balken auf `▴ einklappen`. Im Kiosk-Modus und beim Probenhinweis genügt
+  ein Klick irgendwo auf den Balken. Per Tastatur: mit der Tabulatortaste auf den Balken
+  gehen und die Eingabetaste drücken.
+- Statt des Balkens steht dann ein kleines Schild: rot `⚠ Ausgabe gestört ▾`, beim
+  Probenhinweis gedeckt `Probenmodus ▾`. In der Virtual Console sitzt es rechts in der Zeile
+  „Aktiver Effekt“ zwischen Werkzeugleiste und Tasten und verdeckt dort weder einen Knopf
+  noch eine Taste; in den übrigen Ansichten liegt es in der oberen rechten Ecke. Der Tooltip
+  nennt den vollen Text der Störung.
+- Ein Klick auf das Schild (oder die Eingabetaste) klappt den Balken wieder auf.
+- Bei einer **neuen** Störung klappt der Balken von selbst wieder auf: wenn ein anderer oder
+  ein weiterer Ausgang ausfällt, wenn sich der Grund ändert oder wenn dieselbe Störung länger
+  als 10 Sekunden weg war und wiederkommt. Ein Wackelkontakt, der innerhalb von 10 Sekunden
+  wiederkehrt, gilt als dieselbe Störung – das Schild bleibt dann klein, damit der Balken
+  nicht ständig über die Tasten springt.
+- Endet die Störung, verschwinden Balken und Schild von selbst.
+- Der eingeklappte Zustand wird nicht gespeichert: Nach einem Neustart steht wieder der volle
+  Balken. Statusleiste und DMX-Monitor zeigen die Störung unverändert an.
 
 ## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
 
