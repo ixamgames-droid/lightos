@@ -718,9 +718,15 @@ def test_universal_c_runtime_steht_als_nicht_eingebaut_in_den_hinweisen():
 
 
 def test_offene_punkte_sind_als_offen_gekennzeichnet():
-    """Was rechtlich nicht geklaert ist, steht als offen da — nicht als erledigt."""
-    assert "**Offen:**" in _abschnitt("Chromium")
-    assert "**Offen:**" in _abschnitt("Weitere enthaltene Bibliotheken")
+    """Was rechtlich nicht geklaert ist, stand als offen da. Chromium und Mesa
+    sind seit LIZ-2 (Rest) erledigt: dort steht jetzt die Sammeldatei
+    (tests/test_liz2_rest_sammeldateien.py) und kein „Offen“ mehr."""
+    assert "**Offen:**" not in _abschnitt("Chromium")
+    assert "licenses/QtWebEngine-THIRD-PARTY.txt" in _abschnitt("Chromium")
+    assert "**Offen:**" not in _abschnitt("Weitere enthaltene Bibliotheken")
+    # Mesa hat einen eigenen Abschnitt mit Herkunft/Urheber/Lizenz (PROC-18-Waechter).
+    assert "**Offen:**" not in _abschnitt("Mesa llvmpipe")
+    assert "licenses/Mesa-opengl32sw.txt" in _abschnitt("Mesa llvmpipe")
 
 
 # ── Spec, Setup-Skript, Selbsttest ───────────────────────────────────────────
