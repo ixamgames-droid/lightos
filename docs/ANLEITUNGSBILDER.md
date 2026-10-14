@@ -12,6 +12,7 @@ venv/bin/python tools/anleitungsbilder.py --alle               # alle Anleitunge
 venv/bin/python tools/anleitungsbilder.py projektseite --nur 02_patch
 venv/bin/python tools/anleitungsbilder.py --alle --pruefen     # nur prüfen, nichts schreiben
 venv/bin/python tools/anleitungsbilder.py --liste              # Szenen anzeigen
+venv/bin/python tools/anleitungsbilder.py --demo-show Doku_Demo.lshow   # nur die Show
 ```
 
 Ein Lauf dauert rund 12 Sekunden (davon 5–6 Sekunden für Fenster und Demo-Show).
@@ -32,6 +33,7 @@ zusätzlich; dafür entsprechen Bilder und `--pruefen` genau dem Einzellauf der 
 | `tools/anleitungsbilder/runner.py` | `Szene`, die kleine UI-API, Aufnahme, Verkleinerung, Manifest |
 | `tools/anleitungsbilder/marker.py` | roter Rahmen und Nummernkreis, freie Lage für den Kreis |
 | `tools/anleitungsbilder/szenen_<anleitung>.py` | die Szenen einer Anleitung |
+| `tools/anleitungsbilder/schrift/` | die Schrift der Bilder (Roboto Condensed, siehe [Ausgabe](#ausgabe-und-neu-rendern)) |
 | `docs/<anleitung>/img/NN_name.png` | die Bilder |
 | `docs/<anleitung>/img/NN_name.gif` | animierte Abläufe (Szenen mit `frames`, siehe [GIFs](#gifs)) |
 | `docs/<anleitung>/img/bilder.json` | Manifest: Szene, Titel, Bildgröße, Markierungen, md5, Schrift, git-Stand |
@@ -73,6 +75,20 @@ Farb-Szenen, ein Lauflicht, eine Regenbogen-Matrix, ein Kreis-EFX, die Cue-Liste
 „Doku-Cues" mit drei Cues und eine VC-Seite mit Knöpfen und Fadern. Die fids der
 Rollen stehen in den Szenen unter `ui.info` (`pars`, `washes`, `spots`, `mover`,
 `leiste`).
+
+**Für Nutzer exportieren:** `--demo-show DATEI` baut nur diese Show (in derselben Sandbox,
+mit Selbstprüfung und Abgleich der echten Datenorte) und schreibt sie als `.lshow` nach
+`DATEI` — relativ zum Ort des Aufrufs, die Endung `.lshow` wird ergänzt. Wer eine Anleitung
+nachklickt, öffnet sie mit **Datei → Öffnen...** und sieht dieselben Geräte, Gruppen,
+Funktionen und VC-Tasten wie im Bild. Eine vorhandene Datei wird nicht überschrieben; enthält
+die Show einen Pfad des Baurechners (Sandbox, Heimat- oder Repo-Ordner), wird nichts
+geschrieben. Kopiert wird erst nach dem Abgleich — das Ziel darf deshalb auch ein echter
+Show-Ordner sein.
+
+```bash
+venv/bin/python tools/anleitungsbilder.py --demo-show Doku_Demo.lshow
+venv\Scripts\python tools\anleitungsbilder.py --demo-show Doku_Demo.lshow     # Windows
+```
 
 ## Eine Szene hinzufügen
 
@@ -225,9 +241,18 @@ venv/bin/python -c "import sys; sys.path.insert(0, 'tools'); from anleitungsbild
 ## Ausgabe und Neu-Rendern
 
 - PNG, 8-Bit-Palette ohne Dithering (Pillow), ein Vollbild liegt bei 25–55 KB.
-- Pixelgleich sind die Bilder nur auf demselben Rechner mit denselben Schriften.
-  Das Theme wünscht „Roboto Condensed"; fehlt sie, nimmt Qt einen Ersatz. Welcher es
-  war, steht im Manifest unter `schrift`.
+- **Schrift:** Das Theme wünscht „Roboto Condensed". Das Werkzeug bringt sie mit
+  (`tools/anleitungsbilder/schrift/RobotoCondensed-wght.ttf`, SIL Open Font License 1.1,
+  Herkunft und Lizenztext in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md)) und
+  meldet sie vor dem ersten Bild bei Qt an — damit sehen die Bilder auf jedem Rechner
+  gleich aus, statt je nach Rechner in Noto Sans (Linux) oder Arial (Windows) zu
+  erscheinen. Die App selbst lädt sie nicht. Fehlt die Datei oder lässt sie sich nicht
+  laden, meldet der Lauf das und nimmt den Ersatz des Rechners. Welche Schrift gerendert
+  wurde, steht im Manifest unter `schrift`. Ganz pixelgleich sind Bilder zweier Rechner
+  trotzdem nicht immer (Kantenglättung des Systems); dafür gibt es die Schwelle unten.
+  Bilder aus der Zeit vor der mitgelieferten Schrift tragen im Manifest noch
+  „Noto Sans (statt Roboto Condensed)"; sie wechseln beim nächsten Neu-Rendern ihrer
+  Anleitung.
 - **Windows:** `offscreen` liest dort nicht die Systemschriften, sondern sucht im
   PySide6-Ordner — und findet nichts. Ohne Hilfe hätten die Bilder gar keine Schrift
   (die Ausgabe meldete eine leere Schrift statt „Roboto Condensed"). Die Sandbox
