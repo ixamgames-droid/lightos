@@ -602,7 +602,14 @@ class MainWindow(QMainWindow):
     def _auto_connect_midi(self):
         """Öffnet automatisch alle verfügbaren MIDI-Eingänge, damit Controller
         (z.B. APC mini) ohne manuelles 'Input öffnen' in der MIDI-Ansicht
-        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC."""
+        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC.
+
+        TOOL-27: ``LIGHTOS_NO_MIDI_AUTOCONNECT=1`` schaltet das ab. Werkzeuge,
+        die ein Hauptfenster in ihrer Sandbox bauen, sollen die MIDI-Geräte des
+        Rechners nicht von selbst öffnen (unter Windows sind Eingänge exklusiv
+        — die laufende App bekäme ihren Controller nicht mehr)."""
+        if os.environ.get("LIGHTOS_NO_MIDI_AUTOCONNECT"):
+            return
         try:
             from src.core.midi.midi_manager import get_midi_manager
             mm = get_midi_manager()
@@ -1130,22 +1137,28 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-        # OUT-67: Ausfall-/Probenbanner. Sitzt im Wurzel-Layout UEBER der
-        # Sektionsleiste — die wird im Kiosk-Modus ausgeblendet (wie Menue und
-        # Statusleiste), das Banner bleibt. Gefuellt wird es aus dem
-        # bestehenden Hardware-Takt (`_update_ausgabe_label`).
+        # OUT-67: Ausfall-/Probenbanner. Gefuellt wird es aus dem bestehenden
+        # Hardware-Takt (`_update_ausgabe_label`).
+        # VCB-47: Es liegt NICHT im Layout, sondern ueberlagert den oberen Rand
+        # des Ansichtsstapels — sein Erscheinen und Verschwinden verschiebt
+        # nichts mehr (vorher rutschten alle Tasten der Virtual Console, auch
+        # im Kiosk-Modus). Der Stapel liegt unter Menue-, NOT-AUS- und
+        # Sektionsleiste: Laser-NOT-AUS, STOP ALL, BLACKOUT und Grand Master
+        # werden nie verdeckt.
         from src.ui.ausgabe_banner import AusgabeBannerSteuerung
         self._ausgabe_banner = AusgabeBannerSteuerung(
             kiosk=self._kiosk_mode, parent=central)
         if not self._kiosk_mode:
-            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen.
+            # Im Kiosk-Modus gibt es bewusst keinen Weg in die Einstellungen;
+            # dort klappt ein Klick auf den Balken die Meldung ein.
             self._ausgabe_banner.bei_stoerung_klick = self._open_output_config
-        root.addWidget(self._ausgabe_banner.widget)
         root.addWidget(self._section_bar)
 
         # ── Stacked Widget ─────────────────────────────────────────────────────
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
+        # Nachtrag 2: Banner UND eingeklappter Chip haengen am Stapel.
+        self._ausgabe_banner.ueberlagere(self._stack)
 
         # ── Command-Line (T1.1, MA-/Avolites-Style) ───────────────────────────
         try:

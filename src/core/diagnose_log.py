@@ -806,6 +806,22 @@ def _windows_architektur() -> str:
                                bits=bits)
 
 
+#: Zeile ``Sitzungs-Log:``, wenn es die Datei nicht gibt (UI-87).
+KEIN_SITZUNGS_LOG = "keins (in diesem Datenordner liegt kein Sitzungs-Log)"
+
+
+def _sitzungs_log_angabe(wird_geschrieben: bool) -> str:
+    """Pfad des Sitzungs-Logs — oder die Auskunft, dass es keins gibt.
+
+    UI-87: ``systeminfo.txt`` nannte den Pfad auch, wenn dort nie eine Datei
+    entstanden ist (Start ohne Mitschrift, etwa aus einem Werkzeug; frischer
+    Datenordner bei ``--diagnose``). Wer das Paket liest, sucht dann ein Log,
+    das es nicht gibt. Der Kopfblock des Logs selbst entsteht, BEVOR die Datei
+    geoeffnet wird — dort gilt der Pfad (``wird_geschrieben``)."""
+    pfad = log_path()
+    return pfad if wird_geschrieben or os.path.isfile(pfad) else KEIN_SITZUNGS_LOG
+
+
 def _urheber_text() -> str:
     """LIZ-1: Urheberangabe fuer Kopfblock und systeminfo.txt."""
     from src.core import lizenz
@@ -831,8 +847,8 @@ def _vermerk(app_version: str = "?") -> str:
         return f"Erstellt mit LightOS (? {type(e).__name__})\n"
 
 
-def basis_infos(app_version: str = "?", programm_dir: str | None = None
-                ) -> list[tuple[str, str]]:
+def basis_infos(app_version: str = "?", programm_dir: str | None = None, *,
+                log_wird_geschrieben: bool = False) -> list[tuple[str, str]]:
     """Was schon VOR der QApplication feststeht. Jede Zeile einzeln abgesichert."""
     zeilen: list[tuple[str, str]] = []
 
@@ -861,7 +877,7 @@ def basis_infos(app_version: str = "?", programm_dir: str | None = None
                            f"({platform.python_implementation()}) {sys.executable}")
     feld("PySide6/Qt", _qt_versionen)
     feld("Datenordner", app_data_dir)
-    feld("Sitzungs-Log", log_path)
+    feld("Sitzungs-Log", lambda: _sitzungs_log_angabe(log_wird_geschrieben))
     feld("Arbeitsordner", os.getcwd)
     feld("Sprache/Codierung", lambda: f"{_locale()} | stdout "
                                       f"{getattr(sys.__stdout__, 'encoding', None)}")
@@ -1023,7 +1039,9 @@ def midi_infos() -> list[str]:
 
 def kopfblock(app_version: str = "?", programm_dir: str | None = None) -> str:
     zeilen = [f"\n=== LightOS-Sitzung {_cl._ts()} | PID {os.getpid()} ==="]
-    zeilen += [f"  {k}: {v}" for k, v in basis_infos(app_version, programm_dir)]
+    # Das Log, in dem dieser Kopf steht, wird gleich geoeffnet: Pfad nennen (UI-87).
+    zeilen += [f"  {k}: {v}" for k, v in
+               basis_infos(app_version, programm_dir, log_wird_geschrieben=True)]
     zeilen.append("  (Bildschirme, GPU, DMX, MIDI und Show folgen als "
                   "[diagnose]-Zeilen, sobald bekannt)")
     zeilen.append("=" * 60)
