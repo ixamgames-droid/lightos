@@ -151,7 +151,7 @@ _verify_lock() {
     if [ -n "${LIGHTOS_LOCKFILE:-}" ]; then
         echo "[verify] Hinweis: Sperrdatei per LIGHTOS_LOCKFILE umgelenkt: $LOCKFILE"
     fi
-    local _fehler
+    local _fehler _rc
     if ! _fehler="$( { exec 9>>"$LOCKFILE"; } 2>&1 )"; then
         echo "[verify] FEHLER: Sperrdatei nicht benutzbar: $LOCKFILE"
         echo "[verify]        ${_fehler:-unbekannter Fehler beim Oeffnen}"
@@ -159,12 +159,31 @@ _verify_lock() {
         echo "[verify]        Bewusst ungesperrt fahren: LIGHTOS_VERIFY_NOLOCK=1"
         exit 2
     fi
-    exec 9>"$LOCKFILE"
-    if ! flock -n 9; then
+    # ★ XPLAT-23 Gegenpruefung: die Probe oben schliesst das Zeitfenster bis
+    # hierher nicht. Und `exec` mit misslungener Umlenkung beendet eine
+    # nicht-interaktive bash NICHT (nachgemessen) — ohne Abfrage liefe es weiter
+    # in `flock -n 9` auf einem ungueltigen Deskriptor.
+    exec 9>"$LOCKFILE" || _verify_lock_kaputt "Oeffnen nach erfolgreicher Probe misslungen"
+    # ★ flock unterscheidet: 1 = belegt (Vorgabe von -E), alles andere ist ein
+    # FEHLER (gemessen: ungueltiger Deskriptor -> 65). Vorher wurde jeder
+    # Nicht-Null-Wert als „andere Sitzung" gedeutet, das blockierende `flock 9`
+    # scheiterte dann sofort ebenso, und es hiess „Sperre frei, starte" — ein
+    # ungesperrter Volllauf mit falscher Diagnose, genau XPLAT-23 (i).
+    flock -n 9
+    _rc=$?
+    if [ "$_rc" -eq 1 ]; then
         echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."
-        flock 9
+        flock 9 || _verify_lock_kaputt "flock beim Warten gescheitert (Exit $?)"
         echo "[verify] Sperre frei, starte."
+    elif [ "$_rc" -ne 0 ]; then
+        _verify_lock_kaputt "flock gescheitert (Exit $_rc)"
     fi
+}
+_verify_lock_kaputt() {
+    echo "[verify] FEHLER: Sperre nicht nehmbar: $LOCKFILE"
+    echo "[verify]        $1 — die volle Suite laeuft NICHT ungesperrt los."
+    echo "[verify]        Bewusst ungesperrt fahren: LIGHTOS_VERIFY_NOLOCK=1"
+    exit 2
 }
 _verify_lock "$@"
 

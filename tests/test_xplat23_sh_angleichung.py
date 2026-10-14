@@ -110,6 +110,46 @@ class ShAngleichungTest(unittest.TestCase):
         self.assertIn("per LIGHTOS_LOCKFILE umgelenkt", r.stdout)
         self.assertIn(os.path.join(self._dir, ".pytest_lock"), r.stdout)
 
+    # ── Gegenpruefung: flock-FEHLER ist nicht „belegt" ──────────────────────
+    def _falsches_flock(self, rc_n, rc_warten):
+        """Legt ein ``flock`` vor den PATH, das mit festen Exit-Codes antwortet.
+        1 ist bei flock „belegt"; alles andere ein Fehler (gemessen: ein
+        ungueltiger Deskriptor liefert 65)."""
+        bindir = os.path.join(self._dir, "bin")
+        os.makedirs(bindir, exist_ok=True)
+        stub = os.path.join(bindir, "flock")
+        with open(stub, "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh\n"
+                    f'if [ "$1" = "-n" ]; then exit {rc_n}; fi\n'
+                    f"exit {rc_warten}\n")
+        os.chmod(stub, 0o755)
+        return bindir + os.pathsep + os.environ.get("PATH", "")
+
+    def test_flock_fehler_wird_nicht_als_belegt_gedeutet(self):
+        """Vorher: jeder Nicht-Null-Wert von ``flock -n`` hiess „andere
+        Sitzung", das blockierende ``flock`` scheiterte sofort ebenso, und der
+        Volllauf startete UNGESPERRT mit „Sperre frei, starte"."""
+        r = self._lauf(PATH=self._falsches_flock(65, 65))
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("Sperre nicht nehmbar", r.stdout)
+        self.assertNotIn("andere Sitzung", r.stdout)
+        self.assertNotIn("Syntax-Check", r.stdout)
+
+    def test_flock_scheitert_beim_warten_bricht_ab(self):
+        r = self._lauf(PATH=self._falsches_flock(1, 65))
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("warte", r.stdout)
+        self.assertNotIn("Sperre frei, starte", r.stdout)
+        self.assertNotIn("Syntax-Check", r.stdout)
+
+    def test_belegt_und_dann_frei_laeuft_durch(self):
+        """Positivkontrolle zum falschen flock: belegt (1), dann frei (0) ist
+        der Normalfall „andere Sitzung, gewartet" und muss durchlaufen."""
+        r = self._lauf(PATH=self._falsches_flock(1, 0))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("Sperre frei, starte", r.stdout)
+        self.assertIn("Syntax-Check", r.stdout)
+
     # ── Nebenbefund: stderr bleibt nach der Sperrnahme sichtbar ─────────────
     def test_stderr_bleibt_nach_der_sperrnahme_offen(self):
         """``bash -x`` schreibt seine Spur nach stderr. Steht nach der
