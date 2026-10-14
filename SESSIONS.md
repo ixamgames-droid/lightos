@@ -73,7 +73,7 @@
 | VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
 | TOOL-27 | A | fix/tool27-pruefwerkzeuge-eigene-sandbox | 2026-10-13T20:41Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
-| LAS-39 | A | fix/las39-laser-erkennung-ohne-datenbank | 2026-10-14T14:16Z | - |
+| LAS-39 | A | fix/las39-laser-erkennung-ohne-datenbank | 2026-10-14T14:24Z | src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py |
 | QA-97 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | QA-98 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
 | UI-94 | A | chore/backlog-nachtrag-2026-10-14 | 2026-10-13T23:16Z | - |
@@ -287,7 +287,6 @@
 
 ## Verlauf
 
-- 2026-10-13T16:14Z A claim IMP-2
 - 2026-10-13T16:35Z A done LIZ-1
 - 2026-10-13T16:59Z A done DOC-72
 - 2026-10-13T17:01Z A claim PROC-22
@@ -317,3 +316,4 @@
 - 2026-10-14T13:52Z A done ENG-35
 - 2026-10-14T13:52Z A done VCB-46
 - 2026-10-14T14:16Z A aktualisiert LAS-39: Branch chore/backlog-nachtrag-2026-10-14 -> fix/las39-laser-erkennung-ohne-datenbank
+- 2026-10-14T14:24Z A aktualisiert LAS-39: Dateien - -> src/core/laser/erkennung.py · src/core/app_state.py · src/ui/main_window.py
