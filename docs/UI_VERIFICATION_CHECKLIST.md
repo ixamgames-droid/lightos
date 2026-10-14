@@ -48,7 +48,7 @@ fehlt zunaechst hier und macht das Gate rot (Schutz gegen Doku-Drift).
 
 Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = mind. ein beschrifteter Text/Tooltip · **Aktion/Signal** = Button/`QAction`/Klassen-`Signal` vorhanden · **Regressionstest** = abdeckende Testdatei · **Doc** = Komponentenseite · **Verifikationspfad** = ausfuehrbarer `pytest`-Testname ODER `manuell`.
 
-**Stand:** 24 no-arg Views (24 headless baubar), 19 VC-Widgets (19 headless baubar).
+**Stand:** 25 no-arg Views (25 headless baubar), 19 VC-Widgets (19 headless baubar).
 
 ### Views (`src/ui/views/*.py`, no-arg `*View`)
 
@@ -71,6 +71,7 @@ Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = m
 | `patch_view.py` | `PatchView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/patch_view.md` | `test_every_no_arg_view_builds` |
 | `playback_view.py` | `PlaybackView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/playback_view.md` | `test_every_no_arg_view_builds` |
 | `preset_browser_view.py` | `PresetBrowserView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/preset_browser_view.md` | `test_every_no_arg_view_builds` |
+| `prioritaeten_view.py` | `PrioritaetenView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | — | `test_every_no_arg_view_builds` |
 | `programmer_view.py` | `ProgrammerView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/programmer_view.md` | `test_every_no_arg_view_builds` |
 | `rgb_matrix_view.py` | `RgbMatrixView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/rgb_matrix_view.md` | `test_every_no_arg_view_builds` |
 | `show_manager_view.py` | `ShowManagerView` | ja | ja | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/views/show_manager_view.md` | `test_every_no_arg_view_builds` |

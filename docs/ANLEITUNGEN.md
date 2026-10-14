@@ -67,6 +67,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | [Farb-Matrix](anleitung_farbmatrix/ANLEITUNG_FARBMATRIX.md) | RGB/RGBW-Farbeffekte über eine Gruppe: Algorithmen, Raster. | Beispiel-Show nicht im Repo |
 | [Farbchase frei zusammenstellen](anleitung_farbchase/ANLEITUNG_FARBCHASE.md) | Chase mit frei wählbarer Farbfolge, z. B. Blau-Weiß, auch beat-synchron. | Beispiel-Show nicht im Repo |
 | [Dimmer-Matrix & relative Geschwindigkeit](anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md) | Helligkeits-Lauflicht als eigene Ebene, phasengekoppelt zur Farbe. | Beispiel-Show nicht im Repo |
+| [Wer gewinnt? Prioritäten für Effekte](anleitung_prioritaeten/ANLEITUNG.md) | Die Schichten von den Grundwerten bis zum NOT-AUS, die fünf Stufen für Effekte, die Ansicht **Prioritäten** und das Feld **Stufe** in jedem Editor. | Keine Show nötig |
 | [EFX — Moving-Head-Bewegung](anleitung_efx/ANLEITUNG_EFX.md) | Pan/Tilt-Bahnen (Kreis, Acht …), „Dimmer/Shutter mit öffnen“, Geräte-Verhältnis. | Beispiel-Show nicht im Repo |
 | [Matrix-Effekte](anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md) | Feuer, Regen, Radar, Spirale, Wisch und Welle. | Generator `build_event_demo_2026.py` |
 | [Abläufe & Mischen](anleitung_ablaeufe/ANLEITUNG_ABLAEUFE_MISCHEN.md) | Collections, Chaser, Cue-Listen und Live-Chase: Farbe × Bewegung × Strobo kombinieren. | Generator `build_event_demo_2026.py` |
@@ -124,6 +125,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [Zwei Universen über zwei Adapter](anleitung_zwei_universen/ANLEITUNG.md) | Universe 1 über ENTTEC USB Pro, Universe 2 über Art-Net, patchen und im Output-Monitor prüfen. | Keine Show nötig |
 | [ENTTEC und Art-Net gleichzeitig](anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md) | Jedes Universum mit eigenem Ausgabe-Backend; ENTTEC, Art-Net und sACN frei mischen. | Keine Show nötig |
 | [Netzwerk vorbereiten (Windows)](anleitung_netzwerk_windows/ANLEITUNG.md) | Welche Funktion welchen Port braucht (Art-Net 6454, sACN 5568, Web-Remote 5000, MSC 6004), Netzwerkprofil, feste Adresse im Lichtnetz, Firewall-Freigaben anlegen und entfernen, typische Fehlerbilder. | Keine Show nötig |
+| [Externe Pulte über Netzwerk und MIDI](anleitung_externe_pulte/ANLEITUNG_EXTERNE_PULTE.md) | LightOS neben einem externen Lichtpult: DMX per Art-Net/sACN an das Pult senden, DMX vom Pult empfangen und einmischen (HTP/LTP), Cues per MIDI Show Control auslösen lassen; was nicht geht, Netzwerk und Ports (6454, 5568, 6004), Sicherheit, Fehlersuche, Stand der Erprobung. | Keine Show nötig |
 
 ## Shows & Beispiele
 

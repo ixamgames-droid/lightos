@@ -44,7 +44,7 @@ def test_abschnitt_nennt_bedienung_und_grenzen():
     a = _abschnitt()
     for wort in ("Modify-Effekt", "**Modify**", "Addieren", "Abziehen", "Abdunkeln",
                  "Stärke", "Modify-Stärke", "Stil Dimmer", "Start-Reihenfolge",
-                 "Layer-Priorität", "Snap-Tasten", "Programmer", "Chaser-Schritt",
+                 "**Stufe**", "Snap-Tasten", "Programmer", "Chaser-Schritt",
                  "Farbe und Dimmer bleiben getrennt",
                  # Stand „fertiges Bild“: Regel, Master, Schrittweite
                  "fertige Bild", "Grundhelligkeit", "Grand Master", "Blackout",

@@ -24,10 +24,11 @@ Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
 
 - **Algorithmus: Chase** (Lauflicht; alternativ *Atmen (Puls)* = pulsierend, *Strobe* = hartes An/Aus)
 - **Stil: Dimmer**
-- **Spalten/Reihen** musst du nicht von Hand setzen: Der eingebettete Editor folgt automatisch
-  der **Programmer-Auswahl** (die manuellen Zuweisungs-Buttons sind ausgeblendet). Daraus ergibt
-  sich das Geräte-Grid von selbst — bei loser Auswahl als **Spalten = Anzahl der Geräte**
-  (hier 10 = PAR + Spider), **Reihen = 1**.
+- **Spalten/Reihen** musst du nicht von Hand setzen: Die mit **+ Neu** angelegte Matrix nimmt
+  die **Programmer-Auswahl** und folgt ihr, bis du sie speicherst. Daraus ergibt sich das
+  Geräte-Grid von selbst — bei loser Auswahl als **Spalten = Anzahl der Geräte**
+  (hier 10 = PAR + Spider), **Reihen = 1**. Eine schon gespeicherte Matrix ändert ihr Raster
+  nur über **Auswahl übernehmen**.
 - **💾 Speichern**, dann in der Liste links **▶ Start** — gestartet wird immer die gespeicherte
   Fassung.
 
@@ -46,7 +47,7 @@ Die **Vorschau** zeigt die Helligkeit als Graustufen-Lauflicht (weiße Balken = 
 
 Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** jetzt direkt:
 **Geschwindigkeit**, **Tempo-Bus**, **Tempo ×**, **Tempo-Versatz**, **Taktgleich starten**
-(diese drei nur bei gewähltem Bus), **Layer-Priorität**, **Einblenden**, **Ausblenden** und
+(diese drei nur bei gewähltem Bus), **Stufe**, **Einblenden**, **Ausblenden** und
 **Hüllkurven-Form**.
 
 - **Geschwindigkeit** ist die eigene Rate der Matrix (Schritte pro Sekunde). Sie wirkt nur im
@@ -54,8 +55,9 @@ Im Matrix-Editor gibt es in der Gruppe **Tempo & Blende** jetzt direkt:
   eine BPM (Tap oder Musik), bestimmt **Tempo ×** das Tempo: für einen doppelt so schnellen
   Dimmer-Puls also bei der Dimmer-Matrix **Tempo × = 2** einstellen, die Farb-Matrix bleibt
   auf 1.
-- Mit **Layer-Priorität** entscheidest du, wer gewinnt, wenn zwei Effekte denselben Kanal
-  schreiben (höher gewinnt; bei gleicher Priorität der zuletzt gestartete Effekt).
+- Mit der **Stufe** entscheidest du, wer gewinnt, wenn zwei Effekte denselben Kanal
+  schreiben (die höhere Stufe gewinnt; bei gleicher Stufe der zuletzt gestartete Effekt).
+  Alle Stufen und die ganze Reihenfolge: [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md).
 - **Einblenden / Ausblenden** sind die Ein-/Ausblendzeiten (in Sekunden) beim Start/Stopp; die
   **Hüllkurven-Form** bestimmt deren Verlauf.
 
@@ -306,10 +308,10 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
 ### Reihenfolge
 
 - Ein Modify-Effekt rechnet immer **nach** allen normalen Effekten — egal, was zuerst gestartet
-  wurde und welche **Layer-Priorität** sie haben. Er wirkt also auch auf einen normalen Effekt
-  mit höherer Priorität: verrechnet wird mit dem, was am Ende gewinnt.
+  wurde und in welcher **Stufe** sie liegen. Er wirkt also auch auf einen normalen Effekt
+  in einer höheren Stufe: verrechnet wird mit dem, was am Ende gewinnt.
 - Mehrere Modify-Effekte wirken **nacheinander**, jeder kappt für sich: zuerst nach
-  Layer-Priorität (niedrige zuerst), bei gleicher Priorität in **Start-Reihenfolge**.
+  Stufe (die niedrige zuerst), bei gleicher Stufe in **Start-Reihenfolge**.
   Beispiel auf 40 %: erst Addieren 50 %, dann Abziehen 100 % ergibt 0 %; umgekehrt gestartet
   ergibt es 50 %.
 
@@ -357,7 +359,7 @@ Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
 ---
 
 **Kurz:** Gruppe wählen → Matrix-Tab → **+ Neu** → **Stil Dimmer** + Algorithmus *Chase* (Raster
-folgt der Auswahl) → Helligkeit über **Dimmer-Bereich** (Min/Max) → **💾 Speichern** →
+kommt aus der Auswahl) → Helligkeit über **Dimmer-Bereich** (Min/Max) → **💾 Speichern** →
 **▶ Start**. Tempo: neue Matrizen hängen am Bus **Global** (folgt der Musik-BPM); schneller als
 die Farb-Matrix wird der Puls über **Tempo ×** — **Geschwindigkeit** wirkt nur ohne laufende BPM.
 Live umschalten in der **Virtuellen Konsole** (Speed-Rad, Element **Tempo-Bus**, Buttons

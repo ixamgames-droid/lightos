@@ -9,6 +9,7 @@ Verwendung:
 Im Main Menue: Ctrl+Z (stack.undo()) / Ctrl+Y (stack.redo()).
 """
 from __future__ import annotations
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable
 
@@ -35,6 +36,24 @@ class Command:
             self.do()
 
 
+def _sammel_command(label: str, teile: list[Command]) -> Command:
+    """Ein Command aus mehreren. Ein Teil, das wirft, haelt die uebrigen
+    nicht auf — sonst bliebe nach einem Rueckgaengig die Haelfte stehen."""
+    def _jedes(folge, aufruf):
+        for teil in folge:
+            try:
+                aufruf(teil)
+            except Exception as e:
+                print(f"[UndoStack] Teil '{teil.label}' fehlgeschlagen: {e}")
+
+    return Command(
+        label=label,
+        do=lambda: None,
+        undo=lambda: _jedes(list(reversed(teile)), Command.revert),
+        redo=lambda: _jedes(list(teile), Command.reexecute),
+    )
+
+
 class UndoStack:
     """Stack mit Undo/Redo. MAX_SIZE Eintraege als FIFO."""
 
@@ -45,6 +64,8 @@ class UndoStack:
         self._redo: list[Command] = []
         self._listeners: list[Callable[[], None]] = []
         self._suspended: int = 0   # waehrend undo()/redo() keine push
+        # IMP-1: waehrend ``gruppe()`` sammelt push() hier statt auf dem Stack.
+        self._sammler: list[Command] | None = None
 
     # ── Push / Execute ───────────────────────────────────────────────────────
 
@@ -58,6 +79,9 @@ class UndoStack:
             except Exception as e:
                 print(f"[UndoStack] execute error: {e}")
                 return
+        if self._sammler is not None:
+            self._sammler.append(cmd)
+            return
         self._undo.append(cmd)
         # Cap
         if len(self._undo) > self.MAX_SIZE:
@@ -68,6 +92,29 @@ class UndoStack:
     def push_simple(self, label: str, do, undo):
         """Shortcut: push(Command(label, do, undo))."""
         self.push(Command(label=label, do=do, undo=undo))
+
+    @contextmanager
+    def gruppe(self, label: str):
+        """IMP-1: alles, was innerhalb des Blocks gepusht wird, landet als EIN
+        Schritt auf dem Stack — ein Rueckgaengig nimmt alles zurueck (in
+        umgekehrter Reihenfolge), ein Wiederholen stellt alles wieder her.
+
+        Gedacht fuer Sammelvorgaenge, die N-mal denselben Einzelweg gehen
+        (Patch-Import: N-mal ``add_fixture``) — so bleibt der Einzelweg samt
+        seinem eigenen Undo/Redo die einzige Wahrheit. Wird nichts gepusht,
+        entsteht kein Schritt. Verschachtelt zaehlt die aeusserste Gruppe.
+        Wirft der Block, bleibt das bis dahin Gesammelte als ein Schritt
+        ruecknehmbar."""
+        if self._sammler is not None or self._suspended:
+            yield
+            return
+        self._sammler = []
+        try:
+            yield
+        finally:
+            teile, self._sammler = self._sammler, None
+            if teile:
+                self.push(_sammel_command(label, teile), execute=False)
 
     # ── Undo / Redo ──────────────────────────────────────────────────────────
 
