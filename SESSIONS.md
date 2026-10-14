@@ -67,6 +67,7 @@
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
+| LAS-31 | A | - | 2026-10-14T18:14Z | - |
 
 ## Blocker & Fallen
 
@@ -275,7 +276,6 @@
 
 ## Verlauf
 
-- 2026-10-13T22:21Z B done DOC-71
 - 2026-10-13T22:26Z A claim IMP-3
 - 2026-10-13T22:43Z A done ENG-37
 - 2026-10-13T23:16Z A claim LAS-39
@@ -305,3 +305,4 @@
 - 2026-10-14T16:55Z A done TOOL-27
 - 2026-10-14T17:18Z A done VCB-47
 - 2026-10-14T18:02Z A done ENG-40
+- 2026-10-14T18:14Z A claim LAS-31
