@@ -153,9 +153,15 @@ def test_alles_weiss_laesst_keinen_patch_zurueck():
         "rest = [(f.fid, f.universe, f.address) for f in get_state().get_patched_fixtures()]\n"
         "print('REST', rest)\n"
         "sys.exit(rc or (3 if rest else 0))\n")
-    lauf = subprocess.run([sys.executable, "-c", code], cwd=_REPO,
+    # Ohne die Schalter fuer das harte Prozessende (conftest, pytest_unconfigure):
+    # die CI setzt LIGHTOS_HARDEN_EXIT_ALL, und dann endet der Unterprozess schon
+    # in pytest.main() per os._exit — die Zeilen danach (der Blick auf den Patch)
+    # liefen nie, und „REST“ fehlte in der Ausgabe (Linux-CI, 12.10.2026).
+    umgebung = {k: v for k, v in os.environ.items()
+                if k not in ("LIGHTOS_HARDEN_EXIT_ALL", "LIGHTOS_HARDEN_EXIT")}
+    lauf = subprocess.run([sys.executable, "-c", code], cwd=_REPO, env=umgebung,
                           capture_output=True, text=True, encoding="utf-8",
                           errors="replace", timeout=240,
                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     assert lauf.returncode == 0, lauf.stdout[-2000:]
-    assert "REST []" in lauf.stdout
+    assert "REST []" in lauf.stdout, lauf.stdout[-2000:]
