@@ -1503,6 +1503,7 @@ class _LiveTestPanel(QGroupBox):
         return ""
 
     def _start(self):
+        self._info.setStyleSheet("color:#9aa4af;")
         mode = self.current_mode()
         if not mode or not mode.channels:
             # Erst den Knopf loesen, dann der Text: das Loesen laeuft ueber
@@ -1566,11 +1567,23 @@ class _LiveTestPanel(QGroupBox):
         if not self._notaus_aktiv():
             return
         tester, self._tester = self._tester, None
+        aus_bekannt = bool(self._aus_werte)
         tester.blackout(self._aus_werte)
         tester.halten()
         self._stop()
-        self._info.setText(
-            "Laser-NOT-AUS — Test beendet, Laser auf „aus“ gestellt.")
+        if aus_bekannt:
+            self._info.setText(
+                "Laser-NOT-AUS — Test beendet, Laser auf „aus“ gestellt.")
+        else:
+            # Codex-Review #1064: ohne hinterlegten Aus-Wert stehen jetzt alle
+            # Kanaele auf 0 — und 0 kann bei so einem Laser „an“ heissen (das
+            # sagt schon die Rueckfrage). Keine Entwarnung melden.
+            self._info.setText(
+                "⚠ Laser-NOT-AUS — Test beendet, alle Kanäle auf 0. Für diesen "
+                "Modus ist kein Aus-Wert hinterlegt: ob der Laser jetzt dunkel "
+                "ist, kann LightOS nicht sagen. Laser am Gerät ausschalten "
+                "(Schlüsselschalter/Not-Aus).")
+            self._info.setStyleSheet("color:#ff6b6b; font-weight:bold;")
 
     def _stop(self):
         self._notaus_timer.stop()

@@ -316,7 +316,9 @@ gesendet wird und ob der Laser mit den Default-Werten **sofort strahlt**. Mit
   Laser – auch dann nicht, wenn er ausgelöst wird, während die Rückfrage noch
   offen ist.
 - Kennt das Profil noch **keinen Aus-Wert**, sagt die Rückfrage das: LightOS
-  weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt.
+  weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt. Beendet der
+  NOT-AUS so einen Test, stehen alle Kanäle auf 0, und die Infozeile sagt rot,
+  dass das nicht sicher „aus“ heißt – dann den Laser am Gerät ausschalten.
 
 ## 8. Patchen und bedienen
 
