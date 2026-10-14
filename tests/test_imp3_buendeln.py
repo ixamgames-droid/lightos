@@ -696,3 +696,37 @@ def test_programmer_schreibt_ausserhalb_des_sammelns_sofort_wie_vorher(state, bi
     assert _live(state, 1, 1, 8) == [0] * 8
     state.clear_programmer()
     assert _live(state, 1, 9, 1) == [0]
+
+
+def test_scheitert_schon_der_erste_neuaufbau_rechnen_funktionen_mit_dem_leeren_plan(
+        tmp_path, bib, monkeypatch):
+    """IMP-3, Gegenprüfung: ein frischer ``AppState`` hat einen leeren Plan —
+    auch seine Geräteliste (``_plan_patch``) ist dann leer, nicht „noch
+    keine“. Scheitert schon der erste Neuaufbau (Show laden), bekamen die
+    Funktionen sonst ``_patch_cache`` mit dem Laser zum leeren Plan: seine
+    Adressen gingen als Roh-Kanäle an beiden NOT-AUS-Ebenen vorbei hinaus."""
+    pfad = tmp_path / "show.db"
+    st = _oeffne(pfad)
+    st.add_fixture(_laser(st, bib, 1, 10))
+    _schliesse(st)
+
+    st = A.AppState()
+    try:
+        def kaputt(*a, **k):
+            raise RuntimeError("Neuaufbau gescheitert")
+
+        monkeypatch.setattr(st, "_rebuild_render_plan", kaputt)
+        with pytest.raises(RuntimeError):
+            st.open_show(str(pfad))
+        assert [f.fid for f in st._patch_cache] == [1]
+        assert st._fix_index == {}
+        st.set_laser_estop(True)
+        monkeypatch.setattr(st.function_manager, "tick", _alles_voll)
+        for _ in range(2):
+            st._render_frame(0.02)
+            assert _live(st, 3, 10, 5) == [0] * 5
+        with st.patch_sammeln():       # auch der Block hält die leere Liste
+            st._render_frame(0.02)
+            assert _live(st, 3, 10, 5) == [0] * 5
+    finally:
+        _schliesse(st)

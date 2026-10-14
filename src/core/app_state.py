@@ -346,7 +346,11 @@ class AppState:
         # laufende Funktion ein Geraet, das der Plan (und die NOT-AUS-Maske)
         # noch nicht kennt: waehrend patch_sammeln(), nach einem gescheiterten
         # Neuaufbau, im Augenblick zwischen Listen- und Plantausch.
-        self._plan_patch: list | None = None
+        # Anfangs LEER (wie der anfangs leere Plan unten), nicht None: scheitert
+        # schon der erste Neuaufbau (Show laden), bekaemen die Funktionen sonst
+        # ueber den Rueckfall in _render_frame _patch_cache zum leeren Plan.
+        # None gibt es nur im nackten Zustand ohne __init__ (Test-Stubs).
+        self._plan_patch: list | None = []
         # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
         # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
         # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
