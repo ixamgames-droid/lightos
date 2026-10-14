@@ -2542,6 +2542,26 @@ class VCButton(VCWidget):
         long_press_cb.setToolTip("Im Live-Modus den Button lange halten, um die Effekt-"
                                  "Parameter zu bearbeiten (deferred apply). Bei Flash sinnlos.")
 
+        # ENG-39: gelbe Hinweiszeile, wenn eine andere Taste / ein Fader an
+        # denselben Geraeten denselben Baustein steuert. Reine Auskunft. Sie
+        # liest die Ziele aus den FELDERN (im Dialog ist noch nichts
+        # uebernommen) und rechnet nur beim Oeffnen und bei Aenderungen.
+        from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+
+        def _hinweis_ziele():
+            if act.currentData() not in (ButtonAction.FUNCTION_TOGGLE.value,
+                                         ButtonAction.FUNCTION_FLASH.value):
+                return []
+            return target_editor.ids()
+
+        ueberschn_hinweis = UeberschneidungsHinweis(self, _hinweis_ziele)
+        _hinweis_setzer = {"f": None}
+        ueberschn_hinweis.sichtbar_setzen = (
+            lambda an: _hinweis_setzer["f"](ueberschn_hinweis, an)
+            if _hinweis_setzer["f"] is not None else None)
+        target_editor.changed.connect(ueberschn_hinweis.veraltet)
+        act.currentIndexChanged.connect(ueberschn_hinweis.veraltet)
+
         # ── Aktions-Konstanten (Sichtbarkeit) ──
         FT, FF = ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH
         EA, SG = ButtonAction.EFFECT_ACTION, ButtonAction.SELECT_GROUP
@@ -2642,8 +2662,10 @@ class VCButton(VCWidget):
             a = act.currentData()        # roher Enum-Wert (str)
             func_like = a in (FT, FF, EA, TG, FL, AW)
             target_editor.set_title("Aktion auf" if a == EA else "Schaltet mit")
+            _hinweis_setzer["f"] = set_row_visible      # ENG-39
             rows = {
                 target_editor:    a in (FT, FF, EA, AW),
+                ueberschn_hinweis: ueberschn_hinweis.hat_hinweis(),
                 snap_combo:       a == SN,
                 snap_editor:      a == LS,
                 snap_mode_combo:  a == LS,
@@ -2704,6 +2726,7 @@ class VCButton(VCWidget):
             "update_visibility": update_visibility,
             "action_combo": act,
             "pad_combo": pad_style_combo,
+            "ueberschneidungs_hinweis": ueberschn_hinweis,
             "top": [("Beschriftung:", cap), ("Aktion:", act)],
             "sections": [
                 ("target", "Ziel und Verhalten", False, "vc_button_sec_target", [
@@ -2754,6 +2777,9 @@ class VCButton(VCWidget):
 
         for label, w in S["top"]:
             form.addRow(label, w)
+        # ENG-39: der gelbe Hinweis steht gleich unter „Aktion“, ueber die
+        # ganze Breite — nicht in einem Bereich, der zugeklappt sein kann.
+        form.addRow(S["ueberschneidungs_hinweis"])
 
         adv_section = None
         for key, title, _collapsed, prefs, rows in S["sections"]:
@@ -2802,7 +2828,11 @@ class VCButton(VCWidget):
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
 
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        angenommen = dlg.exec() == QDialog.DialogCode.Accepted
+        # ENG-39: der Dialog bleibt als Kind der Taste bestehen — seine
+        # Hinweiszeile soll danach nicht bei jeder Aenderung weiterrechnen.
+        S["ueberschneidungs_hinweis"].stilllegen()
+        if angenommen:
             S["apply"]()
 
     def build_inspector_body(self, host=None):
@@ -2827,6 +2857,11 @@ class VCButton(VCWidget):
         for label, w in S["top"]:
             top_form.addRow(label, w)
         v.addWidget(top_inner)
+        # ENG-39: der gelbe Hinweis steht gleich unter „Aktion“, ueber die
+        # ganze Breite und ausserhalb der Klappbereiche — er bleibt zu sehen,
+        # auch wenn „Ziel und Verhalten“ zugeklappt ist. Die Zeile bricht um
+        # und haelt sich im schmalen Inspector an die sichtbare Breite.
+        v.addWidget(S["ueberschneidungs_hinweis"])
 
         row_form_of = {}
         sections = []   # (key, CollapsibleSection, [row_widgets])
@@ -2834,6 +2869,10 @@ class VCButton(VCWidget):
             inner = _QWidget()
             f = QFormLayout(inner)
             f.setContentsMargins(0, 0, 0, 0)
+            # Im schmalen Inspector rutscht ein Feld, das neben seiner
+            # Beschriftung nicht passt, unter sie — statt den ganzen Inhalt
+            # breiter zu machen als das Panel (vorher 478 px Mindestbreite).
+            f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
             row_widgets = []
             for label, w in rows:
                 f.addRow(label, w)
@@ -2854,6 +2893,8 @@ class VCButton(VCWidget):
                     f.setRowVisible(w, bool(show))
                 except Exception:
                     w.setVisible(bool(show))
+            else:
+                w.setVisible(bool(show))    # ENG-39: Hinweis liegt in keinem Formular
 
         def set_section_visible(k, show):
             for key, sec, _rws in sections:
