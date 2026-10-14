@@ -9,6 +9,7 @@ Nach jeder Code-Änderung an Widgets/Enums/Algos/Params neu laufen lassen
 """
 from __future__ import annotations
 
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import os
 import sys
 

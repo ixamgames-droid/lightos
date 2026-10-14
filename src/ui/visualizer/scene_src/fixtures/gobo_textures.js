@@ -594,9 +594,14 @@ function _unterAus(f) {
  *                 oder null = keine Kante (Boden, Wand, kein Treffer)
  *  @param unten   true = das Muster ragt ueber die Kante (Rest nach unten)
  *  @param yUnten  Hoehe der Flaeche darunter
+ *  @param aufhellen  VIZ-107, 0..1: die Strahlmitte liegt schon NEBEN der
+ *                 Oberseite, der Kegel verlaesst sie gerade — die Scheibe
+ *                 unten naehert sich der vollen Helligkeit, die sie hat,
+ *                 sobald sie allein liegt (0 = wie auf der Oberseite gemessen)
  *  @returns true, wenn die zweite Scheibe liegt
  */
-export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ, anteil = 1) {
+export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ, anteil = 1,
+                                    aufhellen = 0) {
   const main = f && f.floorSpot;
   if (!main || !main.material) return false;
   const ebenen = main.material.clippingPlanes;
@@ -624,7 +629,11 @@ export function goboKanteAbgleichen(f, kante, unten, yUnten, hitX, hitZ, anteil 
   // und die Projektion mit der Kegel-Reichweite ausblendet) und mit dem
   // Abstandsquadrat schwaecher als auf der Oberseite — nie heller als oben.
   const hoch = (_A.y - kante.y) / Math.max(1e-3, _A.y - yUnten);
-  f._goboUntenDeck = Math.max(0, Math.min(1, anteil)) * Math.max(0, Math.min(1, hoch * hoch));
+  const quadrat = Math.max(0, Math.min(1, hoch * hoch));
+  // VIZ-107: hat der Kegel die Oberseite verlassen, liegt unten wieder EINE
+  // Scheibe mit voller Helligkeit — dorthin fuehrt `aufhellen` stufenlos.
+  const hell = Math.max(0, Math.min(1, aufhellen));
+  f._goboUntenDeck = Math.max(0, Math.min(1, anteil)) * (quadrat + (1 - quadrat) * hell);
   f._goboUnten = true;
   _unterAktiv.add(f);
   _unterAngleichen(f);
