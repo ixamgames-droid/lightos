@@ -57,7 +57,6 @@
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
 | VCB-44 | D | fix/vcb44-blackout-ziele-streng-dialog-pruefung | 2026-10-12T15:27Z | src/core/group_ref.py · src/ui/virtualconsole/vc_button.py · src/core/sync.py · src/ui/widgets/validation_dialog.py |
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
-| VIZ-107 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | tests/test_viz107_gobo_niedrig_buehnenkante_scene.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | ENG-36 | A | feature/eng36-cloning | 2026-10-12T18:15Z | src/core/show/klonen.py · src/ui/views/patch_view.py |
@@ -278,7 +277,6 @@
 
 ## Verlauf
 
-- 2026-10-13T20:21Z D done OUT-77
 - 2026-10-13T20:41Z A claim TOOL-27
 - 2026-10-13T20:44Z A done VIZ-104
 - 2026-10-13T21:06Z B done VIZ-105
@@ -308,3 +306,4 @@
 - 2026-10-14T15:10Z A done UI-94
 - 2026-10-14T15:10Z A done ENG-41
 - 2026-10-14T15:39Z D done UI-87
+- 2026-10-14T16:17Z B done VIZ-107
