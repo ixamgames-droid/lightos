@@ -590,6 +590,27 @@ class TasteTest(unittest.TestCase):
         finally:
             host.deleteLater()
 
+    def test_eigenschaften_uebernehmen_meldet_die_aktive_taste_ab(self):
+        """Codex-Review #1087 (CDX-59): „Übernehmen“ setzt die Taste auf
+        inaktiv (``_snap_active``/``_snap_prev``) — sie muss dann auch aus dem
+        Snap-Register heraus. Sonst blieb sie oberster Halter, und bei
+        unveraendertem Haken samt Programmer-Wert wirkte die
+        Dimmer-Uebersteuerung weiter, obwohl die Taste aus ist."""
+        from src.ui.virtualconsole import vc_button as VB
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True, mode="toggle")
+        btn._trigger(True)
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+        host = QWidget()
+        try:
+            S = btn._build_settings(host, live=False)
+            S["apply"]()                           # nichts geaendert, nur OK
+        finally:
+            host.deleteLater()
+        self.assertFalse(btn._snap_active)
+        halter = [ref() for st in VB._snap_stack.values() for ref, _v in st]
+        self.assertNotIn(btn, halter, "die inaktive Taste haelt noch")
+        self.assertEqual(self._ovr(), {}, "Uebersteuerung ohne aktive Taste")
+
     def test_haken_nur_bei_snap_tasten_sichtbar_und_wirksam(self):
         btn = self._taste({FID_A: {"intensity": 255}}, haken=True)
         host = QWidget()
