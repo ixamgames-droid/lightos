@@ -67,7 +67,6 @@
 | ENG-40 | A | feature/eng40-modify-kanalwahl | 2026-10-13T19:31Z | - |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
 | VCB-47 | A | fix/vcb47-aktiver-effekt-zeile-verschiebt-tasten | 2026-10-13T20:18Z | - |
-| TOOL-27 | A | fix/tool27-pruefwerkzeuge-eigene-sandbox | 2026-10-13T20:41Z | - |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 
@@ -278,7 +277,6 @@
 
 ## Verlauf
 
-- 2026-10-13T20:44Z A done VIZ-104
 - 2026-10-13T21:06Z B done VIZ-105
 - 2026-10-13T21:45Z B done STAB-37
 - 2026-10-13T22:21Z B done DOC-71
@@ -308,3 +306,4 @@
 - 2026-10-14T15:39Z D done UI-87
 - 2026-10-14T16:17Z B done VIZ-107
 - 2026-10-14T16:29Z A claim QA-97
+- 2026-10-14T16:55Z A done TOOL-27
