@@ -117,14 +117,49 @@ _lockfile_pfad() {
 
 LOCKFILE="$(_lockfile_pfad)"
 
+# ★ XPLAT-23 (ii): Die beiden Schalter wirkten hier wortlos. Ein geerbtes
+# LIGHTOS_VERIFY_NOLOCK machte einen Volllauf ungesperrt, ohne dass es am
+# Exit-Code oder in der Ausgabe zu sehen war — ein gruenes Ergebnis ohne
+# Serialisierung sah aus wie eines mit. verify_loop.ps1 sagt es seit XPLAT-23
+# Scheibe 1 an; hier dieselben Hinweise. Nur Ausgabe, kein anderes Verhalten.
+#
+# ★ XPLAT-23 (i): Hier stand `exec 9>"$LOCKFILE" 2>/dev/null || return 0` —
+# eine nicht oeffenbare Sperrdatei (vertippter LIGHTOS_LOCKFILE, Pfad ist ein
+# Ordner, kein Schreibrecht) fuehrte STILL zu einem ungesperrten Volllauf.
+# Genau das, was der Kommentar oben „schlimmer als keine Sperre" nennt. Jetzt
+# wie in verify_loop.ps1: laut abbrechen (Exit 2), Pfad und Grund nennen, und
+# NICHT warten. Wer bewusst ungesperrt fahren will, hat LIGHTOS_VERIFY_NOLOCK —
+# das sagt es dann wenigstens an. Der Fall „kein flock" bleibt beim Hinweis:
+# dort fehlt das Werkzeug, nicht der Pfad, und das ist keine Fehlbedienung.
+#
+# ★ Nebenbefund beim Umbau: das alte `exec 9>… 2>/dev/null` war nicht nur still
+# im Fehlerfall. `exec` macht JEDE Umlenkung dauerhaft — auch `2>/dev/null`.
+# Jeder gesperrte Volllauf schrieb damit ab hier stderr ins Leere (gemessen:
+# `bash -c 'exec 9>f 2>/dev/null; echo x >&2'` gibt nichts aus). Darum wird das
+# Oeffnen zuerst in einer Unterschale geprobt, die den Fehlertext einfaengt,
+# und die echte Belegung danach OHNE stderr-Umlenkung gemacht.
 _verify_lock() {
     [ "$#" -gt 0 ] && return 0                      # gezielter Lauf: keine Sperre
-    [ -n "${LIGHTOS_VERIFY_NOLOCK:-}" ] && return 0
+    if [ -n "${LIGHTOS_VERIFY_NOLOCK:-}" ]; then
+        echo "[verify] Hinweis: LIGHTOS_VERIFY_NOLOCK gesetzt — die volle Suite laeuft UNGESPERRT."
+        return 0
+    fi
     command -v flock >/dev/null 2>&1 || {
         echo "[verify] Hinweis: kein flock — parallele Suiten sind nicht gesperrt"
         return 0
     }
-    exec 9>"$LOCKFILE" 2>/dev/null || return 0
+    if [ -n "${LIGHTOS_LOCKFILE:-}" ]; then
+        echo "[verify] Hinweis: Sperrdatei per LIGHTOS_LOCKFILE umgelenkt: $LOCKFILE"
+    fi
+    local _fehler
+    if ! _fehler="$( { exec 9>>"$LOCKFILE"; } 2>&1 )"; then
+        echo "[verify] FEHLER: Sperrdatei nicht benutzbar: $LOCKFILE"
+        echo "[verify]        ${_fehler:-unbekannter Fehler beim Oeffnen}"
+        echo "[verify]        Pfad pruefen (LIGHTOS_LOCKFILE?) — hier wird NICHT gewartet."
+        echo "[verify]        Bewusst ungesperrt fahren: LIGHTOS_VERIFY_NOLOCK=1"
+        exit 2
+    fi
+    exec 9>"$LOCKFILE"
     if ! flock -n 9; then
         echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."
         flock 9
