@@ -211,6 +211,18 @@ def test_kaputte_ablage_stoert_nicht(prefs):
     assert sp.sizes()[1] >= 330
 
 
+def test_fehler_beim_speichern_im_log_format(monkeypatch, capsys):
+    """Codex-Review #1082 (CDX-59): Fehler im Log als ``[modul] ERROR: …``
+    (AGENTS.md)."""
+    def kaputt(_werte):
+        raise OSError("Platte voll")
+    monkeypatch.setattr(PV, "_save_prefs", kaputt)
+    SE._speichere_prefs({SE.PREF_BREITE: 300})
+    zeile = capsys.readouterr().out.strip()
+    assert zeile.startswith("[spalte_einklappen] ERROR: "), zeile
+    assert "Platte voll" in zeile
+
+
 def test_gemerkte_breite_ueber_der_hoechstbreite_wird_begrenzt(prefs):
     """Ein zu grosser gemerkter Wert darf weder einen leeren Streifen neben
     der Spalte lassen noch der Ansicht die Breite nehmen."""
