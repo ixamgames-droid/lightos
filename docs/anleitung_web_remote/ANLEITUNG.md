@@ -5,6 +5,9 @@
 > zehn **Executor-Fader** (Ex 1–10) — alles über den Browser, ohne App-Installation.
 > Voraussetzung: Handy und PC hängen im **selben WLAN/LAN**.
 >
+> Wer **eigene** Tasten, Fader und Cuelisten aus der virtuellen Konsole aufs Handy
+> legen will, nimmt die **Handy-Konsole** — siehe [Abschnitt 5](#5-handy-konsole--eigene-tasten-fader-und-cuelisten-aufs-handy-web-09).
+>
 > **Internet braucht das Handy nicht:** Die Seite kommt vollständig vom LightOS-PC,
 > auch ihre Verbindungs-Bibliothek (socket.io). Ein reines Technik-WLAN ohne
 > Internetzugang genügt (WEB-06).
@@ -167,11 +170,149 @@ Seit 2026-07 ist das Web-Remote **per Default abgesichert** (Design-Entscheidung
 
 ---
 
+## 5. Handy-Konsole — eigene Tasten, Fader und Cuelisten aufs Handy (WEB-09)
+
+Die feste Seite aus Abschnitt 3 kennt nur GO, Blackout und die Executor-Fader.
+Die **Handy-Konsole** zeigt stattdessen **deine** Elemente aus der virtuellen
+Konsole: Tasten, Fader und Cuelisten als **Verknüpfungen**. Das Handy drückt
+dabei das Original — gleiche Funktion, gleicher Zustand, auch wenn das Element
+auf einer anderen Bank oder in einem Kasten liegt. Nichts wird doppelt
+programmiert.
+
+### Einrichten
+
+1. **Handy-Konsole bauen:** In der virtuellen Konsole die Seitenleiste
+   **„📱 Handy-Konsole"** einblenden (Knopf in der Werkzeugleiste),
+   **„Bearbeiten"** einschalten und die Elemente hineinlegen — Schritt für
+   Schritt im Abschnitt [Handy-Konsole bauen](#handy-konsole-bauen-web-10)
+   weiter unten. Am schnellsten geht der Anfang mit **„Automatisch füllen"**.
+2. **Einschalten:** in der Seitenleiste oben den Schalter **„Handy-Konsole:
+   aus/an"** umlegen — oder **Ausgabe → „Web-Remote: Verbindung & Token…"** →
+   Haken bei **„Handy-Konsole"**. Beides ist dieselbe Einstellung; Standard ist
+   **aus**. Den Link fürs Handy (`http://<PC-IP>:5000/konsole?k=<token>`) zeigt
+   der Dialog, den **„Verbinden…"** in der Seitenleiste öffnet.
+3. **Am Handy öffnen** und als Lesezeichen bzw. auf den Startbildschirm legen.
+   Die feste Seite zeigt oben rechts zusätzlich **„Handy-Konsole ▸"**, solange
+   die Konsole eingeschaltet ist.
+
+Die Handy-Seiten gehören zur Show: sie werden mit der Show gespeichert und
+gehen auch bei **„Canvas exportieren…/importieren…"** mit. Eine Show von früher
+lädt unverändert — sie hat einfach noch keine Handy-Seiten. Löschst du ein
+Element in der Konsole, verschwindet seine Verknüpfung; machst du das Löschen
+rückgängig, ist auch die Verknüpfung wieder da.
+
+### Handy-Konsole bauen (WEB-10)
+
+Die Seitenleiste **„📱 Handy-Konsole"** zeigt das Handy im Hochformat als
+**Raster aus 4 Spalten × 10 Zeilen** — so, wie es am Handy aussieht —, darunter
+fest **Master** und **BLACKOUT** (die liegen am Handy immer unten und lassen
+sich nicht belegen). Was du hier ablegst, sind **Verknüpfungen**: das Element
+in der großen Konsole bleibt, wo es ist, und behält seine Funktion.
+
+1. **Leiste einblenden:** In der Werkzeugleiste der virtuellen Konsole auf
+   **„📱 Handy-Konsole"** drücken. Die Leiste erscheint rechts neben der
+   Konsole. Ohne „Bearbeiten" ist sie eine **Vorschau**; zum Bauen
+   **„Bearbeiten"** einschalten.
+2. **Element ablegen** — zwei Wege:
+   - **Ziehen:** das Element in der Konsole anfassen und in die Leiste ziehen.
+     Die Zielzelle wird **grün** umrandet (frei) oder **rot** (belegt bzw.
+     nicht möglich). Loslassen legt die Verknüpfung ab; das Element selbst
+     springt an seinen Platz zurück.
+   - **Rechtsklick → „📱 Auf Handy-Konsole legen":** legt es auf den nächsten
+     freien Platz der Seite, die die Leiste gerade zeigt. Ist die Seite voll,
+     kommt es auf die nächste, notfalls auf eine neue.
+
+   Aufs Handy können **Tasten, Fader und Cuelisten**. Bei allem anderen
+   (XY-Pad, Drehregler, Anzeigen, Kästen …) und bei **Laser-Muster-Tasten** ist
+   der Menüpunkt **ausgegraut** und der Grund steht darunter.
+3. **Anordnen:** eine Kachel im Raster anfassen und **verschieben**. Auf ein
+   belegtes Feld lässt sie sich nicht legen.
+4. **Größe ändern:** die Kachel am **Griff unten rechts** ziehen (er erscheint,
+   sobald die Kachel angeklickt ist).
+
+   | Art | kleinste … größte Größe (Spalten × Zeilen) |
+   |---|---|
+   | Taste | 1 × 1 … 4 × 2 |
+   | Fader senkrecht | 1 × 2 … 1 × 5 |
+   | Fader waagerecht | 2 × 1 … 4 × 1 (in **einer** Zeile nach rechts ziehen) |
+   | Cueliste | 4 × 2 … 4 × 4 (immer volle Breite) |
+5. **Herunternehmen:** Kachel anklicken und **Entf** drücken, oder Rechtsklick
+   → **„Von der Handy-Konsole nehmen"**. Das löscht nur die Verknüpfung, nie das
+   Element in der Konsole.
+6. **Seiten:** über dem Raster stehen die Reiter. **„+"** legt eine Seite an
+   (höchstens 12), **„−"** löscht die gezeigte Seite (Rückfrage, wenn etwas
+   darauf liegt). **Doppelklick** auf einen Reiter benennt um, **Ziehen**
+   ändert die Reihenfolge. Ein Element darf auf **mehreren Seiten** liegen
+   (zum Beispiel der Master-Fader), je Seite aber nur einmal — dafür die
+   Seite zuerst über ihren Reiter wählen.
+7. **„Automatisch füllen"** legt alle fernbedienbaren Elemente auf einmal ab:
+   Cuelisten oben (4 × 3 Felder), darunter die Tasten (1 Feld; lange
+   Beschriftungen und Not-Tasten 2 Felder breit), dann die Fader senkrecht
+   nebeneinander (1 × 3 Felder) und eine Blackout-Taste über die volle Breite
+   ganz unten; was nicht passt, kommt auf die nächste Seite. Gibt es schon
+   Seiten, werden sie nach einer Rückfrage **ersetzt**. **„Alles leeren"**
+   entfernt alle Handy-Seiten (ebenfalls mit Rückfrage).
+8. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
+   aus/an"**, darunter der Zustand (**aus** · **an · 0 Handys verbunden** ·
+   **an · 2 Handys verbunden**). **„Verbinden…"** öffnet den Dialog mit Link
+   und Schlüssel. Der Schalter geht auch ohne „Bearbeiten" — die Handy-Konsole
+   lässt sich so jederzeit mit einem Griff ausschalten.
+
+Jeder Schritt ist **ein** Rückgängig-Schritt (**Strg+Z**, wiederholen mit
+**Strg+Y**). Ein **verbundenes Handy** zeigt jede Änderung sofort, ohne
+Nachladen. Elemente, die auf einer Handy-Seite liegen, tragen im
+Bearbeiten-Modus in der großen Konsole ein kleines **grünes Handy-Abzeichen**
+oben rechts.
+
+### Bedienen
+
+| Element | Am Handy |
+|---|---|
+| **Taste** | Antippen löst aus. Der Zustand kommt vom Pult zurück: läuft die Funktion, leuchtet die Taste in ihrer Farbe aus der Konsole. Tasten mit dem Zusatz **„halten"** (Flash, „nur gehalten", Blackout, Alles Weiß) wirken, solange der Finger darauf liegt. |
+| **Fader** | Senkrecht, mit Prozentanzeige. Gezogen wird **relativ**: ein versehentliches Antippen verstellt nichts. Bewegt jemand den Fader am Pult, wandert er am Handy mit. |
+| **Cueliste** | Laufende Cue, die nächste Cue und **GO / BACK / STOP** — für genau diese Cueliste (nicht die „GO-Zielliste" der festen Seite). |
+| **Master + BLACKOUT** (unten, immer da) | Grand Master als Fader; **BLACKOUT** schaltet um (antippen = dunkel, noch einmal = hell) und leuchtet rot, solange das Pult dunkel ist. |
+| **Seiten** | Reiter oben, oder auf freier Fläche seitlich wischen. |
+
+Oben rechts steht die Verbindung: **verbunden** (grün) oder **getrennt** (rot).
+Solange das Handy getrennt ist, ist die Bedienung **gesperrt** — nichts wird
+„blind" gedrückt und später nachgeholt. Sobald die Verbindung wieder steht,
+gleicht das Handy den ganzen Zustand neu ab.
+
+### Was dabei zur Sicherheit gilt
+
+- **Nur was auf einer Handy-Seite liegt**, ist vom Handy aus zu sehen und zu
+  bedienen. Alles andere beantwortet der Server mit **403** — auch wenn jemand
+  die Kennung eines Elements kennt.
+- **Gehaltene Tasten werden losgelassen**, wenn die Verbindung abreißt (WLAN
+  weg, Seite geschlossen, Akku leer), wenn du die Handy-Konsole ausschaltest,
+  den Schlüssel neu erzeugst oder das Web-Interface stoppst. Eine Flash-Taste
+  bleibt so nicht hängen.
+- Es gilt **derselbe Schlüssel** wie für die feste Seite. Er wird beim Verbinden
+  geprüft und bei jeder einzelnen Bedienung noch einmal; nach „Token neu
+  erzeugen" kann auch ein noch verbundenes Handy nichts mehr auslösen.
+- **Laser:** Scharf geschaltet wird ein Laser nur am Pult — vom Handy aus geht
+  nur „unscharf". Laser-Muster lassen sich nicht aufs Handy legen. Den
+  **Laser-NOT-AUS** kann das Handy auslösen, aber nie aufheben, auch nicht über
+  einen Fader oder eine Farb-Taste, die Laser-Werte setzt.
+- Die Seite kommt vollständig vom LightOS-PC und braucht **kein Internet**.
+
+Technik in Kürze: Seite `GET /konsole`, Stand `GET /api/vc/konsole`, Bedienung
+über die Socket-Verbindung (`vc_hallo`, `vc_aktion`, `vc_pult`; Rückmeldung
+`vc_konsole`, `vc_zustand`, höchstens zehnmal je Sekunde) — die Adressen
+`POST /api/vc/widget/<Kennung>/aktion` und `POST /api/vc/pult` gibt es
+zusätzlich. Wer über diese HTTP-Adressen eine Halte-Taste drückt, muss sie
+selbst wieder loslassen; das automatische Loslassen hängt an der
+Socket-Verbindung.
+
+---
+
 ## Kurz-Referenz
 
 1. **Ausgabe → „Web-Interface (Port 5000)"** anhaken → Server läuft auf `0.0.0.0:5000`.
 2. PC-LAN-IP per `ipconfig` holen → am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Token/Direkt-Link aus dem Verbindungs-Dialog, gleiches WLAN).
 3. **GO/BACK/STOP** = Cueliste · **Blackout** = alles dunkel (Toggle) · **Fader Ex 1–10** = Executor-Pegel.
 4. **Token-geschützt** (`?k=…`, ohne → 403) + CORS-Allowlist; Token ist ein **geteiltes** Setup-Geheimnis → nur im vertrauenswürdigen Netz nutzen, danach ausschalten.
+5. **Handy-Konsole** (eigene Tasten/Fader/Cuelisten): VC → **„📱 Handy-Konsole"** → Bearbeiten → Elemente hineinziehen oder **„Automatisch füllen"**, Schalter **„Handy-Konsole: an"** → am Handy `http://<PC-IP>:5000/konsole?k=<token>` (Link unter **„Verbinden…"**).
 
 Zurück zur Übersicht: [../ANLEITUNGEN.md](../ANLEITUNGEN.md)

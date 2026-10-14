@@ -12,6 +12,9 @@
            display: flex; align-items: center; gap: 12px; }
   header h1 { font-size: 18px; font-weight: 700; color: #58a6ff; }
   #status { font-size: 11px; color: #8b949e; }
+  .konsole-link { margin-left: auto; color: #58a6ff; font-size: 13px; font-weight: 700;
+                  text-decoration: none; border: 1px solid #1f4a80; background: #12233b;
+                  border-radius: 14px; padding: 6px 12px; white-space: nowrap; }
   main { flex: 1; padding: 16px; display: grid; gap: 16px;
          grid-template-columns: 1fr 1fr; }
   section { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 16px; }
@@ -49,6 +52,8 @@
 <header>
   <h1>⚡ LightOS Remote</h1>
   <span id="status">Verbinde...</span>
+  {# WEB-09: Verweis auf die Handy-Konsole — nur wenn sie eingeschaltet ist. #}
+  {% if konsole_an %}<a class="konsole-link" href="/konsole">Handy-Konsole ▸</a>{% endif %}
 </header>
 <main>
   <section>

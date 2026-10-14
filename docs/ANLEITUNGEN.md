@@ -90,7 +90,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [Testshow mit Live-Edit-Widget](anleitung_testshow_liveedit/ANLEITUNG_TESTSHOW_LIVEEDIT.md) | Eine Test-Show mit drei Seiten aufbauen und Effekte im Live-Edit-Widget feintunen. | Die Anleitung baut die Show selbst auf; die fertige Show liegt nicht im Repo |
 | [Bilder und GIFs auf VC-Tasten](anleitung_grosse_demo_2026/ANLEITUNG_GROSSE_DEMO_2026.md) | Rundgang durch eine große Demo-Show und Tasten-Hintergründe über das Rechtsklick-Menü. | Generator `build_grosse_demo_show_2026.py` → `Grosse Demo Show 2026.lshow` |
 | [APC mini mappen](anleitung_apc_mapping/ANLEITUNG_APC.md) | VC-Elemente auf Pads und Fader legen (MIDI-Lernen), LED-Feedback. | Keine Show nötig |
-| [Web-Remote — das Handy als Konsole](anleitung_web_remote/ANLEITUNG.md) | Web-Interface starten, LAN-Adresse finden, GO/BACK/STOP, Blackout und Fader im Browser. | Keine Show nötig |
+| [Web-Remote — das Handy als Konsole](anleitung_web_remote/ANLEITUNG.md) | Web-Interface starten, LAN-Adresse finden, GO/BACK/STOP, Blackout und Fader im Browser; Handy-Konsole mit eigenen Tasten, Fadern und Cuelisten aus der virtuellen Konsole. | Keine Show nötig |
 
 ## Musik & BPM
 
