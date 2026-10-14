@@ -90,6 +90,14 @@ _ENTFERNT = {
     "Audio Input": ("2026-09-14 (BPM-10)",
                     "Sektion BPM → Erkennung: Quelle-Combo (PC-Audio je Ausgabegeraet, "
                     "Eingang je Geraet) und Pegelmeter unter der BPM-Zahl"),
+    # ENG-35 (2026-10-13): das Zahlenfeld im Matrix- und im Bewegungs-Editor ist
+    # durch das Auswahlfeld „Stufe" ersetzt. ★ MIT den Markdown-Sternchen: so
+    # nennen Anleitungen ein Bedienelement. Ohne sie traefe das Gate auch den
+    # Begriff „Effect-Layer-Priorität" in docs/OPEN_POINTS_OVERVIEW.md — dort
+    # ist das Vorhaben gemeint, nicht das Feld.
+    "**Layer-Priorität**": ("2026-10-13 (ENG-35)",
+                            "Auswahlfeld 'Stufe' (Grundlicht … Notfall), "
+                            "docs/anleitung_prioritaeten/ANLEITUNG.md"),
     # NICHT aufgenommen: „Controller-Vorlage". Weggefallen ist der gleichnamige
     # BAUKASTEN-BLOCK; der Begriff selbst steht noch in Anleitungen, die
     # erklaeren, dass es den Weg nicht mehr gibt. ★ UI-71: die Annahme, „die

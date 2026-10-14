@@ -602,7 +602,14 @@ class MainWindow(QMainWindow):
     def _auto_connect_midi(self):
         """Öffnet automatisch alle verfügbaren MIDI-Eingänge, damit Controller
         (z.B. APC mini) ohne manuelles 'Input öffnen' in der MIDI-Ansicht
-        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC."""
+        reagieren — Voraussetzung für MIDI-Teach und Live-Feedback der VC.
+
+        TOOL-27: ``LIGHTOS_NO_MIDI_AUTOCONNECT=1`` schaltet das ab. Werkzeuge,
+        die ein Hauptfenster in ihrer Sandbox bauen, sollen die MIDI-Geräte des
+        Rechners nicht von selbst öffnen (unter Windows sind Eingänge exklusiv
+        — die laufende App bekäme ihren Controller nicht mehr)."""
+        if os.environ.get("LIGHTOS_NO_MIDI_AUTOCONNECT"):
+            return
         try:
             from src.core.midi.midi_manager import get_midi_manager
             mm = get_midi_manager()
@@ -1287,6 +1294,14 @@ class MainWindow(QMainWindow):
             tabs.addTab(self._preset_browser_view, "Preset-Browser")
         except Exception as e:
             print(f"[main_window] PresetBrowserView init error: {e}")
+        # ENG-35: Uebersicht „welcher Effekt gewinnt“ — bei den Effekten, als
+        # weiterer Uebersichts-Reiter neben Snapshots und Preset-Browser.
+        try:
+            from src.ui.views.prioritaeten_view import PrioritaetenView
+            self._prioritaeten_view = PrioritaetenView()
+            tabs.addTab(self._prioritaeten_view, "Prioritäten")
+        except Exception as e:
+            print(f"[main_window] PrioritaetenView init error: {e}")
         return tabs
 
     def _build_section_playback(self) -> QWidget:
@@ -1602,6 +1617,11 @@ class MainWindow(QMainWindow):
             return
         u = self._undo_stack.undo_label()
         r = self._undo_stack.redo_label()
+        # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
+        # ein einzelnes „&“ laese das Menue als Tastenkuerzel-Zeichen.
+        from src.ui.menue_text import menue_text
+        u = menue_text(u) if u else u
+        r = menue_text(r) if r else r
         self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
         self._act_undo.setEnabled(self._undo_stack.can_undo())
         self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")
