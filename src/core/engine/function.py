@@ -132,6 +132,10 @@ class Function:
         self.modify: bool = False
         self.modify_mode: str = "add"        # "add" | "sub" | "dim"
         self.modify_strength: int = 100      # Prozent 0..100
+        # ENG-40: Kanalwahl eines Farb-Modify („Wirkt auf"). Leer = Vorgabe:
+        # die Modify-Farbe bestimmt die Kanaele. Sonst Kurzzeichen aus
+        # modify.MODIFY_KANAELE ("r","g","b","w","a","uv").
+        self.modify_channels: tuple = ()
         # ARC-04: zeitbasierte Ein-/Ausblend-Huellkurve (Sekunden, 0 = aus). Wirkt als
         # Output-Multiplikator ueber ALLE Kanaele der Funktion (nicht nur Dimmer),
         # angewandt im FunctionManager.tick. Eigene Namen (env_*), um Scene.fade_in
@@ -495,7 +499,7 @@ class Function:
 
         Basis-Fassung: nein. Der Haken ``modify`` allein genuegt nicht — nur
         Funktionstypen, die das Verrechnen ausdruecklich unterstuetzen,
-        ueberschreiben das (Schritt 1: Matrix im Stil Dimmer)."""
+        ueberschreiben das (Matrix in den Stilen Dimmer, RGB, RGBW)."""
         return False
 
     def to_dict(self) -> dict:
@@ -524,6 +528,11 @@ class Function:
             d["modify_mode"] = self.modify_mode
         if getattr(self, "modify_strength", 100) != 100:
             d["modify_strength"] = self.modify_strength
+        # ENG-40: Kanalwahl nur schreiben, wenn eine getroffen ist.
+        from .modify import normalize_channels
+        _kan = normalize_channels(getattr(self, "modify_channels", ()))
+        if _kan:
+            d["modify_channels"] = list(_kan)
         return d
 
     @classmethod
