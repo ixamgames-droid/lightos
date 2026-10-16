@@ -421,6 +421,30 @@ def _register_routes(app):
         _get_state().clear_programmer()
         return jsonify({"ok": True})
 
+    # ── WEB-08: VC-Widgets ueber ihre Kennung ─────────────────────────────────
+    # Grundlage der Handy-Konsole (WEB-07). Beide Routen liegen hinter demselben
+    # Schluessel-Gate wie alles unter /api/ (``_auth_gate`` kennt nur '/' und
+    # '/static/' als Ausnahmen). Zusaetzlich standardmaessig AUS
+    # (``remote_settings.vc_remote_enabled``): ohne Auswahl, welche Widgets aufs
+    # Handy duerfen, gaebe die Schnittstelle sonst jedes fernbedienbare frei.
+    # Die Aktion laeuft im UI-Thread (``VCFernbedienung``), nie hier.
+
+    @app.route("/api/vc/widgets")
+    def api_vc_widgets():
+        from src.web import vc_remote
+        return jsonify(vc_remote.widget_liste())
+
+    @app.route("/api/vc/widget/<kennung>/aktion", methods=["POST"])
+    def api_vc_widget_aktion(kennung: str):
+        from src.web import vc_remote
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            antwort = {"ok": False, "fehler": "anfrage_ungueltig"}
+        else:
+            antwort = vc_remote.widget_aktion(kennung, data.get("aktion"),
+                                              data.get("wert"))
+        return jsonify(antwort), vc_remote.status_fuer(antwort)
+
 
 def _register_socketio(sio):
 
