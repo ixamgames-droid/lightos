@@ -199,7 +199,7 @@ Bei Crash/Fehler: Bug in `SHOW_2026_BUGLOG.md`, sofort fixen, weiter (autonom).
 - ✅ **base_levels** PAR(1-8)+Spider(11,12)=255 gesetzt (Plan §1). Dimmer-2× (drive_intensity) überschreibt pro Frame.
 - ✅ **Playlist** (5 Hardstyle/Frenchcore/Bounce-Tracks aus `Desktop/Musik/BP Party`, abs. Pfade) in der Show.
 - ✅ **Auto-Show live verifiziert:** VC-Media ▶ startet Musik + `music_autoshow=[1,2,3]`; Audio-BPM-Erkennung sprang an (~145–165 zur Musik); Playlist läuft selbsttätig weiter.
-- ✅ **GIF** der laufenden Show (`docs/anleitung_vc/gif/hardstyle_show_live.gif`) + **APC-MIDI-Teach-Dialog** bebildert (`img/14`, ANLEITUNG_VC §5: Grid 0–63, Track 64–71, Scene 82–89, Fader CC48–56).
+- ✅ **GIF** der laufenden Show (`docs/anleitung_vc/gif/hardstyle_show_live.gif`) + **APC-MIDI-Teach-Dialog** bebildert (`img/14`, ANLEITUNG_VC §5: Grid 0–63, Track 64–71, Scene 82–89, Fader CC48–56). *(Stand 2026-10: GIF und `img/14` sind mit DOC-16 entfernt; die VC-Anleitung zeigt jetzt die Doku-Demo, MIDI Teach in `img/09_midi_teach.png`.)*
 - ⏭️ Zurückgestellt: 3D-Visualizer-GIF (PARs mit laufendem Dimmer zu dunkel) · APC-Hardware-Bindung (Gerät nötig) · ggf. fester MH-Grundton falls strikter Takeover gewünscht (§6b).
 
 ### Authoring-Lehren (2026-06-16)
