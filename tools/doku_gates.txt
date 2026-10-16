@@ -100,3 +100,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_undo_coverage.py             # nennt docs/UNDO_COVERAGE.md nur in Meldungen
 !test_vc_widgets_showcase_layout.py # liest nur docs/.../geometry.json (keine Doku -> volle Suite)
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
+test_imp3_dialog_und_patch.py      # Anleitung Patch & Gruppen: Knopf „Tabellen-Import ▾“, Eingabetaste, doppelte Namen
