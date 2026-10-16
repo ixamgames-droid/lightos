@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTabWidget, QSizePolicy, QFrame,
     QMenu, QSlider, QInputDialog,
 )
-from PySide6.QtCore import Qt, QSize, QTimer, Signal
+from PySide6.QtCore import Qt, QEvent, QSize, QTimer, Signal
 from PySide6.QtGui import (
     QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter, QShortcut,
 )
@@ -34,6 +34,7 @@ from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
 from src.ui.weak_slots import weak_slot
+from src.ui import undo_kuerzel
 
 
 # Recent files storage
@@ -464,6 +465,9 @@ class _SectionBar(QWidget):
 
 
 class MainWindow(QMainWindow):
+    # UI-93: dieses Fenster verteilt Rueckgaengig/Wiederholen selbst (event());
+    # eingebettete Ansichten schalten ihre eigenen Kuerzel dafuer ab.
+    UNDO_KUERZEL_ZENTRAL = True
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
     _bpm_changed_sig = Signal(float)
     # Modus/Quelle/Lock-Aenderung des BPM-Leaders -> Badge in der Top-Bar.
@@ -706,11 +710,16 @@ class MainWindow(QMainWindow):
         # Bearbeiten (Undo/Redo)
         em = mb.addMenu("&Bearbeiten")
         self._act_undo = em.addAction("Rückgängig")
-        self._act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        # UI-93: feste Belegung statt StandardKey — setShortcut(StandardKey.Redo)
+        # nahm nur die ERSTE Bindung der Plattform, unter X11 fehlte Strg+Y.
+        self._act_undo.setShortcuts(undo_kuerzel.undo_folgen())
         self._act_undo.triggered.connect(self._do_undo)
-        self._act_redo = em.addAction("Wiederherstellen")
-        self._act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        self._act_redo = em.addAction("Wiederholen")
+        self._act_redo.setShortcuts(undo_kuerzel.redo_folgen())
         self._act_redo.triggered.connect(self._do_redo)
+        # UI-93: der Layout-Verlauf der Virtual Console meldet sich nicht von
+        # selbst — vor dem Aufklappen nachsehen, welcher Schritt der naechste ist.
+        em.aboutToShow.connect(self._refresh_undo_labels)
         em.addSeparator()
         a = em.addAction("Verlauf löschen")
         a.triggered.connect(self._clear_undo_history)
@@ -1157,6 +1166,11 @@ class MainWindow(QMainWindow):
         # ── Stacked Widget ─────────────────────────────────────────────────────
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
+        # UI-93: welcher Schritt als naechster dran ist, haengt davon ab, ob die
+        # Virtual Console zu sehen ist — beim Wechsel der Ansicht nachziehen
+        # (der Text der Menuepunkte steht auch in Hilfe → Tastenkürzel).
+        self._stack.currentChanged.connect(
+            lambda _i: self._refresh_undo_labels())
         # Nachtrag 2: Banner UND eingeklappter Chip haengen am Stapel.
         self._ausgabe_banner.ueberlagere(self._stack)
 
@@ -1601,37 +1615,127 @@ class MainWindow(QMainWindow):
 
     # ── Undo/Redo ─────────────────────────────────────────────────────────────
 
+    def event(self, ev):
+        # UI-93: Strg+Z / Strg+Y / Strg+Umschalt+Z gehen zuerst an ein
+        # Textfeld mit Fokus; bei sichtbarer Virtual Console dann an den
+        # gemeinsamen Verlauf (Layout der Konsole UND Bearbeiten → Rückgängig,
+        # in zeitlicher Reihenfolge) — sonst an Bearbeiten → Rückgängig.
+        # Vorher lagen dieselben Folgen doppelt im Fenster (Menue +
+        # VC-QShortcut); Qt wertet das als mehrdeutig und loest dann KEINE aus.
+        if (ev.type() == QEvent.Type.ShortcutOverride
+                and undo_kuerzel.vorrang(self, ev, self._lokales_undo)):
+            return True
+        return super().event(ev)
+
+    #: So heisst ein Layout-Schritt der Virtual Console im Menue und in der
+    #: Statuszeile (der Layout-Verlauf kennt nur Schnappschuesse, keine Namen).
+    VC_SCHRITT = "Layout der Virtual Console"
+
+    def _vc_verlauf(self):
+        """Zeichenflaeche der Virtual Console, wenn sie die sichtbare Seite
+        dieses Fensters ist — sonst None. Die Zeichenflaeche nimmt keinen
+        Tastaturfokus, deshalb entscheidet die Sichtbarkeit, nicht der Fokus."""
+        vc = getattr(self, "_vc_view", None)
+        try:
+            if (vc is None or not vc.isVisible() or vc.window() is not self
+                    or not vc._canvas_alive()):
+                return None
+            return vc._canvas
+        except RuntimeError:        # Ansicht schon abgebaut
+            return None
+
+    def _naechster_verlauf(self, wiederholen: bool):
+        """Welcher Schritt ist als naechster dran? ``(quelle, name)`` mit
+        ``quelle`` = ``"app"`` | ``"vc"`` | ``None``.
+
+        UI-93 (Entscheidung des Betreibers, 13.10.): bei sichtbarer Virtual
+        Console sind Layout-Verlauf und App-Verlauf fuer den Bediener EIN
+        Verlauf. Zurueckgenommen wird der zuletzt GEMACHTE Schritt, wiederholt
+        der zuletzt ZURUECKGENOMMENE — die Reihenfolge liefern die gemeinsamen
+        Schrittnummern aus ``src/core/undo.py``. Ist die Virtual Console nicht
+        zu sehen, gilt nur der App-Verlauf: ein Strg+Z im Patch soll kein
+        Layout umbauen, das gerade niemand sieht.
+        """
+        app = getattr(self, "_undo_stack", None)
+        canvas = self._vc_verlauf()
+        a = v = None
+        if app:
+            a = app.redo_marke() if wiederholen else app.undo_schritt()
+        if canvas is not None:
+            v = canvas.redo_marke() if wiederholen else canvas.undo_schritt()
+        if a is None and v is None:
+            return None, None
+        if v is None or (a is not None and a > v):
+            return "app", (app.redo_label() if wiederholen else app.undo_label())
+        return "vc", self.VC_SCHRITT
+
+    def verlauf_schritt(self, wiederholen: bool) -> bool:
+        """Den naechsten Schritt zuruecknehmen bzw. wiederholen.
+
+        DIE eine Stelle fuer Taste, Menuepunkt und die ↶/↷-Knoepfe der
+        Virtual Console — alle drei geben deshalb dieselbe Antwort.
+        """
+        quelle, name = self._naechster_verlauf(wiederholen)
+        ok = False
+        if quelle == "app":
+            ok = (self._undo_stack.redo() if wiederholen
+                  else self._undo_stack.undo())
+        elif quelle == "vc":
+            canvas = self._vc_verlauf()
+            if canvas is not None:
+                (canvas.redo if wiederholen else canvas.undo)()
+                ok = True
+        if ok:
+            wort = "Wiederholt" if wiederholen else "Rückgängig"
+            self.statusBar().showMessage(
+                f"{wort}: {name}" if name else wort, 1500)
+        self._refresh_undo_labels()
+        return ok
+
+    def _lokales_undo(self, wiederholen: bool) -> bool:
+        """Tastenkuerzel bei sichtbarer Virtual Console; True = war zustaendig.
+
+        Die Kuerzel der Menuepunkte ruhen, solange es im App-Verlauf nichts
+        gibt — der gemeinsame Verlauf kann dann trotzdem einen Layout-Schritt
+        haben. Deshalb nimmt das Fenster den Tastendruck hier selbst.
+        """
+        if self._vc_verlauf() is None:
+            return False
+        self.verlauf_schritt(wiederholen)
+        return True
+
     def _do_undo(self):
-        if self._undo_stack:
-            ok = self._undo_stack.undo()
-            if ok:
-                self.statusBar().showMessage("Rückgängig", 1500)
+        self.verlauf_schritt(False)
 
     def _do_redo(self):
-        if self._undo_stack:
-            ok = self._undo_stack.redo()
-            if ok:
-                self.statusBar().showMessage("Wiederhergestellt", 1500)
+        self.verlauf_schritt(True)
 
     def _clear_undo_history(self):
         if self._undo_stack:
             self._undo_stack.clear()
-            self.statusBar().showMessage("Rückgängig-Verlauf geleert", 1500)
+        # UI-93: ein Verlauf fuer den Bediener — das Layout der Virtual
+        # Console gehoert dazu, auch wenn sie gerade nicht zu sehen ist.
+        try:
+            self._vc_view._canvas.verlauf_leeren()
+        except (AttributeError, RuntimeError):
+            pass
+        self.statusBar().showMessage("Rückgängig-Verlauf geleert", 1500)
+        self._refresh_undo_labels()
 
     def _refresh_undo_labels(self):
-        if not getattr(self, "_undo_stack", None):
+        if not hasattr(self, "_act_undo"):
             return
-        u = self._undo_stack.undo_label()
-        r = self._undo_stack.redo_label()
+        quelle_u, u = self._naechster_verlauf(False)
+        quelle_r, r = self._naechster_verlauf(True)
         # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
         # ein einzelnes „&“ laese das Menue als Tastenkuerzel-Zeichen.
         from src.ui.menue_text import menue_text
         u = menue_text(u) if u else u
         r = menue_text(r) if r else r
         self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
-        self._act_undo.setEnabled(self._undo_stack.can_undo())
-        self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")
-        self._act_redo.setEnabled(self._undo_stack.can_redo())
+        self._act_undo.setEnabled(quelle_u is not None)
+        self._act_redo.setText(f"Wiederholen: {r}" if r else "Wiederholen")
+        self._act_redo.setEnabled(quelle_r is not None)
 
     # ── Grand Master / BPM ────────────────────────────────────────────────────
 

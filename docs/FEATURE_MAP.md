@@ -72,7 +72,7 @@ Visualizer als separates Fenster.
 | Menü | Einträge (Kurz) |
 |------|-----------------|
 | **Datei** | Neue Show · Öffnen · Demo-Show öffnen · Speichern · Speichern unter · Zuletzt verwendet · XML-Workspace (.qxw) importieren · Show prüfen & reparieren · Beenden |
-| **Bearbeiten** | Rückgängig · Wiederherstellen · Verlauf löschen (`core/undo.py`) |
+| **Bearbeiten** | Rückgängig · Wiederholen · Verlauf löschen (`core/undo.py`) |
 | **Ansicht** | Alle Views aktualisieren (F5) |
 | **Show** | Cue aufnehmen (R) · Nächste/Vorherige Page |
 | **Programmer** | Highlight (H) · Lowlight (Shift+H) · Programmer leeren (Esc) · Kopieren/Einfügen · Snapshot aufnehmen |
