@@ -2681,21 +2681,47 @@ class AppState:
         gesetzt und gemeldet — ein NOT-AUS darf nicht an einem Folgefehler
         haengen bleiben. Idempotent: bei stehendem Latch schaltet ein weiterer
         Aufruf erneut ab (z. B. einen wieder scharf geschalteten Laser)."""
+        # Jeder Schritt laeuft fuer sich: eine Ausnahme in einem Schritt darf
+        # die folgenden nicht ueberspringen (sonst bliebe ein Netzwerk-Laser
+        # scharf, weil estop_all geworfen hat). Die Geraete-Verriegelung wird
+        # nur geloest, wenn der Manager nachweislich unscharf ist — im Zweifel
+        # bleibt der Laser verriegelt und dunkel.
+        lo = None
         try:
             lo = self.ensure_laser_output()
-            lo.estop_all()
-            lo.set_armed(False)
-            lo.clear_estop_all()
         except Exception as e:
-            print(f"[AppState] Laser-NOT-AUS: Netzwerk-Teil fehlgeschlagen: {e}")
+            print(f"[AppState] Laser-NOT-AUS: Laser-Ausgang nicht verfuegbar: {e}")
+            # Ein Manager, dessen Start gescheitert ist, steht trotzdem hier.
+            lo = getattr(self, "_laser_output", None)
+        verriegelt = False
+        if lo is not None:
+            try:
+                lo.estop_all()
+                verriegelt = True
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: estop_all fehlgeschlagen: {e}")
+            try:
+                lo.set_armed(False)
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Entwaffnen fehlgeschlagen: {e}")
+        if not verriegelt:
             # Latch notfalls direkt (estop_all setzt ihn als Erstes — steht er
             # schon, ist das ein No-Op) und die Anzeige trotzdem benachrichtigen.
-            self.set_laser_estop(True)
+            try:
+                self.set_laser_estop(True)
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Latch nicht gesetzt: {e}")
             try:
                 from .sync import get_sync, SyncEvent
                 get_sync().emit(SyncEvent.LASER_ESTOP, None)
             except Exception:
                 pass
+        if lo is not None and not bool(getattr(lo, "armed", True)):
+            try:
+                lo.clear_estop_all()
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Geraete-Verriegelung "
+                      f"nicht geloest (bleibt dunkel): {e}")
 
     def laser_notaus_loesen(self):
         """LAS-31: den Laser-NOT-AUS bewusst loesen (die Oberflaeche fragt vorher
