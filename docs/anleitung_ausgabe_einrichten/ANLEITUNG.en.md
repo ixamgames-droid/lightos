@@ -351,8 +351,8 @@ kiosk mode). If **no** output is set up at all, a subtle `Probenmodus — es wir
 gesendet` (rehearsal mode — no DMX is being sent) is shown there.
 
 The bar lies **on top of** the upper edge of the view currently shown, directly below the
-bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with the
-laser emergency stop). It does not push anything down: when it appears or disappears, all
+bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with
+the grand master, STOP ALL, BLACKOUT and the laser emergency stop). It does not push anything down: when it appears or disappears, all
 buttons of the Virtual Console and all other controls stay where they are. In return it
 covers a narrow line at the top of the view. A click on the bar does not trigger anything
 underneath it. The bar is always a single line high; a text that is too long is shortened

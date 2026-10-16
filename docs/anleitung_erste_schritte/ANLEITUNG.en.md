@@ -57,7 +57,12 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    without a dimmer may keep emitting; a laser is reliably off only with the **laser
    emergency stop** (LASER NOT-AUS; details in the
    [laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). The
-   button latches; a second click releases the blackout.
+   button latches; a second click releases the blackout. In kiosk mode, where this bar is
+   hidden, **GM**, **STOP ALL** and **BLACKOUT** sit top right in one strip, in this order to the
+   left of **LASER NOT-AUS**. They work like their counterparts in the section bar and show the
+   same state — the GM slider also follows when a VC fader, MIDI or the remote changes the grand
+   master. The mouse wheel does not move the GM there (drag or click it), and the space bar
+   triggers none of the buttons.
    What this looks like in the DMX monitor is shown in
    [Ausgabe einrichten, step 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    To black out only some fixtures or groups, use a

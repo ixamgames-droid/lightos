@@ -50,7 +50,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    denn bei manchen Lasern heißt DMX 0 „Auto“ und würde sie einschalten.
    Kennt das Profil keinen Aus-Wert, strahlt ein Laser ohne Dimmer womöglich
    weiter; sicher aus ist ein Laser nur mit dem **Laser-NOT-AUS**
-   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
+   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf. Im Kiosk-Modus, in dem diese Leiste ausgeblendet ist, stehen **GM**, **STOP ALL** und **BLACKOUT** oben rechts in einem Streifen, in dieser Reihenfolge links neben **LASER NOT-AUS**. Sie wirken wie ihre Gegenstücke in der Sektionsleiste und zeigen denselben Zustand — auch der GM-Regler folgt, wenn ein VC-Fader, MIDI oder die Fernbedienung den Grand Master ändert. Das Mausrad verstellt den GM dort nicht (ziehen oder klicken), und die Leertaste löst keinen der Knöpfe aus.
    Wie das im DMX-Monitor aussieht, zeigt
    [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine

@@ -63,6 +63,7 @@ Visualizer als separates Fenster.
 | BPM-Label + Indikator | BPM-Anzeige (klickbar zum Setzen) + Beat-Blink |
 | STOP ALL | Alle Executors stoppen |
 | BLACKOUT | Globaler Blackout (Toggle) |
+| Kiosk-Streifen oben rechts (LAS-31, UI-95) | Im Kiosk-Modus: Grand Master, STOP ALL, BLACKOUT und LASER NOT-AUS nebeneinander; BLACKOUT und GM zeigen denselben Zustand wie die Sektionsleiste (`output_manager.blackout`, `output_manager.grand_master`), STOP ALL ruft `MainWindow._stop_all` |
 | Command-Line (unten) | MA-/Avolites-Befehlszeile (`widgets/command_line.py`) |
 
 ---
