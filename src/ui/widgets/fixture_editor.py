@@ -987,6 +987,35 @@ class FixtureEditorDialog(QDialog):
             if self._tabs.count() == 0:
                 self._add_mode()
 
+    def _kopie_herkunft(self, s):
+        """UI-82: ``(Original, Herkunft als JSON)`` der Vorlage einer Kopie.
+
+        ``herkunft_fuer`` nimmt eine GUELTIGE gespeicherte Herkunft und leitet
+        sonst aus der Quelle des Originals ab (aeltere Importe, oder nur die
+        FM-63-Bearbeitet-Marke) — als „user“ ginge die Kopie sonst als „eigen“.
+        ``_herkunft_json`` schreibt nur die Herkunftsschluessel: die
+        Bearbeitet-Marke bleibt beim Original. Ein eigenes Profil
+        (``source='user'``) ist immer ableitbar (Herkunft „eigen“).
+
+        Wirft ``ProfilFehler``, wenn die Vorlage fehlt oder ihre Herkunft
+        sich nicht belegen laesst — dann darf keine Kopie entstehen."""
+        from src.core.database import bibliothek_format as BF
+        orig = s.get(FixtureProfile, self._kopie_von)
+        if orig is None:
+            raise BF.ProfilFehler([
+                "Die Vorlage der Kopie steht nicht mehr in der Bibliothek."])
+        return orig, BF._herkunft_json(BF.herkunft_fuer(orig))
+
+    def _kopie_abgelehnt(self, fehler) -> None:
+        """UI-82: Hinweis, warum die Kopie nicht gespeichert wird."""
+        QMessageBox.warning(
+            self, "Kopie nicht möglich",
+            "Die Herkunft der Vorlage lässt sich nicht belegen — eine Kopie "
+            "würde ihre Lizenz- und Herkunftsangabe verlieren. Es wurde "
+            "nichts gespeichert.\n\n" + str(fehler) + "\n\nAbhilfe: die "
+            "Bibliothek aktualisieren oder das Profil neu importieren und "
+            "dann erneut kopieren.")
+
     def _neues_profil(self, s, mfr, name: str) -> FixtureProfile:
         """Neues eigenes Profil (``source='user'``). Ist es die Kopie eines
         anderen Profils, uebernimmt es dessen Herkunft (Lizenz!), Notizen und
@@ -998,19 +1027,12 @@ class FixtureEditorDialog(QDialog):
             fixture_type=self._cb_type.currentText(),
             power_w=self._spin_power.value(), source="user",
         )
-        orig = (s.get(FixtureProfile, self._kopie_von)
-                if self._kopie_von is not None else None)
-        if orig is not None:
-            from src.core.database import bibliothek_format as BF
-            # ``herkunft_fuer`` nimmt eine GUELTIGE gespeicherte Herkunft und
-            # leitet sonst aus der Quelle des Originals ab (aeltere Importe,
-            # oder nur die FM-63-Bearbeitet-Marke) — als „user“ ginge die
-            # Kopie sonst als „eigen“. ``_herkunft_json`` schreibt nur die
-            # Herkunftsschluessel: die Bearbeitet-Marke bleibt beim Original.
-            try:
-                herkunft = BF._herkunft_json(BF.herkunft_fuer(orig))
-            except BF.ProfilFehler:
-                herkunft = ""
+        if self._kopie_von is not None:
+            # UI-82: ohne belegbare Herkunft KEINE Kopie — ``_kopie_herkunft``
+            # wirft ``ProfilFehler``; ``_save`` fragt vorher und schreibt dann
+            # nichts. Frueher fiel die Herkunft hier still auf leer zurueck — die
+            # Kopie galt als „eigen“ und verlor die Lizenz der Vorlage.
+            orig, herkunft = self._kopie_herkunft(s)
             profile.herkunft = herkunft
             profile.notes = orig.notes or ""
             profile.viz_model = orig.viz_model or ""
@@ -1078,6 +1100,17 @@ class FixtureEditorDialog(QDialog):
         if self._nur_ansehen and self._fixture_id is not None:
             # UI-74: zweiter Riegel neben dem gesperrten Knopf.
             return
+
+        # UI-82: eine Kopie ohne belegbare Herkunft wird abgelehnt, BEVOR
+        # irgendetwas gefragt oder geschrieben wird.
+        if self._kopie_von is not None:
+            from src.core.database.bibliothek_format import ProfilFehler
+            with Session(engine()) as s:
+                try:
+                    self._kopie_herkunft(s)
+                except ProfilFehler as e:
+                    self._kopie_abgelehnt(e)
+                    return
 
         # UI-74: kein zweites Profil unter demselben Hersteller + Modell —
         # beim Laden einer Show waere die Aufloesung mehrdeutig (FM-43).
@@ -1173,7 +1206,15 @@ class FixtureEditorDialog(QDialog):
                 else:
                     profile = self._neues_profil(s, mfr, name)
             else:
-                profile = self._neues_profil(s, mfr, name)
+                # UI-82: zweiter Riegel — verschwindet die Herkunft zwischen
+                # Pruefung und Schreiben, bleibt die Sitzung ohne Commit.
+                from src.core.database.bibliothek_format import ProfilFehler
+                try:
+                    profile = self._neues_profil(s, mfr, name)
+                except ProfilFehler as e:
+                    s.rollback()
+                    self._kopie_abgelehnt(e)
+                    return
 
             for mname, chans, description, grid, weiss in modes_data:
                 mode = FixtureMode(
