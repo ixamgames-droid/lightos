@@ -25,7 +25,7 @@ Es gibt **keine** Doppelklick-Sonderfunktion im Betrieb – Doppelklick im Bearb
 Kleine Status-Marker im Element:
 
 - **Gelbes `⇅` oder `▯` oben links** – `⇅` = Fader ist invertiert, `▯` = ein Teilbereich (Min/Max) ist gesetzt. Der Prozentwert oben spiegelt das bereits wider.
-- **Cyan-Punkt oben rechts** – eine MIDI-CC-Bindung ist aktiv.
+- **Cyan-Punkt oben rechts** – eine MIDI-Bindung (CC oder Pitchbend) ist aktiv.
 - **Gelbe Strich-Linie + `⊘▲`/`⊘▼` (Soft-Takeover)** – nur wenn „Pickup" aktiv ist und der Fader nach einem Bank-/Seitenwechsel auf das Durchfahren des physischen Reglers wartet (siehe [MIDI & Tastatur](#midi--tastatur)). Die gestrichelte Linie markiert den Ziel-(VC-)Wert, der zweite gelbe Strich die aktuelle physische Reglerposition, der Pfeil die Richtung, in die der physische Regler bewegt werden muss.
 
 Ist „Touch-Lock" für die VC aktiv, ignoriert der Fader Maus/Touch (reine Anzeige); MIDI/APC regelt weiter (siehe [README.md](README.md)).
@@ -46,6 +46,7 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **Feste Gruppe** | Fixture-Gruppe für Reichweite = *Feste Gruppe* (Programmer/Submaster) bzw. für die Modi *Gruppen-Dimmer* und *Feature-Dimmer (Gruppe)*. | Auswahl vorhandener Gruppen / Freitext |
 | **Feature (Feature-Dimmer)** | Nur Modus *Feature-Dimmer (Gruppe)*: welche Feature-Gruppe der Dimmer skaliert. | `Intensity`, `Color`, `Gobo`, `Beam`, `Position`, `Effect` |
 | **Attribut (Programmer)** | Nur Modus *Programmer-Attribut*: welches Attribut der Fader auf den Fixtures setzt (Standard `intensity`). Liste = bekannte Attribute (Label + Key), eigener Key tippbar – so wird z. B. ein LAS-Speed-Fader auf `gobo_rotation` baubar. | Auswahl/Freitext (z. B. `intensity`, `gobo_rotation`) |
+| **Hinweis** | Gelbe Zeile gleich unter **Steuert**, nur in den Effekt-Modi mit festem Ziel: erscheint, wenn eine Taste oder ein anderer Fader an denselben Geräten denselben Baustein steuert — Dimmer, Farbe, Bewegung oder Gobo. Sie nennt den anderen Effekt und wer gewinnt. Fehlt der Haken „bei 0 wirklich stoppen (sonst nur runterregeln)", endet sie mit „Dieser Fader hält den Effekt auch bei 0 am Laufen — er belegt die Geräte dann weiter.“ Ist der Haken gesetzt, liegt derselbe Effekt aber noch auf einem zweiten Fader ohne Haken, steht dort „Ein anderer Fader hält „…“ auch bei 0 am Laufen — der Effekt belegt die Geräte dann weiter.“ Reine Auskunft, ändert und sperrt nichts. Siehe [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md#7-hinweis-bei-überschneidungen) | Nur Anzeige; der Tooltip zeigt die vollständige Liste |
 | **Wert bei 0 % (Programmer)** | Nur Modus *Programmer-Attribut*: Kanalwert, den der Fader bei 0 % ausgibt. Bildet den Fader auf ein Kanal-Teilband ab (z. B. Laser-Speed-Anfang `192`). | 0–255 |
 | **Wert bei 100 % (Programmer)** | Nur Modus *Programmer-Attribut*: Kanalwert, den der Fader bei 100 % ausgibt (Ende des Teilbands, z. B. `223`). Zusammen mit *Wert bei 0 %* der eigentliche Dynamik-Bereich – unabhängig von den Leitplanken *Wert min/max*. | 0–255 |
 | **Live-Edit-Slot (EFFECT)** | Nur Effekt-Modi: ohne feste Funktions-ID wird der Effekt aus diesem benannten Slot bearbeitet (von einem Effekt-Pad gesetzt) statt des global aktiven. | Freitext (z. B. `MH`, `MX`) |
@@ -58,8 +59,9 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **DMX-Kanal (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Kanal im Universe. | Ganzzahl |
 | **Playback Executor-Slot** | Nur Modus *Playback (Executor)*: der Executor-Slot-Index (0-basiert), dessen Fader dieser Regler steuert. Eigenes Feld – „nicht gesetzt" = kein Slot (der Fader wirkt dann nicht). | Ganzzahl ≥ 0 oder „nicht gesetzt" |
 | **Slot/Funktions-ID (Playback/Effekt)** | Nur in den **Effekt-Modi** sichtbar (unter „Erweitert"): Effekt-Funktions-ID(s). Mehrere IDs mit Komma = Gruppe. Leer = aktiver Effekt. Die „Steuert"-Liste überschreibt dieses Feld. Setzt **nicht** den Playback-Slot – dafür dient das eigene Feld *Playback Executor-Slot*; in Playback-Mode wird dieses Feld gar nicht angezeigt. | Ganzzahl(en), kommagetrennt |
-| **CC-Nummer (-1=keine)** | MIDI-Controller-Nummer für die CC-Bindung. | -1 (keine) bis 127 |
-| **MIDI-Kanal (0=alle)** | MIDI-Kanal der Bindung. | 0 (Alle) bis 16 |
+| **Art** | Art der MIDI-Bindung: **CC** (Fader mit Controller-Nummer, z. B. APC mini) oder **Pitchbend (Motorfader, 14 Bit)** für Mackie-Control- und X-Touch-Pulte. Bei Pitchbend gibt es keine Nummer – der Fader ist sein MIDI-Kanal. | CC / Pitchbend |
+| **CC-Nummer (-1=keine)** | MIDI-Controller-Nummer für die CC-Bindung. Bei Art *Pitchbend* gesperrt. | -1 (keine) bis 127 |
+| **MIDI-Kanal (0=alle)** | MIDI-Kanal der Bindung. Bei *Pitchbend* den Kanal des Faders wählen (Fader 1 = Kanal 1 …); mit „Alle“ bewegt jeder Fader des Pults diesen Regler. | 0 (Alle) bis 16 |
 
 ### Die Modi im Klartext
 
@@ -118,10 +120,11 @@ Die eigentliche Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/e
 
 ## MIDI & Tastatur
 
-Der Fader unterstützt **MIDI-Teach** (nur CC, kein Note); eine **Tasten-Zuweisung gibt es nicht** (ein Fader braucht einen kontinuierlichen Wert, keinen Tastendruck).
+Der Fader unterstützt **MIDI-Teach** für **CC** und **Pitchbend** (kein Note); eine **Tasten-Zuweisung gibt es nicht** (ein Fader braucht einen kontinuierlichen Wert, keinen Tastendruck).
 
 - **Zuweisen:** Im Dialog die **CC-Nummer** (0–127) und optional den **MIDI-Kanal** (0 = alle) eintragen – oder per Rechtsklick „MIDI Teach…" den nächsten eingehenden CC lernen. Aktive Bindung = Cyan-Punkt oben rechts.
 - **Wirkung:** Eingehende CC-Werte (0–127) werden absolut auf 0–255 (0–100 %) abgebildet. Es zählt nur die als CC gebundene Nummer auf dem passenden Kanal.
+- **Motorfader (Mackie Control, X-Touch):** Diese Pulte senden ihre Fader nicht als CC, sondern als **Pitchbend** – je Fader ein MIDI-Kanal, der Wert mit 14 Bit (16 384 Stufen statt 128). Zuweisen: Rechtsklick „MIDI Teach…“ und den Fader am Pult bewegen (die Note, die der Berührungssensor beim Anfassen schickt, wird dabei übergangen), oder im Dialog **Art = Pitchbend** und den Kanal eintragen. Damit erreicht der Regler alle 256 Stufen; mit CC ist es nur jede zweite. **Das Pult fährt seine Fader noch nicht selbst nach** – die Rückmeldung an die Motoren ist ein eigener, offener Punkt (MIDI-14). Bis dahin hilft „Pickup“ gegen Sprünge.
 - **Soft-Takeover / „Pickup":** Ein globaler VC-Schalter für nicht-motorisierte Controller (z. B. APC mini). Nach einem Bank-/Seitenwechsel steht der physische Regler meist woanders als der VC-Wert. Bei aktivem Pickup übernimmt der Fader erst, wenn der physische Regler den aktuellen VC-Wert **einmal durchfährt** – so gibt es keinen Sprung. Bis dahin zeigt das Element den gelben Pickup-Hinweis (Ziel-Linie + Geist-Position + `⊘▲`/`⊘▼`-Richtungspfeil) und ignoriert MIDI.
 
 ## Tipps & Fallen
@@ -130,5 +133,6 @@ Der Fader unterstützt **MIDI-Teach** (nur CC, kein Note); eine **Tasten-Zuweisu
 - **Min/Max und Invertieren gelten in ALLEN Modi**, nicht nur bei DMX. Vertauschte Grenzen (Min > Max) werden toleriert.
 - **„Steuert"-Liste schlägt das Slot-Feld.** In den Effekt-Modi überschreibt eine befüllte „Steuert"-Liste die im Slot-Feld eingetragene ID. Ist die Liste leer, zählt das Slot-Feld (bzw. der aktive Effekt / Live-Edit-Slot).
 - **Effekt-Modi regeln per Default nur** – ohne „Effekt An/Aus" stoppt der Effekt bei 0 nicht, sondern läuft mit Wert 0 weiter. Soll der Fader den Effekt wirklich an-/ausschalten, die Option aktivieren (greift nur bei fester Ziel-ID, nicht beim bloßen „aktiven Effekt").
+- **Ein Effekt bei 0 belegt die Geräte weiter.** Ohne „Effekt An/Aus" läuft der Effekt bei 0 unsichtbar weiter und kann einem schwächeren Effekt auf denselben Geräten den Dimmer, die Farbe oder die Bewegung nehmen. Der gelbe **Hinweis** unter **Steuert** (und an jeder betroffenen Taste) sagt das ausdrücklich. Ein Effekt-Fader mit festem Ziel zählt für diesen Hinweis immer mit.
 - **Pickup wirkt nur, wenn global aktiv.** Ohne den globalen Soft-Takeover-Schalter übernimmt der Fader jeden CC sofort (möglicher Sprung beim Bankwechsel).
 - **Banks/Touch-Lock:** Über Rechtsklick lässt sich der Fader einer Bank (Playback-Seite) zuordnen oder „Alle Banks" (immer sichtbar) – Details in der [README.md](README.md).

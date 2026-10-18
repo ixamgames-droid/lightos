@@ -730,6 +730,17 @@ os.environ.setdefault("LIGHTOS_KEIN_USB", "1")
 # Regressionstest: tests/test_autosave_recovery_headless.py.
 os.environ.setdefault("LIGHTOS_NO_RECOVERY_PROMPT", "1")
 
+# LIZ-1: der echte GUI-Start (main.main()) fragt ohne gueltige Testlizenz nach
+# einer Lizenzdatei — ein modaler Dialog, den headless niemand beantwortet. Die
+# Suite hat keine Lizenz (ihr Datenordner ist ein Wegwerf-Ordner) und soll auch
+# keine brauchen. Dieser Schalter stellt die Abfrage ab; er wirkt NUR unter
+# pytest bzw. in Kindprozessen eines Tests (src/core/lizenz.py::testlauf),
+# ausserhalb davon ist er wirkungslos. Fest gesetzt (nicht setdefault): ein
+# geerbter Wert soll die Suite nicht an den Dialog haengen.
+os.environ["LIGHTOS_LIZENZ_TESTLAUF"] = "1"
+# … und ein geerbter Lizenzpfad des Entwicklers gehoert nicht in die Suite.
+os.environ.pop("LIGHTOS_LIZENZ", None)
+
 import pytest
 
 

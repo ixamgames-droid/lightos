@@ -54,7 +54,11 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
   nur Position, Gobo, Prisma, Fokus/Zoom und Farbrad von Moving Heads mit
   Dimmerkanal bleiben stehen, damit sie beim Lösen nicht sichtbar zurückfahren.
   Ungepatchte Kanäle (z. B. ein Dimmerpack übers Simple Desk), Geräte ohne
-  Dimmerkanal, Laser und Nebelmaschinen gehen komplett aus.
+  Dimmerkanal und Nebelmaschinen gehen komplett aus. **Laser** bekommen den
+  **Aus-Wert aus ihrem Geräteprofil** (nicht immer 0), ihre übrigen Kanäle
+  gehen auf 0; kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich
+  weiter (Einzelheiten, auch zum Laser-NOT-AUS:
+  [Laser-Anleitung](anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 > Der frühere **Snap**-Button in der Leiste ist entfallen — Snapshots nimmst du
 > jetzt über **Programmer → Snapshots** oder das Menü **Programmer → Snapshot
@@ -132,7 +136,8 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
 ### 4.2 Attribute einstellen
 Rechts erscheinen Tabs je nach Gerätetyp:
 **Intensity · Color · Position · Gobo · Weitere** (Gobo nur bei Gobo-Geräten)
-sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
+sowie **Assistent · EFX · Matrix · Paletten** — jeweils nur die, die zur Auswahl
+passen (ein reiner Laser zeigt z. B. nur Assistent, EFX, Laser, Paletten). Pro Kanal ein Fader
 (0–255 / 0–100 %); `↺` setzt einen Kanal auf den Standardwert.
 - **Intensity-Tab:** Dimmer + **Strobe** (Status-Kacheln „Auf" / „Zu" sowie
   „Strobe langsam" / „Strobe mittel" / „Strobe schnell", dazu der Slider
@@ -155,8 +160,10 @@ sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
   im Programmer — **Assistent** („Effekt-Assistent…", „+ Szene", „+ Chaser",
   „Programmer → Szene" sowie eine Funktionsliste mit „Start"/„Stop"; mehr in §5),
   **EFX** (Pan/Tilt-Figuren für Moving Heads), **Matrix** (Pixel-/Farbeffekte)
-  und **Paletten** (gespeicherte Attributwerte). EFX und Matrix folgen der
-  aktuellen Auswahl — erst Geräte/Gruppe wählen, dann den Effekt. Schritt für
+  und **Paletten** (gespeicherte Attributwerte). Ein neuer EFX und eine neue
+  Matrix nehmen die aktuelle Auswahl — erst Geräte/Gruppe wählen, dann den
+  Effekt anlegen; ein gespeicherter Effekt ändert seine Geräte nur über
+  **Auswahl übernehmen**. Schritt für
   Schritt: [EFFEKTE.md](EFFEKTE.md).
 
 ![Programmer – Color-Editor mit Farbwähler](tutorial_matrix/web/m1_color_editor.png)
@@ -279,7 +286,7 @@ Schritt für Schritt:
 - **Datei → Zuletzt verwendet** öffnet frühere Shows schnell.
 - **Datei → Demo-Show öffnen** lädt eine mitgelieferte Beispiel-Show als neue,
   ungespeicherte Show (Speichern legt deine Kopie an).
-- **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) findet/behebt Probleme.
+- **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) prüft die Show und zeigt, was gefunden wurde. Geändert wird dabei nichts; erst der Knopf **Reparieren** im Dialog behebt, was sich automatisch beheben lässt.
 
 ### Das „Issues"-Banner und die Meldungen zu Knöpfen
 

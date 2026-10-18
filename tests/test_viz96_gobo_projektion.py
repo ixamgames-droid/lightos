@@ -177,8 +177,9 @@ aus.ohneChunk = G.patchFragmentShader(std, 'void main() {}');
         self.assertEqual(r["rollBloecke"], 3)
         self.assertEqual(r["rollBedingung"], ["0<2", "1<2", "2<2"])
         self.assertEqual(r["rollIndizes"], ["0", "1", "2"])
-        # Zweimal fuer die Motiv-Koordinate, einmal fuer die Grenzebene (B3).
-        self.assertEqual(r["rollKoord"], ["|".join(["vSpotShadowCoord[ %d ]" % n] * 3)
+        # Zweimal fuer die Motiv-Koordinate, einmal fuer den Achsabstand
+        # (Reichweite) und einmal fuer den weichen Schattenrand (VIZ-102).
+        self.assertEqual(r["rollKoord"], ["|".join(["vSpotShadowCoord[ %d ]" % n] * 4)
                                           for n in range(3)])
         self.assertFalse(r["nacktesI"], "nach dem Ausrollen darf kein `i` stehen bleiben")
         self.assertTrue(r["kopfRoll"], "Feldgroesse = Zahl der Schatten-Lichter")
