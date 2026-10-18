@@ -131,7 +131,9 @@ class MiniLaufTest(unittest.TestCase):
         manifest = json.loads(text)
         self.assertEqual([b["datei"] for b in manifest["bilder"]], ["02_patch.png"])
         self.assertEqual(manifest["bilder"][0]["groesse"], [1600, 900])
-        self.assertTrue(manifest["schrift"])
+        # DOC-16: die mitgelieferte Schrift wird wirklich gerendert (kein
+        # „Noto Sans (statt Roboto Condensed)" je nach Rechner).
+        self.assertEqual(manifest["schrift"], "Roboto Condensed", self._log())
         self.assertNotIn(os.path.realpath(tempfile.gettempdir()), text)
         self.assertNotIn(sandbox.echter_home(), text)
         self.assertNotIn("/home/", text)

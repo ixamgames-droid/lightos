@@ -125,6 +125,12 @@ So bedienst du den Laser im Live-Betrieb ohne den Programmer:
    **„Laser NOT-AUS"** lassen sich ebenfalls auf VC-Buttons legen (auch per
    MIDI-Pad auslösbar).
 
+> **Ein Weg für den NOT-AUS:** Der Knopf **LASER NOT-AUS** oben rechts im
+> Hauptfenster, das Tastenkürzel `Strg+Umschalt+L`, die VC-Taste „Laser NOT-AUS“
+> und der NOT-AUS-Knopf im Laser-Tab lösen alle genau dasselbe aus: Alle Laser
+> werden verriegelt und dunkel, Netzwerk-Laser werden unscharf. Im Kiosk-Modus
+> stehen **BLACKOUT** und **LASER NOT-AUS** nebeneinander im Streifen oben rechts.
+
 > Muster lassen sich außerdem in **Snaps/Szenen** aufnehmen (Programmer →
 > „Speichern" bzw. Assistent-Tab „Programmer → Szene") und so über Chaser abspielen.
 
@@ -224,6 +230,21 @@ DMX nichts dunkel.
   Laser in **keinem** Modus als Kanal und nennt ihn weder im Typ noch im Namen,
   kennt LightOS ihn nicht. Wer so ein Gerät betreibt, nimmt „Laser“ in den
   Patch-Namen auf.
+- **Geräte-Datenbank nicht erreichbar:** Ob ein anderer Modus einen
+  Laser-Kanal hat, steht in der Geräte-Datenbank. Antwortet sie beim Patchen
+  oder Laden nicht, weiß LightOS es für die betroffenen Geräte nicht – und
+  behandelt sie **vorerst als Laser**: LASER NOT-AUS und Blackout schalten sie
+  dunkel, „Alles Weiß“ lässt sie aus, ein Wert daran löst den NOT-AUS nicht.
+  Das gilt dann auch für normale Lampen. Die Statusleiste meldet
+  „Laser-Erkennung unvollständig: Geräte-Datenbank nicht erreichbar“, und der
+  Tooltip des NOT-AUS-Knopfs nennt die Zahl der betroffenen Geräte. LightOS
+  fragt beim nächsten Patchen oder Laden und beim nächsten Auslösen des
+  NOT-AUS nach (erst nachdem der NOT-AUS DMX- und Netzwerk-Laser verriegelt
+  hat; die Bestätigung in der Statusleiste nennt die unvollständige Erkennung
+  dann mit). Antwortet die
+  Datenbank wieder, meldet die Statusleiste „Laser-Erkennung wieder
+  vollständig“ und normale Lampen sind wieder frei – eine Lampe, die der gerade
+  stehende NOT-AUS schon dunkel hält, bleibt es bis zum Lösen.
 - Der **Laser-Tab** erscheint weiterhin nur für Geräte vom Typ „Laser“ oder mit
   Laser-Kanälen.
 

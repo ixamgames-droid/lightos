@@ -12,6 +12,7 @@ Aufruf (aus dem Repo-Root)::
     venv/bin/python tools/anleitungsbilder.py --alle --pruefen # nur baubar?
     venv/bin/python tools/anleitungsbilder.py --liste          # Szenen zeigen
     venv/bin/python tools/anleitungsbilder.py vc_widgets --bildschirm  # 3D-Szenen
+    venv/bin/python tools/anleitungsbilder.py --demo-show Doku_Demo.lshow
 
 Windows (PowerShell/cmd) entsprechend::
 
@@ -58,6 +59,10 @@ def _argumente(argv):
                     help="statt docs/<anleitung>/img nach ORDNER/<anleitung> schreiben")
     ap.add_argument("--behalten", action="store_true",
                     help="Sandbox-Ordner nach dem Lauf nicht loeschen (Fehlersuche)")
+    ap.add_argument("--demo-show", metavar="DATEI",
+                    help="nur die Doku-Demo-Show der Anleitungen bauen und als "
+                         ".lshow nach DATEI schreiben (rendert nichts; eine "
+                         "vorhandene Datei wird nicht ueberschrieben)")
     ap.add_argument("--bildschirm", action="store_true",
                     help="auf dem echten Bildschirm (Linux X11, Windows) statt offscreen "
                          "zeichnen; baut "
@@ -114,8 +119,103 @@ def _je_anleitung_ein_prozess(args, auftraege, nur) -> int:
     return code
 
 
+def _demo_show_ziel(angabe: str) -> str | None:
+    """``--demo-show``: Zielpfad (relativ zum Aufrufort), Endung ``.lshow``.
+    ``None`` = Ziel unbrauchbar (Meldung schon ausgegeben)."""
+    ziel = os.path.abspath(angabe)
+    if not ziel.lower().endswith(".lshow"):
+        ziel += ".lshow"
+    if os.path.exists(ziel):
+        print(f"[anleitungsbilder] {ziel} gibt es schon — nichts geschrieben "
+              "(anderen Namen waehlen oder die Datei vorher entfernen).", flush=True)
+        return None
+    if not os.path.isdir(os.path.dirname(ziel)):
+        print(f"[anleitungsbilder] Ordner {os.path.dirname(ziel)} fehlt — "
+              "nichts geschrieben.", flush=True)
+        return None
+    return ziel
+
+
+def _demo_show_exportieren(args) -> int:
+    """DOC-16 ``--demo-show``: dieselbe Doku-Demo-Show, die die Anleitungen
+    zeigen, als Datei fuer Nutzer — wer eine Anleitung nachklickt, sieht
+    dieselben Geraete, Gruppen, Funktionen und VC-Tasten wie im Bild.
+
+    Gebaut wird wie beim Rendern in der Sandbox (Selbstpruefung der Pfade,
+    Abgleich der echten Datenorte). Erst NACH dem Abgleich wird die fertige
+    Datei an ihr Ziel kopiert — das Ziel darf deshalb auch ein echter
+    Show-Ordner sein, ohne den Abgleich auszuloesen.
+    """
+    import shutil
+    ziel = _demo_show_ziel(args.demo_show)      # vor dem chdir der Sandbox
+    if ziel is None:
+        return 2
+    heimat = os.path.expanduser("~")            # vor der Umlenkung von HOME
+    orte = sandbox.echte_datenorte()
+    vorher = sandbox.schnappschuss(orte)
+    sb = sandbox.einrichten()
+    code, gebaut = 2, None
+    try:
+        import _gen_env  # noqa: F401,E402  (s. main: bestehender Bootstrap)
+        pf = sandbox.selbstpruefung(sb)
+        print("SANDBOX " + __import__("json").dumps(pf, sort_keys=True), flush=True)
+        from anleitungsbilder import demo_show
+        gebaut, _info = demo_show.bauen(sb.pfade["cwd"])
+        spur = _demo_show_spuren(gebaut, [sb.basis, heimat, sandbox.REPO])
+        if spur:
+            print(f"[anleitungsbilder] FEHLER: die Show nennt Pfade des Baurechners "
+                  f"({spur}) — nicht exportiert.", flush=True)
+            gebaut = None
+        else:
+            code = 0
+    except SystemExit as e:
+        if not isinstance(e.code, int):
+            print(e.code, flush=True)
+        code = e.code if isinstance(e.code, int) else 2
+    finally:
+        os.chdir(sandbox.REPO)
+        diff = sandbox.vergleiche(vorher, sandbox.schnappschuss(orte),
+                                  app_laeuft=sandbox.laufende_instanz())
+        if diff:
+            print("[anleitungsbilder] FEHLER: echte Datenorte haben sich waehrend des "
+                  "Laufs veraendert:", flush=True)
+            for z in diff[:20]:
+                print("   " + z, flush=True)
+            code, gebaut = 3, None
+        if code == 0 and gebaut:
+            shutil.copyfile(gebaut, ziel)
+            print(f"[anleitungsbilder] Doku-Demo-Show geschrieben: {ziel}", flush=True)
+        rest = sandbox.aufraeumen(sb)
+        if rest:
+            print(f"[anleitungsbilder] WARNUNG: Sandbox nicht vollstaendig geloescht: "
+                  f"{sb.basis}", flush=True)
+    return code
+
+
+def _demo_show_spuren(pfad: str, orte) -> str:
+    """Steht der Sandbox- oder Heimat-Pfad in der Show-Datei? (Datenschutz:
+    die Datei geht an Nutzer.) Rueckgabe: der gefundene Pfad oder ``""``."""
+    import zipfile
+    kandidaten = set(orte) | {os.path.realpath(o) for o in orte}
+    kandidaten = {k for k in kandidaten if k and len(k) > 3}
+    with zipfile.ZipFile(pfad) as z:
+        for name in z.namelist():
+            text = z.read(name).decode("utf-8", "replace")
+            for k in kandidaten:
+                if k in text or k.replace(os.sep, "/") in text \
+                        or k.replace("\\", "\\\\") in text:
+                    return k
+    return ""
+
+
 def main(argv=None) -> int:
     args = _argumente(sys.argv[1:] if argv is None else argv)
+    if args.demo_show:
+        if args.anleitung or args.alle or args.liste or args.pruefen or args.nur:
+            print("[anleitungsbilder] --demo-show steht allein (ohne Anleitung, "
+                  "--alle, --liste, --pruefen, --nur).", flush=True)
+            return 2
+        return _demo_show_exportieren(args)
     from anleitungsbilder import runner
     namen = runner.anleitungen() if (args.alle or (args.liste and not args.anleitung)) \
         else args.anleitung
