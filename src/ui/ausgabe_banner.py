@@ -642,6 +642,9 @@ class AusgabeBannerSteuerung:
         self._letzte_art = ART_KEIN
         self._schluessel = frozenset()      # Ausfaelle der gezeigten Stoerung
         self._gesehen = {}                  # Ausfall -> zuletzt anliegend (Uhr)
+        # Ausfall -> wann er zuletzt WIRKLICH anlag (nicht: zuletzt gezeigt —
+        # die Drossel haelt eine Meldung noch HALTE_S nach).
+        self._anliegend = {}
         self.widget = AusgabeBanner(parent)
         self.chip = AusgabeChip(parent)
         self.widget.geklickt.connect(self._klick)
@@ -678,6 +681,7 @@ class AusgabeBannerSteuerung:
                 try:
                     self._schluessel = stoer_schluessel(wege)
                     self._pruefe_neue_stoerung(jetzt)
+                    self._anliegend = {a: jetzt for a in self._schluessel}
                 except Exception:
                     self._schluessel = frozenset()
                     self._gesehen.clear()
@@ -724,7 +728,12 @@ class AusgabeBannerSteuerung:
             self._logge_ansicht("Probenhinweis eingeklappt")
         else:
             jetzt = self._uhr()
-            self._gesehen = {a: jetzt for a in (self._schluessel or {z.text})}
+            # Codex-Review #1089: je Ausfall der Zeitpunkt, an dem er zuletzt
+            # ANLAG — nicht der Klick. Eingeklappt waehrend der Nachhaltezeit
+            # zaehlte NACHSICHT_S sonst ab dem Klick, und eine Stoerung, die
+            # nach mehr als NACHSICHT_S zurueckkam, blieb nur ein Chip.
+            self._gesehen = {a: self._anliegend.get(a, jetzt)
+                             for a in (self._schluessel or {z.text})}
             self._logge_ansicht("Störungsmeldung eingeklappt")
         self._zeige(z)
         if fokus:

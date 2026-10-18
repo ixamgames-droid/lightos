@@ -474,10 +474,24 @@ def _text(dev, feld: str, index_feld: str) -> tuple[str, bool]:
     return (str(wert).strip() if wert else ""), True
 
 
+#: Codex-Review #1065: jede Seriennummer, die dieser Lauf gesehen hat (vom
+#: Geraet gelesen oder aus einem Schluessel der Ausgabe-Konfiguration). Das
+#: Diagnosepaket (``diagnose_log``) kuerzt sie woertlich — die Nummer kommt
+#: ungefiltert vom Geraet und kann Trennzeichen enthalten, an denen ein
+#: Textmuster endet.
+GESEHENE_SERIEN: set[str] = set()
+
+
+def _merke_serie(serie: str) -> None:
+    if serie:
+        GESEHENE_SERIEN.add(serie)
+
+
 def _beschreibe(dev, zeile: Kennung) -> UdmxGeraet | None:
     hersteller, h_ok = _text(dev, "manufacturer", "iManufacturer")
     produkt, p_ok = _text(dev, "product", "iProduct")
     serie, _ = _text(dev, "serial_number", "iSerialNumber")
+    _merke_serie(serie)
     bestaetigt, hinweis = True, ""
     if zeile.hersteller is not None or zeile.produkt is not None:
         if not (h_ok and p_ok):
@@ -624,6 +638,7 @@ def schluessel_lesen(text) -> tuple[int | None, int | None, str, str]:
             vid, pid = int(a.strip(), 16), int(b.strip(), 16)
         except ValueError:
             vid = pid = None
+    _merke_serie(serie.strip())
     return vid, pid, serie.strip(), ort.strip()
 
 

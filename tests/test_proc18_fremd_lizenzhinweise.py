@@ -39,6 +39,7 @@ LIZENZEN = ROOT / "licenses"
 #: Ordner, deren Inhalt komplett fremd ist -> jede Datei muss genannt sein.
 FREMD_ORDNER = [
     ROOT / "assets/vendor",
+    ROOT / "tools/anleitungsbilder/schrift",   # DOC-16: Roboto Condensed (OFL)
 ]
 #: Einzelne fremde Dateien ausserhalb dieser Ordner.
 FREMD_DATEIEN = [

@@ -117,19 +117,73 @@ _lockfile_pfad() {
 
 LOCKFILE="$(_lockfile_pfad)"
 
+# ★ XPLAT-23 (ii): Die beiden Schalter wirkten hier wortlos. Ein geerbtes
+# LIGHTOS_VERIFY_NOLOCK machte einen Volllauf ungesperrt, ohne dass es am
+# Exit-Code oder in der Ausgabe zu sehen war — ein gruenes Ergebnis ohne
+# Serialisierung sah aus wie eines mit. verify_loop.ps1 sagt es seit XPLAT-23
+# Scheibe 1 an; hier dieselben Hinweise. Nur Ausgabe, kein anderes Verhalten.
+#
+# ★ XPLAT-23 (i): Hier stand `exec 9>"$LOCKFILE" 2>/dev/null || return 0` —
+# eine nicht oeffenbare Sperrdatei (vertippter LIGHTOS_LOCKFILE, Pfad ist ein
+# Ordner, kein Schreibrecht) fuehrte STILL zu einem ungesperrten Volllauf.
+# Genau das, was der Kommentar oben „schlimmer als keine Sperre" nennt. Jetzt
+# wie in verify_loop.ps1: laut abbrechen (Exit 2), Pfad und Grund nennen, und
+# NICHT warten. Wer bewusst ungesperrt fahren will, hat LIGHTOS_VERIFY_NOLOCK —
+# das sagt es dann wenigstens an. Der Fall „kein flock" bleibt beim Hinweis:
+# dort fehlt das Werkzeug, nicht der Pfad, und das ist keine Fehlbedienung.
+#
+# ★ Nebenbefund beim Umbau: das alte `exec 9>… 2>/dev/null` war nicht nur still
+# im Fehlerfall. `exec` macht JEDE Umlenkung dauerhaft — auch `2>/dev/null`.
+# Jeder gesperrte Volllauf schrieb damit ab hier stderr ins Leere (gemessen:
+# `bash -c 'exec 9>f 2>/dev/null; echo x >&2'` gibt nichts aus). Darum wird das
+# Oeffnen zuerst in einer Unterschale geprobt, die den Fehlertext einfaengt,
+# und die echte Belegung danach OHNE stderr-Umlenkung gemacht.
 _verify_lock() {
     [ "$#" -gt 0 ] && return 0                      # gezielter Lauf: keine Sperre
-    [ -n "${LIGHTOS_VERIFY_NOLOCK:-}" ] && return 0
+    if [ -n "${LIGHTOS_VERIFY_NOLOCK:-}" ]; then
+        echo "[verify] Hinweis: LIGHTOS_VERIFY_NOLOCK gesetzt — die volle Suite laeuft UNGESPERRT."
+        return 0
+    fi
     command -v flock >/dev/null 2>&1 || {
         echo "[verify] Hinweis: kein flock — parallele Suiten sind nicht gesperrt"
         return 0
     }
-    exec 9>"$LOCKFILE" 2>/dev/null || return 0
-    if ! flock -n 9; then
-        echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."
-        flock 9
-        echo "[verify] Sperre frei, starte."
+    if [ -n "${LIGHTOS_LOCKFILE:-}" ]; then
+        echo "[verify] Hinweis: Sperrdatei per LIGHTOS_LOCKFILE umgelenkt: $LOCKFILE"
     fi
+    local _fehler _rc
+    if ! _fehler="$( { exec 9>>"$LOCKFILE"; } 2>&1 )"; then
+        echo "[verify] FEHLER: Sperrdatei nicht benutzbar: $LOCKFILE"
+        echo "[verify]        ${_fehler:-unbekannter Fehler beim Oeffnen}"
+        echo "[verify]        Pfad pruefen (LIGHTOS_LOCKFILE?) — hier wird NICHT gewartet."
+        echo "[verify]        Bewusst ungesperrt fahren: LIGHTOS_VERIFY_NOLOCK=1"
+        exit 2
+    fi
+    # ★ XPLAT-23 Gegenpruefung: die Probe oben schliesst das Zeitfenster bis
+    # hierher nicht. Und `exec` mit misslungener Umlenkung beendet eine
+    # nicht-interaktive bash NICHT (nachgemessen) — ohne Abfrage liefe es weiter
+    # in `flock -n 9` auf einem ungueltigen Deskriptor.
+    exec 9>"$LOCKFILE" || _verify_lock_kaputt "Oeffnen nach erfolgreicher Probe misslungen"
+    # ★ flock unterscheidet: 1 = belegt (Vorgabe von -E), alles andere ist ein
+    # FEHLER (gemessen: ungueltiger Deskriptor -> 65). Vorher wurde jeder
+    # Nicht-Null-Wert als „andere Sitzung" gedeutet, das blockierende `flock 9`
+    # scheiterte dann sofort ebenso, und es hiess „Sperre frei, starte" — ein
+    # ungesperrter Volllauf mit falscher Diagnose, genau XPLAT-23 (i).
+    flock -n 9
+    _rc=$?
+    if [ "$_rc" -eq 1 ]; then
+        echo "[verify] Eine andere Sitzung faehrt gerade die volle Suite — warte ..."
+        flock 9 || _verify_lock_kaputt "flock beim Warten gescheitert (Exit $?)"
+        echo "[verify] Sperre frei, starte."
+    elif [ "$_rc" -ne 0 ]; then
+        _verify_lock_kaputt "flock gescheitert (Exit $_rc)"
+    fi
+}
+_verify_lock_kaputt() {
+    echo "[verify] FEHLER: Sperre nicht nehmbar: $LOCKFILE"
+    echo "[verify]        $1 — die volle Suite laeuft NICHT ungesperrt los."
+    echo "[verify]        Bewusst ungesperrt fahren: LIGHTOS_VERIFY_NOLOCK=1"
+    exit 2
 }
 _verify_lock "$@"
 
