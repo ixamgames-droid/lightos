@@ -74,10 +74,10 @@ def _ohne_profil_auskunft():
     Render-Plan baut."""
     alt = erkennung._profil_quelle
     erkennung.setze_profil_quelle(None)
-    erkennung.vergiss_profile()
+    erkennung.zuruecksetzen()
     yield
     erkennung.setze_profil_quelle(alt)
-    erkennung.vergiss_profile()
+    erkennung.zuruecksetzen()
 
 
 class _Bereich:

@@ -501,6 +501,35 @@ def ist_gleich(pfad: str, neu: bytes) -> bool:
     return fast_gleich(pfad, neu)
 
 
+#: DOC-16: die Schrift, die das Theme wuenscht (``assets/themes/dark.qss``:
+#: „Roboto Condensed"), liegt dem Werkzeug bei — SIL Open Font License 1.1,
+#: Herkunft und Lizenztext in ``THIRD_PARTY_NOTICES.md``. Ohne sie nahm Qt je
+#: Rechner einen anderen Ersatz (Linux Noto Sans, Windows Arial): dieselbe
+#: Szene sah auf zwei Rechnern verschieden aus, ``--pruefen`` meldete jede
+#: fremd gerenderte Anleitung als abweichend. Nur das Werkzeug laedt sie, die
+#: App bleibt unveraendert.
+SCHRIFT_DATEI = os.path.join(PAKET, "schrift", "RobotoCondensed-wght.ttf")
+SCHRIFT_FAMILIE = "Roboto Condensed"
+
+
+def schrift_laden() -> str | None:
+    """Mitgelieferte Schrift bei Qt anmelden (nach der QApplication, vor dem
+    ersten Widget). Rueckgabe: die angemeldete Familie oder ``None`` (dann
+    bleibt es beim Ersatz des Rechners, der Lauf geht weiter)."""
+    from PySide6.QtGui import QFontDatabase
+    if not os.path.isfile(SCHRIFT_DATEI):
+        print(f"[anleitungsbilder] Hinweis: {os.path.relpath(SCHRIFT_DATEI, REPO)} "
+              "fehlt — es gilt die Ersatzschrift dieses Rechners.", flush=True)
+        return None
+    fid = QFontDatabase.addApplicationFont(SCHRIFT_DATEI)
+    familien = QFontDatabase.applicationFontFamilies(fid) if fid >= 0 else []
+    if SCHRIFT_FAMILIE not in familien:
+        print(f"[anleitungsbilder] Hinweis: Schrift nicht ladbar ({familien}) — "
+              "es gilt die Ersatzschrift dieses Rechners.", flush=True)
+        return None
+    return SCHRIFT_FAMILIE
+
+
 def schrift(win) -> str:
     """Tatsaechlich gerenderte Schrift (QSS-Wunsch -> Ersatz dieses Rechners)."""
     from PySide6.QtGui import QFontInfo
@@ -629,6 +658,7 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication.instance() or QApplication(["lightos-anleitungsbilder"])
     app.setApplicationName("LightOS")
+    schrift_laden()
     lo_main._install_font_substitutions()
     # Wie main.main(): Qt-Standardknoepfe (Yes/No/Cancel …) deutsch — sonst
     # zeigten die Bilder englische Knoepfe, die App aber deutsche (UI-64h).

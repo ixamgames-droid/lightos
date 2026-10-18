@@ -29,6 +29,7 @@ test_las30_laser_achsen.py         # Patch-Anleitung nennt die Achsen-Haken
 test_imp2_mitschnitt_anleitung.py  # Szenen-Anleitung, Schritt 11 Mitschnitt: Wortlaut wie im Dialog
 test_imp1_patch_tabelle_anleitung.py # Patch-Anleitung, Abschnitt Tabellen-Import: Wortlaut wie im Dialog
 test_las32_*.py                    # Laser-Anleitung, Abschnitt Sperrzonen
+test_las39_laser_erkennung_ohne_datenbank.py # Laser-Anleitung nennt „Laser-Erkennung unvollständig“
 test_las35_*.py                    # Laser-Anleitung: Planer und Einmess-Assistent
 test_viz109_spalte_einklappen.py   # 3D-Anleitung nennt Klapp-Knopf und F9
 test_vcb45_popout_lage.py          # VC-Anleitung nennt das gemerkte Popout
@@ -47,6 +48,7 @@ test_out76_udmx_windows_treiber.py # INSTALL.md + Anleitung Ausgabe: Weg zum Win
 test_out76_setup_bringt_usb_mit.py # THIRD_PARTY_NOTICES.md + licenses/: pyusb und libusb im Windows-Setup
 test_liz2_fremdlizenzen_setup.py   # THIRD_PARTY_NOTICES.md + licenses/ + requirements.txt: Fremdlizenzen im Windows-Setup
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
+test_liz2_rest_sammeldateien.py    # THIRD_PARTY_NOTICES.md, INSTALL.md, licenses/: Sammeldateien Qt WebEngine/Mesa, mido/winrt raus
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
@@ -101,3 +103,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_undo_coverage.py             # nennt docs/UNDO_COVERAGE.md nur in Meldungen
 !test_vc_widgets_showcase_layout.py # liest nur docs/.../geometry.json (keine Doku -> volle Suite)
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
+test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)

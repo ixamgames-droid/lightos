@@ -4,18 +4,34 @@
 > frei platziert, optional auf den **APC mini** gemappt. Hier baust du sie Schritt für Schritt —
 > alles in der Oberfläche, ohne Code.
 
+**Zum Mitklicken:** Die Bilder zeigen die **Doku-Demo-Show** (acht PAR, zwei Wash, zwei Spot,
+eine LED-Leiste, drei Farb-Szenen, ein Lauflicht, ein Regenbogen, ein Kreis). Dieselbe Show
+erzeugst du aus dem Repo mit
+`venv/bin/python tools/anleitungsbilder.py --demo-show Doku_Demo.lshow`
+(Windows: `venv\Scripts\python tools\anleitungsbilder.py --demo-show Doku_Demo.lshow`) und
+öffnest sie über **Datei → Öffnen...**.
+
 ---
 
 ## 1. VC öffnen & Bearbeiten-Modus
 
-Oben in der Toolbar **Virtual Console** wählen. Anfangs ist der Canvas leer (Raster). Rechts ist die
-**Bibliothek** mit deinen Funktionen und Farb-Snaps.
+In der Sektionsleiste oben **Virtual Console** wählen (Strg+4). Die Konsole zeigt die aktuelle
+**Bank**; in der Doku-Demo liegen auf Bank 1 eine Beschriftung, sechs Funktions-Tasten und vier
+Fader. Rechts ist die **Bibliothek** mit deinen Funktionen und Farb-Snaps.
 
-![Leere VC](img/01_vc_leer.png)
+![Virtual Console mit Bank 1 der Doku-Demo](img/01_vc_ueberblick.png)
+
+1. **Bearbeiten** — schaltet zwischen Bedienen und Bauen um.
+2. **◀ / Bank 1 / ▶** — zwischen den Bänken wechseln (oder **Strg + Bild↑ / Bild↓**).
+3. Die **Statuszeile** unter der Werkzeugleiste nennt den zuletzt gestarteten, noch laufenden
+   Effekt („Kein Effekt aktiv", wenn nichts läuft). Sie hat einen festen Platz — die Konsole
+   verrutscht nicht, wenn ein Effekt startet.
+4. **Bibliothek** — Funktionen und Farb-Snaps zum Ziehen auf die Konsole
+   (**◀ Bibliothek** blendet sie aus).
 
 Klick oben links auf **Bearbeiten** (Schalter wird blau mit grüner Schrift, Beschriftung „Bearbeiten ✓"). Jetzt erscheinen
-die Widget-Werkzeugleiste und das Raster zum Platzieren. Die Werkzeugleiste hat **16 Schnell-Anlegen-
-Knöpfe** für je einen Widget-Typ:
+die Widget-Werkzeugleiste, das Raster zum Platzieren und rechts der **Inspector** (Eigenschaften des
+gewählten Widgets). Die Werkzeugleiste hat **16 Schnell-Anlegen-Knöpfe** für je einen Widget-Typ:
 
 **Button**, **Fader**, **XY Pad**, **Cueliste**, **SpeedDial**, **Encoder**, **Farbe**,
 **Chase-Liste**, **Effekt-Farben**, **Label**, **Frame**, **Musik**, **BPM**, **Tempo-Bus**,
@@ -25,37 +41,49 @@ Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen, Strg+Z / Strg+Y). Eine f
 **Controller-Vorlage** (etwa ein komplettes APC-mini-Layout) lässt sich derzeit **nicht** per Knopf in
 die VC einfügen; den Aufbau übernimmst du Widget für Widget (siehe *APC mini mappen*).
 
-![Bearbeiten-Modus](img/02_bearbeiten_modus.png)
+![Bearbeiten-Modus mit Werkzeugleiste](img/02_bearbeiten_modus.png)
+
+1. **Bearbeiten ✓** — der Bearbeiten-Modus ist an.
+2. Die 16 Knöpfe zum Anlegen der Widgets.
+3. **↶ / ↷** — Rückgängig / Wiederholen.
 
 ## 2. Widgets anlegen
 
 **Schnellster Weg — Effekt aus der Bibliothek ziehen → Drop-Karte:** Eine **Funktion/einen Effekt**
-(z. B. `Matrix 1`) aus der rechten Bibliothek **auf eine freie Stelle des Rasters ziehen** → es öffnet
+(z. B. `Regenbogen`) aus der rechten Bibliothek **auf eine freie Stelle des Rasters ziehen** → es öffnet
 sich die Drop-Karte **„Effekt einrichten"**. Statt einer starren Dialog-Kette zeigt sie **eine Zeile je
 steuerbarem Aspekt** als Häkchen — du kreuzt an, was der Effekt können soll. **„An/Aus (Toggle)"** ist
 vorangekreuzt: ein Klick auf **Erstellen** liefert den klassischen Toggle-Button. Setzt du **mehrere
 Häkchen**, entstehen **mehrere fertig verdrahtete Widgets in EINEM Schritt** (ein einziges **Strg+Z**
 macht alles rückgängig). Die Karte ist intelligent — sie zeigt nur Aspekte, die für genau diesen Effekt
 sinnvoll sind (eine Dimmer-Matrix hat z. B. keine „Farben"-Zeile). Selten gebrauchte Parameter liegen
-im **zugeklappten** Bereich **„Mehr Parameter (N)"** — zum Öffnen anklicken.
+im **zugeklappten** Bereich **„Mehr Parameter (N)"** — zum Öffnen anklicken. Mit
+**„Als Effekt-Box gruppieren"** landen alle gewählten Bedienelemente in einem verschiebbaren
+Container mit Live-Vorschau statt einzeln auf dem Raster.
 
-![Drop-Karte „Effekt einrichten"](img/15_drop_karte.png)
+![Drop-Karte „Effekt einrichten" für den Regenbogen](img/03_drop_karte.png)
+
+1. **„An/Aus (Toggle)"** — vorangekreuzt.
+2. **„Widget: … ▸ ändern"** — für diesen Aspekt passen mehrere Bedien-Elemente.
+3. **„Mehr Parameter (N)"** — zugeklappt.
+4. **Erstellen** — legt alle angekreuzten Widgets an.
 
 Gibt es für einen Aspekt **mehrere passende Bedien-Elemente** (z. B. Tempo = Speed-Rad **oder** Fader),
 steht in der Zeile **„Widget: … ▸ ändern"**. Ein Klick öffnet die **grafische Widget-Galerie**
 („Widget wählen") als eigenes Fenster — du siehst die Möglichkeiten als Kacheln, tippst eine an und
 bestätigst mit **OK** (oder tippst sie doppelt an):
 
-![Widget-Galerie „Widget wählen"](img/16_widget_galerie.png)
+![Widget-Galerie „Widget wählen"](img/04_widget_galerie.png)
 
 **Drop auf einen schon belegten Regler:** Ziehst du einen Effekt auf ein **bereits belegtes**
-Bedien-Element (z. B. einen Speed-Regler oder Fader), wird *nicht* mehr stumm gekoppelt — es erscheint
-die Konflikt-Karte **„Regler ist schon belegt"** mit drei Wegen:
-- **Ersetzen** — der Regler steuert dann nur noch den neuen Effekt.
-- **Dazu koppeln** — beide Effekte hängen am selben Regler (eine Gruppe, ein Tempo).
-- **Neues Widget daneben** — der Regler bleibt unberührt, ein eigenes Element entsteht.
+Bedien-Element (im Bild: `Kreis` auf den Fader **Tempo**, der schon den Regenbogen steuert), wird
+*nicht* mehr stumm gekoppelt — es erscheint die Konflikt-Karte **„Regler ist schon belegt"** mit drei
+Wegen:
+1. **Ersetzen** — der Regler steuert dann nur noch den neuen Effekt.
+2. **Dazu koppeln** — beide Effekte hängen am selben Regler (eine Gruppe, ein Tempo).
+3. **Neues Widget daneben** — der Regler bleibt unberührt, ein eigenes Element entsteht.
 
-![Konflikt-Karte „Regler ist schon belegt"](img/17_konflikt_karte.png)
+![Konflikt-Karte „Regler ist schon belegt"](img/05_konflikt_karte.png)
 
 **Widget-Typ nachträglich tauschen:** bei effektgebundenen Widgets, für deren Aspekt mehrere Bedien-Typen
 passen (z. B. Tempo: Speed-Rad oder Fader), per **Rechtsklick → „↔ Widget ändern…"** → dieselbe Galerie.
@@ -67,11 +95,6 @@ Snap-Taste** (Button mit Aktion „Bibliothek-Farbe/Snap", farbiger Strich) — 
 VC-Button anklicken; er übernimmt Snap bzw. Funktion. (Das Widget **Farbe** — Dialog
 „Farb-Kachel Einstellungen" — ist etwas anderes.)
 
-So ist hier **Bank 1** entstanden — Reihe 1 die drei Looks (Matrix 1 = Farb-Chase, Matrix 2 = Dimmer,
-EFX 1 = Moving-Head-Bewegung), Reihe 2 die Farb-Kacheln blau/grün/rot:
-
-![Funktionen ziehen](img/03_funktionen_ziehen.png)
-
 **Alternativweg — manuell über die Werkzeugleiste** (für Bedienelemente ohne Funktion): Werkzeugleiste →
 **Button** / **Fader** / **Farbe** anklicken → das Widget landet auf dem Raster → **Doppelklick** öffnet
 die Eigenschaften (im Rechtsklick-Menü heißt dieser Eintrag **„Einstellungen..."**):
@@ -81,77 +104,49 @@ die Eigenschaften (im Rechtsklick-Menü heißt dieser Eintrag **„Einstellungen
   „Programmer-Attribut" (z. B. Dimmer) …
 - **Farbe → Ziel:** „Programmer/Selektion" / „Alle Fixtures" / „Effekt (aktive Farbe)".
 
-## 3. Das fertige Layout — 5 Bänke mit Labels
+![Button-Einstellungen der Taste „Rot"](img/06_button_einstellungen.png)
+
+1. **Aktion** — hier „Funktion an/aus" mit der Szene „Alle PAR Rot" als Ziel.
+2. **OK** übernimmt die Einstellungen.
+
+## 3. Bänke mit Labels gliedern
 
 Oben über **◀ / Bank X / ▶** (oder Tastatur **Strg + Bild↑ / Bild↓**) zwischen Bänken wechseln.
 Ein neu angelegtes Widget landet auf der **gerade sichtbaren** Bank. Mit **Label-Widgets** als
-Zonen-Überschriften wird die Konsole übersichtlich. Die Beispiele stammen aus der (archivierten,
-nicht im Repository liegenden) Hardstyle-Show mit **fünf Bänken**; nachbauen lässt sich das Layout mit
-den hier beschriebenen Schritten:
+Zonen-Überschriften wird die Konsole übersichtlich. Eine bewährte Aufteilung:
 
-![Bank 1 fertig aufgebaut (Run-Modus)](img/04_bank1_fertig.png)
+- **Bank 1 — Looks und Master:** Funktions-Tasten für die Looks (grüner Strich unten =
+  Funktions-Toggle), daneben die Fader **Gesamt** (Grand Master), Gruppen-Dimmer und das
+  **Tempo** eines Effekts — so wie Bank 1 der Doku-Demo oben.
+- **Bank 2 — Tempo & Musik:** die BPM- und Musik-Bausteine aus den Abschnitten 6 und 7:
 
-### Bank 1 — Performance
+![Bank 2 „Tempo & Musik"](img/08_bank2_tempo_musik.png)
 
-![Bank 1 — Performance](img/10_bank1_performance.png)
+1. **◀ / Bank 2 / ▶** — die zweite Bank ist sichtbar.
+2. **TEMPO** — BPM-Anzeige (zeigt Tempo und Quelle; ohne Tempo steht dort „—").
+3. **TAP**, **AUTO / MAN** (Umschalter), **Musik-BPM** (Audio-Erkennung an/aus), **BPM −** /
+   **BPM +** (Nudge).
+4. **BPM** — Fader im Modus „Tempo (BPM)" (30–300 BPM).
+5. **MUSIK** — Song-Anzeige (Now Playing / Als Nächstes) mit den Media-Tasten
+   **`<<` / `> / ||` / `>>`** (Zurück / Play-Pause / Vor).
 
-- **LOOKS:** `Farb-Chase` / `Dimmer 2x` / `MH-Bewegung` — Funktions-Toggles (grüner Strich unten).
-- **FARBEN:** `blau` / `grün` / `rot` — Farb-Kacheln (farbiger Strich).
-- **STEUERUNG:** `BLACKOUT` / `STOP ALL` / `CLEAR`.
-- **LIVE & MASTER:** der große grüne **LIVE-SHOW**-Knopf startet den kompletten farbigen
-  Auto-Look (MH-Bewegung + Farb-Chase + Dimmer, alle als **Mehrfach-Aktion** `an` — das
-  **„+2"**-Abzeichen = zwei Zusatzaktionen). Darunter die Fader **MASTER** (Grand Master) und
-  **FX-Dim** (Effekt-Helligkeit).
-
-### Bank 2 — Tempo / BPM
-
-![Bank 2 — Tempo/BPM](img/11_bank2_tempo_bpm.png)
-
-- **TEMPO**-Anzeige (live BPM + Quelle/Modus), **TAP**, **AUTO / MAN** (Umschalter),
-  **Musik-BPM** (Audio-Erkennung an/aus — hier aktiv = cyan), **BPM −/+** (Nudge)
-  und die Fader **BPM** (30–300) + **FX-Tempo** (Effekt-Tempo).
-
-### Bank 3 — Strobe / Musik
-
-![Bank 3 — Strobe/Musik](img/12_bank3_strobe_musik.png)
-
-- **STROBE (halten)** — gehaltener Master-Strobe über eine RGB-Matrix mit Algorithmus *Strobe*
-  + **Tempo**-Fader (Strobe-Tempo). Darunter die **MUSIK**-Anzeige (Now Playing / Als Nächstes) und die
-  Media-Tasten **`<<` / `> / ||` / `>>`** (Zurück / Play-Pause / Vor).
-
-### Bank 4 — Beat-Blink / Effekt-Farben
-
-![Bank 4 — Beat-Blink / Effekt-Farben](img/18_bank4_beat_blink.png)
-
-- **BEAT-BLINK** (Farbe pro Beat, an den **Tempo-Bus** gekoppelt): eine **Effekt-Farben**-Reihe, die
-  pro Beat umfärbt. **Klick = Farbe wählen, Rechtsklick = an/aus.** Das Tempo kommt vom gemeinsamen Bus
-  (siehe Bank *Tempo / BPM*) — hier wird nur die Farbe gesetzt.
-
-### Bank 5 — MH-Gobos / Spider / Bewegung
-
-![Bank 5 — MH-Gobos / Spider / Bewegung](img/19_bank5_mh_spider.png)
-
-- **MOVING-HEAD GOBOS** — Tasten je Gobo (Icon = aktives Gobo).
-- **SPIDER** — Farbe je Bar (links/rechts) als eigene Farb-Kacheln.
-- **BEWEGUNG** — Bewegungs-Effekte/EFX für Moving Heads und Spider.
+Weitere Bänke je nach Show, zum Beispiel **Strobe** (gehaltene Taste + Tempo-Fader, siehe
+Abschnitt 8), **Effekt-Farben** (eine Farbreihe, die pro Beat umfärbt: Klick = Farbe wählen,
+Rechtsklick = an/aus) oder **Moving Heads** (Gobo-Tasten, Bewegungs-Effekte).
 
 ## 4. Fertig & testen
 
-**Bearbeiten** wieder ausschalten → Run-Modus. Jetzt sind die Widgets bedienbar. Im
-Bearbeiten-Modus sieht dieselbe Bank so aus (Raster + Werkzeugleiste sichtbar):
+**Bearbeiten** wieder ausschalten → Run-Modus. Jetzt sind die Widgets bedienbar. Ein Klick auf
+**Lauflicht** startet das Farb-Lauflicht — die Taste leuchtet aktiv (heller Rahmen, Strich unten
+hell), und die Statuszeile nennt den laufenden Effekt:
 
-![Bank 1 im Bearbeiten-Modus](img/13_edit_modus_voll.png)
+![Run-Modus: „Lauflicht" läuft](img/07_taste_aktiv.png)
 
-Ein Klick auf **Farb-Chase** startet den Chase — der Button leuchtet aktiv (heller Rahmen):
+1. Die aktive Taste **Lauflicht**.
+2. Statuszeile **„Aktiver Effekt: Chaser · Farb-Lauflicht"**.
 
-![Aktiver Button (heller Rahmen)](img/05_button_aktiv.png)
-
-Ein Klick auf **LIVE-SHOW** startet den **kompletten Look** (MH-Bewegung + Farb-Chase +
-Dimmer 2x). In der **Live-Ansicht** läuft die Show dann musik-/BPM-synchron — der Farb-Chase
-über alle Geräte (inkl. Moving Heads) und der **Dimmer doppelt so schnell** (Helligkeits-%
-wandert):
-
-![Hardstyle-Show läuft (Live-Ansicht)](gif/hardstyle_show_live.gif)
+Ein zweiter Klick stoppt den Effekt wieder. Was die Geräte gerade tun, siehst du in der Sektion
+**Bühne** (2D-Ansicht) oder im 3D-Visualizer.
 
 ### Konsole auf einen zweiten Bildschirm legen (Popout)
 
@@ -189,7 +184,12 @@ VC-**Button** anklicken → am APC mini die Taste **drücken** → Bindung wird 
 → **🎹 MIDI Teach...**. Es öffnet sich ein Abbild der APC mini — entweder am Gerät die Taste/den Fader
 betätigen **oder** das Element im Bild direkt anklicken (geht auch **ohne** angeschlossene APC):
 
-![MIDI-Teach-Dialog (APC mini Abbild)](img/14_apc_midi_teach.png)
+![MIDI-Teach-Dialog (APC mini Abbild)](img/09_midi_teach.png)
+
+1. Das APC-mini-Abbild: Pad-Grid, Track-Tasten, Scene-Tasten, Fader.
+2. **Bindung entfernen** — löst eine vorhandene Bindung.
+3. **OK** speichert die gewählte Bindung. Ohne angeschlossene APC meldet der Dialog
+   „Kein MIDI-Eingang gefunden" — anklicken im Bild geht trotzdem.
 
 **APC-mini-Belegung** (Original): **Pad-Grid Note 0–63** (Reihe×Spalte), **Track-Tasten 64–71**
 (unter dem Grid), **Scene-Tasten 82–89** (rechte Spalte), **Fader CC 48–56** (CC56 = Master). Der
@@ -204,7 +204,7 @@ APC funktioniert die Bedienung weiter per Touch/Tastatur — nur ohne LED-Rückm
 
 → **Ausführlich** (Belegung, LED-Feedback, mk2): [APC mini mappen](../anleitung_apc_mapping/ANLEITUNG_APC.md).
 
-## 6. Tempo / BPM-Bedienelemente (Bank 2)
+## 6. Tempo / BPM-Bedienelemente
 
 LightOS bringt fertige BPM-Bausteine mit — einfach als Button/Fader/Widget anlegen und die Aktion wählen:
 - **Tap-Tempo** (TAP), **Musik-BPM** (AUTO-Audio-Erkennung an/aus), **BPM +/−** (Nudge),
@@ -213,17 +213,17 @@ LightOS bringt fertige BPM-Bausteine mit — einfach als Button/Fader/Widget anl
   **„Erkennung"**, Quelle **„PC-Audio (Systemstandard)"**) — dann folgen alle
   Beat-Effekte taktgenau der Musik. Die TEMPO-Anzeige auf Bank 2 zeigt die Live-BPM grün an.
 
-## 7. Musik-Player (Bank 3)
+## 7. Musik-Player
 
 Es gibt ein **Song-Anzeige-Widget** (zeigt „Now Playing"/nächstes Lied) sowie Media-Buttons
 (**`> / ||`** = Play/Pause, **`<<`** = Zurück, **`>>`** = Vor) — als Button mit der jeweiligen
 Media-Aktion. So steuerst du den
-internen Player direkt aus der VC (siehe Bank 3 oben). Ohne geladene Playlist steht dort
+internen Player direkt aus der VC (siehe Bank 2 oben). Ohne geladene Playlist steht dort
 „— (keine Playlist)".
 
 → **Ausführlich** (Playlist, Auto-Show, BPM-Sync): [Musik-Sync & Auto-Show](../anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md).
 
-## 8. Strobe (Bank 3)
+## 8. Strobe
 
 Der **STROBE**-Knopf ist ein **gehaltener** Master-Strobe: Aktion **„Funktion (nur gehalten)"** auf eine
 RGB-Matrix mit Algorithmus **Strobe** (treibt alle PAR + Spider weiß an/aus). Der **Tempo**-

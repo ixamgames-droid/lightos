@@ -229,6 +229,12 @@ def bausteine_von(funktion,
         for g in geraete:
             attrs.append(getattr(g, "pan_attr", "pan") or "pan")
             attrs.append(getattr(g, "tilt_attr", "tilt") or "tilt")
+        # Codex-Review #1087: „Dimmer/Shutter öffnen“ (open_beam) schreibt
+        # ``intensity = 255`` (EfxInstance.write) — dann ist die Bewegung auch
+        # ein Dimmer-Schreiber. Der Shutter geht nur mit Beleg auf und zaehlt
+        # hier nicht.
+        if getattr(f, "open_beam", False) and geraete:
+            attrs.append("intensity")
         return _aus_attributen(attrs)
 
     if typ == "MappedChannelChange":

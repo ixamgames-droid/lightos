@@ -33,6 +33,7 @@ NOT-AUS spiegeln den Laser-Safety-Zustand des Managers.
 
 - `tests/test_laser_capability.py` — Laser-Erkennung.
 - `tests/test_laser_dmx_estop.py` — NOT-AUS-Pfad.
+- `tests/test_las31_ein_weg_ausloesen.py` — der NOT-AUS-Knopf geht wie Kopfleiste und VC-Taste über `AppState.laser_notaus_ausloesen` (LAS-31).
 - `tests/test_laser_pattern_picker.py` — Muster-Kacheln.
 - `tests/test_laser_figure.py`, `test_laser_snap_scene.py`, `test_laser_not_spider.py`.
 
