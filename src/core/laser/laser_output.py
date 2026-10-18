@@ -241,6 +241,17 @@ class LaserOutputManager:
             get_sync().emit(SyncEvent.LASER_ESTOP, None)
         except Exception:
             pass
+        # LAS-39: fehlte beim Patchen die Auskunft der Geraete-Datenbank, sie
+        # jetzt nachholen — erst NACH DMX-Latch, Netzwerk-NOT-AUS und
+        # Bestaetigung (Codex-Review #1095): eine gesperrte Datenbank antwortet
+        # erst nach Sekunden. In der App laeuft die Abfrage im Hintergrund
+        # (``AppState.laser_erkennung_nachholen``).
+        nachholen = getattr(self._state, "laser_erkennung_nachholen", None)
+        if callable(nachholen):
+            try:
+                nachholen()
+            except Exception as e:
+                print(f"[laser_output] NOT-AUS: Laser-Erkennung nachholen fehlgeschlagen: {e}")
 
     def clear_estop_all(self):
         with self._lock:

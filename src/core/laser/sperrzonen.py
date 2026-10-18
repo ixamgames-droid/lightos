@@ -85,9 +85,23 @@ MELDUNG_SHOW_OHNE_ZONEN = ("Die vorige Show hatte Sperrzonen, diese hat keine "
 HINWEIS_NUR_ANZEIGE = ("Nur Anzeige — schaltet den Laser NICHT ab "
                        "(am Gerät noch nicht abgenommen)")
 
+#: LAS-35: die EINE Zeile, die im Planer dauernd sichtbar bleibt.
+GRENZEN_KOMPAKT = ("Nur Anzeige — schaltet den Laser nicht ab. Kein Ersatz für "
+                   "Blende, Abstände, Laserschutzbeauftragten.")
+
+#: LAS-35: woher die Randwinkel eines Lasers stammen (Abschnitt
+#: ``laser_felder``, Schluessel ``quelle``; fehlt er, ist nichts vermerkt).
+QUELLE_PROFIL = "profil"
+QUELLE_DATENBLATT = "datenblatt"
+QUELLE_EINGEMESSEN = "eingemessen"
+QUELLE_HAND = "hand"
+QUELLEN = (QUELLE_PROFIL, QUELLE_DATENBLATT, QUELLE_EINGEMESSEN, QUELLE_HAND)
+
 STATUS_ERREICHT = "erreicht"
 STATUS_FREI = "frei"
 STATUS_NICHT_PRUEFBAR = "nicht_pruefbar"
+#: Nur fuer die Ampel je Zone (:func:`zonen_ampel`): es ist kein DMX-Laser da.
+STATUS_KEIN_LASER = "kein_laser"
 
 
 def _zahl(wert, default: float) -> float:
@@ -173,12 +187,19 @@ class LaserFeld:
     unten: float | None = None
     zuschlag: float = ZUSCHLAG_STANDARD
     geraet: str = ""
+    #: LAS-35: Herkunft der Winkel (:data:`QUELLEN`, leer = nicht vermerkt)
+    #: und der Tag dazu (``JJJJ-MM-TT``, nur beim Einmessen gesetzt).
+    quelle: str = ""
+    quelle_datum: str = ""
 
     def __post_init__(self):
         for r in RAENDER:
             setattr(self, r, _winkel_oder_none(getattr(self, r)))
         self.zuschlag = zuschlag_begrenzen(self.zuschlag)
         self.geraet = str(self.geraet or "")
+        self.quelle = self.quelle if self.quelle in QUELLEN else ""
+        datum = self.quelle_datum if isinstance(self.quelle_datum, str) else ""
+        self.quelle_datum = datum if (self.quelle and _ist_datum(datum)) else ""
 
     def passt_zu(self, kennung) -> bool:
         """Gilt dieses Feld fuer das Geraet mit ``kennung``? Ungebunden (eine
@@ -199,6 +220,12 @@ class LaserFeld:
         d["zuschlag"] = float(self.zuschlag)
         if self.geraet:
             d["geraet"] = self.geraet
+        # LAS-35: nur schreiben, was gesetzt ist — ein Feld ohne Herkunft sieht
+        # in der Datei aus wie bisher.
+        if self.quelle:
+            d["quelle"] = self.quelle
+        if self.quelle_datum:
+            d["quelle_datum"] = self.quelle_datum
         return d
 
     @classmethod
@@ -208,7 +235,38 @@ class LaserFeld:
         return cls(links=d.get("links"), rechts=d.get("rechts"),
                    oben=d.get("oben"), unten=d.get("unten"),
                    zuschlag=d.get("zuschlag", ZUSCHLAG_STANDARD),
-                   geraet=d.get("geraet") if isinstance(d.get("geraet"), str) else "")
+                   geraet=d.get("geraet") if isinstance(d.get("geraet"), str) else "",
+                   quelle=d.get("quelle") if isinstance(d.get("quelle"), str) else "",
+                   quelle_datum=d.get("quelle_datum", ""))
+
+
+def _ist_datum(text) -> bool:
+    try:
+        import datetime
+        datetime.date.fromisoformat(text)
+        return len(text) == 10
+    except (TypeError, ValueError):
+        return False
+
+
+def datum_deutsch(iso: str) -> str:
+    """``2026-10-11`` -> ``11.10.2026`` (leer, wenn unlesbar)."""
+    if not _ist_datum(iso):
+        return ""
+    j, m, t = iso.split("-")
+    return f"{t}.{m}.{j}"
+
+
+def quelle_text(feld) -> str:
+    """Woher die Randwinkel stammen, als Klartext fuer die Laser-Karte."""
+    if feld is None or all(getattr(feld, r) is None for r in RAENDER):
+        return "nicht angegeben"
+    if feld.quelle == QUELLE_EINGEMESSEN:
+        tag = datum_deutsch(feld.quelle_datum)
+        return f"eingemessen am {tag}" if tag else "eingemessen"
+    return {QUELLE_PROFIL: "Geräteprofil", QUELLE_DATENBLATT: "Datenblatt",
+            QUELLE_HAND: "von Hand eingetragen"}.get(feld.quelle,
+                                                     "Herkunft nicht vermerkt")
 
 
 def geraete_kennung(fx) -> str:
@@ -526,11 +584,20 @@ def kann_erreichen(pos, rot_deg, feld: LaserFeld, zone: Sperrzone,
     ebenen = feld_ebenen(rot_deg, feld)
     if punkt_in_zone(spitze, zone, rand):
         return True
-    ecken = zonen_ecken(zone, rand)
     # Der Schnitt aus (nach vorn unbegrenzter) Pyramide und Quader ist
     # beschraenkt und konvex; liegt die Spitze ausserhalb des Quaders, hat er
     # deshalb immer einen Anteil an einer Quaderflaeche. Es reicht also, die
     # sechs Flaechen an den fuenf Ebenen zu beschneiden.
+    return bool(_schnitt_polygone(spitze, ebenen, zone, rand, erstes_genuegt=True))
+
+
+def _schnitt_polygone(spitze, ebenen, zone: Sperrzone, rand: float,
+                      erstes_genuegt: bool = False) -> list:
+    """Die Anteile der sechs Quaderflaechen, die im Feld liegen. DIE Rechnung
+    hinter „erreicht": :func:`kann_erreichen` fragt, ob es einen gibt,
+    :func:`erreichter_teil` zeichnet sie."""
+    ecken = zonen_ecken(zone, rand)
+    aus = []
     for flaeche in _FLAECHEN:
         polygon = [ecken[i] for i in flaeche]
         for n in ebenen:
@@ -538,8 +605,198 @@ def kann_erreichen(pos, rot_deg, feld: LaserFeld, zone: Sperrzone,
             if not polygon:
                 break
         if polygon:
-            return True
-    return False
+            aus.append(polygon)
+            if erstes_genuegt:
+                break
+    return aus
+
+
+# ── LAS-35: Umrisse fuer den Planer (Draufsicht x/z, Seitenansicht z/y) ─────
+
+def huelle_2d(punkte) -> list:
+    """Konvexe Huelle (gegen den Uhrzeigersinn), Andrew-Kette."""
+    pts = sorted({(round(float(p[0]), 9), round(float(p[1]), 9)) for p in punkte})
+    if len(pts) <= 2:
+        return pts
+
+    def _kreuz(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    unten, oben = [], []
+    for p in pts:
+        while len(unten) >= 2 and _kreuz(unten[-2], unten[-1], p) <= 0:
+            unten.pop()
+        unten.append(p)
+    for p in reversed(pts):
+        while len(oben) >= 2 and _kreuz(oben[-2], oben[-1], p) <= 0:
+            oben.pop()
+        oben.append(p)
+    return unten[:-1] + oben[:-1]
+
+
+def flaeche_2d(polygon) -> float:
+    n = len(polygon)
+    if n < 3:
+        return 0.0
+    return abs(sum(polygon[i][0] * polygon[(i + 1) % n][1]
+                   - polygon[(i + 1) % n][0] * polygon[i][1]
+                   for i in range(n))) / 2.0
+
+
+def _ansichten(punkte) -> dict:
+    """3D-Punkte als zwei Umrisse: ``drauf`` = (x, z), ``seite`` = (z, y)."""
+    return {"drauf": huelle_2d([(p[0], p[2]) for p in punkte]),
+            "seite": huelle_2d([(p[2], p[1]) for p in punkte])}
+
+
+def zonen_umriss(zone: Sperrzone, rand: float = 0.0) -> dict:
+    """Die Zone in beiden Ansichten (``drauf``/``seite``)."""
+    return _ansichten(zonen_ecken(zone, rand))
+
+
+#: Kleiner als das ist kein zeichenbarer Fleck (Quadratmeter).
+_FLECK_MIN_M2 = 1e-4
+
+
+def erreichter_teil(pos, rot_deg, feld: LaserFeld, zone: Sperrzone,
+                    rand: float = ZONEN_RAND_M):
+    """Der Teil der Zone, den das Feld erreicht — als Umriss fuer Draufsicht
+    und Seitenansicht (``{"drauf": [...], "seite": [...]}``), oder ``None``,
+    wenn der Laser die Zone nicht erreicht.
+
+    Dieselbe Entscheidung wie :func:`pruefe_laser` (gleiche Funktionen, gleiche
+    Reihenfolge): sagt die Rechnung „erreicht", kommt hier IMMER ein Umriss
+    zurueck. Ist der Schnitt zu duenn zum Zeichnen (das Feld streift nur eine
+    Kante) oder sitzt nur das Geraet in der Zone, ist es die ganze Zone —
+    lieber zu viel schraffiert als ein „frei" im Bild.
+
+    Wirft ``ValueError`` bei fehlenden Randwinkeln/unlesbarer Position."""
+    spitze = feld_spitze(pos, rot_deg)
+    if not all(math.isfinite(v) for v in spitze):
+        raise ValueError("Position unlesbar")
+    ebenen = feld_ebenen(rot_deg, feld)
+    punkte = [p for polygon in _schnitt_polygone(spitze, ebenen, zone, rand)
+              for p in polygon]
+    spitze_drin = punkt_in_zone(spitze, zone, rand)
+    if not (punkte or spitze_drin or punkt_in_zone(pos, zone)):
+        return None
+    if spitze_drin:
+        punkte.append(spitze)
+    teil = _ansichten(punkte)
+    ganz = zonen_umriss(zone, rand)
+    for ansicht in ("drauf", "seite"):
+        if flaeche_2d(teil[ansicht]) < _FLECK_MIN_M2:
+            teil[ansicht] = ganz[ansicht]
+    return teil
+
+
+def feld_umriss(pos, rot_deg, feld: LaserFeld, laenge: float,
+                mit_zuschlag: bool = True) -> dict:
+    """Das Feld eines Lasers als Faecher in beiden Ansichten: Spitze im
+    Austrittsfenster, die vier Kantenstrahlen ``laenge`` Meter weit (entlang
+    der Geraeteachse gemessen). Nur Darstellung."""
+    if not feld.vollstaendig:
+        raise ValueError("Randwinkel fehlen")
+    vorn, rechts, oben = geraete_achsen(rot_deg)
+    spitze = feld_spitze(pos, rot_deg)
+    z = zuschlag_begrenzen(feld.zuschlag) if mit_zuschlag else 0.0
+
+    def _tan(winkel):
+        return math.tan(math.radians(min(_WINKEL_GESAMT_MAX, winkel + z)))
+
+    punkte = [spitze]
+    for a in (_tan(feld.rechts), -_tan(feld.links)):
+        for b in (_tan(feld.oben), -_tan(feld.unten)):
+            punkte.append(tuple(
+                spitze[i] + float(laenge) * (vorn[i] + a * rechts[i] + b * oben[i])
+                for i in range(3)))
+    return _ansichten(punkte)
+
+
+# ── LAS-35: Vorlagen ────────────────────────────────────────────────────────
+
+#: ``(kennung, Knopftext, Zonenname, breite, hoehe, tiefe)``
+VORLAGEN = (
+    ("publikum", "Publikum bis 3 m Höhe vor der Bühne", "Publikum", 10.0, 3.0, 6.0),
+    ("technik", "Technik/FOH", "Technik", 3.0, 2.5, 2.0),
+    ("gang", "Gang", "Gang", 1.5, 2.5, 6.0),
+)
+#: Abstand zwischen Buehnen-Vorderkante und Publikum bzw. Publikum und FOH.
+_VORLAGE_LUECKE_M = 1.0
+
+
+def freier_name(daten: "SperrzonenDaten", wunsch: str) -> str:
+    vorhandene = {z.name for z in daten.zonen}
+    name, n = wunsch, 2
+    while name in vorhandene:
+        name, n = f"{wunsch} {n}", n + 1
+    return name
+
+
+def vorlage_zone(kennung: str, daten: "SperrzonenDaten",
+                 buehne_vorn_z: float = 2.0) -> Sperrzone:
+    """Eine sinnvoll platzierte Zone zum Zurechtziehen. ``buehne_vorn_z`` =
+    Vorderkante der Buehne (dahinter, Richtung ``+z``, steht das Publikum).
+
+    Publikum: mittig vor der Buehne, Boden bis 3 m. Technik/FOH: mittig hinter
+    der Publikumsflaeche. Gang: rechts neben der Publikumsflaeche."""
+    eintrag = next((v for v in VORLAGEN if v[0] == kennung), None)
+    if eintrag is None:
+        raise ValueError(f"unbekannte Vorlage {kennung!r}")
+    _k, _knopf, name, breite, hoehe, tiefe = eintrag
+    pub = next(v for v in VORLAGEN if v[0] == "publikum")
+    pub_vorn = float(buehne_vorn_z) + _VORLAGE_LUECKE_M
+    x, z = 0.0, pub_vorn + tiefe / 2
+    if kennung == "technik":
+        z = pub_vorn + pub[5] + _VORLAGE_LUECKE_M + tiefe / 2
+    elif kennung == "gang":
+        x = pub[3] / 2 + breite / 2
+    return Sperrzone(name=freier_name(daten, name), x=x, y=0.0, z=z,
+                     breite=breite, hoehe=hoehe, tiefe=tiefe)
+
+
+def zonen_ampel(laser, positionen, rotationen, daten: "SperrzonenDaten") -> dict:
+    """Je Zone: ``{"status", "laser": [fid…], "ungeprueft": [fid…]}``.
+
+    Gefragt wird :func:`pruefe_laser` — je Laser und Zone einzeln, also
+    dieselbe Antwort wie die Meldung je Laser. „frei" gibt es nur, wenn JEDER
+    Laser pruefbar war und keiner die Zone erreicht."""
+    positionen, rotationen = positionen or {}, rotationen or {}
+    ampel = {}
+    for zone in daten.zonen:
+        erreicht, ungeprueft = [], []
+        for eintrag in laser:
+            fid, name = int(eintrag[0]), eintrag[1]
+            kennung = eintrag[2] if len(eintrag) > 2 else None
+            b = pruefe_laser(fid, name, positionen.get(fid), rotationen.get(fid),
+                             daten.feld(fid, kennung), [zone])
+            if b.status == STATUS_ERREICHT:
+                erreicht.append(fid)
+            elif b.status == STATUS_NICHT_PRUEFBAR:
+                ungeprueft.append(fid)
+        if erreicht:
+            status = STATUS_ERREICHT
+        elif ungeprueft:
+            status = STATUS_NICHT_PRUEFBAR
+        elif not laser:
+            status = STATUS_KEIN_LASER
+        else:
+            status = STATUS_FREI
+        ampel[zone.id] = {"status": status, "laser": erreicht,
+                          "ungeprueft": ungeprueft}
+    return ampel
+
+
+def ampel_text(eintrag: dict) -> str:
+    status = eintrag.get("status")
+    if status == STATUS_ERREICHT:
+        return "erreicht von Laser " + ", ".join(str(f) for f in eintrag["laser"])
+    if status == STATUS_NICHT_PRUEFBAR:
+        return "nicht prüfbar (Laser " + ", ".join(
+            str(f) for f in eintrag["ungeprueft"]) + ")"
+    if status == STATUS_KEIN_LASER:
+        return "kein Laser"
+    return "frei"
 
 
 # ── Befund je Laser ──────────────────────────────────────────────────────────
