@@ -115,7 +115,9 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    ihn aus, der Blackout schaltet ihn ganz ab, die 3D-Ansicht zeichnet Strahlen.
 3. **Leistung** vom Typenschild (30 W).
 4. Gibt es für dein Gerät eine QLC+-Datei (`.qxf`), kannst du sie hier als
-   Startpunkt laden und danach gegen das Handbuch prüfen.
+   Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
+   Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn
+   du es umbaust. Die Hinweisliste unten zeigt sie an.
 
 ## 4. Modus und Kanäle
 
@@ -284,7 +286,10 @@ bzw. Wirkung ist am Gerät noch nicht bestätigt.
 **Ein vorhandenes Profil nachtragen:** im Fixture-Editor **Als LightOS-Profil
 exportieren…**, im Generator oben **LightOS-Profil (.json) laden…**, die
 Laser-Seiten ausfüllen und speichern. Der Generator legt immer ein **neues**
-eigenes Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage.
+Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage. Es
+übernimmt die Herkunft und Lizenz der geladenen Datei; nur ein frei gebautes
+Profil gilt als „eigenes Profil“. Nennt die Vorlage keine belegbare Herkunft,
+speichert der Generator nicht und zeigt den Hinweis „Herkunft nicht belegbar“.
 Beim Export und Import eines Profils und beim Bearbeiten im Fixture-Editor
 bleiben die Laser-Angaben erhalten.
 
