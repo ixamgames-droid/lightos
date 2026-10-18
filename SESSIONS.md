@@ -63,7 +63,7 @@
 | LAS-31 | A | - | 2026-10-14T18:14Z | - |
 | XPLAT-23 | A | - | 2026-10-14T18:14Z | - |
 | LIZ-2 | A | - | 2026-10-14T18:14Z | - |
-| DOC-16 | A | - | 2026-10-14T18:14Z | - |
+| DOC-16 | A | docs/doc16-anleitungen-neu-bebildert | 2026-10-18T15:37Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
 | CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-14T19:43Z | - |
 
@@ -162,7 +162,6 @@
 
 ## Verlauf
 
-- 2026-10-14T14:28Z A done IMP-1
 - 2026-10-14T14:50Z A aktualisiert QA-97: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa97-reihenfolge-laser-und-ui69
 - 2026-10-14T14:50Z A aktualisiert QA-98: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa98-weissband-test-schneller
 - 2026-10-14T15:06Z A done VCB-45
@@ -192,3 +191,4 @@
 - 2026-10-14T21:35Z A done ENG-39
 - 2026-10-14T22:23Z A done LAS-35
 - 2026-10-18T15:37Z 117 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-18T15:37Z A aktualisiert DOC-16: Branch - -> docs/doc16-anleitungen-neu-bebildert
