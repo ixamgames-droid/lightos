@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType
+from .patch_index import PatchListe
 from . import fade_curve as fc
 
 if TYPE_CHECKING:
@@ -280,6 +281,8 @@ class Scene(Function):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _find_fixture(patch_cache: list["PatchedFixture"], fid: int):
+    if type(patch_cache) is PatchListe:         # ENG-30: nachschlagen
+        return patch_cache.finde(fid)
     for f in patch_cache:
         if f.fid == fid:
             return f
