@@ -86,7 +86,11 @@ Tab **Enttec Pro USB**:
    pre-filled with the saved value; set it deliberately **before** you click
    **Verbinden** (connect).
 4. **Verbinden** — removes any other output of this universe, opens the adapter and
-   saves the assignment. The status then first reports
+   saves the assignment. **One adapter carries exactly one universe:** if the same
+   adapter was on another universe before, that row loses it (the row stays as
+   `Disabled`), and the status says so, for example
+   `… · war Universe 2 — jetzt Universe 1` (was universe 2 — now universe 1). The status
+   then first reports
    `Eingerichtet: … (gespeichert), verbinde …` (set up: … (saved), connecting …) and
    shortly afterwards the result: `Verbunden: … (gespeichert)` (connected: … (saved)),
    or `Port lässt sich nicht öffnen — gespeichert, aber es geht kein DMX raus` (port
@@ -246,6 +250,11 @@ When saving, LightOS checks the table and speaks up if
   anyway. What counts as "the same target" is explained in
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel)
   (German).
+- **the same adapter is in several rows** (*Ein Adapter auf mehreren Universen* = one
+  adapter on several universes) — that is, `Enttec` twice with the same port or `uDMX` twice with the same adapter. One adapter
+  sends only one universe. It is saved anyway, but the adapter is then set up for
+  **none** of them until only one row names it. The quickest fix is the **Enttec Pro
+  USB** tab: choose the universe and click **Verbinden** (step 2).
 
 ## 6. Check: the Output monitor
 
@@ -331,7 +340,7 @@ Universe 1 had its output removed while fixtures are patched on it:
    | `Enttec: <Port> verbindet …` (= connecting …; orange) | The port is being opened right now. If it stays like that, the adapter cannot be reached. |
    | `Enttec: <Port> aktiv (1 Universe)` (= active; green) | Set up, and the adapter is sending. |
    | `Enttec: <Port> sendet NICHT (Universe <n>)` (= is NOT sending; red) | Set up, but the port is not open — no DMX is going out. Check the USB cable and the port. |
-   | `Enttec: falsch konfiguriert` (= misconfigured; orange) | The port entered cannot be right on this computer (e.g. a Windows `COM` port on Linux). The tooltip gives the reason. |
+   | `Enttec: falsch konfiguriert` (= misconfigured; orange) | The port entered cannot be right on this computer (e.g. a Windows `COM` port on Linux), or the same adapter is on several universes and is therefore set up for none of them. The tooltip gives the reason. |
 
 3. **Output indicator** at the bottom right: normally a list such as
    `Ausgabe: U1 Art-Net` (*Ausgabe* = output; three entries at most, the rest as `+n`).
@@ -351,8 +360,8 @@ kiosk mode). If **no** output is set up at all, a subtle `Probenmodus — es wir
 gesendet` (rehearsal mode — no DMX is being sent) is shown there.
 
 The bar lies **on top of** the upper edge of the view currently shown, directly below the
-bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with the
-laser emergency stop). It does not push anything down: when it appears or disappears, all
+bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with
+BLACKOUT and the laser emergency stop). It does not push anything down: when it appears or disappears, all
 buttons of the Virtual Console and all other controls stay where they are. In return it
 covers a narrow line at the top of the view. A click on the bar does not trigger anything
 underneath it. The bar is always a single line high; a text that is too long is shortened
@@ -382,31 +391,11 @@ while the fault persists:
 - The collapsed state is not saved: after a restart the full bar is shown again. Status bar
   and DMX monitor show the fault unchanged.
 
-## 9. What goes out when you quit or remove an output
-
-Many adapters hold the last frame they received even when no program is sending
-any more – an ENTTEC DMX USB Pro or a uDMX adapter as well as most Art-Net and
-sACN nodes. So that
-nothing keeps shining after LightOS is closed, LightOS sends **one last frame**
-first:
-
-- **On quit:** every output gets a frame like a blackout – all light channels to
-  0, lasers to their **off values** (not simply 0, see the laser guide).
-  Pan/tilt, gobo and optics of moving heads with a dimmer stay where they are, so
-  the heads do not travel to their home position.
-- **When an output is removed** (universe deleted, output set to „Disabled“,
-  Art-Net or sACN unticked): the same frame to exactly that output.
-- **Not on „Übernehmen“** (apply): the new output follows immediately there, and a
-  dark frame would be a flash on stage.
-
-If an adapter does not respond (unplugged, driver hanging), LightOS waits about
-one second at most and then quits anyway. That one adapter gets no last frame –
-all others do.
-
-> **Important:** the last frame is no substitute for a main switch. If the
-> computer crashes or the power fails, nobody sends anything any more, and an
-> adapter holds whatever it received last. Lasers therefore belong on their own
-> reachable switch at the device.
+The same red bar appears if the saved configuration has **one adapter on several
+universes** (`… — steht auf Universe 1 und 2, für keines eingerichtet` = is on universes 1
+and 2, set up for none). LightOS does not guess which one was meant and sets the adapter
+up for none of them — otherwise a rig might receive the values of another universe. To
+fix it: choose the right universe in the **Enttec Pro USB** tab and click **Verbinden**.
 
 ## 9. What goes out when you quit or remove an output
 

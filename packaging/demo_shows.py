@@ -154,9 +154,14 @@ def sandbox_umgebung(basis: str, vorlage: dict | None = None) -> dict:
         "XDG_CONFIG_HOME": os.path.join(basis, "xdg", "config"),
         "XDG_CACHE_HOME": os.path.join(basis, "xdg", "cache"),
         "XDG_STATE_HOME": os.path.join(basis, "xdg", "state"),
-        "TMP": os.path.join(basis, "tmp"),
-        "TEMP": os.path.join(basis, "tmp"),
-        "TMPDIR": os.path.join(basis, "tmp"),
+        # Temp-Bereich = der ganze Sandkasten, nicht ``basis/tmp``: die
+        # Werkzeug-Sandbox (``tools/_werkzeug_sandbox``) laesst eine Vorgabe nur
+        # stehen, wenn sie im Temp-Bereich liegt. Mit ``basis/tmp`` galten die
+        # Datenpfade daneben als fremd, jeder Kindprozess bekam eine leere
+        # Bibliothek und spielte sie neu ein (~10 s je Prozess, CDX-59).
+        "TMP": basis,
+        "TEMP": basis,
+        "TMPDIR": basis,
     }
     env = dict(os.environ if vorlage is None else vorlage)
     for name in _ENTFERNEN:

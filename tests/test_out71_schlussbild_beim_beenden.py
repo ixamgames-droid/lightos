@@ -310,7 +310,9 @@ class AusgabeEntfernenTest(unittest.TestCase):
         # der unveraenderte Adapter bekommt kein Bild (kein Dunkel-Blitzer),
         # ein anderer Typ oder ein anderes Ziel schon.
         self.assertEqual(zustand.count("schlussbild=True)"), 2)
-        self.assertIn('if output == "Disabled":\n'
+        # OUT-74: eine Zeile mit doppeltem Adapter bekommt ebenfalls keinen
+        # Nachfolger (der Adapter wird fuer keine Zeile eingerichtet).
+        self.assertIn('if output == "Disabled" or konflikt is not None:\n'
                       '                    self.output_manager.remove_output(num, schlussbild=True)\n'
                       '                else:\n', zustand)
         ansage = zustand.index("ansagen(num, *nachfolger)\n")

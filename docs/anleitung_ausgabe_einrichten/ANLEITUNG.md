@@ -83,7 +83,10 @@ Reiter **Enttec Pro USB**:
    ist mit dem gespeicherten Wert vorbelegt; stell es **vor** dem Klick auf
    **Verbinden** bewusst ein.
 4. **Verbinden** — entfernt einen anderen Ausgang dieses Universums, öffnet den Adapter
-   und speichert die Zuordnung. Danach meldet der Status erst
+   und speichert die Zuordnung. **Ein Adapter trägt genau ein Universum:** lag derselbe
+   Adapter bisher auf einem anderen Universum, verliert jene Zeile ihn (sie bleibt als
+   `Disabled` stehen), und der Status sagt es dazu, zum Beispiel
+   `… · war Universe 2 — jetzt Universe 1`. Danach meldet der Status erst
    `Eingerichtet: … (gespeichert), verbinde …` und wenig später das Ergebnis:
    `Verbunden: … (gespeichert)`, oder `Port lässt sich nicht öffnen — gespeichert, aber
    es geht kein DMX raus`, oder `antwortet nicht — Port/Kabel prüfen`.
@@ -233,6 +236,12 @@ Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
   am Empfänger zu Flackern; gespeichert wird trotzdem. Was dabei als „dasselbe Ziel"
   zählt, erklärt
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel).
+- **derselbe Adapter in mehreren Zeilen** steht (*Ein Adapter auf mehreren Universen*) —
+  also zweimal `Enttec` mit demselben Port oder zweimal `uDMX` mit demselben Adapter. Ein
+  Adapter sendet nur ein Universum.
+  Gespeichert wird trotzdem, eingerichtet wird der Adapter so aber für **keines** davon,
+  bis nur noch eine Zeile ihn nennt. Am schnellsten behebt es der Reiter
+  **Enttec Pro USB**: Universe wählen und **Verbinden** (Schritt 2).
 
 ## 6. Kontrolle: der Output-Monitor
 
@@ -315,7 +324,7 @@ der Ausgang genommen, während dort Geräte gepatcht sind:
    | `Enttec: <Port> verbindet …` (orange) | Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter nicht erreichbar. |
    | `Enttec: <Port> aktiv (1 Universe)` (grün) | Eingerichtet, und der Adapter sendet. |
    | `Enttec: <Port> sendet NICHT (Universe <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
-   | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux). Der Tooltip nennt den Grund. |
+   | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux), oder derselbe Adapter steht auf mehreren Universen und ist deshalb für keines eingerichtet. Der Tooltip nennt den Grund. |
 
 3. **Ausgabe-Anzeige** unten rechts: normal eine Liste wie `Ausgabe: U1 Art-Net`
    (höchstens drei Einträge, der Rest als `+n`). Mit `⚠` und orange:
@@ -334,8 +343,8 @@ sendet; ein Klick auf den Text öffnet den Dialog aus Schritt 1 (nicht im Kiosk-
 gesendet`.
 
 Der Balken liegt **über** dem oberen Rand der gerade gezeigten Ansicht, direkt unter der
-Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit dem
-Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
+Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit
+BLACKOUT und Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
 Tasten der Virtual Console und alle anderen Bedienelemente an ihrem Platz. Dafür verdeckt
 er eine schmale Zeile am oberen Rand der Ansicht. Ein Klick auf den Balken löst nichts aus,
 was darunter liegt. Der Balken ist immer nur eine Zeile hoch; ein zu langer Text wird mit
@@ -366,31 +375,11 @@ die Störungsmeldung nicht, solange die Störung anliegt:
 - Der eingeklappte Zustand wird nicht gespeichert: Nach einem Neustart steht wieder der volle
   Balken. Statusleiste und DMX-Monitor zeigen die Störung unverändert an.
 
-## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
-
-Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
-sendet – ein ENTTEC DMX USB Pro oder ein uDMX-Adapter ebenso wie die meisten
-Art-Net- und sACN-Nodes.
-Damit nach dem Schließen von LightOS nichts weiterleuchtet, sendet LightOS
-vorher **ein letztes Bild**:
-
-- **Beim Beenden:** jede Ausgabe bekommt ein Bild wie bei einem Blackout – alle
-  Lichtkanäle auf 0, Laser auf ihre **Aus-Werte** (nicht einfach 0, siehe
-  Laser-Anleitung). Pan/Tilt, Gobo und Optik von Moving Heads mit Dimmer bleiben
-  stehen; die Köpfe fahren also nicht in die Grundstellung.
-- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
-  gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
-- **Nicht beim „Übernehmen“** einer Einstellung: dort folgt sofort die neue
-  Ausgabe, ein dunkles Bild wäre ein Blitzer auf der Bühne.
-
-Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
-rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
-dann kein letztes Bild – alle anderen schon.
-
-> **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
-> ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
-> was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
-> Schalter am Gerät.
+Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
+mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
+LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
+sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
+**Enttec Pro USB** das richtige Universe wählen und **Verbinden**.
 
 ## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
 

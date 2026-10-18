@@ -617,6 +617,22 @@ class RueckfrageTest(unittest.TestCase):
         om = types.SimpleNamespace(ausgabe_status=kaputt)
         self.assertEqual(oc._andere_ausgaben(om, 1, "Enttec", "COM3"), [])
 
+    def test_artnet_broadcast_bei_gewaehlter_nic_ist_dieselbe_ausgabe(self):
+        """Codex-Review #1057 (CDX-59): der Sender meldet bei gewaehlter NIC
+        den gerichteten Broadcast, der Dialog kennt 255.255.255.255."""
+        from unittest import mock
+        om = types.SimpleNamespace(ausgabe_status=lambda: [
+            {"universum": 1, "weg": "Art-Net", "ziel": "192.168.178.255"}])
+        with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
+                        return_value="192.168.178.255"):
+            self.assertEqual(oc._andere_ausgaben(om, 1, "Art-Net", "255.255.255.255"), [])
+            # Ein anderes Ziel bleibt eine andere Ausgabe.
+            self.assertEqual(len(oc._andere_ausgaben(om, 1, "Art-Net", "10.0.0.5")), 1)
+        # Ohne gewaehlte NIC bleibt der Limited Broadcast, wie gesendet.
+        with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
+                        side_effect=lambda d="255.255.255.255": d):
+            self.assertEqual(len(oc._andere_ausgaben(om, 1, "Art-Net", "255.255.255.255")), 1)
+
     def test_vorgabe_der_frage_ist_nein(self):
         import inspect
         quelle = inspect.getsource(oc.OutputConfigDialog._ersetzen_bestaetigt)
