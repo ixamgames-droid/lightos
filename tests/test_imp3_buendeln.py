@@ -24,13 +24,86 @@ from src.core.undo import UndoStack, get_undo_stack                  # noqa: E40
 
 PAR = "Stage Light ZQ01424"          # Generic, 8-Kanal RGBW
 MH = "ZQ02001 Mini Moving Head"      # U King, 11-Kanal
-LASER = "Galaxian 3D"                # American DJ, Typ laser, „DMX Mode“ (5)
-BAR = "Mega Tri Bar"                 # American DJ, Mehrkopf: „54 Channel Mode“
+# Laser und Mehrkopf-Balken legt dieser Test SELBST in die Test-Bibliothek
+# (``_eigene_profile``): PAR und Moving Head liefert LightOS mit, einen Laser mit
+# „DMX Mode“ und einen 18-Kopf-Balken nicht. Vorher kamen beide aus der
+# gewachsenen Bibliothek des Rechners (QLC+-Importe „Galaxian 3D“/„Mega Tri
+# Bar“) — lokal gruen, in der CI (frisch geseedete DB) rot.
+HERST = "IMP3-Testwerk"
+LASER = "IMP3 Test-Laser"            # Typ laser, „DMX Mode“: 5 Kanaele, laser_*
+BAR = "IMP3 Test-Balken"             # Mehrkopf: „54 Channel Mode“ = 18 x RGB
+BAR_KOEPFE = 18
+
+
+def _laser_profil() -> dict:
+    kanaele = [("Betriebsart", "macro"), ("Muster", "laser_bank"),
+               ("X", "laser_x"), ("Y", "laser_y"), ("Farbe", "laser_color")]
+    return {"manufacturer": HERST, "short_mfr": "IMP3T", "name": LASER,
+            "short_name": "IMP3LASER", "fixture_type": "laser",
+            "source": "user",
+            "modes": [{"name": "DMX Mode", "channel_count": len(kanaele),
+                       "channels": [{"name": n, "attribute": a}
+                                    for n, a in kanaele]}]}
+
+
+def _balken_profil() -> dict:
+    kanaele = [{"name": f"{farbe} {k}", "attribute": attr}
+               for k in range(1, BAR_KOEPFE + 1)
+               for farbe, attr in (("Rot", "color_r"), ("Grün", "color_g"),
+                                   ("Blau", "color_b"))]
+    return {"manufacturer": HERST, "short_mfr": "IMP3T", "name": BAR,
+            "short_name": "IMP3BAR", "fixture_type": "led_bar",
+            "source": "user",
+            "modes": [{"name": "54 Channel Mode", "channel_count": len(kanaele),
+                       "channels": kanaele}]}
+
+
+def _vergiss_caches():
+    A.clear_channel_cache()
+    from src.core.laser import erkennung
+    erkennung.vergiss_profile()
 
 
 @pytest.fixture(scope="module")
-def bib():
-    return T.bibliothek_aus_db()
+def _eigene_profile():
+    """Legt Laser und Balken in die Fixture-DB DIESES Testlaufs (die Kopie aus
+    conftest) und nimmt sie danach samt Hersteller wieder heraus."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from src.core.database import fixture_db as fdb
+    from src.core.database.models import FixtureProfile, Manufacturer
+    eng = fdb.engine()
+    with Session(eng) as s:
+        assert not s.execute(select(Manufacturer).where(
+            Manufacturer.name == HERST)).scalars().all(), \
+            f"„{HERST}“ steht schon in der Bibliothek (Rest eines Abbruchs?)"
+    ids = [fdb.create_user_profile(_laser_profil(), engine=eng),
+           fdb.create_user_profile(_balken_profil(), engine=eng)]
+    _vergiss_caches()
+    try:
+        yield ids
+    finally:
+        with Session(eng) as s:
+            for pid in ids:
+                p = s.get(FixtureProfile, pid)
+                if p is not None:
+                    s.delete(p)
+            for m in s.execute(select(Manufacturer).where(
+                    Manufacturer.name == HERST)).scalars():
+                s.delete(m)
+            s.commit()
+        _vergiss_caches()
+
+
+@pytest.fixture(scope="module")
+def bib(_eigene_profile):
+    b = T.bibliothek_aus_db()
+    laser, bar = b.finde(HERST, LASER), b.finde(HERST, BAR)
+    assert laser.profil is not None and laser.profil.typ == "laser"
+    assert [(m.name, m.kanaele) for m in laser.profil.modi] == [("DMX Mode", 5)]
+    assert bar.profil is not None
+    assert [(m.name, m.kanaele) for m in bar.profil.modi] == [("54 Channel Mode", 54)]
+    return b
 
 
 def _oeffne(pfad):
@@ -72,8 +145,8 @@ def _tabelle(n: int = 12) -> str:
     return ("Name;Hersteller;Profil;Modus;Universum;Adresse;Anzahl\n"
             f"PAR;Generic;{PAR};8-Kanal RGBW;1;1;{n}\n"
             f"Kopf;U King;{MH};11-Kanal;2;1;1\n"
-            f"Balken;American DJ;{BAR};54 Channel Mode;2;100;2\n"
-            f"Laser;American DJ;{LASER};DMX Mode;3;10;1\n")
+            f"Balken;{HERST};{BAR};54 Channel Mode;2;100;2\n"
+            f"Laser;{HERST};{LASER};DMX Mode;3;10;1\n")
 
 
 def _plan(state, bib, text):
@@ -169,6 +242,8 @@ def test_ergebnis_gleicht_dem_alten_weg(tmp_path, bib):
     (alt, alt_n), (neu, neu_n) = bilder
     assert neu == alt
     assert alt[1], "die Tabelle soll mindestens eine Kopf-Gruppe erzeugen"
+    # je Balken (2 Stück) eine Kopf-Gruppe mit allen 18 Köpfen
+    assert [g[2] * g[3] for g in alt[1]] == [BAR_KOEPFE] * 2, alt[1]
     assert alt_n == 3 * 16 and neu_n == 3          # Import, Rückgängig, Wiederholen
 
 
@@ -190,7 +265,7 @@ def test_importierter_laser_ist_sofort_in_not_aus_und_blackout_erfasst(state, bi
 def test_laser_hinweis_kommt_im_sammelweg_weiter_je_geraet(state, bib):
     ohr = Mithoerer(state)
     text = ("Name;Hersteller;Profil;Modus;Universum;Adresse;Anzahl\n"
-            f"Laser;American DJ;{LASER};DMX Mode;1;1;2\n")
+            f"Laser;{HERST};{LASER};DMX Mode;1;1;2\n")
     hinweise = []
     state.subscribe(lambda e, d=None: hinweise.append(d) if e == "hinweis" else None)
     T.wende_an(state, _plan(state, bib, text), bib)
@@ -398,11 +473,11 @@ def _alles_voll(universen, patch, dt):
 
 
 def _laser(state, bib, fid, adresse, universum=3):
-    profil = bib.finde("American DJ", LASER).profil
+    profil = bib.finde(HERST, LASER).profil
     return PatchedFixture(
         fid=fid, label="Laser", fixture_profile_id=profil.id,
         mode_name="DMX Mode", universe=universum, address=adresse,
-        channel_count=5, manufacturer_name="American DJ",
+        channel_count=5, manufacturer_name=HERST,
         fixture_name=LASER, fixture_type="laser")
 
 
