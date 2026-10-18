@@ -46,6 +46,28 @@ Ein Klick auf einen Reiter schaltet den Modus **nicht** um. Wer im Ansehen-Modus
 die Liste ansehen will, macht damit nichts versehentlich anfassbar. Im Bauen-Modus
 hellt **Auto-Helligkeit** die Szene auf (siehe [Teil D](#teil-d--darstellung-reiter-einstellungen)).
 
+### Rechte Spalte ein- und ausklappen
+
+Zwischen der 3D-Ansicht und der Spalte mit den Reitern sitzt ein schmaler Knopf
+über die ganze Höhe. Der Pfeil zeigt, was der Klick tut:
+
+- **›** — „Rechte Spalte einklappen": die Spalte verschwindet, die 3D-Ansicht
+  bekommt die volle Fensterbreite.
+- **‹** — „Rechte Spalte ausklappen": die Spalte kommt in ihrer vorherigen Breite
+  zurück.
+
+Dasselbe macht die Taste `F9`. Wer die Trennleiste von Hand ganz nach rechts
+zieht, klappt die Spalte genauso ein — der Knopf zeigt dann „‹". Zustand und
+Breite merkt sich LightOS auf diesem Rechner, auch über einen Neustart. Die
+3D-Ansicht läuft beim Umschalten weiter, Kamera und Auswahl bleiben.
+
+Springt eine Taste auf einen Reiter der Spalte, während sie eingeklappt ist,
+klappt die Spalte von selbst in der gemerkten Breite aus — sonst wechselte der
+Reiter unsichtbar. `S` (Reiter „Bühne") tut das immer. `F` (Reiter „Fixtures")
+tut es nur, solange der Fokus **nicht** in der 3D-Ansicht liegt: Dort heißt `F`
+„Fit Auswahl" und rückt die Kamera auf die gewählten Geräte. Die Statuszeile
+unten sagt dann, dass `F9` oder `S` die Spalte ausklappt.
+
 ## Teil A — Bühne bauen (Reiter „Bühne")
 
 ![Modus Bauen, Reiter Bühne: die Front-Traverse ist gewählt und gelb hervorgehoben](img/02_buehne_bauen.png)
@@ -101,8 +123,8 @@ Standardmaße und lassen sich wie jedes Bühnenelement verschieben, drehen, in d
 | **+ Podest mit Treppe** | 2,00 × 0,60 × 2,80 m | Treppe vorn mittig; Strahler lassen sich draufstellen |
 | **+ Mischpult-Tisch** | 1,80 × 0,90 × 0,90 m | Tisch mit Pult-Aufsatz (FOH) |
 
-**Mehrere auf einmal:** In der Zeile **„Anzahl: Reihen × Spalten — Abstand"** z. B.
-`2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
+**Mehrere auf einmal:** In den Zeilen **„Anzahl:" (Reihen × Spalten)** und **„Abstand:"**
+darunter z. B. `2 × 3`, Abstand `1,00 m` einstellen, dann **„+ Biertischgarnitur"** → sechs Garnituren
 im Raster, um den Standardplatz zentriert. Die ganze Reihe ist **ein** Undo-Schritt
 (`Strg+Z` nimmt alle zurück). Danach springt die Anzahl von selbst auf `1 × 1` zurück.
 Das Raster gilt nur für die Möbel oben — Böden, Trassen, Wände usw. entstehen immer einzeln.
@@ -329,6 +351,11 @@ Darstellungen; Größe und Lage des Musters bleiben dabei gleich.
   weich aus.
   Nichts schwebt in Höhe der Bühne in der Luft; das gilt auch für den flachen
   Fleck und auf der Stufe Niedrig.
+  Schwenkt der Kopf über die Kante hinaus, bleibt der Teil des Musters auf der
+  Platte liegen, solange der Kegel sie noch trifft. Er wird dabei kleiner, der
+  Teil am Boden größer und heller; nichts springt. Das gilt auch, wenn vor der
+  Bühne eine Publikumsfläche liegt, und für ein Gerät, das vor der Bühne hängt
+  und ihre Vorderseite anstrahlt.
 - **Das Gobo-Bild liegt im Strahl:** Das Motiv füllt den Lichtkegel bis zu
   seinem Rand und endet dort mit weicher Kante; außerhalb des Kegels (Zoom)
   liegt kein Muster. Hinter einer Bühnenkante reicht die Projektion so weit wie
@@ -373,7 +400,8 @@ nötig, misst auf der echten Grafikkarte).
 Die Stufe gilt für **dieses Gerät**, nicht für die Show — sie hängt an der
 Grafikkarte des Rechners. Sie wirkt auf das Vollfenster und die 3D-Ansicht in
 der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
-Neben der Auswahl steht, welche Stufe gerade **aktiv** ist.
+Unter der Auswahl steht, welche Stufe gerade **aktiv** ist (bei „Automatisch" das
+Ergebnis der Erkennung).
 
 | Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Gobo-Muster | Beim Drehen der Kamera |
 |---|---|---|---|---|---|---|
@@ -473,9 +501,10 @@ Frequenz blitzen gemeinsam.
 |---|---|
 | `V` | 3D ↔ 2D Top-Down |
 | `E` | Ansehen ↔ Bauen |
-| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures |
-| `S` | Reiter Bühne |
+| `F` | Fokus in der 3D-Ansicht: Fit Auswahl; sonst Reiter Fixtures (klappt die Spalte aus) |
+| `S` | Reiter Bühne (klappt die Spalte aus) |
 | `D` | Andocken an/aus |
+| `F9` | Rechte Spalte ein-/ausklappen |
 | `Strg+Z` / `Strg+Y` | Rückgängig / Wiederholen |
 
 ## Früher bekannte Macken (alle erledigt)

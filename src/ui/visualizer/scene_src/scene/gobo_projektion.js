@@ -224,6 +224,57 @@ export function goboUeberhangGerichtet(kante, x, z, fuss) {
   return u * u * (3 - 2 * u);
 }
 
+/** VIZ-107: Gegenstueck zum Ueberhang fuer einen Punkt NEBEN der Oberseite —
+ *  wie weit reicht der Fussabdruck noch auf sie (0 = gar nicht, 1 = der Punkt
+ *  liegt auf der Kante oder auf der Oberseite)?
+ *
+ *  Gemessen wird der Weg vom Punkt zum Rechteck im MASS DES FUSSABDRUCKS: eine
+ *  Strecke zaehlt so viel wie ihr Anteil an der Reichweite in ihrer Richtung
+ *  (nach vorn weit, zurueck und quer kurz — `strahlFussabdruck`). Der kleinste
+ *  solche Weg zu irgendeinem Punkt des Rechtecks entscheidet; er aendert sich
+ *  stetig, auch wenn der Punkt an einer ECKE vorbeilaeuft. (Eine erste Fassung
+ *  pruefte nur die acht Richtungen des Fussabdrucks — verfehlte eine davon die
+ *  Ecke, fiel ihr Beitrag in einem Schritt weg.)
+ *
+ *  Weich (smoothstep) wie der Ueberhang: daran haengen Kegelwinkel und
+ *  Helligkeit, nachdem die Strahlmitte die Kante ueberquert hat — sie sollen
+ *  nicht springen. */
+export function goboInnenGerichtet(kante, x, z, fuss) {
+  if (!kante || !fuss || fuss.length < 4) return 0;
+  const ox = x - kante.cx, oz = z - kante.cz;
+  const lx = ox * kante.c - oz * kante.s, lz = ox * kante.s + oz * kante.c;
+  if (Math.abs(lx) <= kante.hx && Math.abs(lz) <= kante.hz) return 1;
+  const ux = fuss[0].dx, uz = fuss[0].dz, px = fuss[2].dx, pz = fuss[2].dz;
+  const vor = fuss[0].weit, zurueck = fuss[1].weit, quer = fuss[2].weit;
+  if (!(vor > 0) || !(zurueck > 0) || !(quer > 0)) return 0;
+  // Weg (vx, vz) in Weltachsen -> Anteil an der Reichweite in seiner Richtung.
+  const mass = (vx, vz) => {
+    const a = vx * ux + vz * uz, b = vx * px + vz * pz;
+    const laengs = a / (a >= 0 ? vor : zurueck), q = b / quer;
+    return Math.sqrt(laengs * laengs + q * q);
+  };
+  // Ecken des Rechtecks relativ zum Punkt, in Weltachsen.
+  const ecke = (ex, ez) => [ex * kante.c + ez * kante.s - ox, -ex * kante.s + ez * kante.c - oz];
+  const e = [ecke(-kante.hx, -kante.hz), ecke(kante.hx, -kante.hz),
+             ecke(kante.hx, kante.hz), ecke(-kante.hx, kante.hz)];
+  // Der Punkt liegt ausserhalb, das Mass ist konvex: das Minimum liegt auf
+  // dem Rand. Je Seite per Dreiteilung (konvex entlang der Strecke).
+  let kleinst = Infinity;
+  for (let i = 0; i < 4; i++) {
+    const [ax, az] = e[i], [bx, bz] = e[(i + 1) % 4];
+    let lo = 0, hi = 1;
+    for (let n = 0; n < 24; n++) {
+      const t1 = lo + (hi - lo) / 3, t2 = hi - (hi - lo) / 3;
+      if (mass(ax + (bx - ax) * t1, az + (bz - az) * t1)
+          <= mass(ax + (bx - ax) * t2, az + (bz - az) * t2)) hi = t2; else lo = t1;
+    }
+    const tm = (lo + hi) / 2;
+    kleinst = Math.min(kleinst, mass(ax + (bx - ax) * tm, az + (bz - az) * tm));
+  }
+  const u = Math.max(0, Math.min(1, 1 - kleinst));
+  return u * u * (3 - 2 * u);
+}
+
 /** Wie lang (m, entlang der Achse) muss der Kegel sein, damit sein FERNER
  *  Rand die Flaeche unter der Kante erreicht? `untenAbstand` = Achse bis zu
  *  dieser Flaeche. Senkrecht nach unten ist das genau `untenAbstand`. */

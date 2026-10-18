@@ -2616,6 +2616,12 @@ _SINGLE_KEY_SHORTCUTS = frozenset({
 })
 
 
+#: VIZ-109: Statuszeile, wenn F bei eingeklappter Spalte „Fit Auswahl" war.
+HINWEIS_F_IN_DER_ANSICHT = (
+    "F hat die Kamera auf die Auswahl eingepasst, weil der Fokus in der "
+    "3D-Ansicht liegt. Die rechte Spalte klappt mit F9 oder S aus.")
+
+
 def _any_focused(*widgets) -> bool:
     """VIZ-10: True, wenn EINE der Spinboxen gerade den Tastatur-Fokus haelt.
     Schuetzt vor der Race: JS-Echo (fixturePositionChanged/-RotationChanged,
@@ -2715,6 +2721,13 @@ class FixtureDragList(QListWidget):
 
 # VIZ-68 (Review A): bei MEHR als so vielen Objekten auf einmal fragt der
 # Knopf nach (genau 200 laufen ohne Rueckfrage durch).
+# VIZ-108: Breite der rechten Spalte (Fixtures / Buehne / Einstellungen).
+RECHTE_SPALTE_MIN = 330
+RECHTE_SPALTE_MAX = 420
+# So viele Helligkeits-Knoepfe stehen nebeneinander. Fuenf in EINER Zeile
+# verlangten mehr Breite, als die Spalte hat.
+HELLIGKEIT_PRESETS_JE_ZEILE = 2
+
 RASTER_RUECKFRAGE_UEBER = 200
 # VIZ-68 (Review A2): Bereich der Positionsfelder X/Z (Buehnenelemente UND
 # Fixtures) in Metern. Ein Raster, das darueber hinaus reicht, wird nicht
@@ -2926,10 +2939,12 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
-        # LAS-32 (S1): Sperrzonen anlegen/bearbeiten und Laser-Felder eintragen.
+        # LAS-32/LAS-35: Sperrzonen planen (ziehen, Vorlagen), Laser-Felder
+        # eintragen oder einmessen.
         act_sperrzonen = QAction("Sperrzonen…", self)
         act_sperrzonen.setToolTip(
-            "Sperrzonen (rote Quader) und das Maximalfeld je Laser eintragen.\n"
+            "Sperrzonen planen: Zonen ziehen, Laser-Felder eintragen oder "
+            "einmessen.\n"
             "Nur Anzeige — schaltet den Laser NICHT ab.")
         act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
         tb.addAction(act_sperrzonen)
@@ -3027,14 +3042,27 @@ class VisualizerWindow(QMainWindow):
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, False)
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        splitter.addWidget(self._view)
+        # VIZ-109: Ansicht + schmaler Klapp-Knopf teilen sich die linke Seite —
+        # der Knopf sitzt so direkt an der Spalte und bleibt sichtbar, wenn
+        # sie zu ist. Die Ansicht selbst bleibt dasselbe Objekt.
+        from src.ui.visualizer.spalte_einklappen import SpaltenKlappe, baue_knopf
+        left_side = QWidget()
+        left_lay = QHBoxLayout(left_side)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(0)
+        left_lay.addWidget(self._view, 1)
+        self._btn_spalte = baue_knopf(left_side)
+        left_lay.addWidget(self._btn_spalte)
+        splitter.addWidget(left_side)
 
         right_panel = self._build_right_panel()
-        right_panel.setMinimumWidth(330)
-        right_panel.setMaximumWidth(420)
+        right_panel.setMinimumWidth(RECHTE_SPALTE_MIN)
+        right_panel.setMaximumWidth(RECHTE_SPALTE_MAX)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
+        splitter.setCollapsible(0, False)   # der Knopf darf nie mit verschwinden
+        self._spalten_klappe = SpaltenKlappe(splitter, self._btn_spalte, 1, self)
 
         self.setCentralWidget(splitter)
 
@@ -3075,8 +3103,10 @@ class VisualizerWindow(QMainWindow):
             ("E", _cycle_edit, "Modus umschalten: Ansehen / Bauen"),
             ("F", self._on_key_f,
              "Auswahl einpassen (Fokus in der 3D-Ansicht), sonst Reiter Fixtures"),
-            ("S", lambda: self._tabs.setCurrentIndex(1), "Reiter Bühne zeigen"),
+            ("S", lambda: self._reiter_per_taste(1), "Reiter Bühne zeigen"),
             ("D", lambda: self._act_dock.toggle(), "Andocken ein/aus"),
+            ("F9", lambda: self._spalten_klappe.umschalten(),          # VIZ-109
+             "Rechte Spalte ein-/ausklappen"),
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.setWhatsThis(was)
@@ -3095,8 +3125,27 @@ class VisualizerWindow(QMainWindow):
         """A3D-29: F bedeutet zweierlei — entschieden wird nach dem Fokus."""
         if self._focus_is_in_3d():
             self._on_fit_selected()
+            # VIZ-109: Wer bei eingeklappter Spalte F drueckt, um sie
+            # auszuklappen, sieht stattdessen die Kamera springen. Die
+            # Statuszeile sagt, was passiert ist und welche Taste ausklappt.
+            klappe = getattr(self, "_spalten_klappe", None)
+            info = getattr(self, "_lbl_info", None)
+            if klappe is not None and klappe.eingeklappt and info is not None:
+                info.setText(HINWEIS_F_IN_DER_ANSICHT)
         else:
-            self._tabs.setCurrentIndex(0)
+            self._reiter_per_taste(0)
+
+    def _reiter_per_taste(self, index: int) -> None:
+        """Reiter der rechten Spalte per Taste zeigen.
+
+        VIZ-109: Ist die Spalte eingeklappt, klappt sie dabei aus — sonst
+        wechselte die Taste den Reiter, ohne dass man etwas saehe. Nur dieser
+        Weg klappt aus; ein Reiterwechsel per Programm (Wiederherstellen,
+        Sprung nach dem Anlegen) laesst die Spalte, wie sie ist."""
+        self._tabs.setCurrentIndex(index)
+        klappe = getattr(self, "_spalten_klappe", None)
+        if klappe is not None and klappe.eingeklappt:
+            klappe.setze_eingeklappt(False)
 
     def _focus_is_in_3d(self) -> bool:
         """Liegt der Tastaturfokus in der 3D-Ansicht?
@@ -3191,13 +3240,17 @@ class VisualizerWindow(QMainWindow):
         # Fixtures-Reiter hoeher als ein Laptop-Bildschirm (768 px); ohne Scroll-
         # bereich wurde das Ende still abgeschnitten — gerade die Knoepfe, die man
         # am Rig braucht.
+        # VIZ-108: dasselbe gilt waagerecht. Mit „Balken nie“ wurde alles, was
+        # breiter ist als die Spalte, rechts still abgeschnitten (Reiter
+        # Einstellungen: die Zeile „aktiv: …“). Der Balken „nach Bedarf“ ist
+        # das Netz fuer grosse Schriften — lieber rollen als nicht erreichen.
         for _w, _name in ((self._build_fixture_tab(), "Fixtures"),
                           (self._build_stage_tab(), "Bühne"),
                           (self._build_settings_tab(), "Einstellungen")):
             _sa = QScrollArea()
             _sa.setWidgetResizable(True)
             _sa.setFrameShape(QFrame.Shape.NoFrame)
-            _sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            _sa.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             _sa.setWidget(_w)
             self._tabs.addTab(_sa, _name)
         # VIZ-14: der Tab waehlt das BAU-WERKZEUG (Fixtures/Bühne), nicht den
@@ -3546,15 +3599,23 @@ class VisualizerWindow(QMainWindow):
         self._spin_spalten.setRange(1, 30)
         self._spin_spalten.setToolTip("Spalten (nebeneinander, entlang der Breite)")
         raster.addWidget(self._spin_spalten)
-        raster.addWidget(QLabel("Abstand:"))
+        raster.addStretch(1)
+        add_grid.addLayout(raster)
+        # VIZ-108: der Abstand in einer eigenen Zeile. In EINER Zeile mit der
+        # Anzahl war sie breiter als die Spalte in ihrer vollen Breite — das
+        # Abstand-Feld war rechts abgeschnitten.
+        abstand = QHBoxLayout()
+        abstand.setSpacing(4)
+        abstand.addWidget(QLabel("Abstand:"))
         self._spin_abstand = LocaleTolerantDoubleSpinBox()
         self._spin_abstand.setRange(0.0, RASTER_ABSTAND_MAX_M)
         self._spin_abstand.setSingleStep(0.25)
         self._spin_abstand.setValue(1.0)
         self._spin_abstand.setSuffix(" m")
         self._spin_abstand.setToolTip("Freier Abstand zwischen den Objekten")
-        raster.addWidget(self._spin_abstand)
-        add_grid.addLayout(raster)
+        abstand.addWidget(self._spin_abstand)
+        abstand.addStretch(1)
+        add_grid.addLayout(abstand)
         layout.addWidget(add_box)
 
         # Properties
@@ -3677,15 +3738,24 @@ class VisualizerWindow(QMainWindow):
         self._combo_quality.setCurrentIndex(
             {"auto": 0, "high": 1, "low": 2, "max": 3}.get(tier_pref, 0))
         self._combo_quality.currentIndexChanged.connect(self._on_quality_tier_changed)
+        # VIZ-108: die Auswahl darf schmaler werden als ihr laengster Eintrag
+        # (die aufgeklappte Liste zeigt ihn ganz) — sonst bestimmt „Niedrig
+        # (schwache/mobile GPU)“ die Breite des ganzen Reiters.
+        self._combo_quality.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo_quality.setMinimumContentsLength(12)
         q_row.addWidget(self._combo_quality, 1)
+        q_layout.addLayout(q_row)
         # Wird über den Bridge-Slot reportGpuTier befüllt — zeigt die AKTIVE
         # Stufe der laufenden Szene (bei "Automatisch" = das Probe-Ergebnis).
+        # VIZ-108: eigene Zeile. Am Ende der Stufen-Zeile war sie das Erste,
+        # was rechts aus der Spalte fiel.
         self._lbl_gpu_tier = QLabel("aktiv: –")
+        self._lbl_gpu_tier.setWordWrap(True)
         self._lbl_gpu_tier.setToolTip(
             "Die gerade aktive Stufe der 3D-Szene. Bei 'Automatisch' ist das\n"
             "das Ergebnis der GPU-Erkennung dieses Rechners.")
-        q_row.addWidget(self._lbl_gpu_tier)
-        q_layout.addLayout(q_row)
+        q_layout.addWidget(self._lbl_gpu_tier)
         # ── VIZ-104: Strobe im 3D zeigen (Blitzen / Gedaempft / Aus) ────────
         from src.ui.visualizer import strobe_prefs
         s_row = QHBoxLayout()
@@ -3748,7 +3818,8 @@ class VisualizerWindow(QMainWindow):
         b_row.addWidget(self._lbl_brightness)
         bg_layout.addLayout(b_row)
 
-        ab_row = QHBoxLayout()
+        # VIZ-108: Haken und Knopf untereinander — nebeneinander waren sie
+        # breiter als die schmale Spalte.
         self._chk_auto_brightness = QCheckBox("Auto-Helligkeit im Bauen-Modus")
         self._chk_auto_brightness.setChecked(True)
         self._chk_auto_brightness.setToolTip(
@@ -3756,23 +3827,28 @@ class VisualizerWindow(QMainWindow):
             "Bauen-Modus wechselst, und zurück auf 20% im Ansehen-Modus."
         )
         self._chk_auto_brightness.toggled.connect(self._on_auto_brightness_toggled)
-        ab_row.addWidget(self._chk_auto_brightness)
+        bg_layout.addWidget(self._chk_auto_brightness)
         btn_auto = QPushButton("Auto-Werte anwenden")
         btn_auto.setFixedHeight(22)
         btn_auto.clicked.connect(self._on_auto_brightness_apply)
-        ab_row.addWidget(btn_auto)
-        bg_layout.addLayout(ab_row)
+        bg_layout.addWidget(btn_auto)
 
-        # Quick-Presets
-        preset_row = QHBoxLayout()
-        for label, val in [("Konzert (10%)", 10), ("Standard (20%)", 20),
-                           ("Probe (50%)", 50), ("Bearbeiten (75%)", 75),
-                           ("Vollhell (100%)", 100)]:
+        # Quick-Presets — VIZ-108: als Raster. Fuenf Knoepfe in EINER Zeile
+        # machten den Reiter breiter als die Spalte; alles rechts davon (auch
+        # „aktiv: …“ oben) wurde abgeschnitten.
+        preset_grid = QGridLayout()
+        self._helligkeit_presets = []
+        for nr, (label, val) in enumerate(
+                [("Konzert (10%)", 10), ("Standard (20%)", 20),
+                 ("Probe (50%)", 50), ("Bearbeiten (75%)", 75),
+                 ("Vollhell (100%)", 100)]):
             btn = QPushButton(label)
             btn.setFixedHeight(22)
             btn.clicked.connect(weak_slot(self._sld_brightness.setValue, val))
-            preset_row.addWidget(btn)
-        bg_layout.addLayout(preset_row)
+            preset_grid.addWidget(btn, nr // HELLIGKEIT_PRESETS_JE_ZEILE,
+                                  nr % HELLIGKEIT_PRESETS_JE_ZEILE)
+            self._helligkeit_presets.append(btn)
+        bg_layout.addLayout(preset_grid)
 
         layout.addWidget(brightness_group)
 
@@ -5857,37 +5933,31 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 
     def _on_sperrzonen_dialog(self):
-        """LAS-32 (S1): den Sperrzonen-Dialog zeigen (nicht modal — das 3D
-        dahinter zeichnet jede Aenderung sofort)."""
-        from src.ui.visualizer.sperrzonen_ui import SperrzonenDialog
-        dlg = getattr(self, "_sperrzonen_dlg", None)
-        if dlg is None:
-            dlg = SperrzonenDialog(self._state, self)
-            self._sperrzonen_dlg = dlg
-        else:
-            dlg.neu_laden()
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        """LAS-35: den Sperrzonen-Planer zeigen (nicht modal — das 3D dahinter
+        zeichnet jede Aenderung sofort). Er hat den frueheren Zahlenfeld-Dialog
+        (LAS-32) abgeloest."""
+        from src.ui.visualizer.sperrzonen_planer import planer_oeffnen
+        self._sperrzonen_dlg = planer_oeffnen(self._state, self)
 
     def _on_state(self, event: str, _data):
         if event == "sperrzonen_anzeige_changed":
             # LAS-32: Fenster „Sicht des Lasers" im 3D geschlossen/geoeffnet ->
-            # der Haken im Sperrzonen-Dialog zieht nach.
+            # der Haken im Sperrzonen-Planer zieht nach.
             dlg = getattr(self, "_sperrzonen_dlg", None)
             if dlg is not None:
                 try:
                     dlg.lasersicht_nachziehen()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event in ("patch_changed", "show_loaded"):
-            # LAS-32: ein offener Sperrzonen-Dialog zeigt sonst die alte Show.
+            # Ein offener Planer zeigt sonst die alte Show; ein laufendes
+            # Einmessen endet dabei (Laser aus).
             dlg = getattr(self, "_sperrzonen_dlg", None)
-            if dlg is not None and dlg.isVisible():
+            if dlg is not None:
                 try:
-                    dlg.neu_laden()
+                    dlg.patch_oder_show_geaendert()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event == "patch_changed":
             self._refresh_patch_list()
         elif event == "show_loaded":
@@ -6060,5 +6130,13 @@ class VisualizerWindow(QMainWindow):
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
+        # LAS-35: das Fenster wird nur versteckt — der Sperrzonen-Planer
+        # erfaehrt davon nichts. Ein laufendes Einmessen endet hier (Laser aus).
+        dlg = getattr(self, "_sperrzonen_dlg", None)
+        if dlg is not None:
+            try:
+                dlg.einmessen_abbrechen()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] ERROR: Einmessen nicht beendet: {e}")
         event.ignore()
         self.hide()
