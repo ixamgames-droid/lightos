@@ -1212,6 +1212,9 @@ class FixtureEditorDialog(QDialog):
                 try:
                     profile = self._neues_profil(s, mfr, name)
                 except ProfilFehler as e:
+                    # Reine Absicherung: die Sitzung endet ohnehin ohne
+                    # Commit und verwirft alles (auch einen schon geflushten
+                    # neuen Hersteller). Der Test belegt „ohne Commit“.
                     s.rollback()
                     self._kopie_abgelehnt(e)
                     return
