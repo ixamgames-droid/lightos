@@ -953,8 +953,12 @@ def dmx_infos() -> list[str]:
             zustand = {True: "sendet", False: "sendet NICHT", None: "unbekannt"}.get(
                 e.get("verbunden"), "?")
             problem = f" — Problem: {e['problem']}" if e.get("problem") else ""
+            # OUT-66: z. B. „anderer Enttec uebernommen“ (Seriennr. wird beim
+            # Packen gekuerzt, OUT-77).
+            hinweis = f" — Hinweis: {e['hinweis']}" if e.get("hinweis") else ""
             raus.append(f"U{e.get('universum')} {e.get('weg')} → "
-                        f"{e.get('ziel') or '(Standard)'}: {zustand}{problem}")
+                        f"{e.get('ziel') or '(Standard)'}: {zustand}{problem}"
+                        f"{hinweis}")
         return raus or ["keine Ausgaenge eingerichtet"]
     except Exception as e:
         return [f"? ({type(e).__name__}: {e})"]

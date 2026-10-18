@@ -1,5 +1,6 @@
 """Output Manager — koordiniert alle DMX-Ausgabegeräte bei 44 Hz."""
 from contextlib import contextmanager
+import contextvars
 import os
 import threading
 import time
@@ -10,6 +11,16 @@ from .sacn import SACNSender
 
 TARGET_HZ = 44
 FRAME_INTERVAL = 1.0 / TARGET_HZ
+
+# OUT-66 (Review 2): Seriennummern der ANDEREN Enttec-Ausgaben, die ein gerade
+# entstehendes Enttec-Geraet schon beim Anlegen kennen muss — der Worker des
+# Proxys oeffnet sonst evtl., bevor der Manager sie nachreichen kann.
+# ``add_enttec`` setzt sie um den Aufruf von ``_make_enttec_device`` herum.
+_ANLEGE_FREMDE: contextvars.ContextVar = contextvars.ContextVar(
+    "lightos_enttec_fremde_seriennr", default=frozenset())
+# Wie oft der Ausgabe-Thread die fremden Seriennummern nachfuehrt (Sekunden):
+# ein Worker lernt seine Nummer erst nach dem Oeffnen.
+ENTTEC_FREMDE_NACHFUEHREN_S = 1.0
 
 
 def _make_enttec_device(port: str):
@@ -32,16 +43,20 @@ def _make_enttec_device(port: str):
         warne_wenn_belegt(port)
     except Exception:                                    # noqa: BLE001
         pass                                             # Diagnose darf nie stoeren
+    # OUT-66 (Review 2): Seriennummern der anderen Enttec-Ausgaben schon beim
+    # Anlegen; nur wenn es welche gibt (der Aufruf bleibt sonst wie vorher).
+    fremde = _ANLEGE_FREMDE.get()
+    kw = {"fremde": fremde} if fremde else {}
     if os.environ.get("LIGHTOS_SERIAL_INPROC"):
-        return EnttecPro(port)
+        return EnttecPro(port, **kw)
     try:
         from .serial_process import EnttecProcessProxy
-        return EnttecProcessProxy(port)
+        return EnttecProcessProxy(port, **({"fremde_seriennr": fremde} if fremde else {}))
     except Exception as e:
         import sys
         print(f"[OutputManager] Serial-Prozess-Isolation nicht verfuegbar ({e}) "
               f"-> In-Prozess-Fallback.", file=sys.stderr)
-        return EnttecPro(port)
+        return EnttecPro(port, **kw)
 
 
 def _make_udmx_device(schluessel: str, streng: bool = False):
@@ -462,7 +477,9 @@ class OutputManager:
         (In-Proc-Enttec folgt dem Dongle) und ``port_aktuell`` (Prozess-Proxy:
         vom Worker zurueckgemeldet, waehrend ``port`` der konfigurierte bleibt)."""
         out = []
-        for name in ("port", "port_aktuell"):
+        # Review 2: ``port_zuletzt`` bleibt nach einem Ausfall stehen — fuer
+        # die NOT-AUS-Sperre lieber eine Nummer zu viel als eine zu wenig.
+        for name in ("port", "port_aktuell", "port_zuletzt"):
             try:
                 p = getattr(dev, name, None)
             except Exception:
@@ -470,6 +487,79 @@ class OutputManager:
             if isinstance(p, str) and p and p not in out:
                 out.append(p)
         return out
+
+    @classmethod
+    def _enttec_belegt_port(cls, dev, port: str) -> bool:
+        """OUT-66 (Review 2): Haengt dieser Ausgang GERADE an ``port``? Der
+        konfigurierte Port immer; eine Nummer, an die er seinem Dongle gefolgt
+        ist, nur solange er dort verbunden ist (``port_aktuell``). Ein toter
+        Ausgang wird so nicht verdraengt, wenn ein anderes Universum auf die
+        laengst wieder freie Nummer gelegt wird."""
+        if cls._weg_enttec(dev)[1] == port:
+            return True
+        try:
+            akt = getattr(dev, "port_aktuell", None)
+        except Exception:
+            akt = None
+        if not isinstance(akt, str) or not akt:
+            akt = getattr(dev, "port", None)        # Attrappen ohne Rueckmeldung
+        return akt == port
+
+    def _enttec_fremde_nachfuehren(self):
+        """OUT-66 (Review 2): jeder Enttec-Ausgabe die Seriennummern der
+        ANDEREN konfigurierten Enttec-Ausgaben mitgeben. Einen Dongle mit
+        einer dieser Nummern nimmt sie nie; einen anderen Dongle am eigenen
+        Port (Ersatzgeraet) darf sie uebernehmen. Meldet dabei neue Hinweise
+        der Geraete (Uebernahme) einmal ins Log."""
+        geraete = list(dict(getattr(self, "_enttec_outputs", None) or {}).items())
+        nummern = {}
+        for u, dev in geraete:
+            try:
+                sn = getattr(dev, "seriennr", None)
+            except Exception:
+                sn = None
+            if isinstance(sn, str) and sn:
+                nummern[u] = sn
+        gemeldet = getattr(self, "_enttec_hinweise", None)
+        if gemeldet is None:
+            gemeldet = self._enttec_hinweise = {}
+        for u, dev in geraete:
+            f = getattr(dev, "setze_fremde_seriennr", None)
+            if callable(f):
+                try:
+                    f(frozenset(sn for v, sn in nummern.items() if v != u))
+                except Exception:
+                    pass
+            text = self._enttec_hinweis(dev)
+            if text and gemeldet.get(u) != text:
+                gemeldet[u] = text
+                import sys
+                print(f"[OutputManager] Enttec Universum {u}: {text}",
+                      file=sys.stderr)
+
+    @staticmethod
+    def _enttec_hinweis(dev) -> str:
+        f = getattr(dev, "hinweis", None)
+        if not callable(f):
+            return ""
+        try:
+            return str(f() or "")
+        except Exception:
+            return ""
+
+    def _fremde_fuer(self, universe: int) -> frozenset:
+        """Seriennummern der Enttec-Ausgaben ausser ``universe``."""
+        raus = set()
+        for u, dev in dict(getattr(self, "_enttec_outputs", None) or {}).items():
+            if u == universe:
+                continue
+            try:
+                sn = getattr(dev, "seriennr", None)
+            except Exception:
+                sn = None
+            if isinstance(sn, str) and sn:
+                raus.add(sn)
+        return frozenset(raus)
 
     @classmethod
     def _wege_enttec(cls, dev) -> list:
@@ -753,7 +843,9 @@ class OutputManager:
         """Was gerade WIRKLICH sendet — pro Universum und Ausgabeweg.
 
         Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem",
-        "zustand"}``. ``zustand`` (OUT-75) ist die Selbstauskunft des Geraets
+        "zustand", "hinweis"}``. ``hinweis`` (OUT-66) ist eine Auskunft ohne
+        Ausfall, z. B. dass ein Enttec ein Ersatzgeraet am eigenen Port
+        uebernommen hat — leer, wenn es nichts zu sagen gibt. ``zustand`` (OUT-75) ist die Selbstauskunft des Geraets
         (``ZUSTAND_*``) — damit laesst sich „verbindet gerade“ von „weiss es
         nicht“ unterscheiden, die in ``verbunden`` beide ``None`` sind.
         ``verbunden`` ist dreiwertig: ``True`` sendet, ``False`` sendet nicht,
@@ -799,6 +891,9 @@ class OutputManager:
                         problem_text = str(f() or "")
                     except Exception:
                         problem_text = ""
+            # OUT-66 (Review 2): Hinweis ohne Ausfall (z. B. „anderer Enttec
+            # uebernommen“) — informativ, kein Problem und kein Alarm.
+            hinweis = self._enttec_hinweis(dev) if weg == "Enttec" else ""
             raus.append({
                 "universum": universum, "weg": weg,
                 # Jeder Sendertyp nennt sein Ziel anders: Enttec den `port`,
@@ -809,6 +904,7 @@ class OutputManager:
                 "verbunden": verbunden,
                 "problem": problem_text,
                 "zustand": geraet_zustand(dev),
+                "hinweis": hinweis,
             })
         raus.sort(key=lambda d: (d["universum"], d["weg"]))
         return raus
@@ -1189,9 +1285,17 @@ class OutputManager:
         # Weg danach in der Liste, bevor ein anderes Universum ihn bekommt.
         self._estop_wege_nachfuehren()
         self.close_enttec_on_port(port)
-        self._swap_device(self._enttec_outputs, universe, _make_enttec_device(port))
+        # OUT-66 (Review 2): das neue Geraet kennt die Seriennummern der
+        # anderen Enttec-Ausgaben schon beim Anlegen (erstes Oeffnen).
+        token = _ANLEGE_FREMDE.set(self._fremde_fuer(universe))
+        try:
+            neu = _make_enttec_device(port)
+        finally:
+            _ANLEGE_FREMDE.reset(token)
+        self._swap_device(self._enttec_outputs, universe, neu)
         self._estop_wege_nachfuehren()       # OUT-64
         self._entfernte_wege_vergessen(universe)
+        self._enttec_fremde_nachfuehren()
 
     def close_enttec_on_port(self, port: str):
         """Schliesst eine evtl. offene Enttec-Verbindung auf diesem COM-Port
@@ -1199,9 +1303,9 @@ class OutputManager:
         with self._io_lock:
             # OUT-66: auch der Port, an den der Worker dem Dongle gefolgt ist
             # (``port_aktuell``) — ein Dongle hat genau einen Ausgang.
+            # Review 2: die gefolgte Nummer nur, solange er dort verbunden ist.
             victims = [(u, d) for u, d in self._enttec_outputs.items()
-                       if port in self._enttec_ports_jetzt(d)
-                       or getattr(d, "port", None) == port]
+                       if self._enttec_belegt_port(d, port)]
             for u, _ in victims:
                 self._enttec_outputs.pop(u, None)
                 self._vergiss_fehler(u)   # OUT-51, s. _vergiss_fehler
@@ -1210,6 +1314,8 @@ class OutputManager:
                 dev.close()
             except Exception:
                 pass
+        if victims:
+            self._enttec_fremde_nachfuehren()
 
     def add_udmx(self, universe: int, schluessel: str = ""):
         """OUT-68: uDMX-Adapter fuer ein Universum einrichten. ``schluessel`` =
@@ -1404,6 +1510,8 @@ class OutputManager:
             except Exception:
                 pass
         self._udmx_streng_nachfuehren()
+        if any(name == "enttec" for name, _ in victims):
+            self._enttec_fremde_nachfuehren()     # OUT-66 (Review 2)
 
     def _schlussbild_an(self, universe: int, ext, victims) -> None:
         """OUT-71: den schon aus der Registry genommenen Adaptern EINES
@@ -1664,6 +1772,7 @@ class OutputManager:
                 pass
 
     def _loop(self):
+        naechstes_nachfuehren = 0.0
         while self._running:
             t0 = time.perf_counter()
             try:
@@ -1672,6 +1781,14 @@ class OutputManager:
                 # Eine Exception darf den Output-Thread NIE beenden, sonst steht
                 # die Ausgabe danach still ohne sichtbaren Grund.
                 print(f"[OutputManager] frame error: {exc}")
+            # OUT-66 (Review 2): ein Worker lernt seine Seriennummer erst nach
+            # dem Oeffnen — die anderen Ausgaben erfahren sie hier (gedrosselt).
+            if t0 >= naechstes_nachfuehren:
+                naechstes_nachfuehren = t0 + ENTTEC_FREMDE_NACHFUEHREN_S
+                try:
+                    self._enttec_fremde_nachfuehren()
+                except Exception as exc:
+                    print(f"[OutputManager] Enttec-Seriennummern: {exc}")
             elapsed = time.perf_counter() - t0
             sleep = max(0.0, FRAME_INTERVAL - elapsed)
             time.sleep(sleep)

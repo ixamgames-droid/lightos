@@ -125,6 +125,8 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
 
 PORT_BYTES = 256            # OUT-66: shared Rueckmeldung aktueller Port
 SN_BYTES = 64               # OUT-66: shared gelernte USB-Seriennummer
+FREMDE_BYTES = 1024         # OUT-66: Seriennummern der ANDEREN Ausgaben (je Zeile)
+HINWEIS_BYTES = 256         # OUT-66: Hinweis "Ersatz-Dongle uebernommen"
 
 
 def _lies_text(arr) -> str:
@@ -146,24 +148,37 @@ def _schreib_text(arr, text, n: int):
         pass
 
 
-def _enttec_fabrik(enttec_cls, port, port_akt=None, seriennr=None):
+def _fremde_aus(arr) -> list[str]:
+    """OUT-66: die Seriennummern der anderen Ausgaben aus dem shared Feld."""
+    return [z.strip() for z in _lies_text(arr).splitlines() if z.strip()]
+
+
+def _enttec_fabrik(enttec_cls, port, port_akt=None, seriennr=None,
+                   fremde=None, hinweis=None):
     """OUT-66: Fabrik fuer den Worker-Enttec. Reicht die vom Proxy gehaltene
     Seriennummer an jeden (neu gestarteten) Worker weiter, damit der SEINEN
     Dongle sucht und nicht den, der gerade am konfigurierten Port haengt; und
-    meldet den tatsaechlich geoeffneten Port + gelernte Nummer zurueck."""
-    def melde(p, sn):
+    meldet den tatsaechlich geoeffneten Port + gelernte Nummer zurueck.
+
+    Review 2: ``fremde`` (vom OutputManager ueber den Proxy gepflegt) nennt
+    die Seriennummern der ANDEREN Enttec-Ausgaben — der Worker liest es bei
+    jeder Entscheidung neu. ``hinweis`` traegt die Meldung „anderer Dongle am
+    eigenen Port uebernommen“ zurueck in die Ausgabe-Diagnose."""
+    def melde(p, sn, text=""):
         _schreib_text(port_akt, p, PORT_BYTES)
         if sn:
             _schreib_text(seriennr, sn, SN_BYTES)
+        if text:
+            _schreib_text(hinweis, text, HINWEIS_BYTES)
 
     def fabrik():
         return enttec_cls(port, seriennr=_lies_text(seriennr) or None,
-                          melde=melde)
+                          melde=melde, fremde=lambda: _fremde_aus(fremde))
     return fabrik
 
 
 def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL,
-                 port_akt=None, seriennr=None):
+                 port_akt=None, seriennr=None, fremde=None, hinweis=None):
     """Kindprozess-Einstieg (Top-Level -> picklebar fuer ``spawn``)."""
     try:
         from src.core.dmx.enttec_pro import EnttecPro
@@ -177,7 +192,8 @@ def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL,
     # ``PPID = 989 = systemd`` weiter — der Kernel hatte sie beim Tod des
     # Parents an den Subreaper umgehaengt. Genau das faengt der PID-Vergleich.
     _ppid0 = os.getppid()
-    _serial_worker_loop(_enttec_fabrik(EnttecPro, port, port_akt, seriennr),
+    _serial_worker_loop(_enttec_fabrik(EnttecPro, port, port_akt, seriennr,
+                                       fremde, hinweis),
                         buf, stop_flag, status,
                         frame_interval, parent_alive=_eltern_wache(_ppid0))
 
@@ -350,7 +366,8 @@ class EnttecProcessProxy:
     _LOG_NAME = "dmx.enttec"
 
     def __init__(self, port: str, frame_interval: float = FRAME_INTERVAL,
-                 _process_factory=None, _clock=time.monotonic):
+                 _process_factory=None, _clock=time.monotonic,
+                 fremde_seriennr=()):
         self.port = port
         self._frame_interval = frame_interval
         self._clock = _clock
@@ -363,6 +380,13 @@ class EnttecProcessProxy:
         # einem neu gestarteten Worker mitgegeben wird.
         self._port_akt = self._ctx.Array("c", PORT_BYTES)
         self._seriennr = self._ctx.Array("c", SN_BYTES)
+        # OUT-66 (Review 2): Seriennummern der ANDEREN Enttec-Ausgaben (vom
+        # OutputManager gepflegt, VOR dem ersten Spawn schon gesetzt) und der
+        # Hinweis des Workers, wenn er einen Ersatz-Dongle uebernommen hat.
+        self._fremde = self._ctx.Array("c", FREMDE_BYTES)
+        self._hinweis = self._ctx.Array("c", HINWEIS_BYTES)
+        self._fremde_text = ""
+        self.setze_fremde_seriennr(fremde_seriennr)
         # Prozess-Fabrik injizierbar fuer Tests (kein echter Subprozess noetig).
         self._process_factory = _process_factory or self._default_process_factory
         self._proc = None
@@ -376,7 +400,7 @@ class EnttecProcessProxy:
         return self._ctx.Process(
             target=_worker_main,
             args=(self.port, self._buf, self._stop, self._status, self._frame_interval,
-                  self._port_akt, self._seriennr),
+                  self._port_akt, self._seriennr, self._fremde, self._hinweis),
             name=f"EnttecSerial-{self.port}",
             daemon=True,
         )
@@ -443,9 +467,42 @@ class EnttecProcessProxy:
     @property
     def port_aktuell(self) -> str:
         """OUT-66: der Port, den der Worker gerade WIRKLICH offen hat. Folgt er
-        dem Dongle an eine neue Nummer (SERIAL-02), steht die hier — der
-        OutputManager sperrt den NOT-AUS-Weg dann auch ueber diese Nummer."""
+        dem Dongle an eine neue Nummer (SERIAL-02), steht die hier.
+
+        Review 2: nur solange der Worker verbunden ist (``is_connected``) —
+        nach Verlust, Watchdog oder Worker-Tod der konfigurierte Port. Sonst
+        verdraengte ``close_enttec_on_port`` diesen Ausgang, wenn ein anderes
+        Universum auf die (laengst wieder freie) Nummer gelegt wird. Fuer die
+        NOT-AUS-Sperre zaehlt :attr:`port_zuletzt` (bleibt stehen)."""
+        try:
+            verbunden = self.is_connected()
+        except Exception:
+            verbunden = False
+        if not verbunden:
+            return self.port
+        return self.port_zuletzt
+
+    @property
+    def port_zuletzt(self) -> str:
+        """OUT-66: der zuletzt vom Worker gemeldete Port, auch nach einem
+        Ausfall — der NOT-AUS-Weg sperrt lieber eine Nummer zu viel."""
         return _lies_text(getattr(self, "_port_akt", None)) or self.port
+
+    def setze_fremde_seriennr(self, menge):
+        """OUT-66 (Review 2): Seriennummern der ANDEREN konfigurierten
+        Enttec-Ausgaben ins gemeinsame Feld (der Worker liest es bei jeder
+        Entscheidung neu). Schreibt nur bei Aenderung."""
+        text = "\n".join(sorted({str(s).strip() for s in (menge or ())
+                                 if s and str(s).strip()}))
+        if text == getattr(self, "_fremde_text", None):
+            return
+        self._fremde_text = text
+        _schreib_text(getattr(self, "_fremde", None), text, FREMDE_BYTES)
+
+    def hinweis(self) -> str:
+        """OUT-66 (Review 2): Hinweis des Workers fuer die Ausgabe-Diagnose
+        (z. B. „anderer Enttec an … uebernommen“); leer = nichts."""
+        return _lies_text(getattr(self, "_hinweis", None))
 
     @property
     def seriennr(self) -> str | None:

@@ -191,14 +191,28 @@ class EnttecPro:
     # zurueck, reaktiviert sich die Ausgabe von selbst (ohne App-Neustart).
     RECONNECT_EVERY_S = 3.0
 
-    def __init__(self, port: str, seriennr: str | None = None, melde=None):
+    def __init__(self, port: str, seriennr: str | None = None, melde=None,
+                 fremde=None):
         """``seriennr`` (OUT-66): die Seriennummer, die diese Ausgabe schon
         einmal gelernt hat — der Prozess-Proxy reicht sie einem NEU gestarteten
-        Worker mit, damit der gezielt SEINEN Dongle sucht. ``melde(port, sn)``
-        wird nach jedem erfolgreichen Oeffnen gerufen (Rueckmeldung an den
-        Proxy: aktueller Port + gelernte Seriennummer)."""
+        Worker mit, damit der gezielt SEINEN Dongle sucht. ``melde(port, sn,
+        hinweis)`` wird nach jedem erfolgreichen Oeffnen gerufen (Rueckmeldung
+        an den Proxy: aktueller Port, gelernte Seriennummer, Hinweis bei
+        uebernommenem Ersatz-Dongle).
+
+        ``fremde`` (OUT-66, Review 2): die Seriennummern, die ANDERE
+        konfigurierte Enttec-Ausgaben gelernt haben — eine Menge oder eine
+        Funktion, die sie liefert (Worker: liest das gemeinsame Feld des
+        Proxys). Der ``OutputManager`` haelt sie aktuell
+        (:meth:`setze_fremde_seriennr`). Einen Dongle mit einer dieser Nummern
+        nimmt die Ausgabe nie; einen anderen Dongle am EIGENEN konfigurierten
+        Port (Ersatzgeraet) uebernimmt sie und lernt seine Nummer neu."""
         self.port = port
         self._melde = melde
+        self._fremde_quelle = fremde
+        # OUT-66: sichtbarer Hinweis (Ausgabe-Diagnose), wenn ein anderer
+        # Dongle am eigenen Port uebernommen wurde; leer = nichts zu melden.
+        self._hinweis = ""
         # OUT-66: der KONFIGURIERTE Port. ``port`` folgt dem Dongle, wenn er nach
         # einem Replug an neuer Nummer haengt (SERIAL-02); ``konfig_port`` bleibt
         # — er ist der Schluessel der NOT-AUS-Sperre je Ausgabeweg (OUT-64,
@@ -243,23 +257,26 @@ class EnttecPro:
         Dongle und der eigene ist nicht zu sehen -> SerialException (der Worker
         versucht es gedrosselt erneut), statt fremd zu schreiben."""
         port, sn = self.port, self._seriennr
-        if not sn:
-            return port
         try:
             kand = enttec_kandidaten()
         except Exception:
             kand = []
-        gleiche = [d for d, s in kand if s == sn and not self._fremd(d, s)]
-        for d in gleiche:
-            if _port_key(d) == _port_key(port):
-                return d
-        if gleiche:
-            return gleiche[0]
+        if sn:
+            gleiche = [d for d, s in kand if s == sn and not self._verboten(d, s)]
+            for d in gleiche:
+                if _port_key(d) == _port_key(port):
+                    return d
+            if gleiche:
+                return gleiche[0]
+        # Review 2: am eigenen Port haengt ein Dongle mit ANDERER Nummer (oder
+        # es ist noch keine bekannt). Kennt eine andere Ausgabe diese Nummer,
+        # ist es deren Dongle -> nie nehmen. Sonst ist es ein Ersatzgeraet und
+        # wird uebernommen (:meth:`_geoeffnet` lernt die Nummer neu).
         for d, s in kand:
-            if _port_key(d) == _port_key(port) and s and s != sn:
+            if _port_key(d) == _port_key(port) and s and self._verboten(d, s):
                 raise serial.SerialException(
-                    f"{port}: dort haengt ein anderer Enttec (Seriennummer {s}, "
-                    f"erwartet {sn}) — wird nicht genommen (OUT-66)")
+                    f"{port}: dort haengt der Enttec einer anderen Ausgabe "
+                    f"(Seriennr. {s}) — wird nicht genommen (OUT-66)")
         return port
 
     @staticmethod
@@ -292,10 +309,26 @@ class EnttecPro:
 
     def _geoeffnet(self, port: str, lernen: bool = True):
         """OUT-66: Port als von dieser Instanz offen eintragen, Seriennummer
-        merken (nur wenn noch keine bekannt ist — sie aendert sich nie — und
-        nur, wenn der Port exklusiv offen ist: ``lernen``)."""
+        merken (nur, wenn der Port exklusiv offen ist: ``lernen``).
+
+        Eine schon bekannte Nummer wird nur in EINEM Fall ersetzt (Review 2):
+        am KONFIGURIERTEN Port steckt jetzt ein anderer Dongle, dessen Nummer
+        keine andere Ausgabe kennt — ein Ersatzgeraet. Dann lernt die Ausgabe
+        dessen Nummer und meldet die Uebernahme sichtbar (:meth:`hinweis`)."""
         with _REG_LOCK:
             _OFFEN[_port_key(port)] = id(self)
+        if self._seriennr and lernen \
+                and _port_key(port) == _port_key(self.konfig_port):
+            ist = _seriennummer_von(port)
+            if ist and ist != self._seriennr and not self._verboten(port, ist):
+                alt, self._seriennr = self._seriennr, None
+                _registry_freigeben(id(self), auch_seriennr=True)
+                with _REG_LOCK:
+                    _OFFEN[_port_key(port)] = id(self)
+                self._hinweis = (f"Anderer Enttec an {port} übernommen: "
+                                 f"Seriennr. {ist} statt Seriennr. {alt}")
+                import sys
+                print(f"[EnttecPro] {self._hinweis} (OUT-66).", file=sys.stderr)
         if self._seriennr:
             with _REG_LOCK:
                 if _SN_BESITZER.get(self._seriennr, id(self)) == id(self):
@@ -309,12 +342,60 @@ class EnttecPro:
                         self._seriennr = sn
         if self._melde is not None:
             try:
-                self._melde(self.port, self._seriennr)
+                self._melde(self.port, self._seriennr, self._hinweis)
             except Exception:
                 pass
 
     def _port_freigeben(self, auch_seriennr: bool = False):
         _registry_freigeben(id(self), auch_seriennr)
+
+    # ── OUT-66 (Review 2): fremde Seriennummern, Auskunft fuer den Manager ────
+
+    def setze_fremde_seriennr(self, menge):
+        """Vom ``OutputManager``: die Seriennummern der ANDEREN konfigurierten
+        Enttec-Ausgaben (ersetzt eine beim Anlegen mitgegebene Quelle)."""
+        self._fremde_quelle = frozenset(str(s) for s in (menge or ()) if s)
+
+    def _fremde_sn(self) -> frozenset:
+        q = self._fremde_quelle
+        try:
+            werte = q() if callable(q) else q
+            return frozenset(str(s) for s in (werte or ()) if s)
+        except Exception:
+            return frozenset()
+
+    def _verboten(self, device: str, sn: str | None = None) -> bool:
+        """True, wenn ``device``/``sn`` einer anderen Instanz dieses Prozesses
+        gehoert ODER eine andere konfigurierte Ausgabe die Nummer kennt."""
+        if self._fremd(device, sn):
+            return True
+        return bool(sn) and sn in self._fremde_sn()
+
+    @property
+    def seriennr(self) -> str | None:
+        """Die gelernte USB-Seriennummer (sonst None)."""
+        return self._seriennr
+
+    @property
+    def port_aktuell(self) -> str:
+        """Der Port, an dem GERADE gesendet wird — nur solange der Port offen
+        ist; sonst der konfigurierte (Review 2: ein toter Ausgang belegt keine
+        fremde Nummer, ``close_enttec_on_port`` verdraengt ihn dort nicht)."""
+        try:
+            offen = (not self._disabled) and bool(self._ser.is_open)
+        except Exception:
+            offen = False
+        return self.port if offen else self.konfig_port
+
+    @property
+    def port_zuletzt(self) -> str:
+        """Der zuletzt geoeffnete Port, auch nach einem Ausfall (NOT-AUS-Weg:
+        lieber eine Nummer zu viel gesperrt als eine zu wenig)."""
+        return self.port
+
+    def hinweis(self) -> str:
+        """OUT-66: Hinweis fuer die Ausgabe-Diagnose (leer = nichts)."""
+        return self._hinweis
 
     def _fremd(self, device: str, sn: str | None = None) -> bool:
         """OUT-66: True, wenn ``device`` (bzw. der Dongle mit ``sn``) einer
@@ -419,7 +500,7 @@ class EnttecPro:
             kand = []
         eigen = {_port_key(self.port), _port_key(self.konfig_port)}
         sn = self._seriennr
-        frei = [(d, s) for d, s in kand if not self._fremd(d, s)]
+        frei = [(d, s) for d, s in kand if not self._verboten(d, s)]
         if sn:
             gleiche = [d for d, s in frei if s == sn]
             if gleiche:
@@ -431,6 +512,11 @@ class EnttecPro:
             # Enttec sichtbar ist und der keine Nummer zeigt.
             if len(kand) == 1 and frei and not frei[0][1]:
                 return frei[0][0]
+            # Review 2: Ersatzgeraet am KONFIGURIERTEN Port — uebernehmen, wenn
+            # keine andere Ausgabe seine Nummer kennt (sonst nie).
+            for d, s in kand:
+                if _port_key(d) == _port_key(self.konfig_port) and s and s != sn:
+                    return None if self._verboten(d, s) else d
         else:
             for d, _s in frei:
                 if _port_key(d) in eigen:
@@ -441,7 +527,7 @@ class EnttecPro:
         # (fremde Seriennummer) haengt oder eine andere Instanz sie offen hat.
         for d, s in kand:
             if _port_key(d) == _port_key(self.port):
-                if (sn and s and s != sn) or self._fremd(d, s):
+                if (sn and s and s != sn) or self._verboten(d, s):
                     return None
         if self._fremd(self.port):
             return None

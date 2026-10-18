@@ -53,6 +53,23 @@ Worker-Loop).
   gelernte Seriennummer zurueck; ein neu gestarteter Worker bekommt sie mit
   (`EnttecPro(port, seriennr=…)`). Ohne Exklusiv-Sperre geoeffnet (fremder Halter)
   wird keine Seriennummer gelernt.
+- **Ersatzgerät am eigenen Port (OUT-66, Review 2):** Steckt am KONFIGURIERTEN Port ein
+  anderer Dongle als der gelernte, wird er übernommen und seine Seriennummer neu
+  gelernt — beim ersten Öffnen wie beim Reconnect —, sofern keine ANDERE konfigurierte
+  Enttec-Ausgabe diese Nummer kennt. Die Menge dieser fremden Nummern gibt der
+  `OutputManager` jeder Ausgabe mit (beim Anlegen, laufend im Ausgabe-Thread, nach dem
+  Entfernen; `setze_fremde_seriennr`, beim Proxy über ein gemeinsames Feld). Ein Dongle
+  mit einer fremden Nummer wird nie genommen. Die Übernahme erscheint als `hinweis` in
+  `OutputManager.ausgabe_status()` (Systeminfo, Tooltip der Ausgabe-Anzeige) und im Log.
+- **Toter Ausgang (Review 2):** `port_aktuell` nennt eine gefolgte Nummer nur, solange
+  der Ausgang dort verbunden ist; `close_enttec_on_port` verdrängt einen toten Ausgang
+  dort also nicht. Die NOT-AUS-Sperre liest zusätzlich `port_zuletzt` (bleibt nach dem
+  Ausfall stehen — lieber eine Nummer zu viel gesperrt).
+- **Grenze — Neustart (→ OUT-80):** die Seriennummer lebt nur zur Laufzeit. Vertauscht
+  Linux beim Booten `ttyUSB0`/`ttyUSB1`, öffnet jedes Universum den Dongle des anderen
+  und lernt ihn als eigenen (bestand schon vor OUT-66, Konfiguration über den
+  Portnamen). Abhilfe geplant in OUT-80: Seriennummer in der Universums-Konfiguration,
+  unter Linux `/dev/serial/by-id`.
 - `close()` bricht/leert vorher den Output-Puffer, damit `CloseHandle()` nicht mit einem
   ausstehenden `WriteFile` kollidiert. Idempotent, fehlertolerant.
 
@@ -69,6 +86,7 @@ Worker-Loop).
 - `tests/test_enttec_fail_watchdog.py`
 - `tests/test_serial_status_reconnect.py` (SERIAL-02)
 - `tests/test_out66_enttec_reconnect_eigener_port.py` (OUT-66)
+- `tests/test_out66_ersatz_dongle_review2.py` (OUT-66, Ersatzgerät, Worker-Argumente, toter Ausgang)
 
 ## Quelle
 

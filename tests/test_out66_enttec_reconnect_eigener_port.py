@@ -163,6 +163,9 @@ class ZweiDongles(_Basis):
         a = self._neu(P0)
         self._abziehen(a)
         WELT.enttecs = {P0: "ZZZ"}               # anderer Dongle hat die Nummer
+        # Review 2: ZZZ gehoert einer ANDEREN konfigurierten Ausgabe (sonst
+        # waere es ein Ersatzgeraet und wuerde uebernommen).
+        a.setze_fremde_seriennr({"ZZZ"})
         WELT.oeffnungen.clear()
         self._reconnect(a)
         self.assertTrue(a.is_disabled())
@@ -299,7 +302,8 @@ class ErstesOeffnen(_Basis):
         WELT.enttecs = {P0: "BBB"}
         WELT.oeffnungen.clear()
         with self.assertRaises(serial.SerialException):
-            self.geraete.append(EnttecPro(P0, seriennr="AAA"))
+            # Review 2: BBB kennt eine andere Ausgabe -> deren Dongle.
+            self.geraete.append(EnttecPro(P0, seriennr="AAA", fremde={"BBB"}))
         self.assertEqual([], WELT.oeffnungen)
 
     def test_neustart_mit_seriennummer_am_eigenen_port(self):
@@ -386,8 +390,10 @@ class NotAusProxy(unittest.TestCase):
         a = self.om._enttec_outputs[1]
         self.om.universes[1].set_channel(40, 255)
         self.om.set_laser_estop_mask({1: frozenset({40})}, True)
-        # Worker folgt dem Dongle nach P3 (SERIAL-02) und meldet das.
+        # Worker folgt dem Dongle nach P3 (SERIAL-02), ist dort verbunden und
+        # meldet das.
         self.sp._schreib_text(a._port_akt, P3, self.sp.PORT_BYTES)
+        a._status.value = self.sp.ST_OK
         self.assertEqual(P3, a.port_aktuell)
         self.assertEqual(P0, a.port)
         self.assertIn(("enttec", P3), self.om._wege_enttec(a))
