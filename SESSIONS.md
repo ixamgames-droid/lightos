@@ -61,7 +61,7 @@
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 | LAS-31 | A | - | 2026-10-14T18:14Z | - |
-| XPLAT-23 | A | - | 2026-10-14T18:14Z | - |
+| XPLAT-23 | A | fix/xplat23-sh-angleichung | 2026-10-18T15:37Z | - |
 | LIZ-2 | A | fix/liz2-lizenzen-rest | 2026-10-18T15:37Z | - |
 | DOC-16 | A | docs/doc16-anleitungen-neu-bebildert | 2026-10-18T15:37Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
@@ -162,7 +162,6 @@
 
 ## Verlauf
 
-- 2026-10-14T14:50Z A aktualisiert QA-98: Branch chore/backlog-nachtrag-2026-10-14 -> fix/qa98-weissband-test-schneller
 - 2026-10-14T15:06Z A done VCB-45
 - 2026-10-14T15:10Z A done LAS-39
 - 2026-10-14T15:10Z A done LAS-40
@@ -192,3 +191,4 @@
 - 2026-10-18T15:37Z 117 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T15:37Z A aktualisiert DOC-16: Branch - -> docs/doc16-anleitungen-neu-bebildert
 - 2026-10-18T15:37Z A aktualisiert LIZ-2: Branch - -> fix/liz2-lizenzen-rest
+- 2026-10-18T15:37Z A aktualisiert XPLAT-23: Branch - -> fix/xplat23-sh-angleichung
