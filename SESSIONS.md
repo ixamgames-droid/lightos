@@ -66,6 +66,7 @@
 | DOC-16 | A | docs/doc16-anleitungen-neu-bebildert | 2026-10-18T15:37Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
 | CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-14T19:43Z | - |
+| QA-98 | A | fix/qa98-weissband-test-schneller | 2026-10-18T15:37Z | - |
 
 ## Blocker & Fallen
 
@@ -162,7 +163,6 @@
 
 ## Verlauf
 
-- 2026-10-14T15:10Z A done LAS-39
 - 2026-10-14T15:10Z A done LAS-40
 - 2026-10-14T15:10Z A done QA-97
 - 2026-10-14T15:10Z A done QA-98
@@ -192,3 +192,4 @@
 - 2026-10-18T15:37Z A aktualisiert LIZ-2: Branch - -> fix/liz2-lizenzen-rest
 - 2026-10-18T15:37Z A aktualisiert XPLAT-23: Branch - -> fix/xplat23-sh-angleichung
 - 2026-10-18T15:37Z A aktualisiert LAS-31: Branch - -> fix/las31-notaus-ein-weg-blackout-kiosk
+- 2026-10-18T15:37Z A claim QA-98
