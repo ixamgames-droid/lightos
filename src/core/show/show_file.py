@@ -526,6 +526,31 @@ def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
         return False
 
 
+def _modus_exakt(paare, mode_name: str, channel_count: int) -> bool:
+    """FM-63/FM-73: traegt ein Profil (``paare`` = seine (Name, Kanalzahl))
+    den Modus der Show — Name und, soweit bekannt, Kanalzahl, oder den
+    umbenannten Zwilling mit gleicher Kanalzahl?"""
+    if any(n == mode_name and (not channel_count or c == channel_count)
+           for n, c in paare):
+        return True
+    # FM-73: der Import hat den zweiten gleichnamigen Modus in
+    # „Name (n)“ umbenannt — fuer die Show ist das derselbe
+    # Modus (Alias-Regel in ``modus_wahl``), kein fehlender.
+    from src.core.database.modus_wahl import ist_zwilling
+    return bool(channel_count) and any(
+        c == channel_count and ist_zwilling(n, mode_name) for n, c in paare)
+
+
+def _modus_der_show_da(paare, mode_name: str, channel_count: int) -> bool:
+    """FM-65: Modusregel des Schnellwegs. Mit Modusname wie ``_modus_exakt``,
+    nur mit Kanalzahl: ein Modus dieser Kanalzahl; ohne beides immer wahr."""
+    if mode_name:
+        return _modus_exakt(paare, mode_name, channel_count)
+    if channel_count:
+        return any(c == channel_count for _n, c in paare)
+    return True
+
+
 def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                                 fixture_name: str, *, mode_name: str = "",
                                 channel_count: int = 0) -> int:
@@ -596,6 +621,16 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     Die FM-43-Regel „builtin vor Import“ gilt damit nur noch innerhalb einer
     Stufe: hat ein Import den Modus der Show und das builtin nicht, gewinnt
     der Import (die Dubletten-Meldung bleibt).
+
+    ★★ **FM-65: auch der Schnellweg „ID passt, Name passt“ prueft den Modus.**
+    Profil-IDs kollidieren ueber Geraete-DBs: eine Show von Rechner X kann mit
+    ihrer ID hier auf ein GLEICHNAMIGES Profil mit anderen Modi zeigen — bisher
+    still angenommen, falsche Kanalbelegung. Traegt die Show Modusname und/oder
+    Kanalzahl und hat das Profil der ID diesen Modus nicht
+    (``_modus_der_show_da``), laeuft der normale Abgleich oben; die ID der Show
+    steht dabei in jeder Stufe vorn, findet er nichts Besseres, bleibt sie —
+    mit Meldung in ``_ladeprobleme``. Legacy-Shows ohne Modus/Kanalzahl: wie
+    bisher.
     """
     if not fixture_name:
         return profile_id
@@ -612,11 +647,23 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                 .options(joinedload(FixtureProfile.manufacturer))
                 .where(FixtureProfile.id == profile_id)
             ).scalar_one_or_none()
+            # FM-65: ID + Name passen — aber traegt das Profil der ID auch den
+            # Modus der Show? Sonst zeigt die ID in DIESER Bibliothek womoeglich
+            # auf ein gleichnamiges Profil mit anderen Modi (andere Geraete-DB).
+            id_ohne_modus = False
             if current is not None:
                 current_mfr = getattr(current.manufacturer, "name", "") or ""
                 if (current.name == fixture_name and
                         (not manufacturer_name or current_mfr.casefold() == manufacturer_name.casefold())):
-                    return profile_id
+                    if not (mode_name or channel_count):
+                        return profile_id          # Legacy: wie bisher
+                    from src.core.database.models import FixtureMode
+                    paare = [(n, int(c or 0)) for n, c in session.execute(
+                        select(FixtureMode.name, FixtureMode.channel_count)
+                        .where(FixtureMode.fixture_id == profile_id))]
+                    if _modus_der_show_da(paare, mode_name, channel_count):
+                        return profile_id
+                    id_ohne_modus = True
 
             query = (
                 select(FixtureProfile.id, FixtureProfile.source)
@@ -652,34 +699,46 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     modi.setdefault(int(fid_), []).append((mname, int(mcount or 0)))
 
                 def _exakt(t) -> bool:
-                    paare = modi.get(int(t[0]), [])
-                    if any(n == mode_name and (not channel_count or c == channel_count)
-                           for n, c in paare):
-                        return True
-                    # FM-73: der Import hat den zweiten gleichnamigen Modus in
-                    # „Name (n)“ umbenannt — fuer die Show ist das derselbe
-                    # Modus (Alias-Regel in ``modus_wahl``), kein fehlender.
-                    from src.core.database.modus_wahl import ist_zwilling
-                    return bool(channel_count) and any(
-                        c == channel_count and ist_zwilling(n, mode_name)
-                        for n, c in paare)
+                    return _modus_exakt(modi.get(int(t[0]), []), mode_name,
+                                        channel_count)
 
                 def _kanalzahl(t) -> bool:
                     return bool(channel_count) and any(
                         c == channel_count for _n, c in modi.get(int(t[0]), []))
 
+                if id_ohne_modus:
+                    # FM-65: findet der Abgleich nichts Besseres, bleibt es bei
+                    # der ID der Show (innerhalb jeder Stufe zuerst) — nicht bei
+                    # irgendeinem anderen gleichnamigen Profil.
+                    treffer = sorted(treffer, key=lambda t: int(t[0]) != profile_id)
                 gewaehlt = treffer[0]
                 if mode_name or channel_count:
                     gewaehlt = (next((t for t in treffer if mode_name and _exakt(t)), None)
                                 or next((t for t in treffer if _kanalzahl(t)), None)
                                 or treffer[0])
                 resolved = int(gewaehlt[0])
-                print(
-                    f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
-                    f"({_geraet})"
-                )
+                if resolved != profile_id:
+                    print(
+                        f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
+                        f"({_geraet})"
+                    )
                 modus_passt = not mode_name or _exakt(gewaehlt)
-                if not modus_passt:
+                if id_ohne_modus:
+                    modus_passt = _modus_der_show_da(
+                        modi.get(resolved, []), mode_name, channel_count)
+                if not modus_passt and resolved == profile_id:
+                    # FM-65: kein besseres Profil — die ID bleibt, aber laut.
+                    _modus = (f"„{mode_name}“ ({channel_count} Kanaele)"
+                              if mode_name and channel_count else
+                              f"„{mode_name}“" if mode_name else
+                              f"mit {channel_count} Kanaelen")
+                    _ladeprobleme.append(
+                        f"„{_geraet}“: Profil {profile_id} hat in dieser "
+                        f"Geraetebibliothek den Modus {_modus} der Show NICHT "
+                        f"(die ID gehoert hier wohl zu einem gleichnamigen Profil "
+                        f"mit anderen Modi), ein passenderes Profil gibt es nicht. "
+                        f"Kanalbelegung am Geraet pruefen.")
+                elif not modus_passt:
                     _ladeprobleme.append(
                         f"„{_geraet}“: Profil {profile_id} passt nicht zur Show "
                         f"(fehlt oder traegt einen anderen Namen), "
