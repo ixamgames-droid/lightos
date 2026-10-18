@@ -563,7 +563,9 @@ class MitschnittDialog(QDialog):
 
     @property
     def szenen_ids(self) -> list[int]:
-        return list(self._szenen)
+        """Die festgehaltenen Szenen, die es in der Show noch gibt — in der
+        Reihenfolge des Festhaltens (so stehen sie in Liste und Chaser)."""
+        return [sid for sid in self._szenen if self._lebt(sid)]
 
     def _fm(self):
         return self._state.function_manager
@@ -802,11 +804,18 @@ class MitschnittDialog(QDialog):
         # Nur loeschen, was der Assistent selbst angelegt hat und was noch
         # dieselbe Funktion ist — nie eine fremde mit derselben Nummer.
         szene = fm.get(sid) if self._lebt(sid) else None
-        if sid in self._szenen:
-            self._szenen.remove(sid)
-        self._szenen_obj.pop(sid, None)
-        self._szenen_text.pop(sid, None)
-        if szene is not None:
+        if szene is None:
+            # Gibt es nicht mehr (oder nicht mehr als dieselbe): vergessen.
+            if sid in self._szenen:
+                self._szenen.remove(sid)
+            self._szenen_obj.pop(sid, None)
+            self._szenen_text.pop(sid, None)
+        else:
+            # Codex-Review #1085: die Buchfuehrung bleibt stehen. Die Liste
+            # zeigt ohnehin nur, was in der Show lebt (``_liste_abgleichen``);
+            # holt Rueckgaengig die Szene zurueck, steht sie wieder an ihrem
+            # Platz in der Liste und kommt in den Chaser. Vorher fehlte sie dort,
+            # obwohl sie wieder in der Show war.
             from src.core.undo import Command, get_undo_stack
             get_undo_stack().push(Command(
                 label=f"Mitschnitt „{szene.name}“ entfernen",

@@ -52,7 +52,7 @@ def _speichere_prefs(werte: dict) -> None:
         from src.ui.views.programmer_view import _save_prefs
         _save_prefs(werte)
     except Exception as e:
-        print(f"[Visualizer] Spalten-Zustand nicht gespeichert: {e}")
+        print(f"[spalte_einklappen] ERROR: Spalten-Zustand nicht gespeichert: {e}")
 
 
 def baue_knopf(parent=None) -> QToolButton:

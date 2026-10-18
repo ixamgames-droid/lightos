@@ -61,6 +61,22 @@ ins Repo kommen.
   deshalb nichts von fremden Servern (WEB-06). Version passend zum Server
   (python-socketio 5.x / python-engineio 4.x, Socket.IO-Protokoll 5).
 
+## Roboto Condensed — Schrift der Anleitungsbilder (v3.008)
+
+- **Herkunft:** Google Fonts (<https://github.com/google/fonts>), Ordner
+  `ofl/robotocondensed/`, Stand Commit `69d0549e8fc7ad72e1531734c81237be401ec4fd`; dort aus
+  Roboto v3.008 (<https://github.com/googlefonts/roboto-classic>, Release v3.008). Datei
+  `RobotoCondensed[wght].ttf` unverändert, nur umbenannt.
+- **Urheber:** Copyright 2011 The Roboto Project Authors.
+- **Lizenz:** SIL Open Font License 1.1 —
+  [`licenses/OFL-1.1-RobotoCondensed.txt`](licenses/OFL-1.1-RobotoCondensed.txt).
+- **Dateien:**
+  - `tools/anleitungsbilder/schrift/RobotoCondensed-wght.ttf`
+- **SHA-256:** `dace262afcee68a5276f200d8026c57221735c0118ab5fda8c2c0d3dc409a8d0`
+- **Wofür:** nur das Bild-Werkzeug `tools/anleitungsbilder.py` (DOC-16) lädt sie, damit die
+  Anleitungsbilder auf jedem Rechner in derselben Schrift entstehen. Die App und das
+  Windows-Installationspaket enthalten sie nicht.
+
 ## pyusb — USB-Zugriff für uDMX-Adapter (im Windows-Installationspaket)
 
 - **Herkunft:** pyusb (<https://github.com/pyusb/pyusb>), Version laut `requirements.txt`
@@ -251,9 +267,13 @@ Zu pyusb, libusb und libusb-package stehen eigene Abschnitte weiter oben.
   Die Aufstellung aller enthaltenen Bibliotheken mit ihren Lizenztexten führt die
   Qt-Dokumentation: „Qt WebEngine Licensing“,
   <https://doc.qt.io/qt-6/qtwebengine-licensing.html>.
-- **Offen:** Die PySide6-Pakete bringen diese Aufstellung nicht als Datei mit. Ob und in
-  welcher Form sie dem Setup beigelegt wird, ist noch zu entscheiden (LIZ-2, Rückfrage an
-  den Projektinhaber).
+- **Lizenztext:** [`licenses/QtWebEngine-THIRD-PARTY.txt`](licenses/QtWebEngine-THIRD-PARTY.txt)
+  – alle dort genannten Bibliotheken (125) mit Lizenz, Projektseite und Lizenztext, für
+  Qt WebEngine 6.140.0 (Chromium 140), die Fassung in PySide6 6.12.0. Die PySide6-Pakete
+  bringen diese Aufstellung nicht mit (auch nicht in `qtwebengine_resources.pak`); die Datei
+  entsteht aus den Seiten der Qt-Dokumentation mit
+  `packaging/windows/fremdlizenzen_sammeln.py webengine`. Der Bau liest die Version aus
+  `Qt6WebEngineCore.dll` und bricht ab, wenn die Datei eine andere beschreibt.
 
 ## FFmpeg — in Qt Multimedia (im Windows-Installationspaket)
 
@@ -283,12 +303,7 @@ in numpy. Das Bauwerkzeug erkennt sie an ihren Dateien.
   <https://github.com/OpenMathLib/OpenBLAS>. Lizenztext und die Hinweise zu den darin
   enthaltenen Teilen (LAPACK, GCC-Laufzeitbibliothek mit Ausnahmeklausel) stehen in der
   Lizenzdatei von numpy (`licenses/pakete/numpy-<Version>/LICENSE.txt`).
-- **Mesa llvmpipe** (`_internal/PySide6/opengl32sw.dll`) – OpenGL in Software, von Qt als
-  fertige Datei beigelegt
-  (<https://download.qt.io/development_releases/prebuilt/llvmpipe/windows/>); Mesa steht
-  überwiegend unter der MIT-Lizenz (<https://docs.mesa3d.org/license.html>). Qt lädt die
-  Datei nur, wenn Software-OpenGL verlangt wird. **Offen:** ein Lizenztext liegt der Datei
-  nicht bei (LIZ-2, Rückfrage).
+- **Mesa llvmpipe** (`_internal/PySide6/opengl32sw.dll`) – eigener Abschnitt unten.
 - **Microsoft Visual C++ Laufzeit** (`VCRUNTIME140*.dll`, `MSVCP140*.dll`) – von Microsoft,
   **nicht** Open Source. Sie kommt ausschließlich aus der Python-Installation und aus den
   Paketen (PySide6, shiboken6, numpy), nie von anderswo auf dem Bau-Rechner – eine solche
@@ -299,6 +314,26 @@ in numpy. Das Bauwerkzeug erkennt sie an ihren Dateien.
   zu Windows 10 und 11, und das Setup verlangt Windows 10. Das Bauwerkzeug hätte sie aus
   einem zufälligen Ordner des Bau-Rechners eingesammelt; sie entfällt, und der Bau wie der
   Selbsttest des fertigen Programms melden, wenn doch eine dabei ist.
+
+## Mesa llvmpipe — OpenGL in Software (im Windows-Installationspaket)
+
+- **Herkunft:** von Qt als fertige Datei beigelegt
+  (<https://download.qt.io/development_releases/prebuilt/llvmpipe/windows/>); die Datei in
+  PySide6 6.12.0 ist Mesa 11.2.2 mit statisch eingebundenem LLVM 3.6.2 (Versionskennung in
+  der Datei; bis auf die Signatur gleich Qts Archiv
+  `opengl32sw-64-mesa_11_2_2-signed_sha256.7z`). Qt lädt sie nur, wenn Software-OpenGL
+  verlangt wird.
+- **Urheber:** die Mesa-Autoren (<https://www.mesa3d.org/>); LLVM: University of Illinois at
+  Urbana-Champaign und das LLVM-Team (<https://llvm.org/>).
+- **Lizenz:** überwiegend MIT (<https://docs.mesa3d.org/license.html>), dazu Boost (C11-
+  Thread-Emulation), BSD (Jimenez's MLAA) und für LLVM 3.6.2 die University of
+  Illinois/NCSA-Lizenz mit den Hinweisen zu regex und MD5 —
+  [`licenses/Mesa-opengl32sw.txt`](licenses/Mesa-opengl32sw.txt), aus den
+  Original-Quellarchiven (<https://archive.mesa3d.org/>, <https://releases.llvm.org/>)
+  erzeugt mit `packaging/windows/fremdlizenzen_sammeln.py mesa`. Der Bau prüft die
+  Mesa-Version der Datei gegen die Lizenzdatei.
+- **Dateien:**
+  - `_internal/PySide6/opengl32sw.dll` (nur im Windows-Installationspaket)
 
 ## PyInstaller — Startlader von LightOS.exe (im Windows-Installationspaket)
 
