@@ -44,6 +44,11 @@ class _FakeState:
     def ensure_laser_output(self):
         return self._laser_output
 
+    # LAS-31: die VC-Taste geht ueber den EINEN Weg von AppState.
+    from src.core.app_state import AppState as _AS
+    laser_notaus_ausloesen = _AS.laser_notaus_ausloesen
+    del _AS
+
 
 class VcLaserButtonTest(unittest.TestCase):
     @classmethod

@@ -1762,19 +1762,24 @@ class MainWindow(QMainWindow):
 
     def _sync_blackout_button(self, an: bool):
         """UI-58: der Knopf zeigt den ECHTEN Blackout-Zustand, auch wenn ihn ein
-        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat."""
-        btn = getattr(self, "_btn_blackout", None)
-        if btn is None:
-            return
-        try:
-            btn.blockSignals(True)
-            btn.setChecked(bool(an))
-            btn.blockSignals(False)
-            btn.setStyleSheet(
-                "background:#cc0000; color:#ffffff; font-weight:bold;"
-                "border:2px solid #ff0000;" if an else "")
-        except RuntimeError:
-            pass        # Fenster schon abgebaut
+        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat.
+
+        LAS-31: im Kiosk-Modus gibt es einen zweiten BLACKOUT-Knopf im
+        NOT-AUS-Streifen. Beide zeigen dasselbe — die eine Quelle der Wahrheit
+        ist ``output_manager.blackout`` (UI-58-Abo)."""
+        for name in ("_btn_blackout", "_btn_blackout_kiosk"):
+            btn = getattr(self, name, None)
+            if btn is None:
+                continue
+            try:
+                btn.blockSignals(True)
+                btn.setChecked(bool(an))
+                btn.blockSignals(False)
+                btn.setStyleSheet(
+                    "background:#cc0000; color:#ffffff; font-weight:bold;"
+                    "border:2px solid #ff0000;" if an else "")
+            except RuntimeError:
+                pass        # Fenster schon abgebaut
 
     def _quick_record_cue(self):
         stacks = self._state.cue_stacks
@@ -3042,7 +3047,14 @@ class MainWindow(QMainWindow):
 
     def _notaus_in_kioskleiste(self):
         """Kiosk: eigener schmaler Streifen ueber dem Inhalt, Knopf rechts
-        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet)."""
+        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet).
+
+        LAS-31: BLACKOUT steht im Kiosk mit im Streifen, direkt links neben
+        LASER NOT-AUS — gleiche Bedienung wie der Knopf der Sektionsleiste
+        (Klick schaltet um, ``_toggle_blackout``), gleiche Anzeige
+        (``_sync_blackout_button``). Der Streifen liegt im Layout ueber dem
+        Ansichtsstapel; das Ausgabe-Banner (VCB-47) ueberlagert nur den
+        Stapel — beide verdecken sich nicht."""
         btn = getattr(self, "_btn_laser_notaus", None)
         if btn is None:
             return
@@ -3053,12 +3065,31 @@ class MainWindow(QMainWindow):
             lay.setContentsMargins(4, 2, 4, 2)
             lay.addStretch(1)
             self._sperrzonen_kopfzeile_bauen(lay)     # LAS-32, auch im Kiosk
+            bo = QPushButton("BLACKOUT")
+            bo.setObjectName("blackoutBtn")
+            bo.setCheckable(True)
+            bo.setMinimumHeight(btn.minimumHeight())
+            bo.setMinimumWidth(88)
+            bo.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # wie der NOT-AUS daneben
+            bo.setToolTip(
+                "Schaltet die gesamte Lichtausgabe dunkel. Ein weiterer Klick "
+                "schaltet sie wieder ein. Der Knopf zeigt immer den echten "
+                "Zustand, auch wenn eine VC-Taste, die Kommandozeile oder "
+                "die Fernbedienung den "
+                "Blackout geschaltet hat.")
+            bo.clicked.connect(self._toggle_blackout)
+            self._btn_blackout_kiosk = bo
+            lay.addWidget(bo)
             lay.addWidget(btn)
             root = self.centralWidget().layout()
             root.insertWidget(max(0, root.indexOf(self._section_bar)), leiste)
             self._notaus_leiste = leiste
         except Exception as e:
             print(f"[main_window] NOT-AUS-Leiste (Kiosk) fehlgeschlagen: {e}")
+        try:
+            self._sync_blackout_button(bool(self._state.output_manager.blackout))
+        except Exception:
+            pass
 
     def _laser_notaus_ausloesen(self):
         """Ausloesen — ein Schritt, keine Rueckfrage (Klick und Tastenkuerzel)."""
