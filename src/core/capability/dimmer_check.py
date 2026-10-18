@@ -89,7 +89,9 @@ def geraet_aus_patch(pf: dict):
     from types import SimpleNamespace
     return SimpleNamespace(
         fixture_profile_id=_profil_id_wie_beim_laden(pf),
-        mode_name=str(pf.get("mode_name") or ""),
+        # Alt-Shows ohne ``mode_name``: ``mode`` als Rueckfall, wie der Loader
+        # (show_file._patched_fixture_from_data) und die Profilwahl oben.
+        mode_name=str(pf.get("mode_name", pf.get("mode", "")) or ""),
         channel_count=_zahl(pf.get("channel_count"), 1),
         address=_zahl(pf.get("address"), 1),
         spider_dual_tilt=bool(pf.get("spider_dual_tilt", False)))

@@ -209,5 +209,96 @@ class LintLoestWieDerLoader(unittest.TestCase):
         self.assertEqual(SF._ladehinweise, vorher_h)
 
 
+def _geraete(eng):
+    """Alle Modi aller Profile der Bibliothek mit ihren Kanaelen (ueber
+    dieselbe Aufloesung wie der Lint) — zum Aussuchen."""
+    from types import SimpleNamespace
+    from src.core.app_state import get_channels_for_patched
+    from src.core.database.models import FixtureProfile
+    out = []
+    with Session(eng) as s:
+        for p in s.execute(select(FixtureProfile)
+                           .order_by(FixtureProfile.id)).scalars():
+            for m in sorted(p.modes, key=lambda m: m.id):
+                g = SimpleNamespace(fixture_profile_id=p.id, mode_name=m.name,
+                                    channel_count=m.channel_count, address=1,
+                                    spider_dual_tilt=False)
+                out.append((p.id, p.manufacturer.name, p.name, m.name,
+                            m.channel_count,
+                            list(get_channels_for_patched(g) or ())))
+    return out
+
+
+def _attrs(chans) -> set[str]:
+    return {(getattr(c, "attribute", "") or "").lower() for c in chans}
+
+
+class DimmerPruefungenLoesenWieDerLoader(unittest.TestCase):
+    """Gegenpruefung zu FM-69: auch ``statische_befunde`` (DIMMER-DUNKEL) und
+    ``weiss_zuordnung_befunde`` (WEISS-DIMMER-ZUORDNUNG) nehmen das Profil, das
+    der Loader nimmt — nicht die rohe Nummer der Show. Je Pruefung ein Geraet,
+    bei dem Name und Nummer auf VERSCHIEDENE Profile zeigen, so gewaehlt, dass
+    nur das richtig aufgeloeste Profil einen Befund liefert."""
+
+    @classmethod
+    def setUpClass(cls):
+        from src.core.capability.dimmer_check import DIMMER_ATTRS
+        from src.core.dimmer_segmente import zuordnung_fehlt
+        _bauen(cls)
+        alle = _geraete(cls.eng)
+        cls.ohne_dimmer = next(g for g in alle
+                               if g[5] and not (_attrs(g[5]) & DIMMER_ATTRS))
+        cls.mit_dimmer = next(g for g in alle if _attrs(g[5]) & DIMMER_ATTRS)
+        cls.weiss_offen = next((g for g in alle if zuordnung_fehlt(g[5])), None)
+
+    @staticmethod
+    def _patch(geraet, nummer: int) -> dict:
+        _, hersteller, modell, modus, kanaele, _ = geraet
+        return {"fid": 1, "label": "Geraet 1", "fixture_profile_id": nummer,
+                "manufacturer_name": hersteller, "fixture_name": modell,
+                "mode_name": modus, "channel_count": kanaele,
+                "universe": 1, "address": 1}
+
+    def _dunkel(self, pf):
+        from src.core.capability.dimmer_check import statische_befunde
+        show = {"patch": [pf], "functions": [
+            {"type": "RGBMatrix", "name": "Farbe", "style": "RGB",
+             "drive_intensity": False, "fixture_grid": [1]}]}
+        return [b.code for b in statische_befunde(show)]
+
+    def _weiss(self, pf):
+        from src.core.capability.dimmer_check import weiss_zuordnung_befunde
+        show = {"patch": [pf], "functions": [
+            {"type": "RGBMatrix", "name": "Weiss", "style": "RGB",
+             "fixture_grid": [None], "weiss_grid": [[1, 0]]}]}
+        return [b.code for b in weiss_zuordnung_befunde(show)]
+
+    def test_dimmer_dunkel_sieht_das_geraet_hinter_dem_namen(self):
+        # Name: Geraet MIT Dimmer, Nummer: fremdes Profil OHNE Dimmer. Mit der
+        # rohen Nummer gaebe es keinen Dimmer und damit keinen Befund.
+        pf = self._patch(self.mit_dimmer, self.ohne_dimmer[0])
+        self.assertEqual(self._dunkel(pf), ["DIMMER-DUNKEL"])
+        # Gegenprobe: umgekehrt bleibt es still.
+        pf = self._patch(self.ohne_dimmer, self.mit_dimmer[0])
+        self.assertEqual(self._dunkel(pf), [])
+
+    def test_weiss_zuordnung_sieht_das_geraet_hinter_dem_namen(self):
+        self.assertIsNotNone(self.weiss_offen,
+                             "kein Profil mit offener Weiss-Zuordnung")
+        pf = self._patch(self.weiss_offen, self.ohne_dimmer[0])
+        self.assertEqual(self._weiss(pf), ["WEISS-DIMMER-ZUORDNUNG"])
+        pf = self._patch(self.ohne_dimmer, self.weiss_offen[0])
+        self.assertEqual(self._weiss(pf), [])
+
+    def test_alte_show_mit_mode_statt_mode_name(self):
+        """Alt-Shows tragen den Modus unter ``mode`` — der Loader liest ihn
+        als Rueckfall (show_file._patched_fixture_from_data), also auch die
+        Kanal-Aufloesung des Lints."""
+        from src.core.capability.dimmer_check import geraet_aus_patch
+        pf = self._patch(self.mit_dimmer, self.mit_dimmer[0])
+        pf["mode"] = pf.pop("mode_name")
+        self.assertEqual(geraet_aus_patch(pf).mode_name, self.mit_dimmer[3])
+
+
 if __name__ == "__main__":
     unittest.main()
