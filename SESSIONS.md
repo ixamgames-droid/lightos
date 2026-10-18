@@ -61,7 +61,6 @@
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-18T15:37Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-18T15:37Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 | LAS-31 | A | fix/las31-notaus-ein-weg-blackout-kiosk | 2026-10-18T15:37Z | - |
-| LIZ-2 | A | fix/liz2-lizenzen-rest | 2026-10-18T15:37Z | - |
 | DOC-16 | A | docs/doc16-anleitungen-neu-bebildert | 2026-10-18T15:37Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
 | CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-18T15:37Z | - |
@@ -162,7 +161,6 @@
 
 ## Verlauf
 
-- 2026-10-14T16:29Z A claim QA-97
 - 2026-10-14T16:55Z A done TOOL-27
 - 2026-10-14T17:18Z A done VCB-47
 - 2026-10-14T18:02Z A done ENG-40
@@ -192,3 +190,4 @@
 - 2026-10-18T16:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T16:44Z D claim OUT-79
 - 2026-10-18T16:44Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-18T16:52Z A done LIZ-2
