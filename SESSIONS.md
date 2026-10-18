@@ -66,6 +66,7 @@
 | OUT-66 | A | fix/out66-enttec-reconnect-eigener-port | 2026-10-18T17:04Z | src/core/dmx/enttec_pro.py |
 | FM-65 | A | fix/fm65-show-laden-modus-pruefen | 2026-10-18T17:50Z | src/core/show/show_file.py |
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-18T19:42Z | src/ui/widgets/fixture_editor.py |
+| FM-69 | A | fix/fm69-bibliotheks-update-bestehende-db | 2026-10-18T19:42Z | src/core/database/fixture_db.py |
 
 ## Blocker & Fallen
 
@@ -155,7 +156,6 @@
 
 ## Verlauf
 
-- 2026-10-14T19:45Z A done ENG-36
 - 2026-10-14T20:14Z D done VCB-44
 - 2026-10-14T21:35Z A done ENG-39
 - 2026-10-14T22:23Z A done LAS-35
@@ -185,3 +185,4 @@
 - 2026-10-18T19:30Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T19:42Z A claim UI-82
 - 2026-10-18T19:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-18T19:42Z A claim FM-69
