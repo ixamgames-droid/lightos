@@ -3211,6 +3211,15 @@ class MainWindow(QMainWindow):
                 # NOT-AUS-Maske leer, ueber DMX geht dann nichts dunkel.
                 tip += (" — über DMX schaltet der Knopf dann nichts dunkel: er "
                         "deckt nur Geräte, die LightOS als Laser erkennt.")
+            # LAS-39: fehlt die Profil-Auskunft (Geraete-Datenbank nicht
+            # erreichbar), gelten die betroffenen Geraete vorerst als Laser —
+            # das muss der Betreiber am Knopf sehen.
+            try:
+                unvollstaendig = str(self._state.laser_erkennung_hinweis() or "")
+            except Exception:
+                unvollstaendig = ""
+            if unvollstaendig:
+                tip += "\n" + unvollstaendig
             if btn.text() != text:
                 btn.setText(text)
             if btn.styleSheet() != stil:
@@ -3236,9 +3245,18 @@ class MainWindow(QMainWindow):
         nach ein paar Sekunden von selbst zurücksetzt."""
         try:
             sb = self.statusBar()
-            sb.showMessage(
-                "⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
-                "verriegelt, Netzwerk-Ausgabe unscharf)", 6000)
+            text = ("⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
+                    "verriegelt, Netzwerk-Ausgabe unscharf)")
+            # LAS-39: die Bestaetigung ersetzt die Statuszeile — fehlt die
+            # Profil-Auskunft noch, gehoert der Hinweis HIER hinein, sonst
+            # ueberschriebe ihn die Bestaetigung sofort.
+            try:
+                unvollstaendig = str(self._state.laser_erkennung_hinweis() or "")
+            except Exception:
+                unvollstaendig = ""
+            if unvollstaendig:
+                text += " · " + unvollstaendig
+            sb.showMessage(text, 6000)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
             QTimer.singleShot(6000, lambda: self._reset_statusbar_style())
@@ -3382,8 +3400,13 @@ class MainWindow(QMainWindow):
         try:
             from src.core.sync import validate_and_repair
             from src.ui.widgets.validation_dialog import ValidationDialog
-            issues = validate_and_repair(self._state, fix=True)
-            dlg = ValidationDialog(issues, self)
+            # VCB-44: erst NUR pruefen. Repariert wird, wenn der Bediener im
+            # Dialog „Reparieren“ waehlt — vorher lief die Reparatur ungefragt,
+            # noch bevor der Dialog erschien.
+            issues = validate_and_repair(self._state, fix=False)
+            dlg = ValidationDialog(
+                issues, self,
+                reparieren=lambda: validate_and_repair(self._state, fix=True))
             dlg.exec()
             # Trigger Refresh-All danach
             try:

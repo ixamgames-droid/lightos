@@ -1761,6 +1761,11 @@ class AppState:
         fehl, bleibt die Antwort offen: ``erkennung`` fragt dann beim ersten
         Bedarf je Profil nach (``_profil_hat_laserkanal``) — der Patch darf an
         dieser Stelle nie scheitern.
+
+        LAS-39: Eine gescheiterte Abfrage fuehrt die Profile als OFFEN — sie
+        gelten bis zur Antwort als Laser (``erkennung.GRUND_PROFIL_UNBEKANNT``).
+        Offene Profile werden hier bei jedem Aufruf erneut gefragt (das ist das
+        Nachholen). Rueckgabe: ob eine bisher offene Auskunft jetzt da ist.
         """
         offen = set()
         for fx in getattr(self, "_patch_cache", None) or ():
@@ -1768,14 +1773,116 @@ class AppState:
             if profil_id is not None and not laser_erkennung.profil_bekannt(profil_id):
                 offen.add(profil_id)
         if not offen:
-            return
+            return False
+        vorher_offen = laser_erkennung.offene_profile()
         try:
             antworten = _profile_mit_laserkanal(offen)
         except Exception as e:
             debug_swallow("app_state.laser_profile_bestimmen", e)
-            return
+            for profil_id in offen:
+                laser_erkennung.merke_offen(profil_id)
+            return False
         for profil_id, hat_laser in antworten.items():
             laser_erkennung.merke_profil(profil_id, hat_laser)
+        return bool(vorher_offen & set(antworten))
+
+    def _laser_erkennung_offen_zahl(self, fix_index=None) -> int:
+        """LAS-39: wie viele gepatchte Geraete gelten nur deshalb als Laser,
+        weil die Profil-Auskunft fehlt?"""
+        offen = laser_erkennung.offene_profile()
+        if not offen:
+            return 0
+        if fix_index is None:
+            geraete = list(getattr(self, "_patch_cache", None) or ())
+        else:
+            geraete = [fx for fx, _ch in fix_index.values()]
+        return sum(1 for fx in geraete
+                   if getattr(fx, "fixture_profile_id", None) in offen)
+
+    def laser_erkennung_hinweis(self) -> str:
+        """LAS-39: Satz fuer NOT-AUS-Knopf und Statuszeile, solange die
+        Laser-Erkennung unvollstaendig ist — sonst leer."""
+        return laser_erkennung.hinweis_unvollstaendig(
+            self._laser_erkennung_offen_zahl())
+
+    def _laser_erkennung_melden(self, fix_index=None, immer=False):
+        """LAS-39: Wechsel „unvollstaendig“ <-> „vollstaendig“ dem Betreiber
+        sagen (Statuszeile ueber ``hinweis`` und Log). ``immer``: den Hinweis
+        auch ohne Wechsel erneut zeigen (frisch ausgeloester NOT-AUS)."""
+        n = self._laser_erkennung_offen_zahl(fix_index)
+        war = bool(getattr(self, "_laser_erkennung_unvollstaendig", False))
+        self._laser_erkennung_unvollstaendig = n > 0
+        if n > 0 and (immer or not war):
+            text = laser_erkennung.hinweis_unvollstaendig(n)
+        elif n == 0 and war:
+            text = laser_erkennung.hinweis_vollstaendig()
+        else:
+            return
+        print(f"[AppState] {text}")
+        try:
+            self._emit("hinweis", text)
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_melden", e)
+
+    def laser_erkennung_nachholen(self):
+        """LAS-39: beim ausgeloesten NOT-AUS fehlende Profil-Auskuenfte
+        nachholen. Ist eine da, wird der Render-Plan neu gebaut: eine normale
+        Lampe faellt dann aus der Laser-Menge (die klebrige Maske haelt sie bis
+        zum Loesen dunkel, der naechste NOT-AUS laesst sie frei). Ohne offene
+        Profile kostet das nichts.
+
+        Aufgerufen wird es von ``LaserOutputManager.estop_all`` erst NACH dem
+        DMX-Latch UND dem Netzwerk-NOT-AUS (``conn.estop()``) — nie aus
+        ``set_laser_estop``: eine gesperrte Datenbank antwortet erst nach dem
+        SQLite-Timeout (Sekunden), und darauf darf kein Teil des NOT-AUS warten
+        (CDX-25: das Billige zuerst, das Teure danach).
+
+        Codex-Review #1095: und es blockiert den Aufrufer nicht. Mit
+        registriertem UI-Marshaller (die App) laeuft die Datenbank-Abfrage in
+        einem eigenen Faden; Neuaufbau bzw. Hinweis kommen danach im UI-Faden
+        — die Oberflaeche friert waehrend eines SQLite-Timeouts nicht ein.
+        Ohne Marshaller (Werkzeuge, Tests) laeuft alles wie bisher sofort."""
+        if not laser_erkennung.offene_profile():
+            return
+        marshaller = getattr(self, "_ui_marshaller", None)
+        if marshaller is None:
+            self._laser_erkennung_abschliessen(self._laser_erkennung_fragen())
+            return
+        if getattr(self, "_laser_nachholen_laeuft", False):
+            return                       # eine Abfrage laeuft schon
+        self._laser_nachholen_laeuft = True
+
+        def faden():
+            try:
+                bekannt = self._laser_erkennung_fragen()
+            finally:
+                self._laser_nachholen_laeuft = False
+            try:
+                marshaller(lambda: self._laser_erkennung_abschliessen(bekannt))
+            except Exception as e:
+                debug_swallow("app_state.laser_erkennung_nachholen", e)
+
+        threading.Thread(target=faden, name="laser-erkennung-nachholen",
+                         daemon=True).start()
+
+    def _laser_erkennung_fragen(self) -> bool:
+        """Der langsame Teil des Nachholens (Datenbank). Wirft nie."""
+        try:
+            return bool(self._laser_profile_bestimmen())
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_nachholen", e)
+            return False
+
+    def _laser_erkennung_abschliessen(self, bekannt: bool) -> None:
+        """Nach der Abfrage: Neuaufbau, wenn eine Auskunft da ist, sonst den
+        Hinweis erneut zeigen."""
+        try:
+            if bekannt:
+                self._rebuild_render_plan()
+                return
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_nachholen", e)
+        self._laser_erkennung_melden(immer=True)
 
     def profil_geaendert(self, profile_id=None) -> bool:
         """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
@@ -2032,6 +2139,11 @@ class AppState:
         # A3D-01: die Laser-Estop-Maske am OutputManager mitpflegen (Adressen
         # koennen sich geaendert haben, waehrend der NOT-AUS-Latch aktiv ist).
         self._push_laser_estop_mask()
+        # LAS-39: fehlende Profil-Auskunft sichtbar machen bzw. zuruecknehmen.
+        try:
+            self._laser_erkennung_melden(fix_index)
+        except Exception as e:
+            debug_swallow("app_state.rebuild_render_plan.laser_erkennung", e)
 
     def _release_engine_extra(self):
         """STAB-14: gibt die zuletzt als Engine-Extra committeten Roh-Kanaele
@@ -2645,6 +2757,8 @@ class AppState:
         # CDX-12: Reihenfolge ist ASYMMETRISCH und failt in beide Richtungen sicher.
         # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
         # und die OutputManager-Maske (Ebene 2) wird separat angewandt.
+        # LAS-39: KEIN Nachholen der Profil-Auskunft hier — das macht
+        # ``estop_all`` nach dem Netzwerk-NOT-AUS (``laser_erkennung_nachholen``).
         with self._get_estop_lock():
             if active and not getattr(self, "laser_estop_active", False):
                 # OUT-63: frischer Latch -> klebrige Maske neu beginnen (nur
@@ -2691,6 +2805,11 @@ class AppState:
             # Latch notfalls direkt (estop_all setzt ihn als Erstes — steht er
             # schon, ist das ein No-Op) und die Anzeige trotzdem benachrichtigen.
             self.set_laser_estop(True)
+            # LAS-39: auch hier erst nach dem Verriegeln nachholen.
+            try:
+                self.laser_erkennung_nachholen()
+            except Exception as e2:
+                debug_swallow("app_state.laser_notaus.nachholen", e2)
             try:
                 from .sync import get_sync, SyncEvent
                 get_sync().emit(SyncEvent.LASER_ESTOP, None)
