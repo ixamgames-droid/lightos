@@ -169,10 +169,22 @@ def strobe_hz_aus_attrs(attrs, channels, sfx: str | None = None) -> float:
     return hz
 
 
-def hat_kopf_shutter(channels) -> bool:
-    """Hat das Geraet mehr als einen Shutter-/Strobe-Kanal derselben Art —
-    also einen je Kopf?"""
-    return any("#" in k for k in _kanaele_nach_schluessel(channels))
+def hat_kopf_shutter(channels, kopfzahl: int | None = None) -> bool:
+    """Hat das Geraet einen Shutter-/Strobe-Kanal je Kopf?
+
+    Ohne ``kopfzahl``: mehr als einen Kanal derselben Art. Mit ``kopfzahl``
+    (Codex-Review #1071): nur, wenn es von einer Art GENAU so viele Kanaele
+    gibt wie Koepfe. Zwei Shutter bei zwoelf Farbkoepfen (Varytec Colors
+    Nervestrobe HP, Modi mit 56/68 Kanaelen) sind kein Shutter je Kopf — sonst
+    bekaemen nur die Koepfe 0 und 1 eine Frequenz, und 2 bis 11 leuchteten im
+    Bild durch. Dann blitzt das Geraet als Ganzes."""
+    zahl: dict[str, int] = {}
+    for k in _kanaele_nach_schluessel(channels):
+        art = k.partition("#")[0]
+        zahl[art] = zahl.get(art, 0) + 1
+    if kopfzahl is None:
+        return any(n > 1 for n in zahl.values())
+    return int(kopfzahl) > 1 and any(n == int(kopfzahl) for n in zahl.values())
 
 
 def blitz_bilder(hz: float, fps: float, deckel_hz: float = DECKEL_HZ,

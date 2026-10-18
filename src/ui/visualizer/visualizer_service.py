@@ -488,7 +488,7 @@ def _build_fixture_payload(fixture, attrs: dict[str, int],
     head_count = _multihead_count(attrs)
     if head_count >= 2:
         heads = []
-        kopf_shutter = hat_kopf_shutter(channels)
+        kopf_shutter = hat_kopf_shutter(channels, head_count)
         # VIZ-63: Pan/Tilt je Kopf aus ``pt`` (invert/swap zurueckgenommen, wie
         # fuer das Gesamtgeraet) und mit Feinkanal — bis 2026-09-29 kamen sie aus
         # den DRAHT-Werten ``attrs``: eine Mover-Bar mit ``invert_pan`` stand im

@@ -97,7 +97,7 @@ class PatchImportDialog(QDialog):
         self._state = state
         self._tabelle = tabelle
         self._bibliothek = bibliothek
-        self.wahl: dict[int, tuple[int, str]] = {}
+        self.wahl: dict[int, tuple] = {}
         self.plan: T.Plan = self._rechne()
         self.ergebnis: T.Ergebnis | None = None
         self._auswahl: list[QComboBox] = []
@@ -203,7 +203,7 @@ class PatchImportDialog(QDialog):
                 box.addItem(MODUS_WAEHLEN, None)
             for modus in pz.profil.modi:
                 box.addItem(_eintrag_text(pz.profil, modus),
-                            (pz.profil.id, modus.name))
+                            (pz.profil.id, modus.name, modus.kanaele))
             if pz.modus is not None:
                 box.setCurrentIndex(box.findText(_eintrag_text(pz.profil, pz.modus)))
             box.setToolTip("Erkanntes Profil. Hier lässt sich der Modus "
@@ -212,7 +212,8 @@ class PatchImportDialog(QDialog):
             box.addItem(BITTE_WAEHLEN, None)
             for profil in pz.vorschlaege:
                 for modus in profil.modi:
-                    box.addItem(_eintrag_text(profil, modus), (profil.id, modus.name))
+                    box.addItem(_eintrag_text(profil, modus),
+                                (profil.id, modus.name, modus.kanaele))
             box.setToolTip("Nicht sicher erkannt. Zur Wahl stehen die "
                            "ähnlichsten Profile der Geräte-Bibliothek, je Modus.")
         else:
@@ -258,7 +259,9 @@ class PatchImportDialog(QDialog):
         if daten is None:
             self.wahl.pop(zeile, None)
         else:
-            self.wahl[zeile] = (int(daten[0]), str(daten[1]))
+            # Codex-Review #1084: die Kanalzahl gehoert dazu — gleichnamige
+            # Modi sind zulaessig, ueber den Namen allein gewann der erste.
+            self.wahl[zeile] = (int(daten[0]), str(daten[1]), int(daten[2]))
         self._auswahl_tooltip(self._auswahl[zeile])
         self.plan = self._rechne()
         self._zeigen()

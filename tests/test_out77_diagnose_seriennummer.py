@@ -195,3 +195,51 @@ def test_das_gepackte_paket_nennt_sie_nirgends(zustand, tmp_path, monkeypatch):
         for name in zf.namelist():
             inhalt = zf.read(name).decode("utf-8", errors="replace")
             assert SERIE not in inhalt, name
+
+
+# ── Codex-Review #1065 (CDX-59): Trennzeichen IN der Seriennummer ───────────
+
+@pytest.fixture
+def gesehen(monkeypatch):
+    """Die Liste der gesehenen Nummern gehoert dem Prozess — im Test frisch."""
+    monkeypatch.setattr(udmx, "GESEHENE_SERIEN", set())
+    return udmx.GESEHENE_SERIEN
+
+
+def test_doppelpunkt_in_der_nummer_wird_ganz_gekuerzt(gesehen):
+    """Ohne dass LightOS die Nummer kennt: ein Doppelpunkt MITTEN in der
+    Nummer gehoert dazu, ein abschliessender nicht."""
+    text = anonymisiere("U3 uDMX → 16c0:05dc#ABC:DEF123: sendet")
+    assert "ABC" not in text and "DEF1" not in text
+    assert "16c0:05dc#…F123: sendet" in text
+    text = anonymisiere("Anyma uDMX · Seriennr. QQ:RR:SS77 · Bus 1")
+    assert "QQ" not in text and "RR" not in text
+    assert "Seriennr. …SS77 · Bus 1" in text
+
+
+def test_leerzeichen_in_einer_gesehenen_nummer(gesehen):
+    """Eine Nummer mit Leerzeichen erkennt kein Textmuster — wohl aber die
+    Liste der Nummern, die der uDMX-Pfad gelesen hat (Geraet oder Schluessel)."""
+    vid, pid, serie, _ = udmx.schluessel_lesen("16c0:05dc#LAB 4711X")
+    assert serie == "LAB 4711X" and serie in gesehen
+    text = anonymisiere(f"U3 uDMX → 16c0:05dc#{serie}: sendet; "
+                        f"Anyma uDMX · Seriennr. {serie} · Bus 1")
+    assert "LAB" not in text and "4711" not in text, text
+    assert "16c0:05dc#…711X: sendet" in text
+
+
+def test_vom_geraet_gelesene_nummer_wird_gemerkt(gesehen):
+    dev = types.SimpleNamespace(
+        idVendor=0x16C0, idProduct=0x05DC, iManufacturer=1, iProduct=1,
+        iSerialNumber=1, manufacturer="www.anyma.ch", product="uDMX",
+        serial_number=" SN 12:34 ", bus=1, address=2, port_numbers=(1,))
+    zeile = udmx._tabellen_zeile(0x16C0, 0x05DC)
+    udmx._beschreibe(dev, zeile)
+    assert "SN 12:34" in gesehen
+    assert "SN 12:34" not in anonymisiere("Seriennr. SN 12:34 · Bus 1")
+
+
+def test_kurze_oder_harmlose_nummern_werden_nicht_woertlich_ersetzt(gesehen):
+    gesehen.update({"A:1", "ABCDEF"})
+    # „A:1“ ist zu kurz, „ABCDEF“ hat kein Trennzeichen (das Muster reicht).
+    assert anonymisiere("Zeit A:1 und ABCDEF im Text") == "Zeit A:1 und ABCDEF im Text"

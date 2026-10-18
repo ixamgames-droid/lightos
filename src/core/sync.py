@@ -82,6 +82,9 @@ class SyncEvent(str, Enum):
     LASER_ARMED_CHANGED = "laser_armed_changed"  # Laser scharf/unscharf/Not-Aus (LAS-10) — Anzeige-Sync
     LASER_ESTOP = "laser_estop"                # Laser-NOT-AUS ausgelöst (UXT-09) — globale Bestätigung
     REFRESH_ALL = "refresh_all"                # Globale "Alle neu laden"
+    # Codex-Review #1078: Show-Inhalt geaendert, fuer den es kein eigenes Event
+    # gibt (Klonen in Grundwerte und Konsolen-Tasten). Gehoert nur dem Auto-Save.
+    SHOW_INHALT_CHANGED = "show_inhalt_changed"
 
 
 class StateSync:

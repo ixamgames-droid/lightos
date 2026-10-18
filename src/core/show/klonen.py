@@ -1489,7 +1489,7 @@ def _plane_werte(sammler: _Sammler, behaelter: Callable, q: _Geraet, z: _Geraet,
         nqk = _finde_schluessel(nd, q.fid)
         if nqk is None or not isinstance(nd.get(nqk), dict):
             continue
-        mit = {k: v for k, v in nd[nqk].items() if k in u.werte}
+        mit = _begleitwerte(nd[nqk], u.werte)
         if mit:
             nzk = _finde_schluessel(nd, z.fid)
             if nzk is None:
@@ -1506,6 +1506,42 @@ def _plane_werte(sammler: _Sammler, behaelter: Callable, q: _Geraet, z: _Geraet,
     if len(sammler.schritte) == vorher:
         return
     sammler.schritte.extend(neben_schritte)
+
+
+def _begleitwerte(quelle: dict, ziel_werte: dict) -> dict:
+    """Begleitwerte der Quelle (Cue-Verzoegerungen je Attribut) auf die
+    Ziel-Schluessel umlegen.
+
+    Codex-Review #1078: gefiltert wurde nur nach GLEICHEN Schluesseln — bei
+    ``intensity`` → ``dimmer`` oder einer uebersetzten Farbe (RGB → CMY/Rad)
+    fielen die Verzoegerungen still weg, der geklonte Cue lief mit anderem
+    Timing. Jetzt bekommt ein Ziel-Schluessel:
+
+    * den Wert des gleichnamigen Quell-Schluessels, sonst
+    * als Dimmer den eines Quell-Dimmers, als Farbe den der Quell-Farbkanaele
+      (sind sie verschieden: den groessten — nichts startet frueher als
+      vorher).
+    """
+    if not isinstance(quelle, dict):
+        return {}
+    q_dimmer = [v for k, v in quelle.items()
+                if str(k).partition("#")[0].lower() in _DIMMER]
+    q_farbe = [v for k, v in quelle.items()
+               if classify_attr(str(k).partition("#")[0].lower()) == "Color"]
+    out: dict = {}
+    for zk in ziel_werte:
+        if zk in quelle:
+            out[zk] = quelle[zk]
+            continue
+        basis = str(zk).partition("#")[0].lower()
+        if basis in _DIMMER and q_dimmer:
+            out[zk] = q_dimmer[0]
+        elif classify_attr(basis) == "Color" and q_farbe:
+            try:
+                out[zk] = max(q_farbe)
+            except TypeError:
+                out[zk] = q_farbe[0]
+    return out
 
 
 def _aendert(schritt: Schritt) -> bool:
@@ -1734,6 +1770,16 @@ def _benachrichtigen(state, bereiche: set, palette_manager=None) -> None:
             from ..engine.palette import PaletteManager
             PaletteManager._notify_palettes_changed()
         still(_pal)
+    if bereiche:
+        # Codex-Review #1078: Grundwerte und Konsolen-Tasten haben kein eigenes
+        # Event, an dem der Auto-Save haengt — ein solcher Klon ging bei einem
+        # Absturz verloren. Dieses Event sagt dem Auto-Save „es hat sich etwas
+        # geaendert“ (fuer jeden Klon, auch Rueckgaengig).
+        def _inhalt():
+            from ..sync import SyncEvent, get_sync
+            get_sync().emit(SyncEvent.SHOW_INHALT_CHANGED,
+                            {"klonen": sorted(bereiche)})
+        still(_inhalt)
 
 
 # ── Sicherung und der eine Rückgängig-Schritt ───────────────────────────────

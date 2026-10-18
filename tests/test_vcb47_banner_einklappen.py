@@ -123,6 +123,25 @@ class RegelOhneFensterTest(unittest.TestCase):
         self.assertGreaterEqual(NACHSICHT_S, 2 * runde)
         self.assertLessEqual(NACHSICHT_S, 15.0, "Sicherheit vor Bequemlichkeit")
 
+    def test_einklappen_in_der_nachhaltezeit_zaehlt_ab_der_letzten_beobachtung(self):
+        """Codex-Review #1089 (CDX-59): eingeklappt waehrend der Nachhaltezeit
+        (die Stoerung liegt schon nicht mehr an, das Banner steht noch). Die
+        Frist zaehlt ab dem Zeitpunkt, an dem die Stoerung zuletzt ANLAG, nicht
+        ab dem Klick — sonst blieb eine nach mehr als NACHSICHT_S
+        wiederkehrende Stoerung nur ein Chip."""
+        self._takt([dict(_A)])
+        zuletzt_da = self.t
+        self._takt([_ok(_A)], dt=HALTE_S * 0.9)          # weg, Banner haelt noch
+        self.assertEqual(self.s.zustand.art, ART_STOERUNG, "Vorbedingung")
+        self._ein()
+        self.assertTrue(self._chip())
+        # Wiederkehr: mehr als NACHSICHT_S nach dem letzten Anliegen, aber
+        # weniger als NACHSICHT_S nach dem Klick.
+        self.t = zuletzt_da + NACHSICHT_S + 0.5 - TAKT_S
+        self.assertLess(self.t + TAKT_S - (zuletzt_da + HALTE_S * 0.9), NACHSICHT_S)
+        self._takt([dict(_A)])
+        self.assertTrue(self._offen(), "neue Stoerung muss aufklappen")
+
     def test_startet_ausgeklappt_und_laesst_sich_einklappen(self):
         self._takt([dict(_A)])
         self.assertTrue(self._offen())

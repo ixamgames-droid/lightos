@@ -483,6 +483,18 @@ class LageMerker(QObject):
         f = self.parent()
         return (f.x(), f.y(), f.width(), f.height(), _zustand_von(f))
 
+    def _normal_lage_von_qt(self, ist) -> "Rechteck | None":
+        """``normalGeometry()`` des Fensters, sofern brauchbar — also nicht
+        leer und nicht das gerade maximierte Rechteck selbst."""
+        try:
+            g = self.parent().normalGeometry()
+            r = Rechteck(g.x(), g.y(), g.width(), g.height())
+        except Exception:
+            return None
+        if r.w < _MIN_BREITE or r.h < _MIN_HOEHE or r == Rechteck(*ist[:4]):
+            return None
+        return r
+
     def _offen(self):
         """Das Fenster, sofern es sichtbar ist — sonst ``None``."""
         f = self.parent()
@@ -731,10 +743,6 @@ class LageMerker(QObject):
         zustand = ist[4]
         if zustand == NORMAL:
             self._normal = Rechteck(*ist[:4])
-        fenster = self._normal
-        if fenster is None:
-            # Maximiert geoeffnet ohne bekannte Normal-Lage.
-            fenster = Rechteck(*ist[:4])
         try:
             paare = lies_bildschirme()
         except Exception as e:
@@ -745,6 +753,15 @@ class LageMerker(QObject):
         bildschirme = [b for b, _ in paare]
         # Maximiert/Vollbild: der Bildschirm, den das Fenster gerade fuellt.
         idx = bildschirm_von(bildschirme, Rechteck(*ist[:4]))
+        fenster = self._normal
+        if fenster is None:
+            # Maximiert/Vollbild geoeffnet ohne bekannte Normal-Lage.
+            # Codex-Review #1083: NICHT das maximierte Rechteck als Normal-Lage
+            # merken — „Wiederherstellen“ oeffnete das Fenster sonst beim
+            # naechsten Start bildschirmfuellend. Erst die Normal-Lage, die Qt
+            # kennt, sonst die Standardgroesse mittig auf diesem Bildschirm.
+            fenster = self._normal_lage_von_qt(ist) or mittig(
+                STANDARD_GROESSE, bildschirme[idx].nutzbar)
         wert = als_gemerkt(bildschirme[idx], fenster, zustand)
         if wert == self._zuletzt:
             return

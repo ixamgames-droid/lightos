@@ -718,8 +718,19 @@ def _drop_queued_stage_adds(bridge, sid: str) -> int:
 
 def _stage_loesch_on_change(window, el):
     """Was nach Loeschen/Undo/Redo eines Buehnen-Elements nachzuziehen ist —
-    EIN Abgleich fuer beide Loeschwege (Knopf und 3D-Bild, VIZ-105)."""
+    EIN Abgleich fuer beide Loeschwege (Knopf und 3D-Bild, VIZ-105).
+
+    Codex-Review #1061: der Abgleich gilt nur, solange die Buehne von damals
+    noch die aktive ist. Nach einem Buehnenwechsel trifft Undo/Redo die ALTE
+    Buehne (der Undo-Stapel bleibt beim Wechsel stehen); hat die neue ein
+    Element mit derselben ID (gespeicherte Buehnen behalten ihre IDs), ueber-
+    schrieb ``_sync_stage_node_to_scene(el)`` es sonst mit den alten
+    Eigenschaften."""
+    buehne = window._current_stage
+
     def _on_delete_change():
+        if window._current_stage is not buehne:
+            return
         # Inkrementell statt Full-Reload (Gegenstück zum Add-Pfad aus
         # b65eb9c): ein kompletter loadStageJson-Umbau pro Löschung
         # re-armierte Pending-Gate, Repair-Ketten und 1200ms-Reassert —
@@ -742,6 +753,14 @@ def _stage_loesch_on_change(window, el):
         window._refresh_stage_tree()
         window._update_status_counts()
     return _on_delete_change
+
+
+def _buehne_noch_aktiv(window):
+    """Codex-Review #1061: ``True``, solange die JETZT aktive Buehne noch
+    dieselbe ist — fuer das Undo einer Loeschung, das sonst Geraete an ein
+    gleichnamiges Element einer inzwischen geladenen Buehne haengte."""
+    buehne = window._current_stage
+    return lambda: window._current_stage is buehne
 
 
 def _positionen_melden(fids) -> None:
@@ -5187,6 +5206,7 @@ class VisualizerWindow(QMainWindow):
             label=f"{el.name or el.id} löschen",
             on_change=_on_delete_change,
             on_docks_restored=lambda fids: _docks_nach_undo_melden(self, el.id, fids),
+            buehne_aktiv=_buehne_noch_aktiv(self),
         )
         self._current_stage.remove(el.id)
         self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
@@ -5511,6 +5531,7 @@ class VisualizerWindow(QMainWindow):
                 label=f"{el.name or el.id} löschen",
                 on_change=_stage_loesch_on_change(self, el),
                 on_docks_restored=lambda fids: _docks_nach_undo_melden(self, sid, fids),
+                buehne_aktiv=_buehne_noch_aktiv(self),
             )
         self._current_stage.remove(sid)
         self._remove_stage_node_from_scene(sid)
