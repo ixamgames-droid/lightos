@@ -67,6 +67,7 @@
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
 | OUT-66 | A | fix/out66-enttec-reconnect-eigener-port | 2026-10-18T17:04Z | src/core/dmx/enttec_pro.py |
+| FM-65 | A | fix/fm65-show-laden-modus-pruefen | 2026-10-18T17:50Z | src/core/show/show_file.py |
 
 ## Blocker & Fallen
 
@@ -160,7 +161,6 @@
 
 ## Verlauf
 
-- 2026-10-14T18:14Z A claim LAS-31
 - 2026-10-14T18:14Z A claim XPLAT-23
 - 2026-10-14T18:14Z A claim LIZ-2
 - 2026-10-14T18:14Z A claim DOC-16
@@ -190,3 +190,4 @@
 - 2026-10-18T17:04Z A claim OUT-66
 - 2026-10-18T17:04Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T17:32Z A done CDX-59
+- 2026-10-18T17:50Z A claim FM-65
