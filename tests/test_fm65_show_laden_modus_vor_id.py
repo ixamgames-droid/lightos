@@ -106,7 +106,11 @@ class KollisionUeberZweiDBs(_Basis):
     def test_modus_und_kanalzahl__das_richtige_profil(self):
         self.assertEqual(self._laden(mode_name="Basic", channel_count=6),
                          self.richtig)
-        self.assertEqual(self.probleme, [])
+        # Gegenpruefung FM-65: der Wechsel weg von der gleichnamigen ID ist
+        # nie still — genau eine Meldung, die beide IDs nennt.
+        self.assertEqual(len(self.probleme), 1, self.probleme)
+        self.assertIn(f"genommen wurde Profil {self.richtig}", self.probleme[0])
+        self.assertIn("gleichnamig", self.probleme[0])
 
     def test_nur_kanalzahl_gespeichert__das_richtige_profil(self):
         self.assertEqual(self._laden(channel_count=6), self.richtig)
@@ -158,8 +162,9 @@ class KeinBesseresProfil(_Basis):
 
     def test_id_bleibt__aber_laut(self):
         self.assertEqual(self._laden(mode_name="Basic", channel_count=6), ID)
-        self.assertTrue(any("NICHT" in p and "Basic" in p for p in self.probleme),
-                        self.probleme)
+        self.assertTrue(any("NICHT" in p and "Basic" in p
+                            and "ein passenderes Profil gibt es nicht" in p
+                            for p in self.probleme), self.probleme)
 
     def test_nur_kanalzahl__id_bleibt__aber_laut(self):
         self.assertEqual(self._laden(channel_count=6), ID)
@@ -172,6 +177,57 @@ class KeinBesseresProfil(_Basis):
         self._profil(self.db_b, ID + 1, "builtin", (("Wieder anders", 9),))
         self.assertEqual(self._laden(mode_name="Basic", channel_count=6), ID)
         self.assertTrue(any("NICHT" in p for p in self.probleme), self.probleme)
+
+
+class GegenpruefungEigenerRechner(_Basis):
+    """Gegenpruefung FM-65: keine Fehlalarme / stillen Wechsel ohne Kollision."""
+
+    def test_kurzform_des_browsers__still(self):
+        """Der Geraetebrowser speichert „5 Channel (alte Version)“ als
+        „5 Channel“ (``split(" (")[0]``) — UXT-08-Umbenennung, kein Alarm."""
+        self._profil(self.db_b, ID, "qlcplus",
+                     (("9 Channel", 9), ("5 Channel (alte Version)", 5)))
+        self._hier(self.db_b)
+        self.assertEqual(self._laden(mode_name="5 Channel", channel_count=5), ID)
+        self.assertEqual(self.probleme, [])
+
+    def test_kurzform_mit_dublette__keine_dublettenwarnung(self):
+        self._profil(self.db_b, ID, "qlcplus",
+                     (("9 Channel", 9), ("5 Channel (alte Version)", 5)))
+        self._profil(self.db_b, ID + 1, "builtin",
+                     (("9 Channel", 9), ("5 Channel (alte Version)", 5)))
+        self._hier(self.db_b)
+        self.assertEqual(self._laden(mode_name="5 Channel", channel_count=5), ID)
+        self.assertEqual(self.probleme, [])
+
+    def test_reifegrad_zusatz_entfallen__id_bleibt(self):
+        """„Standard (ungeprueft)“ wurde zu „Standard“, 8 Kanaele wie vorher:
+        nicht still auf den alten Import mit dem alten Namen umhaengen."""
+        self._profil(self.db_b, ID, "lightos", (("Standard", 8),))
+        self._profil(self.db_b, ID + 1, "qlcplus", (("Standard (ungeprueft)", 8),))
+        self._hier(self.db_b)
+        self.assertEqual(
+            self._laden(mode_name="Standard (ungeprueft)", channel_count=8), ID)
+        self.assertEqual(self.probleme, [])
+
+    def test_umhaengen_weg_von_gleichnamiger_id__laut(self):
+        """Eigenes Profil bearbeitet (Basic 6 -> 7), ein Import traegt Basic 6:
+        der Wechsel weg von der ID ist nicht still."""
+        self._profil(self.db_b, ID, "user", (("Basic", 7),))
+        self._profil(self.db_b, ID + 1, "qlcplus", (("Basic", 6),))
+        self._hier(self.db_b)
+        self.assertEqual(self._laden(mode_name="Basic", channel_count=6), ID + 1)
+        self.assertTrue(any(str(ID) in p and str(ID + 1) in p
+                            and "gleichnamig" in p for p in self.probleme),
+                        self.probleme)
+
+    def test_kanalzahl_null__wie_nicht_gespeichert(self):
+        """Browser-Patch eines Profils ohne Kanaele: channel_count=0 in der
+        Show ist „nicht gespeichert“, nicht 1 Kanal."""
+        self._profil(self.db_b, ID, "qlcplus", (("Basic", 6),))
+        self._hier(self.db_b)
+        self.assertEqual(self._laden(mode_name="", channel_count=0), ID)
+        self.assertEqual(self.probleme, [])
 
 
 if __name__ == "__main__":
