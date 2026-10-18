@@ -61,7 +61,6 @@
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
-| OUT-66 | A | fix/out66-enttec-reconnect-eigener-port | 2026-10-18T17:04Z | src/core/dmx/enttec_pro.py |
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-18T19:42Z | src/ui/widgets/fixture_editor.py |
 | FM-69 | A | fix/fm69-bibliotheks-update-bestehende-db | 2026-10-18T19:42Z | src/core/database/fixture_db.py |
 | FM-76 | A | fix/fm76-generator-herkunft-mittragen | 2026-10-18T19:54Z | src/ui/widgets/fixture_generator.py |
@@ -159,7 +158,6 @@
 
 ## Verlauf
 
-- 2026-10-18T16:16Z A done XPLAT-23
 - 2026-10-18T16:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T16:44Z D claim OUT-79
 - 2026-10-18T16:44Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -189,3 +187,4 @@
 - 2026-10-18T21:53Z D claim QA-101
 - 2026-10-18T21:53Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T21:54Z D claim QA-102
+- 2026-10-18T22:29Z A done OUT-66
