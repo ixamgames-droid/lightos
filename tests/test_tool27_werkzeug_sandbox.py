@@ -483,6 +483,36 @@ class SandboxModulTest(unittest.TestCase):
             self.assertEqual(erg["vorgaben"]["APPDATA"], echt)
             self.assertNotEqual(erg["umgebung"]["APPDATA"], echt)
 
+    def test_echte_vorgaben_fuer_show_db_und_ausgabe_werden_umgelenkt(self):
+        """Codex-Review #1090: Zeigen ``LIGHTOS_UNIVERSES_JSON`` oder
+        ``LIGHTOS_SHOW_DB`` auf die ECHTEN Dateien des Bedieners (ausserhalb des
+        Temp-Bereichs), liess das blosse ``setdefault`` sie stehen — ein
+        Pruefwerkzeug baute AppState mit echter Ausgabe und echter Show-DB.
+        Dieselbe Regel wie beim Datenordner: nur eine Vorgabe im Temp-Bereich
+        bleibt. Eine gesetzte Bibliothek wird KOPIERT (dieselbe Datei als Quelle)."""
+        with tempfile.TemporaryDirectory(prefix="lightos_tool27_") as tmp:
+            env, daten, temp = _bediener_umgebung(tmp)
+            echt = {
+                "LIGHTOS_SHOW_DB": os.path.join(daten, "current_show.db"),
+                "LIGHTOS_UNIVERSES_JSON": os.path.join(daten, "universes.json"),
+                "LIGHTOS_CRASH_LOG": os.path.join(daten, "crash.log"),
+                "LIGHTOS_FIXTURE_DB": os.path.join(daten, "eigene_fixtures.db"),
+            }
+            with open(echt["LIGHTOS_FIXTURE_DB"], "wb") as f:
+                f.write(b"CDX-59 eigene Bibliothek")
+            env.update(echt)
+            lauf, erg = _kind(_NUR_SANDBOX, tmp, env, "audit_tooltip_coverage.py")
+            self.assertIsNotNone(erg, (lauf.returncode, lauf.stderr[-1500:]))
+            wurzel = erg["beschreibung"]["wurzel"]
+            self.assertTrue(wurzel and _innerhalb(wurzel, temp), erg)
+            for var, wert in echt.items():
+                with self.subTest(var):
+                    self.assertEqual(erg["vorgaben"][var], wert)
+                    self.assertTrue(_innerhalb(erg["umgebung"][var], wurzel),
+                                    (var, erg["umgebung"][var]))
+            self.assertIn("fixtures.db", erg["wurzel_inhalt"])
+            self.assertEqual(sorted(os.listdir(daten)), ["eigene_fixtures.db"])
+
     def test_echte_daten_nur_fuer_die_erlaubten_werkzeuge(self):
         sys.path.insert(0, str(TOOLS))
         try:

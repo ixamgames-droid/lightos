@@ -107,6 +107,12 @@ class PrioritaetenView(QWidget):
         self._lauf_timer.setInterval(500)
         self._lauf_timer.timeout.connect(self._laufzustand_nachziehen)
         self._lauf_timer.start()
+        # Codex-Review #1087: alle 2 s nachsehen, ob die Konsole umbelegt wurde
+        # (die Tooltips der Ueberschneidungen haengen daran) — nur sichtbar.
+        self._vc_timer = QTimer(self)
+        self._vc_timer.setInterval(2000)
+        self._vc_timer.timeout.connect(self._vc_takt)
+        self._vc_timer.start()
 
         stufen_melder().geaendert.connect(self._melde_veraltet)
         try:
@@ -262,6 +268,45 @@ class PrioritaetenView(QWidget):
                     liste.append(f.name)
         return aus
 
+    def _ueberschneidungs_tipps(self) -> dict[int, list[str]]:
+        """ENG-39: je Effekt, der auf einer Taste oder einem Fader der Virtual
+        Console liegt, dieselben Saetze wie die gelbe Hinweiszeile an der Taste
+        („Dieser Effekt und … steuern beide …“). Leer, wenn die Ansicht nicht
+        im selben Fenster wie eine Virtual Console steckt. Laeuft nur beim
+        Neuaufbau der Liste."""
+        try:
+            from src.core.engine import ueberschneidung
+            from src.ui.virtualconsole.vc_canvas import VCCanvas
+            from src.ui.widgets.ueberschneidung_hinweis import (
+                konsolen_beziehungen, rechen_umgebung)
+            # Dieselben Regeln wie an der Taste: Fader zaehlen immer mit,
+            # Tasten desselben Solo-Frames melden sich untereinander nicht.
+            ids, gegenueber, haltend = konsolen_beziehungen(
+                self.window().findChildren(VCCanvas))
+            self._vc_stand_gebaut = self._vc_stand_aus(ids, gegenueber, haltend)
+            if len(ids) < 2:
+                return {}
+            umgebung = rechen_umgebung()
+            nach_id = {int(i): self._fm.get(i) for i in ids}
+            aus: dict[int, list[str]] = {}
+            for fid in ids:
+                f = nach_id.get(fid)
+                andere = [nach_id[g] for g in ids
+                          if g in gegenueber.get(fid, ()) and nach_id.get(g) is not None]
+                if f is None or not andere:
+                    continue
+                # Tooltip: die vollstaendige Liste, nichts zusammengefasst.
+                zeilen = ueberschneidung.hinweis_zeilen(
+                    ueberschneidung.ueberschneidungen(
+                        f, andere, haltend=haltend, **umgebung),
+                    "Effekt", hoechstens=None)
+                if zeilen:
+                    aus[int(f.id)] = zeilen
+            return aus
+        except Exception as e:
+            print(f"[prioritaeten_view] Überschneidungen: {e}")
+            return {}
+
     # ── Liste bauen ───────────────────────────────────────────────────────────
 
     def gruppen_zahlen(self, funktionen=None) -> list[int]:
@@ -272,6 +317,38 @@ class PrioritaetenView(QWidget):
         zahlen = {s.zahl for s in stufen.STUFEN}
         zahlen |= {stufen.zahl_von(getattr(f, "priority", 0)) for f in funktionen}
         return sorted(zahlen, reverse=True)
+
+    @staticmethod
+    def _vc_stand_aus(ids, gegenueber, haltend) -> tuple:
+        return (tuple(ids),
+                tuple(sorted((k, tuple(sorted(v))) for k, v in gegenueber.items())),
+                tuple(sorted(haltend)))
+
+    def _vc_stand(self):
+        """Codex-Review #1087: die Beziehungen der Konsole, aus denen die
+        Ueberschneidungs-Tooltips entstehen. Fuer ein Umbelegen einer Taste gibt
+        es kein Event, an dem die Ansicht haengt — sie vergleicht deshalb beim
+        Zeigen (und im Lauf-Takt) diesen Stand mit dem des letzten Aufbaus.
+        ``None``: nicht bestimmbar (dann nichts tun)."""
+        try:
+            from src.ui.virtualconsole.vc_canvas import VCCanvas
+            from src.ui.widgets.ueberschneidung_hinweis import konsolen_beziehungen
+            return self._vc_stand_aus(*konsolen_beziehungen(
+                self.window().findChildren(VCCanvas)))
+        except Exception:
+            return None
+
+    def _vc_takt(self) -> None:
+        if not self.isVisible() or self.window().isMinimized():
+            return
+        self._vc_geaendert_pruefen()
+
+    def _vc_geaendert_pruefen(self) -> None:
+        if self._veraltet:
+            return
+        stand = self._vc_stand()
+        if stand is not None and stand != getattr(self, "_vc_stand_gebaut", None):
+            self._melde_veraltet()
 
     def _melde_veraltet(self, *_a):
         self._veraltet = True
@@ -286,6 +363,7 @@ class PrioritaetenView(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
+        self._vc_geaendert_pruefen()
         if self._veraltet:
             self._neu_timer.start()
 
@@ -308,7 +386,8 @@ class PrioritaetenView(QWidget):
             funktionen = self._funktionen()
             nachschlagen = self._kanal_attribut()
             mitglied = self._mitglied_von(funktionen)
-            laufend = set(self._fm.running_ids())
+            laufend = self._laufende_ids(funktionen)
+            self._ueberschn = self._ueberschneidungs_tipps()    # ENG-39
 
             self._baum.blockSignals(True)
             self._baum.clear()
@@ -373,6 +452,7 @@ class PrioritaetenView(QWidget):
         if int(f.id) in mitglied:
             tipps.append("Läuft auch in: " + ", ".join(mitglied[int(f.id)])
                          + " — dort gilt deren Stufe, nicht diese.")
+        tipps.extend(getattr(self, "_ueberschn", {}).get(int(f.id), ()))
         if tipps:
             for spalte in range(len(_SPALTEN)):
                 it.setToolTip(spalte, "\n".join(tipps))
@@ -395,12 +475,26 @@ class PrioritaetenView(QWidget):
             for j in range(kopf.childCount()):
                 yield kopf.child(j)
 
+    def _laufende_ids(self, funktionen) -> set:
+        """Was gerade laeuft — auch Kinder, die ein Container (Sammlung)
+        selbst gestartet hat. Codex-Review #1081: ``collection.write`` startet
+        seine Kinder per ``child.start()`` am FunctionManager vorbei; in
+        ``running_ids()`` fehlen sie, ``f.is_running`` sagt es richtig."""
+        laufend = set(self._fm.running_ids())
+        for f in funktionen or ():
+            try:
+                if getattr(f, "is_running", False):
+                    laufend.add(f.id)
+            except Exception:
+                continue
+        return laufend
+
     def _laufzustand_nachziehen(self):
         if not self.isVisible() or self.window().isMinimized():
             return
         if self._veraltet:
             return
-        laufend = set(self._fm.running_ids())
+        laufend = self._laufende_ids(self._fm.all())
         for it in self._effekt_zeilen():
             fid = it.data(0, _ROLLE_FID)
             laeuft = fid in laufend

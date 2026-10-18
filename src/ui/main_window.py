@@ -1775,19 +1775,24 @@ class MainWindow(QMainWindow):
 
     def _sync_blackout_button(self, an: bool):
         """UI-58: der Knopf zeigt den ECHTEN Blackout-Zustand, auch wenn ihn ein
-        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat."""
-        btn = getattr(self, "_btn_blackout", None)
-        if btn is None:
-            return
-        try:
-            btn.blockSignals(True)
-            btn.setChecked(bool(an))
-            btn.blockSignals(False)
-            btn.setStyleSheet(
-                "background:#cc0000; color:#ffffff; font-weight:bold;"
-                "border:2px solid #ff0000;" if an else "")
-        except RuntimeError:
-            pass        # Fenster schon abgebaut
+        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat.
+
+        LAS-31: im Kiosk-Modus gibt es einen zweiten BLACKOUT-Knopf im
+        NOT-AUS-Streifen. Beide zeigen dasselbe — die eine Quelle der Wahrheit
+        ist ``output_manager.blackout`` (UI-58-Abo)."""
+        for name in ("_btn_blackout", "_btn_blackout_kiosk"):
+            btn = getattr(self, name, None)
+            if btn is None:
+                continue
+            try:
+                btn.blockSignals(True)
+                btn.setChecked(bool(an))
+                btn.blockSignals(False)
+                btn.setStyleSheet(
+                    "background:#cc0000; color:#ffffff; font-weight:bold;"
+                    "border:2px solid #ff0000;" if an else "")
+            except RuntimeError:
+                pass        # Fenster schon abgebaut
 
     def _quick_record_cue(self):
         stacks = self._state.cue_stacks
@@ -3055,7 +3060,14 @@ class MainWindow(QMainWindow):
 
     def _notaus_in_kioskleiste(self):
         """Kiosk: eigener schmaler Streifen ueber dem Inhalt, Knopf rechts
-        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet)."""
+        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet).
+
+        LAS-31: BLACKOUT steht im Kiosk mit im Streifen, direkt links neben
+        LASER NOT-AUS — gleiche Bedienung wie der Knopf der Sektionsleiste
+        (Klick schaltet um, ``_toggle_blackout``), gleiche Anzeige
+        (``_sync_blackout_button``). Der Streifen liegt im Layout ueber dem
+        Ansichtsstapel; das Ausgabe-Banner (VCB-47) ueberlagert nur den
+        Stapel — beide verdecken sich nicht."""
         btn = getattr(self, "_btn_laser_notaus", None)
         if btn is None:
             return
@@ -3066,12 +3078,31 @@ class MainWindow(QMainWindow):
             lay.setContentsMargins(4, 2, 4, 2)
             lay.addStretch(1)
             self._sperrzonen_kopfzeile_bauen(lay)     # LAS-32, auch im Kiosk
+            bo = QPushButton("BLACKOUT")
+            bo.setObjectName("blackoutBtn")
+            bo.setCheckable(True)
+            bo.setMinimumHeight(btn.minimumHeight())
+            bo.setMinimumWidth(88)
+            bo.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # wie der NOT-AUS daneben
+            bo.setToolTip(
+                "Schaltet die gesamte Lichtausgabe dunkel. Ein weiterer Klick "
+                "schaltet sie wieder ein. Der Knopf zeigt immer den echten "
+                "Zustand, auch wenn eine VC-Taste, die Kommandozeile oder "
+                "die Fernbedienung den "
+                "Blackout geschaltet hat.")
+            bo.clicked.connect(self._toggle_blackout)
+            self._btn_blackout_kiosk = bo
+            lay.addWidget(bo)
             lay.addWidget(btn)
             root = self.centralWidget().layout()
             root.insertWidget(max(0, root.indexOf(self._section_bar)), leiste)
             self._notaus_leiste = leiste
         except Exception as e:
             print(f"[main_window] NOT-AUS-Leiste (Kiosk) fehlgeschlagen: {e}")
+        try:
+            self._sync_blackout_button(bool(self._state.output_manager.blackout))
+        except Exception:
+            pass
 
     def _laser_notaus_ausloesen(self):
         """Ausloesen — ein Schritt, keine Rueckfrage (Klick und Tastenkuerzel)."""
@@ -3224,6 +3255,15 @@ class MainWindow(QMainWindow):
                 # NOT-AUS-Maske leer, ueber DMX geht dann nichts dunkel.
                 tip += (" — über DMX schaltet der Knopf dann nichts dunkel: er "
                         "deckt nur Geräte, die LightOS als Laser erkennt.")
+            # LAS-39: fehlt die Profil-Auskunft (Geraete-Datenbank nicht
+            # erreichbar), gelten die betroffenen Geraete vorerst als Laser —
+            # das muss der Betreiber am Knopf sehen.
+            try:
+                unvollstaendig = str(self._state.laser_erkennung_hinweis() or "")
+            except Exception:
+                unvollstaendig = ""
+            if unvollstaendig:
+                tip += "\n" + unvollstaendig
             if btn.text() != text:
                 btn.setText(text)
             if btn.styleSheet() != stil:
@@ -3249,9 +3289,18 @@ class MainWindow(QMainWindow):
         nach ein paar Sekunden von selbst zurücksetzt."""
         try:
             sb = self.statusBar()
-            sb.showMessage(
-                "⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
-                "verriegelt, Netzwerk-Ausgabe unscharf)", 6000)
+            text = ("⏹  LASER NOT-AUS ausgelöst — alle Laser dunkel (DMX-Laser "
+                    "verriegelt, Netzwerk-Ausgabe unscharf)")
+            # LAS-39: die Bestaetigung ersetzt die Statuszeile — fehlt die
+            # Profil-Auskunft noch, gehoert der Hinweis HIER hinein, sonst
+            # ueberschriebe ihn die Bestaetigung sofort.
+            try:
+                unvollstaendig = str(self._state.laser_erkennung_hinweis() or "")
+            except Exception:
+                unvollstaendig = ""
+            if unvollstaendig:
+                text += " · " + unvollstaendig
+            sb.showMessage(text, 6000)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
             QTimer.singleShot(6000, lambda: self._reset_statusbar_style())
@@ -3395,8 +3444,13 @@ class MainWindow(QMainWindow):
         try:
             from src.core.sync import validate_and_repair
             from src.ui.widgets.validation_dialog import ValidationDialog
-            issues = validate_and_repair(self._state, fix=True)
-            dlg = ValidationDialog(issues, self)
+            # VCB-44: erst NUR pruefen. Repariert wird, wenn der Bediener im
+            # Dialog „Reparieren“ waehlt — vorher lief die Reparatur ungefragt,
+            # noch bevor der Dialog erschien.
+            issues = validate_and_repair(self._state, fix=False)
+            dlg = ValidationDialog(
+                issues, self,
+                reparieren=lambda: validate_and_repair(self._state, fix=True))
             dlg.exec()
             # Trigger Refresh-All danach
             try:
@@ -3457,8 +3511,14 @@ class MainWindow(QMainWindow):
                        SyncEvent.FUNCTION_CHANGED, SyncEvent.GROUP_CHANGED,
                        SyncEvent.CUE_STACK_CHANGED, SyncEvent.PALETTE_CHANGED,
                        SyncEvent.OUTPUT_CONFIG_CHANGED,
-                       SyncEvent.LIVE_VIEW_CHANGED):
+                       SyncEvent.LIVE_VIEW_CHANGED,
+                       SyncEvent.SHOW_INHALT_CHANGED):
                 sync.subscribe(ev, self._mark_autosave_dirty)
+            # Codex-Review #1081: eine geaenderte Stufe (Prioritaet) meldet sich
+            # bewusst NICHT ueber FUNCTION_CHANGED, sondern ueber den eigenen
+            # Stufen-Melder — ohne ihn blieb sie als einzige Aenderung ungesichert.
+            from src.ui.widgets.stufe_auswahl import stufen_melder
+            stufen_melder().geaendert.connect(self._mark_autosave_dirty)
             print(f"[autosave] aktiv ({mins} min, dirty-basiert) -> {self._autosave_path()}")
         except Exception as e:
             print(f"[autosave] setup error: {e}")

@@ -545,9 +545,30 @@ def _andere_ausgaben(om, universum: int, weg: str, ziel: str) -> list[dict]:
         eintraege = list(status() or [])
     except Exception:
         return []
+    soll = _ziel_wie_gesendet(weg, ziel)
     return [e for e in eintraege
             if e.get("universum") == universum
-            and not (e.get("weg") == weg and str(e.get("ziel") or "") == str(ziel or ""))]
+            and not (e.get("weg") == weg
+                     and _ziel_wie_gesendet(weg, e.get("ziel")) == soll)]
+
+
+def _ziel_wie_gesendet(weg: str, ziel) -> str:
+    """Das Ziel so, wie der Sender es fuehrt.
+
+    Codex-Review #1057: ``ArtNetSender`` rechnet den Limited Broadcast
+    ``255.255.255.255`` bei gewaehlter NIC in deren gerichteten Broadcast um
+    (NET-04), und ``ausgabe_status()`` meldet dieses umgerechnete Ziel. Der
+    Dialog kennt die konfigurierte Adresse — woertlich verglichen galt das
+    unveraenderte Uebernehmen als „andere Ausgabe“, und es kam eine
+    Rueckfrage ohne Grund."""
+    text = str(ziel or "")
+    if weg == "Art-Net" and text == "255.255.255.255":
+        try:
+            from src.core.dmx.output_iface import artnet_broadcast_target
+            return str(artnet_broadcast_target(text))
+        except Exception:
+            return text
+    return text
 
 
 def _ausgabe_text(weg: str, ziel: str) -> str:
