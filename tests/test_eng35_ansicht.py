@@ -429,7 +429,10 @@ def test_rueckgaengig_menue_zeigt_das_kaufmannsund():
     _app()
     stapel = UndoStack()
     attrappe = SimpleNamespace(_undo_stack=stapel, _act_undo=QAction(),
-                               _act_redo=QAction())
+                               _act_redo=QAction(), _vc_verlauf=lambda: None)
+    # UI-93: die Menuetexte kommen aus dem gemeinsamen Verlauf.
+    attrappe._naechster_verlauf = (
+        lambda wiederholen: MainWindow._naechster_verlauf(attrappe, wiederholen))
     stapel.push_simple("Stufe: Blitz → Strobe & Blinder",
                        lambda: None, lambda: None)
     MainWindow._refresh_undo_labels(attrappe)
@@ -438,7 +441,7 @@ def test_rueckgaengig_menue_zeigt_das_kaufmannsund():
     stapel.undo()
     MainWindow._refresh_undo_labels(attrappe)
     assert _wie_qt_es_zeigt(attrappe._act_redo.text()) == \
-        "Wiederherstellen: Stufe: Blitz → Strobe & Blinder"
+        "Wiederholen: Stufe: Blitz → Strobe & Blinder"
     assert attrappe._act_undo.text() == "Rückgängig"
 
 

@@ -574,11 +574,15 @@ class ReviewTexteTest(unittest.TestCase):
     """R5 + R6: Anleitung und Hilfetexte beschreiben den eigenen Verlauf und
     nennen kein plattformfalsches Kuerzel."""
 
-    def test_hilfetexte_ohne_strg_y(self):
+    def test_hilfetexte_nennen_kein_einseitiges_kuerzel(self):
+        # Urspruenglich „ohne Strg+Y“: das Kuerzel war je Plattform ein anderes.
+        # Seit UI-93 wirken Strg+Y UND Strg+Umschalt+Z ueberall — der Text
+        # nennt deshalb beide oder keines, nie nur eines.
         from src.ui.views.programmer_view import _PROGRAMMER_HELP
-        for k in ("Rückgängig", "Wiederholen"):
-            self.assertNotIn("Strg+Y", _PROGRAMMER_HELP[k])
-        self.assertIn("Bearbeiten → Wiederherstellen", _PROGRAMMER_HELP["Wiederholen"])
+        self.assertNotIn("Strg+Y", _PROGRAMMER_HELP["Rückgängig"])
+        wdh = _PROGRAMMER_HELP["Wiederholen"]
+        self.assertEqual("Strg+Y" in wdh, "Strg+Umschalt+Z" in wdh)
+        self.assertIn("Bearbeiten → Wiederholen", wdh)
 
     def test_anleitung_beschreibt_eigenen_verlauf(self):
         pfad = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
