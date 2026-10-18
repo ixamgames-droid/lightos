@@ -50,7 +50,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    denn bei manchen Lasern heißt DMX 0 „Auto“ und würde sie einschalten.
    Kennt das Profil keinen Aus-Wert, strahlt ein Laser ohne Dimmer womöglich
    weiter; sicher aus ist ein Laser nur mit dem **Laser-NOT-AUS**
-   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
+   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf. Im Kiosk-Modus, in dem diese Leiste ausgeblendet ist, steht **BLACKOUT** oben rechts direkt links neben **LASER NOT-AUS** und zeigt denselben Zustand.
    Wie das im DMX-Monitor aussieht, zeigt
    [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine

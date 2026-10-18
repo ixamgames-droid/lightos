@@ -125,6 +125,12 @@ So bedienst du den Laser im Live-Betrieb ohne den Programmer:
    **„Laser NOT-AUS"** lassen sich ebenfalls auf VC-Buttons legen (auch per
    MIDI-Pad auslösbar).
 
+> **Ein Weg für den NOT-AUS:** Der Knopf **LASER NOT-AUS** oben rechts im
+> Hauptfenster, das Tastenkürzel `Strg+Umschalt+L`, die VC-Taste „Laser NOT-AUS“
+> und der NOT-AUS-Knopf im Laser-Tab lösen alle genau dasselbe aus: Alle Laser
+> werden verriegelt und dunkel, Netzwerk-Laser werden unscharf. Im Kiosk-Modus
+> stehen **BLACKOUT** und **LASER NOT-AUS** nebeneinander im Streifen oben rechts.
+
 > Muster lassen sich außerdem in **Snaps/Szenen** aufnehmen (Programmer →
 > „Speichern" bzw. Assistent-Tab „Programmer → Szene") und so über Chaser abspielen.
 

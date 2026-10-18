@@ -13,6 +13,7 @@ from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
+from .dmx import adapter_zeilen
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
 from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
@@ -321,6 +322,11 @@ class AppState:
         # nicht — benutze /dev/ttyUSB0"). Der Statusbalken liest das, damit ein
         # falsch konfigurierter Adapter nicht laenger als gruen durchgeht.
         self.enttec_port_notes: dict[int, str | None] = {}
+        # OUT-74: Adapter, die in universes.json in mehr als einer Zeile stehen
+        # und deshalb fuer keine eingerichtet sind (`adapter_zeilen.Doppelt`).
+        # Das Ausfall-Banner liest das — im Kiosk-Modus gibt es keine
+        # Statusleiste, die den Hinweis aus `enttec_port_notes` zeigen koennte.
+        self.adapter_konflikte: list = []
         self.programmer: dict[int, dict[str, int]] = {}
         # Schuetzt jeden Lese-/Schreibzugriff auf self.programmer. Der MIDI-/OSC-/
         # Web-Thread mutiert den Programmer (set_programmer_value), waehrend der
@@ -459,6 +465,9 @@ class AppState:
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
+        # ENG-30: fid -> (Eintrag aus _fix_index, Adresse, Universum,
+        #                 Intensitaets-, Dimmer-, Farb-Adressen) — s. _adress_listen.
+        self._adress_plan: dict[int, tuple] = {}
         # VCB-11: slot -> (fids, gruppen) der gedrueckten Blackout-Tasten mit Ziel.
         self._ziel_blackout_specs: dict = {}
         self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
@@ -2013,6 +2022,20 @@ class AppState:
         # getauschte Kombination (neuer fix_index + alte spans/defaults) sieht.
         new_default_frame = {u: bytes(b) for u, b in defaults.items()}
         new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        # ENG-30: die Adresslisten, die _render_frame je Geraet braucht, EINMAL
+        # hier ableiten statt in jedem Frame (bei 80 Geraeten rund 5700
+        # Attributzugriffe auf Datenbank-Objekte je Frame, die Haelfte der
+        # Grundlast). Ein Geraet, bei dem das Ableiten wirft, bleibt ohne
+        # Eintrag — der Frame rechnet es dann wie bisher selbst (und meldet
+        # den Fehler dort, wo er bisher auch auffiel).
+        adress_plan: dict[int, tuple] = {}
+        for _fid, _eintrag in fix_index.items():
+            try:
+                _fx = _eintrag[0]
+                adress_plan[_fid] = (_eintrag, _fx.address, _fx.universe,
+                                     *self._adress_listen(_fx, _eintrag[1]))
+            except Exception:
+                continue
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
         new_laser_rearm_fids = frozenset(laser_rearm_fids)
@@ -2087,6 +2110,7 @@ class AppState:
                 # auf die Maske des vorigen Plans.
                 self._blackout_keep_gesetzt = new_keep_mask
                 self._fix_index = fix_index
+                self._adress_plan = adress_plan
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
                 self._patched_set = new_patched_set
@@ -2466,6 +2490,45 @@ class AppState:
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
 
+        # ★ OUT-74: derselbe Adapter in mehr als einer Zeile.
+        #
+        # Bisher richtete die Schleife unten beide Zeilen nacheinander ein;
+        # `add_enttec` schliesst den Anschluss auf dem jeweils anderen
+        # Universum, also gewann die Zeile, die zufaellig weiter hinten in der
+        # Datei steht. Der Adapter sendete dann moeglicherweise das falsche
+        # Universum — ohne Meldung. Welche Zeile gemeint war, steht nicht in
+        # der Datei; die erste oder letzte zu nehmen hiesse raten. Deshalb: der
+        # Adapter wird fuer KEINE der Zeilen eingerichtet, und es wird gesagt
+        # (Statusleiste ueber `enttec_port_notes`, Dialog, Konsole).
+        try:
+            doppelt = {adapter_zeilen.schluessel(d.typ, d.patch): d
+                       for d in adapter_zeilen.doppelte(rows)}
+        except Exception as e:
+            print(f"[app_state] apply_output_config: Adapter-Pruefung: {e}")
+            doppelt = {}
+        for d in doppelt.values():
+            print(f"[app_state] apply_output_config: {d.text}")
+        self.adapter_konflikte = list(doppelt.values())
+
+        def _merke_hinweis(universum, text):
+            # Lazy-Init wie unten begruendet (HW-5b): Stubs in Bestandstests
+            # bringen `enttec_port_notes` nicht mit.
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes is None:
+                notes = {}
+                self.enttec_port_notes = notes
+            notes[universum] = text
+
+        def _vergiss_hinweis(universum):
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes:
+                notes.pop(universum, None)
+
+        # Hinweise zu Universen, die es nicht mehr gibt, gehen mit ihnen.
+        for universum in list(getattr(self, "enttec_port_notes", None) or {}):
+            if universum not in konfiguriert:
+                _vergiss_hinweis(universum)
+
         for r in rows or []:
             try:
                 num = int(r.get("num", 1))
@@ -2491,13 +2554,28 @@ class AppState:
                 # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
+                konflikt = doppelt.get(adapter_zeilen.schluessel(output, patch))
                 # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
                 # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
                 # „Uebernehmen“ die Buehne dunkel.
-                if output == "Disabled":
+                # OUT-74: dasselbe gilt fuer eine Zeile mit doppeltem Adapter —
+                # der Adapter wird fuer KEINE der Zeilen eingerichtet, es kommt
+                # also kein Nachfolger. Ohne Schlussbild hielte er sein letztes
+                # Bild und die Buehne bliebe stehen, obwohl nichts mehr sendet.
+                if output == "Disabled" or konflikt is not None:
                     self.output_manager.remove_output(num, schlussbild=True)
                 else:
                     self.output_manager.remove_output(num)
+                if konflikt is not None:
+                    # OUT-74: nicht einrichten, s. o. — der Ausgang ist
+                    # entfernt, das Universum bleibt ohne Adapter.
+                    _merke_hinweis(num, konflikt.text)
+                    continue
+                if output != "Enttec":
+                    # Ein Hinweis aus einem frueheren Lauf (falscher Port,
+                    # doppelter Adapter) gilt nicht mehr, sobald die Zeile
+                    # keinen Enttec mehr meint.
+                    _vergiss_hinweis(num)
                 if output == "Enttec" and patch:
                     # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
                     # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit
@@ -2520,11 +2598,7 @@ class AppState:
                     hinweis = diagnose_enttec_port(patch)
                     if hinweis:
                         print(f"[app_state] Universe {num} (Enttec): {hinweis}")
-                    notes = getattr(self, "enttec_port_notes", None)
-                    if notes is None:
-                        notes = {}
-                        self.enttec_port_notes = notes
-                    notes[num] = hinweis
+                    _merke_hinweis(num, hinweis)
                     self.output_manager.add_enttec(num, patch)
                 elif output == "uDMX":
                     # OUT-68: ``patch`` = Adapter-Schluessel (Kennung +
@@ -2795,16 +2869,36 @@ class AppState:
         gesetzt und gemeldet — ein NOT-AUS darf nicht an einem Folgefehler
         haengen bleiben. Idempotent: bei stehendem Latch schaltet ein weiterer
         Aufruf erneut ab (z. B. einen wieder scharf geschalteten Laser)."""
+        # Jeder Schritt laeuft fuer sich: eine Ausnahme in einem Schritt darf
+        # die folgenden nicht ueberspringen (sonst bliebe ein Netzwerk-Laser
+        # scharf, weil estop_all geworfen hat). Die Geraete-Verriegelung wird
+        # nur geloest, wenn der Manager nachweislich unscharf ist — im Zweifel
+        # bleibt der Laser verriegelt und dunkel.
+        lo = None
         try:
             lo = self.ensure_laser_output()
-            lo.estop_all()
-            lo.set_armed(False)
-            lo.clear_estop_all()
         except Exception as e:
-            print(f"[AppState] Laser-NOT-AUS: Netzwerk-Teil fehlgeschlagen: {e}")
+            print(f"[AppState] Laser-NOT-AUS: Laser-Ausgang nicht verfuegbar: {e}")
+            # Ein Manager, dessen Start gescheitert ist, steht trotzdem hier.
+            lo = getattr(self, "_laser_output", None)
+        verriegelt = False
+        if lo is not None:
+            try:
+                lo.estop_all()
+                verriegelt = True
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: estop_all fehlgeschlagen: {e}")
+            try:
+                lo.set_armed(False)
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Entwaffnen fehlgeschlagen: {e}")
+        if not verriegelt:
             # Latch notfalls direkt (estop_all setzt ihn als Erstes — steht er
             # schon, ist das ein No-Op) und die Anzeige trotzdem benachrichtigen.
-            self.set_laser_estop(True)
+            try:
+                self.set_laser_estop(True)
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Latch nicht gesetzt: {e}")
             # LAS-39: auch hier erst nach dem Verriegeln nachholen.
             try:
                 self.laser_erkennung_nachholen()
@@ -2815,6 +2909,12 @@ class AppState:
                 get_sync().emit(SyncEvent.LASER_ESTOP, None)
             except Exception:
                 pass
+        if lo is not None and not bool(getattr(lo, "armed", True)):
+            try:
+                lo.clear_estop_all()
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Geraete-Verriegelung "
+                      f"nicht geloest (bleibt dunkel): {e}")
 
     def laser_notaus_loesen(self):
         """LAS-31: den Laser-NOT-AUS bewusst loesen (die Oberflaeche fragt vorher
@@ -4402,6 +4502,8 @@ class AppState:
         # getauschte Feld-Kombination in diesen Frame einschleusen.
         with self._get_plan_lock():
             fix_index = self._fix_index
+            # ENG-30: defensiv wie _laser_estop_addrs (Test-Stubs ohne das Feld).
+            adress_plan = getattr(self, "_adress_plan", None) or {}
             default_frame = self._default_frame
             commit_spans = self._commit_spans
             patched_set = self._patched_set
@@ -4486,26 +4588,26 @@ class AppState:
         effect_present: dict[int, bool] = {}
         for fidi, entry in fix_index.items():
             fx, chans = entry
-            addrs = self._fixture_intensity_addrs(fx, chans)
+            fx_univ = fx.universe
+            # ENG-30: Listen aus dem Plan — aber nur, wenn der Eintrag noch
+            # GENAU zu diesem Geraet passt: derselbe (Geraet, Kanaele)-Eintrag
+            # und unveraenderte Adresse/Universum. Sonst (von Hand gesetzter
+            # _fix_index, Adresse am Objekt geaendert) wie bisher ableiten.
+            # Die Listen sind geteilt und werden NUR gelesen.
+            plan = adress_plan.get(fidi)
+            if (plan is not None and plan[0] is entry
+                    and plan[1] == fx.address and plan[2] == fx_univ):
+                addrs, dims, cols = plan[3], plan[4], plan[5]
+            else:
+                addrs, dims, cols = self._adress_listen(fx, chans)
             inten_addrs[fidi] = addrs
-            dims: list[int] = []
-            cols: list[int] = []
-            for ch in chans:
-                a_l = (getattr(ch, "attribute", "") or "").lower()
-                ad = fx.address + ch.channel_number - 1
-                if not (1 <= ad <= 512):
-                    continue
-                if a_l in _DIM_INTENSITY_ATTRS:
-                    dims.append(ad)
-                elif a_l in _DIM_COLOR_ATTRS:
-                    cols.append(ad)
             dim_addrs[fidi] = dims
             color_addrs[fidi] = cols
-            su = scratch.get(fx.universe)
+            su = scratch.get(fx_univ)
             if su is None:
                 effect_present[fidi] = False
                 continue
-            base = default_frame.get(fx.universe)
+            base = default_frame.get(fx_univ)
             present = False
             for a in addrs:
                 dv = base[a - 1] if (base and a - 1 < len(base)) else 0
@@ -5242,6 +5344,31 @@ class AppState:
                 # dienen; subtraktives CMY NICHT (Skalieren Richtung 0 hellt auf).
                 color.append(addr)
         return inten if inten else color
+
+    def _adress_listen(self, fx, chans) -> tuple[list[int], list[int], list[int]]:
+        """ENG-30: die drei Adresslisten, die ``_render_frame`` je Geraet braucht.
+
+        ``(intensitaet, dimmer, farbe)``: die Adressen, die der Dimmer-Master
+        skaliert (``_fixture_intensity_addrs``), NUR die echten Dimmer-/
+        Intensitaets-Kanaele und NUR die Farb-Kanaele (hier MIT CMY — die
+        implizite Grundhelligkeit 4a² fragt „ist eine Farbe aktiv", nicht
+        „darf ich skalieren").
+
+        Reine Ableitung aus Geraet und Kanaelen. ``_rebuild_render_plan`` legt
+        das Ergebnis in den Plan; EINE Stelle fuer Plan und Frame."""
+        addrs = self._fixture_intensity_addrs(fx, chans)
+        dims: list[int] = []
+        cols: list[int] = []
+        for ch in chans:
+            a_l = (getattr(ch, "attribute", "") or "").lower()
+            ad = fx.address + ch.channel_number - 1
+            if not (1 <= ad <= 512):
+                continue
+            if a_l in _DIM_INTENSITY_ATTRS:
+                dims.append(ad)
+            elif a_l in _DIM_COLOR_ATTRS:
+                cols.append(ad)
+        return addrs, dims, cols
 
     def _fixture_head_intensity_addr_map(self, fx, chans) -> dict:
         """FM-HEADLAYOUT A4: ``{head: [addr]}`` — welche Adressen ein KOPF-genauer

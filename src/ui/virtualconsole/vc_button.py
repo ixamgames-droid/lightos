@@ -1725,15 +1725,12 @@ class VCButton(VCWidget):
 
         if self.action == ButtonAction.LASER_ESTOP:
             # LAS-10: Laser-Not-Aus (Trigger) — sofort dunkel + entwaffnen.
-            # Reihenfolge wie in der Laser-Steuerseite: verriegeln → unscharf →
-            # Verriegelung lösen (armed=False haelt es dunkel, Session bleibt
-            # fuer bewusstes Wieder-Scharfschalten offen).
+            # LAS-31: derselbe EINE Weg wie Kopfleiste, Tastenkuerzel und
+            # Laser-Seite (AppState.laser_notaus_ausloesen: verriegeln ->
+            # unscharf -> Geraete-Verriegelung loesen). Die Taste loest nur aus.
             if press:
                 try:
-                    lo = state.ensure_laser_output()
-                    lo.estop_all()
-                    lo.set_armed(False)
-                    lo.clear_estop_all()
+                    state.laser_notaus_ausloesen()
                 except Exception as e:
                     print(f"[VCButton] laser estop error: {e}")
                 self.update()
