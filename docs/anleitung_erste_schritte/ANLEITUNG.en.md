@@ -240,6 +240,14 @@ folder inside the LightOS data folder (Linux: `~/.local/share/LightOS/shows`, Wi
 `%APPDATA%\LightOS\shows`). After saving, the path is shown in the window title and
 briefly in the status bar (`Gespeichert: …` = saved).
 
+**Messages when opening.** If LightOS could not read parts of a show, the window
+**Show unvollstaendig geladen** (show loaded incompletely) lists them — saving then makes
+the loss permanent, so back up the file first. If, on the other hand, a fixture profile
+merely exists twice in the fixture library and it makes no difference to the show which
+one was taken (same mode with the same channels and values), nothing is lost: there is no
+window, only a **Hinweis: …** (note) in the status bar for 15 seconds, behind whatever
+message is shown there. If the two profiles differ, the window stays.
+
 **Automatic backup:** in addition, LightOS saves every 5 minutes to the file
 `auto_save.lshow` in the LightOS data folder. Set the interval under
 **Datei → Auto-Save-Intervall...** (1–60 minutes). If on the next start this backup is

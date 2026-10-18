@@ -56,10 +56,6 @@ APPDATA_DIR = Path(app_data_dir())
 PYTHON_MIN = (3, 11)
 OPTIONAL_REQUIREMENTS = {
     "python-rtmidi",
-    "winrt-windows.devices.midi",
-    "winrt-windows.devices.enumeration",
-    "winrt-windows.foundation",
-    "winrt-windows.foundation.collections",
 }
 
 
@@ -391,7 +387,7 @@ def install_requirements(use_venv: bool):
         if opt_rc != 0:
             warn(
                 "Optionale Pakete konnten nicht vollstaendig installiert werden. "
-                "Die App startet trotzdem, einzelne Features (MIDI 2.0 / rtmidi) "
+                "Die App startet trotzdem, einzelne Features (MIDI ueber python-rtmidi) "
                 "koennen fehlen."
             )
             for req_line in optional_reqs:

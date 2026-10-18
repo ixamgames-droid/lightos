@@ -246,6 +246,22 @@ def test_testlauf_schalter_wirkt_nur_unter_pytest():
                             "PYTEST_CURRENT_TEST": "x"}, {"pytest": 1}) is False
 
 
+def test_testlauf_schalter_wirkt_im_gepackten_programm_nie():
+    """Codex-Review #1076 (CDX-59): Schalter und ``PYTEST_CURRENT_TEST`` stammen
+    nur aus der Umgebung. Im gepackten Programm gibt es keine Testsuite — dort
+    darf keine Kombination die Abfrage abschalten."""
+    kind = {"LIGHTOS_LIZENZ_TESTLAUF": "1", "PYTEST_CURRENT_TEST": "x"}
+    assert lizenz.testlauf(kind, {"pytest": 1}, gepackt=True) is False
+    assert lizenz.abfrage_noetig(OHNE, env=kind, module={"pytest": 1},
+                                 gepackt=True) is True
+    assert lizenz.testlauf(kind, {}, gepackt=False) is True
+    # Ohne Angabe entscheidet sys.frozen.
+    import sys
+    from unittest import mock
+    with mock.patch.object(sys, "frozen", True, create=True):
+        assert lizenz.testlauf(kind, {"pytest": 1}) is False
+
+
 def test_die_suite_selbst_laeuft_mit_dem_schalter():
     """tests/conftest.py setzt den Schalter — sonst bliebe jeder Test, der
     ``main.main()`` durchlaeuft, am Dialog haengen."""

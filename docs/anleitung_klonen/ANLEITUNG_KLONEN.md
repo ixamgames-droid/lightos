@@ -152,6 +152,11 @@ Paletten, Grundwerte):
 | Pan/Tilt, Zoom, Fokus, Gobo, Prisma, Shutter/Strobe, Makros | fallen in dieser Fassung weg — „kommt in einem späteren Schritt". |
 | Werte einzelner Köpfe (Mehrkopf-Geräte) | fallen zwischen verschiedenen Typen weg. Werte ohne Kopf-Angabe gelten am Ziel für alle Köpfe. |
 
+**Verzögerungen eines Cues** (je Kanal, beim Ein- und beim Ausblenden) gehen mit dem
+übersetzten Wert mit: die des Dimmers auf den Dimmer des Ziels, die der Farbkanäle auf
+die Farbkanäle des Ziels (hatten die Farbkanäle der Quelle verschiedene Verzögerungen,
+gilt die größte).
+
 **Farbe und Dimmer bleiben getrennt.** Ein geklonter Farb-Snap bringt keinen
 Dimmerwert mit. Hat die Quelle keinen Dimmer, bekommt das Ziel keinen — das steht als
 Hinweis in der Vorschau, den Dimmer des Ziels stellst du selbst ein.
