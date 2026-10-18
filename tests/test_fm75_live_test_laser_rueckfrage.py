@@ -376,3 +376,48 @@ def test_par_stoppen_schreibt_die_vorwerte_zurueck_wie_bisher(aufbau):
     live._btn_start.setChecked(False)
     assert _werte(aufbau.universum, 2) == [44, 0]
     assert live._info.text() == "Test gestoppt — Kanäle zurückgesetzt."
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# D) Codex-Review #1064 (CDX-59)
+# ══════════════════════════════════════════════════════════════════════════════
+
+def test_notaus_waehrend_der_rueckfrage_startet_keinen_test(aufbau, monkeypatch):
+    """Die Rueckfrage ist modal; der NOT-AUS kann waehrenddessen ueber
+    MIDI/OSC/Web kommen. Danach darf kein einziger Wert gesendet werden."""
+    def frage(_parent, _text):
+        aufbau.state.laser_estop_active = True          # NOT-AUS, Dialog offen
+        return True
+
+    monkeypatch.setattr(fg, "_laser_test_fragen", frage)
+    live = aufbau.bauen(_laser(default=200))._live
+    live._btn_start.setChecked(True)
+    assert live._tester is None
+    assert _werte(aufbau.universum) == [0, 0, 0], "nach dem NOT-AUS wurde gesendet"
+    assert not live._btn_start.isChecked()
+    assert not live._notaus_timer.isActive()
+    assert "NOT-AUS" in live._info.text() and "nichts gesendet" in live._info.text()
+
+
+def test_notaus_ohne_aus_wert_meldet_keine_entwarnung(aufbau):
+    """Ohne hinterlegten Aus-Wert stehen nach dem NOT-AUS alle Kanaele auf 0 —
+    das kann bei so einem Laser „an“ heissen. Die Meldung sagt das, statt
+    „Laser auf aus gestellt“ zu behaupten."""
+    aufbau.antwort["wert"] = True
+    m = _modell([("Muster", "gobo_wheel", 10, []), ("Rot", "color_r", 255, [])])
+    live = aufbau.bauen(m)._live
+    live._btn_start.setChecked(True)
+    assert live._tester is not None and live._aus_werte == {}
+    aufbau.state.laser_estop_active = True
+    live._notaus_pruefen()
+    assert live._tester is None
+    text = live._info.text()
+    assert "auf „aus“ gestellt" not in text
+    assert "kein Aus-Wert" in text and "am Gerät ausschalten" in text
+    # Ein Laser mit Aus-Wert meldet weiter die Entwarnung.
+    aufbau.state.laser_estop_active = False
+    live2 = aufbau.bauen(_laser(default=200, bereiche=_AUS_BEI_50))._live
+    live2._btn_start.setChecked(True)
+    aufbau.state.laser_estop_active = True
+    live2._notaus_pruefen()
+    assert "auf „aus“ gestellt" in live2._info.text()

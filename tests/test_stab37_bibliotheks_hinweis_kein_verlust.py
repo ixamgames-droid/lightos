@@ -184,6 +184,97 @@ class SammlerTests(_MitDubletten):
                          "Hinweise der vorigen Show duerfen nicht stehen bleiben")
 
 
+class FolgenVergleichTests(unittest.TestCase):
+    """Codex-Review #1072 (CDX-59): gleich ist mehr als Typ + Attributfolge.
+    Default-, Highlight- und Bereichswerte, Segmente und Laser-Angaben liest
+    der Render-Plan, die Shutter- und die Laser-Aus-Logik; das 3D-Modell das
+    Bild. Unterscheiden sich zwei Dubletten nur dort, bleibt es eine Warnung."""
+
+    @classmethod
+    def setUpClass(cls):
+        from src.core.database.models import (ChannelRange, FixtureChannel,
+                                              FixtureMode, FixtureProfile,
+                                              Manufacturer)
+        cls._eng = frische_library(cls)
+        cls.ids = {}
+        with Session(cls._eng) as s:
+            m = Manufacturer(name="Folgen AG", short_name="FOLG")
+            s.add(m)
+            s.flush()
+
+            def profil(name, *, viz="", default=0, kind="open", laser="", segment=None,
+                       k1_name="K1", bereich_name=None, zweiter_modus=None):
+                p = FixtureProfile(manufacturer=m, name=name, fixture_type="par",
+                                   short_name=name[:6].upper(), power_w=10,
+                                   source="builtin", viz_model=viz)
+                mo = FixtureMode(fixture=p, name=MODUS, channel_count=len(RGBD))
+                for i, a in enumerate(RGBD, start=1):
+                    ch = FixtureChannel(channel_number=i,
+                                        name=k1_name if i == 1 else f"K{i}",
+                                        attribute=a,
+                                        default_value=default if i == 1 else 0,
+                                        laser_angaben=laser if i == 1 else "",
+                                        segment=segment if i == 1 else None)
+                    if i == 1:
+                        ch.ranges.append(ChannelRange(
+                            range_from=0, range_to=255,
+                            name=bereich_name or f"Name {name}", kind=kind))
+                    mo.channels.append(ch)
+                if zweiter_modus:
+                    m2 = FixtureMode(fixture=p, name="1-Kanal", channel_count=1)
+                    m2.channels.append(FixtureChannel(channel_number=1,
+                                                      name=zweiter_modus,
+                                                      attribute="raw"))
+                s.add(p)
+                s.flush()
+                cls.ids[name] = p.id
+
+            profil("basis")
+            profil("basis_umbenannte_bereiche")     # nur der Bereichsname anders
+            profil("default", default=255)
+            profil("bereich", kind="strobe")
+            profil("laser", laser='{"version": 1}')
+            profil("segment", segment=0)
+            profil("modell", viz="moving_head")
+            # Namen, die die Ausgabe DEUTET (Gegenpruefung CDX-59):
+            profil("kanalname_laser", k1_name="Laser Mode")
+            profil("anderer_modus_laser", zweiter_modus="Laser Pattern")
+            profil("anderer_modus_ohne_laser", zweiter_modus="Programm")
+            profil("ohne_art", kind="")
+            profil("ohne_art_open", kind="", bereich_name="Open")
+            profil("strobe_hz", kind="strobe", bereich_name="Strobe 1-25 Hz")
+            profil("strobe_ohne_hz", kind="strobe", bereich_name="Strobe")
+            s.commit()
+
+    def _gleich(self, a, b):
+        with Session(self._eng) as s:
+            return SF._dublette_ohne_folgen(s, self.ids[a], [self.ids[b]],
+                                            MODUS, KANAELE)
+
+    def test_nur_der_name_eines_bereichs_anders_ist_gleich(self):
+        self.assertTrue(self._gleich("basis", "basis_umbenannte_bereiche"))
+
+    def test_was_die_ausgabe_liest_macht_den_unterschied(self):
+        for anders in ("default", "bereich", "laser", "segment", "modell"):
+            with self.subTest(anders):
+                self.assertFalse(self._gleich("basis", anders))
+
+    def test_gedeutete_namen_machen_den_unterschied(self):
+        """Gegenpruefung CDX-59: ein Name ist nicht nur Beschriftung, wo die
+        Ausgabe ihn deutet — „Laser“ im Kanalnamen (auch in einem ANDEREN Modus,
+        LAS-38) macht ein Profil zum Laser, „Open“ einen Bereich ohne Art zum
+        Offen-Bereich, „1-25 Hz“ gibt die Blitzfrequenz."""
+        for a, b in (("basis", "kanalname_laser"),
+                     ("anderer_modus_ohne_laser", "anderer_modus_laser"),
+                     ("ohne_art", "ohne_art_open"),
+                     ("strobe_ohne_hz", "strobe_hz")):
+            with self.subTest(f"{a} / {b}"):
+                self.assertFalse(self._gleich(a, b))
+
+    def test_zusatzmodus_ohne_laser_bleibt_gleich(self):
+        self.assertTrue(self._gleich("basis", "anderer_modus_ohne_laser"))
+
+
 class LadenTests(_MitDubletten):
     """Der ganze Weg: eine gespeicherte Show mit drei Geraeten, deren
     Profil-Nummer auf diesem Rechner ins Leere zeigt — wie bei einer Demo-Show,
@@ -345,3 +436,19 @@ class OberflaecheTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DokuTests(unittest.TestCase):
+    """Codex-Review #1072 (CDX-59): die geaenderte Meldung beim Oeffnen (Hinweis
+    in der Statusleiste statt Fenster) steht in der Anleitung „Erste Schritte“,
+    deutsch und englisch."""
+
+    def test_anleitung_erste_schritte_nennt_beide_meldungen(self):
+        from pathlib import Path
+        ordner = Path(__file__).resolve().parents[1] / "docs" / "anleitung_erste_schritte"
+        for datei in ("ANLEITUNG.md", "ANLEITUNG.en.md"):
+            with self.subTest(datei):
+                text = (ordner / datei).read_text(encoding="utf-8")
+                self.assertIn("Show unvollstaendig geladen", text)
+                self.assertIn("Hinweis: …", text)
+                self.assertIn("15", text)

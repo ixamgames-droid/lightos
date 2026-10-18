@@ -293,11 +293,18 @@ class BauPruefungenTest(unittest.TestCase):
         env = self.bau.sandbox_umgebung(self.tmp, vorlage=geerbt)
         basis = os.path.realpath(self.tmp)
         for name in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_DATA_HOME",
-                     "XDG_CONFIG_HOME", "TMPDIR", "TEMP", "TMP", "LIGHTOS_FIXTURE_DB",
+                     "XDG_CONFIG_HOME", "LIGHTOS_FIXTURE_DB",
                      "LIGHTOS_PREFS_DIR", "LIGHTOS_CRASH_LOG", "LIGHTOS_SACN_CID",
                      "LIGHTOS_UNIVERSES_JSON"):
             with self.subTest(name=name):
                 self.assertTrue(env[name].startswith(basis + os.sep), env[name])
+                # Die Werkzeug-Sandbox laesst eine Vorgabe nur im Temp-Bereich
+                # stehen; liegt ein Datenpfad daneben, lenkt sie ihn um und
+                # jeder Kindprozess spielt die Bibliothek neu ein (CDX-59).
+                self.assertTrue(env[name].startswith(env["TMPDIR"] + os.sep), env[name])
+        for name in ("TMPDIR", "TEMP", "TMP"):
+            with self.subTest(name=name):
+                self.assertEqual(env[name], basis)
         for name in ("LIGHTOS_SHOW_DB", "LIGHTOS_GEN_OUT", "LIGHTOS_OUTPUT_IFACE", "DISPLAY"):
             self.assertNotIn(name, env)
         self.assertEqual(env["QT_QPA_PLATFORM"], "offscreen")

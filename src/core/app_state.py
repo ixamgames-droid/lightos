@@ -4589,6 +4589,11 @@ class AppState:
         # Es zaehlt nur, was WIRKLICH noch im Programmer steht: hat jemand den
         # Wert inzwischen ueberschrieben oder den Programmer geleert, gilt wieder
         # die alte Regel. Master, Fader, Blackout und NOT-AUS liegen dahinter.
+        # Codex-Review #1081: und NUR die Dimmer-Schluessel, deren Wert noch
+        # der des Snaps ist — ein Geraet mit mehreren Dimmern behaelt an einem
+        # unbeteiligten (manuell gesetzten) Dimmer den Effekt
+        # (``snap_dimmer_nur``: fid -> erlaubte Schluessel).
+        snap_dimmer_nur: dict[int, set[str]] = {}
         _snap_ovr = getattr(self, "snap_dimmer_override", None)
         if _snap_ovr and func_inten_fids:
             for fidi, erwartet in list(_snap_ovr.items()):
@@ -4597,8 +4602,12 @@ class AppState:
                 pa = programmer.get(fidi)
                 if pa is None:
                     pa = programmer.get(str(fidi))
-                if pa and any(pa.get(k) == v for k, v in erwartet.items()):
+                if not pa:
+                    continue
+                treffer = {k for k, v in erwartet.items() if pa.get(k) == v}
+                if treffer:
                     intensity_wins = intensity_wins | {fidi}
+                    snap_dimmer_nur[fidi] = treffer
         owned_by_func = func_inten_fids - intensity_wins   # hier wirkt Programmer NICHT
 
         prog_factor: dict[int, float] = {}
@@ -4637,7 +4646,8 @@ class AppState:
                         protect[univ].discard(a)
         self._apply_fixture_map(scratch, programmer,
                                 skip_intensity_for=set(prog_factor) | owned_by_func,
-                                protect_addrs=protect, fix_index=fix_index)
+                                protect_addrs=protect, fix_index=fix_index,
+                                intensitaet_nur=snap_dimmer_nur)
 
         # 4a². Implizite Grundhelligkeit — „Farbe heisst sichtbar". Ein Fixture mit
         #      eigenem Dimmer-/Intensitaets-Kanal, dessen Farbe aktiv ist (durch
@@ -5076,7 +5086,8 @@ class AppState:
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,
                            protect_addrs: dict | None = None,
-                           fix_index: dict | None = None):
+                           fix_index: dict | None = None,
+                           intensitaet_nur: dict | None = None):
         """Malt eine {fid: {attr: val}}-Schicht in die Scratch-Universen (LTP:
         nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht).
 
@@ -5086,6 +5097,11 @@ class AppState:
         Funktions-Layer (Matrix/EFX) treibt und die dieser Layer NICHT ueberschreiben
         darf (WP-6/Abschnitt 8). Intensitaet bleibt unberuehrt von protect (sie wird
         ueber skip_intensity_for multipliziert).
+        intensitaet_nur: {fid: set(schluessel)} — fuer diese Geraete schreibt der
+        Layer nur die Intensitaets-Kanaele dieser Schluessel (``dimmer#1``; ein
+        gespiegelter Kopf zaehlt unter dem Schluessel, den er liest). Die
+        uebrigen Intensitaets-Kanaele bleiben bei der Schicht darunter
+        (VCB-46/Codex-Review #1081: Snap-Uebersteuerung nur fuer IHRE Dimmer).
 
         Mehrkopf (X-6): wiederholt sich ein Attribut in den Kanaelen (z. B. zwei
         Farb-/Tilt-Baenke eines Spiders), liest das N-te Vorkommen den Schluessel
@@ -5118,6 +5134,7 @@ class AppState:
             if su is None:
                 continue
             skip_inten = fidi in skip
+            nur_inten = (intensitaet_nur or {}).get(fidi)
             prot = protect.get(fx.universe, ())
             seen_attr: dict[str, int] = {}
             for ch in chans:
@@ -5138,6 +5155,8 @@ class AppState:
                 attr_l = (a or "").lower()
                 is_inten = attr_l in _DIM_INTENSITY_ATTRS
                 if skip_inten and is_inten:
+                    continue
+                if is_inten and nur_inten is not None and key not in nur_inten:
                     continue
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):

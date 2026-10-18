@@ -2613,6 +2613,10 @@ class VCButton(VCWidget):
             self.snap_dimmer_override = (self.action == LS
                                          and snap_dim_ovr_cb.isChecked())
             self._snap_active = False
+            # Codex-Review #1087: wie in ``from_dict`` auch die Anspruechen im
+            # Snap-Register abmelden. Sonst blieb die (jetzt inaktive) Taste
+            # oberster Halter, und ihre Dimmer-Uebersteuerung wirkte weiter.
+            forget_snap_claims(self)
             self._snap_prev = {}
             dimmer_override_abgleich(
                 halter=self if self.snap_dimmer_override and not _haken_alt

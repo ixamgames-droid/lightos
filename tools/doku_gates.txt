@@ -102,3 +102,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_undo_coverage.py             # nennt docs/UNDO_COVERAGE.md nur in Meldungen
 !test_vc_widgets_showcase_layout.py # liest nur docs/.../geometry.json (keine Doku -> volle Suite)
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
+test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)
