@@ -401,8 +401,12 @@ class Profil:
     def anzeige(self) -> str:
         return f"{self.hersteller} {self.name}".strip()
 
-    def modus(self, name: str) -> Modus | None:
-        return next((m for m in self.modi if m.name == name), None)
+    def modus(self, name: str, kanaele: int | None = None) -> Modus | None:
+        """Der Modus ``name`` — mit ``kanaele`` der gleichnamige mit dieser
+        Kanalzahl. Gleichnamige Modi sind zulaessig (``modus_wahl``, FM-67);
+        nur ueber den Namen gewann stumm der erste (Codex-Review #1084)."""
+        return next((m for m in self.modi if m.name == name
+                     and (kanaele is None or m.kanaele == int(kanaele))), None)
 
 
 EXAKT, UNSCHARF, GEWAEHLT, OFFEN = "exakt", "unscharf", "gewaehlt", "offen"
@@ -689,7 +693,7 @@ class PlanZeile:
 class Plan:
     tabelle: Tabelle
     zeilen: list[PlanZeile]
-    wahl: dict[int, tuple[int, str]]
+    wahl: dict[int, tuple]
 
     def anlegbare(self) -> list[PlanZeile]:
         return [z for z in self.zeilen if z.status == ANLEGBAR]
@@ -732,12 +736,13 @@ def belegung_aus_state(state) -> list[Belegung]:
 
 
 def baue_plan(tabelle: Tabelle, bibliothek: Bibliothek, vorhandene=(),
-              wahl: dict[int, tuple[int, str]] | None = None) -> Plan:
+              wahl: dict[int, tuple] | None = None) -> Plan:
     """Aus Tabelle + Bibliothek + vorhandenem Patch den Plan rechnen.
 
     ``wahl``: was der Nutzer fuer eine Zeile ausgesucht hat —
-    ``{Zeilenindex: (Profil-ID, Modusname)}``. Eine Wahl, die es in der
-    Bibliothek nicht (mehr) gibt, zaehlt nicht."""
+    ``{Zeilenindex: (Profil-ID, Modusname[, Kanalzahl])}``. Die Kanalzahl
+    unterscheidet gleichnamige Modi. Eine Wahl, die es in der Bibliothek
+    nicht (mehr) gibt, zaehlt nicht."""
     wahl = dict(wahl or {})
     vorhandene = list(vorhandene)
     zeilen = [_plan_zeile(i, z, bibliothek, wahl.get(i))
@@ -756,7 +761,8 @@ def _plan_zeile(index: int, z: Zeile, bibliothek: Bibliothek, gewaehlt) -> PlanZ
     profil = modus = None
     if gewaehlt is not None:
         profil = bibliothek.profil(gewaehlt[0])
-        modus = profil.modus(gewaehlt[1]) if profil else None
+        kanaele = gewaehlt[2] if len(gewaehlt) > 2 else None
+        modus = profil.modus(gewaehlt[1], kanaele) if profil else None
     if profil is not None and modus is not None:
         pz.profil, pz.modus, pz.art = profil, modus, GEWAEHLT
     elif fund.profil is not None:

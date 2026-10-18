@@ -50,7 +50,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    denn bei manchen Lasern heißt DMX 0 „Auto“ und würde sie einschalten.
    Kennt das Profil keinen Aus-Wert, strahlt ein Laser ohne Dimmer womöglich
    weiter; sicher aus ist ein Laser nur mit dem **Laser-NOT-AUS**
-   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
+   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf. Im Kiosk-Modus, in dem diese Leiste ausgeblendet ist, steht **BLACKOUT** oben rechts direkt links neben **LASER NOT-AUS** und zeigt denselben Zustand.
    Wie das im DMX-Monitor aussieht, zeigt
    [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine
@@ -225,6 +225,15 @@ Die Datei-Dialoge starten im Ordner der aktuellen Show, sonst im Ordner `shows` 
 LightOS-Datenordner (Linux: `~/.local/share/LightOS/shows`, Windows:
 `%APPDATA%\LightOS\shows`). Nach dem Speichern steht der Pfad im Fenstertitel und kurz
 in der Statusleiste (`Gespeichert: …`).
+
+**Meldungen beim Öffnen.** Konnte LightOS Teile einer Show nicht lesen, erscheint das
+Fenster **Show unvollstaendig geladen** mit der Liste dieser Teile — wer dann speichert,
+schreibt den Verlust fest, also vorher eine Kopie der Datei sichern. Steht dagegen nur
+ein Geräteprofil zweimal in der Geräte-Bibliothek und ist es für die Show gleich, welches
+genommen wurde (gleicher Modus mit denselben Kanälen und Werten), ist nichts verloren:
+dann kommt kein Fenster, sondern für 15 Sekunden ein **Hinweis: …** in der Statusleiste,
+hinter der Meldung, die dort gerade steht. Unterscheiden sich die beiden Profile, bleibt
+es beim Fenster.
 
 **Automatisch gesichert** wird zusätzlich alle 5 Minuten in die Datei `auto_save.lshow`
 im LightOS-Datenordner. Das Intervall stellst du unter **Datei → Auto-Save-Intervall...**

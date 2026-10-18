@@ -603,3 +603,44 @@ def test_import_knopf_ist_ein_menueknopf_und_per_tastatur_bedienbar(state, monke
         assert gerufen == ["import", "vorlage"]
     finally:
         menu.hide()
+
+
+# ── Codex-Review #1084 (CDX-59): gleichnamige Modi ──────────────────────────
+
+def _bib_gleichnamig():
+    return T.Bibliothek([T.Profil(
+        id=4711, hersteller="Doppel", name="Zwei Modi Gleichnamig", typ="par",
+        modi=(T.Modus("Standard", 4), T.Modus("Standard", 12)))])
+
+
+def test_gleichnamige_modi_die_wahl_trifft_den_gewaehlten(state):
+    """Gleichnamige Modi sind zulaessig (modus_wahl). Gewaehlt wird der mit
+    12 Kanaelen — er muss es bleiben (Footprint 12, nicht 4)."""
+    bib = _bib_gleichnamig()
+    text = "Name;Hersteller;Profil;Universum;Adresse\nX;Doppel;Zwei Modi Gleichnamig;1;1\n"
+    dlg = D.PatchImportDialog(state, T.lies_tabelle(text), bib, "liste.csv")
+    box = dlg._auswahl[0]
+    zwoelf = next(i for i in range(box.count())
+                  if box.itemData(i) and "(12 Kanäle)" in box.itemText(i))
+    dlg.waehle(0, zwoelf)
+    pz = dlg.plan.zeilen[0]
+    assert pz.art == T.GEWAEHLT
+    assert pz.modus.kanaele == 12
+    assert [g.kanaele for g in pz.geraete] == [12]
+    # Die 4-Kanal-Wahl bleibt ebenso, was sie ist.
+    vier = next(i for i in range(box.count())
+                if box.itemData(i) and "(4 Kanäle)" in box.itemText(i))
+    dlg.waehle(0, vier)
+    assert dlg.plan.zeilen[0].modus.kanaele == 4
+
+
+def test_profil_modus_mit_kanalzahl():
+    p = _bib_gleichnamig().profil(4711)
+    assert p.modus("Standard").kanaele == 4              # ohne Zahl: der erste
+    assert p.modus("Standard", 12).kanaele == 12
+    assert p.modus("Standard", 7) is None
+    # Alte Wahl (ohne Kanalzahl) wird weiter verstanden.
+    plan = T.baue_plan(T.lies_tabelle(
+        "Name;Hersteller;Profil;Universum;Adresse\nX;Doppel;Zwei Modi Gleichnamig;1;1\n"),
+        _bib_gleichnamig(), (), {0: (4711, "Standard")})
+    assert plan.zeilen[0].modus.kanaele == 4

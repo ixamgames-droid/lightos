@@ -41,6 +41,8 @@ _VERFAELSCHT = "\x00QA59-ZERSTOERT\x00"
 # Prozess. Muster und Begruendung: tests/_qt_lifecycle.py, Vorbild
 # tests/test_vc_inspector_panel.py:37-54 — dort ist derselbe Fehlerfall
 # beschrieben, und dieser Test hatte ihn trotzdem.
+from src.ui.widgets.ueberschneidung_hinweis import (     # noqa: E402
+    UeberschneidungsHinweis)
 import pytest as _pytest_cdx54                             # noqa: E402
 from _qt_lifecycle import destroy_all_top_level_widgets    # noqa: E402
 
@@ -78,6 +80,10 @@ _NICHT_BEDIENBAR = (
     # eigenen Weg zurueck, nicht ueber ein Live-Signal am Knopf. Sie stehen
     # hier, damit sie BENANNT uebersprungen werden statt still.
     "Knopf ohne eigenen Wert (oeffnet einen Dialog)",
+    # ENG-39: die gelbe Zeile „Hinweis“ ist reine Anzeige — sie traegt keinen
+    # Wert, den ein Benutzer aendern koennte, und schreibt nichts in die Taste.
+    # Bewusst nur DIESE Klasse, kein beliebiges Textfeld.
+    "Hinweiszeile ohne Wert (UeberschneidungsHinweis)",
 )
 
 
@@ -153,7 +159,8 @@ class JedesFeldCommittetLiveTest(unittest.TestCase):
         unerwartet = [
             f"{type(w).__name__} {pfad}" for pfad, w in unbedienbar
             if not (isinstance(w, QComboBox) and w.count() < 2)
-            and not isinstance(w, QPushButton)]
+            and not isinstance(w, QPushButton)
+            and not isinstance(w, UeberschneidungsHinweis)]
         self.assertEqual(
             [], unerwartet,
             "Diese Bedienelemente konnte die Messung nicht ausloesen und sie "

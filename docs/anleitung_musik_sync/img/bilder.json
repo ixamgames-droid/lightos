@@ -1,0 +1,54 @@
+{
+  "anleitung": "musik_sync",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "161a0039",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py musik_sync'.",
+  "bilder": [
+    {
+      "datei": "01_musik_tab.png",
+      "szene": "01_musik_tab",
+      "titel": "Musik-Tab: Playlist, Ordner laden, Auto-Show für Lied, globaler Schalter",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "7d0b858cfcc7b982310af5775a248e72"
+    },
+    {
+      "datei": "02_autoshow_fuer_lied.png",
+      "szene": "02_autoshow_fuer_lied",
+      "titel": "Dialog „Auto-Show für …“: Funktionen je Lied",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "45460c5896383e83c39d232f429f15bc"
+    },
+    {
+      "datei": "03_play_vc.png",
+      "szene": "03_play_vc",
+      "titel": "Play: Musik-Anzeige mit Media-Tasten in der VC",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "6f89e88a66276d0719a3c9d5666dff7a"
+    },
+    {
+      "datei": "04_bpm_quelle.png",
+      "szene": "04_bpm_quelle",
+      "titel": "BPM-Sektion, Erkennung: Quelle (hier „Aus“), TAP, Auto",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "a6a6fd9e3537115fc007f8354c69c3e0"
+    }
+  ]
+}
