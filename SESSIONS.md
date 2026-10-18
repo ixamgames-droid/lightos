@@ -39,7 +39,6 @@
 | UI-88 | D | perf/ui88-2d-bild-schneller | 2026-10-11T14:27Z | src/ui/views/live_view.py · tests/test_ui88_2d_bild_schneller.py |
 | LAS-34 | A | feature/las34-laser-tab | 2026-10-11T13:51Z | - |
 | MIDI-15 | D | feature/midi15-touch-sperre | 2026-10-12T18:42Z | src/core/midi/midi_mapper.py · src/ui/views/midi_view.py · tests/test_midi15_touch_sperre.py |
-| ENG-30 | D | perf/eng30-engine-zeit-je-frame | 2026-10-11T15:41Z | src/core/app_state.py · src/core/engine/function_manager.py · src/core/engine/patch_index.py · src/core/engine/scene.py · src/core/engine/efx.py · src/core/engine/rgb_matrix.py · src/core/engine/mapped_channel.py · tools/engine_frame_zeit.py · tools/benchmark_universes.py · docs/ENGINE_FRAME_ZEIT.md · docs/PERFORMANCE.md · tests/test_eng30_frame_zeit.py |
 | OUT-69 | A | - | 2026-10-11T14:04Z | - |
 | WEB-10 | A | feature/web10-handy-seitenleiste | 2026-10-11T16:32Z | - |
 | OUT-70 | A | feature/out70-interface-erkennung-assistent | 2026-10-11T15:44Z | - |
@@ -158,7 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-14T21:35Z A done ENG-39
 - 2026-10-14T22:23Z A done LAS-35
 - 2026-10-18T15:37Z 117 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T15:37Z A aktualisiert DOC-16: Branch - -> docs/doc16-anleitungen-neu-bebildert
@@ -188,3 +186,4 @@
 - 2026-10-18T19:42Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T19:42Z A claim FM-69
 - 2026-10-18T19:54Z A claim FM-76
+- 2026-10-18T19:59Z D done ENG-30
