@@ -112,6 +112,8 @@ class VCCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._edit_mode = False
+        # UI-96: Kiosk-Modus — kein Bearbeiten, keine Zuweisungs-/Lern-Modi.
+        self._kiosk = False
         self._snap_to_grid = False
         self._active_bank = 0
         # Undo/Redo: Snapshot-Verlauf der VC-Layouts (Hinzufuegen/Loeschen/…).
@@ -457,6 +459,8 @@ class VCCanvas(QWidget):
         Aktiviert MIDI-Learn: der nächste Klick auf einen VCButton bewaffnet ihn,
         die darauf folgende MIDI-Message wird ihm zugewiesen.
         """
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._midi_learn_btn = None
         # Signalisiere allen Buttons dass sie für MIDI-Learn klickbar sind
         self._awaiting_button_click_for = "midi_learn"
@@ -480,6 +484,8 @@ class VCCanvas(QWidget):
         Aktiviert Assign-Modus: nächster Klick auf einen VCButton weist ihm
         den angegebenen Snapshot zu.
         """
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_snapshot_index = snapshot_index
         self._awaiting_button_click_for = "snapshot"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -494,6 +500,8 @@ class VCCanvas(QWidget):
     def start_function_assign(self, function_id: int):
         """Aktiviert Assign-Modus: nächster Klick auf einen VCButton macht ihn
         zum Funktions-Toggle für die gewählte Funktion (Effekt/Matrix/Scene)."""
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_function_id = function_id
         self._awaiting_button_click_for = "function"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -508,6 +516,8 @@ class VCCanvas(QWidget):
     def start_snap_assign(self, snap_id: int):
         """Aktiviert Assign-Modus: naechster Klick auf einen VCButton macht ihn
         zur Farb-/Snap-Taste fuer den gewaehlten Bibliothek-Snap."""
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_snap_id = snap_id
         self._awaiting_button_click_for = "library_snap"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -599,7 +609,25 @@ class VCCanvas(QWidget):
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
+    def set_kiosk(self, kiosk: bool) -> None:
+        """UI-96: Kiosk-Modus setzen. Beim Einschalten endet ein laufender
+        Bearbeiten-/Zuweisungs-Modus sofort."""
+        self._kiosk = bool(kiosk)
+        if self._kiosk:
+            self.cancel_midi_learn()
+            self.cancel_snapshot_assign()
+            self.cancel_function_assign()
+            self.cancel_snap_assign()
+            if self._edit_mode:
+                self.set_edit_mode(False)
+
+    @property
+    def kiosk(self) -> bool:
+        return self._kiosk
+
     def set_edit_mode(self, enabled: bool):
+        if self._kiosk and enabled:
+            enabled = False     # UI-96: im Kiosk nie Bearbeiten-Modus
         self._edit_mode = enabled
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
@@ -2108,6 +2136,8 @@ class VCCanvas(QWidget):
                 json.dump(self.to_dict(), f, indent=2)
 
     def _load(self):
+        if self._kiosk:
+            return          # UI-96: kein Layout-Import im Kiosk
         path, _ = QFileDialog.getOpenFileName(self, "VC Layout laden",
                                                "", "JSON (*.json)")
         if path:

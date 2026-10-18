@@ -148,6 +148,12 @@ hell), und die Statuszeile nennt den laufenden Effekt:
 Ein zweiter Klick stoppt den Effekt wieder. Was die Geräte gerade tun, siehst du in der Sektion
 **Bühne** (2D-Ansicht) oder im 3D-Visualizer.
 
+**Nur bedienen: Kiosk-Modus.** Mit `--kiosk` gestartet (`python main.py --kiosk`) zeigt LightOS
+die fertige Konsole im Vollbild **ohne Bearbeitungswege**: Die **Bibliothek**-Seitenleiste fehlt
+ganz (kein Ziehen auf Tasten, kein „➡ Auf VC-Taste legen"), und **Bearbeiten**, **MIDI Lernen**,
+**Canvas importieren…** sowie Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) gibt es dort nicht. Die
+Tasten, Fader, Bänke, Touch-Lock und Pickup bleiben bedienbar.
+
 ### Konsole auf einen zweiten Bildschirm legen (Popout)
 
 **⧉ Popout** in der Werkzeugleiste holt die ganze Konsole in ein eigenes Fenster, zum Beispiel
