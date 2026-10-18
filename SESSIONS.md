@@ -69,6 +69,7 @@
 | QA-99 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:51Z | tests/conftest.py · tests/test_qa99_windows_offscreen_schriften.py · backlog.d/QA-99.md |
 | QA-100 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:52Z | tests/test_qa100_anleitung_ueberschriften_einmalig.py · tools/doku_gates.txt · backlog.d/QA-100.md |
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
+| QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 
 ## Blocker & Fallen
 
@@ -157,7 +158,6 @@
 
 ## Verlauf
 
-- 2026-10-18T15:37Z A done LAS-39
 - 2026-10-18T16:16Z A done XPLAT-23
 - 2026-10-18T16:16Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T16:44Z D claim OUT-79
@@ -187,3 +187,4 @@
 - 2026-10-18T21:52Z D claim QA-100
 - 2026-10-18T21:53Z D claim QA-101
 - 2026-10-18T21:53Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-18T21:54Z D claim QA-102
