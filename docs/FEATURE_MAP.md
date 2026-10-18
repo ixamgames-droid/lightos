@@ -64,7 +64,7 @@ Visualizer als separates Fenster.
 | STOP ALL | Alle Executors stoppen |
 | BLACKOUT | Globaler Blackout (Toggle) |
 | Kiosk-Streifen oben rechts (LAS-31) | Im Kiosk-Modus: BLACKOUT und LASER NOT-AUS nebeneinander; BLACKOUT zeigt denselben Zustand wie der Knopf der Sektionsleiste (`output_manager.blackout`) |
-| Kiosk-Modus ohne Bearbeitung (UI-96) | `--kiosk`: Virtual Console ohne Bibliothek-Seitenleiste; Bearbeiten, MIDI Lernen, Canvas-Import und Undo/Redo gesperrt (`VirtualConsoleView(kiosk=…)`, `VCCanvas.set_kiosk`) |
+| Kiosk-Modus ohne Bearbeitung (UI-96) | `--kiosk`: Virtual Console ohne Bibliothek-Seitenleiste; Bearbeiten, MIDI Lernen, Canvas-Import, Undo/Redo und das Effekte-Menü des Tempo-Bus-Controllers gesperrt (`VirtualConsoleView(kiosk=…)`, `VCCanvas.set_kiosk`, `VCWidget._kiosk_active`) |
 | Command-Line (unten) | MA-/Avolites-Befehlszeile (`widgets/command_line.py`) |
 
 ---

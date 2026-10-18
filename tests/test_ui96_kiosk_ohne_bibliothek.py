@@ -135,13 +135,19 @@ class KioskOhneBearbeitungTest(_Ansicht):
 
     def test_canvas_import_gesperrt(self):
         self.assertFalse(_sichtbar(self.view, self.view._btn_load))
+        # QMessageBox.warning mitpatchen: fehlt die Sperre, landet _load mit dem
+        # erfundenen Pfad im Fehlerzweig — ohne Patch haengt der Test dort am
+        # modalen Dialog statt sauber rot zu werden.
         with mock.patch.object(vcv.VCCanvas, "from_dict") as fd, \
                 mock.patch("src.ui.virtualconsole.vc_canvas.QFileDialog."
-                           "getOpenFileName", return_value=("x.json", "")) as dlg:
+                           "getOpenFileName", return_value=("x.json", "")) as dlg, \
+                mock.patch("src.ui.virtualconsole.vc_canvas.QMessageBox."
+                           "warning") as warn:
             self.view._load()
             self.view._canvas._load()
         dlg.assert_not_called()
         fd.assert_not_called()
+        warn.assert_not_called()
 
     def test_undo_redo_gesperrt(self):
         c = self.view._canvas
@@ -209,19 +215,123 @@ class OhneKioskUnveraendertTest(_Ansicht):
 
 
 class CanvasKioskNachtraeglichTest(unittest.TestCase):
+    """Jeder der vier Zuweisungs-/Lern-Modi endet beim nachtraeglichen
+    Einschalten des Kiosk vollstaendig — nicht nur ``_awaiting_button_click_for``
+    (das setzt jede cancel-Methode zurueck), sondern auch das je Modus
+    gemerkte Ziel."""
 
-    def test_set_kiosk_beendet_laufenden_modus(self):
+    def _canvas(self):
         _app()
         c = vcv.VCCanvas()
-        try:
-            c.set_edit_mode(True)
-            c.start_function_assign(3)
-            c.set_kiosk(True)
-            self.assertFalse(c._edit_mode)
-            self.assertIsNone(c._awaiting_button_click_for)
-        finally:
-            c.deleteLater()
-            _app().processEvents()
+        self.addCleanup(lambda: (c.deleteLater(), _app().processEvents()))
+        return c
+
+    def test_set_kiosk_beendet_bearbeiten(self):
+        c = self._canvas()
+        c.set_edit_mode(True)
+        c.set_kiosk(True)
+        self.assertFalse(c._edit_mode)
+
+    def test_set_kiosk_beendet_midi_lernen(self):
+        c = self._canvas()
+        c.start_midi_learn()
+        taste = mock.Mock(_midi_armed=True)
+        c._midi_learn_btn = taste          # Taste schon bewaffnet
+        c.set_kiosk(True)
+        self.assertIsNone(c._awaiting_button_click_for)
+        self.assertIsNone(c._midi_learn_btn)
+        self.assertFalse(taste._midi_armed)
+
+    def test_set_kiosk_beendet_snapshot_zuweisung(self):
+        c = self._canvas()
+        c.start_snapshot_assign(2)
+        c.set_kiosk(True)
+        self.assertIsNone(c._awaiting_button_click_for)
+        self.assertIsNone(c._assign_snapshot_index)
+
+    def test_set_kiosk_beendet_funktions_zuweisung(self):
+        c = self._canvas()
+        c.start_function_assign(3)
+        c.set_kiosk(True)
+        self.assertIsNone(c._awaiting_button_click_for)
+        self.assertIsNone(c._assign_function_id)
+
+    def test_set_kiosk_beendet_snap_zuweisung(self):
+        c = self._canvas()
+        c.start_snap_assign(4)
+        c.set_kiosk(True)
+        self.assertIsNone(c._awaiting_button_click_for)
+        self.assertIsNone(c._assign_snap_id)
+
+
+class TempoBusControllerKioskTest(unittest.TestCase):
+    """Gegenpruefung UI-96: Der Tempo-Bus-Controller oeffnet im Bedienmodus beim
+    Klick auf die Effekte-Zeile ein Menue (Effekt entfernen, „Effekte hinzufuegen /
+    Parameter…" = Eigenschaften-Dialog). Im Kiosk ist das ein Bearbeitungsweg und
+    gesperrt. Quelle, Faktor, SYNC und die Bus-Wahl bleiben Bedienung."""
+
+    KIOSK = True
+
+    def setUp(self):
+        from PySide6.QtCore import QPointF, Qt
+        from PySide6.QtGui import QMouseEvent
+        from PySide6.QtCore import QEvent
+        from src.ui.virtualconsole.vc_tempo_bus_controller import (
+            VCTempoBusController)
+        self.app = _app()
+        self.canvas = vcv.VCCanvas()
+        self.canvas.resize(600, 400)
+        self.canvas.set_kiosk(self.KIOSK)
+        self.tb = VCTempoBusController(parent=self.canvas)
+        self.tb.setGeometry(10, 10, 260, 180)
+        self.tb.set_edit_mode(False)
+        self.function_ids = []
+
+        def klick(pos):
+            ev = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(pos),
+                             QPointF(self.tb.mapToGlobal(pos)),
+                             Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                             Qt.KeyboardModifier.NoModifier)
+            self.tb.mousePressEvent(ev)
+        self.klick = klick
+
+    def tearDown(self):
+        self.tb.deleteLater()
+        self.canvas.deleteLater()
+        self.app.processEvents()
+
+    def test_effekte_zeile_oeffnet_kein_menue(self):
+        with mock.patch.object(self.tb, "_open_effects_menu") as menue, \
+                mock.patch.object(self.tb, "_open_properties") as dlg:
+            self.klick(self.tb._effects_rect().center())
+        if self.KIOSK:
+            menue.assert_not_called()
+        else:
+            menue.assert_called_once()
+        dlg.assert_not_called()
+
+    def test_menue_und_dialog_direkt_gesperrt(self):
+        mod = "src.ui.virtualconsole.vc_tempo_bus_controller."
+        with mock.patch(mod + "QMenu") as menue, \
+                mock.patch(mod + "QDialog") as dlg:
+            menue.return_value.exec.return_value = None
+            self.tb._open_effects_menu(QPoint(0, 0))
+            if self.KIOSK:
+                self.tb._open_properties()
+        if self.KIOSK:
+            menue.assert_not_called()
+            dlg.assert_not_called()
+        else:
+            menue.assert_called_once()
+
+    def test_bus_wahl_bleibt_bedienung(self):
+        with mock.patch.object(self.tb, "_open_bus_menu") as bus:
+            self.klick(self.tb._bus_rect().center())
+        bus.assert_called_once()
+
+
+class TempoBusControllerOhneKioskTest(TempoBusControllerKioskTest):
+    KIOSK = False
 
 
 class HauptfensterKioskTest(unittest.TestCase):

@@ -151,8 +151,10 @@ Ein zweiter Klick stoppt den Effekt wieder. Was die Geräte gerade tun, siehst d
 **Nur bedienen: Kiosk-Modus.** Mit `--kiosk` gestartet (`python main.py --kiosk`) zeigt LightOS
 die fertige Konsole im Vollbild **ohne Bearbeitungswege**: Die **Bibliothek**-Seitenleiste fehlt
 ganz (kein Ziehen auf Tasten, kein „➡ Auf VC-Taste legen"), und **Bearbeiten**, **MIDI Lernen**,
-**Canvas importieren…** sowie Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) gibt es dort nicht. Die
-Tasten, Fader, Bänke, Touch-Lock und Pickup bleiben bedienbar.
+**Canvas importieren…** sowie Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) gibt es dort nicht. Auch das Effekte-Menü des
+**Tempo-Bus-Controllers** (Effekt entfernen, „Effekte hinzufügen / Parameter…") öffnet sich im Kiosk
+nicht. Die Tasten, Fader, Bänke, Touch-Lock und Pickup bleiben bedienbar — beim Tempo-Bus-Controller
+auch Quelle, Faktor, SYNC und die Bus-Wahl.
 
 ### Konsole auf einen zweiten Bildschirm legen (Popout)
 
