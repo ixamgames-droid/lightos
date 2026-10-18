@@ -61,6 +61,20 @@ _OFFEN: dict[str, int] = {}          # port_key -> id(instanz)
 _SN_BESITZER: dict[str, int] = {}    # seriennummer -> id(instanz)
 
 
+# OUT-66 (Runde 3): Eintraege der Fremdmenge mit diesem Praefix sind keine
+# Seriennummern, sondern die Kennung einer ANDEREN konfigurierten Ausgabe, die
+# ihren Dongle noch nicht kennt (z. B. ``?U2 (COM4)``). Solange es so eine gibt,
+# wird kein Ersatz-Dongle uebernommen: er koennte genau deren Dongle sein.
+OHNE_NUMMER = "?"
+# Anfang des Hinweises „Ersatz NICHT uebernommen“ (voruebergehend; ein neu
+# gestarteter Worker uebernimmt ihn nicht als bleibenden Hinweis).
+SPERR_HINWEIS = "Nicht übernommen:"
+
+
+def ist_sperr_hinweis(text) -> bool:
+    return str(text or "").startswith(SPERR_HINWEIS)
+
+
 def _registry_freigeben(owner: int, auch_seriennr: bool = True):
     with _REG_LOCK:
         for k in [k for k, v in _OFFEN.items() if v == owner]:
@@ -192,7 +206,7 @@ class EnttecPro:
     RECONNECT_EVERY_S = 3.0
 
     def __init__(self, port: str, seriennr: str | None = None, melde=None,
-                 fremde=None):
+                 fremde=None, hinweis: str = "", frueher=()):
         """``seriennr`` (OUT-66): die Seriennummer, die diese Ausgabe schon
         einmal gelernt hat — der Prozess-Proxy reicht sie einem NEU gestarteten
         Worker mit, damit der gezielt SEINEN Dongle sucht. ``melde(port, sn,
@@ -206,13 +220,28 @@ class EnttecPro:
         Proxys). Der ``OutputManager`` haelt sie aktuell
         (:meth:`setze_fremde_seriennr`). Einen Dongle mit einer dieser Nummern
         nimmt die Ausgabe nie; einen anderen Dongle am EIGENEN konfigurierten
-        Port (Ersatzgeraet) uebernimmt sie und lernt seine Nummer neu."""
+        Port (Ersatzgeraet) uebernimmt sie und lernt seine Nummer neu.
+
+        Runde 3: Eintraege mit Praefix :data:`OHNE_NUMMER` in ``fremde`` sind
+        ANDERE Ausgaben, die ihren Dongle noch nicht kennen — solange es eine
+        gibt, wird kein Ersatz uebernommen (Hinweis statt Licht), sonst
+        koennten zwei Universen still tauschen. ``hinweis``/``frueher``: vom
+        Proxy gehaltener bleibender Hinweis und die frueher eigenen Nummern
+        (ein neu gestarteter Worker vergisst sie so nicht)."""
         self.port = port
         self._melde = melde
         self._fremde_quelle = fremde
         # OUT-66: sichtbarer Hinweis (Ausgabe-Diagnose), wenn ein anderer
         # Dongle am eigenen Port uebernommen wurde; leer = nichts zu melden.
-        self._hinweis = ""
+        self._hinweis = "" if ist_sperr_hinweis(hinweis) else str(hinweis or "")
+        # Runde 3: voruebergehender Hinweis „Ersatz nicht uebernommen“ (leer,
+        # sobald wieder ein Dongle offen ist).
+        self._sperr_hinweis = ""
+        # Runde 3: Seriennummern, die diese Ausgabe VOR einer Ersatz-Uebernahme
+        # hatte. Der OutputManager reicht sie als „frueher eigen“ in die
+        # Fremdmenge der ANDEREN Ausgaben (zweite Sicherung gegen Tausch).
+        self._frueher: set[str] = {str(x).strip() for x in (frueher or ())
+                                   if x and str(x).strip()}
         # OUT-66: der KONFIGURIERTE Port. ``port`` folgt dem Dongle, wenn er nach
         # einem Replug an neuer Nummer haengt (SERIAL-02); ``konfig_port`` bleibt
         # — er ist der Schluessel der NOT-AUS-Sperre je Ausgabeweg (OUT-64,
@@ -247,7 +276,10 @@ class EnttecPro:
         # ein anderer (z. B. der Worker des anderen Universums nach vertauschtem
         # Wiedereinstecken). Dessen Seriennummer darf sie sich nicht als eigene
         # merken — sonst folgte auch jeder spaetere Reconnect dem fremden Dongle.
-        self._geoeffnet(ziel, lernen=exklusiv)
+        if not self._geoeffnet(ziel, lernen=exklusiv):
+            # Runde 3: erst jetzt als Ersatz erkannt, aber gesperrt -> zu.
+            self._schliessen_still()
+            raise serial.SerialException(f"{ziel}: {self._sperr_hinweis}")
 
     def _start_ziel(self) -> str:
         """OUT-66: Wohin das ERSTE Oeffnen geht. Ohne bekannte Seriennummer der
@@ -277,6 +309,11 @@ class EnttecPro:
                 raise serial.SerialException(
                     f"{port}: dort haengt der Enttec einer anderen Ausgabe "
                     f"(Seriennr. {s}) — wird nicht genommen (OUT-66)")
+            # Runde 3: Ersatz nur, wenn keine andere Ausgabe ohne gelernte
+            # Nummer existiert — sonst koennte er genau deren Dongle sein.
+            if (sn and _port_key(d) == _port_key(port) and s and s != sn
+                    and self._ersatz_sperren(d, s)):
+                raise serial.SerialException(f"{port}: {self._sperr_hinweis}")
         return port
 
     @staticmethod
@@ -307,21 +344,63 @@ class EnttecPro:
             return serial.Serial(port, ENTTEC_BAUD, **kw), False
         return serial.Serial(port, ENTTEC_BAUD, **kw), True
 
-    def _geoeffnet(self, port: str, lernen: bool = True):
+    def _schliessen_still(self):
+        try:
+            self._ser.close()
+        except Exception:
+            pass
+        self._port_freigeben()
+
+    def _ersatz_sperren(self, device: str, ist: str) -> bool:
+        """OUT-66 (Runde 3): True, wenn ein Ersatz-Dongle ``ist`` an ``device``
+        NICHT uebernommen werden darf, weil eine andere konfigurierte Ausgabe
+        ihren Dongle noch nicht kennt (er koennte deren sein). Setzt dann den
+        Hinweis und meldet ihn (Proxy: gemeinsames Feld)."""
+        andere = self._ohne_nummer()
+        if not andere:
+            return False
+        wer = (f"Ausgabe {andere[0]} ihren Dongle noch nicht kennt"
+               if len(andere) == 1 else
+               f"die Ausgaben {', '.join(andere)} ihre Dongles noch nicht kennen")
+        text = (f"{SPERR_HINWEIS} anderer Enttec an {device} (Seriennr. {ist}), "
+                f"weil {wer}")
+        if text != self._sperr_hinweis:
+            import sys
+            print(f"[EnttecPro] {text} (OUT-66).", file=sys.stderr)
+        self._sperr_hinweis = text
+        self._melden(None)
+        return True
+
+    def _melden(self, port):
+        if self._melde is None:
+            return
+        try:
+            self._melde(port, self._seriennr, self.hinweis(),
+                        tuple(sorted(self._frueher)))
+        except Exception:
+            pass
+
+    def _geoeffnet(self, port: str, lernen: bool = True) -> bool:
         """OUT-66: Port als von dieser Instanz offen eintragen, Seriennummer
         merken (nur, wenn der Port exklusiv offen ist: ``lernen``).
 
         Eine schon bekannte Nummer wird nur in EINEM Fall ersetzt (Review 2):
         am KONFIGURIERTEN Port steckt jetzt ein anderer Dongle, dessen Nummer
         keine andere Ausgabe kennt — ein Ersatzgeraet. Dann lernt die Ausgabe
-        dessen Nummer und meldet die Uebernahme sichtbar (:meth:`hinweis`)."""
+        dessen Nummer und meldet die Uebernahme sichtbar (:meth:`hinweis`).
+
+        Runde 3: gibt False zurueck, wenn es ein Ersatz waere, der gesperrt
+        ist (:meth:`_ersatz_sperren`) — der Aufrufer schliesst dann wieder."""
         with _REG_LOCK:
             _OFFEN[_port_key(port)] = id(self)
         if self._seriennr and lernen \
                 and _port_key(port) == _port_key(self.konfig_port):
             ist = _seriennummer_von(port)
             if ist and ist != self._seriennr and not self._verboten(port, ist):
+                if self._ersatz_sperren(port, ist):
+                    return False
                 alt, self._seriennr = self._seriennr, None
+                self._frueher.add(alt)            # Runde 3: „frueher eigen“
                 _registry_freigeben(id(self), auch_seriennr=True)
                 with _REG_LOCK:
                     _OFFEN[_port_key(port)] = id(self)
@@ -340,11 +419,9 @@ class EnttecPro:
                     if _SN_BESITZER.get(sn, id(self)) == id(self):
                         _SN_BESITZER[sn] = id(self)
                         self._seriennr = sn
-        if self._melde is not None:
-            try:
-                self._melde(self.port, self._seriennr, self._hinweis)
-            except Exception:
-                pass
+        self._sperr_hinweis = ""                  # Runde 3: wieder ein Dongle offen
+        self._melden(self.port)
+        return True
 
     def _port_freigeben(self, auch_seriennr: bool = False):
         _registry_freigeben(id(self), auch_seriennr)
@@ -356,13 +433,30 @@ class EnttecPro:
         Enttec-Ausgaben (ersetzt eine beim Anlegen mitgegebene Quelle)."""
         self._fremde_quelle = frozenset(str(s) for s in (menge or ()) if s)
 
-    def _fremde_sn(self) -> frozenset:
+    def _fremde_eintraege(self) -> frozenset:
         q = self._fremde_quelle
         try:
             werte = q() if callable(q) else q
             return frozenset(str(s) for s in (werte or ()) if s)
         except Exception:
             return frozenset()
+
+    def _fremde_sn(self) -> frozenset:
+        return frozenset(s for s in self._fremde_eintraege()
+                         if not s.startswith(OHNE_NUMMER))
+
+    def _ohne_nummer(self) -> list[str]:
+        """Runde 3: Kennungen der ANDEREN Ausgaben ohne gelernte Nummer."""
+        return sorted(s[len(OHNE_NUMMER):].strip()
+                      for s in self._fremde_eintraege()
+                      if s.startswith(OHNE_NUMMER)
+                      and s[len(OHNE_NUMMER):].strip())
+
+    @property
+    def frueher_seriennr(self) -> frozenset:
+        """Runde 3: Nummern, die diese Ausgabe vor einer Ersatz-Uebernahme
+        hatte (bleiben fuer die anderen fremd)."""
+        return frozenset(self._frueher)
 
     def _verboten(self, device: str, sn: str | None = None) -> bool:
         """True, wenn ``device``/``sn`` einer anderen Instanz dieses Prozesses
@@ -394,8 +488,9 @@ class EnttecPro:
         return self.port
 
     def hinweis(self) -> str:
-        """OUT-66: Hinweis fuer die Ausgabe-Diagnose (leer = nichts)."""
-        return self._hinweis
+        """OUT-66: Hinweis fuer die Ausgabe-Diagnose (leer = nichts). Ein
+        gerade gesperrter Ersatz (Runde 3) steht vorn."""
+        return "; ".join(t for t in (self._sperr_hinweis, self._hinweis) if t)
 
     def _fremd(self, device: str, sn: str | None = None) -> bool:
         """OUT-66: True, wenn ``device`` (bzw. der Dongle mit ``sn``) einer
@@ -514,9 +609,13 @@ class EnttecPro:
                 return frei[0][0]
             # Review 2: Ersatzgeraet am KONFIGURIERTEN Port — uebernehmen, wenn
             # keine andere Ausgabe seine Nummer kennt (sonst nie).
+            # Runde 3: und nur, wenn keine andere Ausgabe ohne gelernte Nummer
+            # existiert (der Dongle koennte deren sein).
             for d, s in kand:
                 if _port_key(d) == _port_key(self.konfig_port) and s and s != sn:
-                    return None if self._verboten(d, s) else d
+                    if self._verboten(d, s) or self._ersatz_sperren(d, s):
+                        return None
+                    return d
         else:
             for d, _s in frei:
                 if _port_key(d) in eigen:
@@ -569,7 +668,9 @@ class EnttecPro:
             melde_still("dmx.enttec.reconnect", e, text=f"Port {target}")
             return
         self.port = target
-        self._geoeffnet(target, lernen=exklusiv)   # OUT-66
+        if not self._geoeffnet(target, lernen=exklusiv):   # OUT-66
+            self._schliessen_still()                # Runde 3: gesperrter Ersatz
+            return
         self._disabled = False
         self._fail_count = 0
         # OUT-51: Auch die Erholung gehoert gemeldet. Wer nur den Ausfall sieht,

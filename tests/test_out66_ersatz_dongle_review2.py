@@ -359,12 +359,13 @@ class WorkerArgumente(unittest.TestCase):
             aufruf = ctx.aufrufe[0]
             self.assertIs(sp._worker_main, aufruf["target"])
             args = aufruf["args"]
-            for feld in ("_port_akt", "_seriennr", "_fremde", "_hinweis"):
+            for feld in ("_port_akt", "_seriennr", "_fremde", "_hinweis",
+                         "_frueher"):
                 self.assertTrue(any(a is getattr(px, feld) for a in args),
                                 f"{feld} geht nicht an den Worker")
             # Reihenfolge = Signatur von _worker_main
             self.assertEqual((px._port_akt, px._seriennr, px._fremde,
-                              px._hinweis), tuple(args[5:9]))
+                              px._hinweis, px._frueher), tuple(args[5:10]))
         finally:
             px.close()
 
@@ -373,7 +374,8 @@ KIND_SN = "KIND-AAA"
 
 
 def _kind_mit_attrappe(port, buf, stop, status, frame_interval,
-                       port_akt=None, seriennr=None, fremde=None, hinweis=None):
+                       port_akt=None, seriennr=None, fremde=None, hinweis=None,
+                       frueher=None):
     """Laeuft im ECHTEN spawn-Kind: ``comports``/``serial.Serial`` durch
     Attrappen ersetzen und dann den echten ``_worker_main`` starten. Beim
     ersten Start steckt KIND-AAA am konfigurierten Port; kennt der Worker die
@@ -411,7 +413,7 @@ def _kind_mit_attrappe(port, buf, stop, status, frame_interval,
     _lp.comports = comports
     _serial.Serial = _S
     _sp._worker_main(port, buf, stop, status, frame_interval,
-                     port_akt, seriennr, fremde, hinweis)
+                     port_akt, seriennr, fremde, hinweis, frueher)
 
 
 class EchterSpawn(unittest.TestCase):

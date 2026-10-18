@@ -512,14 +512,7 @@ class OutputManager:
         Port (Ersatzgeraet) darf sie uebernehmen. Meldet dabei neue Hinweise
         der Geraete (Uebernahme) einmal ins Log."""
         geraete = list(dict(getattr(self, "_enttec_outputs", None) or {}).items())
-        nummern = {}
-        for u, dev in geraete:
-            try:
-                sn = getattr(dev, "seriennr", None)
-            except Exception:
-                sn = None
-            if isinstance(sn, str) and sn:
-                nummern[u] = sn
+        self._enttec_frueher_merken()
         gemeldet = getattr(self, "_enttec_hinweise", None)
         if gemeldet is None:
             gemeldet = self._enttec_hinweise = {}
@@ -527,7 +520,7 @@ class OutputManager:
             f = getattr(dev, "setze_fremde_seriennr", None)
             if callable(f):
                 try:
-                    f(frozenset(sn for v, sn in nummern.items() if v != u))
+                    f(self._fremde_fuer(u, merken=False))
                 except Exception:
                     pass
             text = self._enttec_hinweis(dev)
@@ -547,18 +540,82 @@ class OutputManager:
         except Exception:
             return ""
 
-    def _fremde_fuer(self, universe: int) -> frozenset:
-        """Seriennummern der Enttec-Ausgaben ausser ``universe``."""
+    @staticmethod
+    def _enttec_sn(dev):
+        try:
+            sn = getattr(dev, "seriennr", None)
+        except Exception:
+            sn = None
+        return sn if isinstance(sn, str) and sn else None
+
+    def _enttec_frueher_merken(self):
+        """OUT-66 (Runde 3): „frueher eigene“ Seriennummern je Universum
+        sammeln — die das Geraet selbst nennt (``frueher_seriennr``) und jede,
+        die der Manager das Geraet vorher melden sah. Sie bleiben fuer die
+        ANDEREN Ausgaben fremd, bis die App neu startet oder das Universum neu
+        zugewiesen wird (anderes Geraet-Objekt -> vergessen)."""
+        frueher = getattr(self, "_enttec_frueher", None)
+        if frueher is None:
+            frueher = self._enttec_frueher = {}
+        zuletzt = getattr(self, "_enttec_sn_zuletzt", None)
+        if zuletzt is None:
+            zuletzt = self._enttec_sn_zuletzt = {}
+        geraete = dict(getattr(self, "_enttec_outputs", None) or {})
+        for u in [u for u in list(zuletzt) if u not in geraete]:
+            zuletzt.pop(u, None)
+            frueher.pop(u, None)
+        for u, dev in geraete.items():
+            sn = self._enttec_sn(dev)
+            vorher = zuletzt.get(u)
+            if vorher is None or vorher[0] != id(dev):
+                frueher.pop(u, None)              # neu zugewiesen
+                vorher = None
+            menge = frueher.setdefault(u, set())
+            if vorher and vorher[1] and sn and vorher[1] != sn:
+                menge.add(vorher[1])
+            try:
+                menge.update(str(x) for x in (getattr(dev, "frueher_seriennr", None)
+                                              or ()) if x)
+            except Exception:
+                pass
+            menge.discard(sn)
+            zuletzt[u] = (id(dev), sn or (vorher[1] if vorher else None))
+
+    def _enttec_nachweislich_eigen(self, dev) -> bool:
+        """Runde 3: True, wenn der Ausgang GERADE an seinem konfigurierten Port
+        mit einem Dongle verbunden ist — sein Dongle ist dann nachweislich
+        dort (und nicht der Ersatz am Port eines anderen)."""
+        if geraet_verbunden(dev) is not True:
+            return False
+        konfig = self._weg_enttec(dev)[1]
+        try:
+            akt = getattr(dev, "port_aktuell", None)
+        except Exception:
+            akt = None
+        if not isinstance(akt, str) or not akt:
+            akt = getattr(dev, "port", None)
+        return bool(konfig) and akt == konfig
+
+    def _fremde_fuer(self, universe: int, merken: bool = True) -> frozenset:
+        """Seriennummern der Enttec-Ausgaben ausser ``universe`` — gelernte
+        und (Runde 3) „frueher eigene“ — plus je eine Kennung
+        ``?U<n> (<port>)`` fuer jede andere Ausgabe ohne gelernte Nummer, deren
+        Dongle nicht nachweislich an ihrem eigenen Port steckt. Solange es so
+        eine gibt, uebernimmt ``universe`` keinen Ersatz-Dongle."""
+        from .enttec_pro import OHNE_NUMMER
+        if merken:
+            self._enttec_frueher_merken()
+        frueher = dict(getattr(self, "_enttec_frueher", None) or {})
         raus = set()
         for u, dev in dict(getattr(self, "_enttec_outputs", None) or {}).items():
             if u == universe:
                 continue
-            try:
-                sn = getattr(dev, "seriennr", None)
-            except Exception:
-                sn = None
-            if isinstance(sn, str) and sn:
+            raus.update(frueher.get(u, ()))
+            sn = self._enttec_sn(dev)
+            if sn:
                 raus.add(sn)
+            elif not self._enttec_nachweislich_eigen(dev):
+                raus.add(f"{OHNE_NUMMER}U{u} ({self._weg_enttec(dev)[1]})")
         return frozenset(raus)
 
     @classmethod

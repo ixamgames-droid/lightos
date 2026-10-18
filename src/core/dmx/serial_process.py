@@ -127,6 +127,7 @@ PORT_BYTES = 256            # OUT-66: shared Rueckmeldung aktueller Port
 SN_BYTES = 64               # OUT-66: shared gelernte USB-Seriennummer
 FREMDE_BYTES = 1024         # OUT-66: Seriennummern der ANDEREN Ausgaben (je Zeile)
 HINWEIS_BYTES = 256         # OUT-66: Hinweis "Ersatz-Dongle uebernommen"
+FRUEHER_BYTES = 512         # OUT-66 (Runde 3): frueher eigene Seriennummern
 
 
 def _lies_text(arr) -> str:
@@ -148,13 +149,27 @@ def _schreib_text(arr, text, n: int):
         pass
 
 
-def _fremde_aus(arr) -> list[str]:
-    """OUT-66: die Seriennummern der anderen Ausgaben aus dem shared Feld."""
+def _fremde_zeilen(arr) -> list[str]:
+    """OUT-66: alle Zeilen des shared Fremd-Feldes — Seriennummern und (Runde 3)
+    mit ``?`` beginnende Kennungen anderer Ausgaben ohne gelernte Nummer."""
     return [z.strip() for z in _lies_text(arr).splitlines() if z.strip()]
 
 
+def _fremde_aus(arr) -> list[str]:
+    """OUT-66: die Seriennummern der anderen Ausgaben aus dem shared Feld."""
+    from .enttec_pro import OHNE_NUMMER
+    return [z for z in _fremde_zeilen(arr) if not z.startswith(OHNE_NUMMER)]
+
+
+def _ohne_nummer_aus(arr) -> list[str]:
+    """OUT-66 (Runde 3): Kennungen der anderen Ausgaben ohne gelernte Nummer."""
+    from .enttec_pro import OHNE_NUMMER
+    return [z[len(OHNE_NUMMER):].strip() for z in _fremde_zeilen(arr)
+            if z.startswith(OHNE_NUMMER)]
+
+
 def _enttec_fabrik(enttec_cls, port, port_akt=None, seriennr=None,
-                   fremde=None, hinweis=None):
+                   fremde=None, hinweis=None, frueher=None):
     """OUT-66: Fabrik fuer den Worker-Enttec. Reicht die vom Proxy gehaltene
     Seriennummer an jeden (neu gestarteten) Worker weiter, damit der SEINEN
     Dongle sucht und nicht den, der gerade am konfigurierten Port haengt; und
@@ -163,22 +178,35 @@ def _enttec_fabrik(enttec_cls, port, port_akt=None, seriennr=None,
     Review 2: ``fremde`` (vom OutputManager ueber den Proxy gepflegt) nennt
     die Seriennummern der ANDEREN Enttec-Ausgaben — der Worker liest es bei
     jeder Entscheidung neu. ``hinweis`` traegt die Meldung „anderer Dongle am
-    eigenen Port uebernommen“ zurueck in die Ausgabe-Diagnose."""
-    def melde(p, sn, text=""):
-        _schreib_text(port_akt, p, PORT_BYTES)
+    eigenen Port uebernommen“ zurueck in die Ausgabe-Diagnose.
+
+    Runde 3: ``fremde`` enthaelt auch die Kennungen anderer Ausgaben ohne
+    gelernte Nummer (dann wird kein Ersatz uebernommen), ``hinweis`` auch den
+    voruebergehenden „nicht uebernommen“-Hinweis (wird ueberschrieben, sobald
+    wieder ein Dongle offen ist), ``frueher`` die vor einer Uebernahme eigenen
+    Seriennummern — ein neu gestarteter Worker bekommt sie mit."""
+    def melde(p, sn, text="", frueher_sn=()):
+        if p:
+            _schreib_text(port_akt, p, PORT_BYTES)
         if sn:
             _schreib_text(seriennr, sn, SN_BYTES)
-        if text:
-            _schreib_text(hinweis, text, HINWEIS_BYTES)
+        _schreib_text(hinweis, text, HINWEIS_BYTES)
+        if frueher_sn:
+            alt = set(_fremde_zeilen(frueher))
+            _schreib_text(frueher, "\n".join(sorted(alt | set(frueher_sn))),
+                          FRUEHER_BYTES)
 
     def fabrik():
         return enttec_cls(port, seriennr=_lies_text(seriennr) or None,
-                          melde=melde, fremde=lambda: _fremde_aus(fremde))
+                          melde=melde, fremde=lambda: _fremde_zeilen(fremde),
+                          hinweis=_lies_text(hinweis),
+                          frueher=_fremde_zeilen(frueher))
     return fabrik
 
 
 def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL,
-                 port_akt=None, seriennr=None, fremde=None, hinweis=None):
+                 port_akt=None, seriennr=None, fremde=None, hinweis=None,
+                 frueher=None):
     """Kindprozess-Einstieg (Top-Level -> picklebar fuer ``spawn``)."""
     try:
         from src.core.dmx.enttec_pro import EnttecPro
@@ -193,7 +221,7 @@ def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL,
     # Parents an den Subreaper umgehaengt. Genau das faengt der PID-Vergleich.
     _ppid0 = os.getppid()
     _serial_worker_loop(_enttec_fabrik(EnttecPro, port, port_akt, seriennr,
-                                       fremde, hinweis),
+                                       fremde, hinweis, frueher),
                         buf, stop_flag, status,
                         frame_interval, parent_alive=_eltern_wache(_ppid0))
 
@@ -385,6 +413,9 @@ class EnttecProcessProxy:
         # Hinweis des Workers, wenn er einen Ersatz-Dongle uebernommen hat.
         self._fremde = self._ctx.Array("c", FREMDE_BYTES)
         self._hinweis = self._ctx.Array("c", HINWEIS_BYTES)
+        # Runde 3: Seriennummern, die die Ausgabe vor einer Ersatz-Uebernahme
+        # hatte („frueher eigen“, bleiben fuer die anderen Ausgaben fremd).
+        self._frueher = self._ctx.Array("c", FRUEHER_BYTES)
         self._fremde_text = ""
         self.setze_fremde_seriennr(fremde_seriennr)
         # Prozess-Fabrik injizierbar fuer Tests (kein echter Subprozess noetig).
@@ -400,7 +431,8 @@ class EnttecProcessProxy:
         return self._ctx.Process(
             target=_worker_main,
             args=(self.port, self._buf, self._stop, self._status, self._frame_interval,
-                  self._port_akt, self._seriennr, self._fremde, self._hinweis),
+                  self._port_akt, self._seriennr, self._fremde, self._hinweis,
+                  self._frueher),
             name=f"EnttecSerial-{self.port}",
             daemon=True,
         )
@@ -491,7 +523,8 @@ class EnttecProcessProxy:
     def setze_fremde_seriennr(self, menge):
         """OUT-66 (Review 2): Seriennummern der ANDEREN konfigurierten
         Enttec-Ausgaben ins gemeinsame Feld (der Worker liest es bei jeder
-        Entscheidung neu). Schreibt nur bei Aenderung."""
+        Entscheidung neu). Schreibt nur bei Aenderung. Runde 3: Eintraege mit
+        ``?`` sind Kennungen anderer Ausgaben ohne gelernte Nummer."""
         text = "\n".join(sorted({str(s).strip() for s in (menge or ())
                                  if s and str(s).strip()}))
         if text == getattr(self, "_fremde_text", None):
@@ -508,6 +541,12 @@ class EnttecProcessProxy:
     def seriennr(self) -> str | None:
         """OUT-66: vom Worker gelernte USB-Seriennummer (sonst None)."""
         return _lies_text(getattr(self, "_seriennr", None)) or None
+
+    @property
+    def frueher_seriennr(self) -> frozenset:
+        """OUT-66 (Runde 3): Nummern, die der Worker vor einer Ersatz-Uebernahme
+        hatte (bleiben fuer die anderen Ausgaben fremd)."""
+        return frozenset(_fremde_zeilen(getattr(self, "_frueher", None)))
 
     def status(self) -> int:
         """Roher Worker-/Port-Status (``ST_CONNECTING``/``ST_OK``/``ST_DISABLED``),

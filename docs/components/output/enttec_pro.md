@@ -61,6 +61,21 @@ Worker-Loop).
   Entfernen; `setze_fremde_seriennr`, beim Proxy über ein gemeinsames Feld). Ein Dongle
   mit einer fremden Nummer wird nie genommen. Die Übernahme erscheint als `hinweis` in
   `OutputManager.ausgabe_status()` (Systeminfo, Tooltip der Ausgabe-Anzeige) und im Log.
+- **Kein Ersatz, solange eine andere Ausgabe ihren Dongle nicht kennt (OUT-66, Runde 3):**
+  Hat eine ANDERE konfigurierte Enttec-Ausgabe noch keine Seriennummer gelernt (Dongle
+  fehlte seit dem Start oder seit „Übernehmen“), könnte der Ersatz genau ihr Dongle sein
+  — zwei Universen tauschten still. Dann bleibt die Ausgabe dunkel; `hinweis` meldet
+  „Nicht übernommen: anderer Enttec an … weil Ausgabe U2 (…) ihren Dongle noch nicht
+  kennt“. Ausnahme: die andere Ausgabe ist gerade an ihrem EIGENEN konfigurierten Port
+  verbunden (ihr Dongle ist nachweislich dort). Der `OutputManager` reicht diese
+  Ausgaben als Einträge `?U<n> (<port>)` in derselben Fremdmenge mit (beim Proxy im
+  selben gemeinsamen Feld). Mit nur EINER konfigurierten Enttec-Ausgabe wird ein Ersatz
+  weiter übernommen.
+- **„Früher eigen“ (Runde 3):** Wer einen Ersatz übernimmt, behält die alte Nummer
+  (`frueher_seriennr`, beim Proxy ein weiteres gemeinsames Feld, ein neu gestarteter
+  Worker bekommt sie mit). Der Manager sammelt sie je Universum (auch einen beobachteten
+  Nummernwechsel) und gibt sie den ANDEREN Ausgaben als fremd mit — bis zum App-Neustart
+  oder bis das Universum neu zugewiesen wird.
 - **Toter Ausgang (Review 2):** `port_aktuell` nennt eine gefolgte Nummer nur, solange
   der Ausgang dort verbunden ist; `close_enttec_on_port` verdrängt einen toten Ausgang
   dort also nicht. Die NOT-AUS-Sperre liest zusätzlich `port_zuletzt` (bleibt nach dem
@@ -87,6 +102,7 @@ Worker-Loop).
 - `tests/test_serial_status_reconnect.py` (SERIAL-02)
 - `tests/test_out66_enttec_reconnect_eigener_port.py` (OUT-66)
 - `tests/test_out66_ersatz_dongle_review2.py` (OUT-66, Ersatzgerät, Worker-Argumente, toter Ausgang)
+- `tests/test_out66_ersatz_runde3.py` (OUT-66, kein Tausch mit ungelernter Ausgabe, Einzel-Dongle, „früher eigen“)
 
 ## Quelle
 
