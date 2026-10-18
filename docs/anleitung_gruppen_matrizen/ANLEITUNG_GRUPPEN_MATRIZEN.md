@@ -15,10 +15,11 @@ den Gerätenamen, steht hier nur der feste Teil. Sektions- und Tab-Namen stehen 
 *(Ein Test misst das nach: jede so zitierte Beschriftung muss es in der laufenden
 Oberfläche wirklich geben.)*
 
-> 🖼 **Bilder fehlen noch.** Screenshots und das GIF des Ablaufs sind bewusst **offen**
-> (Backlog `DOC-13`): sie sollen am realen Aufbau am laufenden Programm entstehen, nicht
-> an einer erfundenen Show. Der Text unten ist ohne Bilder vollständig benutzbar; die
-> Raster sind als Textbilder dargestellt.
+> 🖼 **Zu den Bildern:** Sie zeigen die **Doku-Demo-Show** (erzeugen mit
+> `venv/bin/python tools/anleitungsbilder.py --demo-show Doku_Demo.lshow`). Deren
+> **LED-Leiste** hat **vier** einzeln färbbare Köpfe statt der 48 Zonen des Balkens aus dem
+> Beispiel — Menüs, Knöpfe und Abläufe sind dieselben, nur die Zahlen sind kleiner. Die
+> Raster des Beispiels stehen als Textbilder im Text.
 
 ---
 
@@ -199,6 +200,15 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
 * **Oben rechts:** das schwebende Panel „Rastergröße" mit „Spalten:" und „Zeilen:"
   (verschiebbar, zuklappbar über ▾).
 
+![Gruppen-Editor mit der Gruppe Leiste](img/01_gruppen_editor.png)
+
+1. „Gruppe:" — die Auswahl der Gruppe.
+2. „⧉ Matrizen zusammenlegen…" (Abschnitt 6).
+3. Der Gerätebaum „Fixtures (drag auf Raster):".
+4. „Köpfe einzeln → Raster ▾" (Abschnitt 4).
+5. Das Raster — hier steht die LED-Leiste als **ganzes Gerät** in der ersten Zelle.
+6. Das Panel „Rastergröße".
+
 > ⚠️ **Speichern nicht vergessen — und zwar bevor du etwas anderes anklickst.**
 > Platzierungen und Rastergröße stehen zunächst nur im Editor; erst „Speichern" schreibt sie
 > in die Gruppe. Ungespeichertes verwirft LightOS **ohne Rückfrage**, sobald du eine andere
@@ -216,6 +226,12 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
    * **„aufteilen (48 Elemente)"** mit den Unterpunkten
      **„wie im Gerät hinterlegt (4×12)"**, „als Zeile", „als Spalte", **„als Block…"**
    * „Alle Zellen von" *…Gerätename…* „entfernen"
+![Rechtsklick auf die Zelle der LED-Leiste](img/02_rechtsklick_aufteilen.png)
+
+*Im Bild: (1) die Zelle der LED-Leiste, (2) `aufteilen (4 Elemente)`, (3) „als Zeile",
+(4) „als Block…". Die Leiste hat keine hinterlegte Form — „wie im Gerät hinterlegt" fehlt
+deshalb im Untermenü.*
+
 3. **„wie im Gerät hinterlegt (4×12)"** ist der kurze Weg — ein Klick, fertig. Die
    Form kommt aus dem Fixture-Profil (Feld *Pixel-Raster:* im Fixture-Generator); der
    Menüpunkt zeigt sie in Klammern und erscheint nur, wenn sie zur Kopfzahl passt.
@@ -227,7 +243,13 @@ Sektion **Patchen** → Tab **Fixture-Gruppen**.
    Quadratwurzel (bei 48 also 6).
    Für den Balken **12** eintragen.
 
-Ergebnis: **12 Spalten × 4 Zeilen** — auf beiden Wegen.
+Ergebnis: **12 Spalten × 4 Zeilen** — auf beiden Wegen. Mit „als Zeile" liegen die Köpfe
+nebeneinander in einer Reihe; bei der LED-Leiste der Doku-Demo sieht das so aus:
+
+![Die vier Köpfe der LED-Leiste nach „als Zeile"](img/03_koepfe_als_zeile.png)
+
+1. Vier Kopf-Zellen (`K1`–`K4`), je eine Rasterzelle.
+2. „Speichern" — erst damit steht die Anordnung in der Gruppe.
 
 ```
 Nach „als Block…" mit 12 Spalten (K1 = Kopf 1):
@@ -307,6 +329,11 @@ rechts und klick „Speichern".
 > auf Spalte 8 legt und danach auf 3 Spalten verkleinert, hat das Gerät aus der Gruppe
 > geworfen, ohne es zu merken.
 
+![PAR / LED-Leiste / PAR in einer Gruppe](img/04_leiste_zwischen_par.png)
+
+*Im Bild: (1) die LED-Leiste als **eine** Zelle zwischen PAR 1 und PAR 8, (2) „Spalten:" 3 und
+„Zeilen:" 1, (3) „Speichern".*
+
 ```
 PAR / Balken / PAR — der Balken als EIN Element:
 ┌──────────┬──────────┬──────────┐
@@ -327,6 +354,10 @@ Rundweg in jedem Fall.
 
 Der Knopf **„⧉ Matrizen zusammenlegen…"** öffnet den Dialog „Matrizen zusammenlegen"
 mit der Liste „Gruppen wählen (von oben nach unten gestapelt):".
+
+![Dialog „Matrizen zusammenlegen"](img/05_matrizen_zusammenlegen.png)
+
+*Im Bild: (1) die Liste mit zwei gewählten Gruppen (`PAR links`, `PAR rechts`), (2) OK.*
 
 * Mindestens **zwei** Gruppen auswählen.
 * Gestapelt wird in **Listenreihenfolge** (nicht in der Reihenfolge deiner Klicks):
@@ -382,7 +413,8 @@ ein Effekt dann als Fläche läuft.
 * **Ohne hinterlegte Form wird geraten.** „wie im Gerät hinterlegt" und die Vorbelegung
   von „als Block…" gibt es nur, wenn das Profil eine Rasterform trägt (ZQ06121: 4×12).
   Fehlt sie, trag sie im Fixture-Generator unter *Pixel-Raster:* nach.
-* **Screenshots und GIF dieser Anleitung** — siehe Kasten ganz oben (`DOC-13`).
+* **Bilder am Balken mit 48 Zonen** — die Bilder zeigen die LED-Leiste der Doku-Demo mit vier
+  Köpfen (siehe Kasten ganz oben); ein GIF des ganzen Ablaufs fehlt noch.
 
 ---
 

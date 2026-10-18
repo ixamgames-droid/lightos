@@ -61,6 +61,22 @@ ins Repo kommen.
   deshalb nichts von fremden Servern (WEB-06). Version passend zum Server
   (python-socketio 5.x / python-engineio 4.x, Socket.IO-Protokoll 5).
 
+## Roboto Condensed — Schrift der Anleitungsbilder (v3.008)
+
+- **Herkunft:** Google Fonts (<https://github.com/google/fonts>), Ordner
+  `ofl/robotocondensed/`, Stand Commit `69d0549e8fc7ad72e1531734c81237be401ec4fd`; dort aus
+  Roboto v3.008 (<https://github.com/googlefonts/roboto-classic>, Release v3.008). Datei
+  `RobotoCondensed[wght].ttf` unverändert, nur umbenannt.
+- **Urheber:** Copyright 2011 The Roboto Project Authors.
+- **Lizenz:** SIL Open Font License 1.1 —
+  [`licenses/OFL-1.1-RobotoCondensed.txt`](licenses/OFL-1.1-RobotoCondensed.txt).
+- **Dateien:**
+  - `tools/anleitungsbilder/schrift/RobotoCondensed-wght.ttf`
+- **SHA-256:** `dace262afcee68a5276f200d8026c57221735c0118ab5fda8c2c0d3dc409a8d0`
+- **Wofür:** nur das Bild-Werkzeug `tools/anleitungsbilder.py` (DOC-16) lädt sie, damit die
+  Anleitungsbilder auf jedem Rechner in derselben Schrift entstehen. Die App und das
+  Windows-Installationspaket enthalten sie nicht.
+
 ## pyusb — USB-Zugriff für uDMX-Adapter (im Windows-Installationspaket)
 
 - **Herkunft:** pyusb (<https://github.com/pyusb/pyusb>), Version laut `requirements.txt`
