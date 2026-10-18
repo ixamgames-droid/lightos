@@ -1725,15 +1725,12 @@ class VCButton(VCWidget):
 
         if self.action == ButtonAction.LASER_ESTOP:
             # LAS-10: Laser-Not-Aus (Trigger) — sofort dunkel + entwaffnen.
-            # Reihenfolge wie in der Laser-Steuerseite: verriegeln → unscharf →
-            # Verriegelung lösen (armed=False haelt es dunkel, Session bleibt
-            # fuer bewusstes Wieder-Scharfschalten offen).
+            # LAS-31: derselbe EINE Weg wie Kopfleiste, Tastenkuerzel und
+            # Laser-Seite (AppState.laser_notaus_ausloesen: verriegeln ->
+            # unscharf -> Geraete-Verriegelung loesen). Die Taste loest nur aus.
             if press:
                 try:
-                    lo = state.ensure_laser_output()
-                    lo.estop_all()
-                    lo.set_armed(False)
-                    lo.clear_estop_all()
+                    state.laser_notaus_ausloesen()
                 except Exception as e:
                     print(f"[VCButton] laser estop error: {e}")
                 self.update()
@@ -2613,6 +2610,10 @@ class VCButton(VCWidget):
             self.snap_dimmer_override = (self.action == LS
                                          and snap_dim_ovr_cb.isChecked())
             self._snap_active = False
+            # Codex-Review #1087: wie in ``from_dict`` auch die Anspruechen im
+            # Snap-Register abmelden. Sonst blieb die (jetzt inaktive) Taste
+            # oberster Halter, und ihre Dimmer-Uebersteuerung wirkte weiter.
+            forget_snap_claims(self)
             self._snap_prev = {}
             dimmer_override_abgleich(
                 halter=self if self.snap_dimmer_override and not _haken_alt

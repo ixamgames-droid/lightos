@@ -48,6 +48,8 @@ bestimmt und nicht nur ihr Vorhandensein).
 from __future__ import annotations
 
 import os
+import shutil
+import tempfile
 import types
 import unittest
 from types import SimpleNamespace
@@ -57,7 +59,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import select, text                            # noqa: E402
 from sqlalchemy.orm import Session, selectinload               # noqa: E402
 
-from _fixture_quelle import frische_library                    # noqa: E402
 from src.core.database.models import (                         # noqa: E402
     FixtureMode, FixtureProfile, PatchedFixture)
 
@@ -97,12 +98,96 @@ def _dict_for(f):
     return VisualizerBridge._fixture_to_dict(fake_self, f)
 
 
+# ── QA-98: Vorlagen einmal je Modul, je Test eine Kopie ──────────────────────
+#
+# Bis QA-98 seedete JEDER Test die Bibliothek neu (~0,8 s) und rief dann oft
+# ``ensure_builtins`` auf einer nur geseedeten DB — das spielte jedes Mal alle
+# ~490 Dateien aus ``fixtures/bibliothek/`` frisch ein (~7 s je Test). Allein lief
+# die Datei damit ~112 s und im segmentierten Gate unter Last ins 300-s-Limit.
+#
+# Jetzt wird jede Vorlage EINMAL je Modul gebaut, und jeder Test bekommt eine
+# eigene byte-gleiche Kopie der Datei. Die Isolation bleibt also voll (jeder Test
+# veraendert nur seine Kopie), und der Inhalt ist exakt der eines frischen
+# Laufs — nur nicht 24-mal neu errechnet.
+#
+# * ``"seed"``       — genau das, was ``frische_library`` baut: ``_seed`` aus dem
+#   QUELLTEXT (FIXTEST-FRESH), sonst nichts.
+# * ``"gestartet"``  — dieselbe Bibliothek nach dem ersten ``ensure_builtins``,
+#   also nach einem Programmstart: Builtin-Stand (FM-50) und Bibliothek-Stempel
+#   (FM-56) stehen. Das ist der Zustand jeder BESTEHENDEN Bibliothek — genau der,
+#   fuer den ``NachtragTest`` den Nachtrag beweisen soll. Dort laeuft der
+#   Nachtrag damit ALLEIN: frueher lief im selben ``ensure_builtins`` auch noch
+#   der FM-50-Abgleich und das komplette Einspielen mit, die eine fehlende
+#   Leiste haetten verdecken koennen.
+
+_VORLAGEN: dict[str, str] = {}
+_VORLAGEN_DIR: list[str] = []
+
+
+def _vorlage(art: str) -> str:
+    if art in _VORLAGEN:
+        return _VORLAGEN[art]
+    from src.core.database import fixture_db as FDB
+    if not _VORLAGEN_DIR:
+        _VORLAGEN_DIR.append(tempfile.mkdtemp(prefix="lightos_cdx52_vorlage_"))
+    pfad = os.path.join(_VORLAGEN_DIR[0], f"{art}.db")
+    alt = FDB._engine
+    motor = FDB.get_engine(pfad)
+    try:
+        with Session(motor) as s:
+            FDB._seed(s)
+            s.commit()
+        if art == "gestartet":
+            FDB._engine = motor
+            FDB.ensure_builtins()
+        elif art != "seed":
+            raise ValueError(art)
+    finally:
+        FDB._engine = alt
+        motor.dispose()
+    _VORLAGEN[art] = pfad
+    return pfad
+
+
+def tearDownModule():
+    for d in _VORLAGEN_DIR:
+        shutil.rmtree(d, ignore_errors=True)
+    _VORLAGEN_DIR.clear()
+    _VORLAGEN.clear()
+
+
+def _library_aus_vorlage(fall, art: str):
+    """Wie ``frische_library``: eigene DB-Datei je Test, ``fixture_db._engine``
+    zeigt waehrenddessen darauf, danach wird alles zurueckgestellt."""
+    from src.core.database import fixture_db as FDB
+    verzeichnis = tempfile.mkdtemp(prefix="lightos_fixtures_")
+    ziel = os.path.join(verzeichnis, "fixtures.db")
+    shutil.copyfile(_vorlage(art), ziel)
+    alt = FDB._engine
+    motor = FDB.get_engine(ziel)
+    FDB._engine = motor
+
+    def zurueck():
+        FDB._engine = alt
+        try:
+            motor.dispose()
+        except Exception:
+            pass
+        shutil.rmtree(verzeichnis, ignore_errors=True)
+
+    fall.addCleanup(zurueck)
+    return motor
+
+
 class _LibraryCase(unittest.TestCase):
-    """Frisch aus dem Quelltext geseedete Bibliothek (FIXTEST-FRESH)."""
+    """Frisch aus dem Quelltext geseedete Bibliothek (FIXTEST-FRESH) — als Kopie
+    einer einmal je Modul gebauten Vorlage (QA-98)."""
+
+    VORLAGE = "seed"
 
     def setUp(self):
         from src.core.app_state import clear_channel_cache
-        self._eng = frische_library(self)
+        self._eng = _library_aus_vorlage(self, self.VORLAGE)
         clear_channel_cache()
         self.addCleanup(clear_channel_cache)
 
@@ -204,7 +289,12 @@ class NachtragTest(_LibraryCase):
     schon benutzt (gemessen auf Robins Rechner: 1789 Profile, 5122 Modi).
     ``ensure_builtins`` baut ein vorhandenes Profil nur bei abweichender
     ATTRIBUT-Signatur neu, und eine Rasterform steht in keinem Attribut. Der
-    ZQ06121 verloere sein Band also auf jedem gewachsenen Rechner."""
+    ZQ06121 verloere sein Band also auf jedem gewachsenen Rechner.
+
+    QA-98: Ausgangspunkt ist eine schon GESTARTETE Bibliothek (siehe
+    ``_vorlage``) — der Zustand, den dieser Nachtrag in der Praxis antrifft."""
+
+    VORLAGE = "gestartet"
 
     def _leiste_loeschen(self):
         with Session(self._eng) as s:
@@ -325,6 +415,46 @@ class NachtragTest(_LibraryCase):
                 "der Nachtrag meldet Arbeit, obwohl die Leiste schon steht")
 
 
+class NachtragNachUpdateTest(NachtragTest):
+    """★★ Dieselben Aussagen fuer den ersten Start NACH einem Update — der Weg,
+    auf dem eine nachgereichte Leiste tatsaechlich ankommt. Dann passt der
+    gestempelte Builtin-Stand (FM-50) nicht mehr zum Code, und im selben
+    ``ensure_builtins`` laeuft nach dem Nachtrag auch ``_builtins_abgleichen``.
+    Ein Abgleich, der die Leiste wieder verliert, nahme sie genau diesem
+    Rechner.
+
+    QA-98: Bis dahin lief jeder ``NachtragTest`` auf einer nur geseedeten
+    Bibliothek und damit (bei kopierter Nutzer-DB im Testprozess) zufaellig
+    auch durch den Abgleich. Mit der Vorlage „gestartet" steht der Stand schon —
+    hier wird er deshalb ausdruecklich geloescht und ``_FRISCH_GESEEDET``
+    abgeschaltet, damit der Abgleich unabhaengig von der Testumgebung laeuft.
+    Gegenprobe: ein Abgleich, der ``white_rows``/``white_cols`` nullt, macht
+    hier fuenf Tests rot."""
+
+    def setUp(self):
+        super().setUp()
+        from unittest import mock
+        from src.core.database import fixture_db as FDB
+        with Session(self._eng) as s:
+            FDB._stand_schreiben(s, "vor-dem-update")
+            s.commit()
+        patcher = mock.patch.object(FDB, "_FRISCH_GESEEDET", False)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_der_abgleich_laeuft_hier_wirklich(self):
+        """Vorbedingung dieser Klasse: ohne Abgleich waere sie eine Kopie von
+        ``NachtragTest``."""
+        from src.core.database import fixture_db as FDB
+        aufrufe = []
+        echt = FDB._builtins_abgleichen
+        from unittest import mock
+        with mock.patch.object(FDB, "_builtins_abgleichen",
+                               side_effect=lambda s: aufrufe.append(1) or echt(s)):
+            FDB.ensure_builtins()
+        self.assertEqual(aufrufe, [1])
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # 3. Auflesen: white_grid_for
 # ════════════════════════════════════════════════════════════════════════════
@@ -342,9 +472,13 @@ class LightosLeisteKommtAusDerDateiTest(_LibraryCase):
     der Datei, und ein Einspielen ohne Stempel stellt eine fehlende wieder her.
     """
 
+    # Der Seed legt nur die Builtins an; die Dateien spielt der erste
+    # ``ensure_builtins`` ein — wie beim Programmstart. QA-98: dieser erste Lauf
+    # steckt in der Vorlage (einmal je Modul, auf frischem Seed); der Aufruf
+    # unten ist der naechste Start.
+    VORLAGE = "gestartet"
+
     def setUp(self):
-        # Der Seed legt nur die Builtins an; die Dateien spielt der erste
-        # ``ensure_builtins`` je Engine ein — wie beim Programmstart.
         super().setUp()
         from src.core.database.fixture_db import ensure_builtins
         ensure_builtins()
@@ -384,18 +518,41 @@ class LightosLeisteKommtAusDerDateiTest(_LibraryCase):
     def test_einspielen_stellt_eine_fehlende_leiste_wieder_her(self):
         """Ein Einspielen ohne passenden Stempel (= die Datei hat sich
         geaendert) muss die Leiste aus der Datei zurueckbringen — der Weg,
-        auf dem eine nachgereichte Leiste jede bestehende Bibliothek erreicht."""
+        auf dem eine nachgereichte Leiste jede bestehende Bibliothek erreicht.
+
+        QA-98: Ohne Stempel prueft ``einspielen`` ALLE ~490 Dateien zur Probe
+        neu (allein ~32 s; genau dafuer gibt es den Stempel). Der Stempel stimmt
+        hier deshalb fuer jede Datei OHNE Leiste und fehlt fuer jede MIT — die
+        Dateien, ueber die dieser Test etwas aussagt, gehen also alle den Weg
+        „Datei geaendert". Was die uebrigen zusaetzlich zeigten (eine Datei ohne
+        ``"weiss"`` legt beim Einspielen keine Leiste an), deckt
+        ``test_eingespielte_leisten_sind_die_der_dateien`` ab: dort lief das
+        Einspielen frisch ueber ALLE Dateien, auf demselben ``_anlegen``."""
         from src.core.database import bibliothek_format as BF
         soll = self._aus_dateien()
+        stempel = {}
+        mit_leiste = 0
+        for pfad in BF.bibliothek_dateien():
+            d = BF.lade_datei(pfad)
+            if any((m.get("weiss") or {}).get("rows")
+                   or (m.get("weiss") or {}).get("cols") for m in d["modi"]):
+                mit_leiste += 1
+                continue
+            rel = os.path.relpath(pfad, BF.BIBLIOTHEK_DIR).replace(os.sep, "/")
+            with open(pfad, "rb") as fh:
+                stempel[rel] = BF._datei_hash(fh.read())
+        self.assertTrue(mit_leiste, "Vorbedingung: eine Datei traegt eine Leiste")
         with Session(self._eng) as s:
             s.execute(text("UPDATE fixture_modes SET white_rows = 0, "
                            "white_cols = 0"))
             s.commit()
         self.assertEqual(self._ist(), {}, "Vorbedingung")
         with Session(self._eng) as s:
-            BF.einspielen(s)
+            BF.einspielen(s, stempel=stempel)
             s.commit()
         self.assertEqual(self._ist(), soll)
+        self.assertEqual(len(BF.LETZTES_EINSPIELEN["aktualisiert"]), mit_leiste,
+                         "genau die Dateien mit Leiste liefen als geaendert")
 
 
 class WhiteGridForTest(_LibraryCase):

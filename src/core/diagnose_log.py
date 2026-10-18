@@ -108,10 +108,37 @@ def _seriennummern_kuerzen(text: str) -> str:
     Adapter-Liste. Ein Schluessel mit Anschluss (``2008:1066@1-2``) nennt
     keine Seriennummer und bleibt unveraendert."""
     import re
-    text = re.sub(r"(?i)\b([0-9a-f]{4}:[0-9a-f]{4}#)([^\s,;:()\[\]'\"]+)",
+    # Codex-Review #1065: die Seriennummer kommt ungefiltert vom Geraet und darf
+    # Trennzeichen enthalten („ABC:DEF123“, „AB CD12“). Die Muster unten enden
+    # an solchen Zeichen und kuerzten nur den Anfang. Deshalb zuerst jede
+    # Nummer, die LightOS in diesem Lauf gesehen hat und die so ein Zeichen
+    # traegt, woertlich ersetzen (laengste zuerst) …
+    for serie in sorted(_bekannte_sonder_serien(), key=len, reverse=True):
+        if serie in text:
+            text = text.replace(serie, kuerze_seriennummer(serie))
+    # … und ein Doppelpunkt MITTEN in der Nummer gehoert dazu (ein
+    # abschliessender wie in „…#SN: sendet“ nicht).
+    teil = r"[^\s,;:()\[\]'\"·]+"
+    text = re.sub(r"(?i)\b([0-9a-f]{4}:[0-9a-f]{4}#)(" + teil + r"(?::" + teil + r")*)",
                   lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
-    return re.sub(r"(Seriennr\.\s+)([^\s,;:()\[\]'\"·]+)",
+    return re.sub(r"(Seriennr\.\s+)(" + teil + r"(?::" + teil + r")*)",
                   lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
+
+
+#: Zeichen, an denen die Muster in :func:`_seriennummern_kuerzen` enden.
+_TRENNER = frozenset(" \t\r\n,;:()[]'\"·")
+
+
+def _bekannte_sonder_serien() -> set[str]:
+    """Seriennummern, die der uDMX-Pfad in diesem Lauf gelesen hat (Geraet
+    oder Schluessel der Ausgabe-Konfiguration) und die ein Trennzeichen
+    enthalten. Ohne geladenes uDMX-Modul gibt es keine. Kurze Nummern (unter
+    vier Zeichen) bleiben aussen vor — sie woertlich zu ersetzen traefe
+    beliebige andere Stellen des Texts."""
+    modul = sys.modules.get("src.core.dmx.udmx")
+    gesehen = getattr(modul, "GESEHENE_SERIEN", None) or ()
+    return {s for s in list(gesehen)
+            if len(s) >= 4 and not s.startswith("…") and any(c in _TRENNER for c in s)}
 
 
 def _lizenz_inhalt_entfernen(text: str) -> str:

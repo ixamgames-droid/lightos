@@ -254,6 +254,33 @@ class CommandTests(_Basis):
         self.assertEqual(dict(self.state.visualizer_docks), {3: self.boden.id})
         self.assertEqual(dict(self.state.visualizer_positions), vorher)
 
+    def test_undo_nach_buehnenwechsel_trifft_kein_element_gleicher_id(self):
+        """Codex-Review #1061 (CDX-59): die neue Buehne hat ein Element mit
+        DERSELBEN ID (gespeicherte Buehnen behalten ihre IDs). Das Undo der
+        alten Loeschung darf es weder mit den alten Eigenschaften
+        ueberschreiben noch Geraete daran anhaengen."""
+        import copy
+        w = _fenster(self.state, self.stage, ausgewaehlt=self.truss)
+        self._bestuecken(w)
+        w.loeschen_knopf()
+        neu = StageDefinition(name="Geladene Bühne")
+        zwilling = copy.deepcopy(self.truss)
+        zwilling.x, zwilling.name = 9.0, "Andere Traverse"
+        neu.elements.append(zwilling)
+        w._current_stage = neu                                     # Wechsel
+        w._sync_stage_node_to_scene(zwilling)
+        docks_vorher = dict(self.state.visualizer_docks)
+
+        self.undo.undo()
+        knoten = self.state._scene.get(self.truss.id)
+        self.assertIsNotNone(knoten)
+        self.assertAlmostEqual(knoten.transform.pos_m[0], 9.0,
+                               msg="das Element der neuen Buehne wurde ueberschrieben")
+        self.assertEqual(knoten.name, "Andere Traverse")
+        self.assertEqual(dict(self.state.visualizer_docks), docks_vorher,
+                         "Geraete an das Element der neuen Buehne gehaengt")
+        w._bridge.push_add_stage_object_data.assert_not_called()
+
     def test_callback_bekommt_nur_die_wirklich_angehaengten(self):
         w = _fenster(self.state, self.stage)
         self._bestuecken(w)

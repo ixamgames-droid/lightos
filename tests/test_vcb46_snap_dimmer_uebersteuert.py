@@ -240,6 +240,28 @@ class RendererTest(unittest.TestCase):
         self.assertEqual(self.st.snap_dimmer_override,
                          {7: {"intensity": 255, "dimmer#1": 9}})
 
+    def test_mehrere_dimmer_nur_der_des_snaps_uebersteuert(self):
+        """Codex-Review #1081 (CDX-59): Ein Geraet mit zwei Dimmern; der Snap
+        setzt nur ``intensity#1``, ``intensity`` steht von Hand im Programmer.
+        Nur der Dimmer des Snaps gewinnt gegen den Effekt — der unbeteiligte
+        bleibt beim Effekt, wie ohne Haken."""
+        from unittest import mock
+        with mock.patch.dict(_FIXTURES, {6: (50, [_Ch("intensity", 1),
+                                                  _Ch("intensity", 2),
+                                                  _Ch("color_r", 3)])}):
+            st = _make_state()
+        st.function_manager.writes = {50: 40, 51: 60}
+        st.programmer = {6: {"intensity": 255, "intensity#1": 200}}
+        st._render_frame(0.02)
+        u = st.universes[1]
+        self.assertEqual((u.get_channel(50), u.get_channel(51)), (40, 60),
+                         "ohne Haken behaelt der Effekt beide")
+        st.set_snap_dimmer_override({6: {"intensity#1": 200}})
+        st._render_frame(0.02)
+        self.assertEqual(u.get_channel(51), 200, "Dimmer des Snaps gewinnt")
+        self.assertEqual(u.get_channel(50), 40,
+                         "der manuelle Dimmer daneben bleibt beim Effekt")
+
     # ── Master, Fader, NOT-AUS behalten das letzte Wort ──────────────────────
 
     def test_submaster_und_geraete_dimmer_wirken_weiter(self):
@@ -567,6 +589,27 @@ class TasteTest(unittest.TestCase):
             self.assertIs(btn.snap_dimmer_override, False)
         finally:
             host.deleteLater()
+
+    def test_eigenschaften_uebernehmen_meldet_die_aktive_taste_ab(self):
+        """Codex-Review #1087 (CDX-59): „Übernehmen“ setzt die Taste auf
+        inaktiv (``_snap_active``/``_snap_prev``) — sie muss dann auch aus dem
+        Snap-Register heraus. Sonst blieb sie oberster Halter, und bei
+        unveraendertem Haken samt Programmer-Wert wirkte die
+        Dimmer-Uebersteuerung weiter, obwohl die Taste aus ist."""
+        from src.ui.virtualconsole import vc_button as VB
+        btn = self._taste({FID_A: {"intensity": 255}}, haken=True, mode="toggle")
+        btn._trigger(True)
+        self.assertEqual(self._ovr(), {FID_A: {"intensity": 255}})
+        host = QWidget()
+        try:
+            S = btn._build_settings(host, live=False)
+            S["apply"]()                           # nichts geaendert, nur OK
+        finally:
+            host.deleteLater()
+        self.assertFalse(btn._snap_active)
+        halter = [ref() for st in VB._snap_stack.values() for ref, _v in st]
+        self.assertNotIn(btn, halter, "die inaktive Taste haelt noch")
+        self.assertEqual(self._ovr(), {}, "Uebersteuerung ohne aktive Taste")
 
     def test_haken_nur_bei_snap_tasten_sichtbar_und_wirksam(self):
         btn = self._taste({FID_A: {"intensity": 255}}, haken=True)

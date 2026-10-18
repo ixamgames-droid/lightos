@@ -1,0 +1,109 @@
+{
+  "anleitung": "vc",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "161a0039",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc'.",
+  "bilder": [
+    {
+      "datei": "01_vc_ueberblick.png",
+      "szene": "01_vc_ueberblick",
+      "titel": "Virtual Console: Bank 1 der Doku-Demo, Bearbeiten, Bänke, Statuszeile, Bibliothek",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "fa2cc5cb6e31bc53b56b8c5ac2da074d"
+    },
+    {
+      "datei": "02_bearbeiten_modus.png",
+      "szene": "02_bearbeiten_modus",
+      "titel": "Bearbeiten-Modus mit Werkzeugleiste und Rückgängig/Wiederholen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "0404215c4e83f49b638d7f08e4de8333"
+    },
+    {
+      "datei": "03_drop_karte.png",
+      "szene": "03_drop_karte",
+      "titel": "Drop-Karte „Effekt einrichten“ für den Regenbogen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "5e72fb32dd4c9176fb64d369d7436510"
+    },
+    {
+      "datei": "04_widget_galerie.png",
+      "szene": "04_widget_galerie",
+      "titel": "Widget-Galerie „Widget wählen“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "3e228a52bf895dbd9c12b3588e6344d8"
+    },
+    {
+      "datei": "05_konflikt_karte.png",
+      "szene": "05_konflikt_karte",
+      "titel": "Konflikt-Karte „Regler ist schon belegt“ (Kreis auf den Fader Tempo)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "ca24627d16a1363821325750ba05128c"
+    },
+    {
+      "datei": "06_button_einstellungen.png",
+      "szene": "06_button_einstellungen",
+      "titel": "Button-Einstellungen: Aktion wählen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "8549d73f8eb5c02d3c5841d8b48a4fbc"
+    },
+    {
+      "datei": "07_taste_aktiv.png",
+      "szene": "07_taste_aktiv",
+      "titel": "Run-Modus: „Lauflicht“ läuft, Statuszeile nennt den Effekt",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "9069518ec5bcffbc01f31934e35c896b"
+    },
+    {
+      "datei": "08_bank2_tempo_musik.png",
+      "szene": "08_bank2_tempo_musik",
+      "titel": "Bank 2: Tempo- und Musik-Bausteine",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "590aca571e773a35b1aeeac0e5874cbd"
+    },
+    {
+      "datei": "09_midi_teach.png",
+      "szene": "09_midi_teach",
+      "titel": "MIDI Teach mit APC-mini-Abbild",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "9af4baeb3347feb00c67cd217c1ab2c3"
+    }
+  ]
+}
