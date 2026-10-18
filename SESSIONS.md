@@ -63,7 +63,6 @@
 | LAS-31 | A | fix/las31-notaus-ein-weg-blackout-kiosk | 2026-10-18T15:37Z | - |
 | DOC-16 | A | docs/doc16-anleitungen-neu-bebildert | 2026-10-18T15:37Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
-| CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-18T15:37Z | - |
 | QA-98 | A | fix/qa98-weissband-test-schneller | 2026-10-18T15:37Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
@@ -161,7 +160,6 @@
 
 ## Verlauf
 
-- 2026-10-14T18:02Z A done ENG-40
 - 2026-10-14T18:14Z A claim LAS-31
 - 2026-10-14T18:14Z A claim XPLAT-23
 - 2026-10-14T18:14Z A claim LIZ-2
@@ -191,3 +189,4 @@
 - 2026-10-18T16:52Z A done LIZ-2
 - 2026-10-18T17:04Z A claim OUT-66
 - 2026-10-18T17:04Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-18T17:32Z A done CDX-59
