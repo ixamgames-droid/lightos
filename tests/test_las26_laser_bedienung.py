@@ -111,6 +111,11 @@ class _State:
     def ensure_laser_output(self):
         return self.lo
 
+    # LAS-31: die Laser-Seite loest ueber den EINEN Weg von AppState aus.
+    from src.core.app_state import AppState as _AS
+    laser_notaus_ausloesen = _AS.laser_notaus_ausloesen
+    del _AS
+
 
 def _view(monkeypatch, fixtures):
     _app()

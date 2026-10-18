@@ -718,8 +718,19 @@ def _drop_queued_stage_adds(bridge, sid: str) -> int:
 
 def _stage_loesch_on_change(window, el):
     """Was nach Loeschen/Undo/Redo eines Buehnen-Elements nachzuziehen ist —
-    EIN Abgleich fuer beide Loeschwege (Knopf und 3D-Bild, VIZ-105)."""
+    EIN Abgleich fuer beide Loeschwege (Knopf und 3D-Bild, VIZ-105).
+
+    Codex-Review #1061: der Abgleich gilt nur, solange die Buehne von damals
+    noch die aktive ist. Nach einem Buehnenwechsel trifft Undo/Redo die ALTE
+    Buehne (der Undo-Stapel bleibt beim Wechsel stehen); hat die neue ein
+    Element mit derselben ID (gespeicherte Buehnen behalten ihre IDs), ueber-
+    schrieb ``_sync_stage_node_to_scene(el)`` es sonst mit den alten
+    Eigenschaften."""
+    buehne = window._current_stage
+
     def _on_delete_change():
+        if window._current_stage is not buehne:
+            return
         # Inkrementell statt Full-Reload (Gegenstück zum Add-Pfad aus
         # b65eb9c): ein kompletter loadStageJson-Umbau pro Löschung
         # re-armierte Pending-Gate, Repair-Ketten und 1200ms-Reassert —
@@ -742,6 +753,14 @@ def _stage_loesch_on_change(window, el):
         window._refresh_stage_tree()
         window._update_status_counts()
     return _on_delete_change
+
+
+def _buehne_noch_aktiv(window):
+    """Codex-Review #1061: ``True``, solange die JETZT aktive Buehne noch
+    dieselbe ist — fuer das Undo einer Loeschung, das sonst Geraete an ein
+    gleichnamiges Element einer inzwischen geladenen Buehne haengte."""
+    buehne = window._current_stage
+    return lambda: window._current_stage is buehne
 
 
 def _positionen_melden(fids) -> None:
@@ -2939,10 +2958,12 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
-        # LAS-32 (S1): Sperrzonen anlegen/bearbeiten und Laser-Felder eintragen.
+        # LAS-32/LAS-35: Sperrzonen planen (ziehen, Vorlagen), Laser-Felder
+        # eintragen oder einmessen.
         act_sperrzonen = QAction("Sperrzonen…", self)
         act_sperrzonen.setToolTip(
-            "Sperrzonen (rote Quader) und das Maximalfeld je Laser eintragen.\n"
+            "Sperrzonen planen: Zonen ziehen, Laser-Felder eintragen oder "
+            "einmessen.\n"
             "Nur Anzeige — schaltet den Laser NICHT ab.")
         act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
         tb.addAction(act_sperrzonen)
@@ -5190,6 +5211,7 @@ class VisualizerWindow(QMainWindow):
             label=f"{el.name or el.id} löschen",
             on_change=_on_delete_change,
             on_docks_restored=lambda fids: _docks_nach_undo_melden(self, el.id, fids),
+            buehne_aktiv=_buehne_noch_aktiv(self),
         )
         self._current_stage.remove(el.id)
         self._stage_dirty = True   # VIZ-10: Element geloescht -> ungespeichert
@@ -5514,6 +5536,7 @@ class VisualizerWindow(QMainWindow):
                 label=f"{el.name or el.id} löschen",
                 on_change=_stage_loesch_on_change(self, el),
                 on_docks_restored=lambda fids: _docks_nach_undo_melden(self, sid, fids),
+                buehne_aktiv=_buehne_noch_aktiv(self),
             )
         self._current_stage.remove(sid)
         self._remove_stage_node_from_scene(sid)
@@ -5936,37 +5959,31 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 
     def _on_sperrzonen_dialog(self):
-        """LAS-32 (S1): den Sperrzonen-Dialog zeigen (nicht modal — das 3D
-        dahinter zeichnet jede Aenderung sofort)."""
-        from src.ui.visualizer.sperrzonen_ui import SperrzonenDialog
-        dlg = getattr(self, "_sperrzonen_dlg", None)
-        if dlg is None:
-            dlg = SperrzonenDialog(self._state, self)
-            self._sperrzonen_dlg = dlg
-        else:
-            dlg.neu_laden()
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        """LAS-35: den Sperrzonen-Planer zeigen (nicht modal — das 3D dahinter
+        zeichnet jede Aenderung sofort). Er hat den frueheren Zahlenfeld-Dialog
+        (LAS-32) abgeloest."""
+        from src.ui.visualizer.sperrzonen_planer import planer_oeffnen
+        self._sperrzonen_dlg = planer_oeffnen(self._state, self)
 
     def _on_state(self, event: str, _data):
         if event == "sperrzonen_anzeige_changed":
             # LAS-32: Fenster „Sicht des Lasers" im 3D geschlossen/geoeffnet ->
-            # der Haken im Sperrzonen-Dialog zieht nach.
+            # der Haken im Sperrzonen-Planer zieht nach.
             dlg = getattr(self, "_sperrzonen_dlg", None)
             if dlg is not None:
                 try:
                     dlg.lasersicht_nachziehen()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event in ("patch_changed", "show_loaded"):
-            # LAS-32: ein offener Sperrzonen-Dialog zeigt sonst die alte Show.
+            # Ein offener Planer zeigt sonst die alte Show; ein laufendes
+            # Einmessen endet dabei (Laser aus).
             dlg = getattr(self, "_sperrzonen_dlg", None)
-            if dlg is not None and dlg.isVisible():
+            if dlg is not None:
                 try:
-                    dlg.neu_laden()
+                    dlg.patch_oder_show_geaendert()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event == "patch_changed":
             self._refresh_patch_list()
         elif event == "show_loaded":
@@ -6139,5 +6156,13 @@ class VisualizerWindow(QMainWindow):
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
+        # LAS-35: das Fenster wird nur versteckt — der Sperrzonen-Planer
+        # erfaehrt davon nichts. Ein laufendes Einmessen endet hier (Laser aus).
+        dlg = getattr(self, "_sperrzonen_dlg", None)
+        if dlg is not None:
+            try:
+                dlg.einmessen_abbrechen()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] ERROR: Einmessen nicht beendet: {e}")
         event.ignore()
         self.hide()

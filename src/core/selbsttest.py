@@ -177,6 +177,14 @@ PFLICHT_LIZENZDATEIEN: tuple[str, ...] = tuple("/".join(teile) for teile in (
     ("licenses", "GPL-3.0.txt"),
 ))
 
+#: LIZ-2 (Rest): Bibliothek im Programmordner -> Sammeldatei ihrer Fremdlizenzen
+#: (``packaging/windows/fremdlizenzen_sammeln.py``).
+SAMMELDATEIEN_JE_BIBLIOTHEK: tuple[tuple[str, str], ...] = tuple(
+    ("/".join(dll), "/".join(text)) for dll, text in (
+        (("PySide6", "Qt6WebEngineCore.dll"), ("licenses", "QtWebEngine-THIRD-PARTY.txt")),
+        (("PySide6", "opengl32sw.dll"), ("licenses", "Mesa-opengl32sw.txt")),
+    ))
+
 
 def pruefe_fremdlizenzen(wurzel: str | None = None,
                          gefroren: bool | None = None) -> list[str]:
@@ -201,6 +209,12 @@ def pruefe_fremdlizenzen(wurzel: str | None = None,
     wurzel = wurzel or programm_dir()
     fehler = [f"Lizenzen: fehlt {rel}" for rel in PFLICHT_LIZENZDATEIEN
               if not os.path.isfile(os.path.join(wurzel, *rel.split("/")))]
+    # LIZ-2 (Rest): Qt WebEngine (Chromium) und Mesa bringen ihre Fremdlizenzen
+    # nicht mit — liegt die Bibliothek bei, muss ihre Sammeldatei dabei sein.
+    for dll, text in SAMMELDATEIEN_JE_BIBLIOTHEK:
+        if (os.path.isfile(os.path.join(wurzel, *dll.split("/")))
+                and not os.path.isfile(os.path.join(wurzel, *text.split("/")))):
+            fehler.append(f"Lizenzen: fehlt {text} (zu {dll})")
     if not _hat_datei(os.path.join(wurzel, "licenses", "pakete")):
         fehler.append("Lizenzen: der Ordner mit den Lizenztexten der "
                       "Python-Pakete ist leer oder fehlt")

@@ -393,6 +393,7 @@ def push_remove_stage_element(
     label: str = "Bühnen-Element löschen",
     on_change: Callable[[], None],
     on_docks_restored: Callable[[list], None] | None = None,
+    buehne_aktiv: Callable[[], bool] | None = None,
 ) -> None:
     """RemoveNode-Command fuer ein geloeschtes Buehnen-Element. Muss VOR dem
     eigentlichen ``stage_def.remove(...)`` aufgerufen werden (Snapshot).
@@ -404,6 +405,10 @@ def push_remove_stage_element(
     lose. ``on_docks_restored`` bekommt die Geraete, die das Undo wieder
     angehaengt hat (das 3D-Bild fuehrt die Andockung selbst und erfaehrt sie
     nur vom Aufrufer).
+
+    ``buehne_aktiv`` (Codex-Review #1061): ``False``, wenn inzwischen eine
+    andere Buehne aktiv ist. Dann haengt das Undo nichts an — der Knoten mit
+    derselben ID gehoert dann einem Element der NEUEN Buehne.
     """
     eid = element.id
     index = None
@@ -430,6 +435,8 @@ def push_remove_stage_element(
         # stehen, sonst legte die Dock-Sicht einen Platzhalter an.
         docks = getattr(state, "visualizer_docks", None)
         if docks is None or not docked:
+            return
+        if buehne_aktiv is not None and not buehne_aktiv():
             return
         # Steht der Knoten des Elements NICHT wieder im Graphen (die Buehne
         # wurde inzwischen gewechselt, das Undo trifft die alte), gibt es

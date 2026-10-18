@@ -6,8 +6,8 @@ Frame, daher ist die effektive Update-Rate halb so schnell wie die fps.
 MTC FPS Codes:
     0 = 24 fps     1 = 25 fps     2 = 29.97 (drop)    3 = 30 fps
 
-Verwendet rtmidi (bevorzugt), faellt auf mido zurueck falls vorhanden.
-Wenn beide nicht vorhanden -> Reader laeuft trotzdem (no-op via subscribe).
+Verwendet python-rtmidi.
+Wenn es nicht vorhanden ist -> Reader laeuft trotzdem (no-op via subscribe).
 """
 from __future__ import annotations
 import threading

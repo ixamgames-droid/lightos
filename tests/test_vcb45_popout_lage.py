@@ -268,6 +268,30 @@ def test_maximiert_merkt_die_lage_vor_dem_maximieren(prefs, zwei_bildschirme):
     assert g2["fenster"] == [150, 1200, 1000, 640]
 
 
+def test_maximiert_ohne_normal_lage_merkt_nicht_das_maximierte_rechteck(
+        prefs, zwei_bildschirme, monkeypatch):
+    """Codex-Review #1083 (CDX-59): erster Start auf einem Bildschirm (keine
+    Vorgabe, also keine Normal-Lage) und gleich maximiert. Gemerkt wurde das
+    MAXIMIERTE Rechteck als Normal-Lage — „Wiederherstellen“ blieb dann
+    bildschirmfuellend. Jetzt: Normal-Lage von Qt, sonst Standardgroesse mittig."""
+    zwei_bildschirme(OBEN)
+    w, merker = _fenster(PL.ziel_lage([OBEN], None, 0))
+    assert merker._normal is None, "Vorbedingung: keine Normal-Lage bekannt"
+    maximiert = (0, 0, 1920, 1040, PL.MAXIMIERT)
+    monkeypatch.setattr(merker, "_ist", lambda: maximiert)
+    # (a) Qt kennt keine brauchbare Normal-Lage -> Standardgroesse mittig.
+    monkeypatch.setattr(merker, "_normal_lage_von_qt", lambda ist: None)
+    merker.sichern()
+    g = prefs()[PL.PREF_SCHLUESSEL]
+    assert g["zustand"] == "maximized"
+    assert g["fenster"] == [320, 120, 1280, 800]
+    # (b) Qt kennt sie -> die gilt.
+    monkeypatch.setattr(merker, "_normal_lage_von_qt",
+                        lambda ist: Rechteck(100, 80, 900, 600))
+    merker.sichern()
+    assert prefs()[PL.PREF_SCHLUESSEL]["fenster"] == [100, 80, 900, 600]
+
+
 def test_bewegen_schreibt_entprellt(prefs, zwei_bildschirme, monkeypatch):
     geschrieben = []
     echt = PL.speichere_gemerkt

@@ -50,7 +50,8 @@ Web-Fernbedienung startet nur auf Klick.
 Regeln:
 
 * **Eine bewusste Vorgabe bleibt stehen.** Die einzelnen Schalter werden mit
-  ``setdefault`` gesetzt. Fuer den Datenordner gilt die Regel der Test-Suite
+  ``setdefault`` gesetzt. Fuer den Datenordner, die Show-DB, die
+  Ausgabe-Konfiguration, das Absturzprotokoll und die Bibliothek gilt die Regel der Test-Suite
   (``conftest._geerbter_datenordner``): eine Vorgabe im Temp-Bereich ist eine
   bewusste Umlenkung (Testlauf, Bild-Sandbox, Sichtproben-Sandkasten) und
   bleibt; alles andere ist der echte Ordner und wird umgelenkt — ``APPDATA``
@@ -246,9 +247,15 @@ def _setze(name: str, wert: str) -> None:
 
 
 def _vorgabe(name: str, *teile: str) -> None:
-    """``setdefault`` auf einen Pfad in der Sandbox — ohne den Ordner anzulegen,
-    wenn die Variable schon gesetzt ist."""
-    if not os.environ.get(name):
+    """Ein Pfad in der Sandbox — ohne den Ordner anzulegen, wenn die Variable
+    schon auf eine bewusste Umlenkung zeigt.
+
+    ★ Bewusst ist nur eine Vorgabe im Temp-Bereich (dieselbe Regel wie beim
+    Datenordner). Ein blosses ``setdefault`` liess eine Vorgabe auf die ECHTE
+    ``universes.json`` bzw. ``current_show.db`` stehen — ein Pruefwerkzeug baute
+    dann ``AppState`` mit der echten Ausgabe-Konfiguration (Codex-Review #1090,
+    dasselbe Muster wie CDX-49)."""
+    if not _im_temp_bereich(os.environ.get(name)):
         _setze(name, os.path.join(_wurzel(), *teile))
 
 
@@ -269,11 +276,16 @@ def _datenordner_umlenken() -> None:
 
 def _bibliothek_kopieren() -> None:
     """``LIGHTOS_FIXTURE_DB`` auf eine Kopie der Bibliothek des Rechners."""
-    if os.environ.get("LIGHTOS_FIXTURE_DB"):
+    vorgabe = os.environ.get("LIGHTOS_FIXTURE_DB")
+    if _im_temp_bereich(vorgabe):
         return                              # bewusste Vorgabe — bleibt stehen
+    # Zeigt die Vorgabe auf eine Bibliothek ausserhalb des Temp-Bereichs, wird
+    # GENAU DIESE kopiert — gesehen wird derselbe Bestand, geschrieben (Schema-
+    # Migration) nur in die Kopie.
+    quelle = vorgabe or os.path.join(ECHTER_DATENORDNER, "fixtures.db")
     ziel = os.path.join(_wurzel(), "fixtures.db")
     try:
-        shutil.copyfile(os.path.join(ECHTER_DATENORDNER, "fixtures.db"), ziel)
+        shutil.copyfile(quelle, ziel)
     except OSError:
         pass        # noch keine Bibliothek da -> die App legt sich in der Sandbox eine an
     _setze("LIGHTOS_FIXTURE_DB", ziel)

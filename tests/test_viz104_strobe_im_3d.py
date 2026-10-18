@@ -236,6 +236,24 @@ class PayloadTest(unittest.TestCase):
         self.assertTrue(S.hat_kopf_shutter([_SHUTTER, s2]))
         self.assertFalse(S.hat_kopf_shutter([_SHUTTER]))
 
+    def test_zwei_shutter_bei_zwoelf_koepfen_blitzen_als_ganzes(self):
+        """Codex-Review #1071 (CDX-59): Varytec Colors Nervestrobe HP — zwei
+        Shutter, zwoelf Farbkoepfe. Das ist KEIN Shutter je Kopf: sonst bekaemen
+        nur Kopf 0 und 1 eine Frequenz, und 2 bis 11 leuchteten durch. Das
+        Geraet blitzt als Ganzes (kein Feld je Kopf, ``strobe_hz`` gesetzt)."""
+        s2 = _ch(ranges=list(_SHUTTER.ranges))
+        attrs = {"intensity": 255, "shutter": 219, "shutter#1": 219,
+                 "color_r": 255}
+        attrs.update({f"color_r#{h}": 255 for h in range(1, 12)})
+        p = self._p(attrs, [_SHUTTER, s2])
+        self.assertEqual(len(p["heads"]), 12)
+        self.assertEqual(p["strobe_hz"], 20.0)
+        for h in p["heads"]:
+            self.assertNotIn("strobe_hz", h)
+        self.assertFalse(S.hat_kopf_shutter([_SHUTTER, s2], 12))
+        self.assertTrue(S.hat_kopf_shutter([_SHUTTER, s2], 2))
+        self.assertFalse(S.hat_kopf_shutter([_SHUTTER], 1))
+
     def test_nur_kopf_1_oder_nur_kopf_2_oder_verschieden_schnell(self):
         s2 = _ch(ranges=list(_SHUTTER.ranges))
         kan = [_SHUTTER, s2]

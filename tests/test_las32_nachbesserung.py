@@ -27,6 +27,7 @@ from src.core.database import bibliothek_format as B
 from src.core.laser import sperrzonen as S
 from src.core.laser import sperrzonen_merker as M
 from src.core.laser.sperrzonen import LaserFeld, Sperrzone, SperrzonenDaten
+from src.ui.visualizer import sperrzonen_planer as P
 from src.ui.visualizer import sperrzonen_ui as UI
 
 _app = QApplication.instance() or QApplication([])
@@ -117,7 +118,7 @@ class BindungTest(unittest.TestCase):
 
     def test_dialog_bindet_das_feld_beim_eintragen(self):
         st = _State()
-        dlg = UI.SperrzonenDialog(st)
+        dlg = P.SperrzonenPlaner(st)
         try:
             dlg._feld_spins[2]["links"].setValue(12.0)
             self.assertEqual(st.sperrzonen.laser_felder[2].geraet,
@@ -283,7 +284,7 @@ class KopfzeileWidgetTest(unittest.TestCase):
     def test_neue_zone_im_dialog_setzt_den_merker(self):
         st = _State()
         with mock.patch.object(M, "merke_benutzt") as merke:
-            dlg = UI.SperrzonenDialog(st)
+            dlg = P.SperrzonenPlaner(st)
             try:
                 dlg._zone_neu()
             finally:
@@ -455,7 +456,7 @@ class DatenblattTest(unittest.TestCase):
 class DatenblattKnopfTest(unittest.TestCase):
     def setUp(self):
         self.st = _State()
-        self.dlg = UI.SperrzonenDialog(self.st)
+        self.dlg = P.SperrzonenPlaner(self.st)
         self.addCleanup(self.dlg.deleteLater)
 
     def _werte(self):
@@ -463,16 +464,16 @@ class DatenblattKnopfTest(unittest.TestCase):
         return (f.links, f.rechts, f.oben, f.unten)
 
     def test_knopf_ist_da(self):
-        self.assertEqual(self.dlg._btn_datenblatt.text(),
+        self.assertEqual(self.dlg._laser_karten[2].btn_datenblatt.text(),
                          "Winkel aus Profil / Datenblatt")
-        self.assertTrue(self.dlg._btn_datenblatt.isEnabled())
+        self.assertTrue(self.dlg._laser_karten[2].btn_datenblatt.isEnabled())
 
     def test_profil_mit_winkel_fuellt_ohne_rueckfrage(self):
         feld = LaserFeld(links=30, rechts=30, oben=20, unten=20)
         with mock.patch.object(S, "winkel_aus_bibliothek", return_value=feld) as wb, \
                 mock.patch.object(self.dlg, "_frage_gesamtwinkel",
                                   side_effect=AssertionError("unerwartete Frage")):
-            self.dlg._btn_datenblatt.click()
+            self.dlg._laser_karten[2].btn_datenblatt.click()
         wb.assert_called_once_with("Laserworld", "EL-400RGB MK2")
         self.assertEqual(self._werte(), (30.0, 30.0, 20.0, 20.0))
         self.assertEqual(self.dlg._feld_spins[2]["oben"].value(), 20.0)
@@ -483,7 +484,7 @@ class DatenblattKnopfTest(unittest.TestCase):
         with mock.patch.object(S, "winkel_aus_bibliothek", return_value=None), \
                 mock.patch.object(self.dlg, "_frage_gesamtwinkel",
                                   return_value=(40.0, 30.0)) as frage:
-            self.dlg._btn_datenblatt.click()
+            self.dlg._laser_karten[2].btn_datenblatt.click()
         frage.assert_called_once()
         self.assertEqual(self._werte(), (20.0, 20.0, 15.0, 15.0))
         self.assertIn("Datenblatt 40° × 30°", self.dlg._datenblatt_info.text())
@@ -493,12 +494,12 @@ class DatenblattKnopfTest(unittest.TestCase):
         self.dlg._feld_spins[2]["zuschlag"].setValue(8.0)
         with mock.patch.object(S, "winkel_aus_bibliothek", return_value=None), \
                 mock.patch.object(self.dlg, "_frage_gesamtwinkel", return_value=None):
-            self.dlg._btn_datenblatt.click()
+            self.dlg._laser_karten[2].btn_datenblatt.click()
         self.assertEqual(self._werte(), (None, None, None, None))
         with mock.patch.object(S, "winkel_aus_bibliothek", return_value=None), \
                 mock.patch.object(self.dlg, "_frage_gesamtwinkel",
                                   return_value=(20.0, 20.0)):
-            self.dlg._btn_datenblatt.click()
+            self.dlg._laser_karten[2].btn_datenblatt.click()
         self.assertEqual(self.st.sperrzonen.feld(2).zuschlag, 8.0)
 
     def test_eingabe_dialog_hat_beide_felder(self):
