@@ -65,6 +65,7 @@
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-18T19:42Z | src/ui/widgets/fixture_editor.py |
 | FM-69 | A | fix/fm69-bibliotheks-update-bestehende-db | 2026-10-18T19:42Z | src/core/database/fixture_db.py |
 | FM-76 | A | fix/fm76-generator-herkunft-mittragen | 2026-10-18T19:54Z | src/ui/widgets/fixture_generator.py |
+| UI-96 | A | fix/ui96-kiosk-ohne-bibliothek | 2026-10-18T21:46Z | src/ui/views/virtual_console_view.py |
 
 ## Blocker & Fallen
 
@@ -153,7 +154,6 @@
 
 ## Verlauf
 
-- 2026-10-18T15:37Z A aktualisiert XPLAT-23: Branch - -> fix/xplat23-sh-angleichung
 - 2026-10-18T15:37Z A aktualisiert LAS-31: Branch - -> fix/las31-notaus-ein-weg-blackout-kiosk
 - 2026-10-18T15:37Z A claim QA-98
 - 2026-10-18T15:37Z A claim LAS-39
@@ -183,3 +183,4 @@
 - 2026-10-18T20:38Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T21:17Z A done FM-65
 - 2026-10-18T21:17Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-18T21:46Z A claim UI-96
