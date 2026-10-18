@@ -346,7 +346,9 @@ class KombiBleibtDunkelTest(_ZusammenBasis):
         self._dunkel("vor dem Ausfall")
         self.auskunft_ausgefallen = True       # jede Abfrage scheitert
         self._neu_planen()
-        self.assertNotIn(_KOMBI_FID, self.st._laser_fids)   # Vorbedingung des Falls
+        # LAS-39: ohne Auskunft gilt das Geraet weiter als Laser (vorher fiel es
+        # aus dem Plan). Die Aussage hier gilt in beiden Faellen: dunkel.
+        self.assertIn(_KOMBI_FID, self.st._laser_fids)
         self.st.set_programmer_value(_KOMBI_FID, "raw", 255)
         self._dunkel("Profil-Auskunft ausgefallen")
 
