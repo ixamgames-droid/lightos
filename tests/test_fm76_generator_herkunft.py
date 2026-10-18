@@ -191,6 +191,61 @@ class GeladeneBibliotheksdateiTest(_Fall):
         self.assertIn("übernommen", text)
 
 
+    def test_zweite_vorlage_ersetzt_die_herkunft(self):
+        """Gegenpruefung: im selben Dialog erst Auro (QLC+, Apache-2.0), dann
+        die Handbuch-Vorlage laden — die Herkunft der ersten darf nicht
+        kleben bleiben."""
+        vorlage = BF.lade_datei(_HANDBUCH)
+        dlg = self._dialog()
+        self._datei_laden(dlg, _AURO, modell="Auro Spot FM76")
+        self._datei_laden(dlg, _HANDBUCH, modell="Pint FM76")
+        self.assertEqual(dlg._model.herkunft["herkunft"], vorlage["herkunft"])
+        pid = self._speichern(dlg)
+        h, _ = self._herkunft(pid)
+        self.assertEqual(h["herkunft"], vorlage["herkunft"])
+        self.assertEqual(h["quelle"], vorlage["quelle"])
+        self.assertNotEqual(h["herkunft"].get("art"), "qlcplus")
+        self.assertNotIn("Apache-2.0", json.dumps(h))
+
+    def test_qxf_nach_vorlage_traegt_qxf_herkunft(self):
+        dlg = self._dialog()
+        self._datei_laden(dlg, _AURO, modell="Auro Spot FM76")
+        self._qxf_laden(dlg)
+        self.assertEqual(dlg._model.herkunft["herkunft"]["original"],
+                         "FM76-Par.qxf")
+        pid = self._speichern(dlg)
+        h, _ = self._herkunft(pid)
+        self.assertEqual(h["herkunft"]["original"], "FM76-Par.qxf")
+        self.assertIn("Testautorin", h["herkunft"]["urheber"])
+
+
+class VermerkEinmaligTest(_Fall):
+
+    def test_mit_vermerk_haengt_nur_einmal_an(self):
+        vorlage = BF.lade_datei(_AURO)
+        h = {k: vorlage[k] for k in BF.HERKUNFT_SCHLUESSEL}
+        einmal = BF.mit_vermerk(h, BF.GENERATOR_VERMERK)
+        zweimal = BF.mit_vermerk(einmal, BF.GENERATOR_VERMERK)
+        self.assertEqual(
+            zweimal["herkunft"]["geaendert"].count(BF.GENERATOR_VERMERK), 1)
+        self.assertEqual(zweimal, einmal)
+
+    def test_zweimal_im_generator_gespeichert_ein_vermerk(self):
+        """Profil aus Auro speichern, wieder in den Generator laden und erneut
+        speichern — der Generator-Vermerk steht trotzdem nur einmal da."""
+        dlg = self._dialog()
+        self._datei_laden(dlg, _AURO, modell="Auro Spot FM76")
+        pid = self._speichern(dlg)
+        modell = FG.model_from_profile(pid, engine=self.engine)
+        modell.model = "Auro Spot FM76 zwei"
+        zweit = self._dialog(modell)
+        pid2 = self._speichern(zweit)
+        self.assertNotEqual(pid2, pid)
+        h, _ = self._herkunft(pid2)
+        self.assertEqual(
+            h["herkunft"]["geaendert"].count(BF.GENERATOR_VERMERK), 1)
+
+
 class QxfImportTest(_Fall):
 
     def test_qxf_vorlage_traegt_qlcplus_herkunft(self):
