@@ -85,6 +85,12 @@ Worker-Loop).
   und lernt ihn als eigenen (bestand schon vor OUT-66, Konfiguration über den
   Portnamen). Abhilfe geplant in OUT-80: Seriennummer in der Universums-Konfiguration,
   unter Linux `/dev/serial/by-id`.
+- **Grenze — „Übernehmen“ nach Vertauschen zur Laufzeit (→ OUT-80):** „Übernehmen“ in der
+  Ausgabe-Konfiguration legt jede Ausgabe neu an, ohne die gelernte Seriennummer und ohne
+  die „früher eigenen“ Nummern. Wurden die Dongles vorher zur Laufzeit vertauscht
+  eingesteckt, lernt danach jedes Universum den Dongle an seinem konfigurierten Port —
+  also den des anderen. Ohne OUT-66 war das genauso; OUT-80 behebt beides, indem die
+  Nummer in der Konfiguration steht und beim Anlegen mitgegeben wird.
 - `close()` bricht/leert vorher den Output-Puffer, damit `CloseHandle()` nicht mit einem
   ausstehenden `WriteFile` kollidiert. Idempotent, fehlertolerant.
 
