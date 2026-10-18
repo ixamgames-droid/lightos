@@ -191,6 +191,67 @@ def forget_snap_claims(owner) -> None:
             _snap_stack[key] = kept
         else:
             _snap_forsake(key, stack)
+    dimmer_override_abgleich()
+
+
+def dimmer_override_abgleich(frisch=(), halter=None) -> None:
+    """VCB-46: sagt dem Renderer, wessen Dimmer gerade laufende Dimmer-Effekte
+    uebersteuert.
+
+    Abgeleitet aus dem Halter-Stapel oben, nicht aus einem zweiten Register: ein
+    Geraet zaehlt, solange der OBERSTE Halter seines Dimmer-Attributs eine Taste
+    mit dem Haken ``snap_dimmer_override`` ist. Damit gilt dieselbe Regel wie
+    fuer die Werte selbst — zuletzt gedrueckt gewinnt, und wer loslaesst, gibt
+    an die vorher gehaltene Taste zurueck (mit oder ohne Haken).
+
+    Wird nach jedem Setzen, Zuruecknehmen und Abmelden gerufen. Fehlt der Haken
+    ueberall, ist das Ergebnis leer und der Renderer rechnet wie bisher.
+
+    Der Stapel allein genuegt nicht: er merkt nicht, wenn jemand ANDERES den
+    Kanal uebernimmt („Programmer leeren“, Handwert) — die gehaltene Taste
+    bliebe oberster Halter. Deshalb zaehlt ein Halter nur, wenn (1) sein Wert
+    wirklich im Programmer steht UND (2) er ihn gerade selbst geschrieben hat
+    (``frisch`` = die Schluessel ``(fid, attr)`` dieses Aufrufers) oder sein
+    Eintrag bis jetzt unveraendert galt. Den zweiten Teil haelt der AppState
+    nach: er streicht einen Eintrag, sobald der Wert im Programmer weg ist. So
+    kann ein von Hand gezogener, zufaellig gleicher Wert den Vorrang nicht
+    wiederbeleben. ``halter`` = eine Taste, deren Haken gerade in den
+    Eigenschaften eingeschaltet wurde: ihre gehaltenen Werte zaehlen wie frisch
+    geschrieben.
+    """
+    try:
+        from src.core.app_state import get_state, ist_dimmer_attribut
+        state = get_state()
+    except Exception:
+        return
+    setzen = getattr(state, "set_snap_dimmer_override", None)
+    if setzen is None:
+        return                      # Test-Stub ohne das Feld
+    bisher = getattr(state, "snap_dimmer_override", None) or {}
+    frisch = set(frisch or ())
+    ziel: dict[int, dict[str, int]] = {}
+    for (fid, attr), stack in list(_snap_stack.items()):
+        if not stack or not ist_dimmer_attribut(attr):
+            continue
+        ref, wert = stack[-1]
+        oben = ref()
+        if oben is None or not getattr(oben, "snap_dimmer_override", False):
+            continue
+        if ((fid, attr) not in frisch and oben is not halter
+                and (bisher.get(int(fid)) or {}).get(attr) != int(wert)):
+            continue                # Vorrang inzwischen verfallen
+        try:
+            if state.get_programmer_value(int(fid), attr) != int(wert):
+                continue            # der Wert steht gar nicht (mehr) da
+        except Exception:
+            continue
+        ziel.setdefault(int(fid), {})[attr] = int(wert)
+    if not ziel and not bisher:
+        return                      # nichts an, nichts war an
+    try:
+        setzen(ziel)
+    except Exception as e:
+        print(f"[VCButton] Dimmer-Übersteuerung-Fehler: {e}")
 
 # Quadratische Standard-Groesse fuer NEU angelegte Buttons (Pad-Look wie im
 # Demo-Show-Generator, PAD=56 → hier etwas grosszuegiger fuer Hand-Platzierung).
@@ -382,6 +443,12 @@ class VCButton(VCWidget):
         # Analog function_ids: snap_id bleibt das Primaerziel, snap_ids sind Extras.
         self.snap_ids: list[int] = []
         self.snap_mode: str = "toggle"      # "set" | "flash" | "toggle"
+        # VCB-46: Haken „übersteuert laufende Dimmer-Effekte“. An = solange die
+        # Snap-Taste aktiv ist, gewinnen ihre DIMMER-Werte an ihren Geraeten
+        # gegen einen laufenden Dimmer-Effekt (sonst behaelt der Effekt den
+        # Dimmer). Nur der Dimmer — Farbe bleibt davon getrennt. Vorgabe aus;
+        # gespeichert wird das Feld nur, wenn es an ist.
+        self.snap_dimmer_override: bool = False
         self._snap_active: bool = False     # Laufzeit-Zustand fuer toggle
         # Vorherige Programmer-Werte (fuer Toggle/Flash-Ruecknahme):
         # {(fid, attr): alter_wert_oder_None}
@@ -774,6 +841,7 @@ class VCButton(VCWidget):
             self._snap_prev = prev
         except Exception as e:
             print(f"[VCButton] Snap-Apply-Fehler: {e}")
+        dimmer_override_abgleich(frisch=prev)   # VCB-46
 
     def _snap_verlauf(self, state):
         """FM-52: Halten/Loslassen einer Flash-Snap-Taste ist Wiedergabe und
@@ -796,6 +864,7 @@ class VCButton(VCWidget):
         prev = getattr(self, "_snap_prev", None) or {}
         if not prev:
             return
+        zurueck: set = set()        # VCB-46: an die vorige Taste zurueckgegeben
         try:
             from src.core.app_state import get_state
             state = get_state()
@@ -807,6 +876,7 @@ class VCButton(VCWidget):
                         continue          # Kanal gehoert inzwischen jemand anderem
                     if what == "reapply":
                         state.set_programmer_value(fid, attr, int(value))
+                        zurueck.add((fid, attr))
                     elif value is None:
                         state.clear_programmer_value(fid, attr)
                     else:
@@ -815,6 +885,7 @@ class VCButton(VCWidget):
             print(f"[VCButton] Snap-Restore-Fehler: {e}")
         finally:
             self._snap_prev = {}
+            dimmer_override_abgleich(frisch=zurueck)    # VCB-46
 
     def release_if_held(self) -> bool:
         """UI-57: das verschluckte Loslassen nachholen.
@@ -1147,6 +1218,36 @@ class VCButton(VCWidget):
         if c is None or jetzt - c[0] > 1.0:
             c = self._bo_verloren_cache = (jetzt, self._blackout_ziele_verloren())
         return c[1]
+
+    def _blackout_leer_bestaetigt(self, S: dict, parent=None) -> bool:
+        """VCB-44: ``True`` = der Dialog darf mit OK schliessen.
+
+        Steht die Aktion auf Blackout und hat der Ziel-Editor nur leere Zeilen,
+        wird gefragt, ob die Taste wirklich ALLES dunkel schalten soll. „Ja“
+        merkt das in ``S["blackout_entscheid"]`` (dann uebernimmt ``apply`` das leere
+        Ziel), „Nein“ laesst den Dialog offen. Vorgabe ist „Nein“.
+        """
+        from PySide6.QtWidgets import QMessageBox
+        editor = S.get("blackout_editor")
+        combo = S.get("action_combo")
+        if editor is None or combo is None:
+            return True
+        if (combo.currentData() != ButtonAction.BLACKOUT.value
+                or not editor.nur_leere_zeilen()):
+            return True
+        antwort = QMessageBox.question(
+            parent, "Blackout ohne Ziel?",
+            "Im Blackout-Ziel steht eine leere Zeile, aber kein Gerät und keine "
+            "Gruppe.\n\nOhne Ziel schaltet die Taste ALLES dunkel (globaler "
+            "Blackout).\n\nSoll sie ein globaler Blackout sein?\n\n"
+            "„Nein“ führt zurück in den Dialog — dort ein Ziel wählen oder die "
+            "leere Zeile entfernen.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if antwort == QMessageBox.StandardButton.Yes:
+            S.get("blackout_entscheid", {})["global_ok"] = True
+            return True
+        return False
 
     def _blackout_editor_fuellen(self, editor):
         """Den Ziel-Editor des Dialogs mit dem Ziel dieser Taste fuellen.
@@ -2274,6 +2375,19 @@ class VCButton(VCWidget):
                 snap_mode_combo.setCurrentIndex(i)
                 break
 
+        # VCB-46: Haken je Snap-Taste — steht direkt beim Tasten-Modus.
+        snap_dim_ovr_cb = QCheckBox("übersteuert laufende Dimmer-Effekte")
+        snap_dim_ovr_cb.setChecked(bool(getattr(self, "snap_dimmer_override", False)))
+        snap_dim_ovr_cb.setToolTip(
+            "Aus (Vorgabe): Treibt ein laufender Effekt den Dimmer einer Lampe, "
+            "behält er ihn — der Dimmer-Wert dieses Snaps wird dort übergangen.\n"
+            "An: Solange die Taste aktiv ist, gewinnt der Dimmer-Wert des Snaps an "
+            "seinen Lampen gegen laufende Dimmer-Effekte (Blinder, Strobe Weiß). "
+            "Danach läuft der Effekt weiter.\n"
+            "Betrifft nur den Dimmer von Lampen mit eigenem Dimmer-Kanal — Farbe "
+            "bleibt unberührt. Master, Gruppen-Fader, Blackout und NOT-AUS "
+            "behalten das letzte Wort.")
+
         eff_action_combo = QComboBox()
         _eff_keys: list[str] = []
         for _k, _lbl in EFFECT_ACTION_LABELS:
@@ -2428,6 +2542,26 @@ class VCButton(VCWidget):
         long_press_cb.setToolTip("Im Live-Modus den Button lange halten, um die Effekt-"
                                  "Parameter zu bearbeiten (deferred apply). Bei Flash sinnlos.")
 
+        # ENG-39: gelbe Hinweiszeile, wenn eine andere Taste / ein Fader an
+        # denselben Geraeten denselben Baustein steuert. Reine Auskunft. Sie
+        # liest die Ziele aus den FELDERN (im Dialog ist noch nichts
+        # uebernommen) und rechnet nur beim Oeffnen und bei Aenderungen.
+        from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+
+        def _hinweis_ziele():
+            if act.currentData() not in (ButtonAction.FUNCTION_TOGGLE.value,
+                                         ButtonAction.FUNCTION_FLASH.value):
+                return []
+            return target_editor.ids()
+
+        ueberschn_hinweis = UeberschneidungsHinweis(self, _hinweis_ziele)
+        _hinweis_setzer = {"f": None}
+        ueberschn_hinweis.sichtbar_setzen = (
+            lambda an: _hinweis_setzer["f"](ueberschn_hinweis, an)
+            if _hinweis_setzer["f"] is not None else None)
+        target_editor.changed.connect(ueberschn_hinweis.veraltet)
+        act.currentIndexChanged.connect(ueberschn_hinweis.veraltet)
+
         # ── Aktions-Konstanten (Sichtbarkeit) ──
         FT, FF = ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH
         EA, SG = ButtonAction.EFFECT_ACTION, ButtonAction.SELECT_GROUP
@@ -2437,6 +2571,10 @@ class VCButton(VCWidget):
         AW = ButtonAction.ALL_WHITE   # bindet die (hochpriore) Weiss-Szene wie ein Flash
         LP = ButtonAction.LASER_PATTERN   # LAS-18: Laser-Muster abrufen
         BO = ButtonAction.BLACKOUT        # VCB-11: Blackout mit optionalem Ziel
+
+        # VCB-44: ob ein Blackout OHNE Ziel ausdruecklich bestaetigt wurde
+        # (Rueckfrage beim OK des Dialogs). ``apply`` liest es.
+        blackout_entscheid: dict = {}
 
         def apply():
             self.caption = cap.text() or self.caption
@@ -2469,8 +2607,16 @@ class VCButton(VCWidget):
             _sids = snap_editor.ids() if self.action == LS else []
             self.snap_id, self.snap_ids = self._snap_binding_for_action(self.action, _sids)
             self.snap_mode = snap_mode_combo.currentData() or "toggle"
+            # VCB-46: der Haken gehoert zur Snap-Taste; bei jeder anderen Aktion
+            # faellt er weg (sonst wanderte ein unsichtbarer Haken in die Show).
+            _haken_alt = bool(getattr(self, "snap_dimmer_override", False))
+            self.snap_dimmer_override = (self.action == LS
+                                         and snap_dim_ovr_cb.isChecked())
             self._snap_active = False
             self._snap_prev = {}
+            dimmer_override_abgleich(
+                halter=self if self.snap_dimmer_override and not _haken_alt
+                else None)
             self.effect_action_key = eff_action_combo.currentData() or self.effect_action_key
             self.group_name = group_combo.currentText().strip()
             self.laser_palette = laser_pal_combo.currentText().strip()
@@ -2478,7 +2624,18 @@ class VCButton(VCWidget):
             # freigegeben (Ziel/Aktion koennten sich gerade geaendert haben).
             self._release_target_blackout()
             if self.action == BO:
-                self._blackout_ziel_aus_editor(blackout_editor)
+                # ★ VCB-44: eine Zeile, in der nichts gewaehlt ist, lieferte
+                # „kein Ziel“ — und kein Ziel heisst GLOBALER Blackout. Die
+                # Taste wurde so still vom gezielten zum globalen Blackout
+                # (oder ein neues Ziel ging verloren). Ohne ausdrueckliches Ja
+                # (Rueckfrage im Dialog, s. ``_blackout_leer_bestaetigt``)
+                # bleibt das Ziel, wie es war.
+                if blackout_editor.nur_leere_zeilen() and not blackout_entscheid.get("global_ok"):
+                    self._show_status(
+                        "Blackout-Ziel: leere Zeile — kein Gerät und keine "
+                        "Gruppe gewählt. Das Ziel der Taste bleibt unverändert.")
+                else:
+                    self._blackout_ziel_aus_editor(blackout_editor)
             else:
                 self.blackout_fids, self.blackout_groups = [], []
                 self.blackout_group_ids, self.blackout_group_refs = [], {}
@@ -2505,11 +2662,14 @@ class VCButton(VCWidget):
             a = act.currentData()        # roher Enum-Wert (str)
             func_like = a in (FT, FF, EA, TG, FL, AW)
             target_editor.set_title("Aktion auf" if a == EA else "Schaltet mit")
+            _hinweis_setzer["f"] = set_row_visible      # ENG-39
             rows = {
                 target_editor:    a in (FT, FF, EA, AW),
+                ueberschn_hinweis: ueberschn_hinweis.hat_hinweis(),
                 snap_combo:       a == SN,
                 snap_editor:      a == LS,
                 snap_mode_combo:  a == LS,
+                snap_dim_ovr_cb:  a == LS,
                 eff_action_combo: a == EA,
                 group_combo:      a == SG,
                 blackout_editor:  a == BO,
@@ -2543,6 +2703,7 @@ class VCButton(VCWidget):
             snap_combo.currentIndexChanged.connect(lambda *_: _live())
             snap_editor.changed.connect(lambda *_: _live())
             snap_mode_combo.currentIndexChanged.connect(lambda *_: _live())
+            snap_dim_ovr_cb.toggled.connect(lambda *_: _live())
             eff_action_combo.currentIndexChanged.connect(lambda *_: _live())
             group_combo.currentTextChanged.connect(lambda *_: _live())
             blackout_editor.changed.connect(lambda *_: _live())
@@ -2560,9 +2721,12 @@ class VCButton(VCWidget):
 
         return {
             "apply": apply,
+            "blackout_editor": blackout_editor,
+            "blackout_entscheid": blackout_entscheid,
             "update_visibility": update_visibility,
             "action_combo": act,
             "pad_combo": pad_style_combo,
+            "ueberschneidungs_hinweis": ueberschn_hinweis,
             "top": [("Beschriftung:", cap), ("Aktion:", act)],
             "sections": [
                 ("target", "Ziel und Verhalten", False, "vc_button_sec_target", [
@@ -2570,6 +2734,7 @@ class VCButton(VCWidget):
                     ("Snapshot:", snap_combo),
                     ("Snap-Ziele:", snap_editor),
                     ("Tasten-Modus (Snap):", snap_mode_combo),
+                    ("Dimmer (Snap):", snap_dim_ovr_cb),
                     ("Effekt-Aktion:", eff_action_combo),
                     ("Gruppe (SelectGroup):", group_combo),
                     ("Blackout-Ziel:", blackout_editor),
@@ -2612,6 +2777,9 @@ class VCButton(VCWidget):
 
         for label, w in S["top"]:
             form.addRow(label, w)
+        # ENG-39: der gelbe Hinweis steht gleich unter „Aktion“, ueber die
+        # ganze Breite — nicht in einem Bereich, der zugeklappt sein kann.
+        form.addRow(S["ueberschneidungs_hinweis"])
 
         adv_section = None
         for key, title, _collapsed, prefs, rows in S["sections"]:
@@ -2650,11 +2818,21 @@ class VCButton(VCWidget):
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(dlg.accept)
+        def _ok():
+            # VCB-44: erst fragen, dann schliessen — bei „Nein“ bleibt der
+            # Dialog offen, damit das Ziel gewaehlt werden kann.
+            if self._blackout_leer_bestaetigt(S, dlg):
+                dlg.accept()
+
+        btns.accepted.connect(_ok)
         btns.rejected.connect(dlg.reject)
         form.addRow(btns)
 
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        angenommen = dlg.exec() == QDialog.DialogCode.Accepted
+        # ENG-39: der Dialog bleibt als Kind der Taste bestehen — seine
+        # Hinweiszeile soll danach nicht bei jeder Aenderung weiterrechnen.
+        S["ueberschneidungs_hinweis"].stilllegen()
+        if angenommen:
             S["apply"]()
 
     def build_inspector_body(self, host=None):
@@ -2679,6 +2857,11 @@ class VCButton(VCWidget):
         for label, w in S["top"]:
             top_form.addRow(label, w)
         v.addWidget(top_inner)
+        # ENG-39: der gelbe Hinweis steht gleich unter „Aktion“, ueber die
+        # ganze Breite und ausserhalb der Klappbereiche — er bleibt zu sehen,
+        # auch wenn „Ziel und Verhalten“ zugeklappt ist. Die Zeile bricht um
+        # und haelt sich im schmalen Inspector an die sichtbare Breite.
+        v.addWidget(S["ueberschneidungs_hinweis"])
 
         row_form_of = {}
         sections = []   # (key, CollapsibleSection, [row_widgets])
@@ -2686,6 +2869,10 @@ class VCButton(VCWidget):
             inner = _QWidget()
             f = QFormLayout(inner)
             f.setContentsMargins(0, 0, 0, 0)
+            # Im schmalen Inspector rutscht ein Feld, das neben seiner
+            # Beschriftung nicht passt, unter sie — statt den ganzen Inhalt
+            # breiter zu machen als das Panel (vorher 478 px Mindestbreite).
+            f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
             row_widgets = []
             for label, w in rows:
                 f.addRow(label, w)
@@ -2706,6 +2893,8 @@ class VCButton(VCWidget):
                     f.setRowVisible(w, bool(show))
                 except Exception:
                     w.setVisible(bool(show))
+            else:
+                w.setVisible(bool(show))    # ENG-39: Hinweis liegt in keinem Formular
 
         def set_section_visible(k, show):
             for key, sec, _rws in sections:
@@ -2781,6 +2970,10 @@ class VCButton(VCWidget):
                 _save_sids.append(iv)
         d["snap_ids"] = _save_sids
         d["snap_mode"] = self.snap_mode
+        # VCB-46: nur schreiben, wenn an — eine Show ohne den Haken bleibt
+        # byte-gleich.
+        if getattr(self, "snap_dimmer_override", False):
+            d["snap_dimmer_override"] = True
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
         d["laser_palette"] = self.laser_palette
@@ -2866,6 +3059,7 @@ class VCButton(VCWidget):
                 _sids.append(iv)
         self.snap_ids = _sids
         self.snap_mode = d.get("snap_mode", "toggle")
+        self.snap_dimmer_override = bool(d.get("snap_dimmer_override", False))
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")
         self.laser_palette = d.get("laser_palette", "")

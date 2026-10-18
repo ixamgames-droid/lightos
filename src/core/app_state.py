@@ -215,6 +215,14 @@ INPUT_SOURCE_TIMEOUT_S = 2.5
 # Drift mehr): genau diese Gruppe MINUS shutter/strobe. Die Beziehung lockt
 # tests/test_dim_intensity_sentinel.py -> aendert jemand attr_groups, schlaegt er an.
 _DIM_INTENSITY_ATTRS = frozenset(ATTR_GROUPS["Intensity"]) - frozenset({"shutter", "strobe"})
+
+
+def ist_dimmer_attribut(attr) -> bool:
+    """Ist ``attr`` ein Dimmer-/Intensitaets-Attribut im Sinne des Renderers
+    (ohne Shutter/Strobe, Mehrkopf-Zusatz ``#N`` zaehlt mit)?"""
+    return str(attr or "").lower().split("#", 1)[0] in _DIM_INTENSITY_ATTRS
+
+
 _DIM_COLOR_ATTRS = frozenset({
     "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
     "red", "green", "blue", "white", "amber", "uv",
@@ -357,6 +365,12 @@ class AppState:
         # None = kein Fokus -> Funktion besitzt einen direkt getriebenen Dimmer
         # (Default). Wird nur lesend im Output-Thread benutzt -> einfaches Attribut.
         self.programmer_focus: str | None = None
+        # VCB-46: Geraete, deren Programmer-DIMMER gerade von einer Snap-Taste mit
+        # dem Haken „übersteuert laufende Dimmer-Effekte“ gehalten wird:
+        # {fid: {attribut: wert}}. Gepflegt von den VC-Tasten (vc_button.py),
+        # gelesen vom Renderer; wird immer als Ganzes ersetzt (eine Zuweisung).
+        # Leer = Verhalten wie bisher.
+        self.snap_dimmer_override: dict[int, dict[str, int]] = {}
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # VIZ-11 (Schritt 3+4): kanonischer Store ist ab jetzt der SceneGraph
         # (state._scene); die 5 Legacy-Felder darunter sind schreibende
@@ -2813,6 +2827,7 @@ class AppState:
             # FM-52: mitgezogene Master-/Anker-Schluessel gehoeren zum Schritt.
             aenderungen = self._prog_unterschied(fid, vorher, self.programmer.get(fid, {}))
         self._verlauf_notiere(aenderungen, attr_label(key))
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         # LAS-36: ein Laser-Wert loest den NOT-AUS NICHT (frueher A3D-02). Er steht
         # jetzt im Programmer; solange der Latch steht, haelt der Renderer die
@@ -2864,6 +2879,7 @@ class AppState:
                 self.programmer.pop(fid, None)
         if alt is not None:
             self._verlauf_notiere([(fid, attribute, alt, None)], "Wert entfernen")
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
 
@@ -2898,6 +2914,9 @@ class AppState:
                 self.clear_remote_input()
             except Exception as e:
                 print(f"[app_state] clear_remote_input error: {e}")
+        # VCB-46: mit dem Wert geht auch sein Vorrang vor Dimmer-Effekten —
+        # auch wenn die Snap-Taste noch gehalten ist.
+        self._snap_dimmer_override_pruefen()
         if flush:
             self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
@@ -2977,6 +2996,7 @@ class AppState:
                     else:
                         self.programmer.setdefault(fid, {})[key] = int(wert)
                     betroffen.add(fid)
+            self._snap_dimmer_override_pruefen()                # VCB-46
             for fid in betroffen:
                 self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", None)
@@ -4266,10 +4286,26 @@ class AppState:
             print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
             su.begin_write_log()
+        # ENG-37: Modify-Effekte schreiben im Funktions-Durchlauf nichts — der
+        # Manager sammelt ihre Betraege, verrechnet wird in 4a²b auf das fertige
+        # Bild. ``tick`` wird bewusst mit denselben drei Argumenten gerufen wie
+        # immer (Manager-Ersatz und gepatchte ``tick`` in Tests kennen keinen
+        # Schalter); das Aufschieben wird vorher am Manager angemeldet.
+        _fm = self.function_manager
+        _modify_anwenden = getattr(_fm, "modify_anwenden", None)
+        _modify_aufschieben = getattr(_fm, "modify_aufschieben", None)
         try:
-            self.function_manager.tick(scratch, self._patch_cache, dt)
+            if _modify_aufschieben is not None and _modify_anwenden is not None:
+                _modify_aufschieben(True)
+            _fm.tick(scratch, self._patch_cache, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        finally:
+            if _modify_aufschieben is not None:
+                try:
+                    _modify_aufschieben(False)
+                except Exception:
+                    pass
         func_touched: dict[int, set[int]] = {}
         for univ, su in scratch.items():
             func_touched[univ] = su.end_write_log()
@@ -4399,6 +4435,25 @@ class AppState:
             if getattr(self, "selected_cells", None):
                 sel.update(self.auswahl_referenzierte_fids())
             intensity_wins = func_inten_fids & sel
+        # VCB-46: Snap-Taste mit Haken „übersteuert laufende Dimmer-Effekte“.
+        # Solange die Taste aktiv ist, gewinnt IHR Dimmer-Wert an IHREN Geraeten
+        # gegen einen laufenden Dimmer-Effekt — derselbe Weg wie der Intensity-
+        # Reiter eine Zeile hoeher (Programmer-Dimmer absolut statt uebergangen),
+        # also keine zweite Schicht. Nur der Dimmer: Farb-, Bewegungs- und
+        # Gobo-Kanaele eines Effekts bleiben ueber ``protect`` beim Effekt.
+        # Es zaehlt nur, was WIRKLICH noch im Programmer steht: hat jemand den
+        # Wert inzwischen ueberschrieben oder den Programmer geleert, gilt wieder
+        # die alte Regel. Master, Fader, Blackout und NOT-AUS liegen dahinter.
+        _snap_ovr = getattr(self, "snap_dimmer_override", None)
+        if _snap_ovr and func_inten_fids:
+            for fidi, erwartet in list(_snap_ovr.items()):
+                if fidi not in func_inten_fids or fidi in intensity_wins:
+                    continue
+                pa = programmer.get(fidi)
+                if pa is None:
+                    pa = programmer.get(str(fidi))
+                if pa and any(pa.get(k) == v for k, v in erwartet.items()):
+                    intensity_wins = intensity_wins | {fidi}
         owned_by_func = func_inten_fids - intensity_wins   # hier wirkt Programmer NICHT
 
         prog_factor: dict[int, float] = {}
@@ -4494,6 +4549,24 @@ class AppState:
                 continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
             for a in dims:
                 su.set_channel(a, 255)
+
+        # 4a²b. ENG-37: Modify-Effekte — der EINE spaete Rechengang. Verrechnet
+        #      wird mit dem FERTIGEN Wert der Schichten darunter: Effekte,
+        #      Cuelisten, Programmer/Snaps und die implizite Grundhelligkeit von
+        #      eben. Ein Modify-Effekt hat in Schritt 2 nichts geschrieben — er
+        #      steht in keinem Schreib-Protokoll, besitzt keinen Dimmer und
+        #      schaltet die Grundhelligkeit nicht ab; wo sein Betrag 0 ist,
+        #      bleibt der Wert unveraendert. Bewusst HIER, also VOR Szenen-
+        #      Vorschau, „Alles Weiss“, Submastern/Fixture-Dimmern (4b),
+        #      DMX-Eingang, Simple Desk und Laser-NOT-AUS (4d) sowie vor Grand
+        #      Master/Blackout im OutputManager: die behalten das letzte Wort,
+        #      ein Modify kann Blackout und NOT-AUS nie aufhellen.
+        #      Kosten ohne laufenden Modify-Effekt: ein leerer Listen-Test.
+        if _modify_anwenden is not None:
+            try:
+                _modify_anwenden(scratch)
+            except Exception as exc:
+                print(f"[AppState] render modify error: {exc}")
 
         # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
         # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen
@@ -4802,6 +4875,58 @@ class AppState:
                     for a in rel:
                         if 1 <= a <= 512 and a not in patched:
                             live.set_channel(a, 0)
+
+    def set_snap_dimmer_override(self, ziel: dict | None) -> None:
+        """VCB-46: setzt, wessen Programmer-Dimmer laufende Dimmer-Effekte
+        uebersteuert — ``{fid: {attribut: wert}}`` der gerade aktiven Snap-Tasten
+        mit Haken. Ersetzt den bisherigen Stand als Ganzes (der Renderer liest
+        im Ausgabe-Thread; eine einzelne Zuweisung ist dafuer atomar)."""
+        neu: dict[int, dict[str, int]] = {}
+        for fid, attrs in (ziel or {}).items():
+            try:
+                fidi = int(fid)
+            except (TypeError, ValueError):
+                continue
+            eintrag = {}
+            for attr, wert in (attrs or {}).items():
+                if not ist_dimmer_attribut(attr):
+                    continue
+                try:
+                    eintrag[str(attr)] = int(wert)
+                except (TypeError, ValueError):
+                    continue
+            if eintrag:
+                neu[fidi] = eintrag
+        self.snap_dimmer_override = neu
+
+    def _snap_dimmer_override_pruefen(self) -> None:
+        """VCB-46: streicht jeden Eintrag aus ``snap_dimmer_override``, dessen
+        Wert NICHT mehr im Programmer steht.
+
+        Laeuft nach jeder Aenderung am Programmer. Ohne das bliebe der Eintrag
+        einer noch gehaltenen Taste nach „Programmer leeren“ (oder nachdem
+        jemand den Wert ueberschrieben hat) stehen — und ein spaeter von Hand
+        gezogener, zufaellig gleicher Dimmerwert uebersteuerte den Effekt, obwohl
+        er gar nicht von der Taste kommt. Was hier gestrichen wurde, kommt erst
+        zurueck, wenn eine Taste ihren Wert neu schreibt
+        (``dimmer_override_abgleich``). Ohne Eintraege ein einziger Vergleich.
+        """
+        alt = getattr(self, "snap_dimmer_override", None)
+        if not alt:
+            return
+        neu: dict[int, dict[str, int]] = {}
+        with self._prog_lock:
+            for fidi, erwartet in alt.items():
+                pa = self.programmer.get(fidi)
+                if pa is None:
+                    pa = self.programmer.get(str(fidi))
+                if not pa:
+                    continue
+                bleibt = {k: v for k, v in erwartet.items() if pa.get(k) == v}
+                if bleibt:
+                    neu[fidi] = bleibt
+        if neu != alt:
+            self.snap_dimmer_override = neu
 
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,
