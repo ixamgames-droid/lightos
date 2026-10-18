@@ -455,6 +455,14 @@ class BlackoutTargetEditor(TargetListEditor):
             return f"Gruppe: {name}" if gleiche == 1 else f"Gruppe: {name} (nicht gefunden)"
         return f"Gerät: {v[2:]} (nicht gefunden)"
 
+    def nur_leere_zeilen(self) -> bool:
+        """VCB-44: es gibt Zeilen, aber in keiner ist ein Geraet oder eine
+        Gruppe gewaehlt. Das ist KEINE Entscheidung fuer „global“ — wer eine
+        Zeile anlegt, will ein Ziel und hat es nur noch nicht gewaehlt. Eine
+        Liste ganz ohne Zeilen ist dagegen der ausdrueckliche globale Blackout
+        (so steht es dann auch im Editor)."""
+        return bool(self._rows) and not self.ids()
+
     def fids(self) -> list[int]:
         out: list[int] = []
         for k in self.ids():

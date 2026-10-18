@@ -2616,6 +2616,12 @@ _SINGLE_KEY_SHORTCUTS = frozenset({
 })
 
 
+#: VIZ-109: Statuszeile, wenn F bei eingeklappter Spalte „Fit Auswahl" war.
+HINWEIS_F_IN_DER_ANSICHT = (
+    "F hat die Kamera auf die Auswahl eingepasst, weil der Fokus in der "
+    "3D-Ansicht liegt. Die rechte Spalte klappt mit F9 oder S aus.")
+
+
 def _any_focused(*widgets) -> bool:
     """VIZ-10: True, wenn EINE der Spinboxen gerade den Tastatur-Fokus haelt.
     Schuetzt vor der Race: JS-Echo (fixturePositionChanged/-RotationChanged,
@@ -2933,10 +2939,12 @@ class VisualizerWindow(QMainWindow):
         act_clear_fx.triggered.connect(self._clear_positions)
         tb.addAction(act_clear_fx)
 
-        # LAS-32 (S1): Sperrzonen anlegen/bearbeiten und Laser-Felder eintragen.
+        # LAS-32/LAS-35: Sperrzonen planen (ziehen, Vorlagen), Laser-Felder
+        # eintragen oder einmessen.
         act_sperrzonen = QAction("Sperrzonen…", self)
         act_sperrzonen.setToolTip(
-            "Sperrzonen (rote Quader) und das Maximalfeld je Laser eintragen.\n"
+            "Sperrzonen planen: Zonen ziehen, Laser-Felder eintragen oder "
+            "einmessen.\n"
             "Nur Anzeige — schaltet den Laser NICHT ab.")
         act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
         tb.addAction(act_sperrzonen)
@@ -3034,7 +3042,18 @@ class VisualizerWindow(QMainWindow):
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, False)
         s.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
         s.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        splitter.addWidget(self._view)
+        # VIZ-109: Ansicht + schmaler Klapp-Knopf teilen sich die linke Seite —
+        # der Knopf sitzt so direkt an der Spalte und bleibt sichtbar, wenn
+        # sie zu ist. Die Ansicht selbst bleibt dasselbe Objekt.
+        from src.ui.visualizer.spalte_einklappen import SpaltenKlappe, baue_knopf
+        left_side = QWidget()
+        left_lay = QHBoxLayout(left_side)
+        left_lay.setContentsMargins(0, 0, 0, 0)
+        left_lay.setSpacing(0)
+        left_lay.addWidget(self._view, 1)
+        self._btn_spalte = baue_knopf(left_side)
+        left_lay.addWidget(self._btn_spalte)
+        splitter.addWidget(left_side)
 
         right_panel = self._build_right_panel()
         right_panel.setMinimumWidth(RECHTE_SPALTE_MIN)
@@ -3042,6 +3061,8 @@ class VisualizerWindow(QMainWindow):
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 0)
+        splitter.setCollapsible(0, False)   # der Knopf darf nie mit verschwinden
+        self._spalten_klappe = SpaltenKlappe(splitter, self._btn_spalte, 1, self)
 
         self.setCentralWidget(splitter)
 
@@ -3082,8 +3103,10 @@ class VisualizerWindow(QMainWindow):
             ("E", _cycle_edit, "Modus umschalten: Ansehen / Bauen"),
             ("F", self._on_key_f,
              "Auswahl einpassen (Fokus in der 3D-Ansicht), sonst Reiter Fixtures"),
-            ("S", lambda: self._tabs.setCurrentIndex(1), "Reiter Bühne zeigen"),
+            ("S", lambda: self._reiter_per_taste(1), "Reiter Bühne zeigen"),
             ("D", lambda: self._act_dock.toggle(), "Andocken ein/aus"),
+            ("F9", lambda: self._spalten_klappe.umschalten(),          # VIZ-109
+             "Rechte Spalte ein-/ausklappen"),
         ):
             sc = QShortcut(QKeySequence(key), self)
             sc.setWhatsThis(was)
@@ -3102,8 +3125,27 @@ class VisualizerWindow(QMainWindow):
         """A3D-29: F bedeutet zweierlei — entschieden wird nach dem Fokus."""
         if self._focus_is_in_3d():
             self._on_fit_selected()
+            # VIZ-109: Wer bei eingeklappter Spalte F drueckt, um sie
+            # auszuklappen, sieht stattdessen die Kamera springen. Die
+            # Statuszeile sagt, was passiert ist und welche Taste ausklappt.
+            klappe = getattr(self, "_spalten_klappe", None)
+            info = getattr(self, "_lbl_info", None)
+            if klappe is not None and klappe.eingeklappt and info is not None:
+                info.setText(HINWEIS_F_IN_DER_ANSICHT)
         else:
-            self._tabs.setCurrentIndex(0)
+            self._reiter_per_taste(0)
+
+    def _reiter_per_taste(self, index: int) -> None:
+        """Reiter der rechten Spalte per Taste zeigen.
+
+        VIZ-109: Ist die Spalte eingeklappt, klappt sie dabei aus — sonst
+        wechselte die Taste den Reiter, ohne dass man etwas saehe. Nur dieser
+        Weg klappt aus; ein Reiterwechsel per Programm (Wiederherstellen,
+        Sprung nach dem Anlegen) laesst die Spalte, wie sie ist."""
+        self._tabs.setCurrentIndex(index)
+        klappe = getattr(self, "_spalten_klappe", None)
+        if klappe is not None and klappe.eingeklappt:
+            klappe.setze_eingeklappt(False)
 
     def _focus_is_in_3d(self) -> bool:
         """Liegt der Tastaturfokus in der 3D-Ansicht?
@@ -5891,37 +5933,31 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] _on_brightness_from_js error: {e}")
 
     def _on_sperrzonen_dialog(self):
-        """LAS-32 (S1): den Sperrzonen-Dialog zeigen (nicht modal — das 3D
-        dahinter zeichnet jede Aenderung sofort)."""
-        from src.ui.visualizer.sperrzonen_ui import SperrzonenDialog
-        dlg = getattr(self, "_sperrzonen_dlg", None)
-        if dlg is None:
-            dlg = SperrzonenDialog(self._state, self)
-            self._sperrzonen_dlg = dlg
-        else:
-            dlg.neu_laden()
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        """LAS-35: den Sperrzonen-Planer zeigen (nicht modal — das 3D dahinter
+        zeichnet jede Aenderung sofort). Er hat den frueheren Zahlenfeld-Dialog
+        (LAS-32) abgeloest."""
+        from src.ui.visualizer.sperrzonen_planer import planer_oeffnen
+        self._sperrzonen_dlg = planer_oeffnen(self._state, self)
 
     def _on_state(self, event: str, _data):
         if event == "sperrzonen_anzeige_changed":
             # LAS-32: Fenster „Sicht des Lasers" im 3D geschlossen/geoeffnet ->
-            # der Haken im Sperrzonen-Dialog zieht nach.
+            # der Haken im Sperrzonen-Planer zieht nach.
             dlg = getattr(self, "_sperrzonen_dlg", None)
             if dlg is not None:
                 try:
                     dlg.lasersicht_nachziehen()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event in ("patch_changed", "show_loaded"):
-            # LAS-32: ein offener Sperrzonen-Dialog zeigt sonst die alte Show.
+            # Ein offener Planer zeigt sonst die alte Show; ein laufendes
+            # Einmessen endet dabei (Laser aus).
             dlg = getattr(self, "_sperrzonen_dlg", None)
-            if dlg is not None and dlg.isVisible():
+            if dlg is not None:
                 try:
-                    dlg.neu_laden()
+                    dlg.patch_oder_show_geaendert()
                 except Exception as e:                   # noqa: BLE001
-                    print(f"[Visualizer] Sperrzonen-Dialog: {e}")
+                    print(f"[Visualizer] Sperrzonen-Planer: {e}")
         if event == "patch_changed":
             self._refresh_patch_list()
         elif event == "show_loaded":
@@ -6094,5 +6130,13 @@ class VisualizerWindow(QMainWindow):
         if not self._confirm_close_with_unsaved_stage():
             event.ignore()
             return
+        # LAS-35: das Fenster wird nur versteckt — der Sperrzonen-Planer
+        # erfaehrt davon nichts. Ein laufendes Einmessen endet hier (Laser aus).
+        dlg = getattr(self, "_sperrzonen_dlg", None)
+        if dlg is not None:
+            try:
+                dlg.einmessen_abbrechen()
+            except Exception as e:                       # noqa: BLE001
+                print(f"[Visualizer] ERROR: Einmessen nicht beendet: {e}")
         event.ignore()
         self.hide()

@@ -14,8 +14,8 @@ from .carousel import Carousel
 from .efx import EfxInstance
 from .rgb_matrix import RgbMatrixInstance
 from .modify import (ModifySammler, ist_modify, modify_posten,
-                     normalize_mode, normalize_strength, posten_anwenden,
-                     setze_sammler)
+                     normalize_channels, normalize_mode, normalize_strength,
+                     posten_anwenden, setze_sammler)
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -705,6 +705,8 @@ class FunctionManager:
             f.modify = bool(fd.get("modify", False))
             f.modify_mode = normalize_mode(fd.get("modify_mode", "add"))
             f.modify_strength = normalize_strength(fd.get("modify_strength", 100))
+            # ENG-40: Kanalwahl; fehlt der Schluessel, gilt die Vorgabe.
+            f.modify_channels = normalize_channels(fd.get("modify_channels"))
             self._functions[f.id] = f
         # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
         # neu erstellte Funktionen mit geladenen und ueberschreiben sie.

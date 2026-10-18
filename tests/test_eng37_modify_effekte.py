@@ -539,28 +539,31 @@ def test_normales_kind_einer_collection_schreibt_unveraendert(rig):
     assert bild == [90] * N                  # letzter Schreiber gewinnt, wie bisher
 
 
-# ── Schritt 1: nur Stil Dimmer ───────────────────────────────────────────────
+# ── Nur Mengen: Stil Shutter verrechnet nicht ────────────────────────────────
+# (Stil RGB/RGBW ist seit ENG-38 freigeschaltet: tests/test_eng38_modify_farbe.py)
 
 
-def test_haken_bei_farb_stil_bleibt_ein_normaler_effekt(monkeypatch):
-    """Steht der Haken bei Stil RGB, wird NICHT verrechnet — Farbe und Dimmer
-    bleiben getrennt, und der Effekt laeuft wie ohne Haken."""
-    kan = [_Ch("color_r", 1), _Ch("color_g", 2), _Ch("color_b", 3)]
+def test_haken_bei_stil_shutter_bleibt_ein_normaler_effekt(monkeypatch):
+    """Steht der Haken bei Stil Shutter, wird NICHT verrechnet — eine Stellung
+    ist keine Menge, der Effekt laeuft wie ohne Haken."""
+    kan = [_Ch("shutter", 1), _Ch("intensity", 2)]
     monkeypatch.setattr(A, "get_channels_for_patched", lambda fx: kan)
     rig = [_Fx(1, 1)]
 
     def bild(haken):
-        m = RgbMatrixInstance("rgb", cols=1, rows=1, fixture_grid=[1],
-                              algorithm=RgbAlgorithm.PLAIN, color1=(200, 100, 50))
+        m = RgbMatrixInstance("shutter", cols=1, rows=1, fixture_grid=[1],
+                              algorithm=RgbAlgorithm.PLAIN, color1=(255, 255, 255))
+        m.style = MatrixStyle.SHUTTER
+        m.shutter_min, m.shutter_max = 20, 200
         m.tempo_bus_id = ""
         m.modify = haken
         m.modify_mode = "sub"
         assert m.modify_wirksam() is False
         u = Universe(1)
-        u.set_range(1, bytes([10, 10, 10]))
+        u.set_range(1, bytes([10, 10]))
         _fm(m).tick({1: u}, rig, DT)
-        return list(u.get_all()[:3])
-    assert bild(True) == bild(False) == [200, 100, 50]
+        return list(u.get_all()[:2])
+    assert bild(True) == bild(False) == [200, 10]
 
 
 def test_andere_funktionstypen_verrechnen_nicht():
@@ -740,7 +743,7 @@ def test_parameterliste_ohne_haken_unveraendert():
     m.modify = True
     mit = [s.key for s in m.list_params()]
     assert [k for k in mit if not k.startswith("modify")] == schluessel
-    m.style = MatrixStyle.RGB                # Haken bei Farbe: nicht wirksam
+    m.style = MatrixStyle.SHUTTER            # Haken bei Shutter: nicht wirksam
     assert not [s.key for s in m.list_params() if s.key.startswith("modify")]
 
 
