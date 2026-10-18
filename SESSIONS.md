@@ -58,7 +58,7 @@
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | UI-93 | A | fix/ui93-wiederholen-strg-y-linux | 2026-10-13T20:18Z | - |
-| IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-13T22:26Z | - |
+| IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-18T15:37Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-14T16:29Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 | LAS-31 | A | fix/las31-notaus-ein-weg-blackout-kiosk | 2026-10-18T15:37Z | - |
 | XPLAT-23 | A | fix/xplat23-sh-angleichung | 2026-10-18T15:37Z | - |
