@@ -72,10 +72,14 @@ MAX_GESAMT_BYTES = 500 * 1024 * 1024
 ANLASS_AUTO = "auto"
 ANLASS_VOR_SPEICHERN = "vor-speichern"
 ANLASS_VOR_VERWERFEN = "vor-verwerfen"
+#: ENG-36: der Stand unmittelbar vor einem Klon-Vorgang (viele Stellen der Show
+#: auf einmal). Zaehlt in der Staffelung zu den Anlass-Sicherungen.
+ANLASS_VOR_KLONEN = "vor-klonen"
 ANLASS_TEXT = {
     ANLASS_AUTO: "Auto-Save",
     ANLASS_VOR_SPEICHERN: "vor dem Überschreiben",
     ANLASS_VOR_VERWERFEN: "vor dem Verwerfen",
+    ANLASS_VOR_KLONEN: "vor dem Klonen",
 }
 
 _ZEITFORMAT = "%Y%m%d-%H%M%S"
