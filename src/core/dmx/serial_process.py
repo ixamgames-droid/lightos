@@ -123,7 +123,47 @@ def _serial_worker_loop(dev_factory, buf, stop_flag, status,
             pass
 
 
-def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL):
+PORT_BYTES = 256            # OUT-66: shared Rueckmeldung aktueller Port
+SN_BYTES = 64               # OUT-66: shared gelernte USB-Seriennummer
+
+
+def _lies_text(arr) -> str:
+    """OUT-66: Text aus einem shared ``Array('c', n)`` (leer bei Fehler/None)."""
+    if arr is None:
+        return ""
+    try:
+        return bytes(arr.value).decode("utf-8", "replace").strip()
+    except Exception:
+        return ""
+
+
+def _schreib_text(arr, text, n: int):
+    if arr is None:
+        return
+    try:
+        arr.value = str(text or "").encode("utf-8")[:n - 1]
+    except Exception:
+        pass
+
+
+def _enttec_fabrik(enttec_cls, port, port_akt=None, seriennr=None):
+    """OUT-66: Fabrik fuer den Worker-Enttec. Reicht die vom Proxy gehaltene
+    Seriennummer an jeden (neu gestarteten) Worker weiter, damit der SEINEN
+    Dongle sucht und nicht den, der gerade am konfigurierten Port haengt; und
+    meldet den tatsaechlich geoeffneten Port + gelernte Nummer zurueck."""
+    def melde(p, sn):
+        _schreib_text(port_akt, p, PORT_BYTES)
+        if sn:
+            _schreib_text(seriennr, sn, SN_BYTES)
+
+    def fabrik():
+        return enttec_cls(port, seriennr=_lies_text(seriennr) or None,
+                          melde=melde)
+    return fabrik
+
+
+def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL,
+                 port_akt=None, seriennr=None):
     """Kindprozess-Einstieg (Top-Level -> picklebar fuer ``spawn``)."""
     try:
         from src.core.dmx.enttec_pro import EnttecPro
@@ -137,7 +177,8 @@ def _worker_main(port, buf, stop_flag, status, frame_interval=FRAME_INTERVAL):
     # ``PPID = 989 = systemd`` weiter — der Kernel hatte sie beim Tod des
     # Parents an den Subreaper umgehaengt. Genau das faengt der PID-Vergleich.
     _ppid0 = os.getppid()
-    _serial_worker_loop(lambda: EnttecPro(port), buf, stop_flag, status,
+    _serial_worker_loop(_enttec_fabrik(EnttecPro, port, port_akt, seriennr),
+                        buf, stop_flag, status,
                         frame_interval, parent_alive=_eltern_wache(_ppid0))
 
 
@@ -317,6 +358,11 @@ class EnttecProcessProxy:
         self._buf = self._ctx.Array("B", DMX_BYTES)        # shared latest frame
         self._stop = self._ctx.Value("b", 0)
         self._status = self._ctx.Value("b", ST_CONNECTING)
+        # OUT-66: Rueckmeldung des Workers — Port, den er WIRKLICH offen hat
+        # (folgt dem Dongle nach SERIAL-02), und die gelernte Seriennummer, die
+        # einem neu gestarteten Worker mitgegeben wird.
+        self._port_akt = self._ctx.Array("c", PORT_BYTES)
+        self._seriennr = self._ctx.Array("c", SN_BYTES)
         # Prozess-Fabrik injizierbar fuer Tests (kein echter Subprozess noetig).
         self._process_factory = _process_factory or self._default_process_factory
         self._proc = None
@@ -329,7 +375,8 @@ class EnttecProcessProxy:
     def _default_process_factory(self):
         return self._ctx.Process(
             target=_worker_main,
-            args=(self.port, self._buf, self._stop, self._status, self._frame_interval),
+            args=(self.port, self._buf, self._stop, self._status, self._frame_interval,
+                  self._port_akt, self._seriennr),
             name=f"EnttecSerial-{self.port}",
             daemon=True,
         )
@@ -386,6 +433,24 @@ class EnttecProcessProxy:
         (SERIAL-01)."""
         p = self._proc
         return bool(p is not None and p.is_alive())
+
+    @property
+    def konfig_port(self) -> str:
+        """OUT-66: der konfigurierte Port (= ``port``; Schluessel der
+        NOT-AUS-Sperre je Ausgabeweg)."""
+        return self.port
+
+    @property
+    def port_aktuell(self) -> str:
+        """OUT-66: der Port, den der Worker gerade WIRKLICH offen hat. Folgt er
+        dem Dongle an eine neue Nummer (SERIAL-02), steht die hier — der
+        OutputManager sperrt den NOT-AUS-Weg dann auch ueber diese Nummer."""
+        return _lies_text(getattr(self, "_port_akt", None)) or self.port
+
+    @property
+    def seriennr(self) -> str | None:
+        """OUT-66: vom Worker gelernte USB-Seriennummer (sonst None)."""
+        return _lies_text(getattr(self, "_seriennr", None)) or None
 
     def status(self) -> int:
         """Roher Worker-/Port-Status (``ST_CONNECTING``/``ST_OK``/``ST_DISABLED``),

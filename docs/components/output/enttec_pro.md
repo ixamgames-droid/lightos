@@ -49,6 +49,10 @@ Worker-Loop).
   KONFIGURIERTEN Port exklusiv, wird nur gewarnt und geteilt geöffnet (wie OUT-54).
   `konfig_port` bleibt beim Portwechsel stehen — er ist der Schlüssel der
   NOT-AUS-Sperre je Ausgabeweg (`OutputManager._weg_enttec`, OUT-64).
+  Im Prozess-Proxy meldet der Worker den geoeffneten Port (`port_aktuell`) und die
+  gelernte Seriennummer zurueck; ein neu gestarteter Worker bekommt sie mit
+  (`EnttecPro(port, seriennr=…)`). Ohne Exklusiv-Sperre geoeffnet (fremder Halter)
+  wird keine Seriennummer gelernt.
 - `close()` bricht/leert vorher den Output-Puffer, damit `CloseHandle()` nicht mit einem
   ausstehenden `WriteFile` kollidiert. Idempotent, fehlertolerant.
 

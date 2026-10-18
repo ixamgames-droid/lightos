@@ -197,6 +197,19 @@ class ZweiDongles(_Basis):
         self.assertTrue(a.is_disabled(), "fremd exklusiv gehaltener Port genommen")
         self.assertEqual(P0, a.port)
 
+    def test_ohne_seriennummer_zweiter_enttec_von_anderer_instanz_belegt(self):
+        # Review: B (ohne Seriennummer) haelt P1 offen, A kommt an P2 zurueck.
+        # Zwei Enttec sichtbar -> ohne Seriennummer NICHT eindeutig; A bleibt
+        # aus und oeffnet P2 nicht (Regel "genau EIN sichtbarer Enttec").
+        WELT.enttecs = {P0: None, P1: None}
+        a, b = self._neu(P0), self._neu(P1)
+        self._abziehen(a)
+        WELT.enttecs = {P1: None, P2: None}
+        WELT.oeffnungen.clear()
+        self._reconnect(a)
+        self.assertTrue(a.is_disabled())
+        self.assertNotIn(P2, [p for p, _ in WELT.oeffnungen])
+
 
 class Serial02BleibtHeil(_Basis):
 
@@ -257,6 +270,144 @@ class Exklusiv(_Basis):
         WELT.enttecs = {P0: None}
         self._neu(P0)
         self.assertNotIn("exclusive", WELT.oeffnungen[-1][1])
+
+
+class ErstesOeffnen(_Basis):
+    """Review OUT-66: auch das ERSTE Oeffnen (frisch gestarteter Worker,
+    Oeffnungs-Neuversuch im Worker) darf keinen fremden Dongle als eigenen
+    lernen."""
+
+    @unittest.skipUnless(POSIX, "Exklusiv-Sperre nur unter POSIX")
+    def test_fremd_exklusiv_gehalten_keine_seriennummer_gelernt(self):
+        # Vertauscht eingesteckt: an A's Port P0 haengt B's Dongle, B's Worker
+        # haelt ihn exklusiv. A oeffnet (OUT-54) geteilt — lernt BBB aber nicht.
+        WELT.enttecs = {P0: "BBB", P1: "AAA"}
+        WELT.fremd_exklusiv = {P0}
+        a = self._neu(P0)
+        self.assertTrue(a.is_open())
+        self.assertIsNone(a._seriennr, "fremde Seriennummer als eigene gelernt")
+
+    def test_neustart_mit_bekannter_seriennummer_sucht_eigenen_dongle(self):
+        WELT.enttecs = {P0: "BBB", P1: "AAA"}
+        a = EnttecPro(P0, seriennr="AAA")
+        self.geraete.append(a)
+        self.assertEqual(P1, a.port, "Worker-Neustart nahm den fremden Dongle")
+        self.assertEqual(P0, a.konfig_port)
+        self.assertEqual("AAA", a._seriennr)
+
+    def test_neustart_eigener_nicht_da_fremder_am_port_wirft(self):
+        WELT.enttecs = {P0: "BBB"}
+        WELT.oeffnungen.clear()
+        with self.assertRaises(serial.SerialException):
+            self.geraete.append(EnttecPro(P0, seriennr="AAA"))
+        self.assertEqual([], WELT.oeffnungen)
+
+    def test_neustart_mit_seriennummer_am_eigenen_port(self):
+        WELT.enttecs = {P0: "AAA", P1: "AAA2"}
+        a = EnttecPro(P0, seriennr="AAA")
+        self.geraete.append(a)
+        self.assertEqual(P0, a.port)
+
+    def test_worker_fabrik_reicht_seriennummer_weiter(self):
+        from src.core.dmx import serial_process as sp
+        port_akt, sn = SimpleNamespace(value=b""), SimpleNamespace(value=b"")
+        WELT.enttecs = {P0: "AAA"}
+        fabrik = sp._enttec_fabrik(EnttecPro, P0, port_akt, sn)
+        a = fabrik()
+        self.assertEqual(b"AAA", sn.value)
+        self.assertEqual(P0.encode(), port_akt.value)
+        a.close()
+        # Worker stirbt; beim Neustart haengt B's Dongle an P0, A's an P3.
+        WELT.enttecs = {P0: "BBB", P3: "AAA"}
+        a2 = fabrik()
+        self.geraete.append(a2)
+        self.assertEqual(P3, a2.port)
+        self.assertEqual(P3.encode(), port_akt.value,
+                         "aktueller Port nicht an den Proxy gemeldet")
+
+    def test_worker_main_nutzt_die_fabrik(self):
+        import inspect
+        from src.core.dmx import serial_process as sp
+        self.assertIn("_enttec_fabrik", inspect.getsource(sp._worker_main))
+
+
+class _FakeProc:
+    exitcode = None
+
+    def start(self):
+        pass
+
+    def is_alive(self):
+        return True
+
+    def join(self, timeout=None):
+        pass
+
+    def terminate(self):
+        pass
+
+
+class NotAusProxy(unittest.TestCase):
+    """Review OUT-66: Im Standardbetrieb steckt der Prozess-Proxy dazwischen.
+    Folgt sein Worker dem Dongle an eine neue Nummer, meldet er sie ueber
+    ``port_aktuell`` — die NOT-AUS-Sperre greift auch dort."""
+
+    def setUp(self):
+        from src.core.dmx import output_manager as om_mod
+        from src.core.dmx import serial_process as sp
+        self.sp = sp
+        self.proxies = []
+
+        def mach(port):
+            d = sp.EnttecProcessProxy(port, _process_factory=_FakeProc)
+            self.proxies.append(d)
+            return d
+        p = mock.patch.object(om_mod, "_make_enttec_device", mach)
+        p.start(); self.addCleanup(p.stop)
+        p2 = mock.patch("src.core.dmx.port_check.warne_wenn_belegt",
+                        lambda *_a, **_k: None, create=True)
+        p2.start(); self.addCleanup(p2.stop)
+        self.om = om_mod.OutputManager()
+        for u in (1, 2):
+            self.om.add_universe(u)
+        self.addCleanup(self._zu)
+
+    def _zu(self):
+        for u in (1, 2):
+            try:
+                self.om.remove_output(u)
+            except Exception:
+                pass
+        for d in self.proxies:
+            d.close()
+
+    def test_sperre_haelt_ueber_gemeldeten_neuen_port(self):
+        self.om.add_enttec(1, P0)
+        a = self.om._enttec_outputs[1]
+        self.om.universes[1].set_channel(40, 255)
+        self.om.set_laser_estop_mask({1: frozenset({40})}, True)
+        # Worker folgt dem Dongle nach P3 (SERIAL-02) und meldet das.
+        self.sp._schreib_text(a._port_akt, P3, self.sp.PORT_BYTES)
+        self.assertEqual(P3, a.port_aktuell)
+        self.assertEqual(P0, a.port)
+        self.assertIn(("enttec", P3), self.om._wege_enttec(a))
+        self.om.universes[2].set_channel(40, 255)
+        self.om.add_enttec(2, P3)
+        self.assertNotIn(1, self.om._enttec_outputs,
+                         "U1 schreibt weiter auf den Dongle an P3")
+        b = self.om._enttec_outputs[2]
+        self.assertTrue(self.om._werte_fuer(self.om._laser_estop_wege,
+                                            self.om._wege_enttec(b)),
+                        "U2 auf neuer Nummer ohne NOT-AUS-Sperre")
+        self.om._send_all()
+        self.assertEqual(0, bytes(b._buf.get_obj())[39],
+                         "OUT-66: NOT-AUS ueber die neue Portnummer umgangen")
+
+    def test_ohne_rueckmeldung_konfigurierter_port(self):
+        d = self.sp.EnttecProcessProxy(P0, _process_factory=_FakeProc)
+        self.proxies.append(d)
+        self.assertEqual(P0, d.port_aktuell)
+        self.assertIsNone(d.seriennr)
 
 
 class NotAusNachPortwechsel(_Basis):

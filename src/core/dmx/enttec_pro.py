@@ -191,8 +191,14 @@ class EnttecPro:
     # zurueck, reaktiviert sich die Ausgabe von selbst (ohne App-Neustart).
     RECONNECT_EVERY_S = 3.0
 
-    def __init__(self, port: str):
+    def __init__(self, port: str, seriennr: str | None = None, melde=None):
+        """``seriennr`` (OUT-66): die Seriennummer, die diese Ausgabe schon
+        einmal gelernt hat — der Prozess-Proxy reicht sie einem NEU gestarteten
+        Worker mit, damit der gezielt SEINEN Dongle sucht. ``melde(port, sn)``
+        wird nach jedem erfolgreichen Oeffnen gerufen (Rueckmeldung an den
+        Proxy: aktueller Port + gelernte Seriennummer)."""
         self.port = port
+        self._melde = melde
         # OUT-66: der KONFIGURIERTE Port. ``port`` folgt dem Dongle, wenn er nach
         # einem Replug an neuer Nummer haengt (SERIAL-02); ``konfig_port`` bleibt
         # — er ist der Schluessel der NOT-AUS-Sperre je Ausgabeweg (OUT-64,
@@ -201,7 +207,8 @@ class EnttecPro:
         self.konfig_port = port
         # OUT-66: Seriennummer des Dongles, sobald einmal offen (falls das System
         # eine meldet). Daran erkennt der Reconnect SEINEN Dongle wieder.
-        self._seriennr: str | None = None
+        self._seriennr: str | None = (str(seriennr).strip() or None
+                                      if seriennr else None)
         # Ohne close() verschwundene Instanzen geben ihre Eintraege trotzdem frei
         # (sonst sperrte eine tote Instanz den Port/Dongle fuer immer).
         import weakref
@@ -218,8 +225,42 @@ class EnttecPro:
         # GESAMTE Engine einfrieren. 0.5 s sind grosszuegig fuer ein 513-Byte-
         # Paket bei 57600 Baud (~90 ms); ein Timeout wirft SerialTimeoutException,
         # die der OutputManager faengt und das Frame ueberspringt.
-        self._ser = self._oeffne(port, exklusiv_pflicht=False)
-        self._geoeffnet(port)
+        ziel = self._start_ziel()
+        eigen = _port_key(ziel) == _port_key(port)
+        self._ser, exklusiv = self._oeffne(ziel, exklusiv_pflicht=not eigen)
+        self.port = ziel
+        # OUT-66 (Review): Bekam diese Instanz den Port NICHT exklusiv, haelt ihn
+        # ein anderer (z. B. der Worker des anderen Universums nach vertauschtem
+        # Wiedereinstecken). Dessen Seriennummer darf sie sich nicht als eigene
+        # merken — sonst folgte auch jeder spaetere Reconnect dem fremden Dongle.
+        self._geoeffnet(ziel, lernen=exklusiv)
+
+    def _start_ziel(self) -> str:
+        """OUT-66: Wohin das ERSTE Oeffnen geht. Ohne bekannte Seriennummer der
+        konfigurierte Port (wie bisher). Mit bekannter (Worker-Neustart) der
+        Dongle mit DIESER Nummer — bevorzugt am eigenen Port, sonst an seiner
+        neuen Nummer (SERIAL-02). Haengt am eigenen Port erkennbar ein ANDERER
+        Dongle und der eigene ist nicht zu sehen -> SerialException (der Worker
+        versucht es gedrosselt erneut), statt fremd zu schreiben."""
+        port, sn = self.port, self._seriennr
+        if not sn:
+            return port
+        try:
+            kand = enttec_kandidaten()
+        except Exception:
+            kand = []
+        gleiche = [d for d, s in kand if s == sn and not self._fremd(d, s)]
+        for d in gleiche:
+            if _port_key(d) == _port_key(port):
+                return d
+        if gleiche:
+            return gleiche[0]
+        for d, s in kand:
+            if _port_key(d) == _port_key(port) and s and s != sn:
+                raise serial.SerialException(
+                    f"{port}: dort haengt ein anderer Enttec (Seriennummer {s}, "
+                    f"erwartet {sn}) — wird nicht genommen (OUT-66)")
+        return port
 
     @staticmethod
     def _oeffne(port: str, exklusiv_pflicht: bool):
@@ -232,31 +273,45 @@ class EnttecPro:
         (``exklusiv_pflicht=False``), wird nur gewarnt und ohne Sperre
         geoeffnet — wie bei OUT-54: ein Ausgang, der sich wegen einer
         Vermutung abschaltet, ist im Live-Betrieb schlimmer. Ein FREMDER
-        Port beim Reconnect (``exklusiv_pflicht=True``) wird so nie genommen."""
+        Port beim Reconnect (``exklusiv_pflicht=True``) wird so nie genommen.
+
+        Gibt ``(ser, exklusiv)`` zurueck; ``exklusiv`` ist False nur im
+        geteilten Notfall-Pfad (ein anderer haelt den Port)."""
         kw = dict(timeout=1, write_timeout=0.5)
         if os.name == "posix":
             try:
-                return serial.Serial(port, ENTTEC_BAUD, exclusive=True, **kw)
+                return serial.Serial(port, ENTTEC_BAUD, exclusive=True, **kw), True
             except (serial.SerialException, OSError) as e:
                 if exklusiv_pflicht or not _ist_sperr_fehler(e):
                     raise
                 import sys
                 print(f"[EnttecPro] {port} wird schon exklusiv gehalten — "
                       f"oeffne ihn trotzdem (geteilte Leitung).", file=sys.stderr)
-        return serial.Serial(port, ENTTEC_BAUD, **kw)
+            return serial.Serial(port, ENTTEC_BAUD, **kw), False
+        return serial.Serial(port, ENTTEC_BAUD, **kw), True
 
-    def _geoeffnet(self, port: str):
+    def _geoeffnet(self, port: str, lernen: bool = True):
         """OUT-66: Port als von dieser Instanz offen eintragen, Seriennummer
-        merken (nur wenn noch keine bekannt ist — sie aendert sich nie)."""
+        merken (nur wenn noch keine bekannt ist — sie aendert sich nie — und
+        nur, wenn der Port exklusiv offen ist: ``lernen``)."""
         with _REG_LOCK:
             _OFFEN[_port_key(port)] = id(self)
-        if not self._seriennr:
+        if self._seriennr:
+            with _REG_LOCK:
+                if _SN_BESITZER.get(self._seriennr, id(self)) == id(self):
+                    _SN_BESITZER[self._seriennr] = id(self)
+        elif lernen:
             sn = _seriennummer_von(port)
             if sn:
                 with _REG_LOCK:
                     if _SN_BESITZER.get(sn, id(self)) == id(self):
                         _SN_BESITZER[sn] = id(self)
                         self._seriennr = sn
+        if self._melde is not None:
+            try:
+                self._melde(self.port, self._seriennr)
+            except Exception:
+                pass
 
     def _port_freigeben(self, auch_seriennr: bool = False):
         _registry_freigeben(id(self), auch_seriennr)
@@ -421,14 +476,14 @@ class EnttecPro:
         eigen = _port_key(target) in {_port_key(self.port),
                                       _port_key(self.konfig_port)}
         try:
-            self._ser = self._oeffne(target, exklusiv_pflicht=not eigen)
+            self._ser, exklusiv = self._oeffne(target, exklusiv_pflicht=not eigen)
         except (serial.SerialException, OSError, ValueError) as e:
             # STAB-30: der Grund des gescheiterten Wiederverbindens (gedrosselt).
             from src.core.diagnose_log import melde_still
             melde_still("dmx.enttec.reconnect", e, text=f"Port {target}")
             return
         self.port = target
-        self._geoeffnet(target)              # OUT-66
+        self._geoeffnet(target, lernen=exklusiv)   # OUT-66
         self._disabled = False
         self._fail_count = 0
         # OUT-51: Auch die Erholung gehoert gemeldet. Wer nur den Ausfall sieht,

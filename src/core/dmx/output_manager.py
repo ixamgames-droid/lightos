@@ -448,11 +448,28 @@ class OutputManager:
         nicht der aktuelle. Der In-Proc-:class:`EnttecPro` folgt nach einem
         Replug seinem Dongle an eine neue Nummer (SERIAL-02) und aendert dabei
         ``port`` — mit ``port`` als Schluessel fiele die beim Latch gemerkte
-        Sperre genau dann weg. Der Prozess-Proxy meldet ohnehin immer den
+        Sperre genau dann weg. Der Prozess-Proxy meldet als ``port`` immer den
         konfigurierten Port; dass dahinter derselbe Dongle steckt, sichert
         ``EnttecPro._reconnect_ziel``."""
-        port = getattr(dev, "konfig_port", None) or getattr(dev, "port", None)
+        port = getattr(dev, "konfig_port", None)
+        if not isinstance(port, str) or not port:
+            port = getattr(dev, "port", None)
         return ("enttec", port)
+
+    @staticmethod
+    def _enttec_ports_jetzt(dev) -> list:
+        """OUT-66: die Portnamen, an denen der Ausgang GERADE schreibt: ``port``
+        (In-Proc-Enttec folgt dem Dongle) und ``port_aktuell`` (Prozess-Proxy:
+        vom Worker zurueckgemeldet, waehrend ``port`` der konfigurierte bleibt)."""
+        out = []
+        for name in ("port", "port_aktuell"):
+            try:
+                p = getattr(dev, name, None)
+            except Exception:
+                p = None
+            if isinstance(p, str) and p and p not in out:
+                out.append(p)
+        return out
 
     @classmethod
     def _wege_enttec(cls, dev) -> list:
@@ -461,9 +478,9 @@ class OutputManager:
         hat, auch diese. Geht danach ein anderes Universum auf die NEUE Nummer,
         trifft es so dieselbe Sperre."""
         wege = [cls._weg_enttec(dev)]
-        jetzt = ("enttec", getattr(dev, "port", None))
-        if jetzt[1] is not None and jetzt not in wege:
-            wege.append(jetzt)
+        for p in cls._enttec_ports_jetzt(dev):
+            if ("enttec", p) not in wege:
+                wege.append(("enttec", p))
         return wege
 
     @staticmethod
@@ -1180,8 +1197,11 @@ class OutputManager:
         """Schliesst eine evtl. offene Enttec-Verbindung auf diesem COM-Port
         (thread-sicher), egal auf welchem Universe sie haengt."""
         with self._io_lock:
+            # OUT-66: auch der Port, an den der Worker dem Dongle gefolgt ist
+            # (``port_aktuell``) — ein Dongle hat genau einen Ausgang.
             victims = [(u, d) for u, d in self._enttec_outputs.items()
-                       if getattr(d, "port", None) == port]
+                       if port in self._enttec_ports_jetzt(d)
+                       or getattr(d, "port", None) == port]
             for u, _ in victims:
                 self._enttec_outputs.pop(u, None)
                 self._vergiss_fehler(u)   # OUT-51, s. _vergiss_fehler
