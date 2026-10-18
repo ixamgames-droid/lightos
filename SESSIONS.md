@@ -65,7 +65,7 @@
 | LIZ-2 | A | fix/liz2-lizenzen-rest | 2026-10-18T15:37Z | - |
 | DOC-16 | A | docs/doc16-anleitungen-neu-bebildert | 2026-10-18T15:37Z | - |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
-| CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-14T19:43Z | - |
+| CDX-59 | A | fix/cdx-nachlese-2026-10-14 | 2026-10-18T15:37Z | - |
 | QA-98 | A | fix/qa98-weissband-test-schneller | 2026-10-18T15:37Z | - |
 | LAS-39 | A | fix/las39-laser-erkennung-ohne-datenbank | 2026-10-18T15:37Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
