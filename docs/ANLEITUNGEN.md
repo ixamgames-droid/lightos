@@ -16,12 +16,19 @@ nach durch. **Installiert** wird LightOS laut [INSTALL.md](../INSTALL.md) — au
   und den Laser- und Gobo-Test. Sie öffnet sich als neue, ungespeicherte Show; **Speichern**
   legt deine eigene Kopie an. Aus dem Quellcode baut `python packaging/demo_shows.py` alle
   fünf auf einmal; der einzelne Generator geht weiterhin.
+- **Doku-Demo** — die kleine Show, die die Bilder dieser Anleitungen zeigt (acht PAR, zwei
+  Wash, zwei Spot, eine LED-Leiste, Farb-Szenen, Lauflicht, Regenbogen, Kreis, eine Cue-Liste,
+  eine VC-Bank). Aus dem Quellcode:
+  `venv/bin/python tools/anleitungsbilder.py --demo-show Doku_Demo.lshow` (Linux) bzw.
+  `venv\Scripts\python tools\anleitungsbilder.py --demo-show Doku_Demo.lshow` (Windows),
+  danach **Datei → Öffnen...**.
 - **Keine Show nötig** — die Anleitung beginnt mit einer leeren oder deiner eigenen Show.
 - **Beispiel-Show nicht im Repo** — die Bilder stammen aus einer privaten Show. Die Schritte
   gelten trotzdem für jedes Rig; Namen von Tasten und Gruppen weichen dann ab.
 
 Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & Cues,
-Geräte-Bibliothek, 3D-Bühne, Große Bühnen-Show) zeigen
+Geräte-Bibliothek, 3D-Bühne, Große Bühnen-Show, Virtual Console, Gruppen und Matrizen,
+Musik-Sync) zeigen
 die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLEITUNGSBILDER.md)).
 Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
@@ -47,6 +54,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster oder Block, zu einer Zelle zusammenfassen, Matrizen zusammenlegen. | Keine Show nötig |
 | [Geräte-Bibliothek & eigene Profile](anleitung_geraete_bibliothek/ANLEITUNG.md) | Mitgelieferte Profile und LightOS-Bibliothek (Herkunft, „geprüft“), Gerät aus der Bibliothek patchen, freie Bibliothek herunterladen, eigenes Profil im Fixture-Editor, LightOS-Profil exportieren/importieren, Zuordnung Dimmer → Weiß-Segment, die neuen 3D-Modelle. | Keine Show nötig |
 | [Eigenes Gerät mit dem Fixture Generator anlegen](anleitung_fixture_generator/ANLEITUNG_FIXTURE_GENERATOR.md) | Am Beispiel des Show-Lasers Laserworld EL-400RGB MK2: Angaben von Typenschild und Handbuch-DMX-Tabelle, DIP-Schalter, Generator (Kopf, Kanäle, Attribute, Bereiche), Laser-Sicherheit über den Aus-Wert, Laser-Seiten (Muster mit Schemabild, Farben, Richtungen), Prüfen/Speichern, patchen, Reiter Laser, Laser-NOT-AUS, EFX auf den Laser-Achsen, 3D, sicherer Abgleich am echten Gerät. | Keine Show nötig |
+| [Geräte klonen](anleitung_klonen/ANLEITUNG_KLONEN.md) | Was ein Gerät in der Show tut (Gruppen, Effekte, Snaps, Szenen, Cues, Paletten), auf andere übertragen — mit Vorschau, Sicherung und einem Rückgängig-Schritt; Dimmer und Farbe auch zwischen verschiedenen Gerätetypen. Noch ohne Bilder. | Keine Show nötig |
 | [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel und Laser. | Keine Show nötig |
 | [Moving Heads steuern](anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md) | Farbrad, Gobo, Bewegung und gezieltes Pan/Tilt über die Virtual Console. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |
 | [Spider steuern](anleitung_spider/ANLEITUNG_SPIDER.md) | Farb-Themes je Bar und Tilt-Bewegung (Schere, Wippe). | Generator `build_event_demo_2026.py` |
@@ -83,7 +91,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 
 | Anleitung | Worum geht's | Show |
 |---|---|---|
-| [Virtual Console bauen & designen](anleitung_vc/ANLEITUNG_VC.md) | Eigene Bedienoberfläche: Bänke, Tasten, Fader, Labels, Strobe. | Beispiel-Show nicht im Repo |
+| [Virtual Console bauen & designen](anleitung_vc/ANLEITUNG_VC.md) | Eigene Bedienoberfläche: Bänke, Tasten, Fader, Labels, Strobe. | Doku-Demo |
 | [VC-Widget-Referenz](anleitung_vc_widgets/README.md) · [English](anleitung_vc_widgets/README.en.md) | Eine Seite je Element (Taste, Fader, XY-Pad, Encoder, Matrix-Editor …): Einstellungen, Dialogfelder, Fallstricke. | Generator `build_vc_widgets_showcase.py` → `VC_Widgets_Showcase.lshow` |
 | [Alle VC-Elemente im Überblick](anleitung_vc_elemente/ANLEITUNG_VC_ELEMENTE.md) | Kurzreferenz aller Bau-Elemente und der Baukasten-Knöpfe. | Generator `build_vc_elements_showcase.py` → `VC_Elemente_Showcase.lshow` |
 | [Effekte einfach aufbauen](anleitung_vc_smartbuild/ANLEITUNG.md) | Effekte per Drag & Drop auf die VC legen und einrichten. | Generator `build_farb_fx_vc_show.py` → `Farb_FX_VC_Show.lshow` |
@@ -103,7 +111,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 | [Tempo-Controller](anleitung_tempo_controller/ANLEITUNG_TEMPO_CONTROLLER.md) | Das All-in-One-Tempo-Element der VC: Bus, Quelle, Faktor und mitlaufende Effekte. | Keine Show nötig |
 | [Speed-Dial, Master/Sub & Grand-Master](anleitung_speed/ANLEITUNG_SPEED.md) | Tempo aus der VC regeln, mehrere Tempi koppeln, Grand-Master. | Keine Show nötig |
 | [Tempo steuern: Speed, BPM, Master/Sub, Tempo-Buses](anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md) | Die Tempo-Bank der Event-Demo. | Generator `build_event_demo_2026.py` |
-| [Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md) | Playlist abspielen, die Show startet automatisch, das Tempo folgt der Musik. | Beispiel-Show nicht im Repo |
+| [Musik-Sync & Auto-Show](anleitung_musik_sync/ANLEITUNG_MUSIK_SYNC.md) | Playlist abspielen, die Show startet automatisch, das Tempo folgt der Musik. | Doku-Demo + eigene Musik |
 | [Hochzeit: Farbwechsel und Dimmer taktgleich](anleitung_hochzeit_tempo/ANLEITUNG_HOCHZEIT_TEMPO.md) | Drei Tempo-Controller auf eigenen Bussen, unterschiedlich schnell, gemeinsamer Taktstart. | Beispiel-Show nicht im Repo |
 | [Drei Geschwindigkeiten aus einer Master-BPM](anleitung_test123_tempo/ANLEITUNG_TEST123_TEMPO.md) | Farbwechsel, Dimmer und Bewegung mit je eigener relativer Geschwindigkeit. | Beispiel-Show nicht im Repo |
 

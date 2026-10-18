@@ -482,8 +482,11 @@ Deshalb gilt:
   nicht von selbst (`LIGHTOS_NO_MIDI_AUTOCONNECT`).
 - **Bewusste Vorgaben bleiben stehen.** Wer eine der Variablen selbst setzt
   (Testlauf, Bild-Sandbox, Sichtproben-Sandkasten), behaelt seinen Wert. Fuer den
-  Datenordner zaehlt nur eine Vorgabe im Temp-Bereich als bewusst — `APPDATA` ist
-  unter Windows immer gesetzt.
+  Datenordner, die Show-Datenbank, die Ausgabe-Konfiguration, das
+  Absturzprotokoll und die Bibliothek zaehlt dabei nur eine Vorgabe im
+  Temp-Bereich als bewusst — `APPDATA` ist unter Windows immer gesetzt, und eine
+  Vorgabe auf die echte `universes.json` oder `current_show.db` wird umgelenkt
+  (eine gesetzte Bibliothek ausserhalb des Temp-Bereichs wird kopiert).
 - **Echte Daten nur auf Ansage.** Zwei Werkzeuge sollen am Bestand des Bedieners
   arbeiten und bekommen ihn nur mit `--echte-daten` (mit Warnzeile, App vorher
   schliessen, Ausgaenge bleiben auch dann zu): `tools/patch_quarantaene.py`

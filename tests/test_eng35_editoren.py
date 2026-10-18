@@ -446,3 +446,45 @@ def test_20_mal_umschalten_stuerzt_nicht_ab(tmp_path):
         f"Kindprozess endete mit {fertig.returncode} nach {runden} von 20 "
         f"Runden — nativer Absturz oder Fehler:\n{aus[-3000:]}")
     assert runden == 20
+
+
+def test_stufenaenderung_markiert_den_autosave():
+    """Codex-Review #1081 (CDX-59): ``setze_stufen`` meldet sich nur ueber den
+    Stufen-Melder, nicht als SyncEvent. Der Auto-Save hoerte nur auf
+    SyncEvents — war die Stufe die einzige Aenderung, wurde nicht gesichert.
+    Die echte ``_setup_autosave`` laeuft auf einem schlanken Stellvertreter
+    (kein Hauptfenster)."""
+    from PySide6.QtCore import QObject
+    from src.ui.main_window import MainWindow
+
+    _app()
+
+    class _Fenster(QObject):
+        _autosave_minutes = lambda self: 60             # noqa: E731
+        _autosave_path = lambda self: "unbenutzt"      # noqa: E731
+        _do_autosave = lambda self: None               # noqa: E731
+        _mark_autosave_dirty = MainWindow._mark_autosave_dirty
+        _setup_autosave = MainWindow._setup_autosave
+
+    w = _Fenster()
+    fm = get_function_manager()
+    s = fm.new_scene("CDX59 Stufe")
+    try:
+        w._setup_autosave()
+        w._autosave_timer.stop()
+        w._autosave_dirty = False
+        setze_stufen([(s, STROBE)], rueckgaengig=False)
+        assert w._autosave_dirty is True
+    finally:
+        try:
+            stufen_melder().geaendert.disconnect(w._mark_autosave_dirty)
+        except (RuntimeError, TypeError):
+            pass
+        from src.core.sync import SyncEvent, get_sync
+        for ev in SyncEvent:
+            try:
+                get_sync().unsubscribe(ev, w._mark_autosave_dirty)
+            except Exception:
+                pass
+        fm.remove(s.id)
+        w.deleteLater()

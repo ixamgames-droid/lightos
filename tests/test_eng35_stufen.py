@@ -245,6 +245,20 @@ def test_bausteine_bewegung_und_leere_bewegung():
     assert stufen.bausteine_von(e).text() == "Bewegung"
 
 
+def test_bausteine_bewegung_mit_offenem_strahl_schreibt_den_dimmer():
+    """Codex-Review #1087 (CDX-59): „Dimmer/Shutter öffnen“ setzt
+    ``intensity = 255`` — Ueberschneidungs-Hinweis und Prioritaeten-Uebersicht
+    muessen den Dimmer-Konflikt kennen."""
+    from src.core.engine.efx import EfxFixture
+    fm = FunctionManager()
+    e = fm.new_efx("Kreis offen")
+    e.fixtures = [EfxFixture(fid=1)]
+    e.open_beam = True
+    assert stufen.bausteine_von(e).text() == "Dimmer · Bewegung"
+    e.fixtures = []
+    assert stufen.bausteine_von(e).text() == "—", "ohne Geraete schreibt sie nichts"
+
+
 def test_bausteine_szene_nur_mit_kanal_auskunft():
     fm = FunctionManager()
     s = fm.new_scene("Rot")
