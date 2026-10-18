@@ -444,7 +444,42 @@ class OutputManager:
 
     @staticmethod
     def _weg_enttec(dev):
-        return ("enttec", getattr(dev, "port", None))
+        """OUT-66: Schluessel ist der KONFIGURIERTE Port (``konfig_port``),
+        nicht der aktuelle. Der In-Proc-:class:`EnttecPro` folgt nach einem
+        Replug seinem Dongle an eine neue Nummer (SERIAL-02) und aendert dabei
+        ``port`` — mit ``port`` als Schluessel fiele die beim Latch gemerkte
+        Sperre genau dann weg. Der Prozess-Proxy meldet ohnehin immer den
+        konfigurierten Port; dass dahinter derselbe Dongle steckt, sichert
+        ``EnttecPro._reconnect_ziel``."""
+        port = getattr(dev, "konfig_port", None) or getattr(dev, "port", None)
+        return ("enttec", port)
+
+    @classmethod
+    def _wege_enttec(cls, dev) -> list:
+        """OUT-66: ALLE Weg-Schluessel eines Enttec-Ausgangs — der konfigurierte
+        Port und, wenn der Reconnect den Dongle an einer neuen Nummer gefunden
+        hat, auch diese. Geht danach ein anderes Universum auf die NEUE Nummer,
+        trifft es so dieselbe Sperre."""
+        wege = [cls._weg_enttec(dev)]
+        jetzt = ("enttec", getattr(dev, "port", None))
+        if jetzt[1] is not None and jetzt not in wege:
+            wege.append(jetzt)
+        return wege
+
+    @staticmethod
+    def _werte_fuer(wege, schluessel):
+        """OUT-66: gesperrte Adressen ueber einen oder mehrere Weg-Schluessel
+        (``{adresse: aus_wert}``); der erste Schluessel gewinnt bei Gleichstand."""
+        if not wege:
+            return None
+        if not isinstance(schluessel, list):
+            return wege.get(schluessel)
+        werte = None
+        for k in reversed(schluessel):
+            w = wege.get(k)
+            if w:
+                werte = {**werte, **w} if werte else w
+        return werte
 
     @staticmethod
     def _weg_udmx(dev=None):
@@ -493,7 +528,7 @@ class OutputManager:
         ext = dict(getattr(self, "_out_universe", None) or {}).get(univ_num)
         dev = dict(getattr(self, "_enttec_outputs", None) or {}).get(univ_num)
         if dev is not None:
-            wege.append(self._weg_enttec(dev))
+            wege.extend(self._wege_enttec(dev))     # OUT-66: alt + neu
         if dict(getattr(self, "_udmx_outputs", None) or {}).get(univ_num) is not None:
             wege.append(self._weg_udmx())
         if dict(getattr(self, "_artnet_outputs", None) or {}).get(univ_num) is not None:
@@ -1368,7 +1403,7 @@ class OutputManager:
         for name, dev in victims:
             try:
                 if name == "enttec":
-                    dev.send_dmx(self._bild_fuer_weg(data, self._weg_enttec(dev)))
+                    dev.send_dmx(self._bild_fuer_weg(data, self._wege_enttec(dev)))
                     self._ausschreiben(dev)
                 elif name == "udmx":
                     # OUT-68: der Sender legt das Bild nur ab und schickt beim
@@ -1393,7 +1428,7 @@ class OutputManager:
         (OUT-64) obenauf — ein umgeroutetes Universum darf den verriegelten
         Laser auch mit seinem letzten Bild nicht oeffnen."""
         wege = getattr(self, "_laser_estop_wege", None)
-        return self._weg_nullen(data, wege.get(weg) if wege else None)
+        return self._weg_nullen(data, self._werte_fuer(wege, weg))
 
     def _entfernte_wege_vergessen(self, universe: int | None = None):
         """OUT-64: gemerkte Wege aus ``remove_output`` verwerfen — fuer ein
@@ -1598,7 +1633,7 @@ class OutputManager:
                         isolated.append((universe, dev, ist_enttec))
         for universe, dev, ist_enttec in isolated:
             if universe in bilder:
-                weg = self._weg_enttec(dev) if ist_enttec else self._weg_udmx()
+                weg = self._wege_enttec(dev) if ist_enttec else self._weg_udmx()
                 try:
                     dev.send_dmx(self._bild_fuer_weg(bilder[universe], weg))
                 except Exception:
@@ -1861,7 +1896,7 @@ class OutputManager:
                 if enttec is not None:
                     try:
                         bild = self._weg_nullen(
-                            data, wege.get(self._weg_enttec(enttec)) if wege else None)
+                            data, self._werte_fuer(wege, self._wege_enttec(enttec)))
                         gesendet.append(
                             ("Enttec", str(getattr(enttec, "port", "") or ""), bild))
                         enttec.send_dmx(bild)

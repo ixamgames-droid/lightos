@@ -39,6 +39,16 @@ Worker-Loop).
 - `is_open`-Guard: kein Schreiben auf ein bereits geschlossenes Handle.
 - `_try_reconnect` öffnet den Port gedrosselt neu; gelingt es, reaktiviert sich die
   Ausgabe von selbst (ohne App-Neustart). `is_disabled()` für UI-Status.
+- **Nur der eigene Dongle (OUT-66):** `_reconnect_ziel` wählt das Ziel des Reconnects.
+  Bekannt ist die USB-Seriennummer (beim ersten Öffnen aus `comports()` gemerkt) → der
+  Enttec mit dieser Nummer, auch an neuer COM-Nummer (SERIAL-02). Ohne Seriennummer →
+  der eigene Portname, sonst ein anderer Port nur, wenn genau EIN Enttec sichtbar ist.
+  Ports und Seriennummern anderer `EnttecPro`-Instanzen im selben Prozess scheiden aus;
+  ist nichts eindeutig, wird der Versuch ausgelassen. Unter POSIX wird mit
+  `exclusive=True` geöffnet (zwischen den Worker-Prozessen); hält jemand den
+  KONFIGURIERTEN Port exklusiv, wird nur gewarnt und geteilt geöffnet (wie OUT-54).
+  `konfig_port` bleibt beim Portwechsel stehen — er ist der Schlüssel der
+  NOT-AUS-Sperre je Ausgabeweg (`OutputManager._weg_enttec`, OUT-64).
 - `close()` bricht/leert vorher den Output-Puffer, damit `CloseHandle()` nicht mit einem
   ausstehenden `WriteFile` kollidiert. Idempotent, fehlertolerant.
 
@@ -53,6 +63,8 @@ Worker-Loop).
 
 - `tests/test_enttec_pro.py`
 - `tests/test_enttec_fail_watchdog.py`
+- `tests/test_serial_status_reconnect.py` (SERIAL-02)
+- `tests/test_out66_enttec_reconnect_eigener_port.py` (OUT-66)
 
 ## Quelle
 
