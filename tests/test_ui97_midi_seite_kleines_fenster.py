@@ -13,7 +13,7 @@ import pytest
 from PySide6.QtCore import QRect
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QGroupBox, QLabel, QPushButton,
-    QScrollArea, QWidget)
+    QScrollArea, QSplitter, QWidget)
 
 from src.ui.views import midi_view as midi_ui
 from test_midi_view import _FakeMidi, _FakeMtcReader, _FakeState
@@ -109,12 +109,60 @@ def test_schnell_vorlagen_erreichbar(monkeypatch, w, h):
         assert b.visibleRegion().boundingRect().height() >= b.minimumSizeHint().height()
 
 
+# 1380×730 ≈ Platz der Seite im Hauptfenster bei 1440×900 (gleicher Abzug
+# für Navigation, Sub-Tabs und Statusleiste wie bei 940×470).
+SEITE_1440x900 = (1380, 730)
+
+
 def test_seite_nutzt_grosses_fenster_ohne_scrollen(monkeypatch):
-    """Gegenstück: bei 1440×900 passt alles, kein senkrechter Rollbalken."""
-    host, view = _view_im_host(monkeypatch, 1440, 900)
+    """Gegenstück: bei 1440×900 passt alles, kein senkrechter Rollbalken —
+    auch die letzte Zeile (MSC-Hinweis) liegt im sichtbaren Bereich."""
+    host, view = _view_im_host(monkeypatch, *SEITE_1440x900)
     scroll = view.findChild(QScrollArea)
     assert scroll is not None
+    inhalt = scroll.widget()
+    assert inhalt.minimumSizeHint().height() <= SEITE_1440x900[1], (
+        f"Inhalt braucht {inhalt.minimumSizeHint().height()} px, "
+        f"Seite hat {SEITE_1440x900[1]}")
     assert not scroll.verticalScrollBar().isVisible()
+    assert scroll.verticalScrollBar().maximum() == 0
+    for b in (view._btn_tmpl_faders, view._btn_tmpl_notes):
+        assert b.visibleRegion().boundingRect().height() == b.height()
+
+
+@pytest.mark.parametrize("w,h", GROESSEN + [SEITE_1440x900])
+def test_splitter_klappt_die_tabelle_nicht_ein(monkeypatch, w, h):
+    """Den senkrechten Splitter kann man nicht auf null zuziehen."""
+    host, view = _view_im_host(monkeypatch, w, h)
+    splitter = view.findChild(QSplitter)
+    assert splitter is not None
+    assert not splitter.childrenCollapsible()
+    splitter.setSizes([10_000, 0])
+    _app().processEvents()
+    t = view._map_table
+    assert t.height() >= t.minimumHeight() > 0
+    assert t.viewport().height() >= 3 * t.verticalHeader().defaultSectionSize()
+    splitter.setSizes([0, 10_000])
+    _app().processEvents()
+    geraete = _geraete_box(view)
+    assert geraete.height() >= geraete.minimumSizeHint().height()
+
+
+def test_feedback_texte_sagen_an_aus(monkeypatch):
+    """Spaltenköpfe „An“/„Aus“ — Tooltip und Dialoge nennen dasselbe."""
+    host, view = _view_im_host(monkeypatch, *SEITE_1440x900)
+    assert _knopf(view, "Feedback...").toolTip() == "LED-Farben für An/Aus (Velocity) setzen"
+    fragen = []
+
+    def _get_int(_parent, titel, text, *a, **k):
+        fragen.append((titel, text))
+        return 0, True
+    monkeypatch.setattr(midi_ui.QInputDialog, "getInt", _get_int)
+    mapping = midi_ui.MidiMapping(name="x", msg_type="note_on", channel=1, data1=5)
+    view._prompt_feedback_values(mapping)   # nur die Abfrage, keine Mapper-Daten
+    assert fragen, "Feedback-Dialog nicht erreicht"
+    for titel, text in fragen:
+        assert "ON" not in titel + text and "OFF" not in titel + text, (titel, text)
 
 
 def test_spaltenkoepfe_deutsch_mit_tooltips(monkeypatch):
