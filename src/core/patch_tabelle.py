@@ -919,8 +919,13 @@ def _satz_zeilen(andere: list[PlanZeile]) -> str:
     if len(andere) == 1:
         o = andere[0]
         return f"Überschneidet sich mit Zeile {o.zeile.nr} der Tabelle („{o.name}“)."
-    nummern = _aufzaehlung([str(o.zeile.nr) for o in andere])
-    return f"Überschneidet sich mit den Zeilen {nummern} der Tabelle."
+    if len(andere) <= 3:
+        nummern = _aufzaehlung([str(o.zeile.nr) for o in andere])
+        return f"Überschneidet sich mit den Zeilen {nummern} der Tabelle."
+    # ab vier: Anzahl dazu — „3 … 8“ allein laese sich wie ein lueckenloser
+    # Bereich, auch wenn 4 und 6 nicht betroffen sind (volle Liste im Tooltip)
+    return (f"Überschneidet sich mit {len(andere)} Zeilen der Tabelle "
+            f"({andere[0].zeile.nr} … {andere[-1].zeile.nr}).")
 
 
 _NAME_MIT_NUMMER = re.compile(r"^(.*\S)\s+(\d+)$")

@@ -86,11 +86,33 @@ def test_mehrere_tabellenzeilen_werden_zusammengefasst(bib):
              "D;LED PAR-56;13\n", bib)
     gross = p.zeilen[0]
     assert gross.status == T.UEBERSCHNEIDUNG
-    assert "Überschneidet sich mit den Zeilen 3 … 6 der Tabelle." in gross.status_text
+    assert "Überschneidet sich mit 4 Zeilen der Tabelle (3 … 6)." in gross.status_text
     assert "• Zeile 4 der Tabelle („B“)" in gross.status_tooltip
     assert p.zeilen[1].status_text.endswith("Überschneidet sich mit Zeile 2 der Tabelle („Gross“).")
     # fünf Zeilen betroffen — gezählt werden Zeilen
     assert p.zaehlerzeile() == "Kein Gerät wird angelegt, 5 Zeilen mit Überschneidungen"
+
+
+def test_tabellenzeilen_mit_luecke_nennen_die_anzahl(bib):
+    """Gegenprüfung: ab vier Zeilen erstes … letztes — die Anzahl muss dabei
+    stehen, sonst liest sich „3 … 8“ wie ein lückenloser Bereich, obwohl die
+    Zeilen 4 und 6 gar nicht betroffen sind."""
+    p = plan("Name;Profil;Adresse\n"
+             "Gross;Grosse Leiste;1\n"
+             "A;LED PAR-56;1\n"
+             "Weit 1;LED PAR-56;400\n"
+             "B;LED PAR-56;9\n"
+             "Weit 2;LED PAR-56;450\n"
+             "C;LED PAR-56;17\n"
+             "D;LED PAR-56;29\n", bib)
+    gross = p.zeilen[0]
+    assert gross.status == T.UEBERSCHNEIDUNG
+    assert gross.status_text.endswith(
+        "Überschneidet sich mit 4 Zeilen der Tabelle (3 … 8).")
+    for nr in (3, 5, 7, 8):
+        assert f"• Zeile {nr} der Tabelle" in gross.status_tooltip
+    for nr in (4, 6):
+        assert f"• Zeile {nr} der Tabelle" not in gross.status_tooltip
 
 
 def test_vorhandene_und_tabellenzeile_zugleich(bib):
