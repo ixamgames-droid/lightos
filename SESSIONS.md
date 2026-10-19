@@ -60,7 +60,7 @@
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-19T14:04Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
-| UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-18T19:42Z | src/ui/widgets/fixture_editor.py |
+| UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-19T14:04Z | src/ui/widgets/fixture_editor.py |
 | FM-69 | A | fix/fm69-bibliotheks-update-bestehende-db | 2026-10-18T19:42Z | src/core/database/fixture_db.py |
 | FM-76 | A | fix/fm76-generator-herkunft-mittragen | 2026-10-18T19:54Z | src/ui/widgets/fixture_generator.py |
 | UI-96 | A | fix/ui96-kiosk-ohne-bibliothek | 2026-10-18T21:46Z | src/ui/views/virtual_console_view.py |
