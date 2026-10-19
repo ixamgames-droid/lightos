@@ -1221,7 +1221,8 @@ class MainWindow(QMainWindow):
         # Sektion 2: Programmer (Programmer | Funktionen | EFX | RGB Matrix | Paletten | Snapshots)
         self._stack.addWidget(self._build_section_programmer())
         # Sektion 3: Virtual Console
-        self._vc_view = VirtualConsoleView()
+        # UI-96: im Kiosk ohne Bibliothek-Seitenleiste und ohne Bearbeitungswege.
+        self._vc_view = VirtualConsoleView(kiosk=self._kiosk_mode)
         self._stack.addWidget(self._vc_view)
         # Sektion 4: Simple Desk + Channel Groups
         sd_tabs = _SubTabs()
