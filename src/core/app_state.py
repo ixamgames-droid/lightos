@@ -16,7 +16,7 @@ from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .dmx import adapter_zeilen
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
-from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
+from .laser.erkennung import ist_laser, ist_laserkanal
 from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
@@ -261,24 +261,16 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
     "color_wheel", "colour_wheel", "color",
 })
 
-# A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
-# DMX-Laser-NOT-AUS-Latch wieder auf ("wieder an" = bewusstes Einschalten): die
-# Betriebsart/Musterbank (laser_bank), die Muster-/Gobo-Auswahl (gobo_wheel), der
-# Shutter und die Effekt-/Programm-Auswahl (macro — treibt bei macro-basierten
-# Party-Lasern wie dem PARTYLASER-Builtin ohne laser_bank/gobo_wheel die Emission).
-# Ein harmloses Attribut (Position laser_x/laser_y, Zoom, Punktfarbe, Twist, Raster,
-# …) darf den NOT-AUS NICHT lösen — sonst öffnet ein Positions-/Farb-Nudge den Laser
-# trotz gedrücktem Not-Aus wieder. Annahme wie bei UXT-12: Betriebsart/Shutter/Macro
-# 0 = Laser aus; die genannten Attribute sind die Betriebsart-/Emissions-Gates.
-# CDX-13 (David-Entscheidung 2026-07-20, SAFETY vor Usability): `intensity` bleibt
-# BEWUSST DRAUSSEN. Ein FB4-/Streaming-Laser exponiert seine Helligkeit als
-# `intensity`, könnte also per Helligkeitsregler nicht wieder scharfgeschaltet
-# werden — das ist gewollt: `intensity` ist zu breit, ein Szenen-/Snapshot-/
-# Palette-Apply mit Laser-`intensity>0` (über set_programmer_value) würde den
-# NOT-AUS sonst UNGEWOLLT lösen. Bewusstes Wieder-Scharfschalten läuft über den
-# FB4-„Cue"-Kanal (= `gobo_wheel`, bereits whitelisted). Regressionstest:
-# tests/test_laser_dmx_estop.py::test_intensity_on_laser_keeps_latch.
-_LASER_REARM_ATTRS = frozenset({"shutter", "laser_bank", "gobo_wheel", "macro"})
+# LAS-36: KEIN Programmer-Wert loest den Laser-NOT-AUS. Frueher (A3D-02) hob
+# ``set_programmer_value`` den Latch auf, sobald Betriebsart, Musterbank, Muster,
+# Shutter oder Macro eines Lasers gesetzt wurden („wieder an“). Damit liess sich
+# die Rueckfrage am NOT-AUS-Knopf umgehen — ueber den Laser-Tab, einen VC-Fader,
+# eine Snap-/Muster-Taste, Rueckgaengig und den MIDI-Regler „Programmer Attribut“,
+# der ohne Auswahl auf ALLE gepatchten Geraete schreibt (Befund S-01, QA-96).
+# Jetzt wird der Wert gemerkt, der Latch bleibt stehen, die Ausgabe bleibt auf den
+# Aus-Werten. Geloest wird allein ueber ``AppState.laser_notaus_loesen`` — und das
+# ruft die Oberflaeche nur nach der Rueckfrage (``src/ui/laser_notaus.py``).
+# Waechter: tests/test_las36_notaus_nur_mit_rueckfrage.py.
 
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
 LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
@@ -483,9 +475,6 @@ class AppState:
         # Universum seit der Aktivierung des Latches; erst das Loesen leert sie.
         self._laser_estop_klebrig: dict[int, frozenset] = {}
         self._laser_fids: frozenset = frozenset()            # fids aller DMX-Laser
-        # LAS-37: die Teilmenge, die wie ein Laser BEDIENT wird (Typ oder
-        # laser_*-Kanal) — nur deren Muster-/Betriebsart-Abruf loest den NOT-AUS.
-        self._laser_rearm_fids: frozenset = frozenset()
         # STAB-15: Der 44-Hz-Renderer (_render_frame) liest den Render-Plan
         # (_fix_index/_default_frame/_commit_spans/_patched_set/_laser_estop_addrs),
         # waehrend _rebuild_render_plan ihn beim Umpatchen feldweise austauscht.
@@ -1937,7 +1926,6 @@ class AppState:
         addrs: dict[int, set] = {}
         laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
         laser_fids: set = set()
-        laser_rearm_fids: set = set()
         for fx in self._patch_cache:
             chans = get_channels_for_patched(fx)
             # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
@@ -1960,12 +1948,6 @@ class AppState:
             is_laser = ist_laser(fx, chans)
             if is_laser:
                 laser_fids.add(fx.fid)
-                # Nur ueber einen Namen erkannt (Lichtset, Moving Head mit
-                # Laserdiode): gedeckt vom NOT-AUS, aber ein Gobo-/Shutter-/Makro-
-                # Wert an so einem Geraet ist kein „Laser wieder an“ und darf den
-                # NOT-AUS nicht loesen.
-                if not nur_ueber_namen(fx, chans):
-                    laser_rearm_fids.add(fx.fid)
             for ch in chans:
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -2038,7 +2020,6 @@ class AppState:
                 continue
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
-        new_laser_rearm_fids = frozenset(laser_rearm_fids)
         # A3D-18: Snapshot der bisher gepatchten Adressen VOR dem Tausch — Adressen,
         # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
         # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
@@ -2116,7 +2097,6 @@ class AppState:
                 self._patched_set = new_patched_set
                 self._laser_estop_addrs = new_laser_estop_addrs
                 self._laser_fids = new_laser_fids
-                self._laser_rearm_fids = new_laser_rearm_fids
         # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
         # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
         self._release_engine_extra()
@@ -2884,10 +2864,10 @@ class AppState:
         Fixtures, die über normale DMX-Kanäle ein Muster ausgeben, erreicht das
         nicht. Ist dieser Latch aktiv, zwingt der Renderer alle Laser-Kanäle als
         oberste Ebene auf 0 (Betriebsart/Shutter 0 = Laser aus); zusätzlich erzwingt
-        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01). Der
-        Latch wird bewusst durch das nächste Setzen eines Laser-Werts wieder gelöst
-        (Muster-Abruf/Regler = „wieder an") — ein Show-Load lässt ihn absichtlich
-        stehen (dunkel = sicher)."""
+        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01).
+        LAS-36: Kein Programmer-Wert, kein Show-Load und keine Patch-Aenderung
+        nimmt den Latch zurueck (dunkel = sicher). ``set_laser_estop(False)`` ruft
+        im Programm nur ``laser_notaus_loesen`` — der eine Loese-Weg."""
         # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
         # CDX-12: Reihenfolge ist ASYMMETRISCH und failt in beide Richtungen sicher.
         # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
@@ -2978,19 +2958,24 @@ class AppState:
                       f"nicht geloest (bleibt dunkel): {e}")
 
     def laser_notaus_loesen(self):
-        """LAS-31: den Laser-NOT-AUS bewusst loesen (die Oberflaeche fragt vorher
-        nach). Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
-        unscharf — Scharfschalten ist ein eigener Schritt."""
-        self.set_laser_estop(False)
+        """LAS-31/LAS-36: den Laser-NOT-AUS bewusst loesen — der EINZIGE Weg, auf
+        dem der Latch faellt. Aufrufer ist die Rueckfrage der Oberflaeche
+        (``src/ui/laser_notaus.loesen_mit_rueckfrage``); nichts sonst ruft das,
+        auch kein Tastenkuerzel, kein MIDI und keine Fernbedienung.
 
-    def _laser_rearm_menge(self) -> frozenset:
-        """LAS-37: die Geraete, deren Muster-/Betriebsart-Abruf den NOT-AUS
-        loest — die wie ein Laser bedienten. Ein Zustand ohne diese Menge (vor
-        dem ersten Plan) faellt auf alle erkannten Laser zurueck."""
-        menge = getattr(self, "_laser_rearm_fids", None)
-        if menge is None:
-            menge = getattr(self, "_laser_fids", frozenset())
-        return menge or frozenset()
+        Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
+        unscharf — Scharfschalten ist ein eigener Schritt. DMX-Laser geben danach
+        sofort wieder aus, was Programmer, Szenen und Effekte vorgeben — auch
+        Werte, die waehrend des NOT-AUS gesetzt wurden.
+
+        Meldet ``SyncEvent.LASER_ESTOP`` (Daten ``False`` = geloest), damit die
+        Anzeigen nachziehen; Abonnenten lesen ``laser_estop_active``."""
+        self.set_laser_estop(False)
+        try:
+            from .sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LASER_ESTOP, False)
+        except Exception:
+            pass
 
     def laser_anzahl(self) -> int:
         """LAS-31: Zahl der als Laser erkannten gepatchten Geraete — DMX-Laser
@@ -3124,20 +3109,9 @@ class AppState:
         self._verlauf_notiere(aenderungen, attr_label(key))
         self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
-        # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
-        # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
-        # den Laser-NOT-AUS auf. Ein harmloses Attribut (Position/Zoom/Farbe/…) darf
-        # ihn NICHT lösen — sonst öffnet ein Positions-Nudge den Laser trotz Not-Aus.
-        # Auf den Basisnamen prüfen: Snap-/VC-Restore-Pfade reichen den Composite-Key
-        # "attr#N" (Kopf>0) direkt als attribute durch -> vor dem Whitelist-Check das
-        # "#N"-Suffix abspalten, sonst entriegelt ein Kopf>0-Gate den Not-Aus nicht.
-        if (getattr(self, "laser_estop_active", False)
-                and str(attribute).split("#", 1)[0] in _LASER_REARM_ATTRS
-                and int(fid) in self._laser_rearm_menge()):
-            # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
-            with self._get_estop_lock():
-                self.laser_estop_active = False
-                self._push_laser_estop_mask()
+        # LAS-36: ein Laser-Wert loest den NOT-AUS NICHT (frueher A3D-02). Er steht
+        # jetzt im Programmer; solange der Latch steht, haelt der Renderer die
+        # Laser-Adressen auf den Aus-Werten. Loesen: ``laser_notaus_loesen``.
         self._emit("programmer_changed", fid)
         if undoable and old != new_val:
             self._push_undo(
@@ -3282,8 +3256,8 @@ class AppState:
     def _programmer_werte_anwenden(self, werte: dict):
         """FM-52: schreibt ``{(fid, key): wert|None}`` direkt in den Programmer
         (``None`` = Schluessel entfernen). Bewusst NICHT ueber
-        set_programmer_value: das wuerde den Laser-NOT-AUS aufheben (UXT-12) —
-        ein Rueckgaengig darf einen Laser nie wieder scharf schalten. Ebenso kein
+        set_programmer_value (eigener Verlaufs-/Undo-Eintrag). Den Laser-NOT-AUS
+        hebt ein Rueckgaengig nie auf — seit LAS-36 tut das kein Wert mehr. Ebenso kein
         clear_remote_input. Nicht mehr gepatchte Geraete werden uebersprungen
         (remove_fixture entfernt deren Eintrag ohne Ereignis)."""
         gepatcht = {f.fid for f in getattr(self, "_patch_cache", [])}
