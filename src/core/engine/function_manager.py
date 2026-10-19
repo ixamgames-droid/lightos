@@ -561,9 +561,9 @@ class FunctionManager:
                 self._tick_funktionen(ordered, universes, patch_cache, dt,
                                       finished, sammler, patch_fn)
             else:
-                self._tick_funktionen(ordered, universes, patch_cache, dt,
-                                      finished, sammler, patch_fn,
-                                      protokoll=protokoll)
+                self._tick_mitgeschnitten(ordered, universes, patch_cache, dt,
+                                          finished, sammler, patch_fn,
+                                          protokoll)
         finally:
             setze_sammler(sammler_alt)
         if protokoll is not None and self._wg_zaehler > 0:
@@ -581,8 +581,36 @@ class FunctionManager:
                 self._start_order = [fid for fid in self._start_order
                                      if fid in self._running_ids]
 
+    def _tick_mitgeschnitten(self, ordered, universes, patch_cache, dt,
+                             finished, sammler, patch_fn, protokoll) -> None:
+        """ENG-35 Schritt 4: der Funktions-Durchlauf mit Protokoll.
+
+        Je Universum wird EINMAL je Takt ein :class:`wer_gewinnt.Mitschnitt`
+        an Stelle des Schreib-Protokolls eingehaengt (ein evtl. laufendes
+        Protokoll des Renderers bekommt jede Adresse unveraendert
+        weitergereicht). Je Funktion wird nur ``takt.fid`` umgesetzt — der
+        Mehraufwand waechst mit den geschriebenen Adressen, nicht mit
+        (laufende Funktionen x Universen)."""
+        takt = wer_gewinnt.Takt()
+        mitschnitte = {}
+        for u, su in universes.items():
+            tauschen = getattr(su, "write_log_tauschen", None)
+            if tauschen is None:
+                continue
+            m = wer_gewinnt.Mitschnitt(None, takt)
+            m.aussen = tauschen(m)
+            mitschnitte[u] = (su, m)
+        try:
+            self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                  finished, sammler, patch_fn, takt=takt)
+        finally:
+            for u, (su, m) in mitschnitte.items():
+                su.write_log_tauschen(m.aussen)
+                for fid, adressen in m.je_fid.items():
+                    protokoll.eintragen(fid, u, adressen)
+
     def _tick_funktionen(self, ordered, universes, patch_cache, dt,
-                         finished, sammler, patch_fn=None, protokoll=None):
+                         finished, sammler, patch_fn=None, takt=None):
         """Schleife ueber die laufenden Funktionen (Rumpf von ``tick``).
 
         ENG-30: ``patch_fn`` ist ``patch_cache`` mit fid-Tabelle (siehe
@@ -597,6 +625,8 @@ class FunctionManager:
             if f is None or not f.is_running:
                 finished.add(fid)
                 continue
+            if takt is not None:
+                takt.fid = fid          # ENG-35 Schritt 4: wer schreibt jetzt
             try:
                 inten = f.intensity
                 try:
@@ -624,11 +654,7 @@ class FunctionManager:
                     if p is not None:
                         sammler.posten.append(p)
                 elif inten >= 0.999 and env >= 0.999:
-                    if protokoll is None:
-                        f.write(universes, patch_fn, dt, self._functions)
-                    else:
-                        self._write_protokolliert(f, fid, universes, patch_fn,
-                                                  dt, protokoll)
+                    f.write(universes, patch_fn, dt, self._functions)
                 else:
                     if dim_map is None:
                         dim_map = self._dim_addr_map(patch_cache)
@@ -652,8 +678,6 @@ class FunctionManager:
                         if shared is None:
                             continue
                         touched = pu.end_write_log()
-                        if protokoll is not None:
-                            protokoll.eintragen(fid, u, touched)
                         after = pu.get_all()
                         dims = dim_map.get(u, frozenset())
                         for ch in touched:
@@ -672,26 +696,6 @@ class FunctionManager:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
             if not f.is_running:
                 finished.add(fid)
-
-    def _write_protokolliert(self, f, fid, universes, patch_fn, dt,
-                             protokoll) -> None:
-        """ENG-35 Schritt 4: der schnelle Pfad mit Protokoll. Je Universum ein
-        Teil-Protokoll um ``f.write`` — ein evtl. laufendes Protokoll des
-        Renderers (``_render_frame``) bekommt die Adressen danach unveraendert
-        nachgetragen."""
-        vorher = {}
-        for u, su in universes.items():
-            beginn = getattr(su, "teil_log_beginnen", None)
-            if beginn is not None:
-                vorher[u] = beginn()
-        try:
-            f.write(universes, patch_fn, dt, self._functions)
-        finally:
-            for u, alt in vorher.items():
-                su = universes.get(u)
-                if su is None:
-                    continue
-                protokoll.eintragen(fid, u, su.teil_log_beenden(alt))
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 

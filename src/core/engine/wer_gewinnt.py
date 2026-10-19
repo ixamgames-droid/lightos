@@ -83,6 +83,57 @@ class SchreibProtokoll:
         return self._geschrieben
 
 
+class Takt:
+    """Gemeinsamer Stand aller Mitschnitte eines Takts: welche Funktion
+    gerade schreibt. Je Funktion wird nur ``fid`` umgesetzt — unabhaengig
+    davon, wie viele Universen es gibt."""
+
+    __slots__ = ("fid",)
+
+    def __init__(self):
+        self.fid = None
+
+
+class Mitschnitt:
+    """Steht waehrend des Funktions-Durchlaufs an Stelle des Schreib-Protokolls
+    eines Universums (``Universe.write_log_tauschen``) — einmal je Takt und
+    Universum eingehaengt, nicht je Funktion. Jede geschriebene Adresse geht an
+    das aeussere Protokoll (falls der Renderer eins fuehrt, unveraendert) und
+    in die Menge der gerade schreibenden Funktion (``Takt.fid``)."""
+
+    __slots__ = ("aussen", "takt", "je_fid", "_fid", "_menge")
+
+    def __init__(self, aussen, takt: Takt):
+        self.aussen = aussen
+        self.takt = takt
+        self.je_fid: dict[int, set[int]] = {}   # Einfuege-Reihenfolge = Takt
+        self._fid = None
+        self._menge: set[int] | None = None
+
+    def _ziel(self) -> set[int]:
+        fid = self.takt.fid
+        if fid != self._fid or self._menge is None:
+            m = self.je_fid.get(fid)
+            if m is None:
+                m = self.je_fid[fid] = set()
+            self._fid, self._menge = fid, m
+        return self._menge
+
+    def add(self, adresse: int) -> None:
+        # heisser Pfad (je geschriebenem Kanal): Ziel nur bei Wechsel suchen
+        if self.aussen is not None:
+            self.aussen.add(adresse)
+        if self.takt.fid == self._fid and self._menge is not None:
+            self._menge.add(adresse)
+        else:
+            self._ziel().add(adresse)
+
+    def update(self, adressen) -> None:
+        if self.aussen is not None:
+            self.aussen.update(adressen)
+        self._ziel().update(adressen)
+
+
 @dataclass
 class Ergebnis:
     """Was eine Funktion im letzten Frame erreicht hat."""

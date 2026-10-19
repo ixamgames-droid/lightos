@@ -3,7 +3,7 @@
 1. Das Protokoll „Adresse -> letzter Schreiber“ laeuft nur, solange es
    angefordert ist (Zaehler); aus = der Takt beruehrt es nicht.
 2. Schneller Pfad UND priv-Pfad (Helligkeit < 1) protokollieren.
-3. Das Schreib-Protokoll des Renderers bleibt unveraendert (Teil-Protokoll).
+3. Das Schreib-Protokoll des Renderers bleibt unveraendert (Mitschnitt reicht weiter).
 4. Auswertung je Geraet: gewinnt auf n / verdeckt auf m von X.
 5. Im Renderer: Cueliste, Programmer und Snap liegen darueber; Modify-Effekte
    gelten nicht als Verdecker.
@@ -109,11 +109,13 @@ def _fm(*funktionen):
 
 
 class _SpionUniverse(Universe):
+    """Zaehlt jeden Wechsel des Schreib-Protokolls (``_write_log``)."""
     teil = 0
 
-    def teil_log_beginnen(self):
-        type(self).teil += 1
-        return super().teil_log_beginnen()
+    def __setattr__(self, name, wert):
+        if name == "_write_log" and "_write_log" in self.__dict__:
+            type(self).teil += 1
+        super().__setattr__(name, wert)
 
 
 def test_aus_beruehrt_der_takt_das_protokoll_nicht():
@@ -121,7 +123,7 @@ def test_aus_beruehrt_der_takt_das_protokoll_nicht():
     fm = _fm(_Schreiber(1, range(4)), _Schreiber(2, range(2, 4)))
     assert fm.wer_gewinnt_aktiv is False
     fm.tick({1: _SpionUniverse(1)}, _patch(), DT)
-    assert _SpionUniverse.teil == 0, "aus: kein Teil-Protokoll im Takt"
+    assert _SpionUniverse.teil == 0, "aus: kein Protokoll-Wechsel im Takt"
     assert fm._wg_protokoll is None
     assert fm.wer_gewinnt(_patch()) == {}
 
@@ -184,6 +186,51 @@ def test_unverdeckt_und_ungepatcht_bleibt_leer():
     p.eintragen(7, 1, {400, 401})                # keine Lampe dort
     assert wer_gewinnt.auswerten(p, None, _patch(), lambda f: "x") == {}
     assert wer_gewinnt.auswerten(None, None, _patch(), lambda f: "x") == {}
+
+
+class _Univ2Schreiber(_Schreiber):
+    """Schreibt nur ins Universum 2 (Lampen dort ab Adresse 1)."""
+
+    def write(self, universes, patch_cache, dt, registry):
+        for i in self.lampen:
+            universes[2].set_channel(_adr(i), self.wert)
+
+
+def test_an_aufwand_waechst_nicht_mit_funktionen_mal_universen():
+    """Befund der Gegenpruefung: je laufender Funktion auf JEDEM Universum ein
+    Teil-Protokoll (zwei Lock-Wechsel) liess den Takt mit (Funktionen x
+    Universen) wachsen. Jetzt: einmal je Takt und Universum einhaengen."""
+    n_univ, n_fkt = 16, 30
+    funktionen = [_Schreiber(fid, (fid % N,), priority=fid)
+                  for fid in range(1, n_fkt + 1)]
+    fm = _fm(*funktionen)
+    fm.wer_gewinnt_anfordern()
+    _SpionUniverse.teil = 0
+    fm.tick({u: _SpionUniverse(u) for u in range(1, n_univ + 1)},
+            _patch(), DT)
+    assert _SpionUniverse.teil <= 2 * n_univ, (
+        f"{_SpionUniverse.teil} Protokoll-Wechsel fuer {n_fkt} Funktionen "
+        f"auf {n_univ} Universen — erwartet hoechstens {2 * n_univ}")
+    erg = fm.wer_gewinnt(_patch())
+    # Lampe 0 schreiben fid 8, 16, 24 -> 24 (hoechste Stufe) gewinnt
+    assert erg[8].text() == "verdeckt von F24 auf 1 Gerät"
+    assert erg[24].text() == ""
+
+
+def test_schreiber_auf_anderem_universum_und_aeusseres_log():
+    patch = _patch() + [_Fx(100 + i, _adr(i), universe=2) for i in range(2)]
+    fm = _fm(_Schreiber(1, (0,)), _Univ2Schreiber(2, (0, 1), priority=5),
+             _Univ2Schreiber(3, (1,), priority=9, name="Oben2"))
+    fm.wer_gewinnt_anfordern()
+    u1, u2 = Universe(1), Universe(2)
+    u2.begin_write_log()
+    fm.tick({1: u1, 2: u2}, patch, DT)
+    assert u2.end_write_log() == {_adr(0), _adr(1)}
+    assert u1._write_log is None, "ohne aeusseres Log bleibt es aus"
+    erg = fm.wer_gewinnt(patch)
+    assert erg[1].text() == "" and erg[1].gewinnt == 1
+    assert (erg[2].gewinnt, erg[2].verdeckt) == (1, 1)
+    assert erg[2].text() == "verdeckt von Oben2 auf 1 Gerät"
 
 
 # ── (3) das Protokoll des Renderers bleibt gleich ────────────────────────────

@@ -28,25 +28,15 @@ class Universe:
             self._write_log = None
             return log
 
-    def teil_log_beginnen(self):
-        """ENG-35 Schritt 4: ein eigenes Teil-Protokoll innerhalb eines evtl.
-        laufenden Protokolls beginnen. Liefert das bisherige (oder ``None``);
-        ``teil_log_beenden`` gibt es zurueck und traegt die Teil-Adressen dort
-        nach — das aeussere Protokoll sieht danach dasselbe wie ohne Teil."""
+    def write_log_tauschen(self, neu):
+        """ENG-35 Schritt 4: das Schreib-Protokoll gegen ``neu`` tauschen und
+        das bisherige (oder ``None``) liefern. ``neu`` braucht nur ``add`` und
+        ``update`` — der Mitschnitt „wer gewinnt“ haengt sich so einmal je Takt
+        und Universum ein und reicht an ein evtl. aeusseres Protokoll weiter."""
         with self._lock:
-            vorher = self._write_log
-            self._write_log = set()
-            return vorher
-
-    def teil_log_beenden(self, vorher) -> set[int]:
-        """Gegenstueck zu ``teil_log_beginnen``: liefert die Adressen des
-        Teil-Protokolls und stellt das vorherige wieder her."""
-        with self._lock:
-            teil = self._write_log if self._write_log is not None else set()
-            if vorher is not None:
-                vorher.update(teil)
-            self._write_log = vorher
-            return teil
+            alt = self._write_log
+            self._write_log = neu
+            return alt
 
     def set_channel(self, channel: int, value: int):
         """Setzt einen Kanal (1-basiert, Wert 0-255).
