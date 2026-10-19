@@ -108,6 +108,27 @@ Den EFX **💾 Speichern** und mit **▶ Start** starten (**■ Stop** daneben).
 
 ![Moving-Head-Kreis](../tutorial_matrix/gif/mh_kreis.gif)
 
+## 6. Modify-Effekt: die laufende Position verschieben
+
+Mit dem Haken **Modify-Effekt** (Gruppe **Modify**) setzt der EFX keine Position mehr, sondern
+**verschiebt** die Position, die die Geräte ohnehin haben — eine gesetzte Position (Programmer,
+Snap, Cueliste) oder einen anderen Bewegungs-Effekt. So legt man z. B. ein Nicken oder einen
+kleinen Kreis über eine laufende Bewegung.
+
+- **Versatz (°):** größter Ausschlag der Figur in Grad (Vorgabe 20°). Je Gerät wird über dessen
+  Schwenk-/Neigebereich in DMX umgerechnet — 20° sind auf einem 540°-Gerät weniger DMX-Schritte
+  als auf einem 360°-Gerät. Mit Fine-Kanal rechnen Grob und Fein gemeinsam (kein Sprung).
+- **Betriebsart:** *Addieren* verschiebt in Richtung der Figur, *Abziehen* gespiegelt.
+  *Abdunkeln* gibt es bei Bewegung nicht.
+- **Stärke (%)** skaliert den Versatz; ebenso die Helligkeit des Effekts und seine
+  Ein-/Ausblendzeit. An der Virtuellen Konsole stehen dafür **Modify-Stärke**, **Modify-Art** und
+  **Versatz (°)** bereit, solange der Haken gesetzt ist.
+- Zentrum Pan/Tilt spielt im Modify-Betrieb keine Rolle — es zählt nur die Form der Figur.
+- Am Ende des Bereichs wird **gekappt**, nicht umgeschlagen. Umkehren und Tauschen von Pan/Tilt
+  des Geräts werden beachtet. Dimmer und Farbe bleiben unberührt.
+- **Laser werden nie verschoben.** Die Sperrzonen sind nur eine Anzeige und schalten nichts ab;
+  deshalb bekommt ein Laser keinen Versatz. Der Laser-NOT-AUS greift wie immer danach.
+
 ---
 
 **Kurz:** Gruppe (Moving Heads) wählen → Reiter **EFX** → **+ Neu** (der neue EFX nimmt die

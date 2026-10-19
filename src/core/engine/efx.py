@@ -67,6 +67,26 @@ class EfxFixture:
     head: "int | None" = None
 
 
+#: ENG-43: Vorgabe und Grenzen des Bewegungs-Versatzes (Grad, groesster
+#: Ausschlag der Figur im Modify-Betrieb).
+MODIFY_VERSATZ_VORGABE = 20.0
+MODIFY_VERSATZ_MIN = 0.0
+MODIFY_VERSATZ_MAX = 180.0
+#: Betriebsarten eines Bewegungs-Modify (Abdunkeln gibt es fuer Bewegung nicht).
+MODIFY_BEWEGUNG_ARTEN = ("add", "sub")
+
+
+def normalize_versatz(value) -> float:
+    """Versatz in Grad, 0..180; Unlesbares -> Vorgabe."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return MODIFY_VERSATZ_VORGABE
+    if v != v:          # NaN
+        return MODIFY_VERSATZ_VORGABE
+    return max(MODIFY_VERSATZ_MIN, min(MODIFY_VERSATZ_MAX, v))
+
+
 def _target_to_dict(f: "EfxFixture") -> dict:
     """Ein EFX-Ziel fuer die Show-Datei. Optionale Felder (``head``,
     ``pan_attr``, ``tilt_attr``) stehen NUR drin, wenn sie vom Standard
@@ -214,6 +234,15 @@ class EfxInstance(Function):
         self.path_id: str | None = None
         self.path_data: dict | None = None
         self._embedded_path = None  # EfxPath-Cache aus path_data
+        # ENG-43: Modify-Effekt (Bewegung als VERSATZ). Mit Haken setzt der
+        # EFX keine Position, sondern verschiebt die fertige Pan/Tilt-Position
+        # jedes Ziels um die Figur — groesster Ausschlag = ``modify_versatz_grad``
+        # (core/engine/modify.py rechnet Grad -> DMX je Geraet). Ohne Haken
+        # unveraendert; die Felder stehen nur bei Abweichung in der Show.
+        self.modify = False
+        self.modify_mode = "add"           # "add" | "sub"
+        self.modify_strength = 100         # Prozent
+        self.modify_versatz_grad = MODIFY_VERSATZ_VORGABE
         # State
         self._phase = 0.0
         self._bounce_dir = 1.0
@@ -619,6 +648,61 @@ class EfxInstance(Function):
             self.fixtures = [EfxFixture(fid=fid) for fid in movers]
         return len(self.fixtures)
 
+    # ── ENG-43: Bewegung als Modify-Effekt ───────────────────────────────────
+
+    def modify_wirksam(self) -> bool:
+        """ENG-43: Haken gesetzt -> der EFX verschiebt (Versatz in Grad) statt
+        zu setzen. Verrechnet in ``core/engine/modify.py``."""
+        return bool(getattr(self, "modify", False))
+
+    def _figur_versaetze(self) -> list[tuple[float, float]]:
+        """Auslenkung der Figur JE ZIEL (index-gleich zu ``self.fixtures``),
+        normiert: der groessere Halbmesser (Breite/2 bzw. Hoehe/2) ist 1.0 —
+        das Seitenverhaeltnis der Figur bleibt so erhalten. Mitte, Relativ-
+        Zentrum und 16-Bit spielen keine Rolle (es zaehlt nur die Auslenkung)."""
+        n = len(self.fixtures)
+        norm = max(float(self.width), float(self.height)) / 2.0
+        if norm <= 0.0:
+            return [(0.0, 0.0)] * n
+        out = []
+        is_random = (self.algorithm == EfxAlgorithm.RANDOM)
+        counter = bool(getattr(self, "counter_rotate", False))
+        for i, fx in enumerate(self.fixtures):
+            if is_random:
+                offs = 0.0 if getattr(self, "phase_mode", "fan") == "sync" \
+                    else (i * 1.7 * self.spread if n > 1 else 0.0)
+                progress = (-self._rand_progress if (counter and i % 2 == 1)
+                            else self._rand_progress)
+                dx, dy = self._random_xy(progress + offs)
+            else:
+                # Mitte 127.5: eine Figur bis 255 breit wird nie gekappt.
+                pan, tilt = self._calc(self._fixture_phase(i, n, fx), 127.5, 127.5)
+                dx, dy = pan - 127.5, tilt - 127.5
+            if self.mirror and (i % 2 == 1):
+                dx = -dx
+            out.append((dx / norm, dy / norm))
+        return out
+
+    def modify_bewegung(self, patch_cache, dt: float) -> list:
+        """ENG-43: die Versaetze dieses Frames als
+        ``(fx, head, dpan_grad, dtilt_grad, pan_attr, tilt_attr)`` je Ziel.
+        Treibt die Uhr (wie ``write``), schreibt aber NICHTS."""
+        if not self._running or not self.fixtures:
+            return []
+        self._advance(dt)
+        grad = normalize_versatz(getattr(self, "modify_versatz_grad",
+                                         MODIFY_VERSATZ_VORGABE))
+        if grad <= 0.0:
+            return []
+        out = []
+        for ziel, (nx, ny) in zip(self.fixtures, self._figur_versaetze()):
+            fx = _find_fixture(patch_cache, ziel.fid)
+            if fx is None:
+                continue
+            out.append((fx, getattr(ziel, "head", None), nx * grad, ny * grad,
+                        ziel.pan_attr, ziel.tilt_attr))
+        return out
+
     def write(self, universes: dict[int, "Universe"],
               patch_cache: list["PatchedFixture"],
               dt: float,
@@ -917,6 +1001,20 @@ class EfxInstance(Function):
             specs.append(ParamSpec("path", "Custom Path", "select",
                                    path_names[0], options=path_names,
                                    tooltip="gespeicherten Pfad auswählen"))
+        # ENG-43: nur mit Haken „Modify-Effekt" — ein normaler EFX bietet der
+        # Konsole exakt dieselbe Parameterliste wie bisher.
+        if self.modify_wirksam():
+            specs.extend([
+                ParamSpec("modify_strength", "Modify-Stärke", "int", 100, 0, 100, 1,
+                          "Skaliert den Versatz (Prozent)"),
+                ParamSpec("modify_mode", "Modify-Art", "select", "add",
+                          options=MODIFY_BEWEGUNG_ARTEN,
+                          tooltip="Addieren oder Abziehen (gespiegelte Figur)"),
+                ParamSpec("modify_versatz_grad", "Versatz (°)", "float",
+                          MODIFY_VERSATZ_VORGABE, MODIFY_VERSATZ_MIN,
+                          MODIFY_VERSATZ_MAX, 1.0,
+                          "Größter Ausschlag der Figur in Grad"),
+            ])
         return specs
 
     def get_param(self, key: str):
@@ -942,6 +1040,13 @@ class EfxInstance(Function):
             return getattr(self, "tempo_multiplier", 1.0)
         if key == "phase_offset":
             return getattr(self, "phase_offset", 0.0)
+        if key == "modify_strength":
+            return int(getattr(self, "modify_strength", 100))
+        if key == "modify_mode":
+            return getattr(self, "modify_mode", "add")
+        if key == "modify_versatz_grad":
+            return float(getattr(self, "modify_versatz_grad",
+                                 MODIFY_VERSATZ_VORGABE))
         return None
 
     def set_param(self, key: str, value) -> bool:
@@ -1019,6 +1124,16 @@ class EfxInstance(Function):
             except (TypeError, ValueError):
                 pass
             return True
+        if key == "modify_strength":
+            from .modify import normalize_strength
+            self.modify_strength = normalize_strength(value); return True
+        if key == "modify_mode":
+            m = str(value or "").strip().lower()
+            if m not in MODIFY_BEWEGUNG_ARTEN:
+                return False
+            self.modify_mode = m; return True
+        if key == "modify_versatz_grad":
+            self.modify_versatz_grad = normalize_versatz(value); return True
         return False
 
     def _cycle_path(self, step: int) -> bool:
@@ -1178,6 +1293,17 @@ class EfxInstance(Function):
             "path_id": self.path_id,
             "path": self.path_data,
         })
+        # ENG-43: Modify-Felder NUR bei Abweichung von der Vorgabe — Alt-Shows
+        # bleiben so byte-gleich (Save->Load->Save-Fixpunkt).
+        if getattr(self, "modify", False):
+            d["modify"] = True
+        if getattr(self, "modify_mode", "add") != "add":
+            d["modify_mode"] = self.modify_mode
+        if int(getattr(self, "modify_strength", 100)) != 100:
+            d["modify_strength"] = int(self.modify_strength)
+        if float(getattr(self, "modify_versatz_grad", MODIFY_VERSATZ_VORGABE)) \
+                != MODIFY_VERSATZ_VORGABE:
+            d["modify_versatz_grad"] = float(self.modify_versatz_grad)
         return d
 
     @classmethod
@@ -1241,4 +1367,12 @@ class EfxInstance(Function):
         e.path_id = d.get("path_id") or None
         pd = d.get("path")
         e.path_data = dict(pd) if isinstance(pd, dict) else None
+        # ENG-43: fehlt in Alt-Shows -> normaler EFX.
+        from .modify import normalize_strength
+        e.modify = bool(d.get("modify", False))
+        mm = str(d.get("modify_mode", "add") or "add").strip().lower()
+        e.modify_mode = mm if mm in MODIFY_BEWEGUNG_ARTEN else "add"
+        e.modify_strength = normalize_strength(d.get("modify_strength", 100))
+        e.modify_versatz_grad = normalize_versatz(
+            d.get("modify_versatz_grad", MODIFY_VERSATZ_VORGABE))
         return e
