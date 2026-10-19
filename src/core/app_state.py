@@ -13,9 +13,10 @@ from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
+from .dmx import adapter_zeilen
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
-from .laser.erkennung import ist_laser, ist_laserkanal, nur_ueber_namen
+from .laser.erkennung import ist_laser, ist_laserkanal
 from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
@@ -260,24 +261,16 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
     "color_wheel", "colour_wheel", "color",
 })
 
-# A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
-# DMX-Laser-NOT-AUS-Latch wieder auf ("wieder an" = bewusstes Einschalten): die
-# Betriebsart/Musterbank (laser_bank), die Muster-/Gobo-Auswahl (gobo_wheel), der
-# Shutter und die Effekt-/Programm-Auswahl (macro — treibt bei macro-basierten
-# Party-Lasern wie dem PARTYLASER-Builtin ohne laser_bank/gobo_wheel die Emission).
-# Ein harmloses Attribut (Position laser_x/laser_y, Zoom, Punktfarbe, Twist, Raster,
-# …) darf den NOT-AUS NICHT lösen — sonst öffnet ein Positions-/Farb-Nudge den Laser
-# trotz gedrücktem Not-Aus wieder. Annahme wie bei UXT-12: Betriebsart/Shutter/Macro
-# 0 = Laser aus; die genannten Attribute sind die Betriebsart-/Emissions-Gates.
-# CDX-13 (David-Entscheidung 2026-07-20, SAFETY vor Usability): `intensity` bleibt
-# BEWUSST DRAUSSEN. Ein FB4-/Streaming-Laser exponiert seine Helligkeit als
-# `intensity`, könnte also per Helligkeitsregler nicht wieder scharfgeschaltet
-# werden — das ist gewollt: `intensity` ist zu breit, ein Szenen-/Snapshot-/
-# Palette-Apply mit Laser-`intensity>0` (über set_programmer_value) würde den
-# NOT-AUS sonst UNGEWOLLT lösen. Bewusstes Wieder-Scharfschalten läuft über den
-# FB4-„Cue"-Kanal (= `gobo_wheel`, bereits whitelisted). Regressionstest:
-# tests/test_laser_dmx_estop.py::test_intensity_on_laser_keeps_latch.
-_LASER_REARM_ATTRS = frozenset({"shutter", "laser_bank", "gobo_wheel", "macro"})
+# LAS-36: KEIN Programmer-Wert loest den Laser-NOT-AUS. Frueher (A3D-02) hob
+# ``set_programmer_value`` den Latch auf, sobald Betriebsart, Musterbank, Muster,
+# Shutter oder Macro eines Lasers gesetzt wurden („wieder an“). Damit liess sich
+# die Rueckfrage am NOT-AUS-Knopf umgehen — ueber den Laser-Tab, einen VC-Fader,
+# eine Snap-/Muster-Taste, Rueckgaengig und den MIDI-Regler „Programmer Attribut“,
+# der ohne Auswahl auf ALLE gepatchten Geraete schreibt (Befund S-01, QA-96).
+# Jetzt wird der Wert gemerkt, der Latch bleibt stehen, die Ausgabe bleibt auf den
+# Aus-Werten. Geloest wird allein ueber ``AppState.laser_notaus_loesen`` — und das
+# ruft die Oberflaeche nur nach der Rueckfrage (``src/ui/laser_notaus.py``).
+# Waechter: tests/test_las36_notaus_nur_mit_rueckfrage.py.
 
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
 LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
@@ -321,6 +314,11 @@ class AppState:
         # nicht — benutze /dev/ttyUSB0"). Der Statusbalken liest das, damit ein
         # falsch konfigurierter Adapter nicht laenger als gruen durchgeht.
         self.enttec_port_notes: dict[int, str | None] = {}
+        # OUT-74: Adapter, die in universes.json in mehr als einer Zeile stehen
+        # und deshalb fuer keine eingerichtet sind (`adapter_zeilen.Doppelt`).
+        # Das Ausfall-Banner liest das — im Kiosk-Modus gibt es keine
+        # Statusleiste, die den Hinweis aus `enttec_port_notes` zeigen koennte.
+        self.adapter_konflikte: list = []
         self.programmer: dict[int, dict[str, int]] = {}
         # Schuetzt jeden Lese-/Schreibzugriff auf self.programmer. Der MIDI-/OSC-/
         # Web-Thread mutiert den Programmer (set_programmer_value), waehrend der
@@ -459,6 +457,9 @@ class AppState:
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
+        # ENG-30: fid -> (Eintrag aus _fix_index, Adresse, Universum,
+        #                 Intensitaets-, Dimmer-, Farb-Adressen) — s. _adress_listen.
+        self._adress_plan: dict[int, tuple] = {}
         # VCB-11: slot -> (fids, gruppen) der gedrueckten Blackout-Tasten mit Ziel.
         self._ziel_blackout_specs: dict = {}
         self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
@@ -474,9 +475,6 @@ class AppState:
         # Universum seit der Aktivierung des Latches; erst das Loesen leert sie.
         self._laser_estop_klebrig: dict[int, frozenset] = {}
         self._laser_fids: frozenset = frozenset()            # fids aller DMX-Laser
-        # LAS-37: die Teilmenge, die wie ein Laser BEDIENT wird (Typ oder
-        # laser_*-Kanal) — nur deren Muster-/Betriebsart-Abruf loest den NOT-AUS.
-        self._laser_rearm_fids: frozenset = frozenset()
         # STAB-15: Der 44-Hz-Renderer (_render_frame) liest den Render-Plan
         # (_fix_index/_default_frame/_commit_spans/_patched_set/_laser_estop_addrs),
         # waehrend _rebuild_render_plan ihn beim Umpatchen feldweise austauscht.
@@ -1928,7 +1926,6 @@ class AppState:
         addrs: dict[int, set] = {}
         laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
         laser_fids: set = set()
-        laser_rearm_fids: set = set()
         for fx in self._patch_cache:
             chans = get_channels_for_patched(fx)
             # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
@@ -1951,12 +1948,6 @@ class AppState:
             is_laser = ist_laser(fx, chans)
             if is_laser:
                 laser_fids.add(fx.fid)
-                # Nur ueber einen Namen erkannt (Lichtset, Moving Head mit
-                # Laserdiode): gedeckt vom NOT-AUS, aber ein Gobo-/Shutter-/Makro-
-                # Wert an so einem Geraet ist kein „Laser wieder an“ und darf den
-                # NOT-AUS nicht loesen.
-                if not nur_ueber_namen(fx, chans):
-                    laser_rearm_fids.add(fx.fid)
             for ch in chans:
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -2013,9 +2004,22 @@ class AppState:
         # getauschte Kombination (neuer fix_index + alte spans/defaults) sieht.
         new_default_frame = {u: bytes(b) for u, b in defaults.items()}
         new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        # ENG-30: die Adresslisten, die _render_frame je Geraet braucht, EINMAL
+        # hier ableiten statt in jedem Frame (bei 80 Geraeten rund 5700
+        # Attributzugriffe auf Datenbank-Objekte je Frame, die Haelfte der
+        # Grundlast). Ein Geraet, bei dem das Ableiten wirft, bleibt ohne
+        # Eintrag — der Frame rechnet es dann wie bisher selbst (und meldet
+        # den Fehler dort, wo er bisher auch auffiel).
+        adress_plan: dict[int, tuple] = {}
+        for _fid, _eintrag in fix_index.items():
+            try:
+                _fx = _eintrag[0]
+                adress_plan[_fid] = (_eintrag, _fx.address, _fx.universe,
+                                     *self._adress_listen(_fx, _eintrag[1]))
+            except Exception:
+                continue
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
-        new_laser_rearm_fids = frozenset(laser_rearm_fids)
         # A3D-18: Snapshot der bisher gepatchten Adressen VOR dem Tausch — Adressen,
         # die jetzt NICHT mehr gepatcht sind (Fixture entfernt/umadressiert), muessen
         # danach im Live-Universe freigegeben werden (sonst Zombie-Kanal).
@@ -2087,18 +2091,29 @@ class AppState:
                 # auf die Maske des vorigen Plans.
                 self._blackout_keep_gesetzt = new_keep_mask
                 self._fix_index = fix_index
+                self._adress_plan = adress_plan
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
                 self._patched_set = new_patched_set
                 self._laser_estop_addrs = new_laser_estop_addrs
                 self._laser_fids = new_laser_fids
-                self._laser_rearm_fids = new_laser_rearm_fids
         # STAB-14: die zuletzt als Engine-Extra committeten Roh-Kanaele aktiv
         # freigeben, statt das Tracking nur zu leeren (sonst Zombie, s. Helfer).
         self._release_engine_extra()
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
+        # OUT-72: Aus-Werte von Lasern, die mit diesem Plan aus dem Patch
+        # gefallen sind, stehen lassen — sonst faellt ihre Adresse auf 0, und
+        # 0 heisst bei manchem Laser „an“.
+        # ★ Codex-Review #1056: VOR der Freigabe. ``_release_now`` schreibt die
+        # alten Laser-Adressen sofort auf 0, und gegen ``_send_all`` gibt es
+        # ausserhalb von ``_plan_lock`` keine Sperre — stand die Maske erst
+        # danach, konnte dazwischen ein Frame mit 0 („Auto run“) hinausgehen.
+        try:
+            self._laser_aus_verwaist_nachfuehren(new_laser_aus, new_patched_set)
+        except Exception as e:
+            print(f"[AppState] laser aus verwaist error: {e}")
         self._release_unpatched_addrs(old_patched, new_patched_set,
                                      never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
@@ -2191,6 +2206,46 @@ class AppState:
                 for a in prev_addrs:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
+
+    def _laser_aus_verwaist_nachfuehren(self, neue_maske, gepatcht) -> None:
+        """OUT-72: Aus-Werte nicht mehr gepatchter Laser festhalten.
+
+        Wird ein Laser entpatcht, umadressiert oder mit einem Show-Wechsel
+        ersetzt, gibt ``_release_unpatched_addrs`` seine Adressen frei — sie
+        fallen auf 0. Bei einem Laser, dessen Betriebsart bei DMX 0 „Auto run“
+        heisst, ist das AN, und niemand kann das Geraet mehr steuern: es steht
+        in keiner Maske. Am Geraet selbst hat sich nichts geaendert; es hoert
+        weiter auf seine Adresse.
+
+        Deshalb bleibt der zuletzt bekannte Aus-Wert jeder solchen Adresse auf
+        der Leitung (``OutputManager.set_laser_aus_verwaist``), bis
+
+        * die Adresse wieder gepatcht ist — dann bestimmt das neue Geraet —, oder
+        * die Ausgabe endet (das Schlussbild traegt die Werte ebenfalls).
+
+        Gemerkt wird nur, was nicht 0 ist: 0 ist der Wert einer freien Adresse
+        ohnehin. ``neue_maske`` ist die Aus-Maske des neuen Plans
+        (``_build_gm_laser_aus_mask``), ``gepatcht`` seine belegten Adressen je
+        Universum. Mit ``getattr``, weil Testhelfer den Zustand ohne
+        ``__init__`` bauen.
+        """
+        kandidaten = {u: dict(m) for u, m in
+                      (getattr(self, "_laser_aus_verwaist", None) or {}).items()}
+        for u, m in (getattr(self, "_laser_aus_plan", None) or {}).items():
+            kandidaten.setdefault(u, {}).update(m)      # der juengere Wert gewinnt
+        verwaist: dict[int, dict[int, int]] = {}
+        for u, m in kandidaten.items():
+            belegt = (gepatcht or {}).get(u) or ()
+            for addr, wert in m.items():
+                if wert and addr not in belegt:
+                    verwaist.setdefault(u, {})[addr] = wert
+        if neue_maske is not None:
+            self._laser_aus_plan = {u: dict(m) for u, m in neue_maske.items()}
+        self._laser_aus_verwaist = verwaist
+        setze = getattr(getattr(self, "output_manager", None),
+                        "set_laser_aus_verwaist", None)
+        if callable(setze):
+            setze(verwaist)
 
     def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict,
                                  *, never_defer: dict | None = None):
@@ -2466,6 +2521,45 @@ class AppState:
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
 
+        # ★ OUT-74: derselbe Adapter in mehr als einer Zeile.
+        #
+        # Bisher richtete die Schleife unten beide Zeilen nacheinander ein;
+        # `add_enttec` schliesst den Anschluss auf dem jeweils anderen
+        # Universum, also gewann die Zeile, die zufaellig weiter hinten in der
+        # Datei steht. Der Adapter sendete dann moeglicherweise das falsche
+        # Universum — ohne Meldung. Welche Zeile gemeint war, steht nicht in
+        # der Datei; die erste oder letzte zu nehmen hiesse raten. Deshalb: der
+        # Adapter wird fuer KEINE der Zeilen eingerichtet, und es wird gesagt
+        # (Statusleiste ueber `enttec_port_notes`, Dialog, Konsole).
+        try:
+            doppelt = {adapter_zeilen.schluessel(d.typ, d.patch): d
+                       for d in adapter_zeilen.doppelte(rows)}
+        except Exception as e:
+            print(f"[app_state] apply_output_config: Adapter-Pruefung: {e}")
+            doppelt = {}
+        for d in doppelt.values():
+            print(f"[app_state] apply_output_config: {d.text}")
+        self.adapter_konflikte = list(doppelt.values())
+
+        def _merke_hinweis(universum, text):
+            # Lazy-Init wie unten begruendet (HW-5b): Stubs in Bestandstests
+            # bringen `enttec_port_notes` nicht mit.
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes is None:
+                notes = {}
+                self.enttec_port_notes = notes
+            notes[universum] = text
+
+        def _vergiss_hinweis(universum):
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes:
+                notes.pop(universum, None)
+
+        # Hinweise zu Universen, die es nicht mehr gibt, gehen mit ihnen.
+        for universum in list(getattr(self, "enttec_port_notes", None) or {}):
+            if universum not in konfiguriert:
+                _vergiss_hinweis(universum)
+
         for r in rows or []:
             try:
                 num = int(r.get("num", 1))
@@ -2491,13 +2585,38 @@ class AppState:
                 # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
+                konflikt = doppelt.get(adapter_zeilen.schluessel(output, patch))
                 # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
                 # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
                 # „Uebernehmen“ die Buehne dunkel.
-                if output == "Disabled":
+                # OUT-72: kommt ein ANDERER Adapter (Typwechsel Enttec ->
+                # Art-Net, anderer Anschluss, andere Adresse), geht der alte
+                # ebenfalls wirklich. Der Manager erfaehrt deshalb vorher, was
+                # gleich kommt, und gibt jedem Adapter, der nicht genau dieser
+                # ist, sein Schlussbild; der unveraenderte bekommt keines.
+                # OUT-74: wie bei „Disabled“ bei einer Zeile mit doppeltem Adapter —
+                # der Adapter wird fuer KEINE der Zeilen eingerichtet, es kommt
+                # also kein Nachfolger. Ohne Schlussbild hielte er sein letztes
+                # Bild und die Buehne bliebe stehen, obwohl nichts mehr sendet.
+                if output == "Disabled" or konflikt is not None:
                     self.output_manager.remove_output(num, schlussbild=True)
                 else:
+                    nachfolger = _ausgabe_nachfolger(output, patch, out_u)
+                    ansagen = getattr(self.output_manager,
+                                      "nachfolger_ansagen", None)
+                    if nachfolger is not None and callable(ansagen):
+                        ansagen(num, *nachfolger)
                     self.output_manager.remove_output(num)
+                if konflikt is not None:
+                    # OUT-74: nicht einrichten, s. o. — der Ausgang ist
+                    # entfernt, das Universum bleibt ohne Adapter.
+                    _merke_hinweis(num, konflikt.text)
+                    continue
+                if output != "Enttec":
+                    # Ein Hinweis aus einem frueheren Lauf (falscher Port,
+                    # doppelter Adapter) gilt nicht mehr, sobald die Zeile
+                    # keinen Enttec mehr meint.
+                    _vergiss_hinweis(num)
                 if output == "Enttec" and patch:
                     # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
                     # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit
@@ -2520,11 +2639,7 @@ class AppState:
                     hinweis = diagnose_enttec_port(patch)
                     if hinweis:
                         print(f"[app_state] Universe {num} (Enttec): {hinweis}")
-                    notes = getattr(self, "enttec_port_notes", None)
-                    if notes is None:
-                        notes = {}
-                        self.enttec_port_notes = notes
-                    notes[num] = hinweis
+                    _merke_hinweis(num, hinweis)
                     self.output_manager.add_enttec(num, patch)
                 elif output == "uDMX":
                     # OUT-68: ``patch`` = Adapter-Schluessel (Kennung +
@@ -2749,10 +2864,10 @@ class AppState:
         Fixtures, die über normale DMX-Kanäle ein Muster ausgeben, erreicht das
         nicht. Ist dieser Latch aktiv, zwingt der Renderer alle Laser-Kanäle als
         oberste Ebene auf 0 (Betriebsart/Shutter 0 = Laser aus); zusätzlich erzwingt
-        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01). Der
-        Latch wird bewusst durch das nächste Setzen eines Laser-Werts wieder gelöst
-        (Muster-Abruf/Regler = „wieder an") — ein Show-Load lässt ihn absichtlich
-        stehen (dunkel = sicher)."""
+        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01).
+        LAS-36: Kein Programmer-Wert, kein Show-Load und keine Patch-Aenderung
+        nimmt den Latch zurueck (dunkel = sicher). ``set_laser_estop(False)`` ruft
+        im Programm nur ``laser_notaus_loesen`` — der eine Loese-Weg."""
         # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
         # CDX-12: Reihenfolge ist ASYMMETRISCH und failt in beide Richtungen sicher.
         # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
@@ -2843,19 +2958,24 @@ class AppState:
                       f"nicht geloest (bleibt dunkel): {e}")
 
     def laser_notaus_loesen(self):
-        """LAS-31: den Laser-NOT-AUS bewusst loesen (die Oberflaeche fragt vorher
-        nach). Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
-        unscharf — Scharfschalten ist ein eigener Schritt."""
-        self.set_laser_estop(False)
+        """LAS-31/LAS-36: den Laser-NOT-AUS bewusst loesen — der EINZIGE Weg, auf
+        dem der Latch faellt. Aufrufer ist die Rueckfrage der Oberflaeche
+        (``src/ui/laser_notaus.loesen_mit_rueckfrage``); nichts sonst ruft das,
+        auch kein Tastenkuerzel, kein MIDI und keine Fernbedienung.
 
-    def _laser_rearm_menge(self) -> frozenset:
-        """LAS-37: die Geraete, deren Muster-/Betriebsart-Abruf den NOT-AUS
-        loest — die wie ein Laser bedienten. Ein Zustand ohne diese Menge (vor
-        dem ersten Plan) faellt auf alle erkannten Laser zurueck."""
-        menge = getattr(self, "_laser_rearm_fids", None)
-        if menge is None:
-            menge = getattr(self, "_laser_fids", frozenset())
-        return menge or frozenset()
+        Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
+        unscharf — Scharfschalten ist ein eigener Schritt. DMX-Laser geben danach
+        sofort wieder aus, was Programmer, Szenen und Effekte vorgeben — auch
+        Werte, die waehrend des NOT-AUS gesetzt wurden.
+
+        Meldet ``SyncEvent.LASER_ESTOP`` (Daten ``False`` = geloest), damit die
+        Anzeigen nachziehen; Abonnenten lesen ``laser_estop_active``."""
+        self.set_laser_estop(False)
+        try:
+            from .sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LASER_ESTOP, False)
+        except Exception:
+            pass
 
     def laser_anzahl(self) -> int:
         """LAS-31: Zahl der als Laser erkannten gepatchten Geraete — DMX-Laser
@@ -2989,20 +3109,9 @@ class AppState:
         self._verlauf_notiere(aenderungen, attr_label(key))
         self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
-        # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
-        # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
-        # den Laser-NOT-AUS auf. Ein harmloses Attribut (Position/Zoom/Farbe/…) darf
-        # ihn NICHT lösen — sonst öffnet ein Positions-Nudge den Laser trotz Not-Aus.
-        # Auf den Basisnamen prüfen: Snap-/VC-Restore-Pfade reichen den Composite-Key
-        # "attr#N" (Kopf>0) direkt als attribute durch -> vor dem Whitelist-Check das
-        # "#N"-Suffix abspalten, sonst entriegelt ein Kopf>0-Gate den Not-Aus nicht.
-        if (getattr(self, "laser_estop_active", False)
-                and str(attribute).split("#", 1)[0] in _LASER_REARM_ATTRS
-                and int(fid) in self._laser_rearm_menge()):
-            # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
-            with self._get_estop_lock():
-                self.laser_estop_active = False
-                self._push_laser_estop_mask()
+        # LAS-36: ein Laser-Wert loest den NOT-AUS NICHT (frueher A3D-02). Er steht
+        # jetzt im Programmer; solange der Latch steht, haelt der Renderer die
+        # Laser-Adressen auf den Aus-Werten. Loesen: ``laser_notaus_loesen``.
         self._emit("programmer_changed", fid)
         if undoable and old != new_val:
             self._push_undo(
@@ -3147,8 +3256,8 @@ class AppState:
     def _programmer_werte_anwenden(self, werte: dict):
         """FM-52: schreibt ``{(fid, key): wert|None}`` direkt in den Programmer
         (``None`` = Schluessel entfernen). Bewusst NICHT ueber
-        set_programmer_value: das wuerde den Laser-NOT-AUS aufheben (UXT-12) —
-        ein Rueckgaengig darf einen Laser nie wieder scharf schalten. Ebenso kein
+        set_programmer_value (eigener Verlaufs-/Undo-Eintrag). Den Laser-NOT-AUS
+        hebt ein Rueckgaengig nie auf — seit LAS-36 tut das kein Wert mehr. Ebenso kein
         clear_remote_input. Nicht mehr gepatchte Geraete werden uebersprungen
         (remove_fixture entfernt deren Eintrag ohne Ereignis)."""
         gepatcht = {f.fid for f in getattr(self, "_patch_cache", [])}
@@ -4428,6 +4537,8 @@ class AppState:
         # getauschte Feld-Kombination in diesen Frame einschleusen.
         with self._get_plan_lock():
             fix_index = self._fix_index
+            # ENG-30: defensiv wie _laser_estop_addrs (Test-Stubs ohne das Feld).
+            adress_plan = getattr(self, "_adress_plan", None) or {}
             default_frame = self._default_frame
             commit_spans = self._commit_spans
             patched_set = self._patched_set
@@ -4512,26 +4623,26 @@ class AppState:
         effect_present: dict[int, bool] = {}
         for fidi, entry in fix_index.items():
             fx, chans = entry
-            addrs = self._fixture_intensity_addrs(fx, chans)
+            fx_univ = fx.universe
+            # ENG-30: Listen aus dem Plan — aber nur, wenn der Eintrag noch
+            # GENAU zu diesem Geraet passt: derselbe (Geraet, Kanaele)-Eintrag
+            # und unveraenderte Adresse/Universum. Sonst (von Hand gesetzter
+            # _fix_index, Adresse am Objekt geaendert) wie bisher ableiten.
+            # Die Listen sind geteilt und werden NUR gelesen.
+            plan = adress_plan.get(fidi)
+            if (plan is not None and plan[0] is entry
+                    and plan[1] == fx.address and plan[2] == fx_univ):
+                addrs, dims, cols = plan[3], plan[4], plan[5]
+            else:
+                addrs, dims, cols = self._adress_listen(fx, chans)
             inten_addrs[fidi] = addrs
-            dims: list[int] = []
-            cols: list[int] = []
-            for ch in chans:
-                a_l = (getattr(ch, "attribute", "") or "").lower()
-                ad = fx.address + ch.channel_number - 1
-                if not (1 <= ad <= 512):
-                    continue
-                if a_l in _DIM_INTENSITY_ATTRS:
-                    dims.append(ad)
-                elif a_l in _DIM_COLOR_ATTRS:
-                    cols.append(ad)
             dim_addrs[fidi] = dims
             color_addrs[fidi] = cols
-            su = scratch.get(fx.universe)
+            su = scratch.get(fx_univ)
             if su is None:
                 effect_present[fidi] = False
                 continue
-            base = default_frame.get(fx.universe)
+            base = default_frame.get(fx_univ)
             present = False
             for a in addrs:
                 dv = base[a - 1] if (base and a - 1 < len(base)) else 0
@@ -5269,6 +5380,31 @@ class AppState:
                 color.append(addr)
         return inten if inten else color
 
+    def _adress_listen(self, fx, chans) -> tuple[list[int], list[int], list[int]]:
+        """ENG-30: die drei Adresslisten, die ``_render_frame`` je Geraet braucht.
+
+        ``(intensitaet, dimmer, farbe)``: die Adressen, die der Dimmer-Master
+        skaliert (``_fixture_intensity_addrs``), NUR die echten Dimmer-/
+        Intensitaets-Kanaele und NUR die Farb-Kanaele (hier MIT CMY — die
+        implizite Grundhelligkeit 4a² fragt „ist eine Farbe aktiv", nicht
+        „darf ich skalieren").
+
+        Reine Ableitung aus Geraet und Kanaelen. ``_rebuild_render_plan`` legt
+        das Ergebnis in den Plan; EINE Stelle fuer Plan und Frame."""
+        addrs = self._fixture_intensity_addrs(fx, chans)
+        dims: list[int] = []
+        cols: list[int] = []
+        for ch in chans:
+            a_l = (getattr(ch, "attribute", "") or "").lower()
+            ad = fx.address + ch.channel_number - 1
+            if not (1 <= ad <= 512):
+                continue
+            if a_l in _DIM_INTENSITY_ATTRS:
+                dims.append(ad)
+            elif a_l in _DIM_COLOR_ATTRS:
+                cols.append(ad)
+        return addrs, dims, cols
+
     def _fixture_head_intensity_addr_map(self, fx, chans) -> dict:
         """FM-HEADLAYOUT A4: ``{head: [addr]}`` — welche Adressen ein KOPF-genauer
         Dimm-Faktor (VC-Submaster pro Kopf) je Kopf skalieren darf.
@@ -5961,6 +6097,28 @@ def profil_geaendert(profile_id=None) -> bool:
         clear_channel_cache()
         return False
     return st.profil_geaendert(profile_id)
+
+
+def _ausgabe_nachfolger(output: str, patch: str, out_u):
+    """OUT-72: ``(typ, ziel, externes Universum)`` des Adapters, den
+    ``apply_output_config`` fuer diese Zeile gleich einrichtet — fuer
+    ``OutputManager.nachfolger_ansagen``. ``None`` fuer Ausgabetypen, die hier
+    nicht eingerichtet werden.
+
+    Ein Enttec ohne Anschluss wird nicht eingerichtet: die Ansage nennt dann
+    ein Ziel, das kein laufender Adapter hat — alles Bisherige geht also und
+    bekommt sein Schlussbild.
+    """
+    if output == "Enttec":
+        return ("enttec", patch, None)
+    if output == "uDMX":
+        # OUT-68: ``patch`` = Adapter-Schluessel, leer = der einzige vorhandene.
+        return ("udmx", str(patch or "").strip(), None)
+    if output == "ArtNet":
+        return ("artnet", patch or "255.255.255.255", out_u)
+    if output == "sACN":
+        return ("sacn", patch or "", out_u)
+    return None
 
 
 def clear_channel_cache():

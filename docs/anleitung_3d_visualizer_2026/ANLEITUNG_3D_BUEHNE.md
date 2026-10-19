@@ -293,7 +293,7 @@ hilft **Kamera → Fit (alle)**.
 - **Show** (Geräte, Positionen, gespeicherte Kameras, Gruppen, Effekte, VC) im
   Hauptfenster über **Datei → Speichern** bzw. **Speichern unter…**.
 
-Rückgängig/Wiederholen (`Strg+Z`/`Strg+Y`) wirkt auch im Visualizer-Fenster.
+Rückgängig/Wiederholen (`Strg+Z` / `Strg+Y` oder `Strg+Umschalt+Z`) wirkt auch im Visualizer-Fenster.
 Löschst du ein Bühnen-Element (über **Element LÖSCHEN** oder im Bild mit `Entf` bzw.
 dem runden Löschen-Knopf), bringt das Rückgängig es zurück und hängt die Geräte
 wieder an, die daran angedockt waren.
@@ -505,7 +505,7 @@ Frequenz blitzen gemeinsam.
 | `S` | Reiter Bühne (klappt die Spalte aus) |
 | `D` | Andocken an/aus |
 | `F9` | Rechte Spalte ein-/ausklappen |
-| `Strg+Z` / `Strg+Y` | Rückgängig / Wiederholen |
+| `Strg+Z` / `Strg+Y` oder `Strg+Umschalt+Z` | Rückgängig / Wiederholen |
 
 ## Früher bekannte Macken (alle erledigt)
 

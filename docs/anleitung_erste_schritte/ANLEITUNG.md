@@ -50,7 +50,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    denn bei manchen Lasern heißt DMX 0 „Auto“ und würde sie einschalten.
    Kennt das Profil keinen Aus-Wert, strahlt ein Laser ohne Dimmer womöglich
    weiter; sicher aus ist ein Laser nur mit dem **Laser-NOT-AUS**
-   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf. Im Kiosk-Modus, in dem diese Leiste ausgeblendet ist, steht **BLACKOUT** oben rechts direkt links neben **LASER NOT-AUS** und zeigt denselben Zustand.
+   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf. Im Kiosk-Modus, in dem diese Leiste ausgeblendet ist, stehen **GM**, **STOP ALL** und **BLACKOUT** oben rechts in einem Streifen, in dieser Reihenfolge links neben **LASER NOT-AUS**. Sie wirken wie ihre Gegenstücke in der Sektionsleiste und zeigen denselben Zustand — auch der GM-Regler folgt, wenn ein VC-Fader, MIDI oder die Fernbedienung den Grand Master ändert. Das Mausrad verstellt den GM dort nicht (ziehen oder klicken), und die Leertaste löst keinen der Knöpfe aus.
    Wie das im DMX-Monitor aussieht, zeigt
    [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine
@@ -60,7 +60,10 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    (auch im Kiosk-Modus oben rechts; Tastenkürzel `Strg+Umschalt+L`): ein Klick schaltet
    alle Laser sofort dunkel, ohne Rückfrage, und der Knopf blinkt dann als
    **LASER NOT-AUS AKTIV**. Gelöst wird er nur bewusst — noch einmal klicken und die
-   Rückfrage bestätigen.
+   Rückfrage bestätigen. Nichts anderes löst ihn: kein Regler, keine Taste der Virtual
+   Console, kein MIDI-Controller, kein Tastenkürzel. Solange er aktiv ist, werden
+   Laser-Werte gemerkt, der Laser bleibt dunkel; nach dem Lösen gibt er sofort wieder
+   aus, was eingestellt ist.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,

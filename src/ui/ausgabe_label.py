@@ -86,6 +86,7 @@ def ausgabe_label(wege, probleme, ohne_ausgang) -> tuple[str, str, str]:
         tooltip = "\n".join(
             f"U{w['universum']} {w['weg']}"
             + (f" → {w['ziel']}" if w.get("ziel") else "")
+            + (f" — {w['hinweis']}" if w.get("hinweis") else "")   # OUT-66
             for w in wege)
         return (text, FARBE_NORMAL, tooltip)
 
