@@ -631,6 +631,9 @@ class PlanZeile:
     #: IMP-3: ``(Name aus der Tabelle, neuer Name)`` je Geraet, das beim
     #: Import eine Nummer bekommt, weil es den Namen schon gab.
     umbenannt: list[tuple[str, str]] = field(default_factory=list)
+    #: IMP-4: die volle Liste der Ueberschneidungen, wenn der Status-Satz sie
+    #: zusammenfasst (mehr als ein Treffer) — fuer den Tooltip.
+    ueberschneidungen: list[str] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -688,6 +691,15 @@ class PlanZeile:
             text += "  Hinweis: " + " ".join(self.hinweise)
         return text
 
+    @property
+    def status_tooltip(self) -> str:
+        """IMP-4: der Status-Satz, bei zusammengefassten Ueberschneidungen
+        darunter die volle Liste."""
+        if not self.ueberschneidungen:
+            return self.status_text
+        return (self.status_text + "\n\nÜberschneidet sich mit:\n"
+                + "\n".join("• " + t for t in self.ueberschneidungen))
+
 
 @dataclass
 class Plan:
@@ -718,8 +730,10 @@ class Plan:
         if z[OFFEN]:
             teile.append(f"{z[OFFEN]} offen")
         if z[UEBERSCHNEIDUNG]:
+            # IMP-4: gezaehlt werden ZEILEN, nicht Ueberschneidungen.
             n = z[UEBERSCHNEIDUNG]
-            teile.append(f"{n} Überschneidung" + ("en" if n > 1 else ""))
+            teile.append(f"{n} Zeile" + ("n" if n > 1 else "")
+                         + " mit Überschneidungen")
         if z[FEHLER]:
             teile.append(f"{z[FEHLER]} mit Fehler")
         return ", ".join(teile)
@@ -835,12 +849,15 @@ def _pruefe_ueberschneidungen(zeilen: list[PlanZeile], vorhandene) -> None:
         for g in pz.geraete:
             eintraege.setdefault(g.universum, []).append(
                 (g.adresse, g.ende, (pz, g)))
-    gruende: dict[int, list[str]] = {}
+    # IMP-4: je Zeile erst sammeln, dann EINEN Satz bauen — sonst steht bei
+    # acht vorhandenen PARs achtmal derselbe Satz in der Status-Zelle.
+    treffer_alt: dict[int, list[Belegung]] = {}
+    treffer_zeile: dict[int, list[PlanZeile]] = {}
 
-    def melde(pz: PlanZeile, text: str) -> None:
-        liste = gruende.setdefault(pz.index, [])
-        if text not in liste:
-            liste.append(text)
+    def merke(ziel: dict, pz: PlanZeile, was) -> None:
+        liste = ziel.setdefault(pz.index, [])
+        if not any(w is was for w in liste):
+            liste.append(was)
 
     for universum in eintraege:
         for a, b in ueberlappende_paare(eintraege[universum]):
@@ -853,18 +870,57 @@ def _pruefe_ueberschneidungen(zeilen: list[PlanZeile], vorhandene) -> None:
                 if hier is None:
                     continue
                 if dort is None:
-                    melde(hier, f"Überschneidet sich mit dem vorhandenen Gerät "
-                                f"„{dort_g.name}“ (Universum {universum}, Kanal "
-                                f"{dort_g.adresse} bis "
-                                f"{dort_g.adresse + dort_g.kanaele - 1}).")
+                    merke(treffer_alt, hier, dort_g)
                 else:
-                    melde(hier, f"Überschneidet sich mit Zeile {dort.zeile.nr} "
-                                f"der Tabelle („{dort.name}“).")
+                    merke(treffer_zeile, hier, dort)
     for pz in zeilen:
-        if pz.index in gruende:
-            pz.status = UEBERSCHNEIDUNG
-            pz.gruende.extend(gruende[pz.index])
-            pz.geraete = []
+        alt = treffer_alt.get(pz.index, [])
+        andere = treffer_zeile.get(pz.index, [])
+        if not alt and not andere:
+            continue
+        pz.status = UEBERSCHNEIDUNG
+        alt.sort(key=lambda b: (b.adresse, b.name))
+        andere.sort(key=lambda o: o.zeile.nr)
+        if alt:
+            pz.gruende.append(_satz_vorhandene(alt))
+        if andere:
+            pz.gruende.append(_satz_zeilen(andere))
+        if len(alt) > 1 or len(andere) > 1:
+            pz.ueberschneidungen = (
+                [f"„{b.name}“ (Universum {b.universum}, Kanal {b.adresse} bis "
+                 f"{b.adresse + b.kanaele - 1})" for b in alt]
+                + [f"Zeile {o.zeile.nr} der Tabelle („{o.name}“)" for o in andere])
+        pz.geraete = []
+
+
+def _aufzaehlung(namen: list[str]) -> str:
+    """„A“ · „A“ und „B“ · „A“, „B“ und „C“ · ab vier: „A“ … „H“."""
+    if len(namen) == 1:
+        return namen[0]
+    if len(namen) <= 3:
+        return ", ".join(namen[:-1]) + " und " + namen[-1]
+    return f"{namen[0]} … {namen[-1]}"
+
+
+def _satz_vorhandene(alt: list[Belegung]) -> str:
+    """IMP-4: ein Satz fuer alle vorhandenen Geraete, mit denen sich eine
+    Zeile ueberschneidet; der Kanalbereich umfasst alle."""
+    von = min(b.adresse for b in alt)
+    bis = max(b.adresse + b.kanaele - 1 for b in alt)
+    wo = f"(Universum {alt[0].universum}, Kanal {von} bis {bis})"
+    if len(alt) == 1:
+        return f"Überschneidet sich mit dem vorhandenen Gerät „{alt[0].name}“ {wo}."
+    namen = _aufzaehlung([f"„{b.name}“" for b in alt])
+    return (f"Überschneidet sich mit {len(alt)} vorhandenen Geräten: "
+            f"{namen} {wo}.")
+
+
+def _satz_zeilen(andere: list[PlanZeile]) -> str:
+    if len(andere) == 1:
+        o = andere[0]
+        return f"Überschneidet sich mit Zeile {o.zeile.nr} der Tabelle („{o.name}“)."
+    nummern = _aufzaehlung([str(o.zeile.nr) for o in andere])
+    return f"Überschneidet sich mit den Zeilen {nummern} der Tabelle."
 
 
 _NAME_MIT_NUMMER = re.compile(r"^(.*\S)\s+(\d+)$")
