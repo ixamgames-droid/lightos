@@ -47,7 +47,7 @@
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
-| LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-18T15:37Z | - |
+| LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-19T14:04Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
