@@ -55,7 +55,7 @@
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
-| IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-18T15:37Z | - |
+| IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-19T14:04Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-19T14:04Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-19T14:04Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
