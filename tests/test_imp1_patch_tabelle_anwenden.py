@@ -559,7 +559,11 @@ def test_auswahlfeld_tooltip_folgt_der_wahl(state, bib):
 
 def test_import_knopf_ist_ein_menueknopf_und_per_tastatur_bedienbar(state, monkeypatch):
     """STAB-33: kein QPushButton.setMenu. Leertaste auf dem Knopf klappt das
-    Menü auf, Pfeil-ab + Eingabe löst den ersten Eintrag aus."""
+    Menü auf, Pfeil-ab + Eingabe löst den ersten Eintrag aus.
+
+    IMP-3: das gilt für die Ansicht ALLEIN. Im Hauptfenster gehört die
+    Leertaste dem Kürzel GO; dort öffnet die Eingabetaste das Menü
+    (tests/test_imp3_dialog_und_patch.py)."""
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QPushButton

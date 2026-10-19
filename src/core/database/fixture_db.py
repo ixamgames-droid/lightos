@@ -487,7 +487,8 @@ def _laser_text(laser) -> str:
     return als_text(laser)
 
 
-def create_user_profile(payload: dict, *, engine=None) -> int:
+def create_user_profile(payload: dict, *, engine=None,
+                        herkunft: dict | None = None) -> int:
     """Speichert ein vom Fixture-Generator erzeugtes Payload als neues
     FixtureProfile (source="user") in der DB und gibt die neue Profil-ID zurueck.
 
@@ -502,7 +503,25 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
     die physische Rasterform (``grid_rows``/``grid_cols``/``white_rows``/
     ``white_cols``), damit ein ueber den Generator angelegtes Panel dieselbe
     Form traegt wie ein ueber den Fixture-Editor angelegtes.
+
+    FM-76: ``herkunft`` = die vier Herkunftsfelder (``quelle``/``herkunft``/
+    ``geprueft``/``autor``) der Vorlage, aus der das Profil entstand (geladene
+    Bibliotheksdatei, QLC+-Datei). Sie werden in ``FixtureProfile.herkunft``
+    geschrieben — sonst meldete ``bibliothek_format.herkunft_fuer`` fuer das
+    neue Profil „eigen“ und die Lizenzangabe der Vorlage waere verloren.
+    ``None`` (Default) = frei gebautes, eigenes Profil wie bisher. Eine
+    ungueltige Angabe wird abgelehnt (``ValueError``), nicht still verworfen.
     """
+    herkunft_text, provenance = "", ""
+    if herkunft is not None:
+        from . import bibliothek_format as BF
+        h = BF.herkunft_aus_daten(herkunft)
+        if h is None:
+            raise ValueError(
+                "Herkunftsangabe der Vorlage unvollständig oder ungültig — "
+                "nichts gespeichert.")
+        herkunft_text = BF._herkunft_json(h)
+        provenance = BF._provenance({"format_version": BF.FORMAT_VERSION, **h})
     eng = engine if engine is not None else globals()["engine"]()
     with Session(eng) as s:
         mfr = _get_or_create_mfr(
@@ -520,6 +539,8 @@ def create_user_profile(payload: dict, *, engine=None) -> int:
             source=payload.get("source", "user") or "user",
             # FM-12: expliziter 3D-Modell-Override ("" = Automatik).
             viz_model=(payload.get("viz_model") or "").strip()[:40],
+            herkunft=herkunft_text,
+            provenance=provenance,
         )
         s.add(prof)
         s.flush()
