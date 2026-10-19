@@ -6058,6 +6058,13 @@ class AppState:
         # Legacy callbacks — ueber eine Kopie iterieren, damit ein Callback, der
         # sich (un)subscribed, die Iteration nicht sprengt.
         for cb in list(self._callbacks):
+            # QA-97: gebundene Methode eines schon zerstoerten Qt-Objekts (View
+            # eines abgebauten Fensters, das sich nie abgemeldet hat) — abmelden
+            # statt aufrufen. Ihr Python-Teil liefe sonst bis zur ersten
+            # Qt-Beruehrung weiter und koennte noch den State veraendern.
+            if _gebunden_an_totes_qt_objekt(cb):
+                self.unsubscribe(cb)
+                continue
             try:
                 cb(event, data)
             except Exception as exc:
@@ -6079,6 +6086,22 @@ class AppState:
         ID des aufrufenden Threads als 'UI-Thread'."""
         self._ui_marshaller = fn
         self._ui_thread_id = threading.get_ident()
+
+
+def _gebunden_an_totes_qt_objekt(cb) -> bool:
+    """QA-97: ist ``cb`` eine gebundene Methode eines Qt-Objekts, dessen
+    C++-Seite schon zerstoert ist? Ohne shiboken (oder fuer Nicht-Qt-Objekte)
+    immer ``False`` — dann bleibt alles beim alten Verhalten."""
+    obj = getattr(cb, "__self__", None)
+    if obj is None:
+        return False
+    try:
+        from .sync import _qt_is_valid
+        if _qt_is_valid is None:
+            return False
+        return not _qt_is_valid(obj)
+    except Exception:
+        return False
 
 
 # Cache: (profile_id, mode_name, channel_count) -> list[FixtureChannel] (detached).
