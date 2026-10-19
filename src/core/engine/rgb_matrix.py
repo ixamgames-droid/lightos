@@ -2363,10 +2363,13 @@ class RgbMatrixInstance(Function):
     def _dunkle_durchlassen(self) -> bool:
         """ENG-42: wirkt der Haken „dunkle Lampen durchlassen"?
 
-        Nur im Stil Dimmer. In den anderen Stilen bleibt ein gesetzter Haken
-        gemerkt, wirkt aber nicht (die Farbe kommt spaeter)."""
+        Nur im Stil Dimmer und nur beim normalen Effekt. In den anderen Stilen
+        und bei Modify bleibt ein gesetzter Haken gemerkt, wirkt aber nicht
+        (die Farbe kommt spaeter; ein Modify-Betrag darf sich durch den Haken
+        nicht aendern, z. B. bei mehreren Zellen auf einem Geraet)."""
         return (bool(getattr(self, "dunkle_durchlassen", False))
-                and self.style == MatrixStyle.DIMMER)
+                and self.style == MatrixStyle.DIMMER
+                and not getattr(self, "modify", False))
 
     def _farb_modify(self) -> bool:
         """ENG-38: laeuft diese Matrix als Modify-Effekt im Stil FARBE?

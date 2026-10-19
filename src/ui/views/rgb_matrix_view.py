@@ -1875,7 +1875,7 @@ class RgbMatrixView(QWidget):
                    "Lampen, die er gerade hell macht (Wert über 0, auch der "
                    "Schweif) — genau auf seinen Wert, wie ein normaler Effekt "
                    "in seiner Stufe. Die dunklen gibt er an das zurück, was "
-                   "darunter läuft (anderer Effekt, Cueliste, Snap).\n"
+                   "darunter läuft (anderer Effekt, Snap, Grundhelligkeit).\n"
                    "Anders als Modify „Addieren“: der legt obendrauf "
                    "(40 % + 70 % = 100 %), hier stehen genau 70 %.\n"
                    "Steht „Min“ im Dimmer-Bereich über 0, ist keine Lampe dunkel.")

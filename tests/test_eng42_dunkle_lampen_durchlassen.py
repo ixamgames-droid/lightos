@@ -294,6 +294,30 @@ def test_andere_stile_ignorieren_den_haken(monkeypatch):
     assert bilder[0] == bilder[1]
 
 
+def test_modify_ignoriert_den_haken(rig):
+    """Gegenprüfung: bei Modify wirkt ein gemerkter Haken nicht (wie Tooltip
+    und Anleitung sagen). Zwei Zellen auf EINEM Gerät: mit wirkendem Haken
+    schriebe nur die helle Zelle — der Modify-Betrag änderte sich."""
+    from src.core.engine.modify import modify_posten
+    ergebnisse = []
+    for haken in (False, True):
+        m = RgbMatrixInstance("mod", cols=2, rows=1, fixture_grid=[1, 1],
+                              algorithm=RgbAlgorithm.CHASE,
+                              color1=(255, 255, 255))
+        m.style = MatrixStyle.DIMMER
+        m.tempo_bus_id = ""
+        m.matrix_speed = 1.0
+        m.params.update({"runner_count": 1, "after_fade": 0.0, "fade": 0.0,
+                         "movement": "normal"})
+        m.modify = True
+        m.dunkle_durchlassen = haken
+        assert m._dunkle_durchlassen() is False
+        m.start()
+        ergebnisse.append([modify_posten(m, [1], rig[:1], DT)
+                           for _ in range(6)])
+    assert ergebnisse[0] == ergebnisse[1]
+
+
 # ── Renderer: Besitz, Grundhelligkeit, Snap-Dimmer ───────────────────────────
 
 

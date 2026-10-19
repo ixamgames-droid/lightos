@@ -395,7 +395,7 @@ Modus *Addieren* 100 %. Soll der Läufer **genau** 70 % zeigen und der Rest bei 
 nimm einen **normalen** Dimmer-Effekt (kein Modify) in einer höheren Stufe und setze den Haken
 **Dunkle Lampen durchlassen** (unter „Modify-Effekt“, nur im Stil Dimmer). Dann schreibt der
 Effekt nur Lampen mit einem Wert über 0 — Schweif-Lampen zählen als hell —, die dunklen bleiben
-beim Effekt darunter, bei Cueliste, Snap oder Grundhelligkeit. Einblendzeit und Helligkeit wirken
+beim Effekt darunter, bei Snap/Programmer oder Grundhelligkeit. Einblendzeit und Helligkeit wirken
 wie bei jedem Effekt, aber nur auf die hellen Lampen. Steht **Min** über 0, ist keine Lampe dunkel.
 
 ### Noch aufzunehmende Bilder
