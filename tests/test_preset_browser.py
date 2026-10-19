@@ -61,7 +61,8 @@ class GroupEntriesTest(unittest.TestCase):
     def test_tuple_shape(self):
         e = group_entries([("G1", "F", [1])])
         self.assertEqual(e[0].name, "G1")
-        self.assertIn("1 Geräte", e[0].subtitle)
+        self.assertIn("1 Gerät", e[0].subtitle)
+        self.assertNotIn("1 Geräte", e[0].subtitle)   # UI-101(2)
 
 
 class FilterEntriesTest(unittest.TestCase):
