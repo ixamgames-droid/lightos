@@ -58,7 +58,6 @@
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | OUT-80 | A | fix/out80-enttec-seriennummer-in-konfiguration | 2026-10-19T14:03Z | - |
-| UI-102 | A | fix/ui102-fixture-editor-ansehen-hinweis | 2026-10-19T16:49Z | - |
 | DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-19T16:49Z | - |
 | ENG-37 | A | feat/eng37-modify-sichtbar | 2026-10-19T18:00Z | - |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-19T18:00Z | - |
@@ -107,7 +106,6 @@
 
 ## Verlauf
 
-- 2026-10-19T18:25Z A claim QA-103
 - 2026-10-19T18:25Z 4 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T18:30Z A done IMP-3
 - 2026-10-19T18:30Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -137,3 +135,4 @@
 - 2026-10-19T22:09Z A done UI-101
 - 2026-10-19T22:09Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T22:22Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T22:40Z A done UI-102
