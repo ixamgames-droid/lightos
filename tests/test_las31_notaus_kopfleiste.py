@@ -24,6 +24,7 @@ import src.core.app_state as A                                       # noqa: E40
 from src.core.app_state import AppState                              # noqa: E402
 from src.core.dmx.output_manager import OutputManager                # noqa: E402
 import src.ui.main_window as MW                                      # noqa: E402
+from _qt_lifecycle import flush_deferred_deletes                     # noqa: E402
 from src.ui import laser_notaus                                      # noqa: E402
 
 
@@ -120,8 +121,17 @@ class _Basis(unittest.TestCase):
     def tearDownClass(cls):
         cls.w._state = cls._echter_state
         cls.w.hide()
+        # QA-97: das Fenster muss WIRKLICH sterben. ``processEvents()`` stellt
+        # ``DeferredDelete`` nicht zu (tests/_qt_lifecycle.py) — das Fenster
+        # lebte weiter, haelt seine Bus-Abos und verbrauchte in spaeteren
+        # Dateien den Sperrzonen-Wechselhinweis (test_las32_nachbesserung).
+        # Bewusst ohne ``close()``: dessen closeEvent faehrt Ausgabe/MIDI des
+        # echten State herunter, das gehoert nicht zum Abbau eines Testfensters.
         cls.w.deleteLater()
+        flush_deferred_deletes()
         _app().processEvents()
+        flush_deferred_deletes()
+        cls.w = None
         A.get_channels_for_patched = cls._orig_channels
 
     def setUp(self):
@@ -134,7 +144,8 @@ class _Basis(unittest.TestCase):
         # wird sie dort, wo sie gestellt wird (LAS-36: src/ui/laser_notaus.py).
         # ``main_window.QMessageBox`` ist seit UI-92 eine Unterklasse — ein
         # Ersatz dort erreicht die Rueckfrage des NOT-AUS nicht mehr; der
-        # Ersatz an der Qt-Klasse gilt dagegen auch fuer das Hauptfenster.
+        # Ersatz an ``laser_notaus.QMessageBox`` (seit LAS-40 ebenfalls eine
+        # Unterklasse mit festen Knopftexten) trifft genau diese Rueckfrage.
         p = mock.patch.object(laser_notaus.QMessageBox, "warning",
                               side_effect=AssertionError("unerwartete Rueckfrage"))
         self.frage = p.start()
