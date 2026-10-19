@@ -20,6 +20,7 @@ Verhindert strukturell Fehler wie den vertauschten ZQ02001 Dimmer/Strobe-Kanal.
 """
 from __future__ import annotations
 
+import html
 from dataclasses import dataclass, field
 
 from PySide6.QtWidgets import (
@@ -167,6 +168,15 @@ class GeneratorModel:
     # FM-12: expliziter 3D-Modell-Override ("" = Automatik/Vorschlag).
     viz_model: str = ""
     modes: list[GenMode] = field(default_factory=list)
+    # FM-76: Herkunft der geladenen Vorlage — die vier Felder ``quelle``/
+    # ``herkunft``/``geprueft``/``autor`` wie in der Bibliotheksdatei.
+    # ``None`` = frei gebaut („eigen“). Bleibt beim Umbauen im Dialog stehen:
+    # die Lizenzpflicht folgt dem Ursprung, nicht dem Umfang der Aenderung.
+    herkunft: dict | None = None
+    # FM-76: nicht leer = das Modell kommt aus einer Vorlage, deren Herkunft
+    # sich nicht belegen laesst (Grund im Text). Dann wird nicht gespeichert —
+    # sonst ginge die Vorlage still als „eigen“ durch (wie UI-82).
+    herkunft_fehlt: str = ""
 
     def to_payload(self) -> dict:
         return build_profile_payload(self)
@@ -264,13 +274,64 @@ def _clamp_geo(v) -> int:
 
 # ── Speichern in die Fixture-DB ──────────────────────────────────────────────
 
-def save_generated_profile(payload: dict, *, engine=None) -> int:
+def save_generated_profile(payload: dict, *, engine=None,
+                           herkunft: dict | None = None) -> int:
     """Speichert ein von :func:`build_profile_payload` erzeugtes Payload als
     neues FixtureProfile (source="user") in der Fixture-DB. Gibt die neue
     Profil-ID zurueck. ``engine`` erlaubt eine Test-DB (Default: globale DB).
+    ``herkunft`` (FM-76): die Herkunft der Vorlage, siehe
+    :func:`herkunft_zum_speichern`; ``None`` = eigenes Profil.
     """
     from src.core.database import fixture_db as fdb
-    return fdb.create_user_profile(payload, engine=engine)
+    return fdb.create_user_profile(payload, engine=engine, herkunft=herkunft)
+
+
+def herkunft_zum_speichern(model: GeneratorModel) -> dict | None:
+    """FM-76: die Herkunft, mit der ``model`` gespeichert wird — die der
+    geladenen Vorlage, bei QLC+/OFL mit dem Vermerk, dass sie im Generator
+    bearbeitet wurde; ``None`` fuer ein frei gebautes Profil."""
+    if not model.herkunft:
+        return None
+    from src.core.database import bibliothek_format as BF
+    h = BF.mit_vermerk(model.herkunft, BF.GENERATOR_VERMERK)
+    # Herkunft und Lizenz folgen der Vorlage — ihr Pruefvermerk nicht: der
+    # Inhalt kann im Generator veraendert worden sein.
+    h["geprueft"] = {"ok": False,
+                     "wie": "im Fixture-Generator aus einer Vorlage gebaut, "
+                            "nicht erneut geprueft"}
+    return h
+
+
+def herkunft_text(model: GeneratorModel) -> str:
+    """FM-76: kurze Anzeige der mitgetragenen Herkunft fuer die Hinweisliste
+    (leer bei einem frei gebauten Profil)."""
+    if model.herkunft_fehlt:
+        return ""
+    h = model.herkunft
+    if not h:
+        return ""
+    art = h["herkunft"].get("art", "")
+    lizenz = h["herkunft"].get("lizenz", "")
+    titel = h.get("quelle", {}).get("titel", "")
+    namen = {"qlcplus": "QLC+", "ofl": "Open Fixture Library",
+             "lightos": "LightOS", "hersteller-handbuch": "Herstellerhandbuch"}
+    return (f"Herkunft der Vorlage: {namen.get(art, art)}, Lizenz {lizenz}"
+            + (f" — {titel}" if titel else "")
+            + ". Sie wird beim Speichern übernommen, auch wenn du das Profil "
+              "umbaust.")
+
+
+HERKUNFT_FEHLT_TITEL = "Herkunft nicht belegbar"
+
+
+def herkunft_fehlt_hinweis(model: GeneratorModel) -> str:
+    """FM-76: Text, warum ein Profil aus einer Vorlage ohne belegbare
+    Herkunft nicht gespeichert wird (Wortlaut wie UI-82)."""
+    return ("Die Herkunft der geladenen Vorlage lässt sich nicht belegen — "
+            "das neue Profil würde ihre Lizenz- und Herkunftsangabe verlieren. "
+            "Es wurde nichts gespeichert.\n\n" + model.herkunft_fehlt +
+            "\n\nAbhilfe: die Vorlage als Bibliotheksdatei (.json) oder als "
+            "QLC+-Datei (.qxf) laden — dann wird ihre Herkunft übernommen.")
 
 
 # ── Validierung (nicht-blockierende Hinweise) ────────────────────────────────
@@ -1759,7 +1820,9 @@ class FixtureGeneratorDialog(QDialog):
         self._spin_power.setValue(self._model.power_w)
         self._edit_notes = QLineEdit(self._model.notes)
         b_import = QPushButton("QLC+ (.qxf) importieren…")
-        b_import.setToolTip("Vorhandene QLC+-Definition als Startpunkt laden.")
+        b_import.setToolTip(
+            "Vorhandene QLC+-Definition als Startpunkt laden. Die Herkunft "
+            "(QLC+, Lizenz Apache-2.0) wird beim Speichern übernommen.")
         b_import.clicked.connect(self._import_qxf)
         felder = [("Hersteller:", self._edit_mfr, "Modell:", self._edit_model),
                   ("Kurzname:", self._edit_short, "Typ:", self._cb_type),
@@ -1775,7 +1838,8 @@ class FixtureGeneratorDialog(QDialog):
         b_profil.setToolTip(
             "Ein LightOS-Profil als Startpunkt laden — z. B. um einem Laser "
             "Muster, Farben und Richtungen nachzutragen. Gespeichert wird ein "
-            "neues eigenes Profil.")
+            "neues Profil; die Herkunft und Lizenz der Vorlage werden "
+            "übernommen.")
         b_profil.clicked.connect(self._import_profil)
         laden = QHBoxLayout()
         laden.addWidget(b_profil)
@@ -2024,6 +2088,17 @@ class FixtureGeneratorDialog(QDialog):
             rows.append(f"<span style='color:{color};'>[{tag}]</span> {text}")
         if laser:
             rows.append(f"<span style='color:#3fb950;'>{laser}</span>")
+        # FM-76: woher die geladene Vorlage stammt (wird mitgespeichert).
+        if self._model.herkunft_fehlt:
+            rows.append("<span style='color:#f85149;'>[FEHLER]</span> "
+                        + html.escape("Herkunft der Vorlage nicht belegbar — "
+                                      "Speichern nicht möglich. "
+                                      + self._model.herkunft_fehlt))
+        else:
+            ht = herkunft_text(self._model)
+            if ht:
+                rows.append("<span style='color:#58a6ff;'>[Herkunft]</span> "
+                            + html.escape(ht))
         self._issues.setHtml("<br>".join(rows))
 
     # ── Import / Export ──────────────────────────────────────────────────
@@ -2106,6 +2181,11 @@ class FixtureGeneratorDialog(QDialog):
             QMessageBox.warning(self, "Speichern",
                                 "Mindestens ein Modus mit Kanälen nötig.")
             return
+        # FM-76: Vorlage ohne belegbare Herkunft — nicht still als „eigen“.
+        if self._model.herkunft_fehlt:
+            QMessageBox.warning(self, HERKUNFT_FEHLT_TITEL,
+                                herkunft_fehlt_hinweis(self._model))
+            return
         # Live-Test sauber beenden, bevor wir speichern.
         self._live.shutdown()
 
@@ -2120,7 +2200,9 @@ class FixtureGeneratorDialog(QDialog):
             if ans != QMessageBox.StandardButton.Yes:
                 return
         try:
-            self.saved_id = save_generated_profile(self._model.to_payload())
+            self.saved_id = save_generated_profile(
+                self._model.to_payload(),
+                herkunft=herkunft_zum_speichern(self._model))
         except Exception as e:
             QMessageBox.warning(self, "Speichern", f"Fehlgeschlagen:\n{e}")
             return
@@ -2176,9 +2258,12 @@ def model_from_daten(daten: dict) -> GeneratorModel:
     ``fixtures/bibliothek/SCHEMA.md``) als :class:`GeneratorModel` — der Weg,
     ein vorhandenes Profil im Generator WIEDER ZU OEFFNEN, samt Laser-Angaben.
 
-    Gespeichert wird danach wie immer ein NEUES eigenes Profil; die Herkunft
-    der Vorlage (``quelle``/``herkunft``) reist nicht mit."""
+    Gespeichert wird danach wie immer ein NEUES Profil. FM-76: die Herkunft
+    der Vorlage (``quelle``/``herkunft``/``geprueft``/``autor``) reist mit
+    (``GeneratorModel.herkunft``) — fehlt sie oder ist sie ungueltig, steht
+    der Grund in ``herkunft_fehlt`` und gespeichert wird nicht."""
     import copy
+    from src.core.database import bibliothek_format as BF
     modes: list[GenMode] = []
     for m in daten.get("modi", ()):
         chans = []
@@ -2211,19 +2296,41 @@ def model_from_daten(daten: dict) -> GeneratorModel:
         power_w=int(daten.get("leistung_w", 0) or 0),
         notes=str(daten.get("notizen", "")),
         viz_model=str(daten.get("viz_model", "")),
-        modes=modes)
+        modes=modes,
+        herkunft=BF.herkunft_aus_daten(daten),
+        herkunft_fehlt="" if BF.herkunft_aus_daten(daten) else (
+            f"„{daten.get('hersteller', '?')} / {daten.get('modell', '?')}“: "
+            "die Vorlage nennt keine gültige Herkunft (quelle/herkunft/"
+            "geprueft/autor)."))
 
 
 def model_from_profile(profil_id: int, *, engine=None) -> GeneratorModel:
     """LAS-33: ein Profil aus der Fixture-DB als :class:`GeneratorModel`
     (siehe :func:`model_from_daten`)."""
+    from sqlalchemy.orm import Session
     from src.core.database import bibliothek_format as BF
-    # Die Herkunft wird hier nicht gebraucht — feste Angaben, damit der Export
-    # auch fuer Profile gelingt, deren Herkunft sich nicht belegen laesst.
-    return model_from_daten(BF.exportiere(
-        profil_id, engine=engine, quelle={"titel": "Vorlage"},
-        herkunft={"art": "lightos", "lizenz": "eigen"},
-        geprueft={"ok": False, "wie": "Vorlage"}, autor="Vorlage"))
+    from src.core.database import fixture_db as fdb
+    # FM-76: die Herkunft des Profils (``herkunft_fuer``) reist mit. Laesst
+    # sie sich nicht belegen, wird der Inhalt trotzdem geladen (feste
+    # Platzhalter fuer den Export) — gespeichert wird dann aber nicht.
+    eng = engine if engine is not None else fdb.engine()
+    fehlt = ""
+    with Session(eng) as s:
+        prof = BF._profil_laden(s, profil_id)
+        if prof is None:
+            raise ValueError(f"Profil {profil_id} gibt es nicht")
+        try:
+            herkunft = BF.herkunft_fuer(prof)
+        except BF.ProfilFehler as e:
+            herkunft, fehlt = None, str(e)
+    platzhalter = {"quelle": {"titel": "Vorlage"},
+                   "herkunft": {"art": "lightos", "lizenz": "eigen"},
+                   "geprueft": {"ok": False, "wie": "Vorlage"}, "autor": "Vorlage"}
+    modell = model_from_daten(BF.exportiere(
+        profil_id, engine=eng, **(herkunft or platzhalter)))
+    if fehlt:
+        modell.herkunft, modell.herkunft_fehlt = None, fehlt
+    return modell
 
 
 def model_from_qxf(path: str) -> GeneratorModel:
@@ -2332,7 +2439,20 @@ def model_from_qxf(path: str) -> GeneratorModel:
                                      grid_rows=mode_grid[0],
                                      grid_cols=mode_grid[1]))
 
+    # FM-76: QLC+-Herkunft wie beim Bibliotheks-Import (Apache-2.0, Urheber
+    # aus <Creator>, Pfad in QLC+) — sonst ginge die Lizenz beim Speichern
+    # verloren.
+    from src.core.database.bibliothek_format import qxf_herkunft
+    herkunft = qxf_herkunft(
+        path, root,
+        geaendert="durch den LightOS-Fixture-Generator ins LightOS-Format "
+                  "uebernommen (Kanal-Attribute auf LightOS-Namen abgebildet, "
+                  "Default-/Highlight-Werte von LightOS gesetzt)",
+        autor="LightOS (Fixture-Generator, QXF-Import)",
+        wie="aus QLC+ in den Fixture-Generator geladen, nicht gegen das "
+            "Handbuch geprueft")
     return GeneratorModel(
         manufacturer=mfr, model=model_name,
         short_name=model_name[:40], fixture_type=TYPE_MAP.get(type_str, "other"),
-        notes=f"Importiert aus QLC+ ({type_str}).", modes=modes_out)
+        notes=f"Importiert aus QLC+ ({type_str}).", modes=modes_out,
+        herkunft=herkunft)

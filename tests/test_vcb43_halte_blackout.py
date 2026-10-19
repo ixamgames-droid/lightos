@@ -25,6 +25,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication                          # noqa: E402
+from _qt_lifecycle import flush_deferred_deletes                     # noqa: E402
 
 from src.core.app_state import get_state                             # noqa: E402
 from src.core.dmx.output_manager import OutputManager               # noqa: E402
@@ -238,8 +239,12 @@ class KopfzeileTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.om.set_blackout(False)
         _halter_loesen(cls.om)
+        # QA-97: wirklich abbauen (processEvents stellt DeferredDelete nicht zu).
         cls.w.deleteLater()
+        flush_deferred_deletes()
         _app().processEvents()
+        flush_deferred_deletes()
+        cls.w = None
 
     def setUp(self):
         self.om.set_blackout(False)
