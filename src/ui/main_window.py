@@ -464,6 +464,21 @@ class _SectionBar(QWidget):
             self._reflowing = False
 
 
+class _GmReglerOhneRad(QSlider):
+    """UI-95: Grand-Master-Regler im Kiosk-Streifen.
+
+    Das Mausrad verstellt ihn nur, wenn er den Fokus hat (Muster wie
+    ``StufeAuswahl``) — und da er bewusst keinen Tastaturfokus bekommt (die
+    Leertaste ist GO), heisst das: nie. Wer im Kiosk ueber den Streifen rollt,
+    dunkelt nicht nebenbei die Buehne ab. Gezogen und geklickt wird normal."""
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
 class MainWindow(QMainWindow):
     # UI-93: dieses Fenster verteilt Rueckgaengig/Wiederholen selbst (event());
     # eingebettete Ansichten schalten ihre eigenen Kuerzel dafuer ab.
@@ -509,6 +524,10 @@ class MainWindow(QMainWindow):
         self._blackout_changed_sig.connect(self._sync_blackout_button)
         self._laser_estop_sig.connect(self._on_laser_estop_ui)
         self._state.subscribe(self._on_state_event)
+        # QA-97: beim Abbau wieder abmelden — sonst bekommt ein totes Fenster
+        # weiter jedes State-Ereignis (Tests bauen viele Fenster je Prozess).
+        self.destroyed.connect(
+            lambda *_a, st=self._state, cb=self._on_state_event: st.unsubscribe(cb))
         self._visualizer_window = None
         self._current_show_path: str | None = None
         # DEMO-8: Dateiname, den „Speichern unter" nach dem Oeffnen einer
@@ -564,22 +583,29 @@ class MainWindow(QMainWindow):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.REFRESH_ALL, self._on_refresh_all)
-            sync.subscribe(SyncEvent.SHOW_LOADED, self._on_show_loaded)
+            # QA-97: an die Lebenszeit des Fensters gebunden (subscribe_widget).
+            # Mit plain subscribe() blieben die Abos eines abgebauten Fensters
+            # im globalen Bus: ein totes Fenster verbrauchte weiter den
+            # Sperrzonen-Wechselhinweis, und sein NOT-AUS-Abonnent warf in
+            # jedem LASER_ESTOP.
+            def abo(ev, cb, _sync=sync):
+                _sync.subscribe_widget(ev, self, cb)
+            abo(SyncEvent.REFRESH_ALL, self._on_refresh_all)
+            abo(SyncEvent.SHOW_LOADED, self._on_show_loaded)
             # Validation-Banner bei relevanten Aenderungen aktualisieren
-            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._refresh_validation_banner())
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_validation_banner())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_validation_banner())
+            abo(SyncEvent.PATCH_CHANGED, lambda *_: self._refresh_validation_banner())
+            abo(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_validation_banner())
+            abo(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_validation_banner())
             # ISO-01: Fremdwert-Badges bei Simple-Desk-(DMX) und Programmer-Aenderung
             # sowie bei Show-Wechsel/Refresh aktualisieren.
-            sync.subscribe(SyncEvent.DMX_CHANGED, lambda *_: self._refresh_foreign_badges())
-            sync.subscribe(SyncEvent.PROGRAMMER_CHANGED, lambda *_: self._refresh_foreign_badges())
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_foreign_badges())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.DMX_CHANGED, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.PROGRAMMER_CHANGED, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
             # UXT-09: Laser-NOT-AUS unmissverständlich bestätigen (egal woher
             # ausgelöst) — prominenter, nicht-blockierender Statuszeilen-Alarm.
             # LAS-31: ueber ein Signal, weil MIDI/OSC aus ihrem Thread ausloesen.
-            sync.subscribe(SyncEvent.LASER_ESTOP, self._laser_estop_melden)
+            abo(SyncEvent.LASER_ESTOP, self._laser_estop_melden)
         except Exception as e:
             print(f"[main_window] sync subscribe error: {e}")
 
@@ -1759,16 +1785,44 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] grand_master error: {e}")
         self._lbl_gm_val.setText(f"{val}%")
+        self._gm_anzeige_setzen(val)
+
+    def _on_kiosk_gm_changed(self, val: int):
+        """UI-95: der Kiosk-Regler schreibt ueber denselben Weg wie der der
+        Sektionsleiste (``output_manager.set_grand_master``); beide Anzeigen
+        ziehen danach nach."""
+        try:
+            self._state.output_manager.set_grand_master(val / 100.0)
+        except Exception as e:
+            print(f"[main_window] grand_master error: {e}")
+        self._gm_anzeige_setzen(val)
+
+    def _gm_anzeige_setzen(self, val: int):
+        """Alle GM-Regler und -Prozentanzeigen auf ``val`` stellen, OHNE
+        valueChanged auszuloesen. Die eine Quelle der Wahrheit bleibt
+        ``output_manager.grand_master``; Regler und Anzeige folgen nur."""
+        for s_name, l_name in (("_slider_gm", "_lbl_gm_val"),
+                               ("_slider_gm_kiosk", "_lbl_gm_val_kiosk")):
+            slider = getattr(self, s_name, None)
+            label = getattr(self, l_name, None)
+            try:
+                if slider is not None and slider.value() != val:
+                    slider.blockSignals(True)
+                    slider.setValue(val)
+                    slider.blockSignals(False)
+                if label is not None:
+                    label.setText(f"{val}%")
+            except RuntimeError:
+                pass        # Fenster schon abgebaut
 
     def _sync_header_gm(self, gm: float):
         """GDS-1: externe grand_master-Aenderung -> Header-Fader/-Label nachfuehren,
         OHNE valueChanged auszuloesen (blockSignals) — sonst set_grand_master erneut
-        und Feedback-Loop mit dem VC-Grandmaster-Fader."""
+        und Feedback-Loop mit dem VC-Grandmaster-Fader.
+
+        UI-95: der Kiosk-Regler folgt mit (``_gm_anzeige_setzen``)."""
         val = int(round(max(0.0, min(1.0, float(gm))) * 100))
-        self._slider_gm.blockSignals(True)
-        self._slider_gm.setValue(val)
-        self._slider_gm.blockSignals(False)
-        self._lbl_gm_val.setText(f"{val}%")
+        self._gm_anzeige_setzen(val)
 
     def _on_tap_tempo(self):
         """Topbar-TAP: derselbe Helfer wie der TAP im Tab „Erkennung" (BPM-09):
@@ -3153,8 +3207,8 @@ class MainWindow(QMainWindow):
         sc.activated.connect(self._laser_notaus_ausloesen)
         self._sc_laser_notaus = sc
 
-        # Der Latch kann sich ohne Ereignis aendern (ein Muster-Abruf im
-        # Programmer loest ihn) — darum im Takt nachlesen; derselbe Takt blinkt.
+        # Der Zustand wird im Takt nachgelesen (der Knopf fuehrt keinen eigenen);
+        # derselbe Takt blinkt.
         self._notaus_timer = QTimer(self)
         self._notaus_timer.setInterval(450)
         self._notaus_timer.timeout.connect(self._notaus_tick)
@@ -3196,6 +3250,7 @@ class MainWindow(QMainWindow):
                 "Blackout geschaltet hat.")
             bo.clicked.connect(self._toggle_blackout)
             self._btn_blackout_kiosk = bo
+            self._kiosk_gm_und_stop_bauen(lay, btn.minimumHeight())
             lay.addWidget(bo)
             lay.addWidget(btn)
             root = self.centralWidget().layout()
@@ -3207,6 +3262,69 @@ class MainWindow(QMainWindow):
             self._sync_blackout_button(bool(self._state.output_manager.blackout))
         except Exception:
             pass
+
+    def _kiosk_gm_und_stop_bauen(self, lay, hoehe: int) -> None:
+        """UI-95: Grand Master und STOP ALL im Kiosk-Streifen, links vor
+        BLACKOUT (Reihenfolge: GM-Regler, STOP ALL, BLACKOUT, LASER NOT-AUS).
+
+        Gleiche Bedienung wie die Gegenstuecke der Sektionsleiste: STOP ALL
+        ruft ``_stop_all`` (kein eigener Zustand), der Regler schreibt ueber
+        ``output_manager.set_grand_master`` und folgt fremden Aenderungen
+        (VC-Fader, MIDI, Web) ueber dasselbe Abo wie der Regler der
+        Sektionsleiste (``_sync_header_gm``). Keiner von beiden nimmt
+        Tastaturfokus — die Leertaste (GO) erreicht sie nie —, und das Mausrad
+        verstellt den Regler nicht (``_GmReglerOhneRad``)."""
+        gm_gruppe = QWidget()
+        gm_gruppe.setObjectName("kioskGmGruppe")
+        gl = QHBoxLayout(gm_gruppe)
+        gl.setContentsMargins(0, 0, 0, 0)
+        gl.setSpacing(4)
+        lbl = QLabel("GM")
+        lbl.setStyleSheet("color: #cccccc; padding: 0 4px; font-weight: bold;")
+        gl.addWidget(lbl)
+        regler = _GmReglerOhneRad(Qt.Orientation.Horizontal)
+        regler.setObjectName("kioskGmRegler")
+        regler.setRange(0, 100)
+        regler.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        regler.setFixedWidth(140)
+        regler.setMinimumHeight(hoehe)
+        regler.setToolTip(
+            "Grand Master (0–100 %) — derselbe Wert wie der Regler der "
+            "Sektionsleiste und der Grand-Master-Fader der Virtual Console.\n"
+            "Das Mausrad verstellt ihn hier nicht; zum Ändern ziehen oder "
+            "klicken.\n"
+            "Sicher aus ist ein Laser nur mit dem Laser-NOT-AUS.")
+        try:
+            start = int(round(float(self._state.output_manager.grand_master) * 100))
+        except Exception:
+            start = 100
+        regler.setValue(max(0, min(100, start)))
+        regler.valueChanged.connect(self._on_kiosk_gm_changed)
+        gl.addWidget(regler)
+        wert = QLabel(f"{regler.value()}%")
+        wert.setObjectName("kioskGmWert")
+        wert.setStyleSheet("color: #aaaaaa; padding: 0 4px;")
+        wert.setMinimumWidth(wert.fontMetrics().horizontalAdvance("100%") + 8)
+        gl.addWidget(wert)
+        gm_gruppe.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        gm_gruppe.setMinimumWidth(gm_gruppe.sizeHint().width())
+        self._slider_gm_kiosk = regler
+        self._lbl_gm_val_kiosk = wert
+        lay.addWidget(gm_gruppe)
+
+        stop = QPushButton("STOP ALL")
+        stop.setObjectName("blackoutBtn")          # Stil wie in der Sektionsleiste
+        stop.setMinimumHeight(hoehe)
+        stop.setMinimumWidth(78)
+        stop.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # nie per Leertaste/Enter
+        stop.setAutoRepeat(False)
+        stop.setToolTip(
+            "Stoppt alle laufenden Cuelisten, Chaser, Szenen und Effekte auf "
+            "allen Seiten — wie STOP ALL in der Sektionsleiste. Grand Master "
+            "und Blackout bleiben, wie sie sind.")
+        stop.clicked.connect(self._stop_all)
+        self._btn_stop_all_kiosk = stop
+        lay.addWidget(stop)
 
     def _laser_notaus_ausloesen(self):
         """Ausloesen — ein Schritt, keine Rueckfrage (Klick und Tastenkuerzel)."""
@@ -3232,28 +3350,16 @@ class MainWindow(QMainWindow):
             return
         if jetzt < self._notaus_sperre_bis:
             return
-        antwort = QMessageBox.warning(
-            self, "Laser-NOT-AUS lösen?",
-            "Der Laser-NOT-AUS ist aktiv.\n\n"
-            "Nach dem Lösen geben DMX-Laser sofort wieder aus, was Programmer, "
-            "Szenen und Effekte gerade vorgeben. Netzwerk-Laser bleiben "
-            "unscharf.\n\n"
-            "Nur lösen, wenn der Strahlbereich frei ist. Jetzt lösen?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel)
-        if antwort != QMessageBox.StandardButton.Yes:
-            self._sync_notaus_button()
-            return
-        try:
-            self._state.laser_notaus_loesen()
-        except Exception as e:
-            print(f"[main_window] Laser-NOT-AUS lösen Fehler: {e}")
+        # LAS-36: der EINE Loese-Weg — Rueckfrage und Loesen liegen gemeinsam in
+        # src/ui/laser_notaus.py (ein spaeterer zweiter Knopf nimmt dieselbe).
+        from src.ui.laser_notaus import loesen_mit_rueckfrage
+        geloest = loesen_mit_rueckfrage(self, self._state)
         self._sync_notaus_button()
-        try:
-            if not getattr(self._state, "laser_estop_active", False):
+        if geloest:
+            try:
                 self.statusBar().showMessage("Laser-NOT-AUS gelöst", 5000)
-        except Exception:
-            pass
+            except Exception:
+                pass
 
     def _notaus_tick(self):
         self._notaus_blink ^= 1
@@ -3346,8 +3452,10 @@ class MainWindow(QMainWindow):
             if aktiv:
                 text = self._NOTAUS_TEXT_AKTIV
                 stil = self._NOTAUS_STIL_AKTIV[self._notaus_blink & 1]
-                tip = ("LASER NOT-AUS AKTIV — Laser sind dunkel verriegelt.\n"
-                       "Lösen: klicken und die Rückfrage bestätigen.\n")
+                tip = ("LASER NOT-AUS AKTIV — Werte werden gemerkt, der Laser "
+                       "bleibt dunkel.\n"
+                       "Lösen geht nur hier: klicken und die Rückfrage "
+                       "bestätigen.\n")
             else:
                 text = self._NOTAUS_TEXT
                 stil = self._NOTAUS_STIL_BEREIT
@@ -3383,7 +3491,10 @@ class MainWindow(QMainWindow):
         self._laser_estop_sig.emit()
 
     def _on_laser_estop_ui(self):
-        self._on_laser_estop()
+        # LAS-36: das Ereignis kommt auch beim Loesen — der rote Alarm
+        # „ausgelöst“ gehoert nur zum stehenden Latch.
+        if getattr(self._state, "laser_estop_active", False):
+            self._on_laser_estop()
         self._sync_notaus_button()
 
     def _on_laser_estop(self, *_):
@@ -3617,7 +3728,7 @@ class MainWindow(QMainWindow):
                        SyncEvent.OUTPUT_CONFIG_CHANGED,
                        SyncEvent.LIVE_VIEW_CHANGED,
                        SyncEvent.SHOW_INHALT_CHANGED):
-                sync.subscribe(ev, self._mark_autosave_dirty)
+                sync.subscribe_widget(ev, self, self._mark_autosave_dirty)  # QA-97
             # Codex-Review #1081: eine geaenderte Stufe (Prioritaet) meldet sich
             # bewusst NICHT ueber FUNCTION_CHANGED, sondern ueber den eigenen
             # Stufen-Melder — ohne ihn blieb sie als einzige Aenderung ungesichert.

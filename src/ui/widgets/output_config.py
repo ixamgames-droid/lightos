@@ -640,6 +640,19 @@ def _persist_output_ungesperrt(num: int, output: str, patch: str,
     return _save_universe_config(rows)
 
 
+def _nachfolger_ansagen(om, universe: int, name: str, ziel: str = "",
+                        out_universe=None) -> None:
+    """OUT-72: dem Ausgabe-Manager sagen, welcher Adapter GLEICH nach dem
+    folgenden ``remove_output`` fuer dieses Universum kommt. Jeder entfernte
+    Adapter, der nicht genau dieser ist (anderer Typ, Anschluss, Adresse),
+    bekommt dann sein Schlussbild — ein Enttec, der auf Art-Net umgestellt
+    wird, hielte sonst sein letztes Bild. Attrappen ohne die Methode bleiben
+    beim bisherigen Verhalten."""
+    ansagen = getattr(om, "nachfolger_ansagen", None)
+    if callable(ansagen):
+        ansagen(universe, name, ziel, out_universe)
+
+
 def _mit_umzug(dialog, text: str, feld: str = "_enttec_umzug") -> str:
     """OUT-74: haengt „war Universe 2 — jetzt Universe 1" an eine Statusmeldung.
 
@@ -1343,6 +1356,7 @@ class OutputConfigDialog(QDialog):
             # Dongle (Gegenpruefung) — dann die Nummer des Dongles dort oder
             # keine, s. ``_enttec_seriennr_fuer``.
             sn = _enttec_seriennr_fuer(univ, port, om)
+            _nachfolger_ansagen(om, univ, "enttec", port)      # OUT-72
             om.remove_output(univ)
             if sn:
                 om.add_enttec(univ, port, seriennr=sn)
@@ -1638,6 +1652,7 @@ class OutputConfigDialog(QDialog):
             state.universes[univ] = om.add_universe(univ)
         try:
             # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen.
+            _nachfolger_ansagen(om, univ, "udmx", schluessel)   # OUT-72
             om.remove_output(univ)
             # Oeffnet nichts im UI-Thread: add_udmx startet nur den Sender.
             om.add_udmx(univ, schluessel)
@@ -1785,13 +1800,14 @@ class OutputConfigDialog(QDialog):
         # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen, sonst
         # bleibt bei einem Cross-Typ-Wechsel (z. B. Enttec->ArtNet) der alte Adapter
         # aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
-        state.output_manager.remove_output(univ)
         # A3D-15: externe Art-Net-Universe aus der (bisher toten) Startuniversum-
         # Spinbox durchreichen. Weicht sie NICHT vom Default (univ-1) ab -> None,
         # damit der Send-Pfad den abwaertskompatiblen Default (univ_num-1) nutzt und
         # universes.json sauber bleibt (Konvention "leer = Default", wie die Tabelle).
         start = self._spin_artnet_start_univ.value()
         out_u = start if start != univ - 1 else None
+        _nachfolger_ansagen(state.output_manager, univ, "artnet", ip, out_u)  # OUT-72
+        state.output_manager.remove_output(univ)
         state.output_manager.add_artnet(univ, ip, out_universe=out_u)
         self._artnet_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
         gespeichert = _persist_output(univ, "ArtNet", ip, out_universe=out_u)
@@ -2162,6 +2178,8 @@ class OutputConfigDialog(QDialog):
             # Gemessen: 5 von 5 Uebernahmen mit unveraenderter Konfiguration.
             # Der MU-01-Grund fuer diesen Aufruf bleibt erhalten — die FREMDEN
             # Adaptertypen werden weiterhin entfernt.
+            # OUT-72: die FREMDEN Adapter gehen wirklich -> Schlussbild.
+            _nachfolger_ansagen(state.output_manager, univ, "sacn", target_ip or "")
             state.output_manager.remove_output(univ, ausser="sacn")
             state.output_manager.add_sacn(univ, target_ip)
             self._sacn_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
