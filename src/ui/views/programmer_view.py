@@ -17,10 +17,10 @@ from PySide6.QtWidgets import (
     QLineEdit, QGroupBox, QScrollArea, QFrame,
     QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter,
     QStackedWidget, QButtonGroup, QInputDialog, QRadioButton, QComboBox,
-    QWhatsThis
+    QWhatsThis, QSpacerItem
 )
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
@@ -37,6 +37,7 @@ from src.core.group_cells import (ACHSE_WEISS, parse_group_cell, parse_zelle,
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.core import programmer_verlauf as _pv
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.flow_layout import FlowLayout
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
 _PREFS_DIR = app_data_dir()
@@ -260,8 +261,22 @@ class ProgrammerView(QWidget):
         self._build_body()
 
     def _build_toolbar(self):
-        """Gemeinsame Toolbar (beide Layouts) inkl. Layout-Umschalter."""
+        """Gemeinsame Toolbar (beide Layouts) inkl. Layout-Umschalter.
+
+        UI-98: Bearbeiten- und Werkzeug-Knoepfe liegen in einem umbrechenden
+        :class:`FlowLayout`. In einer starren ``QHBoxLayout`` passten sie bei
+        1000×640 nicht in eine Zeile; Qt quetschte sie dann unter ihre
+        Wunschbreite („Alles lösche“, „arb-Werkzeug.“, „itions-Werkzeu“).
+        Jetzt bricht die Leiste in eine zweite Zeile um, Hilfe- und
+        Layout-Knopf bleiben rechts oben.
+        """
         tb = QHBoxLayout()
+        tb.setContentsMargins(0, 0, 0, 0)
+        self._toolbar_flow_host = QWidget()
+        _sp = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        _sp.setHeightForWidth(True)
+        self._toolbar_flow_host.setSizePolicy(_sp)
+        flow = FlowLayout(self._toolbar_flow_host, margin=0, h_spacing=6, v_spacing=4)
         for label, slot, color in [
             ("Hervorheben", self._highlight, "#FFD700"),
             ("Abdunkeln",  self._lowlight,  "#888888"),
@@ -287,12 +302,21 @@ class ProgrammerView(QWidget):
                 # Breite auf die LAENGERE der beiden Fassungen festnageln, sonst
                 # huepft die halbe Toolbar bei jedem Auswahlwechsel.
                 self._btn_clear = b
-                b.setMinimumWidth(b.fontMetrics().horizontalAdvance(
-                    self._clear_button_labels(99)[0]) + 24)
-            tb.addWidget(b)
+                # UI-98: mit FETTER Schrift messen (das Stylesheet setzt
+                # font-weight: bold) und beide Fassungen beruecksichtigen —
+                # mit der normalen Schrift gemessen war „Alles löschen“
+                # breiter als der Knopf.
+                _f = QFont(b.font())
+                _f.setBold(True)
+                _fm = QFontMetrics(_f)
+                b.setMinimumWidth(max(
+                    _fm.horizontalAdvance(self._clear_button_labels(n)[0])
+                    for n in (0, 99)) + 24)
+            flow.addWidget(b)
         self._sync_clear_button()
         self._sync_verlauf_buttons()
-        tb.addSpacing(20)
+        flow.addItem(QSpacerItem(14, 26, QSizePolicy.Policy.Fixed,
+                                 QSizePolicy.Policy.Fixed))
 
         # Tool-Buttons (Color, Position, Fan)
         for label, slot in [
@@ -304,9 +328,9 @@ class ProgrammerView(QWidget):
             b.setFixedHeight(26)
             b.clicked.connect(slot)
             b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3
-            tb.addWidget(b)
+            flow.addWidget(b)
 
-        tb.addStretch(1)
+        tb.addWidget(self._toolbar_flow_host, 1)
 
         # U-3 (P-08): Hilfe-Modus. Aktiviert Qts "What's This?" — der naechste Klick
         # auf ein Bedienelement zeigt dessen Hilfetext (setWhatsThis) als Sprechblase,
@@ -323,7 +347,7 @@ class ProgrammerView(QWidget):
             "an, um zu erfahren, was es tut."
         )
         self._btn_help.clicked.connect(lambda: QWhatsThis.enterWhatsThisMode())
-        tb.addWidget(self._btn_help)
+        tb.addWidget(self._btn_help, 0, Qt.AlignmentFlag.AlignTop)
 
         self._btn_layout = QPushButton()
         self._btn_layout.setFixedHeight(26)
@@ -335,7 +359,7 @@ class ProgrammerView(QWidget):
         )
         self._btn_layout.clicked.connect(self._toggle_layout)
         self._update_layout_button()
-        tb.addWidget(self._btn_layout)
+        tb.addWidget(self._btn_layout, 0, Qt.AlignmentFlag.AlignTop)
 
         self._root.addLayout(tb)
 
