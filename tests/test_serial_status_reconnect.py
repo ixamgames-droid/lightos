@@ -60,7 +60,7 @@ class _FakeSerial:
     bzw. verschwundener COM-Port)."""
     _available: set[str] = set()
 
-    def __init__(self, port, baud, timeout=1, write_timeout=0.5):
+    def __init__(self, port, baud, timeout=1, write_timeout=0.5, **_kw):
         if port not in _FakeSerial._available:
             raise enttec_pro.serial.SerialException(f"cannot open {port}")
         self.port = port
@@ -124,7 +124,7 @@ def test_reconnect_uses_find_enttec_port_on_new_com():
         dev._disabled = True
         dev._last_reconnect = -1e9   # Drossel umgehen
         _FakeSerial._available = {"COM_NEW"}   # alte Nummer weg, neue da
-        with mock.patch.object(enttec_pro, "find_enttec_port", lambda: "COM_NEW"):
+        with mock.patch.object(enttec_pro, "enttec_kandidaten", lambda: [("COM_NEW", None)]):
             dev.send_dmx(bytes(512))   # loest _try_reconnect aus
         assert dev.port == "COM_NEW", "Reconnect uebernimmt die per VID/PID gefundene Nummer"
         assert dev.is_disabled() is False, "nach erfolgreichem Reopen wieder aktiv"
@@ -138,7 +138,7 @@ def test_reconnect_falls_back_to_old_number_when_vidpid_absent():
         dev._disabled = True
         dev._last_reconnect = -1e9
         # find_enttec_port findet nichts (Geraet noch nicht sichtbar) -> alte Nummer.
-        with mock.patch.object(enttec_pro, "find_enttec_port", lambda: None):
+        with mock.patch.object(enttec_pro, "enttec_kandidaten", lambda: []):
             dev.send_dmx(bytes(512))
         assert dev.port == "COM3", "Fallback auf die urspruengliche Nummer"
         assert dev.is_disabled() is False
@@ -152,6 +152,6 @@ def test_reconnect_stays_disabled_when_no_port_openable():
         dev._disabled = True
         dev._last_reconnect = -1e9
         _FakeSerial._available = set()   # weder alt noch neu oeffenbar
-        with mock.patch.object(enttec_pro, "find_enttec_port", lambda: None):
+        with mock.patch.object(enttec_pro, "enttec_kandidaten", lambda: []):
             dev.send_dmx(bytes(512))
         assert dev.is_disabled() is True, "kein Port offen -> bleibt disabled"

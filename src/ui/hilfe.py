@@ -331,12 +331,15 @@ def sammle_tastenkuerzel(wurzeln, bereiche=None) -> list[Kuerzel]:
             for seq in act.shortcuts():
                 _dazu(tasten_text(seq), aktion, bereich)
         for sc in wurzel.findChildren(QShortcut):
-            portabel = sc.key().toString(QKeySequence.SequenceFormat.PortableText)
-            aktion = (sc.whatsThis() or sc.objectName()
-                      or _BEKANNTE_KUERZEL.get(portabel)
-                      or _STANDARD_AKTION.get(portabel, "(ohne Beschreibung)"))
-            _dazu(tasten_text(sc.key()), _sauber(aktion),
-                  _fenster_bereich(sc.parent(), bereiche))
+            # UI-93: ein QShortcut kann mehrere Folgen tragen (Wiederholen:
+            # Strg+Y und Strg+Umschalt+Z) — alle auffuehren, nicht nur die erste.
+            for folge in (sc.keys() or [sc.key()]):
+                portabel = folge.toString(QKeySequence.SequenceFormat.PortableText)
+                aktion = (sc.whatsThis() or sc.objectName()
+                          or _BEKANNTE_KUERZEL.get(portabel)
+                          or _STANDARD_AKTION.get(portabel, "(ohne Beschreibung)"))
+                _dazu(tasten_text(folge), _sauber(aktion),
+                      _fenster_bereich(sc.parent(), bereiche))
 
     aus.sort(key=lambda e: (e.bereich != ALLGEMEIN, e.bereich.lower(),
                             e.aktion.lower(), e.tasten))

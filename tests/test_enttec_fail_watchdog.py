@@ -102,7 +102,9 @@ class EnttecFailWatchdogTest(unittest.TestCase):
 
     def test_reconnect_reenables_when_port_returns(self):
         # Patch fuer den GANZEN Test aktiv -> auch der Reconnect oeffnet einen Fake.
-        with mock.patch.object(enttec_pro.serial, "Serial", _FakeSerial):
+        # OUT-66: keine echten Enttec in die Wahl des Reconnects lassen.
+        with mock.patch.object(enttec_pro.serial, "Serial", _FakeSerial), \
+                mock.patch.object(enttec_pro, "enttec_kandidaten", lambda: []):
             dev = EnttecPro("COM_TEST")
             dev._reconnect_every_s = 0.0   # Drossel aus -> sofortiger Reconnect-Versuch
             old = dev._ser
