@@ -57,7 +57,7 @@
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-18T15:37Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-18T15:37Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
-| UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-18T15:37Z | - |
+| UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-19T14:04Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-18T19:42Z | src/ui/widgets/fixture_editor.py |
