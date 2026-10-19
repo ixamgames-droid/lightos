@@ -63,7 +63,7 @@
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-19T14:04Z | src/ui/widgets/fixture_editor.py |
 | FM-69 | A | fix/fm69-bibliotheks-update-bestehende-db | 2026-10-19T14:04Z | src/core/database/fixture_db.py |
 | FM-76 | A | fix/fm76-generator-herkunft-mittragen | 2026-10-19T14:04Z | src/ui/widgets/fixture_generator.py |
-| UI-96 | A | fix/ui96-kiosk-ohne-bibliothek | 2026-10-18T21:46Z | src/ui/views/virtual_console_view.py |
+| UI-96 | A | fix/ui96-kiosk-ohne-bibliothek | 2026-10-19T14:04Z | src/ui/views/virtual_console_view.py |
 | QA-99 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:51Z | tests/conftest.py · tests/test_qa99_windows_offscreen_schriften.py · backlog.d/QA-99.md |
 | QA-100 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:52Z | tests/test_qa100_anleitung_ueberschriften_einmalig.py · tools/doku_gates.txt · backlog.d/QA-100.md |
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
