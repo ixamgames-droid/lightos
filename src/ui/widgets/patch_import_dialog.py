@@ -38,8 +38,25 @@ from src.ui.widgets import dialog_groesse
 TITEL = "Patch aus Tabelle importieren"
 DATEI_FILTER = "Tabellen (*.csv *.txt *.tsv);;Alle Dateien (*)"
 
-SPALTEN = ["Zeile", "Name", "In der Tabelle", "Profil / Modus", "Univ.",
+SPALTEN = ["Zeile", "Name", "Tabelle", "Profil / Modus", "Univ.",
            "Adresse", "Kanäle", "Status"]
+#: IMP-3: Erklaerung je Spaltenkopf. Der Kopf „Tabelle“ hiess „In der
+#: Tabelle“ und stand bei 900 px Dialogbreite als „n der Tabell“ da — jetzt
+#: ist er kurz, die Erklaerung steht hier, und keine Spalte wird schmaler
+#: als ihr Kopftext (``_kleinste_breite``).
+SPALTEN_TIPP = {
+    0: "Zeilennummer in der Datei.",
+    1: "Name, unter dem das Gerät im Patch angelegt wird. Gab es den Namen "
+       "schon, steht hier der neue Name mit Nummer.",
+    2: "So steht das Gerät in der Tabelle: Hersteller, Profil und Modus, "
+       "wie sie in der Datei geschrieben sind.",
+    3: "Profil und Modus aus der Geräte-Bibliothek, mit denen die Zeile "
+       "angelegt wird. Bei „offen“ hier das richtige Gerät wählen.",
+    4: "Universum, in das das Gerät gepatcht wird.",
+    5: "Startadresse des Geräts (bei mehreren Geräten: des ersten).",
+    6: "Kanäle, die ein Gerät in diesem Modus belegt.",
+    7: "Was mit der Zeile passiert und warum.",
+}
 S_ZEILE, S_NAME, S_TABELLE, S_PROFIL, S_UNIV, S_ADRESSE, S_KANAELE, S_STATUS = range(8)
 
 #: Breite, die „Status“ (der Grund im Klartext) immer behaelt.
@@ -60,6 +77,9 @@ START_HOEHE = 620
 BITTE_WAEHLEN = "— bitte wählen —"
 MODUS_WAEHLEN = "— Modus wählen —"
 KEIN_VORSCHLAG = "— kein passendes Profil —"
+
+#: IMP-3: Farbe des Namens, wenn der Import ihn nummeriert hat.
+FARBE_UMBENANNT = "#d29922"
 
 _FARBE = {
     T.ANLEGBAR: "#3fb950",
@@ -134,6 +154,8 @@ class PatchImportDialog(QDialog):
 
         self._table = QTableWidget(len(self.plan.zeilen), len(SPALTEN))
         self._table.setHorizontalHeaderLabels(SPALTEN)
+        for spalte, tipp in SPALTEN_TIPP.items():
+            self._table.horizontalHeaderItem(spalte).setToolTip(tipp)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table.setAlternatingRowColors(True)
@@ -275,7 +297,8 @@ class PatchImportDialog(QDialog):
         weder Zellen noch Auswahlfelder."""
         for zeile, pz in enumerate(self.plan.zeilen):
             z = pz.zeile
-            name = pz.name + (f"  ×{z.anzahl}" if z.anzahl > 1 else "")
+            # IMP-3: der Name, unter dem WIRKLICH angelegt wird.
+            name = pz.anzeige_name + (f"  ×{z.anzahl}" if z.anzahl > 1 else "")
             texte = {
                 S_ZEILE: str(z.nr),
                 S_NAME: name,
@@ -291,6 +314,19 @@ class PatchImportDialog(QDialog):
                 item.setToolTip(text)
             status = self._table.item(zeile, S_STATUS)
             status.setForeground(QColor(_FARBE[pz.status]))
+            # IMP-3: ein umbenanntes Geraet faellt in der Spalte „Name“ auf
+            # (fett, Hinweisfarbe); der Tooltip nennt alten und neuen Namen.
+            zelle = self._table.item(zeile, S_NAME)
+            schrift = zelle.font()
+            schrift.setBold(bool(pz.umbenannt))
+            zelle.setFont(schrift)
+            if pz.umbenannt:
+                zelle.setForeground(QColor(FARBE_UMBENANNT))
+                zelle.setToolTip("\n".join(
+                    f"„{alt}“ gab es schon — heißt jetzt „{neu}“."
+                    for alt, neu in pz.umbenannt))
+            else:
+                zelle.setData(Qt.ItemDataRole.ForegroundRole, None)
         self._wunsch = self._wunschbreiten()
         self._zeilenhoehen()
         self._lbl_zaehler.setText(self.plan.zaehlerzeile())
@@ -329,6 +365,12 @@ class PatchImportDialog(QDialog):
             wunsch[spalte] = breite
         return wunsch
 
+    def _kleinste_breite(self, spalte: int) -> int:
+        """IMP-3: kleinste Breite einer Textspalte — nie schmaler als ihr
+        Kopftext („n der Tabell“ bei 900 px)."""
+        return max(BIEGSAM[spalte][0],
+                   self._table.horizontalHeader().sectionSizeHint(spalte))
+
     def _tabellen_rand(self) -> int:
         """Was von der Breite der Tabelle nicht den Spalten gehoert: Rahmen
         und der senkrechte Rollbalken (immer mitgerechnet, damit die Breiten
@@ -341,7 +383,7 @@ class PatchImportDialog(QDialog):
         (``kleinste``: ihre kleinste Breite, „Status“ :data:`STATUS_MIN`)."""
         wunsch = self._wunsch or self._wunschbreiten()
         if kleinste:
-            spalten = sum(BIEGSAM[s][0] if s in BIEGSAM else b
+            spalten = sum(self._kleinste_breite(s) if s in BIEGSAM else b
                           for s, b in wunsch.items()) + STATUS_MIN
         else:
             spalten = sum(wunsch.values()) + STATUS_WUNSCH
@@ -358,15 +400,16 @@ class PatchImportDialog(QDialog):
             return
         platz = self._table.width() - self._tabellen_rand() - STATUS_MIN
         fest = sum(b for s, b in wunsch.items() if s not in BIEGSAM)
-        frei = platz - fest - sum(kleinste for kleinste, _ in BIEGSAM.values())
+        klein = {s: min(self._kleinste_breite(s), wunsch[s]) for s in BIEGSAM}
+        frei = platz - fest - sum(klein.values())
         breiten = {s: b for s, b in wunsch.items() if s not in BIEGSAM}
         # Zuerst das Auswahlfeld: sein Text bricht nicht um. Was dann noch
-        # frei ist, teilen sich Name und „In der Tabelle“ (die umbrechen).
+        # frei ist, teilen sich Name und „Tabelle“ (die umbrechen).
         for gruppe in ((S_PROFIL,), tuple(s for s in BIEGSAM if s != S_PROFIL)):
-            luft = sum(wunsch[s] - BIEGSAM[s][0] for s in gruppe)
+            luft = sum(wunsch[s] - klein[s] for s in gruppe)
             anteil = 1.0 if luft <= 0 else max(0.0, min(1.0, frei / luft))
             for spalte in gruppe:
-                kleinste = BIEGSAM[spalte][0]
+                kleinste = klein[spalte]
                 breiten[spalte] = kleinste + int((wunsch[spalte] - kleinste) * anteil)
                 frei -= breiten[spalte] - kleinste
         for spalte, breite in breiten.items():
@@ -414,10 +457,21 @@ class PatchImportDialog(QDialog):
         if not self.plan.anlegbare():
             return
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        fehler = None
         try:
             self.ergebnis = T.wende_an(self._state, self.plan, self._bibliothek)
+        except Exception as e:
+            fehler = e
         finally:
             QApplication.restoreOverrideCursor()
+        if fehler is not None:
+            # Codex-Review #1093: nichts angelegt (sonst stuende es im
+            # Ergebnis) — ehrlich sagen statt still offen zu bleiben.
+            print(f"[patch_import_dialog] ERROR: Import fehlgeschlagen: {fehler}")
+            QMessageBox.warning(self, "Patch-Import",
+                                "Der Import ist fehlgeschlagen, es wurde nichts "
+                                f"angelegt:\n{fehler}")
+            return
         self.accept()
 
 
@@ -457,6 +511,11 @@ def meldung_nach_import(ergebnis: T.Ergebnis) -> str:
     """Der Satz nach dem Anwenden."""
     n = ergebnis.geraete
     text = "1 Gerät angelegt." if n == 1 else f"{n} Geräte angelegt."
+    if ergebnis.umbenannt:
+        u = ergebnis.umbenannt
+        text += (f"\n\n{u} Gerät{'e' if u > 1 else ''} "
+                 f"{'haben' if u > 1 else 'hat'} eine Nummer am Namen bekommen, "
+                 "weil es den Namen schon gab.")
     if ergebnis.ausgelassen:
         m = ergebnis.ausgelassen
         text += (f"\n\n{m} Zeile{'n' if m > 1 else ''} der Tabelle "
