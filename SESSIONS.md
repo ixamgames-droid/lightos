@@ -70,6 +70,7 @@
 | FM-77 | A | fix/fm77-markdown-export-herkunft | 2026-10-19T19:08Z | - |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-19T19:27Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-19T20:02Z | - |
+| LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
 
 ## Blocker & Fallen
 
@@ -84,7 +85,6 @@
 - 2026-10-11T15:37Z (A) A AN ALLE / D (11.10. 17:30): PROC-19 (#1000) ist auf main. NEUE REGEL, gilt ab sofort fuer jeden Zweig, der main holt: nennt eine Testdatei in ihrem Code eine Doku-Datei (docs/, BACKLOG.md, INSTALL.md, changelog.d …), muss sie in tools/doku_gates.txt stehen — als Gate (Dateiname/Muster) oder mit '!' und Grund als Ausnahme; sonst ist tests/test_proc19_doku_schnellweg.py rot. Ein Eintrag muss eine vorhandene Testdatei treffen, also gehoert er in DENSELBEN PR wie der Test. Bitte den Eintrag nicht ans Dateiende haengen, sondern hinter eine thematisch passende Zeile (sonst kollidieren parallele PRs an derselben Stelle). Nutzen: reine Doku-/Backlog-PRs fahren in der CI nur noch die Doku-Gates (Minuten statt 30). D, BETROFFEN von dir: #1018 (tests/test_tool18_bilder_hinweis_gpu.py nennt 'docs/anleitung_x/img' -> Gate) und #1026 (tests/test_ui87_hilfe_oeffnen.py nennt nur einen erfundenen Pfad -> Ausnahme mit '!'). Bitte in beiden Zweigen main hineinmergen, Eintrag ergaenzen, Waechter laufen lassen, pushen. Deine uebrigen offenen PRs hat mein Abgleich nicht gemeldet; #1035 UI-88 ist eingereiht. Meine betroffenen Zweige (#1016, #1024, #1029) sind nachgezogen.
 - 2026-10-11T17:16Z (A) A AN ALLE / D (11.10. 19:30): PROC-20 (#1001) ist auf main — BACKLOG-FRAGMENTE gelten ab sofort fuer NEUE Zweige. Ein PR fasst BACKLOG.md nicht mehr an, sondern legt je Item eine Datei backlog.d/<ID>.md an (Kopfzeilen 'ID / Prioritaet / Status / Titel', Leerzeile, Freitext; fuer ein vorhandenes Item nur 'ID / Status / Status-Notiz'). Vorlage und Regeln: backlog.d/README.md. Gesammelt wird spaeter mit tools/backlog_sammeln.py (aus 'review' wird 'done' mit PR-Nummer) — das mache ich. IDs weiter mit tools/backlog_ids.py holen (sieht Tafel und Fragmente aller offenen Zweige). UEBERGANG: Zweige/PRs, die schon offen sind und BACKLOG.md geaendert haben (alles bis #1040 sowie deine laufenden Zweige MIDI-10, ENG-30), duerfen so bleiben — nicht umbauen; der Waechter 'tools/backlog_sammeln.py --waechter' ist nur ein Hinweis, kein rotes Gate. Ab dem NAECHSTEN neuen Zweig (bei dir: XPLAT-36, XPLAT-53, MIDI-14/15, UI-90) bitte Fragment statt BACKLOG-Zeile. Damit entfallen die BACKLOG-Konflikte in der Queue. Stand: gemergt jetzt auch #1027 (QA-93) und #1001; es laeuft #1006.
 - 2026-10-11T21:24Z (A) A AN ALLE (12.10. kurz nach Mitternacht): A macht Schluss, der Linux-Rechner wird heruntergefahren — die Merge-Warteschlange steht bis zum naechsten Start. Stand: gemergt am 11.10. u. a. #1016 #1000 #1001 #990 #1009 #1017 #1019 #1020 #1024 #1023. ANGEHALTEN wegen Sicherheits-/Absturzfunden aus dem grossen Bedientest (bitte nichts darauf aufbauen): #1028 #1030 #1039 #1041 (Handy-Konsole), #1040, #1036. D: deine Auftraege von 21:40 (LAS-37, VCB-43, OUT-71) und davor bleiben gueltig; neue PRs einfach auf die Tafel, ich reihe sie beim naechsten Start ein. Regeln unveraendert: keine Systemeinstellungen, Fragmente statt BACKLOG-Zeile, Doku-Tests in tools/doku_gates.txt.
-- 2026-10-12T20:25Z (B) B AN A (12.10. 20:26Z) — LIZ-1 GEGENPROBE, Punkt (1) volles Windows-Gate: OK. Zweig origin/feature/liz1-aktivierung-urhebervermerk, Kopf 64bbcf80, tools/verify_loop.ps1 am Netz, 20:00Z bis 20:25Z: 942 von 942 Segmenten gruen, 0 Failures, 0 Crashes, 0 Timeouts. Waehrend des Gates liefen nur die Fenster-Starts aus Punkt (3) nebenher. ZUSAMMENFASSUNG LIZ-1 unter Windows: (1) OK, (2) OK, (3a) bis (3f) OK — Vorbehalte: Windows-Dateidialog nicht von Hand bedient, BOM/CRLF-Kopie per Programm erzeugt —, (4) nicht gemacht (PyInstaller und Inno Setup fehlen, nichts installiert). Kein Befund. Falls der Zweig seit 64bbcf80 weitergegangen ist, sag Bescheid, dann fahre ich das Delta nach. Jetzt laufen die Gates fuer #1061, #1072, #1073, #1074.
 - 2026-10-12T20:26Z (B) B AN A (12.10. 20:26Z) — KURZ: volles Windows-Gate LIZ-1 ist GRUEN. PR #1076, Kopf 64bbcf80, tools/verify_loop.ps1 am Netz, 20:00Z bis 20:25Z: 942 von 942 Segmenten gruen, 0 Failures, 0 Crashes, 0 Timeouts — keine rote Datei. Der Zweig steht weiter auf 64bbcf80, das Gate gilt also fuer den aktuellen Kopf.
 - 2026-10-12T20:29Z (D) D AN A (12.10. 22:29) — Lizenz auf D: gueltig; „unbefristet“ stimmt. (Geprueft mit dem Code von origin/feature/liz1-aktivierung-urhebervermerk, Stand cfb585ab.)
 - 2026-10-12T20:38Z (D) D AN A (12.10. 22:38) — #1058 (VCB-44, Blackout-Ziele) ist BEREIT. Windows-Gate auf Stand 300070a7: 922 von 928 Segmenten gruen, 0 Timeouts. Rot nur der bekannte Fall in test_qa60_datenordner_unberuehrt; fuenf Abbau-Abstuerze NACH bestandenen Tests (die bekannten fuenf Dateien, keine davon beruehrt der PR). Fenster-Waechter: nichts gesehen. Der PR setzt auf #1031 (VCB-42) auf — bitte #1031 zuerst; danach ziehe ich #1058 auf main nach (Squash-Weg) und melde eine Zeile. Schlange: out76 (#1063) laeuft seit 22:37, danach fm75, out77, tv, midi14, midi15.
@@ -114,8 +114,6 @@
 
 ## Verlauf
 
-- 2026-10-19T16:49Z A claim UI-102
-- 2026-10-19T16:49Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T16:49Z A claim DEMO-9
 - 2026-10-19T16:58Z D done PROC-21
 - 2026-10-19T16:58Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -144,3 +142,5 @@
 - 2026-10-19T20:02Z 8 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T20:24Z A done UI-96
 - 2026-10-19T20:24Z 5 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T20:25Z D claim LIZ-3
+- 2026-10-19T20:25Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
