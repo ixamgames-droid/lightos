@@ -183,6 +183,16 @@ class RueckfrageKnoepfeTest(unittest.TestCase):
             self.assertIn(wort, abschnitt)
         self.assertNotIn("„Ja“", abschnitt)
 
+    def test_anleitung_grenzt_doppelklick_sperre_auf_den_knopf_ein(self):
+        """Die 1-s-Sperre gilt nur nach dem Ausloesen MIT DEM KNOPF — nach
+        Kuerzel, Laser-Tab, VC-Taste oder MIDI kommt die Rueckfrage sofort."""
+        with open(_DOKU, encoding="utf-8") as f:
+            doku = f.read()
+        abschnitt = doku[doku.index("**NOT-AUS lösen:**"):]
+        abschnitt = " ".join(abschnitt[:abschnitt.index("\n\n")].split())
+        self.assertIn("innerhalb einer Sekunde nach dem Auslösen mit diesem Knopf",
+                      abschnitt)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # B) Ueber den Knopf LASER NOT-AUS im Hauptfenster (normal und Kiosk)
@@ -240,6 +250,18 @@ class _FensterFaelle:
         self.assertGreater(self.w._notaus_sperre_bis, time.monotonic())
         bild = self._klick(lambda box: box.button(_JA).click())  # zweiter Klick
         self.assertIsNone(bild, "Doppelklick darf nicht fragen")
+        self.assertTrue(self.st.laser_estop_active)
+
+    def test_sperre_nur_nach_ausloesen_mit_dem_knopf(self):
+        """Ausloesen auf anderem Weg (Kuerzel/Laser-Tab/VC/MIDI) setzt keine
+        Sperre: der naechste Knopf-Klick fragt sofort (Vorgabe bleibt Abbrechen)."""
+        self.w._notaus_sperre_bis = 0.0
+        self.w._laser_notaus_ausloesen()                  # wie das Tastenkuerzel
+        self.assertTrue(self.st.laser_estop_active)
+        self.assertLessEqual(self.w._notaus_sperre_bis, time.monotonic())
+        bild = self._klick(lambda box: box.reject())
+        self.assertIsNotNone(bild, "nach Ausloesen ohne Knopf muss sofort gefragt werden")
+        self.assertEqual(bild["vorgabe"], _ABBRECHEN)
         self.assertTrue(self.st.laser_estop_active)
 
     def test_jeder_klick_schaltet_zuerst_ab(self):

@@ -203,8 +203,10 @@ hier — ein Laser bekommt also nicht einfach überall 0:
   Hauptfenster — klicken und in der Rückfrage „Laser-NOT-AUS lösen?“ auf
   **„NOT-AUS lösen“** klicken. Vorgabe ist **„Abbrechen“**: Eingabetaste,
   Escape und Leertaste lösen nicht, der NOT-AUS bleibt dann aktiv. Klickst du
-  innerhalb einer Sekunde nach dem Auslösen noch einmal, kommt keine Rückfrage
-  (Schutz vor Doppelklick). Der Knopf im Laser-Tab
+  innerhalb einer Sekunde nach dem Auslösen mit diesem Knopf noch einmal, kommt
+  keine Rückfrage (Schutz vor Doppelklick). Wurde der NOT-AUS anders ausgelöst
+  (Tastenkürzel, Laser-Tab, VC-Taste, MIDI), fragt schon der erste Klick auf den
+  Knopf nach. Der Knopf im Laser-Tab
   und die VC-Taste „Laser NOT-AUS“ lösen nur aus. Solange der NOT-AUS aktiv
   ist, werden Werte gemerkt, der Laser bleibt dunkel: Betriebsart, Muster,
   Regler, Snaps und MIDI lösen ihn nicht. Nach dem Lösen gibt der Laser sofort
