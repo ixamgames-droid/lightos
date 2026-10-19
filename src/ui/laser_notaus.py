@@ -16,7 +16,7 @@ Strahlbereich sehen koennen. Nie aus einem Fernweg (Handy, OSC, MIDI) rufen.
 """
 from __future__ import annotations
 
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox as _QtMessageBox
 
 TITEL = "Laser-NOT-AUS lösen?"
 TEXT = (
@@ -27,10 +27,51 @@ TEXT = (
     "Nur lösen, wenn der Strahlbereich frei ist. Jetzt lösen?"
 )
 
+#: LAS-40: feste Knopftexte (wie in der Anleitung Laser). Ohne sie nimmt Qt
+#: die Texte vom Betriebssystem — je nach Sprache/Oberflaeche „Ja“, „Yes“ …,
+#: und ein blosses „Ja“ sagt an dieser Stelle nicht, was es ausloest.
+KNOPF_LOESEN = "NOT-AUS lösen"
+KNOPF_ABBRECHEN = "Abbrechen"
+
+
+class QMessageBox(_QtMessageBox):          # noqa: F811 — bewusst derselbe Name
+    """LAS-40: ``warning`` mit FESTEN Beschriftungen — das Muster aus UI-92
+    (``main_window.QMessageBox.question``).
+
+    Als Unterklasse unter demselben Namen, damit die Stelle, an der Tests die
+    Antwort einsetzen (``laser_notaus.QMessageBox.warning``), dieselbe bleibt.
+    Der Knopf „NOT-AUS lösen“ ist weiter ``StandardButton.Yes``; Vorgabe,
+    Escape-Knopf und Fokus sind „Abbrechen“ — Eingabetaste, Escape und
+    Leertaste loesen nie."""
+
+    FESTE_TEXTE = (
+        (_QtMessageBox.StandardButton.Yes, KNOPF_LOESEN),
+        (_QtMessageBox.StandardButton.Cancel, KNOPF_ABBRECHEN),
+    )
+
+    @staticmethod
+    def warning(parent, title, text,
+                buttons=_QtMessageBox.StandardButton.Ok,
+                defaultButton=_QtMessageBox.StandardButton.NoButton):
+        box = _QtMessageBox(_QtMessageBox.Icon.Warning, title, text, buttons, parent)
+        for knopf, beschriftung in QMessageBox.FESTE_TEXTE:
+            b = box.button(knopf)
+            if b is not None:
+                b.setText(beschriftung)
+        abbrechen = box.button(_QtMessageBox.StandardButton.Cancel)
+        if abbrechen is not None:
+            box.setEscapeButton(abbrechen)
+        if defaultButton != _QtMessageBox.StandardButton.NoButton:
+            box.setDefaultButton(defaultButton)
+            vorgabe = box.button(defaultButton)
+            if vorgabe is not None:
+                vorgabe.setFocus()
+        return _QtMessageBox.StandardButton(box.exec())
+
 
 def loesen_mit_rueckfrage(parent, state) -> bool:
-    """Fragt nach und loest den NOT-AUS nur bei „Ja“. Vorgabe ist „Abbrechen“
-    (Enter/Leertaste loesen nicht). Gibt True zurueck, wenn der Latch danach
+    """Fragt nach und loest den NOT-AUS nur bei „NOT-AUS lösen“. Vorgabe ist
+    „Abbrechen“ (Enter/Escape/Leertaste loesen nicht). Gibt True zurueck, wenn der Latch danach
     nicht mehr steht."""
     if not getattr(state, "laser_estop_active", False):
         return False
