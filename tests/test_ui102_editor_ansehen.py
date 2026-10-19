@@ -135,6 +135,31 @@ class AnsehenTest(_TempDB):
                                  QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.assertIn("nurAnsehen", dlg.styleSheet())
 
+    @staticmethod
+    def _hintergrund(w):
+        """Farbe am rechten Feldrand (innen, abseits von Text und Rahmen)."""
+        w.ensurePolished()
+        img = w.grab().toImage()
+        return img.pixelColor(img.width() - 4, img.height() // 2).name()
+
+    def test_optik_kommt_wirklich_an(self):
+        """Gegenpruefung: Eigenschaft + Stylesheet-Text allein reichen nicht —
+        ohne unpolish/polish bliebe das Feld hell. Darum Pixel vergleichen."""
+        dlg = self._dlg(nur_ansehen=True)
+        dlg.show()
+        _app.processEvents()
+        eigen = editor_module.FixtureEditorDialog(fixture_id=self.pid_user)
+        eigen.show()
+        _app.processEvents()
+        tab_a, tab_e = dlg._tabs.widget(0), eigen._tabs.widget(0)
+        paare = [(dlg._edit_short, eigen._edit_short, "Kurzname"),
+                 (dlg._spin_power, eigen._spin_power, "Leistung"),
+                 (tab_a._edit_name, tab_e._edit_name, "Mode-Name")]
+        for a, e, name in paare:
+            with self.subTest(feld=name):
+                self.assertEqual(self._hintergrund(a), "#2e2e2e")
+                self.assertNotEqual(self._hintergrund(e), "#2e2e2e")
+
     def test_tabelle_ohne_bearbeiten(self):
         dlg = self._dlg(nur_ansehen=True)
         tbl = dlg._tabs.widget(0)._tbl
