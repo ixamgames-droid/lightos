@@ -18,6 +18,11 @@ FRAME_INTERVAL = 1.0 / TARGET_HZ
 # ``add_enttec`` setzt sie um den Aufruf von ``_make_enttec_device`` herum.
 _ANLEGE_FREMDE: contextvars.ContextVar = contextvars.ContextVar(
     "lightos_enttec_fremde_seriennr", default=frozenset())
+# OUT-80: die in ``universes.json`` gespeicherte Seriennummer des Dongles, den
+# das gerade entstehende Enttec-Geraet suchen soll (``add_enttec`` setzt sie
+# wie ``_ANLEGE_FREMDE`` um den Aufruf herum). Leer = keine bekannt.
+_ANLEGE_SERIENNR: contextvars.ContextVar = contextvars.ContextVar(
+    "lightos_enttec_eigene_seriennr", default=None)
 # Wie oft der Ausgabe-Thread die fremden Seriennummern nachfuehrt (Sekunden):
 # ein Worker lernt seine Nummer erst nach dem Oeffnen.
 ENTTEC_FREMDE_NACHFUEHREN_S = 1.0
@@ -47,11 +52,19 @@ def _make_enttec_device(port: str):
     # Anlegen; nur wenn es welche gibt (der Aufruf bleibt sonst wie vorher).
     fremde = _ANLEGE_FREMDE.get()
     kw = {"fremde": fremde} if fremde else {}
+    # OUT-80: die gespeicherte Seriennummer — das erste Oeffnen sucht dann
+    # SEINEN Dongle, auch wenn die Portnummern beim Booten vertauscht sind.
+    seriennr = _ANLEGE_SERIENNR.get()
+    if seriennr:
+        kw["seriennr"] = seriennr
     if os.environ.get("LIGHTOS_SERIAL_INPROC"):
         return EnttecPro(port, **kw)
     try:
         from .serial_process import EnttecProcessProxy
-        return EnttecProcessProxy(port, **({"fremde_seriennr": fremde} if fremde else {}))
+        pkw = {"fremde_seriennr": fremde} if fremde else {}
+        if seriennr:
+            pkw["seriennr"] = seriennr
+        return EnttecProcessProxy(port, **pkw)
     except Exception as e:
         import sys
         print(f"[OutputManager] Serial-Prozess-Isolation nicht verfuegbar ({e}) "
@@ -505,6 +518,60 @@ class OutputManager:
             akt = getattr(dev, "port", None)        # Attrappen ohne Rueckmeldung
         return akt == port
 
+    # ── OUT-80: Seriennummer dauerhaft in der Konfiguration ─────────────────
+
+    def _enttec_sn_tabelle(self) -> dict:
+        """OUT-80: Universum -> gespeicherte bzw. zuletzt gelernte Seriennummer
+        (lazy: Bestandstests bauen den Manager teils ohne ``__init__``)."""
+        t = getattr(self, "_enttec_sn_konfig", None)
+        if t is None:
+            t = self._enttec_sn_konfig = {}
+        return t
+
+    def enttec_seriennr_vormerken(self, zuordnung) -> None:
+        """OUT-80: die in ``universes.json`` gespeicherten Seriennummern ALLER
+        Enttec-Zeilen, bevor die Ausgaben (neu) angelegt werden
+        (``AppState.apply_output_config``). Sie gelten fuer jede Ausgabe als
+        fremd, die sie nicht selbst traegt — auch fuer eine, die VOR dem
+        Universum angelegt wird, dem der Dongle gehoert. Sonst nahme beim Start
+        das erste Universum den Dongle des zweiten als „Ersatz“."""
+        t = self._enttec_sn_tabelle()
+        t.clear()
+        for u, sn in dict(zuordnung or {}).items():
+            sn = str(sn or "").strip()
+            if sn:
+                try:
+                    t[int(u)] = sn
+                except (TypeError, ValueError):
+                    continue
+
+    def enttec_seriennr(self, universe: int) -> str | None:
+        """OUT-80: die Seriennummer des Dongles von ``universe`` — gelernt vom
+        laufenden Geraet, sonst die gespeicherte (``None`` = keine bekannt)."""
+        dev = dict(getattr(self, "_enttec_outputs", None) or {}).get(universe)
+        sn = self._enttec_sn(dev) if dev is not None else None
+        return sn or self._enttec_sn_tabelle().get(universe)
+
+    def _enttec_seriennr_abgleichen(self, geraete) -> None:
+        """OUT-80: hat ein Geraet eine (andere) Seriennummer gelernt als die
+        gespeicherte, die Tabelle nachziehen und ``bei_enttec_seriennr(u, sn)``
+        rufen — der Aufrufer (``AppState``) schreibt sie in ``universes.json``.
+        Nur bei Aenderung, also nicht je Frame; der Rueckruf darf nicht
+        blockieren (er laeuft im Ausgabe-Thread)."""
+        t = self._enttec_sn_tabelle()
+        for u, dev in geraete:
+            sn = self._enttec_sn(dev)
+            if not sn or t.get(u) == sn:
+                continue
+            t[u] = sn
+            cb = getattr(self, "bei_enttec_seriennr", None)
+            if callable(cb):
+                try:
+                    cb(u, sn)
+                except Exception as e:
+                    print(f"[OutputManager] ERROR: Seriennummer U{u} nicht "
+                          f"gespeichert: {e}")
+
     def _enttec_fremde_nachfuehren(self):
         """OUT-66 (Review 2): jeder Enttec-Ausgabe die Seriennummern der
         ANDEREN konfigurierten Enttec-Ausgaben mitgeben. Einen Dongle mit
@@ -512,6 +579,7 @@ class OutputManager:
         Port (Ersatzgeraet) darf sie uebernehmen. Meldet dabei neue Hinweise
         der Geraete (Uebernahme) einmal ins Log."""
         geraete = list(dict(getattr(self, "_enttec_outputs", None) or {}).items())
+        self._enttec_seriennr_abgleichen(geraete)     # OUT-80
         self._enttec_frueher_merken()
         gemeldet = getattr(self, "_enttec_hinweise", None)
         if gemeldet is None:
@@ -607,6 +675,10 @@ class OutputManager:
             self._enttec_frueher_merken()
         frueher = dict(getattr(self, "_enttec_frueher", None) or {})
         raus = set()
+        # OUT-80: gespeicherte Nummern der anderen Universen — auch solcher,
+        # deren Ausgabe (noch) nicht angelegt ist (Start, „Übernehmen“).
+        raus.update(sn for u, sn in self._enttec_sn_tabelle().items()
+                    if u != universe and sn)
         for u, dev in dict(getattr(self, "_enttec_outputs", None) or {}).items():
             if u == universe:
                 continue
@@ -900,7 +972,7 @@ class OutputManager:
         """Was gerade WIRKLICH sendet — pro Universum und Ausgabeweg.
 
         Je Eintrag ``{"universum", "weg", "ziel", "verbunden", "problem",
-        "zustand", "hinweis"}``. ``hinweis`` (OUT-66) ist eine Auskunft ohne
+        "zustand", "hinweis", "seriennr"}``. ``hinweis`` (OUT-66) ist eine Auskunft ohne
         Ausfall, z. B. dass ein Enttec ein Ersatzgeraet am eigenen Port
         uebernommen hat — leer, wenn es nichts zu sagen gibt. ``zustand`` (OUT-75) ist die Selbstauskunft des Geraets
         (``ZUSTAND_*``) — damit laesst sich „verbindet gerade“ von „weiss es
@@ -951,6 +1023,10 @@ class OutputManager:
             # OUT-66 (Review 2): Hinweis ohne Ausfall (z. B. „anderer Enttec
             # uebernommen“) — informativ, kein Problem und kein Alarm.
             hinweis = self._enttec_hinweis(dev) if weg == "Enttec" else ""
+            # OUT-80: Seriennummer des Dongles (gelernt oder gespeichert) —
+            # Dialog und Diagnose zeigen sie nur gekuerzt (OUT-77).
+            seriennr = (self.enttec_seriennr(universum) or ""
+                        if weg == "Enttec" else "")
             raus.append({
                 "universum": universum, "weg": weg,
                 # Jeder Sendertyp nennt sein Ziel anders: Enttec den `port`,
@@ -962,6 +1038,7 @@ class OutputManager:
                 "problem": problem_text,
                 "zustand": geraet_zustand(dev),
                 "hinweis": hinweis,
+                "seriennr": seriennr,
             })
         raus.sort(key=lambda d: (d["universum"], d["weg"]))
         return raus
@@ -1333,39 +1410,72 @@ class OutputManager:
             except Exception:
                 pass
 
-    def add_enttec(self, universe: int, port: str):
+    def add_enttec(self, universe: int, port: str, seriennr: str | None = None):
+        """Enttec an ``port`` fuer ``universe`` einrichten.
+
+        ``seriennr`` (OUT-80): die in ``universes.json`` gespeicherte
+        Seriennummer des Dongles dieses Universums. Das erste Oeffnen sucht
+        dann diesen Dongle — auch an einer anderen Portnummer —, statt den zu
+        lernen, der gerade am konfigurierten Port steckt. ``None`` = keine
+        bekannt (alte Zeile, „vergessen“): Verhalten wie vor OUT-80."""
         # Falls derselbe COM-Port bereits auf einem ANDEREN Universe offen ist,
         # zuerst thread-sicher schliessen (ein Port kann nur einmal geoeffnet
         # sein -> sonst "Access denied" beim erneuten Verbinden).
         # OUT-64: VOR dem Schliessen nachfuehren — haengt der Laser an diesem
         # Port (auch unter neuer COM-Nummer nach einem Reconnect), steht der
         # Weg danach in der Liste, bevor ein anderes Universum ihn bekommt.
+        seriennr = str(seriennr or "").strip() or None
         self._estop_wege_nachfuehren()
-        self.close_enttec_on_port(port)
+        self.close_enttec_on_port(port, fuer_seriennr=seriennr)
+        # OUT-80: die Nummer gehoert ab jetzt diesem Universum (keine = keine).
+        if seriennr:
+            self._enttec_sn_tabelle()[universe] = seriennr
+        else:
+            self._enttec_sn_tabelle().pop(universe, None)
         # OUT-66 (Review 2): das neue Geraet kennt die Seriennummern der
         # anderen Enttec-Ausgaben schon beim Anlegen (erstes Oeffnen).
         token = _ANLEGE_FREMDE.set(self._fremde_fuer(universe))
+        token_sn = _ANLEGE_SERIENNR.set(seriennr)
         try:
             neu = _make_enttec_device(port)
         finally:
+            _ANLEGE_SERIENNR.reset(token_sn)
             _ANLEGE_FREMDE.reset(token)
         self._swap_device(self._enttec_outputs, universe, neu)
         self._estop_wege_nachfuehren()       # OUT-64
         self._entfernte_wege_vergessen(universe)
         self._enttec_fremde_nachfuehren()
 
-    def close_enttec_on_port(self, port: str):
+    def close_enttec_on_port(self, port: str, fuer_seriennr: str | None = None):
         """Schliesst eine evtl. offene Enttec-Verbindung auf diesem COM-Port
-        (thread-sicher), egal auf welchem Universe sie haengt."""
+        (thread-sicher), egal auf welchem Universe sie haengt.
+
+        ``fuer_seriennr`` (OUT-80): die gespeicherte Seriennummer der Ausgabe,
+        die gleich an ``port`` angelegt wird. Haengt dort nur ein ANDERER
+        Ausgang, der seinem Dongle (mit anderer bekannter Nummer) an diese
+        Portnummer gefolgt ist, bleibt er stehen: die neue Ausgabe sucht ihren
+        eigenen Dongle und nimmt den fremden nie. Sonst verdraengte jedes
+        „Übernehmen“ nach vertauschtem Einstecken das andere Universum."""
+        fuer_seriennr = str(fuer_seriennr or "").strip() or None
+
+        def _trifft(d) -> bool:
+            if not self._enttec_belegt_port(d, port):
+                return False
+            if not fuer_seriennr or self._weg_enttec(d)[1] == port:
+                return True
+            andere = self._enttec_sn(d)
+            return not (andere and andere != fuer_seriennr)
+
         with self._io_lock:
             # OUT-66: auch der Port, an den der Worker dem Dongle gefolgt ist
             # (``port_aktuell``) — ein Dongle hat genau einen Ausgang.
             # Review 2: die gefolgte Nummer nur, solange er dort verbunden ist.
             victims = [(u, d) for u, d in self._enttec_outputs.items()
-                       if self._enttec_belegt_port(d, port)]
+                       if _trifft(d)]
             for u, _ in victims:
                 self._enttec_outputs.pop(u, None)
                 self._vergiss_fehler(u)   # OUT-51, s. _vergiss_fehler
+                self._enttec_sn_tabelle().pop(u, None)          # OUT-80
         for _, dev in victims:
             try:
                 dev.close()
@@ -1568,6 +1678,9 @@ class OutputManager:
                 pass
         self._udmx_streng_nachfuehren()
         if any(name == "enttec" for name, _ in victims):
+            # OUT-80: wie die gelernte gibt auch die gespeicherte Nummer frei —
+            # ``apply_output_config`` legt sie mit ``add_enttec`` gleich wieder an.
+            self._enttec_sn_tabelle().pop(universe, None)
             self._enttec_fremde_nachfuehren()     # OUT-66 (Review 2)
 
     def _schlussbild_an(self, universe: int, ext, victims) -> None:

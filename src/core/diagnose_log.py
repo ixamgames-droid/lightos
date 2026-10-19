@@ -119,6 +119,11 @@ def _seriennummern_kuerzen(text: str) -> str:
     # … und ein Doppelpunkt MITTEN in der Nummer gehoert dazu (ein
     # abschliessender wie in „…#SN: sendet“ nicht).
     teil = r"[^\s,;:()\[\]'\"·]+"
+    # OUT-80: stabile Linux-Portnamen tragen die Seriennummer im Namen
+    # (``/dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_<nr>-if00-port0``).
+    text = re.sub(r"(by-id/usb-[^\s/]*_)([^\s/_]+)(-if\d+(?:-port\d+)?)",
+                  lambda m: m.group(1) + kuerze_seriennummer(m.group(2))
+                  + m.group(3), text)
     text = re.sub(r"(?i)\b([0-9a-f]{4}:[0-9a-f]{4}#)(" + teil + r"(?::" + teil + r")*)",
                   lambda m: m.group(1) + kuerze_seriennummer(m.group(2)), text)
     return re.sub(r"(Seriennr\.\s+)(" + teil + r"(?::" + teil + r")*)",
@@ -983,8 +988,11 @@ def dmx_infos() -> list[str]:
             # OUT-66: z. B. „anderer Enttec uebernommen“ (Seriennr. wird beim
             # Packen gekuerzt, OUT-77).
             hinweis = f" — Hinweis: {e['hinweis']}" if e.get("hinweis") else ""
+            # OUT-80: Seriennummer des Dongles, schon hier gekuerzt.
+            sn = (f" (Dongle Seriennr. {kuerze_seriennummer(e['seriennr'])})"
+                  if e.get("seriennr") else "")
             raus.append(f"U{e.get('universum')} {e.get('weg')} → "
-                        f"{e.get('ziel') or '(Standard)'}: {zustand}{problem}"
+                        f"{e.get('ziel') or '(Standard)'}{sn}: {zustand}{problem}"
                         f"{hinweis}")
         return raus or ["keine Ausgaenge eingerichtet"]
     except Exception as e:
@@ -1177,11 +1185,15 @@ def einstellungen_text() -> str:
                 # DMX-Fernhilfe; das Ziel (COM-Port/IP) bleibt drin, ohne Namen.
                 for r in daten:
                     if isinstance(r, dict):
+                        # OUT-80: gespeicherte Enttec-Seriennummer nur gekuerzt.
+                        sn = str(r.get("enttec_seriennr") or "").strip()
                         zeilen.append(
                             f"  U{r.get('num')}: {r.get('output') or 'Disabled'} "
                             f"→ {r.get('patch') or '(Standard)'}"
                             + (f" (extern U{r.get('out_universe')})"
-                               if r.get("out_universe") not in (None, "") else ""))
+                               if r.get("out_universe") not in (None, "") else "")
+                            + (f" (Dongle Seriennr. {kuerze_seriennummer(sn)})"
+                               if sn else ""))
             else:
                 zeilen += ["  " + z for z in _einstellungen_flach(daten)]
         except Exception as e:

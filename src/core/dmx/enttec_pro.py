@@ -156,6 +156,10 @@ def diagnose_port(configured: str) -> str | None:
         vorhanden = []
     if want and want in vorhanden:
         return None
+    # OUT-80: ein stabiler Name (/dev/serial/by-id/…, Symlink) zeigt auf einen
+    # der gelisteten Anschluesse — dann ist er da.
+    if want and _port_key(want) in {_port_key(v) for v in vorhanden}:
+        return None
 
     try:
         gefunden = find_enttec_port()
@@ -306,6 +310,15 @@ class EnttecPro:
         # wird uebernommen (:meth:`_geoeffnet` lernt die Nummer neu).
         for d, s in kand:
             if _port_key(d) == _port_key(port) and s and self._verboten(d, s):
+                # OUT-80: sichtbar machen (Ausgabe-Diagnose), nicht nur im
+                # Worker werfen — typisch nach vertauschtem Einstecken, wenn
+                # der eigene Dongle fehlt.
+                self._sperr_hinweis = (
+                    f"{SPERR_HINWEIS} Enttec an {d} (Seriennr. {s}) gehört "
+                    f"einer anderen Ausgabe"
+                    + (f"; eigener Dongle (Seriennr. {sn}) nicht gefunden"
+                       if sn else ""))
+                self._melden(None)
                 raise serial.SerialException(
                     f"{port}: dort haengt der Enttec einer anderen Ausgabe "
                     f"(Seriennr. {s}) — wird nicht genommen (OUT-66)")

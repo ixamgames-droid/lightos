@@ -79,6 +79,10 @@ Tab **Enttec Pro USB**:
    connected to it, it is marked `(kein USB-Gerät erkannt)` (no USB device detected).
    In both cases the line below the list names the detected adapter. Without any port
    it says `Kein Port gefunden` (no port found).
+   On **Linux** each port is followed by its **stable name**
+   (`/dev/serial/by-id/usb-ENTTEC_…`, marked `stabiler Name für /dev/ttyUSB0`). It does
+   not change when Linux swaps `ttyUSB0` and `ttyUSB1` at boot — the better choice with
+   two adapters.
 2. **Ports aktualisieren** (refresh ports) — read the list in again after plugging in.
    The selection is kept; if nothing was selected yet, the ENTTEC you just plugged in
    is preselected.
@@ -233,6 +237,13 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    `2008:1066@1-2`; easiest to have the **uDMX (USB)** tab enter it).
 3. **Ext-Universe** — optionally the universe number on the network. If empty, the
    default applies: Art-Net `#` minus 1, sACN `#`.
+   **Dongle** (read-only) — for `Enttec` the serial number of the adapter this universe
+   looks for, shortened (`Seriennr. …5123`). LightOS remembers it once the adapter has
+   sent, and finds it by it even at another port after a restart — two ENTTECs do not
+   swap their universes when Linux swaps the port numbers. Changing only the port of the
+   row keeps the number. To make the universe use a **different** adapter: select the
+   row, **Dongle neu zuordnen** (reassign dongle; or right-click the row) and
+   **Speichern** — it then learns the adapter plugged into its port.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
    removes the selected rows from the table; this only takes effect with **Speichern**
    (save).

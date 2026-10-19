@@ -31,6 +31,7 @@ jede Rechner-Lage (Linux, Windows, nichts gesteckt) als Liste nachstellen.
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 from typing import Iterable
@@ -97,6 +98,55 @@ def ordnen(ports: Iterable) -> list[Anschluss]:
         liste.append(Anschluss(device, beschreibung, klasse_von(port)))
     liste.sort(key=lambda a: (_RANG[a.klasse], _natuerlich(a.device)))
     return liste
+
+
+#: OUT-80: stabile Namen serieller USB-Geraete unter Linux (udev). Sie tragen
+#: Hersteller, Modell und Seriennummer und aendern sich nicht, wenn der Kernel
+#: beim Booten ``ttyUSB0``/``ttyUSB1`` vertauscht. Umlenkbar ueber
+#: ``LIGHTOS_SERIAL_BY_ID`` (Tests: ein Ordner, den es nicht gibt).
+BY_ID_ORDNER = "/dev/serial/by-id"
+
+
+def _by_id_ordner() -> str:
+    return os.environ.get("LIGHTOS_SERIAL_BY_ID") or BY_ID_ORDNER
+
+
+def mit_stabilen_namen(anschluesse: Iterable[Anschluss],
+                       ordner: str | None = None) -> list[Anschluss]:
+    """OUT-80: hinter jedem Anschluss zusaetzlich seine stabilen Namen aus
+    ``/dev/serial/by-id`` (nur unter POSIX und nur, wenn der Ordner da ist —
+    Windows und Rechner ohne udev bekommen die Liste unveraendert).
+
+    Ein stabiler Name erbt die Klasse seines Anschlusses; vorgewaehlt wird
+    weiter der Anschluss selbst (:func:`vorschlag` nimmt den ersten Adapter).
+    """
+    liste = list(anschluesse)
+    if os.name != "posix":
+        return liste
+    ordner = ordner or _by_id_ordner()
+    try:
+        namen = sorted(os.listdir(ordner))
+    except OSError:
+        return liste
+    nach_ziel: dict[str, list[str]] = {}
+    for name in namen:
+        pfad = os.path.join(ordner, name)
+        try:
+            nach_ziel.setdefault(os.path.realpath(pfad), []).append(pfad)
+        except OSError:
+            continue
+    raus: list[Anschluss] = []
+    for a in liste:
+        raus.append(a)
+        try:
+            ziel = os.path.realpath(a.device)
+        except OSError:
+            continue
+        for pfad in nach_ziel.get(ziel, ()):
+            if pfad != a.device:
+                raus.append(Anschluss(pfad, f"stabiler Name für {a.device}",
+                                      a.klasse))
+    return raus
 
 
 def sichtbare(anschluesse: Iterable[Anschluss], alle: bool = False,
