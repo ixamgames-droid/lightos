@@ -1163,8 +1163,13 @@ class StageCanvas(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._reload_positions_safe())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._reload_positions_safe())
+            # QA-97: an die Widget-Lebenszeit gebunden. Mit plain subscribe()
+            # lief der Abonnent einer abgebauten Ansicht beim naechsten
+            # Show-Laden weiter und schrieb noch Positionen in den State.
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self,
+                                  lambda *_: self._reload_positions_safe())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self,
+                                  lambda *_: self._reload_positions_safe())
             # VIZ-70: Patch-/Profil-Aenderung (Umadressieren, Mode, Bereiche,
             # Invert …) -> beim naechsten Takt sofort neu zeichnen, nicht erst
             # nach dem Sicherheitsnetz. An die Widget-Lebenszeit gebunden.
@@ -2926,21 +2931,25 @@ class LiveView(QWidget):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._on_patch_changed())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._on_patch_changed())
+            # QA-97: alle an die Lebenszeit der Ansicht gebunden (siehe StageCanvas).
+            sync.subscribe_widget(SyncEvent.PATCH_CHANGED, self,
+                                  lambda *_: self._on_patch_changed())
+            sync.subscribe_widget(SyncEvent.REFRESH_ALL, self,
+                                  lambda *_: self._on_patch_changed())
             # Gruppe anderswo erstellt/geaendert (Gruppen-Editor, …) -> Liste auffrischen.
-            sync.subscribe(SyncEvent.GROUP_CHANGED, lambda *_: self._refresh_group_list())
+            sync.subscribe_widget(SyncEvent.GROUP_CHANGED, self,
+                                  lambda *_: self._refresh_group_list())
             # Globale Programmer-Auswahl (anderswo gesetzt) in der Live View
             # spiegeln (goldener Ring + Listen-Markierung). cb(event, data).
-            sync.subscribe(SyncEvent.SELECTION_CHANGED,
-                           lambda *a: self._on_global_selection_changed(
-                               a[1] if len(a) > 1 else None))
+            sync.subscribe_widget(SyncEvent.SELECTION_CHANGED, self,
+                                  lambda *a: self._on_global_selection_changed(
+                                      a[1] if len(a) > 1 else None))
             # P4: Nach Show-Load die Steuerelemente (Zoom/Grid/Snap/Welt) an den
             # wiederhergestellten Canvas-Zustand angleichen; QOL-05: danach die
             # 2D-Ansicht auf die Fixtures einpassen (kompakte, aus 3D migrierte Rigs
             # lagen sonst als ueberlappender Klumpen im Weltraum).
-            sync.subscribe(SyncEvent.SHOW_LOADED,
-                           lambda *_: self._on_show_loaded_2d())
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self,
+                                  lambda *_: self._on_show_loaded_2d())
         except Exception as e:
             print(f"[live_view] sync (fixture list) subscribe error: {e}")
 
