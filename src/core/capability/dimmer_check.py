@@ -41,6 +41,61 @@ DIMMER_ATTRS = frozenset({"intensity", "dimmer", "master"})
 
 # ── Kanal-Aufloesung (eine Quelle fuer beide Fassungen) ──────────────────────
 
+def _profil_id_wie_beim_laden(pf: dict) -> int:
+    """Die Profil-Nummer, die ``load_show`` fuer diesen Patch-Eintrag nimmt.
+
+    ★ FM-69: eine Show traegt die Nummern der Bibliothek, in der sie gebaut
+    wurde (Demo-Shows: eine Wegwerf-Bibliothek). Auf einem Rechner mit
+    gewachsener Bibliothek zeigt dieselbe Nummer auf ein ANDERES Profil; der
+    Loader loest das ueber Hersteller + Modell auf (FM-43/FM-44). Mit der rohen
+    Nummer sah der Lint das fremde Profil und meldete Falsches — zweimal
+    ``EFX-ACHSE-FEHLT`` fuer die SH-LASER3W der Showcase-Show, deren Laser in der
+    App richtig liefen. Hier dieselbe Funktion wie im Loader, kein Nachbau.
+
+    Die Meldungen, die die Aufloesung fuer ``load_show`` sammelt
+    (``_ladeprobleme``/``_ladehinweise``) und ihre Ausgaben gehoeren nicht zum
+    Lint: sie werden danach zurueckgestellt bzw. verschluckt."""
+    pid = _zahl(pf.get("fixture_profile_id", pf.get("profile_id", 0)), 0)
+    modell = str(pf.get("fixture_name", "") or "")
+    if not modell:
+        return pid                      # Legacy-Show ohne Namen: die Nummer gilt
+    try:
+        import contextlib
+        import io
+        from src.core.show import show_file as SF
+    except Exception:
+        return pid
+    probleme, hinweise = list(SF._ladeprobleme), dict(SF._ladehinweise)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            return int(SF._resolve_fixture_profile_id(
+                pid, str(pf.get("manufacturer_name", "") or ""), modell,
+                mode_name=str(pf.get("mode_name", pf.get("mode", "")) or ""),
+                channel_count=(min(512, max(1, _zahl(pf.get("channel_count"), 1)))
+                               if "channel_count" in pf else 0)))
+    except Exception:
+        return pid
+    finally:
+        SF._ladeprobleme[:] = probleme
+        SF._ladehinweise.clear()
+        SF._ladehinweise.update(hinweise)
+
+
+def geraet_aus_patch(pf: dict):
+    """Ein Patch-Eintrag der Show-Datei als Geraet, so weit die
+    Kanal-Aufloesung (``get_channels_for_patched``) es liest — mit der
+    Profil-Nummer, die auch ``load_show`` nimmt (FM-69). Eine Stelle fuer alle
+    DB-Pruefungen des Show-Lints."""
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        fixture_profile_id=_profil_id_wie_beim_laden(pf),
+        # Alt-Shows ohne ``mode_name``: ``mode`` als Rueckfall, wie der Loader
+        # (show_file._patched_fixture_from_data) und die Profilwahl oben.
+        mode_name=str(pf.get("mode_name", pf.get("mode", "")) or ""),
+        channel_count=_zahl(pf.get("channel_count"), 1),
+        address=_zahl(pf.get("address"), 1),
+        spider_dual_tilt=bool(pf.get("spider_dual_tilt", False)))
+
 def dimmer_kanaele(fixture) -> list[int]:
     """Absolute DMX-Kanaele (1..512) der Master-Dimmer EINES gepatchten Geraets.
 
@@ -267,7 +322,6 @@ def statische_befunde(show: dict) -> list[Finding]:
         if w.get("type") == "VCSlider" and str(w.get("mode", "")) in _HEBENDE_REGLER:
             return []
 
-    from types import SimpleNamespace
     befunde: list[Finding] = []
     for i, pf in enumerate(patch):
         if not isinstance(pf, dict):
@@ -277,12 +331,7 @@ def statische_befunde(show: dict) -> list[Finding]:
             continue
         # Das gepatchte Geraet nur so weit nachbilden, wie die Kanal-Aufloesung
         # es liest — dieselbe Funktion wie im Live-Pfad, kein zweiter Nachbau.
-        fake = SimpleNamespace(
-            fixture_profile_id=_zahl(pf.get("fixture_profile_id"), 0),
-            mode_name=str(pf.get("mode_name") or ""),
-            channel_count=_zahl(pf.get("channel_count"), 1),
-            address=_zahl(pf.get("address"), 1),
-            spider_dual_tilt=bool(pf.get("spider_dual_tilt", False)))
+        fake = geraet_aus_patch(pf)
         absolut = dimmer_kanaele(fake)
         if not absolut:
             continue
@@ -347,7 +396,6 @@ def weiss_zuordnung_befunde(show: dict) -> list[Finding]:
     weiss_fids.pop(-1, None)
     if not weiss_fids:
         return []
-    from types import SimpleNamespace
     try:
         from src.core.app_state import get_channels_for_patched
         from src.core.dimmer_segmente import zuordnung_fehlt, zuordnung_probleme
@@ -360,12 +408,7 @@ def weiss_zuordnung_befunde(show: dict) -> list[Finding]:
         fid = _zahl(pf.get("fid"), -1)
         if fid not in weiss_fids:
             continue
-        fake = SimpleNamespace(
-            fixture_profile_id=_zahl(pf.get("fixture_profile_id"), 0),
-            mode_name=str(pf.get("mode_name") or ""),
-            channel_count=_zahl(pf.get("channel_count"), 1),
-            address=_zahl(pf.get("address"), 1),
-            spider_dual_tilt=bool(pf.get("spider_dual_tilt", False)))
+        fake = geraet_aus_patch(pf)
         try:
             chans = list(get_channels_for_patched(fake) or ())
         except Exception:
