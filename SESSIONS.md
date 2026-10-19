@@ -57,7 +57,6 @@
 | PROC-21 | D | fix/test-verschmutzung-allwhite-las32 | 2026-10-12T17:48Z | tests/conftest.py · tests/test_allwhite_covers_all.py · tests/test_out61_estop_lade_fenster.py · tests/test_proc21_test_verschmutzung.py |
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-19T14:04Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-19T14:04Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
-| UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-19T14:04Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-19T14:04Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-19T14:04Z | src/ui/widgets/fixture_editor.py |
@@ -157,7 +156,6 @@
 
 ## Verlauf
 
-- 2026-10-18T17:32Z A done CDX-59
 - 2026-10-18T17:50Z A claim FM-65
 - 2026-10-18T18:11Z A done LAS-31
 - 2026-10-18T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -187,3 +185,4 @@
 - 2026-10-19T14:03Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T14:03Z A claim UI-97
 - 2026-10-19T14:04Z A claim SAMMEL-BACKLOG-1019
+- 2026-10-19T14:04Z A done UI-95
