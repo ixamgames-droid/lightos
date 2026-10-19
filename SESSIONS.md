@@ -70,6 +70,7 @@
 | UI-97 | A | fix/ui97-midi-seite-kleines-fenster | 2026-10-19T14:03Z | - |
 | SAMMEL-BACKLOG-1019 | A | chore/backlog-sichtpruefung-1019 | 2026-10-19T14:04Z | - |
 | LAS-40 | A | fix/las40-notaus-rueckfrage-feste-knoepfe | 2026-10-19T14:32Z | - |
+| PROC-23 | A | chore/proc-a-teilt-zu | 2026-10-19T14:32Z | - |
 
 ## Blocker & Fallen
 
@@ -156,7 +157,6 @@
 
 ## Verlauf
 
-- 2026-10-18T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T18:50Z A done DOC-16
 - 2026-10-18T18:50Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T19:30Z A done QA-98
@@ -186,3 +186,4 @@
 - 2026-10-19T14:04Z A done UI-95
 - 2026-10-19T14:29Z A done LAS-36
 - 2026-10-19T14:32Z A claim LAS-40
+- 2026-10-19T14:32Z A claim PROC-23
