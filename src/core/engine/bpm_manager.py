@@ -85,6 +85,8 @@ class BPMManager:
         self._tick_index: int = 0
         self._bar_callbacks: list = []   # callback(bar_index)
         self._tick_callbacks: list = []  # callback(tick_index, is_beat)
+        # QA-103: nach shutdown() startet kein Beat-Faden mehr (App-Ende).
+        self._shut_down: bool = False
 
     # ── Properties ──────────────────────────────────────────────────────────────
 
@@ -339,7 +341,11 @@ class BPMManager:
             self._source = "off"
             self._grid_active = False
             self._bpm = 0.0
-        self._stop_timer()
+        # QA-103: den alten Beat-Faden ABWARTEN, nicht nur abmelden. Ein Faden,
+        # der gerade in _emit_beat steckt (CI: kalter function_manager-Import),
+        # lief sonst nach reset() weiter und sammelte dort Garbage ein, waehrend
+        # der Mainthread Widgets abbaute -> SIGSEGV (test_bpm_view, 3 rote CI-Laeufe).
+        self._join_beat_thread(self._stop_timer())
         self._emit_bpm_change()
         self._emit_state_change()
 
@@ -611,16 +617,43 @@ class BPMManager:
 
     def _ensure_running(self):
         # Wird unter self._lock aufgerufen (siehe _sync_emitter).
-        if self._running:
+        if self._running or self._shut_down:
             return
         self._running = True
         self._timer = threading.Thread(target=self._loop, daemon=True, name="BPM-Beat")
         self._timer.start()
 
-    def _stop_timer(self):
+    def _stop_timer(self) -> threading.Thread | None:
+        """Meldet den Beat-Faden ab und gibt ihn zurueck (zum Abwarten AUSSERHALB
+        des Locks, siehe ``_join_beat_thread``)."""
         with self._lock:
+            t = self._timer
             self._running = False
             self._timer = None
+        return t
+
+    @staticmethod
+    def _join_beat_thread(t: threading.Thread | None, timeout: float = 1.0) -> bool:
+        """QA-103: einen abgemeldeten Beat-Faden zu Ende laufen lassen.
+
+        Nie unter ``self._lock`` aufrufen (der Faden kann ihn ueber Callbacks
+        brauchen) und nie aus dem Faden selbst (Beat-Callback ruft reset()).
+        Begrenzt: der Faden schlaeft hoechstens 50 ms, ein Beat dauert Millisekunden;
+        haengt ein Callback, geht es nach ``timeout`` trotzdem weiter."""
+        if t is None or t is threading.current_thread() or not t.is_alive():
+            return True
+        t.join(timeout)
+        return not t.is_alive()
+
+    def shutdown(self, timeout: float = 1.0) -> bool:
+        """QA-103: App-Ende — Beat-Faden stoppen, abwarten und keinen neuen mehr
+        starten (auch nicht durch eine spaete Quelle). Vor dem Qt-Abbau aufrufen:
+        ein weiterlaufender 'BPM-Beat' greift sonst in function_manager/app_state
+        und kann Python-Garbage (inkl. Qt-Wrapper) in seinem Faden freigeben,
+        waehrend der Mainthread Widgets zerstoert. Endgueltig. True = Faden ist weg."""
+        with self._lock:
+            self._shut_down = True
+        return self._join_beat_thread(self._stop_timer(), timeout)
 
     def _loop(self):
         me = threading.current_thread()
