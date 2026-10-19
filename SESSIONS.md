@@ -69,6 +69,7 @@
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-19T18:00Z | - |
 | QA-103 | A | fix/qa-bpm-view-absturz | 2026-10-19T18:25Z | - |
 | IMP-4 | A | fix/imp4-ueberschneidung-zusammenfassen | 2026-10-19T19:08Z | - |
+| FM-77 | A | fix/fm77-markdown-export-herkunft | 2026-10-19T19:08Z | - |
 
 ## Blocker & Fallen
 
@@ -131,7 +132,6 @@
 
 ## Verlauf
 
-- 2026-10-19T14:32Z A claim PROC-23
 - 2026-10-19T14:52Z A done UI-82
 - 2026-10-19T14:52Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T15:50Z A done FM-69
@@ -161,3 +161,4 @@
 - 2026-10-19T19:03Z 4 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:08Z A claim IMP-4
 - 2026-10-19T19:08Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T19:08Z A claim FM-77
