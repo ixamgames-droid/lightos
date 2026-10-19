@@ -131,7 +131,8 @@ class ChannelGroupsView(QWidget):
         self._lbl_leer.setObjectName("channel_groups_leer")
         self._lbl_leer.setWordWrap(True)
         self._lbl_leer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_leer.setStyleSheet("color:#777; font-style:italic;")
+        # Hellgrau statt #777: auf dem Theme-Grund #333 sonst nur 2,8:1 Kontrast.
+        self._lbl_leer.setStyleSheet("color:#a0a0a0; font-style:italic;")
         root.addWidget(self._lbl_leer, 1)
 
     def _refresh_table(self):
