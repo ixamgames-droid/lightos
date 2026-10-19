@@ -71,6 +71,7 @@
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-19T19:27Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-19T20:02Z | - |
 | LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
+| LAS-41 | A | fix/las41-kiosk-notaus-bestaetigung | 2026-10-19T20:37Z | - |
 
 ## Blocker & Fallen
 
@@ -113,7 +114,6 @@
 
 ## Verlauf
 
-- 2026-10-19T16:58Z D done PROC-21
 - 2026-10-19T16:58Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T17:06Z D done OUT-79
 - 2026-10-19T17:06Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -143,3 +143,4 @@
 - 2026-10-19T20:25Z D claim LIZ-3
 - 2026-10-19T20:25Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T20:31Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T20:37Z A claim LAS-41
