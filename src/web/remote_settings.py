@@ -12,6 +12,12 @@ Gehaltene Werte:
                               Web-Server bindet nur an 127.0.0.1 (kein LAN).
   * ``osc_network_enabled`` — Toggle 'OSC ueber Netzwerk' (Default AUS). Aus ->
                               OSC-Server bindet 127.0.0.1 (nur lokal).
+  * ``vc_remote_enabled``   — WEB-08/WEB-09: die Handy-Konsole (``/konsole``,
+                              ``/api/vc/…``). Default AUS. Eingeschaltet gibt
+                              sie nur die Widgets frei, die auf einer
+                              Handy-Seite der Konsole liegen (WEB-09); im
+                              Dialog „Web-Remote: Verbindung & Token" als
+                              Schalter „Handy-Konsole".
 
 Alles offline/stdlib, keine externe Dependency."""
 from __future__ import annotations
@@ -39,6 +45,9 @@ DEFAULTS: dict = {
     "token": "",
     "lan_remote_enabled": True,
     "osc_network_enabled": False,
+    # WEB-08/WEB-09: s. Modulkopf. Bewusst AUS — der Nutzer schaltet die
+    # Handy-Konsole im Web-Remote-Dialog selbst ein.
+    "vc_remote_enabled": False,
     # Auth-Epoche: wird bei jeder Token-Rotation erhoeht. Die Web-Session speichert
     # die Epoche zum Auth-Zeitpunkt; der Gate weist Sessions mit veralteter Epoche ab
     # -> ein 'Token neu erzeugen' wirft bestehende Sessions SOFORT raus (Security-
@@ -223,3 +232,14 @@ def is_osc_network_enabled() -> bool:
 
 def set_osc_network_enabled(enabled: bool) -> None:
     save_settings({"osc_network_enabled": bool(enabled)})
+
+
+def is_vc_remote_enabled() -> bool:
+    """WEB-08/WEB-09: ist die Handy-Konsole eingeschaltet (``/api/vc/…``)?
+    Nur ein echtes ``true`` schaltet ein — ein kaputter Wert in der Datei
+    (Text, Zahl) bleibt AUS."""
+    return load_settings().get("vc_remote_enabled", False) is True
+
+
+def set_vc_remote_enabled(enabled: bool) -> None:
+    save_settings({"vc_remote_enabled": bool(enabled)})
