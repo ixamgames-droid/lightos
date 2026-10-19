@@ -58,7 +58,11 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    emergency stop** (LASER NOT-AUS; details in the
    [laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). The
    button latches; a second click releases the blackout. In kiosk mode, where this bar is
-   hidden, **BLACKOUT** sits top right, directly left of **LASER NOT-AUS**, and shows the same state.
+   hidden, **GM**, **STOP ALL** and **BLACKOUT** sit top right in one strip, in this order to the
+   left of **LASER NOT-AUS**. They work like their counterparts in the section bar and show the
+   same state — the GM slider also follows when a VC fader, MIDI or the remote changes the grand
+   master. The mouse wheel does not move the GM there (drag or click it), and the space bar
+   triggers none of the buttons.
    What this looks like in the DMX monitor is shown in
    [Ausgabe einrichten, step 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    To black out only some fixtures or groups, use a
@@ -68,7 +72,9 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    (laser emergency stop; also top right in kiosk mode; shortcut `Ctrl+Shift+L`): one click
    makes all lasers dark at once, without a confirmation, and the button then flashes as
    **LASER NOT-AUS AKTIV**. It is released only deliberately — click it again and confirm
-   the prompt.
+   the prompt. Nothing else releases it: no slider, no Virtual Console button, no MIDI
+   controller, no keyboard shortcut. While it is active, laser values are remembered and
+   the laser stays dark; once released, the laser immediately outputs whatever is set.
 7. **Command line** — for keyboard commands such as `1 thru 5 @ 80`. Examples are shown as
    placeholder text in the field.
 8. **Status bar** — on the left the state of the ENTTEC adapter

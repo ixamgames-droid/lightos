@@ -325,10 +325,35 @@ def test_blackout_und_alles_weiss_sehen_die_kurzmodi(bib):
         assert all_white.ist_geraet_ohne_licht(g, kanaele), g.datei
 
 
+# Die Attribute, deren Wert den NOT-AUS frueher (A3D-02) geloest hat.
+_FRUEHER_LOESEND = ("shutter", "laser_bank", "gobo_wheel", "macro")
+
+
+def _kein_wert_loest(st, fid, kanaele, wer):
+    """LAS-36: seit dem Zusammenfuehren gibt es keine Loese-Menge mehr — KEIN
+    Wert loest den NOT-AUS, an keinem Geraet. Geprueft wird darum das Verhalten:
+    jeder Kanal des Geraets und jedes frueher loesende Attribut bekommt einen
+    Wert, der Latch bleibt stehen."""
+    assert not hasattr(st, "_laser_rearm_menge")
+    assert not hasattr(st, "_laser_rearm_fids")
+    attribute = list(_FRUEHER_LOESEND) + ["intensity"]
+    attribute += [k.attribute for k in kanaele if k.attribute not in attribute]
+    st.set_laser_estop(True)
+    try:
+        for attribut in attribute:
+            st.set_programmer_value(fid, attribut, 200)
+            assert st.laser_estop_active is True, (
+                f"{wer}: {attribut} hat den NOT-AUS ohne Rueckfrage geloest")
+    finally:
+        st.programmer.pop(fid, None)
+        st.laser_notaus_loesen()                 # der eine Weg (LAS-36)
+    assert st.laser_estop_active is False
+
+
 def test_die_kurzmodi_loesen_den_notaus_nicht(bib):
     st = bib.st
-    for g, _kanaele in _kurzmodi(bib):
-        assert g.fid not in st._laser_rearm_menge(), g.datei
+    for g, kanaele in _kurzmodi(bib):
+        _kein_wert_loest(st, g.fid, kanaele, g.datei)
 
 
 def test_alles_weiss_laesst_lampen_weiter_zu(bib):
@@ -462,7 +487,17 @@ def test_kurzmodus_aus_der_datenbank_ist_im_notaus(profile_in_der_db):
     assert set(st._laser_fids) == {1}
     assert set(st._laser_estop_addrs.get(1, ())) == {1, 2, 3}
     assert st.laser_anzahl() == 1
-    assert 1 not in st._laser_rearm_menge()
+    # Ein Wert am Kombigeraet loest nicht (LAS-36: kein Wert loest) — und der
+    # Kurz-Modus bleibt dabei dunkel.
+    kanaele = A.get_channels_for_patched(kombi)
+    for k in kanaele:
+        k.default_value = 120
+    _kein_wert_loest(st, 1, kanaele, "Kombi Bar 3-channel")
+    st.set_laser_estop(True)
+    st.set_programmer_value(1, kanaele[0].attribute, 200)
+    st._render_frame(0.02)
+    assert [st.universes[1].get_channel(a) for a in (1, 2, 3)] == [0, 0, 0]
+    assert st.laser_estop_active is True
 
 
 def test_einmal_je_laden_und_der_plan_fragt_nicht_mehr(profile_in_der_db, monkeypatch):

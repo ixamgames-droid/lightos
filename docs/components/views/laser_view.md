@@ -18,7 +18,7 @@ NOT-AUS spiegeln den Laser-Safety-Zustand des Managers.
 | Kanal-Zeile (`_ChannelRow`) | Slider/Spin setzt DMX-Wert; Range-Combo wählt ChannelRange |
 | Muster-Kachel (`_PatternTile`, LAS-18b) | Werksfigur/Muster abrufen |
 | Arm | Laser scharf/unscharf (Safety-Toggle, spiegelt Manager) |
-| NOT-AUS | Sofort-Stopp + entwaffnen |
+| NOT-AUS | Sofort-Stopp + entwaffnen. Löst nur aus — gelöst wird allein mit dem Knopf oben rechts im Hauptfenster samt Rückfrage (LAS-36); bis dahin werden Werte gemerkt, der Laser bleibt dunkel |
 | Weitere Kanäle (`_ADVANCED_GROUP`) | Zusatz-Attribute (Zoom, Gobo, Rotation) eingeklappt |
 
 ## Verknüpfungen

@@ -307,7 +307,9 @@ class AusgabeEntfernenTest(unittest.TestCase):
             zustand = f.read()
         # geloeschtes Universum und „Disabled“: ja. Typwechsel/Neuaufbau: nein.
         self.assertEqual(zustand.count("schlussbild=True)"), 2)
-        self.assertIn('if output == "Disabled":\n'
+        # OUT-74: eine Zeile mit doppeltem Adapter bekommt ebenfalls keinen
+        # Nachfolger (der Adapter wird fuer keine Zeile eingerichtet).
+        self.assertIn('if output == "Disabled" or konflikt is not None:\n'
                       '                    self.output_manager.remove_output(num, schlussbild=True)\n'
                       '                else:\n'
                       '                    self.output_manager.remove_output(num)\n', zustand)
