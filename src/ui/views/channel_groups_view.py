@@ -76,6 +76,12 @@ def _format_channels(channels: list[int]) -> str:
     return ",".join(str(c) for c in channels)
 
 
+#: UI-101(5): Hinweis, solange es keine Kanal-Gruppe gibt.
+LEER_TEXT = ("Noch keine Kanal-Gruppen.\n"
+             "„+ Neue Gruppe“ legt eine an — ihr Wert-Slider regelt dann alle "
+             "eingetragenen DMX-Kanäle gemeinsam (Submaster).")
+
+
 class ChannelGroupsView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -118,6 +124,15 @@ class ChannelGroupsView(QWidget):
         self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self._table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         root.addWidget(self._table, 1)
+
+        # UI-101(5): ohne Gruppen stand nur ein leerer Tabellenkopf da — kein
+        # Wort dazu, was hier hingehoert. Leerhinweis statt leerer Flaeche.
+        self._lbl_leer = QLabel(LEER_TEXT)
+        self._lbl_leer.setObjectName("channel_groups_leer")
+        self._lbl_leer.setWordWrap(True)
+        self._lbl_leer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._lbl_leer.setStyleSheet("color:#777; font-style:italic;")
+        root.addWidget(self._lbl_leer, 1)
 
     def _refresh_table(self):
         self._table.blockSignals(True)
@@ -168,6 +183,9 @@ class ChannelGroupsView(QWidget):
             b_apply.clicked.connect(weak_slot(self._apply_value, row))
             self._table.setCellWidget(row, 4, b_apply)
         self._table.blockSignals(False)
+        leer = not self._groups
+        self._table.setHidden(leer)
+        self._lbl_leer.setHidden(not leer)
 
     # ── Callbacks ─────────────────────────────────────────────────────────────
 

@@ -18,7 +18,7 @@ from src.core.app_state import (get_state, AppState, color_head_count,
                                  get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
-from src.ui.widgets.fixture_browser import FixtureBrowserDialog
+from src.ui.widgets.fixture_browser import FixtureBrowserDialog, typ_anzeige
 
 TYPE_COLORS = {
     "moving_head": "#1a4a6e",
@@ -863,7 +863,9 @@ class PatchView(QWidget):
                 str(f.universe),
                 str(f.address),
                 str(f.channel_count),
-                f.fixture_type,
+                # UI-101(1): lesbarer Typname („PAR", „LED-Bar") statt des
+                # internen Schluessels — dieselbe Tabelle wie im Geraete-Browser.
+                typ_anzeige(f.fixture_type),
             ]
             bg = QColor(TYPE_COLORS.get(f.fixture_type, "#222233"))
             is_conflict = f.fid in conflicts
