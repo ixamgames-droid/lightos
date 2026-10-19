@@ -70,6 +70,7 @@
 | LAS-40 | A | fix/las40-notaus-rueckfrage-feste-knoepfe | 2026-10-19T14:32Z | - |
 | PROC-23 | A | chore/proc-a-teilt-zu | 2026-10-19T14:32Z | - |
 | UI-98 | A | fix/ui98-kleines-fenster-programmer-playback | 2026-10-19T16:22Z | - |
+| UI-101 | A | fix/ui101-kleinkram-sichtpruefung | 2026-10-19T16:23Z | - |
 
 ## Blocker & Fallen
 
@@ -148,7 +149,6 @@
 
 ## Verlauf
 
-- 2026-10-18T19:42Z A claim FM-69
 - 2026-10-18T19:54Z A claim FM-76
 - 2026-10-18T19:59Z D done ENG-30
 - 2026-10-18T20:38Z D done OUT-74
@@ -178,3 +178,4 @@
 - 2026-10-19T15:50Z 5 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T16:22Z A claim UI-98
 - 2026-10-19T16:22Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T16:23Z A claim UI-101
