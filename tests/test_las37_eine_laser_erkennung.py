@@ -370,9 +370,9 @@ def _kanal(nr, attribut, name=""):
 
 def test_gobo_am_moving_head_mit_laserdiode_loest_den_notaus_nicht():
     """Die weite Regel deckt mehr Geraete mit dem NOT-AUS — sie darf nicht
-    zugleich mehr Wege schaffen, ihn zu loesen. Ein Gobo-, Shutter- oder
-    Makro-Wert an einem Geraet, das nur ueber einen Namen als Laser gilt, ist
-    kein „Laser wieder an“. Am echten Laser loest der Muster-Abruf wie bisher."""
+    zugleich mehr Wege schaffen, ihn zu loesen. Seit LAS-36 loest KEIN Wert den
+    NOT-AUS mehr: weder Gobo/Shutter am Moving Head mit Laserdiode noch der
+    Muster-Abruf am echten Laser — nur ``laser_notaus_loesen`` (Rueckfrage)."""
     mh_kan = [_kanal(1, "intensity", "Dimmer"), _kanal(2, "gobo_wheel", "Gobo"),
               _kanal(3, "shutter", "Shutter"), _kanal(4, "raw", "Laser Helligkeit")]
     la_kan = [_kanal(1, "laser_bank", "Muster"), _kanal(2, "shutter", "Betriebsart")]
@@ -384,14 +384,16 @@ def test_gobo_am_moving_head_mit_laserdiode_loest_den_notaus_nicht():
     try:
         st = _zustand([(mh, mh_kan), (laser, la_kan)])
         assert st._laser_fids == frozenset({11, 12})           # beide gedeckt
-        assert st._laser_rearm_fids == frozenset({12})          # nur der Laser loest
+        assert not hasattr(st, "_laser_rearm_fids")             # LAS-36: keine Loese-Menge mehr
         st.set_laser_estop(True)
         for attribut in ("gobo_wheel", "shutter", "intensity"):
             st.set_programmer_value(11, attribut, 120)
             assert st.laser_estop_active is True, f"{attribut} am Moving Head hat geloest"
         st._render_frame(0.02)
         assert st.universes[1].get_channel(4) == 0               # Laserdiode bleibt aus
-        st.set_programmer_value(12, "laser_bank", 42)            # bewusster Muster-Abruf
+        st.set_programmer_value(12, "laser_bank", 42)            # Muster-Abruf am echten Laser
+        assert st.laser_estop_active is True                     # LAS-36: loest auch nicht
+        st.laser_notaus_loesen()                                 # der eine Weg
         assert st.laser_estop_active is False
     finally:
         A.get_channels_for_patched = alt

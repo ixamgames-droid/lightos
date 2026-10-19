@@ -102,13 +102,20 @@ class LaserDmxEstopTest(unittest.TestCase):
         # … der PAR bleibt unberührt (NOT-AUS gilt nur dem Laser).
         self.assertEqual(self.live.get_channel(20), 200)
 
-    def test_setting_laser_value_clears_latch(self):
+    def test_setting_laser_value_keeps_latch(self):
+        # LAS-36 (frueher „…clears_latch“): ein neuer Laser-Wert loest den NOT-AUS
+        # nicht mehr. Er wird gemerkt, die Ausgabe bleibt dunkel; erst das
+        # bewusste Loesen (Rueckfrage -> laser_notaus_loesen) gibt ihn frei.
         self.st.set_laser_estop(True)
-        # Bewusster neuer Laser-Wert = „wieder an" → Latch löst.
         self.st.set_programmer_value(7, "laser_bank", 42)
+        self.assertTrue(self.st.laser_estop_active)
+        self.assertEqual(self.st.programmer[7]["laser_bank"], 42)   # gemerkt
+        self.st._render_frame(0.02)
+        self.assertEqual(self.live.get_channel(10), 0)          # bleibt dunkel
+        self.st.laser_notaus_loesen()
         self.assertFalse(self.st.laser_estop_active)
         self.st._render_frame(0.02)
-        self.assertEqual(self.live.get_channel(10), 42)         # Laser wieder da
+        self.assertEqual(self.live.get_channel(10), 42)         # jetzt wieder da
 
     def test_non_laser_value_keeps_latch(self):
         self.st.set_laser_estop(True)
@@ -130,19 +137,19 @@ class LaserDmxEstopTest(unittest.TestCase):
         self.st._render_frame(0.02)
         self.assertEqual(self.live.get_channel(12), 0)      # laser_x-Adr bleibt dunkel
 
-    def test_output_relevant_attrs_clear_latch(self):
-        # A3D-02: Betriebsart/Musterbank/Gobo/Shutter/Macro = bewusstes „wieder an".
-        # macro deckt macro-getriebene Party-Laser (ohne laser_bank/gobo_wheel) ab;
-        # die "#N"-Varianten simulieren den Snap-/VC-Restore-Pfad (Composite-Key,
-        # der als attribute durchgereicht wird -> Basisname muss matchen).
+    def test_output_relevant_attrs_keep_latch(self):
+        # LAS-36 (frueher A3D-02 „…clear_latch“): auch Betriebsart/Musterbank/Gobo/
+        # Shutter/Macro loesen den NOT-AUS nicht mehr — genau diese Liste war der
+        # Weg an der Rueckfrage vorbei (Befund S-01). Die "#N"-Varianten sind der
+        # Snap-/VC-Restore-Pfad (Composite-Key als attribute).
         for attr in ("shutter", "gobo_wheel", "laser_bank", "macro",
                      "gobo_wheel#1", "shutter#1"):
             with self.subTest(attr=attr):
                 self.st.set_laser_estop(True)
                 self.assertTrue(self.st.laser_estop_active)
                 self.st.set_programmer_value(7, attr, 60)
-                self.assertFalse(self.st.laser_estop_active,
-                                 f"{attr} sollte den NOT-AUS-Latch lösen")
+                self.assertTrue(self.st.laser_estop_active,
+                                f"{attr} hat den NOT-AUS ohne Rueckfrage geloest")
 
     def test_harmless_composite_key_keeps_latch(self):
         # Kopf>0-Position (laser_x#1) bleibt harmlos -> Latch hält.
@@ -171,10 +178,14 @@ class LaserDmxEstopTest(unittest.TestCase):
                         "intensity löste den Laser-NOT-AUS (Safety-Regression)")
         self.st.set_programmer_value(7, "intensity#1", 255)    # Kopf>0-Variante ebenso
         self.assertTrue(self.st.laser_estop_active)
-        # Gegenprobe: der bewusste Rearm-Pfad (gobo_wheel = FB4-Cue) löst weiterhin.
+        # LAS-36: die fruehere Gegenprobe („gobo_wheel = FB4-Cue loest weiterhin“)
+        # gilt nicht mehr — auch der Cue-Kanal loest nicht. Der bewusste Weg ist
+        # jetzt allein das Loesen mit Rueckfrage.
         self.st.set_programmer_value(7, "gobo_wheel", 60)
+        self.assertTrue(self.st.laser_estop_active)
+        self.st.laser_notaus_loesen()
         self.assertFalse(self.st.laser_estop_active,
-                         "gobo_wheel-Rearm (FB4-Cue) funktioniert nicht mehr")
+                         "bewusstes Loesen (laser_notaus_loesen) funktioniert nicht")
 
 
 if __name__ == "__main__":
