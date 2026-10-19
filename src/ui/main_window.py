@@ -1123,6 +1123,7 @@ class MainWindow(QMainWindow):
         try:
             from src.core.engine.bpm_manager import get_bpm_manager
             self._bpm_mgr = get_bpm_manager()
+            self._bpm_mgr.freigeben()      # QA-103: shutdown() eines frueheren Fensters aufheben
             self._bpm_mgr.subscribe_beat(self._on_beat)
             # BPM-Aenderung (Tap/APC/Audio) -> Label sofort aktualisieren.
             self._bpm_changed_sig.connect(self._update_bpm_label)

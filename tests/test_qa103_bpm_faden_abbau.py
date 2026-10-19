@@ -2,7 +2,7 @@
 
 Befund: ``tests/test_bpm_view.py`` starb in der Linux-CI dreimal mit SIGSEGV.
 Der faulthandler-Stack zeigte den Faden 'BPM-Beat' beim Garbage-Collecting in
-``_emit_beat`` (kalter ``function_manager``-Import), WAEHREND der Mainthread im
+``_emit_beat`` (erster ``function_manager``-Import im Prozess), WAEHREND der Mainthread im
 Teardown Widgets abbaute -- obwohl der Test vorher ``mgr.reset()`` gerufen hatte.
 ``reset()`` meldete den Faden nur ab (``_running = False``), wartete aber nicht
 auf ihn; ein Beat, der schon lief, lief zu Ende -- mitten in den Qt-Abbau.
@@ -87,3 +87,19 @@ def test_main_window_stoppt_bpm_faden_beim_beenden():
     i_bpm = close.index("_mgr.shutdown()")
     assert i_bpm < close.index("get_audio_capture().stop()")
     assert i_bpm < close.index("output_manager.stop(")
+
+
+def test_freigeben_hebt_shutdown_auf():
+    """Nach shutdown() (Fenster geschlossen) startet der interne Takt nicht mehr;
+    freigeben() — vom naechsten Hauptfenster gerufen — erlaubt ihn wieder."""
+    from src.core.engine.bpm_manager import BPMManager
+    m = BPMManager()
+    m.shutdown()
+    m.set_bpm(120)
+    assert not m._running
+    m.freigeben()
+    m.set_bpm(120)
+    try:
+        assert m._running
+    finally:
+        m.shutdown()

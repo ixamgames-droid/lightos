@@ -342,7 +342,7 @@ class BPMManager:
             self._grid_active = False
             self._bpm = 0.0
         # QA-103: den alten Beat-Faden ABWARTEN, nicht nur abmelden. Ein Faden,
-        # der gerade in _emit_beat steckt (CI: kalter function_manager-Import),
+        # der gerade in _emit_beat steckt (CI: erster function_manager-Import im Prozess),
         # lief sonst nach reset() weiter und sammelte dort Garbage ein, waehrend
         # der Mainthread Widgets abbaute -> SIGSEGV (test_bpm_view, 3 rote CI-Laeufe).
         self._join_beat_thread(self._stop_timer())
@@ -654,6 +654,14 @@ class BPMManager:
         with self._lock:
             self._shut_down = True
         return self._join_beat_thread(self._stop_timer(), timeout)
+
+    def freigeben(self) -> None:
+        """QA-103: hebt ``shutdown()`` wieder auf. Ein neues Hauptfenster ruft das
+        beim Aufbau — der Manager ist ein Modul-Singleton und bliebe sonst nach
+        dem Schliessen eines Fensters (Tests, Neustart im selben Prozess) fuer
+        immer stumm."""
+        with self._lock:
+            self._shut_down = False
 
     def _loop(self):
         me = threading.current_thread()
