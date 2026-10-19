@@ -134,7 +134,8 @@ class _Basis(unittest.TestCase):
         # wird sie dort, wo sie gestellt wird (LAS-36: src/ui/laser_notaus.py).
         # ``main_window.QMessageBox`` ist seit UI-92 eine Unterklasse — ein
         # Ersatz dort erreicht die Rueckfrage des NOT-AUS nicht mehr; der
-        # Ersatz an der Qt-Klasse gilt dagegen auch fuer das Hauptfenster.
+        # Ersatz an ``laser_notaus.QMessageBox`` (seit LAS-40 ebenfalls eine
+        # Unterklasse mit festen Knopftexten) trifft genau diese Rueckfrage.
         p = mock.patch.object(laser_notaus.QMessageBox, "warning",
                               side_effect=AssertionError("unerwartete Rueckfrage"))
         self.frage = p.start()

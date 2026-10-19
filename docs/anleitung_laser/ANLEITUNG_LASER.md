@@ -200,7 +200,11 @@ hier — ein Laser bekommt also nicht einfach überall 0:
   allen Kanälen. Bedeutet 0 an der Betriebsart dieses Lasers nicht „aus“
   (sondern z. B. „Auto“), strahlt er trotz Blackout weiter.
 - **NOT-AUS lösen:** nur mit dem Knopf **LASER NOT-AUS** oben rechts im
-  Hauptfenster — klicken und die Rückfrage bestätigen. Der Knopf im Laser-Tab
+  Hauptfenster — klicken und in der Rückfrage „Laser-NOT-AUS lösen?“ auf
+  **„NOT-AUS lösen“** klicken. Vorgabe ist **„Abbrechen“**: Eingabetaste,
+  Escape und Leertaste lösen nicht, der NOT-AUS bleibt dann aktiv. Klickst du
+  innerhalb einer Sekunde nach dem Auslösen noch einmal, kommt keine Rückfrage
+  (Schutz vor Doppelklick). Der Knopf im Laser-Tab
   und die VC-Taste „Laser NOT-AUS“ lösen nur aus. Solange der NOT-AUS aktiv
   ist, werden Werte gemerkt, der Laser bleibt dunkel: Betriebsart, Muster,
   Regler, Snaps und MIDI lösen ihn nicht. Nach dem Lösen gibt der Laser sofort
