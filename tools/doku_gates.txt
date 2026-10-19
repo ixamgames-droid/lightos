@@ -48,6 +48,7 @@ test_out76_udmx_windows_treiber.py # INSTALL.md + Anleitung Ausgabe: Weg zum Win
 test_out76_setup_bringt_usb_mit.py # THIRD_PARTY_NOTICES.md + licenses/: pyusb und libusb im Windows-Setup
 test_liz2_fremdlizenzen_setup.py   # THIRD_PARTY_NOTICES.md + licenses/ + requirements.txt: Fremdlizenzen im Windows-Setup
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
+test_liz2_rest_sammeldateien.py    # THIRD_PARTY_NOTICES.md, INSTALL.md, licenses/: Sammeldateien Qt WebEngine/Mesa, mido/winrt raus
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
@@ -55,8 +56,10 @@ test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
 test_tool18_bilder_hinweis_gpu.py  # Bild-Werkzeug: Fehlstand unter docs/<anleitung>/img (Zielpfad im Wegwerf-Ordner)
 test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
 test_las25_doku_aus_werte.py
+test_las36_doku_notaus_loesen.py   # Wortlaut NOT-AUS loesen: Erste Schritte, Laser, Buehnen-Show, Geraete-Generator
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
 test_ui92_kleinkram_qa96.py        # Speichern-Frage: Knopfnamen wie in anleitung_erste_schritte
+test_ui93_wiederholen_kuerzel.py   # Wort „Wiederholen“ und beide Tastenfolgen in README und Anleitungen
 test_ui64_programmer_playback.py
 test_viz69_render_ruckler.py       # Wortlaut in ANLEITUNG_3D_BUEHNE.md
 test_viz71_qualitaetsstufen.py
@@ -101,3 +104,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_undo_coverage.py             # nennt docs/UNDO_COVERAGE.md nur in Meldungen
 !test_vc_widgets_showcase_layout.py # liest nur docs/.../geometry.json (keine Doku -> volle Suite)
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
+test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)

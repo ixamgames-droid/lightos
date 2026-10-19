@@ -7,11 +7,49 @@ Verwendung:
                        undo=lambda: state.remove_fixture(f.fid)))
 
 Im Main Menue: Ctrl+Z (stack.undo()) / Ctrl+Y (stack.redo()).
+
+UI-93 (Nachtrag): Es gibt mehr als einen Verlauf — diesen Stapel und den
+Layout-Verlauf der Virtual Console (Schnappschuesse in ``VCCanvas``). Fuer den
+Bediener ist es EIN Verlauf: Strg+Z nimmt den zuletzt gemachten Schritt
+zurueck, egal aus welchem Stapel. Dafuer traegt jeder Eintrag eine
+Schrittnummer aus EINEM gemeinsamen Zaehler:
+
+* ``neuer_schritt()``      — beim Ablegen eines neuen Schritts. Ein neuer
+  Schritt verwirft den Wiederholen-Zweig ALLER Verlaeufe (wie in jedem
+  Programm mit einem einzigen Verlauf).
+* ``ruecknahme_marke()``   — beim Zuruecknehmen. Wiederholt wird zuerst, was
+  zuletzt zurueckgenommen wurde.
+* ``wiederholen_verworfen(marke)`` — True, wenn seit dieser Ruecknahme
+  irgendwo ein neuer Schritt abgelegt wurde.
+
+Die Stapel pruefen das selbst (``UndoStack._redo_pruefen``,
+``VCCanvas._redo_pruefen``) — sie muessen einander dafuer nicht kennen.
 """
 from __future__ import annotations
+import itertools
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable
+
+_schritt_zaehler = itertools.count(1)
+_letzter_neuer_schritt = 0
+
+
+def neuer_schritt() -> int:
+    """Nummer fuer einen NEU gemachten Schritt (verwirft jedes Wiederholen)."""
+    global _letzter_neuer_schritt
+    _letzter_neuer_schritt = next(_schritt_zaehler)
+    return _letzter_neuer_schritt
+
+
+def ruecknahme_marke() -> int:
+    """Nummer fuer eine Ruecknahme (ordnet die Wiederholen-Zweige zeitlich)."""
+    return next(_schritt_zaehler)
+
+
+def wiederholen_verworfen(marke: int) -> bool:
+    """Wurde nach der Ruecknahme ``marke`` irgendwo ein neuer Schritt gemacht?"""
+    return marke < _letzter_neuer_schritt
 
 
 @dataclass
@@ -22,6 +60,9 @@ class Command:
     undo: Callable[[], None]
     # Optional Redo, falls do() Seiteneffekte hat die nicht wiederholbar sind
     redo: Callable[[], None] | None = None
+    # UI-93: Platz im gemeinsamen Verlauf (setzt der Stapel, nicht der Aufrufer).
+    schritt: int = 0     # wann der Schritt gemacht wurde
+    zurueck: int = 0     # wann er zuletzt zurueckgenommen wurde
 
     def execute(self):
         self.do()
@@ -80,8 +121,11 @@ class UndoStack:
                 print(f"[UndoStack] execute error: {e}")
                 return
         if self._sammler is not None:
+            # IMP-1: Teile einer Gruppe bekommen keine eigene Schrittnummer —
+            # erst der Sammelschritt am Ende der Gruppe (UI-93).
             self._sammler.append(cmd)
             return
+        cmd.schritt = neuer_schritt()
         self._undo.append(cmd)
         # Cap
         if len(self._undo) > self.MAX_SIZE:
@@ -129,11 +173,21 @@ class UndoStack:
             print(f"[UndoStack] undo error: {e}")
         finally:
             self._suspended -= 1
+        cmd.zurueck = ruecknahme_marke()
         self._redo.append(cmd)
         self._notify()
         return True
 
+    def _redo_pruefen(self) -> None:
+        """UI-93: Wiederholen-Zweig verwerfen, wenn seit der Ruecknahme in
+        einem ANDEREN Verlauf ein neuer Schritt gemacht wurde (der eigene
+        ``push`` leert ihn ohnehin). Der oberste Eintrag ist der zuletzt
+        zurueckgenommene — ist er verworfen, sind es alle darunter auch."""
+        if self._redo and wiederholen_verworfen(self._redo[-1].zurueck):
+            self._redo.clear()
+
     def redo(self) -> bool:
+        self._redo_pruefen()
         if not self._redo:
             return False
         cmd = self._redo.pop()
@@ -152,13 +206,24 @@ class UndoStack:
         return len(self._undo) > 0
 
     def can_redo(self) -> bool:
+        self._redo_pruefen()
         return len(self._redo) > 0
 
     def undo_label(self) -> str | None:
         return self._undo[-1].label if self._undo else None
 
     def redo_label(self) -> str | None:
+        self._redo_pruefen()
         return self._redo[-1].label if self._redo else None
+
+    def undo_schritt(self) -> int | None:
+        """UI-93: Schrittnummer des naechsten Rueckgaengig (None = leer)."""
+        return self._undo[-1].schritt if self._undo else None
+
+    def redo_marke(self) -> int | None:
+        """UI-93: Ruecknahme-Marke des naechsten Wiederholen (None = leer)."""
+        self._redo_pruefen()
+        return self._redo[-1].zurueck if self._redo else None
 
     def clear(self):
         self._undo.clear()

@@ -168,6 +168,27 @@ def test_laufender_effekt_ist_markiert(fm, ansicht):
     assert zeilen["ENG35 Steht"].text(3) == "● läuft"
 
 
+def test_von_einer_sammlung_gestartetes_kind_ist_markiert(fm, ansicht):
+    """Codex-Review #1081 (CDX-59): eine Sammlung startet ihre Kinder selbst
+    (``child.start()``), am FunctionManager vorbei — in ``running_ids()``
+    fehlen sie. Die Ansicht fragt deshalb auch ``is_running``."""
+    s = fm.new_scene("ENG35 Kind laeuft")
+    s.start()                                    # wie collection.write es tut
+    try:
+        assert s.id not in fm.running_ids(), "Vorbedingung"
+        _neu(ansicht)
+        zeilen = {it.text(0): it for it in ansicht._effekt_zeilen()}
+        assert zeilen["ENG35 Kind laeuft"].text(3) == "● läuft"
+        s.stop()
+        ansicht._laufzustand_nachziehen()
+        assert zeilen["ENG35 Kind laeuft"].text(3) == ""
+        s.start()
+        ansicht._laufzustand_nachziehen()
+        assert zeilen["ENG35 Kind laeuft"].text(3) == "● läuft"
+    finally:
+        s.stop()
+
+
 def test_mitglied_einer_sammlung_traegt_den_hinweis(fm, ansicht):
     s = fm.new_scene("ENG35 Kind")
     c = fm.new_collection("ENG35 Paket")
@@ -408,7 +429,10 @@ def test_rueckgaengig_menue_zeigt_das_kaufmannsund():
     _app()
     stapel = UndoStack()
     attrappe = SimpleNamespace(_undo_stack=stapel, _act_undo=QAction(),
-                               _act_redo=QAction())
+                               _act_redo=QAction(), _vc_verlauf=lambda: None)
+    # UI-93: die Menuetexte kommen aus dem gemeinsamen Verlauf.
+    attrappe._naechster_verlauf = (
+        lambda wiederholen: MainWindow._naechster_verlauf(attrappe, wiederholen))
     stapel.push_simple("Stufe: Blitz → Strobe & Blinder",
                        lambda: None, lambda: None)
     MainWindow._refresh_undo_labels(attrappe)
@@ -417,7 +441,7 @@ def test_rueckgaengig_menue_zeigt_das_kaufmannsund():
     stapel.undo()
     MainWindow._refresh_undo_labels(attrappe)
     assert _wie_qt_es_zeigt(attrappe._act_redo.text()) == \
-        "Wiederherstellen: Stufe: Blitz → Strobe & Blinder"
+        "Wiederholen: Stufe: Blitz → Strobe & Blinder"
     assert attrappe._act_undo.text() == "Rückgängig"
 
 

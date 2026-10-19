@@ -302,7 +302,11 @@ Ein gespeichertes Profil öffnet man über **Datenbank → „Fixture-Profil bea
 - **Mitgelieferte** (`builtin`, `lightos`) lassen sich nur **ansehen** (Speichern, Import
   und die Modus-/Kanal-Knöpfe gesperrt) oder **als eigenes Profil kopieren** — die Kopie
   bekommt den Zusatz „(eigen)“ am Modellnamen und `source = "user"`; Herkunft (Lizenz),
-  Notizen und 3D-Modell übernimmt sie vom Original. Grund: die nächste
+  Notizen und 3D-Modell übernimmt sie vom Original. Lässt sich die Herkunft des Originals
+  nicht belegen (weder in der Datenbank noch in einer Bibliotheksdatei), lehnt der Editor
+  die Kopie mit „Kopie nicht möglich“ ab und speichert nichts (UI-82) — sonst ginge die
+  Lizenzangabe still verloren. Abhilfe: Bibliothek aktualisieren bzw. neu importieren.
+  Eigene Profile lassen sich immer kopieren (Herkunft „eigen“). Grund für die Kopie: die nächste
   Bibliotheks-Aktualisierung bzw. `ensure_builtins()` schriebe eine Änderung am Original
   still zurück. Der Editor prüft die Quelle selbst, auch ohne „nur ansehen“ vom Aufrufer.
 - **Kopie aus dem Patch:** Wird ein mitgeliefertes Profil per Rechtsklick im Patch
