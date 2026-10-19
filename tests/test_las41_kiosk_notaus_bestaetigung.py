@@ -138,6 +138,23 @@ class KioskBestaetigungTest(_Basis):
         QTest.qWait(400)
         self.assertFalse(m.isVisible())
 
+    def test_erneutes_ausloesen_startet_die_zeit_neu(self):
+        """Wer kurz vor Ablauf erneut ausloest (Doppel-Ausloesen), bekommt
+        die volle Anzeigedauer neu — der Balken verschwindet nicht nach der
+        urspruenglichen Frist."""
+        self.w._NOTAUS_BESTAETIGUNG_MS = 600
+        self._ausloesen_per_bus()
+        m = self._meldung()
+        QTest.qWait(400)
+        self.assertTrue(m.isVisible())
+        self._ausloesen_per_bus()                 # erneut, vor Ablauf
+        QTest.qWait(400)                          # urspruengliche Frist vorbei
+        self.assertTrue(m.isVisible(),
+                        "Zeit nicht neu gestartet — Balken zu frueh weg")
+        self.assertTrue(self.w._kiosk_notaus_timer.isActive())
+        QTest.qWait(600)                          # neue Frist vorbei
+        self.assertFalse(m.isVisible())
+
     def test_kuerzel_weg_ueber_fenster(self):
         """Der Abonnent des Fensters selbst (Kuerzel loest ueber den State
         aus und meldet sich ueber den Bus zurueck)."""
