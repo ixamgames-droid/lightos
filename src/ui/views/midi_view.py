@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox, QListWidget, QListWidgetItem, QPlainTextEdit,
     QGroupBox, QFormLayout, QSplitter, QTableWidget,
     QTableWidgetItem, QHeaderView, QCheckBox, QAbstractItemView,
-    QInputDialog, QMessageBox, QSpinBox
+    QInputDialog, QMessageBox, QSpinBox, QScrollArea, QFrame
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
@@ -37,7 +37,23 @@ ACTION_LABELS = {
     ACTION_NONE:           "Keine Aktion",
 }
 
-MAP_COLS = ["Name", "Target", "Typ", "Ch", "D1", "Mode", "ON", "OFF", "Port"]
+# UI-97: Nur die ANZEIGE der Spaltenköpfe ist deutsch. Gespeichert wird über
+# MidiMapping.to_dict() (feste Feldnamen) — die Spaltenindizes in
+# _refresh_map_table/_on_map_item_changed bleiben unverändert.
+MAP_COLS = ["Name", "Ziel", "Typ", "Kanal", "Daten 1", "Modus", "An", "Aus", "Port"]
+MAP_COL_TIPS = [
+    "Frei wählbarer Name des Mappings",
+    "Was gesteuert wird, z. B. executor_go:1 oder grand_master",
+    "MIDI-Nachrichtentyp: note_on, cc oder pitchbend",
+    "MIDI-Kanal 1–16",
+    "Daten 1 = Noten- bzw. Controller-Nummer (0–127)",
+    "Tastenverhalten: press, toggle, flash oder continuous",
+    "LED-Feedback: Velocity-Wert für „an“ (0–127)",
+    "LED-Feedback: Velocity-Wert für „aus“ (0–127)",
+    "Nur Nachrichten von diesem Eingang (leer = alle)",
+]
+# UI-97: Die Mapping-Tabelle zeigt immer mindestens so viele Zeilen.
+MAP_MIN_ROWS = 4
 
 
 def pitchbend_zeile(msg) -> str:
@@ -110,10 +126,25 @@ class MidiView(QWidget):
         super().closeEvent(event)
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        # UI-97: Bei kleinem Fenster (1000×640) scrollt die Seite, statt
+        # Geräte-Felder übereinander und die Mapping-Tabelle auf ihre
+        # Kopfzeile zu quetschen. Der Scrollbereich gibt dem Inhalt immer
+        # mindestens dessen minimumSizeHint.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        outer.addWidget(self._scroll)
+        content = QWidget()
+        self._scroll.setWidget(content)
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(8, 8, 8, 8)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
+        # Kein Bereich darf sich auf null ziehen lassen (sonst wäre die
+        # Tabelle wieder weg) — der Splitter achtet so auf Mindesthöhen.
+        splitter.setChildrenCollapsible(False)
 
         # ── Oberer Bereich: Geräteverwaltung + Konsole ────────────────────────
         top = QWidget()
@@ -122,6 +153,7 @@ class MidiView(QWidget):
 
         # Linke Seite: Geräte
         dev_box = QGroupBox("MIDI-Geräte")
+        self._dev_box = dev_box
         dev_l = QFormLayout(dev_box)
 
         self._combo_in = QComboBox()
@@ -223,7 +255,15 @@ class MidiView(QWidget):
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        map_l.addWidget(self._map_table)
+        for col, tip in enumerate(MAP_COL_TIPS):
+            kopf = self._map_table.horizontalHeaderItem(col)
+            if kopf is not None:
+                kopf.setToolTip(tip)
+        self._map_table.setMinimumHeight(
+            hdr.sizeHint().height()
+            + MAP_MIN_ROWS * self._map_table.verticalHeader().defaultSectionSize()
+            + 2 * self._map_table.frameWidth())
+        map_l.addWidget(self._map_table, 1)
 
         # Schnell-Mapping-Vorlagen
         tmpl_box = QGroupBox("Schnell-Vorlagen")
@@ -234,6 +274,8 @@ class MidiView(QWidget):
         btn_tmpl_notes.clicked.connect(self._template_notes_go)
         tmpl_l.addWidget(btn_tmpl_faders)
         tmpl_l.addWidget(btn_tmpl_notes)
+        self._btn_tmpl_faders = btn_tmpl_faders
+        self._btn_tmpl_notes = btn_tmpl_notes
         map_l.addWidget(tmpl_box)
 
         splitter.addWidget(map_box)
