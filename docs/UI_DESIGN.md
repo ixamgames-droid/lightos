@@ -150,7 +150,7 @@ DIMMER     PAN        TILT       ROT  GRÜN  BLAU  GOBO   ZOOM
 | `F1`–`F8` | Executor 1–8 GO |
 | `Ctrl+S` | Show speichern |
 | `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
+| `Ctrl+Y` oder `Ctrl+Shift+Z` | Redo |
 | `R` | Record-Modus |
 | `G` | Gruppe erstellen |
 | `P` | Palette erstellen |

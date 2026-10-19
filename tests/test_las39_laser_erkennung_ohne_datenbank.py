@@ -191,7 +191,9 @@ def test_ein_wert_am_unsicheren_geraet_loest_den_notaus_nicht(rig):
     st = rig.st
     _patchen(st)
     assert st._laser_fids == frozenset({1, 2})
-    assert not (st._laser_rearm_menge() & {1, 2})
+    # LAS-36: seit dem Knopf mit Rueckfrage loest KEIN Wert den NOT-AUS mehr —
+    # an keinem Geraet; die frühere Rearm-Menge gibt es nicht mehr.
+    assert not hasattr(st, "_laser_rearm_menge")
 
 
 def test_nichts_wird_als_nein_gemerkt(rig):
