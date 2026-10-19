@@ -11,6 +11,7 @@ from src.core.strobe import strobe_hz as _strobe_hz   # noqa: E402
 from src.core.strobe import TAST as _STROBE_TAST, blitz_an as _blitz_an   # noqa: E402
 import math
 import os
+import re
 import time
 from collections import deque
 from src.core.paths import app_data_dir
@@ -894,19 +895,73 @@ def fx_badge_rect(size: float, tscale: float = 1.0,
 BUEHNEN_NAME_MAX = 16
 
 
-def buehnen_beschriftung(fixture) -> tuple[str, bool]:
+#: DEMO-9: eine Nummer am Namensende („… 3", „… 12/2") bleibt beim Kuerzen
+#: stehen — an ihr unterscheidet man gleich benannte Geraete.
+_END_NUMMER = re.compile(r"\s(\S{0,5}\d)$")
+
+#: DEMO-9: so viel Luft (Bildschirm-px) braucht ein Name zusaetzlich zu seiner
+#: Breite, damit er nicht in den Namen des naechsten Nachbarn laeuft.
+BUEHNEN_LABEL_LUFT = 6.0
+
+
+def _buehnen_name_kuerzen(name: str) -> str:
+    """Auf ``BUEHNEN_NAME_MAX`` Zeichen kuerzen; eine Endnummer bleibt
+    erhalten („Stairville MH-X50+ 3" -> „Stairville MH… 3")."""
+    if len(name) <= BUEHNEN_NAME_MAX:
+        return name
+    m = _END_NUMMER.search(name)
+    if m:
+        ende = m.group(1)
+        kopf = name[:BUEHNEN_NAME_MAX - 2 - len(ende)].rstrip()
+        if kopf:
+            return f"{kopf}… {ende}"
+    return name[:BUEHNEN_NAME_MAX - 1].rstrip() + "…"
+
+
+def buehnen_beschriftung(fixture, doppelt=frozenset()) -> tuple[str, bool]:
     """DEMO-9: Text unter dem Symbol der 2D-Buehne -> ``(text, ist_name)``.
 
     Bis hierher stand dort immer Typ-Kuerzel + Geraetenummer („MH 9",
     „PARBAR 13"), waehrend Geraeteliste, Gruppen und Info-Box den Namen aus dem
-    Patch zeigen („Wash 1", „LED-Leiste"). Jetzt folgt die Buehne dem Namen; nur
-    ein Geraet ohne Namen behaelt Kuerzel + Nummer."""
+    Patch zeigen („Wash 1", „LED-Leiste"). Jetzt folgt die Buehne dem Namen; ein
+    Geraet ohne Namen behaelt Kuerzel + Nummer — ebenso eines, dessen
+    (gekuerzter) Name in ``doppelt`` steht, also auf der Buehne nicht
+    eindeutig waere (Kopien per „Mit Offset kopieren" heissen gleich)."""
     name = " ".join(str(getattr(fixture, "label", "") or "").split())
     if not name:
         return f"{fixture.fid}", False
-    if len(name) > BUEHNEN_NAME_MAX:
-        name = name[:BUEHNEN_NAME_MAX - 1].rstrip() + "…"
+    name = _buehnen_name_kuerzen(name)
+    if name in doppelt:
+        return f"{fixture.fid}", False
     return name, True
+
+
+def buehnen_beschriftungen(fixtures) -> dict:
+    """DEMO-9: ``buehnen_beschriftung`` fuer alle Geraete eines Patches —
+    {fid: (text, ist_name)}. Ein Name, der (nach dem Kuerzen) mehrfach
+    vorkommt, faellt bei allen Traegern auf Kuerzel + Nummer zurück."""
+    zaehler: dict = {}
+    for f in fixtures:
+        t, ist = buehnen_beschriftung(f)
+        if ist:
+            zaehler[t] = zaehler.get(t, 0) + 1
+    doppelt = frozenset(t for t, n in zaehler.items() if n > 1)
+    return {f.fid: buehnen_beschriftung(f, doppelt) for f in fixtures}
+
+
+def buehnen_label_waehlen(sb: dict, lod: int, screen_gap: float) -> tuple[str, bool]:
+    """DEMO-9: welches Label der Zeichner bekommt -> ``(label, ist_name)``.
+
+    LOD 1 zeigt die Nummer. Bei LOD 0 steht der Name nur, wenn er samt
+    ``BUEHNEN_LABEL_LUFT`` in den Bildschirm-Abstand zum naechsten Nachbarn
+    passt (``sb["name_breite"]`` = Breite bei 8 pt) — sonst liefen benachbarte
+    Namen ineinander (das Label wird nicht abgeschnitten); dann Kuerzel +
+    Nummer wie frueher."""
+    if lod == 1:
+        return sb["fid_text"], False
+    if sb["ist_name"] and sb.get("name_breite", 0.0) + BUEHNEN_LABEL_LUFT > screen_gap:
+        return sb["fid_text"], False
+    return sb["label"], sb["ist_name"]
 
 
 def _lod_for_screen_gap(screen_gap: float) -> int:
@@ -1088,6 +1143,8 @@ class StageCanvas(QWidget):
         self._strobe_bild: int = 0     # VIZ-104: Zaehler der Takt-Bilder
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
+        # DEMO-9: {fid: (Patch-Label, (text, ist_name))} — siehe _beschriftung_fuer.
+        self._beschriftungen: dict | None = None
         self._tick_fp: dict | None = None
         # Nullpunkt der Steckbrief-Uhr; ``_sb_uhr`` = Sekunden seither (je Bild
         # einmal gesetzt), ``_sb_rest`` = wie viele das laufende Bild noch
@@ -1250,6 +1307,7 @@ class StageCanvas(QWidget):
     def _patch_geaendert(self, *_a) -> None:
         self._paint_sig = None
         self._steckbriefe.clear()
+        self._beschriftungen = None
 
     # ── UI-86: Bildrate aus der gemessenen Zeichenzeit ───────────────────────
     # Bei hoher Pixeldichte (200 % Skalierung) kostete ein Bild der 2D-Ansicht
@@ -1664,6 +1722,7 @@ class StageCanvas(QWidget):
     def _reload_positions_safe(self):
         try:
             self._steckbriefe.clear()
+            self._beschriftungen = None
             self._load_positions()
             self._apply_meta_from_state()
             self.update()
@@ -2113,6 +2172,26 @@ class StageCanvas(QWidget):
 
     def _steckbriefe_verwerfen(self) -> None:
         self._steckbriefe.clear()
+        self._beschriftungen = None
+
+    def _beschriftung_fuer(self, fixture) -> tuple[str, bool]:
+        """DEMO-9: Buehnen-Label eines Geraets. Ob ein Name doppelt ist, haengt
+        am ganzen Patch — deshalb einmal fuer alle berechnet und neu, sobald
+        das Label dieses Geraets nicht mehr dem gemerkten entspricht."""
+        b = self._beschriftungen
+        e = b.get(fixture.fid) if b is not None else None
+        if e is None or e[0] != getattr(fixture, "label", None):
+            try:
+                alle = list(self._state.get_patched_fixtures())
+            except Exception:
+                alle = []
+            if not any(f.fid == fixture.fid for f in alle):
+                alle.append(fixture)
+            texte = buehnen_beschriftungen(alle)
+            b = self._beschriftungen = {
+                f.fid: (getattr(f, "label", None), texte[f.fid]) for f in alle}
+            e = b[fixture.fid]
+        return e[1]
 
     def _steckbrief(self, fixture, fp_map=None) -> dict:
         fp = fp_map.get(fixture.fid) if fp_map else None
@@ -2124,9 +2203,12 @@ class StageCanvas(QWidget):
                     or self._sb_rest <= 0):
                 return sb
             self._sb_rest -= 1          # zu alt: auffrischen, solange das Bild noch darf
-        _name, _ist_name = buehnen_beschriftung(fixture)
+        _name, _ist_name = self._beschriftung_fuer(fixture)
         sb = {"fp": fp, "t": self._sb_uhr, "uni": fixture.universe,
               "label": _name, "ist_name": _ist_name, "fid_text": f"{fixture.fid}",
+              # DEMO-9: Breite des Namens auf dem Bildschirm (8 pt wie das
+              # Label in ``FixtureRenderer.draw``) fuer buehnen_label_waehlen
+              "name_breite": _text_breite(8.0, _name) if _ist_name else 0.0,
               "farbe": [], "kanaele": [], "pt": [], "strobe": [], "ok": True}
         try:
             channels = get_channels_for_patched(fixture)
@@ -2474,8 +2556,6 @@ class StageCanvas(QWidget):
             effects = self._get_active_effects(fixture.fid, strobe_hz, running, vorab)
             if effects or strobe_hz != 0.0:
                 animiert = True
-            label = sb["label"]
-            _ist_name = sb["ist_name"]
             _render_type = sb["render_type"]
             _ring = sb["ring"]
             _pr, _tr = sb["pr"], sb["tr"]
@@ -2483,15 +2563,16 @@ class StageCanvas(QWidget):
             # UI-26: Label-Detailgrad aus dem Bildschirm-Nachbarabstand. Selektierte
             # oder hervorgehobene Fixtures bekommen IMMER das volle Label (der Nutzer
             # will genau die sehen), unabhaengig von der Dichte.
-            _lod = _lod_for_screen_gap(self._nn_gap.get(fixture.fid, 1e9) * self.zoom)
+            _gap = self._nn_gap.get(fixture.fid, 1e9) * self.zoom
+            _lod = _lod_for_screen_gap(_gap)
             _teil = fixture.fid in self._teil_fids
             if (fixture.fid in self._selected_fids or _teil
                     or fixture.fid in self._highlight_fids):
                 _lod = 0
-            if _lod == 1:
-                # DEMO-9: Kurz-Label bleibt die Nummer — ein Name passt nicht
-                # in den engen Nachbarabstand, fuer den LOD 1 gedacht ist.
-                label, _ist_name = sb["fid_text"], False
+                _gap = 1e9      # der Nutzer will genau dieses Geraet lesen
+            # DEMO-9: LOD 1 -> Nummer; LOD 0 -> Name nur, wenn er neben den
+            # Nachbarn passt, sonst Kuerzel + Nummer.
+            label, _ist_name = buehnen_label_waehlen(sb, _lod, _gap)
             FixtureRenderer.draw(
                 painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
