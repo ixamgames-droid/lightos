@@ -69,6 +69,7 @@
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | OUT-80 | A | fix/out80-enttec-seriennummer-in-konfiguration | 2026-10-19T14:03Z | - |
+| UI-97 | A | fix/ui97-midi-seite-kleines-fenster | 2026-10-19T14:03Z | - |
 
 ## Blocker & Fallen
 
@@ -155,7 +156,6 @@
 
 ## Verlauf
 
-- 2026-10-18T17:04Z A claim OUT-66
 - 2026-10-18T17:04Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T17:32Z A done CDX-59
 - 2026-10-18T17:50Z A claim FM-65
@@ -185,3 +185,4 @@
 - 2026-10-18T22:53Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T14:03Z A claim OUT-80
 - 2026-10-19T14:03Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T14:03Z A claim UI-97
