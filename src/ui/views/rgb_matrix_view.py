@@ -104,11 +104,10 @@ class MatrixPreview(QWidget):
         mw = getattr(m, "modify_wirksam", None)
         if mw is None or not mw():
             return ""
-        # + und − aus derselben Quelle wie Taste/Fader (modify_zeichen); fuer
-        # Abdunkeln bleibt die Vorschau beim „×" (die Konsole zeigt „◐") — ob
-        # beide gleich werden, entscheidet Robin noch.
+        # Zeichen aus derselben Quelle wie Taste/Fader (modify_zeichen) — auch
+        # „◐" fuer Abdunkeln (Entscheidung Projektinhaber 19.10.2026).
         _art = normalize_mode(getattr(m, "modify_mode", "add"))
-        text = "×" if _art == "dim" else MODIFY_ZEICHEN[_art]
+        text = MODIFY_ZEICHEN[_art]
         if getattr(m, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW):
             kan = normalize_channels(getattr(m, "modify_channels", ()))
             if kan:

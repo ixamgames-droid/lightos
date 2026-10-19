@@ -291,7 +291,7 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
   RGB-Geräte) dimmen Fader, Grand Master und Blackout die verrechnete Farbe.
 - Der Regler **Helligkeit** des Farb-Modify stellt wie beim Dimmer nur die Stärke ein.
 - Die Vorschau im Editor zeigt beim Farb-Modify die echten Farben; das Zeichen in der Ecke nennt
-  die Betriebsart (+ Addieren, − Abziehen, × Abdunkeln, dann schraffiert).
+  die Betriebsart (+ Addieren, − Abziehen, ◐ Abdunkeln, dann schraffiert).
 
 ### Nur bestimmte Kanäle verändern: „Wirkt auf“
 

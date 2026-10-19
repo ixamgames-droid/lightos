@@ -279,12 +279,13 @@ def test_engine_sperrt_wirklich_was_der_editor_meldet(fm):
 # ── Gegenpruefung: eine Quelle, Tooltip, Nachziehen ─────────────────────────
 
 def test_editor_eckentext_nimmt_zeichen_aus_derselben_quelle(fm, monkeypatch):
-    """+ und − der Editor-Vorschau kommen aus MODIFY_ZEICHEN (eine Quelle mit
-    Taste/Fader); Abdunkeln bleibt in der Vorschau „×" (offene Entscheidung)."""
+    """Alle drei Zeichen der Editor-Vorschau kommen aus MODIFY_ZEICHEN (eine
+    Quelle mit Taste/Fader), auch Abdunkeln (Entscheidung 19.10.2026)."""
     from src.ui.views.rgb_matrix_view import MatrixPreview
     from src.ui.widgets import modify_zeichen
     monkeypatch.setitem(modify_zeichen.MODIFY_ZEICHEN, "add", "⊕")
     monkeypatch.setitem(modify_zeichen.MODIFY_ZEICHEN, "sub", "⊖")
+    monkeypatch.setitem(modify_zeichen.MODIFY_ZEICHEN, "dim", "⊘")
     m = _matrix(fm, mode="add")
     v = MatrixPreview()
     try:
@@ -294,7 +295,7 @@ def test_editor_eckentext_nimmt_zeichen_aus_derselben_quelle(fm, monkeypatch):
         m.modify_mode = "sub"
         assert v.modify_eckentext() == "⊖"
         m.modify_mode = "dim"
-        assert v.modify_eckentext() == "×"
+        assert v.modify_eckentext() == "⊘"
     finally:
         v._timer.stop()
         v.deleteLater()

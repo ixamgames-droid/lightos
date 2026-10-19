@@ -11,7 +11,7 @@
   „Modify-Effekte geben als Chaser-Schritt nichts aus – direkt, in einer Sammlung oder der
   Show-Zeitleiste starten“ (die Engine sperrt solche Schritte).
 - Zeichen und Farben aus einer Quelle (`src/ui/widgets/modify_zeichen.py`), auch für die Vorschau
-  im Matrix-Editor (dort bleibt Abdunkeln vorerst „×“); `stufen.modify_unter` findet
+  im Matrix-Editor (dort jetzt ebenfalls „◐“ für Abdunkeln); `stufen.modify_unter` findet
   Modify-Effekte auch in Sammlungen und Shows.
 - Ein Tooltip über dem Zeichen auf Taste und Fader erklärt die Betriebsart.
 - Backlog: ENG-36/38/39/40 auf erledigt, ENG-35/37 abgeglichen, neu ENG-42 (Läufer mit „dunkle
