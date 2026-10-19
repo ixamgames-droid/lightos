@@ -81,5 +81,11 @@ def test_datenordner_in_der_doku_passt_zur_pfadschicht():
 
 
 def test_fragmente_nennen_die_id():
-    assert re.search(r"^ID: LIZ-1$", _lies("backlog.d", "LIZ-1.md"), re.M)
+    # Nach dem Einsammeln (backlog_sammeln.py) steht der Eintrag in BACKLOG.md
+    # und das Fragment ist geloescht — beides ist gueltig.
+    fragment = os.path.join(ROOT, "backlog.d", "LIZ-1.md")
+    if os.path.exists(fragment):
+        assert re.search(r"^ID: LIZ-1$", _lies("backlog.d", "LIZ-1.md"), re.M)
+    else:
+        assert re.search(r"^\| LIZ-1 \|", _lies("BACKLOG.md"), re.M)
     assert "(LIZ-1)" in _lies("changelog.d", "2026-10-12-LIZ-1.md").splitlines()[0]
