@@ -76,6 +76,49 @@ def leerzelle_hintergrund() -> QBrush:
     return QBrush(QColor(LEERZELLE_FARBE))
 
 
+# ── UI-102: Ansehen-Modus SICHTBAR schreibgeschuetzt ─────────────────────────
+#
+# ★ Bis UI-102 sperrte der Ansehen-Modus nur die Knoepfe; dass nichts
+#   gespeichert wird, stand allein im Fenstertitel. Felder, Kombis und
+#   Tabellenzellen sahen aus wie im Bearbeiten-Modus — man tippte, und erst
+#   der graue Speichern-Knopf verriet, dass alles umsonst war.
+# ★ Die Felder werden schreibgeschuetzt (Text bleibt les- und markierbar),
+#   Auswahlen gesperrt; alle tragen die Eigenschaft ``nurAnsehen`` und
+#   bekommen darueber eine gedaempfte Optik. NICHT die ``:disabled``-Optik des
+#   Themes (#555 auf #2a2a2a): die ist fuer ein Profil, das man LESEN will,
+#   zu schwach.
+NUR_ANSEHEN_EIGENSCHAFT = "nurAnsehen"
+NUR_ANSEHEN_HINWEIS = (
+    "Mitgeliefertes Profil — nur ansehen, Änderungen werden nicht "
+    "gespeichert. Zum Ändern: Fenster schließen und „Als eigenes Profil "
+    "kopieren…“ wählen.")
+NUR_ANSEHEN_STIL = (
+    'QLineEdit[nurAnsehen="true"], QAbstractSpinBox[nurAnsehen="true"], '
+    'QComboBox[nurAnsehen="true"] {'
+    " background-color: #2e2e2e; color: #c8c8c8; border: 1px solid #3a3a3a; }"
+    ' QComboBox[nurAnsehen="true"]::drop-down {'
+    " background: #2e2e2e; border-left: 1px solid #3a3a3a; }"
+    ' QTableWidget[nurAnsehen="true"] { color: #c8c8c8; }')
+
+
+def nur_ansehen_markieren(w) -> None:
+    """UI-102: ein Eingabefeld schreibschuetzen und als solches kennzeichnen.
+
+    Texte/Zahlen werden ``readOnly`` (lesbar, markierbar, Spin-Pfeile weg),
+    Auswahlen (``QComboBox`` hat kein readOnly) gesperrt."""
+    from PySide6.QtWidgets import QAbstractSpinBox
+    if isinstance(w, QLineEdit):
+        w.setReadOnly(True)
+    elif isinstance(w, QAbstractSpinBox):
+        w.setReadOnly(True)
+        w.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+    else:
+        w.setEnabled(False)
+    w.setProperty(NUR_ANSEHEN_EIGENSCHAFT, True)
+    w.style().unpolish(w)
+    w.style().polish(w)
+
+
 def profil_patch_folgen(fixture_id, gepatchte, modi_neu, *,
                         name_alt: tuple[str, str] | None = None,
                         name_neu: tuple[str, str] | None = None) -> list[str]:
@@ -186,6 +229,8 @@ class _ModeTab(QWidget):
         # FM-46 (Review): Zuordnungen haengen am Weiss-KANAL, nicht an seiner
         # Nummer — Loeschen/Verschieben eines `color_w` zieht sie mit.
         self._ziele = SegmentZiele()
+        #: UI-102: Ansehen-Modus — auch neu gebaute Zellen-Kombis sperren.
+        self._gesperrt = False
         layout = QVBoxLayout(self)
 
         name_row = QHBoxLayout()
@@ -290,9 +335,36 @@ class _ModeTab(QWidget):
         layout.addLayout(btn_row)
 
     def nur_ansehen(self) -> None:
-        """UI-74: Kanal-Knoepfe sperren (Profil wird nur angesehen)."""
+        """UI-74: Kanal-Knoepfe sperren (Profil wird nur angesehen).
+        UI-102: dazu Mode-Name, Geometrie und Tabelle sichtbar
+        schreibgeschuetzt."""
+        self._gesperrt = True
         for b in self._kanal_knoepfe:
             b.setEnabled(False)
+        for w in (self._edit_name, self._spin_grid_rows, self._spin_grid_cols,
+                  self._spin_white_rows, self._spin_white_cols):
+            nur_ansehen_markieren(w)
+        self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._tbl.setProperty(NUR_ANSEHEN_EIGENSCHAFT, True)
+        self._tbl.style().unpolish(self._tbl)
+        self._tbl.style().polish(self._tbl)
+        self._zellen_sperren()
+
+    def ist_nur_ansehen(self) -> bool:
+        return self._gesperrt
+
+    def _zellen_sperren(self) -> None:
+        """UI-102: Kombis (Attribut, Weiß-Segment) und Textzellen sperren."""
+        if not self._gesperrt:
+            return
+        for r in range(self._tbl.rowCount()):
+            for c in range(self._tbl.columnCount()):
+                w = self._tbl.cellWidget(r, c)
+                if w is not None:
+                    nur_ansehen_markieren(w)
+                it = self._tbl.item(r, c)
+                if it is not None:
+                    it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
     @staticmethod
     def _geo_spin(tooltip: str) -> QSpinBox:
@@ -423,6 +495,7 @@ class _ModeTab(QWidget):
                 it.setFlags(Qt.ItemFlag.NoItemFlags)
                 it.setBackground(leerzelle_hintergrund())
                 self._tbl.setItem(i, SEGMENT_COL, it)
+        self._zellen_sperren()
         self._update_segment_hinweis()
 
     def _set_segment(self, row: int, combo_index: int):
@@ -610,6 +683,14 @@ class FixtureEditorDialog(QDialog):
         """UI-74: Ansehen-Modus — Speichern, Import und alle Knoepfe, die Modi
         oder Kanaele aendern, sind gesperrt. Export bleibt offen."""
         self.setWindowTitle("Fixture Editor — nur ansehen (mitgeliefertes Profil)")
+        # UI-102: der Hinweis steht IM Dialog, nicht nur im Fenstertitel;
+        # die Felder sind sichtbar schreibgeschuetzt.
+        self._lbl_nur_ansehen.setHidden(False)
+        self.setStyleSheet(NUR_ANSEHEN_STIL)
+        for w in (self._cb_manufacturer, self._edit_name, self._edit_short,
+                  self._cb_type, self._spin_power):
+            nur_ansehen_markieren(w)
+        self._btn_cancel.setText("Schließen")
         self._btn_save.setEnabled(False)
         self._btn_save.setToolTip(
             "Mitgelieferte Profile werden nicht überschrieben — "
@@ -624,6 +705,13 @@ class FixtureEditorDialog(QDialog):
         # FM-74: Kopf und Modi liegen in einem Rollbereich (`root` = Layout
         # des Inhalts); Import/Export und Speichern bleiben darunter stehen.
         aussen = QVBoxLayout(self)
+        # UI-102: Hinweis im Ansehen-Modus — ueber dem Rollbereich, damit er
+        # beim Blaettern stehen bleibt. Stil wie der FM-46-Hinweis.
+        self._lbl_nur_ansehen = QLabel(NUR_ANSEHEN_HINWEIS)
+        self._lbl_nur_ansehen.setWordWrap(True)
+        self._lbl_nur_ansehen.setStyleSheet("color: #d08a00; padding: 2px 0 4px 0;")
+        self._lbl_nur_ansehen.setHidden(True)
+        aussen.addWidget(self._lbl_nur_ansehen)
         inhalt = QWidget()
         root = QVBoxLayout(inhalt)
         root.setContentsMargins(0, 0, 0, 0)
@@ -700,6 +788,7 @@ class FixtureEditorDialog(QDialog):
         btn_box.accepted.connect(self._save)
         btn_box.rejected.connect(self.reject)
         self._btn_save = btn_box.button(QDialogButtonBox.StandardButton.Save)
+        self._btn_cancel = btn_box.button(QDialogButtonBox.StandardButton.Cancel)
         aussen.addWidget(btn_box)
 
     def showEvent(self, e):

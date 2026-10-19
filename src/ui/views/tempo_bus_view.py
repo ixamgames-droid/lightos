@@ -17,12 +17,12 @@ ueber ``subscribe_widget`` an die Lebenszeit dieses Widgets gebunden.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QRect, QSize, Qt, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QGroupBox, QScrollArea, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QDoubleSpinBox,
-    QCheckBox, QTreeWidget, QTreeWidgetItem,
+    QCheckBox, QStyle, QStyleOptionViewItem, QTreeWidget, QTreeWidgetItem,
 )
 
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
@@ -162,6 +162,24 @@ class TempoBusView(QWidget):
         self._fx_empty.setVisible(total == 0)
         tree.setVisible(total > 0)
 
+    def _zell_hint(self, w) -> QSize:
+        """UI-101(3): Size-Hint einer Zelle, deren Inhalt ein Widget ist.
+
+        Der Delegate setzt Zell-Widgets in das TEXT-Rechteck der Zelle, das links
+        und rechts um den Textrand des Stils schmaler ist als die Spalte. Diesen
+        Rand aufschlagen, sonst bleibt das Widget trotz passender Spalte zu schmal."""
+        w.ensurePolished()
+        hint = w.sizeHint()
+        tree = self._fx_tree
+        opt = QStyleOptionViewItem()
+        opt.initFrom(tree)
+        opt.rect = QRect(0, 0, 200, hint.height())
+        opt.features = QStyleOptionViewItem.ViewItemFeature.HasDisplay
+        text = tree.style().subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, opt, tree)
+        rand = max(0, opt.rect.width() - text.width())
+        return QSize(hint.width() + rand, hint.height())
+
     def _add_effect_row(self, top, f, bus_id):
         tree = self._fx_tree
         fid = int(getattr(f, "id", 0))
@@ -179,6 +197,11 @@ class TempoBusView(QWidget):
         combo.setProperty("fid", fid)
         combo.currentIndexChanged.connect(self._on_row_bus_combo_changed)
         tree.setItemWidget(row, 2, combo)
+        # UI-101(3): ResizeToContents misst nur Zeilen-TEXT, keine Zell-Widgets —
+        # die Spalte blieb so breit wie der Kopf „Bus" und kappte die Auswahl
+        # („Haupt-BPM (Globa"). Die Groesse der Combo als Size-Hint der Zelle
+        # hinterlegen, dann richtet sich die Spaltenbreite nach ihr.
+        row.setSizeHint(2, self._zell_hint(combo))
 
         spin = QDoubleSpinBox()
         spin.setRange(0.0625, 16.0)
@@ -187,6 +210,7 @@ class TempoBusView(QWidget):
         spin.setValue(float(getattr(f, "tempo_multiplier", 1.0) or 1.0))
         spin.valueChanged.connect(weak_slot_fwd(self._on_row_mult_changed, fid))
         tree.setItemWidget(row, 3, spin)
+        row.setSizeHint(3, self._zell_hint(spin))     # UI-101(3), wie oben
 
         chk = QCheckBox()
         chk.setChecked(bool(getattr(f, "align_on_start", True)))
