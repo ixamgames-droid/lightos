@@ -17,6 +17,7 @@ from .rgb_matrix import RgbMatrixInstance
 from .modify import (ModifySammler, ist_modify, modify_posten,
                      normalize_channels, normalize_mode, normalize_strength,
                      posten_anwenden, setze_sammler)
+from . import wer_gewinnt
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -46,6 +47,11 @@ class FunctionManager:
         self._dim_map_key: int = -1
         # ENG-30: die Patch-Liste mit fid-Tabelle, die ``write`` bekommt.
         self._patch_liste: PatchListe | None = None
+        # ENG-35 Schritt 4: „wer gewinnt“ — Protokoll nur, solange eine Anzeige
+        # es angefordert hat (Zaehler). 0 = aus, der Takt bleibt wie bisher.
+        self._wg_zaehler = 0
+        self._wg_protokoll: wer_gewinnt.SchreibProtokoll | None = None
+        self._wg_oben: dict | None = None
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -442,6 +448,45 @@ class FunctionManager:
             liste = self._patch_liste = PatchListe(patch_cache)
         return liste
 
+    # ── ENG-35 Schritt 4: wer gewinnt ─────────────────────────────────────────
+
+    def wer_gewinnt_anfordern(self) -> None:
+        """Eine Anzeige will das Protokoll „Adresse -> letzter Schreiber“.
+        Jede Anforderung braucht genau ein ``wer_gewinnt_freigeben``."""
+        with self._lock:
+            self._wg_zaehler += 1
+
+    def wer_gewinnt_freigeben(self) -> None:
+        with self._lock:
+            self._wg_zaehler = max(0, self._wg_zaehler - 1)
+            if self._wg_zaehler == 0:
+                self._wg_protokoll = None
+                self._wg_oben = None
+
+    @property
+    def wer_gewinnt_aktiv(self) -> bool:
+        return getattr(self, "_wg_zaehler", 0) > 0
+
+    def wer_gewinnt_oben(self, oben: dict | None) -> None:
+        """Der Renderer meldet die Schicht ueber den Funktionen dieses Frames:
+        ``{universum: {adresse: "Cueliste"|"Programmer"|"Snap"}}``. Wird
+        als Ganzes getauscht (der Leser bekommt nie einen halben Stand)."""
+        if self.wer_gewinnt_aktiv:
+            self._wg_oben = oben
+
+    def wer_gewinnt(self, patch) -> dict[int, "wer_gewinnt.Ergebnis"]:
+        """Je Funktion des letzten Frames: gewinnt auf n / verdeckt auf m
+        Geraeten von X. Leer, solange niemand das Protokoll angefordert hat
+        oder noch kein Frame gelaufen ist."""
+        protokoll = getattr(self, "_wg_protokoll", None)
+        oben = getattr(self, "_wg_oben", None)
+
+        def name_von(fid):
+            f = self._functions.get(fid)
+            return getattr(f, "name", None) if f is not None else None
+
+        return wer_gewinnt.auswerten(protokoll, oben, patch, name_von)
+
     def modify_aufschieben(self, an: bool = True) -> None:
         """ENG-37: den NAECHSTEN ``tick`` anweisen, die Modify-Posten nur zu
         sammeln (``True``) — der Aufrufer verrechnet sie dann selbst ueber
@@ -507,11 +552,23 @@ class FunctionManager:
         # (Layer-Prioritaet, darin Start-Reihenfolge).
         sammler = ModifySammler()
         sammler_alt = setze_sammler(sammler)
+        # ENG-35 Schritt 4: Protokoll nur, wenn angefordert — sonst None und
+        # der Takt laeuft exakt wie bisher.
+        protokoll = (wer_gewinnt.SchreibProtokoll()
+                     if getattr(self, "_wg_zaehler", 0) > 0 else None)
         try:
-            self._tick_funktionen(ordered, universes, patch_cache, dt,
-                                  finished, sammler, patch_fn)
+            if protokoll is None:
+                self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                      finished, sammler, patch_fn)
+            else:
+                self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                      finished, sammler, patch_fn,
+                                      protokoll=protokoll)
         finally:
             setze_sammler(sammler_alt)
+        if protokoll is not None and self._wg_zaehler > 0:
+            # (zwischendurch freigegeben -> nichts Veraltetes liegen lassen)
+            self._wg_protokoll = protokoll
         self._modify_posten = sammler.posten
         if not (modify_spaeter or getattr(self, "_modify_aufschieben", False)):
             self.modify_anwenden(universes)
@@ -525,7 +582,7 @@ class FunctionManager:
                                      if fid in self._running_ids]
 
     def _tick_funktionen(self, ordered, universes, patch_cache, dt,
-                         finished, sammler, patch_fn=None):
+                         finished, sammler, patch_fn=None, protokoll=None):
         """Schleife ueber die laufenden Funktionen (Rumpf von ``tick``).
 
         ENG-30: ``patch_fn`` ist ``patch_cache`` mit fid-Tabelle (siehe
@@ -567,7 +624,11 @@ class FunctionManager:
                     if p is not None:
                         sammler.posten.append(p)
                 elif inten >= 0.999 and env >= 0.999:
-                    f.write(universes, patch_fn, dt, self._functions)
+                    if protokoll is None:
+                        f.write(universes, patch_fn, dt, self._functions)
+                    else:
+                        self._write_protokolliert(f, fid, universes, patch_fn,
+                                                  dt, protokoll)
                 else:
                     if dim_map is None:
                         dim_map = self._dim_addr_map(patch_cache)
@@ -591,6 +652,8 @@ class FunctionManager:
                         if shared is None:
                             continue
                         touched = pu.end_write_log()
+                        if protokoll is not None:
+                            protokoll.eintragen(fid, u, touched)
                         after = pu.get_all()
                         dims = dim_map.get(u, frozenset())
                         for ch in touched:
@@ -609,6 +672,26 @@ class FunctionManager:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
             if not f.is_running:
                 finished.add(fid)
+
+    def _write_protokolliert(self, f, fid, universes, patch_fn, dt,
+                             protokoll) -> None:
+        """ENG-35 Schritt 4: der schnelle Pfad mit Protokoll. Je Universum ein
+        Teil-Protokoll um ``f.write`` — ein evtl. laufendes Protokoll des
+        Renderers (``_render_frame``) bekommt die Adressen danach unveraendert
+        nachgetragen."""
+        vorher = {}
+        for u, su in universes.items():
+            beginn = getattr(su, "teil_log_beginnen", None)
+            if beginn is not None:
+                vorher[u] = beginn()
+        try:
+            f.write(universes, patch_fn, dt, self._functions)
+        finally:
+            for u, alt in vorher.items():
+                su = universes.get(u)
+                if su is None:
+                    continue
+                protokoll.eintragen(fid, u, su.teil_log_beenden(alt))
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
