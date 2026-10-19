@@ -1043,7 +1043,8 @@ class EfxInstance(Function):
         if key == "modify_strength":
             return int(getattr(self, "modify_strength", 100))
         if key == "modify_mode":
-            return getattr(self, "modify_mode", "add")
+            m = getattr(self, "modify_mode", "add")
+            return m if m in MODIFY_BEWEGUNG_ARTEN else "add"
         if key == "modify_versatz_grad":
             return float(getattr(self, "modify_versatz_grad",
                                  MODIFY_VERSATZ_VORGABE))

@@ -12,7 +12,7 @@ from .sequence import Sequence
 from .audio_func import AudioFunction
 from .effect_func import LayeredEffect
 from .carousel import Carousel
-from .efx import EfxInstance
+from .efx import EfxInstance, MODIFY_BEWEGUNG_ARTEN
 from .rgb_matrix import RgbMatrixInstance
 from .modify import (ModifySammler, ist_modify, modify_posten,
                      normalize_channels, normalize_mode, normalize_strength,
@@ -727,6 +727,12 @@ class FunctionManager:
             # (jede Alt-Show) -> Vorgaben = normaler Effekt.
             f.modify = bool(fd.get("modify", False))
             f.modify_mode = normalize_mode(fd.get("modify_mode", "add"))
+            # ENG-43: Eine Bewegung kennt nur Addieren/Abziehen. normalize_mode
+            # liesse „dim" durch — dann behielten Show und Konsole einen Wert,
+            # den die Auswahl nicht anbietet. Auf die EFX-Arten begrenzen.
+            if (isinstance(f, EfxInstance)
+                    and f.modify_mode not in MODIFY_BEWEGUNG_ARTEN):
+                f.modify_mode = "add"
             f.modify_strength = normalize_strength(fd.get("modify_strength", 100))
             # ENG-40: Kanalwahl; fehlt der Schluessel, gilt die Vorgabe.
             f.modify_channels = normalize_channels(fd.get("modify_channels"))

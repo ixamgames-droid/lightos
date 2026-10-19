@@ -452,3 +452,24 @@ def test_konsolen_parameter_nur_mit_haken():
     assert e.set_param("modify_versatz_grad", -5) and e.modify_versatz_grad == 0
     assert not e.set_param("modify_mode", "dim")
     assert e.set_param("modify_mode", "sub") and e.get_param("modify_mode") == "sub"
+
+
+def test_show_lader_begrenzt_modify_art_auf_bewegung():
+    """Gegenpruefung: Der allgemeine Show-Lader (FunctionManager.from_dict)
+    darf das von EfxInstance.from_dict bereinigte modify_mode nicht wieder auf
+    „dim" setzen — eine Bewegung kennt nur Addieren/Abziehen."""
+    e = EfxInstance("lader")
+    e.modify = True
+    fm = FunctionManager()
+    fm._functions[e.id] = e
+    d = json.loads(json.dumps(fm.to_dict()))
+    eintrag = next(x for x in d["functions"] if x.get("id") == e.id)
+    eintrag["modify_mode"] = "dim"
+    fm2 = FunctionManager()
+    fm2.from_dict(d)
+    e2 = fm2._functions[e.id]
+    assert e2.modify_mode in ("add", "sub")
+    assert e2.get_param("modify_mode") in ("add", "sub")
+    # get_param schuetzt auch, falls der Wert anderweitig ungueltig wird.
+    e2.modify_mode = "dim"
+    assert e2.get_param("modify_mode") == "add"
