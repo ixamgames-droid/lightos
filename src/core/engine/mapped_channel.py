@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from src.core.database.models import PatchedFixture
 
 from .function import Function, FunctionType
+from .patch_index import PatchListe
 from .fade_curve import eval_named, CURVE_NAMES
 from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 
@@ -151,6 +152,8 @@ class MappedRule:
 
 
 def _find_fixture(patch_cache, fid):
+    if type(patch_cache) is PatchListe:         # ENG-30: nachschlagen
+        return patch_cache.finde(fid)
     for fx in patch_cache or ():
         if getattr(fx, "fid", None) == fid:
             return fx

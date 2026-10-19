@@ -40,6 +40,11 @@
   + `VCWidget._edit_properties` (Vorher-Snapshot um den Dialog) + `mousePress/Release` (Move/Resize)
   + `_vc_undo/_vc_redo` in der View. **Pre-Edit-Snapshot-Muster:** Vorher-Stand erfassen, Aktion
   ausfuehren, nur bei `to_dict() != before` per `push_undo_snapshot(before)` ablegen (kein No-op-Strg+Z).
+  **Gemeinsamer Verlauf (UI-93):** Im Hauptfenster bilden dieser Layout-Verlauf und der App-Verlauf
+  (`src/core/undo.py`) bei sichtbarer VC EINEN Verlauf. Jeder Eintrag beider Stapel traegt eine
+  Schrittnummer aus einem gemeinsamen Zaehler (`neuer_schritt()` / `ruecknahme_marke()`);
+  `MainWindow.verlauf_schritt` nimmt den juengsten Schritt und bedient Taste, Menue und ↶/↷.
+  Ein neuer Schritt in einem Stapel verwirft das Wiederholen in beiden (`_redo_pruefen`).
 - **„Steuert"-Liste unter Widgets:** Button-/Fader-/XY-Pad-Dialoge haben eine aufklappbare Liste
   der gesteuerten Funktionen/Effekte NACH NAMEN (statt nur Slot-Nummern) — je Zeile Auswahl-Combo,
   beim Fader zusaetzlich Parameter-Combo, „✕" loescht, „+" fuegt hinzu. Wiederverwendbare Komponente
