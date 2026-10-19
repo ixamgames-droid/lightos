@@ -2131,6 +2131,17 @@ class AppState:
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
+        # OUT-72: Aus-Werte von Lasern, die mit diesem Plan aus dem Patch
+        # gefallen sind, stehen lassen — sonst faellt ihre Adresse auf 0, und
+        # 0 heisst bei manchem Laser „an“.
+        # ★ Codex-Review #1056: VOR der Freigabe. ``_release_now`` schreibt die
+        # alten Laser-Adressen sofort auf 0, und gegen ``_send_all`` gibt es
+        # ausserhalb von ``_plan_lock`` keine Sperre — stand die Maske erst
+        # danach, konnte dazwischen ein Frame mit 0 („Auto run“) hinausgehen.
+        try:
+            self._laser_aus_verwaist_nachfuehren(new_laser_aus, new_patched_set)
+        except Exception as e:
+            print(f"[AppState] laser aus verwaist error: {e}")
         self._release_unpatched_addrs(old_patched, new_patched_set,
                                      never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
@@ -2223,6 +2234,46 @@ class AppState:
                 for a in prev_addrs:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
+
+    def _laser_aus_verwaist_nachfuehren(self, neue_maske, gepatcht) -> None:
+        """OUT-72: Aus-Werte nicht mehr gepatchter Laser festhalten.
+
+        Wird ein Laser entpatcht, umadressiert oder mit einem Show-Wechsel
+        ersetzt, gibt ``_release_unpatched_addrs`` seine Adressen frei — sie
+        fallen auf 0. Bei einem Laser, dessen Betriebsart bei DMX 0 „Auto run“
+        heisst, ist das AN, und niemand kann das Geraet mehr steuern: es steht
+        in keiner Maske. Am Geraet selbst hat sich nichts geaendert; es hoert
+        weiter auf seine Adresse.
+
+        Deshalb bleibt der zuletzt bekannte Aus-Wert jeder solchen Adresse auf
+        der Leitung (``OutputManager.set_laser_aus_verwaist``), bis
+
+        * die Adresse wieder gepatcht ist — dann bestimmt das neue Geraet —, oder
+        * die Ausgabe endet (das Schlussbild traegt die Werte ebenfalls).
+
+        Gemerkt wird nur, was nicht 0 ist: 0 ist der Wert einer freien Adresse
+        ohnehin. ``neue_maske`` ist die Aus-Maske des neuen Plans
+        (``_build_gm_laser_aus_mask``), ``gepatcht`` seine belegten Adressen je
+        Universum. Mit ``getattr``, weil Testhelfer den Zustand ohne
+        ``__init__`` bauen.
+        """
+        kandidaten = {u: dict(m) for u, m in
+                      (getattr(self, "_laser_aus_verwaist", None) or {}).items()}
+        for u, m in (getattr(self, "_laser_aus_plan", None) or {}).items():
+            kandidaten.setdefault(u, {}).update(m)      # der juengere Wert gewinnt
+        verwaist: dict[int, dict[int, int]] = {}
+        for u, m in kandidaten.items():
+            belegt = (gepatcht or {}).get(u) or ()
+            for addr, wert in m.items():
+                if wert and addr not in belegt:
+                    verwaist.setdefault(u, {})[addr] = wert
+        if neue_maske is not None:
+            self._laser_aus_plan = {u: dict(m) for u, m in neue_maske.items()}
+        self._laser_aus_verwaist = verwaist
+        setze = getattr(getattr(self, "output_manager", None),
+                        "set_laser_aus_verwaist", None)
+        if callable(setze):
+            setze(verwaist)
 
     def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict,
                                  *, never_defer: dict | None = None):
@@ -2668,13 +2719,23 @@ class AppState:
                 # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
                 # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
                 # „Uebernehmen“ die Buehne dunkel.
-                # OUT-74: dasselbe gilt fuer eine Zeile mit doppeltem Adapter —
+                # OUT-72: kommt ein ANDERER Adapter (Typwechsel Enttec ->
+                # Art-Net, anderer Anschluss, andere Adresse), geht der alte
+                # ebenfalls wirklich. Der Manager erfaehrt deshalb vorher, was
+                # gleich kommt, und gibt jedem Adapter, der nicht genau dieser
+                # ist, sein Schlussbild; der unveraenderte bekommt keines.
+                # OUT-74: wie bei „Disabled“ bei einer Zeile mit doppeltem Adapter —
                 # der Adapter wird fuer KEINE der Zeilen eingerichtet, es kommt
                 # also kein Nachfolger. Ohne Schlussbild hielte er sein letztes
                 # Bild und die Buehne bliebe stehen, obwohl nichts mehr sendet.
                 if output == "Disabled" or konflikt is not None:
                     self.output_manager.remove_output(num, schlussbild=True)
                 else:
+                    nachfolger = _ausgabe_nachfolger(output, patch, out_u)
+                    ansagen = getattr(self.output_manager,
+                                      "nachfolger_ansagen", None)
+                    if nachfolger is not None and callable(ansagen):
+                        ansagen(num, *nachfolger)
                     self.output_manager.remove_output(num)
                 if konflikt is not None:
                     # OUT-74: nicht einrichten, s. o. — der Ausgang ist
@@ -6168,6 +6229,13 @@ class AppState:
         # Legacy callbacks — ueber eine Kopie iterieren, damit ein Callback, der
         # sich (un)subscribed, die Iteration nicht sprengt.
         for cb in list(self._callbacks):
+            # QA-97: gebundene Methode eines schon zerstoerten Qt-Objekts (View
+            # eines abgebauten Fensters, das sich nie abgemeldet hat) — abmelden
+            # statt aufrufen. Ihr Python-Teil liefe sonst bis zur ersten
+            # Qt-Beruehrung weiter und koennte noch den State veraendern.
+            if _gebunden_an_totes_qt_objekt(cb):
+                self.unsubscribe(cb)
+                continue
             try:
                 cb(event, data)
             except Exception as exc:
@@ -6191,6 +6259,22 @@ class AppState:
         self._ui_thread_id = threading.get_ident()
 
 
+def _gebunden_an_totes_qt_objekt(cb) -> bool:
+    """QA-97: ist ``cb`` eine gebundene Methode eines Qt-Objekts, dessen
+    C++-Seite schon zerstoert ist? Ohne shiboken (oder fuer Nicht-Qt-Objekte)
+    immer ``False`` — dann bleibt alles beim alten Verhalten."""
+    obj = getattr(cb, "__self__", None)
+    if obj is None:
+        return False
+    try:
+        from .sync import _qt_is_valid
+        if _qt_is_valid is None:
+            return False
+        return not _qt_is_valid(obj)
+    except Exception:
+        return False
+
+
 # Cache: (profile_id, mode_name, channel_count) -> list[FixtureChannel] (detached).
 # Ohne Cache macht get_channels_for_patched pro Fixture pro Frame (44 Hz) eine
 # neue DB-Session — viel zu teuer fuer den zentralen Per-Frame-Renderer.
@@ -6207,6 +6291,28 @@ def profil_geaendert(profile_id=None) -> bool:
         clear_channel_cache()
         return False
     return st.profil_geaendert(profile_id)
+
+
+def _ausgabe_nachfolger(output: str, patch: str, out_u):
+    """OUT-72: ``(typ, ziel, externes Universum)`` des Adapters, den
+    ``apply_output_config`` fuer diese Zeile gleich einrichtet — fuer
+    ``OutputManager.nachfolger_ansagen``. ``None`` fuer Ausgabetypen, die hier
+    nicht eingerichtet werden.
+
+    Ein Enttec ohne Anschluss wird nicht eingerichtet: die Ansage nennt dann
+    ein Ziel, das kein laufender Adapter hat — alles Bisherige geht also und
+    bekommt sein Schlussbild.
+    """
+    if output == "Enttec":
+        return ("enttec", patch, None)
+    if output == "uDMX":
+        # OUT-68: ``patch`` = Adapter-Schluessel, leer = der einzige vorhandene.
+        return ("udmx", str(patch or "").strip(), None)
+    if output == "ArtNet":
+        return ("artnet", patch or "255.255.255.255", out_u)
+    if output == "sACN":
+        return ("sacn", patch or "", out_u)
+    return None
 
 
 def clear_channel_cache():

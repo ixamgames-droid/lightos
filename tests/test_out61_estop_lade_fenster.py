@@ -19,6 +19,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from src.core.app_state import get_state                                  # noqa: E402
+from src.core.show.show_file import reset_show                            # noqa: E402
 from src.core.engine.channel_modifier import (ChannelModifier, CurveType,  # noqa: E402
                                               get_modifier_manager)
 
@@ -28,6 +29,11 @@ LASER = 40
 class EstopImLadeFensterTest(unittest.TestCase):
 
     def setUp(self):
+        # PROC-21: die Voraussetzung dieses Tests ausdruecklich herstellen —
+        # auf der gemessenen Adresse ist NICHTS gepatcht. Ein frueherer Test,
+        # der seinen Patch stehen laesst, liess den Renderer sonst einen
+        # Grundwert auf die Laser-Adresse schreiben (127 statt 0).
+        reset_show()
         self.om = get_state().output_manager
         self.u = self.om.universes[1]
         self.mods = get_modifier_manager()
