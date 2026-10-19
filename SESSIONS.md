@@ -47,7 +47,6 @@
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
-| LAS-36 | A | fix/las36-notaus-loesen-lasererkennung | 2026-10-19T14:04Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
@@ -156,7 +155,6 @@
 
 ## Verlauf
 
-- 2026-10-18T17:50Z A claim FM-65
 - 2026-10-18T18:11Z A done LAS-31
 - 2026-10-18T18:11Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T18:50Z A done DOC-16
@@ -186,3 +184,4 @@
 - 2026-10-19T14:03Z A claim UI-97
 - 2026-10-19T14:04Z A claim SAMMEL-BACKLOG-1019
 - 2026-10-19T14:04Z A done UI-95
+- 2026-10-19T14:29Z A done LAS-36
