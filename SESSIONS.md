@@ -48,7 +48,6 @@
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
-| OUT-72 | D | fix/out72-schlussbild-typwechsel-laser-nachlauf | 2026-10-12T14:44Z | src/core/dmx/output_manager.py · src/core/app_state.py · src/ui/widgets/output_config.py |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
@@ -149,7 +148,6 @@
 
 ## Verlauf
 
-- 2026-10-18T19:54Z A claim FM-76
 - 2026-10-18T19:59Z D done ENG-30
 - 2026-10-18T20:38Z D done OUT-74
 - 2026-10-18T20:38Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -179,3 +177,4 @@
 - 2026-10-19T16:22Z A claim UI-98
 - 2026-10-19T16:22Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T16:23Z A claim UI-101
+- 2026-10-19T16:28Z D done OUT-72
