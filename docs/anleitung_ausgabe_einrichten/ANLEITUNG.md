@@ -375,6 +375,12 @@ die Störungsmeldung nicht, solange die Störung anliegt:
 - Der eingeklappte Zustand wird nicht gespeichert: Nach einem Neustart steht wieder der volle
   Balken. Statusleiste und DMX-Monitor zeigen die Störung unverändert an.
 
+Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
+mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
+LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
+sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
+**Enttec Pro USB** das richtige Universe wählen und **Verbinden**.
+
 ## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
 
 Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
@@ -389,23 +395,44 @@ vorher **ein letztes Bild**:
   stehen; die Köpfe fahren also nicht in die Grundstellung.
 - **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
   gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
-- **Nicht beim „Übernehmen“** einer Einstellung: dort folgt sofort die neue
-  Ausgabe, ein dunkles Bild wäre ein Blitzer auf der Bühne.
+- **Beim Wechsel auf einen anderen Adapter:** stellst du ein Universum von
+  ENTTEC auf Art-Net um, auf einen anderen Port, einen anderen uDMX-Adapter,
+  eine andere Ziel-IP oder eine andere Universumsnummer im Netzwerk, bekommt der
+  **bisherige** Adapter bzw. Node dasselbe letzte Bild – er hielte sonst, was er
+  zuletzt bekam.
+- **Nicht beim „Übernehmen“ ohne Änderung:** dort folgt sofort dieselbe Ausgabe,
+  ein dunkles Bild wäre ein Blitzer auf der Bühne.
 
 Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
 rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
 dann kein letztes Bild – alle anderen schon.
 
+**Laser, die aus dem Patch genommen werden.** Entfernst du einen Laser aus dem
+Patch, gibst ihm eine andere Adresse oder lädst eine Show ohne ihn, hört das
+Gerät weiter auf seine bisherige Adresse. Fiele sie auf 0, schaltete das manchen
+Laser **ein** (bei vielen heißt DMX 0 „Auto run“) – und LightOS könnte ihn nicht
+mehr steuern. Deshalb bleibt der **Aus-Wert** des Lasers auf seiner bisherigen
+Adresse stehen, auch im Blackout und im letzten Bild beim Beenden, bis
+
+- die Adresse wieder gepatcht ist (dann bestimmt das neue Gerät), oder
+- LightOS beendet wird.
+
+Das gilt nur für Adressen, deren Aus-Wert nicht 0 ist. Solange so ein Wert
+gehalten wird, kommt auf dieser Adresse nichts anderes hinaus – auch kein Wert
+aus einem Skript oder vom Simple Desk. Der DMX Monitor zeigt den gehaltenen
+Wert.
+
+**So bekommst du die Adresse wieder frei:** Patche ein Gerät auf diese Adresse –
+ab dann bestimmt es, was dort hinausgeht (nimmst du es wieder aus dem Patch,
+ist die Adresse frei und steht auf 0). Oder beende LightOS und starte es neu:
+nach dem Neustart wird nichts mehr gehalten. Einen eigenen Knopf zum Freigeben
+gibt es mit Absicht nicht. Schalte den Laser vorher am Gerät aus oder gib ihm
+dort eine andere Adresse – er hört sonst weiter auf die alte.
+
 > **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
 > ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
 > was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
 > Schalter am Gerät.
-
-Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
-mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
-LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
-sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
-**Enttec Pro USB** das richtige Universe wählen und **Verbinden**.
 
 ## Netzwerk-Falle bei Art-Net und sACN
 

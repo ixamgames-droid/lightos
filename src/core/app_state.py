@@ -340,6 +340,23 @@ class AppState:
         # add_fixture() nicht 1×/Fixture re-entrant patch_changed feuert; der
         # Aufrufer macht danach EINEN gebündelten Refresh.
         self._suppress_emits: bool = False
+        # IMP-3: Sammelweg fuer viele Patch-Aenderungen am Stueck (Tabellen-
+        # Import, sein Rueckgaengig/Wiederholen) — s. patch_sammeln().
+        self._patch_sammel_tiefe: int = 0
+        self._patch_sammel_thread: int | None = None
+        self._patch_sammel_neuaufbau: bool = False
+        self._patch_sammel_ereignisse: list[str] = []
+        # Die Geraeteliste, aus der der GELTENDE Render-Plan gebaut wurde
+        # (unter _plan_lock mit ihm getauscht). Die Funktionen im Renderer
+        # bekommen IMMER diese Liste statt _patch_cache — sonst schriebe eine
+        # laufende Funktion ein Geraet, das der Plan (und die NOT-AUS-Maske)
+        # noch nicht kennt: waehrend patch_sammeln(), nach einem gescheiterten
+        # Neuaufbau, im Augenblick zwischen Listen- und Plantausch.
+        # Anfangs LEER (wie der anfangs leere Plan unten), nicht None: scheitert
+        # schon der erste Neuaufbau (Show laden), bekaemen die Funktionen sonst
+        # ueber den Rueckfall in _render_frame _patch_cache zum leeren Plan.
+        # None gibt es nur im nackten Zustand ohne __init__ (Test-Stubs).
+        self._plan_patch: list | None = []
         # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
         # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
         # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
@@ -1745,6 +1762,13 @@ class AppState:
                 s.execute(select(PatchedFixture).order_by(PatchedFixture.fid)).scalars()
             )
         self._rebuild_universes()
+        if self._patch_sammelt():
+            # IMP-3: Geraeteliste und Universen stimmen sofort (das naechste
+            # add_fixture braucht sie: freie Nummer, gebundenes Objekt fuer
+            # Kopf-Gruppe und Laser-Hinweis). Kanal-Cache, Laser-Profile und
+            # Render-Plan baut patch_sammeln() EINMAL am Ende neu.
+            self._patch_sammel_neuaufbau = True
+            return
         clear_channel_cache()
         self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
@@ -1926,7 +1950,10 @@ class AppState:
         addrs: dict[int, set] = {}
         laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
         laser_fids: set = set()
-        for fx in self._patch_cache:
+        # IMP-3: die Liste, aus der DIESER Plan entsteht — wird unten mit ihm
+        # getauscht (s. _plan_patch).
+        plan_patch = list(self._patch_cache)
+        for fx in plan_patch:
             chans = get_channels_for_patched(fx)
             # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
             # der Channel-Cache nach clear_channel_cache wieder befuellt wird) —
@@ -2090,6 +2117,7 @@ class AppState:
                 # wirft unten etwas, bezoege sich der naechste Uebergang sonst
                 # auf die Maske des vorigen Plans.
                 self._blackout_keep_gesetzt = new_keep_mask
+                self._plan_patch = plan_patch
                 self._fix_index = fix_index
                 self._adress_plan = adress_plan
                 self._default_frame = new_default_frame
@@ -2103,6 +2131,17 @@ class AppState:
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
+        # OUT-72: Aus-Werte von Lasern, die mit diesem Plan aus dem Patch
+        # gefallen sind, stehen lassen — sonst faellt ihre Adresse auf 0, und
+        # 0 heisst bei manchem Laser „an“.
+        # ★ Codex-Review #1056: VOR der Freigabe. ``_release_now`` schreibt die
+        # alten Laser-Adressen sofort auf 0, und gegen ``_send_all`` gibt es
+        # ausserhalb von ``_plan_lock`` keine Sperre — stand die Maske erst
+        # danach, konnte dazwischen ein Frame mit 0 („Auto run“) hinausgehen.
+        try:
+            self._laser_aus_verwaist_nachfuehren(new_laser_aus, new_patched_set)
+        except Exception as e:
+            print(f"[AppState] laser aus verwaist error: {e}")
         self._release_unpatched_addrs(old_patched, new_patched_set,
                                      never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
@@ -2196,6 +2235,46 @@ class AppState:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
 
+    def _laser_aus_verwaist_nachfuehren(self, neue_maske, gepatcht) -> None:
+        """OUT-72: Aus-Werte nicht mehr gepatchter Laser festhalten.
+
+        Wird ein Laser entpatcht, umadressiert oder mit einem Show-Wechsel
+        ersetzt, gibt ``_release_unpatched_addrs`` seine Adressen frei — sie
+        fallen auf 0. Bei einem Laser, dessen Betriebsart bei DMX 0 „Auto run“
+        heisst, ist das AN, und niemand kann das Geraet mehr steuern: es steht
+        in keiner Maske. Am Geraet selbst hat sich nichts geaendert; es hoert
+        weiter auf seine Adresse.
+
+        Deshalb bleibt der zuletzt bekannte Aus-Wert jeder solchen Adresse auf
+        der Leitung (``OutputManager.set_laser_aus_verwaist``), bis
+
+        * die Adresse wieder gepatcht ist — dann bestimmt das neue Geraet —, oder
+        * die Ausgabe endet (das Schlussbild traegt die Werte ebenfalls).
+
+        Gemerkt wird nur, was nicht 0 ist: 0 ist der Wert einer freien Adresse
+        ohnehin. ``neue_maske`` ist die Aus-Maske des neuen Plans
+        (``_build_gm_laser_aus_mask``), ``gepatcht`` seine belegten Adressen je
+        Universum. Mit ``getattr``, weil Testhelfer den Zustand ohne
+        ``__init__`` bauen.
+        """
+        kandidaten = {u: dict(m) for u, m in
+                      (getattr(self, "_laser_aus_verwaist", None) or {}).items()}
+        for u, m in (getattr(self, "_laser_aus_plan", None) or {}).items():
+            kandidaten.setdefault(u, {}).update(m)      # der juengere Wert gewinnt
+        verwaist: dict[int, dict[int, int]] = {}
+        for u, m in kandidaten.items():
+            belegt = (gepatcht or {}).get(u) or ()
+            for addr, wert in m.items():
+                if wert and addr not in belegt:
+                    verwaist.setdefault(u, {})[addr] = wert
+        if neue_maske is not None:
+            self._laser_aus_plan = {u: dict(m) for u, m in neue_maske.items()}
+        self._laser_aus_verwaist = verwaist
+        setze = getattr(getattr(self, "output_manager", None),
+                        "set_laser_aus_verwaist", None)
+        if callable(setze):
+            setze(verwaist)
+
     def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict,
                                  *, never_defer: dict | None = None):
         """A3D-18: Adressen, die vor dem Rebuild gepatcht waren, jetzt aber NICHT
@@ -2286,6 +2365,108 @@ class AppState:
     # (der singleShot(0) unten feuert dann nie). In der App beendet der
     # singleShot den Nachlauf im naechsten Durchlauf der Ereignisschleife.
     _SHOW_LADE_NACHLAUF_S = 1.0
+
+    # ── IMP-3: viele Patch-Aenderungen, EIN Neuaufbau ────────────────────────
+
+    #: Ereignisse, die patch_sammeln() zurueckhaelt und am Ende je EINMAL
+    #: sendet — in dieser Reihenfolge. Alles andere (``hinweis`` mit dem
+    #: Laser-Hinweis, ``group_changed`` MIT Daten, …) geht sofort durch.
+    _PATCH_SAMMEL_EREIGNISSE = ("patch_changed", "group_changed")
+
+    def _patch_sammelt(self) -> bool:
+        """True nur im Thread, der patch_sammeln() geoeffnet hat — ein
+        anderer Thread (MIDI/OSC/Web) baut und sendet wie immer."""
+        return (getattr(self, "_patch_sammel_tiefe", 0) > 0
+                and getattr(self, "_patch_sammel_thread", None)
+                == threading.get_ident())
+
+    @contextlib.contextmanager
+    def patch_sammeln(self):
+        """IMP-3: Kontext um VIELE Patch-Aenderungen am Stueck (Tabellen-
+        Import mit N-mal ``add_fixture``, sein Rueckgaengig/Wiederholen).
+
+        Ohne ihn baut jede einzelne Aenderung Kanal-Cache, Laser-Profile und
+        Render-Plan neu und sendet ``patch_changed`` — jede Ansicht (Patch,
+        Programmer, 2D/3D, Live View) baut sich N-mal neu auf. Im Kontext:
+
+        * ``_reload_patch_cache`` laedt nur Geraeteliste und Universen; der
+          volle Neuaufbau (Kanal-Cache, Laser-Profile, RENDER-PLAN) laeuft
+          EINMAL beim Verlassen.
+        * ``patch_changed`` und ``group_changed`` (ohne Daten) werden
+          gemerkt und beim Verlassen je EINMAL gesendet — erst
+          ``patch_changed``, dann ``group_changed``, beide NACH dem
+          Neuaufbau. Jeder Empfaenger sieht also den fertigen Stand.
+        * Alles andere bleibt, wie es ist: Kopf-Gruppen werden je Geraet
+          angelegt, der Laser-Hinweis (``hinweis``) kommt je Geraet sofort,
+          Rueckgaengig-Schritte entstehen wie immer. Das ist der Unterschied
+          zu ``_suppress_emits`` (Show-Laden), das auch Kopf-Gruppen und
+          Laser-Hinweis abschaltet.
+
+        Sicherheit: beim Verlassen ist der Render-Plan garantiert aktuell —
+        auch wenn der Block wirft (``finally``); ein importierter Laser ist
+        damit sofort in NOT-AUS und Blackout erfasst. WAEHREND des Blocks
+        gilt der alte Plan MIT seiner Geraeteliste (``_plan_patch``): der
+        Ausgabe-Thread gibt den Funktionen nie ``_patch_cache``, sondern
+        immer die Liste, aus der der geltende Plan gebaut wurde. Ein neues Geraet
+        gibt damit noch nichts aus (kein Default, kein Span, keine Funktion
+        schreibt es — sonst ginge sein Wert als „nicht gepatchte Roh-Adresse“
+        an der NOT-AUS-Maske vorbei aufs Kabel), ein gerade entferntes wird
+        bis zum Ende weiter wie bisher gerendert und dann freigegeben. Der
+        Block laeuft im UI-Thread am Stueck; das Fenster ist kurz.
+
+        Verschachtelbar (Tiefenzaehler); nur die aeusserste Ebene baut und
+        sendet. Gilt nur fuer den Thread, der den Kontext geoeffnet hat.
+        NUR DER GUI-THREAD darf den Block oeffnen: Tiefenzaehler und
+        Besitzer-Thread sind nicht gesperrt — zwei Threads, die gleichzeitig
+        oeffnen und schliessen, koennten den abschliessenden Neuaufbau
+        verlieren.
+        Wurde im Block nichts am Patch geaendert, passiert am Ende nichts."""
+        if (getattr(self, "_patch_sammel_tiefe", 0) > 0
+                and getattr(self, "_patch_sammel_thread", None)
+                != threading.get_ident()):
+            # Ein zweiter Thread sammelt nicht mit (und stoert den ersten nicht).
+            yield
+            return
+        if getattr(self, "_patch_sammel_tiefe", 0) == 0:
+            self._patch_sammel_thread = threading.get_ident()
+            self._patch_sammel_neuaufbau = False
+            self._patch_sammel_ereignisse = []
+            # Der Ausgabe-Thread rendert die Funktionen mit der Geraeteliste
+            # des geltenden Plans (s. _render_frame). Gibt es noch keinen
+            # Plan, die jetzige Liste festhalten — BEVOR die erste Aenderung
+            # _patch_cache austauscht.
+            with self._get_plan_lock():
+                if getattr(self, "_plan_patch", None) is None:
+                    self._plan_patch = list(getattr(self, "_patch_cache", None) or ())
+        self._patch_sammel_tiefe = getattr(self, "_patch_sammel_tiefe", 0) + 1
+        try:
+            yield
+        finally:
+            self._patch_sammel_tiefe = max(0, self._patch_sammel_tiefe - 1)
+            if self._patch_sammel_tiefe == 0:
+                self._patch_sammeln_abschliessen()
+
+    def _patch_sammeln_abschliessen(self) -> None:
+        """Aeusserste Ebene verlassen: einmal voll neu aufbauen, dann die
+        gemerkten Ereignisse je einmal senden. Scheitert der Neuaufbau, wird
+        trotzdem gesendet (die Ansichten zeigen dann wenigstens die
+        Geraeteliste) und der Fehler geht weiter nach oben — ein nicht
+        aktueller Render-Plan darf nicht still bleiben."""
+        self._patch_sammel_thread = None
+        neuaufbau = getattr(self, "_patch_sammel_neuaufbau", False)
+        ereignisse = list(getattr(self, "_patch_sammel_ereignisse", ()) or ())
+        self._patch_sammel_neuaufbau = False
+        self._patch_sammel_ereignisse = []
+        try:
+            if neuaufbau:
+                self._reload_patch_cache()
+        finally:
+            # Scheitert der Neuaufbau, bleiben Plan UND seine Geraeteliste
+            # (_plan_patch) alt — der Renderer rechnet stimmig mit dem alten
+            # Stand weiter, bis ein Neuaufbau gelingt.
+            for ereignis in self._PATCH_SAMMEL_EREIGNISSE:
+                if ereignis in ereignisse:
+                    self._emit(ereignis)
 
     @contextlib.contextmanager
     def show_wird_geladen(self):
@@ -2538,13 +2719,23 @@ class AppState:
                 # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
                 # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
                 # „Uebernehmen“ die Buehne dunkel.
-                # OUT-74: dasselbe gilt fuer eine Zeile mit doppeltem Adapter —
+                # OUT-72: kommt ein ANDERER Adapter (Typwechsel Enttec ->
+                # Art-Net, anderer Anschluss, andere Adresse), geht der alte
+                # ebenfalls wirklich. Der Manager erfaehrt deshalb vorher, was
+                # gleich kommt, und gibt jedem Adapter, der nicht genau dieser
+                # ist, sein Schlussbild; der unveraenderte bekommt keines.
+                # OUT-74: wie bei „Disabled“ bei einer Zeile mit doppeltem Adapter —
                 # der Adapter wird fuer KEINE der Zeilen eingerichtet, es kommt
                 # also kein Nachfolger. Ohne Schlussbild hielte er sein letztes
                 # Bild und die Buehne bliebe stehen, obwohl nichts mehr sendet.
                 if output == "Disabled" or konflikt is not None:
                     self.output_manager.remove_output(num, schlussbild=True)
                 else:
+                    nachfolger = _ausgabe_nachfolger(output, patch, out_u)
+                    ansagen = getattr(self.output_manager,
+                                      "nachfolger_ansagen", None)
+                    if nachfolger is not None and callable(ansagen):
+                        ansagen(num, *nachfolger)
                     self.output_manager.remove_output(num)
                 if konflikt is not None:
                     # OUT-74: nicht einrichten, s. o. — der Ausgang ist
@@ -4004,7 +4195,27 @@ class AppState:
         return out
 
     def _flush_programmer_to_dmx(self, fid: int):
-        fixture = next((f for f in self._patch_cache if f.fid == fid), None)
+        # IMP-3 (zweite Pruefung): Geraet und Kanaele kommen aus dem GELTENDEN
+        # Render-Plan, nicht aus _patch_cache. Ein Geraet, das der Plan noch
+        # nicht kennt (gerade im Sammelblock angelegt oder umadressiert),
+        # steht in keinem Span und in keiner NOT-AUS-Maske — ein Direkt-
+        # Schreiben auf seine Adressen ginge an beiden NOT-AUS-Ebenen vorbei
+        # aufs Kabel. Der Wert bleibt im Programmer und kommt mit dem
+        # naechsten Frame nach dem Neuaufbau ueber den Renderer hinaus.
+        with self._get_plan_lock():
+            plan = getattr(self, "_fix_index", None)
+            eintrag = plan.get(fid) if plan is not None else None
+        if plan is None:
+            # Noch gar kein Plan (nackter Zustand ohne __init__, nur in
+            # Tests): wie frueher ueber die Geraeteliste. Ein echter AppState
+            # hat ab __init__ immer einen (anfangs leeren) Plan.
+            fixture = next((f for f in (getattr(self, "_patch_cache", None) or ())
+                            if f.fid == fid), None)
+            channels = get_channels_for_patched(fixture) if fixture else ()
+        elif eintrag is None:
+            return
+        else:
+            fixture, channels = eintrag
         if not fixture or fixture.universe not in self.universes:
             return
         # LAS-04: Netzwerk-Laser haben keinen DMX-Adressraum — ihre Werte
@@ -4013,7 +4224,6 @@ class AppState:
             return
         universe = self.universes[fixture.universe]
         prog = apply_pan_tilt_orientation(fixture, self.programmer.get(fid, {}))
-        channels = get_channels_for_patched(fixture)
         seen: dict[str, int] = {}
         for ch in channels:
             a = ch.attribute
@@ -4033,8 +4243,14 @@ class AppState:
                 universe.set_channel(dmx_addr, val)
 
     def _flush_all_to_dmx(self):
-        for f in self._patch_cache:
-            self._flush_programmer_to_dmx(f.fid)
+        # Ueber den geltenden Plan (s. _flush_programmer_to_dmx), in dessen
+        # Reihenfolge — die der Geraeteliste, aus der er gebaut wurde.
+        with self._get_plan_lock():
+            plan = getattr(self, "_fix_index", None)
+            fids = (list(plan) if plan is not None else
+                    [f.fid for f in (getattr(self, "_patch_cache", None) or ())])
+        for fid in fids:
+            self._flush_programmer_to_dmx(fid)
 
     # ── Simple Desk (manuelle Roh-Override-Ebene, ISO-03) ──────────────────────
 
@@ -4483,6 +4699,12 @@ class AppState:
             patched_set = self._patched_set
             # _laser_estop_addrs wie zuvor defensiv (Test-Stubs ohne das Feld).
             laser_estop_addrs = getattr(self, "_laser_estop_addrs", {})
+            # IMP-3: die Geraeteliste DIESES Plans, im selben Schnappschuss —
+            # _patch_cache kann dem Plan voraus sein (s. _plan_patch). Nur
+            # ohne Plan (nackter Zustand) die Geraeteliste selbst.
+            plan_patch = getattr(self, "_plan_patch", None)
+            if plan_patch is None:
+                plan_patch = self._patch_cache
         # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
         scratch: dict[int, Universe] = {}
         for univ, _live in live_universes:
@@ -4518,7 +4740,8 @@ class AppState:
         try:
             if _modify_aufschieben is not None and _modify_anwenden is not None:
                 _modify_aufschieben(True)
-            _fm.tick(scratch, self._patch_cache, dt)
+            # IMP-3: immer die Geraeteliste des geltenden Plans (nicht _patch_cache).
+            _fm.tick(scratch, plan_patch, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
         finally:
@@ -5963,6 +6186,8 @@ class AppState:
         # Ist das Sync-Abo aktiv, kommt der Refresh ueber GROUP_CHANGED (aus dem
         # _emit unten) — hier nicht zusaetzlich, sonst liefe er doppelt. Ein
         # unterdrueckter Emit (Bulk-Laden) erreicht das Abo nicht -> dann direkt.
+        # IMP-3: im Sammelweg kommt GROUP_CHANGED einmal am Ende — das Abo
+        # zieht die Blackout-Ziele dann nach.
         if not self._gruppen_sync_aktiv() or getattr(self, "_suppress_emits", False):
             self._refresh_target_blackouts()
         self._emit("group_changed", data)
@@ -5984,6 +6209,13 @@ class AppState:
         # vollständigen Aufbau EINEN gebündelten Refresh.
         if getattr(self, "_suppress_emits", False):
             return
+        # IMP-3: im Sammelweg patch_changed/group_changed (ohne Daten) nur
+        # merken — patch_sammeln() sendet sie am Ende je einmal.
+        if (data is None and event in self._PATCH_SAMMEL_EREIGNISSE
+                and self._patch_sammelt()):
+            if event not in self._patch_sammel_ereignisse:
+                self._patch_sammel_ereignisse.append(event)
+            return
         marshaller = self._ui_marshaller
         if marshaller is not None and threading.get_ident() != self._ui_thread_id:
             try:
@@ -5997,6 +6229,13 @@ class AppState:
         # Legacy callbacks — ueber eine Kopie iterieren, damit ein Callback, der
         # sich (un)subscribed, die Iteration nicht sprengt.
         for cb in list(self._callbacks):
+            # QA-97: gebundene Methode eines schon zerstoerten Qt-Objekts (View
+            # eines abgebauten Fensters, das sich nie abgemeldet hat) — abmelden
+            # statt aufrufen. Ihr Python-Teil liefe sonst bis zur ersten
+            # Qt-Beruehrung weiter und koennte noch den State veraendern.
+            if _gebunden_an_totes_qt_objekt(cb):
+                self.unsubscribe(cb)
+                continue
             try:
                 cb(event, data)
             except Exception as exc:
@@ -6020,6 +6259,22 @@ class AppState:
         self._ui_thread_id = threading.get_ident()
 
 
+def _gebunden_an_totes_qt_objekt(cb) -> bool:
+    """QA-97: ist ``cb`` eine gebundene Methode eines Qt-Objekts, dessen
+    C++-Seite schon zerstoert ist? Ohne shiboken (oder fuer Nicht-Qt-Objekte)
+    immer ``False`` — dann bleibt alles beim alten Verhalten."""
+    obj = getattr(cb, "__self__", None)
+    if obj is None:
+        return False
+    try:
+        from .sync import _qt_is_valid
+        if _qt_is_valid is None:
+            return False
+        return not _qt_is_valid(obj)
+    except Exception:
+        return False
+
+
 # Cache: (profile_id, mode_name, channel_count) -> list[FixtureChannel] (detached).
 # Ohne Cache macht get_channels_for_patched pro Fixture pro Frame (44 Hz) eine
 # neue DB-Session — viel zu teuer fuer den zentralen Per-Frame-Renderer.
@@ -6036,6 +6291,28 @@ def profil_geaendert(profile_id=None) -> bool:
         clear_channel_cache()
         return False
     return st.profil_geaendert(profile_id)
+
+
+def _ausgabe_nachfolger(output: str, patch: str, out_u):
+    """OUT-72: ``(typ, ziel, externes Universum)`` des Adapters, den
+    ``apply_output_config`` fuer diese Zeile gleich einrichtet — fuer
+    ``OutputManager.nachfolger_ansagen``. ``None`` fuer Ausgabetypen, die hier
+    nicht eingerichtet werden.
+
+    Ein Enttec ohne Anschluss wird nicht eingerichtet: die Ansage nennt dann
+    ein Ziel, das kein laufender Adapter hat — alles Bisherige geht also und
+    bekommt sein Schlussbild.
+    """
+    if output == "Enttec":
+        return ("enttec", patch, None)
+    if output == "uDMX":
+        # OUT-68: ``patch`` = Adapter-Schluessel, leer = der einzige vorhandene.
+        return ("udmx", str(patch or "").strip(), None)
+    if output == "ArtNet":
+        return ("artnet", patch or "255.255.255.255", out_u)
+    if output == "sACN":
+        return ("sacn", patch or "", out_u)
+    return None
 
 
 def clear_channel_cache():

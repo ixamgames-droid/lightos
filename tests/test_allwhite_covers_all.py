@@ -109,6 +109,13 @@ class RenderTest(unittest.TestCase):
     def setUp(self):
         ensure_builtins()
         reset_show()
+        # PROC-21: den Patch am Ende wieder wegnehmen (als ERSTE Aufraeum-
+        # Aktion angemeldet, laeuft also zuletzt). Bisher blieben nach dem
+        # letzten Test drei Moving Heads und eine Bar im globalen Zustand —
+        # MH3 auf Universum 1, Adresse 40. Genau dort misst
+        # ``test_out61_estop_lade_fenster``; der Renderer schrieb ihm den
+        # Pan-Grundwert hinein (127 statt 255).
+        self.addCleanup(reset_show)
         self.state = get_state()
         # Mover: hat intensity UND ein Farbrad — beides muss der Override treffen.
         for fid, addr in ((1, 1), (2, 20), (3, 40)):
