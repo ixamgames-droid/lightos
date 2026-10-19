@@ -1,0 +1,10 @@
+ID: ENG-42
+Prioritaet: P2
+Status: review
+Status-Notiz: Haken „Dunkle Lampen durchlassen“ im Matrix-Editor (Stil Dimmer); Untergrund 40 % + Läufer 70 % = genau 70/40 %, Schreib-Protokoll nur helle Lampen; Farbe und Konsolen-Parameter offen
+Titel: Echter Läufer über Untergrund -- Haken „dunkle Lampen durchlassen“ (setzt die hellen Lampen genau, statt zu addieren)
+
+**Herkunft:** ENG-35 Schritt 5 „Läufer über Untergrund“; Entscheidung des Projektinhabers vom 19.10.2026: der Modify-Effekt *Addieren* (ENG-37) reicht NICHT allein, zusätzlich soll es einen echten Läufer geben.
+**Befund:** Ein normales Dimmer-Lauflicht schreibt für jede seiner Lampen einen Wert, auch 0 für die gerade dunklen. Liegt es über einem anderen Dimmer-Effekt, verdeckt es ihn auf allen seinen Lampen -- eine höhere Stufe macht daraus keinen Läufer über einem Untergrund (Anleitung Prioritäten, Abschnitt 8). Modify-Addieren legt nur obendrauf: über einem Untergrund von 40 % wird ein Läufer mit 70 % zu 100 %, nicht zu 70 %; *Abdunkeln* unter dem Läufer geht damit gar nicht.
+**Nachstellen:** Dimmer-Effekt A (Funkeln, 40 %) auf acht Lampen starten, darüber ein Dimmer-Lauflicht B auf denselben Lampen in höherer Stufe -- nur die zwei Läufer-Lampen leuchten, die übrigen sechs sind dunkel statt bei A.
+**Fertig, wenn:** der Matrix-Editor (Stil Dimmer, später Farbe) einen festen Haken „dunkle Lampen durchlassen“ hat; mit Haken schreibt der Effekt nur Lampen, deren Wert über 0 liegt (genau gesetzt, wie ein normaler Effekt mit seiner Stufe), alle anderen gibt er an den Effekt darunter zurück -- auch im Schreib-Protokoll (Dimmer-Besitz, automatische Grundhelligkeit, Snap-Dimmer-Übersteuerung); Schweif-Lampen zählen als hell; Ein-/Ausblendung und Effekt-Helligkeit verhalten sich wie beim normalen Effekt. Alt-Shows byte-gleich (Feld nur bei gesetztem Haken gespeichert). Konsolen-Parameter optional. Abgrenzung zu Modify in der Anleitung (Prioritäten Abschnitt 8, Dimmer-Matrix Abschnitt 5). Tests: Untergrund 40 %, Läufer 70 % -> genau 70 % auf den Läufer-Lampen, 40 % auf den übrigen; ohne Haken unverändert.

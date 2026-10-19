@@ -388,6 +388,16 @@ Dimmer steht auf 77 (Werte 0–255). Der Modify-Effekt ist an dieser Lampe voll 
 - Die Vorschau im Editor zeigt den Modify-Effekt allein, im Stil Dimmer eingefärbt nach
   Betriebsart (Bernstein = Addieren, Blau = Abziehen, schraffiert = Abdunkeln).
 
+### Modify oder echter Läufer? „Dunkle Lampen durchlassen“
+
+Modify **ersetzt nichts**, es verrechnet: über 40 % Untergrund macht ein Läufer mit 70 % im
+Modus *Addieren* 100 %. Soll der Läufer **genau** 70 % zeigen und der Rest bei 40 % bleiben,
+nimm einen **normalen** Dimmer-Effekt (kein Modify) in einer höheren Stufe und setze den Haken
+**Dunkle Lampen durchlassen** (unter „Modify-Effekt“, nur im Stil Dimmer). Dann schreibt der
+Effekt nur Lampen mit einem Wert über 0 — Schweif-Lampen zählen als hell —, die dunklen bleiben
+beim Effekt darunter, bei Cueliste, Snap oder Grundhelligkeit. Einblendzeit und Helligkeit wirken
+wie bei jedem Effekt, aber nur auf die hellen Lampen. Steht **Min** über 0, ist keine Lampe dunkel.
+
 ### Noch aufzunehmende Bilder
 
 Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:

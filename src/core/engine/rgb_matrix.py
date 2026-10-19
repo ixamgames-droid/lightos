@@ -576,6 +576,12 @@ class RgbMatrixInstance(Function):
         self.dimmer_levels = DimmerSequence([255, 128, 64])
         self.shutter_min: int = 0          # Shutter-Style Untergrenze
         self.shutter_max: int = 255        # Shutter-Style Obergrenze
+        # ENG-42: Haken „dunkle Lampen durchlassen" (nur Stil Dimmer). Gesetzt
+        # schreibt der Effekt nur Lampen, deren Dimmerwert ueber 0 liegt; die
+        # dunklen schreibt er gar nicht — sie gehoeren dann dem, was darunter
+        # liegt (anderer Effekt, Cue, Snap, Grundhelligkeit). Gespeichert wird
+        # der Schluessel nur bei gesetztem Haken (Alt-Shows byte-gleich).
+        self.dunkle_durchlassen: bool = False
         # Phase 4: unbeschraenkte Phase (kein % max(cols,rows) mehr)
         self._step: float = 0.0
         self._last_tick: float = 0.0
@@ -862,6 +868,10 @@ class RgbMatrixInstance(Function):
         # unten Zeichen fuer Zeichen beim ENG-38-Verhalten. Sonst die Menge der
         # Kanal-Attribute, die dieser Modify-Effekt als EINZIGE schreibt.
         kanalwahl = self._modify_kanalwahl() if farb_modify else _KEINE_KANALWAHL
+        # ENG-42: „dunkle Lampen durchlassen" — einmal je Frame bestimmt; ohne
+        # Haken bleibt die Zellschleife bis auf diesen einen Wahrheitstest
+        # Zeichen fuer Zeichen wie bisher.
+        durchlassen = self._dunkle_durchlassen()
         try:
             from src.core.app_state import (get_channels_for_patched,
                                             channels_for_head,
@@ -876,6 +886,12 @@ class RgbMatrixInstance(Function):
                 break
             r, g, b = grid[idx]
             rgb = (r, g, b)
+            # ENG-42: dunkle Lampe (Dimmerwert 0) gar nicht schreiben — dann
+            # steht sie in keinem Schreib-Protokoll, besitzt keinen Dimmer und
+            # der Effekt darunter (bzw. Snap/Grundhelligkeit) bleibt sichtbar.
+            # Schweif-Lampen haben einen Wert ueber 0 und zaehlen als hell.
+            if durchlassen and self._dimmer_output(rgb) <= 0:
+                continue
             fx = _find_fixture(patch_cache, fid)
             if fx is None:
                 continue
@@ -2344,6 +2360,14 @@ class RgbMatrixInstance(Function):
         Shutter-Stellung ist keine Menge, die sich addieren liesse."""
         return bool(getattr(self, "modify", False)) and self.style in _MODIFY_STILE
 
+    def _dunkle_durchlassen(self) -> bool:
+        """ENG-42: wirkt der Haken „dunkle Lampen durchlassen"?
+
+        Nur im Stil Dimmer. In den anderen Stilen bleibt ein gesetzter Haken
+        gemerkt, wirkt aber nicht (die Farbe kommt spaeter)."""
+        return (bool(getattr(self, "dunkle_durchlassen", False))
+                and self.style == MatrixStyle.DIMMER)
+
     def _farb_modify(self) -> bool:
         """ENG-38: laeuft diese Matrix als Modify-Effekt im Stil FARBE?
 
@@ -2417,6 +2441,9 @@ class RgbMatrixInstance(Function):
             # Phase-4-Parameter
             "params": self.params,
         })
+        # ENG-42: nur bei gesetztem Haken speichern — Alt-Shows byte-gleich.
+        if getattr(self, "dunkle_durchlassen", False):
+            d["dunkle_durchlassen"] = True
         return d
 
     def apply_dict(self, d: dict) -> None:
@@ -2553,6 +2580,9 @@ class RgbMatrixInstance(Function):
         self.intensity_max = int(d.get("intensity_max", 255))
         self.shutter_min = int(d.get("shutter_min", 0))
         self.shutter_max = int(d.get("shutter_max", 255))
+        # ENG-42: fehlender Schluessel = Vorgabe (aus), wie bei ``modify`` —
+        # sonst bliebe ein im Editor entfernter Haken beim Speichern stehen.
+        self.dunkle_durchlassen = bool(d.get("dunkle_durchlassen", False))
         # Parameter: gespeicherte params + Migrations-Defaults (setdefault, damit
         # explizit gespeicherte Werte Vorrang vor den Migrations-Defaults haben).
         self.params = dict(d.get("params", {}))

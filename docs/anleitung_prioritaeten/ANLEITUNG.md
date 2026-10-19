@@ -206,7 +206,10 @@ alle Geräte der Mitglieder und die Stufe des Behälters.
 - **Kein „Untergrund“:** Ein Dimmer-Lauflicht schreibt für *jede* seiner Lampen einen Wert,
   auch 0 für die gerade dunklen. Liegt es über einem anderen Dimmer-Effekt, verdeckt es ihn
   auf diesen Lampen vollständig — eine höhere Stufe macht daraus keinen Läufer *über* einem
-  Untergrund.
+  Untergrund. Dafür gibt es im Matrix-Editor (Stil Dimmer) den Haken **Dunkle Lampen
+  durchlassen**: dann setzt der Effekt nur seine hellen Lampen (auch den Schweif) genau auf
+  seinen Wert, in seiner Stufe — die dunklen gehören dem, was darunter läuft. Anders als
+  Modify *Addieren* (legt obendrauf, 40 % + 70 % = 100 %) stehen dort genau 70 %.
 - **Master und Blackout:** Grand Master, Gruppen-Fader, Blackout und Laser-NOT-AUS wirken
   nach allen Effekten, egal auf welcher Stufe.
 
