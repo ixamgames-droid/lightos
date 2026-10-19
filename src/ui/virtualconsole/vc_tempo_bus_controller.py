@@ -314,8 +314,10 @@ class VCTempoBusController(VCWidget):
         if self._reset_rect().contains(pos):
             self.set_factor(1.0); event.accept(); return
         # Effekte-Zeile -> Pro-Effekt-Menue (einzeln entfernen / hinzufuegen / Parameter)
+        # UI-96: im Kiosk ist das Bearbeitung — Klick wird geschluckt.
         if self._effects_rect().contains(pos):
-            self._open_effects_menu(event.globalPosition().toPoint())
+            if not self._kiosk_active():
+                self._open_effects_menu(event.globalPosition().toPoint())
             event.accept(); return
         # SYNC
         if self._sync_rect().contains(pos):
@@ -345,6 +347,8 @@ class VCTempoBusController(VCWidget):
     def _open_effects_menu(self, global_pos):
         """Pro-Effekt-Menue: jeden gekoppelten Effekt einzeln entfernen, oder den
         Eigenschaften-Dialog oeffnen (hinzufuegen + pro Effekt den Parameter waehlen)."""
+        if self._kiosk_active():
+            return          # UI-96: im Kiosk keine Effekt-Belegung
         menu = QMenu(self)
         ids = self._targets()
         for fid, nm in zip(ids, self._target_names(ids)):
@@ -488,6 +492,8 @@ class VCTempoBusController(VCWidget):
     # ── Eigenschaften ────────────────────────────────────────────────────────────
 
     def _open_properties(self):
+        if self._kiosk_active():
+            return          # UI-96: im Kiosk kein Eigenschaften-Dialog
         dlg = QDialog(self)
         dlg.setWindowTitle("Tempo-Bus-Controller")
         form = QFormLayout(dlg)

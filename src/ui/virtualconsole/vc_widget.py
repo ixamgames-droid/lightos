@@ -605,6 +605,12 @@ class VCWidget(QFrame):
         """function_id des gebundenen Effekts (oder None = aktiver Effekt)."""
         return None
 
+    def _kiosk_active(self) -> bool:
+        """UI-96: True, wenn der umgebende Canvas im Kiosk-Modus ist — dort gibt
+        es auch im Bedienmodus keinen Weg in Eigenschaften/Belegung."""
+        canvas = self._find_canvas()
+        return bool(getattr(canvas, "kiosk", False)) if canvas is not None else False
+
     def _find_canvas(self):
         """Naechster Vorfahr, der Live-Bedienelemente erzeugen kann (VCCanvas)."""
         p = self.parent()
