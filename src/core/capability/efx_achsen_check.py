@@ -51,8 +51,8 @@ def efx_achsen_befunde(show: dict) -> list[Finding]:
         if isinstance(pf, dict):
             patch_by_fid.setdefault(_zahl(pf.get("fid"), -1), pf)
     try:
-        from types import SimpleNamespace
         from src.core.app_state import get_channels_for_patched
+        from .dimmer_check import geraet_aus_patch
     except Exception:
         return []
     attr_cache: dict[int, set[str] | None] = {}
@@ -63,12 +63,9 @@ def efx_achsen_befunde(show: dict) -> list[Finding]:
         pf = patch_by_fid.get(fid)
         res: set[str] | None = None
         if pf is not None:
-            fake = SimpleNamespace(
-                fixture_profile_id=_zahl(pf.get("fixture_profile_id"), 0),
-                mode_name=str(pf.get("mode_name") or ""),
-                channel_count=_zahl(pf.get("channel_count"), 1),
-                address=_zahl(pf.get("address"), 1),
-                spider_dual_tilt=bool(pf.get("spider_dual_tilt", False)))
+            # FM-69: dieselbe Profil-Nummer wie ``load_show`` — eine Show aus
+            # einer anderen Bibliothek traegt fremde Nummern.
+            fake = geraet_aus_patch(pf)
             try:
                 chans = list(get_channels_for_patched(fake) or ())
             except Exception:
