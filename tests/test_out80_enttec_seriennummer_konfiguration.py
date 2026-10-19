@@ -43,9 +43,10 @@ from src.core.dmx import serial_process as sp                    # noqa: E402
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_PID, ENTTEC_VID  # noqa: E402
 
 if os.name == "posix":
-    P0, P1 = "/dev/ttyFAKE_OUT80_0", "/dev/ttyFAKE_OUT80_1"
+    P0, P1, P2 = ("/dev/ttyFAKE_OUT80_0", "/dev/ttyFAKE_OUT80_1",
+                  "/dev/ttyFAKE_OUT80_2")
 else:
-    P0, P1 = "COM80", "COM81"
+    P0, P1, P2 = "COM80", "COM81", "COM82"
 
 FELD = "enttec_seriennr"
 
@@ -307,6 +308,79 @@ class NeustartVertauschtePorts(_Basis):
                 self.om.remove_output(u)
 
 
+class EigenerFehltInProzess(_Basis):
+    """Gegenpruefung Befund 3: im In-Prozess-Pfad wird U1 angelegt (und
+    oeffnet), BEVOR U2 existiert — nur die vorgemerkte Nummer von U2 haelt
+    U1 von dessen Dongle fern."""
+
+    def test_fremder_am_port_wird_nicht_genommen(self):
+        os.environ["LIGHTOS_SERIAL_INPROC"] = "1"
+        self._schreibe(_zeile(1, P0, "AAA"), _zeile(2, P1, "BBB"))
+        WELT.enttecs = {P0: "BBB"}                  # AAA fehlt
+        with mock.patch.object(enttec_pro, "_OFFEN", {}), \
+                mock.patch.object(enttec_pro, "_SN_BESITZER", {}):
+            self._uebernehmen()
+
+            def _sn(u):          # dunkel = nicht angelegt oder nicht offen
+                d = self.om._enttec_outputs.get(u)
+                return d._ser.sn if d is not None and d.is_open() else None
+            self.assertNotEqual("BBB", _sn(1), "U1 schreibt auf den Dongle von U2")
+            self.assertEqual("BBB", _sn(2))
+            for u in (1, 2):
+                self.om.remove_output(u)
+
+
+class DoppelteNummer(_Basis):
+    """Gegenpruefung Befund 1: dieselbe Nummer in zwei Zeilen."""
+    UNIVERSEN = (1, 3)
+
+    def test_verdraengen_hinterlaesst_keine_doppelte_nummer(self):
+        # Weg aus dem Befund (In-Prozess): U1 lief auf AAA an P0; die Datei
+        # nennt jetzt U1 an P2 MIT AAA (alter Dialog-Stand) und eine neue
+        # Zeile U3 an P0 ohne Nummer. U1 folgt AAA nach P0, U3 verdraengt es
+        # dort und lernt AAA.
+        os.environ["LIGHTOS_SERIAL_INPROC"] = "1"
+        with mock.patch.object(enttec_pro, "_OFFEN", {}), \
+                mock.patch.object(enttec_pro, "_SN_BESITZER", {}), \
+                redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self._schreibe(_zeile(1, P0, "AAA"))
+            WELT.enttecs = {P0: "AAA"}
+            self._uebernehmen()
+            self._nachfuehren()
+            self._speichern_abwarten()
+            self._schreibe(_zeile(1, P2, "AAA"), _zeile(3, P0))
+            WELT.enttecs = {P0: "AAA", P2: "CCC"}
+            self._uebernehmen()
+            self._nachfuehren()
+            self._speichern_abwarten()
+            z = self._zeilen()
+            self.assertEqual("AAA", z[3][FELD])
+            self.assertNotEqual("AAA", z[1].get(FELD), "AAA steht in zwei Zeilen")
+            for u in (1, 3):
+                self.om.remove_output(u)
+
+    def test_doppelte_nummer_wird_keinem_gegeben(self):
+        # So stand es nach dem Befund in der Datei; nach dem Neustart muss
+        # jedes Universum senden, keines sich selbst sperren.
+        self._schreibe(_zeile(1, P2, "AAA"), _zeile(3, P0, "AAA"))
+        WELT.enttecs = {P0: "AAA", P2: "CCC"}
+        self._uebernehmen()
+        w = self._worker(1, 3)
+        self.assertEqual(("CCC", "AAA"), (w[1].dongle(), w[3].dongle()))
+        notes = getattr(self.state, "enttec_port_notes", {})
+        self.assertIn("steht auch bei Universe 3", notes.get(1) or "")
+        self.assertIn("steht auch bei Universe 1", notes.get(3) or "")
+        self._nachfuehren()
+        self._speichern_abwarten()
+        z = self._zeilen()
+        self.assertEqual(("CCC", "AAA"), (z[1][FELD], z[3][FELD]))
+
+    def test_vormerken_verwirft_doppelte(self):
+        with redirect_stdout(io.StringIO()):
+            self.om.enttec_seriennr_vormerken({1: "AAA", 3: "AAA", 4: "DDD"})
+        self.assertEqual({4: "DDD"}, self.om._enttec_sn_tabelle())
+
+
 # ── alte Zeilen ohne Nummer ──────────────────────────────────────────────────
 
 class AlteZeilen(_Basis):
@@ -439,8 +513,10 @@ class UebernehmenNachVertauschen(_Basis):
         w = self._worker(1, 2)
         self.assertEqual(("AAA", "BBB"), (w[1].dongle(), w[2].dongle()))
 
-    def test_bewusst_anderer_port_behaelt_nummer(self):
-        # Der Nutzer stellt U1 auf P1 um: der Dongle zaehlt, nicht der Port.
+    def test_gespeicherte_nummer_gilt_vor_dem_port(self):
+        # Datei nennt P1 MIT der Nummer AAA (so sieht ein Neustart nach dem
+        # Vertauschen aus): der Dongle zaehlt, nicht der Port. Eine
+        # Portaenderung im Dialog schreibt dagegen "" (s. DialogTest).
         self._schreibe(_zeile(1, P0, "AAA"))
         WELT.enttecs = {P0: "AAA"}
         self._uebernehmen()
@@ -452,6 +528,23 @@ class UebernehmenNachVertauschen(_Basis):
         w = self._worker(1)
         self.assertEqual("AAA", w[1].dongle())
         self.assertEqual("AAA", self._zeilen()[1][FELD])
+
+    def test_portaenderung_aus_dem_dialog_nimmt_den_neuen_dongle(self):
+        # Gegenpruefung Befund 2: der Dialog schreibt bei neuem Port "" —
+        # dann sendet U1 auf dem Dongle am gewaehlten Port, nicht still weiter
+        # auf dem alten.
+        self._schreibe(_zeile(1, P0, "AAA"))
+        WELT.enttecs = {P0: "AAA"}
+        self._uebernehmen()
+        self._worker(1)
+        self._schreibe(_zeile(1, P2, ""))
+        WELT.enttecs = {P0: "AAA", P2: "CCC"}
+        self._uebernehmen()
+        w = self._worker(1)
+        self.assertEqual("CCC", w[1].dongle(), "gewaehlter Port ignoriert")
+        self._nachfuehren()
+        self._speichern_abwarten()
+        self.assertEqual("CCC", self._zeilen()[1][FELD])
 
     def test_not_aus_sperre_greift_nach_uebernehmen(self):
         self._laufzeit_vertauscht()
@@ -543,7 +636,7 @@ class DialogTest(unittest.TestCase):
         oc._UNIV_CONFIG_PATH = self.pfad
         self.addCleanup(setattr, oc, "_UNIV_CONFIG_PATH", alt)
         oc._save_universe_config([
-            _zeile(1, P0, "EN314159"),
+            _zeile(1, P0, "EN0314159"),
             {"num": 2, "name": "Netz", "output": "Disabled", "patch": ""},
         ])
         from src.core.app_state import get_state
@@ -577,48 +670,105 @@ class DialogTest(unittest.TestCase):
         t = self.dlg._univ_table
         self.assertEqual("Dongle", t.horizontalHeaderItem(5).text())
         self.assertEqual("Seriennr. …4159", t.item(0, 5).text())
-        self.assertNotIn("EN314159", t.item(0, 5).text())
+        self.assertNotIn("EN0314159", t.item(0, 5).text())
         self.assertEqual("—", t.item(1, 5).text())
 
-    def test_speichern_behaelt_nummer_auch_bei_neuem_port(self):
+    def test_speichern_ohne_portaenderung_behaelt_nummer(self):
+        self.dlg._univ_table.item(0, 1).setText("Bühne")
+        self.dlg._univ_save()
+        z = self._datei()
+        self.assertEqual((P0, "EN0314159"), (z[1]["patch"], z[1][FELD]))
+        self.assertNotIn(FELD, z[2])
+
+    def test_neuer_port_vergisst_nummer(self):
+        # Gegenpruefung Befund 2: ein ausdruecklich anderer Port meint einen
+        # anderen Dongle — sonst sendete U1 still weiter auf dem alten.
         self.dlg._univ_table.item(0, 3).setText(P1)
         self.dlg._univ_save()
         z = self._datei()
-        self.assertEqual((P1, "EN314159"), (z[1]["patch"], z[1][FELD]))
+        self.assertEqual((P1, ""), (z[1]["patch"], z[1][FELD]))
         self.assertNotIn(FELD, z[2])
+
+    def test_umnummerieren_und_neue_zeile_erbt_keine_nummer(self):
+        # Gegenpruefung Befund 1: Zeile 1 -> # 3, neue Zeile 1 (Enttec).
+        t = self.dlg._univ_table
+        t.item(0, 0).setText("3")
+        self.dlg._univ_add()
+        neu = t.rowCount() - 1
+        t.item(neu, 0).setText("1")
+        t.cellWidget(neu, 2).setCurrentText("Enttec")
+        t.item(neu, 3).setText(P1)
+        self.dlg._univ_save()
+        z = self._datei()
+        self.assertEqual("EN0314159", z[3][FELD])
+        self.assertEqual("", z[1].get(FELD, ""))
+        self.assertEqual("Enttec", z[1]["output"])
+
+    def test_warnung_waehrend_speichern_verliert_gelernte_nicht(self):
+        # Gegenpruefung Befund 4: waehrend eine Warnung offen ist (eigene
+        # Ereignisschleife), lernt der Hintergrund eine neue Nummer.
+        def _gelernt(*_a, **_k):
+            enttec_konfig.seriennr_eintragen(self.pfad, 1, "EN0888888")
+        self.oc.QMessageBox.warning.side_effect = _gelernt
+        self.dlg._univ_table.item(1, 0).setText("99")   # -> Warnung (Klemmung)
+        self.dlg._univ_save()
+        self.assertTrue(self.oc.QMessageBox.warning.called)
+        self.assertEqual("EN0888888", self._datei()[1][FELD])
 
     def test_im_hintergrund_gelernte_nummer_geht_nicht_verloren(self):
         rows = self.oc._load_universe_config()
-        rows[0][FELD] = "EN777777"            # nach dem Oeffnen des Dialogs gelernt
+        rows[0][FELD] = "EN0777777"            # nach dem Oeffnen des Dialogs gelernt
         self.oc._save_universe_config(rows)
         self.dlg._univ_save()
-        self.assertEqual("EN777777", self._datei()[1][FELD])
+        self.assertEqual("EN0777777", self._datei()[1][FELD])
 
     def test_dongle_neu_zuordnen(self):
         self.dlg._univ_table.selectRow(0)
         self.dlg._btn_dongle_neu.click()
         self.assertEqual("wird neu zugeordnet", self.dlg._univ_table.item(0, 5).text())
-        self.assertEqual("EN314159", self._datei()[1][FELD], "vor dem Speichern")
+        self.assertEqual("EN0314159", self._datei()[1][FELD], "vor dem Speichern")
         self.dlg._univ_save()
         self.assertEqual("", self._datei()[1][FELD])
         self.assertEqual("—", self.dlg._univ_table.item(0, 5).text())
         # Ein zweites Speichern vergisst nicht erneut eine inzwischen gelernte.
         rows = self.oc._load_universe_config()
-        rows[0][FELD] = "EN111111"
+        rows[0][FELD] = "EN0111111"
         self.oc._save_universe_config(rows)
         self.dlg._univ_save()
-        self.assertEqual("EN111111", self._datei()[1][FELD])
+        self.assertEqual("EN0111111", self._datei()[1][FELD])
 
-    def test_verbinden_gibt_gespeicherte_nummer_mit(self):
+    def _verbinden(self, univ, port):
         self.dlg._enttec_status_pruefen_spaeter = lambda *a, **k: None
         self.dlg._combo_port.clear()
-        self.dlg._combo_port.addItem("Test", P1)
+        self.dlg._combo_port.addItem("Test", port)
         self.dlg._combo_port.setCurrentIndex(0)
-        self.dlg._spin_enttec_univ.setValue(1)
+        self.dlg._spin_enttec_univ.setValue(univ)
         self.dlg._connect_enttec()
-        self.assertEqual(((1, P1), {"seriennr": "EN314159"}),
+
+    def test_verbinden_gibt_gespeicherte_nummer_mit(self):
+        self._verbinden(1, P0)
+        self.assertEqual(((1, P0), {"seriennr": "EN0314159"}),
                          self.add_enttec_aufrufe[-1])
-        self.assertEqual("EN314159", self._datei()[1][FELD])
+        self.assertEqual("EN0314159", self._datei()[1][FELD])
+
+    def test_verbinden_anderer_port_ohne_alte_nummer(self):
+        # Gegenpruefung Befund 2: „Verbinden“ an einem anderen Port.
+        self._verbinden(1, P1)
+        self.assertEqual(((1, P1), {}), self.add_enttec_aufrufe[-1])
+        self.assertEqual((P1, ""), (self._datei()[1]["patch"],
+                                    self._datei()[1][FELD]))
+
+    def test_verbinden_umzug_ersetzt_nummer_der_zielzeile(self):
+        # Gegenpruefung Befund 2: U2 (P1, EN0222222) gibt seinen Adapter an U1.
+        rows = self.oc._load_universe_config()
+        rows[1].update(output="Enttec", patch=P1, **{FELD: "EN0222222"})
+        self.oc._save_universe_config(rows)
+        self._verbinden(1, P1)
+        self.assertEqual(((1, P1), {"seriennr": "EN0222222"}),
+                         self.add_enttec_aufrufe[-1])
+        z = self._datei()
+        self.assertEqual("EN0222222", z[1][FELD])
+        self.assertNotIn(FELD, z[2])
 
     def test_verbinden_umzug_nimmt_nummer_mit(self):
         self.dlg._enttec_status_pruefen_spaeter = lambda *a, **k: None
@@ -627,10 +777,10 @@ class DialogTest(unittest.TestCase):
         self.dlg._combo_port.setCurrentIndex(0)
         self.dlg._spin_enttec_univ.setValue(2)
         self.dlg._connect_enttec()
-        self.assertEqual(((2, P0), {"seriennr": "EN314159"}),
+        self.assertEqual(((2, P0), {"seriennr": "EN0314159"}),
                          self.add_enttec_aufrufe[-1])
         z = self._datei()
-        self.assertEqual("EN314159", z[2][FELD])
+        self.assertEqual("EN0314159", z[2][FELD])
         self.assertNotIn(FELD, z[1])
 
 
@@ -693,7 +843,7 @@ class Diagnose(unittest.TestCase):
         from src.core.diagnose_log import anonymisiere
         text = anonymisiere(
             "U1 Enttec → /dev/serial/by-id/usb-ENTTEC_DMX_USB_PRO_EN555123-if00-port0")
-        self.assertNotIn("EN555123", text)
+        self.assertNotIn("EN0555123", text)
         self.assertIn("usb-ENTTEC_DMX_USB_PRO_…5123-if00-port0", text)
         self.assertEqual(text, anonymisiere(text))
 
@@ -701,27 +851,27 @@ class Diagnose(unittest.TestCase):
         from src.core import diagnose_log
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "universes.json"), "w", encoding="utf-8") as f:
-                json.dump([_zeile(1, P0, "EN555123")], f)
+                json.dump([_zeile(1, P0, "EN0555123")], f)
             with mock.patch.object(diagnose_log, "app_data_dir", lambda: d):
                 text = diagnose_log.einstellungen_text()
         self.assertIn("Dongle Seriennr. …5123", text)
-        self.assertNotIn("EN555123", text)
+        self.assertNotIn("EN0555123", text)
 
     def test_ausgabe_status_und_dmx_infos(self):
         from src.core import diagnose_log
         om = om_mod.OutputManager()
-        dev = SimpleNamespace(port=P0, konfig_port=P0, seriennr="EN555123",
+        dev = SimpleNamespace(port=P0, konfig_port=P0, seriennr="EN0555123",
                               is_open=lambda: True, close=lambda: None,
                               hinweis=lambda: "")
         om._enttec_outputs[1] = dev
         eintrag = [e for e in om.ausgabe_status() if e["weg"] == "Enttec"][0]
-        self.assertEqual("EN555123", eintrag["seriennr"])
+        self.assertEqual("EN0555123", eintrag["seriennr"])
         state = SimpleNamespace(output_manager=om)
         mod = SimpleNamespace(_state=state)
         with mock.patch.dict(sys.modules, {"src.core.app_state": mod}):
             zeilen = diagnose_log.dmx_infos()
         self.assertIn("Dongle Seriennr. …5123", zeilen[0])
-        self.assertNotIn("EN555123", zeilen[0])
+        self.assertNotIn("EN0555123", zeilen[0])
 
 
 class Speicher(unittest.TestCase):
@@ -740,6 +890,24 @@ class Speicher(unittest.TestCase):
                 rows = json.load(f)
             self.assertEqual("AAA", rows[0][FELD])
             self.assertNotIn(FELD, rows[1])
+
+    def test_eintragen_entfernt_nummer_aus_anderen_zeilen(self):
+        # Gegenpruefung Befund 1: ein Dongle, ein Ausgang.
+        with tempfile.TemporaryDirectory() as d:
+            pfad = os.path.join(d, "universes.json")
+            enttec_konfig.atomar_schreiben(pfad, [
+                _zeile(1, P2, "AAA"), _zeile(3, P0)])
+            self.assertTrue(enttec_konfig.seriennr_eintragen(pfad, 3, "AAA"))
+            with open(pfad, encoding="utf-8") as f:
+                rows = json.load(f)
+            self.assertNotIn(FELD, rows[0])
+            self.assertEqual("AAA", rows[1][FELD])
+            # Auch wenn die eigene Zeile die Nummer schon traegt.
+            enttec_konfig.atomar_schreiben(pfad, [
+                _zeile(1, P2, "AAA"), _zeile(3, P0, "AAA")])
+            self.assertTrue(enttec_konfig.seriennr_eintragen(pfad, 3, "AAA"))
+            with open(pfad, encoding="utf-8") as f:
+                self.assertNotIn(FELD, json.load(f)[0])
 
     def test_schreibfehler_laesst_datei_stehen(self):
         with tempfile.TemporaryDirectory() as d:

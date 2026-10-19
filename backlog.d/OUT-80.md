@@ -1,7 +1,7 @@
 ID: OUT-80
 Prioritaet: P2
 Status: review
-Status-Notiz: Seriennummer je Enttec-Zeile in universes.json (enttec_seriennr), beim Anlegen mitgegeben, gelernt/Ersatz atomar nachgetragen; Dialog-Spalte „Dongle“ (gekürzt) + „Dongle neu zuordnen“; Linux by-id-Namen im Port-Feld; Diagnose gekürzt. Offen: Messung am Rig mit zwei Dongles.
+Status-Notiz: Seriennummer je Enttec-Zeile in universes.json (enttec_seriennr), beim Anlegen mitgegeben, gelernt/Ersatz atomar nachgetragen; Dialog-Spalte „Dongle“ (gekürzt) + „Dongle neu zuordnen“; Linux by-id-Namen im Port-Feld; Diagnose gekürzt. Gegenprüfung: Nummer nie in zwei Zeilen (doppelte werden keinem gegeben + Hinweis), ausdrückliche Portwahl vergisst die alte Nummer, Umzug ersetzt sie, Dialog liest Nummern erst unter DATEI_LOCK. Offen: Messung am Rig mit zwei Dongles.
 Titel: Enttec-Seriennummer dauerhaft in der Universums-Konfiguration — Port-Vertauschung beim Booten und nach „Übernehmen“
 
 **Herkunft:** zweite Gegenprüfung zu OUT-66 (Befund 3). Bestand schon vor OUT-66 (Konfiguration nur über den Portnamen), eigenes Vorhaben.

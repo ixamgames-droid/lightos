@@ -231,8 +231,10 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    Universum sucht, gekürzt (`Seriennr. …5123`). LightOS merkt sie sich, sobald der
    Adapter einmal gesendet hat, und findet ihn darüber auch nach einem Neustart an einem
    anderen Port wieder — zwei ENTTEC tauschen ihre Universen also nicht, wenn Linux die
-   Portnummern vertauscht. Ändert sich nur der Port der Zeile, bleibt die Nummer.
-   Soll das Universum einen **anderen** Adapter nehmen: Zeile markieren, **Dongle neu
+   Portnummern vertauscht. Wählen Sie für die Zeile **ausdrücklich einen anderen Port**
+   (hier oder mit **Verbinden** im Reiter Enttec), gilt die alte Nummer nicht mehr: das
+   Universum lernt den Adapter am neuen Port (der stabile Name desselben Anschlusses
+   zählt nicht als anderer Port). Soll das Universum einen **anderen** Adapter nehmen: Zeile markieren, **Dongle neu
    zuordnen** (oder Rechtsklick auf die Zeile) und **Speichern** — danach lernt es den
    Adapter, der an seinem Port steckt.
 4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die

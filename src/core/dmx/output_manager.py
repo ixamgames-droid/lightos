@@ -537,9 +537,17 @@ class OutputManager:
         das erste Universum den Dongle des zweiten als „Ersatz“."""
         t = self._enttec_sn_tabelle()
         t.clear()
+        # Gegenpruefung: eine Nummer bei zwei Universen ist mehrdeutig —
+        # keinem zuordnen (der Aufrufer meldet es), statt eines sich selbst
+        # sperren zu lassen.
+        from . import enttec_konfig
+        doppelt = enttec_konfig.doppelte(zuordnung)
+        if doppelt:
+            print(f"[OutputManager] Enttec-Seriennummer mehrfach konfiguriert, "
+                  f"nicht verwendet: {len(doppelt)} (OUT-80)")
         for u, sn in dict(zuordnung or {}).items():
             sn = str(sn or "").strip()
-            if sn:
+            if sn and sn not in doppelt:
                 try:
                     t[int(u)] = sn
                 except (TypeError, ValueError):
@@ -563,6 +571,9 @@ class OutputManager:
             sn = self._enttec_sn(dev)
             if not sn or t.get(u) == sn:
                 continue
+            # Gegenpruefung: ein Dongle gehoert genau einem Universum.
+            for anderes in [k for k, v in t.items() if v == sn and k != u]:
+                t.pop(anderes, None)
             t[u] = sn
             cb = getattr(self, "bei_enttec_seriennr", None)
             if callable(cb):

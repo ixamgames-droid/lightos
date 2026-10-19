@@ -97,6 +97,11 @@ def seriennr_eintragen(pfad: str, universum: int, seriennr: str) -> bool:
 
     ``True`` nur, wenn die Datei geaendert wurde. Keine Enttec-Zeile fuer das
     Universum (geloescht, Typ gewechselt) oder schon dieselbe Nummer: nichts.
+
+    Gegenpruefung: ein Dongle hat genau einen Ausgang — dieselbe Nummer
+    verschwindet aus jeder ANDEREN Zeile (Feld entfernt). Sonst stand sie nach
+    einem Verdraengen in zwei Zeilen, und nach dem Neustart sperrte sich eines
+    der beiden Universen dauerhaft selbst.
     """
     sn = str(seriennr or "").strip()
     if not sn or not pfad:
@@ -105,18 +110,36 @@ def seriennr_eintragen(pfad: str, universum: int, seriennr: str) -> bool:
         if not os.path.exists(pfad):
             return False
         rows = lies(pfad)
+        eigene = [z for z in rows if isinstance(z, dict)
+                  and _nummer(z) == int(universum)
+                  and str(z.get("output") or "").strip() == "Enttec"]
+        if not eigene:
+            return False
         geaendert = False
-        for zeile in rows:
-            if not isinstance(zeile, dict) or _nummer(zeile) != int(universum):
-                continue
-            if str(zeile.get("output") or "").strip() != "Enttec":
-                continue
+        for zeile in eigene:
             if aus_zeile(zeile) != sn:
                 zeile[FELD] = sn
+                geaendert = True
+        for zeile in rows:
+            if (isinstance(zeile, dict) and _nummer(zeile) != int(universum)
+                    and aus_zeile(zeile) == sn):
+                zeile.pop(FELD, None)
                 geaendert = True
         if not geaendert:
             return False
         return atomar_schreiben(pfad, rows)
+
+
+def doppelte(zuordnung) -> set:
+    """Gegenpruefung: Nummern, die in ``{universum: nummer}`` mehr als einem
+    Universum gehoeren. Sie sind mehrdeutig und werden keinem mitgegeben —
+    jedes dieser Universen verhaelt sich wie eine alte Zeile ohne Nummer."""
+    gesehen: dict[str, int] = {}
+    for sn in dict(zuordnung or {}).values():
+        sn = str(sn or "").strip()
+        if sn:
+            gesehen[sn] = gesehen.get(sn, 0) + 1
+    return {sn for sn, n in gesehen.items() if n > 1}
 
 
 class SeriennrSpeicher:

@@ -240,8 +240,10 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    **Dongle** (read-only) — for `Enttec` the serial number of the adapter this universe
    looks for, shortened (`Seriennr. …5123`). LightOS remembers it once the adapter has
    sent, and finds it by it even at another port after a restart — two ENTTECs do not
-   swap their universes when Linux swaps the port numbers. Changing only the port of the
-   row keeps the number. To make the universe use a **different** adapter: select the
+   swap their universes when Linux swaps the port numbers. If you **deliberately pick a
+   different port** for the row (here or with **Verbinden** on the Enttec tab), the old
+   number no longer applies: the universe learns the adapter at the new port (the stable
+   name of the same port does not count as a different one). To make the universe use a **different** adapter: select the
    row, **Dongle neu zuordnen** (reassign dongle; or right-click the row) and
    **Speichern** — it then learns the adapter plugged into its port.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)

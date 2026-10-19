@@ -98,9 +98,20 @@ Worker-Loop).
   `os.replace`, dieselbe Sperre wie der Dialog). Eine übernommene Ersatz-Nummer ersetzt
   die gespeicherte. Fehlt das Feld (alte Zeile), gilt die Nummer des laufenden Geräts;
   ein leeres Feld (`""`) heißt „vergessen“ (Dialog: **Dongle neu zuordnen**) — dann wird
-  keine mitgegeben, die nächste gelernte wird eingetragen. Ein Portwechsel der Zeile behält
-  die Nummer (der Dongle zählt, nicht der Port); zieht der Adapter im Reiter Enttec auf ein
-  anderes Universum um, zieht die Nummer mit.
+  keine mitgegeben, die nächste gelernte wird eingetragen. Ein **ausdrücklicher Portwechsel**
+  im Dialog (Reiter Universen oder „Verbinden“ im Reiter Enttec) schreibt `""`: der
+  Bediener meint den Dongle am neuen Port, die Ausgabe sendet nicht still weiter auf dem
+  alten (Gegenprüfung). Derselbe Anschluss unter anderem Namen (`/dev/serial/by-id`,
+  `com3`/`COM3`) gilt nicht als Wechsel. Zieht der Adapter im Reiter Enttec auf ein anderes
+  Universum um, ersetzt seine Nummer die der Zielzeile.
+- **Ein Dongle, eine Zeile (Gegenprüfung):** `seriennr_eintragen` entfernt die gelernte
+  Nummer aus jeder anderen Zeile; der Dialog gibt einer neuen Zeile keine Nummer aus der
+  Datei mit und liest die Nummern erst unmittelbar vor dem Schreiben unter `DATEI_LOCK`.
+  Steht trotzdem dieselbe Nummer in mehreren Enttec-Zeilen (Handbearbeitung, ältere
+  Datei), bekommt sie keine davon (`enttec_konfig.doppelte`) — die Universen verhalten
+  sich wie alte Zeilen und lernen neu; der Hinweis „Enttec-Seriennummer steht auch bei
+  Universe …“ steht in der Statusleiste. Die Nummer des laufenden Geräts ergänzt eine Zeile
+  ohne Feld nur, wenn keine andere Zeile sie ausdrücklich trägt.
 - **Linux: stabile Namen.** Der Reiter Enttec bietet hinter jedem Anschluss zusätzlich die
   Namen aus `/dev/serial/by-id` an (`anschluss_auswahl.mit_stabilen_namen`; im Test über
   `LIGHTOS_SERIAL_BY_ID` umgelenkt). Windows unverändert. `diagnose_port` erkennt einen

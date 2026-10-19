@@ -313,7 +313,8 @@ class FeatureDimmer:
 
 
 
-def _enttec_seriennr_vorbereiten(state, path: str, rows) -> dict:
+def _enttec_seriennr_vorbereiten(state, path: str, rows,
+                                 doppelt_hinweise: dict | None = None) -> dict:
     """OUT-80: Seriennummer je Enttec-Zeile (``{universum: nummer}``).
 
     Fehlt das Feld (alte Zeile, oder der Dialog schrieb seine Tabelle,
@@ -323,12 +324,19 @@ def _enttec_seriennr_vorbereiten(state, path: str, rows) -> dict:
 
     Haengt ausserdem den Rueckruf an den OutputManager, der neu gelernte
     Nummern in ``path`` schreibt (im Hintergrund, nur bei Aenderung).
-    Fehler hier halten das Einrichten nie auf."""
+    Fehler hier halten das Einrichten nie auf.
+
+    Gegenpruefung: die Nummer des laufenden Geraets gilt nur, wenn keine
+    andere Zeile sie ausdruecklich traegt (umnummerierte Zeile, neue Zeile mit
+    der alten Nummer). Steht dieselbe Nummer trotzdem in mehreren Zeilen, ist
+    sie mehrdeutig: KEINE dieser Zeilen bekommt sie (Verhalten wie eine alte
+    Zeile), und ``doppelt_hinweise`` bekommt je Universum einen Hinweis."""
     om = state.output_manager
     zuordnung: dict[int, str] = {}
     try:
         from src.core.dmx import enttec_konfig
         laufend = getattr(om, "enttec_seriennr", None)
+        ohne_feld: list[int] = []
         for r in rows or []:
             if not isinstance(r, dict):
                 continue
@@ -339,10 +347,30 @@ def _enttec_seriennr_vorbereiten(state, path: str, rows) -> dict:
             except (TypeError, ValueError):
                 continue
             sn = enttec_konfig.aus_zeile(r)
-            if sn is None and callable(laufend):
-                sn = laufend(num) or None
-            if sn:
+            if sn is None:
+                ohne_feld.append(num)
+            elif sn:
+                zuordnung.setdefault(num, sn)
+                if zuordnung[num] != sn:            # zwei Zeilen, ein Universum
+                    zuordnung[num] = ""
+        ausdruecklich = set(zuordnung.values())
+        for num in ohne_feld:
+            sn = (laufend(num) or None) if callable(laufend) else None
+            if sn and sn not in ausdruecklich and num not in zuordnung:
                 zuordnung[num] = sn
+        doppelt = enttec_konfig.doppelte(zuordnung)
+        for num, sn in sorted(zuordnung.items()):
+            if sn in doppelt:
+                andere = sorted(u for u, s in zuordnung.items()
+                                if s == sn and u != num)
+                text = (f"Enttec-Seriennummer steht auch bei Universe "
+                        f"{', '.join(map(str, andere))} — nicht verwendet; "
+                        f"Dongle im Ausgabe-Dialog neu zuordnen (OUT-80).")
+                print(f"[app_state] Universe {num} (Enttec): {text}")
+                if doppelt_hinweise is not None:
+                    doppelt_hinweise[num] = text
+        zuordnung = {u: sn for u, sn in zuordnung.items()
+                     if sn and sn not in doppelt}
         vormerken = getattr(om, "enttec_seriennr_vormerken", None)
         if callable(vormerken):
             vormerken(zuordnung)
@@ -2519,7 +2547,9 @@ class AppState:
         # und die gespeicherten allen Ausgaben vorab bekanntgeben.
         # Modul-Funktion statt Methode: Bestandstests rufen diese Methode auf
         # einem SimpleNamespace-Stub auf (s. HW-5b weiter unten).
-        enttec_sn = _enttec_seriennr_vorbereiten(self, path, rows)
+        enttec_sn_doppelt: dict[int, str] = {}
+        enttec_sn = _enttec_seriennr_vorbereiten(self, path, rows,
+                                                 enttec_sn_doppelt)
         # ★★ OUT-52: Zuerst die Ausgaenge raeumen, deren Zeile GELOESCHT wurde.
         #
         # Die Schleife unten laeuft nur ueber die Zeilen, die es noch GIBT —
@@ -2650,6 +2680,10 @@ class AppState:
                     hinweis = diagnose_enttec_port(patch)
                     if hinweis:
                         print(f"[app_state] Universe {num} (Enttec): {hinweis}")
+                    # OUT-80 (Gegenpruefung): mehrdeutige Seriennummer sagen.
+                    if enttec_sn_doppelt.get(num):
+                        hinweis = "; ".join(
+                            t for t in (hinweis, enttec_sn_doppelt[num]) if t)
                     _merke_hinweis(num, hinweis)
                     # OUT-80: die gespeicherte Seriennummer mitgeben — das
                     # erste Oeffnen sucht SEINEN Dongle, nicht den, der nach

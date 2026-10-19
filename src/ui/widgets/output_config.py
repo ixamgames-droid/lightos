@@ -345,33 +345,60 @@ def _kurz(seriennr) -> str:
     return kuerze_seriennummer(str(seriennr or ""))
 
 
+def _gleicher_port(a, b) -> bool:
+    """OUT-80: derselbe Anschluss (Windows ``com3``/``COM3``, POSIX auch ueber
+    einen stabilen Namen aus ``/dev/serial/by-id``)."""
+    from src.core.dmx.enttec_pro import _port_key
+    return bool(str(a or "").strip()) and _port_key(a) == _port_key(b)
+
+
+def _laufende_seriennr(om, univ) -> str | None:
+    f = getattr(om, "enttec_seriennr", None)
+    if not callable(f):
+        return None
+    try:
+        return f(int(univ)) or None
+    except Exception:
+        return None
+
+
 def _enttec_seriennr_fuer(univ: int, port: str, om=None) -> str | None:
     """OUT-80: die Seriennummer, mit der „Verbinden“ den Enttec von ``univ``
-    anlegt. Die gespeicherte der Zeile (``""`` = bewusst vergessen -> keine);
-    fehlt sie, die einer ANDEREN Enttec-Zeile mit demselben Anschluss (der
-    Adapter zieht um, OUT-74), sonst die des laufenden Geraets."""
+    an ``port`` anlegt (``None`` = keine).
+
+    * Gleicher Anschluss wie in der Zeile von ``univ``: deren Nummer
+      (``""`` = bewusst vergessen -> keine; fehlt sie, die des laufenden
+      Geraets).
+    * Anderer Anschluss (Gegenpruefung): der Bediener hat ausdruecklich einen
+      anderen Port gewaehlt — die alte Nummer gilt NICHT mehr, sonst sendete
+      das Universum still weiter auf dem alten Dongle. Gemeint ist der Dongle
+      dieses Ports: die Nummer einer ANDEREN Enttec-Zeile mit diesem
+      Anschluss (der Adapter zieht um, OUT-74; sonst deren laufende), oder
+      keine — dann lernt das Universum den Dongle an ``port``.
+    """
     rows = [r for r in _load_universe_config() if isinstance(r, dict)]
-    for r in rows:
+
+    def _num(r):
         try:
-            if int(r.get("num", -1)) == int(univ):
-                sn = enttec_konfig.aus_zeile(r)
-                if sn is not None:
-                    return sn or None
+            return int(r.get("num", -1))
         except (TypeError, ValueError):
-            continue
-    key = adapter_zeilen.schluessel("Enttec", port)
-    for r in rows:
-        if key is not None and adapter_zeilen.schluessel(
-                r.get("output"), r.get("patch")) == key:
-            sn = enttec_konfig.aus_zeile(r)
-            if sn:
-                return sn
-    f = getattr(om, "enttec_seriennr", None)
-    if callable(f):
-        try:
-            return f(univ) or None
-        except Exception:
             return None
+
+    eigene = next((r for r in rows if _num(r) == int(univ)), None)
+    if (eigene is not None
+            and str(eigene.get("output") or "").strip() == "Enttec"
+            and _gleicher_port(eigene.get("patch"), port)):
+        sn = enttec_konfig.aus_zeile(eigene)
+        if sn is not None:
+            return sn or None
+        return _laufende_seriennr(om, univ)
+    for r in rows:
+        if (r is not eigene and str(r.get("output") or "").strip() == "Enttec"
+                and _gleicher_port(r.get("patch"), port)):
+            sn = enttec_konfig.aus_zeile(r)
+            if sn is not None:
+                return sn or None
+            return _laufende_seriennr(om, _num(r))
     return None
 
 
@@ -483,7 +510,8 @@ def _ext_zeile_pruefen(r: dict) -> bool:
 
 
 def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
-                    abgeraeumt: list | None = None) -> bool:
+                    abgeraeumt: list | None = None,
+                    enttec_seriennr=_UNSET) -> bool:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
     wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
@@ -502,6 +530,11 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
     QA-50: Gibt jetzt zurueck, ob die Datei wirklich geschrieben wurde. Die
     Aufrufer haengen ihre „(gespeichert)"-Meldung daran — sonst steht dort
     Erfolg, waehrend die Einstellung den naechsten Start nicht ueberlebt.
+
+    OUT-80: ``enttec_seriennr`` — ``_UNSET`` = Feld nicht anfassen (nur beim
+    Umzug wandert die Nummer mit), sonst der Wert, der in der Zeile steht
+    (``""`` = keine bekannt, das Universum lernt den Dongle an ``patch``).
+    Dieselbe Nummer verschwindet aus jeder anderen Zeile.
 
     OUT-74: ``abgeraeumt`` — eine Liste, die der Aufrufer mitgibt, wenn die
     Zeile einen ADAPTER meint (Enttec, uDMX). Dann verliert jede ANDERE Zeile
@@ -567,10 +600,22 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
                         r.pop(enttec_konfig.FELD, None)
                 except (TypeError, ValueError):
                     pass
-        if (output == "Enttec" and mitnehmen and ziel is not None
-                and enttec_konfig.aus_zeile(ziel) is None):
+        # Gegenpruefung: die mitgenommene Nummer ERSETZT die alte der Zielzeile
+        # (der Adapter dieses Ports ist jetzt ihrer), statt sie nur zu ergaenzen.
+        if output == "Enttec" and mitnehmen and ziel is not None:
             ziel[enttec_konfig.FELD] = mitnehmen
         abgeraeumt.extend(geraeumt)
+    if enttec_seriennr is not _UNSET:
+        ziel = next((r for r in rows if isinstance(r, dict)
+                     and str(r.get("num")) == str(int(num))), None)
+        sn = str(enttec_seriennr or "").strip()
+        if ziel is not None:
+            ziel[enttec_konfig.FELD] = sn
+        if sn:
+            for r in rows:
+                if (isinstance(r, dict) and r is not ziel
+                        and enttec_konfig.aus_zeile(r) == sn):
+                    r.pop(enttec_konfig.FELD, None)
     return _save_universe_config(rows)
 
 
@@ -1273,8 +1318,10 @@ class OutputConfigDialog(QDialog):
             # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen
             # (auch ArtNet/sACN), sonst bleibt bei einem Cross-Typ-Wechsel der alte
             # Adapter aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
-            # OUT-80: die gespeicherte Seriennummer kommt mit — auch wenn der
-            # Port gewechselt wurde: der Dongle zaehlt, nicht der Port.
+            # OUT-80: die gespeicherte Seriennummer kommt mit, solange der Port
+            # derselbe ist. Ein ausdruecklich anderer Port meint einen anderen
+            # Dongle (Gegenpruefung) — dann die Nummer des Dongles dort oder
+            # keine, s. ``_enttec_seriennr_fuer``.
             sn = _enttec_seriennr_fuer(univ, port, om)
             om.remove_output(univ)
             if sn:
@@ -1289,7 +1336,8 @@ class OutputConfigDialog(QDialog):
             # dort weiter in der Datei und kam beim naechsten Start zurueck.
             geraeumt: list[int] = []
             gespeichert = _persist_output(univ, "Enttec", port,
-                                          abgeraeumt=geraeumt)
+                                          abgeraeumt=geraeumt,
+                                          enttec_seriennr=sn or "")
             self._enttec_umzug = adapter_zeilen.umzug_text(geraeumt, univ)
             self._enttec_hinweise_nachfuehren(state, univ, port, geraeumt)
             self._univ_tabelle_nachladen()   # OUT-58, wie A3D-15 beim Art-Net
@@ -1781,7 +1829,7 @@ class OutputConfigDialog(QDialog):
                 num0 = None
             num_item.setData(Qt.ItemDataRole.UserRole, {
                 "num0": num0, "sn": enttec_konfig.aus_zeile(r),
-                "vergessen": False})
+                "patch0": str(r.get("patch") or ""), "vergessen": False})
             self._univ_dongle_zelle(i)
 
     # ── OUT-80: Dongle-Seriennummer je Zeile ─────────────────────────────────
@@ -1840,18 +1888,31 @@ class OutputConfigDialog(QDialog):
             item.setData(Qt.ItemDataRole.UserRole, meta)
             self._univ_dongle_zelle(z)
 
-    def _univ_seriennr_fuer_speichern(self, zeile: int, num: int, frisch) -> str | None:
+    def _univ_seriennr_fuer_speichern(self, zeile: int, entry: dict,
+                                      frisch) -> str | None:
         """Was beim Speichern im Feld steht: ``""`` nach „neu zuordnen“; sonst
         die AKTUELLE Nummer der Datei (sie kann seit dem Laden der Tabelle im
         Hintergrund gelernt worden sein), sonst die geladene; ``None`` = Feld
-        weglassen."""
+        weglassen.
+
+        Gegenpruefung: eine NEUE Zeile erbt nie eine Nummer aus der Datei —
+        auch nicht die einer Zeile, die frueher dieselbe Universumsnummer
+        hatte (sonst standen nach dem Umnummerieren zwei Zeilen auf einem
+        Dongle). Eine Enttec-Zeile mit ausdruecklich geaendertem Port meint
+        einen anderen Dongle: ``""``, das Universum lernt den am neuen Port."""
         meta = self._univ_meta(zeile)
+        enttec = entry.get("output") == "Enttec"
         if meta.get("vergessen"):
             return ""
         alt = meta.get("num0")
+        if alt is None:
+            return "" if enttec else None
+        if enttec and "patch0" in meta and not _gleicher_port(
+                meta.get("patch0"), entry.get("patch")):
+            return ""
         for r in frisch:
             try:
-                if int(r.get("num", -1)) == int(alt if alt is not None else num):
+                if int(r.get("num", -1)) == int(alt):
                     sn = enttec_konfig.aus_zeile(r)
                     if sn is not None:
                         return sn
@@ -1882,9 +1943,6 @@ class OutputConfigDialog(QDialog):
 
     def _univ_save(self):
         rows = []
-        # OUT-80: frischer Stand der Datei fuer die Seriennummern.
-        frisch = [r for r in _load_universe_config() if isinstance(r, dict)]
-        seriennr_je_zeile: list[str | None] = []
         adjusted: list[tuple[int, int]] = []   # A3D-33: (Zeilennr, geklemmte Nummer)
         # NET-13: (Zeilennr, Ausgabetyp, Eingabe, geklemmter Wert)
         ext_adjusted: list[tuple[int, str, str, int]] = []
@@ -1928,11 +1986,6 @@ class OutputConfigDialog(QDialog):
                     ext_adjusted.append((r + 1, entry["output"], ext_text, wert))
                     if ext_item is not None:
                         ext_item.setText(str(wert))   # UI spiegelt den Wert in der Datei
-            # OUT-80: die Seriennummer bleibt an der Zeile — auch bei neuem Port.
-            sn = self._univ_seriennr_fuer_speichern(r, num, frisch)
-            if sn is not None:
-                entry[enttec_konfig.FELD] = sn
-            seriennr_je_zeile.append(sn)
             rows.append(entry)
         if adjusted:
             _lst = ", ".join(f"Zeile {r}: → {n}" for r, n in adjusted)
@@ -1987,7 +2040,30 @@ class OutputConfigDialog(QDialog):
         # hat. Beide Fehler waren nur im Terminal zu sehen, das im Betrieb
         # niemand offen hat. Ein Dialog, der Erfolg behauptet, ist schlimmer als
         # gar keine Rueckmeldung: er beendet die Suche nach dem Fehler.
-        if not _save_universe_config(rows):
+        # OUT-80: die Seriennummern erst JETZT aus der Datei nachlesen, unter
+        # derselben Sperre wie der Hintergrund-Speicher und ohne Dialog
+        # dazwischen (Gegenpruefung) — die Warnungen oben laufen in eigenen
+        # Ereignisschleifen; eine dort gelernte Nummer ginge sonst verloren.
+        with enttec_konfig.DATEI_LOCK:
+            frisch = [r for r in _load_universe_config() if isinstance(r, dict)]
+            seriennr_je_zeile: list[str | None] = []
+            for z, entry in enumerate(rows):
+                sn = self._univ_seriennr_fuer_speichern(z, entry, frisch)
+                if sn is not None:
+                    entry[enttec_konfig.FELD] = sn
+                seriennr_je_zeile.append(sn)
+            # Ein Dongle, ein Universum: steht eine Nummer jetzt in mehreren
+            # Zeilen (z. B. im Hintergrund fuer eine andere gelernt), behaelt
+            # sie keine — die Universen lernen neu, statt sich zu sperren.
+            doppelt = enttec_konfig.doppelte(
+                {z: e.get(enttec_konfig.FELD) for z, e in enumerate(rows)
+                 if e.get("output") == "Enttec"})
+            for z, entry in enumerate(rows):
+                if entry.get(enttec_konfig.FELD) in doppelt:
+                    entry[enttec_konfig.FELD] = ""
+                    seriennr_je_zeile[z] = ""
+            gespeichert = _save_universe_config(rows)
+        if not gespeichert:
             QMessageBox.critical(
                 self, "Nicht gespeichert",
                 f"Die Universen-Konfiguration konnte nicht geschrieben werden:\n"
@@ -2001,7 +2077,8 @@ class OutputConfigDialog(QDialog):
             if item is None:
                 continue
             item.setData(Qt.ItemDataRole.UserRole, {
-                "num0": rows[z]["num"], "sn": sn, "vergessen": False})
+                "num0": rows[z]["num"], "sn": sn,
+                "patch0": rows[z]["patch"], "vergessen": False})
             self._univ_dongle_zelle(z)
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
         angewandt, fehler = True, ""
