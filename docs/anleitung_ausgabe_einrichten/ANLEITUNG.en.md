@@ -79,10 +79,6 @@ Tab **Enttec Pro USB**:
    connected to it, it is marked `(kein USB-Gerät erkannt)` (no USB device detected).
    In both cases the line below the list names the detected adapter. Without any port
    it says `Kein Port gefunden` (no port found).
-   On **Linux** each port is followed by its **stable name**
-   (`/dev/serial/by-id/usb-ENTTEC_…`, marked `stabiler Name für /dev/ttyUSB0`). It does
-   not change when Linux swaps `ttyUSB0` and `ttyUSB1` at boot — the better choice with
-   two adapters.
 2. **Ports aktualisieren** (refresh ports) — read the list in again after plugging in.
    The selection is kept; if nothing was selected yet, the ENTTEC you just plugged in
    is preselected.
@@ -242,10 +238,14 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    sent, and finds it by it even at another port after a restart — two ENTTECs do not
    swap their universes when Linux swaps the port numbers. If you **deliberately pick a
    different port** for the row (here or with **Verbinden** on the Enttec tab), the old
-   number no longer applies: the universe learns the adapter at the new port (the stable
-   name of the same port does not count as a different one). To make the universe use a **different** adapter: select the
-   row, **Dongle neu zuordnen** (reassign dongle; or right-click the row) and
-   **Speichern** — it then learns the adapter plugged into its port.
+   number no longer applies: the universe learns the adapter at the new port. To make the
+   universe use a **different** adapter: select the row, **Dongle neu zuordnen**
+   (reassign dongle; or right-click the row) and **Speichern** — it then learns the
+   adapter plugged into its port.
+   **Check once after the update:** an older configuration remembers, at its first
+   start, the adapter that is plugged into its port at that moment. If the ports were
+   swapped just then, the **Dongle** column shows the other adapter's number — use
+   **Dongle neu zuordnen** and **Speichern**.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
    removes the selected rows from the table; this only takes effect with **Speichern**
    (save).

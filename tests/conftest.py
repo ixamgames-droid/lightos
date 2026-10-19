@@ -334,13 +334,6 @@ os.environ.setdefault(
 os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
     _TEST_ROOT, f"lightos_test_universes_{_TEST_TOKEN}.json")
 
-# OUT-80: die stabilen Portnamen unter /dev/serial/by-id bietet der
-# Enttec-Reiter unter Linux zusaetzlich an. Im Test zeigt das auf einen Ordner,
-# den es nicht gibt — sonst hingen Tests mit Attrappen-Ports wie /dev/ttyUSB0
-# davon ab, ob am Testrechner gerade ein echter Adapter steckt.
-os.environ["LIGHTOS_SERIAL_BY_ID"] = os.path.join(
-    _TEST_ROOT, f"lightos_test_kein_by_id_{_TEST_TOKEN}")
-
 
 def _purge_test_dbs():
     """Die PROZESS-EIGENE Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)

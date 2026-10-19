@@ -76,10 +76,6 @@ Reiter **Enttec Pro USB**:
    Gerät, steht `(kein USB-Gerät erkannt)` dabei. In beiden Fällen nennt die Zeile
    unter der Liste den erkannten Adapter. Ohne jeden Port steht dort
    `Kein Port gefunden`.
-   Unter **Linux** steht hinter jedem Anschluss zusätzlich sein **stabiler Name**
-   (`/dev/serial/by-id/usb-ENTTEC_…`, Zusatz `stabiler Name für /dev/ttyUSB0`). Er
-   ändert sich nicht, wenn Linux beim Booten `ttyUSB0` und `ttyUSB1` vertauscht — bei
-   zwei Adaptern die bessere Wahl.
 2. **Ports aktualisieren** — nach dem Einstecken die Liste neu einlesen. Die Auswahl
    bleibt dabei erhalten; war noch nichts gewählt, wird der eben eingesteckte ENTTEC
    vorgewählt.
@@ -233,10 +229,13 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    anderen Port wieder — zwei ENTTEC tauschen ihre Universen also nicht, wenn Linux die
    Portnummern vertauscht. Wählen Sie für die Zeile **ausdrücklich einen anderen Port**
    (hier oder mit **Verbinden** im Reiter Enttec), gilt die alte Nummer nicht mehr: das
-   Universum lernt den Adapter am neuen Port (der stabile Name desselben Anschlusses
-   zählt nicht als anderer Port). Soll das Universum einen **anderen** Adapter nehmen: Zeile markieren, **Dongle neu
-   zuordnen** (oder Rechtsklick auf die Zeile) und **Speichern** — danach lernt es den
-   Adapter, der an seinem Port steckt.
+   Universum lernt den Adapter am neuen Port. Soll das Universum einen **anderen**
+   Adapter nehmen: Zeile markieren, **Dongle neu zuordnen** (oder Rechtsklick auf die
+   Zeile) und **Speichern** — danach lernt es den Adapter, der an seinem Port steckt.
+   **Nach dem Update einmal prüfen:** eine ältere Konfiguration merkt sich beim ersten
+   Start den Adapter, der gerade an ihrem Port steckt. Waren die Ports genau dann
+   vertauscht, steht in der Spalte **Dongle** die Nummer des anderen Adapters — dann
+   **Dongle neu zuordnen** und **Speichern**.
 4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
    markierten Zeilen aus der Tabelle; wirksam wird das erst mit **Speichern**.
 5. **Speichern** — schreibt `universes.json` (im LightOS-Datenordner) und wendet die Konfiguration

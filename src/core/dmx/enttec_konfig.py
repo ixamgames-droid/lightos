@@ -56,9 +56,23 @@ def _nummer(zeile) -> int | None:
 def atomar_schreiben(pfad: str, rows) -> bool:
     """``rows`` als JSON nach ``pfad`` — erst in eine Hilfsdatei daneben, dann
     per ``os.replace`` an ihren Platz (auf Windows und POSIX atomar).
-    ``True`` = geschrieben."""
+    ``True`` = geschrieben.
+
+    Gegenpruefung 2: ``os.replace`` ersetzt auch eine schreibgeschuetzte Datei
+    (es braucht nur Schreibrecht im Ordner) und einen Symlink durch eine
+    Datei. Darum: ein Symlink wird aufgeloest und sein ZIEL ersetzt; ohne
+    Schreibrecht auf die vorhandene Datei scheitert das Schreiben sichtbar
+    (``False`` + Meldung) wie vor OUT-80 das direkte ``open(…, "w")``."""
+    try:
+        pfad = os.path.realpath(pfad)
+    except (OSError, ValueError):
+        pass
     tmp = f"{pfad}.tmp{os.getpid()}"
     with DATEI_LOCK:
+        if os.path.exists(pfad) and not os.access(pfad, os.W_OK):
+            print(f"[enttec_konfig] ERROR: {pfad} nicht geschrieben: "
+                  f"schreibgeschuetzt")
+            return False
         try:
             ordner = os.path.dirname(pfad)
             if ordner:

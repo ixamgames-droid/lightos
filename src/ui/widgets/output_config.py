@@ -346,10 +346,16 @@ def _kurz(seriennr) -> str:
 
 
 def _gleicher_port(a, b) -> bool:
-    """OUT-80: derselbe Anschluss (Windows ``com3``/``COM3``, POSIX auch ueber
-    einen stabilen Namen aus ``/dev/serial/by-id``)."""
-    from src.core.dmx.enttec_pro import _port_key
-    return bool(str(a or "").strip()) and _port_key(a) == _port_key(b)
+    """OUT-80: derselbe Portname — gleichgesetzt wird nur die Gross-/
+    Kleinschreibung eines Windows-Namens (``com3``/``COM3``). Bewusst KEIN
+    Aufloesen von Symlinks (``/dev/serial/by-id``): zwei Namen fuer einen
+    Anschluss bietet der Dialog nicht an (Gegenpruefung 2)."""
+    a, b = str(a or "").strip(), str(b or "").strip()
+    if not a:
+        return False
+    if a.upper().startswith("COM") and b.upper().startswith("COM"):
+        return a.upper() == b.upper()
+    return a == b
 
 
 def _laufende_seriennr(om, univ) -> str | None:
@@ -512,6 +518,21 @@ def _ext_zeile_pruefen(r: dict) -> bool:
 def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
                     abgeraeumt: list | None = None,
                     enttec_seriennr=_UNSET) -> bool:
+    """Lesen-Aendern-Schreiben von ``universes.json`` unter
+    ``enttec_konfig.DATEI_LOCK`` (OUT-80, Gegenpruefung 2) — sonst konnte der
+    Hintergrund-Speicher der gelernten Seriennummern dazwischen schreiben und
+    wurde mit dem alten Stand ueberschrieben. Beschreibung s.
+    :func:`_persist_output_ungesperrt`."""
+    with enttec_konfig.DATEI_LOCK:
+        return _persist_output_ungesperrt(
+            num, output, patch, out_universe=out_universe,
+            abgeraeumt=abgeraeumt, enttec_seriennr=enttec_seriennr)
+
+
+def _persist_output_ungesperrt(num: int, output: str, patch: str,
+                               out_universe=_UNSET,
+                               abgeraeumt: list | None = None,
+                               enttec_seriennr=_UNSET) -> bool:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
     wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
@@ -1226,9 +1247,8 @@ class OutputConfigDialog(QDialog):
         aktuell = (bevorzugt or self._combo_port.currentData()
                    or _gespeicherter_enttec_port())
         alle_zeigen = self._check_alle_ports.isChecked()
-        # OUT-80: unter Linux zusaetzlich die stabilen Namen (/dev/serial/by-id).
-        anschluesse = anschluss_auswahl.mit_stabilen_namen(
-            anschluss_auswahl.ordnen(serial.tools.list_ports.comports()))
+        anschluesse = anschluss_auswahl.ordnen(
+            serial.tools.list_ports.comports())
         self._anschluesse = anschluesse
         # Der Neuaufbau meldet jede Zwischenauswahl — die Hinweiszeile wird
         # einmal am Ende gesetzt, nicht je Eintrag.
@@ -1335,9 +1355,17 @@ class OutputConfigDialog(QDialog):
             # anderen Universum schon geschlossen; ohne das Abraeumen stand er
             # dort weiter in der Datei und kam beim naechsten Start zurueck.
             geraeumt: list[int] = []
+            # OUT-80 (Gegenpruefung 2): ``add_enttec`` kann den Dongle schon
+            # geoeffnet und seine Nummer gelernt haben (In-Prozess-Pfad) — die
+            # gilt, nicht ``""``. Danach erfaehrt der Manager, was in der Datei
+            # steht; eine erst spaeter gelernte meldet er so erneut.
+            sn = _laufende_seriennr(om, univ) or sn or ""
             gespeichert = _persist_output(univ, "Enttec", port,
                                           abgeraeumt=geraeumt,
-                                          enttec_seriennr=sn or "")
+                                          enttec_seriennr=sn)
+            gemerkt = getattr(om, "enttec_seriennr_gespeichert", None)
+            if gespeichert and callable(gemerkt):
+                gemerkt(univ, sn)
             self._enttec_umzug = adapter_zeilen.umzug_text(geraeumt, univ)
             self._enttec_hinweise_nachfuehren(state, univ, port, geraeumt)
             self._univ_tabelle_nachladen()   # OUT-58, wie A3D-15 beim Art-Net

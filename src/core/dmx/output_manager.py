@@ -5,7 +5,7 @@ import os
 import threading
 import time
 from .universe import Universe
-from .enttec_pro import EnttecPro
+from .enttec_pro import EnttecPro, _port_key
 from .artnet import ArtNetSender
 from .sacn import SACNSender
 
@@ -560,6 +560,24 @@ class OutputManager:
         sn = self._enttec_sn(dev) if dev is not None else None
         return sn or self._enttec_sn_tabelle().get(universe)
 
+    def enttec_seriennr_gespeichert(self, universe: int, seriennr) -> None:
+        """OUT-80 (Gegenpruefung 2): ``universes.json`` traegt fuer ``universe``
+        jetzt ``seriennr`` (leer = keine). Die Tabelle zieht nach — weicht die
+        Nummer des laufenden Geraets davon ab (z. B. gelernt, waehrend der
+        Dialog seine Zeile mit ``""`` schrieb), meldet der naechste Abgleich
+        sie erneut und sie wird nachgetragen, statt bis zum Neustart nur hier
+        zu stehen."""
+        sn = str(seriennr or "").strip()
+        t = self._enttec_sn_tabelle()
+        try:
+            u = int(universe)
+        except (TypeError, ValueError):
+            return
+        if sn:
+            t[u] = sn
+        else:
+            t.pop(u, None)
+
     def _enttec_seriennr_abgleichen(self, geraete) -> None:
         """OUT-80: hat ein Geraet eine (andere) Seriennummer gelernt als die
         gespeicherte, die Tabelle nachziehen und ``bei_enttec_seriennr(u, sn)``
@@ -711,6 +729,20 @@ class OutputManager:
         for p in cls._enttec_ports_jetzt(dev):
             if ("enttec", p) not in wege:
                 wege.append(("enttec", p))
+        # OUT-80 (Gegenpruefung 2): derselbe Anschluss unter einem anderen
+        # Namen — von Hand eingetippt ``/dev/serial/by-id/…`` (Symlink auf
+        # ``ttyUSB1``) oder unter Windows ``com3`` statt ``COM3``. Zusaetzlich
+        # (nie statt) der normalisierte Schluessel: die Sperre wird so nur
+        # breiter, und beide Schreibweisen treffen dieselbe.
+        for _, p in list(wege):
+            if not isinstance(p, str) or not p:
+                continue
+            try:
+                k = _port_key(p)
+            except Exception:
+                continue
+            if k and ("enttec", k) not in wege:
+                wege.append(("enttec", k))
         return wege
 
     @staticmethod

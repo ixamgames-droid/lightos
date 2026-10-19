@@ -622,7 +622,12 @@ class Vergessen(_Basis):
 
 # ── Dialog ───────────────────────────────────────────────────────────────────
 
-class DialogTest(unittest.TestCase):
+class _DialogBasis(unittest.TestCase):
+    #: True = der echte ``add_enttec`` des Managers laeuft (mit Attrappen).
+    ECHT = False
+
+    def _echt_vorbereiten(self):
+        pass
 
     def setUp(self):
         from PySide6.QtWidgets import QApplication
@@ -643,11 +648,18 @@ class DialogTest(unittest.TestCase):
         state = get_state()
         om = state.output_manager
         self.add_enttec_aufrufe = []
-        p = mock.patch.object(om, "add_enttec", lambda *a, **k:
-                              self.add_enttec_aufrufe.append((a, k)))
-        p.start(); self.addCleanup(p.stop)
-        p = mock.patch.object(om, "remove_output", lambda *a, **k: None)
-        p.start(); self.addCleanup(p.stop)
+        self.om = om
+        if self.ECHT:
+            self._echt_vorbereiten()
+        else:
+            p = mock.patch.object(om, "add_enttec", lambda *a, **k:
+                                  self.add_enttec_aufrufe.append((a, k)))
+            p.start(); self.addCleanup(p.stop)
+            p = mock.patch.object(om, "remove_output", lambda *a, **k: None)
+            p.start(); self.addCleanup(p.stop)
+            # Die Seriennummer-Tabelle des (geteilten) Managers je Test frisch.
+            p = mock.patch.object(om, "_enttec_sn_konfig", {}, create=True)
+            p.start(); self.addCleanup(p.stop)
         p = mock.patch.object(state, "apply_output_config", lambda *a, **k: None)
         p.start(); self.addCleanup(p.stop)
         p = mock.patch.object(oc, "QMessageBox")
@@ -665,6 +677,17 @@ class DialogTest(unittest.TestCase):
     def _datei(self):
         with open(self.pfad, encoding="utf-8") as f:
             return {r["num"]: r for r in json.load(f)}
+
+    def _verbinden(self, univ, port):
+        self.dlg._enttec_status_pruefen_spaeter = lambda *a, **k: None
+        self.dlg._combo_port.clear()
+        self.dlg._combo_port.addItem("Test", port)
+        self.dlg._combo_port.setCurrentIndex(0)
+        self.dlg._spin_enttec_univ.setValue(univ)
+        self.dlg._connect_enttec()
+
+
+class DialogTest(_DialogBasis):
 
     def test_zeigt_gekuerzt(self):
         t = self.dlg._univ_table
@@ -737,14 +760,6 @@ class DialogTest(unittest.TestCase):
         self.dlg._univ_save()
         self.assertEqual("EN0111111", self._datei()[1][FELD])
 
-    def _verbinden(self, univ, port):
-        self.dlg._enttec_status_pruefen_spaeter = lambda *a, **k: None
-        self.dlg._combo_port.clear()
-        self.dlg._combo_port.addItem("Test", port)
-        self.dlg._combo_port.setCurrentIndex(0)
-        self.dlg._spin_enttec_univ.setValue(univ)
-        self.dlg._connect_enttec()
-
     def test_verbinden_gibt_gespeicherte_nummer_mit(self):
         self._verbinden(1, P0)
         self.assertEqual(((1, P0), {"seriennr": "EN0314159"}),
@@ -784,57 +799,105 @@ class DialogTest(unittest.TestCase):
         self.assertNotIn(FELD, z[1])
 
 
-# ── Linux: stabile Namen; Diagnose ───────────────────────────────────────────
+# ── Gegenpruefung 2: keine zwei Namen fuer einen Anschluss ───────────────────
 
-@unittest.skipUnless(os.name == "posix", "/dev/serial/by-id gibt es nur unter POSIX")
-class StabileNamen(unittest.TestCase):
+class KeineStabilenNamen(unittest.TestCase):
+    """Entscheidung: by-id-Namen bietet OUT-80 NICHT an (sie galten in den
+    NOT-AUS-Weg-Schluesseln als anderer Anschluss)."""
+
+    def test_port_auswahl_ohne_by_id(self):
+        self.assertFalse(hasattr(anschluss_auswahl, "mit_stabilen_namen"))
+        self.assertFalse(hasattr(anschluss_auswahl, "BY_ID_ORDNER"))
+
+    def test_gleicher_port_nur_windows_schreibweise(self):
+        import src.ui.widgets.output_config as oc
+        self.assertTrue(oc._gleicher_port("COM3", "com3"))
+        self.assertTrue(oc._gleicher_port(" COM3", "COM3 "))
+        self.assertFalse(oc._gleicher_port("COM3", "COM4"))
+        self.assertFalse(oc._gleicher_port("", ""))
+        self.assertTrue(oc._gleicher_port(P0, P0))
+        self.assertFalse(oc._gleicher_port(P0, P1))
+
+    @unittest.skipUnless(os.name == "posix", "Symlinks als Portnamen: POSIX")
+    def test_gleicher_port_loest_keine_symlinks_auf(self):
+        import src.ui.widgets.output_config as oc
+        with tempfile.TemporaryDirectory() as d:
+            ziel = os.path.join(d, "ttyFAKE_OUT80")
+            open(ziel, "w").close()
+            link = os.path.join(d, "usb-ENTTEC_DMX_USB_PRO_EN123456-if00-port0")
+            os.symlink(ziel, link)
+            self.assertFalse(oc._gleicher_port(link, ziel))
+
+
+class _Sender:
+    gesendet: dict = {}
+
+    def __init__(self, port):
+        self.port = port
+
+    def send_dmx(self, data):
+        _Sender.gesendet[self.port] = bytes(data)
+
+    def close(self):
+        pass
+
+    def is_open(self):
+        return True
+
+
+@unittest.skipUnless(os.name == "posix", "Symlinks als Portnamen: POSIX")
+class NotAusZweiNamenEinAnschluss(unittest.TestCase):
+    """Gegenpruefung 2, Befund 1: ein von Hand eingetippter by-id-Name und der
+    tty-Name desselben Anschlusses sind EIN Ausgabeweg (OUT-64)."""
 
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.tmp.cleanup)
-        self.geraet = os.path.join(self.tmp.name, "ttyFAKE0")
-        open(self.geraet, "w").close()
-        self.byid = os.path.join(self.tmp.name, "by-id")
-        os.mkdir(self.byid)
-        self.link = os.path.join(self.byid,
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.ziel = os.path.join(tmp.name, "ttyFAKE_OUT80_1")
+        open(self.ziel, "w").close()
+        self.link = os.path.join(tmp.name,
                                  "usb-ENTTEC_DMX_USB_PRO_EN123456-if00-port0")
-        os.symlink(self.geraet, self.link)
+        os.symlink(self.ziel, self.link)
+        p = mock.patch.object(om_mod, "_make_enttec_device", _Sender)
+        p.start()
+        self.addCleanup(p.stop)
+        _Sender.gesendet = {}
+        self.om = om_mod.OutputManager()
+        for u in (1, 2):
+            self.om.add_universe(u)
+        self.om.universes[1].set_channel(40, 255)
+        self.om.universes[2].set_channel(40, 255)
 
-    def _liste(self):
-        return anschluss_auswahl.ordnen([
-            SimpleNamespace(device=self.geraet, vid=ENTTEC_VID, pid=ENTTEC_PID,
-                            description="DMX USB PRO"),
-            SimpleNamespace(device="/dev/ttyS0", vid=None, pid=None,
-                            description="n/a")])
+    def _senden(self):
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.om._send_all()
 
-    def test_link_hinter_dem_anschluss(self):
-        liste = anschluss_auswahl.mit_stabilen_namen(self._liste(), self.byid)
-        self.assertEqual([self.geraet, self.link, "/dev/ttyS0"],
-                         [a.device for a in liste])
-        self.assertEqual(anschluss_auswahl.ADAPTER, liste[1].klasse)
-        self.assertEqual(self.geraet, anschluss_auswahl.vorschlag(liste))
+    def _pruefen(self, laser_port, anderer_port, laser_weg_entfernen):
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.om.add_enttec(1, laser_port)
+            self.om.set_laser_estop_mask({1: frozenset({40})}, True)
+            if laser_weg_entfernen:
+                self.om.remove_output(1)
+            self.om.add_enttec(2, anderer_port)
+        self._senden()
+        self.assertEqual(0, _Sender.gesendet[anderer_port][39],
+                         f"NOT-AUS umgangen: Laser an {laser_port}, "
+                         f"U2 an {anderer_port}")
 
-    def test_ohne_ordner_unveraendert(self):
-        liste = self._liste()
-        self.assertEqual(liste, anschluss_auswahl.mit_stabilen_namen(
-            liste, os.path.join(self.tmp.name, "fehlt")))
+    def test_laser_an_by_id_dann_tty(self):
+        self._pruefen(self.link, self.ziel, False)
 
-    def test_test_umgebung_zeigt_auf_keinen_echten_ordner(self):
-        self.assertNotEqual(anschluss_auswahl.BY_ID_ORDNER,
-                            anschluss_auswahl._by_id_ordner())
+    def test_laser_an_by_id_entfernt_dann_tty(self):
+        self._pruefen(self.link, self.ziel, True)
 
-    def test_diagnose_kennt_den_stabilen_namen(self):
-        with mock.patch.object(enttec_pro, "list_serial_ports",
-                               lambda: [self.geraet]):
-            self.assertIsNone(enttec_pro.diagnose_port(self.link))
+    def test_laser_an_tty_dann_by_id(self):
+        self._pruefen(self.ziel, self.link, True)
 
-
-class WindowsUnveraendert(unittest.TestCase):
-    def test_keine_zusatznamen(self):
-        liste = anschluss_auswahl.ordnen([SimpleNamespace(
-            device="COM3", vid=ENTTEC_VID, pid=ENTTEC_PID, description="x")])
-        with mock.patch.object(anschluss_auswahl.os, "name", "nt"):
-            self.assertEqual(liste, anschluss_auswahl.mit_stabilen_namen(liste))
+    def test_ungesperrt_bleibt_255(self):
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.om.add_enttec(2, self.ziel)
+        self._senden()
+        self.assertEqual(255, _Sender.gesendet[self.ziel][39])
 
 
 class Diagnose(unittest.TestCase):
@@ -920,6 +983,193 @@ class Speicher(unittest.TestCase):
             self.assertEqual(["universes.json"], os.listdir(d))
             with open(pfad, encoding="utf-8") as f:
                 self.assertNotIn(FELD, json.load(f)[0])
+
+    def test_persist_output_unter_datei_lock(self):
+        # Gegenpruefung 2, Befund 4: Lesen-Aendern-Schreiben unter der Sperre
+        # des Hintergrund-Speichers.
+        import threading
+        import src.ui.widgets.output_config as oc
+        with tempfile.TemporaryDirectory() as d:
+            pfad = os.path.join(d, "universes.json")
+            enttec_konfig.atomar_schreiben(pfad, [_zeile(1, P0)])
+            frei_beim_lesen = []
+            orig = oc._load_universe_config
+
+            def _laden():
+                ergebnis = {}
+
+                def _anderer_thread():
+                    ok = enttec_konfig.DATEI_LOCK.acquire(blocking=False)
+                    if ok:
+                        enttec_konfig.DATEI_LOCK.release()
+                    ergebnis["frei"] = ok
+                t = threading.Thread(target=_anderer_thread)
+                t.start()
+                t.join()
+                frei_beim_lesen.append(ergebnis["frei"])
+                return orig()
+            with mock.patch.object(oc, "_UNIV_CONFIG_PATH", pfad), \
+                    mock.patch.object(oc, "_load_universe_config", _laden):
+                self.assertTrue(oc._persist_output(1, "Enttec", P1))
+            self.assertEqual([False], frei_beim_lesen,
+                             "universes.json ohne DATEI_LOCK gelesen")
+
+    @unittest.skipIf(getattr(os, "geteuid", lambda: 1)() == 0,
+                     "root darf schreibgeschuetzte Dateien schreiben")
+    def test_schreibgeschuetzte_datei_bleibt(self):
+        # Gegenpruefung 2, Befund 5: os.replace haette den Schutz entfernt.
+        import stat
+        with tempfile.TemporaryDirectory() as d:
+            pfad = os.path.join(d, "universes.json")
+            enttec_konfig.atomar_schreiben(pfad, [_zeile(1, P0)])
+            with open(pfad, encoding="utf-8") as f:
+                vorher = f.read()
+            os.chmod(pfad, stat.S_IREAD)
+            try:
+                with redirect_stdout(io.StringIO()) as aus:
+                    self.assertFalse(enttec_konfig.atomar_schreiben(
+                        pfad, [_zeile(1, P1)]))
+                self.assertIn("nicht geschrieben", aus.getvalue())
+                self.assertFalse(os.access(pfad, os.W_OK),
+                                 "Schreibschutz verschwunden")
+                with open(pfad, encoding="utf-8") as f:
+                    self.assertEqual(vorher, f.read())
+                self.assertEqual(["universes.json"], os.listdir(d))
+            finally:
+                os.chmod(pfad, stat.S_IREAD | stat.S_IWRITE)
+
+    def test_symlink_bleibt_symlink(self):
+        # Gegenpruefung 2, Befund 5: das ZIEL wird ersetzt, nicht der Link.
+        with tempfile.TemporaryDirectory() as d:
+            ziel = os.path.join(d, "echt.json")
+            link = os.path.join(d, "universes.json")
+            enttec_konfig.atomar_schreiben(ziel, [_zeile(1, P0)])
+            try:
+                os.symlink(ziel, link)
+            except (OSError, NotImplementedError):
+                self.skipTest("Symlinks hier nicht erlaubt")
+            self.assertTrue(enttec_konfig.seriennr_eintragen(link, 1, "AAA"))
+            self.assertTrue(os.path.islink(link), "Symlink durch Datei ersetzt")
+            with open(ziel, encoding="utf-8") as f:
+                self.assertEqual("AAA", json.load(f)[0][FELD])
+            self.assertEqual(sorted(["echt.json", "universes.json"]),
+                             sorted(os.listdir(d)))
+
+
+# ── Gegenpruefung 2, Befund 3: „Verbinden“ mit echtem add_enttec ────────────
+
+class _DialogEcht(_DialogBasis):
+    """Wie :class:`DialogTest`, aber ``add_enttec``/``remove_output`` des
+    Managers laufen echt — mit Attrappen-Ports (``comports``, ``Serial``) und
+    Attrappen-Prozess. Kein echter serieller Port."""
+    ECHT = True
+    INPROC = False
+
+    def _echt_vorbereiten(self):
+        global WELT
+        WELT = _Welt()
+        WELT.enttecs = {P1: "EN0999999"}
+        self.proxies = []
+        test = self
+
+        class _Proxy(sp.EnttecProcessProxy):
+            def __init__(self, port, **kw):
+                kw.setdefault("_process_factory", _FakeProc)
+                super().__init__(port, **kw)
+                test.proxies.append(self)
+
+        self.gemeldet = []
+        patches = [
+            mock.patch.object(serial.tools.list_ports, "comports",
+                              lambda *a, **k: WELT.comports()),
+            mock.patch.object(enttec_pro.serial, "Serial", _FakeSerial),
+            mock.patch.object(sp, "EnttecProcessProxy", _Proxy),
+            mock.patch("src.core.dmx.port_check.warne_wenn_belegt",
+                       lambda *_a, **_k: None, create=True),
+            mock.patch.dict(os.environ, {}, clear=False),
+            mock.patch.object(enttec_pro, "_OFFEN", {}),
+            mock.patch.object(enttec_pro, "_SN_BESITZER", {}),
+            # Rueckruf des Hintergrund-Speichers: hier nur mitschreiben.
+            mock.patch.object(self.om, "bei_enttec_seriennr",
+                              lambda u, sn: self.gemeldet.append((u, sn)),
+                              create=True),
+            mock.patch.object(self.om, "_enttec_sn_konfig", {}, create=True),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        if self.INPROC:
+            os.environ["LIGHTOS_SERIAL_INPROC"] = "1"
+        else:
+            os.environ.pop("LIGHTOS_SERIAL_INPROC", None)
+        self.addCleanup(self._echt_zu)
+
+    def _echt_zu(self):
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.om.remove_output(1)
+        for px in self.proxies:
+            px.close()
+
+    def _verbinden_still(self, univ, port):
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self._verbinden(univ, port)
+
+    def _nachfuehren(self):
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            self.om._enttec_fremde_nachfuehren()
+
+
+class DialogVerbindenInProzess(_DialogEcht):
+    INPROC = True
+
+    def test_gelernte_nummer_wird_gespeichert_nicht_geleert(self):
+        # „Verbinden“ an einem anderen Port: add_enttec oeffnet sofort und
+        # lernt EN0999999 — die Zeile darf danach nicht "" tragen.
+        self._verbinden_still(1, P1)
+        self.assertEqual("EN0999999", self.om.enttec_seriennr(1))
+        z = self._datei()
+        self.assertEqual((P1, "EN0999999"), (z[1]["patch"], z[1][FELD]),
+                         "gelernte Nummer beim naechsten Start vergessen")
+
+
+class DialogVerbindenProxy(_DialogEcht):
+
+    def _lernt(self, px, sn="EN0999999"):
+        sp._schreib_text(px._seriennr, sn, sp.SN_BYTES)
+        self._nachfuehren()
+
+    def test_spaeter_gelernte_nummer_wird_gemeldet(self):
+        self._verbinden_still(1, P1)
+        self.assertEqual("", self._datei()[1][FELD])
+        self._lernt(self.om._enttec_outputs[1])
+        self.assertIn((1, "EN0999999"), self.gemeldet)
+
+    def test_gelernt_zwischen_anlegen_und_speichern(self):
+        # Der Worker meldet die Nummer, bevor „Verbinden“ die Zeile schreibt.
+        orig = self.om.add_enttec
+
+        def _add(*a, **k):
+            orig(*a, **k)
+            self._lernt(self.om._enttec_outputs[1])
+        with mock.patch.object(self.om, "add_enttec", _add):
+            self._verbinden_still(1, P1)
+        self.assertEqual("EN0999999", self._datei()[1][FELD])
+
+    def test_gelernt_waehrend_des_speicherns_wird_erneut_gemeldet(self):
+        # Die Nummer kommt erst, waehrend die Zeile mit "" geschrieben wird:
+        # der naechste Abgleich meldet sie erneut, statt sie zu verschlucken.
+        import src.ui.widgets.output_config as oc
+        orig = oc._persist_output_ungesperrt
+
+        def _persist(*a, **k):
+            self._lernt(self.om._enttec_outputs[1])
+            return orig(*a, **k)
+        with mock.patch.object(oc, "_persist_output_ungesperrt", _persist):
+            self._verbinden_still(1, P1)
+        self.gemeldet.clear()
+        self._nachfuehren()
+        self.assertIn((1, "EN0999999"), self.gemeldet,
+                      "gelernte Nummer nie mehr gemeldet")
 
 
 if __name__ == "__main__":

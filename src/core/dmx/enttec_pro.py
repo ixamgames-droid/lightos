@@ -156,10 +156,6 @@ def diagnose_port(configured: str) -> str | None:
         vorhanden = []
     if want and want in vorhanden:
         return None
-    # OUT-80: ein stabiler Name (/dev/serial/by-id/…, Symlink) zeigt auf einen
-    # der gelisteten Anschluesse — dann ist er da.
-    if want and _port_key(want) in {_port_key(v) for v in vorhanden}:
-        return None
 
     try:
         gefunden = find_enttec_port()
