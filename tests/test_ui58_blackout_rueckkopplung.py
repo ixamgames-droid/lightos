@@ -11,6 +11,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication                          # noqa: E402
+from _qt_lifecycle import flush_deferred_deletes                     # noqa: E402
 
 from src.core.app_state import get_state                             # noqa: E402
 from src.core.dmx.output_manager import OutputManager               # noqa: E402
@@ -61,8 +62,14 @@ class KopfzeilenKnopfTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.om.set_blackout(False)
+        # QA-97: processEvents() stellt DeferredDelete nicht zu — ohne die
+        # Zustellung lebte das Fenster weiter und seine Ansichten griffen beim
+        # naechsten Show-Laden einer spaeteren Datei in den State.
         cls.w.deleteLater()
+        flush_deferred_deletes()
         _app().processEvents()
+        flush_deferred_deletes()
+        cls.w = None
 
     def setUp(self):
         self.om.set_blackout(False)

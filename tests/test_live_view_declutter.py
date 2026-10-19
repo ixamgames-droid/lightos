@@ -98,6 +98,10 @@ class TestGridLayout(unittest.TestCase):
         """_load_positions läuft mit Mock-Fixtures durch (Raster-Zweig + Gap-Cache)
         ohne Crash und füllt Positionen + nn_gap."""
         c = StageCanvas()
+        # QA-97: _load_positions schreibt die Raster-Positionen in den
+        # globalen Szenengraphen (je fid ein Knoten). Ein spaeterer Test
+        # (test_live_view_fixes) fand sonst fid 1 schon platziert vor.
+        vorher = set(c._state.live_view_positions)
         try:
             fx = _fixtures(6)
             c._state.get_patched_fixtures = lambda: list(fx)
@@ -108,6 +112,9 @@ class TestGridLayout(unittest.TestCase):
                 self.assertIn(fid, c._positions)
         finally:
             c._state.__dict__.pop("get_patched_fixtures", None)
+            lv = c._state.live_view_positions
+            for fid in set(lv) - vorher:
+                lv.pop(fid, None)
             c.deleteLater()
 
 
