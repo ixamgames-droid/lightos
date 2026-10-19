@@ -663,6 +663,16 @@ class VCSlider(VCWidget):
         except Exception:
             return []
 
+    def event(self, e):
+        # ENG-37-B: Tooltip ueber dem Zeichen erklaert die Betriebsart.
+        try:
+            from src.ui.widgets.modify_zeichen import zeige_modify_tooltip
+            if zeige_modify_tooltip(self, e):
+                return True
+        except Exception:
+            pass
+        return super().event(e)
+
     def _autostart_targets(self):
         """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
         An/Aus der Ziel-Effekte. Wert > 0 startet sie (falls noch nicht laufend),
@@ -900,10 +910,13 @@ class VCSlider(VCWidget):
         # ENG-37-B: Zeichen der Modify-Betriebsart unten links — links neben dem
         # Spurende, ueber der Beschriftung (die bleibt frei und zentriert).
         _modify = self._modify_arten()
+        self._modify_zeichen_rect = None
         if _modify:
             from src.ui.widgets.modify_zeichen import zeichne_modify_zeichen
             _h = 14
-            zeichne_modify_zeichen(p, 2, self.height() - 18 - _h - 1, _modify[:1], _h)
+            _my = self.height() - 18 - _h - 1
+            _mw = zeichne_modify_zeichen(p, 2, _my, _modify[:1], _h)
+            self._modify_zeichen_rect = QRect(2, _my, _mw, _h)
 
         # MIDI-Bindung-Indikator oben rechts (cyan dot)
         if self.midi_cc >= 0:

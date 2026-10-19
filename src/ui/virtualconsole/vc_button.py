@@ -991,6 +991,16 @@ class VCButton(VCWidget):
         except Exception:
             return []
 
+    def event(self, e):
+        # ENG-37-B: Tooltip ueber dem Zeichen erklaert die Betriebsart.
+        try:
+            from src.ui.widgets.modify_zeichen import zeige_modify_tooltip
+            if zeige_modify_tooltip(self, e):
+                return True
+        except Exception:
+            pass
+        return super().event(e)
+
     # ── Farb-Vorschau-Badge (oben rechts) ────────────────────────────────────
     def _color_badge_colors(self) -> list:
         """Anzeige-Farben des gebundenen Farb-Effekts/-Snaps (gecacht pro Bindung).
@@ -2267,11 +2277,12 @@ class VCButton(VCWidget):
 
         # ENG-37-B: Zeichen der Modify-Betriebsart unten links, ueber dem
         # Aktions-Streifen (4 px) — oben rechts gehoert Farb-Badge/Gobo.
+        self._modify_zeichen_rect = None
         if _modify:
             from src.ui.widgets.modify_zeichen import zeichne_modify_zeichen
-            zeichne_modify_zeichen(
-                p, int(face.left()) + 4, int(face.bottom()) - 4 - 2 - _mz_h,
-                _modify, _mz_h)
+            _mx, _my = int(face.left()) + 4, int(face.bottom()) - 4 - 2 - _mz_h
+            _mw = zeichne_modify_zeichen(p, _mx, _my, _modify, _mz_h)
+            self._modify_zeichen_rect = QRect(_mx, _my, _mw, _mz_h)
 
         # MIDI-Bindung-Indikator oben rechts
         if self.midi_data1 >= 0:

@@ -15,7 +15,7 @@ from src.core.engine.modify import (MODIFY_LABELS, MODIFY_MODES, MODIFY_KANAELE,
                                     normalize_mode)
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
-from src.ui.widgets.modify_zeichen import MODIFY_VORSCHAU_RGB
+from src.ui.widgets.modify_zeichen import MODIFY_VORSCHAU_RGB, MODIFY_ZEICHEN
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
@@ -104,8 +104,11 @@ class MatrixPreview(QWidget):
         mw = getattr(m, "modify_wirksam", None)
         if mw is None or not mw():
             return ""
-        text = {"add": "+", "sub": "−", "dim": "×"}[
-            normalize_mode(getattr(m, "modify_mode", "add"))]
+        # + und − aus derselben Quelle wie Taste/Fader (modify_zeichen); fuer
+        # Abdunkeln bleibt die Vorschau beim „×" (die Konsole zeigt „◐") — ob
+        # beide gleich werden, entscheidet Robin noch.
+        _art = normalize_mode(getattr(m, "modify_mode", "add"))
+        text = "×" if _art == "dim" else MODIFY_ZEICHEN[_art]
         if getattr(m, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW):
             kan = normalize_channels(getattr(m, "modify_channels", ()))
             if kan:

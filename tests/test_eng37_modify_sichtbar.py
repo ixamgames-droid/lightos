@@ -274,3 +274,83 @@ def test_engine_sperrt_wirklich_was_der_editor_meldet(fm):
     mod = _matrix(fm, "Läufer-Modify")
     assert Chaser._render_child_target(mod, [1], {}, fm) == {}
 
+
+
+# ── Gegenpruefung: eine Quelle, Tooltip, Nachziehen ─────────────────────────
+
+def test_editor_eckentext_nimmt_zeichen_aus_derselben_quelle(fm, monkeypatch):
+    """+ und − der Editor-Vorschau kommen aus MODIFY_ZEICHEN (eine Quelle mit
+    Taste/Fader); Abdunkeln bleibt in der Vorschau „×" (offene Entscheidung)."""
+    from src.ui.views.rgb_matrix_view import MatrixPreview
+    from src.ui.widgets import modify_zeichen
+    monkeypatch.setitem(modify_zeichen.MODIFY_ZEICHEN, "add", "⊕")
+    monkeypatch.setitem(modify_zeichen.MODIFY_ZEICHEN, "sub", "⊖")
+    m = _matrix(fm, mode="add")
+    v = MatrixPreview()
+    try:
+        v._timer.stop()
+        v.set_matrix(m)
+        assert v.modify_eckentext() == "⊕"
+        m.modify_mode = "sub"
+        assert v.modify_eckentext() == "⊖"
+        m.modify_mode = "dim"
+        assert v.modify_eckentext() == "×"
+    finally:
+        v._timer.stop()
+        v.deleteLater()
+
+
+def test_taste_und_fader_erklaeren_das_zeichen_per_tooltip(fm):
+    from PySide6.QtCore import QPoint
+    from src.ui.virtualconsole.vc_slider import SliderMode, VCSlider
+    from src.ui.widgets.modify_zeichen import modify_tooltip_an
+    m = _matrix(fm, mode="sub")
+    b = _taste(m.id)
+    b.grab()
+    r = b._modify_zeichen_rect
+    assert r is not None and r.width() > 0
+    tip = modify_tooltip_an(b, r.center())
+    assert "Abziehen" in tip and "Modify" in tip
+    assert modify_tooltip_an(b, QPoint(b.width() - 2, 2)) == ""
+    s = VCSlider("Läufer")
+    s.mode = SliderMode.EFFECT_INTENSITY
+    s.function_id = m.id
+    s.grab()
+    assert "Abziehen" in modify_tooltip_an(s, s._modify_zeichen_rect.center())
+    # ohne Modify kein Zeichen -> keine Flaeche, kein Tooltip
+    m.modify = False
+    b.grab()
+    assert b._modify_zeichen_rect is None
+    assert modify_tooltip_an(b, r.center()) == ""
+
+
+def test_konsole_zeichnet_bei_betriebsart_wechsel_neu(fm):
+    """_update_active_fx ruft update() an Taste/Fader, sobald Haken oder
+    Betriebsart umgestellt werden — auch wenn sich am Laufzustand nichts aendert."""
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QWidget
+    from src.ui.views.virtual_console_view import VirtualConsoleView
+    m = _matrix(fm, mode="add")
+    canvas = QWidget()
+    b = _taste(m.id)
+    b.setParent(canvas)
+    zaehler = []
+    b.update = lambda *a: zaehler.append(1)
+    stub = SimpleNamespace(
+        _canvas=canvas, _sidebar=None,
+        _canvas_alive=lambda: True,
+        _function_catalog_signature=lambda funcs: 0,
+        _zeige_aktiven_effekt=lambda *a: None,
+        _TEXT_KEIN_EFFEKT="", _STIL_ZEILE_LEER="", _STIL_ZEILE_AKTIV="")
+    VirtualConsoleView._update_active_fx(stub)          # erster Lauf: Ausgangslage
+    zaehler.clear()
+    VirtualConsoleView._update_active_fx(stub)
+    assert zaehler == []                                # nichts geaendert -> still
+    m.modify_mode = "dim"
+    VirtualConsoleView._update_active_fx(stub)
+    assert zaehler, "Betriebsart umgestellt, Taste nicht neu gezeichnet"
+    zaehler.clear()
+    m.modify = False
+    VirtualConsoleView._update_active_fx(stub)
+    assert zaehler, "Haken entfernt, Taste nicht neu gezeichnet"
+    canvas.deleteLater()

@@ -65,6 +65,34 @@ def modify_tooltip(arten) -> str:
             "statt es zu ersetzen.")
 
 
+def modify_tooltip_an(widget, pos) -> str:
+    """Tooltip-Text, wenn ``pos`` (Widget-Koordinaten) auf dem zuletzt gemalten
+    Zeichen von ``widget`` liegt — sonst leer. ``widget`` merkt sich die Flaeche
+    beim Malen in ``_modify_zeichen_rect`` und liefert ``_modify_arten()``."""
+    r = getattr(widget, "_modify_zeichen_rect", None)
+    if r is None or not r.contains(pos):
+        return ""
+    try:
+        return modify_tooltip(widget._modify_arten())
+    except Exception:
+        return ""
+
+
+def zeige_modify_tooltip(widget, event) -> bool:
+    """Fuer ``event()`` von Taste/Fader: zeigt beim Tooltip-Ereignis ueber dem
+    Zeichen die Erklaerung und gibt True zurueck (Ereignis erledigt). Ueberall
+    sonst False — der normale Tooltip des Widgets bleibt unberuehrt."""
+    from PySide6.QtCore import QEvent
+    if event.type() != QEvent.Type.ToolTip:
+        return False
+    tip = modify_tooltip_an(widget, event.pos())
+    if not tip:
+        return False
+    from PySide6.QtWidgets import QToolTip
+    QToolTip.showText(event.globalPos(), tip, widget)
+    return True
+
+
 def modify_signatur(funktionen) -> tuple:
     """Kurze Signatur aller Modify-Effekte (ID, Betriebsart) — die Konsole zeichnet
     ihre Widgets neu, sobald sie sich aendert (Haken oder Betriebsart umgestellt)."""
