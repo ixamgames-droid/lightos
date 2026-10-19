@@ -276,7 +276,10 @@ class ProgrammerView(QWidget):
         _sp = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         _sp.setHeightForWidth(True)
         self._toolbar_flow_host.setSizePolicy(_sp)
-        flow = FlowLayout(self._toolbar_flow_host, margin=0, h_spacing=6, v_spacing=4)
+        # Zeilen mittig: die Bearbeiten-Knöpfe sind niedriger als die
+        # Werkzeug-Knöpfe und stünden sonst oben versetzt.
+        flow = FlowLayout(self._toolbar_flow_host, margin=0, h_spacing=6,
+                          v_spacing=4, zeilen_zentrieren=True)
         for label, slot, color in [
             ("Hervorheben", self._highlight, "#FFD700"),
             ("Abdunkeln",  self._lowlight,  "#888888"),
@@ -318,17 +321,26 @@ class ProgrammerView(QWidget):
         flow.addItem(QSpacerItem(14, 26, QSizePolicy.Policy.Fixed,
                                  QSizePolicy.Policy.Fixed))
 
-        # Tool-Buttons (Color, Position, Fan)
+        # Tool-Buttons (Color, Position, Fan) — als eine Gruppe, damit der
+        # Umbruch sie nur gemeinsam in die nächste Zeile nimmt.
+        self._toolbar_werkzeuge = QWidget()
+        _wz = QHBoxLayout(self._toolbar_werkzeuge)
+        _wz.setContentsMargins(0, 0, 0, 0)
+        _wz.setSpacing(6)
         for label, slot in [
             ("Farb-Werkzeug...",    self._open_color_tool),
             ("Positions-Werkzeug...", self._open_position_tool),
             ("Fächer...",           self._open_fan_tool),
         ]:
             b = QPushButton(label)
-            b.setFixedHeight(26)
+            # dark.qss (min-height + Innenabstand) macht die Knöpfe ohnehin
+            # 32 px hoch; mit 26 px fester Höhe zentrierte die Gruppe sie
+            # versetzt.
+            b.setFixedHeight(32)
             b.clicked.connect(slot)
             b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3
-            flow.addWidget(b)
+            _wz.addWidget(b)
+        flow.addWidget(self._toolbar_werkzeuge)
 
         tb.addWidget(self._toolbar_flow_host, 1)
 

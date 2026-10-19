@@ -97,7 +97,7 @@ def programmer(tmp_path, monkeypatch):
 def _zeilen(knoepfe) -> int:
     """Anzahl Zeilen; Knöpfe unterschiedlicher Höhe stehen in einer Zeile
     leicht versetzt (zentriert), deshalb mit Toleranz zählen."""
-    ys = sorted(b.y() for b in knoepfe)
+    ys = sorted(_rect_in(b, b.window()).y() for b in knoepfe)
     return 1 + sum(1 for a, b in zip(ys, ys[1:]) if b - a > 8)
 
 
@@ -145,6 +145,37 @@ def test_programmer_werkzeugleiste_bricht_um_statt_zu_quetschen(programmer):
     wirt.close()
 
 
+_WERKZEUGE = ("Farb-Werkzeug...", "Positions-Werkzeug...", "Fächer...")
+
+
+def _mitte_y(b: QPushButton, bezug: QWidget) -> int:
+    return _rect_in(b, bezug).center().y()
+
+
+def test_programmer_werkzeugleiste_zeilen_mittig_ausgerichtet(programmer):
+    """Gegenprüfung: Bearbeiten-Knöpfe (niedriger) standen oben bündig und
+    damit höher als die Werkzeug-Knöpfe derselben Zeile."""
+    wirt = _im_wirt(programmer, GROSS)
+    flow = [b for b in _toolbar_knoepfe(programmer) if b.text() not in ("?",)
+            and b is not programmer._btn_layout]
+    mitten = {b.text(): _mitte_y(b, programmer) for b in flow}
+    assert max(mitten.values()) - min(mitten.values()) <= 1, mitten
+    wirt.close()
+
+
+def test_programmer_werkzeug_gruppe_bricht_nur_gemeinsam_um(programmer):
+    """Gegenprüfung: bei 1000 px stand „Farb-Werkzeug...“ in Zeile 1,
+    „Positions-Werkzeug...“ und „Fächer...“ in Zeile 2."""
+    wirt = _im_wirt(programmer, KLEIN)
+    for breite in range(760, 1500, 10):
+        _neu_groesse(wirt, programmer, (breite, KLEIN[1]))
+        wz = [b for b in _toolbar_knoepfe(programmer) if b.text() in _WERKZEUGE]
+        assert len(wz) == 3
+        mitten = {b.text(): _mitte_y(b, programmer) for b in wz}
+        assert max(mitten.values()) - min(mitten.values()) <= 1, (breite, mitten)
+    wirt.close()
+
+
 def test_loeschen_knopf_mindestbreite_mit_fetter_schrift(programmer):
     b = programmer._btn_clear
     f = QFont(b.font())
@@ -182,8 +213,9 @@ def test_executoren_passen_bei_1000_nebeneinander(playback):
         # ⚙ liegt im eigenen Executor (vorher über dem Nachbarnamen).
         assert r.contains(_rect_in(e._btn_cfg, playback))
         for b in e._fn_buttons:
-            fm = QFontMetrics(b.font())
-            assert b.width() >= fm.horizontalAdvance(b.text()) + 6, b.text()
+            # sizeHint enthält den Innenabstand aus dem Stylesheet — die
+            # reine Textbreite + Pauschale bemerkte abgeschnittene Tasten nicht.
+            assert _text_passt(b), (b.text(), b.width(), b.sizeHint().width())
     for a, b in zip(rects, rects[1:]):
         assert not a.intersects(b)
     wirt.close()
@@ -211,7 +243,64 @@ def test_executor_leiste_scrollt_statt_zu_ueberlappen_wenn_zu_schmal(playback):
     rects = [e.geometry() for e in playback._executors_widgets]
     for a, b in zip(rects, rects[1:]):
         assert not a.intersects(b)
+    # Bei Mindestbreite bleiben die Tasten ungekürzt.
+    for e in playback._executors_widgets:
+        assert e.width() == e.mindestbreite()
+        for b in e._fn_buttons:
+            assert _text_passt(b), (b.text(), b.width(), b.sizeHint().width())
     wirt.close()
+
+
+def test_executor_mindestbreite_reicht_fuer_alle_tastenbeschriftungen(playback):
+    """Jede mögliche Belegung (GO/◀/■/FL) passt bei Mindestbreite — gemessen
+    mit dem echten Tasten-Stylesheet, nicht nur mit der Textbreite."""
+    wirt = _im_wirt(playback, KLEIN)
+    e = playback._executors_widgets[0]
+    b = e._fn_buttons[0]
+    alt_text, alt_style = b.text(), b.styleSheet()
+    breit = 0
+    for text in e.BTN_LABELS.values():
+        b.setText(text)
+        for style in (e._fn_buttons[1].styleSheet(), alt_style):
+            b.setStyleSheet(style)
+            breit = max(breit, b.sizeHint().width())
+    b.setText(alt_text)
+    b.setStyleSheet(alt_style)
+    m = e.layout().contentsMargins()
+    tasten = 3 * breit + 2 * e._btn_row.spacing() + m.left() + m.right()
+    assert e.mindestbreite() >= tasten, (e.mindestbreite(), tasten)
+    wirt.close()
+
+
+def test_langer_cuelisten_name_macht_executor_nicht_breiter(playback):
+    """Gegenprüfung: ein 40 Zeichen langer Cuelisten-Name darf die
+    Executor-Auswahl nicht aufziehen — sonst überlappen die Executoren bei
+    1000 px bzw. Ex 10 fällt rechts heraus."""
+    from src.core.app_state import get_state
+    from src.core.engine.cue_stack import CueStack
+    state = get_state()
+    lang = CueStack("Sehr langer Cuelisten-Name für die Prüfung")
+    assert len(lang.name) >= 40
+    state.cue_stacks.append(lang)
+    ex = state.playback_engine.get_executor(1)
+    alt = ex.stack
+    try:
+        ex.stack = lang
+        playback._refresh_executors()
+        wirt = _im_wirt(playback, KLEIN)
+        exe = playback._executors_widgets
+        assert exe[0]._combo.currentText() == lang.name
+        rects = [_rect_in(w, playback) for w in exe]
+        for w, r in zip(exe, rects):
+            assert w.visibleRegion().boundingRect() == w.rect(), f"Ex {w._slot}"
+            assert playback.rect().contains(r), f"Ex {w._slot} ragt heraus: {r}"
+        for a, b in zip(rects, rects[1:]):
+            assert not a.intersects(b)
+        assert not playback._exec_scroll.scrollt()
+        wirt.close()
+    finally:
+        ex.stack = alt
+        state.cue_stacks.remove(lang)
 
 
 @pytest.mark.parametrize("groesse", [KLEIN, GROSS])
