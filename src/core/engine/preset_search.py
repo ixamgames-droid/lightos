@@ -62,7 +62,9 @@ def group_entries(groups: Iterable[Any]) -> list[PresetEntry]:
             name, folder, fids = (name or ""), (folder or ""), (fids or [])
             gid = None
         n = len(fids)
-        subtitle = " · ".join(x for x in (folder, f"{n} Geräte") if x)
+        # UI-101(2): „1 Gerät" statt „1 Geräte".
+        anzahl = f"{n} Gerät" if n == 1 else f"{n} Geräte"
+        subtitle = " · ".join(x for x in (folder, anzahl) if x)
         out.append(PresetEntry("group", name, subtitle, (), ref=(gid, name)))
     return out
 
