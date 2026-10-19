@@ -15,9 +15,16 @@ tragen den Pfeil ohnehin als "▾" im Text — der eingebaute war doppelt.
 
 Dieser Knopf merkt sich das Menue selbst und klappt es beim Klick unter sich
 auf. ``menu()``/``setMenu()``/``showMenu()`` bleiben als Schnittstelle erhalten.
+
+IMP-3, Tastatur: das Menue klappt mit der EINGABETASTE auf. Ein ``QPushButton``
+reagiert auf sie nur in einem Dialog (``autoDefault``), im Hauptfenster gar
+nicht — und die Leertaste, Qts eigene Knopf-Taste, kommt dort nie an: sie ist
+das globale Kuerzel fuer GO und bleibt es. Darum nimmt der Knopf Return/Enter
+selbst an.
 """
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMenu, QPushButton
 
 
@@ -39,3 +46,11 @@ class MenueKnopf(QPushButton):
         if menu is None or not self.isEnabled():
             return
         menu.popup(self.mapToGlobal(self.rect().bottomLeft()))
+
+    def keyPressEvent(self, event) -> None:          # noqa: N802 — Qt-Name
+        if (event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+                and self._menue is not None and self.isEnabled()):
+            self.showMenu()
+            event.accept()
+            return
+        super().keyPressEvent(event)
