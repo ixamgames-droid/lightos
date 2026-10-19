@@ -58,7 +58,7 @@
 | IMP-3 | A | feature/imp3-import-namen-und-buendeln | 2026-10-19T14:04Z | - |
 | QA-97 | A | fix/qa97-reihenfolge-laser-und-ui69 | 2026-10-19T14:04Z | src/core/sync.py · src/core/app_state.py · src/ui/main_window.py · src/ui/views/live_view.py |
 | UI-95 | A | fix/ui95-kiosk-stop-all-grand-master | 2026-10-19T14:04Z | - |
-| SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-18T15:37Z | - |
+| SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-19T14:04Z | - |
 | OUT-79 | D | docs/out79-eingang-firewall-hinweis | 2026-10-18T16:44Z | backlog.d/OUT-79.md |
 | UI-82 | A | fix/ui82-kopie-ohne-herkunft-verweigern | 2026-10-19T14:04Z | src/ui/widgets/fixture_editor.py |
 | FM-69 | A | fix/fm69-bibliotheks-update-bestehende-db | 2026-10-19T14:04Z | src/core/database/fixture_db.py |
