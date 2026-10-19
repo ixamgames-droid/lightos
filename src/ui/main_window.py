@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTabWidget, QSizePolicy, QFrame,
     QMenu, QSlider, QInputDialog,
 )
-from PySide6.QtCore import Qt, QSize, QTimer, Signal
+from PySide6.QtCore import Qt, QEvent, QSize, QTimer, Signal
 from PySide6.QtGui import (
     QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter, QShortcut,
 )
@@ -34,6 +34,7 @@ from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
 from src.ui.weak_slots import weak_slot
+from src.ui import undo_kuerzel
 
 
 # Recent files storage
@@ -463,7 +464,25 @@ class _SectionBar(QWidget):
             self._reflowing = False
 
 
+class _GmReglerOhneRad(QSlider):
+    """UI-95: Grand-Master-Regler im Kiosk-Streifen.
+
+    Das Mausrad verstellt ihn nur, wenn er den Fokus hat (Muster wie
+    ``StufeAuswahl``) — und da er bewusst keinen Tastaturfokus bekommt (die
+    Leertaste ist GO), heisst das: nie. Wer im Kiosk ueber den Streifen rollt,
+    dunkelt nicht nebenbei die Buehne ab. Gezogen und geklickt wird normal."""
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
 class MainWindow(QMainWindow):
+    # UI-93: dieses Fenster verteilt Rueckgaengig/Wiederholen selbst (event());
+    # eingebettete Ansichten schalten ihre eigenen Kuerzel dafuer ab.
+    UNDO_KUERZEL_ZENTRAL = True
     # BPM-Aenderung kann aus Fremd-Threads (Audio) kommen -> Signal marshallt in UI.
     _bpm_changed_sig = Signal(float)
     # Modus/Quelle/Lock-Aenderung des BPM-Leaders -> Badge in der Top-Bar.
@@ -706,11 +725,16 @@ class MainWindow(QMainWindow):
         # Bearbeiten (Undo/Redo)
         em = mb.addMenu("&Bearbeiten")
         self._act_undo = em.addAction("Rückgängig")
-        self._act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        # UI-93: feste Belegung statt StandardKey — setShortcut(StandardKey.Redo)
+        # nahm nur die ERSTE Bindung der Plattform, unter X11 fehlte Strg+Y.
+        self._act_undo.setShortcuts(undo_kuerzel.undo_folgen())
         self._act_undo.triggered.connect(self._do_undo)
-        self._act_redo = em.addAction("Wiederherstellen")
-        self._act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        self._act_redo = em.addAction("Wiederholen")
+        self._act_redo.setShortcuts(undo_kuerzel.redo_folgen())
         self._act_redo.triggered.connect(self._do_redo)
+        # UI-93: der Layout-Verlauf der Virtual Console meldet sich nicht von
+        # selbst — vor dem Aufklappen nachsehen, welcher Schritt der naechste ist.
+        em.aboutToShow.connect(self._refresh_undo_labels)
         em.addSeparator()
         a = em.addAction("Verlauf löschen")
         a.triggered.connect(self._clear_undo_history)
@@ -1157,6 +1181,11 @@ class MainWindow(QMainWindow):
         # ── Stacked Widget ─────────────────────────────────────────────────────
         self._stack = QStackedWidget()
         root.addWidget(self._stack, 1)
+        # UI-93: welcher Schritt als naechster dran ist, haengt davon ab, ob die
+        # Virtual Console zu sehen ist — beim Wechsel der Ansicht nachziehen
+        # (der Text der Menuepunkte steht auch in Hilfe → Tastenkürzel).
+        self._stack.currentChanged.connect(
+            lambda _i: self._refresh_undo_labels())
         # Nachtrag 2: Banner UND eingeklappter Chip haengen am Stapel.
         self._ausgabe_banner.ueberlagere(self._stack)
 
@@ -1531,7 +1560,20 @@ class MainWindow(QMainWindow):
         # keine zweite Abfrage: das Banner bekommt die eben gelesenen Wege.
         banner = getattr(self, "_ausgabe_banner", None)
         if banner is not None:
-            banner.aktualisiere(om, wege)
+            # OUT-74: ein Adapter, der in zwei Zeilen steht, ist fuer keine
+            # eingerichtet — er fehlt also in `wege`. Fuer das Banner ist das
+            # trotzdem ein Ausfall („es kommt nichts an"), und im Kiosk-Modus
+            # der einzige Ort, an dem es steht.
+            banner_wege = wege
+            try:
+                from src.core.dmx import adapter_zeilen
+                konflikte = adapter_zeilen.stoerungen(
+                    getattr(self._state, "adapter_konflikte", None))
+                if konflikte:
+                    banner_wege = list(wege) + konflikte
+            except Exception:
+                banner_wege = wege
+            banner.aktualisiere(om, banner_wege)
         # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
         # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
         # Antwort darauf soll es nicht geben.
@@ -1601,37 +1643,127 @@ class MainWindow(QMainWindow):
 
     # ── Undo/Redo ─────────────────────────────────────────────────────────────
 
+    def event(self, ev):
+        # UI-93: Strg+Z / Strg+Y / Strg+Umschalt+Z gehen zuerst an ein
+        # Textfeld mit Fokus; bei sichtbarer Virtual Console dann an den
+        # gemeinsamen Verlauf (Layout der Konsole UND Bearbeiten → Rückgängig,
+        # in zeitlicher Reihenfolge) — sonst an Bearbeiten → Rückgängig.
+        # Vorher lagen dieselben Folgen doppelt im Fenster (Menue +
+        # VC-QShortcut); Qt wertet das als mehrdeutig und loest dann KEINE aus.
+        if (ev.type() == QEvent.Type.ShortcutOverride
+                and undo_kuerzel.vorrang(self, ev, self._lokales_undo)):
+            return True
+        return super().event(ev)
+
+    #: So heisst ein Layout-Schritt der Virtual Console im Menue und in der
+    #: Statuszeile (der Layout-Verlauf kennt nur Schnappschuesse, keine Namen).
+    VC_SCHRITT = "Layout der Virtual Console"
+
+    def _vc_verlauf(self):
+        """Zeichenflaeche der Virtual Console, wenn sie die sichtbare Seite
+        dieses Fensters ist — sonst None. Die Zeichenflaeche nimmt keinen
+        Tastaturfokus, deshalb entscheidet die Sichtbarkeit, nicht der Fokus."""
+        vc = getattr(self, "_vc_view", None)
+        try:
+            if (vc is None or not vc.isVisible() or vc.window() is not self
+                    or not vc._canvas_alive()):
+                return None
+            return vc._canvas
+        except RuntimeError:        # Ansicht schon abgebaut
+            return None
+
+    def _naechster_verlauf(self, wiederholen: bool):
+        """Welcher Schritt ist als naechster dran? ``(quelle, name)`` mit
+        ``quelle`` = ``"app"`` | ``"vc"`` | ``None``.
+
+        UI-93 (Entscheidung des Betreibers, 13.10.): bei sichtbarer Virtual
+        Console sind Layout-Verlauf und App-Verlauf fuer den Bediener EIN
+        Verlauf. Zurueckgenommen wird der zuletzt GEMACHTE Schritt, wiederholt
+        der zuletzt ZURUECKGENOMMENE — die Reihenfolge liefern die gemeinsamen
+        Schrittnummern aus ``src/core/undo.py``. Ist die Virtual Console nicht
+        zu sehen, gilt nur der App-Verlauf: ein Strg+Z im Patch soll kein
+        Layout umbauen, das gerade niemand sieht.
+        """
+        app = getattr(self, "_undo_stack", None)
+        canvas = self._vc_verlauf()
+        a = v = None
+        if app:
+            a = app.redo_marke() if wiederholen else app.undo_schritt()
+        if canvas is not None:
+            v = canvas.redo_marke() if wiederholen else canvas.undo_schritt()
+        if a is None and v is None:
+            return None, None
+        if v is None or (a is not None and a > v):
+            return "app", (app.redo_label() if wiederholen else app.undo_label())
+        return "vc", self.VC_SCHRITT
+
+    def verlauf_schritt(self, wiederholen: bool) -> bool:
+        """Den naechsten Schritt zuruecknehmen bzw. wiederholen.
+
+        DIE eine Stelle fuer Taste, Menuepunkt und die ↶/↷-Knoepfe der
+        Virtual Console — alle drei geben deshalb dieselbe Antwort.
+        """
+        quelle, name = self._naechster_verlauf(wiederholen)
+        ok = False
+        if quelle == "app":
+            ok = (self._undo_stack.redo() if wiederholen
+                  else self._undo_stack.undo())
+        elif quelle == "vc":
+            canvas = self._vc_verlauf()
+            if canvas is not None:
+                (canvas.redo if wiederholen else canvas.undo)()
+                ok = True
+        if ok:
+            wort = "Wiederholt" if wiederholen else "Rückgängig"
+            self.statusBar().showMessage(
+                f"{wort}: {name}" if name else wort, 1500)
+        self._refresh_undo_labels()
+        return ok
+
+    def _lokales_undo(self, wiederholen: bool) -> bool:
+        """Tastenkuerzel bei sichtbarer Virtual Console; True = war zustaendig.
+
+        Die Kuerzel der Menuepunkte ruhen, solange es im App-Verlauf nichts
+        gibt — der gemeinsame Verlauf kann dann trotzdem einen Layout-Schritt
+        haben. Deshalb nimmt das Fenster den Tastendruck hier selbst.
+        """
+        if self._vc_verlauf() is None:
+            return False
+        self.verlauf_schritt(wiederholen)
+        return True
+
     def _do_undo(self):
-        if self._undo_stack:
-            ok = self._undo_stack.undo()
-            if ok:
-                self.statusBar().showMessage("Rückgängig", 1500)
+        self.verlauf_schritt(False)
 
     def _do_redo(self):
-        if self._undo_stack:
-            ok = self._undo_stack.redo()
-            if ok:
-                self.statusBar().showMessage("Wiederhergestellt", 1500)
+        self.verlauf_schritt(True)
 
     def _clear_undo_history(self):
         if self._undo_stack:
             self._undo_stack.clear()
-            self.statusBar().showMessage("Rückgängig-Verlauf geleert", 1500)
+        # UI-93: ein Verlauf fuer den Bediener — das Layout der Virtual
+        # Console gehoert dazu, auch wenn sie gerade nicht zu sehen ist.
+        try:
+            self._vc_view._canvas.verlauf_leeren()
+        except (AttributeError, RuntimeError):
+            pass
+        self.statusBar().showMessage("Rückgängig-Verlauf geleert", 1500)
+        self._refresh_undo_labels()
 
     def _refresh_undo_labels(self):
-        if not getattr(self, "_undo_stack", None):
+        if not hasattr(self, "_act_undo"):
             return
-        u = self._undo_stack.undo_label()
-        r = self._undo_stack.redo_label()
+        quelle_u, u = self._naechster_verlauf(False)
+        quelle_r, r = self._naechster_verlauf(True)
         # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
         # ein einzelnes „&“ laese das Menue als Tastenkuerzel-Zeichen.
         from src.ui.menue_text import menue_text
         u = menue_text(u) if u else u
         r = menue_text(r) if r else r
         self._act_undo.setText(f"Rückgängig: {u}" if u else "Rückgängig")
-        self._act_undo.setEnabled(self._undo_stack.can_undo())
-        self._act_redo.setText(f"Wiederherstellen: {r}" if r else "Wiederherstellen")
-        self._act_redo.setEnabled(self._undo_stack.can_redo())
+        self._act_undo.setEnabled(quelle_u is not None)
+        self._act_redo.setText(f"Wiederholen: {r}" if r else "Wiederholen")
+        self._act_redo.setEnabled(quelle_r is not None)
 
     # ── Grand Master / BPM ────────────────────────────────────────────────────
 
@@ -1642,16 +1774,44 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] grand_master error: {e}")
         self._lbl_gm_val.setText(f"{val}%")
+        self._gm_anzeige_setzen(val)
+
+    def _on_kiosk_gm_changed(self, val: int):
+        """UI-95: der Kiosk-Regler schreibt ueber denselben Weg wie der der
+        Sektionsleiste (``output_manager.set_grand_master``); beide Anzeigen
+        ziehen danach nach."""
+        try:
+            self._state.output_manager.set_grand_master(val / 100.0)
+        except Exception as e:
+            print(f"[main_window] grand_master error: {e}")
+        self._gm_anzeige_setzen(val)
+
+    def _gm_anzeige_setzen(self, val: int):
+        """Alle GM-Regler und -Prozentanzeigen auf ``val`` stellen, OHNE
+        valueChanged auszuloesen. Die eine Quelle der Wahrheit bleibt
+        ``output_manager.grand_master``; Regler und Anzeige folgen nur."""
+        for s_name, l_name in (("_slider_gm", "_lbl_gm_val"),
+                               ("_slider_gm_kiosk", "_lbl_gm_val_kiosk")):
+            slider = getattr(self, s_name, None)
+            label = getattr(self, l_name, None)
+            try:
+                if slider is not None and slider.value() != val:
+                    slider.blockSignals(True)
+                    slider.setValue(val)
+                    slider.blockSignals(False)
+                if label is not None:
+                    label.setText(f"{val}%")
+            except RuntimeError:
+                pass        # Fenster schon abgebaut
 
     def _sync_header_gm(self, gm: float):
         """GDS-1: externe grand_master-Aenderung -> Header-Fader/-Label nachfuehren,
         OHNE valueChanged auszuloesen (blockSignals) — sonst set_grand_master erneut
-        und Feedback-Loop mit dem VC-Grandmaster-Fader."""
+        und Feedback-Loop mit dem VC-Grandmaster-Fader.
+
+        UI-95: der Kiosk-Regler folgt mit (``_gm_anzeige_setzen``)."""
         val = int(round(max(0.0, min(1.0, float(gm))) * 100))
-        self._slider_gm.blockSignals(True)
-        self._slider_gm.setValue(val)
-        self._slider_gm.blockSignals(False)
-        self._lbl_gm_val.setText(f"{val}%")
+        self._gm_anzeige_setzen(val)
 
     def _on_tap_tempo(self):
         """Topbar-TAP: derselbe Helfer wie der TAP im Tab „Erkennung" (BPM-09):
@@ -1762,19 +1922,24 @@ class MainWindow(QMainWindow):
 
     def _sync_blackout_button(self, an: bool):
         """UI-58: der Knopf zeigt den ECHTEN Blackout-Zustand, auch wenn ihn ein
-        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat."""
-        btn = getattr(self, "_btn_blackout", None)
-        if btn is None:
-            return
-        try:
-            btn.blockSignals(True)
-            btn.setChecked(bool(an))
-            btn.blockSignals(False)
-            btn.setStyleSheet(
-                "background:#cc0000; color:#ffffff; font-weight:bold;"
-                "border:2px solid #ff0000;" if an else "")
-        except RuntimeError:
-            pass        # Fenster schon abgebaut
+        VC-Taster, Web, OSC oder die Kommandozeile geschaltet hat.
+
+        LAS-31: im Kiosk-Modus gibt es einen zweiten BLACKOUT-Knopf im
+        NOT-AUS-Streifen. Beide zeigen dasselbe — die eine Quelle der Wahrheit
+        ist ``output_manager.blackout`` (UI-58-Abo)."""
+        for name in ("_btn_blackout", "_btn_blackout_kiosk"):
+            btn = getattr(self, name, None)
+            if btn is None:
+                continue
+            try:
+                btn.blockSignals(True)
+                btn.setChecked(bool(an))
+                btn.blockSignals(False)
+                btn.setStyleSheet(
+                    "background:#cc0000; color:#ffffff; font-weight:bold;"
+                    "border:2px solid #ff0000;" if an else "")
+            except RuntimeError:
+                pass        # Fenster schon abgebaut
 
     def _quick_record_cue(self):
         stacks = self._state.cue_stacks
@@ -3031,8 +3196,8 @@ class MainWindow(QMainWindow):
         sc.activated.connect(self._laser_notaus_ausloesen)
         self._sc_laser_notaus = sc
 
-        # Der Latch kann sich ohne Ereignis aendern (ein Muster-Abruf im
-        # Programmer loest ihn) — darum im Takt nachlesen; derselbe Takt blinkt.
+        # Der Zustand wird im Takt nachgelesen (der Knopf fuehrt keinen eigenen);
+        # derselbe Takt blinkt.
         self._notaus_timer = QTimer(self)
         self._notaus_timer.setInterval(450)
         self._notaus_timer.timeout.connect(self._notaus_tick)
@@ -3042,7 +3207,14 @@ class MainWindow(QMainWindow):
 
     def _notaus_in_kioskleiste(self):
         """Kiosk: eigener schmaler Streifen ueber dem Inhalt, Knopf rechts
-        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet)."""
+        (die Sektionsleiste mit BLACKOUT ist dort ausgeblendet).
+
+        LAS-31: BLACKOUT steht im Kiosk mit im Streifen, direkt links neben
+        LASER NOT-AUS — gleiche Bedienung wie der Knopf der Sektionsleiste
+        (Klick schaltet um, ``_toggle_blackout``), gleiche Anzeige
+        (``_sync_blackout_button``). Der Streifen liegt im Layout ueber dem
+        Ansichtsstapel; das Ausgabe-Banner (VCB-47) ueberlagert nur den
+        Stapel — beide verdecken sich nicht."""
         btn = getattr(self, "_btn_laser_notaus", None)
         if btn is None:
             return
@@ -3053,12 +3225,95 @@ class MainWindow(QMainWindow):
             lay.setContentsMargins(4, 2, 4, 2)
             lay.addStretch(1)
             self._sperrzonen_kopfzeile_bauen(lay)     # LAS-32, auch im Kiosk
+            bo = QPushButton("BLACKOUT")
+            bo.setObjectName("blackoutBtn")
+            bo.setCheckable(True)
+            bo.setMinimumHeight(btn.minimumHeight())
+            bo.setMinimumWidth(88)
+            bo.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # wie der NOT-AUS daneben
+            bo.setToolTip(
+                "Schaltet die gesamte Lichtausgabe dunkel. Ein weiterer Klick "
+                "schaltet sie wieder ein. Der Knopf zeigt immer den echten "
+                "Zustand, auch wenn eine VC-Taste, die Kommandozeile oder "
+                "die Fernbedienung den "
+                "Blackout geschaltet hat.")
+            bo.clicked.connect(self._toggle_blackout)
+            self._btn_blackout_kiosk = bo
+            self._kiosk_gm_und_stop_bauen(lay, btn.minimumHeight())
+            lay.addWidget(bo)
             lay.addWidget(btn)
             root = self.centralWidget().layout()
             root.insertWidget(max(0, root.indexOf(self._section_bar)), leiste)
             self._notaus_leiste = leiste
         except Exception as e:
             print(f"[main_window] NOT-AUS-Leiste (Kiosk) fehlgeschlagen: {e}")
+        try:
+            self._sync_blackout_button(bool(self._state.output_manager.blackout))
+        except Exception:
+            pass
+
+    def _kiosk_gm_und_stop_bauen(self, lay, hoehe: int) -> None:
+        """UI-95: Grand Master und STOP ALL im Kiosk-Streifen, links vor
+        BLACKOUT (Reihenfolge: GM-Regler, STOP ALL, BLACKOUT, LASER NOT-AUS).
+
+        Gleiche Bedienung wie die Gegenstuecke der Sektionsleiste: STOP ALL
+        ruft ``_stop_all`` (kein eigener Zustand), der Regler schreibt ueber
+        ``output_manager.set_grand_master`` und folgt fremden Aenderungen
+        (VC-Fader, MIDI, Web) ueber dasselbe Abo wie der Regler der
+        Sektionsleiste (``_sync_header_gm``). Keiner von beiden nimmt
+        Tastaturfokus — die Leertaste (GO) erreicht sie nie —, und das Mausrad
+        verstellt den Regler nicht (``_GmReglerOhneRad``)."""
+        gm_gruppe = QWidget()
+        gm_gruppe.setObjectName("kioskGmGruppe")
+        gl = QHBoxLayout(gm_gruppe)
+        gl.setContentsMargins(0, 0, 0, 0)
+        gl.setSpacing(4)
+        lbl = QLabel("GM")
+        lbl.setStyleSheet("color: #cccccc; padding: 0 4px; font-weight: bold;")
+        gl.addWidget(lbl)
+        regler = _GmReglerOhneRad(Qt.Orientation.Horizontal)
+        regler.setObjectName("kioskGmRegler")
+        regler.setRange(0, 100)
+        regler.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        regler.setFixedWidth(140)
+        regler.setMinimumHeight(hoehe)
+        regler.setToolTip(
+            "Grand Master (0–100 %) — derselbe Wert wie der Regler der "
+            "Sektionsleiste und der Grand-Master-Fader der Virtual Console.\n"
+            "Das Mausrad verstellt ihn hier nicht; zum Ändern ziehen oder "
+            "klicken.\n"
+            "Sicher aus ist ein Laser nur mit dem Laser-NOT-AUS.")
+        try:
+            start = int(round(float(self._state.output_manager.grand_master) * 100))
+        except Exception:
+            start = 100
+        regler.setValue(max(0, min(100, start)))
+        regler.valueChanged.connect(self._on_kiosk_gm_changed)
+        gl.addWidget(regler)
+        wert = QLabel(f"{regler.value()}%")
+        wert.setObjectName("kioskGmWert")
+        wert.setStyleSheet("color: #aaaaaa; padding: 0 4px;")
+        wert.setMinimumWidth(wert.fontMetrics().horizontalAdvance("100%") + 8)
+        gl.addWidget(wert)
+        gm_gruppe.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        gm_gruppe.setMinimumWidth(gm_gruppe.sizeHint().width())
+        self._slider_gm_kiosk = regler
+        self._lbl_gm_val_kiosk = wert
+        lay.addWidget(gm_gruppe)
+
+        stop = QPushButton("STOP ALL")
+        stop.setObjectName("blackoutBtn")          # Stil wie in der Sektionsleiste
+        stop.setMinimumHeight(hoehe)
+        stop.setMinimumWidth(78)
+        stop.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # nie per Leertaste/Enter
+        stop.setAutoRepeat(False)
+        stop.setToolTip(
+            "Stoppt alle laufenden Cuelisten, Chaser, Szenen und Effekte auf "
+            "allen Seiten — wie STOP ALL in der Sektionsleiste. Grand Master "
+            "und Blackout bleiben, wie sie sind.")
+        stop.clicked.connect(self._stop_all)
+        self._btn_stop_all_kiosk = stop
+        lay.addWidget(stop)
 
     def _laser_notaus_ausloesen(self):
         """Ausloesen — ein Schritt, keine Rueckfrage (Klick und Tastenkuerzel)."""
@@ -3084,28 +3339,16 @@ class MainWindow(QMainWindow):
             return
         if jetzt < self._notaus_sperre_bis:
             return
-        antwort = QMessageBox.warning(
-            self, "Laser-NOT-AUS lösen?",
-            "Der Laser-NOT-AUS ist aktiv.\n\n"
-            "Nach dem Lösen geben DMX-Laser sofort wieder aus, was Programmer, "
-            "Szenen und Effekte gerade vorgeben. Netzwerk-Laser bleiben "
-            "unscharf.\n\n"
-            "Nur lösen, wenn der Strahlbereich frei ist. Jetzt lösen?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel)
-        if antwort != QMessageBox.StandardButton.Yes:
-            self._sync_notaus_button()
-            return
-        try:
-            self._state.laser_notaus_loesen()
-        except Exception as e:
-            print(f"[main_window] Laser-NOT-AUS lösen Fehler: {e}")
+        # LAS-36: der EINE Loese-Weg — Rueckfrage und Loesen liegen gemeinsam in
+        # src/ui/laser_notaus.py (ein spaeterer zweiter Knopf nimmt dieselbe).
+        from src.ui.laser_notaus import loesen_mit_rueckfrage
+        geloest = loesen_mit_rueckfrage(self, self._state)
         self._sync_notaus_button()
-        try:
-            if not getattr(self._state, "laser_estop_active", False):
+        if geloest:
+            try:
                 self.statusBar().showMessage("Laser-NOT-AUS gelöst", 5000)
-        except Exception:
-            pass
+            except Exception:
+                pass
 
     def _notaus_tick(self):
         self._notaus_blink ^= 1
@@ -3198,8 +3441,10 @@ class MainWindow(QMainWindow):
             if aktiv:
                 text = self._NOTAUS_TEXT_AKTIV
                 stil = self._NOTAUS_STIL_AKTIV[self._notaus_blink & 1]
-                tip = ("LASER NOT-AUS AKTIV — Laser sind dunkel verriegelt.\n"
-                       "Lösen: klicken und die Rückfrage bestätigen.\n")
+                tip = ("LASER NOT-AUS AKTIV — Werte werden gemerkt, der Laser "
+                       "bleibt dunkel.\n"
+                       "Lösen geht nur hier: klicken und die Rückfrage "
+                       "bestätigen.\n")
             else:
                 text = self._NOTAUS_TEXT
                 stil = self._NOTAUS_STIL_BEREIT
@@ -3235,7 +3480,10 @@ class MainWindow(QMainWindow):
         self._laser_estop_sig.emit()
 
     def _on_laser_estop_ui(self):
-        self._on_laser_estop()
+        # LAS-36: das Ereignis kommt auch beim Loesen — der rote Alarm
+        # „ausgelöst“ gehoert nur zum stehenden Latch.
+        if getattr(self._state, "laser_estop_active", False):
+            self._on_laser_estop()
         self._sync_notaus_button()
 
     def _on_laser_estop(self, *_):
@@ -3467,8 +3715,14 @@ class MainWindow(QMainWindow):
                        SyncEvent.FUNCTION_CHANGED, SyncEvent.GROUP_CHANGED,
                        SyncEvent.CUE_STACK_CHANGED, SyncEvent.PALETTE_CHANGED,
                        SyncEvent.OUTPUT_CONFIG_CHANGED,
-                       SyncEvent.LIVE_VIEW_CHANGED):
+                       SyncEvent.LIVE_VIEW_CHANGED,
+                       SyncEvent.SHOW_INHALT_CHANGED):
                 sync.subscribe(ev, self._mark_autosave_dirty)
+            # Codex-Review #1081: eine geaenderte Stufe (Prioritaet) meldet sich
+            # bewusst NICHT ueber FUNCTION_CHANGED, sondern ueber den eigenen
+            # Stufen-Melder — ohne ihn blieb sie als einzige Aenderung ungesichert.
+            from src.ui.widgets.stufe_auswahl import stufen_melder
+            stufen_melder().geaendert.connect(self._mark_autosave_dirty)
             print(f"[autosave] aktiv ({mins} min, dirty-basiert) -> {self._autosave_path()}")
         except Exception as e:
             print(f"[autosave] setup error: {e}")

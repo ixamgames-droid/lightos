@@ -71,8 +71,9 @@ versetzt — die Strahlen schwenken gegeneinander.
   erst bei **0 %** aus. Das gilt nur, weil ihr Profil einen Aus-Wert kennt (Betriebsart
   „Laser off", LAS-24); viele Laser-Profile kennen keinen und strahlen bei 0 % weiter.
 - **Laser NOT-AUS** (roter Knopf) schaltet sofort alle Laser dunkel, auch mitten in einem
-  Look; kein Knopf schaltet sie danach wieder ein. Die Sperre löst erst ein bewusst gesetzter
-  Shutter-Wert im Programmer (Reiter **Laser**), siehe [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md).
+  Look; kein Knopf der Show schaltet sie danach wieder ein. Die Sperre löst nur der Knopf
+  **LASER NOT-AUS** oben rechts im Hauptfenster (klicken, Rückfrage bestätigen) — danach geben
+  die Laser sofort wieder aus, was eingestellt ist; siehe [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus).
   Verlässlich aus ist ein Laser nur damit.
 
 ## Bilder

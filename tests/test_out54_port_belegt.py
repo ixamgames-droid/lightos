@@ -139,7 +139,7 @@ class VerdrahtungTest(unittest.TestCase):
         from src.core.dmx import output_manager
         quelle = inspect.getsource(output_manager._make_enttec_device)
         self.assertIn("warne_wenn_belegt", quelle)
-        self.assertLess(quelle.index("warne_wenn_belegt"), quelle.index("EnttecPro(port)"))
+        self.assertLess(quelle.index("warne_wenn_belegt"), quelle.index("EnttecPro(port"))
 
     def test_diagnose_darf_die_ausgabe_nicht_verhindern(self):
         """Der Aufruf ist bewusst in try/except: eine kaputte Diagnose darf die

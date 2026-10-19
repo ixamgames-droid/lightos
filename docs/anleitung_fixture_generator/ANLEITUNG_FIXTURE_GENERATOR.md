@@ -313,9 +313,12 @@ gesendet wird und ob der Laser mit den Default-Werten **sofort strahlt**. Mit
   stand – der Kanal bleibt dann auf dem Aus-Wert stehen.
 - Der **Laser-NOT-AUS** beendet einen laufenden Laser-Test und lässt den Laser
   auf „aus“. Solange der NOT-AUS aktiv ist, startet kein Live-Test mit einem
-  Laser.
+  Laser – auch dann nicht, wenn er ausgelöst wird, während die Rückfrage noch
+  offen ist.
 - Kennt das Profil noch **keinen Aus-Wert**, sagt die Rückfrage das: LightOS
-  weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt.
+  weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt. Beendet der
+  NOT-AUS so einen Test, stehen alle Kanäle auf 0, und die Infozeile sagt rot,
+  dass das nicht sicher „aus“ heißt – dann den Laser am Gerät ausschalten.
 
 ## 8. Patchen und bedienen
 
@@ -347,10 +350,12 @@ Den Laser in der Geräteliste wählen; der Reiter **Laser** erscheint.
 ![Laser-NOT-AUS gedrückt](img/08_laser_not_aus.png)
 
 Nach dem NOT-AUS (1) zeigt die Laser-Seite rot an, dass er greift (2), die
-Statuszeile bestätigt ihn. Position, Farbe oder Größe zu verändern schaltet
-den Laser **nicht** wieder ein — erst ein neuer Klick auf eine Betriebsart oder
-ein neues Muster. Den NOT-AUS gibt es auch als VC-Taste (Aktion
-„Laser NOT-AUS“).
+Statuszeile bestätigt ihn. Kein Wert schaltet den Laser wieder ein — auch
+keine Betriebsart und kein Muster: Werte werden gemerkt, der Laser bleibt
+dunkel. Gelöst wird der NOT-AUS nur mit dem Knopf **LASER NOT-AUS** oben
+rechts im Hauptfenster (klicken, Rückfrage bestätigen); danach gibt der Laser
+sofort wieder aus, was eingestellt ist. Den NOT-AUS gibt es auch als VC-Taste
+(Aktion „Laser NOT-AUS“) — sie löst nur aus.
 
 ### Bewegung mit EFX
 

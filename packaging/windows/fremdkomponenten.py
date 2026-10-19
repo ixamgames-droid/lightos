@@ -135,11 +135,6 @@ PAKETE: dict[str, dict] = {
 NICHT_IM_BUNDLE: dict[str, str] = {
     "pyside6": "Sammelpaket ohne eigene Dateien im Bundle; seine Teile stehen "
                "einzeln in PAKETE (pyside6-essentials, pyside6-addons, shiboken6 …)",
-    "mido": "wird im Programm nirgends importiert (MIDI laeuft ueber python-rtmidi)",
-    "winrt-windows-devices-midi": "wird im Programm nirgends importiert",
-    "winrt-windows-devices-enumeration": "wird im Programm nirgends importiert",
-    "winrt-windows-foundation": "wird im Programm nirgends importiert",
-    "winrt-windows-foundation-collections": "wird im Programm nirgends importiert",
 }
 
 # ── Qt ───────────────────────────────────────────────────────────────────────
@@ -234,6 +229,23 @@ EINGEBETTET: tuple[tuple[str, str, str, str], ...] = (
      "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist",
      r"(^|/)(msvcp|vcruntime|concrt|vccorlib|vcomp)\d+[\w-]*\.dll$"),
 )
+
+#: Lizenztext unter ``licenses/`` zu einer eingebetteten Bibliothek, wenn sie
+#: selbst keinen mitbringt (Erzeugung: ``fremdlizenzen_sammeln.py``).
+EINGEBETTET_TEXTE: dict[str, str] = {
+    "Mesa llvmpipe (opengl32sw.dll)": "Mesa-opengl32sw.txt",
+}
+
+#: LIZ-2 (Rest): Teile aus den PySide6-Paketen, deren Fremdlizenzen die Pakete
+#: NICHT mitbringen. Zielpfad im Bundle (klein, ``/``) -> (Sammeldatei unter
+#: ``licenses/``, Kopfzeile darin mit der Version, Art der Versionsermittlung).
+#: Die Sammeldatei beschreibt genau EINE Version; liegt eine andere im Bundle,
+#: bricht der Bau ab — dann ``fremdlizenzen_sammeln.py`` neu laufen lassen.
+SAMMELDATEIEN: dict[str, tuple[str, str, str]] = {
+    "pyside6/qt6webenginecore.dll": ("QtWebEngine-THIRD-PARTY.txt",
+                                     "Qt-WebEngine-Version:", "pe"),
+    "pyside6/opengl32sw.dll": ("Mesa-opengl32sw.txt", "Mesa-Version:", "mesa"),
+}
 
 #: Gehoert zu Windows 10/11 und darf NICHT ins Bundle (``qt_umfang`` laesst es
 #: weg): die Universal C Runtime. PyInstaller sammelte sie aus dem PATH des
@@ -473,6 +485,75 @@ def befunde(erfasst: dict, pakete_info: dict, texte,
     return aus
 
 
+def pe_dateiversion(daten: bytes) -> str | None:
+    """Dateiversion ``a.b.c`` aus der Versionsressource einer Windows-DLL
+    (``VS_FIXEDFILEINFO``, erkannt an ihrer Signatur ``0xFEEF04BD``).
+
+    Gesucht wird die Signatur direkt hinter dem Schluessel ``VS_VERSION_INFO``
+    (UTF-16) — in einer DLL von 200 MB koennen dieselben vier Bytes auch
+    zufaellig im Code stehen. Ohne Schluessel: erstes Vorkommen."""
+    sig = b"\xbd\x04\xef\xfe"
+    i = -1
+    k = daten.find("VS_VERSION_INFO\0".encode("utf-16-le"))
+    while k >= 0 and i < 0:
+        j = daten.find(sig, k, k + 48)
+        i = j
+        k = daten.find("VS_VERSION_INFO\0".encode("utf-16-le"), k + 1)
+    if i < 0:
+        i = daten.find(sig)
+    if i < 0 or len(daten) < i + 16:
+        return None
+    ms, ls = int.from_bytes(daten[i + 8:i + 12], "little"), \
+        int.from_bytes(daten[i + 12:i + 16], "little")
+    return f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}"
+
+
+def mesa_version(daten: bytes) -> str | None:
+    """Mesa-Version, mit der sich ``opengl32sw.dll`` selbst ausweist."""
+    m = re.search(rb"Mesa (\d+\.\d+\.\d+)", daten)
+    return m.group(1).decode("ascii") if m else None
+
+
+def _kopf_wert(text: str, kopf: str) -> str | None:
+    for zeile in text.splitlines()[:40]:
+        if zeile.startswith(kopf):
+            return zeile[len(kopf):].strip()
+    return None
+
+
+def sammeldatei_befunde(eintraege, lizenz_ordner: str, texte) -> list[str]:
+    """Liegt zu Qt WebEngine und Mesa die Sammeldatei bei — fuer genau die
+    Version im Bundle? ``eintraege``: ``(ziel, quelle, …)``; ``lizenz_ordner``:
+    ``licenses/`` im Repo; ``texte``: Namen der Texte, die ins Bundle kommen."""
+    texte = set(texte)
+    aus: list[str] = []
+    for eintrag in eintraege:
+        ziel = str(eintrag[0]).replace("\\", "/").lower()
+        if ziel not in SAMMELDATEIEN:
+            continue
+        datei, kopf, art = SAMMELDATEIEN[ziel]
+        wie = ("python packaging/windows/fremdlizenzen_sammeln.py "
+               + ("webengine" if art == "pe" else "mesa"))
+        if datei not in texte:
+            aus.append(f"{eintrag[0]}: Sammeldatei licenses/{datei} kommt nicht ins "
+                       f"Bundle (fehlt im Repo oder ist Git nicht bekannt) — {wie}")
+            continue
+        try:
+            with open(os.path.join(lizenz_ordner, datei), encoding="utf-8") as f:
+                soll = _kopf_wert(f.read(), kopf)
+            with open(eintrag[1], "rb") as f:
+                daten = f.read()
+        except OSError as e:
+            aus.append(f"{eintrag[0]}: {type(e).__name__}: {e}")
+            continue
+        ist = pe_dateiversion(daten) if art == "pe" else mesa_version(daten)
+        if ist is None or soll is None or ist != soll:
+            aus.append(f"{eintrag[0]}: Version im Bundle „{ist}“, licenses/{datei} "
+                       f"beschreibt „{soll}“ — Sammeldatei neu erzeugen ({wie}) "
+                       "und einchecken")
+    return aus
+
+
 def windows_eigene(ziele) -> list[str]:
     """Dateien im Bundle, die zu Windows selbst gehoeren (Universal C Runtime)."""
     return [f"{z}: gehoert zu Windows 10/11 und soll nicht ins Setup "
@@ -522,6 +603,9 @@ def liste_text(erfasst: dict, pakete_info: dict, python_version: str,
               "eigene Datei unter _internal/PySide6/ und ist austauschbar."]
         for s in staemme:
             z.append(f"Qt6{s}.dll | {QT_BIBLIOTHEKEN.get(s, '?')}")
+        if "WebEngineCore" in staemme:
+            z.append("  Chromium und die Fremdbibliotheken in Qt WebEngine: "
+                     + SAMMELDATEIEN["pyside6/qt6webenginecore.dll"][0])
     if erfasst["eingebettet"]:
         z += ["", "In den Paketen bzw. in Python enthaltene Bibliotheken",
               "-----------------------------------------------------"]
@@ -532,6 +616,8 @@ def liste_text(erfasst: dict, pakete_info: dict, python_version: str,
             kurz = ", ".join(dateien[:6]) + (" …" if len(dateien) > 6 else "")
             z.append(f"{name} | {lizenz} | {quelle}")
             z.append(f"  Dateien: {kurz}")
+            if name in EINGEBETTET_TEXTE:
+                z.append(f"  Lizenztext: {EINGEBETTET_TEXTE[name]}")
     return "\n".join(z) + "\n"
 
 
@@ -625,6 +711,8 @@ def pruefe_und_schreibe(eintraege, repo: str, arbeitsordner: str,
     ziele = [str(e[0]) for e in eintraege]
     gefunden = befunde(erfasst, info, texte_im_bundle(ziele), python_lizenz)
     gefunden += qt_befunde(ziele) + windows_eigene(ziele)
+    gefunden += sammeldatei_befunde(eintraege, os.path.join(repo, ORDNER),
+                                    texte_im_bundle(ziele))
     if gefunden:
         return [], gefunden
     datas = schreibe_lizenzen(arbeitsordner, erfasst, info, python_lizenz,
