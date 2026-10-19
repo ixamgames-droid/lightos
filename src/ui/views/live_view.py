@@ -428,7 +428,10 @@ class FixtureRenderer:
              zoom: float = 1.0, pan_range_deg: float = 540.0,
              tilt_range_deg: float = 270.0, pan_zero_dmx: float = 128.0,
              tilt_zero_dmx: float = 128.0, lod: int = 0,
-             ring_segments: int = 0, einrasten=None):
+             ring_segments: int = 0, einrasten=None, ist_name: bool = False):
+        # ist_name (DEMO-9): ``label`` ist der Geraetename aus dem Patch (siehe
+        # ``buehnen_beschriftung``) und steht dann OHNE Typ-Praefix da — sonst
+        # ist ``label`` die Nummer und bekommt den Praefix ("MH 9").
         # ring_segments (VIZ-53): Zahl der Ring-Segmente eines 'pixel_head'.
         # Sie ist eine Eigenschaft des GEPATCHTEN Geraets und kommt deshalb vom
         # Canvas mit (`app_state.pixel_ring_segments`) — dieselbe Zahl, die auch
@@ -809,14 +812,18 @@ class FixtureRenderer:
             label_prefix = "?"
 
         # Label darunter (konstante Bildschirmgroesse, nicht abschneiden).
-        # LOD 0 = "PREFIX Name", LOD 1 = nur Kurz-Label (spart Breite bei Dichte),
+        # LOD 0 = Geraetename (ohne Namen "PREFIX Nummer"), LOD 1 = nur Kurz-Label
+        # (Nummer, spart Breite bei Dichte),
         # LOD 2 = kein Label (Selektion/Hover bekommt vom Canvas immer LOD 0).
         if lod <= 1:
             painter.setPen(_C_LABEL)
             painter.setFont(_schrift(8 * tscale))
             text_rect = label_rect(size, tscale)
             if lod == 0:
-                _txt = (f"{label_prefix} {label}" if label else label_prefix)
+                if ist_name and label:
+                    _txt = label
+                else:
+                    _txt = (f"{label_prefix} {label}" if label else label_prefix)
             else:
                 _txt = (label if label else label_prefix)
             painter.drawText(text_rect, _AL_LABEL, _txt)
@@ -880,6 +887,26 @@ def fx_badge_rect(size: float, tscale: float = 1.0,
     oben = oben_rect(size, tscale)
     x = max(size * 0.25, pct_breite / 2 + 3.0 * tscale)
     return QRectF(x, oben.bottom() - bh, bw, bh)
+
+
+#: DEMO-9: laengere Geraetenamen werden fuer die 2D-Beschriftung gekuerzt —
+#: der volle Name steht in der Info-Box und in der Geraeteliste.
+BUEHNEN_NAME_MAX = 16
+
+
+def buehnen_beschriftung(fixture) -> tuple[str, bool]:
+    """DEMO-9: Text unter dem Symbol der 2D-Buehne -> ``(text, ist_name)``.
+
+    Bis hierher stand dort immer Typ-Kuerzel + Geraetenummer („MH 9",
+    „PARBAR 13"), waehrend Geraeteliste, Gruppen und Info-Box den Namen aus dem
+    Patch zeigen („Wash 1", „LED-Leiste"). Jetzt folgt die Buehne dem Namen; nur
+    ein Geraet ohne Namen behaelt Kuerzel + Nummer."""
+    name = " ".join(str(getattr(fixture, "label", "") or "").split())
+    if not name:
+        return f"{fixture.fid}", False
+    if len(name) > BUEHNEN_NAME_MAX:
+        name = name[:BUEHNEN_NAME_MAX - 1].rstrip() + "…"
+    return name, True
 
 
 def _lod_for_screen_gap(screen_gap: float) -> int:
@@ -2097,8 +2124,9 @@ class StageCanvas(QWidget):
                     or self._sb_rest <= 0):
                 return sb
             self._sb_rest -= 1          # zu alt: auffrischen, solange das Bild noch darf
+        _name, _ist_name = buehnen_beschriftung(fixture)
         sb = {"fp": fp, "t": self._sb_uhr, "uni": fixture.universe,
-              "label": f"{fixture.fid}",
+              "label": _name, "ist_name": _ist_name, "fid_text": f"{fixture.fid}",
               "farbe": [], "kanaele": [], "pt": [], "strobe": [], "ok": True}
         try:
             channels = get_channels_for_patched(fixture)
@@ -2447,6 +2475,7 @@ class StageCanvas(QWidget):
             if effects or strobe_hz != 0.0:
                 animiert = True
             label = sb["label"]
+            _ist_name = sb["ist_name"]
             _render_type = sb["render_type"]
             _ring = sb["ring"]
             _pr, _tr = sb["pr"], sb["tr"]
@@ -2459,6 +2488,10 @@ class StageCanvas(QWidget):
             if (fixture.fid in self._selected_fids or _teil
                     or fixture.fid in self._highlight_fids):
                 _lod = 0
+            if _lod == 1:
+                # DEMO-9: Kurz-Label bleibt die Nummer — ein Name passt nicht
+                # in den engen Nachbarabstand, fuer den LOD 1 gedacht ist.
+                label, _ist_name = sb["fid_text"], False
             FixtureRenderer.draw(
                 painter, _render_type, x, y,
                 self._fixture_size, color, intensity, label,
@@ -2471,6 +2504,7 @@ class StageCanvas(QWidget):
                 pan_range_deg=_pr, tilt_range_deg=_tr,
                 pan_zero_dmx=_pz, tilt_zero_dmx=_tz,
                 lod=_lod, ring_segments=_ring, einrasten=_einr,
+                ist_name=_ist_name,
             )
             # Info-Box für genau ein selektiertes Fixture vorbereiten
             if fixture.fid in self._selected_fids and len(self._selected_fids) == 1:
