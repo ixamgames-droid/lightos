@@ -67,6 +67,7 @@
 | UI-101 | A | fix/ui101-kleinkram-sichtpruefung | 2026-10-19T16:23Z | - |
 | UI-102 | A | fix/ui102-fixture-editor-ansehen-hinweis | 2026-10-19T16:49Z | - |
 | DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-19T16:49Z | - |
+| ENG-37 | A | feat/eng37-modify-sichtbar | 2026-10-19T18:00Z | - |
 
 ## Blocker & Fallen
 
@@ -139,7 +140,6 @@
 
 ## Verlauf
 
-- 2026-10-18T22:29Z A done OUT-66
 - 2026-10-18T22:53Z A done UI-93
 - 2026-10-18T22:53Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T14:03Z A claim OUT-80
@@ -169,3 +169,4 @@
 - 2026-10-19T17:19Z A done PROC-23
 - 2026-10-19T17:59Z A done QA-97
 - 2026-10-19T17:59Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T18:00Z A claim ENG-37
