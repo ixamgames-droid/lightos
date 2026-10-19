@@ -524,6 +524,10 @@ class MainWindow(QMainWindow):
         self._blackout_changed_sig.connect(self._sync_blackout_button)
         self._laser_estop_sig.connect(self._on_laser_estop_ui)
         self._state.subscribe(self._on_state_event)
+        # QA-97: beim Abbau wieder abmelden — sonst bekommt ein totes Fenster
+        # weiter jedes State-Ereignis (Tests bauen viele Fenster je Prozess).
+        self.destroyed.connect(
+            lambda *_a, st=self._state, cb=self._on_state_event: st.unsubscribe(cb))
         self._visualizer_window = None
         self._current_show_path: str | None = None
         # DEMO-8: Dateiname, den „Speichern unter" nach dem Oeffnen einer
@@ -579,22 +583,29 @@ class MainWindow(QMainWindow):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe(SyncEvent.REFRESH_ALL, self._on_refresh_all)
-            sync.subscribe(SyncEvent.SHOW_LOADED, self._on_show_loaded)
+            # QA-97: an die Lebenszeit des Fensters gebunden (subscribe_widget).
+            # Mit plain subscribe() blieben die Abos eines abgebauten Fensters
+            # im globalen Bus: ein totes Fenster verbrauchte weiter den
+            # Sperrzonen-Wechselhinweis, und sein NOT-AUS-Abonnent warf in
+            # jedem LASER_ESTOP.
+            def abo(ev, cb, _sync=sync):
+                _sync.subscribe_widget(ev, self, cb)
+            abo(SyncEvent.REFRESH_ALL, self._on_refresh_all)
+            abo(SyncEvent.SHOW_LOADED, self._on_show_loaded)
             # Validation-Banner bei relevanten Aenderungen aktualisieren
-            sync.subscribe(SyncEvent.PATCH_CHANGED, lambda *_: self._refresh_validation_banner())
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_validation_banner())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_validation_banner())
+            abo(SyncEvent.PATCH_CHANGED, lambda *_: self._refresh_validation_banner())
+            abo(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_validation_banner())
+            abo(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_validation_banner())
             # ISO-01: Fremdwert-Badges bei Simple-Desk-(DMX) und Programmer-Aenderung
             # sowie bei Show-Wechsel/Refresh aktualisieren.
-            sync.subscribe(SyncEvent.DMX_CHANGED, lambda *_: self._refresh_foreign_badges())
-            sync.subscribe(SyncEvent.PROGRAMMER_CHANGED, lambda *_: self._refresh_foreign_badges())
-            sync.subscribe(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_foreign_badges())
-            sync.subscribe(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.DMX_CHANGED, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.PROGRAMMER_CHANGED, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.SHOW_LOADED, lambda *_: self._refresh_foreign_badges())
+            abo(SyncEvent.REFRESH_ALL, lambda *_: self._refresh_foreign_badges())
             # UXT-09: Laser-NOT-AUS unmissverständlich bestätigen (egal woher
             # ausgelöst) — prominenter, nicht-blockierender Statuszeilen-Alarm.
             # LAS-31: ueber ein Signal, weil MIDI/OSC aus ihrem Thread ausloesen.
-            sync.subscribe(SyncEvent.LASER_ESTOP, self._laser_estop_melden)
+            abo(SyncEvent.LASER_ESTOP, self._laser_estop_melden)
         except Exception as e:
             print(f"[main_window] sync subscribe error: {e}")
 
@@ -3717,7 +3728,7 @@ class MainWindow(QMainWindow):
                        SyncEvent.OUTPUT_CONFIG_CHANGED,
                        SyncEvent.LIVE_VIEW_CHANGED,
                        SyncEvent.SHOW_INHALT_CHANGED):
-                sync.subscribe(ev, self._mark_autosave_dirty)
+                sync.subscribe_widget(ev, self, self._mark_autosave_dirty)  # QA-97
             # Codex-Review #1081: eine geaenderte Stufe (Prioritaet) meldet sich
             # bewusst NICHT ueber FUNCTION_CHANGED, sondern ueber den eigenen
             # Stufen-Melder — ohne ihn blieb sie als einzige Aenderung ungesichert.

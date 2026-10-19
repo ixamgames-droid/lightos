@@ -23,14 +23,28 @@ Daraus folgt die Grundregel, aus der alles andere abgeleitet ist:
 | Rolle | Wer | Zustaendig fuer |
 |---|---|---|
 | **Leitende Sitzung** (`A`) | die Sitzung, die diese Datei pflegt | **Arbeitsverteilung**, Second Brain, Prozess/Regeln, Konfliktentscheidung, Freigabe strittiger Merges |
-| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten **oder sich freie aus `BACKLOG.md` nehmen**, Befunde als Fragment unter `backlog.d/` (PROC-20), Blocker in `SESSIONS.md` |
+| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten; selbst suchen **nur, wenn `A` auf der Tafel abgemeldet ist** (PROC-23), Befunde als Fragment unter `backlog.d/` (PROC-20), Blocker in `SESSIONS.md` |
 
 **★ `A` teilt zu, `B` arbeitet ab (Ansage vom Betreiber, 2026-09-03).** Das ist
 die Grundform: `A` entscheidet, was als Naechstes drankommt und wer es macht,
-und legt es auf der Tafel ab. `B` muss dafuer **nicht warten** — was im
-`BACKLOG.md` frei steht (Status `todo`, kein Claim), darf `B` jederzeit selbst
-nehmen. Nur was `A` ausdruecklich fuer sich reserviert oder als `decision`
-markiert hat, bleibt liegen.
+und legt es auf der Tafel ab.
+
+**★ Seit 2026-10-19 (Ansage vom Betreiber, PROC-23): `A` ist der Master.**
+Mitarbeitende Sitzungen arbeiten ab, was `A` ihnen zuteilt (Tafel-Eintrag
+„A AN B/C/D“ oder Auftrag beim Start der Sitzung). Laeuft eine Sitzung leer,
+meldet sie das auf der Tafel und wartet auf die naechste Zuteilung.
+
+**Selbst suchen** darf eine Sitzung nur, wenn klar ist, dass von `A` nichts mehr
+kommt — `A` hat sich auf der Tafel **abgemeldet** (Blocker „A abgemeldet …“). Auch
+dann nur:
+* Items, die **nur diese Sitzung** erledigen kann (Windows, Windows-ARM, am Rig,
+  zweiter Bildschirm …) — die duerfen auch gross sein, oder
+* **allgemeine kleine** Items.
+
+**Immer:** `A` prueft das Ergebnis nach (adversariale Gegenpruefung), und
+gemergt wird **nur ueber die Merge-Warteschlange von `A`** (Gate +
+`pr_bereit --strict`) — die Sitzung meldet „bereit“ mit PR-Nummer auf der Tafel.
+Grund: `A` haelt den Ueberblick ueber Warteschlange, Konflikte und Reihenfolge.
 
 Woran `A` sich dabei halten muss, damit aus „Leitung" keine Sackgasse wird:
 

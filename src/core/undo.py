@@ -27,7 +27,7 @@ Die Stapel pruefen das selbst (``UndoStack._redo_pruefen``,
 """
 from __future__ import annotations
 import itertools
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from typing import Callable
 
@@ -77,15 +77,20 @@ class Command:
             self.do()
 
 
-def _sammel_command(label: str, teile: list[Command]) -> Command:
+def _sammel_command(label: str, teile: list[Command], rahmen=None) -> Command:
     """Ein Command aus mehreren. Ein Teil, das wirft, haelt die uebrigen
-    nicht auf — sonst bliebe nach einem Rueckgaengig die Haelfte stehen."""
+    nicht auf — sonst bliebe nach einem Rueckgaengig die Haelfte stehen.
+
+    ``rahmen`` (IMP-3): Fabrik eines Kontextmanagers, der um das GANZE
+    Rueckgaengig bzw. Wiederholen gelegt wird (z. B. ``state.patch_sammeln``:
+    ein Neuaufbau statt einem je Teil)."""
     def _jedes(folge, aufruf):
-        for teil in folge:
-            try:
-                aufruf(teil)
-            except Exception as e:
-                print(f"[UndoStack] Teil '{teil.label}' fehlgeschlagen: {e}")
+        with (rahmen() if rahmen is not None else nullcontext()):
+            for teil in folge:
+                try:
+                    aufruf(teil)
+                except Exception as e:
+                    print(f"[UndoStack] Teil '{teil.label}' fehlgeschlagen: {e}")
 
     return Command(
         label=label,
@@ -138,7 +143,7 @@ class UndoStack:
         self.push(Command(label=label, do=do, undo=undo))
 
     @contextmanager
-    def gruppe(self, label: str):
+    def gruppe(self, label: str, rahmen=None):
         """IMP-1: alles, was innerhalb des Blocks gepusht wird, landet als EIN
         Schritt auf dem Stack — ein Rueckgaengig nimmt alles zurueck (in
         umgekehrter Reihenfolge), ein Wiederholen stellt alles wieder her.
@@ -148,7 +153,11 @@ class UndoStack:
         seinem eigenen Undo/Redo die einzige Wahrheit. Wird nichts gepusht,
         entsteht kein Schritt. Verschachtelt zaehlt die aeusserste Gruppe.
         Wirft der Block, bleibt das bis dahin Gesammelte als ein Schritt
-        ruecknehmbar."""
+        ruecknehmbar.
+
+        ``rahmen`` (IMP-3): Fabrik eines Kontextmanagers fuer das spaetere
+        Rueckgaengig/Wiederholen des ganzen Schritts — NICHT fuer den Block
+        selbst (den rahmt der Aufrufer)."""
         if self._sammler is not None or self._suspended:
             yield
             return
@@ -158,7 +167,7 @@ class UndoStack:
         finally:
             teile, self._sammler = self._sammler, None
             if teile:
-                self.push(_sammel_command(label, teile), execute=False)
+                self.push(_sammel_command(label, teile, rahmen), execute=False)
 
     # ── Undo / Redo ──────────────────────────────────────────────────────────
 
