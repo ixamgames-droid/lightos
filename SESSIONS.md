@@ -63,7 +63,6 @@
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | OUT-80 | A | fix/out80-enttec-seriennummer-in-konfiguration | 2026-10-19T14:03Z | - |
 | UI-97 | A | fix/ui97-midi-seite-kleines-fenster | 2026-10-19T14:03Z | - |
-| SAMMEL-BACKLOG-1019 | A | chore/backlog-sichtpruefung-1019 | 2026-10-19T14:04Z | - |
 | LAS-40 | A | fix/las40-notaus-rueckfrage-feste-knoepfe | 2026-10-19T14:32Z | - |
 | PROC-23 | A | chore/proc-a-teilt-zu | 2026-10-19T14:32Z | - |
 | UI-98 | A | fix/ui98-kleines-fenster-programmer-playback | 2026-10-19T16:22Z | - |
@@ -144,7 +143,6 @@
 
 ## Verlauf
 
-- 2026-10-18T21:52Z D claim QA-100
 - 2026-10-18T21:53Z D claim QA-101
 - 2026-10-18T21:53Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T21:54Z D claim QA-102
@@ -174,3 +172,4 @@
 - 2026-10-19T16:58Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T17:06Z D done OUT-79
 - 2026-10-19T17:06Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T17:10Z A done SAMMEL-BACKLOG-1019
