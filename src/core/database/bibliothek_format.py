@@ -951,12 +951,38 @@ def gespeicherte_herkunft(prof) -> dict | None:
         d = json.loads(getattr(prof, "herkunft", "") or "")
     except ValueError:
         return None
+    return herkunft_aus_daten(d)
+
+
+def herkunft_aus_daten(d) -> dict | None:
+    """Die vier Herkunftsfelder (``quelle``/``herkunft``/``geprueft``/``autor``)
+    aus einem LightOS-Profil (oder einer gespeicherten Angabe) — als Kopie,
+    oder ``None``, wenn eines fehlt oder die Pruefung des Formats es ablehnt.
+
+    FM-76: dieselbe Regel fuer die DB-Spalte und fuer eine in den Fixture
+    Generator geladene Vorlage."""
     if not isinstance(d, dict) or any(k not in d for k in HERKUNFT_SCHLUESSEL):
         return None
     probe = {"format_version": FORMAT_VERSION, **{k: d[k] for k in HERKUNFT_SCHLUESSEL}}
     if any(f.startswith(k) for f in pruefe(probe) for k in HERKUNFT_SCHLUESSEL):
         return None
-    return {k: d[k] for k in HERKUNFT_SCHLUESSEL}
+    return copy.deepcopy({k: d[k] for k in HERKUNFT_SCHLUESSEL})
+
+
+#: FM-76: Vermerk in ``herkunft.geaendert``, wenn eine fremde Vorlage (QLC+,
+#: OFL) im Fixture Generator bearbeitet und als neues Profil gespeichert wird.
+GENERATOR_VERMERK = "im LightOS-Fixture-Generator bearbeitet"
+
+
+def mit_vermerk(herkunft: dict, vermerk: str) -> dict:
+    """Kopie der vier Herkunftsfelder; bei einer fremden Art (QLC+, OFL) mit
+    ``vermerk`` in ``herkunft.geaendert`` (Apache-2.0 §4b) — einmal."""
+    h = copy.deepcopy(herkunft)
+    if h["herkunft"].get("art") in FREMD_ARTEN:
+        alt = h["herkunft"].get("geaendert", "")
+        if vermerk not in alt:
+            h["herkunft"]["geaendert"] = f"{alt}; {vermerk}".strip("; ")
+    return h
 
 
 def _anlegen(s, daten: dict, source: str):
@@ -1235,6 +1261,44 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
 _QLC_URL = "https://github.com/mcallegari/qlcplus/blob/master/"
 
 
+def qxf_original(pfad: str, original: str | None = None) -> str:
+    """``herkunft.original`` einer ``.qxf``: Pfad in QLC+
+    (``resources/fixtures/…``), sonst der Dateiname."""
+    if original is not None:
+        return original
+    norm = os.path.abspath(pfad).replace(os.sep, "/")
+    i = norm.find("resources/fixtures/")
+    return norm[i:] if i >= 0 else os.path.basename(pfad)
+
+
+def qxf_urheber(root) -> str:
+    """``herkunft.urheber`` einer ``.qxf`` — QLC+-Beitragende plus, falls da,
+    der ``<Creator>``-Block der Datei (QA-72)."""
+    from .qxf_import import herkunft_aus_creator
+    creator = herkunft_aus_creator(root)
+    urheber = "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.)"
+    if creator:
+        urheber += f"; Datei: {creator}"
+    return urheber
+
+
+def qxf_herkunft(pfad: str, root, *, geaendert: str, autor: str, wie: str,
+                 original: str | None = None) -> dict:
+    """Die vier Herkunftsfelder einer ``.qxf`` (art ``qlcplus``, Apache-2.0) —
+    dieselben Angaben wie :func:`qxf_zu_daten` (FM-76: auch fuer den
+    QXF-Import des Fixture Generators)."""
+    original = qxf_original(pfad, original)
+    quelle = {"titel": f"QLC+-Geraetedefinition {os.path.basename(pfad)}"}
+    if original.startswith("resources/"):
+        quelle["url"] = _QLC_URL + original
+    return {"quelle": quelle,
+            "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0",
+                         "urheber": qxf_urheber(root), "original": original,
+                         "geaendert": geaendert},
+            "geprueft": {"ok": False, "wie": wie},
+            "autor": autor}
+
+
 def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
     """Eine QLC+-``.qxf`` ueber den vorhandenen Importer (``qxf_import``) ins
     LightOS-Format. Der Importer laeuft in einer Speicher-DB — dieselben
@@ -1248,7 +1312,7 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
     from .models import FixtureProfile, create_all_idempotent
-    from .qxf_import import herkunft_aus_creator, import_qxf_file
+    from .qxf_import import import_qxf_file
 
     try:
         root = ET.parse(pfad).getroot()
@@ -1266,14 +1330,6 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
             s.flush()
             prof = s.query(FixtureProfile).first()
             prof = _profil_laden(s, prof.id)
-            if original is None:
-                norm = os.path.abspath(pfad).replace(os.sep, "/")
-                i = norm.find("resources/fixtures/")
-                original = norm[i:] if i >= 0 else os.path.basename(pfad)
-            creator = herkunft_aus_creator(root)
-            urheber = "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.)"
-            if creator:
-                urheber += f"; Datei: {creator}"
             n_seg = sum(1 for m in prof.modes for c in m.channels if c.segment is not None)
             n_raster = sum(1 for m in prof.modes if m.grid_rows or m.grid_cols)
             n_bereiche = sum(len(c.ranges) for m in prof.modes for c in m.channels)
@@ -1292,19 +1348,10 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
                 geaendert.append(f"{n_lang} Bereichsnamen auf 80 Zeichen gekuerzt")
             if n_seg:
                 geaendert.append(f"{n_seg} Dimmer-Weiss-Segment-Zuordnung(en) aus <Head> abgeleitet")
-            daten = profil_zu_daten(
-                prof,
-                quelle={"titel": f"QLC+-Geraetedefinition {os.path.basename(pfad)}",
-                        "url": _QLC_URL + original if original.startswith("resources/")
-                        else ""},
-                herkunft={"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": urheber,
-                          "original": original, "geaendert": "; ".join(geaendert)},
-                geprueft={"ok": False, "wie": "automatisch aus QLC+ konvertiert, "
-                                              "nicht gegen das Handbuch geprueft"},
-                autor="LightOS (QXF-Konverter)")
-            if not daten["quelle"]["url"]:
-                del daten["quelle"]["url"]
-            return daten
+            return profil_zu_daten(prof, **qxf_herkunft(
+                pfad, root, original=original, geaendert="; ".join(geaendert),
+                autor="LightOS (QXF-Konverter)",
+                wie="automatisch aus QLC+ konvertiert, nicht gegen das Handbuch geprueft"))
     finally:
         eng.dispose()
 
