@@ -15,6 +15,7 @@ from src.core.engine.modify import (MODIFY_LABELS, MODIFY_MODES, MODIFY_KANAELE,
                                     normalize_mode)
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
+from src.ui.widgets.modify_zeichen import MODIFY_VORSCHAU_RGB
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
@@ -333,17 +334,17 @@ class MatrixPreview(QWidget):
                 else:
                     # ENG-37: Modify allein, nach Art eingefaerbt (Betrag = Helligkeit).
                     lvl = max(r, g, b) / 255.0
-                    if modify_art == "add":
+                    # ENG-37-B: Farben aus EINER Quelle (modify_zeichen) — die
+                    # Konsole zeigt das Zeichen der Betriebsart in denselben.
+                    vr, vg, vb = MODIFY_VORSCHAU_RGB[modify_art]
+                    if modify_art in ("add", "sub"):
                         p.fillRect(x, y, w, h, QColor(
-                            int(255 * lvl), int(176 * lvl), 0))
-                    elif modify_art == "sub":
-                        p.fillRect(x, y, w, h, QColor(
-                            int(64 * lvl), int(140 * lvl), int(255 * lvl)))
+                            int(vr * lvl), int(vg * lvl), int(vb * lvl)))
                     else:
                         p.fillRect(x, y, w, h, QColor("#0d1117"))
-                        g_ = int(200 * lvl)
                         p.fillRect(x, y, w, h, QBrush(
-                            QColor(g_, g_, g_), Qt.BrushStyle.BDiagPattern))
+                            QColor(int(vr * lvl), int(vg * lvl), int(vb * lvl)),
+                            Qt.BrushStyle.BDiagPattern))
         if modify_art is not None:
             p.setPen(QColor("#e6edf3"))
             p.drawText(8, 18, self.modify_eckentext())

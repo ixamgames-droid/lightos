@@ -40,6 +40,7 @@ test_eng36_klonen_anleitung.py     # Anleitung Klonen: Wortlaut wie im Dialog, E
 test_eng35_doku.py                 # Anleitung „Wer gewinnt?“ (Stufen, Snap-Haken VCB-46), Merge-Vertrag, Feld „Stufe“ in den Editor-Anleitungen, Button-Anleitung
 test_eng39_doku.py                 # Anleitung „Wer gewinnt?“, Abschnitt „Hinweis bei Überschneidungen“; Button-Anleitung; Fragmente
 test_eng37_modify_doku.py          # Dimmer-Matrix-Anleitung, Abschnitt Modify-Effekt: Tabelle gegen die Engine
+test_eng37_modify_sichtbar_doku.py  # Dimmer-Matrix §5 + Prioritaeten §8: Tasten-Zeichen, Chaser-Hinweis (Wortlaut aus dem Code), ENG-42/43
 test_eng38_modify_farbe_doku.py    # Dimmer-Matrix-Anleitung, Modify im Stil Farbe: Tabelle gegen die Engine
 test_eng40_modify_kanalwahl_doku.py # Dimmer-Matrix-Anleitung, „Wirkt auf“: Tabelle gegen die Engine
 test_ui91_efx_reiter_geraeteliste.py # Anleitungen nennen „Auswahl übernehmen“ (EFX/Matrix)

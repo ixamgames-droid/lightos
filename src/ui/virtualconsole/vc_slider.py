@@ -646,6 +646,23 @@ class VCSlider(VCWidget):
                 ids.append(iv)
         return ids
 
+    def _modify_arten(self) -> list[str]:
+        """ENG-37-B: Betriebsarten der FEST gebundenen Ziel-Effekte, die als
+        Modify-Effekt laufen (nur Effekt-Modi). Der Rueckfall „aktiver Effekt"
+        zeigt bewusst nichts — sein Ziel wechselt mit jedem Start."""
+        if self.mode not in (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
+                             SliderMode.EFFECT_PARAM):
+            return []
+        fids = self._all_target_fids()
+        if not fids:
+            return []
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            from src.ui.widgets.modify_zeichen import modify_arten
+            return modify_arten(fids, get_function_manager())
+        except Exception:
+            return []
+
     def _autostart_targets(self):
         """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
         An/Aus der Ziel-Effekte. Wert > 0 startet sie (falls noch nicht laufend),
@@ -879,6 +896,14 @@ class VCSlider(VCWidget):
             p.setFont(QFont("Segoe UI", 7))
             mark = "⇅" if self.invert else "▯"
             p.drawText(QRect(2, 0, 12, 12), Qt.AlignmentFlag.AlignCenter, mark)
+
+        # ENG-37-B: Zeichen der Modify-Betriebsart unten links — links neben dem
+        # Spurende, ueber der Beschriftung (die bleibt frei und zentriert).
+        _modify = self._modify_arten()
+        if _modify:
+            from src.ui.widgets.modify_zeichen import zeichne_modify_zeichen
+            _h = 14
+            zeichne_modify_zeichen(p, 2, self.height() - 18 - _h - 1, _modify[:1], _h)
 
         # MIDI-Bindung-Indikator oben rechts (cyan dot)
         if self.midi_cc >= 0:
