@@ -3135,10 +3135,11 @@ class VisualizerWindow(QMainWindow):
         # Visualizer-Fenster wirken (getrennter Top-Level-QMainWindow, das
         # Hauptfenster-Menue-Shortcuts erreichen ihn nicht). Gemeinsamer
         # globaler UndoStack (kein zweiter Stack, siehe Design (e)).
-        sc_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
-        sc_undo.activated.connect(self._do_undo)
-        sc_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
-        sc_redo.activated.connect(self._do_redo)
+        # UI-93: feste Belegung (Strg+Z; Strg+Y UND Strg+Umschalt+Z) statt
+        # StandardKey — unter X11 fehlte sonst Strg+Y.
+        from src.ui import undo_kuerzel
+        self._undo_kuerzel = undo_kuerzel.kuerzel_anlegen(
+            self, self._do_undo, self._do_redo)
 
     def _on_key_f(self):
         """A3D-29: F bedeutet zweierlei — entschieden wird nach dem Fokus."""
@@ -3198,7 +3199,7 @@ class VisualizerWindow(QMainWindow):
     def _do_redo(self):
         ok = get_undo_stack().redo()
         if ok and hasattr(self, "_lbl_info"):
-            self._lbl_info.setText("Wiederhergestellt")
+            self._lbl_info.setText("Wiederholt")
 
     def event(self, e):
         # Einzelbuchstaben-Shortcuts (V/E/F/S/D) duerfen die Texteingabe in
@@ -3208,6 +3209,10 @@ class VisualizerWindow(QMainWindow):
         if e.type() == QEvent.Type.ShortcutOverride:
             if _should_pass_key_to_text(self.focusWidget(), e.key(), e.modifiers()):
                 e.accept()
+                return True
+            # UI-93: Strg+Y/Strg+Umschalt+Z in einem Textfeld gehoeren dem Feld.
+            from src.ui import undo_kuerzel
+            if undo_kuerzel.vorrang(self, e):
                 return True
         return super().event(e)
 
