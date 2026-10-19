@@ -403,6 +403,20 @@ class PatchChangedPruneTest(_ServiceTestCase):
         self.assertIn(2, svc._last_payload)
 
 
+def _rumpf_fenster_abbauen(win):
+    """QA-97: ``deleteLater`` + erzwungene ``DeferredDelete``-Zustellung."""
+    from PySide6.QtWidgets import QApplication
+    from _qt_lifecycle import flush_deferred_deletes
+    try:
+        win.hide()
+        win.deleteLater()
+    except RuntimeError:
+        return
+    flush_deferred_deletes()
+    QApplication.processEvents()
+    flush_deferred_deletes()
+
+
 class WindowAsServiceTargetTest(_ServiceTestCase):
     """VIZ-12 Schritt 3: ``VisualizerWindow`` dockt als EIN Service-Target an,
     statt einen eigenen Timer + eigenes DMX-Push-State-Subscribe zu bauen.
@@ -485,6 +499,13 @@ class WindowAsServiceTargetTest(_ServiceTestCase):
             if svc is not None and target is not None:
                 svc.detach_target(target)
             state.unsubscribe(win._on_state)
+            # QA-97: das Rumpf-Fenster wirklich abbauen. Es blieb sonst als
+            # Top-Level-Widget stehen; der Aufraeumer einer SPAETEREN Datei
+            # (destroy_all_top_level_widgets) rief dann close() -> closeEvent
+            # scheiterte am fehlenden ``_stage_dirty`` -> ERROR im Teardown
+            # fremder Tests. Bewusst ohne close(): das Rumpf-Fenster hat die
+            # Attribute des echten closeEvent nicht.
+            _rumpf_fenster_abbauen(win)
 
     def test_close_event_hides_and_keeps_target_attached(self):
         """VIZ-12 Schritt 4 (Dauerfenster): confirmed closeEvent versteckt nur
@@ -526,6 +547,13 @@ class WindowAsServiceTargetTest(_ServiceTestCase):
             if svc is not None and target is not None:
                 svc.detach_target(target)
             state.unsubscribe(win._on_state)
+            # QA-97: das Rumpf-Fenster wirklich abbauen. Es blieb sonst als
+            # Top-Level-Widget stehen; der Aufraeumer einer SPAETEREN Datei
+            # (destroy_all_top_level_widgets) rief dann close() -> closeEvent
+            # scheiterte am fehlenden ``_stage_dirty`` -> ERROR im Teardown
+            # fremder Tests. Bewusst ohne close(): das Rumpf-Fenster hat die
+            # Attribute des echten closeEvent nicht.
+            _rumpf_fenster_abbauen(win)
 
     def test_release_state_detaches_target_from_service(self):
         from src.ui.visualizer.visualizer_window import VisualizerWindow

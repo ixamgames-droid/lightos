@@ -966,15 +966,22 @@ class PatchView(QWidget):
         STAB-33: ``MenueKnopf`` statt ``QPushButton.setMenu`` — der eingebaute
         Menue-Pfeil loest unter Windows „QFont::setPointSize: Point size <= 0“
         aus (s. widgets/menue_knopf.py). Der Pfeil steht als „▾“ im Text; das
-        Menue klappt beim Klick UND bei Leertaste/Eingabe auf dem Knopf auf und
-        laesst sich danach mit den Pfeiltasten bedienen."""
+        Menue klappt beim Klick und per Tastatur mit der EINGABETASTE auf dem
+        Knopf auf und laesst sich danach mit den Pfeiltasten bedienen.
+
+        IMP-3: NICHT die Leertaste — die gehoert im Hauptfenster dem
+        globalen Kuerzel GO und kommt beim Knopf nie an. Sie wird dafuer
+        nicht umbelegt; ``MenueKnopf.keyPressEvent`` nimmt die Eingabetaste
+        selbst an, weil ein QPushButton ausserhalb eines Dialogs auf sie
+        sonst nicht reagiert."""
         from PySide6.QtWidgets import QMenu
         from src.ui.widgets.menue_knopf import MenueKnopf
         self._btn_import = MenueKnopf("Tabellen-Import ▾")
         self._btn_import.setToolTip(
             "Geräteliste aus einer Tabelle (CSV) übernehmen — für den Umstieg "
             "von einem anderen Lichtprogramm. Mit Vorschau; vorhandene Geräte "
-            "bleiben unverändert.")
+            "bleiben unverändert. Mit der Tastatur öffnet die Eingabetaste "
+            "das Menü.")
         menu = QMenu(self._btn_import)
         menu.setToolTipsVisible(True)
         self._act_import = menu.addAction("Aus Tabelle importieren …")
