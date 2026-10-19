@@ -464,6 +464,21 @@ class _SectionBar(QWidget):
             self._reflowing = False
 
 
+class _GmReglerOhneRad(QSlider):
+    """UI-95: Grand-Master-Regler im Kiosk-Streifen.
+
+    Das Mausrad verstellt ihn nur, wenn er den Fokus hat (Muster wie
+    ``StufeAuswahl``) — und da er bewusst keinen Tastaturfokus bekommt (die
+    Leertaste ist GO), heisst das: nie. Wer im Kiosk ueber den Streifen rollt,
+    dunkelt nicht nebenbei die Buehne ab. Gezogen und geklickt wird normal."""
+
+    def wheelEvent(self, event):
+        if self.hasFocus():
+            super().wheelEvent(event)
+        else:
+            event.ignore()
+
+
 class MainWindow(QMainWindow):
     # UI-93: dieses Fenster verteilt Rueckgaengig/Wiederholen selbst (event());
     # eingebettete Ansichten schalten ihre eigenen Kuerzel dafuer ab.
@@ -1759,16 +1774,44 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"[main_window] grand_master error: {e}")
         self._lbl_gm_val.setText(f"{val}%")
+        self._gm_anzeige_setzen(val)
+
+    def _on_kiosk_gm_changed(self, val: int):
+        """UI-95: der Kiosk-Regler schreibt ueber denselben Weg wie der der
+        Sektionsleiste (``output_manager.set_grand_master``); beide Anzeigen
+        ziehen danach nach."""
+        try:
+            self._state.output_manager.set_grand_master(val / 100.0)
+        except Exception as e:
+            print(f"[main_window] grand_master error: {e}")
+        self._gm_anzeige_setzen(val)
+
+    def _gm_anzeige_setzen(self, val: int):
+        """Alle GM-Regler und -Prozentanzeigen auf ``val`` stellen, OHNE
+        valueChanged auszuloesen. Die eine Quelle der Wahrheit bleibt
+        ``output_manager.grand_master``; Regler und Anzeige folgen nur."""
+        for s_name, l_name in (("_slider_gm", "_lbl_gm_val"),
+                               ("_slider_gm_kiosk", "_lbl_gm_val_kiosk")):
+            slider = getattr(self, s_name, None)
+            label = getattr(self, l_name, None)
+            try:
+                if slider is not None and slider.value() != val:
+                    slider.blockSignals(True)
+                    slider.setValue(val)
+                    slider.blockSignals(False)
+                if label is not None:
+                    label.setText(f"{val}%")
+            except RuntimeError:
+                pass        # Fenster schon abgebaut
 
     def _sync_header_gm(self, gm: float):
         """GDS-1: externe grand_master-Aenderung -> Header-Fader/-Label nachfuehren,
         OHNE valueChanged auszuloesen (blockSignals) — sonst set_grand_master erneut
-        und Feedback-Loop mit dem VC-Grandmaster-Fader."""
+        und Feedback-Loop mit dem VC-Grandmaster-Fader.
+
+        UI-95: der Kiosk-Regler folgt mit (``_gm_anzeige_setzen``)."""
         val = int(round(max(0.0, min(1.0, float(gm))) * 100))
-        self._slider_gm.blockSignals(True)
-        self._slider_gm.setValue(val)
-        self._slider_gm.blockSignals(False)
-        self._lbl_gm_val.setText(f"{val}%")
+        self._gm_anzeige_setzen(val)
 
     def _on_tap_tempo(self):
         """Topbar-TAP: derselbe Helfer wie der TAP im Tab „Erkennung" (BPM-09):
@@ -3196,6 +3239,7 @@ class MainWindow(QMainWindow):
                 "Blackout geschaltet hat.")
             bo.clicked.connect(self._toggle_blackout)
             self._btn_blackout_kiosk = bo
+            self._kiosk_gm_und_stop_bauen(lay, btn.minimumHeight())
             lay.addWidget(bo)
             lay.addWidget(btn)
             root = self.centralWidget().layout()
@@ -3207,6 +3251,69 @@ class MainWindow(QMainWindow):
             self._sync_blackout_button(bool(self._state.output_manager.blackout))
         except Exception:
             pass
+
+    def _kiosk_gm_und_stop_bauen(self, lay, hoehe: int) -> None:
+        """UI-95: Grand Master und STOP ALL im Kiosk-Streifen, links vor
+        BLACKOUT (Reihenfolge: GM-Regler, STOP ALL, BLACKOUT, LASER NOT-AUS).
+
+        Gleiche Bedienung wie die Gegenstuecke der Sektionsleiste: STOP ALL
+        ruft ``_stop_all`` (kein eigener Zustand), der Regler schreibt ueber
+        ``output_manager.set_grand_master`` und folgt fremden Aenderungen
+        (VC-Fader, MIDI, Web) ueber dasselbe Abo wie der Regler der
+        Sektionsleiste (``_sync_header_gm``). Keiner von beiden nimmt
+        Tastaturfokus — die Leertaste (GO) erreicht sie nie —, und das Mausrad
+        verstellt den Regler nicht (``_GmReglerOhneRad``)."""
+        gm_gruppe = QWidget()
+        gm_gruppe.setObjectName("kioskGmGruppe")
+        gl = QHBoxLayout(gm_gruppe)
+        gl.setContentsMargins(0, 0, 0, 0)
+        gl.setSpacing(4)
+        lbl = QLabel("GM")
+        lbl.setStyleSheet("color: #cccccc; padding: 0 4px; font-weight: bold;")
+        gl.addWidget(lbl)
+        regler = _GmReglerOhneRad(Qt.Orientation.Horizontal)
+        regler.setObjectName("kioskGmRegler")
+        regler.setRange(0, 100)
+        regler.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        regler.setFixedWidth(140)
+        regler.setMinimumHeight(hoehe)
+        regler.setToolTip(
+            "Grand Master (0–100 %) — derselbe Wert wie der Regler der "
+            "Sektionsleiste und der Grand-Master-Fader der Virtual Console.\n"
+            "Das Mausrad verstellt ihn hier nicht; zum Ändern ziehen oder "
+            "klicken.\n"
+            "Sicher aus ist ein Laser nur mit dem Laser-NOT-AUS.")
+        try:
+            start = int(round(float(self._state.output_manager.grand_master) * 100))
+        except Exception:
+            start = 100
+        regler.setValue(max(0, min(100, start)))
+        regler.valueChanged.connect(self._on_kiosk_gm_changed)
+        gl.addWidget(regler)
+        wert = QLabel(f"{regler.value()}%")
+        wert.setObjectName("kioskGmWert")
+        wert.setStyleSheet("color: #aaaaaa; padding: 0 4px;")
+        wert.setMinimumWidth(wert.fontMetrics().horizontalAdvance("100%") + 8)
+        gl.addWidget(wert)
+        gm_gruppe.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        gm_gruppe.setMinimumWidth(gm_gruppe.sizeHint().width())
+        self._slider_gm_kiosk = regler
+        self._lbl_gm_val_kiosk = wert
+        lay.addWidget(gm_gruppe)
+
+        stop = QPushButton("STOP ALL")
+        stop.setObjectName("blackoutBtn")          # Stil wie in der Sektionsleiste
+        stop.setMinimumHeight(hoehe)
+        stop.setMinimumWidth(78)
+        stop.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # nie per Leertaste/Enter
+        stop.setAutoRepeat(False)
+        stop.setToolTip(
+            "Stoppt alle laufenden Cuelisten, Chaser, Szenen und Effekte auf "
+            "allen Seiten — wie STOP ALL in der Sektionsleiste. Grand Master "
+            "und Blackout bleiben, wie sie sind.")
+        stop.clicked.connect(self._stop_all)
+        self._btn_stop_all_kiosk = stop
+        lay.addWidget(stop)
 
     def _laser_notaus_ausloesen(self):
         """Ausloesen — ein Schritt, keine Rueckfrage (Klick und Tastenkuerzel)."""
