@@ -289,8 +289,13 @@ class EstopAusWertJeWegTest(unittest.TestCase):
         self.st._rebuild_render_plan()
         self.st.set_laser_estop(True)
         self._senden()
-        # Laser war schon vor dem Latch weg: weder Adresse noch Aus-Wert bekannt.
-        self.assertEqual(0, self._byte(("_ArtNet", 0)))
+        # Laser war schon vor dem Latch weg: der NOT-AUS kennt weder Adresse
+        # noch Aus-Wert — seine klebrige Maske bleibt leer.
+        self.assertFalse((getattr(self.om, "_laser_estop_aus", None) or {}).get(1))
+        # Auf der Leitung steht trotzdem der Aus-Wert: seit OUT-72 haelt die
+        # Ausgabe ihn fuer jede frei gewordene Laser-Adresse (0 hiesse bei
+        # diesem Laser „Auto run“), unabhaengig vom NOT-AUS.
+        self.assertEqual(AUS, self._byte(("_ArtNet", 0)))
 
     def test_out65_lade_fenster_latch_waehrend_laden(self):
         # OUT-61b: Latch erst waehrend des Ladens — der Plan ist schon leer.
