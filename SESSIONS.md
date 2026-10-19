@@ -71,6 +71,7 @@
 | UI-98 | A | fix/ui98-kleines-fenster-programmer-playback | 2026-10-19T16:22Z | - |
 | UI-101 | A | fix/ui101-kleinkram-sichtpruefung | 2026-10-19T16:23Z | - |
 | UI-102 | A | fix/ui102-fixture-editor-ansehen-hinweis | 2026-10-19T16:49Z | - |
+| DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-19T16:49Z | - |
 
 ## Blocker & Fallen
 
@@ -147,7 +148,6 @@
 
 ## Verlauf
 
-- 2026-10-18T20:38Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T21:17Z A done FM-65
 - 2026-10-18T21:17Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-18T21:46Z A claim UI-96
@@ -177,3 +177,4 @@
 - 2026-10-19T16:28Z D done OUT-72
 - 2026-10-19T16:49Z A claim UI-102
 - 2026-10-19T16:49Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
+- 2026-10-19T16:49Z A claim DEMO-9
