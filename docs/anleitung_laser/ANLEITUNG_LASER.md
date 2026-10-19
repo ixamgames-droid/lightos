@@ -130,6 +130,10 @@ So bedienst du den Laser im Live-Betrieb ohne den Programmer:
 > und der NOT-AUS-Knopf im Laser-Tab lösen alle genau dasselbe aus: Alle Laser
 > werden verriegelt und dunkel, Netzwerk-Laser werden unscharf. Im Kiosk-Modus
 > stehen **BLACKOUT** und **LASER NOT-AUS** nebeneinander im Streifen oben rechts.
+> Die rote Bestätigung „LASER NOT-AUS ausgelöst — alle Laser dunkel …“ steht
+> im Normalfenster für 6 Sekunden in der Statusleiste; im Kiosk-Modus (ohne
+> Statusleiste) erscheint sie genauso lange als roter Balken direkt unter dem
+> Streifen und verdeckt keinen seiner Knöpfe.
 
 > Muster lassen sich außerdem in **Snaps/Szenen** aufnehmen (Programmer →
 > „Speichern" bzw. Assistent-Tab „Programmer → Szene") und so über Chaser abspielen.
