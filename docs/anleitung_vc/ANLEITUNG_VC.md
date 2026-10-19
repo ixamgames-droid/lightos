@@ -37,7 +37,18 @@ gewählten Widgets). Die Werkzeugleiste hat **16 Schnell-Anlegen-Knöpfe** für 
 **Chase-Liste**, **Effekt-Farben**, **Label**, **Frame**, **Musik**, **BPM**, **Tempo-Bus**,
 **Tempo-Controller**, **Live-Edit**.
 
-Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen, Strg+Z / Strg+Y). Eine fertige
+Rechts daneben **↶ / ↷** (Rückgängig/Wiederholen; per Tastatur **Strg+Z** und **Strg+Y** oder
+**Strg+Umschalt+Z** – beide Wiederholen-Tasten gehen unter Windows wie unter Linux). Solange die
+Virtual Console zu sehen ist, gibt es **einen gemeinsamen Verlauf**: Layout-Schritte der Konsole und
+Änderungen an Patch und Geräten stehen darin in der Reihenfolge, in der du sie gemacht hast.
+**Strg+Z** nimmt den zuletzt gemachten Schritt zurück, **Wiederholen** holt den zuletzt
+zurückgenommenen wieder – egal, aus welchem der beiden Bereiche er stammt. Die Tasten, die Knöpfe
+**↶ / ↷** und das Menü **Bearbeiten → Rückgängig / Wiederholen** tun dabei dasselbe; das Menü nennt
+den Schritt, der als nächster dran ist (ein Layout-Schritt heißt dort **Layout der Virtual
+Console**). Das gilt auch im Bedienmodus, wenn das Layout gar nicht bearbeitet wird. Machst du nach
+einem Rückgängig etwas Neues, ist der Wiederholen-Zweig für beide Bereiche verworfen. Auf den anderen
+Seiten der App bleibt das Layout der Konsole unberührt – dort gilt nur der Verlauf von Patch und
+Geräten. In einem Textfeld mit Schreibmarke gelten die Tasten für den getippten Text. Eine fertige
 **Controller-Vorlage** (etwa ein komplettes APC-mini-Layout) lässt sich derzeit **nicht** per Knopf in
 die VC einfügen; den Aufbau übernimmst du Widget für Widget (siehe *APC mini mappen*).
 
