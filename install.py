@@ -3,9 +3,10 @@ r"""LightOS Installer.
 Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt eine
 Desktop-Verknuepfung sowie Default-Daten an.
 
-Funktioniert auf Windows x64 UND ARM64. Auf Windows-ARM ist x64-Python
-(per Emulation) der empfohlene Weg; natives ARM64-Python laeuft ohne
-3D-Visualizer (XPLAT-46).
+Funktioniert auf Windows x64 und auf Windows-ARM mit x64-Python (per
+Emulation, XPLAT-46). Natives ARM64-Python ist nicht unterstuetzt (instabil,
+kein 3D) - x64-Python nehmen (XPLAT-51). Der Installer warnt dann deutlich,
+bricht aber nicht ab.
 
 Usage:
     python install.py [--no-venv] [--no-shortcut] [--dev] [--neu-venv]
@@ -168,6 +169,14 @@ def detect_native_os_arch() -> str:
 # XPLAT-46 (Entscheidung 05.10.2026): auf Windows-ARM ist x64-Python der
 # empfohlene Weg. Die nativen win_arm64-Wheels von PySide6-Addons haben kein
 # QtWebEngine (XPLAT-45) - mit ARM64-Python fehlt der 3D-Visualizer.
+# XPLAT-51: dazu stuerzte LightOS mit einem ARM64-venv in 6 von 12 Starts ab
+# (Access Violation nach 8,6 bis 9,5 s, wechselnde Stelle im Hauptthread), mit
+# x64-Python und derselben PySide6-Version nie. Natives ARM64-Python gilt
+# deshalb als nicht unterstuetzt. Ob der Installer dann abbricht, hat der
+# Projektinhaber nicht entschieden - bis dahin warnt er nur, laut.
+ARM64_NICHT_UNTERSTUETZT = (
+    "Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - "
+    "x64-Python nehmen.")
 X64_PYTHON_BEFEHL = "winget install Python.Python.3.12 --architecture x64"
 # Codex #967: "py -3.12-64" heisst seit Python 3.11 nur "nicht 32-bit" und
 # waehlt bei parallel installiertem ARM64-Python nicht sicher x64. Eindeutig
@@ -228,14 +237,18 @@ def check_arm_runtime():
     if os.name != "nt" or os_arch != "arm64":
         return
     if py_arch == "arm64":
+        warn("!" * 60)
+        warn(ARM64_NICHT_UNTERSTUETZT)
         warn(
-            "Natives ARM64-Python: LightOS laeuft, aber OHNE 3D-Visualizer - "
-            "die ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine. "
-            "python-rtmidi baut hier nur mit MSVC Build Tools (MIDI geht sonst "
-            "ueber den eingebauten WinMM-Weg)."
+            "Instabil: mit nativem ARM64-Python stuerzte LightOS in 6 von 12 "
+            "Starts ab (Access Violation). Kein 3D-Visualizer: die ARM64-Pakete von "
+            "PySide6-Addons enthalten kein QtWebEngine. python-rtmidi baut hier "
+            "nur mit MSVC Build Tools (MIDI geht sonst ueber den WinMM-Weg)."
         )
-        warn(f"Empfohlen auf Windows-ARM: x64-Python ({X64_PYTHON_BEFEHL}), "
+        warn(f"So geht es: x64-Python installieren ({X64_PYTHON_BEFEHL}), "
              f"dann: {x64_installer_aufruf(finde_x64_python())}")
+        warn("Die Installation laeuft trotzdem weiter - auf eigenes Risiko.")
+        warn("!" * 60)
     else:
         info("x64-Python unter Emulation auf Windows-ARM - empfohlener Weg, "
              "der 3D-Visualizer ist verfuegbar.")
@@ -500,8 +513,8 @@ def show_summary(use_venv: bool = True):
     info(f"Python-Architektur: {py_arch}")
     info(f"OS-Architektur:     {os_arch}")
     if os.name == "nt" and os_arch == "arm64" and py_arch == "arm64":
-        warn("Natives ARM64-Python: kein 3D-Visualizer. Mit x64-Python geht alles "
-             f"({X64_PYTHON_BEFEHL}).")
+        warn(f"{ARM64_NICHT_UNTERSTUETZT} Mit x64-Python geht alles "
+             f"({X64_PYTHON_BEFEHL}, dann {x64_installer_aufruf()}).")
     info(f"venv:        {VENV_DIR if use_venv else '- (--no-venv)'}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")
