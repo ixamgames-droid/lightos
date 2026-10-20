@@ -87,7 +87,7 @@ vier (Name; Profil; Universum; Adresse).
 
 **Die Vorschau** zeigt je Tabellenzeile, was passieren wird — in der Spalte **Status** steht der
 Grund im Klartext, darunter eine Zählerzeile (zum Beispiel „12 Geräte werden angelegt, 2 offen,
-1 Überschneidung“):
+1 Zeile mit Überschneidungen“):
 
 - **wird angelegt** — Profil und Modus sind sicher erkannt, die Adresse ist frei.
 - **offen** — LightOS ist sich beim Profil oder beim Modus nicht sicher und **rät nicht**. In der
@@ -100,7 +100,9 @@ Grund im Klartext, darunter eine Zählerzeile (zum Beispiel „12 Geräte werden
 - **wird nicht angelegt** — die Adresse liegt nicht in 1 bis 512, das Gerät reicht über Kanal 512
   hinaus, das Universum gibt es nicht, oder die Zeile **überschneidet** sich mit einem vorhandenen
   Gerät oder mit einer anderen Zeile der Tabelle. Überschneiden sich zwei Zeilen der Tabelle,
-  bleiben beide weg — welche stimmt, steht nur in der Tabelle.
+  bleiben beide weg — welche stimmt, steht nur in der Tabelle. Trifft eine Zeile mehrere Geräte,
+  fasst der Status sie in einem Satz zusammen („Überschneidet sich mit 8 vorhandenen Geräten:
+  „PAR 1“ … „PAR 8“ (Universum 1, Kanal 1 bis 32).“); der Tooltip der Zelle nennt jedes einzeln.
 
 **Doppelte Namen** sind kein Hindernis: jedes Gerät bekommt beim Import einen eigenen Namen. Steht
 ein Name mehrfach in der Tabelle oder gibt es ihn im Patch schon, hängt LightOS die nächste freie

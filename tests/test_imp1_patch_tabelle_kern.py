@@ -422,7 +422,7 @@ def test_zaehlerzeile(bib):
     assert p.zaehler() == {"geraete": 3, "umbenannt": 0, T.OFFEN: 2,
                            T.UEBERSCHNEIDUNG: 2, T.FEHLER: 1}
     assert p.zaehlerzeile() == \
-        "3 Geräte werden angelegt, 2 offen, 2 Überschneidungen, 1 mit Fehler"
+        "3 Geräte werden angelegt, 2 offen, 2 Zeilen mit Überschneidungen, 1 mit Fehler"
 
 
 def test_zaehlerzeile_einzahl_und_nichts(bib):
