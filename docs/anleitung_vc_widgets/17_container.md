@@ -61,7 +61,7 @@ So richtest du es ein (Bearbeiten-Modus):
 
 1. Container anlegen, an die gewünschte Stelle schieben und auf die gewünschte Größe ziehen — dort erscheint das Pop-up später auch.
 2. Doppelklick auf den Container → **„Pop-up: Pop-up-Feld …"** anhaken. Der Rahmen wird violett, die Kopfzeile zeigt `▣`. Das Feld bleibt zum Befüllen offen.
-3. Tasten, Fader usw. hineinlegen (Rechtsklick → „Widget hinzufügen" oder hineinziehen).
+3. Tasten, Fader usw. hineinlegen (Rechtsklick → „Widget hinzufügen" oder hineinziehen). Ziehst du eine Funktion, einen Snapshot oder einen Snap auf die freie Fläche des offenen Felds, landet die neue Taste im Feld.
 4. Eine Taste auf der Konsole anlegen, Aktion **„Pop-up-Feld öffnen/schließen"** wählen und unter **„Pop-up-Feld"** den Container auswählen.
 
 - **Im Bearbeiten-Modus** löst ein Klick auf die Pop-up-Taste nichts aus. Zum Befüllen öffnest du das Feld per Rechtsklick auf die Taste („Pop-up-Feld öffnen") oder per Rechtsklick auf die freie Konsole → **„Pop-up-Felder"** (dort findest du auch Felder ohne Taste). Rechtsklick auf das offene Feld → „Pop-up-Feld schließen".
@@ -70,7 +70,7 @@ So richtest du es ein (Bearbeiten-Modus):
 - **Kiosk-Modus:** Pop-up-Tasten funktionieren normal; bearbeiten lässt sich dort nichts.
 - **Keine Verschachtelung:** Ein Pop-up-Feld darf keine Pop-up-Taste (und kein weiteres Pop-up-Feld) enthalten. Der Editor verhindert das mit einem Hinweis — beim Umstellen der Aktion, beim Hineinziehen einer Pop-up-Taste und beim Anhaken „Pop-up-Feld" an einem Container, der schon eine Pop-up-Taste enthält. Nur Container direkt auf der Konsole können Pop-up-Felder sein.
 - **Umbenennen ist sicher:** Die Taste merkt sich das Feld über eine feste Kennung, nicht über die Beschriftung.
-- Die Banks gelten wie sonst: Ein Pop-up-Feld auf Bank 2 erscheint nur, wenn Bank 2 aktiv ist.
+- Die Banks gelten wie sonst: Ein Pop-up-Feld auf Bank 2 erscheint nur, wenn Bank 2 aktiv ist. Leg **Taste und Feld auf dieselbe Bank** (oder das Feld auf „alle Bänke"). Liegt das Feld auf einer anderen Bank, leuchtet die Taste dort nicht, und ein Druck zeigt nur einen Hinweis.
 
 ## Tipps & Fallen
 

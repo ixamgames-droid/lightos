@@ -496,5 +496,109 @@ class EditorOeffnenTest(_Basis):
         self.assertFalse(any("Pop-up" in a.text() for a in m.actions()))
 
 
+class GegenpruefungTest(_Basis):
+    """Befunde der Gegenpruefung (Drop ins offene Feld, Laufzeit-Sperre,
+    Bank-Abgleich, Redo)."""
+
+    def test_drop_auf_offenes_popup_landet_im_feld(self):
+        self._aufbau(fader=False)
+        c = self.canvas
+        c.set_edit_mode(True)
+        self.feld.set_popup_offen(True)
+        vorher = set(self.feld.findChildren(VCButton))
+        c.apply_drop(function_id=1, pos=QPoint(500, 280), target=None)
+        c.apply_drop(snapshot_index=0, pos=QPoint(400, 280), target=None)
+        neu = set(self.feld.findChildren(VCButton)) - vorher
+        self.assertEqual(len(neu), 2)
+        for w in neu:
+            self.assertIs(w.parent(), self.feld)
+            self.assertTrue(w.isVisible())
+            self.assertTrue(self.feld._content_rect().contains(w.geometry()))
+        # Keine verirrte Taste auf der Konsole.
+        lose = [w for w in c.findChildren(
+            VCButton, options=Qt.FindChildOption.FindDirectChildrenOnly)]
+        self.assertEqual({w.caption for w in lose}, {"Unten", "Farben…"})
+        # Ein Strg+Z je Ablage nimmt sie wieder heraus.
+        c.undo()
+        c.undo()
+        feld = vc_popup.alle_popups(c)[0]
+        self.assertEqual(len(feld.findChildren(VCButton)), 1)
+
+    def test_gegenprobe_drop_bei_geschlossenem_feld_auf_die_konsole(self):
+        self._aufbau(fader=False)
+        c = self.canvas
+        c.set_edit_mode(True)
+        c.apply_drop(function_id=1, pos=QPoint(500, 280), target=None)
+        self.assertEqual(len(self.feld.findChildren(VCButton)), 1)
+        lose = c.findChildren(
+            VCButton, options=Qt.FindChildOption.FindDirectChildrenOnly)
+        self.assertEqual(len(lose), 3)
+
+    def test_popup_taste_im_popup_feld_bleibt_wirkungslos(self):
+        """Laufzeit-Sperre: eine (z. B. per Datei) ins Feld geratene Pop-up-Taste
+        schaltet ihr Feld nicht."""
+        self._aufbau(fader=False)
+        self.kind.apply_dict({"type": "VCButton", "caption": "Rot",
+                              "action": "PopupToggle",
+                              "popup_target": self.feld.popup_id})
+        self.assertEqual(self.kind.action, ButtonAction.POPUP_TOGGLE)
+        self.feld.set_popup_offen(True)
+        vc_popup.hinweis_zuruecksetzen()
+        self.kind._trigger(True)
+        self.kind._trigger(False)
+        self.assertTrue(self.feld.popup_offen())
+        self.assertEqual(vc_popup.letzter_hinweis(), vc_popup.HINWEIS_TASTE_IM_POPUP)
+
+    def test_gegenprobe_popup_taste_auf_konsole_schaltet(self):
+        self._aufbau(fader=False)
+        self.feld.set_popup_offen(True)
+        self.taste._trigger(True)
+        self.assertFalse(self.feld.popup_offen())
+
+    def test_feld_auf_anderer_bank_taste_zeigt_nicht_offen(self):
+        self._aufbau(fader=False)
+        c = self.canvas
+        self.taste.bank = -1
+        self.feld.bank = 0
+        c.set_active_bank(1)
+        self.assertTrue(self.taste.isVisible())
+        vc_popup.hinweis_zuruecksetzen()
+        self.taste._trigger(True)
+        self.assertFalse(self.feld.popup_offen())
+        self.assertFalse(self.taste._aktionszustand())
+        self.assertEqual(vc_popup.letzter_hinweis(), vc_popup.HINWEIS_FELD_ANDERE_BANK)
+        # Auf Bank 0 offen, dann Bank 1: Taste leuchtet nicht fuer ein
+        # unsichtbares Feld; zurueck auf Bank 0 wieder offen.
+        c.set_active_bank(0)
+        self.taste._trigger(True)
+        self.assertTrue(self.taste._aktionszustand())
+        c.set_active_bank(1)
+        self.assertFalse(self.feld.isVisible())
+        self.assertFalse(self.taste._aktionszustand())
+        c.set_active_bank(0)
+        self.assertTrue(self.feld.isVisible())
+        self.assertTrue(self.taste._aktionszustand())
+
+    def test_redo_popup_eigenschaft_bleibt_im_editor_offen(self):
+        c = self.canvas
+        c.set_edit_mode(True)
+        f = c._add_widget("VCFrame", QPoint(10, 300))
+        f._open_properties = lambda: f.set_popup(True)
+        f._edit_properties()
+        c.undo()
+        c.redo()
+        feld = vc_popup.alle_popups(c)[0]
+        self.assertTrue(feld.popup_offen())
+        self.assertTrue(feld.isVisible())
+
+    def test_gegenprobe_laden_bleibt_geschlossen_im_editor(self):
+        c = self.canvas
+        c.set_edit_mode(True)
+        c.from_dict({"widgets": [{"type": "VCFrame", "popup": True,
+                                  "popup_id": "abc", "x": 0, "y": 0,
+                                  "w": 200, "h": 100}]})
+        self.assertFalse(vc_popup.alle_popups(c)[0].popup_offen())
+
+
 if __name__ == "__main__":
     unittest.main()

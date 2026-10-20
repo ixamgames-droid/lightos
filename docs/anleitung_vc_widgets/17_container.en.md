@@ -63,7 +63,7 @@ How to set it up (edit mode):
 
 1. Create a container, move it to the desired place and drag it to the desired size — that is where the pop-up will appear later.
 2. Double-click the container → tick **„Pop-up: Pop-up-Feld …"**. The frame turns violet, the header shows `▣`. The field stays open so you can fill it.
-3. Put buttons, faders etc. into it (right-click → „Widget hinzufügen" (add widget) or drag them in).
+3. Put buttons, faders etc. into it (right-click → „Widget hinzufügen" (add widget) or drag them in). If you drop a function, snapshot or snap onto the free area of the open field, the new button lands inside the field.
 4. Create a button on the console, choose the action **„Pop-up-Feld öffnen/schließen"** (open/close pop-up field) and select the container under **„Pop-up-Feld"**.
 
 - **In edit mode** a click on the pop-up button triggers nothing. To fill the field, open it by right-clicking the button („Pop-up-Feld öffnen", open pop-up field) or by right-clicking the empty console → **„Pop-up-Felder"** (pop-up fields; fields without a button are listed there too). Right-click the open field → „Pop-up-Feld schließen" (close pop-up field).
@@ -72,7 +72,7 @@ How to set it up (edit mode):
 - **Kiosk mode:** pop-up buttons work normally; nothing can be edited there.
 - **No nesting:** a pop-up field may not contain a pop-up button (or another pop-up field). The editor prevents this with a hint — when changing the action, when dragging a pop-up button in, and when ticking „Pop-up-Feld" on a container that already contains a pop-up button. Only containers placed directly on the console can be pop-up fields.
 - **Renaming is safe:** the button remembers the field by a fixed ID, not by its caption.
-- Banks apply as usual: a pop-up field on bank 2 only appears while bank 2 is active.
+- Banks apply as usual: a pop-up field on bank 2 only appears while bank 2 is active. Put **button and field on the same bank** (or the field on „all banks"). If the field is on another bank, the button does not light up there and pressing it only shows a hint.
 
 ## Tips & pitfalls
 

@@ -1526,8 +1526,16 @@ class VCButton(VCWidget):
         return vc_popup.finde_popup(self._find_canvas(), self.popup_target)
 
     def popup_offen(self) -> bool:
+        """Taste (und APC-Pad) zeigt „offen“ nur, wenn das Feld offen ist UND
+        auf der aktiven Bank liegt — sonst leuchtete sie fuer ein Feld, das man
+        gar nicht sieht."""
         f = self._popup_ziel()
-        return bool(f is not None and f.popup_offen())
+        if f is None or not f.popup_offen():
+            return False
+        cv = self._find_canvas()
+        if cv is not None and hasattr(cv, "on_active_bank"):
+            return bool(cv.on_active_bank(f))
+        return True
 
     def _popup_umschalten(self) -> None:
         from . import vc_popup
@@ -1538,6 +1546,12 @@ class VCButton(VCWidget):
         f = self._popup_ziel()
         if f is None:
             vc_popup.hinweis(self, vc_popup.HINWEIS_ZIEL_FEHLT)
+            return
+        cv = self._find_canvas()
+        if (cv is not None and hasattr(cv, "on_active_bank")
+                and not cv.on_active_bank(f)):
+            # Feld liegt auf einer anderen Bank: nichts unsichtbar umschalten.
+            vc_popup.hinweis(self, vc_popup.HINWEIS_FELD_ANDERE_BANK)
             return
         f.popup_umschalten()
         self.update()

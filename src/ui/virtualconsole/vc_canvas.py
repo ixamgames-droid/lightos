@@ -460,6 +460,7 @@ class VCCanvas(QWidget):
             if hasattr(child, "_apply_bank_visibility"):
                 child._apply_bank_visibility()
         self.popups_nach_oben()
+        self.popup_tasten_auffrischen()   # VCB-48: offen-Anzeige haengt an der Bank
 
     def _on_midi_raw(self, msg):
         # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
@@ -950,6 +951,10 @@ class VCCanvas(QWidget):
         from .vc_button import VCButton, ButtonAction
         from .vc_slider import VCSlider, SliderMode
 
+        # VCB-48: Ablage auf die freie Flaeche eines OFFENEN Pop-up-Felds ->
+        # neue Elemente gehoeren ins Feld (sonst laegen sie verdeckt darunter).
+        feld = self._offenes_popup_an(pos) if target is None else None
+
         if function_id is not None:
             # WS1: gefuehrter Smart-Drop auf leeres Canvas (statt fixem Toggle-Button).
             # Nur im interaktiven Pfad (echter Drag&Drop); Direktaufrufe/Tests bleiben
@@ -962,8 +967,9 @@ class VCCanvas(QWidget):
                 results = panel.run()
                 if not results:
                     return
-                self.build_from_smart_results(results, pos=pos,
-                                              box=getattr(panel, "box_mode", False))
+                created = self.build_from_smart_results(
+                    results, pos=pos, box=getattr(panel, "box_mode", False))
+                self._drop_ins_popup(feld, created, pos)
                 return
             # Funktionsnamen fuer Caption ermitteln
             fn_name: str | None = None
@@ -1047,6 +1053,7 @@ class VCCanvas(QWidget):
                         w.caption = fn_name
                     w.setVisible(self.on_active_bank(w))
                     w.show()
+                    self._drop_ins_popup(feld, [w], drop_pos)
 
         elif snapshot_index is not None:
             if isinstance(target, VCButton):
@@ -1062,6 +1069,7 @@ class VCCanvas(QWidget):
                     w.snapshot_index = snapshot_index
                     w.setVisible(self.on_active_bank(w))
                     w.show()
+                    self._drop_ins_popup(feld, [w], drop_pos)
 
         elif snap_id is not None:
             if isinstance(target, VCButton):
@@ -1073,6 +1081,46 @@ class VCCanvas(QWidget):
                     self._assign_snap_to_button(w, snap_id)
                     w.setVisible(self.on_active_bank(w))
                     w.show()
+                    self._drop_ins_popup(feld, [w], drop_pos)
+
+    def _offenes_popup_an(self, pos):
+        """VCB-48: oberstes OFFENES (sichtbares) Pop-up-Feld an ``pos`` — oder None."""
+        if pos is None:
+            return None
+        from . import vc_popup
+        treffer = None
+        for f in vc_popup.alle_popups(self):
+            if self.soll_sichtbar(f) and f.geometry().contains(pos):
+                treffer = f          # letzter Treffer liegt im Stapel zuoberst
+        return treffer
+
+    def _drop_ins_popup(self, feld, widgets, pos) -> None:
+        """VCB-48: frisch per Drop angelegte Widgets in das offene Pop-up-Feld
+        ``feld`` umhaengen (Position relativ zum Feld, in dessen Inhaltsflaeche).
+        Rahmen bleiben auf der Konsole (keine verschachtelten Rahmen). Der
+        Undo-Punkt liegt schon VOR dem Anlegen — ein Strg+Z nimmt alles zurueck."""
+        if feld is None or not widgets:
+            return
+        from .vc_frame import VCFrame
+        grid = self.GRID if self._snap_to_grid else 0
+        cr = feld._content_rect()
+        for w in widgets:
+            if w is None or isinstance(w, VCFrame):
+                continue
+            local = feld.mapFrom(self, w.pos())
+            lx = min(max(local.x(), cr.x()), max(cr.x(), cr.right() - w.width()))
+            ly = min(max(local.y(), cr.y()), max(cr.y(), cr.bottom() - w.height()))
+            if grid > 0:
+                lx = round(lx / grid) * grid
+                ly = round(ly / grid) * grid
+            feld.add_child_to_page(w, feld._current_page)
+            w.set_snap_grid(grid)
+            w.move(lx, ly)
+            w.raise_()
+            w.update()
+        feld.update()
+        self.popups_nach_oben()
+        self._update_content_extent()
 
     def _build_from_smart_result(self, res, pos):
         """WS1: erzeugt aus einem SmartDropResult ein vorverdrahtetes VC-Widget."""
@@ -2169,14 +2217,18 @@ class VCCanvas(QWidget):
         # VCB-48: offen/zu ist Laufzeit und steht nicht im Layout. Ein Undo
         # im Bearbeiten-Modus soll das gerade befuellte Pop-up nicht zuklappen.
         from . import vc_popup
-        offen = {f.popup_id for f in vc_popup.alle_popups(self) if f.popup_offen()}
+        vorher = vc_popup.alle_popups(self)
+        offen = {f.popup_id for f in vorher if f.popup_offen()}
+        bekannt = {f.popup_id for f in vorher}
         self._restoring = True
         try:
             self.from_dict(layout)
         finally:
             self._restoring = False
         for f in vc_popup.alle_popups(self):
-            if f.popup_id in offen:
+            # Im Bearbeiten-Modus bleibt ein Feld, das eben noch kein Pop-up war
+            # (Redo von „Rahmen wird Pop-up-Feld“), offen — wie beim Anhaken.
+            if f.popup_id in offen or (self._edit_mode and f.popup_id not in bekannt):
                 f.set_popup_offen(True)
 
     # ── Serialization ─────────────────────────────────────────────────────────

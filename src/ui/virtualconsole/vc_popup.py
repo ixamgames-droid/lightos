@@ -37,6 +37,10 @@ HINWEIS_ZIEL_FEHLT = (
     "Pop-up-Taste: das zugehörige Pop-up-Feld gibt es nicht (mehr). "
     "In den Einstellungen der Taste ein Feld wählen.")
 
+HINWEIS_FELD_ANDERE_BANK = (
+    "Pop-up-Taste: das zugehörige Pop-up-Feld liegt auf einer anderen Bank. "
+    "Taste und Feld auf dieselbe Bank legen (oder das Feld auf „alle Bänke“).")
+
 # Fuer Tests und Diagnose: der zuletzt gezeigte Hinweis.
 _letzter_hinweis: str = ""
 
