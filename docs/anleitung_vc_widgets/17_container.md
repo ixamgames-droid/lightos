@@ -47,10 +47,30 @@ Der Dialog „Frame Einstellungen" enthält genau diese Felder:
 | Seitenanzahl | Anzahl der Seiten/Tabs des Containers. Bei `1` zeigt die Kopfzeile die Beschriftung; ab `2` erscheinen umschaltbare Tabs. | Ganzzahl 1–10 (Standard 1) |
 | Header anzeigen | Blendet die obere Kopfzeile (mit Beschriftung bzw. Tabs) ein oder aus. Ohne Header beginnt der Inhaltsbereich ganz oben — dann gibt es **keine Tabs** zum Seitenwechsel mehr. | An / Aus (Standard An) |
 | Modus → Solo-Frame | „Solo-Frame (nur 1 Button gleichzeitig aktiv)": Schaltet beim Drücken eines Buttons die übrigen aktiven Buttons im Container automatisch aus; eine Funktion, die der gedrückte Button selbst schaltet (dieselbe Funktion auf zwei Buttons), wird dabei umgeschaltet statt ausgeschaltet. Aktiv erkennbar am roten Rahmen. | An / Aus (Standard Aus) |
+| Pop-up → Pop-up-Feld | „Pop-up-Feld (öffnet/schließt per Pop-up-Taste, liegt dann über der Konsole)": Der Container ist normalerweise unsichtbar und wird von einer Pop-up-Taste geöffnet und geschlossen — siehe [Pop-up-Tasten](#pop-up-tasten). Erkennbar am violetten Rahmen und `▣` in der Kopfzeile. | An / Aus (Standard Aus) |
 
 Hintergrund- und Vordergrundfarbe des Containers stellst du nicht in diesem Dialog ein, sondern über das Rechtsklick-Kontextmenü („Vordergrund-Farbe" / „Hintergrund-Farbe").
 
-Gespeichert werden Seitenanzahl, Header-Sichtbarkeit, Solo-Modus sowie alle enthaltenen Kind-Elemente samt ihrer Seitenzuordnung (jedes Kind merkt sich, auf welcher Seite es liegt). Beim Laden wird nur die aktuelle Seite eingeblendet.
+Gespeichert werden Seitenanzahl, Header-Sichtbarkeit, Solo-Modus, die Pop-up-Eigenschaft sowie alle enthaltenen Kind-Elemente samt ihrer Seitenzuordnung (jedes Kind merkt sich, auf welcher Seite es liegt). Beim Laden wird nur die aktuelle Seite eingeblendet.
+
+## Pop-up-Tasten
+
+Ein Container kann ein **Pop-up-Feld** werden: Es ist normalerweise unsichtbar und erscheint erst, wenn du eine **Pop-up-Taste** drückst. Offen liegt es **über** allen anderen Elementen der Konsole — Klicks auf das Feld erreichen nichts, was darunter liegt. **Dieselbe Taste** schließt es wieder; solange es offen ist, leuchtet die Taste.
+
+So richtest du es ein (Bearbeiten-Modus):
+
+1. Container anlegen, an die gewünschte Stelle schieben und auf die gewünschte Größe ziehen — dort erscheint das Pop-up später auch.
+2. Doppelklick auf den Container → **„Pop-up: Pop-up-Feld …"** anhaken. Der Rahmen wird violett, die Kopfzeile zeigt `▣`. Das Feld bleibt zum Befüllen offen.
+3. Tasten, Fader usw. hineinlegen (Rechtsklick → „Widget hinzufügen" oder hineinziehen).
+4. Eine Taste auf der Konsole anlegen, Aktion **„Pop-up-Feld öffnen/schließen"** wählen und unter **„Pop-up-Feld"** den Container auswählen.
+
+- **Im Bearbeiten-Modus** löst ein Klick auf die Pop-up-Taste nichts aus. Zum Befüllen öffnest du das Feld per Rechtsklick auf die Taste („Pop-up-Feld öffnen") oder per Rechtsklick auf die freie Konsole → **„Pop-up-Felder"** (dort findest du auch Felder ohne Taste). Rechtsklick auf das offene Feld → „Pop-up-Feld schließen".
+- **Beim Laden einer Show** sind alle Pop-up-Felder geschlossen. Gespeichert wird nur das Layout, nicht ob ein Feld offen war.
+- **MIDI und Tastatur:** Tasten im geschlossenen Pop-up bleiben über ihre MIDI-Note bzw. ihren Hotkey auslösbar und behalten ihren Zustand (wie Elemente einer anderen Container-Seite). Auch die Pop-up-Taste selbst lässt sich per MIDI/Hotkey bedienen; auf dem APC leuchtet ihr Pad, solange das Feld offen ist.
+- **Kiosk-Modus:** Pop-up-Tasten funktionieren normal; bearbeiten lässt sich dort nichts.
+- **Keine Verschachtelung:** Ein Pop-up-Feld darf keine Pop-up-Taste (und kein weiteres Pop-up-Feld) enthalten. Der Editor verhindert das mit einem Hinweis — beim Umstellen der Aktion, beim Hineinziehen einer Pop-up-Taste und beim Anhaken „Pop-up-Feld" an einem Container, der schon eine Pop-up-Taste enthält. Nur Container direkt auf der Konsole können Pop-up-Felder sein.
+- **Umbenennen ist sicher:** Die Taste merkt sich das Feld über eine feste Kennung, nicht über die Beschriftung.
+- Die Banks gelten wie sonst: Ein Pop-up-Feld auf Bank 2 erscheint nur, wenn Bank 2 aktiv ist.
 
 ## Tipps & Fallen
 

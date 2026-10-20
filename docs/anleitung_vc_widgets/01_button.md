@@ -83,6 +83,7 @@ Der Dialog blendet je nach gewählter **Aktion** nur die passenden Felder ein. B
 | Funktion (nur gehalten) | Startet die Funktion(en) beim Drücken, stoppt sie beim Loslassen (Flash auf Effekt-Ebene) |
 | Effekt-Aktion (Live) | Löst eine Live-Aktion auf dem gebundenen bzw. aktiven Effekt aus (siehe Effekt-Aktionen) |
 | Gruppe auswählen | Wählt die Fixtures der angegebenen Gruppe in den Programmer (Live-Auswahl per Pad/MIDI) |
+| Pop-up-Feld öffnen/schließen | Öffnet das gewählte Pop-up-Feld über der Konsole; derselbe Druck schließt es wieder. Die Taste leuchtet, solange das Feld offen ist — siehe [Container → Pop-up-Tasten](17_container.md#pop-up-tasten) |
 | Bibliothek-Farbe/Snap | Setzt einen Snap (Farbe/Look) aus der Show-Bibliothek in den Programmer; Verhalten je nach Tasten-Modus (Umschalten/Setzen/Halten) |
 | Snapshot abrufen | Schreibt die Werte des gewählten Snapshots in den Programmer |
 | Programmer leeren (Clear) | Leert den Programmer (gibt manuelle Farben/Snaps frei) |
