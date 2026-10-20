@@ -15,7 +15,6 @@
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
-| XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
 | WEB-08 | A | feature/web08-widget-kennung-fernausloesung | 2026-10-11T09:40Z | - |
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
@@ -89,7 +88,6 @@
 
 ## Verlauf
 
-- 2026-10-20T15:45Z A done DEMO-9
 - 2026-10-20T16:15Z A claim VCB-48
 - 2026-10-20T16:25Z A done ENG-37
 - 2026-10-20T16:55Z A claim NET-15
@@ -119,3 +117,4 @@
 - 2026-10-20T18:24Z A done LAS-41
 - 2026-10-20T18:31Z A done XPLAT-51
 - 2026-10-20T18:31Z A claim XPLAT-51
+- 2026-10-20T18:31Z A done XPLAT-52
