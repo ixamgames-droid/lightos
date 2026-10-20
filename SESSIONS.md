@@ -51,6 +51,7 @@
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-20T15:21Z | - |
 | VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-20T16:15Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
 | NET-15 | A | feat/net15-dmx-fernsteuerung | 2026-10-20T16:55Z | src/core/artnet_input.py · src/core/sacn_input.py |
+| SAMMEL-VERLOREN-1020 | A | chore/backlog-verlorene-ids-1020 | 2026-10-20T16:57Z | backlog.d/* |
 
 ## Blocker & Fallen
 
@@ -90,7 +91,6 @@
 
 ## Verlauf
 
-- 2026-10-19T22:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-20T14:26Z A claim SAMMEL-BACKLOG-1020
 - 2026-10-20T14:26Z A claim UI-103
 - 2026-10-20T14:26Z A claim UI-104
@@ -120,3 +120,4 @@
 - 2026-10-20T16:56Z B done VIZ-106
 - 2026-10-20T16:56Z B done VIZ-108
 - 2026-10-20T16:56Z D done OUT-76
+- 2026-10-20T16:57Z A claim SAMMEL-VERLOREN-1020
