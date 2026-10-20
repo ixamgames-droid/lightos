@@ -42,7 +42,6 @@
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-20T14:08Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-20T14:08Z | - |
 | LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
-| LAS-41 | A | fix/las41-kiosk-notaus-bestaetigung | 2026-10-20T14:08Z | - |
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-20T14:26Z | - |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
@@ -90,7 +89,6 @@
 
 ## Verlauf
 
-- 2026-10-20T14:40Z A done QA-103
 - 2026-10-20T15:14Z A done OUT-80
 - 2026-10-20T15:21Z A claim UI-100
 - 2026-10-20T15:45Z A done DEMO-9
@@ -120,3 +118,4 @@
 - 2026-10-20T17:07Z A done IMP-4
 - 2026-10-20T17:45Z A done FM-77
 - 2026-10-20T18:01Z A claim QA-104
+- 2026-10-20T18:24Z A done LAS-41
