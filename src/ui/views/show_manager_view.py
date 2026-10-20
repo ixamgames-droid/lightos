@@ -21,6 +21,14 @@ RULER_H = 24             # pixels for time ruler
 TRACK_LABEL_W = 150      # width of left track label panel
 
 
+#: UI-101(4): Leerhinweis der Timeline. Frueher „Keine Show geladen" — das
+#: las sich, als sei die Show-DATEI nicht geladen, obwohl nur noch keine
+#: Timeline-Show (Spuren mit Funktionen) gewaehlt ist.
+LEER_TEXT = ("Keine Timeline-Show ausgewählt.\n"
+             "Oben „+ Neue Show“ anlegen oder unter „Show:“ eine vorhandene wählen.\n"
+             "Die geöffnete Show-Datei ist davon unabhängig.")
+
+
 class TimelineCanvas(QWidget):
     """Paintable timeline area — tracks + ShowFunctions as colored blocks."""
 
@@ -123,7 +131,7 @@ class TimelineCanvas(QWidget):
             painter.drawText(
                 self.rect().adjusted(0, RULER_H, 0, 0),
                 Qt.AlignmentFlag.AlignCenter,
-                'Keine Show geladen — oben „+ Neue Show" anlegen oder eine wählen.')
+                LEER_TEXT)
             return
 
         # Tracks
