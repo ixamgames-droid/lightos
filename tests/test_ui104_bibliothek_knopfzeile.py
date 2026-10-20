@@ -142,3 +142,100 @@ def test_mindesthoehe_aus_fontmetrics():
         assert b.minimumHeight() >= fm.height() + 8, punkt
         assert b.minimumWidth() >= max(32, fm.horizontalAdvance("↻") + 22), punkt
         assert b.maximumHeight() > 1000 and b.maximumWidth() > 1000, punkt
+
+
+# ── Gegenprüfung: Touch-Modus und Snapshots-Ansicht ─────────────────────────
+# Unter der Touch-QSS (Knöpfe 52 px hoch) und schmaler Bibliothek bricht die
+# Leiste in viele Zeilen um. FlowLayout.minimumSize() meldete nur die Größe
+# des größten Einzelknopfs; jenseits des QSplitter wird heightForWidth nicht
+# weitergereicht, das Eltern-Layout staucht die Leiste also unter ihre
+# Zeilenhöhe — „↻“ wurde zum Strich über dem Baumkopf, „Löschen“ ragte in
+# den Baum.
+
+def _touch_qss() -> str:
+    from src.ui.main_window import MainWindow
+
+    class _Attrappe(QWidget):
+        _touch_mode = True
+
+    a = _Attrappe()
+    MainWindow._apply_theme(a)
+    qss = a.styleSheet()
+    a.deleteLater()
+    assert "Touch-Mode Override" in qss
+    return qss
+
+
+@pytest.fixture
+def snapshots_view():
+    _app()
+    from src.ui.views.snapshots_view import SnapshotsView
+    view = SnapshotsView()
+    yield view
+    if shiboken6.isValid(view):
+        view.close()
+
+
+@pytest.mark.parametrize("groesse", [(1000, 500), (1100, 560), (1440, 760)])
+def test_touch_snapshots_leiste_nicht_gestaucht(snapshots_view, groesse):
+    app = _app()
+    wirt = QWidget()
+    wirt.setStyleSheet(_touch_qss())
+    snapshots_view.setParent(wirt)
+    wirt.resize(*groesse)
+    snapshots_view.setGeometry(0, 0, *groesse)
+    wirt.show()
+    for _ in range(10):
+        app.processEvents()
+    panel = snapshots_view._snap_file_panel
+    knoepfe = _knoepfe(panel)
+    assert set(knoepfe) == set(_LEISTE)
+    leiste = knoepfe["Löschen"].parentWidget()
+    baum = _rect_in(panel._tree, panel)
+    for text, b in knoepfe.items():
+        assert b.height() >= b.minimumHeight(), (text, b.height())
+        r = _rect_in(b, leiste)
+        assert leiste.rect().contains(r), (
+            f"„{text}“ ragt aus der Leiste: {r.getRect()} in "
+            f"{leiste.rect().getRect()} ({groesse})")
+        assert not _rect_in(b, panel).intersects(baum), (text, groesse)
+    wirt.close()
+
+
+def test_flowlayout_mindesthoehe_folgt_umbruch():
+    """FlowLayout meldet bei bekannter Breite die umbrochene Höhe als
+    Mindesthöhe — nicht nur die Höhe des größten Einzelknopfs."""
+    app = _app()
+    from src.ui.widgets.flow_layout import FlowLayout
+    wirt = QWidget()
+    fl = FlowLayout(wirt, margin=0, h_spacing=4, v_spacing=4)
+    for t in _LEISTE:
+        b = QPushButton(t)
+        b.setFixedSize(80, 30)
+        fl.addWidget(b)
+    wirt.resize(90, 400)
+    wirt.show()
+    app.processEvents()
+    fl.setGeometry(QRect(0, 0, 90, 400))
+    # Sechs Zeilen à 30 px + 5×4 px Abstand.
+    assert fl.heightForWidth(90) == 200
+    assert fl.minimumSize().height() >= 200, fl.minimumSize()
+    wirt.close()
+
+
+def test_touch_snapshots_bibliothek_zwei_knoepfe_je_zeile(snapshots_view):
+    """Snapshots-Ansicht: das 12-spaltige Raster darf die Bibliothek nicht auf
+    Knopfbreite drücken (sechs Zeilen à 52 px unter Touch-QSS)."""
+    app = _app()
+    wirt = QWidget()
+    wirt.setStyleSheet(_touch_qss())
+    snapshots_view.setParent(wirt)
+    wirt.resize(1000, 500)
+    snapshots_view.setGeometry(0, 0, 1000, 500)
+    wirt.show()
+    for _ in range(10):
+        app.processEvents()
+    knoepfe = _knoepfe(snapshots_view._snap_file_panel)
+    zeilen = {b.y() for b in knoepfe.values()}
+    assert len(zeilen) <= 3, sorted(zeilen)
+    wirt.close()

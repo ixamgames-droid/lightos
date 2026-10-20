@@ -317,7 +317,10 @@ class SnapshotsView(QWidget):
         # Rechte Seite: Snap-Dateimanager
         try:
             from src.ui.views.snap_file_panel import SnapFilePanel
-            self._snap_file_panel = SnapFilePanel()
+            # UI-104: mindestens zwei Knöpfe je Zeile — das 12-spaltige
+            # Raster drückte die Bibliothek sonst auf Knopfbreite (Touch:
+            # sechs Zeilen, „↻“/„Löschen“ ragten in den Baum).
+            self._snap_file_panel = SnapFilePanel(mindest_spalten=2)
         except Exception as e:
             print(f"[snapshots] snap_file_panel load error: {e}")
             self._snap_file_panel = QWidget()

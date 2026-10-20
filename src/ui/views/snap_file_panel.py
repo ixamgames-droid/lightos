@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QDialog, QCheckBox, QMenu, QFormLayout, QLineEdit,
     QDoubleSpinBox, QComboBox, QDialogButtonBox, QToolButton,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QCursor, QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.flow_layout import FlowLayout
@@ -579,8 +579,13 @@ class SnapFilePanel(QWidget):
     _midi_learned_sig = Signal(object)
 
     def __init__(self, parent=None, *, drag_to_canvas: bool = False, canvas=None,
-                 show_header: bool = True):
+                 show_header: bool = True, mindest_spalten: int = 1):
         super().__init__(parent)
+        # UI-104: so viele Knöpfe der Leiste sollen mindestens nebeneinander
+        # passen (s. minimumSizeHint). Die Snapshots-Ansicht setzt 2 — dort
+        # drückt das 12-spaltige Raster die Bibliothek sonst auf Knopfbreite.
+        self._mindest_spalten = max(1, int(mindest_spalten))
+        self._leisten_knoepfe: list[QPushButton] = []
         # VC-Modus: Baum-Items lassen sich auf das VC-Canvas ziehen und per
         # Kontextmenue direkt auf eine Taste legen. Muss VOR _setup_ui() stehen
         # (der Baum liest das Flag im Konstruktor).
@@ -689,7 +694,8 @@ class SnapFilePanel(QWidget):
         # ragte unten 4 px aus der Leiste. „↻“ war auf 24 px Breite gezwungen,
         # hinter 2×10 px Innenabstand blieb vom Zeichen nur ein „:“.
         # Jetzt: Mindestmaße aus der Schrift, Wunschgröße bestimmt das Theme.
-        for btn in [b_save, b_folder, b_apply, b_chase, b_del, b_ref]:
+        self._leisten_knoepfe = [b_save, b_folder, b_apply, b_chase, b_del, b_ref]
+        for btn in self._leisten_knoepfe:
             _knopf_mindestmass(btn, symbol=btn is b_ref)
             tb.addWidget(btn)
         layout.addWidget(tb_host)
@@ -712,6 +718,22 @@ class SnapFilePanel(QWidget):
         self._tree.itemExpanded.connect(self._on_item_expanded)
         self._tree.itemCollapsed.connect(self._on_item_collapsed)
         layout.addWidget(self._tree, stretch=1)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        """UI-104: bei ``mindest_spalten`` > 1 mindestens so breit, dass die
+        breitesten Knöpfe der Leiste nebeneinander passen. Sonst bricht die
+        Leiste (Touch-QSS: 52-px-Knöpfe) in sechs Zeilen um und nimmt dem Baum
+        die ganze Höhe. Wunschbreiten aus dem Theme, nicht fest."""
+        s = super().minimumSizeHint()
+        if self._mindest_spalten <= 1 or not self._leisten_knoepfe:
+            return s
+        breiten = sorted((b.sizeHint().width() for b in self._leisten_knoepfe
+                          if not b.isHidden()), reverse=True)
+        n = min(self._mindest_spalten, len(breiten))
+        m = self.layout().contentsMargins() if self.layout() else None
+        rand = (m.left() + m.right()) if m is not None else 0
+        soll = sum(breiten[:n]) + 4 * (n - 1) + rand
+        return QSize(max(s.width(), soll), s.height())
 
     # ── Ordner-Zustand (auf-/zugeklappt) ──────────────────────────────────────
 
