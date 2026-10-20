@@ -33,7 +33,6 @@
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
-| VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-20T14:08Z | - |
 | QA-99 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:51Z | tests/conftest.py · tests/test_qa99_windows_offscreen_schriften.py · backlog.d/QA-99.md |
@@ -92,7 +91,6 @@
 
 ## Verlauf
 
-- 2026-10-19T22:22Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T22:40Z A done UI-102
 - 2026-10-19T22:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-20T14:26Z A claim SAMMEL-BACKLOG-1020
@@ -122,3 +120,4 @@
 - 2026-10-20T16:56Z D done DOC-70
 - 2026-10-20T16:56Z D done TOOL-21
 - 2026-10-20T16:56Z B done VIZ-106
+- 2026-10-20T16:56Z B done VIZ-108
