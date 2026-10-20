@@ -265,6 +265,13 @@ def wert14(msg) -> int:
     return d2 << 7
 
 
+def pitchbend_bytes(channel: int, wert: int) -> list[int]:
+    """MIDI-14: Pitchbend-Nachricht mit 14 Bit (0..16383) — das Gegenstueck zu
+    :func:`wert14`: ``data1`` = untere, ``data2`` = obere 7 Bit."""
+    w = max(0, min(16383, int(wert)))
+    return [0xE0 | ((int(channel) - 1) & 0x0F), w & 0x7F, (w >> 7) & 0x7F]
+
+
 def fader_wert(msg) -> float:
     """MIDI-10: Stellung eines Faders als 0..1.
 
@@ -872,6 +879,15 @@ class MidiManager:
         status = 0x90 | ((channel - 1) & 0x0F)
         return self.send_message_to(port_name,
                                     [status, note & 0x7F, velocity & 0x7F])
+
+    def send_pitchbend(self, channel: int, wert: int) -> bool:
+        """MIDI-14: Pitchbend (14 Bit, 0..16383) ueber den gemeinsamen
+        Ausgang — so faehrt ein Mackie-/X-Touch-Pult seinen Motorfader."""
+        return self.send_message(pitchbend_bytes(channel, wert))
+
+    def send_pitchbend_to(self, port_name: str, channel: int, wert: int) -> bool:
+        """MIDI-14: Pitchbend an EINEN BESTIMMTEN Ausgang (s. ``send_message_to``)."""
+        return self.send_message_to(port_name, pitchbend_bytes(channel, wert))
 
     def _open_aux_output(self, port_name: str):
         """Zweit-Ausgang oeffnen und halten. Aufrufer haelt ``_io_lock``."""
