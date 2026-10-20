@@ -36,8 +36,10 @@ class SACNReceiver:
         self._merges: dict[int, tuple[int, str]] = {}
         self._merge_cb_installed = False
 
-    def start(self, universes: list[int] | None = None):
-        """Starte Listener. Wenn universes=None -> bind ohne multicast join."""
+    def start(self, universes: list[int] | None = None,
+              host: str = "0.0.0.0", port: int = SACN_PORT):
+        """Starte Listener auf ``universes`` (Multicast-Join; ``None`` -> [1]).
+        ``host``/``port`` nur fuer Tests (127.0.0.1 + freier Port, NET-15)."""
         if self._running:
             return
         if universes is None:
@@ -49,7 +51,7 @@ class SACNReceiver:
                 self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except (AttributeError, OSError):
                 pass  # Not on Windows
-            self._sock.bind(("0.0.0.0", SACN_PORT))
+            self._sock.bind((host, int(port)))
             self._sock.settimeout(0.5)
             # Multicast Join
             for u in universes:
@@ -64,7 +66,7 @@ class SACNReceiver:
         )
         self._thread.start()
         self._install_merge_handler()
-        print(f"[sACN-In] listening on 0.0.0.0:{SACN_PORT}, universes={universes}")
+        print(f"[sACN-In] listening on {host}:{port}, universes={universes}")
 
     def stop(self):
         self._running = False
@@ -155,7 +157,13 @@ class SACNReceiver:
         # gepatchte Kanaele. ``_render_frame`` mischt die Schicht deterministisch.
         try:
             from src.core.app_state import get_state
-            get_state().apply_input_merge(out_univ, data, mode)
+            # NET-15: Kanaele der DMX-Fernsteuerung nicht in die Ausgabe mischen.
+            from src.core.dmx.fernsteuerung import reservierte_kanaele
+            skip = reservierte_kanaele("sacn", in_univ)
+            if skip:
+                get_state().apply_input_merge(out_univ, data, mode, skip=skip)
+            else:
+                get_state().apply_input_merge(out_univ, data, mode)
         except Exception as e:
             print(f"[sACN-In] merge error: {e}")
 

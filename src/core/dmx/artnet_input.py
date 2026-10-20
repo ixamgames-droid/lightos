@@ -35,7 +35,9 @@ class ArtNetReceiver:
         # mode: "HTP" / "LTP" / "REPLACE"
         self._merges: dict[int, tuple[int, str]] = {}
 
-    def start(self):
+    def start(self, host: str = "0.0.0.0", port: int = ARTNET_PORT):
+        """``host``/``port`` nur fuer Tests (127.0.0.1 + freier Port, NET-15);
+        die App lauscht immer auf 0.0.0.0:6454."""
         if self._running:
             return
         try:
@@ -51,7 +53,7 @@ class ArtNetReceiver:
                 self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except (AttributeError, OSError):
                 pass  # Not on Windows (kein SO_REUSEPORT)
-            self._sock.bind(("0.0.0.0", ARTNET_PORT))
+            self._sock.bind((host, int(port)))
             self._sock.settimeout(0.5)
         except Exception as e:
             print(f"[ArtNet-In] bind error: {e}")
@@ -63,7 +65,7 @@ class ArtNetReceiver:
         )
         self._thread.start()
         self._install_merge_handler()
-        print(f"[ArtNet-In] listening on 0.0.0.0:{ARTNET_PORT}")
+        print(f"[ArtNet-In] listening on {host}:{port}")
 
     def stop(self):
         self._running = False
@@ -136,7 +138,13 @@ class ArtNetReceiver:
         # gepatchte Kanaele. ``_render_frame`` mischt die Schicht deterministisch.
         try:
             from src.core.app_state import get_state
-            get_state().apply_input_merge(out_univ, data, mode)
+            # NET-15: Kanaele der DMX-Fernsteuerung nicht in die Ausgabe mischen.
+            from src.core.dmx.fernsteuerung import reservierte_kanaele
+            skip = reservierte_kanaele("artnet", in_univ)
+            if skip:
+                get_state().apply_input_merge(out_univ, data, mode, skip=skip)
+            else:
+                get_state().apply_input_merge(out_univ, data, mode)
         except Exception as e:
             print(f"[ArtNet-In] merge error: {e}")
 
