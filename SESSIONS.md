@@ -43,7 +43,6 @@
 | VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-20T16:15Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
 | NET-15 | A | feat/net15-dmx-fernsteuerung | 2026-10-20T16:55Z | src/core/artnet_input.py · src/core/sacn_input.py |
 | SAMMEL-VERLOREN-1020 | A | chore/backlog-verlorene-ids-1020 | 2026-10-20T16:57Z | backlog.d/* |
-| QA-104 | A | fix/qa103-test-importzeit | 2026-10-20T18:01Z | tests/test_qa103_bpm_faden_abbau.py |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-20T18:31Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | XPLAT-52 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-20T18:31Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | BPM-31 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-20T18:50Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
@@ -89,7 +88,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z A done UI-81
 - 2026-10-20T16:56Z A done DOC-65
 - 2026-10-20T16:56Z A done LAS-26
 - 2026-10-20T16:56Z A done NET-14
@@ -119,3 +117,4 @@
 - 2026-10-20T19:40Z A claim WEB-12
 - 2026-10-20T19:48Z A done SAMMEL-BACKLOG-1014
 - 2026-10-20T20:30Z D done LIZ-3
+- 2026-10-20T20:54Z A done QA-104
