@@ -69,6 +69,7 @@
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-20T15:21Z | - |
 | VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-20T16:15Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
+| NET-15 | A | feat/net15-dmx-fernsteuerung | 2026-10-20T16:55Z | src/core/artnet_input.py · src/core/sacn_input.py |
 
 ## Blocker & Fallen
 
@@ -108,7 +109,6 @@
 
 ## Verlauf
 
-- 2026-10-19T19:42Z A done LAS-40
 - 2026-10-19T19:42Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T20:02Z A claim ENG-43
 - 2026-10-19T20:02Z 8 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -138,3 +138,4 @@
 - 2026-10-20T15:45Z A done DEMO-9
 - 2026-10-20T16:15Z A claim VCB-48
 - 2026-10-20T16:25Z A done ENG-37
+- 2026-10-20T16:55Z A claim NET-15
