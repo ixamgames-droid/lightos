@@ -49,6 +49,7 @@
 | SAMMEL-VERLOREN-1020 | A | chore/backlog-verlorene-ids-1020 | 2026-10-20T16:57Z | backlog.d/* |
 | QA-104 | A | fix/qa103-test-importzeit | 2026-10-20T18:01Z | tests/test_qa103_bpm_faden_abbau.py |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-20T18:31Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
+| XPLAT-52 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-20T18:31Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 
 ## Blocker & Fallen
 
@@ -88,7 +89,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:15Z A claim VCB-48
 - 2026-10-20T16:25Z A done ENG-37
 - 2026-10-20T16:55Z A claim NET-15
 - 2026-10-20T16:56Z A done FM-58
@@ -118,3 +118,4 @@
 - 2026-10-20T18:31Z A done XPLAT-51
 - 2026-10-20T18:31Z A claim XPLAT-51
 - 2026-10-20T18:31Z A done XPLAT-52
+- 2026-10-20T18:31Z A claim XPLAT-52
