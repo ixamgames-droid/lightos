@@ -15,7 +15,6 @@
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
 | VIZ-95 | A | feature/viz95-lasermuster-3d | 2026-10-08T20:47Z | src/ui/visualizer |
-| NET-14 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-16 | A | feature/midi5-msc | 2026-10-09T16:27Z | src/core/midi |
 | MIDI-4 | A | fix/midi3-mapping-robust | 2026-10-09T16:27Z | src/core/midi/midi_mapper.py |
 | XPLAT-50 | A | fix/xplat49-uninstall-datenschutz | 2026-10-10T09:29Z | start.bat · start.ps1 |
@@ -101,7 +100,6 @@
 
 ## Verlauf
 
-- 2026-10-19T20:37Z A claim LAS-41
 - 2026-10-19T20:41Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T20:53Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T21:05Z A done UI-97
@@ -131,3 +129,4 @@
 - 2026-10-20T16:56Z A done UI-81
 - 2026-10-20T16:56Z A done DOC-65
 - 2026-10-20T16:56Z A done LAS-26
+- 2026-10-20T16:56Z A done NET-14
