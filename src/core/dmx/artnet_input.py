@@ -35,11 +35,15 @@ class ArtNetReceiver:
         # mode: "HTP" / "LTP" / "REPLACE"
         self._merges: dict[int, tuple[int, str]] = {}
 
-    def start(self, host: str = "0.0.0.0", port: int = ARTNET_PORT):
+    def start(self, host: str = "0.0.0.0", port: int | None = None):
         """``host``/``port`` nur fuer Tests (127.0.0.1 + freier Port, NET-15);
-        die App lauscht immer auf 0.0.0.0:6454."""
+        die App lauscht immer auf 0.0.0.0:6454. ``port=None`` liest
+        ``ARTNET_PORT`` erst hier (nicht als Default-Wert eingefroren) — Tests
+        biegen die Modul-Konstante um (IMP-2)."""
         if self._running:
             return
+        if port is None:
+            port = ARTNET_PORT
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

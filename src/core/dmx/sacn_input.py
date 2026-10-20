@@ -37,11 +37,14 @@ class SACNReceiver:
         self._merge_cb_installed = False
 
     def start(self, universes: list[int] | None = None,
-              host: str = "0.0.0.0", port: int = SACN_PORT):
+              host: str = "0.0.0.0", port: int | None = None):
         """Starte Listener auf ``universes`` (Multicast-Join; ``None`` -> [1]).
-        ``host``/``port`` nur fuer Tests (127.0.0.1 + freier Port, NET-15)."""
+        ``host``/``port`` nur fuer Tests (127.0.0.1 + freier Port, NET-15);
+        ``port=None`` liest ``SACN_PORT`` erst hier."""
         if self._running:
             return
+        if port is None:
+            port = SACN_PORT
         if universes is None:
             universes = [1]
         try:
