@@ -109,3 +109,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
 test_imp3_dialog_und_patch.py      # Anleitung Patch & Gruppen: Knopf „Tabellen-Import ▾“, Eingabetaste, doppelte Namen
 test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)
+test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen
