@@ -254,7 +254,7 @@ Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
   Adapter sendet nur ein Universum.
   Gespeichert wird trotzdem, eingerichtet wird der Adapter so aber für **keines** davon,
   bis nur noch eine Zeile ihn nennt. Am schnellsten behebt es der Reiter
-  **Enttec Pro USB**: Universe wählen und **Verbinden** (Schritt 2).
+  **Enttec Pro USB**: Universum wählen und **Verbinden** (Schritt 2).
 
 ## 6. Kontrolle: der Output-Monitor
 
@@ -392,7 +392,7 @@ Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Ad
 mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
 LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
 sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
-**Enttec Pro USB** das richtige Universe wählen und **Verbinden**.
+**Enttec Pro USB** das richtige Universum wählen und **Verbinden**.
 
 ## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
 

@@ -242,5 +242,34 @@ class FixtureEditorTest(unittest.TestCase):
         self.assertEqual(tab.channels[-1]["name"], "Kanal 1")
 
 
+class HinweiseUndRueckfrageTest(AusgabeDialogTest):
+    """Gegenpruefung UI-100: auch die Adapter-Hinweise im Enttec-/uDMX-Reiter und
+    die Rueckfrage „Laufende Ausgabe ersetzen?“ sagen „Universum“ — wie ihre
+    Schwester-Meldung im Universen-Reiter („steht auf Universum“)."""
+
+    def test_doppelter_adapter_hinweis_sagt_universum(self):
+        oc._save_universe_config([
+            {"num": 1, "name": "A", "output": "Enttec", "patch": "/dev/ttyUSB0"},
+            {"num": 2, "name": "B", "output": "Enttec", "patch": "/dev/ttyUSB0"},
+            {"num": 3, "name": "C", "output": "uDMX", "patch": ""},
+            {"num": 4, "name": "D", "output": "uDMX", "patch": ""},
+        ])
+        dlg = oc.OutputConfigDialog()
+        self.addCleanup(dlg.deleteLater)
+        for lbl in (dlg._lbl_enttec_status, dlg._lbl_udmx_status):
+            text = lbl.text()
+            self.assertIn("steht auf Universum", text)
+            self.assertIn("Universum wählen", text)
+            self.assertIsNone(re.search(r"\bUniverse\b", text), text)
+
+    def test_rueckfrage_ersetzen_sagt_universum(self):
+        andere = [{"universum": 2, "weg": "ArtNet", "ziel": "10.0.0.5"}]
+        with mock.patch.object(oc, "_andere_ausgaben", lambda *a: andere):
+            self.dlg._ersetzen_bestaetigt(object(), 2, "Enttec", "/dev/ttyUSB0")
+        text = oc.QMessageBox.question.call_args[0][2]
+        self.assertIn("Universum 2 gibt gerade aus über:", text)
+        self.assertIsNone(re.search(r"\bUniverse\b", text), text)
+
+
 if __name__ == "__main__":
     unittest.main()

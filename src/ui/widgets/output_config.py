@@ -1189,10 +1189,10 @@ class OutputConfigDialog(QDialog):
         for d in adapter_zeilen.doppelte(_load_universe_config()):
             if d.typ == "Enttec":
                 self._lbl_enttec_status.setText(
-                    f"⚠ {d.patch} steht auf Universe "
+                    f"⚠ {d.patch} steht auf Universum "
                     f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
                     f"sendet nur ein Universum, eingerichtet ist er für keines. "
-                    f"Universe wählen und „Verbinden“: die anderen Zeilen "
+                    f"Universum wählen und „Verbinden“: die anderen Zeilen "
                     f"werden abgeräumt.")
                 break
 
@@ -1209,10 +1209,10 @@ class OutputConfigDialog(QDialog):
         for d in adapter_zeilen.doppelte(_load_universe_config()):
             if d.typ == "uDMX":
                 self._lbl_udmx_status.setText(
-                    f"⚠ {d.patch or 'Der uDMX-Adapter'} steht auf Universe "
+                    f"⚠ {d.patch or 'Der uDMX-Adapter'} steht auf Universum "
                     f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
                     f"sendet nur ein Universum, eingerichtet ist er für keines. "
-                    f"Universe wählen und „Verbinden“: die anderen Zeilen "
+                    f"Universum wählen und „Verbinden“: die anderen Zeilen "
                     f"werden abgeräumt.")
                 break
 
@@ -1488,7 +1488,7 @@ class OutputConfigDialog(QDialog):
             for e in andere)
         antwort = QMessageBox.question(
             self, "Laufende Ausgabe ersetzen?",
-            f"Universe {univ} gibt gerade aus über:\n{liste}\n\n"
+            f"Universum {univ} gibt gerade aus über:\n{liste}\n\n"
             f"Soll das durch {_ausgabe_text(weg, ziel)} ersetzt werden? "
             f"Die bisherige Ausgabe endet dann.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,

@@ -354,7 +354,7 @@ class DoppelterAdapterBeimLadenTest(_MitKonfig):
     def test_der_dialog_sagt_es_statt_eine_der_zeilen_als_gespeichert_zu_zeigen(self):
         dlg = self._dialog()
         text = dlg._lbl_enttec_status.text()
-        self.assertIn("Universe 1 und 2", text)
+        self.assertIn("Universum 1 und 2", text)
         self.assertIn("für keines", text)
         self.assertNotIn("Gespeichert:", text)
 
@@ -477,7 +477,7 @@ class UdmxDoppeltBeimLadenTest(_MitKonfig):
     def test_der_udmx_reiter_sagt_es(self):
         dlg = self._dialog()
         text = dlg._lbl_udmx_status.text()
-        self.assertIn("Universe 1 und 2", text)
+        self.assertIn("Universum 1 und 2", text)
         self.assertIn("für keines", text)
 
     def test_zwei_udmx_ohne_angabe_sind_derselbe_adapter(self):

@@ -52,8 +52,8 @@ eintragen. Mit **`Speichern`** übernehmen.
 > `COM3 — USB Serial Port (COM3) [Enttec Pro]`. Diesen Port trägst du im Universen-Tab bei
 > „Patch" ein. `Ports aktualisieren` frischt die Liste nach dem Einstecken auf.
 
-Im **Universen**-Tab siehst du dann beide Zeilen nebeneinander — Universe 1 mit Output
-`ArtNet` / Patch `192.168.178.99` und Universe 3 mit Output `Enttec` / Patch `COM3`: das
+Im **Universen**-Tab siehst du dann beide Zeilen nebeneinander — Universum 1 mit Ausgang
+`ArtNet` / Patch `192.168.178.99` und Universum 3 mit Ausgang `Enttec` / Patch `COM3`: das
 ist „Enttec und Art-Net gleichzeitig".
 
 ## 3. Prüfen, dass beide laufen
