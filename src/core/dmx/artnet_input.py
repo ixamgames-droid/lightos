@@ -31,6 +31,7 @@ class ArtNetReceiver:
         self._thread: threading.Thread | None = None
         self._running = False
         self._callbacks: list[Callable[[int, bytes], None]] = []
+        self._callbacks_absender: list[Callable[..., None]] = []   # NET-15
         # Merge-Konfiguration: {in_universe: (out_universe, mode)}
         # mode: "HTP" / "LTP" / "REPLACE"
         self._merges: dict[int, tuple[int, str]] = {}
@@ -102,6 +103,18 @@ class ArtNetReceiver:
         if cb in self._callbacks:
             self._callbacks.remove(cb)
 
+    def subscribe_absender(self, cb: Callable[..., None]):
+        """NET-15: ``cb(universe, dmx, absender, prioritaet)`` — mit Absender,
+        damit die Fernsteuerung zwei Pulte auf demselben Universum trennen
+        kann. Absender = IP des Senders, Prioritaet ``None``
+        (Art-Net kennt keine)."""
+        if cb not in self._callbacks_absender:
+            self._callbacks_absender.append(cb)
+
+    def unsubscribe_absender(self, cb: Callable[..., None]):
+        if cb in self._callbacks_absender:
+            self._callbacks_absender.remove(cb)
+
     # ── Merge in Universe ────────────────────────────────────────────────────
 
     def set_merge(self, in_universe: int, out_universe: int, mode: str = "HTP"):
@@ -157,7 +170,7 @@ class ArtNetReceiver:
     def _loop(self):
         while self._running and self._sock is not None:
             try:
-                data, _addr = self._sock.recvfrom(1024)
+                data, addr = self._sock.recvfrom(1024)
                 if len(data) < 18 or data[:8] != ARTNET_HEADER:
                     continue
                 opcode = struct.unpack("<H", data[8:10])[0]
@@ -176,6 +189,12 @@ class ArtNetReceiver:
                 for cb in list(self._callbacks):
                     try:
                         cb(universe, dmx)
+                    except Exception as e:
+                        print(f"[ArtNet-In] cb error: {e}")
+                absender = addr[0] if addr else None
+                for cb in list(self._callbacks_absender):
+                    try:
+                        cb(universe, dmx, absender, None)
                     except Exception as e:
                         print(f"[ArtNet-In] cb error: {e}")
             except socket.timeout:

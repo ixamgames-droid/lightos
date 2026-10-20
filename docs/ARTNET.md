@@ -211,8 +211,12 @@ starten (auch beim nächsten Programmstart, solange „aktiv" gespeichert ist).
 **Fader wirken nur bei Änderung.** Ein DMX-Strom wiederholt jeden Wert rund 44-mal
 pro Sekunde. Würde jeder Wert angewandt, überschriebe ein ruhig stehendes Pult jede
 Bedienung desselben Faders in LightOS. Deshalb ist der erste empfangene Wert (nach
-„Übernehmen", nach dem Start und nach einer Empfangspause von mehr als 2,5 s) nur die
+„Übernehmen", nach dem Start und nach einer Empfangspause von mehr als 5 s) nur die
 Ausgangslage; erst wenn sich der Kanal bewegt, springt der Fader auf den Pultwert.
+Die 5 s liegen bewusst über dem Art-Net-Keep-Alive: ein Sender darf bei unveränderten
+Daten bis zu 4 s schweigen, und viele Pulte senden nur bei Änderung. Ein Pult, das
+noch länger schweigt (gegen die Spezifikation), verliert nach der Pause die erste
+Bewegung bzw. das erste GO.
 Das entspricht der MIDI-Zuordnung, die ebenfalls nur auf Bewegung reagiert und
 ebenfalls kein Soft-Takeover (Abholen) kennt.
 
@@ -220,12 +224,25 @@ ebenfalls kein Soft-Takeover (Abholen) kennt.
 löst die Taste **genau einmal** aus. Erst wenn er wieder unter *Schwelle − Hysterese*
 fällt (Hysterese 10 %, also unter 102), ist sie erneut scharf. Ein Kanal, der um die
 Schwelle wackelt, löst so nicht mehrfach aus. Steht der Kanal bei der Ausgangslage
-schon oben, löst das nichts aus.
+schon oben, löst das nichts aus. Ist die Schwelle kleiner oder gleich der Hysterese
+(z. B. 10 %), macht erst der Wert 0 die Taste wieder scharf.
+
+**Mehrere Sender auf einem Universum** (Haupt- und Backup-Pult, zwei Art-Net-IPs,
+sACN mit verschiedener Priorität): Die Fernsteuerung hört je Quelle und Universum
+auf **einen** Absender — den ersten (Art-Net: IP-Adresse, sACN: CID). Bei sACN
+übernimmt eine Quelle mit **höherer Priorität** sofort. Pakete anderer Absender
+werden verworfen, bis der Besitzer länger als 5 s schweigt; dann übernimmt der
+nächste, und sein erster Wert ist wieder nur Ausgangslage. sACN-Pakete mit
+Preview-Bit oder Stream-Ende erreichen die Fernsteuerung nicht. Ohne diese Trennung
+würden abwechselnd eintreffende Pakete zweier Pulte die Schwelle ständig kreuzen
+und GO rund 20-mal pro Sekunde auslösen. Der **Merge** trennt Absender weiterhin
+nicht (dort flackern dann höchstens die betroffenen Kanäle).
 
 **Nicht in der Ausgabe:** Zugeordnete Kanäle werden **nicht** in die Ausgabe gemischt,
 auch wenn auf demselben eingehenden Universum ein Merge eingerichtet ist — ein
 GO-Kanal soll nicht nebenbei einen Dimmer steuern. Alle anderen Kanäle des
-Universums mischen weiter wie eingestellt.
+Universums mischen weiter wie eingestellt. Auch der **DMX-Mitschnitt** (Szene aus
+dem Eingang) lässt diese Kanäle aus.
 
 **Threads:** Der Empfang läuft in einem eigenen Thread (`ArtNet-In`/`sACN-In`). Er
 erkennt dort nur, *was* passieren soll; angewandt wird im GUI-Thread (Queue +
@@ -250,7 +267,9 @@ Qt-Signal, `src/core/dmx/fernsteuerung.py`).
 ```
 
 Ziele: `executor_fader`, `grand_master`, `executor_go`, `executor_back`,
-`executor_stop`. Die Hysterese hat (noch) keine eigene Spalte im Dialog, wird aber
+`executor_stop`. Eine Zeile mit unbekannter Quelle oder unbekanntem Ziel, Kanal
+außerhalb 1–512 oder ungültigem Universum wird beim Laden verworfen (nicht auf den
+Rand geklemmt). Die Hysterese hat (noch) keine eigene Spalte im Dialog, wird aber
 aus der Datei gelesen und beim Speichern beibehalten.
 
 **Grenzen:** Executor-Ziele gelten für die gerade aktive Executor-Seite (wie bei MIDI).

@@ -21,6 +21,13 @@ Verhalten (bewusst wie die MIDI-Zuordnung, ``midi_mapper``):
   Kanal unter ``schwelle - hysterese`` (Standard 10 %) faellt, ist die Taste
   wieder scharf. Steht der Kanal bei der Ausgangslage schon oben, loest das
   nichts aus.
+* **Eine Quelle je Universum.** Senden zwei Pulte dasselbe Universum (Haupt-
+  und Backup-Pult), wuerden ihre abwechselnd eintreffenden Pakete jede
+  Flankenerkennung zerreiben (GO ~22-mal pro Sekunde). Deshalb gehoert ein
+  ``(Quelle, Universum)`` dem ersten Absender (Art-Net: IP, sACN: CID); bei
+  sACN uebernimmt eine Quelle mit hoeherer Prioritaet sofort. Fremde Pakete
+  werden verworfen, bis der Besitzer ``PAUSE_S`` lang schweigt. sACN-Preview-
+  und Stream-Ende-Pakete reichen die Empfaenger gar nicht erst durch.
 * **Fernsteuer-Kanaele werden NICHT in die Ausgabe gemischt.** Laeuft auf
   demselben eingehenden Universum auch ein Input-Merge, nimmt der Merge diese
   Kanaele aus (:func:`reservierte_kanaele`).
@@ -63,9 +70,15 @@ _TASTE = {ZIEL_GO: "go", ZIEL_BACK: "back", ZIEL_STOP: "stop"}
 SCHWELLE_STANDARD = 50      # Prozent
 HYSTERESE_STANDARD = 10     # Prozent
 #: Nach so langer Empfangspause gilt der naechste Wert wieder nur als
-#: Ausgangslage (wie der NET-05-Quellen-Timeout des Merges, ~2,5 s). Sonst
-#: loeste ein Pult, das mit oben stehendem GO-Kanal zurueckkommt, sofort GO aus.
-PAUSE_S = 2.5
+#: Ausgangslage, und ein anderer Absender darf das Universum uebernehmen.
+#: Sonst loeste ein Pult, das mit oben stehendem GO-Kanal zurueckkommt, sofort
+#: GO aus. Bewusst laenger als das Art-Net-Keep-Alive (ein Sender darf bei
+#: unveraenderten Daten bis zu 4 s schweigen) — sonst ginge bei einem Pult, das
+#: nur bei Aenderung sendet, das erste GO / die erste Fader-Bewegung nach
+#: jeder Ruhephase still verloren.
+PAUSE_S = 5.0
+#: Prioritaet, wenn der Absender keine kennt (Art-Net, Aufrufe ohne Absender)
+PRIORITAET_STANDARD = 100
 FORMAT_VERSION = 1
 EXECUTOR_MAX = 20           # PlaybackEngine.MAX_EXECUTORS
 
@@ -99,10 +112,20 @@ class Zuordnung:
         if quelle not in QUELLEN or ziel not in ZIELE:
             return None
         u_hi = 32768 if quelle == QUELLE_ARTNET else 63999
+        # Kanal/Universum ausserhalb des Bereichs NICHT an den Rand klemmen:
+        # Kanal 0 -> 1 steuerte still einen anderen, echten Kanal und naehme
+        # ihn zugleich aus der Ausgabe. Kaputte Zeile -> verwerfen.
+        try:
+            kanal = int(d.get("kanal"))
+            universum = int(d.get("universum"))
+        except (TypeError, ValueError):
+            return None
+        if not (1 <= kanal <= 512 and 1 <= universum <= u_hi):
+            return None
         return cls(
             quelle=quelle,
-            universum=_int(d.get("universum"), 1, 1, u_hi),
-            kanal=_int(d.get("kanal"), 1, 1, 512),
+            universum=universum,
+            kanal=kanal,
             ziel=ziel,
             executor=_int(d.get("executor"), 1, 1, EXECUTOR_MAX),
             schwelle=_int(d.get("schwelle"), SCHWELLE_STANDARD, 1, 100),
@@ -118,8 +141,11 @@ class Zuordnung:
         return max(1, min(255, round(self.schwelle * 255 / 100)))
 
     def aus_roh(self) -> int:
-        """Unter diesem DMX-Wert ist die Taste wieder scharf (<)."""
-        return max(0, self.ein_roh() - round(self.hysterese * 255 / 100))
+        """Unter diesem DMX-Wert ist die Taste wieder scharf (<). Mindestens
+        1: ist die Hysterese >= der Schwelle, waere ``wert < 0`` nie erfuellt
+        und die Taste loeste nur ein einziges Mal aus. So macht dann erst 0
+        sie wieder scharf."""
+        return max(1, self.ein_roh() - round(self.hysterese * 255 / 100))
 
 
 @dataclass
@@ -192,7 +218,10 @@ class DmxFernsteuerung:
         self._index: dict[tuple[str, int], list[tuple[int, Zuordnung]]] = {}
         self._letzter: dict[int, int] = {}      # index -> letzter Rohwert
         self._oben: dict[int, bool] = {}        # index -> Taste steht oben
-        self._zuletzt: dict[tuple[str, int], float] = {}
+        # {(quelle, universum): [absender, prioritaet, zuletzt]} — wem das
+        # Universum gerade gehoert (eine Quelle je Universum, s. Modulkopf)
+        self._besitzer: dict[tuple[str, int], list] = {}
+        self.verworfen = 0      # Pakete fremder Absender (Status/Tests)
         self._queue: "queue.SimpleQueue[Aktion]" = queue.SimpleQueue()
         self._wecker: Callable[[], None] | None = None
         self._verbunden: dict[str, object] = {}
@@ -216,7 +245,7 @@ class DmxFernsteuerung:
             self._index = idx
             self._letzter.clear()
             self._oben.clear()
-            self._zuletzt.clear()
+            self._besitzer.clear()
         # Liegengebliebene Aktionen der alten Zuordnung verwerfen.
         self._leeren()
 
@@ -235,20 +264,42 @@ class DmxFernsteuerung:
 
     # ── Empfangs-Thread ───────────────────────────────────────────────────
 
-    def empfange(self, quelle: str, universum: int, data) -> int:
+    def empfange(self, quelle: str, universum: int, data,
+                 absender=None, prioritaet: int | None = None) -> int:
         """Im Empfangs-Thread: Werte pruefen, Aktionen einreihen. Liefert die
-        Zahl neu eingereihter Aktionen. Wendet NICHTS selbst an."""
+        Zahl neu eingereihter Aktionen. Wendet NICHTS selbst an.
+
+        ``absender`` (Art-Net: IP, sACN: CID) und ``prioritaet`` (sACN) legen
+        fest, wem das Universum gehoert; Pakete anderer Absender werden
+        verworfen (s. Modulkopf). Ohne Absender gilt alles als eine Quelle."""
         neu = 0
         jetzt = self._uhr()
         schluessel = (quelle, int(universum))
+        prio = PRIORITAET_STANDARD if prioritaet is None else int(prioritaet)
         with self._lock:
             eintraege = self._index.get(schluessel)
             if not eintraege:
                 return 0
-            vorher = self._zuletzt.get(schluessel)
-            self._zuletzt[schluessel] = jetzt
-            if vorher is not None and jetzt - vorher > PAUSE_S:
-                # Pult war weg -> Ausgangslage neu aufnehmen.
+            besitz = self._besitzer.get(schluessel)
+            neu_aufnehmen = False
+            if besitz is None:
+                self._besitzer[schluessel] = [absender, prio, jetzt]
+            else:
+                abgelaufen = jetzt - besitz[2] > PAUSE_S
+                if absender == besitz[0]:
+                    # Pult war weg -> Ausgangslage neu aufnehmen.
+                    neu_aufnehmen = abgelaufen
+                    besitz[1] = prio
+                    besitz[2] = jetzt
+                elif abgelaufen or prio > besitz[1]:
+                    # Anderer Absender uebernimmt (Besitzer schweigt bzw.
+                    # sACN-Quelle mit hoeherer Prioritaet).
+                    self._besitzer[schluessel] = [absender, prio, jetzt]
+                    neu_aufnehmen = True
+                else:
+                    self.verworfen += 1
+                    return 0
+            if neu_aufnehmen:
                 for i, _z in eintraege:
                     self._letzter.pop(i, None)
                     self._oben.pop(i, None)
@@ -357,11 +408,22 @@ class DmxFernsteuerung:
 
     # ── Empfaenger anbinden ───────────────────────────────────────────────
 
-    def _cb_artnet(self, universum: int, data) -> None:
-        self.empfange(QUELLE_ARTNET, universum, data)
+    def _cb_artnet(self, universum: int, data, absender=None,
+                   prioritaet=None) -> None:
+        self.empfange(QUELLE_ARTNET, universum, data, absender, prioritaet)
 
-    def _cb_sacn(self, universum: int, data) -> None:
-        self.empfange(QUELLE_SACN, universum, data)
+    def _cb_sacn(self, universum: int, data, absender=None,
+                 prioritaet=None) -> None:
+        self.empfange(QUELLE_SACN, universum, data, absender, prioritaet)
+
+    @staticmethod
+    def _anmelden(rx, cb) -> None:
+        # Mit Absender (Quellen-Trennung, sACN ohne Preview), sonst schlicht.
+        mit = getattr(rx, "subscribe_absender", None)
+        if mit is not None:
+            mit(cb)
+        else:
+            rx.subscribe(cb)
 
     def verbinden(self, artnet_rx=None, sacn_rx=None) -> None:
         """Als Empfangs-Callback anmelden (idempotent). Ohne Argument die
@@ -372,8 +434,8 @@ class DmxFernsteuerung:
         if sacn_rx is None:
             from src.core.dmx.sacn_input import get_sacn_receiver
             sacn_rx = get_sacn_receiver()
-        artnet_rx.subscribe(self._cb_artnet)
-        sacn_rx.subscribe(self._cb_sacn)
+        self._anmelden(artnet_rx, self._cb_artnet)
+        self._anmelden(sacn_rx, self._cb_sacn)
         self._verbunden = {QUELLE_ARTNET: artnet_rx, QUELLE_SACN: sacn_rx}
 
     def empfaenger_starten(self) -> list[str]:

@@ -349,8 +349,9 @@ def test_fehlende_kaputte_und_alte_datei(tmp_path):
     k = fsm.lade_konfig(str(alt))
     assert [(z.quelle, z.universum, z.kanal, z.ziel, z.schwelle, z.hysterese)
             for z in k.zuordnungen] == [
-        ("artnet", 1, 5, "executor_go", 50, 10),
-        ("sacn", 1, 512, "grand_master", 50, 10)]
+        ("artnet", 1, 5, "executor_go", 50, 10)]
+    # Kanal 9999 / Universum "x" wird verworfen, nicht auf 512 bzw. 1 geklemmt
+    # (sonst steuerte die Zeile still einen echten anderen Kanal).
 
 
 def test_universes_json_bleibt_unberuehrt(tmp_path, monkeypatch):
@@ -599,3 +600,229 @@ def test_ausgabe_dialog_hat_die_tabelle(tmp_path, monkeypatch):
         assert t.bottom() < k.top(), (t, k)
     finally:
         dlg.deleteLater()
+
+
+# ── Gegenpruefung (Runde 2) ───────────────────────────────────────────────
+
+def test_zwei_pulte_auf_demselben_universum_kein_go_gewitter():
+    """Haupt- und Backup-Pult senden dasselbe Universum, Pakete kommen
+    abwechselnd: ohne Quellen-Trennung loeste GO ~22-mal pro Sekunde aus."""
+    t = [0.0]
+    st = _state()
+    fs = _fs(Zuordnung(kanal=1, ziel=ZIEL_GO), uhr=lambda: t[0])
+    n = 0
+    for i in range(44):
+        t[0] = i / 44
+        if i % 2:
+            n += fs.empfange("artnet", 1, _dmx(k1=0), absender="10.0.0.2")
+        else:
+            n += fs.empfange("artnet", 1, _dmx(k1=255), absender="10.0.0.1")
+    assert n == 0          # Besitzer (erstes Pult) steht oben -> Ausgangslage
+    assert fs.verworfen == 22
+    # Der Besitzer drueckt GO (runter, hoch) -> genau einmal
+    fs.empfange("artnet", 1, _dmx(k1=0), absender="10.0.0.1")
+    fs.empfange("artnet", 1, _dmx(k1=255), absender="10.0.0.2")
+    fs.empfange("artnet", 1, _dmx(k1=255), absender="10.0.0.1")
+    fs.abarbeiten(st)
+    assert len(st.tasten) == 1
+
+
+def test_backup_pult_uebernimmt_erst_nach_pause_mit_neuer_ausgangslage():
+    t = [0.0]
+    st = _state()
+    fs = _fs(Zuordnung(kanal=1, ziel=ZIEL_FADER, executor=2), uhr=lambda: t[0])
+    fs.empfange("artnet", 1, _dmx(k1=10), absender="A")
+    fs.empfange("artnet", 1, _dmx(k1=200), absender="B")   # verworfen
+    assert fs.abarbeiten(st) == 0
+    t[0] = fsm.PAUSE_S + 1          # A schweigt
+    fs.empfange("artnet", 1, _dmx(k1=200), absender="B")   # Ausgangslage
+    assert fs.abarbeiten(st) == 0
+    fs.empfange("artnet", 1, _dmx(k1=100), absender="B")
+    fs.empfange("artnet", 1, _dmx(k1=255), absender="A")   # jetzt fremd
+    assert fs.abarbeiten(st) == 1
+    assert st.playback_engine.get_executor(2).fader_value == pytest.approx(100 / 255)
+
+
+def test_sacn_hoehere_prioritaet_uebernimmt_sofort():
+    st = _state()
+    fs = _fs(Zuordnung(quelle="sacn", kanal=1, ziel=ZIEL_FADER, executor=1))
+    fs.empfange("sacn", 1, _dmx(k1=10), absender="cid-a", prioritaet=100)
+    fs.empfange("sacn", 1, _dmx(k1=20), absender="cid-a", prioritaet=100)
+    fs.empfange("sacn", 1, _dmx(k1=99), absender="cid-b", prioritaet=50)   # niedriger
+    fs.empfange("sacn", 1, _dmx(k1=150), absender="cid-c", prioritaet=150)  # uebernimmt
+    fs.empfange("sacn", 1, _dmx(k1=30), absender="cid-a", prioritaet=100)   # verworfen
+    fs.empfange("sacn", 1, _dmx(k1=160), absender="cid-c", prioritaet=150)
+    fs.abarbeiten(st)
+    assert st.playback_engine.get_executor(1).fader_value == pytest.approx(160 / 255)
+    assert fs.verworfen == 2
+
+
+def test_sacn_kopf_preview_und_stream_ende_werden_verworfen():
+    from src.core.dmx.sacn import _pack_framing
+    from src.core.dmx.sacn_input import SACNReceiver
+    cid = bytes(range(16))
+    normal = _pack_framing(_dmx(k1=1), 7, 1, "t", cid)
+    assert SACNReceiver._parse_kopf(normal) == (cid.hex(), 100, False)
+    assert SACNReceiver._parse_kopf(_pack_framing(_dmx(), 7, 1, "t", cid, options=0x80))[2]
+    assert SACNReceiver._parse_kopf(_pack_framing(_dmx(), 7, 1, "t", cid, options=0x40))[2]
+    gefaelscht = bytearray(normal)
+    gefaelscht[108] = 180
+    assert SACNReceiver._parse_kopf(bytes(gefaelscht))[1] == 180
+
+
+def test_e2e_artnet_zwei_absender_ueber_loopback(monkeypatch):
+    """Zwei Art-Net-Sender (127.0.0.1 und 127.0.0.2) auf demselben
+    Universum: nur der erste steuert."""
+    from src.core.dmx.artnet import _build_artdmx
+    from src.core.dmx.artnet_input import ArtNetReceiver
+    port = _freier_port()
+    rx = ArtNetReceiver()
+    rx.start(host="127.0.0.1", port=port)
+    if not rx.is_running():
+        pytest.skip("UDP-Loopback nicht bindbar")
+    tx1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    tx2 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        try:
+            tx2.bind(("127.0.0.2", 0))
+        except OSError:
+            pytest.skip("127.0.0.2 nicht bindbar")
+        fs = _fs(Zuordnung(universum=1, kanal=1, ziel=ZIEL_GO, executor=5))
+        monkeypatch.setattr(fsm, "_instanz", fs)
+        ziel = _Ziel(fs)
+        fs.verbinden(artnet_rx=rx, sacn_rx=SimpleNamespace(subscribe=lambda cb: None))
+        for i in range(20):
+            tx1.sendto(_build_artdmx(0, _dmx(k1=0), i), ("127.0.0.1", port))
+            tx2.sendto(_build_artdmx(0, _dmx(k1=255), i), ("127.0.0.1", port))
+        assert _warte(lambda: fs.verworfen >= 15)
+        time.sleep(0.05)
+        st = _state()
+        fs.abarbeiten(st)
+        assert st.tasten == [] and ziel.n == 0
+        tx1.sendto(_build_artdmx(0, _dmx(k1=255), 99), ("127.0.0.1", port))
+        assert _warte(lambda: ziel.n >= 1)
+        fs.abarbeiten(st)
+        assert [(s, b) for s, b, _t in st.tasten] == [(5, "go")]
+    finally:
+        tx1.close()
+        tx2.close()
+        rx.stop()
+
+
+def test_e2e_sacn_preview_steuert_nicht(monkeypatch):
+    from src.core.dmx.sacn import _pack_framing
+    from src.core.dmx.sacn_input import SACNReceiver
+    port = _freier_port()
+    rx = SACNReceiver()
+    rx.start(universes=[], host="127.0.0.1", port=port)
+    if not rx.is_running():
+        pytest.skip("UDP-Loopback nicht bindbar")
+    tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        fs = _fs(Zuordnung(quelle="sacn", universum=4, kanal=1, ziel=ZIEL_GO, executor=1))
+        monkeypatch.setattr(fsm, "_instanz", fs)
+        ziel = _Ziel(fs)
+        fs.verbinden(artnet_rx=SimpleNamespace(subscribe=lambda cb: None), sacn_rx=rx)
+        cid = bytes(16)
+        tx.sendto(_pack_framing(_dmx(k1=0), 4, 1, "t", cid), ("127.0.0.1", port))
+        for i in range(5):
+            tx.sendto(_pack_framing(_dmx(k1=255), 4, 2 + i, "t", cid, options=0x80),
+                      ("127.0.0.1", port))
+        time.sleep(0.2)
+        assert ziel.n == 0
+        tx.sendto(_pack_framing(_dmx(k1=255), 4, 9, "t", cid), ("127.0.0.1", port))
+        assert _warte(lambda: ziel.n >= 1)
+    finally:
+        tx.close()
+        rx.stop()
+
+
+def test_art_net_keep_alive_pause_verschluckt_kein_go_und_keinen_fader():
+    """Art-Net darf bei unveraenderten Daten bis zu 4 s schweigen. Danach
+    darf ein GO bzw. die erste Fader-Bewegung nicht als Ausgangslage
+    verschluckt werden."""
+    t = [0.0]
+    st = _state()
+    fs = _fs(Zuordnung(kanal=1, ziel=ZIEL_GO, executor=1),
+             Zuordnung(kanal=2, ziel=ZIEL_FADER, executor=2), uhr=lambda: t[0])
+    fs.empfange("artnet", 1, _dmx(k1=0, k2=0))
+    t[0] = 4.0
+    fs.empfange("artnet", 1, _dmx(k1=0, k2=0))      # Keep-Alive
+    t[0] = 7.0
+    assert fs.empfange("artnet", 1, _dmx(k1=255, k2=200)) == 2
+    fs.abarbeiten(st)
+    assert len(st.tasten) == 1
+    assert st.playback_engine.get_executor(2).fader_value == pytest.approx(200 / 255)
+    assert fsm.PAUSE_S > 4.0
+
+
+def test_schwelle_kleiner_gleich_hysterese_loest_jedesmal_aus():
+    st = _state()
+    fs = _go_fs(schwelle=10)
+    z = fs.konfig.zuordnungen[0]
+    assert z.aus_roh() >= 1
+    for v in (0, 255, 0, 255, 0, 255):
+        fs.empfange("artnet", 1, _dmx(k1=v))
+    fs.abarbeiten(st)
+    assert len(st.tasten) == 3      # erste 0 = Ausgangslage, dann 3 Flanken
+    st2 = _state()
+    fs2 = _go_fs(schwelle=1)
+    for v in (0, 255, 0, 255, 0, 255, 0, 255):
+        fs2.empfange("artnet", 1, _dmx(k1=v))
+    fs2.abarbeiten(st2)
+    assert len(st2.tasten) == 4
+
+
+@pytest.mark.parametrize("zeile", [
+    {"kanal": 0}, {"kanal": 513}, {"kanal": -5}, {"kanal": "x"}, {"kanal": None},
+    {"universum": 0}, {"universum": 40000},
+])
+def test_ungueltiger_kanal_oder_universum_wird_verworfen_nicht_geklemmt(zeile):
+    d = {"quelle": "artnet", "universum": 1, "kanal": 1, "ziel": ZIEL_GO}
+    d.update(zeile)
+    assert Zuordnung.aus_dict(d) is None
+    gut = {"quelle": "artnet", "universum": 1, "kanal": 512, "ziel": ZIEL_GO}
+    assert Zuordnung.aus_dict(gut).kanal == 512
+
+
+def test_kurzpaket_bricht_spaetere_zuordnungen_nicht_ab():
+    """Paket mit 10 Kanaelen: Zuordnungen auf 11 und 20 fehlen im Paket,
+    Kanal 5 (danach eingetragen) muss trotzdem verarbeitet werden."""
+    st = _state()
+    fs = _fs(Zuordnung(kanal=11, ziel=ZIEL_GM),
+             Zuordnung(kanal=20, ziel=ZIEL_GO),
+             Zuordnung(kanal=5, ziel=ZIEL_FADER, executor=3))
+    fs.empfange("artnet", 1, bytes(10))
+    b = bytearray(10)
+    b[4] = 255
+    assert fs.empfange("artnet", 1, bytes(b)) == 1
+    fs.abarbeiten(st)
+    assert st.playback_engine.get_executor(3).fader_value == 1.0
+
+
+def test_mitschnitt_laesst_fernsteuer_kanaele_aus():
+    from types import SimpleNamespace as NS
+    from src.core import mitschnitt as M
+    par = [NS(channel_number=i, attribute=a, name=a) for i, a in
+           enumerate(("intensity", "color_r", "color_g", "color_b"), 1)]
+    fx = NS(fid=1, universe=1, address=1, channel_count=4, label="PAR",
+            fixture_type="par", fixture_name="", manufacturer_name="",
+            protocol="dmx", _kanaele=par)
+    puffer = M.Eingangspuffer()
+    puffer.melde("artnet", 3, _dmx(k1=255, k2=200, k3=7))
+    bild = M.eingangsbild(puffer, lambda p, u: 1,
+                          reserviert=lambda p, u: frozenset({1}) if (p, u) == ("artnet", 3)
+                          else frozenset())
+    assert bild.ausgelassen == {1: frozenset({1})}
+    m = M.lies_abbild(bild.abbild, [fx], kanaele_fuer=lambda f: f._kanaele,
+                      auslassen=bild.ausgelassen)
+    assert m.geraete[0].attribute == {"color_r": 200, "color_g": 7, "color_b": 0}
+    # Vorgabe: die App-Fernsteuerung
+    fs = _fs(Zuordnung(quelle="artnet", universum=3, kanal=2, ziel=ZIEL_GO))
+    import src.core.dmx.fernsteuerung as fsmod
+    alt = fsmod._instanz
+    fsmod._instanz = fs
+    try:
+        assert M.eingangsbild(puffer, lambda p, u: 1).ausgelassen == {1: frozenset({2})}
+    finally:
+        fsmod._instanz = alt
