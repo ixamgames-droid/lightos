@@ -69,6 +69,7 @@
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-20T15:21Z | - |
+| VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-20T16:15Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
 
 ## Blocker & Fallen
 
@@ -108,7 +109,6 @@
 
 ## Verlauf
 
-- 2026-10-19T19:27Z A claim ENG-42
 - 2026-10-19T19:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:42Z A done LAS-40
 - 2026-10-19T19:42Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -138,3 +138,4 @@
 - 2026-10-20T15:14Z A done OUT-80
 - 2026-10-20T15:21Z A claim UI-100
 - 2026-10-20T15:45Z A done DEMO-9
+- 2026-10-20T16:15Z A claim VCB-48
