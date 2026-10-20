@@ -288,7 +288,9 @@ def mh_color_scene(name, slot):
     return sc
 
 
-mh_solid = {nm: mh_color_scene(f"MH {nm.capitalize()}", MHCOL[nm])
+# DEMO-9: Schluessel ASCII, Funktionsnamen mit Umlaut („MH Grün", „MH Weiß").
+MH_FARBNAME = {"gruen": "Grün", "weiss": "Weiß"}
+mh_solid = {nm: mh_color_scene(f"MH {MH_FARBNAME.get(nm, nm.capitalize())}", MHCOL[nm])
             for nm in ("rot", "gruen", "blau", "gelb", "weiss", "rosa")}
 
 
