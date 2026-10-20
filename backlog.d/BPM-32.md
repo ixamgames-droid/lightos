@@ -1,7 +1,7 @@
 ID: BPM-32
 Prioritaet: P3
-Status: decision
-Status-Notiz: Folgefrage aus BPM-31 — Projektinhaber entscheidet
+Status: blocked
+Status-Notiz: wartet auf Entscheidung des Projektinhabers (Folgefrage aus BPM-31)
 Nach: BPM-31
 Titel: Auto-Show setzt die Nominal-BPM des Titels auch bei BPM-Quelle „Aus“/„OS2L“ (BPM-17-Sperre gilt dort nicht)
 
