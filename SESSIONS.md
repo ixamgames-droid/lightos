@@ -18,7 +18,6 @@
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-10T14:17Z | - |
 | XPLAT-52 | A | fix/xplat52-installer-venv-arch | 2026-10-10T14:17Z | - |
 | VIZ-101 | A | fix/viz101-licht-durch-wand | 2026-10-10T14:38Z | - |
-| DOC-70 | D | - | 2026-10-10T22:54Z | - |
 | TOOL-21 | D | - | 2026-10-10T22:54Z | - |
 | WEB-08 | A | feature/web08-widget-kennung-fernausloesung | 2026-10-11T09:40Z | - |
 | WEB-09 | A | feature/web09-handy-seite-rueckmeldung | 2026-10-11T12:08Z | - |
@@ -95,7 +94,6 @@
 
 ## Verlauf
 
-- 2026-10-19T21:30Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T22:09Z A done UI-101
 - 2026-10-19T22:09Z 2 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T22:22Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -125,3 +123,4 @@
 - 2026-10-20T16:56Z A done XPLAT-50
 - 2026-10-20T16:56Z A done OUT-67
 - 2026-10-20T16:56Z D done QA-91
+- 2026-10-20T16:56Z D done DOC-70
