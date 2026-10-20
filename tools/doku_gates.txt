@@ -52,6 +52,7 @@ test_out76_setup_bringt_usb_mit.py # THIRD_PARTY_NOTICES.md + licenses/: pyusb u
 test_liz2_fremdlizenzen_setup.py   # THIRD_PARTY_NOTICES.md + licenses/ + requirements.txt: Fremdlizenzen im Windows-Setup
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
 test_liz2_rest_sammeldateien.py    # THIRD_PARTY_NOTICES.md, INSTALL.md, licenses/: Sammeldateien Qt WebEngine/Mesa, mido/winrt raus
+test_liz3_ueber_dialog_lgpl.py     # licenses/: „Über LightOS“ nennt die LGPL-Bibliotheken und zeigt auf die Lizenztexte
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
