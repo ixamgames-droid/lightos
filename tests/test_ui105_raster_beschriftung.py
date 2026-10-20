@@ -11,7 +11,9 @@ wie Windows die logische DPI anhebt) und ueber kleine bis grosse Zellen:
 - ist die Zelle zu klein, entfaellt der Kurzname (die Nummer bleibt);
 - Gegenprobe: die alte Rechnung ueberlappt in genau diesen Faellen — der
   Ueberlappungs-Test erkennt den Fehler also wirklich;
-- das paintEvent nutzt die neue Lage (kein fester 14-px-Versatz mehr).
+- das paintEvent zeichnet wirklich dorthin: ``QPainter.drawText`` wird
+  abgefangen, Nummer und Name schneiden sich nicht, liegen in der Zelle,
+  der Block steht senkrecht mittig, ein zu langer Name wird mit „…“ gekuerzt.
 """
 from __future__ import annotations
 
@@ -23,7 +25,7 @@ from unittest import mock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QRect
-from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtGui import QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QApplication
 
 from src.ui.views.fixture_group_view import FixtureGridWidget
@@ -126,28 +128,71 @@ class PaintNutztNeueLageTest(unittest.TestCase):
         g.update_fixture_labels({1: "Spot links", 2: "LED-Bar"})
         return g
 
-    def test_paint_zeichnet_in_die_berechneten_rechtecke(self):
+    def _gezeichnet(self, g: FixtureGridWidget):
+        """Faengt ``QPainter.drawText(QRect, flags, text)`` beim echten Paint ab
+        und liefert je Aufruf (Rechteck, Text, Schrift)."""
+        orig = QPainter.drawText
+        aufrufe = []
+
+        def spion(painter, *args):
+            if args and isinstance(args[0], QRect) and len(args) == 3:
+                aufrufe.append((QRect(args[0]), args[2], QFont(painter.font())))
+            return orig(painter, *args)
+
+        with mock.patch.object(QPainter, "drawText", spion):
+            g.grab()
+        return aufrufe
+
+    @staticmethod
+    def _zelle(g: FixtureGridWidget, c: int, r: int) -> QRect:
+        cw, ch = g.cell_size()
+        return QRect(int(c * cw) + 2, int(r * ch) + 2, int(cw) - 4, int(ch) - 4)
+
+    def test_paint_zeichnet_getrennt_in_die_zelle(self):
+        """Was paintEvent WIRKLICH zeichnet: die Textzeile der Nummer und die
+        des Namens (mittig im jeweiligen Rechteck, Hoehe aus den fontMetrics)
+        schneiden sich nicht, liegen in der Zelle, und der Block aus beiden
+        steht senkrecht mittig."""
         for kante in (24, 80):
             g = self._grid(kante)
-            echt = FixtureGridWidget.zell_text_rechtecke
-            ergebnisse = []
-
-            def spion(rect, big, small):
-                r = echt(rect, big, small)
-                ergebnisse.append(r)
-                return r
-
-            with mock.patch.object(FixtureGridWidget, "zell_text_rechtecke",
-                                   staticmethod(spion)):
-                g.grab()
+            aufrufe = self._gezeichnet(g)
+            zellen = {(0, 0): ("1", "Spot lin"), (1, 0): ("2", "LED-Bar")}
             with self.subTest(zelle=kante):
-                self.assertEqual(len(ergebnisse), 2)
-                for b, s in ergebnisse:
-                    if kante >= 80:
-                        self.assertIsNotNone(s)
-                        self.assertFalse(b.intersects(s))
-                    else:
-                        self.assertIsNone(s)
+                for (c, r), (nummer, _name) in zellen.items():
+                    cell = self._zelle(g, c, r)
+                    in_zelle = [a for a in aufrufe if cell.contains(a[0].center())]
+                    gross = [a for a in in_zelle if a[2].bold()]
+                    klein = [a for a in in_zelle if not a[2].bold()]
+                    self.assertEqual(len(gross), 1, f"{cell}: {in_zelle}")
+                    b = _text_rect(gross[0][0], gross[0][2])
+                    self.assertTrue(cell.contains(b), f"Nummer {b} ausserhalb {cell}")
+                    if kante < 80:
+                        self.assertEqual(klein, [], "zu kleine Zelle: Name entfaellt")
+                        continue
+                    self.assertEqual(len(klein), 1, f"{cell}: {in_zelle}")
+                    s = _text_rect(klein[0][0], klein[0][2])
+                    self.assertTrue(cell.contains(s), f"Name {s} ausserhalb {cell}")
+                    self.assertFalse(b.intersects(s), f"Nummer {b} schneidet Name {s}")
+                    mitte = (b.top() + s.bottom()) / 2
+                    self.assertLessEqual(abs(mitte - cell.center().y()), 1.5,
+                                         f"Block {b.top()}..{s.bottom()} nicht mittig in {cell}")
+
+    def test_paint_kuerzt_zu_langen_namen(self):
+        """Schmale, hohe Zelle: der Name passt in der Hoehe, aber nicht in der
+        Breite — er wird mit „…“ auf die Breite seines Rechtecks gekuerzt."""
+        g = FixtureGridWidget()
+        g.cols, g.rows = 8, 2
+        g.setMinimumSize(0, 0)
+        g.resize(8 * 26, 2 * 80)
+        g.positions = {(0, 0): 1}
+        g.update_fixture_labels({1: "WWWWWWWWWW"})
+        aufrufe = self._gezeichnet(g)
+        klein = [a for a in aufrufe if not a[2].bold()]
+        self.assertEqual(len(klein), 1, aufrufe)
+        rect, text, font = klein[0]
+        self.assertNotEqual(text, "WWWWWWWW", "Name wurde nicht gekuerzt")
+        self.assertTrue(text.endswith("…") or text == "", text)
+        self.assertLessEqual(QFontMetrics(font).horizontalAdvance(text), rect.width())
 
     def test_kein_fester_pixelversatz_mehr(self):
         src = inspect.getsource(FixtureGridWidget.paintEvent)
