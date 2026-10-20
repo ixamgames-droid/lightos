@@ -124,6 +124,10 @@ Cuelisten, Snap-Tasten, Programmer und die automatische Grundhelligkeit zusammen
    Haken raus = wieder ein ganz normaler Effekt; Betriebsart und Stärke bleiben gemerkt.
 3. **💾 Speichern** und den Effekt auf eine normale Taste der Virtuellen Konsole legen:
    Taste an = der Modify-Effekt wirkt, Taste aus = alles läuft wie vorher weiter.
+   Die Taste zeigt **unten links das Zeichen der Betriebsart**: **+** (Addieren, Bernstein),
+   **−** (Abziehen, Blau), **◐** (Abdunkeln, Grau) — dieselben Farben wie die Vorschau im Editor.
+   Ein Effekt-Fader mit festem Ziel trägt das Zeichen links unten neben der Spur. Wer Haken oder
+   Betriebsart umstellt, sieht das Zeichen auf der Konsole sofort mitwechseln.
 4. Wer mag, legt einen Regler auf den Effekt-Parameter **Modify-Stärke**. Der Regler
    **Helligkeit** des Modify-Effekts und seine Ein-/Ausblendzeit wirken ebenfalls nur auf die
    Stärke — das Darunterliegende wird davon nie mitgedimmt.
@@ -287,7 +291,7 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
   RGB-Geräte) dimmen Fader, Grand Master und Blackout die verrechnete Farbe.
 - Der Regler **Helligkeit** des Farb-Modify stellt wie beim Dimmer nur die Stärke ein.
 - Die Vorschau im Editor zeigt beim Farb-Modify die echten Farben; das Zeichen in der Ecke nennt
-  die Betriebsart (+ Addieren, − Abziehen, × Abdunkeln, dann schraffiert).
+  die Betriebsart (+ Addieren, − Abziehen, ◐ Abdunkeln, dann schraffiert).
 
 ### Nur bestimmte Kanäle verändern: „Wirkt auf“
 
@@ -377,6 +381,10 @@ Dimmer steht auf 77 (Werte 0–255). Der Modify-Effekt ist an dieser Lampe voll 
 - Als **Chaser-Schritt** ist ein Modify-Effekt gesperrt: der Schritt gibt nichts aus. Ein Chaser
   blendet feste Bilder ineinander; ein Modify-Effekt hätte dort alle Lampen außerhalb des Läufers
   überschrieben. Direkt gestartet, in einer Sammlung und in der Show-Zeitleiste funktioniert er.
+  Der **Chaser-Editor** sagt das: ein solcher Schritt steht gelb mit ⚠ in der Liste (auch, wenn
+  der Modify-Effekt in einer Sammlung oder Show *in* dem Schritt steckt), darunter die gelbe
+  Zeile „Modify-Effekte geben als Chaser-Schritt nichts aus – direkt, in einer Sammlung oder der
+  Show-Zeitleiste starten“.
 - Steht **Dimmer-Bereich Min** im Modify-Effekt über 0, bekommt **jede** Lampe diesen Grundbetrag
   ab (der Editor weist darauf hin).
 - **Der Schweif gehört zum Effekt und wird mit verrechnet.** Der Haken **Modify-Effekt** stellt
@@ -403,6 +411,8 @@ Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
 9. Matrix-Editor, Stil RGB, Haken **Modify-Effekt** gesetzt, Gruppe **Modify** mit dem Hinweis zum Dimmer.
 10. Lampenreihe in Farbe: blauer Hintergrund / rotes Modify-Lauflicht allein / Ergebnis mit Addieren.
 11. Gruppe **Modify** mit der Zeile **Wirkt auf**, „Weiß“ angekreuzt, Vorschau mit „− nur Weiß“.
+12. Drei Tasten mit den Zeichen **+**, **−** und **◐** unten links.
+13. Chaser-Editor mit einem gelb markierten Modify-Schritt und der Hinweiszeile.
 
 ---
 
