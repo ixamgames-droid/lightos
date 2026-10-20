@@ -70,6 +70,7 @@
 | LAS-41 | A | fix/las41-kiosk-notaus-bestaetigung | 2026-10-20T14:08Z | - |
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-20T14:26Z | - |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
+| UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
 
 ## Blocker & Fallen
 
@@ -109,7 +110,6 @@
 
 ## Verlauf
 
-- 2026-10-19T19:03Z A done FM-76
 - 2026-10-19T19:03Z 4 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:08Z A claim IMP-4
 - 2026-10-19T19:08Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -139,3 +139,4 @@
 - 2026-10-19T22:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-20T14:26Z A claim SAMMEL-BACKLOG-1020
 - 2026-10-20T14:26Z A claim UI-103
+- 2026-10-20T14:26Z A claim UI-104
