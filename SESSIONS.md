@@ -52,7 +52,7 @@
 | VIZ-106 | B | fix/viz105-buehne-undo-traverse-2d-verschieben | 2026-10-12T19:20Z | src/core/stage/scene_commands.py · src/ui/views/live_view.py · src/ui/visualizer/visualizer_window.py · tests/test_viz106_2d_verschieben_3d_undo.py |
 | VIZ-108 | B | fix/viz107-3d-fenster-gobo-niedrig-einstellungen | 2026-10-12T19:21Z | src/ui/visualizer/visualizer_window.py · tests/test_viz108_reiter_einstellungen_breite.py |
 | OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
-| SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-19T14:04Z | - |
+| SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-20T14:08Z | - |
 | QA-99 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:51Z | tests/conftest.py · tests/test_qa99_windows_offscreen_schriften.py · backlog.d/QA-99.md |
 | QA-100 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:52Z | tests/test_qa100_anleitung_ueberschriften_einmalig.py · tools/doku_gates.txt · backlog.d/QA-100.md |
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
