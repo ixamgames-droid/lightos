@@ -905,12 +905,13 @@ class VerbindungTest(_MitAnsicht):
             vc_remote.zuschauer_weg("handy-2")
 
     def test_verbinden_oeffnet_den_bestehenden_dialog(self):
-        self.assertEqual(self.leiste._btn_verbinden.text(), "Verbinden…")
+        # WEB-12: „📱 Handy verbinden“ — der Dialog schaltet gleich alles ein
+        self.assertEqual(self.leiste._btn_verbinden.text(), "📱 Handy verbinden")
         dialog = mock.Mock()
         with mock.patch.object(self.view, "window",
                                return_value=mock.Mock(_open_web_remote_dialog=dialog)):
             self.leiste._btn_verbinden.click()
-        dialog.assert_called_once_with()
+        dialog.assert_called_once_with(verbinden=True)
         # ohne Hauptfenster: ein Hinweis, wo der Dialog steht
         from src.ui.views import virtual_console_view as ansicht
         with mock.patch.object(self.view, "window", return_value=object()), \

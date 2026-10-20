@@ -2796,205 +2796,15 @@ class MainWindow(QMainWindow):
 
     # ── Web / OSC ─────────────────────────────────────────────────────────────
 
-    def _open_web_remote_dialog(self):
-        """CDX-24: Verbindungs-Dialog mit den beiden Sicherheits-Bedienelementen,
-        die die Anleitung seit jeher bewirbt, die es in der UI aber nie gab —
-        `regenerate_token()` und `set_lan_remote_enabled()` hatten repo-weit NUR
-        Test-Aufrufer. (Das im Design-Doc als Follow-up geparkte NET-02-UI; der
-        BACKLOG-Verweis darauf zeigte ins Leere.)"""
-        from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                                       QCheckBox, QPushButton, QLineEdit)
-        from PySide6.QtGui import QGuiApplication
-        from src.web import remote_settings
-        from src.web.app import remote_url, refresh_running_token
-
-        dlg = QDialog(self)          # Parent = Lebensdauer an das Fenster koppeln
-        dlg.setWindowTitle("Web-Remote: Verbindung & Token")
-        lay = QVBoxLayout(dlg)
-        # WEB-11: der Dialog folgt seinem Inhalt — der QR-Code erscheint und
-        # verschwindet mit den Schaltern; ohne das staucht Qt die Zeilen
-        # darunter in den Code hinein, statt das Fenster zu vergroessern.
-        from PySide6.QtWidgets import QLayout
-        lay.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
-
-        lbl_url = QLabel()
-        lbl_url.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        lay.addWidget(lbl_url)
-
-        # Direkt-Link als selektierbares Feld: am Handy abtippen ODER kopieren.
-        edit_link = QLineEdit()
-        edit_link.setReadOnly(True)
-        lay.addWidget(edit_link)
-
-        row = QHBoxLayout()
-        btn_copy = QPushButton("Link kopieren")
-        # WEB-11: „Schlüssel" ist das Wort der Handy-Konsole, „Token" das der
-        # Anleitung zur festen Fernbedienung — der Knopf nennt beide.
-        btn_regen = QPushButton("Schlüssel erneuern (neues Token)")
-        btn_regen.setObjectName("web_remote_schluessel_erneuern")
-        btn_regen.setToolTip(
-            "Erzeugt einen neuen Schlüssel. Alle bisherigen Links und QR-Codes "
-            "werden sofort ungültig, verbundene Geräte getrennt.")
-        row.addWidget(btn_copy)
-        row.addWidget(btn_regen)
-        lay.addLayout(row)
-
-        cb_lan = QCheckBox("LAN-/Handy-Remote (aus = nur dieser PC)")
-        lay.addWidget(cb_lan)
-
-        # WEB-09: die Handy-Konsole. Standard AUS; eingeschaltet bedient das
-        # Handy nur, was auf einer Handy-Seite der virtuellen Konsole liegt.
-        cb_konsole = QCheckBox("Handy-Konsole (bedient nur Elemente der Handy-Seiten)")
-        cb_konsole.setObjectName("web_remote_handy_konsole")
-        cb_konsole.setToolTip(
-            "Aus: das Handy hat nur die feste Fernbedienung (GO, Blackout, "
-            "Executor-Fader).\nEin: zusätzlich die Handy-Konsole mit den Elementen, "
-            "die in der virtuellen Konsole auf einer Handy-Seite liegen.")
-        lay.addWidget(cb_konsole)
-        edit_konsole = QLineEdit()
-        edit_konsole.setReadOnly(True)
-        edit_konsole.setObjectName("web_remote_konsole_link")
-        lay.addWidget(edit_konsole)
-
-        # WEB-11: QR-Code zum Verbinden. Zeigt den Code nur, wenn das
-        # Web-Interface laeuft, im LAN erreichbar ist UND die Handy-Konsole an
-        # ist — sonst den noetigen Schritt. Der Link im Code ist derselbe wie
-        # im Feld darueber (mit der gewaehlten Netzwerkkarte).
-        from src.ui.widgets.handy_qr import HandyQrFeld
-        qr_feld = HandyQrFeld(klein=False, parent=dlg)
-        lay.addWidget(qr_feld)
-
-        lbl_hint = QLabel()
-        lbl_hint.setWordWrap(True)
-        lbl_hint.setStyleSheet("color: #999;")
-        lay.addWidget(lbl_hint)
-
-        def _refresh_labels():
-            try:
-                token = remote_settings.get_token()
-                lan_on = remote_settings.is_lan_remote_enabled()
-            except Exception:
-                token, lan_on = "", True
-            url = remote_url(5000)
-            lbl_url.setText(f"Adresse: {url}\nToken: {token}")
-            edit_link.setText(f"{url}/?k={token}" if token else url)
-            cb_lan.blockSignals(True)
-            cb_lan.setChecked(bool(lan_on))
-            cb_lan.blockSignals(False)
-            try:
-                konsole_an = remote_settings.is_vc_remote_enabled()
-            except Exception:
-                konsole_an = False
-            cb_konsole.blockSignals(True)
-            cb_konsole.setChecked(bool(konsole_an))
-            cb_konsole.blockSignals(False)
-            edit_konsole.setVisible(bool(konsole_an))
-            edit_konsole.setText(f"{url}/konsole?k={token}" if token
-                                 else f"{url}/konsole")
-            # WEB-11: Code und Feld zeigen dieselbe Adresse — bei mehreren
-            # Netzwerkkarten die im QR-Feld gewaehlte.
-            qr_feld.aktualisiere(sofort=True)
-            if qr_feld.url():
-                edit_konsole.setText(qr_feld.url())
-            lbl_hint.setText(
-                "Erreichbar für Geräte im selben (W)LAN — Zugriff nur mit Token."
-                if lan_on else
-                "Nur dieser PC. Andere Geräte im Netz erreichen die Fernbedienung nicht.")
-
-        def _copy():
-            # Einziger Handler ohne eigenes Netz waere sonst dieser — eine
-            # Exception in einem Qt-Slot ist unter PySide6 kein stiller Fehler.
-            try:
-                QGuiApplication.clipboard().setText(edit_link.text())
-                self.statusBar().showMessage("Direkt-Link kopiert.", 3000)
-            except Exception as e:
-                QMessageBox.warning(dlg, "Kopieren fehlgeschlagen", str(e))
-
-        def _regen():
-            # Default bewusst „Nein": ein Enter/Leertaste im Showbetrieb wuerde
-            # sonst alle Geraete rauswerfen.
-            if QMessageBox.question(
-                    dlg, "Schlüssel erneuern",
-                    "Ein neuer Schlüssel (Token) macht ALLE bisherigen Links, "
-                    "QR-Codes und angemeldeten Geräte sofort ungültig.\n\nFortfahren?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
-                return
-            try:
-                # `regenerate_token` prueft selbst nach, ob wirklich persistiert
-                # wurde, und wirft sonst — sonst meldeten wir Erfolg, waehrend die
-                # alten Links weiter gelten (save_settings schluckt Schreibfehler).
-                remote_settings.regenerate_token()
-            except Exception as e:
-                QMessageBox.warning(dlg, "Schlüssel erneuern", str(e))
-                _refresh_labels()
-                return
-            # Ohne das hier laeuft die Rotation ins Leere: der Gate liest das Token
-            # aus app.config, das nur beim create_app gefuellt wird — der laufende
-            # Server akzeptierte sonst weiter den ALTEN ?k=-Link. Der Aufruf kappt
-            # zusaetzlich alle offenen Verbindungen.
-            refreshed = refresh_running_token()
-            _refresh_labels()
-            self.statusBar().showMessage(
-                "Neues Token aktiv — alte Links und verbundene Geräte sind ungültig."
-                if refreshed else
-                "Neues Token gespeichert (wirkt beim nächsten Einschalten).", 5000)
-
-        def _konsole_toggled(checked: bool):
-            # Wirkt sofort am laufenden Server: die Schnittstelle liest die
-            # Einstellung bei jedem Aufruf. Beim Ausschalten werden gehaltene
-            # Tasten losgelassen und verbundene Handys gesperrt.
-            try:
-                remote_settings.set_vc_remote_enabled(bool(checked))
-                from src.web import vc_remote
-                vc_remote.einstellung_geaendert()
-            except Exception as e:
-                QMessageBox.warning(dlg, "Handy-Konsole", str(e))
-            _refresh_labels()
-            self.statusBar().showMessage(
-                "Handy-Konsole eingeschaltet — Elemente in der virtuellen Konsole über "
-                "die Seitenleiste „📱 Handy-Konsole“ auswählen." if remote_settings.is_vc_remote_enabled()
-                else "Handy-Konsole ausgeschaltet.", 5000)
-
-        def _lan_toggled(checked: bool):
-            remote_settings.set_lan_remote_enabled(bool(checked))
-            # NET-09-Falle: die Bind-Adresse wird NUR in start_server gelesen. Ein
-            # Umschalten am laufenden Server waere sonst wirkungslos — der Nutzer
-            # glaubt "aus", der Port bleibt aber im LAN offen. Deshalb hier hart
-            # neu starten; stop_server kappt dabei auch bestehende Verbindungen
-            # (ein aufgestufter WebSocket ueberlebt das blosse Schliessen des
-            # Listen-Sockets, s. dort) und gibt den Port frei.
-            #
-            # Den Serverzustand aus dem Modul lesen, NICHT am Menue-Haken: die
-            # beiden koennen auseinanderlaufen, und daran haengt hier, ob der
-            # Bind-Wechsel ueberhaupt wirksam wird.
-            from src.web import app as _web
-            if _web.is_running():
-                try:
-                    _web.stop_server()
-                    _web.start_server(5000)
-                    self.statusBar().showMessage(
-                        "Web-Interface neu gestartet — Bind-Adresse übernommen.", 4000)
-                except Exception as e:
-                    # Server ist jetzt unten — Menue/Statusleiste ehrlich nachziehen,
-                    # sonst behauptet die UI weiter "laeuft".
-                    self._act_web.setChecked(False)
-                    self._lbl_web.setText("Web: aus")
-                    self._lbl_web.setStyleSheet("")
-                    QMessageBox.warning(dlg, "Web-Interface Fehler", str(e))
-            _refresh_labels()
-
-        def _qr_geaendert():
-            # andere Netzwerkkarte gewaehlt / Schluessel von anderswo erneuert
-            if qr_feld.url():
-                edit_konsole.setText(qr_feld.url())
-
-        qr_feld.geaendert.connect(_qr_geaendert)
-        btn_copy.clicked.connect(_copy)
-        btn_regen.clicked.connect(_regen)
-        cb_lan.toggled.connect(_lan_toggled)
-        cb_konsole.toggled.connect(_konsole_toggled)
-        _refresh_labels()
+    def _open_web_remote_dialog(self, verbinden: bool = False):
+        """CDX-24 / WEB-12: Verbindungs-Dialog des Web-Remotes
+        (``src/ui/widgets/web_remote_dialog.py``). ``verbinden``: gleich
+        „📱 Handy verbinden“ ausfuehren (Knopf in der Seitenleiste der
+        virtuellen Konsole) — alles Noetige in einem Schritt einschalten."""
+        from src.ui.widgets.web_remote_dialog import WebRemoteDialog
+        dlg = WebRemoteDialog(self, steuerung=_WebSteuerung(self))
+        if verbinden:
+            dlg.handy_verbinden()
         dlg.exec()
 
     def _toggle_web_server(self, checked: bool):
@@ -4268,3 +4078,51 @@ def _sep() -> QLabel:
     s = QLabel("|")
     s.setStyleSheet("color: #444444; padding: 0 4px;")
     return s
+
+
+class _WebSteuerung:
+    """WEB-12: Server-Schalter fuer den Verbindungs-Dialog. Haelt Menue-Haken
+    und Statuszeile mit dem echten Serverzustand in Takt (CDX-24: den Zustand
+    aus dem Modul lesen, nie am Haken)."""
+
+    def __init__(self, fenster):
+        self._f = fenster
+
+    def laeuft(self) -> bool:
+        from src.web import app as web_app
+        return bool(web_app.is_running())
+
+    def _anzeigen(self, an: bool, port: int = 5000) -> None:
+        # ``_act_web`` haengt an ``triggered`` — setChecked loest nichts aus.
+        self._f._act_web.setChecked(bool(an))
+        self._f._lbl_web.setText(f"Web: :{port} OK" if an else "Web: aus")
+        self._f._lbl_web.setStyleSheet("color: #9DFF52;" if an else "")
+
+    def starten(self) -> None:
+        from src.web import app as web_app
+        try:
+            port = web_app.start_server(5000) or 5000
+        except Exception:
+            self._anzeigen(False)
+            raise
+        self._anzeigen(True, port)
+
+    def neu_starten(self) -> None:
+        # NET-09-Falle: die Bind-Adresse wird NUR beim Start gelesen.
+        # stop_server kappt dabei auch bestehende Verbindungen.
+        from src.web import app as web_app
+        web_app.stop_server()
+        try:
+            port = web_app.start_server(5000) or 5000
+        except Exception:
+            # Server ist jetzt unten — Menue/Statusleiste ehrlich nachziehen.
+            self._anzeigen(False)
+            raise
+        self._anzeigen(True, port)
+        self.melde("Web-Interface neu gestartet — Bind-Adresse übernommen.")
+
+    def melde(self, text: str) -> None:
+        try:
+            self._f.statusBar().showMessage(text, 5000)
+        except Exception:
+            pass

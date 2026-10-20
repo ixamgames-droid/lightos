@@ -956,8 +956,12 @@ class SchalterTest(unittest.TestCase):
             gebaut["link"] = dlg.findChild(QLineEdit, "web_remote_konsole_link")
             return 0
 
+        # WEB-12: den Link gibt es nur bei laufendem Server (hier: nur dieser PC)
+        import src.web.app as web_app
         for ziel, name, wert in ((QDialog, "exec", _exec),
-                                 (remote_settings, "get_token", lambda: "abc")):
+                                 (remote_settings, "get_token", lambda: "abc"),
+                                 (web_app, "is_running", lambda: True),
+                                 (web_app, "bind_host", lambda: "127.0.0.1")):
             fleck = mock.patch.object(ziel, name, wert)
             fleck.start()
             self.addCleanup(fleck.stop)

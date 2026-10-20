@@ -34,13 +34,12 @@ WARNUNG = ("Nur im eigenen WLAN zeigen — wer den Code scannt, "
            "kann die Handy-Konsole bedienen.")
 
 SCHRITTE = {
-    SERVER_AUS: "Das Web-Interface läuft nicht. Einschalten: "
-                "Ausgabe → Web-Interface.",
+    SERVER_AUS: "Das Web-Interface läuft nicht. „📱 Handy verbinden“ schaltet "
+                "alles Nötige ein.",
     NUR_LOKAL: "Das Web-Interface ist nur auf diesem PC erreichbar. "
-               "Für das Handy „LAN-/Handy-Remote“ einschalten "
-               "(Ausgabe → Web-Remote: Verbindung & Token).",
-    KONSOLE_AUS: "Die Handy-Konsole ist ausgeschaltet. Den Schalter "
-                 "„Handy-Konsole“ einschalten.",
+               "„📱 Handy verbinden“ schaltet „LAN-/Handy-Remote“ ein.",
+    KONSOLE_AUS: "Die Handy-Konsole ist ausgeschaltet. „📱 Handy verbinden“ "
+                 "oder den Schalter „Handy-Konsole“ einschalten.",
     KEIN_NETZ: "Keine Netzwerkverbindung gefunden. Den PC mit dem WLAN "
                "(oder per Kabel mit dem Router) verbinden, in dem auch das "
                "Handy ist.",

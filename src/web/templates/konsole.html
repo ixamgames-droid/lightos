@@ -73,13 +73,15 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
 .taste.notaus .streifen{display:none}
 /* WEB-12: Laser ohne Freigabe gesperrt, verlorenes Ziel (QA96-19) */
 .zelle.gesperrt{opacity:.55;filter:grayscale(.6)}
-.zelle .schloss{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:700;color:#f2cc60;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px;pointer-events:none}
+.zelle .schloss,.zelle .warntext{display:block;flex:0 0 auto;max-width:100%;text-align:center;font-size:10px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px;margin-top:2px;pointer-events:none;letter-spacing:0}
+.zelle .schloss{color:#f2cc60}
+.zelle .warntext{color:#ff7b72}
+.zelle .schloss:empty,.zelle .warntext:empty{display:none}
 .zelle.ziel_fehlt{border:2px dashed #ff5555 !important;box-shadow:none !important}
 .zelle.ziel_fehlt.aktiv{background:linear-gradient(#2b323c,#1f252d) !important;color:#e6edf3 !important}
+.zelle.ziel_fehlt small,.zelle.ziel_fehlt .punkt,.zelle.gesperrt .punkt{display:none}
 .zelle .warn{position:absolute;top:3px;right:6px;color:#ff5555;font-size:13px;font-weight:700;pointer-events:none}
-.zelle .warntext{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#ff7b72;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;padding:0 3px;pointer-events:none}
 /* WEB-12 (QA96-37): Laser-NOT-AUS am Pult aktiv */
 #notaus{flex:0 0 auto;display:none;background:#8e2421;border-bottom:2px solid #f0625d;color:#fff;font-weight:700;font-size:14px;
   text-align:center;padding:8px 10px;letter-spacing:.5px}

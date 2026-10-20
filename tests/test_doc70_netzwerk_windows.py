@@ -137,7 +137,8 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
             "Web-Interface (Port 5000)": ("src", "ui", "main_window.py"),
             "OS2L-Server (Port 1234)": ("src", "ui", "main_window.py"),
             "OSC-Server (Port 7770)": ("src", "ui", "main_window.py"),
-            "LAN-/Handy-Remote": ("src", "ui", "main_window.py"),
+            # WEB-12: der Verbindungs-Dialog steht in einer eigenen Datei
+            "LAN-/Handy-Remote": ("src", "ui", "widgets", "web_remote_dialog.py"),
         }
         for beschriftung, pfad in fundorte.items():
             with self.subTest(beschriftung):

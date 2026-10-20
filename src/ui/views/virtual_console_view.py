@@ -1159,13 +1159,13 @@ class VirtualConsoleView(QWidget):
             self._btn_handy.setChecked(True)
 
     def _handy_verbinden(self):
-        """„Verbinden…" in der Seitenleiste: der bestehende Dialog „Web-Remote:
-        Verbindung & Token" mit Link und Schluessel."""
+        """„📱 Handy verbinden" in der Seitenleiste: der Dialog „Web-Remote:
+        Verbindung & Token", der gleich alles Noetige einschaltet (WEB-12)."""
         fenster = self.window()
         oeffnen = getattr(fenster, "_open_web_remote_dialog", None)
         if callable(oeffnen):
             try:
-                oeffnen()
+                oeffnen(verbinden=True)
             except Exception as e:
                 print(f"[virtual_console_view] ERROR: Web-Remote-Dialog: {e}")
                 QMessageBox.warning(self, "Handy-Konsole", str(e))

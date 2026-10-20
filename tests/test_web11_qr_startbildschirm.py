@@ -1257,11 +1257,14 @@ class DialogTest(_MitNetz):
         dlg, _feld, bild, _link = self._dialog()
         schritt = dlg.findChild(QLabel, "handy_qr_schritt")
         self.assertTrue(bild.isHidden())
-        self.assertIn("Ausgabe → Web-Interface", schritt.text())
+        # WEB-12: der Schritt nennt „📱 Handy verbinden“ (schaltet alles ein)
+        self.assertIn("läuft nicht", schritt.text())
+        self.assertIn("Handy verbinden", schritt.text())
         self.laeuft, self.bind = True, "127.0.0.1"
         _feld.aktualisiere()
         self.assertTrue(bild.isHidden())
-        self.assertIn("LAN-/Handy-Remote", schritt.text())
+        self.assertIn("nur auf diesem PC", schritt.text())
+        self.assertIn("Handy verbinden", schritt.text())
 
     def test_schluessel_erneuern_macht_den_alten_code_ungueltig(self):
         remote_settings.set_vc_remote_enabled(True)
@@ -1280,9 +1283,10 @@ class DialogTest(_MitNetz):
 
         def frage(_eltern, titel, text, *a, **k):
             gefragt.append((titel, text))
-            return self.mw.QMessageBox.StandardButton.Yes
+            return wrd.QMessageBox.StandardButton.Yes
 
-        with mock.patch.object(self.mw.QMessageBox, "question", frage):
+        from src.ui.widgets import web_remote_dialog as wrd     # WEB-12
+        with mock.patch.object(wrd.QMessageBox, "question", frage):
             knopf.click()
         neu = remote_settings.get_token()
         self.assertNotEqual(alt, neu)

@@ -717,12 +717,12 @@ class HandyKonsolenLeiste(QWidget):
         """)
         self._schalter.toggled.connect(self._schalter_umgelegt)
         zeile.addWidget(self._schalter, 1)
-        self._btn_verbinden = QPushButton("Verbinden…")
+        self._btn_verbinden = QPushButton("📱 Handy verbinden")
         self._btn_verbinden.setObjectName("handy_verbinden")
         self._btn_verbinden.setFixedHeight(TREFFER)
         self._btn_verbinden.setToolTip(
-            "Öffnet „Web-Remote: Verbindung & Token“ mit QR-Code, Link und "
-            "Schlüssel fürs Handy.")
+            "Schaltet in einem Schritt alles ein, was das Handy braucht "
+            "(WLAN-Zugriff, Handy-Konsole, Web-Interface), und zeigt den QR-Code.")
         self._btn_verbinden.setStyleSheet(_KNOPF_CSS)
         self._btn_verbinden.clicked.connect(self.verbinden_angefragt.emit)
         zeile.addWidget(self._btn_verbinden)
