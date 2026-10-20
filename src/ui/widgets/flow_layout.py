@@ -24,11 +24,15 @@ class FlowLayout(QLayout):
         margin: int = 0,
         h_spacing: int = 6,
         v_spacing: int = 4,
+        zeilen_zentrieren: bool = False,
     ) -> None:
         super().__init__(parent)
         self._items: list[QLayoutItem] = []
         self._h_space = h_spacing
         self._v_space = v_spacing
+        # UI-98: Elemente unterschiedlicher Höhe innerhalb ihrer Zeile
+        # senkrecht mittig ausrichten (sonst oben bündig).
+        self._zentrieren = zeilen_zentrieren
         self.setContentsMargins(margin, margin, margin, margin)
 
     # ── Pflicht-Overrides ────────────────────────────────────────────────────
@@ -94,6 +98,13 @@ class FlowLayout(QLayout):
         x = effective.x()
         y = effective.y()
         line_height = 0
+        zeile: list[tuple[QLayoutItem, QPoint, QSize]] = []
+
+        def _zeile_setzen() -> None:
+            for it, pos, hint in zeile:
+                dy = (line_height - hint.height()) // 2 if self._zentrieren else 0
+                it.setGeometry(QRect(pos + QPoint(0, dy), hint))
+            zeile.clear()
 
         for item in self._items:
             w = item.widget()
@@ -103,13 +114,17 @@ class FlowLayout(QLayout):
             next_x = x + hint.width() + self._h_space
             if next_x - self._h_space > effective.right() and line_height > 0:
                 # In die nächste Zeile umbrechen.
+                if not test_only:
+                    _zeile_setzen()
                 x = effective.x()
                 y = y + line_height + self._v_space
                 next_x = x + hint.width() + self._h_space
                 line_height = 0
             if not test_only:
-                item.setGeometry(QRect(QPoint(x, y), hint))
+                zeile.append((item, QPoint(x, y), hint))
             x = next_x
             line_height = max(line_height, hint.height())
 
+        if not test_only:
+            _zeile_setzen()
         return y + line_height - rect.y() + margins.bottom()
