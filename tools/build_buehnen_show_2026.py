@@ -94,6 +94,8 @@ MH_GOBO2 = 40
 LASER_OFFEN = 60
 LASER_ZU = 0
 LASER_FARBE = {"rot": 19, "gelb": 27, "gruen": 35, "cyan": 43, "blau": 51, "lila": 59}
+# DEMO-9: Schluessel ASCII, Funktionsnamen mit Umlaut („Laser Farbe grün").
+LASER_FARBNAME = {"gruen": "grün"}
 LASER_NOTAUS_ROT = "#b00000"
 # Fester Startwert der EFX-Zufallswege: jeder Bau ergibt dieselbe Datei (kein
 # EFX nutzt den Algorithmus Random, der Wert aendert also nichts am Licht).
@@ -398,7 +400,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     laser_farbe = b.chaser("Laser Farbwechsel")
     laser_farbe.fn.run_order = RunOrder.Loop
     for farbe in ("gruen", "cyan", "blau", "lila", "rot"):
-        sc = b.scene(f"Laser Farbe {farbe}")
+        sc = b.scene(f"Laser Farbe {LASER_FARBNAME.get(farbe, farbe)}")
         for f in laser:
             sc.fn.set_value(f, k[f]["color_wheel"], LASER_FARBE[farbe])
         laser_farbe.fn.steps.append(ChaserStep(function_id=sc.id, fade_in=0.0,
