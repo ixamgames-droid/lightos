@@ -51,6 +51,7 @@
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-20T18:31Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | XPLAT-52 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-20T18:31Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | BPM-31 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-20T18:50Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
+| UI-105 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-20T18:50Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
 
 ## Blocker & Fallen
 
@@ -90,7 +91,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:55Z A claim NET-15
 - 2026-10-20T16:56Z A done FM-58
 - 2026-10-20T16:56Z A done VIZ-85
 - 2026-10-20T16:56Z A done VIZ-86
@@ -120,3 +120,4 @@
 - 2026-10-20T18:31Z A done XPLAT-52
 - 2026-10-20T18:31Z A claim XPLAT-52
 - 2026-10-20T18:50Z A claim BPM-31
+- 2026-10-20T18:50Z A claim UI-105
