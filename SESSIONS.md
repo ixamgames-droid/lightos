@@ -69,6 +69,7 @@
 | LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
 | LAS-41 | A | fix/las41-kiosk-notaus-bestaetigung | 2026-10-20T14:08Z | - |
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-20T14:26Z | - |
+| UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
 
 ## Blocker & Fallen
 
@@ -108,7 +109,6 @@
 
 ## Verlauf
 
-- 2026-10-19T18:30Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:03Z A done FM-76
 - 2026-10-19T19:03Z 4 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:08Z A claim IMP-4
@@ -138,3 +138,4 @@
 - 2026-10-19T22:40Z A done UI-102
 - 2026-10-19T22:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-20T14:26Z A claim SAMMEL-BACKLOG-1020
+- 2026-10-20T14:26Z A claim UI-103
