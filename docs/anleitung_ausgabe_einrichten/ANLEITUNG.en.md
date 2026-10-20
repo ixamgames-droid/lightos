@@ -233,6 +233,19 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    `2008:1066@1-2`; easiest to have the **uDMX (USB)** tab enter it).
 3. **Ext-Universe** — optionally the universe number on the network. If empty, the
    default applies: Art-Net `#` minus 1, sACN `#`.
+   **Dongle** (read-only) — for `Enttec` the serial number of the adapter this universe
+   looks for, shortened (`Seriennr. …5123`). LightOS remembers it once the adapter has
+   sent, and finds it by it even at another port after a restart — two ENTTECs do not
+   swap their universes when Linux swaps the port numbers. If you **deliberately pick a
+   different port** for the row (here or with **Verbinden** on the Enttec tab), the old
+   number no longer applies: the universe learns the adapter at the new port. To make the
+   universe use a **different** adapter: select the row, **Dongle neu zuordnen**
+   (reassign dongle; or right-click the row) and **Speichern** — it then learns the
+   adapter plugged into its port.
+   **Check once after the update:** an older configuration remembers, at its first
+   start, the adapter that is plugged into its port at that moment. If the ports were
+   swapped just then, the **Dongle** column shows the other adapter's number — use
+   **Dongle neu zuordnen** and **Speichern**.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
    removes the selected rows from the table; this only takes effect with **Speichern**
    (save).

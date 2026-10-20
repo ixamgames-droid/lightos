@@ -223,6 +223,19 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    `2008:1066@1-2`; am einfachsten über den Reiter **uDMX (USB)** eintragen lassen).
 3. **Ext-Universe** — optional die Universumsnummer im Netzwerk. Leer gilt der Standard:
    Art-Net `#` minus 1, sACN `#`.
+   **Dongle** (nur lesbar) — bei `Enttec` die Seriennummer des Adapters, den das
+   Universum sucht, gekürzt (`Seriennr. …5123`). LightOS merkt sie sich, sobald der
+   Adapter einmal gesendet hat, und findet ihn darüber auch nach einem Neustart an einem
+   anderen Port wieder — zwei ENTTEC tauschen ihre Universen also nicht, wenn Linux die
+   Portnummern vertauscht. Wählen Sie für die Zeile **ausdrücklich einen anderen Port**
+   (hier oder mit **Verbinden** im Reiter Enttec), gilt die alte Nummer nicht mehr: das
+   Universum lernt den Adapter am neuen Port. Soll das Universum einen **anderen**
+   Adapter nehmen: Zeile markieren, **Dongle neu zuordnen** (oder Rechtsklick auf die
+   Zeile) und **Speichern** — danach lernt es den Adapter, der an seinem Port steckt.
+   **Nach dem Update einmal prüfen:** eine ältere Konfiguration merkt sich beim ersten
+   Start den Adapter, der gerade an ihrem Port steckt. Waren die Ports genau dann
+   vertauscht, steht in der Spalte **Dongle** die Nummer des anderen Adapters — dann
+   **Dongle neu zuordnen** und **Speichern**.
 4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
    markierten Zeilen aus der Tabelle; wirksam wird das erst mit **Speichern**.
 5. **Speichern** — schreibt `universes.json` (im LightOS-Datenordner) und wendet die Konfiguration

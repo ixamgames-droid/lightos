@@ -208,8 +208,10 @@ alle Geräte der Mitglieder und die Stufe des Behälters.
   auf diesen Lampen vollständig — eine höhere Stufe macht daraus keinen Läufer *über* einem
   Untergrund. Dafür gibt es im Matrix-Editor (Stil Dimmer) den Haken **Dunkle Lampen
   durchlassen**: dann setzt der Effekt nur seine hellen Lampen (auch den Schweif) genau auf
-  seinen Wert, in seiner Stufe — die dunklen gehören dem, was darunter läuft. Anders als
-  Modify *Addieren* (legt obendrauf, 40 % + 70 % = 100 %) stehen dort genau 70 %.
+  seinen Wert, in seiner Stufe — die dunklen gehören dem, was darunter läuft. Anders als ein
+  **Modify-Effekt** in der Betriebsart *Addieren* (legt obendrauf, 40 % + 70 % = 100 %;
+  Anleitung [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md))
+  stehen dort genau 70 %.
 - **Master und Blackout:** Grand Master, Gruppen-Fader, Blackout und Laser-NOT-AUS wirken
   nach allen Effekten, egal auf welcher Stufe.
 
