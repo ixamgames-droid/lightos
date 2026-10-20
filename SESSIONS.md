@@ -69,6 +69,7 @@
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-20T14:26Z | - |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
+| UI-100 | A | fix/ui100-englische-reste | 2026-10-20T15:21Z | - |
 
 ## Blocker & Fallen
 
@@ -108,7 +109,6 @@
 
 ## Verlauf
 
-- 2026-10-19T19:08Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:08Z A claim FM-77
 - 2026-10-19T19:27Z A claim ENG-42
 - 2026-10-19T19:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -138,3 +138,4 @@
 - 2026-10-20T14:26Z A claim UI-104
 - 2026-10-20T14:40Z A done QA-103
 - 2026-10-20T15:14Z A done OUT-80
+- 2026-10-20T15:21Z A claim UI-100
