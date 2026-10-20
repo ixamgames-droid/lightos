@@ -36,7 +36,6 @@
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-20T14:08Z | - |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-20T14:08Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-20T14:08Z | - |
-| LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-20T14:26Z | - |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
@@ -89,7 +88,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z A done TOOL-16
 - 2026-10-20T16:56Z A done UI-81
 - 2026-10-20T16:56Z A done DOC-65
 - 2026-10-20T16:56Z A done LAS-26
@@ -119,3 +117,4 @@
 - 2026-10-20T19:40Z A done WEB-12
 - 2026-10-20T19:40Z A claim WEB-12
 - 2026-10-20T19:48Z A done SAMMEL-BACKLOG-1014
+- 2026-10-20T20:30Z D done LIZ-3
