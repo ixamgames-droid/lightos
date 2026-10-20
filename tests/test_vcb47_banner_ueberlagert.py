@@ -48,6 +48,14 @@ _AUSFALL = {"universum": 1, "weg": "Enttec", "ziel": "COM9",
 _LAEUFT = dict(_AUSFALL, verbunden=True)
 
 
+def _hinweis_zeile(ansicht):
+    """UI-103: der Platz, den eine Ansicht ohne Unterreiter fuer Banner und
+    Chip freigibt (Virtual Console: Zeile „Aktiver Effekt“) — oder ``None``."""
+    frage = getattr(ansicht, "ausgabe_chip_platz", None)
+    platz = frage() if callable(frage) else None
+    return platz if platz is not None and platz.isVisible() else None
+
+
 def _app():
     return QApplication.instance() or QApplication([])
 
@@ -210,9 +218,17 @@ class _ImHauptfenster(unittest.TestCase):
         self.assertTrue(banner.isVisible(), hinweis)
         inhalt = self._im_fenster(w._stack)
         rechteck = self._im_fenster(banner)
-        self.assertEqual(rechteck.left(), inhalt.left(), hinweis)
-        self.assertEqual(rechteck.top(), inhalt.top(), hinweis)
-        self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
+        zeile = _hinweis_zeile(w._stack.currentWidget())
+        if zeile is not None:
+            # UI-103: Virtual Console — rechtsbuendig in der Zeile „Aktiver
+            # Effekt“, nie ueber Bank-Knoepfen oder der VC-Werkzeugleiste.
+            feld = self._im_fenster(zeile)
+            self.assertTrue(feld.contains(rechteck), hinweis)
+            self.assertEqual(rechteck.right(), feld.right(), hinweis)
+        else:
+            self.assertEqual(rechteck.left(), inhalt.left(), hinweis)
+            self.assertEqual(rechteck.top(), inhalt.top(), hinweis)
+            self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
         self.assertGreater(rechteck.height(), 0, hinweis)
         kinder = [k for k in w.centralWidget().children()
                   if isinstance(k, QWidget)]
@@ -303,8 +319,12 @@ class _ImHauptfenster(unittest.TestCase):
             self._banner_streifen = self._im_fenster(self.banner)
             self._zeige(ART_KEIN)
             stellen = self._verdeckte_stellen()
-            self.assertTrue(stellen, "Unter dem Banner liegt kein Knopf – der "
-                                     "Test prüft sonst nichts.")
+            # UI-103: in der Virtual Console liegt das Banner in der Zeile
+            # „Aktiver Effekt“ — darunter ist KEIN Knopf mehr (vorher die
+            # Bank-Blaetterknoepfe und die VC-Werkzeugleiste). Dass ein Klick
+            # trotzdem nie durchgeht, prueft die eigens untergeschobene Taste
+            # in test_taste_unter_dem_banner_wird_nicht_ausgeloest.
+            self.assertEqual(stellen, {}, "Banner verdeckt einen Knopf")
             ausgeloest = []
             for knopf in stellen:
                 knopf.clicked.connect(
@@ -334,6 +354,12 @@ class _ImHauptfenster(unittest.TestCase):
             for knopf in stellen:
                 knopf.clicked.disconnect()
             if art == ART_STOERUNG and not self.KIOSK:
+                self.steuerung.klappe_aus()
+                self._zeige(art)
+                with redirect_stdout(io.StringIO()):
+                    QTest.mouseClick(self.banner, Qt.MouseButton.LeftButton,
+                                     pos=QPoint(10, self.banner.height() // 2))
+                self._lauf()
                 self.assertTrue(geklickt, "Klick auf die Störung öffnet die "
                                           "Ausgabe-Einstellungen.")
             self.steuerung.bei_stoerung_klick = self._klick_vorher
@@ -347,12 +373,16 @@ class _ImHauptfenster(unittest.TestCase):
         self.steuerung.bei_stoerung_klick = lambda: geklickt.append(1)
         # Die Taste wird eigens in den verdeckten Streifen gehoben — als freies
         # Kind des Inhaltsbereichs, damit kein Layout verschoben wird.
-        taste = VCButton(parent=self.w._stack.currentWidget())
+        ansicht = self.w._stack.currentWidget()
+        taste = VCButton(parent=ansicht)
         taste.set_edit_mode(False)
         self.addCleanup(taste.deleteLater)
         taste.action = ButtonAction.FUNCTION_TOGGLE
         taste.function_id = self.fn.id
-        taste.setGeometry(200, 0, 120, 60)
+        # UI-103: das Banner liegt nicht mehr am oberen Rand, sondern rechts in
+        # der Zeile „Aktiver Effekt“ — die Taste reicht von dort nach unten.
+        oben_links = ansicht.mapFrom(self.w, self._im_fenster(self.banner).topLeft())
+        taste.setGeometry(oben_links.x() + 20, oben_links.y(), 120, 60)
         taste.show()
         taste.raise_()
         self._lauf()

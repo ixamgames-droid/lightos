@@ -1180,7 +1180,8 @@ class MainWindow(QMainWindow):
         # im Kiosk-Modus). Der Stapel liegt unter Menue-, NOT-AUS- und
         # Sektionsleiste: Laser-NOT-AUS, STOP ALL, BLACKOUT und Grand Master
         # werden nie verdeckt. UI-103: ebenso wenig die Unterreiter der
-        # Sektionen — das Banner weicht neben oder unter die Reiterzeile aus.
+        # Sektionen (das Banner steht neben den Reitern) und die Leiste der
+        # Virtual Console (dort steht es in der Zeile „Aktiver Effekt“).
         from src.ui.ausgabe_banner import AusgabeBannerSteuerung
         self._ausgabe_banner = AusgabeBannerSteuerung(
             kiosk=self._kiosk_mode, parent=central)

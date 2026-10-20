@@ -42,6 +42,14 @@ _AUSFALL = {"universum": 1, "weg": "Enttec", "ziel": "COM9",
 _LAEUFT = dict(_AUSFALL, verbunden=True)
 
 
+def _hinweis_zeile(ansicht):
+    """UI-103: der Platz, den eine Ansicht ohne Unterreiter fuer Banner und
+    Chip freigibt (Virtual Console: Zeile „Aktiver Effekt“) — oder ``None``."""
+    frage = getattr(ansicht, "ausgabe_chip_platz", None)
+    platz = frage() if callable(frage) else None
+    return platz if platz is not None and platz.isVisible() else None
+
+
 class _Manager:
     def __init__(self, wege):
         self.wege = wege
@@ -133,6 +141,12 @@ class _Haerte(unittest.TestCase):
             belegt.setWidth(min(leiste.width(), leiste.sizeHint().width()))
             self.assertTrue(inhalt.contains(rechteck), hinweis)
             self.assertFalse(rechteck.intersects(belegt), hinweis)
+        elif _hinweis_zeile(ansicht) is not None:
+            # UI-103: Virtual Console — rechtsbuendig in der Zeile „Aktiver
+            # Effekt“, nie ueber Bank-Knoepfen oder der VC-Werkzeugleiste.
+            feld = self._im_fenster(_hinweis_zeile(ansicht))
+            self.assertTrue(feld.contains(rechteck), hinweis)
+            self.assertEqual(rechteck.right(), feld.right(), hinweis)
         else:
             self.assertEqual(rechteck.topLeft(), inhalt.topLeft(), hinweis)
             self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
