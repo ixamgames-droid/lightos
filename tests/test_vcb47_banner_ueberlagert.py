@@ -31,7 +31,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QPoint, QRect, Qt                         # noqa: E402
 from PySide6.QtTest import QTest                                     # noqa: E402
 from PySide6.QtWidgets import (QApplication, QPushButton,            # noqa: E402
-                               QVBoxLayout, QWidget)
+                               QTabWidget, QVBoxLayout, QWidget)
 
 from src.core.app_state import get_state                             # noqa: E402
 from src.ui.ausgabe_banner import (ART_KEIN, ART_PROBE,              # noqa: E402
@@ -238,10 +238,21 @@ class _ImHauptfenster(unittest.TestCase):
             self._zeige(ART_KEIN)
 
     def test_banner_ist_in_jeder_ansicht_oben(self):
+        """Oben in jeder Ansicht — seit UI-103 aber nie ueber Unterreitern:
+        Ansichten mit Reiterleiste prueft ``test_ui103_banner_unterreiter``."""
         self._zeige(ART_STOERUNG)
         for i in range(self.w._stack.count()):
             self.w._stack.setCurrentIndex(i)
             self._lauf()
+            if isinstance(self.w._stack.currentWidget(), QTabWidget):
+                leiste = self.w._stack.currentWidget().tabBar()
+                self.assertFalse(
+                    self._im_fenster(self.banner).intersects(
+                        self._im_fenster(leiste).adjusted(
+                            0, 0, -(leiste.width() - min(
+                                leiste.width(), leiste.sizeHint().width())), 0)),
+                    f"Ansicht {i}: Banner ueber den Unterreitern")
+                continue
             self._pruefe_lage_des_banners(f"Ansicht {i}")
 
     # -- Sicherheit ----------------------------------------------------------

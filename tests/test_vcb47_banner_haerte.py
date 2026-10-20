@@ -29,7 +29,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, QRect, Qt                         # noqa: E402
 from PySide6.QtTest import QTest                                     # noqa: E402
-from PySide6.QtWidgets import QApplication, QPushButton, QWidget     # noqa: E402
+from PySide6.QtWidgets import (QApplication, QPushButton,            # noqa: E402
+                               QTabWidget, QWidget)
 
 from src.ui.ausgabe_banner import (ART_KEIN, ART_PROBE,              # noqa: E402
                                    ART_STOERUNG, HALTE_S, AusgabeBanner)
@@ -124,8 +125,17 @@ class _Haerte(unittest.TestCase):
         self.assertTrue(banner.isVisible(), hinweis)
         inhalt = self._im_fenster(w._stack)
         rechteck = self._im_fenster(banner)
-        self.assertEqual(rechteck.topLeft(), inhalt.topLeft(), hinweis)
-        self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
+        ansicht = w._stack.currentWidget()
+        if isinstance(ansicht, QTabWidget):
+            # UI-103: neben oder unter den Unterreitern, nie darueber.
+            leiste = ansicht.tabBar()
+            belegt = self._im_fenster(leiste)
+            belegt.setWidth(min(leiste.width(), leiste.sizeHint().width()))
+            self.assertTrue(inhalt.contains(rechteck), hinweis)
+            self.assertFalse(rechteck.intersects(belegt), hinweis)
+        else:
+            self.assertEqual(rechteck.topLeft(), inhalt.topLeft(), hinweis)
+            self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
         self.assertGreaterEqual(rechteck.height(), 10, hinweis)
         self.assertTrue(w.rect().contains(rechteck),
                         f"Banner ragt aus dem Fenster {hinweis}")

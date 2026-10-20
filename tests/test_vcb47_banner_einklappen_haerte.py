@@ -501,8 +501,12 @@ class _ImFenster(unittest.TestCase):
             self.assertIs(zeigt, self.banner,
                           "Ein weiterer Ausfall muss aufklappen.")
             self.assertIn("(+1 weitere)", self.banner.text())
-            self.assertEqual(self._im_fenster(self.banner).topLeft(),
-                             self._im_fenster(self.w._stack).topLeft())
+            # UI-103: in Ansichten mit Unterreitern weicht das Banner neben
+            # oder unter die Reiterzeile aus — dort gilt sein Zielrechteck.
+            soll = (self.banner.ziel_rechteck().topLeft()
+                    if ab._unterreiter(self.w._stack, self.w.centralWidget())
+                    else self.w._stack.mapTo(self.w.centralWidget(), QPoint(0, 0)))
+            self.assertEqual(self.banner.pos(), soll)
             self._takt([dict(_A), _ok(_B)])
             self._ein()
 
