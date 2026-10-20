@@ -28,7 +28,6 @@
 | MIDI-14 | D | feature/midi14-motorfader-rueckmeldung | 2026-10-12T18:32Z | src/core/midi/midi_mapper.py · src/core/midi/midi_manager.py · tests/test_midi14_motorfader_rueckmeldung.py |
 | WEB-11 | A | feature/web11-qr-startbildschirm | 2026-10-11T16:32Z | - |
 | QA-96 | A | - | 2026-10-11T16:56Z | - |
-| WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-20T19:15Z | - |
@@ -90,7 +89,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z A done VIZ-85
 - 2026-10-20T16:56Z A done VIZ-86
 - 2026-10-20T16:56Z A done VIZ-87
 - 2026-10-20T16:56Z A done TOOL-16
@@ -120,3 +118,4 @@
 - 2026-10-20T18:50Z A claim BPM-31
 - 2026-10-20T18:50Z A claim UI-105
 - 2026-10-20T19:07Z D done QA-99
+- 2026-10-20T19:40Z A done WEB-12
