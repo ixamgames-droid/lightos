@@ -410,15 +410,56 @@ class VCCanvas(QWidget):
             obj = obj.parent()
         return True
 
+    def soll_sichtbar(self, w) -> bool:
+        """Sichtbarkeit eines Canvas-Kinds: aktive Bank UND — bei einem
+        Pop-up-Feld (VCB-48) — offen. MIDI/Hotkey fragen weiter nur
+        :meth:`on_active_bank`: Kinder eines geschlossenen Pop-ups bleiben
+        ausloesbar und behalten ihren Zustand (wie Elemente anderer Seiten)."""
+        if not self.on_active_bank(w):
+            return False
+        if getattr(w, "_popup", False):
+            return bool(getattr(w, "_popup_offen", False))
+        return True
+
+    def popups_nach_oben(self) -> None:
+        """VCB-48: offene Pop-up-Felder liegen ueber allen anderen Elementen —
+        auch nachdem ein anderes Widget angelegt/abgelegt (raise_) wurde."""
+        from . import vc_popup
+        for f in vc_popup.alle_popups(self):
+            if f.popup_offen():
+                f.raise_()
+
+    def popup_tasten_auffrischen(self, popup_id: str = "") -> None:
+        """VCB-48: Pop-up-Tasten neu zeichnen (sie zeigen offen/zu)."""
+        from . import vc_popup
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return
+        for w in widgets:
+            if vc_popup.ist_popup_taste(w) and (
+                    not popup_id or getattr(w, "popup_target", "") == popup_id):
+                w.update()
+
+    def popup_umschalten(self, popup_id: str) -> bool:
+        """Pop-up-Feld mit dieser Kennung oeffnen/schliessen. False = gibt es nicht."""
+        from . import vc_popup
+        f = vc_popup.finde_popup(self, popup_id)
+        if f is None:
+            return False
+        f.popup_umschalten()
+        return True
+
     def _apply_bank_visibility(self):
         for child in self.findChildren(
             VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly
         ):
-            child.setVisible(self.on_active_bank(child))
+            child.setVisible(self.soll_sichtbar(child))
             # Frames haben eigene (Seiten x Bank)-Sichtbarkeit fuer ihre Kinder —
             # sonst blieben Bank-Pins verschachtelter Widgets unbeachtet.
             if hasattr(child, "_apply_bank_visibility"):
                 child._apply_bank_visibility()
+        self.popups_nach_oben()
 
     def _on_midi_raw(self, msg):
         # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
@@ -1745,6 +1786,19 @@ class VCCanvas(QWidget):
             act = add_menu.addAction(wtype.replace("VC", ""))
             act.setData((wtype, local_pos))
 
+        # VCB-48: Pop-up-Felder sind geschlossen unsichtbar — hier lassen sie
+        # sich im Bearbeiten-Modus zum Befuellen oeffnen (und wiederfinden).
+        from . import vc_popup
+        _pops = vc_popup.alle_popups(self)
+        if _pops:
+            pop_menu = menu.addMenu("Pop-up-Felder")
+            for f in _pops:
+                a = pop_menu.addAction(f.caption or "(ohne Namen)")
+                a.setCheckable(True)
+                a.setChecked(f.popup_offen())
+                a.triggered.connect(
+                    lambda checked=False, ff=f: ff.set_popup_offen(bool(checked)))
+
         menu.addSeparator()
         act_clear = menu.addAction("Alle löschen")
         # UIC-05: Canvas-Export/Import nur noch über die Toolbar (keine Dopplung im
@@ -1786,7 +1840,8 @@ class VCCanvas(QWidget):
             w.moved.connect(self._on_widget_moved)
         except (AttributeError, RuntimeError):
             pass
-        w.setVisible(self.on_active_bank(w))
+        w.setVisible(self.soll_sichtbar(w))
+        self.popups_nach_oben()          # VCB-48: neues Widget nicht ueber ein offenes Pop-up
         self._update_content_extent()
         return w
 
@@ -1906,12 +1961,26 @@ class VCCanvas(QWidget):
         # reihenfolge liegt zuoberst (raise_() haengt das Widget hinten an).
         target = None
         for f in self.findChildren(VCFrame, options=Qt.FindChildOption.FindDirectChildrenOnly):
-            if f is widget or not self.on_active_bank(f):
+            # VCB-48: ein geschlossenes Pop-up-Feld ist kein Ablageziel.
+            if f is widget or not self.soll_sichtbar(f):
                 continue
             if f.geometry().contains(center_canvas):
                 target = f
         parent = widget.parent()
         grid = self.GRID if self._snap_to_grid else 0
+
+        from . import vc_popup
+        if (target is not None and parent is not target and target.is_popup()
+                and (vc_popup.ist_popup_taste(widget)
+                     or vc_popup.enthaelt_popup_elemente(widget))):
+            # VCB-48: keine Pop-up-Taste in ein Pop-up-Feld — zurueck an den
+            # Ausgangsplatz, mit Hinweis.
+            vc_popup.hinweis(self, vc_popup.HINWEIS_TASTE_IM_POPUP)
+            orig = getattr(widget, "_orig_rect", None)
+            if orig is not None and orig.isValid():
+                widget.setGeometry(orig)
+            widget.update()
+            return
 
         if target is not None and parent is not target:
             # In den Frame hinein.
@@ -1949,6 +2018,7 @@ class VCCanvas(QWidget):
             self._reattach_highlight(widget, had_hl)
             widget.show()
             widget.update()
+        self.popups_nach_oben()
 
     @staticmethod
     def _detach_highlight(widget) -> bool:
@@ -2096,11 +2166,18 @@ class VCCanvas(QWidget):
         self._restore(self._redo_stack.pop())
 
     def _restore(self, layout: dict):
+        # VCB-48: offen/zu ist Laufzeit und steht nicht im Layout. Ein Undo
+        # im Bearbeiten-Modus soll das gerade befuellte Pop-up nicht zuklappen.
+        from . import vc_popup
+        offen = {f.popup_id for f in vc_popup.alle_popups(self) if f.popup_offen()}
         self._restoring = True
         try:
             self.from_dict(layout)
         finally:
             self._restoring = False
+        for f in vc_popup.alle_popups(self):
+            if f.popup_id in offen:
+                f.set_popup_offen(True)
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
