@@ -158,6 +158,18 @@ def scope_ohne_werte(state, programmer: dict) -> bool:
                          scope_heads=kw.get("scope_heads"))
 
 
+def _knopf_mindestmass(btn: QPushButton, *, symbol: bool = False) -> None:
+    """UI-104: Mindesthöhe (und bei Symbolknöpfen -breite) aus den
+    fontMetrics — nie ein festes Höchstmaß; die Wunschgröße setzt das Theme."""
+    fm = btn.fontMetrics()
+    # 2×4 px Innenabstand + 2×1 px Rahmen (dark.qss) + Luft.
+    btn.setMinimumHeight(max(24, fm.height() + 12))
+    if symbol:
+        # 2×10 px Innenabstand + 2×1 px Rahmen; mindestens 32 px, damit
+        # ein einzelnes Zeichen wie „↻“ nicht zum „:“ zusammenfällt.
+        btn.setMinimumWidth(max(32, fm.horizontalAdvance(btn.text()) + 24))
+
+
 class ChannelSelectDialog(QDialog):
     """Auswahl, WAS beim Speichern (Snap/Szene) uebernommen wird.
 
@@ -649,34 +661,36 @@ class SnapFilePanel(QWidget):
         tb = FlowLayout(tb_host, margin=0, h_spacing=4, v_spacing=4)
 
         b_save = QPushButton("Speichern")
-        b_save.setFixedHeight(24)
         b_save.setToolTip("Aktuellen Programmer hier speichern")
         b_save.clicked.connect(self._save_snap)
 
         b_folder = QPushButton("Ordner +")
-        b_folder.setFixedHeight(24)
         b_folder.clicked.connect(self._new_folder)
 
         b_apply = QPushButton("Anwenden")
-        b_apply.setFixedHeight(24)
         b_apply.clicked.connect(self._apply_selected)
 
         b_chase = QPushButton("Chase +")
-        b_chase.setFixedHeight(24)
         b_chase.setToolTip("Aus mehreren selektierten Snaps eine Sequence/Chase erzeugen")
         b_chase.clicked.connect(self._create_chase_from_selection)
 
         b_del = QPushButton("Löschen")
-        b_del.setFixedHeight(24)
         b_del.setStyleSheet("color: #ff6666;")
         b_del.clicked.connect(self._delete_selected)
 
         b_ref = QPushButton("↻")
-        b_ref.setFixedSize(24, 24)
         b_ref.setToolTip("Aktualisieren")
         b_ref.clicked.connect(self._refresh_tree)
 
+        # UI-104: keine festen 24 px mehr. Das Stylesheet (min-height 22 px +
+        # 2×4 px Innenabstand) setzt die Mindesthöhe auf 32 px, die feste
+        # Höchsthöhe blieb 24 -> das Flow-Layout plante 32-px-Zeilen, setzte die
+        # Knöpfe aber 4 px tiefer (Höchst- gegen Mindestmaß), die zweite Zeile
+        # ragte unten 4 px aus der Leiste. „↻“ war auf 24 px Breite gezwungen,
+        # hinter 2×10 px Innenabstand blieb vom Zeichen nur ein „:“.
+        # Jetzt: Mindestmaße aus der Schrift, Wunschgröße bestimmt das Theme.
         for btn in [b_save, b_folder, b_apply, b_chase, b_del, b_ref]:
+            _knopf_mindestmass(btn, symbol=btn is b_ref)
             tb.addWidget(btn)
         layout.addWidget(tb_host)
 
