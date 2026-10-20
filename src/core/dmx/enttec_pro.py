@@ -306,6 +306,15 @@ class EnttecPro:
         # wird uebernommen (:meth:`_geoeffnet` lernt die Nummer neu).
         for d, s in kand:
             if _port_key(d) == _port_key(port) and s and self._verboten(d, s):
+                # OUT-80: sichtbar machen (Ausgabe-Diagnose), nicht nur im
+                # Worker werfen — typisch nach vertauschtem Einstecken, wenn
+                # der eigene Dongle fehlt.
+                self._sperr_hinweis = (
+                    f"{SPERR_HINWEIS} Enttec an {d} (Seriennr. {s}) gehört "
+                    f"einer anderen Ausgabe"
+                    + (f"; eigener Dongle (Seriennr. {sn}) nicht gefunden"
+                       if sn else ""))
+                self._melden(None)
                 raise serial.SerialException(
                     f"{port}: dort haengt der Enttec einer anderen Ausgabe "
                     f"(Seriennr. {s}) — wird nicht genommen (OUT-66)")

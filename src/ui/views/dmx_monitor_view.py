@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QSpinBox, QCheckBox, QLineEdit, QToolTip,
 )
 from PySide6.QtCore import Qt, QTimer, QRect, QSize, QEvent
-from PySide6.QtGui import QPainter, QColor, QFont, QPen
+from PySide6.QtGui import QPainter, QColor, QFont, QFontMetrics, QPen
 from src.core.app_state import get_state
 # U-4/SD-03: Kanal-Funktion (Kürzel + Farbe) — dieselben Helfer wie der Simple Desk.
 from src.ui.views.simple_desk import channel_function_color, channel_function_abbrev
@@ -16,6 +16,14 @@ COLS = 32
 ROWS = 16
 CELL_W = 36
 CELL_H = 30
+
+
+def kuerzel_zeile(text: str, fm: QFontMetrics, breite: int) -> str:
+    """UI-101(6): Kuerzel-Zeile einer Zelle auf ``breite`` Pixel bringen.
+
+    Passt der Text, bleibt er unveraendert (wird zentriert gezeichnet); sonst
+    rechts mit „…" gekuerzt — der Anfang (Geraete-Kuerzel) bleibt lesbar."""
+    return fm.elidedText(text, Qt.TextElideMode.ElideRight, max(0, int(breite)))
 
 
 class DmxGrid(QWidget):
@@ -100,6 +108,7 @@ class DmxGrid(QWidget):
         small_font = QFont("Segoe UI", 7)
         big_font = QFont("Courier New", 10)
         big_font.setBold(True)
+        small_fm = QFontMetrics(small_font)
 
         for ch_idx in range(512):
             row = ch_idx // COLS
@@ -156,9 +165,11 @@ class DmxGrid(QWidget):
                 text = f"{short} {abbrev}".strip()
                 p.setFont(small_font)
                 p.setPen(QColor(channel_function_color(attr)))
+                # UI-101(6): zu lange Kuerzel rechts mit „…" kuerzen — zentriert
+                # gezeichnet fehlten sonst Anfang UND Ende („AR 10 Din").
                 p.drawText(int(x) + 1, int(y) + int(ch) - 11, int(cw) - 2, 10,
                            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
-                           text)
+                           kuerzel_zeile(text, small_fm, int(cw) - 2))
         if self._leer_text:
             # OUT-75: abdunkeln und sagen, warum hier nichts steht.
             p.fillRect(self.rect(), QColor(12, 12, 16, 200))

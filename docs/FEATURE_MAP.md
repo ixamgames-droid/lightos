@@ -64,6 +64,7 @@ Visualizer als separates Fenster.
 | STOP ALL | Alle Executors stoppen |
 | BLACKOUT | Globaler Blackout (Toggle) |
 | Kiosk-Streifen oben rechts (LAS-31, UI-95) | Im Kiosk-Modus: Grand Master, STOP ALL, BLACKOUT und LASER NOT-AUS nebeneinander; BLACKOUT und GM zeigen denselben Zustand wie die Sektionsleiste (`output_manager.blackout`, `output_manager.grand_master`), STOP ALL ruft `MainWindow._stop_all` |
+| Kiosk-Modus ohne Bearbeitung (UI-96) | `--kiosk`: Virtual Console ohne Bibliothek-Seitenleiste; Bearbeiten, MIDI Lernen, Canvas-Import, Undo/Redo und das Effekte-Menü des Tempo-Bus-Controllers gesperrt (`VirtualConsoleView(kiosk=…)`, `VCCanvas.set_kiosk`, `VCWidget._kiosk_active`) |
 | Command-Line (unten) | MA-/Avolites-Befehlszeile (`widgets/command_line.py`) |
 
 ---

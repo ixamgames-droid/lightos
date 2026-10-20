@@ -1123,6 +1123,7 @@ class MainWindow(QMainWindow):
         try:
             from src.core.engine.bpm_manager import get_bpm_manager
             self._bpm_mgr = get_bpm_manager()
+            self._bpm_mgr.freigeben()      # QA-103: shutdown() eines frueheren Fensters aufheben
             self._bpm_mgr.subscribe_beat(self._on_beat)
             # BPM-Aenderung (Tap/APC/Audio) -> Label sofort aktualisieren.
             self._bpm_changed_sig.connect(self._update_bpm_label)
@@ -1221,7 +1222,8 @@ class MainWindow(QMainWindow):
         # Sektion 2: Programmer (Programmer | Funktionen | EFX | RGB Matrix | Paletten | Snapshots)
         self._stack.addWidget(self._build_section_programmer())
         # Sektion 3: Virtual Console
-        self._vc_view = VirtualConsoleView()
+        # UI-96: im Kiosk ohne Bibliothek-Seitenleiste und ohne Bearbeitungswege.
+        self._vc_view = VirtualConsoleView(kiosk=self._kiosk_mode)
         self._stack.addWidget(self._vc_view)
         # Sektion 4: Simple Desk + Channel Groups
         sd_tabs = _SubTabs()
@@ -3923,6 +3925,17 @@ class MainWindow(QMainWindow):
             self._midi_autoconnect_timer.stop()
         except Exception:
             pass
+        # QA-103: den 'BPM-Beat'-Faden VOR dem Output-/Qt-Abbau stoppen und
+        # abwarten. Er griff sonst bis zum Prozessende in function_manager/
+        # app_state und konnte in seinem Faden Garbage freigeben, waehrend hier
+        # Widgets abgebaut werden (in der CI als SIGSEGV gemessen). Ueber das
+        # Modul-Global, damit kein Singleton nur fuers Beenden entsteht.
+        try:
+            from src.core.engine import bpm_manager as _bpm_mod
+            if _bpm_mod._mgr is not None:
+                _bpm_mod._mgr.shutdown()
+        except Exception as e:
+            print(f"[MainWindow] bpm shutdown error: {e}")
         # PulseAudio/soundcard MUSS vor dem Python-/Qt-Abbau beendet und
         # gejoint werden. Ein daemon AudioCapture-Thread im nativen
         # pa_threaded_mainloop verursachte auf Linux nach bereits gemeldetem

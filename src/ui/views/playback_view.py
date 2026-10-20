@@ -5,10 +5,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QLabel, QComboBox, QSplitter,
     QGroupBox, QSlider, QDoubleSpinBox, QLineEdit, QInputDialog,
     QAbstractItemView, QSizePolicy, QFrame, QMessageBox,
-    QDialog, QFormLayout, QDialogButtonBox
+    QDialog, QFormLayout, QDialogButtonBox, QScrollArea
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QEvent
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QFontMetrics
 from src.core.app_state import get_state, AppState
 from src.core.engine.cue_stack import CueStack
 from src.core.engine.cue import Cue
@@ -265,23 +265,44 @@ class PlaybackView(QWidget):
         bo.addWidget(self._btn_loop)
         # F-7: Ablauf-Modus (Einzel/Loop/Bounce/Ping-Pong)
         from PySide6.QtWidgets import QComboBox as _QCombo
-        bo.addWidget(QLabel("Modus:"))
+        # UI-98: „Modus:“ und Auswahl in EINER Zeile — spart eine Zeile Höhe;
+        # bei 1000×640 reichte die Spalte sonst nicht und „Loop: AUS“
+        # verdeckte „Modus:“.
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel("Modus:"))
         self._combo_mode = _QCombo()
         for _m, _lbl in (("single", "Einzel (am Ende stop)"), ("loop", "Loop"),
                          ("bounce", "Bounce"), ("pingpong", "Ping-Pong")):
             self._combo_mode.addItem(_lbl, _m)
         self._combo_mode.currentIndexChanged.connect(self._on_mode_changed)
-        bo.addWidget(self._combo_mode)
+        mode_row.addWidget(self._combo_mode, 1)
+        bo.addLayout(mode_row)
         rv.addWidget(box_opts)
 
         rv.addStretch()
-        splitter.addWidget(right)
+        # UI-98: rechte Spalte scrollt, statt bei wenig Höhe ihre Felder
+        # übereinander zu schieben (vorher bei 1000×640: Modus-Auswahl unten
+        # abgeschnitten, „Loop: AUS“ über „Modus:“).
+        self._right_scroll = QScrollArea()
+        self._right_scroll.setWidget(right)
+        self._right_scroll.setWidgetResizable(True)
+        self._right_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._right_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._right_scroll.setMinimumWidth(
+            right.minimumSizeHint().width()
+            + self._right_scroll.verticalScrollBar().sizeHint().width())
+        splitter.addWidget(self._right_scroll)
         splitter.setSizes([700, 250])
-        layout.addWidget(splitter)
+        # UI-98: der Splitter bekommt die freie Höhe — vorher teilte die
+        # VBox sie auch der Beschriftung „Executor-Leiste:“ zu (großer
+        # Leerraum bei 1440×900).
+        layout.addWidget(splitter, 1)
 
         # ── Executor-Leiste ───────────────────────────────────────────────────
         layout.addWidget(QLabel("Executor-Leiste:"))
         exec_scroll = QHBoxLayout()
+        exec_scroll.setContentsMargins(0, 0, 0, 0)
         self._executors_widgets: list[ExecutorWidget] = []
         for i in range(1, 11):
             ex_widget = ExecutorWidget(i, self._state)
@@ -292,8 +313,13 @@ class PlaybackView(QWidget):
             self._executors_widgets.append(ex_widget)
         exec_widget = QWidget()
         exec_widget.setLayout(exec_scroll)
-        exec_widget.setFixedHeight(140)
-        layout.addWidget(exec_widget)
+        # UI-98: Executoren mit fester Breite 110 passten bei 1000×640 nicht
+        # nebeneinander — Qt schob sie übereinander (⚙ über dem Nachbarnamen,
+        # Ex 10 rechts abgeschnitten). Jetzt haben sie eine aus der Schrift
+        # gemessene Mindestbreite; reicht auch die nicht, scrollt die Leiste
+        # waagerecht, statt zu überlappen.
+        self._exec_scroll = _ExecutorLeiste(exec_widget)
+        layout.addWidget(self._exec_scroll)
 
     # ── Cuelisten-Verwaltung ──────────────────────────────────────────────────
 
@@ -694,6 +720,48 @@ class PlaybackView(QWidget):
         self._tick.stop()
 
 
+class _ExecutorLeiste(QScrollArea):
+    """UI-98: waagerecht scrollende Executor-Leiste.
+
+    Die Höhe folgt dem Inhalt; nur wenn die Executoren nicht nebeneinander
+    passen (Leiste scrollt), kommt die Höhe der Bildlaufleiste dazu — sonst
+    verdeckte sie die Tasten.
+    """
+
+    def __init__(self, inhalt: QWidget, parent=None):
+        super().__init__(parent)
+        self.setWidget(inhalt)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Mindesthöhe der Executoren steht erst nach dem Stylesheet fest
+        # (Polish) — auf jede Layout-Anfrage des Inhalts nachziehen.
+        inhalt.installEventFilter(self)
+        self._hoehe_anpassen()
+
+    def eventFilter(self, obj, event):
+        if obj is self.widget() and event.type() in (
+                QEvent.Type.LayoutRequest, QEvent.Type.Show):
+            self._hoehe_anpassen()
+        return super().eventFilter(obj, event)
+
+    def scrollt(self) -> bool:
+        """Passen die Executoren nicht nebeneinander (Leiste scrollt)?"""
+        return self.widget().minimumSizeHint().width() > self.width()
+
+    def _hoehe_anpassen(self) -> None:
+        inhalt = self.widget()
+        h = inhalt.minimumSizeHint().height()
+        if self.scrollt():
+            h += self.horizontalScrollBar().sizeHint().height()
+        if self.height() != h or self.minimumHeight() != h:
+            self.setFixedHeight(h)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._hoehe_anpassen()
+
+
 class ExecutorWidget(QWidget):
     """Ein Executor-Slot: Fader + Label + 3 Buttons."""
 
@@ -704,8 +772,33 @@ class ExecutorWidget(QWidget):
         super().__init__(parent)
         self._slot = slot
         self._state = state
-        self.setFixedWidth(110)
         self._setup_ui()
+        # UI-98: statt fester 110 px eine aus fontMetrics gemessene
+        # Mindestbreite (drei Tasten + Rand), höchstens wie bisher 110 px.
+        self.setMinimumWidth(self.mindestbreite())
+        self.setMaximumWidth(max(110, self.mindestbreite()))
+        self.setSizePolicy(QSizePolicy.Policy.Preferred,
+                           QSizePolicy.Policy.Preferred)
+
+    #: Rand je Taste (2 × 3 px Innenabstand + 2 × 1 px Rahmen + Luft).
+    TASTEN_RAND = 10
+    #: Rand der Auswahl (Innenabstand + Pfeilfeld 20 px + Rahmen, dark.qss).
+    AUSWAHL_RAND = 36
+
+    def mindestbreite(self) -> int:
+        """UI-98: kleinste Breite (aus fontMetrics), bei der die drei Tasten
+        und „— Leer —“ in der Auswahl ungekürzt bleiben."""
+        f = QFont(self._fn_buttons[0].font())
+        f.setPixelSize(10)
+        f.setBold(True)
+        fm = QFontMetrics(f)
+        taste = max(fm.horizontalAdvance(t) for t in self.BTN_LABELS.values()) \
+            + self.TASTEN_RAND
+        sp = max(0, self._btn_row.spacing())
+        tasten = 3 * taste + 2 * sp
+        auswahl = fm.horizontalAdvance(self._combo.itemText(0)) + self.AUSWAHL_RAND
+        m = self.layout().contentsMargins()
+        return max(tasten, auswahl) + m.left() + m.right()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -734,6 +827,12 @@ class ExecutorWidget(QWidget):
             self._combo.addItem(s.name, s)
         self._combo.currentIndexChanged.connect(self._assign_stack)
         self._combo.setStyleSheet("font-size: 10px;")
+        # UI-98: lange Cuelisten-Namen machen den Executor nicht breiter.
+        self._combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self._combo.setMinimumContentsLength(1)
+        self._combo.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                  QSizePolicy.Policy.Fixed)
         layout.addWidget(self._combo)
 
         # Fader (Intensität ODER manueller Crossfade — je nach fader_function)
@@ -747,10 +846,16 @@ class ExecutorWidget(QWidget):
         # 3 frei konfigurierbare Tasten (einheitlich pressed/released, damit
         # FLASH auch dann momentan ist, wenn es auf Taste 1/2 liegt).
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(3)
+        self._btn_row = btn_layout
         self._fn_buttons: list[QPushButton] = []
         for i in range(3):
             b = QPushButton()
             b.setFixedHeight(22)
+            # UI-98: Tasten duerfen bis auf ihre Schriftbreite schrumpfen;
+            # die Untergrenze stellt ExecutorWidget.mindestbreite() sicher.
+            b.setMinimumWidth(0)
+            b.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
             b.pressed.connect(weak_slot(self._press, i))
             b.released.connect(weak_slot(self._release, i))
             btn_layout.addWidget(b)
@@ -785,7 +890,9 @@ class ExecutorWidget(QWidget):
         for b, fn in zip(self._fn_buttons, fns):
             b.setText(self.BTN_LABELS.get(fn, fn[:2].upper()))
             b.setToolTip(self.BTN_TIPS.get(fn, fn))
-            style = "font-size: 10px;"
+            # UI-98: schmaler Innenabstand (dark.qss: 10 px) — sonst passten
+            # drei Tasten bei 1000×640 nicht in einen Executor.
+            style = "font-size: 10px; padding: 2px 3px;"
             if fn == "go":
                 # UI-64d: Grün bleibt das GO-Erkennungszeichen, die Schrift
                 # aber weiß + fett — vorher #00ff00 auf #006600 (10px, dünn)
