@@ -1,6 +1,7 @@
 ID: DEMO-9
 Prioritaet: P3
-Status: todo
+Status: review
+Status-Notiz: 2D-Bühne zeigt den Gerätenamen (Ansicht, gilt für alle Shows; Endnummer bleibt beim Kürzen, doppelte oder nicht neben den Nachbarn passende Namen → Kürzel + Nummer); „Laser Farbe grün“, „MH Grün“/„MH Weiß“ in den Demo-Generatoren; Demo-Shows neu gebaut (nicht eingecheckt, entstehen beim Paketieren)
 Titel: Demo-Show „Showcase Club-Nacht“: „Laser Farbe gruen“ und 2D-Beschriftung „MH 9“ statt Gerätename
 
 **Herkunft:** Sichtprüfung von main im Sandkasten (offscreen, Demo-Show „Showcase Club-Nacht“), 19.10.2026, Sitzung A.
