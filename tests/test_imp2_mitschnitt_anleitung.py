@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import pathlib
 
+from backlog_eintrag import eintrag
 from src.core import mitschnitt as M
 from src.ui.widgets import mitschnitt_dialog as D
 
@@ -71,7 +72,8 @@ def test_englische_fassung_hat_den_abschnitt_mit_den_deutschen_knopfnamen():
 
 
 def test_fragmente_liegen_bei():
-    assert (ROOT / "backlog.d" / "IMP-2.md").read_text(encoding="utf-8").startswith("ID: IMP-2\n")
+    # Fragment oder (nach dem Einsammeln) Zeile in BACKLOG.md — beides gilt.
+    assert "IMP-2" in eintrag(ROOT, "IMP-2")
     assert list((ROOT / "changelog.d").glob("*-IMP-2.md"))
 
 
