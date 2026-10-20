@@ -32,7 +32,6 @@
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-20T14:08Z | - |
-| QA-99 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:51Z | tests/conftest.py · tests/test_qa99_windows_offscreen_schriften.py · backlog.d/QA-99.md |
 | QA-100 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:52Z | tests/test_qa100_anleitung_ueberschriften_einmalig.py · tools/doku_gates.txt · backlog.d/QA-100.md |
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
@@ -91,7 +90,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z A done FM-58
 - 2026-10-20T16:56Z A done VIZ-85
 - 2026-10-20T16:56Z A done VIZ-86
 - 2026-10-20T16:56Z A done VIZ-87
@@ -121,3 +119,4 @@
 - 2026-10-20T18:31Z A claim XPLAT-52
 - 2026-10-20T18:50Z A claim BPM-31
 - 2026-10-20T18:50Z A claim UI-105
+- 2026-10-20T19:07Z D done QA-99
