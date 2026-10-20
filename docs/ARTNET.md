@@ -149,7 +149,18 @@ Art-Net über WLAN ist möglich, aber für kritische Live-Einsätze wird Kabel (
 
 ## Art-Net Receive (Node-Modus)
 
-LightOS kann auch Art-Net **empfangen** (z.B. von GrandMA oder ChamSys als Backup oder Merge):
+LightOS kann auch Art-Net (und sACN) **empfangen** und die eingehenden Kanäle in ein
+lokales Universum **mischen** (HTP / LTP / REPLACE) — etwa um ein anderes Pult als
+Backup oder zusätzliche Quelle durch LightOS hindurchzureichen.
+
+> **Klarstellung:** Das ist **reines DMX-Durchmischen**, keine Pult-Integration.
+> Ein grandMA, ChamSys o. ä. steuert dabei keine Executoren, Cuelisten oder den
+> Grand Master von LightOS — seine Werte landen nur als Kanalwerte in der Ausgabe.
+> Wer LightOS vom Pult aus **bedienen** will, nutzt die
+> [Fernsteuerung](#fernsteuerung-pult-bedient-lightos) weiter unten.
+
+Prinzip des Empfängers (vereinfacht; die echte Umsetzung liegt in
+`src/core/dmx/artnet_input.py` bzw. `sacn_input.py`):
 
 ```python
 class ArtNetReceiver:
@@ -177,3 +188,73 @@ class ArtNetReceiver:
             dmx_data = raw[18:18 + length]
             self.callback(universe, dmx_data)
 ```
+
+---
+
+## Fernsteuerung (Pult bedient LightOS)
+
+Seit NET-15 können eingehende Art-Net- oder sACN-Kanäle LightOS **bedienen** — der
+universelle Weg für jedes Pult und jedes Programm, das DMX übers Netz senden kann,
+ohne MIDI.
+
+**Einrichten:** *Ausgabe → Reiter „DMX Input" → Gruppe „Fernsteuerung"*. Je Zeile:
+Quelle (Art-Net/sACN), eingehendes Universum, Kanal und Ziel. „Fernsteuerung aktiv"
+anhaken, **Übernehmen** — die Zuordnung wird gespeichert und die nötigen Empfänger
+starten (auch beim nächsten Programmstart, solange „aktiv" gespeichert ist).
+
+| Ziel | Wirkung |
+|---|---|
+| Executor-Fader | Fader des Executors *n* (aktuelle Seite) = Kanalwert 0–255 → 0–100 % |
+| Grand Master | Grand Master; Executoren mit Fader-Funktion „master" folgen (wie bei MIDI) |
+| GO (Weiter) / Zurück / Stop | Taste des Executors *n*, ausgelöst über eine Schwelle |
+
+**Fader wirken nur bei Änderung.** Ein DMX-Strom wiederholt jeden Wert rund 44-mal
+pro Sekunde. Würde jeder Wert angewandt, überschriebe ein ruhig stehendes Pult jede
+Bedienung desselben Faders in LightOS. Deshalb ist der erste empfangene Wert (nach
+„Übernehmen", nach dem Start und nach einer Empfangspause von mehr als 2,5 s) nur die
+Ausgangslage; erst wenn sich der Kanal bewegt, springt der Fader auf den Pultwert.
+Das entspricht der MIDI-Zuordnung, die ebenfalls nur auf Bewegung reagiert und
+ebenfalls kein Soft-Takeover (Abholen) kennt.
+
+**GO per Schwelle:** Steigt der Kanal über die Schwelle (Standard 50 % = Wert 128),
+löst die Taste **genau einmal** aus. Erst wenn er wieder unter *Schwelle − Hysterese*
+fällt (Hysterese 10 %, also unter 102), ist sie erneut scharf. Ein Kanal, der um die
+Schwelle wackelt, löst so nicht mehrfach aus. Steht der Kanal bei der Ausgangslage
+schon oben, löst das nichts aus.
+
+**Nicht in der Ausgabe:** Zugeordnete Kanäle werden **nicht** in die Ausgabe gemischt,
+auch wenn auf demselben eingehenden Universum ein Merge eingerichtet ist — ein
+GO-Kanal soll nicht nebenbei einen Dimmer steuern. Alle anderen Kanäle des
+Universums mischen weiter wie eingestellt.
+
+**Threads:** Der Empfang läuft in einem eigenen Thread (`ArtNet-In`/`sACN-In`). Er
+erkennt dort nur, *was* passieren soll; angewandt wird im GUI-Thread (Queue +
+Qt-Signal, `src/core/dmx/fernsteuerung.py`).
+
+**Gespeichert** wird in `dmx_fernsteuerung.json` im App-Datenordner (eigene Datei;
+`universes.json` bleibt unberührt, ältere Konfigurationen laden also unverändert):
+
+```json
+{
+  "version": 1,
+  "aktiv": true,
+  "zuordnungen": [
+    {"quelle": "artnet", "universum": 1, "kanal": 1, "ziel": "executor_fader",
+     "executor": 1, "schwelle": 50, "hysterese": 10},
+    {"quelle": "artnet", "universum": 1, "kanal": 2, "ziel": "executor_go",
+     "executor": 1, "schwelle": 50, "hysterese": 10},
+    {"quelle": "sacn", "universum": 5, "kanal": 10, "ziel": "grand_master",
+     "executor": 1, "schwelle": 50, "hysterese": 10}
+  ]
+}
+```
+
+Ziele: `executor_fader`, `grand_master`, `executor_go`, `executor_back`,
+`executor_stop`. Die Hysterese hat (noch) keine eigene Spalte im Dialog, wird aber
+aus der Datei gelesen und beim Speichern beibehalten.
+
+**Grenzen:** Executor-Ziele gelten für die gerade aktive Executor-Seite (wie bei MIDI).
+Die Art-Net-Universumsnummer ist die von LightOS (1-basiert, Draht-Universum 0 = 1),
+wie beim Merge. Wird die Fernsteuerung ausgeschaltet, laufen bereits gestartete
+Empfänger weiter (sie können für den Merge gebraucht werden).
+
