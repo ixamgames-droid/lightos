@@ -5,6 +5,7 @@ import pathlib
 import re
 import unittest
 
+from backlog_eintrag import eintrag
 from src.core.laser import feld_einmessen as E
 from src.core.laser import sperrzonen as S
 
@@ -85,15 +86,9 @@ class DokuTest(unittest.TestCase):
         self.assertIn("**nicht** ab", fragment)
 
     def test_backlog_zeile(self):
-        # PROC-20: Der Eintrag liegt als Fragment unter backlog.d/, bis er
-        # gesammelt ist; danach steht er als Zeile in BACKLOG.md.
-        fragment = _REPO / "backlog.d" / "LAS-35.md"
-        if fragment.exists():
-            zeile = fragment.read_text(encoding="utf-8")
-        else:
-            backlog = (_REPO / "BACKLOG.md").read_text(encoding="utf-8")
-            zeile = next(z for z in backlog.splitlines()
-                         if z.startswith("| LAS-35 |"))
+        # PROC-20: Fragment unter backlog.d/, bis es gesammelt ist; danach
+        # Zeile in BACKLOG.md — die Hilfe liest beides.
+        zeile = eintrag(_REPO, "LAS-35")
         self.assertIn("nur Anzeige", zeile)
         self.assertIn("Am echten Laser", zeile)
 
