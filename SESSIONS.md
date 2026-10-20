@@ -67,7 +67,7 @@
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-20T14:08Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-20T14:08Z | - |
 | LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
-| LAS-41 | A | fix/las41-kiosk-notaus-bestaetigung | 2026-10-19T20:41Z | - |
+| LAS-41 | A | fix/las41-kiosk-notaus-bestaetigung | 2026-10-20T14:08Z | - |
 
 ## Blocker & Fallen
 
