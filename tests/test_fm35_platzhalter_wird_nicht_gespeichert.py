@@ -5,7 +5,7 @@ auf den Speichern-Knopf, danach Blick in eine Temp-DB).** Vor dem Fix legte
 ein EINZIGER Mausklick unmittelbar nach dem Oeffnen des Generators die Zeile
 ``(1, 'Generic', 'Neues Fixture', 'NEUES FI', 'user')`` in der Bibliothek an,
 ``saved_id`` war ``1``, der Dialog war zu, und es erschien KEINE Warnung. Im
-Fixture-Editor genuegten zwei Klicks ("+ Channel", "Speichern") fuer
+Fixture-Editor genuegten zwei Klicks ("+ Kanal", "Speichern") fuer
 ``(1, 'ADB', 'Neues Fixture', 'NEUES FI', 'user')``. Nach dem Fix: 0 Zeilen,
 ``saved_id is None``, Dialog offen, genau eine ``QMessageBox.warning``.
 
@@ -185,13 +185,13 @@ class _FM35Fall(unittest.TestCase):
 
     def _editor(self, *, mit_kanal: bool = True):
         """Ein echter, sichtbarer Editor-Dialog; auf Wunsch mit dem Klick auf
-        "+ Channel", ohne den der Modus-Check den Speichern-Klick abfaengt."""
+        "+ Kanal", ohne den der Modus-Check den Speichern-Klick abfaengt."""
         dlg = ed_mod.FixtureEditorDialog()
         self.addCleanup(dlg.deleteLater)
         dlg.show()
         _app.processEvents()
         if mit_kanal:
-            self._klick(self._knopf_mit_text(dlg, "+ Channel"), "+ Channel")
+            self._klick(self._knopf_mit_text(dlg, "+ Kanal"), "+ Kanal")
         return dlg
 
     def _speichern_klicken(self, dlg):
@@ -257,7 +257,7 @@ class GeneratorEinKlickTest(_FM35Fall):
 
 
 class EditorZweiKlicksTest(_FM35Fall):
-    """(2) Editor: "+ Channel", dann "Speichern" legt ebenfalls nichts an."""
+    """(2) Editor: "+ Kanal", dann "Speichern" legt ebenfalls nichts an."""
 
     def test_channel_und_speichern_legt_nichts_an(self):
         dlg = self._editor()
@@ -275,7 +275,7 @@ class EditorZweiKlicksTest(_FM35Fall):
         self._erwarte_platzhalter_warnung("Editor, zwei Klicks")
 
     def test_ohne_kanal_faengt_weiter_der_modus_check_ab(self):
-        """GEGENPROBE zur Reihenfolge: ohne "+ Channel" bleibt es beim
+        """GEGENPROBE zur Reihenfolge: ohne "+ Kanal" bleibt es beim
         bestehenden Modus-Hinweis — die neue Wache hat ihn nicht verdraengt.
         (Der Editor prueft den Kopf zuerst, also warnt er hier ueber den
         Platzhalter; entscheidend ist, dass NICHT gespeichert wird und der
@@ -286,7 +286,7 @@ class EditorZweiKlicksTest(_FM35Fall):
         self.assertEqual([], self._zeilen())
         self.assertTrue(dlg.isVisible())
         self.assertEqual(1, len(self.warnungen))
-        self.assertIn("Channels", self.warnungen[-1][1],
+        self.assertIn("Kanäle", self.warnungen[-1][1],
                       "Der Modus-Check meldet sich nicht mehr: "
                       f"{self.warnungen!r}")
 

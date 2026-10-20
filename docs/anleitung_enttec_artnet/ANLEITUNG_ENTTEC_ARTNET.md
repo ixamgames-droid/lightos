@@ -33,19 +33,19 @@ dürfen dieselbe Adresse haben.
 ## 2. Ausgabe konfigurieren — beide Backends setzen
 
 **Menü `Ausgabe` → `Konfigurieren…`** öffnet den Dialog *Ausgabe konfigurieren*. Er hat die
-Tabs **Enttec Pro USB · Art-Net · sACN (E1.31) · DMX Input · Universen**.
+Tabs **Enttec Pro USB · Art-Net · sACN (E1.31) · DMX-Eingang · Universen**.
 
 Der eigentliche Dual-Output-Schalter ist der Tab **Universen**. Dort steht pro Universum:
-**Name · Output-Typ (Disabled / Enttec / sACN / ArtNet) · Patch (Port/IP) · Ext-Universe**.
+**Name · Ausgang (Aus / Enttec / uDMX / sACN / ArtNet) · Patch (Port/IP) · Ext. Universum**.
 
 Setze:
 
-| # | Name | Output | Patch (Port/IP) |
+| # | Name | Ausgang | Patch (Port/IP) |
 |---|---|---|---|
 | 1 | EventPar (Art-Net) | **ArtNet** | `192.168.178.99` *(Node-IP; oder `255.255.255.255` für Broadcast)* |
 | 3 | Hydra (Enttec) | **Enttec** | `COM3` *(dein Enttec-COM-Port)* |
 
-Fehlt ein Universum, mit **`+ Universe hinzufügen`** anlegen; dann Output-Typ und Patch
+Fehlt ein Universum, mit **`+ Universum hinzufügen`** anlegen; dann Ausgang und Patch
 eintragen. Mit **`Speichern`** übernehmen.
 
 > **Enttec-Port finden:** Der Tab **Enttec Pro USB** listet den erkannten Adapter, z. B.
@@ -62,7 +62,7 @@ ist „Enttec und Art-Net gleichzeitig".
   verbunden und sendet (in Klammern die Zahl der Universen auf diesem Adapter). Orange
   „`… verbindet …`" = der Port wird gerade geöffnet; rot „`… sendet NICHT`" = eingerichtet,
   aber es geht kein DMX raus (USB-Kabel/Port prüfen). Art-Net braucht keinen Verbindungsstatus (verbindungsloses UDP) — es sendet,
-  sobald der Output-Typ auf ArtNet steht.
+  sobald der Ausgang auf ArtNet steht.
 - **Test:** Sektion **Programmer** → beide Geräte auswählen (`Alle`) → im Tab **Intensity** den
   **Master Dimmer** hochziehen und im Tab **Color** eine Farbe wählen. Jetzt leuchten
   **beide** Geräte **gleichzeitig** — der EventPar über Art-Net, der Hydrabeam über Enttec.

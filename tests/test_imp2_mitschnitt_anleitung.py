@@ -37,11 +37,11 @@ def test_knoepfe_und_haken_wie_im_dialog():
 
 def test_weg_zum_eingang_wie_im_hilfetext_des_dialogs():
     text = " ".join(_abschnitt().split())
-    for wort in ("Ausgabe → Konfigurieren...", "DMX Input", "Art-Net Input aktivieren",
-                 "sACN Input aktivieren", "Eingehendes Universe", "Merge in Universe",
+    for wort in ("Ausgabe → Konfigurieren...", "DMX-Eingang", "Art-Net-Eingang aktivieren",
+                 "sACN-Eingang aktivieren", "Eingehendes Universum", "Mischen in Universum",
                  "Übernehmen"):
         assert f"**{wort}**" in text, wort
-    for wort in ("DMX Input", "Art-Net Input aktivieren", "Merge in Universe"):
+    for wort in ("DMX-Eingang", "Art-Net-Eingang aktivieren", "Mischen in Universum"):
         assert wort in D.HILFE_EINGANG
 
 

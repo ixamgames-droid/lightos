@@ -26,8 +26,8 @@ jedem Betriebssystem.
 |---|---|---|---|
 | Art-Net-**Ausgabe** | **Ausgabe → Konfigurieren...**, Reiter **Art-Net** | sendet an UDP 6454 | nein |
 | sACN-**Ausgabe** | Reiter **sACN (E1.31)** | sendet an UDP 5568 | nein |
-| Art-Net-**Eingang** | Reiter **DMX Input** → **Art-Net Input aktivieren** | lauscht auf UDP 6454 | **ja** |
-| sACN-**Eingang** | Reiter **DMX Input** → **sACN Input aktivieren** | lauscht auf UDP 5568 | **ja** |
+| Art-Net-**Eingang** | Reiter **DMX-Eingang** → **Art-Net-Eingang aktivieren** | lauscht auf UDP 6454 | **ja** |
+| sACN-**Eingang** | Reiter **DMX-Eingang** → **sACN-Eingang aktivieren** | lauscht auf UDP 5568 | **ja** |
 | Web-Remote (Handy) | **Ausgabe → Web-Interface (Port 5000)** | lauscht auf TCP 5000 | **ja** |
 | MIDI Show Control über Netzwerk | Sektion **MIDI** → **GMA-MSC über Netzwerk** | lauscht auf UDP 6004 | **ja** |
 | OS2L (Tempo aus der DJ-Software) | **Ausgabe → OS2L-Server (Port 1234)** | lauscht auf TCP 1234 | nur wenn die DJ-Software auf einem **anderen** Rechner läuft |
@@ -259,7 +259,7 @@ zu ist.
   `TcpTestSucceeded : True` heißt: Der Port ist offen.
 - **Art-Net-, sACN- und MSC-Eingang:** UDP lässt sich so nicht testen. Sender einschalten
   und in LightOS nachsehen, ob die Werte ankommen: Sektion **E/A**, Reiter **DMX
-  Monitor**, dort das Universum, das im Reiter **DMX Input** unter **Merge in Universe:**
+  Monitor**, dort das Universum, das im Reiter **DMX-Eingang** unter **Mischen in Universum:**
   steht.
 
 ## 6. Typische Fehlerbilder
