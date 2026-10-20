@@ -29,7 +29,8 @@ import csv
 import difflib
 import io
 import re
-from dataclasses import dataclass, field
+from contextlib import nullcontext
+from dataclasses import dataclass, field, replace
 
 from .patch_ueberlappung import ueberlappende_paare
 
@@ -627,11 +628,42 @@ class PlanZeile:
     status: str = OFFEN
     gruende: list[str] = field(default_factory=list)
     hinweise: list[str] = field(default_factory=list)
+    #: IMP-3: ``(Name aus der Tabelle, neuer Name)`` je Geraet, das beim
+    #: Import eine Nummer bekommt, weil es den Namen schon gab.
+    umbenannt: list[tuple[str, str]] = field(default_factory=list)
+    #: IMP-4: die volle Liste der Ueberschneidungen, wenn der Status-Satz sie
+    #: zusammenfasst (mehr als ein Treffer) — fuer den Tooltip.
+    ueberschneidungen: list[str] = field(default_factory=list)
 
     @property
     def name(self) -> str:
         return (self.zeile.name or (self.profil.name if self.profil else "")
                 or self.zeile.profil)
+
+    @property
+    def anzeige_name(self) -> str:
+        """IMP-3: der Name, unter dem die Zeile WIRKLICH angelegt wird — fuer
+        die Spalte „Name“ der Vorschau. Bei mehreren Geraeten erster und
+        letzter Name, sobald einer davon umbenannt wurde."""
+        if self.status != ANLEGBAR or not self.geraete:
+            return self.name
+        if len(self.geraete) == 1:
+            return self.geraete[0].name
+        if self.umbenannt:
+            return f"{self.geraete[0].name} … {self.geraete[-1].name}"
+        return self.name
+
+    def _umbenannt_text(self) -> str:
+        neu = [f"„{n}“" for _alt, n in self.umbenannt]
+        if len(neu) == 1:
+            if len(self.geraete) == 1:
+                return f"Name gab es schon, heißt jetzt {neu[0]}."
+            return f"1 Name gab es schon, das Gerät heißt jetzt {neu[0]}."
+        if len(neu) > 4:
+            liste = ", ".join(neu[:3]) + f" … {neu[-1]}"
+        else:
+            liste = ", ".join(neu[:-1]) + " und " + neu[-1]
+        return f"{len(neu)} Namen gab es schon, die Geräte heißen jetzt {liste}."
 
     @property
     def universum(self) -> int:
@@ -647,6 +679,10 @@ class PlanZeile:
         if self.status == ANLEGBAR:
             n = len(self.geraete)
             text = STATUS_TEXT[ANLEGBAR] + (f" ({n} Geräte)" if n > 1 else "")
+            if self.umbenannt:
+                # IMP-3: vorn im Satz, nicht hinten bei den Hinweisen — der
+                # Name im Patch ist ein anderer als der in der Tabelle.
+                text += " — " + self._umbenannt_text()
         elif self.status == OFFEN:
             text = "offen — " + " ".join(self.gruende)
         else:
@@ -654,6 +690,15 @@ class PlanZeile:
         if self.hinweise:
             text += "  Hinweis: " + " ".join(self.hinweise)
         return text
+
+    @property
+    def status_tooltip(self) -> str:
+        """IMP-4: der Status-Satz, bei zusammengefassten Ueberschneidungen
+        darunter die volle Liste."""
+        if not self.ueberschneidungen:
+            return self.status_text
+        return (self.status_text + "\n\nÜberschneidet sich mit:\n"
+                + "\n".join("• " + t for t in self.ueberschneidungen))
 
 
 @dataclass
@@ -668,7 +713,8 @@ class Plan:
     def zaehler(self) -> dict[str, int]:
         """``{"geraete": …, OFFEN: …, UEBERSCHNEIDUNG: …, FEHLER: …}`` —
         Geraete, die angelegt werden, und ZEILEN je anderem Status."""
-        z = {"geraete": sum(len(p.geraete) for p in self.anlegbare())}
+        z = {"geraete": sum(len(p.geraete) for p in self.anlegbare()),
+             "umbenannt": sum(len(p.umbenannt) for p in self.anlegbare())}
         for status in (OFFEN, UEBERSCHNEIDUNG, FEHLER):
             z[status] = sum(1 for p in self.zeilen if p.status == status)
         return z
@@ -679,11 +725,15 @@ class Plan:
         teile = ["Kein Gerät wird angelegt" if n == 0
                  else "1 Gerät wird angelegt" if n == 1
                  else f"{n} Geräte werden angelegt"]
+        if z["umbenannt"]:
+            teile[0] += f" ({z['umbenannt']} umbenannt, weil es den Namen schon gab)"
         if z[OFFEN]:
             teile.append(f"{z[OFFEN]} offen")
         if z[UEBERSCHNEIDUNG]:
+            # IMP-4: gezaehlt werden ZEILEN, nicht Ueberschneidungen.
             n = z[UEBERSCHNEIDUNG]
-            teile.append(f"{n} Überschneidung" + ("en" if n > 1 else ""))
+            teile.append(f"{n} Zeile" + ("n" if n > 1 else "")
+                         + " mit Überschneidungen")
         if z[FEHLER]:
             teile.append(f"{z[FEHLER]} mit Fehler")
         return ", ".join(teile)
@@ -712,7 +762,7 @@ def baue_plan(tabelle: Tabelle, bibliothek: Bibliothek, vorhandene=(),
     zeilen = [_plan_zeile(i, z, bibliothek, wahl.get(i))
               for i, z in enumerate(tabelle.zeilen)]
     _pruefe_ueberschneidungen(zeilen, vorhandene)
-    _pruefe_namen(zeilen, vorhandene)
+    _vergib_namen(zeilen, vorhandene)
     return Plan(tabelle=tabelle, zeilen=zeilen, wahl=wahl)
 
 
@@ -799,12 +849,15 @@ def _pruefe_ueberschneidungen(zeilen: list[PlanZeile], vorhandene) -> None:
         for g in pz.geraete:
             eintraege.setdefault(g.universum, []).append(
                 (g.adresse, g.ende, (pz, g)))
-    gruende: dict[int, list[str]] = {}
+    # IMP-4: je Zeile erst sammeln, dann EINEN Satz bauen — sonst steht bei
+    # acht vorhandenen PARs achtmal derselbe Satz in der Status-Zelle.
+    treffer_alt: dict[int, list[Belegung]] = {}
+    treffer_zeile: dict[int, list[PlanZeile]] = {}
 
-    def melde(pz: PlanZeile, text: str) -> None:
-        liste = gruende.setdefault(pz.index, [])
-        if text not in liste:
-            liste.append(text)
+    def merke(ziel: dict, pz: PlanZeile, was) -> None:
+        liste = ziel.setdefault(pz.index, [])
+        if not any(w is was for w in liste):
+            liste.append(was)
 
     for universum in eintraege:
         for a, b in ueberlappende_paare(eintraege[universum]):
@@ -817,41 +870,149 @@ def _pruefe_ueberschneidungen(zeilen: list[PlanZeile], vorhandene) -> None:
                 if hier is None:
                     continue
                 if dort is None:
-                    melde(hier, f"Überschneidet sich mit dem vorhandenen Gerät "
-                                f"„{dort_g.name}“ (Universum {universum}, Kanal "
-                                f"{dort_g.adresse} bis "
-                                f"{dort_g.adresse + dort_g.kanaele - 1}).")
+                    merke(treffer_alt, hier, dort_g)
                 else:
-                    melde(hier, f"Überschneidet sich mit Zeile {dort.zeile.nr} "
-                                f"der Tabelle („{dort.name}“).")
+                    merke(treffer_zeile, hier, dort)
     for pz in zeilen:
-        if pz.index in gruende:
-            pz.status = UEBERSCHNEIDUNG
-            pz.gruende.extend(gruende[pz.index])
-            pz.geraete = []
+        alt = treffer_alt.get(pz.index, [])
+        andere = treffer_zeile.get(pz.index, [])
+        if not alt and not andere:
+            continue
+        pz.status = UEBERSCHNEIDUNG
+        alt.sort(key=lambda b: (b.adresse, b.name))
+        andere.sort(key=lambda o: o.zeile.nr)
+        if alt:
+            pz.gruende.append(_satz_vorhandene(alt))
+        if andere:
+            pz.gruende.append(_satz_zeilen(andere))
+        if len(alt) > 1 or len(andere) > 1:
+            pz.ueberschneidungen = (
+                [f"„{b.name}“ (Universum {b.universum}, Kanal {b.adresse} bis "
+                 f"{b.adresse + b.kanaele - 1})" for b in alt]
+                + [f"Zeile {o.zeile.nr} der Tabelle („{o.name}“)" for o in andere])
+        pz.geraete = []
 
 
-def _pruefe_namen(zeilen: list[PlanZeile], vorhandene) -> None:
-    """Doppelte Namen sind ein HINWEIS, kein Hindernis: auch von Hand darf man
-    acht Geraete „PAR“ nennen, und genau so sehen mitgebrachte Listen aus."""
-    schon = {b.name.casefold() for b in vorhandene if b.name}
-    wo: dict[str, set[int]] = {}
+def _aufzaehlung(namen: list[str]) -> str:
+    """„A“ · „A“ und „B“ · „A“, „B“ und „C“ · ab vier: „A“ … „H“."""
+    if len(namen) == 1:
+        return namen[0]
+    if len(namen) <= 3:
+        return ", ".join(namen[:-1]) + " und " + namen[-1]
+    return f"{namen[0]} … {namen[-1]}"
+
+
+def _satz_vorhandene(alt: list[Belegung]) -> str:
+    """IMP-4: ein Satz fuer alle vorhandenen Geraete, mit denen sich eine
+    Zeile ueberschneidet; der Kanalbereich umfasst alle."""
+    von = min(b.adresse for b in alt)
+    bis = max(b.adresse + b.kanaele - 1 for b in alt)
+    wo = f"(Universum {alt[0].universum}, Kanal {von} bis {bis})"
+    if len(alt) == 1:
+        return f"Überschneidet sich mit dem vorhandenen Gerät „{alt[0].name}“ {wo}."
+    namen = _aufzaehlung([f"„{b.name}“" for b in alt])
+    return (f"Überschneidet sich mit {len(alt)} vorhandenen Geräten: "
+            f"{namen} {wo}.")
+
+
+def _satz_zeilen(andere: list[PlanZeile]) -> str:
+    if len(andere) == 1:
+        o = andere[0]
+        return f"Überschneidet sich mit Zeile {o.zeile.nr} der Tabelle („{o.name}“)."
+    if len(andere) <= 3:
+        nummern = _aufzaehlung([str(o.zeile.nr) for o in andere])
+        return f"Überschneidet sich mit den Zeilen {nummern} der Tabelle."
+    # ab vier: Anzahl dazu — „3 … 8“ allein laese sich wie ein lueckenloser
+    # Bereich, auch wenn 4 und 6 nicht betroffen sind (volle Liste im Tooltip)
+    return (f"Überschneidet sich mit {len(andere)} Zeilen der Tabelle "
+            f"({andere[0].zeile.nr} … {andere[-1].zeile.nr}).")
+
+
+_NAME_MIT_NUMMER = re.compile(r"^(.*\S)\s+(\d+)$")
+
+
+def namens_schluessel(name: str) -> str:
+    """Vergleichsform eines Geraetenamens: Gross/Klein und die Menge der
+    Leerzeichen unterscheiden zwei Namen nicht („PAR  links “ = „par links“) —
+    in einer Auswahlliste sind sie nicht auseinanderzuhalten."""
+    return " ".join((name or "").split()).casefold()
+
+
+def naechster_freier_name(name: str, belegt, merker: dict | None = None) -> str:
+    """IMP-3: ``name`` mit der naechsten freien Nummer — „PAR links“ ->
+    „PAR links 2“, „PAR links 3“ … ``belegt``: vergebene Namen in der Form
+    von :func:`namens_schluessel`; Gross/Klein unterscheidet zwei Namen nicht.
+
+    Endet der Name schon auf eine ABGESETZTE Zahl („PAR 3“), ist das ein
+    Zaehler: es wird weitergezaehlt („PAR 4“), nicht „PAR 3 2“ angehaengt —
+    das laese sich wie eine Unternummer und sortiert falsch. Klebt die Zahl
+    am Wort („ZQ01424“, „PAR64“, „LED-PAR-56“), gehoert sie zur
+    Typbezeichnung und bleibt stehen: „PAR64“ -> „PAR64 2“. Fuehrende Nullen
+    bleiben erhalten („Spot 01“ -> „Spot 02“).
+
+    ``merker`` (optional, vom Aufrufer ueber viele Aufrufe gehalten): merkt
+    je Stamm und Startnummer, bis wohin schon gesucht wurde — tausend gleiche
+    Namen suchen so nicht tausendmal von vorn."""
+    name = " ".join((name or "").split())
+    treffer = _NAME_MIT_NUMMER.match(name)
+    if treffer:
+        stamm, ziffern = treffer.group(1), treffer.group(2)
+        nummer, stellen = int(ziffern) + 1, len(ziffern)
+    else:
+        stamm, nummer, stellen = name, 2, 1
+    marke = (namens_schluessel(stamm), nummer, stellen)
+    if merker is not None:
+        nummer = max(nummer, merker.get(marke, nummer))
+    while True:
+        kandidat = f"{stamm} {nummer:0{stellen}d}" if stamm else str(nummer)
+        if namens_schluessel(kandidat) not in belegt:
+            if merker is not None:
+                merker[marke] = nummer
+            return kandidat
+        nummer += 1
+
+
+def _vergib_namen(zeilen: list[PlanZeile], vorhandene) -> None:
+    """IMP-3 (Entscheidung der Leitung): jedes Geraet bekommt beim Import
+    einen EIGENEN Namen. Steht ein Name mehrfach in der Tabelle oder gibt es
+    ihn im Patch schon, wird er nummeriert (:func:`naechster_freier_name`).
+    Vorher war das nur ein Hinweis und beide Geraete hiessen gleich — in
+    Auswahllisten, Gruppen und der Befehlszeile nicht zu unterscheiden.
+
+    Zwei Durchgaenge: zuerst behaelt jeder AUSDRUECKLICHE Name (Zeile mit
+    einem Geraet), der noch frei ist, seinen Platz — auch ein „PAR 2“ weiter
+    unten in der Tabelle. Erst danach kommen die Doppelten und die Zeilen mit
+    Anzahl > 1 an die Reihe, in Tabellenreihenfolge: deren Namen („PAR 1“ …
+    „PAR n“) hat der Import selbst erzeugt, sie behalten sie, wenn sie frei
+    sind, und zaehlen sonst AUFSTEIGEND weiter („PAR 1“/„PAR 2“ vergeben ->
+    „PAR 3, PAR 4, PAR 5“, nicht „PAR 4, PAR 5, PAR 3“). So benennt der
+    Import nie ein Geraet um, dessen Name in der Tabelle eindeutig war."""
+    belegt = {namens_schluessel(b.name) for b in vorhandene if b.name}
+    spaeter: list[tuple[PlanZeile, int]] = []
     for pz in zeilen:
+        pz.umbenannt = []
         if pz.status != ANLEGBAR:
             continue
-        for g in pz.geraete:
-            wo.setdefault(g.name.casefold(), set()).add(pz.index)
-    for pz in zeilen:
-        if pz.status != ANLEGBAR:
+        if len(pz.geraete) != 1:
+            spaeter.extend((pz, k) for k in range(len(pz.geraete)))
             continue
-        doppelt_patch = any(g.name.casefold() in schon for g in pz.geraete)
-        doppelt_tabelle = any(len(wo[g.name.casefold()]) > 1 for g in pz.geraete)
-        if doppelt_patch:
-            pz.hinweise.append(
-                f"Den Namen „{pz.name}“ gibt es im Patch schon.")
-        elif doppelt_tabelle:
-            pz.hinweise.append(
-                f"Der Name „{pz.name}“ steht mehrfach in der Tabelle.")
+        schluessel = namens_schluessel(pz.geraete[0].name)
+        if schluessel in belegt:
+            spaeter.append((pz, 0))
+        else:
+            belegt.add(schluessel)
+    # Tabellenreihenfolge (der erste Durchgang haengt Zeile fuer Zeile an).
+    merker: dict = {}
+    for pz, k in spaeter:
+        alt = pz.geraete[k]
+        schluessel = namens_schluessel(alt.name)
+        if schluessel not in belegt:
+            belegt.add(schluessel)
+            continue
+        neu = naechster_freier_name(alt.name, belegt, merker)
+        belegt.add(namens_schluessel(neu))
+        pz.geraete[k] = replace(alt, name=neu)
+        pz.umbenannt.append((alt.name, neu))
 
 
 # ── Anwenden ─────────────────────────────────────────────────────────────────
@@ -863,6 +1024,8 @@ class Ergebnis:
     #: Zeilen, die NICHT angelegt wurden (offen, Ueberschneidung, Fehler).
     ausgelassen: int = 0
     fehler: list[str] = field(default_factory=list)
+    #: IMP-3: Geraete, die eine Nummer bekamen, weil es den Namen schon gab.
+    umbenannt: int = 0
 
     @property
     def geraete(self) -> int:
@@ -888,7 +1051,8 @@ def _auto_dual_tilt(profil_id: int, modus_name: str) -> bool:
 def wende_an(state, plan: Plan, bibliothek: Bibliothek) -> Ergebnis:
     """Die anlegbaren Zeilen anlegen — ueber ``state.add_fixture`` wie beim
     Patchen von Hand (Render-Plan, Kopf-Gruppen, Hinweise), als EIN
-    Rueckgaengig-Schritt.
+    Rueckgaengig-Schritt. Doppelte Namen sind dabei schon nummeriert
+    (``_vergib_namen``, gegen den JETZIGEN Patch).
 
     Der Plan wird vorher gegen den JETZIGEN Patch neu gerechnet: lag zwischen
     Vorschau und Anwenden eine Aenderung, wird nichts ueberschrieben.
@@ -905,7 +1069,31 @@ def wende_an(state, plan: Plan, bibliothek: Bibliothek) -> Ergebnis:
         return ergebnis
     etikett = ("Patch-Import: 1 Gerät" if anzahl == 1
                else f"Patch-Import: {anzahl} Geräte")
-    with get_undo_stack().gruppe(etikett):
+    # IMP-3: EIN Neuaufbau (Render-Plan) und EIN patch_changed fuer den ganzen
+    # Import statt einem je Geraet — auch beim Rueckgaengig/Wiederholen des
+    # Schritts (``rahmen``). Kopf-Gruppen, Laser-Hinweis und die Einzelschritte
+    # laufen unveraendert ueber add_fixture.
+    sammeln = getattr(state, "patch_sammeln", None) or nullcontext
+    try:
+        _anlegen(state, anlegbar, ergebnis, sammeln, etikett, PatchedFixture,
+                 get_undo_stack)
+    except Exception as e:
+        # Codex-Review #1093: der EINE Neuaufbau am Ende (``patch_sammeln``)
+        # kann scheitern, NACHDEM Geraete und Rueckgaengig-Schritt schon
+        # angelegt sind. Die Ausnahme lief bis in den Dialog: kein Ergebnis,
+        # der Dialog blieb offen, und „Abbrechen“ sah aus wie ein verworfener
+        # Import. Ist schon etwas angelegt, steht es im Ergebnis — samt Fehler.
+        if not ergebnis.fids:
+            raise
+        ergebnis.fehler.append(
+            f"Die Geräte sind angelegt (Rückgängig nimmt sie zurück), aber der "
+            f"Neuaufbau danach schlug fehl: {e}")
+    return ergebnis
+
+
+def _anlegen(state, anlegbar, ergebnis, sammeln, etikett, PatchedFixture,
+             get_undo_stack) -> None:
+    with sammeln(), get_undo_stack().gruppe(etikett, rahmen=sammeln):
         for pz in anlegbar:
             dual = _auto_dual_tilt(pz.profil.id, pz.modus.name)
             try:
@@ -924,8 +1112,8 @@ def wende_an(state, plan: Plan, bibliothek: Bibliothek) -> Ergebnis:
                         spider_dual_tilt=dual,
                     )))
                 ergebnis.zeilen += 1
+                ergebnis.umbenannt += len(pz.umbenannt)
             except Exception as e:
                 ergebnis.fehler.append(
                     f"Zeile {pz.zeile.nr} („{pz.name}“) ließ sich nicht "
                     f"anlegen: {e}")
-    return ergebnis

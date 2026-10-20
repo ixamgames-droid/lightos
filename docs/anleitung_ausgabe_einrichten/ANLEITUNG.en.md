@@ -233,6 +233,19 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    `2008:1066@1-2`; easiest to have the **uDMX (USB)** tab enter it).
 3. **Ext-Universe** — optionally the universe number on the network. If empty, the
    default applies: Art-Net `#` minus 1, sACN `#`.
+   **Dongle** (read-only) — for `Enttec` the serial number of the adapter this universe
+   looks for, shortened (`Seriennr. …5123`). LightOS remembers it once the adapter has
+   sent, and finds it by it even at another port after a restart — two ENTTECs do not
+   swap their universes when Linux swaps the port numbers. If you **deliberately pick a
+   different port** for the row (here or with **Verbinden** on the Enttec tab), the old
+   number no longer applies: the universe learns the adapter at the new port. To make the
+   universe use a **different** adapter: select the row, **Dongle neu zuordnen**
+   (reassign dongle; or right-click the row) and **Speichern** — it then learns the
+   adapter plugged into its port.
+   **Check once after the update:** an older configuration remembers, at its first
+   start, the adapter that is plugged into its port at that moment. If the ports were
+   swapped just then, the **Dongle** column shows the other adapter's number — use
+   **Dongle neu zuordnen** and **Speichern**.
 4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
    removes the selected rows from the table; this only takes effect with **Speichern**
    (save).
@@ -361,7 +374,7 @@ gesendet` (rehearsal mode — no DMX is being sent) is shown there.
 
 The bar lies **on top of** the upper edge of the view currently shown, directly below the
 bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with
-BLACKOUT and the laser emergency stop). It does not push anything down: when it appears or disappears, all
+the grand master, STOP ALL, BLACKOUT and the laser emergency stop). It does not push anything down: when it appears or disappears, all
 buttons of the Virtual Console and all other controls stay where they are. In return it
 covers a narrow line at the top of the view. A click on the bar does not trigger anything
 underneath it. The bar is always a single line high; a text that is too long is shortened
@@ -391,6 +404,12 @@ while the fault persists:
 - The collapsed state is not saved: after a restart the full bar is shown again. Status bar
   and DMX monitor show the fault unchanged.
 
+The same red bar appears if the saved configuration has **one adapter on several
+universes** (`… — steht auf Universe 1 und 2, für keines eingerichtet` = is on universes 1
+and 2, set up for none). LightOS does not guess which one was meant and sets the adapter
+up for none of them — otherwise a rig might receive the values of another universe. To
+fix it: choose the right universe in the **Enttec Pro USB** tab and click **Verbinden**.
+
 ## 9. What goes out when you quit or remove an output
 
 Many adapters hold the last frame they received even when no program is sending
@@ -405,23 +424,42 @@ first:
   the heads do not travel to their home position.
 - **When an output is removed** (universe deleted, output set to „Disabled“,
   Art-Net or sACN unticked): the same frame to exactly that output.
-- **Not on „Übernehmen“** (apply): the new output follows immediately there, and a
-  dark frame would be a flash on stage.
+- **When you switch to a different adapter:** if you move a universe from ENTTEC
+  to Art-Net, to another port, another uDMX adapter, another target IP or
+  another universe number on the network, the **previous** adapter or node gets
+  the same last frame – otherwise it would hold whatever it received last.
+- **Not on „Übernehmen“** (apply) **without a change:** the same output follows
+  immediately there, and a dark frame would be a flash on stage.
 
 If an adapter does not respond (unplugged, driver hanging), LightOS waits about
 one second at most and then quits anyway. That one adapter gets no last frame –
 all others do.
 
+**Lasers that are taken out of the patch.** If you remove a laser from the
+patch, give it another address or load a show without it, the device still
+listens on its previous address. If that address dropped to 0, some lasers would
+switch **on** (for many, DMX 0 means "auto run") – and LightOS could no longer
+control them. So the laser's **off value** stays on its previous address, also
+during a blackout and in the last frame on quit, until
+
+- the address is patched again (then the new fixture decides), or
+- LightOS is closed.
+
+This applies only to addresses whose off value is not 0. While such a value is
+held, nothing else goes out on that address – not even a value from a script or
+from the Simple Desk. The DMX Monitor shows the held value.
+
+**How to free the address again:** patch a fixture onto that address – from
+then on it decides what goes out there (if you take it out of the patch again,
+the address is free and at 0). Or quit LightOS and start it again: after a
+restart nothing is held any more. There is deliberately no button to release
+it. Switch the laser off at the device first, or give it another address
+there – otherwise it keeps listening on the old one.
+
 > **Important:** the last frame is no substitute for a main switch. If the
 > computer crashes or the power fails, nobody sends anything any more, and an
 > adapter holds whatever it received last. Lasers therefore belong on their own
 > reachable switch at the device.
-
-The same red bar appears if the saved configuration has **one adapter on several
-universes** (`… — steht auf Universe 1 und 2, für keines eingerichtet` = is on universes 1
-and 2, set up for none). LightOS does not guess which one was meant and sets the adapter
-up for none of them — otherwise a rig might receive the values of another universe. To
-fix it: choose the right universe in the **Enttec Pro USB** tab and click **Verbinden**.
 
 ## Network pitfall with Art-Net and sACN
 

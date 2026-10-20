@@ -130,8 +130,16 @@ class VirtualConsoleView(QWidget):
         "background:#0d1117; color:#666; border-bottom:1px solid #21262d;"
         " padding:2px 10px; font-size:11px;")
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, kiosk: bool = False):
         super().__init__(parent)
+        # UI-96: Im Kiosk-Modus (``--kiosk``: „nur Virtual Console, keine
+        # Bearbeitung") gibt es weder die Bibliothek-Seitenleiste noch einen
+        # anderen Weg, das Layout oder die Belegung der Tasten zu aendern:
+        # kein Bearbeiten-Modus, kein MIDI-Lernen, kein Canvas-Import, kein
+        # Undo/Redo. Die Sperren sitzen in den Handlern selbst, nicht nur im
+        # Ausblenden der Knoepfe — ein Kuerzel oder ein direkter Aufruf holt
+        # sie nicht zurueck.
+        self._kiosk = bool(kiosk)
         self._edit_mode = False
         self._midi_learn_active = False
         self._popout_window = None
@@ -174,6 +182,9 @@ class VirtualConsoleView(QWidget):
         """)
         self._btn_edit.toggled.connect(self._toggle_edit)
         tb_layout.addWidget(self._btn_edit)
+        if self._kiosk:
+            self._btn_edit.setEnabled(False)
+            self._btn_edit.setVisible(False)
 
         self._btn_snap = QPushButton("⊞ Raster")
         self._btn_snap.setCheckable(True)
@@ -229,9 +240,22 @@ class VirtualConsoleView(QWidget):
             btn.setVisible(False)
             tb_layout.addWidget(btn)
 
-        # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only. Strg+Z / Strg+Y.
-        for _glyph, _tip, _slot in [("↶", "Rückgängig (Strg+Z)", self._vc_undo),
-                                    ("↷", "Wiederholen (Strg+Y)", self._vc_redo)]:
+        # Undo/Redo (Bearbeitungsverlauf): zwei Pfeile, edit-only.
+        from src.ui import undo_kuerzel
+        # UI-93: die Knoepfe tun dasselbe wie die Tasten, die ihr Tooltip
+        # nennt — im Hauptfenster also den gemeinsamen Verlauf (Layout UND
+        # Patch/Geraete in zeitlicher Reihenfolge), nicht nur das Layout.
+        for _glyph, _tip, _slot in [
+                ("↶", f"Rückgängig ({undo_kuerzel.undo_text()}): nimmt den "
+                      "zuletzt gemachten Schritt zurück. Das ist derselbe "
+                      "Verlauf wie Bearbeiten → Rückgängig – Layout der "
+                      "Konsole und Änderungen an Patch und Geräten in der "
+                      "Reihenfolge, in der du sie gemacht hast.",
+                 self._knopf_rueckgaengig),
+                ("↷", f"Wiederholen ({undo_kuerzel.redo_text()}): holt den "
+                      "zuletzt zurückgenommenen Schritt wieder. Das ist "
+                      "derselbe Verlauf wie Bearbeiten → Wiederholen.",
+                 self._knopf_wiederholen)]:
             ub = QPushButton(_glyph)
             ub.setFixedHeight(26)
             ub.setToolTip(_tip)
@@ -244,10 +268,16 @@ class VirtualConsoleView(QWidget):
             ub.setProperty("edit_only", True)
             ub.setVisible(False)
             tb_layout.addWidget(ub)
-        from PySide6.QtGui import QShortcut, QKeySequence
-        QShortcut(QKeySequence("Ctrl+Z"), self, activated=self._vc_undo)
-        QShortcut(QKeySequence("Ctrl+Y"), self, activated=self._vc_redo)
-        QShortcut(QKeySequence("Ctrl+Shift+Z"), self, activated=self._vc_redo)
+        # UI-93: eigene Kuerzel nur fuer den Betrieb OHNE Hauptfenster. Im
+        # Hauptfenster liegen dieselben Folgen schon auf Bearbeiten →
+        # Rückgängig; doppelt belegt loest Qt keine von beiden aus. Dort
+        # verteilt das Fenster (MainWindow.event) und showEvent schaltet
+        # diese beiden ab.
+        # UI-96: im Kiosk kein Bearbeitungsverlauf -> keine Kuerzel.
+        self._undo_kuerzel = () if self._kiosk else undo_kuerzel.kuerzel_anlegen(
+            self, self._vc_undo, self._vc_redo,
+            "Letzte Änderung am Layout zurücknehmen",
+            "Zurückgenommene Änderung am Layout wiederholen")
 
         # MIDI-Learn-Button
         self._btn_midi_learn = QPushButton("MIDI Lernen")
@@ -266,6 +296,10 @@ class VirtualConsoleView(QWidget):
         self._btn_midi_learn.toggled.connect(self._toggle_midi_learn)
         self._breite_festhalten(self._btn_midi_learn, (self._btn_midi_learn.text(),))
         tb_layout.addWidget(self._btn_midi_learn)
+        if self._kiosk:
+            # UI-96: MIDI-Lernen aendert die Belegung einer Taste -> Bearbeitung.
+            self._btn_midi_learn.setEnabled(False)
+            self._btn_midi_learn.setVisible(False)
 
         # APC LEDs Toggle
         self._btn_apc_leds = QPushButton("APC LEDs")
@@ -400,21 +434,16 @@ class VirtualConsoleView(QWidget):
         """)
         btn_load.clicked.connect(self._load)
         tb_layout.addWidget(btn_load)
+        if self._kiosk:
+            # UI-96: Import ersetzt das ganze Layout -> Bearbeitung.
+            btn_load.setEnabled(False)
+            btn_load.setVisible(False)
+        self._btn_load = btn_load
 
-        # Sidebar-Toggle
-        self._btn_sidebar = QPushButton("◀ Bibliothek")
-        self._btn_sidebar.setCheckable(True)
-        self._btn_sidebar.setChecked(True)
-        self._btn_sidebar.setFixedHeight(26)
-        self._btn_sidebar.setStyleSheet("""
-            QPushButton { background:#21262d; color:#ffd700; border:1px solid #30363d;
-                          border-radius:3px; font-size:10px; padding:0 8px; }
-            QPushButton:checked { background:#2a3344; color:#ffd700; }
-            QPushButton:hover { background:#30363d; }
-        """)
-        self._btn_sidebar.toggled.connect(self._toggle_sidebar)
-        self._breite_festhalten(self._btn_sidebar, ("◀ Bibliothek", "▶ Bibliothek"))
-        tb_layout.addWidget(self._btn_sidebar)
+        # Sidebar-Toggle (UI-96: im Kiosk gibt es keine Bibliothek -> kein Knopf)
+        self._btn_sidebar = None
+        if not self._kiosk:
+            self._sidebar_knopf_bauen(tb_layout)
 
         # Inspector-Panel ein-/ausblenden (nur im Bearbeiten-Modus sichtbar).
         self._btn_inspector = QPushButton("⚙ Inspector ✓")
@@ -477,6 +506,8 @@ class VirtualConsoleView(QWidget):
         self._main_scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
 
         self._canvas = VCCanvas()
+        # UI-96: auch der Canvas kennt den Kiosk (Zuweisungs-/Lern-Modi, Drops).
+        self._canvas.set_kiosk(self._kiosk)
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
         self._canvas.bank_changed.connect(self._on_bank_changed)
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
@@ -492,23 +523,47 @@ class VirtualConsoleView(QWidget):
         self._inspector.setVisible(False)
         splitter.addWidget(self._inspector)
 
-        # Sidebar
-        self._sidebar = SnapshotSidebar(self._canvas)
-        self._sidebar.setStyleSheet(
-            "QWidget { background:#0d1117; border-left:1px solid #21262d; }"
-        )
-        splitter.addWidget(self._sidebar)
+        # Sidebar — UI-96: im Kiosk gar nicht erst gebaut (kein Ziehen, kein
+        # „Auf VC-Taste legen", keine Bibliotheks-Knoepfe).
+        self._sidebar = None
+        if not self._kiosk:
+            self._sidebar = SnapshotSidebar(self._canvas)
+            self._sidebar.setStyleSheet(
+                "QWidget { background:#0d1117; border-left:1px solid #21262d; }"
+            )
+            splitter.addWidget(self._sidebar)
 
         # Größenverhältnis: Canvas viel breiter als Inspector/Sidebar
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 0)
-        splitter.setStretchFactor(2, 1)
+        if self._sidebar is not None:
+            splitter.setStretchFactor(2, 1)
         splitter.setCollapsible(1, True)
         self._splitter = splitter
 
         # Stretch=1: der Canvas-/Sidebar-Splitter bekommt den gesamten
         # verbleibenden vertikalen Platz (Toolbar + Statuszeile sind fix).
         layout.addWidget(splitter, 1)
+
+    def _sidebar_knopf_bauen(self, tb_layout) -> None:
+        """Knopf „◀ Bibliothek" (ausserhalb des Kiosk-Modus)."""
+        self._btn_sidebar = QPushButton("◀ Bibliothek")
+        self._btn_sidebar.setCheckable(True)
+        self._btn_sidebar.setChecked(True)
+        self._btn_sidebar.setFixedHeight(26)
+        self._btn_sidebar.setStyleSheet("""
+            QPushButton { background:#21262d; color:#ffd700; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#2a3344; color:#ffd700; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_sidebar.toggled.connect(self._toggle_sidebar)
+        self._breite_festhalten(self._btn_sidebar, ("◀ Bibliothek", "▶ Bibliothek"))
+        tb_layout.addWidget(self._btn_sidebar)
+
+    @property
+    def kiosk(self) -> bool:
+        return self._kiosk
 
     def showEvent(self, event):
         """Beim Oeffnen der VC einen aktuellen Bibliotheksbaum zeigen.
@@ -523,6 +578,16 @@ class VirtualConsoleView(QWidget):
         markierte Funktion verschwinden, sobald man kurz woanders nachsah.
         """
         super().showEvent(event)
+        # UI-93: verteilt das Fenster Rueckgaengig/Wiederholen selbst, ruhen
+        # die eigenen Kuerzel (sonst waeren die Folgen doppelt belegt).
+        try:
+            from src.ui import undo_kuerzel
+            zentral = bool(getattr(self.window(),
+                                   undo_kuerzel.MERKMAL_ZENTRAL, False))
+            for sc in getattr(self, "_undo_kuerzel", ()):
+                sc.setEnabled(not zentral)
+        except RuntimeError:
+            pass
         # Statusticker laeuft, solange die Ansicht benutzt wird. closeEvent
         # stoppt ihn; ein erneutes Anzeigen weckt ihn wieder auf.
         try:
@@ -615,8 +680,17 @@ class VirtualConsoleView(QWidget):
             # Bei JEDEM Wechsel des Laufzustands die funktionsgebundenen VC-Widgets
             # neu zeichnen — sonst bleibt ein Toggle-Pad „aus", obwohl sein Effekt
             # noch laeuft (oder „an", obwohl er sich selbst/per StopAll beendet hat).
-            if running_ids != getattr(self, "_last_running_ids", None):
+            # ENG-37-B: ebenso, wenn ein Modify-Haken oder eine Betriebsart
+            # umgestellt wurde — Taste/Fader zeigen das Zeichen der Betriebsart.
+            try:
+                from src.ui.widgets.modify_zeichen import modify_signatur
+                modify_sig = modify_signatur(funcs)
+            except Exception:
+                modify_sig = None
+            if (running_ids != getattr(self, "_last_running_ids", None)
+                    or modify_sig != getattr(self, "_last_modify_sig", None)):
                 self._last_running_ids = running_ids
+                self._last_modify_sig = modify_sig
                 if self._canvas_alive():
                     from src.ui.virtualconsole.vc_button import VCButton
                     from src.ui.virtualconsole.vc_slider import VCSlider
@@ -705,6 +779,12 @@ class VirtualConsoleView(QWidget):
             return self._canvas is not None
 
     def _toggle_edit(self, enabled: bool):
+        if self._kiosk and enabled:
+            # UI-96: im Kiosk gibt es keinen Bearbeiten-Modus.
+            blocker = self._btn_edit.blockSignals(True)
+            self._btn_edit.setChecked(False)
+            self._btn_edit.blockSignals(blocker)
+            enabled = False
         self._edit_mode = enabled
         self._btn_edit.setText("Bearbeiten ✓" if enabled else "Bearbeiten")
         self._add_cascade = 0      # UXT-06: Kaskade je Bearbeiten-Sitzung neu
@@ -730,6 +810,11 @@ class VirtualConsoleView(QWidget):
     # ── MIDI-Learn ───────────────────────────────────────────────────────────
 
     def _toggle_midi_learn(self, checked: bool):
+        if self._kiosk and checked:
+            blocker = self._btn_midi_learn.blockSignals(True)
+            self._btn_midi_learn.setChecked(False)
+            self._btn_midi_learn.blockSignals(blocker)
+            return
         self._midi_learn_active = checked
         if checked:
             self._canvas.start_midi_learn()
@@ -908,6 +993,8 @@ class VirtualConsoleView(QWidget):
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
     def _toggle_sidebar(self, checked: bool):
+        if self._sidebar is None or self._btn_sidebar is None:
+            return          # UI-96: Kiosk — keine Bibliothek
         self._sidebar.setVisible(checked)
         self._btn_sidebar.setText("◀ Bibliothek" if checked else "▶ Bibliothek")
         if checked:
@@ -949,13 +1036,40 @@ class VirtualConsoleView(QWidget):
         if w is not None:
             self._canvas._on_widget_selected(w)
 
+    def _verlauf_knopf(self, wiederholen: bool):
+        """↶/↷ der Werkzeugleiste. Im Hauptfenster derselbe gemeinsame Verlauf
+        wie Strg+Z und Bearbeiten → Rückgängig (UI-93) — ein Knopf, dessen
+        Tooltip „Strg+Z“ nennt, darf nichts anderes tun als die Taste. Ohne
+        Hauptfenster (eigenes Fenster, Tests) bleibt es der Layout-Verlauf."""
+        from src.ui import undo_kuerzel
+        try:
+            fenster = self.window()
+        except RuntimeError:
+            fenster = None
+        schritt = getattr(fenster, "verlauf_schritt", None)
+        if (getattr(fenster, undo_kuerzel.MERKMAL_ZENTRAL, False)
+                and callable(schritt)):
+            schritt(wiederholen)
+            return
+        (self._vc_redo if wiederholen else self._vc_undo)()
+
+    def _knopf_rueckgaengig(self):
+        self._verlauf_knopf(False)
+
+    def _knopf_wiederholen(self):
+        self._verlauf_knopf(True)
+
     def _vc_undo(self):
         """Letzte VC-Bearbeitung rueckgaengig (Strg+Z / ↶-Knopf)."""
+        if self._kiosk:
+            return          # UI-96: kein Bearbeitungsverlauf im Kiosk
         if self._canvas_alive():
             self._canvas.undo()
 
     def _vc_redo(self):
         """Rueckgaengig gemachte VC-Bearbeitung wiederholen (Strg+Y / ↷-Knopf)."""
+        if self._kiosk:
+            return          # UI-96: kein Bearbeitungsverlauf im Kiosk
         if self._canvas_alive():
             self._canvas.redo()
 
@@ -967,6 +1081,8 @@ class VirtualConsoleView(QWidget):
         self._canvas._save()
 
     def _load(self):
+        if self._kiosk:
+            return          # UI-96: kein Layout-Import im Kiosk
         self._canvas._load()
 
     # ── Public serialization ──────────────────────────────────────────────────

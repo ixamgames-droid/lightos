@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
 from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
 from .vc_widget import VCWidget
+from src.core import undo as _verlauf      # UI-93: gemeinsame Schrittnummern
 
 
 WIDGET_REGISTRY: dict[str, type] = {}
@@ -112,11 +113,19 @@ class VCCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._edit_mode = False
+        # UI-96: Kiosk-Modus — kein Bearbeiten, keine Zuweisungs-/Lern-Modi.
+        self._kiosk = False
         self._snap_to_grid = False
         self._active_bank = 0
         # Undo/Redo: Snapshot-Verlauf der VC-Layouts (Hinzufuegen/Loeschen/…).
         self._undo_stack: list[dict] = []
         self._redo_stack: list[dict] = []
+        # UI-93: Platz jedes Eintrags im gemeinsamen Verlauf (src/core/undo.py),
+        # gleich lang wie die Stapel. Undo: Schrittnummer. Redo: (Ruecknahme-
+        # Marke, Schrittnummer) — die Schrittnummer kehrt beim Wiederholen
+        # auf den Undo-Stapel zurueck.
+        self._undo_marken: list[int] = []
+        self._redo_marken: list[tuple[int, int]] = []
         self._restoring = False
         self._UNDO_MAX = 50
         # Basis-Arbeitsflaeche. Die tatsaechliche Mindestgroesse waechst mit dem
@@ -457,6 +466,8 @@ class VCCanvas(QWidget):
         Aktiviert MIDI-Learn: der nächste Klick auf einen VCButton bewaffnet ihn,
         die darauf folgende MIDI-Message wird ihm zugewiesen.
         """
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._midi_learn_btn = None
         # Signalisiere allen Buttons dass sie für MIDI-Learn klickbar sind
         self._awaiting_button_click_for = "midi_learn"
@@ -480,6 +491,8 @@ class VCCanvas(QWidget):
         Aktiviert Assign-Modus: nächster Klick auf einen VCButton weist ihm
         den angegebenen Snapshot zu.
         """
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_snapshot_index = snapshot_index
         self._awaiting_button_click_for = "snapshot"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -494,6 +507,8 @@ class VCCanvas(QWidget):
     def start_function_assign(self, function_id: int):
         """Aktiviert Assign-Modus: nächster Klick auf einen VCButton macht ihn
         zum Funktions-Toggle für die gewählte Funktion (Effekt/Matrix/Scene)."""
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_function_id = function_id
         self._awaiting_button_click_for = "function"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -508,6 +523,8 @@ class VCCanvas(QWidget):
     def start_snap_assign(self, snap_id: int):
         """Aktiviert Assign-Modus: naechster Klick auf einen VCButton macht ihn
         zur Farb-/Snap-Taste fuer den gewaehlten Bibliothek-Snap."""
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_snap_id = snap_id
         self._awaiting_button_click_for = "library_snap"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -599,7 +616,25 @@ class VCCanvas(QWidget):
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
+    def set_kiosk(self, kiosk: bool) -> None:
+        """UI-96: Kiosk-Modus setzen. Beim Einschalten endet ein laufender
+        Bearbeiten-/Zuweisungs-Modus sofort."""
+        self._kiosk = bool(kiosk)
+        if self._kiosk:
+            self.cancel_midi_learn()
+            self.cancel_snapshot_assign()
+            self.cancel_function_assign()
+            self.cancel_snap_assign()
+            if self._edit_mode:
+                self.set_edit_mode(False)
+
+    @property
+    def kiosk(self) -> bool:
+        return self._kiosk
+
     def set_edit_mode(self, enabled: bool):
+        if self._kiosk and enabled:
+            enabled = False     # UI-96: im Kiosk nie Bearbeiten-Modus
         self._edit_mode = enabled
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
@@ -1986,29 +2021,78 @@ class VCCanvas(QWidget):
             return
         if self._undo_stack and self._undo_stack[-1] == snapshot:
             return
+        self._marken_angleichen()
         self._undo_stack.append(snapshot)
+        self._undo_marken.append(_verlauf.neuer_schritt())
         if len(self._undo_stack) > self._UNDO_MAX:
             self._undo_stack.pop(0)
+            self._undo_marken.pop(0)
         self._redo_stack.clear()
+        self._redo_marken.clear()
+
+    def _marken_angleichen(self) -> None:
+        """UI-93: Marken so lang halten wie die Stapel. Wer einen Stapel direkt
+        leert oder fuellt, bekommt keine Verschiebung: fehlende Marken zaehlen
+        als „aeltester Schritt“ (0), ueberzaehlige fallen unten weg."""
+        for stapel, marken, leer in ((self._undo_stack, self._undo_marken, 0),
+                                     (self._redo_stack, self._redo_marken, (0, 0))):
+            zuviel = len(marken) - len(stapel)
+            if zuviel > 0:
+                del marken[:zuviel]
+            elif zuviel < 0:
+                marken[:0] = [leer] * (-zuviel)
+
+    def _redo_pruefen(self) -> None:
+        """UI-93: Wiederholen-Zweig verwerfen, wenn seit der Ruecknahme in einem
+        ANDEREN Verlauf (Bearbeiten → Rückgängig) ein neuer Schritt gemacht
+        wurde. Eintraege ohne Marke (direkt abgelegt) bleiben gueltig."""
+        self._marken_angleichen()
+        if (self._redo_marken and self._redo_marken[-1][0]
+                and _verlauf.wiederholen_verworfen(self._redo_marken[-1][0])):
+            self._redo_stack.clear()
+            self._redo_marken.clear()
 
     def can_undo(self) -> bool:
         return bool(self._undo_stack)
 
     def can_redo(self) -> bool:
+        self._redo_pruefen()
         return bool(self._redo_stack)
+
+    def undo_schritt(self):
+        """UI-93: Schrittnummer des naechsten Rueckgaengig (None = leer)."""
+        self._marken_angleichen()
+        return self._undo_marken[-1] if self._undo_stack else None
+
+    def redo_marke(self):
+        """UI-93: Ruecknahme-Marke des naechsten Wiederholen (None = leer)."""
+        self._redo_pruefen()
+        return self._redo_marken[-1][0] if self._redo_stack else None
+
+    def verlauf_leeren(self) -> None:
+        """Layout-Verlauf leeren (Bearbeiten → Verlauf löschen)."""
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._undo_marken.clear()
+        self._redo_marken.clear()
 
     def undo(self):
         """Letzte Aenderung rueckgaengig (Strg+Z)."""
         if not self._undo_stack:
             return
+        self._redo_pruefen()
+        schritt = self._undo_marken.pop()
         self._redo_stack.append(self.to_dict())
+        self._redo_marken.append((_verlauf.ruecknahme_marke(), schritt))
         self._restore(self._undo_stack.pop())
 
     def redo(self):
         """Rueckgaengig gemachte Aenderung wiederholen (Strg+Y / Strg+Umschalt+Z)."""
+        self._redo_pruefen()
         if not self._redo_stack:
             return
         self._undo_stack.append(self.to_dict())
+        self._undo_marken.append(self._redo_marken.pop()[1])
         self._restore(self._redo_stack.pop())
 
     def _restore(self, layout: dict):
@@ -2072,8 +2156,7 @@ class VCCanvas(QWidget):
     def from_dict(self, d: dict):
         if not self._restoring:
             # Echtes Laden einer Show -> Undo-Verlauf zuruecksetzen (nicht beim Restore).
-            self._undo_stack.clear()
-            self._redo_stack.clear()
+            self.verlauf_leeren()
         self._clear()
         # ★ QA-50: Was hier uebersprungen wird, ist beim naechsten Speichern
         # WEG — `to_dict()` kennt nur die Widgets, die es auf die Flaeche
@@ -2108,6 +2191,8 @@ class VCCanvas(QWidget):
                 json.dump(self.to_dict(), f, indent=2)
 
     def _load(self):
+        if self._kiosk:
+            return          # UI-96: kein Layout-Import im Kiosk
         path, _ = QFileDialog.getOpenFileName(self, "VC Layout laden",
                                                "", "JSON (*.json)")
         if path:

@@ -63,7 +63,8 @@ Visualizer als separates Fenster.
 | BPM-Label + Indikator | BPM-Anzeige (klickbar zum Setzen) + Beat-Blink |
 | STOP ALL | Alle Executors stoppen |
 | BLACKOUT | Globaler Blackout (Toggle) |
-| Kiosk-Streifen oben rechts (LAS-31) | Im Kiosk-Modus: BLACKOUT und LASER NOT-AUS nebeneinander; BLACKOUT zeigt denselben Zustand wie der Knopf der Sektionsleiste (`output_manager.blackout`) |
+| Kiosk-Streifen oben rechts (LAS-31, UI-95) | Im Kiosk-Modus: Grand Master, STOP ALL, BLACKOUT und LASER NOT-AUS nebeneinander; BLACKOUT und GM zeigen denselben Zustand wie die Sektionsleiste (`output_manager.blackout`, `output_manager.grand_master`), STOP ALL ruft `MainWindow._stop_all` |
+| Kiosk-Modus ohne Bearbeitung (UI-96) | `--kiosk`: Virtual Console ohne Bibliothek-Seitenleiste; Bearbeiten, MIDI Lernen, Canvas-Import, Undo/Redo und das Effekte-Menü des Tempo-Bus-Controllers gesperrt (`VirtualConsoleView(kiosk=…)`, `VCCanvas.set_kiosk`, `VCWidget._kiosk_active`) |
 | Command-Line (unten) | MA-/Avolites-Befehlszeile (`widgets/command_line.py`) |
 
 ---
@@ -73,7 +74,7 @@ Visualizer als separates Fenster.
 | Menü | Einträge (Kurz) |
 |------|-----------------|
 | **Datei** | Neue Show · Öffnen · Demo-Show öffnen · Speichern · Speichern unter · Zuletzt verwendet · XML-Workspace (.qxw) importieren · Show prüfen & reparieren · Beenden |
-| **Bearbeiten** | Rückgängig · Wiederherstellen · Verlauf löschen (`core/undo.py`) |
+| **Bearbeiten** | Rückgängig · Wiederholen · Verlauf löschen (`core/undo.py`) |
 | **Ansicht** | Alle Views aktualisieren (F5) |
 | **Show** | Cue aufnehmen (R) · Nächste/Vorherige Page |
 | **Programmer** | Highlight (H) · Lowlight (Shift+H) · Programmer leeren (Esc) · Kopieren/Einfügen · Snapshot aufnehmen |

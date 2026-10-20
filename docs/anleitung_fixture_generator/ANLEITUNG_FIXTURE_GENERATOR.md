@@ -115,7 +115,9 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    ihn aus, der Blackout schaltet ihn ganz ab, die 3D-Ansicht zeichnet Strahlen.
 3. **Leistung** vom Typenschild (30 W).
 4. Gibt es für dein Gerät eine QLC+-Datei (`.qxf`), kannst du sie hier als
-   Startpunkt laden und danach gegen das Handbuch prüfen.
+   Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
+   Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn
+   du es umbaust. Die Hinweisliste unten zeigt sie an.
 
 ## 4. Modus und Kanäle
 
@@ -284,7 +286,10 @@ bzw. Wirkung ist am Gerät noch nicht bestätigt.
 **Ein vorhandenes Profil nachtragen:** im Fixture-Editor **Als LightOS-Profil
 exportieren…**, im Generator oben **LightOS-Profil (.json) laden…**, die
 Laser-Seiten ausfüllen und speichern. Der Generator legt immer ein **neues**
-eigenes Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage.
+Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage. Es
+übernimmt die Herkunft und Lizenz der geladenen Datei; nur ein frei gebautes
+Profil gilt als „eigenes Profil“. Nennt die Vorlage keine belegbare Herkunft,
+speichert der Generator nicht und zeigt den Hinweis „Herkunft nicht belegbar“.
 Beim Export und Import eines Profils und beim Bearbeiten im Fixture-Editor
 bleiben die Laser-Angaben erhalten.
 
@@ -350,10 +355,12 @@ Den Laser in der Geräteliste wählen; der Reiter **Laser** erscheint.
 ![Laser-NOT-AUS gedrückt](img/08_laser_not_aus.png)
 
 Nach dem NOT-AUS (1) zeigt die Laser-Seite rot an, dass er greift (2), die
-Statuszeile bestätigt ihn. Position, Farbe oder Größe zu verändern schaltet
-den Laser **nicht** wieder ein — erst ein neuer Klick auf eine Betriebsart oder
-ein neues Muster. Den NOT-AUS gibt es auch als VC-Taste (Aktion
-„Laser NOT-AUS“).
+Statuszeile bestätigt ihn. Kein Wert schaltet den Laser wieder ein — auch
+keine Betriebsart und kein Muster: Werte werden gemerkt, der Laser bleibt
+dunkel. Gelöst wird der NOT-AUS nur mit dem Knopf **LASER NOT-AUS** oben
+rechts im Hauptfenster (klicken, Rückfrage bestätigen); danach gibt der Laser
+sofort wieder aus, was eingestellt ist. Den NOT-AUS gibt es auch als VC-Taste
+(Aktion „Laser NOT-AUS“) — sie löst nur aus.
 
 ### Bewegung mit EFX
 

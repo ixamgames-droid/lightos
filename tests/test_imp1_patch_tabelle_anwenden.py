@@ -267,7 +267,7 @@ def test_dialog_zeigt_zeilen_gruende_und_zaehlerzeile(state, bib):
     _vorhandenes(state, bib)
     dlg = _dialog(state, bib)
     assert dlg._table.rowCount() == 6
-    assert dlg.zaehlerzeile() == "5 Geräte werden angelegt, 2 offen, 1 Überschneidung"
+    assert dlg.zaehlerzeile() == "5 Geräte werden angelegt, 2 offen, 1 Zeile mit Überschneidungen"
     assert dlg.anwenden_moeglich()
     assert dlg.status_text(0) == "wird angelegt (3 Geräte)"
     assert "vorhandenen Gerät „Altbestand“" in dlg.status_text(3)
@@ -340,7 +340,7 @@ def test_dialog_wahl_zeigt_neue_ueberschneidung_in_anderer_zeile(state, bib):
                        if (box.itemData(i) or (0, ""))[1] == "11-Kanal"))
     assert "Überschneidet sich mit Zeile 2" in dlg.status_text(1)
     assert not dlg.anwenden_moeglich()
-    assert dlg.zaehlerzeile() == "Kein Gerät wird angelegt, 2 Überschneidungen"
+    assert dlg.zaehlerzeile() == "Kein Gerät wird angelegt, 2 Zeilen mit Überschneidungen"
 
 
 def test_dialog_mausrad_verstellt_kein_auswahlfeld(state, bib):
@@ -559,7 +559,11 @@ def test_auswahlfeld_tooltip_folgt_der_wahl(state, bib):
 
 def test_import_knopf_ist_ein_menueknopf_und_per_tastatur_bedienbar(state, monkeypatch):
     """STAB-33: kein QPushButton.setMenu. Leertaste auf dem Knopf klappt das
-    Menü auf, Pfeil-ab + Eingabe löst den ersten Eintrag aus."""
+    Menü auf, Pfeil-ab + Eingabe löst den ersten Eintrag aus.
+
+    IMP-3: das gilt für die Ansicht ALLEIN. Im Hauptfenster gehört die
+    Leertaste dem Kürzel GO; dort öffnet die Eingabetaste das Menü
+    (tests/test_imp3_dialog_und_patch.py)."""
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QPushButton

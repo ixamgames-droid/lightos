@@ -384,14 +384,16 @@ def test_offene_und_fehlerhafte_zeilen_blockieren_keine_adressen(bib):
     assert [z.status for z in p.zeilen] == [T.UEBERSCHNEIDUNG, T.UEBERSCHNEIDUNG]
 
 
-def test_doppelte_namen_sind_hinweis_kein_hindernis(bib):
+def test_doppelte_namen_sind_kein_hindernis_und_werden_nummeriert(bib):
+    """IMP-3: frueher nur ein Hinweis (beide hiessen gleich), jetzt bekommt
+    der zweite eine Nummer — Einzelheiten in tests/test_imp3_namen.py."""
     da = [T.Belegung("Front", 3, 1, 1)]
     p = plan("Name;Profil;Adresse\nFront;Dimmer;1\nSeite;Dimmer;2\nseite;Dimmer;3\nEinzeln;Dimmer;4\n",
              bib, da)
     assert [z.status for z in p.zeilen] == [T.ANLEGBAR] * 4
-    assert "gibt es im Patch schon" in p.zeilen[0].status_text
-    assert "mehrfach in der Tabelle" in p.zeilen[1].status_text
-    assert "mehrfach in der Tabelle" in p.zeilen[2].status_text
+    assert [z.geraete[0].name for z in p.zeilen] == ["Front 2", "Seite", "seite 2", "Einzeln"]
+    assert "heißt jetzt „Front 2“" in p.zeilen[0].status_text
+    assert p.zeilen[1].umbenannt == [] and p.zeilen[3].umbenannt == []
     assert p.zeilen[3].hinweise == []
 
 
@@ -417,9 +419,10 @@ def test_zaehlerzeile(bib):
              "E;Dimmer;;300;1\n"              # Überschneidung mit F
              "F;Dimmer;;300;1\n"
              "G;Dimmer;;0;1\n", bib)          # Fehler
-    assert p.zaehler() == {"geraete": 3, T.OFFEN: 2, T.UEBERSCHNEIDUNG: 2, T.FEHLER: 1}
+    assert p.zaehler() == {"geraete": 3, "umbenannt": 0, T.OFFEN: 2,
+                           T.UEBERSCHNEIDUNG: 2, T.FEHLER: 1}
     assert p.zaehlerzeile() == \
-        "3 Geräte werden angelegt, 2 offen, 2 Überschneidungen, 1 mit Fehler"
+        "3 Geräte werden angelegt, 2 offen, 2 Zeilen mit Überschneidungen, 1 mit Fehler"
 
 
 def test_zaehlerzeile_einzahl_und_nichts(bib):
