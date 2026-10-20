@@ -14,7 +14,6 @@
 |---|---|---|---|---|
 | FM-46c | A | feat/fm46-qxf-head | 2026-10-02T11:59Z | - |
 | SAMMEL-DOKU-C | A | sammel/doku-c | 2026-10-02T22:08Z | docs · BACKLOG.md |
-| VIZ-87 | A | fix/viz84-windows-3d | 2026-10-08T15:54Z | - |
 | TOOL-16 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | UI-81 | A | fix/codex-p1-0810 | 2026-10-08T16:57Z | - |
 | DOC-65 | A | feature/fm68-laserworld-el400 | 2026-10-08T18:11Z | docs/anleitung_fixture_generator |
@@ -106,7 +105,6 @@
 
 ## Verlauf
 
-- 2026-10-19T20:24Z A done UI-96
 - 2026-10-19T20:24Z 5 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T20:25Z D claim LIZ-3
 - 2026-10-19T20:25Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
@@ -136,3 +134,4 @@
 - 2026-10-20T16:56Z A done FM-58
 - 2026-10-20T16:56Z A done VIZ-85
 - 2026-10-20T16:56Z A done VIZ-86
+- 2026-10-20T16:56Z A done VIZ-87
