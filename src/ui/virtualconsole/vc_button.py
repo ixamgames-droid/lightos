@@ -970,6 +970,37 @@ class VCButton(VCWidget):
                     return QColor(*rgb)
         return None
 
+    # ── ENG-37-B: Zeichen der Modify-Betriebsart (unten links) ───────────────
+    def _modify_arten(self) -> list[str]:
+        """Betriebsarten (``add``/``sub``/``dim``) der gebundenen Funktionen, die
+        als Modify-Effekt laufen — leer fuer jede andere Taste.
+
+        Bewusst ohne Cache: Haken und Betriebsart lassen sich im Editor und live
+        (Effekt-Parameter) umstellen, ohne dass sich die Bindung aendert; ein
+        Dict-Zugriff je Funktion ist billiger als jede Invalidierung."""
+        if self.action not in (ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH,
+                               ButtonAction.EFFECT_ACTION):
+            return []
+        fids = self._all_function_ids()
+        if not fids:
+            return []
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            from src.ui.widgets.modify_zeichen import modify_arten
+            return modify_arten(fids, get_function_manager())
+        except Exception:
+            return []
+
+    def event(self, e):
+        # ENG-37-B: Tooltip ueber dem Zeichen erklaert die Betriebsart.
+        try:
+            from src.ui.widgets.modify_zeichen import zeige_modify_tooltip
+            if zeige_modify_tooltip(self, e):
+                return True
+        except Exception:
+            pass
+        return super().event(e)
+
     # ── Farb-Vorschau-Badge (oben rechts) ────────────────────────────────────
     def _color_badge_colors(self) -> list:
         """Anzeige-Farben des gebundenen Farb-Effekts/-Snaps (gecacht pro Bindung).
@@ -2168,6 +2199,13 @@ class VCButton(VCWidget):
             _has_gobo, _gpm.width() if _has_gobo else 0, bool(_badge),
             face_w=float(face.width()), badge_d=_badge_d)
         text_rect = face.adjusted(0, 0, -_right_inset, 0) if _right_inset else face
+        # ENG-37-B: Modify-Taste -> Zeichen der Betriebsart unten links. Die
+        # Beschriftung weicht um die Zeichenhoehe nach oben aus (bleibt zentriert
+        # im Rest), damit ein umbrochener Text nicht unter dem Zeichen landet.
+        _modify = self._modify_arten()
+        _mz_h = 16
+        if _modify and face.height() >= 3 * _mz_h:
+            text_rect = text_rect.adjusted(0, 0, 0, -(_mz_h + 2))
         p.drawText(text_rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
 
         # Gobo-Icon (oben rechts), wenn dieser Button einen Gobo setzt.
@@ -2236,6 +2274,15 @@ class VCButton(VCWidget):
             bh = 4.0
             p.fillRect(QRectF(face.left(), face.bottom() - bh, face.width(), bh), bar_color)
             p.restore()
+
+        # ENG-37-B: Zeichen der Modify-Betriebsart unten links, ueber dem
+        # Aktions-Streifen (4 px) — oben rechts gehoert Farb-Badge/Gobo.
+        self._modify_zeichen_rect = None
+        if _modify:
+            from src.ui.widgets.modify_zeichen import zeichne_modify_zeichen
+            _mx, _my = int(face.left()) + 4, int(face.bottom()) - 4 - 2 - _mz_h
+            _mw = zeichne_modify_zeichen(p, _mx, _my, _modify, _mz_h)
+            self._modify_zeichen_rect = QRect(_mx, _my, _mw, _mz_h)
 
         # MIDI-Bindung-Indikator oben rechts
         if self.midi_data1 >= 0:
