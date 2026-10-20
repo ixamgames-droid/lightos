@@ -53,6 +53,7 @@ test_liz2_fremdlizenzen_setup.py   # THIRD_PARTY_NOTICES.md + licenses/ + requir
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
 test_liz2_rest_sammeldateien.py    # THIRD_PARTY_NOTICES.md, INSTALL.md, licenses/: Sammeldateien Qt WebEngine/Mesa, mido/winrt raus
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
+test_xplat51_arm64_nicht_unterstuetzt.py # INSTALL.md/README/CONTRIBUTING/DMX_PROTOCOL: ARM64 "nicht unterstuetzt"
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
 test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
