@@ -37,6 +37,11 @@ HTTP_STATUS = {
     "typ_nicht_erlaubt": 403,
     "nur_am_pult": 403,
     "nicht_freigegeben": 403,
+    "laser_gesperrt": 403,              # WEB-12: Schalter „Laser vom Handy erlauben“ aus
+    "blackout_nicht_von_hier": 403,     # WEB-12: Blackout hat jemand anderes gesetzt
+    "nur_ueber_socket": 400,            # WEB-12: Halten nur ueber den Socket
+    "kein_recht": 403,
+    "kein_zugang": 403,
     "unbekannte_kennung": 404,
     "aktion_unbekannt": 400,
     "wert_ungueltig": 400,
@@ -128,6 +133,9 @@ def widget_aktion(kennung, aktion, wert=None) -> dict:
 _sender = None                  # fn(ereignis, daten) -> an alle Zuschauer
 _zuschauer: set = set()         # Verbindungen, die die Konsole anzeigen
 _gehalten: dict = {}            # Verbindung -> Kennungen gehaltener Tasten
+# WEB-12: Druck und Loslassen gehaltener Tasten nacheinander — sonst saehen zwei
+# Handys, die gleichzeitig druecken, beide „noch niemand haelt“.
+_halte_lock = threading.Lock()
 
 
 def konsole() -> dict:
@@ -153,8 +161,10 @@ def konsole() -> dict:
     return {"ok": True, "aktiv": True, **k}
 
 
-def pult(gm=None, blackout=None) -> dict:
-    """Grand Master (0..255) und/oder Blackout der Handy-Konsole setzen."""
+def pult(gm=None, blackout=None, geraet: str = "") -> dict:
+    """Grand Master (0..255) und/oder Blackout der Handy-Konsole setzen.
+    WEB-12: ``geraet`` = Kennung der Browser-Sitzung; ein Blackout wird nur
+    aufgehoben, wenn ihn dieses Geraet gesetzt hat (``fern_pult``)."""
     if not ist_aktiv():
         return _nein("abgeschaltet")
     if gm is None and blackout is None:
@@ -163,7 +173,7 @@ def pult(gm=None, blackout=None) -> dict:
     if b is None:
         return _nein("keine_konsole")
     try:
-        antwort = b.pult(gm=gm, blackout=blackout)
+        antwort = b.pult(gm=gm, blackout=blackout, geraet=str(geraet or ""))
     except Exception as e:
         print(f"[vc_remote] ERROR: Pult: {e}")
         return _nein("fehler")
@@ -228,14 +238,88 @@ def gehaltene(verbindung=None) -> set:
         return {k for menge in _gehalten.values() for k in menge}
 
 
+def _andere_halten(kennung, ausser) -> bool:
+    """Haelt eine andere Verbindung als ``ausser`` die Taste? (unter ``_lock``)"""
+    return any(kennung in menge for v, menge in _gehalten.items() if v != ausser)
+
+
+def halten(verbindung, kennung) -> dict:
+    """WEB-12: ``verbindung`` drueckt die Halten-Taste ``kennung``.
+
+    Halter werden je Verbindung gezaehlt (Codex zu #1030/#1039/#1041): diese
+    Verbindung wird nur dann Halter, wenn IHR Druck die Taste ausgeloest hat
+    oder schon ein anderes Handy sie haelt. Haelt sie das Pult (Maus, MIDI),
+    bleibt das Pult der einzige Halter — Loslassen oder Abreissen dieses Handys
+    laesst sie dann nicht los."""
+    with _halte_lock:
+        with _lock:
+            if kennung in _gehalten.get(verbindung, ()):
+                return {"ok": True}             # haelt schon
+            andere = _andere_halten(kennung, verbindung)
+        antwort = widget_aktion(kennung, "druecken")
+        if not antwort.get("ok"):
+            return antwort
+        if antwort.get("ausgeloest") or andere:
+            with _lock:
+                _gehalten.setdefault(verbindung, set()).add(kennung)
+        else:
+            antwort = dict(antwort, gehalten_vom_pult=True)
+        return antwort
+
+
+def loslassen_von(verbindung, kennung) -> dict:
+    """WEB-12: ``verbindung`` laesst ``kennung`` los. Losgelassen wird die
+    Taste nur, wenn diese Verbindung sie hielt UND kein anderes Handy sie noch
+    haelt; ein Loslassen ohne vorheriges Halten tut nichts."""
+    with _halte_lock:
+        with _lock:
+            menge = _gehalten.get(verbindung)
+            if not menge or kennung not in menge:
+                return {"ok": True, "nicht_gehalten": True}
+            menge.discard(kennung)
+            if not menge:
+                _gehalten.pop(verbindung, None)
+            if _andere_halten(kennung, verbindung):
+                return {"ok": True, "andere_halten": True}
+        antwort = widget_aktion(kennung, "loslassen")
+        if not antwort.get("ok"):
+            # Das Loslassen kam nicht an (Oberflaeche antwortete nicht
+            # rechtzeitig, Widget inzwischen von der Seite genommen) — die
+            # Taste gilt hier aber nicht mehr als gehalten, ein spaeterer
+            # Verbindungsabbruch liesse sie also auch nicht mehr los. Deshalb
+            # jetzt ueber den Weg, der nicht verfaellt.
+            _loslassen({kennung})
+        return antwort
+
+
+def vergessen(kennungen) -> set:
+    """WEB-12 (Codex zu #1039): die Tasten werden geloescht oder im Typ
+    getauscht — niemand haelt sie mehr. Gibt die Kennungen zurueck, die ein
+    Handy gehalten hatte (der Aufrufer laesst sie selbst los)."""
+    ziel = set(kennungen or ())
+    raus = set()
+    with _lock:
+        for v in list(_gehalten):
+            treffer = _gehalten[v] & ziel
+            if treffer:
+                raus |= treffer
+                _gehalten[v] -= treffer
+                if not _gehalten[v]:
+                    _gehalten.pop(v, None)
+    return raus
+
+
 def zuschauer_weg(verbindung) -> None:
     """Eine Verbindung ist weg (Abbruch, abgemeldet, Server aus): nicht mehr
-    zaehlen und ALLES loslassen, was sie gehalten hat. Eine Flash-Taste oder
-    ein Blackout bleibt sonst stehen, wenn das Handy das WLAN verliert."""
-    with _lock:
-        _zuschauer.discard(verbindung)
-        kennungen = _gehalten.pop(verbindung, set())
-    _loslassen(kennungen)
+    zaehlen und loslassen, was sie gehalten hat — ausser ein anderes Handy
+    haelt dieselbe Taste noch (WEB-12). Eine Flash-Taste oder ein Blackout
+    bleibt sonst stehen, wenn das Handy das WLAN verliert."""
+    with _halte_lock:
+        with _lock:
+            _zuschauer.discard(verbindung)
+            kennungen = _gehalten.pop(verbindung, set())
+            kennungen = {k for k in kennungen if not _andere_halten(k, verbindung)}
+        _loslassen(kennungen)
 
 
 def alle_loslassen() -> None:

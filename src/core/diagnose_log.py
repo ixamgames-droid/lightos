@@ -170,6 +170,49 @@ def _lizenz_inhalt_entfernen(text: str) -> str:
                   lambda m: m.group(1) + "(entfernt)", text)
 
 
+# WEB-12 (QA96-03): der Zugangsschluessel des Web-Remotes steht im Link
+# (``/konsole?k=…``, ``/?k=…``). Werkzeug protokolliert jede Anfrage samt
+# Abfrage — ohne Schwaerzen stand er im Sitzungs-Log und damit im
+# Diagnosepaket. Geschwaerzt wird beim Schreiben ins Log (TeeStream) UND beim
+# Packen (aeltere Logs von vor WEB-12).
+_SCHLUESSEL_MUSTER = None
+SCHLUESSEL_ERSATZ = "<schluessel>"
+
+
+def schluessel_schwaerzen(text: str) -> str:
+    """Ersetzt den Wert von ``k=``/``token=``/``key=`` in Links und Abfragen
+    durch ``<schluessel>``. Wirft nie."""
+    global _SCHLUESSEL_MUSTER
+    if not text or "=" not in text:
+        return text
+    try:
+        if _SCHLUESSEL_MUSTER is None:
+            import re
+            _SCHLUESSEL_MUSTER = re.compile(
+                r"([?&;](?:k|token|key|schluessel)=)[^&\s\"'#<>;]+", re.IGNORECASE)
+        return _SCHLUESSEL_MUSTER.sub(lambda m: m.group(1) + SCHLUESSEL_ERSATZ, text)
+    except Exception:
+        return text
+
+
+def _bekannte_schluessel_schwaerzen(text: str) -> str:
+    """WEB-12: die aktuell gueltigen Schluessel des Web-Remotes auch dort
+    schwaerzen, wo sie ohne ``k=`` stehen (z. B. eine Fehlermeldung, die den
+    Link zerlegt hat). Nur fuers Diagnosepaket — dort darf es Zeit kosten."""
+    if not text:
+        return text
+    try:
+        from src.web import remote_settings
+        roh = remote_settings.load_settings()
+        for name in ("token", "feste_token"):
+            wert = roh.get(name)
+            if isinstance(wert, str) and len(wert) >= 6:
+                text = text.replace(wert, SCHLUESSEL_ERSATZ)
+    except Exception:
+        pass
+    return text
+
+
 def anonymisiere(text: str, home: str | None = None,
                  user: str | None = None) -> str:
     """Ersetzt den Home-Pfad durch ``~`` und den Benutzernamen als Pfadteil durch
@@ -203,6 +246,7 @@ def anonymisiere(text: str, home: str | None = None,
         text = _lizenz_inhalt_entfernen(text)
     except Exception:
         pass
+    text = schluessel_schwaerzen(text)      # WEB-12
     return text
 
 
@@ -355,7 +399,8 @@ class TeeStream:
             except Exception:
                 pass            # kaputte Konsole/Codierung darf nie werfen
         try:
-            self._sink.write(self._mit_zeitstempel(s))
+            # WEB-12: der Schluessel des Web-Remotes kommt nie in die Datei.
+            self._sink.write(self._mit_zeitstempel(schluessel_schwaerzen(s)))
         except Exception:
             pass
         return len(s)
@@ -1381,7 +1426,7 @@ def erstelle_diagnosepaket(ziel: str | None = None, app_version: str = "?",
         if pfad.lower().endswith(_VERBOTENE_ENDUNGEN):
             continue
         try:
-            text = anonymisiere(_lies_text(pfad))
+            text = _bekannte_schluessel_schwaerzen(anonymisiere(_lies_text(pfad)))
             if name.startswith("crash/"):
                 # STAB-33: COM-Hinweise sehen in crash.log wie Abstuerze aus.
                 try:
@@ -1397,7 +1442,7 @@ def erstelle_diagnosepaket(ziel: str | None = None, app_version: str = "?",
                      ("einstellungen.txt", einstellungen_text),
                      ("datenordner.txt", datenordner_text)):
         try:
-            eintraege.append((name, anonymisiere(fn())))
+            eintraege.append((name, _bekannte_schluessel_schwaerzen(anonymisiere(fn()))))
         except Exception as e:
             eintraege.append((name, f"nicht erstellbar: {type(e).__name__}: {e}\n"))
     try:

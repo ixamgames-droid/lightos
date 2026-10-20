@@ -293,19 +293,23 @@ class AblegenTest(_MitAnsicht):
         xy = self.canvas._add_widget("VCXYPad", QPoint(300, 200))
         laser = self._taste(x=500, text="Muster", aktion=ButtonAction.LASER_PATTERN)
         vorher = self._schritte()
-        for widget, wort in ((xy, "XY-Pad"), (laser, "Laser-Muster")):
+        # WEB-12: ein Laser-Muster ist nicht „nicht fernbedienbar“, sondern
+        # Laser-Inhalt — gesperrt, solange „Laser vom Handy erlauben“ aus ist.
+        for widget, wort, grundwort in (
+                (xy, "XY-Pad", "nicht fernbedienbar"),
+                (laser, "Laser vom Handy erlauben", "Steuert einen Laser")):
             akt, menu = self._handy_aktion(widget)
             self.assertFalse(akt.isEnabled())
             self.assertIn("nicht möglich", akt.text())
             self.assertIn(wort, akt.toolTip())
-            self.assertIn("nicht fernbedienbar", akt.toolTip())
+            self.assertIn(grundwort, akt.toolTip())
             grund = [a for a in menu.actions() if a.objectName() == "handy_ablegen_grund"]
             self.assertEqual(len(grund), 1)                     # der Grund steht IM Menue
             self.assertIn(wort, grund[0].text())
             self.assertFalse(grund[0].isEnabled())
             ok, text = self.canvas.handy_ablegen(widget)
             self.assertFalse(ok)
-            self.assertIn("nicht fernbedienbar", text)
+            self.assertIn(grundwort, text)
             ok, _ = self.canvas.handy_ablegen(widget, 0, 0, 0)
             self.assertFalse(ok)
         self.assertEqual(self.canvas.handy_seiten(), hs.leer())
@@ -317,7 +321,9 @@ class AblegenTest(_MitAnsicht):
         for typ in WIDGET_REGISTRY:
             w = self.canvas._add_widget(typ, QPoint(10, 10))
             ok, grund = self.canvas.handy_ablegbar(w)
-            self.assertEqual(ok, beschreibe(w) is not None, typ)
+            a = beschreibe(w)
+            # WEB-12: bekannt UND nicht wegen Laser gesperrt
+            self.assertEqual(ok, a is not None and a.get("gesperrt") != "laser", typ)
             self.assertEqual(bool(grund), not ok, typ)
         muster = self._taste(aktion=ButtonAction.LASER_PATTERN)
         self.assertEqual(self.canvas.handy_ablegbar(muster)[0], False)

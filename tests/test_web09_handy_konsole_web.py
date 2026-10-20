@@ -193,25 +193,32 @@ class FreigabeBrueckeTest(_Basis):
         self.assertIs(k["blackout"], False)
         self.assertEqual(k["seiten"], self.canvas.handy_seiten()["seiten"])
 
-    def test_nicht_mehr_fernbedienbar_bleibt_als_leeres_feld(self):
+    def test_nachtraeglich_laser_bleibt_auf_der_seite_aber_gesperrt(self):
+        # WEB-12: ein Laser-Muster ist kein „nicht fernbedienbarer“ Typ mehr,
+        # sondern Laser-Inhalt — es bleibt an seinem Platz und ist ohne den
+        # Schalter „Laser vom Handy erlauben“ gesperrt.
         t = self._taste()
         self._auf_seite(t)
         t.action = ButtonAction.LASER_PATTERN       # nachtraeglich umgestellt
         k = self.fern.konsole()
-        self.assertEqual(k["widgets"], {})
+        self.assertEqual(k["widgets"][t.widget_id]["gesperrt"], "laser")
         self.assertEqual(len(k["seiten"][0]["eintraege"]), 1)   # Platz bleibt
         self.assertEqual(self.fern.aktion(t.widget_id, "umschalten",
                                           nur_handy_seiten=True)["fehler"],
-                         "typ_nicht_erlaubt")
+                         "laser_gesperrt")
 
     def test_pult_setzt_grand_master_und_blackout(self):
         om = self.state.output_manager
         r = self.fern.pult(gm=64)
         self.assertEqual((r["ok"], r["gm"]), (True, 64))
         self.assertAlmostEqual(om.grand_master, 64 / 255, places=4)
-        self.assertTrue(self.fern.pult(blackout=True)["blackout"])
+        self.assertTrue(self.fern.pult(blackout=True, geraet="handy1")["blackout"])
         self.assertTrue(om.blackout)
-        self.assertFalse(self.fern.pult(blackout=False)["blackout"])
+        # WEB-12: ein anderes Geraet hebt ihn nicht auf, das setzende schon
+        self.assertEqual(self.fern.pult(blackout=False, geraet="handy2")["fehler"],
+                         "blackout_nicht_von_hier")
+        self.assertTrue(om.blackout)
+        self.assertFalse(self.fern.pult(blackout=False, geraet="handy1")["blackout"])
         # kaputte Werte: abgelehnt, nichts verstellt
         for kaputt in ({"gm": "viel"}, {"gm": True}, {"gm": float("nan")},
                        {"blackout": "ja"}, {"blackout": 1}):
@@ -419,6 +426,7 @@ class _WebBasis(_Basis):
         self.app, self.sio = webapp.create_app()
         self.app.config["TESTING"] = True
         self.app.config["LIGHTOS_REMOTE_TOKEN"] = "geheim123"
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "fest456"     # WEB-12
         self.client = self.app.test_client()
 
     def _anmelden(self, client=None):
@@ -510,10 +518,10 @@ class FreigabeHttpTest(_WebBasis):
             self.assertEqual(r.get_json()["fehler"], "nur_am_pult")
             r = self._aktion(muster.widget_id, aktion="umschalten")
             self.assertEqual(r.status_code, 403)
-            self.assertEqual(r.get_json()["fehler"], "typ_nicht_erlaubt")
+            self.assertEqual(r.get_json()["fehler"], "laser_gesperrt")   # WEB-12
             ausgeloest.assert_not_called()
-        self.assertNotIn(muster.widget_id,
-                         self.client.get("/api/vc/konsole").get_json()["widgets"])
+        self.assertEqual(self.client.get("/api/vc/konsole").get_json()["widgets"]
+                         [muster.widget_id]["gesperrt"], "laser")
 
     def test_aktionen_laufen_mit_notaus_sperre(self):
         from src.core import app_state
@@ -743,7 +751,8 @@ class SocketTest(_WebBasis):
         sc = self._socket()
         r = sc.emit("vc_aktion", {"id": draussen.widget_id, "aktion": "loslassen"},
                     callback=True)
-        self.assertEqual(r["fehler"], "nicht_freigegeben")
+        # WEB-12: wer nicht haelt, laesst nichts los — gar nicht erst versucht
+        self.assertEqual(r, {"ok": True, "nicht_gehalten": True})
         self.assertTrue(draussen._pressed)
 
     def test_kennung_die_kein_text_ist_wird_abgelehnt(self):
@@ -825,11 +834,24 @@ class SocketTest(_WebBasis):
         self.assertFalse(vc_remote.melde("vc_zustand", {}))
 
     def test_bestehende_ereignisse_der_festen_seite_bleiben(self):
-        self._anmelden()
+        # WEB-12: nur mit dem Schluessel der festen Fernbedienung und nur,
+        # wenn sie unter „Erweitert“ eingeschaltet ist.
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self.assertEqual(self.client.get("/?k=fest456").status_code, 200)
         sc = self._socket()
         sc.emit("blackout", {"enabled": True})
         self.assertTrue(self.state.output_manager.blackout)
         sc.emit("blackout", {"enabled": False})
+        self.assertFalse(self.state.output_manager.blackout)
+
+    def test_konsolen_schluessel_bedient_die_feste_seite_nicht(self):
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self._anmelden()
+        sc = self._socket()
+        self.assertEqual(sc.emit("blackout", {"enabled": True}, callback=True),
+                         {"ok": False, "fehler": "kein_recht"})
         self.assertFalse(self.state.output_manager.blackout)
 
 
@@ -896,6 +918,10 @@ class SeiteTest(_WebBasis):
         self.assertIn("Bedienung gesperrt", html)
 
     def test_feste_seite_verlinkt_nur_wenn_eingeschaltet(self):
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self._anmelden()                                  # Konsole …
+        self.client.get("/?k=fest456")                    # … und feste Seite
         html = self.client.get("/").get_data(as_text=True)
         self.assertIn('href="/konsole"', html)
         remote_settings.set_vc_remote_enabled(False)

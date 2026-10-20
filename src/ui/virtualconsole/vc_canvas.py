@@ -2017,9 +2017,35 @@ class VCCanvas(QWidget):
                 w._snap_prev = {}
                 forget_snap_claims(w)
 
+    def _gehaltene_loslassen(self, widget) -> None:
+        """WEB-12 (Codex zu #1039): eine gedrueckt gehaltene Taste (Handy,
+        MIDI) vor dem Loeschen/Typ-Tausch loslassen. Sonst findet das spaetere
+        Loslassen die Kennung nicht mehr, und Flash oder Blackout bleibt
+        haengen — auch beim Laden einer Show (``_clear``)."""
+        from .vc_button import VCButton
+        try:
+            betroffen = [widget] + list(widget.findChildren(VCButton))
+        except RuntimeError:
+            return
+        kennungen = []
+        for w in betroffen:
+            if not isinstance(w, VCButton):
+                continue
+            kennungen.append(getattr(w, "widget_id", None))
+            try:
+                w.release_if_held()
+            except Exception as e:
+                print(f"[VCCanvas] ERROR: Loslassen vor dem Loeschen: {e}")
+        try:
+            from src.web import vc_remote
+            vc_remote.vergessen(k for k in kennungen if k)
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Halter vergessen: {e}")
+
     def _remove_widget(self, widget: VCWidget):
         if not self._restoring:
             self._push_undo()      # Widget geloescht -> per Strg+Z wiederherstellbar
+        self._gehaltene_loslassen(widget)
         self._snap_ansprueche_abmelden(widget)
         # WEB-10: mit dem Widget (und bei einem Kasten: seinem Inhalt) fallen
         # seine Verknuepfungen weg — Seitenleiste und Abzeichen erfahren es.
@@ -2040,6 +2066,7 @@ class VCCanvas(QWidget):
     def _clear(self):
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
+            self._gehaltene_loslassen(child)        # WEB-12
             self._snap_ansprueche_abmelden(child)
             child.setParent(None)
             child.deleteLater()
@@ -2261,7 +2288,9 @@ class VCCanvas(QWidget):
             except Exception as e:
                 print(f"[VCCanvas] ERROR: Auskunft {type(w).__name__}: {e}")
                 a = None
-            if a is not None:
+            # WEB-12 (QA96-05): Laser-Inhalt legt „Automatisch fuellen“ nur
+            # aufs Handy, wenn „Laser vom Handy erlauben“ an ist.
+            if a is not None and a.get("gesperrt") != "laser":
                 auskuenfte.append(a)
         neu = _hs.automatisch_fuellen(auskuenfte)
         self.setze_handy_seiten(neu)
@@ -2306,11 +2335,14 @@ class VCCanvas(QWidget):
         """
         if widget is None:
             return False, "Das Element gibt es nicht mehr."
-        if self.handy_auskunft(widget) is not None:
+        auskunft = self.handy_auskunft(widget)
+        if auskunft is not None:
+            # WEB-12: Laser-Inhalt nur mit „Laser vom Handy erlauben“.
+            if auskunft.get("gesperrt") == "laser":
+                return False, ("Steuert einen Laser — aufs Handy nur mit „Laser vom "
+                               "Handy erlauben“ (Ausgabe → Web-Remote: Verbindung & Token).")
             return True, ""
         name = type(widget).__name__
-        if name == "VCButton":
-            return False, "Laser-Muster sind nicht fernbedienbar (nur am Pult)."
         typ = self._HANDY_TYPNAMEN.get(name, name.replace("VC", ""))
         return False, (f"{typ} ist nicht fernbedienbar — aufs Handy können "
                        f"Tasten, Fader und Cuelisten.")

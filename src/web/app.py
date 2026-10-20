@@ -204,18 +204,6 @@ KONSOLE_MANIFEST = {
 }
 
 
-def _num(data, key, default, cast):
-    """Robuste Zahl-Coercion aus einem (JSON-)Dict: bei fehlendem, nicht-
-    numerischem oder nicht-endlichem (int(inf)/int(NaN)) Wert wird der Default
-    zurückgegeben — kein ungefangener HTTP 500 / Handler-Crash aus einem
-    fehlerhaften Remote-Payload heraus (WEB-02). Die anschließenden Clamps
-    (max/min) bleiben die einzige Wert-Leitplanke."""
-    try:
-        return cast(data.get(key, default))
-    except (TypeError, ValueError, OverflowError):
-        return default
-
-
 def bediene_cueliste(state, aktion: str):
     """UI-66: GO/Zurueck/Stop des Web-Remotes (REST + Socket) auf die
     Transport-Ziel-Liste (gewaehlte, wenn auf einem Executor; sonst erster
@@ -245,10 +233,6 @@ def _transport_info(aktion: str) -> dict:
     return info
 
 
-def _transport_antwort(aktion: str):
-    return jsonify({"ok": True, **_transport_info(aktion)})
-
-
 def create_app(port: int = 5000) -> tuple:
     """Create and configure the Flask app + SocketIO."""
     global _flask_app, _socketio
@@ -271,12 +255,17 @@ def create_app(port: int = 5000) -> tuple:
     _flask_app.config["SESSION_COOKIE_SAMESITE"] = "Strict"
     # NET-01: Token bei erstem create_app erzeugen + persistieren (Wiederverwendung
     # bei Neustart). Fehlt das Settings-Modul (z. B. Test-Stub), bleibt es leer.
+    # WEB-12: zwei Schluesselarten — ``LIGHTOS_REMOTE_TOKEN`` oeffnet die
+    # Handy-Konsole, ``LIGHTOS_FESTE_TOKEN`` die feste Fernbedienung.
     try:
         from src.web import remote_settings
         _flask_app.config["LIGHTOS_REMOTE_TOKEN"] = remote_settings.get_token()
+        _flask_app.config["LIGHTOS_FESTE_TOKEN"] = remote_settings.get_feste_token()
     except Exception as e:
-        print(f"[web] token init error: {e}")
+        print(f"[web] token init error: {type(e).__name__}")
         _flask_app.config["LIGHTOS_REMOTE_TOKEN"] = ""
+        _flask_app.config["LIGHTOS_FESTE_TOKEN"] = ""
+    _schluessel_aus_dem_log()
     # NET-03: konkrete Origin-Allowlist statt "*" (Drive-by-CSRF/-WebSocket). Die
     # Liste auch in der App-Config ablegen, damit UI/Tests sie einsehen koennen.
     origins = cors_allowlist(port, weitere=_eigene_adressen())
@@ -289,6 +278,36 @@ def create_app(port: int = 5000) -> tuple:
     return _flask_app, _socketio
 
 
+class _SchluesselFilter:
+    """WEB-12 (QA96-03): schwaerzt ``?k=…`` in den Zeilen, die Werkzeug je
+    Anfrage protokolliert (``"GET /konsole?k=… HTTP/1.1" 200``). Sonst stand
+    der Zugangsschluessel im Terminal, im Sitzungs-Log und im Diagnosepaket."""
+
+    def filter(self, record) -> bool:
+        try:
+            from src.core.diagnose_log import schluessel_schwaerzen
+            text = record.getMessage()
+            neu = schluessel_schwaerzen(text)
+            if neu != text:
+                record.msg, record.args = neu, ()
+        except Exception:
+            pass
+        return True
+
+
+_FILTER = _SchluesselFilter()
+
+
+def _schluessel_aus_dem_log() -> None:
+    """Den Filter an die Logger haengen, die Anfragen protokollieren. Mehrfach
+    aufrufbar (``create_app`` laeuft bei jedem Start)."""
+    import logging
+    for name in ("werkzeug", "engineio.server", "socketio.server"):
+        logger = logging.getLogger(name)
+        if _FILTER not in logger.filters:
+            logger.addFilter(_FILTER)
+
+
 def refresh_token(app) -> None:
     """Laedt das aktuelle Token frisch aus den Prefs in ``app.config`` — nach einer
     Token-Rotation (``remote_settings.regenerate_token()``) aufrufen, damit der
@@ -299,8 +318,9 @@ def refresh_token(app) -> None:
     try:
         from src.web import remote_settings
         app.config["LIGHTOS_REMOTE_TOKEN"] = remote_settings.get_token()
+        app.config["LIGHTOS_FESTE_TOKEN"] = remote_settings.get_feste_token()
     except Exception as e:
-        print(f"[web] refresh_token error: {e}")
+        print(f"[web] refresh_token error: {type(e).__name__}")
 
 
 def is_running() -> bool:
@@ -363,59 +383,217 @@ def disconnect_all_clients() -> int:
     return n
 
 
+# ── WEB-12: getrennte Rechte ────────────────────────────────────────────────
+#
+# Zwei Schluesselarten (QA96-04): der Schluessel der Handy-Konsole oeffnet NUR
+# die Handy-Konsole (was auf einer Handy-Seite liegt), der Schluessel der festen
+# Fernbedienung NUR die feste Seite (GO, Executor-Fader, Blackout) — und auch
+# die nur, solange sie unter „Erweitert" eingeschaltet ist. Roh-DMX ist ein
+# eigener Schalter darunter. Eine Sitzung kann beide Rollen tragen (beide Links
+# im selben Browser geoeffnet), jede nur ueber ihren eigenen Schluessel.
+
+ROLLE_KONSOLE = "konsole"
+ROLLE_FEST = "fest"
+
+RECHT_KONSOLE = "konsole"       # Handy-Konsole
+RECHT_FEST = "fest"             # feste Fernbedienung (eingeschaltet)
+RECHT_ROH_DMX = "roh_dmx"       # feste Fernbedienung + Roh-DMX (eingeschaltet)
+
+#: Ohne Anmeldung erreichbar: die Seiten, die den Handshake machen, und was
+#: keine Daten traegt.
+OFFENE_PFADE = ("/", "/konsole", "/konsole/manifest.webmanifest")
+
+#: Jede Route hinter dem Gate mit dem Recht, das sie verlangt. Eine Route, die
+#: hier fehlt, ist fuer jeden gesperrt (403) — eine neu hinzugefuegte Route
+#: oeffnet so nie versehentlich die Fernsteuerung (Test: jede Regel der App
+#: steht hier oder in ``OFFENE_PFADE``).
+ROUTEN_RECHTE = {
+    "/api/status": RECHT_FEST,
+    "/api/go": RECHT_FEST,
+    "/api/back": RECHT_FEST,
+    "/api/stop": RECHT_FEST,
+    "/api/blackout": RECHT_FEST,
+    "/api/executor/<int:slot>/fader": RECHT_FEST,
+    "/api/executor/<int:slot>/go": RECHT_FEST,
+    "/api/programmer/clear": RECHT_FEST,
+    "/api/channel/<int:universe>/<int:channel>": RECHT_ROH_DMX,
+    "/api/vc/widgets": RECHT_KONSOLE,
+    "/api/vc/widget/<kennung>/aktion": RECHT_KONSOLE,
+    "/api/vc/konsole": RECHT_KONSOLE,
+    "/api/vc/pult": RECHT_KONSOLE,
+}
+
+#: Socket-Ereignisse und ihr Recht (``connect`` verlangt irgendeine Rolle).
+EREIGNIS_RECHTE = {
+    "go": RECHT_FEST, "back": RECHT_FEST, "stop": RECHT_FEST,
+    "fader": RECHT_FEST, "blackout": RECHT_FEST,
+    "vc_hallo": RECHT_KONSOLE, "vc_aktion": RECHT_KONSOLE, "vc_pult": RECHT_KONSOLE,
+}
+
+
+def _rollen() -> set:
+    """Die Rollen der aktuellen Sitzung — leer, wenn sie zu einer alten
+    Auth-Epoche gehoert (Schluessel inzwischen erneuert). Wirft nie."""
+    try:
+        from src.web import remote_settings
+        if session.get("epoch") != remote_settings.get_auth_epoch():
+            return set()
+        roh = session.get("rollen")
+        if not isinstance(roh, list):
+            return set()
+        return {r for r in roh if r in (ROLLE_KONSOLE, ROLLE_FEST)}
+    except Exception as e:
+        print(f"[web] rollen error: {type(e).__name__}")
+        return set()
+
+
+def darf(recht: str, rollen=None) -> bool:
+    """Hat die aktuelle Sitzung dieses Recht? Die Schalter werden bei JEDEM
+    Aufruf gelesen — ein Ausschalten wirkt sofort, auch auf offene Sockets."""
+    rollen = _rollen() if rollen is None else rollen
+    try:
+        from src.web import remote_settings
+        if recht == RECHT_KONSOLE:
+            return ROLLE_KONSOLE in rollen
+        if recht == RECHT_FEST:
+            return ROLLE_FEST in rollen and remote_settings.is_feste_seite_enabled()
+        if recht == RECHT_ROH_DMX:
+            return (ROLLE_FEST in rollen and remote_settings.is_feste_seite_enabled()
+                    and remote_settings.is_roh_dmx_enabled())
+    except Exception as e:
+        print(f"[web] recht error: {type(e).__name__}")
+    return False
+
+
+def geraet() -> str:
+    """WEB-12: Kennung dieses Geraets (Browser-Sitzung) — damit ein Handy nur
+    den Blackout wieder aufhebt, den es selbst gesetzt hat. Leer ohne Sitzung."""
+    try:
+        g = session.get("geraet")
+        return g if isinstance(g, str) else ""
+    except Exception:
+        return ""
+
+
 def _register_auth(app):
-    """NET-01: Token-Gate. Alle Routen ausser der Allowlist ('/', statische
-    Assets) verlangen eine authentisierte Session. Die '/'-Route macht den
-    Token-Handshake (``?k=<token>``)."""
+    """NET-01 + WEB-12: Gate vor jeder Anfrage. Offen sind nur die Seiten, die
+    den Handshake machen, und die statischen Dateien; jede andere Route braucht
+    das Recht aus ``ROUTEN_RECHTE`` — im Zweifel 403."""
 
     @app.before_request
     def _auth_gate():
-        # never-crash: ein Fehler hier darf den Server nicht lahmlegen — aber auch
-        # nicht ungeschuetzt durchlassen (im Zweifel 403).
         try:
             path = request.path or "/"
-            # Allowlist: Startseite (macht den Handshake) + statische Assets.
-            # WEB-09: die Seite der Handy-Konsole macht denselben Handshake —
-            # so taugt ihr Link mit Schluessel als Lesezeichen auf dem
-            # Startbildschirm. Ausgeliefert wird dort nur die leere Huelle;
-            # jeder Inhalt kommt ueber /api/ bzw. den Socket, also hinter dem Gate.
-            # WEB-11: das Manifest fuer „Zum Startbildschirm" liegt ebenfalls
-            # davor — der Browser holt es ohne Sitzung, und es enthaelt nichts
-            # Geheimes (kein Schluessel, keine Daten der Show).
-            if path in ("/", "/konsole", "/konsole/manifest.webmanifest") \
-                    or path.startswith("/static/"):
+            if path in OFFENE_PFADE or path.startswith("/static/"):
                 return None
-            if session.get("authed") is True:
-                # Security-Review: die Session muss zur AKTUELLEN Auth-Epoche passen
-                # -> ein 'Token neu erzeugen' (epoch++) wirft bestehende Sessions raus.
-                from src.web import remote_settings
-                if session.get("epoch") == remote_settings.get_auth_epoch():
-                    return None
+            regel = request.url_rule.rule if request.url_rule is not None else None
+            recht = ROUTEN_RECHTE.get(regel)
+            if recht is not None and darf(recht):
+                return None
         except Exception as e:
-            print(f"[web] auth gate error: {e}")
+            print(f"[web] auth gate error: {type(e).__name__}")
         return ("Forbidden", 403)
+
+
+def _fehler(code: str, status: int):
+    """WEB-12: einheitliche Fehlerantwort (QA96-17: kaputte Anfrage aendert
+    nichts und sagt es)."""
+    return jsonify({"ok": False, "fehler": code}), status
+
+
+def _zahl(wert, unten: float, oben: float):
+    """Eine endliche Zahl im Bereich [unten, oben] — oder None. ``bool`` und
+    Text zaehlen nicht (ein ``true`` ist kein Fader-Wert). Nicht geklemmt:
+    ausserhalb des Bereichs ist ungueltig."""
+    import math
+    if isinstance(wert, bool) or not isinstance(wert, (int, float)):
+        return None
+    if not math.isfinite(wert) or wert < unten or wert > oben:
+        return None
+    return wert
+
+
+def _laser_gesperrt() -> bool:
+    """Ist der Weg zum Laser zu? (Schalter „Laser vom Handy erlauben“ aus.)"""
+    from src.core.laser import fern_freigabe
+    return not fern_freigabe.laser_erlaubt()
+
+
+def fest_blackout(daten) -> tuple[dict, int]:
+    """WEB-12: Blackout der festen Fernbedienung (HTTP und Socket)."""
+    if not isinstance(daten, dict) or not isinstance(daten.get("enabled"), bool):
+        return {"ok": False, "fehler": "anfrage_ungueltig"}, 400
+    from src.web import fern_pult
+    antwort = fern_pult.blackout_setzen(_get_state().output_manager,
+                                        daten["enabled"], geraet())
+    if not antwort.get("ok"):
+        return antwort, 403
+    return {"ok": True, "blackout": bool(_get_state().output_manager.blackout)}, 200
+
+
+def fest_fader(slot, daten) -> tuple[dict, int]:
+    """WEB-12: Executor-Fader der festen Fernbedienung (HTTP und Socket)."""
+    if not isinstance(daten, dict):
+        return {"ok": False, "fehler": "anfrage_ungueltig"}, 400
+    level = _zahl(daten.get("level"), 0.0, 1.0)
+    if level is None or isinstance(slot, bool) or not isinstance(slot, int):
+        return {"ok": False, "fehler": "wert_ungueltig"}, 400
+    state = _get_state()
+    executors = list(state.playback_engine.executors)
+    idx = slot - 1
+    if not 0 <= idx < len(executors):
+        return {"ok": False, "fehler": "unbekannter_slot"}, 404
+    ex = executors[idx]
+    try:
+        vorher = float(ex.fader_value)
+    except (TypeError, ValueError):
+        vorher = 0.0
+    if level > vorher and _laser_gesperrt():
+        from src.core.laser import fern_freigabe
+        if fern_freigabe.executor_trifft_laser(state, ex):
+            return {"ok": False, "fehler": "laser_gesperrt"}, 403
+    ex.fader_value = float(level)
+    return {"ok": True}, 200
+
+
+def fest_transport(aktion: str) -> tuple[dict, int]:
+    """WEB-12: GO/BACK/STOP der festen Fernbedienung (HTTP und Socket). GO und
+    BACK auf eine Liste mit Laser-Inhalt nur mit dem Schalter; STOP immer."""
+    if aktion != "stop" and _laser_gesperrt():
+        from src.core.cueliste_ziel import transport_cueliste
+        from src.core.laser import fern_freigabe
+        state = _get_state()
+        if fern_freigabe.cueliste_trifft_laser(state, transport_cueliste(state)):
+            return {"ok": False, "fehler": "laser_gesperrt"}, 403
+    return {"ok": True, **_transport_info(aktion)}, 200
 
 
 def _register_routes(app):
 
     def _handshake():
-        # NET-01: Token-Handshake. ``?k=<token>`` per constant-time-Vergleich gegen
-        # das persistierte Token; bei Treffer die Session als authed markieren.
+        # NET-01 + WEB-12: ``?k=<schluessel>`` per constant-time-Vergleich gegen
+        # BEIDE Schluesselarten. Jede gibt nur ihre eigene Rolle. Die Sitzung
+        # bekommt die aktuelle Auth-Epoche gestempelt -> „Schluessel erneuern"
+        # (epoch++) entwertet bestehende Sitzungen im Gate.
         try:
             k = request.args.get("k")
-            if k:
-                import secrets as _secrets
-                from src.web import remote_settings
-                # Laufzeit-Token = app.config (bei create_app aus den Prefs gecacht;
-                # ``refresh_token(app)`` haelt es nach einer Rotation aktuell). Die
-                # Session bekommt die aktuelle Auth-Epoche gestempelt -> ein 'Token
-                # neu erzeugen' (epoch++) invalidiert bestehende Sessions im Gate.
-                token = app.config.get("LIGHTOS_REMOTE_TOKEN") or ""
-                if token and _secrets.compare_digest(str(k), str(token)):
-                    session["authed"] = True
-                    session["epoch"] = remote_settings.get_auth_epoch()
+            if not k:
+                return
+            import secrets as _secrets
+            from src.web import remote_settings
+            epoche = remote_settings.get_auth_epoch()
+            rollen = set(_rollen())             # leer bei alter Epoche
+            for rolle, schluessel in (
+                    (ROLLE_KONSOLE, app.config.get("LIGHTOS_REMOTE_TOKEN") or ""),
+                    (ROLLE_FEST, app.config.get("LIGHTOS_FESTE_TOKEN") or "")):
+                if schluessel and _secrets.compare_digest(str(k), str(schluessel)):
+                    rollen.add(rolle)
+                    session["rollen"] = sorted(rollen)
+                    session["epoch"] = epoche
+                    if not isinstance(session.get("geraet"), str):
+                        session["geraet"] = _secrets.token_hex(8)
         except Exception as e:
-            print(f"[web] handshake error: {e}")
+            print(f"[web] handshake error: {type(e).__name__}")
 
     def _konsole_an() -> bool:
         try:
@@ -424,22 +602,49 @@ def _register_routes(app):
         except Exception:
             return False
 
+    _HINWEIS = ("<!DOCTYPE html><html lang=\"de\"><head><meta charset=\"UTF-8\">"
+                "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                "<title>LightOS Remote</title><style>body{{background:#0d1117;color:#e6edf3;"
+                "font-family:sans-serif;padding:32px 20px;line-height:1.5}}a{{color:#58a6ff}}"
+                "</style></head><body><h1 style=\"font-size:20px\">LightOS Remote</h1>"
+                "<p>{text}</p></body></html>")
+
     @app.route("/")
     def index():
         _handshake()
-        # WEB-09: die feste Seite verlinkt auf die Handy-Konsole, wenn sie
-        # eingeschaltet ist.
-        return render_template("index.html", konsole_an=_konsole_an())
+        rollen = _rollen()
+        if darf(RECHT_FEST, rollen):
+            # WEB-09: die feste Seite verlinkt auf die Handy-Konsole, wenn sie
+            # eingeschaltet ist UND diese Sitzung sie oeffnen darf.
+            return render_template(
+                "index.html",
+                konsole_an=_konsole_an() and darf(RECHT_KONSOLE, rollen),
+                roh_dmx=darf(RECHT_ROH_DMX, rollen))
+        if ROLLE_KONSOLE in rollen:
+            # WEB-12: der Schluessel der Handy-Konsole oeffnet die feste Seite
+            # nicht — er fuehrt zur Konsole.
+            return _HINWEIS.format(
+                text="Dieser Link gehört zur <a href=\"/konsole\">Handy-Konsole</a>.")
+        if ROLLE_FEST in rollen:
+            return _HINWEIS.format(
+                text="Die feste Fernbedienung ist ausgeschaltet. Einschalten am Pult: "
+                     "Ausgabe → Web-Remote: Verbindung & Token → Erweitert.")
+        return _HINWEIS.format(
+            text="Kein Zugang. Den Link oder QR-Code aus LightOS öffnen "
+                 "(Ausgabe → Web-Remote: Verbindung & Token).")
 
     @app.route("/konsole")
     def konsole_seite():
         # WEB-09: die Handy-Konsole. Die Seite selbst traegt keine Daten der
         # Show — Seiten und Zustand holt sie ueber /api/vc/konsole und den Socket.
         _handshake()
-        antwort = app.make_response(render_template("konsole.html"))
+        antwort = app.make_response(render_template(
+            "konsole.html", feste_seite=darf(RECHT_FEST)))
         # Nie aus dem Zwischenspeicher: nach einem Update soll das Handy nicht
         # mit einer alten Seite gegen eine neue Schnittstelle sprechen.
         antwort.headers["Cache-Control"] = "no-store"
+        # WEB-12: der Link mit Schluessel soll nicht als Referer weitergehen.
+        antwort.headers["Referrer-Policy"] = "no-referrer"
         return antwort
 
     @app.route("/konsole/manifest.webmanifest")
@@ -480,68 +685,69 @@ def _register_routes(app):
             "mock_mode": state.mock_mode,
         })
 
+    # UI-66: GO/BACK/STOP treffen die Transport-Ziel-Liste (gewaehlte, wenn auf
+    # einem Executor; sonst erster Executor der aktuellen Page mit Liste; ...) —
+    # dieselbe wie Leertaste, Kommandozeile und OSC. Antwort nennt 'liste' +
+    # 'licht' (+ 'warnung'). WEB-04/A3D-40: der Snapshot gegen ein gleichzeitiges
+    # Leeren der Listen liegt in cueliste_ziel.
     @app.route("/api/go", methods=["POST"])
     def api_go():
-        # WEB-04/A3D-40: echten Snapshot ziehen (list(...)). Die 'lokale Referenz'
-        # allein war KEIN Schutz — sie aliast dieselbe Live-Liste, die show_file beim
-        # Laden per cue_stacks.clear() IN-PLACE leert; zwischen 'if stacks:' und
-        # 'stacks[0]' gab das weiterhin einen IndexError (HTTP 500). list(...) kopiert
-        # -> index-sicher (identisches Muster wie /api/status). Den Snapshot zieht
-        # jetzt cueliste_ziel.ziel_cueliste.
-        # UI-66: trifft die Transport-Ziel-Liste (gewaehlte, wenn auf einem
-        # Executor; sonst erster Executor der aktuellen Page mit Liste; ...) —
-        # dieselbe wie Leertaste, Kommandozeile und OSC (frueher fest
-        # cue_stacks[0]). Antwort nennt 'liste' + 'licht' (+ 'warnung').
-        return _transport_antwort("go")
+        antwort, code = fest_transport("go")
+        return jsonify(antwort), code
 
     @app.route("/api/back", methods=["POST"])
     def api_back():
-        return _transport_antwort("back")   # UI-66, s. api_go
+        antwort, code = fest_transport("back")
+        return jsonify(antwort), code
 
     @app.route("/api/stop", methods=["POST"])
     def api_stop():
-        # STOP-Button im Remote-UI stoppt die laufende Cueliste (Pendant zu
-        # go/back). Vorher rief das Frontend die nicht existierende Route
-        # /api/executor/1/back auf -> stiller 404, STOP tat nichts.
-        return _transport_antwort("stop")   # UI-66, s. api_go
+        antwort, code = fest_transport("stop")
+        return jsonify(antwort), code
 
     @app.route("/api/blackout", methods=["POST"])
     def api_blackout():
-        data = request.get_json(silent=True) or {}
-        enabled = bool(data.get("enabled", False))
-        _get_state().output_manager.set_blackout(enabled)
-        return jsonify({"ok": True, "blackout": enabled})
+        # WEB-12 (QA96-17): ohne gueltiges ``enabled`` bleibt alles, wie es ist.
+        antwort, code = fest_blackout(request.get_json(silent=True))
+        return jsonify(antwort), code
 
     @app.route("/api/executor/<int:slot>/fader", methods=["POST"])
     def api_fader(slot: int):
-        data = request.get_json(silent=True) or {}
-        level = _num(data, "level", 1.0, float)   # WEB-02: kein 500 bei kaputtem Payload
-        state = _get_state()
-        executors = state.playback_engine.executors
-        idx = slot - 1
-        if 0 <= idx < len(executors):
-            executors[idx].fader_value = max(0.0, min(1.0, level))
-        return jsonify({"ok": True})
+        antwort, code = fest_fader(slot, request.get_json(silent=True))
+        return jsonify(antwort), code
 
     @app.route("/api/executor/<int:slot>/go", methods=["POST"])
     def api_exec_go(slot: int):
         state = _get_state()
-        executors = state.playback_engine.executors
+        executors = list(state.playback_engine.executors)
         idx = slot - 1
-        if 0 <= idx < len(executors):
-            executors[idx].press_btn("go")
+        if not 0 <= idx < len(executors):
+            return _fehler("unbekannter_slot", 404)
+        if _laser_gesperrt():
+            from src.core.laser import fern_freigabe
+            if fern_freigabe.executor_trifft_laser(state, executors[idx]):
+                return _fehler("laser_gesperrt", 403)
+        executors[idx].press_btn("go")
         return jsonify({"ok": True})
 
     @app.route("/api/channel/<int:universe>/<int:channel>", methods=["POST"])
     def api_channel(universe: int, channel: int):
-        data = request.get_json(silent=True) or {}
-        value = _num(data, "value", 0, int)      # WEB-02: kein 500 bei kaputtem Payload
+        data = request.get_json(silent=True)
+        wert = _zahl(data.get("value") if isinstance(data, dict) else None, 0, 255)
+        if wert is None or wert != int(wert):
+            return _fehler("wert_ungueltig", 400)
         state = _get_state()
+        if not 1 <= channel <= 512 or universe not in state.universes:
+            return _fehler("unbekannter_kanal", 404)
+        if _laser_gesperrt():
+            from src.core.laser import fern_freigabe
+            if fern_freigabe.adresse_ist_laser(state, universe, channel):
+                return _fehler("laser_gesperrt", 403)
         # WEB-01: nicht mehr direkt ins Live-Universe (der 44-Hz-Renderer
         # ueberschriebe gepatchte Kanaele jeden Frame), sondern ueber die
         # Input-Override-Schicht — haelt als diskreter Einzelbefehl (REPLACE,
-        # vom Source-Timeout ausgenommen). Range-Guards liegen in set_input_channel.
-        state.set_input_channel(universe, channel, value, source="web")
+        # vom Source-Timeout ausgenommen).
+        state.set_input_channel(universe, channel, int(wert), source="web")
         return jsonify({"ok": True})
 
     @app.route("/api/programmer/clear", methods=["POST"])
@@ -550,11 +756,8 @@ def _register_routes(app):
         return jsonify({"ok": True})
 
     # ── WEB-08: VC-Widgets ueber ihre Kennung ─────────────────────────────────
-    # Grundlage der Handy-Konsole (WEB-07). Beide Routen liegen hinter demselben
-    # Schluessel-Gate wie alles unter /api/ (``_auth_gate`` kennt nur '/' und
-    # '/static/' als Ausnahmen). Zusaetzlich standardmaessig AUS
-    # (``remote_settings.vc_remote_enabled``): ohne Auswahl, welche Widgets aufs
-    # Handy duerfen, gaebe die Schnittstelle sonst jedes fernbedienbare frei.
+    # Grundlage der Handy-Konsole (WEB-07). Recht ``konsole`` (WEB-12) und
+    # zusaetzlich standardmaessig AUS (``remote_settings.vc_remote_enabled``).
     # Die Aktion laeuft im UI-Thread (``VCFernbedienung``), nie hier.
 
     @app.route("/api/vc/widgets")
@@ -566,8 +769,12 @@ def _register_routes(app):
     def api_vc_widget_aktion(kennung: str):
         from src.web import vc_remote
         data = request.get_json(silent=True)
-        if not isinstance(data, dict):
+        if not isinstance(data, dict) or not isinstance(data.get("aktion"), str):
             antwort = {"ok": False, "fehler": "anfrage_ungueltig"}
+        elif data["aktion"] in ("druecken", "loslassen"):
+            # WEB-12: Halten geht nur ueber den Socket — nur dort laesst eine
+            # abgerissene Verbindung los, was sie haelt. Ueber HTTP ein Tipp.
+            antwort = {"ok": False, "fehler": "nur_ueber_socket"}
         else:
             antwort = vc_remote.widget_aktion(kennung, data.get("aktion"),
                                               data.get("wert"))
@@ -589,64 +796,86 @@ def _register_routes(app):
         if not isinstance(data, dict):
             antwort = {"ok": False, "fehler": "anfrage_ungueltig"}
         else:
-            antwort = vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"))
+            antwort = vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"),
+                                     geraet=geraet())
         return jsonify(antwort), vc_remote.status_fuer(antwort)
 
 
 def _register_socketio(sio):
 
+    from flask_socketio import join_room, disconnect
+    from src.web import vc_remote
+
+    def _berechtigt(recht: str):
+        """WEB-12 (QA96-20): JEDES Ereignis prueft selbst — eine offene
+        Verbindung laeuft nicht mehr durch das HTTP-Gate. Gilt die Sitzung gar
+        nicht mehr (Schluessel erneuert), wird getrennt. Rueckgabe: None = darf,
+        sonst die Fehlerantwort."""
+        rollen = _rollen()
+        if not rollen:
+            try:
+                disconnect()
+            except Exception:
+                pass
+            return {"ok": False, "fehler": "kein_zugang"}
+        if not darf(recht, rollen):
+            return {"ok": False, "fehler": "kein_recht"}
+        return None
+
     @sio.on("connect")
-    def on_connect():
+    def on_connect(auth=None):
         # NET-01/NET-03: unauthentisierte WebSocket-Verbindung ablehnen — das ist
         # zugleich der Riegel gegen Drive-by-WebSockets (der CORS-Check greift bei
-        # WS nicht zuverlaessig). Nur eine Session mit erfolgtem Token-Handshake
-        # darf verbinden.
+        # WS nicht zuverlaessig). CDX-24: auch die Epoche (in ``_rollen``).
         try:
-            if session.get("authed") is not True:
-                return False
-            # CDX-24: auch die EPOCHE pruefen, genau wie das HTTP-Gate. Sonst
-            # duerfte eine Session, die vor einer Token-Rotation authentisiert
-            # wurde, danach noch neu verbinden — die Rotation soll aber ALLE
-            # bisherigen Anmeldungen entwerten.
-            from src.web import remote_settings
-            if session.get("epoch") != remote_settings.get_auth_epoch():
+            if not _rollen():
                 return False
         except Exception as e:
-            print(f"[web] socket connect gate error: {e}")
+            print(f"[web] socket connect gate error: {type(e).__name__}")
             return False
-        state = _get_state()
-        emit("status", {"fixtures": len(state.get_patched_fixtures())})
+        if darf(RECHT_FEST):
+            state = _get_state()
+            emit("status", {"fixtures": len(state.get_patched_fixtures())})
+
+    # ── feste Fernbedienung ───────────────────────────────────────────────────
+    # WEB-12: Antwort nur an den Absender (frueher ``sio.emit`` an ALLE —
+    # auch an die Handys der Konsole) und als Rueckgabe fuer den Rueckruf.
+
+    def _transport(aktion):
+        nein = _berechtigt(RECHT_FEST)
+        if nein:
+            return nein
+        antwort, _code = fest_transport(aktion)
+        emit("ack", {"action": aktion, **antwort})
+        return antwort
 
     @sio.on("go")
     def on_go(data=None):
-        # UI-66: Transport-Ziel-Liste (cueliste_ziel.py), s. api_go.
-        sio.emit("ack", {"action": "go", **_transport_info("go")})
+        return _transport("go")
 
     @sio.on("back")
     def on_back(data=None):
-        # UI-66: Transport-Ziel-Liste (cueliste_ziel.py), s. api_go.
-        sio.emit("ack", {"action": "back", **_transport_info("back")})
+        return _transport("back")
 
     @sio.on("stop")
     def on_stop(data=None):
-        # UI-66: Transport-Ziel-Liste (cueliste_ziel.py), s. api_go.
-        sio.emit("ack", {"action": "stop", **_transport_info("stop")})
+        return _transport("stop")
 
     @sio.on("fader")
     def on_fader(data=None):
-        data = data or {}                     # WEB-03: leerer Emit -> kein AttributeError
-        slot = _num(data, "slot", 1, int)     # WEB-02: kein Handler-Crash bei kaputtem Payload
-        level = _num(data, "level", 1.0, float)
-        state = _get_state()
-        idx = slot - 1
-        if 0 <= idx < len(state.playback_engine.executors):
-            state.playback_engine.executors[idx].fader_value = max(0.0, min(1.0, level))
+        nein = _berechtigt(RECHT_FEST)
+        if nein:
+            return nein
+        if not isinstance(data, dict):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        return fest_fader(data.get("slot"), data)[0]
 
     @sio.on("blackout")
     def on_blackout(data=None):
-        data = data or {}                     # WEB-03: leerer Emit -> kein AttributeError
-        enabled = bool(data.get("enabled", False))
-        _get_state().output_manager.set_blackout(enabled)
+        nein = _berechtigt(RECHT_FEST)
+        if nein:
+            return nein
+        return fest_blackout(data)[0]
 
     # ── WEB-09: Handy-Konsole ueber den Socket ────────────────────────────────
     #
@@ -655,13 +884,6 @@ def _register_socketio(sio):
     # Aktionen Handy -> Pult: dieselbe Pruefkette wie ueber HTTP
     # (``vc_remote.widget_aktion``), nur ohne den Aufbau einer Anfrage je
     # Fader-Schritt.
-    #
-    # ⚠️ Der Schluessel wird beim Verbinden geprueft (``on_connect``) — eine
-    # offene Verbindung laeuft danach aber nicht mehr durch das HTTP-Gate. Jedes
-    # Ereignis der Handy-Konsole prueft deshalb selbst noch einmal Anmeldung UND
-    # Epoche und trennt die Verbindung, wenn sie nicht (mehr) gilt.
-    from flask_socketio import join_room, disconnect
-    from src.web import vc_remote
 
     RAUM = "vc_konsole"
     # Je Verbindung und Widget die Nummer des letzten Fader-Werts. Socket.IO
@@ -675,20 +897,6 @@ def _register_socketio(sio):
         sio.emit(ereignis, daten, to=RAUM)
 
     vc_remote.setze_sender(_senden)
-
-    def _berechtigt() -> bool:
-        try:
-            from src.web import remote_settings
-            if (session.get("authed") is True
-                    and session.get("epoch") == remote_settings.get_auth_epoch()):
-                return True
-        except Exception as e:
-            print(f"[web] socket gate error: {e}")
-        try:
-            disconnect()
-        except Exception:
-            pass
-        return False
 
     def _veraltet(sid, schluessel, nummer) -> bool:
         """True, wenn zu ``schluessel`` schon ein Wert mit hoeherer Nummer kam."""
@@ -706,8 +914,9 @@ def _register_socketio(sio):
         """Das Handy zeigt die Konsole an: als Zuschauer fuehren und den ganzen
         Stand schicken. Kommt nach JEDEM Verbinden — das ist der vollstaendige
         Abgleich nach einer Wiederverbindung."""
-        if not _berechtigt():
-            return {"ok": False, "fehler": "kein_zugang"}
+        nein = _berechtigt(RECHT_KONSOLE)
+        if nein:
+            return nein
         join_room(RAUM)
         vc_remote.zuschauer_dazu(request.sid)   # VOR dem Abgleich, s. Bruecke
         stand = vc_remote.konsole()
@@ -716,8 +925,9 @@ def _register_socketio(sio):
 
     @sio.on("vc_aktion")
     def on_vc_aktion(data=None):
-        if not _berechtigt():
-            return {"ok": False, "fehler": "kein_zugang"}
+        nein = _berechtigt(RECHT_KONSOLE)
+        if nein:
+            return nein
         if not isinstance(data, dict):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         kennung, aktion = data.get("id"), data.get("aktion")
@@ -727,30 +937,27 @@ def _register_socketio(sio):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         if aktion == "setzen" and _veraltet(request.sid, kennung, data.get("n")):
             return {"ok": True, "veraltet": True}
-        antwort = vc_remote.widget_aktion(kennung, aktion, data.get("wert"))
-        if aktion == "druecken" and antwort.get("ok"):
-            vc_remote.gehalten_merken(request.sid, kennung, True)
-        elif aktion == "loslassen":
-            hielt = kennung in vc_remote.gehaltene(request.sid)
-            vc_remote.gehalten_merken(request.sid, kennung, False)
-            if hielt and not antwort.get("ok"):
-                # Das Loslassen kam nicht an (Oberflaeche antwortete nicht
-                # rechtzeitig, Widget inzwischen von der Seite genommen) — die
-                # Taste gilt hier aber nicht mehr als gehalten, ein spaeterer
-                # Verbindungsabbruch liesse sie also auch nicht mehr los.
-                # Deshalb jetzt ueber den Weg, der nicht verfaellt.
-                vc_remote.loslassen([kennung])
-        return antwort
+        if aktion == "druecken":
+            # WEB-12 (Codex #1030/#1039/#1041): gehalten wird je Halter
+            # gezaehlt — ein Druck auf eine Taste, die schon das Pult oder ein
+            # anderes Handy haelt, macht dieses Handy nicht zum Halter, der sie
+            # beim Loslassen oder Abreissen wieder loslaesst.
+            return vc_remote.halten(request.sid, kennung)
+        if aktion == "loslassen":
+            return vc_remote.loslassen_von(request.sid, kennung)
+        return vc_remote.widget_aktion(kennung, aktion, data.get("wert"))
 
     @sio.on("vc_pult")
     def on_vc_pult(data=None):
-        if not _berechtigt():
-            return {"ok": False, "fehler": "kein_zugang"}
+        nein = _berechtigt(RECHT_KONSOLE)
+        if nein:
+            return nein
         if not isinstance(data, dict):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         if "gm" in data and _veraltet(request.sid, "#gm", data.get("n")):
             return {"ok": True, "veraltet": True}
-        return vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"))
+        return vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"),
+                              geraet=geraet())
 
     @sio.on("disconnect")
     def on_disconnect(*_args):
@@ -783,16 +990,17 @@ def start_server(port: int = 5000):
         raise RuntimeError("Flask / flask-socketio not installed")
 
     app, _sio = create_app(port)   # _sio == _socketio-Global (Middleware sitzt an app)
-    # NET-01: Bind-Host am Toggle 'LAN-/Handy-Remote' ausrichten. AN (Default) ->
-    # 0.0.0.0 (das Handy im LAN erreicht es, Token schuetzt). AUS -> 127.0.0.1
-    # (nur der Host selbst, kein LAN-Zugriff).
-    host = "0.0.0.0"
+    # NET-01: Bind-Host am Toggle 'LAN-/Handy-Remote' ausrichten. AN -> 0.0.0.0
+    # (das Handy im LAN erreicht es, der Schluessel schuetzt). AUS (ab Werk,
+    # WEB-12) -> 127.0.0.1 (nur der Host selbst, kein LAN-Zugriff).
+    # WEB-12: im Zweifel nur dieser PC (die Einstellung ist ab Werk aus).
+    host = "127.0.0.1"
     try:
         from src.web import remote_settings
-        if not remote_settings.is_lan_remote_enabled():
-            host = "127.0.0.1"
+        if remote_settings.is_lan_remote_enabled():
+            host = "0.0.0.0"
     except Exception as e:
-        print(f"[web] lan-remote flag read error: {e}")
+        print(f"[web] lan-remote flag read error: {type(e).__name__}")
     # NET-09: Frueher lief der Server via ``sio.run(app, ...)`` — das ruft intern
     # ``werkzeug.serving.run_simple`` (bzw. ``make_server(...).serve_forever()``),
     # gibt aber KEIN Server-Handle her, und ``socketio.stop()`` beendet den
@@ -904,6 +1112,9 @@ def stop_server():
         from src.web import vc_remote
         vc_remote.alle_loslassen()
         vc_remote.setze_sender(None)
+        # WEB-12: wer einen Blackout gesetzt hat, gilt mit dem Server nicht mehr.
+        from src.web import fern_pult
+        fern_pult.vergessen()
     except Exception as e:
         print(f"[web] vc_remote shutdown error: {e}")
     # CDX-24: Globals mit abraeumen — sonst meldet `refresh_running_token()` auch

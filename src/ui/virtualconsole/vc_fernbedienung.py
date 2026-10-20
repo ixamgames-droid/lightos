@@ -37,8 +37,17 @@ Tastatur: beide betreffen nur Maus und Finger am Pult.
 * *Laser scharf/unscharf*: aus der Ferne nur UNSCHARF. Scharf geschaltet wird
   am Pult — dort steht jemand, der den Raum sieht. Das Web-Remote konnte den
   Laser bisher nicht scharf schalten, und dabei bleibt es.
-* *Laser-Muster abrufen* ist nicht fernbedienbar: auf DMX-Lasern wirkt ein
-  Muster ohne Scharfschaltung direkt auf die Ausgabe.
+* *Laser-Inhalt* (WEB-12, Entscheidung des Projektinhabers vom 12.10.2026):
+  ein Element, das einen Laser ansteuert — Laser-Muster, eine Funktion/Szene/
+  Cueliste mit Laser-Geraeten, ein Fader auf Laser-Kanaelen oder Grand Master
+  bei gepatchtem Laser —, ist vom Handy nur bedienbar, wenn am Pult „Laser vom
+  Handy erlauben“ an ist (:func:`laser_inhalt`, ``laser_gesperrt``). Geprueft
+  wird bei JEDER Aktion neu: auch ein nachtraeglich umgestelltes Element und
+  eines, das „Automatisch fuellen“ aufs Handy gelegt hat, ist gesperrt.
+  Loslassen und STOP gehen immer.
+* *Blackout aus Zusatzaktionen*: eine Taste, deren Zusatzaktion den
+  Blackout-Schalter AUS legt, wird abgelehnt, solange der Schalter steht
+  (WEB-12 — das Handy hebt keinen fremden Blackout auf).
 
 **WEB-09: Handy-Seiten, Freigabe und Rueckmeldung**
 
@@ -74,6 +83,8 @@ WERT_UNGUELTIG = "wert_ungueltig"
 NUR_AM_PULT = "nur_am_pult"
 KEINE_KONSOLE = "keine_konsole"
 NICHT_FREIGEGEBEN = "nicht_freigegeben"     # WEB-09: liegt auf keiner Handy-Seite
+LASER_GESPERRT = "laser_gesperrt"           # WEB-12: Laser-Inhalt ohne Schalter
+BLACKOUT_NICHT_VON_HIER = "blackout_nicht_von_hier"   # WEB-12
 ZEITUEBERSCHREITUNG = "zeitueberschreitung"
 FEHLER = "fehler"
 
@@ -94,9 +105,8 @@ def _art(widget) -> str | None:
     """
     name = type(widget).__name__
     if name == "VCButton":
-        from .vc_button import ButtonAction
-        if getattr(widget, "action", None) == ButtonAction.LASER_PATTERN:
-            return None             # s. Modulkopf, Sicherheit
+        # WEB-12: auch Laser-Muster — gesperrt ist es dann ueber den Schalter
+        # „Laser vom Handy erlauben“ (``laser_inhalt``), nicht ueber den Typ.
         return "taste"
     if name == "VCSlider":
         return "fader"
@@ -145,6 +155,185 @@ def _cue_auskunft(cue) -> dict | None:
     return {"nummer": nummer, "name": str(getattr(cue, "label", "") or "")}
 
 
+# ── WEB-12: Laser-Inhalt ─────────────────────────────────────────────────────
+
+def _harmlose_tastenaktionen():
+    from .vc_button import ButtonAction as A
+    # Aktionen, die keinen Laser einschalten koennen (dunkel, stoppen, Tempo,
+    # Auswahl, Musik). Der NOT-AUS und Scharf/Unscharf haben eigene Regeln.
+    return {A.BLACKOUT, A.STOP_ALL, A.CLEAR, A.TAP, A.AUDIO_BPM, A.BPM_NUDGE_UP,
+            A.BPM_NUDGE_DOWN, A.BPM_MODE_TOGGLE, A.SELECT_GROUP, A.MEDIA_PLAY_PAUSE,
+            A.MEDIA_NEXT, A.MEDIA_PREV, A.TAP_BUS, A.SYNC_BUS, A.ARM_BUS, A.FREEZE,
+            A.STOP_EFFECTS, A.AUTO_SYNC, A.LASER_ESTOP, A.LASER_ARM}
+
+
+_snapshot_cache: tuple = (None, None, {})   # (Pfad, mtime, {index: fids})
+
+
+def _snapshot_fids(index) -> set | None:
+    """Geraete eines gespeicherten Snapshots — None, wenn nicht lesbar."""
+    global _snapshot_cache
+    try:
+        import json
+        import os
+        from .vc_button import _SNAPSHOTS_FILE as pfad
+        if not os.path.isfile(pfad):
+            return set()
+        mtime = os.path.getmtime(pfad)
+        alt_pfad, alt_mtime, tabelle = _snapshot_cache
+        if alt_pfad != pfad or alt_mtime != mtime:
+            with open(pfad, encoding="utf-8") as f:
+                daten = json.load(f)
+            tabelle = {}
+            for i, eintrag in enumerate(daten if isinstance(daten, list) else []):
+                werte = (eintrag or {}).get("values", {}) if isinstance(eintrag, dict) else {}
+                tabelle[i] = set(werte) if isinstance(werte, dict) else set()
+            _snapshot_cache = (pfad, mtime, tabelle)
+        return tabelle.get(int(index), set())
+    except Exception:
+        return None
+
+
+def _snap_fids(snap_id) -> set | None:
+    try:
+        from src.core.engine.snap_library import get_snap_library
+        snap = get_snap_library().get(int(snap_id))
+        return set((snap.values or {}).keys()) if snap is not None else set()
+    except Exception:
+        return None
+
+
+def _eintrag_laser(state, typ, eintrag) -> bool:
+    """Eine Zusatzaktion (BTN-01) einer Taste."""
+    from src.core.laser import fern_freigabe as ff
+    if typ in ("function", "funktion"):
+        return ff.funktion_trifft_laser(state, eintrag.get("function_id"))
+    if typ == "effect_action":
+        fid = eintrag.get("function_id")
+        return True if fid is None else ff.funktion_trifft_laser(state, fid)
+    if typ == "snapshot":
+        idx = eintrag.get("snapshot_index")
+        fids = _snapshot_fids(idx) if idx is not None else set()
+        return True if fids is None else ff.fids_treffen_laser(state, fids)
+    if typ == "library_snap":
+        fids = _snap_fids(eintrag.get("snap_id"))
+        return True if fids is None else ff.fids_treffen_laser(state, fids)
+    if typ in ("blackout", "stop_all", "clear"):
+        return False
+    return eintrag.get("function_id") is not None and ff.funktion_trifft_laser(
+        state, eintrag.get("function_id"))
+
+
+def _taste_laser(widget, state) -> bool:
+    from src.core.laser import fern_freigabe as ff
+    from .vc_button import ButtonAction as A
+    for eintrag in list(getattr(widget, "actions", None) or ()):
+        if isinstance(eintrag, dict) and _eintrag_laser(
+                state, str(eintrag.get("type", "")), eintrag):
+            return True
+    a = getattr(widget, "action", None)
+    if a in _harmlose_tastenaktionen():
+        return False
+    fids_fn = list(widget._all_function_ids())
+    if any(ff.funktion_trifft_laser(state, f) for f in fids_fn):
+        return True
+    if a == A.EFFECT_ACTION and not fids_fn:
+        return True                     # wirkt auf den gerade aktiven Effekt
+    if a == A.LIBRARY_SNAP:
+        for sid in widget._all_snap_ids():
+            fids = _snap_fids(sid)
+            if fids is None or ff.fids_treffen_laser(state, fids):
+                return True
+    if a == A.SNAPSHOT and getattr(widget, "snapshot_index", None) is not None:
+        fids = _snapshot_fids(widget.snapshot_index)
+        if fids is None or ff.fids_treffen_laser(state, fids):
+            return True
+    return False
+
+
+def _fader_laser(widget, state) -> bool:
+    from src.core.laser import fern_freigabe as ff
+    from .vc_slider import SliderMode as M
+    m = getattr(widget, "mode", None)
+    if m in (M.BPM, M.SPEED, M.TEMPO_BUS):
+        return False                    # nur Tempo
+    if m == M.LEVEL:
+        return ff.adresse_ist_laser(state, widget.dmx_universe, widget.dmx_channel)
+    if m == M.PLAYBACK:
+        slot = getattr(widget, "playback_slot", None)
+        if slot is None:
+            return False
+        executors = list(state.playback_engine.executors)
+        return 0 <= slot < len(executors) and ff.executor_trifft_laser(
+            state, executors[slot])
+    if m == M.SUBMASTER:
+        fids, _heads = widget._submaster_targets(state)
+        return True if fids is None else ff.fids_treffen_laser(state, fids)
+    if m in (M.GROUP_DIMMER, M.FEATURE_DIMMER) or (
+            m == M.PROGRAMMER and widget.programmer_scope == "group"
+            and widget.programmer_group):
+        return ff.fids_treffen_laser(state, widget._group_fids(state, widget.programmer_group))
+    if m in (M.EFFECT_INTENSITY, M.EFFECT_SPEED, M.EFFECT_PARAM):
+        ids = list(widget._all_target_fids())
+        return True if not ids else any(ff.funktion_trifft_laser(state, i) for i in ids)
+    # GRANDMASTER und PROGRAMMER (alle / Auswahl): erreicht jeden Laser.
+    return True
+
+
+def laser_inhalt(widget, state=None) -> bool:
+    """WEB-12: steuert dieses Element einen Laser an? Im UI-Thread aufrufen.
+    Im Zweifel ja — aber nur, wenn ueberhaupt ein Laser im Patch steht (Laser-
+    Muster zaehlen immer). Wirft nie."""
+    try:
+        name = type(widget).__name__
+        if name == "VCButton":
+            from .vc_button import ButtonAction as A
+            if getattr(widget, "action", None) == A.LASER_PATTERN:
+                return True
+        if state is None:
+            from src.core.app_state import get_state
+            state = get_state()
+        from src.core.laser import fern_freigabe as ff
+        if not ff.gibt_laser(state):
+            return False
+        if name == "VCButton":
+            return _taste_laser(widget, state)
+        if name == "VCSlider":
+            return _fader_laser(widget, state)
+        if name == "VCCueList":
+            return ff.executor_trifft_laser(state, widget._executor())
+        return False
+    except Exception as e:
+        print(f"[vc_fernbedienung] ERROR: Laser-Pruefung {type(widget).__name__}: "
+              f"{type(e).__name__}")
+        return True
+
+
+def _laser_gesperrt(widget) -> bool:
+    from src.core.laser import fern_freigabe as ff
+    return laser_inhalt(widget) and not ff.laser_erlaubt()
+
+
+def _ziel_fehlt(widget) -> list[str]:
+    """WEB-12 (QA96-19): verlorene Ziele, die das Pult am Element mit rotem
+    Rahmen zeigt — Funktion geloescht (tote Bindung) oder Blackout-Ziel weg.
+    Das Handy zeigt sie ebenfalls, statt die Taste unbedarft „aktiv“ zu
+    zeichnen."""
+    if type(widget).__name__ != "VCButton":
+        return []
+    raus = []
+    try:
+        if widget._binding_unresolved():
+            raus.append("Funktion nicht gefunden")
+    except Exception:
+        pass
+    try:
+        raus += [f"Blackout-Ziel verloren: {t}" for t in widget._blackout_verloren_anzeige()]
+    except Exception:
+        pass
+    return raus
+
+
 def beschreibe(widget) -> dict | None:
     """Fernbedien-Auskunft zu einem Widget — oder None, wenn es nicht
     fernbedienbar ist. Nur JSON-taugliche Werte. Im UI-Thread aufrufen."""
@@ -159,7 +348,16 @@ def beschreibe(widget) -> dict | None:
         "textfarbe": _farbe(widget, "_fg_color"),
         "bank": int(getattr(widget, "bank", -1)),
         "gruppe": _gruppe(widget),
+        # WEB-12: Laser-Inhalt und ob er gerade gesperrt ist (Schalter aus),
+        # verlorene Ziele (QA96-19).
+        "laser": bool(laser_inhalt(widget)),
+        "gesperrt": None,
+        "ziel_fehlt": _ziel_fehlt(widget),
     }
+    if d["laser"]:
+        from src.core.laser import fern_freigabe as _ff
+        if not _ff.laser_erlaubt():
+            d["gesperrt"] = "laser"
     if art == "taste":
         aktion = getattr(widget, "action", None)
         d["funktion"] = str(getattr(aktion, "value", aktion) or "")
@@ -204,6 +402,14 @@ def _fader_wert(wert) -> int | None:
     return max(0, min(255, int(round(wert))))
 
 
+def _hebt_blackout_auf(widget) -> bool:
+    """Legt eine Zusatzaktion der Taste den Blackout-Schalter AUS?"""
+    for e in list(getattr(widget, "actions", None) or ()):
+        if isinstance(e, dict) and e.get("type") == "blackout" and e.get("mode") == "off":
+            return True
+    return False
+
+
 def _taste_ausfuehren(widget, aktion: str) -> dict:
     from .vc_button import ButtonAction
     druck = aktion in ("druecken", "umschalten")
@@ -211,14 +417,21 @@ def _taste_ausfuehren(widget, aktion: str) -> dict:
             and not widget._aktionszustand()):
         # Der Laser ist unscharf — ein Druck schaltete ihn scharf. Nur am Pult.
         return _nein(NUR_AM_PULT)
+    if druck and _hebt_blackout_auf(widget):
+        from src.core.app_state import get_state
+        if get_state().output_manager.blackout_schalter:
+            return _nein(BLACKOUT_NICHT_VON_HIER)
+    ausgeloest = False
     if aktion == "druecken":
-        widget.fern_taste(True)
+        ausgeloest = widget.fern_taste(True)
     elif aktion == "loslassen":
-        widget.fern_taste(False)
+        ausgeloest = widget.fern_taste(False)
     else:                                   # ein Tipp: Druck und Loslassen
-        widget.fern_taste(True)
+        ausgeloest = widget.fern_taste(True)
         widget.fern_taste(False)
-    return {"ok": True}
+    # WEB-12: ``ausgeloest`` = DIESER Druck hat die Taste gedrueckt (sie war
+    # nicht schon gehalten) — daran haengt, wer sie wieder loslassen darf.
+    return {"ok": True, "ausgeloest": bool(ausgeloest)}
 
 
 def ausfuehren(widget, aktion, wert=None) -> dict:
@@ -231,6 +444,10 @@ def ausfuehren(widget, aktion, wert=None) -> dict:
                "cueliste": AKTIONEN_CUELISTE}[art]
     if not isinstance(aktion, str) or aktion not in erlaubt:
         return _nein(AKTION_UNBEKANNT)
+    # WEB-12: Laser-Inhalt nur mit dem Schalter. Loslassen und STOP gehen
+    # immer — sie machen nichts an, und ein gehaltener Flash muss los koennen.
+    if aktion not in ("loslassen", "stop") and _laser_gesperrt(widget):
+        return _nein(LASER_GESPERRT)
     try:
         # Der Laser-NOT-AUS ist aus der Ferne nicht aufhebbar (s. Modulkopf):
         # alles, was die Aktion in den Programmer schreibt, laesst den Latch stehen.
@@ -351,9 +568,14 @@ class VCFernbedienung(QObject):
                 if auftrag.zustand == "wartet":
                     auftrag.zustand = "verworfen"
                     return bei_fehler(ZEITUEBERSCHREITUNG)
-            # Der UI-Thread hat gerade doch begonnen: zu Ende laufen lassen,
-            # sonst meldeten wir „nicht ausgefuehrt" fuer etwas, das geschieht.
-            auftrag.fertig.wait(self.ZEITLIMIT_S)
+            # Der UI-Thread hat gerade doch begonnen: zu Ende laufen lassen und
+            # das ECHTE Ergebnis melden. WEB-12 (Codex zu #1028): frueher wurde
+            # nach einer zweiten Wartezeit „Fehler“ gemeldet, obwohl die Aktion
+            # noch lief — das Handy versuchte es erneut und loeste einen
+            # Umschalter oder eine Cue doppelt aus. Was im UI-Thread begonnen
+            # hat, endet dort auch (``_bearbeite`` setzt ``fertig`` im
+            # ``finally``); bis dahin wird gewartet.
+            auftrag.fertig.wait()
         if auftrag.ergebnis is None:
             return bei_fehler(FEHLER)
         return auftrag.ergebnis
@@ -471,12 +693,18 @@ class VCFernbedienung(QObject):
         """Grand Master (0..255) und Blackout — was am Handy fest unten steht."""
         try:
             from src.core.app_state import get_state
-            om = get_state().output_manager
+            state = get_state()
+            om = state.output_manager
+            from src.core.laser import fern_freigabe as _ff
             return {"gm": max(0, min(255, int(round(float(om.grand_master) * 255)))),
-                    "blackout": bool(om.blackout)}
+                    "blackout": bool(om.blackout),
+                    # WEB-12 (QA96-37): der Laser-NOT-AUS ist am Handy sichtbar.
+                    "notaus": bool(getattr(state, "laser_estop_active", False)),
+                    "laser_erlaubt": bool(_ff.laser_erlaubt())}
         except Exception as e:
-            print(f"[vc_fernbedienung] ERROR: Pult-Zustand: {e}")
-            return {"gm": 255, "blackout": False}
+            print(f"[vc_fernbedienung] ERROR: Pult-Zustand: {type(e).__name__}")
+            return {"gm": 255, "blackout": False, "notaus": False,
+                    "laser_erlaubt": False}
 
     def konsole(self) -> dict | None:
         """Vollstaendiger Stand der Handy-Konsole (aus jedem Thread) — fuer den
@@ -503,21 +731,36 @@ class VCFernbedienung(QObject):
             return None
         return k
 
-    def pult(self, gm=None, blackout=None) -> dict:
+    def pult(self, gm=None, blackout=None, geraet: str = "") -> dict:
         """WEB-09: Grand Master (0..255) und/oder Blackout setzen — dieselben
-        Aufrufe wie der GM-Fader und der Blackout-Schalter am Pult."""
+        Aufrufe wie der GM-Fader und der Blackout-Schalter am Pult.
+
+        WEB-12: erst ALLES pruefen, dann setzen (eine Anfrage mit gueltigem
+        GM und kaputtem Blackout verstellte frueher den GM und meldete dann
+        den Fehler). Den Blackout hebt nur auf, wer ihn gesetzt hat; den Grand
+        Master aus der Laser-Aus-Zone zieht ohne Schalter nur, wer ihn
+        hineingezogen hat (``src.web.fern_pult``)."""
         def _tun():
             from src.core.app_state import get_state
-            om = get_state().output_manager
+            from src.core.laser import fern_freigabe as _ff
+            from src.web import fern_pult
+            state = get_state()
+            om = state.output_manager
+            v = None
             if gm is not None:
                 v = _fader_wert(gm)
-                if v is None:
+                if v is None or not 0 <= gm <= 255:
                     return _nein(WERT_UNGUELTIG)
-                om.set_grand_master(v / 255.0)
+            if blackout is not None and not isinstance(blackout, bool):
+                return _nein(WERT_UNGUELTIG)
             if blackout is not None:
-                if not isinstance(blackout, bool):
-                    return _nein(WERT_UNGUELTIG)
-                om.set_blackout(blackout)
+                r = fern_pult.blackout_setzen(om, blackout, geraet)
+                if not r.get("ok"):
+                    return dict(r, **self._pult_jetzt())
+            if v is not None:
+                r = fern_pult.gm_setzen(state, v / 255.0, geraet, _ff.laser_erlaubt())
+                if not r.get("ok"):
+                    return dict(r, **self._pult_jetzt())
             return {"ok": True, **self._pult_jetzt()}
         try:
             return self._im_ui_thread(_tun, _nein)
@@ -591,8 +834,8 @@ class VCFernbedienung(QObject):
                          if v != alt["widgets"].get(k)}
             if geaendert:
                 delta["widgets"] = geaendert
-            for feld in ("gm", "blackout"):
-                if jetzt[feld] != alt[feld]:
+            for feld in ("gm", "blackout", "notaus", "laser_erlaubt"):   # WEB-12
+                if jetzt.get(feld) != alt.get(feld):
                     delta[feld] = jetzt[feld]
             if not delta:
                 return

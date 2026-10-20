@@ -71,6 +71,20 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
 .taste.blackout.aktiv{background:#da3633;color:#fff;box-shadow:0 0 16px rgba(218,54,51,.7)}
 .taste.notaus{background:linear-gradient(#b3312e,#8e2421);border-color:#f0625d;border-bottom-color:#4f1210;color:#fff}
 .taste.notaus .streifen{display:none}
+/* WEB-12: Laser ohne Freigabe gesperrt, verlorenes Ziel (QA96-19) */
+.zelle.gesperrt{opacity:.55;filter:grayscale(.6)}
+.zelle .schloss{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;font-weight:700;color:#f2cc60;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 3px;pointer-events:none}
+.zelle.ziel_fehlt{border:2px dashed #ff5555 !important;box-shadow:none !important}
+.zelle.ziel_fehlt.aktiv{background:linear-gradient(#2b323c,#1f252d) !important;color:#e6edf3 !important}
+.zelle .warn{position:absolute;top:3px;right:6px;color:#ff5555;font-size:13px;font-weight:700;pointer-events:none}
+.zelle .warntext{position:absolute;left:0;right:0;bottom:3px;text-align:center;font-size:10px;color:#ff7b72;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;padding:0 3px;pointer-events:none}
+/* WEB-12 (QA96-37): Laser-NOT-AUS am Pult aktiv */
+#notaus{flex:0 0 auto;display:none;background:#8e2421;border-bottom:2px solid #f0625d;color:#fff;font-weight:700;font-size:14px;
+  text-align:center;padding:8px 10px;letter-spacing:.5px}
+#notaus.an{display:block}
+#notaus small{display:block;font-weight:400;font-size:11px;opacity:.85;margin-top:2px}
 
 /* Fader */
 .fader{background:#11161c;border:1px solid #30363d;display:flex;flex-direction:column;align-items:center;padding:6px 0 5px;overflow:hidden}
@@ -161,9 +175,11 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
   <div id="kopf">
     <span class="logo">LightOS</span>
     <span class="titel" id="titel">Handy-Konsole</span>
-    <a href="/" id="zurueck">‹ Remote</a>
+    {# WEB-12: die feste Fernbedienung nur verlinken, wenn diese Sitzung sie oeffnen darf #}
+    {% if feste_seite %}<a href="/" id="zurueck">‹ Remote</a>{% endif %}
     <span id="verb">getrennt</span>
   </div>
+  <div id="notaus" role="alert">LASER NOT-AUS AKTIV<small>Laser sind dunkel und unscharf – lösen nur am Pult</small></div>
   <div id="reiter"></div>
   <div id="buehne">
     <div id="hinweis" class="an"><b>Verbinde …</b></div>
@@ -193,7 +209,11 @@ var FEHLERTEXT = {
   typ_nicht_erlaubt: 'Element ist nicht fernbedienbar',
   keine_konsole: 'Keine Konsole in LightOS geöffnet',
   zeitueberschreitung: 'LightOS antwortet nicht',
-  kein_zugang: 'Kein Zugang – Link mit Schlüssel neu öffnen'
+  kein_zugang: 'Kein Zugang – Link mit Schlüssel neu öffnen',
+  laser_gesperrt: 'Laser – nur mit Freigabe am Pult',
+  blackout_nicht_von_hier: 'Blackout kam nicht von diesem Handy – aufheben am Pult',
+  kein_recht: 'Nicht erlaubt',
+  wert_ungueltig: 'Ungültiger Wert'
 };
 
 var $ = function (id) { return document.getElementById(id); };
@@ -380,6 +400,7 @@ if (socket) {
     if (d.widgets) { Object.keys(d.widgets).forEach(function (k) { uebernehmeWidget(d.widgets[k]); }); }
     if (d.gm !== undefined) { stand.gm = d.gm; zeigeGm(); }
     if (d.blackout !== undefined) { stand.blackout = d.blackout; zeigeBlackout(); }
+    if (d.notaus !== undefined) { stand.notaus = d.notaus; zeigeNotaus(); }
   });
 } else {
   zeigeHinweis('Seite unvollständig geladen', 'Bitte neu laden.');
@@ -504,6 +525,7 @@ function baueTaste(w, el) {
   el.appendChild(streifen); el.appendChild(name); el.appendChild(klein); el.appendChild(punkt);
   var aktuell = w;
   finger(el, function () {
+    if (aktuell.gesperrt) { melde(FEHLERTEXT.laser_gesperrt); return false; }
     if (aktuell.bedienung === 'halten') { return aktion(aktuell.id, 'druecken'); }
     return aktion(aktuell.id, 'umschalten');
   }, null, function () {
@@ -530,7 +552,7 @@ function baueTaste(w, el) {
 
 // Fader-Bedienung für ein Element mit .bahn/.fuell/.griff/.wert.
 // Relativ zum Aufsetzpunkt: ein Antippen verstellt nichts, erst das Ziehen.
-function faderBedienung(el, lies, schreibe) {
+function faderBedienung(el, lies, schreibe, darf) {
   var bahn = el.querySelector('.bahn'), fuell = el.querySelector('.fuell'),
       griff = el.querySelector('.griff'), wertEl = el.querySelector('.wert');
   var start = null, letzter = 0, offen = null, zuletztGesendet = -1;
@@ -557,6 +579,7 @@ function faderBedienung(el, lies, schreibe) {
     schreibe(v);
   }
   finger(el, function (ev) {
+    if (darf && darf() === false) { return false; }
     var r = bahn.getBoundingClientRect();
     start = {x: ev.clientX, y: ev.clientY, wert: lies(), weg: Math.max(40, quer() ? el.getBoundingClientRect().width : r.height)};
     zuletztGesendet = -1;
@@ -579,7 +602,8 @@ function baueFader(w, el) {
   el.innerHTML = '<span class="wert"></span><div class="bahn"><i class="fuell"></i><b class="griff"></b></div><span class="name"></span>';
   var aktuell = w;
   var zeige = faderBedienung(el, function () { return el._wert !== undefined ? el._wert : aktuell.wert; },
-    function (v) { inHand[aktuell.id] = Date.now(); aktion(aktuell.id, 'setzen', v); });
+    function (v) { inHand[aktuell.id] = Date.now(); aktion(aktuell.id, 'setzen', v); },
+    function () { if (aktuell.gesperrt) { melde(FEHLERTEXT.laser_gesperrt); return false; } });
   return function (neu) {
     aktuell = neu;
     el.querySelector('.name').textContent = neu.beschriftung || '';
@@ -605,8 +629,9 @@ function baueCueliste(w, el, hoehe) {
   anzeige.innerHTML = '<div class="z1"><span></span><span></span></div><div class="jetzt"></div><div class="danach"></div><div class="balken"><i></i></div>';
   var knoepfe = document.createElement('div'); knoepfe.className = 'knoepfe';
   var aktuell = w;
-  knoepfe.appendChild(knopf('GO', 'go', function () { return aktion(aktuell.id, 'go'); }));
-  knoepfe.appendChild(knopf('BACK', 'back', function () { return aktion(aktuell.id, 'back'); }));
+  function frei(was) { if (aktuell.gesperrt) { melde(FEHLERTEXT.laser_gesperrt); return false; } return aktion(aktuell.id, was); }
+  knoepfe.appendChild(knopf('GO', 'go', function () { return frei('go'); }));
+  knoepfe.appendChild(knopf('BACK', 'back', function () { return frei('back'); }));
   knoepfe.appendChild(knopf('STOP', 'stop', function () { return aktion(aktuell.id, 'stop'); }));
   if (hoehe >= 2) { el.appendChild(anzeige); }
   el.appendChild(knoepfe);
@@ -630,6 +655,29 @@ function baueCueliste(w, el, hoehe) {
   };
 }
 
+/* ── WEB-12: Sperre und verlorenes Ziel ─────────────────────────────── */
+
+// Zeigt an jedem Element, was das Pult weiss: gesperrt (Laser ohne Freigabe)
+// oder Ziel verloren (Funktion gelöscht, Blackout-Ziel weg). Ein Element mit
+// verlorenem Ziel leuchtet nicht „aktiv“ — es schaltet ja nichts.
+function mitZustand(el, setze) {
+  var schloss = null, warn = null, warntext = null;
+  return function (w) {
+    setze(w);
+    var gesperrt = w.gesperrt === 'laser';
+    el.classList.toggle('gesperrt', gesperrt);
+    if (gesperrt && !schloss) { schloss = document.createElement('span'); schloss.className = 'schloss'; el.appendChild(schloss); }
+    if (schloss) { schloss.textContent = gesperrt ? '🔒 Laser – Freigabe am Pult' : ''; }
+    var fehlt = (w.ziel_fehlt || []).length > 0;
+    el.classList.toggle('ziel_fehlt', fehlt);
+    if (fehlt && !warn) {
+      warn = document.createElement('span'); warn.className = 'warn'; warn.textContent = '⚠'; el.appendChild(warn);
+      warntext = document.createElement('span'); warntext.className = 'warntext'; el.appendChild(warntext);
+    }
+    if (warn) { warn.style.display = fehlt ? '' : 'none'; warntext.textContent = fehlt ? w.ziel_fehlt[0] : ''; }
+  };
+}
+
 /* ── Aufbau ─────────────────────────────────────────────────────────── */
 
 function uebernehmeWidget(w) {
@@ -640,6 +688,8 @@ function uebernehmeWidget(w) {
 
 function zeigeGm() { if (stand && $('gm')._finger === undefined && Date.now() - gmInHand > 400) { $('gm')._wert = stand.gm; gmZeige(stand.gm); } }
 function zeigeBlackout() { $('bo').classList.toggle('aktiv', !!(stand && stand.blackout)); }
+// WEB-12 (QA96-37): der Laser-NOT-AUS ist am Handy sichtbar.
+function zeigeNotaus() { $('notaus').className = (stand && stand.notaus) ? 'an' : ''; }
 
 function zeigeSeite(nr) {
   var seiten = buehne.querySelectorAll('.seite');
@@ -654,7 +704,9 @@ function zeigeSeite(nr) {
 
 function uebernehmeAlles(k) {
   if (!k) { return; }
-  stand = {seiten: k.seiten || [], widgets: k.widgets || {}, gm: k.gm, blackout: k.blackout, aktiv: !!k.aktiv};
+  stand = {seiten: k.seiten || [], widgets: k.widgets || {}, gm: k.gm, blackout: k.blackout, aktiv: !!k.aktiv,
+           notaus: !!k.notaus};
+  zeigeNotaus();
   rev = k.rev || 0;
   ansichten = {};
   aktiveFinger.slice().forEach(function (abbruch) { abbruch(); });
@@ -699,6 +751,7 @@ function uebernehmeAlles(k) {
       } else {
         setze = baueTaste(w, el);
       }
+      setze = mitZustand(el, setze);
       setze(w);
       (ansichten[w.id] = ansichten[w.id] || []).push(setze);
       s.appendChild(el);
@@ -719,13 +772,20 @@ function uebernehmeAlles(k) {
 /* ── Feste Leiste ───────────────────────────────────────────────────── */
 
 var gmZeige = faderBedienung($('gm'), function () { return $('gm')._wert !== undefined ? $('gm')._wert : (stand ? stand.gm : 255); },
-  function (v) { gmInHand = Date.now(); if (stand) { stand.gm = v; } sende('vc_pult', {gm: v, n: ++zaehler}); });
+  function (v) {
+    gmInHand = Date.now(); if (stand) { stand.gm = v; }
+    sende('vc_pult', {gm: v, n: ++zaehler}, function (antwort) {
+      // WEB-12: abgelehnt (Laser) – der Regler springt auf den echten Wert zurück.
+      if (antwort && antwort.ok === false && antwort.gm !== undefined && stand) { gmInHand = 0; stand.gm = antwort.gm; zeigeGm(); }
+    });
+  });
 
 finger($('bo'), function () {
   if (!stand) { return false; }
   var an = !stand.blackout;
   return sende('vc_pult', {blackout: an}, function (antwort) {
-    if (antwort && antwort.ok) { stand.blackout = antwort.blackout; zeigeBlackout(); }
+    // WEB-12: auch eine Ablehnung traegt den echten Stand (Blackout bleibt).
+    if (antwort && antwort.blackout !== undefined) { stand.blackout = antwort.blackout; zeigeBlackout(); }
   });
 }, null, null);
 

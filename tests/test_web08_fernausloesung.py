@@ -310,13 +310,18 @@ class LaserSicherheitTest(_Basis):
         self.fern.aktion(fern.widget_id, "umschalten")
         self.assertFalse(laser.armed)
 
-    def test_laser_muster_ist_nicht_fernbedienbar(self):
+    def test_laser_muster_nur_mit_dem_schalter(self):
+        # WEB-12: Laser-Muster sind Laser-Inhalt — sichtbar, aber gesperrt,
+        # solange „Laser vom Handy erlauben“ aus ist.
         fern = self._taste(ButtonAction.LASER_PATTERN)
         fern.laser_palette = "Tunnel"
-        self.assertEqual([e for e in self.fern.widgets() if e["id"] == fern.widget_id], [])
-        r = self.fern.aktion(fern.widget_id, "umschalten")
+        eintrag = [e for e in self.fern.widgets() if e["id"] == fern.widget_id]
+        self.assertEqual(eintrag[0]["gesperrt"], "laser")
+        with mock.patch.object(type(fern), "_trigger") as ausgeloest:
+            r = self.fern.aktion(fern.widget_id, "umschalten")
+            ausgeloest.assert_not_called()
         self.assertFalse(r["ok"])
-        self.assertEqual(r["fehler"], "typ_nicht_erlaubt")
+        self.assertEqual(r["fehler"], "laser_gesperrt")
 
 
 # ── Fader ────────────────────────────────────────────────────────────────────
@@ -716,8 +721,12 @@ class WebSchnittstelleTest(_Basis):
         self.assertEqual(r.get_json()["fehler"], "keine_konsole")
 
     def test_bestehende_befehle_bleiben_unveraendert(self):
-        # Die feste Web-Remote-Seite haengt nicht an der neuen Einstellung.
-        self._anmelden()
+        # Die feste Web-Remote-Seite haengt nicht an der Handy-Konsole —
+        # WEB-12: aber an ihrem eigenen Schalter und Schluessel.
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "fest456"
+        self.client.get("/?k=fest456")
         self.assertEqual(self.client.get("/api/status").status_code, 200)
         r = self.client.post("/api/blackout", json={"enabled": True})
         self.assertEqual(r.get_json(), {"ok": True, "blackout": True})
