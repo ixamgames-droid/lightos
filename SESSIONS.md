@@ -58,7 +58,7 @@
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | OUT-80 | A | fix/out80-enttec-seriennummer-in-konfiguration | 2026-10-20T14:08Z | - |
-| DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-19T16:49Z | - |
+| DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-20T14:08Z | - |
 | ENG-37 | A | feat/eng37-modify-sichtbar | 2026-10-19T18:00Z | - |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-19T18:00Z | - |
 | QA-103 | A | fix/qa-bpm-view-absturz | 2026-10-20T14:08Z | - |
