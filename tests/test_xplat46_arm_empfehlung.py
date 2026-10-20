@@ -64,6 +64,8 @@ class TestInstaller:
     def test_zusammenfassung_warnt_nur_bei_nativem_arm64(self, installer, monkeypatch, capsys):
         monkeypatch.setattr(installer.os, "name", "nt")
         monkeypatch.setattr(installer, "detect_native_os_arch", lambda: "arm64")
+        # Ohne (startbares) venv zaehlt das ausfuehrende Python (XPLAT-52).
+        monkeypatch.setattr(installer, "venv_arch", lambda: "unknown")
         monkeypatch.setattr(installer, "detect_arch", lambda: "x64")
         installer.show_summary()
         assert "WARN" not in capsys.readouterr().out

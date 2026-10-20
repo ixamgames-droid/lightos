@@ -479,8 +479,23 @@ def create_shortcut(use_venv: bool = True):
         return None
 
 
-def write_manifest(created_dirs: list[str], shortcut: str | None):
-    py_arch = detect_arch()
+def ziel_arch(use_venv: bool = True) -> str:
+    """Architektur des Python, mit dem LightOS laufen wird (XPLAT-52).
+
+    Bei vorhandenem venv ist das dessen Architektur (``venv_arch()``) - nicht
+    die des Python, das install.py ausfuehrt: bleibt ein x64-venv stehen und
+    install.py laeuft mit ARM64-Python (oder umgekehrt), zaehlt das venv.
+    Ohne venv (``--no-venv`` oder venv nicht startbar) das ausfuehrende."""
+    if use_venv:
+        va = venv_arch()
+        if va != "unknown":
+            return va
+    return detect_arch()
+
+
+def write_manifest(created_dirs: list[str], shortcut: str | None,
+                   use_venv: bool = True):
+    py_arch = ziel_arch(use_venv)
     os_arch = detect_native_os_arch()
     manifest = {
         "version": "1.0",
@@ -494,6 +509,7 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
         "os_arch": os_arch,
         "python_emulated_on_arm64": bool(os_arch == "arm64" and py_arch != "arm64"),
         "arch": py_arch,
+        "installer_python_arch": detect_arch(),
         "platform": platform.platform(),
     }
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
@@ -502,7 +518,8 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
 
 
 def show_summary(use_venv: bool = True):
-    py_arch = detect_arch()
+    py_arch = ziel_arch(use_venv)
+    installer_arch = detect_arch()
     os_arch = detect_native_os_arch()
     # Mit --no-venv gibt es kein venv/: die Befehle nennen dann das Python, in
     # das installiert wurde (Codex-Review zu DOC-62).
@@ -510,7 +527,9 @@ def show_summary(use_venv: bool = True):
     info("=" * 60)
     info("Installation abgeschlossen!")
     info("=" * 60)
-    info(f"Python-Architektur: {py_arch}")
+    info(f"Python-Architektur: {py_arch}" + (" (venv)" if use_venv else ""))
+    if py_arch != installer_arch:
+        info(f"install.py lief mit:  {installer_arch}-Python")
     info(f"OS-Architektur:     {os_arch}")
     if os.name == "nt" and os_arch == "arm64" and py_arch == "arm64":
         warn(f"{ARM64_NICHT_UNTERSTUETZT} Mit x64-Python geht alles "
@@ -568,7 +587,7 @@ def main():
     if not args.no_shortcut:
         shortcut = create_shortcut(use_venv)
 
-    write_manifest(created, shortcut)
+    write_manifest(created, shortcut, use_venv)
     show_summary(use_venv)
 
 
