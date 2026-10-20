@@ -2811,6 +2811,11 @@ class MainWindow(QMainWindow):
         dlg = QDialog(self)          # Parent = Lebensdauer an das Fenster koppeln
         dlg.setWindowTitle("Web-Remote: Verbindung & Token")
         lay = QVBoxLayout(dlg)
+        # WEB-11: der Dialog folgt seinem Inhalt — der QR-Code erscheint und
+        # verschwindet mit den Schaltern; ohne das staucht Qt die Zeilen
+        # darunter in den Code hinein, statt das Fenster zu vergroessern.
+        from PySide6.QtWidgets import QLayout
+        lay.setSizeConstraint(QLayout.SizeConstraint.SetFixedSize)
 
         lbl_url = QLabel()
         lbl_url.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -2823,13 +2828,41 @@ class MainWindow(QMainWindow):
 
         row = QHBoxLayout()
         btn_copy = QPushButton("Link kopieren")
-        btn_regen = QPushButton("Token neu erzeugen")
+        # WEB-11: „Schlüssel" ist das Wort der Handy-Konsole, „Token" das der
+        # Anleitung zur festen Fernbedienung — der Knopf nennt beide.
+        btn_regen = QPushButton("Schlüssel erneuern (neues Token)")
+        btn_regen.setObjectName("web_remote_schluessel_erneuern")
+        btn_regen.setToolTip(
+            "Erzeugt einen neuen Schlüssel. Alle bisherigen Links und QR-Codes "
+            "werden sofort ungültig, verbundene Geräte getrennt.")
         row.addWidget(btn_copy)
         row.addWidget(btn_regen)
         lay.addLayout(row)
 
         cb_lan = QCheckBox("LAN-/Handy-Remote (aus = nur dieser PC)")
         lay.addWidget(cb_lan)
+
+        # WEB-09: die Handy-Konsole. Standard AUS; eingeschaltet bedient das
+        # Handy nur, was auf einer Handy-Seite der virtuellen Konsole liegt.
+        cb_konsole = QCheckBox("Handy-Konsole (bedient nur Elemente der Handy-Seiten)")
+        cb_konsole.setObjectName("web_remote_handy_konsole")
+        cb_konsole.setToolTip(
+            "Aus: das Handy hat nur die feste Fernbedienung (GO, Blackout, "
+            "Executor-Fader).\nEin: zusätzlich die Handy-Konsole mit den Elementen, "
+            "die in der virtuellen Konsole auf einer Handy-Seite liegen.")
+        lay.addWidget(cb_konsole)
+        edit_konsole = QLineEdit()
+        edit_konsole.setReadOnly(True)
+        edit_konsole.setObjectName("web_remote_konsole_link")
+        lay.addWidget(edit_konsole)
+
+        # WEB-11: QR-Code zum Verbinden. Zeigt den Code nur, wenn das
+        # Web-Interface laeuft, im LAN erreichbar ist UND die Handy-Konsole an
+        # ist — sonst den noetigen Schritt. Der Link im Code ist derselbe wie
+        # im Feld darueber (mit der gewaehlten Netzwerkkarte).
+        from src.ui.widgets.handy_qr import HandyQrFeld
+        qr_feld = HandyQrFeld(klein=False, parent=dlg)
+        lay.addWidget(qr_feld)
 
         lbl_hint = QLabel()
         lbl_hint.setWordWrap(True)
@@ -2848,6 +2881,21 @@ class MainWindow(QMainWindow):
             cb_lan.blockSignals(True)
             cb_lan.setChecked(bool(lan_on))
             cb_lan.blockSignals(False)
+            try:
+                konsole_an = remote_settings.is_vc_remote_enabled()
+            except Exception:
+                konsole_an = False
+            cb_konsole.blockSignals(True)
+            cb_konsole.setChecked(bool(konsole_an))
+            cb_konsole.blockSignals(False)
+            edit_konsole.setVisible(bool(konsole_an))
+            edit_konsole.setText(f"{url}/konsole?k={token}" if token
+                                 else f"{url}/konsole")
+            # WEB-11: Code und Feld zeigen dieselbe Adresse — bei mehreren
+            # Netzwerkkarten die im QR-Feld gewaehlte.
+            qr_feld.aktualisiere(sofort=True)
+            if qr_feld.url():
+                edit_konsole.setText(qr_feld.url())
             lbl_hint.setText(
                 "Erreichbar für Geräte im selben (W)LAN — Zugriff nur mit Token."
                 if lan_on else
@@ -2866,9 +2914,9 @@ class MainWindow(QMainWindow):
             # Default bewusst „Nein": ein Enter/Leertaste im Showbetrieb wuerde
             # sonst alle Geraete rauswerfen.
             if QMessageBox.question(
-                    dlg, "Token neu erzeugen",
-                    "Ein neues Token macht ALLE bisherigen Links und angemeldeten "
-                    "Geräte sofort ungültig.\n\nFortfahren?",
+                    dlg, "Schlüssel erneuern",
+                    "Ein neuer Schlüssel (Token) macht ALLE bisherigen Links, "
+                    "QR-Codes und angemeldeten Geräte sofort ungültig.\n\nFortfahren?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
@@ -2878,7 +2926,7 @@ class MainWindow(QMainWindow):
                 # alten Links weiter gelten (save_settings schluckt Schreibfehler).
                 remote_settings.regenerate_token()
             except Exception as e:
-                QMessageBox.warning(dlg, "Token neu erzeugen", str(e))
+                QMessageBox.warning(dlg, "Schlüssel erneuern", str(e))
                 _refresh_labels()
                 return
             # Ohne das hier laeuft die Rotation ins Leere: der Gate liest das Token
@@ -2891,6 +2939,22 @@ class MainWindow(QMainWindow):
                 "Neues Token aktiv — alte Links und verbundene Geräte sind ungültig."
                 if refreshed else
                 "Neues Token gespeichert (wirkt beim nächsten Einschalten).", 5000)
+
+        def _konsole_toggled(checked: bool):
+            # Wirkt sofort am laufenden Server: die Schnittstelle liest die
+            # Einstellung bei jedem Aufruf. Beim Ausschalten werden gehaltene
+            # Tasten losgelassen und verbundene Handys gesperrt.
+            try:
+                remote_settings.set_vc_remote_enabled(bool(checked))
+                from src.web import vc_remote
+                vc_remote.einstellung_geaendert()
+            except Exception as e:
+                QMessageBox.warning(dlg, "Handy-Konsole", str(e))
+            _refresh_labels()
+            self.statusBar().showMessage(
+                "Handy-Konsole eingeschaltet — Elemente in der virtuellen Konsole über "
+                "die Seitenleiste „📱 Handy-Konsole“ auswählen." if remote_settings.is_vc_remote_enabled()
+                else "Handy-Konsole ausgeschaltet.", 5000)
 
         def _lan_toggled(checked: bool):
             remote_settings.set_lan_remote_enabled(bool(checked))
@@ -2920,9 +2984,16 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(dlg, "Web-Interface Fehler", str(e))
             _refresh_labels()
 
+        def _qr_geaendert():
+            # andere Netzwerkkarte gewaehlt / Schluessel von anderswo erneuert
+            if qr_feld.url():
+                edit_konsole.setText(qr_feld.url())
+
+        qr_feld.geaendert.connect(_qr_geaendert)
         btn_copy.clicked.connect(_copy)
         btn_regen.clicked.connect(_regen)
         cb_lan.toggled.connect(_lan_toggled)
+        cb_konsole.toggled.connect(_konsole_toggled)
         _refresh_labels()
         dlg.exec()
 
