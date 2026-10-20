@@ -28,12 +28,11 @@ Tastatur: beide betreffen nur Maus und Finger am Pult.
   nichts, was die feste Web-Remote-Seite nicht schon konnte.
 * *Laser NOT-AUS* ist ausloesbar. Die Taste kennt nur diese eine Richtung
   (dunkel + unscharf); aufheben kann sie nichts.
-  Aufheben kann die Fernausloesung ihn auch auf Umwegen nicht: am Pult loest
-  ein bewusst gesetzter Laser-Wert (Shutter, Musterbank, Gobo, Macro) den
-  NOT-AUS wieder — ein Fader oder eine Snap-Taste mit solchen Werten taete das
-  sonst auch vom Handy aus. Jede Aktion laeuft deshalb in
-  ``app_state.laser_notaus_nicht_loesbar()``: der Wert wird geschrieben, der
-  NOT-AUS bleibt stehen, bis ihn jemand am Pult loest. Das gilt auch fuer
+  Aufheben kann die Fernausloesung ihn auch auf Umwegen nicht: seit LAS-36
+  loest kein Laser-Wert den NOT-AUS (auch kein Fader, keine Snap-Taste); der
+  einzige Weg ist ``AppState.laser_notaus_loesen`` nach der Rueckfrage am Pult.
+  Jede Aktion laeuft zusaetzlich in ``app_state.laser_notaus_nicht_loesbar()``,
+  dort verweigert auch ``laser_notaus_loesen`` das Loesen. Das gilt auch fuer
   verzoegerte Zusatzaktionen einer Taste.
 * *Laser scharf/unscharf*: aus der Ferne nur UNSCHARF. Scharf geschaltet wird
   am Pult — dort steht jemand, der den Raum sieht. Das Web-Remote konnte den

@@ -765,11 +765,10 @@ if __name__ == "__main__":
 
 # ── Laser-NOT-AUS: aus der Ferne nur ausloesbar, nie aufhebbar ───────────────
 #
-# Am Pult loest ein bewusst gesetzter Laser-Wert (Shutter, Musterbank, Gobo,
-# Macro) den NOT-AUS wieder (``AppState.set_programmer_value``). Ein Fader oder
-# eine Snap-Taste mit solchen Werten taete das auch vom Handy aus — die feste
-# Web-Remote-Seite kann das nicht (sie schreibt in die Eingangs-Schicht, die
-# Aus-Maske bleibt). Die Fernausloesung darf hier nicht mehr koennen.
+# Seit LAS-36 loest kein Laser-Wert den NOT-AUS mehr, auch am Pult nicht; der
+# einzige Weg ist ``AppState.laser_notaus_loesen`` (nach der Rueckfrage). Die
+# Fernausloesung laeuft in ``laser_notaus_nicht_loesbar()``; dort verweigert
+# auch ``laser_notaus_loesen`` das Loesen — zweite Sperre fuer das Handy.
 
 class NotAusKernTest(unittest.TestCase):
     """Die Sperre selbst, am echten Latch (Aufbau wie test_laser_dmx_estop)."""
@@ -802,12 +801,23 @@ class NotAusKernTest(unittest.TestCase):
         for adresse in (10, 11, 12, 13):
             self.assertEqual(self.st.universes[1].get_channel(adresse), 0)
 
-    def test_gegenprobe_am_pult_loest_der_wert_weiterhin(self):
+    def test_loesen_im_fern_kontext_verweigert(self):
+        self.st.set_laser_estop(True)
+        with self.A.laser_notaus_nicht_loesbar():
+            self.st.laser_notaus_loesen()
+            self.assertTrue(self.st.laser_estop_active)
+        self.assertTrue(self.st.laser_estop_active)
+
+    def test_gegenprobe_am_pult_loest_nur_laser_notaus_loesen(self):
         self.st.set_laser_estop(True)
         with self.A.laser_notaus_nicht_loesbar():
             pass                            # Kontext verlassen -> Sperre weg
         self.assertFalse(self.A.laser_notaus_loesen_gesperrt())
+        # LAS-36: ein Wert loest auch am Pult nicht mehr ...
         self.st.set_programmer_value(7, "shutter", 200)
+        self.assertTrue(self.st.laser_estop_active)
+        # ... nur der bewusste Weg (Rueckfrage der Oberflaeche)
+        self.st.laser_notaus_loesen()
         self.assertFalse(self.st.laser_estop_active)
 
     def test_sperre_gilt_nur_im_eigenen_thread_und_verschachtelt(self):

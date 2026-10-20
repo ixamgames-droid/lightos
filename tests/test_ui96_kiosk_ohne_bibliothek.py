@@ -87,6 +87,13 @@ class KioskOhneBibliothekTest(_Ansicht):
     def test_splitter_hat_nur_canvas_und_inspector(self):
         self.assertEqual(self.view._splitter.count(), 2)
 
+    def test_keine_handy_konsole_im_kiosk(self):
+        """WEB-10/UI-96: die Seitenleiste „Handy-Konsole" baut Handy-Seiten und
+        schaltet den Fernzugriff — im Kiosk weder Leiste noch Knopf."""
+        self.assertIsNone(self.view._handy_leiste)
+        self.assertFalse(_sichtbar(self.view, self.view._btn_handy))
+        self.view._btn_handy.setChecked(True)      # darf nicht abstuerzen
+
     def test_showevent_und_effekt_takt_ohne_seitenleiste(self):
         self.view.hide()
         self.view.show()
@@ -186,7 +193,8 @@ class OhneKioskUnveraendertTest(_Ansicht):
 
     def test_seitenleiste_da_und_umschaltbar(self):
         self.assertIsInstance(self.view._sidebar, vcv.SnapshotSidebar)
-        self.assertEqual(self.view._splitter.count(), 3)
+        # Canvas, Handy-Konsole (WEB-10), Inspector, Bibliothek
+        self.assertEqual(self.view._splitter.count(), 4)
         self.assertTrue(_sichtbar(self.view, self.view._sidebar))
         self.view._btn_sidebar.setChecked(False)
         self.assertFalse(_sichtbar(self.view, self.view._sidebar))

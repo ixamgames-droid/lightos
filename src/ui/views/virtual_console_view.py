@@ -560,15 +560,18 @@ class VirtualConsoleView(QWidget):
         splitter.addWidget(self._main_scroll)
 
         # WEB-10: Seitenleiste „Handy-Konsole" — direkt neben der Konsole, damit
-        # der Weg beim Hineinziehen kurz ist.
-        from src.ui.virtualconsole.vc_handy_leiste import HandyKonsolenLeiste
-        self._handy_leiste = HandyKonsolenLeiste(self._canvas)
-        self._handy_leiste.setVisible(False)
-        self._handy_leiste.verbinden_angefragt.connect(self._handy_verbinden)
-        # Rechtsklick „Auf Handy-Konsole legen" bei ausgeblendeter Leiste: sie
-        # erscheint, damit man sieht, wo das Element gelandet ist.
-        self._canvas.handy_abgelegt.connect(self._handy_abgelegt)
-        splitter.addWidget(self._handy_leiste)
+        # der Weg beim Hineinziehen kurz ist. UI-96: im Kiosk gar nicht erst
+        # gebaut (sie baut Handy-Seiten und schaltet den Fernzugriff).
+        self._handy_leiste = None
+        if not self._kiosk:
+            from src.ui.virtualconsole.vc_handy_leiste import HandyKonsolenLeiste
+            self._handy_leiste = HandyKonsolenLeiste(self._canvas)
+            self._handy_leiste.setVisible(False)
+            self._handy_leiste.verbinden_angefragt.connect(self._handy_verbinden)
+            # Rechtsklick „Auf Handy-Konsole legen" bei ausgeblendeter Leiste: sie
+            # erscheint, damit man sieht, wo das Element gelandet ist.
+            self._canvas.handy_abgelegt.connect(self._handy_abgelegt)
+            splitter.addWidget(self._handy_leiste)
 
         # Inspector-Panel (Eigenschaften des gewaehlten Widgets, nur im Edit-Modus).
         self._inspector = VCInspectorPanel()
@@ -589,13 +592,17 @@ class VirtualConsoleView(QWidget):
             splitter.addWidget(self._sidebar)
 
         # Größenverhältnis: Canvas viel breiter als Inspector/Sidebar
+        # (Spalten ueber indexOf: im Kiosk fehlen Handy-Leiste und Sidebar, UI-96)
         splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 0)     # Handy-Konsole: feste Breite
-        splitter.setStretchFactor(2, 0)
-        if self._sidebar is not None:       # UI-96: im Kiosk keine Sidebar
-            splitter.setStretchFactor(3, 1)
-        splitter.setCollapsible(1, False)
-        splitter.setCollapsible(2, True)
+        if self._handy_leiste is not None:  # Handy-Konsole: feste Breite
+            i = splitter.indexOf(self._handy_leiste)
+            splitter.setStretchFactor(i, 0)
+            splitter.setCollapsible(i, False)
+        i = splitter.indexOf(self._inspector)
+        splitter.setStretchFactor(i, 0)
+        splitter.setCollapsible(i, True)
+        if self._sidebar is not None:
+            splitter.setStretchFactor(splitter.indexOf(self._sidebar), 1)
         self._splitter = splitter
 
         # Stretch=1: der Canvas-/Sidebar-Splitter bekommt den gesamten
@@ -1141,6 +1148,8 @@ class VirtualConsoleView(QWidget):
 
     def _toggle_handy_leiste(self, checked: bool):
         self._btn_handy.setText("📱 Handy-Konsole ✓" if checked else "📱 Handy-Konsole")
+        if self._handy_leiste is None:
+            return          # UI-96: Kiosk ohne Handy-Leiste
         self._handy_leiste.setVisible(bool(checked))
         if checked:
             self._handy_leiste.set_edit_mode(self._edit_mode)
@@ -1165,7 +1174,8 @@ class VirtualConsoleView(QWidget):
                 self, "Handy-Konsole",
                 "Link und Schlüssel fürs Handy stehen unter\n"
                 "Ausgabe → „Web-Remote: Verbindung & Token…“.")
-        self._handy_leiste._verbindung_zeigen()
+        if self._handy_leiste is not None:
+            self._handy_leiste._verbindung_zeigen()
 
     def _save(self):
         self._canvas._save()
