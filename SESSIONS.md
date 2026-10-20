@@ -50,6 +50,7 @@
 | VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-20T16:15Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
 | NET-15 | A | feat/net15-dmx-fernsteuerung | 2026-10-20T16:55Z | src/core/artnet_input.py · src/core/sacn_input.py |
 | SAMMEL-VERLOREN-1020 | A | chore/backlog-verlorene-ids-1020 | 2026-10-20T16:57Z | backlog.d/* |
+| QA-104 | A | fix/qa103-test-importzeit | 2026-10-20T18:01Z | tests/test_qa103_bpm_faden_abbau.py |
 
 ## Blocker & Fallen
 
@@ -89,7 +90,6 @@
 
 ## Verlauf
 
-- 2026-10-20T14:26Z A claim UI-104
 - 2026-10-20T14:40Z A done QA-103
 - 2026-10-20T15:14Z A done OUT-80
 - 2026-10-20T15:21Z A claim UI-100
@@ -119,3 +119,4 @@
 - 2026-10-20T16:57Z A claim SAMMEL-VERLOREN-1020
 - 2026-10-20T17:07Z A done IMP-4
 - 2026-10-20T17:45Z A done FM-77
+- 2026-10-20T18:01Z A claim QA-104
