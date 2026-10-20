@@ -33,7 +33,6 @@
 | WEB-12 | A | fix/web12-handy-rechte-laser | 2026-10-11T19:15Z | - |
 | WEB-13 | A | - | 2026-10-11T20:18Z | - |
 | WEB-14 | A | - | 2026-10-12T14:26Z | - |
-| OUT-76 | D | fix/out76-udmx-windows-treiber-erkennen | 2026-10-12T17:12Z | src/core/dmx/udmx.py · src/core/dmx/usb_treiber_windows.py · src/ui/widgets/output_config.py · INSTALL.md · docs/anleitung_ausgabe_einrichten · tests/test_out76_udmx_windows_treiber.py |
 | SAMMEL-BACKLOG-1014 | A | chore/backlog-status-abgleich-1014 | 2026-10-20T14:08Z | - |
 | QA-99 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:51Z | tests/conftest.py · tests/test_qa99_windows_offscreen_schriften.py · backlog.d/QA-99.md |
 | QA-100 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:52Z | tests/test_qa100_anleitung_ueberschriften_einmalig.py · tools/doku_gates.txt · backlog.d/QA-100.md |
@@ -91,7 +90,6 @@
 
 ## Verlauf
 
-- 2026-10-19T22:40Z A done UI-102
 - 2026-10-19T22:54Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-20T14:26Z A claim SAMMEL-BACKLOG-1020
 - 2026-10-20T14:26Z A claim UI-103
@@ -121,3 +119,4 @@
 - 2026-10-20T16:56Z D done TOOL-21
 - 2026-10-20T16:56Z B done VIZ-106
 - 2026-10-20T16:56Z B done VIZ-108
+- 2026-10-20T16:56Z D done OUT-76
