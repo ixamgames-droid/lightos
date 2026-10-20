@@ -39,7 +39,6 @@
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-20T14:08Z | - |
-| FM-77 | A | fix/fm77-markdown-export-herkunft | 2026-10-20T14:08Z | - |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-20T14:08Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-20T14:08Z | - |
 | LIZ-3 | D | fix/liz3-ueber-dialog-lgpl-hinweis | 2026-10-19T20:25Z | src/ui/hilfe.py · tests/test_liz3_ueber_dialog_lgpl.py · backlog.d/LIZ-3.md |
@@ -90,7 +89,6 @@
 
 ## Verlauf
 
-- 2026-10-20T14:26Z A claim UI-103
 - 2026-10-20T14:26Z A claim UI-104
 - 2026-10-20T14:40Z A done QA-103
 - 2026-10-20T15:14Z A done OUT-80
@@ -120,3 +118,4 @@
 - 2026-10-20T16:56Z D done OUT-76
 - 2026-10-20T16:57Z A claim SAMMEL-VERLOREN-1020
 - 2026-10-20T17:07Z A done IMP-4
+- 2026-10-20T17:45Z A done FM-77
