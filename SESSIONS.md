@@ -57,7 +57,6 @@
 | QA-100 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:52Z | tests/test_qa100_anleitung_ueberschriften_einmalig.py · tools/doku_gates.txt · backlog.d/QA-100.md |
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
-| DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-20T14:08Z | - |
 | ENG-37 | A | feat/eng37-modify-sichtbar | 2026-10-20T14:08Z | - |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-20T14:08Z | - |
 | IMP-4 | A | fix/imp4-ueberschneidung-zusammenfassen | 2026-10-20T14:08Z | - |
@@ -109,7 +108,6 @@
 
 ## Verlauf
 
-- 2026-10-19T19:08Z A claim FM-77
 - 2026-10-19T19:27Z A claim ENG-42
 - 2026-10-19T19:27Z 3 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:42Z A done LAS-40
@@ -139,3 +137,4 @@
 - 2026-10-20T14:40Z A done QA-103
 - 2026-10-20T15:14Z A done OUT-80
 - 2026-10-20T15:21Z A claim UI-100
+- 2026-10-20T15:45Z A done DEMO-9
