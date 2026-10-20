@@ -159,6 +159,23 @@ class TestDoku:
         assert "6 von 12 Starts" in text
         assert "brechen aber nicht ab" in text
 
+    def test_install_md_tabelle_gibt_keine_freigabe(self):
+        # Gegenpruefung: "OK" neben "instabil" wirkt wie eine Freigabe - die
+        # Abstuerze liegen in nativem Code (PySide6/shiboken6, numpy ...).
+        for paket in ("PySide6", "numpy"):
+            zeile = next(z for z in _text("INSTALL.md").splitlines()
+                         if z.startswith(f"| {paket} |"))
+            assert "OK" not in zeile and "XPLAT-51" in zeile, zeile
+
+    def test_requirements_kopf(self):
+        kopf = " ".join(z.lstrip("# ") for z in _text("requirements.txt").splitlines()[:6])
+        assert _KERN.search(" ".join(kopf.split())), kopf
+        assert "UND ARM64" not in kopf
+
+    def test_xplat46_test_nennt_den_neuen_stand(self):
+        doc = _text("tests/test_xplat46_arm_empfehlung.py").split('"""', 2)[1]
+        assert "XPLAT-51" in doc and _KERN.search(" ".join(doc.split()))
+
     def test_install_md_troubleshooting_kennt_den_absturz(self):
         zeilen = [z for z in _text("INSTALL.md").splitlines()
                   if z.startswith("|") and "Access Violation" in z]

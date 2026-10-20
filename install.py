@@ -229,13 +229,21 @@ def x64_installer_aufruf(pfad: str | None = None) -> str:
     return f'"{pfad or X64_PYTHON_STANDARDPFAD}" install.py --neu-venv'
 
 
-def check_arm_runtime():
-    """Hinweise zur Python-Architektur auf Windows-ARM (XPLAT-46)."""
+def check_arm_runtime(use_venv: bool = True, neu_venv: bool = False):
+    """Hinweise zur Python-Architektur auf Windows-ARM (XPLAT-46).
+
+    Der Warnblock betrifft das Python, das install.py ausfuehrt. Bleibt ein
+    vorhandenes venv anderer Architektur stehen (``create_venv`` fragt erst
+    danach), sagt ein Zusatz, was fuer das venv gilt - sonst widersprachen
+    sich Anfang und Zusammenfassung eines Laufs (Gegenpruefung XPLAT-52)."""
     py_arch = detect_arch()
     os_arch = detect_native_os_arch()
     info(f"Python-Architektur: {py_arch} | OS-Architektur: {os_arch}")
     if os.name != "nt" or os_arch != "arm64":
         return
+    va = venv_arch() if use_venv and not neu_venv else "unknown"
+    if va == py_arch:
+        va = "unknown"
     if py_arch == "arm64":
         warn("!" * 60)
         warn(ARM64_NICHT_UNTERSTUETZT)
@@ -248,10 +256,18 @@ def check_arm_runtime():
         warn(f"So geht es: x64-Python installieren ({X64_PYTHON_BEFEHL}), "
              f"dann: {x64_installer_aufruf(finde_x64_python())}")
         warn("Die Installation laeuft trotzdem weiter - auf eigenes Risiko.")
+        if va != "unknown":
+            warn(f"Das gilt fuer dieses Python. Das vorhandene venv ist {va}-Python "
+                 "und bleibt, wenn es nicht neu angelegt wird (Rueckfrage folgt) - "
+                 f"LightOS laeuft dann mit {va}-Python.")
         warn("!" * 60)
     else:
         info("x64-Python unter Emulation auf Windows-ARM - empfohlener Weg, "
              "der 3D-Visualizer ist verfuegbar.")
+        if va == "arm64":
+            warn(f"Das vorhandene venv ist ARM64-Python. {ARM64_NICHT_UNTERSTUETZT} "
+                 "Bei der folgenden Rueckfrage mit j antworten "
+                 "(oder: install.py --neu-venv), sonst bleibt es.")
 
 
 def venv_arch() -> str:
@@ -270,7 +286,9 @@ def venv_arch() -> str:
         return "unknown"
     if plat == "win32":
         return "x86"
-    return normalize_arch(plat.split("-", 1)[1] if plat.startswith("win-") else plat)
+    # 'win-amd64' -> 'amd64'; sonst steht die Maschine am Ende:
+    # 'linux-x86_64' -> 'x86_64', 'macosx-14.0-arm64' -> 'arm64'.
+    return normalize_arch(plat.rsplit("-", 1)[-1])
 
 
 def _frage_ja(frage: str) -> bool:
@@ -566,9 +584,9 @@ def main():
 
     info(f"LightOS Installer - Arch: {detect_arch()}")
     check_python()
-    check_arm_runtime()
-
     use_venv = not args.no_venv
+    check_arm_runtime(use_venv, args.neu_venv)
+
     if use_venv:
         create_venv(neu=args.neu_venv)
     else:

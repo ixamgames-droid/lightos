@@ -1,5 +1,9 @@
 """XPLAT-46: auf Windows-ARM wird x64-Python empfohlen, ARM64 nur "ohne 3D".
 
+Seit XPLAT-51 heisst natives ARM64-Python "nicht unterstuetzt (instabil, kein
+3D) - x64-Python nehmen" (6 von 12 Starts stuerzten ab); der Wortlaut wird in
+tests/test_xplat51_arm64_nicht_unterstuetzt.py geprueft, hier die Wege dahin.
+
 Entscheidung des Projektinhabers vom 05.10.2026. Hintergrund (XPLAT-45): die
 nativen win_arm64-Wheels von PySide6-Addons haben kein QtWebEngine, mit
 ARM64-Python fehlt also der 3D-Visualizer. Vorher rieten Installer, INSTALL.md
@@ -25,9 +29,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture
-def installer(monkeypatch):
+def installer(monkeypatch, tmp_path):
     monkeypatch.syspath_prepend(str(ROOT))
     import install
+    # check_arm_runtime fragt ein vorhandenes venv: nie das echte des Checkouts.
+    monkeypatch.setattr(install, "VENV_DIR", tmp_path / "venv")
     return install
 
 

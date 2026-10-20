@@ -190,9 +190,9 @@ nicht.
 
 | Paket | ARM64 Status |
 |---|---|
-| PySide6 | OK (ARM64-Wheel) |
+| PySide6 | ARM64-Wheel vorhanden - Abstuerze ungeklaert (XPLAT-51) |
 | PySide6-Addons | ARM64-Wheel **ohne QtWebEngine** - kein 3D-Visualizer |
-| numpy | OK (ARM64-Wheel) |
+| numpy | ARM64-Wheel vorhanden - Abstuerze ungeklaert (XPLAT-51) |
 | soundcard | OK (pure-Python) |
 | flask-socketio | OK (pure-Python) |
 | Flask | OK (pure-Python) |

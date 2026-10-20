@@ -103,3 +103,92 @@ def test_main_reicht_use_venv_an_das_manifest(installer, monkeypatch):
     monkeypatch.setattr(sys, "argv", ["install.py", "--no-venv", "--no-shortcut"])
     installer.main()
     assert gesehen == [False]
+
+
+# ── Gegenpruefung: venv_arch() ausserhalb von Windows ──────────────────────
+class _Lauf:
+    def __init__(self, ausgabe: str):
+        self.stdout, self.returncode = ausgabe + "\n", 0
+
+
+@pytest.mark.parametrize("plat,erwartet", [
+    ("linux-x86_64", "x64"), ("linux-aarch64", "arm64"),
+    ("macosx-14.0-arm64", "arm64"), ("macosx-10.9-x86_64", "x64"),
+    ("win-amd64", "x64"), ("win-arm64", "arm64"), ("win32", "x86"),
+])
+def test_venv_arch_normalisiert_jede_plattform(installer, monkeypatch, plat, erwartet):
+    # sysconfig.get_platform() im venv: unter Linux/macOS 'linux-x86_64' usw. -
+    # vorher kam der ganze String zurueck und stand so im Manifest.
+    monkeypatch.setattr(installer.os, "name", "posix")
+    py = Path(installer.venv_python())
+    py.parent.mkdir(parents=True)
+    py.write_text("", encoding="utf-8")
+    monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: _Lauf(plat))
+    assert installer.venv_arch() == erwartet
+
+
+@pytest.mark.parametrize("plat", ["linux-x86_64", "linux-aarch64"])
+def test_linux_manifest_und_create_venv_ohne_falsche_abweichung(
+        installer, monkeypatch, capsys, plat):
+    monkeypatch.setattr(installer.os, "name", "posix")
+    monkeypatch.setattr(installer, "detect_native_os_arch", lambda: "x64")
+    arch = "x64" if plat.endswith("x86_64") else "arm64"
+    monkeypatch.setattr(installer, "detect_arch", lambda: arch)
+    py = Path(installer.venv_python())
+    py.parent.mkdir(parents=True)
+    py.write_text("", encoding="utf-8")
+    monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: _Lauf(plat))
+    m = _manifest(installer)
+    assert m["python_arch"] == m["arch"] == arch
+    installer.show_summary()
+    assert "install.py lief mit" not in capsys.readouterr().out
+    # create_venv fragt nur bei echter Abweichung nach.
+    monkeypatch.setattr(installer, "_frage_ja",
+                        lambda *a: (_ for _ in ()).throw(AssertionError("Rueckfrage")))
+    installer.create_venv()
+    assert "Das vorhandene venv wurde mit" not in capsys.readouterr().out
+
+
+# ── Gegenpruefung: Anfang und Ende eines Laufs widersprechen sich nicht ────
+def _arm_runtime(installer, monkeypatch, capsys, venv, ausfuehrend, **kw):
+    _archs(installer, monkeypatch, venv, ausfuehrend)
+    monkeypatch.setattr(installer, "finde_x64_python", lambda: None)
+    installer.check_arm_runtime(**kw)
+    return [z for z in capsys.readouterr().out.splitlines() if "WARN" in z]
+
+
+def test_arm_warnung_nennt_vorhandenes_x64_venv(installer, monkeypatch, capsys):
+    warn = _arm_runtime(installer, monkeypatch, capsys, "x64", "arm64")
+    zusatz = [z for z in warn if "vorhandene venv ist x64-Python" in z]
+    assert zusatz and "Rueckfrage folgt" in zusatz[0]
+
+
+def test_x64_installer_warnt_vor_vorhandenem_arm64_venv(installer, monkeypatch, capsys):
+    warn = _arm_runtime(installer, monkeypatch, capsys, "arm64", "x64")
+    zusatz = [z for z in warn if "vorhandene venv ist ARM64-Python" in z]
+    assert zusatz and "nicht unterstuetzt (instabil, kein 3D)" in zusatz[0]
+    assert "--neu-venv" in zusatz[0]
+
+
+@pytest.mark.parametrize("kw", [{"use_venv": False}, {"neu_venv": True}])
+def test_kein_venv_zusatz_ohne_venv_oder_bei_neuanlage(installer, monkeypatch, capsys, kw):
+    for venv, ausfuehrend in MISCHFAELLE:
+        warn = _arm_runtime(installer, monkeypatch, capsys, venv, ausfuehrend, **kw)
+        assert not any("vorhandene venv" in z for z in warn)
+
+
+def test_main_reicht_venv_optionen_an_check_arm_runtime(installer, monkeypatch):
+    import sys
+    gesehen = []
+    for name in ("check_python", "install_requirements", "create_venv",
+                 "create_shortcut", "show_summary", "write_manifest"):
+        monkeypatch.setattr(installer, name, lambda *a, **k: None)
+    monkeypatch.setattr(installer, "create_directories", lambda: [])
+    monkeypatch.setattr(installer, "detect_arch", lambda: "x64")
+    monkeypatch.setattr(installer, "check_arm_runtime",
+                        lambda *a, **k: gesehen.append(a))
+    for argv, erwartet in ((["--no-venv"], (False, False)),
+                           (["--neu-venv"], (True, True)), ([], (True, False))):
+        monkeypatch.setattr(sys, "argv", ["install.py", "--no-shortcut", *argv])
+        installer.main()
+        assert gesehen.pop() == erwartet
