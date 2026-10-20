@@ -313,9 +313,7 @@ def herkunft_text(model: GeneratorModel) -> str:
     art = h["herkunft"].get("art", "")
     lizenz = h["herkunft"].get("lizenz", "")
     titel = h.get("quelle", {}).get("titel", "")
-    namen = {"qlcplus": "QLC+", "ofl": "Open Fixture Library",
-             "lightos": "LightOS", "hersteller-handbuch": "Herstellerhandbuch"}
-    return (f"Herkunft der Vorlage: {namen.get(art, art)}, Lizenz {lizenz}"
+    return (f"Herkunft der Vorlage: {_HERKUNFT_ARTEN.get(art, art)}, Lizenz {lizenz}"
             + (f" — {titel}" if titel else "")
             + ". Sie wird beim Speichern übernommen, auch wenn du das Profil "
               "umbaust.")
@@ -790,6 +788,44 @@ class LiveTester:
 
 # ── Markdown-Export (optional) ───────────────────────────────────────────────
 
+_HERKUNFT_ARTEN = {"qlcplus": "QLC+", "ofl": "Open Fixture Library",
+                   "lightos": "LightOS", "hersteller-handbuch": "Herstellerhandbuch"}
+
+
+def herkunft_markdown(model: GeneratorModel) -> list[str]:
+    """FM-77: Herkunftsblock fuer den Markdown-Export — dieselben Angaben,
+    mit denen das Profil gespeichert wuerde (:func:`herkunft_zum_speichern`,
+    bei QLC+/OFL samt Vermerk „im LightOS-Fixture-Generator bearbeitet“).
+    Eine Kanaltabelle aus einer Vorlage verlaesst das Programm so nie ohne
+    Lizenz- und Urheberangabe (Apache-2.0 §4, MIT). Frei gebaut = „eigen“;
+    nicht belegbar = ausdruecklich so, nie still „eigen“."""
+    if model.herkunft_fehlt:
+        return ["**Herkunft:** nicht belegbar — " + model.herkunft_fehlt]
+    h = herkunft_zum_speichern(model)
+    if not h:
+        return ["**Herkunft:** eigen (frei im LightOS-Fixture-Generator gebaut)"]
+    hk = h.get("herkunft", {})
+    q = h.get("quelle", {})
+    art = hk.get("art", "")
+    zeilen = ["## Herkunft", ""]
+    quelle = q.get("titel", "")
+    if q.get("url"):
+        quelle = f"{quelle} ({q['url']})" if quelle else q["url"]
+    if quelle:
+        zeilen.append(f"- Quelle: {quelle}")
+    zeilen.append(f"- Art: {_HERKUNFT_ARTEN.get(art, art)}")
+    zeilen.append(f"- Lizenz: {hk.get('lizenz', '') or '—'}")
+    if hk.get("urheber"):
+        zeilen.append(f"- Urheber: {hk['urheber']}")
+    if hk.get("original"):
+        zeilen.append(f"- Original: {hk['original']}")
+    if hk.get("geaendert"):
+        zeilen.append(f"- Geändert: {hk['geaendert']}")
+    if h.get("autor"):
+        zeilen.append(f"- Autor: {h['autor']}")
+    return zeilen
+
+
 def model_to_markdown(model: GeneratorModel) -> str:
     """Kanal-Layout des Modells als Markdown (Tabellen je Modus, wie
     docs/MOVING_HEADS.md). Reine Funktion, gut testbar."""
@@ -803,6 +839,8 @@ def model_to_markdown(model: GeneratorModel) -> str:
     if model.notes:
         lines.append("")
         lines.append(model.notes)
+    lines.append("")
+    lines.extend(herkunft_markdown(model))
     for mode in model.modes:
         lines.append("")
         lines.append(f"## {mode.name} ({len(mode.channels)} Kanäle)")
