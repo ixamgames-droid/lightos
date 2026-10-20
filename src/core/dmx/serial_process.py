@@ -395,7 +395,11 @@ class EnttecProcessProxy:
 
     def __init__(self, port: str, frame_interval: float = FRAME_INTERVAL,
                  _process_factory=None, _clock=time.monotonic,
-                 fremde_seriennr=()):
+                 fremde_seriennr=(), seriennr: str | None = None):
+        """``seriennr`` (OUT-80): die in ``universes.json`` gespeicherte
+        Seriennummer des Dongles. Sie steht VOR dem ersten Start im
+        gemeinsamen Feld — schon der erste Worker sucht so seinen Dongle (wie
+        ein neu gestarteter nach OUT-66)."""
         self.port = port
         self._frame_interval = frame_interval
         self._clock = _clock
@@ -408,6 +412,8 @@ class EnttecProcessProxy:
         # einem neu gestarteten Worker mitgegeben wird.
         self._port_akt = self._ctx.Array("c", PORT_BYTES)
         self._seriennr = self._ctx.Array("c", SN_BYTES)
+        if seriennr and str(seriennr).strip():
+            _schreib_text(self._seriennr, str(seriennr).strip(), SN_BYTES)
         # OUT-66 (Review 2): Seriennummern der ANDEREN Enttec-Ausgaben (vom
         # OutputManager gepflegt, VOR dem ersten Spawn schon gesetzt) und der
         # Hinweis des Workers, wenn er einen Ersatz-Dongle uebernommen hat.

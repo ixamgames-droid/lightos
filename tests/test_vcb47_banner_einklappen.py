@@ -614,6 +614,13 @@ class _ImFenster(unittest.TestCase):
         vorher = self._im_fenster(zeile)
         self.view._btn_edit.setChecked(True)
         self._lauf()
+        if self.KIOSK:
+            # UI-96: im Kiosk gibt es keinen Bearbeiten-Modus — die Leiste
+            # bleibt, wie sie ist, und der Chip mit ihr.
+            self.assertFalse(self.view._edit_mode)
+            self.assertEqual(self._im_fenster(zeile), vorher)
+            self.assertTrue(vorher.contains(self._pruefe_chip("Kiosk")))
+            return
         self.assertNotEqual(self._im_fenster(zeile), vorher,
                             "Die Leiste sollte hier umbrechen.")
         self.assertTrue(self._im_fenster(zeile).contains(self._pruefe_chip("B")))
@@ -650,7 +657,9 @@ class _ImFenster(unittest.TestCase):
                 self.assertTrue(self.chip.isVisible())
                 knoepfe = [b for b in self.view._toolbar_widget.findChildren(
                     QAbstractButton) if b.isVisible()]
-                self.assertGreaterEqual(len(knoepfe), 8)
+                # UI-96: im Kiosk fehlen Bearbeiten, MIDI Lernen, Import und
+                # Bibliothek — es bleiben die Bedienknoepfe.
+                self.assertGreaterEqual(len(knoepfe), 7 if self.KIOSK else 8)
                 anteil_k = max(
                     _flaeche(chip.intersected(self._im_fenster(b)))
                     / _flaeche(self._im_fenster(b)) for b in knoepfe)
