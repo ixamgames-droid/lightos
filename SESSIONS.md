@@ -61,7 +61,6 @@
 | DEMO-9 | A | fix/demo9-showcase-club-namen | 2026-10-20T14:08Z | - |
 | ENG-37 | A | feat/eng37-modify-sichtbar | 2026-10-20T14:08Z | - |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-20T14:08Z | - |
-| QA-103 | A | fix/qa-bpm-view-absturz | 2026-10-20T14:08Z | - |
 | IMP-4 | A | fix/imp4-ueberschneidung-zusammenfassen | 2026-10-20T14:08Z | - |
 | FM-77 | A | fix/fm77-markdown-export-herkunft | 2026-10-20T14:08Z | - |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-20T14:08Z | - |
@@ -110,7 +109,6 @@
 
 ## Verlauf
 
-- 2026-10-19T19:03Z 4 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:08Z A claim IMP-4
 - 2026-10-19T19:08Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-19T19:08Z A claim FM-77
@@ -140,3 +138,4 @@
 - 2026-10-20T14:26Z A claim SAMMEL-BACKLOG-1020
 - 2026-10-20T14:26Z A claim UI-103
 - 2026-10-20T14:26Z A claim UI-104
+- 2026-10-20T14:40Z A done QA-103
