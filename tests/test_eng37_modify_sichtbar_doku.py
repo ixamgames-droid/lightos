@@ -19,8 +19,6 @@ def test_anleitungen_nennen_zeichen_hinweis_und_eng42():
         assert wort in " ".join(abschnitt.split()), wort
     pr = (repo / "docs/anleitung_prioritaeten/ANLEITUNG.md").read_text(encoding="utf-8")
     kein = pr.split("**Kein „Untergrund“:**", 1)[1].split("\n- ", 1)[0]
-    assert "Modify-Effekt" in kein and "ENG-42" in kein
+    # ENG-42 ist geliefert: die Anleitung nennt den Haken statt des Backlog-Verweises
+    assert "Modify-Effekt" in kein and "Dunkle Lampen" in " ".join(kein.split())
     assert "anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md" in kein
-    for fid in ("ENG-42", "ENG-43"):
-        text = (repo / "backlog.d" / f"{fid}.md").read_text(encoding="utf-8")
-        assert text.startswith(f"ID: {fid}\n") and "Fertig, wenn:" in text
