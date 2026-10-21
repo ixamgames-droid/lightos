@@ -33,6 +33,8 @@ class FlowLayout(QLayout):
         # UI-98: Elemente unterschiedlicher Höhe innerhalb ihrer Zeile
         # senkrecht mittig ausrichten (sonst oben bündig).
         self._zentrieren = zeilen_zentrieren
+        # UI-104: zuletzt gemeldete Höhe für die aktuelle Breite (s. minimumSize).
+        self._hfw_gemeldet = -1
         self.setContentsMargins(margin, margin, margin, margin)
 
     # ── Pflicht-Overrides ────────────────────────────────────────────────────
@@ -70,7 +72,13 @@ class FlowLayout(QLayout):
 
     def setGeometry(self, rect: QRect) -> None:  # noqa: N802
         super().setGeometry(rect)
-        self._do_layout(rect, test_only=False)
+        hoehe = self._do_layout(rect, test_only=False)
+        if hoehe != self._hfw_gemeldet:
+            # UI-104: Zeilenzahl hat sich mit der Breite geändert -> die
+            # Mindesthöhe (minimumSize) auch; Eltern-Layouts neu fragen lassen.
+            # Die Breite hängt nicht von der Höhe ab, das konvergiert.
+            self._hfw_gemeldet = hoehe
+            self.invalidate()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         return self.minimumSize()
@@ -87,6 +95,14 @@ class FlowLayout(QLayout):
             margins.left() + margins.right(),
             margins.top() + margins.bottom(),
         )
+        # UI-104: Bei bekannter Breite die umbrochene Höhe als Mindesthöhe
+        # melden. Nur der größte Einzelknopf reichte nicht: jenseits eines
+        # QSplitter fragt niemand heightForWidth, das Eltern-Layout stauchte
+        # die Leiste bei Platzmangel unter ihre Zeilenhöhe (Touch-Modus,
+        # schmale Bibliothek: „↻“ als Strich, „Löschen“ im Baum).
+        breite = self.geometry().width()
+        if breite > 0:
+            size.setHeight(max(size.height(), self.heightForWidth(breite)))
         return size
 
     # ── Layout-Kern ──────────────────────────────────────────────────────────
