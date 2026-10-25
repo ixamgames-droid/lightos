@@ -371,6 +371,12 @@ os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
 os.environ["LIGHTOS_DMX_FERNSTEUERUNG"] = os.path.join(
     _TEST_ROOT, f"lightos_test_fernsteuerung_{_TEST_TOKEN}.json")
 
+# OSC-06: dieselbe harte Trennung fuer die freien OSC-Zuordnungen
+# (`paths.osc_zuordnungen_path`) — sonst schriebe „Übernehmen" im OSC-Dialog-
+# Test in den echten Datenordner. Reste: Muster `lightos_test_osc_zuordnungen_*`.
+os.environ["LIGHTOS_OSC_ZUORDNUNGEN"] = os.path.join(
+    _TEST_ROOT, f"lightos_test_osc_zuordnungen_{_TEST_TOKEN}.json")
+
 
 def _purge_test_dbs():
     """Die PROZESS-EIGENE Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
@@ -539,7 +545,7 @@ def _eigene_testpfade() -> set:
     pfade = set()
     for schluessel in ("LIGHTOS_CRASH_LOG", "LIGHTOS_SHOW_DB",
                        "LIGHTOS_SACN_CID", "LIGHTOS_UNIVERSES_JSON",
-                       "LIGHTOS_FIXTURE_DB"):
+                       "LIGHTOS_FIXTURE_DB", "LIGHTOS_OSC_ZUORDNUNGEN"):
         wert = os.environ.get(schluessel)
         if not wert:
             continue
@@ -679,6 +685,7 @@ def _purge_old_test_crash_logs():
                   "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
                   "lightos_test_universes_*.json",
                   "lightos_test_fernsteuerung_*.json",
+                  "lightos_test_osc_zuordnungen_*.json*",
                   "lightos_test_fixtures_*.db*")
         for m in muster:
             for path in glob.glob(os.path.join(_TEST_ROOT, m)):
