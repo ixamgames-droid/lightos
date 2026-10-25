@@ -6,8 +6,25 @@ Sie sehen einander **nur ueber dieses Repo**. Die Regel, aus der alles folgt:
 
     Was nicht gepusht ist, existiert fuer die andere Sitzung nicht.
 
-Dieses Werkzeug pflegt die Tafel ``SESSIONS.md`` auf dem Branch ``sessions``
-und macht daraus einen belastbaren Beleg statt einer Absichtserklaerung.
+Dieses Werkzeug pflegt die Tafel ``SESSIONS.md`` und macht daraus einen
+belastbaren Beleg statt einer Absichtserklaerung.
+
+★ **Wo die Tafel liegt (PROC-25, seit 2026-10-25):** in einem eigenen,
+PRIVATEN Repo ``ixamgames-droid/lightos-intern`` (Branch ``main``), nicht mehr
+auf dem Branch ``sessions`` des oeffentlichen Repos. Das Werkzeug arbeitet auf
+einem lokalen Klon davon:
+
+* ``LIGHTOS_TAFEL_REPO=<pfad>`` (oder ``--tafel <pfad>``) — sonst die Vorgabe
+  ``<Projektordner>/lightos-intern``, also neben ``repo/`` bzw. den Worktrees.
+* Fehlt der Klon, bricht jeder Befehl mit Exit 3 und dem Einrichtungsbefehl
+  ``gh repo clone ixamgames-droid/lightos-intern <pfad>`` ab — es gibt
+  bewusst KEINEN stillen Rueckfall auf ``origin/sessions``.
+* ``LIGHTOS_TAFEL=alt`` nimmt fuer den Uebergangstag noch einmal den alten
+  Branch ``sessions`` (mit Warnung). Nach ``umzug`` schreibt er dort nichts mehr.
+* Vor JEDEM Schreiben auf die Tafel sperrt :func:`pruefe_zugangsdaten`
+  Token-, Kennwort- und Schluessel-Muster. Klarnamen sind im privaten Repo
+  erlaubt; :func:`pruefe_oeffentlich` gilt nur noch fuer Texte, die ins
+  oeffentliche Repo gehen (``LIGHTOS_TAFEL=alt``, Hinweis-Commit von ``umzug``).
 
 ★ **Der Kern ist nicht die Datei, sondern der Push.** Zwei Sitzungen, die im
 selben Moment dasselbe Item nehmen wollen, lesen beide „frei" — die Pruefung
@@ -37,6 +54,10 @@ Aufrufe::
     AN B: bitte `app_state.py` erst nach meinem Merge anfassen
     EOF
     python tools/session_claim.py list --fuer B   # Briefe an B (PROC-17)
+    python tools/session_claim.py entscheidung add "Rig umbauen?" --session A
+    python tools/session_claim.py entscheidung list
+    python tools/session_claim.py entscheidung done E-3 --session A --notiz "ja"
+    python tools/session_claim.py umzug --session A --trocken   # PROC-25, einmalig
 
 Windows PowerShell 5.1: ``… | python … --datei -`` kodiert die Pipe nach
 ``$OutputEncoding`` (Vorgabe US-ASCII) — Umlaute kommen still als ``?`` an.
@@ -53,9 +74,21 @@ import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from typing import NamedTuple
 
-BRANCH = "sessions"
+#: PROC-25: Branch der Tafel im privaten Tafel-Repo.
+BRANCH = "main"
+#: Bis PROC-25: Branch der Tafel im OEFFENTLICHEN Code-Repo (nur noch
+#: ``LIGHTOS_TAFEL=alt`` und ``umzug`` lesen ihn).
+BRANCH_ALT = "sessions"
 DATEI = "SESSIONS.md"
+DATEI_ENTSCHEIDUNGEN = "ENTSCHEIDUNGEN.md"
+#: Ordnername des Klons neben ``repo/`` und das Repo auf GitHub (privat).
+TAFEL_ORDNER = "lightos-intern"
+TAFEL_GITHUB = "ixamgames-droid/lightos-intern"
+#: Steht im Hinweis, den ``umzug`` auf ``origin/sessions`` hinterlaesst — daran
+#: erkennt ein zweiter Lauf (und ``LIGHTOS_TAFEL=alt``) den erledigten Umzug.
+UMZUG_MARKE = "umgezogen nach lightos-intern (privat)"
 
 # Ein Claim verfaellt, wenn die Sitzung ihn nicht auffrischt. Vier Stunden sind
 # lang genug fuer ein grosses Item samt vollem Gate (~15 min) und kurz genug,
@@ -64,13 +97,15 @@ VERFALL = timedelta(hours=4)
 
 _KOPF = """# SESSIONS.md — wer arbeitet gerade woran
 
-<!-- Gepflegt von tools/session_claim.py. Branch `sessions`, wird NIE nach main
-     gemergt. Von Hand editieren ist moeglich, verliert aber die Konflikt-
+<!-- Gepflegt von tools/session_claim.py. Privates Tafel-Repo lightos-intern,
+     Branch main (bis PROC-25: Branch `sessions` des oeffentlichen Repos).
+     Von Hand editieren ist moeglich, verliert aber die Konflikt-
      erkennung: erst der abgelehnte Push macht sichtbar, dass jemand schneller
-     war. Spielregeln: COORDINATION.md
+     war. Spielregeln: COORDINATION.md. Zugangsdaten NIE hierher.
      PROC-08: Blocker verfallen beim naechsten Schreiben nach 7 Tagen — nicht
      aber ungelesene Briefe und der letzte Eintrag jeder Sitzung. Volltext
-     aelterer Eintraege: git log -p origin/sessions -- SESSIONS.md -->
+     aelterer Eintraege: git log -p origin/main -- SESSIONS.md (im Klon
+     lightos-intern; vor dem Umzug: git log -p origin/sessions -- SESSIONS.md) -->
 """
 
 _H_AKTIV = "## Aktive Claims"
@@ -299,7 +334,7 @@ def blocker_fuer(blocker: list[str], sitzung: str) -> list[str]:
 #     `blocker_fuer`; faellt er weg, tauchen schon gelesene Briefe wieder auf,
 #   * ein Eintrag ohne lesbaren Zeitstempel (von Hand geschrieben) — was man
 #     nicht datieren kann, wird nicht weggeworfen.
-# Verfallene Eintraege stehen weiter in der Git-Historie des Zweigs `sessions`.
+# Verfallene Eintraege stehen weiter in der Git-Historie der Tafel.
 
 #: Ab diesem Alter faellt ein Blocker beim naechsten Schreiben von der Tafel.
 BLOCKER_VERFALL = timedelta(days=7)
@@ -474,9 +509,12 @@ def _klarnamen() -> list[str]:
 def pruefe_oeffentlich(text: str) -> list[str]:
     """PRIV-01/02: was in ein oeffentliches Repo nicht hineingehoert.
 
-    Die Tafel liegt auf GitHub. Ein Blocker-Text ist Freitext und damit die
-    einzige Stelle dieses Werkzeugs, an der versehentlich Privates landen kann
-    — deshalb wird genau hier geprueft und nicht am Ende von irgendetwas.
+    Bis PROC-25 lag die Tafel im oeffentlichen Repo; ein Blocker-Text ist
+    Freitext und war damit die Stelle, an der versehentlich Privates landen
+    konnte. Seit dem Umzug ins private ``lightos-intern`` gilt diese Pruefung
+    nur noch fuer Texte, die ins OEFFENTLICHE Repo gehen: ``LIGHTOS_TAFEL=alt``
+    und den Hinweis-Commit von ``umzug``. Zugangsdaten sperrt ueberall
+    :func:`pruefe_zugangsdaten`.
     """
     funde = []
     if re.search(r"/home/(?!user\b|runner\b)[a-z][a-z0-9_-]+/", text):
@@ -493,6 +531,152 @@ def pruefe_oeffentlich(text: str) -> list[str]:
     if re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", text):
         funde.append("E-Mail-Adresse")
     return funde
+
+
+# ─── PROC-25: Zugangsdaten nie auf die Tafel ─────────────────────────────────
+# Im privaten Tafel-Repo duerfen Klarnamen stehen — Zugangsdaten nie: ein
+# privates Repo ist kein Tresor (jeder Klon, jede Sicherung, jeder spaeter
+# hinzugefuegte Mitleser traegt sie mit). Die Pruefung laeuft deshalb nicht nur
+# auf dem neuen Freitext, sondern in `_schreibe_dateien` auf JEDEM Inhalt, der
+# gepusht wird. Gemeldet wird die ART des Fundes, nie der Wert.
+
+_ZUGANGSMUSTER = (
+    ("GitHub-Token (ghp_/gho_/ghu_/ghs_/ghr_…)",
+     re.compile(r"(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{20,}")),
+    ("GitHub-Token (github_pat_…)",
+     re.compile(r"(?<![A-Za-z0-9])github_pat_[A-Za-z0-9_]{20,}")),
+    ("AWS-Zugangsschluessel (AKIA…/ASIA…)",
+     re.compile(r"(?<![A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Z0-9])")),
+    ("Schluessel-Block (-----BEGIN … KEY-----)",
+     re.compile(r"-----BEGIN [A-Z0-9 ]*KEY(?: BLOCK)?-----")),
+    ("API-Schluessel (sk-…)",
+     re.compile(r"(?<![A-Za-z0-9])sk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}")),
+    ("GitLab-Token (glpat-…)",
+     re.compile(r"(?<![A-Za-z0-9])glpat-[A-Za-z0-9_-]{20,}")),
+    ("Slack-Token (xox…-)",
+     re.compile(r"(?<![A-Za-z0-9])xox[abprs]-[A-Za-z0-9-]{10,}")),
+    ("Bearer-Token",
+     re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{20,}")),
+    ("Kennwort/Geheimnis mit Wert (password=, Kennwort: …)",
+     re.compile(r"(?i)(?<![\w-])(?:password|passwort|passwd|kennwort|"
+                r"secret|api[_-]?key|access[_-]?key)\s*[=:]\s*[^\s,;]")),
+)
+
+
+def pruefe_zugangsdaten(text: str) -> list[str]:
+    """PROC-25: Token-/Kennwort-/Schluessel-Muster im Text (Art, nie Wert)."""
+    return [art for art, muster in _ZUGANGSMUSTER if muster.search(text or "")]
+
+
+class ZugangsdatenGesperrt(RuntimeError):
+    """Ein Inhalt, der auf die Tafel sollte, traegt ein Zugangsdaten-Muster."""
+
+    def __init__(self, funde: list[str], datei: str = DATEI):
+        self.funde = funde
+        super().__init__(
+            f"Abgelehnt — Zugangsdaten-Muster in {datei}: {', '.join(funde)}. "
+            "Nichts geschrieben. Zugangsdaten gehoeren nie auf die Tafel "
+            "(auch nicht ins private Repo).")
+
+
+# ─── PROC-25: wo die Tafel liegt ─────────────────────────────────────────────
+
+class TafelOrt(NamedTuple):
+    """Git-Repo, in dem die Tafel gelesen/geschrieben wird, und ihr Branch.
+
+    ``alt`` = Uebergangsweg ``LIGHTOS_TAFEL=alt`` (Branch ``sessions`` im
+    OEFFENTLICHEN Code-Repo) — dort gilt zusaetzlich :func:`pruefe_oeffentlich`.
+    """
+    repo: str
+    branch: str = BRANCH
+    alt: bool = False
+
+
+class TafelFehlt(RuntimeError):
+    """Kein Klon des Tafel-Repos am erwarteten Ort — Meldung mit Klon-Befehl."""
+
+    def __init__(self, pfad: str, grund: str = "kein Git-Klon"):
+        self.pfad = pfad
+        super().__init__(
+            f"Tafel-Klon fehlt ({grund}): {pfad}\n"
+            f"Die Sitzungs-Tafel liegt seit PROC-25 im privaten Repo {TAFEL_GITHUB}.\n"
+            f"Einmal einrichten:\n"
+            f"    gh repo clone {TAFEL_GITHUB} {pfad}\n"
+            f"Anderer Ort: Umgebungsvariable LIGHTOS_TAFEL_REPO=<pfad>.")
+
+
+def code_repo_wurzel() -> str:
+    """Das Code-Repo (bzw. der Worktree), in dem dieses Werkzeug liegt."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def tafel_vorgabe(code_repo: str | None = None) -> str:
+    """``<Projektordner>/lightos-intern`` — Geschwister von ``repo/`` und den
+    Worktrees ``wt-*``, damit alle Worktrees denselben Klon finden."""
+    wurzel = os.path.abspath(code_repo or code_repo_wurzel())
+    return os.path.join(os.path.dirname(wurzel), TAFEL_ORDNER)
+
+
+def tafel_pfad(code_repo: str | None = None, pfad: str | None = None) -> str:
+    """Ausdruecklicher Pfad > ``LIGHTOS_TAFEL_REPO`` > :func:`tafel_vorgabe`."""
+    gewaehlt = pfad or os.environ.get("LIGHTOS_TAFEL_REPO", "").strip()
+    return os.path.abspath(os.path.expanduser(gewaehlt)) if gewaehlt \
+        else tafel_vorgabe(code_repo)
+
+
+def tafel_alt_gewuenscht() -> bool:
+    return os.environ.get("LIGHTOS_TAFEL", "").strip().lower() == "alt"
+
+
+def _ist_eigener_klon(pfad: str) -> str | None:
+    """``None`` = brauchbarer Klon; sonst der Grund, warum nicht.
+
+    ★ Nicht nur „``git rev-parse`` geht": ein leerer Ordner INNERHALB eines
+    anderen Repos (etwa ``repo/lightos-intern``) waere fuer Git ein Teil des
+    Code-Repos — dann landete die Tafel still im falschen, oeffentlichen Repo.
+    """
+    if not os.path.isdir(pfad):
+        return "Ordner fehlt"
+    r = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=pfad,
+                       capture_output=True)
+    if r.returncode != 0:
+        return "kein Git-Klon"
+    gitdir = os.path.realpath(r.stdout.decode("utf-8", "replace").strip())
+    echt = os.path.realpath(pfad)
+    if gitdir not in (echt, os.path.join(echt, ".git")):
+        return "Ordner liegt in einem anderen Repo, ist kein eigener Klon"
+    r = subprocess.run(["git", "remote", "get-url", "origin"], cwd=pfad,
+                       capture_output=True)
+    if r.returncode != 0:
+        return "Klon ohne Remote 'origin'"
+    return None
+
+
+def tafel_ort(code_repo: str | None = None, pfad: str | None = None,
+              warnen: bool = True) -> TafelOrt:
+    """Wo gelesen und geschrieben wird — wirft :class:`TafelFehlt`.
+
+    Es gibt bewusst KEINEN Rueckfall auf ``origin/sessions``: eine Sitzung ohne
+    Klon, die still die alte Tafel nimmt, schriebe Claims dorthin, wo keine
+    andere Sitzung mehr hinsieht — zwei Tafeln sind schlimmer als keine.
+    """
+    if tafel_alt_gewuenscht() and not pfad:
+        if warnen:
+            print("⚠ LIGHTOS_TAFEL=alt: Tafel vom Branch `sessions` des "
+                  "OEFFENTLICHEN Repos — nur fuer den Uebergangstag (PROC-25).",
+                  file=sys.stderr)
+        return TafelOrt(os.path.abspath(code_repo or code_repo_wurzel()),
+                        BRANCH_ALT, True)
+    ziel = tafel_pfad(code_repo, pfad)
+    grund = _ist_eigener_klon(ziel)
+    if grund:
+        raise TafelFehlt(ziel, grund)
+    return TafelOrt(ziel, BRANCH, False)
+
+
+def _ort(ort) -> TafelOrt:
+    """Ein nackter Pfad (Tests, aeltere Aufrufer) ist ein Tafel-Klon auf main."""
+    return ort if isinstance(ort, TafelOrt) else TafelOrt(ort, BRANCH, False)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -549,32 +733,116 @@ def _git(*args: str, eingabe: str | None = None, repo: str | None = None,
     return r.stdout.decode("utf-8").replace("\r\n", "\n").strip()
 
 
-def lade_tafel(repo: str) -> tuple[dict, str | None]:
-    """Tafel + Spitzen-Commit von ``origin/sessions`` (nicht aus dem Arbeitsbaum).
-
-    Der zweite Rueckgabewert ist der Eltern-Commit fuer den naechsten Schreib-
-    vorgang. Er ist die halbe Konflikterkennung: schreiben wir spaeter gegen
-    genau diesen Stand und ist der Remote inzwischen weiter, ist der Push kein
-    Fast-Forward mehr und wird abgelehnt.
-    """
+def _hole(repo: str, branch: str) -> str | None:
+    """``origin/<branch>`` frisch holen; Spitze oder ``None`` (Branch fehlt)."""
     _git("fetch", "--quiet", "origin",
-         f"+refs/heads/{BRANCH}:refs/remotes/origin/{BRANCH}",
+         f"+refs/heads/{branch}:refs/remotes/origin/{branch}",
          repo=repo, pruefen=False)
-    spitze = _git("rev-parse", "--verify", "--quiet", f"origin/{BRANCH}",
-                  repo=repo, pruefen=False)
+    return _git("rev-parse", "--verify", "--quiet", f"origin/{branch}",
+                repo=repo, pruefen=False) or None
+
+
+def lade_datei(ort, datei: str) -> tuple[str, str | None]:
+    """``(Inhalt, Spitze)`` einer Datei der Tafel — leer, wenn es sie noch nicht gibt."""
+    repo, branch, _alt = _ort(ort)
+    spitze = _hole(repo, branch)
     if not spitze:
-        return parse(""), None
-    inhalt = _git("show", f"{spitze}:{DATEI}", repo=repo, pruefen=False)
+        return "", None
+    return _git("show", f"{spitze}:{datei}", repo=repo, pruefen=False), spitze
+
+
+def lade_tafel(ort) -> tuple[dict, str | None]:
+    """Tafel + Spitzen-Commit von ``origin/<branch>`` (nicht aus dem Arbeitsbaum).
+
+    ``ort`` ist ein :class:`TafelOrt` oder der Pfad eines Tafel-Klons
+    (Branch ``main``). Der zweite Rueckgabewert ist der Eltern-Commit fuer den
+    naechsten Schreibvorgang. Er ist die halbe Konflikterkennung: schreiben
+    wir spaeter gegen genau diesen Stand und ist der Remote inzwischen weiter,
+    ist der Push kein Fast-Forward mehr und wird abgelehnt.
+    """
+    inhalt, spitze = lade_datei(ort, DATEI)
     return parse(inhalt), spitze
 
 
-def schreibe_tafel(repo: str, tafel: dict, eltern: str | None,
-                   nachricht: str) -> bool:
-    """Tafel committen und pushen. ``False`` = jemand war schneller.
+class TafelText(NamedTuple):
+    """Ergebnis von :func:`lies_tafel_text` — fuer die LESER der Tafel."""
+    text: str | None          # None = nicht gelesen
+    fehler: str | None        # Lesefehler (Klon da, aber nicht lesbar)
+    klon_fehlt: str | None    # Meldung mit Klon-Befehl, wenn der Klon fehlt
+    quelle: str = ""          # z. B. "lightos-intern:origin/main:SESSIONS.md"
+
+
+def lies_tafel_text(code_repo: str | None = None, holen: bool = False) -> TafelText:
+    """PROC-25: die EINE Lesehilfe fuer Werkzeuge, die die Tafel nur lesen
+    (``backlog_ids``, ``pr_bereit`` …) — statt eigener Kopien von Ort,
+    Branch und Fehlerfall. Wirft nie.
+
+    ``holen=False`` liest den zuletzt geholten Stand (``--kein-fetch``).
+    """
+    try:
+        ort = tafel_ort(code_repo)
+    except TafelFehlt as e:
+        return TafelText(None, None, str(e), f"{TAFEL_ORDNER}:{DATEI}")
+    quelle = (f"origin/{ort.branch}:{DATEI}" if ort.alt
+              else f"{TAFEL_ORDNER}:origin/{ort.branch}:{DATEI}")
+    try:
+        if holen:
+            _hole(ort.repo, ort.branch)
+        r = subprocess.run(["git", "show", f"origin/{ort.branch}:{DATEI}"],
+                           cwd=ort.repo, capture_output=True)
+    except OSError as e:
+        return TafelText(None, f"git nicht aufrufbar ({e})", None, quelle)
+    if r.returncode != 0:
+        return TafelText(None, r.stderr.decode("utf-8", "replace").strip()
+                         or f"git show Exit {r.returncode}", None, quelle)
+    return TafelText(r.stdout.decode("utf-8", "replace").replace("\r\n", "\n"),
+                     None, None, quelle)
+
+
+def _schreibe_dateien(ort, dateien: dict, eltern: str | None,
+                      nachricht: str) -> bool:
+    """Dateien als EIN Commit auf ``origin/<branch>`` — ``False`` = Rennen verloren.
 
     Ueber Plumbing statt Checkout: der Arbeitsbaum der Sitzung (und der einer
-    parallel laufenden!) bleibt unberuehrt.
+    parallel laufenden!) bleibt unberuehrt. Der Baum des Eltern-Commits wird
+    uebernommen und nur ``dateien`` ersetzt — sonst loeschte jeder Claim die
+    ``ENTSCHEIDUNGEN.md`` daneben.
+
+    ★ PROC-25: JEDER Inhalt geht vorher durch :func:`pruefe_zugangsdaten`;
+    ein Fund wirft :class:`ZugangsdatenGesperrt`, bevor irgendetwas
+    geschrieben wird.
     """
+    repo, branch, _alt = _ort(ort)
+    for name, inhalt in dateien.items():
+        funde = pruefe_zugangsdaten(inhalt)
+        if funde:
+            raise ZugangsdatenGesperrt(funde, name)
+    eintraege: dict[str, str] = {}
+    if eltern:
+        for zeile in _git("ls-tree", "-z", eltern, repo=repo).split("\0"):
+            if "\t" in zeile:
+                meta, name = zeile.split("\t", 1)
+                eintraege[name] = meta
+    for name, inhalt in dateien.items():
+        blob = _git("hash-object", "-w", "--stdin", eingabe=inhalt, repo=repo)
+        eintraege[name] = f"100644 blob {blob}"
+    baum = _git("mktree", "-z", eingabe="".join(
+        f"{meta}\t{name}\0" for name, meta in sorted(eintraege.items())), repo=repo)
+    args = ["commit-tree", baum, "-m", nachricht]
+    if eltern:
+        args += ["-p", eltern]
+    commit = _git(*args, repo=repo)
+    # XPLAT-20: wie ``_git`` ueber Bytes — hier wird zwar nichts geschrieben,
+    # aber git meldet Fehler auf stderr mit UTF-8-Zeichen, und die duerfen den
+    # Aufruf nicht an der cp1252-Dekodierung sterben lassen.
+    r = subprocess.run(["git", "push", "origin", f"{commit}:refs/heads/{branch}"],
+                       cwd=repo, capture_output=True)
+    return r.returncode == 0
+
+
+def schreibe_tafel(ort, tafel: dict, eltern: str | None,
+                   nachricht: str) -> bool:
+    """Tafel committen und pushen. ``False`` = jemand war schneller."""
     # PROC-08: die Schreib-Seite haelt die Blockerliste begrenzt — an genau
     # einer Stelle, damit claim/release/blocker es gleich halten.
     t = jetzt()
@@ -584,18 +852,7 @@ def schreibe_tafel(repo: str, tafel: dict, eltern: str | None,
         tafel = dict(tafel, blocker=bleibt, verlauf=list(tafel["verlauf"]) + [
             f"{stempel(t)} {weg} Blocker verfallen (aelter als "
             f"{BLOCKER_VERFALL.days} Tage, gelesen; Volltext in der Historie)"])
-    blob = _git("hash-object", "-w", "--stdin", eingabe=rendere(tafel), repo=repo)
-    baum = _git("mktree", eingabe=f"100644 blob {blob}\t{DATEI}\n", repo=repo)
-    args = ["commit-tree", baum, "-m", nachricht]
-    if eltern:
-        args += ["-p", eltern]
-    commit = _git(*args, repo=repo)
-    # XPLAT-20: wie ``_git`` ueber Bytes — hier wird zwar nichts geschrieben,
-    # aber git meldet Fehler auf stderr mit UTF-8-Zeichen, und die duerfen den
-    # Aufruf nicht an der cp1252-Dekodierung sterben lassen.
-    r = subprocess.run(["git", "push", "origin", f"{commit}:refs/heads/{BRANCH}"],
-                       cwd=repo, capture_output=True)
-    return r.returncode == 0
+    return _schreibe_dateien(ort, {DATEI: rendere(tafel)}, eltern, nachricht)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -611,6 +868,14 @@ def _mit_wiederholung(repo: str, aendern, nachricht: str, versuche: int = 5):
     """
     for versuch in range(versuche):
         tafel, eltern = lade_tafel(repo)
+        if _ort(repo).alt and eltern and ist_umgezogen(repo, eltern):
+            # PROC-25: nach dem Umzug steht auf `sessions` nur noch der
+            # Hinweis. Wer dort weiterschreibt, fuehrt eine zweite Tafel, die
+            # niemand mehr liest.
+            return False, ("LIGHTOS_TAFEL=alt: die Tafel ist schon umgezogen "
+                           f"({UMZUG_MARKE}) — nichts geschrieben. Klon "
+                           f"einrichten: gh repo clone {TAFEL_GITHUB} "
+                           f"{tafel_vorgabe(_ort(repo).repo)}")
         weiter, meldung = aendern(tafel)
         if not weiter:
             return False, meldung
@@ -873,7 +1138,18 @@ def cmd_blocker(args, repo: str) -> int:
         print(f"Hinweis: {len(args.text)} Zeichen (ab {BLOCKER_LANG} wird ein "
               f"Blocker leicht ueberlesen) — Details besser ins BACKLOG, hier "
               f"nur Kern + Verweis. Wird trotzdem geschrieben.", file=sys.stderr)
-    funde = pruefe_oeffentlich(args.text)
+    # PROC-25: Zugangsdaten nie — egal wo die Tafel liegt. (`_schreibe_dateien`
+    # prueft den ganzen Inhalt noch einmal; hier gibt es die fruehe Meldung.)
+    funde = pruefe_zugangsdaten(args.text)
+    if funde:
+        print("Abgelehnt — Zugangsdaten-Muster im Blocker-Text (nie auf die "
+              "Tafel, auch nicht ins private Repo):", file=sys.stderr)
+        for f in funde:
+            print(f"  - {f}", file=sys.stderr)
+        return 2
+    # Klarnamen & Co. nur, wenn die Tafel im OEFFENTLICHEN Repo liegt
+    # (LIGHTOS_TAFEL=alt) — im privaten lightos-intern sind sie erlaubt.
+    funde = pruefe_oeffentlich(args.text) if _ort(repo).alt else []
     if funde:
         print("Abgelehnt — die Tafel liegt in einem OEFFENTLICHEN Repo:",
               file=sys.stderr)
@@ -898,10 +1174,254 @@ def cmd_blocker(args, repo: str) -> int:
     return 0 if ok else 1
 
 
+# ─── PROC-25: offene Entscheidungen (ENTSCHEIDUNGEN.md) ──────────────────────
+# Neben der Tafel liegt im privaten Repo eine Liste offener Entscheidungen —
+# Fragen, die nur der Projektinhaber beantworten kann und die sonst zwischen
+# Blockern untergehen. Eine Zeile je Entscheidung, fortlaufend nummeriert.
+
+_E_KOPF = """# ENTSCHEIDUNGEN.md — offene Entscheidungen
+
+<!-- Gepflegt von tools/session_claim.py entscheidung add|list|done.
+     Eine Zeile je Entscheidung: `- E-<n> · <stempel> (<Sitzung>) <Frage>`.
+     Erledigte wandern nach unten (die juengsten 50 bleiben stehen, der Rest
+     in der Git-Historie). Zugangsdaten NIE hierher.
+     naechste-nummer: {naechste} -->
+"""
+_E_OFFEN = "## Offen"
+_E_ERLEDIGT = "## Erledigt"
+_E_ZEILE = re.compile(r"^- (E-(\d+)) · (.*)$")
+_E_NAECHSTE = re.compile(r"naechste-nummer:\s*(\d+)")
+_E_ERLEDIGT_MAX = 50
+
+
+def parse_entscheidungen(inhalt: str) -> dict:
+    """``{"offen": [(id, text)], "erledigt": [(id, text)], "naechste": n}``."""
+    offen, erledigt, abschnitt, hoechste = [], [], None, 0
+    for zeile in (inhalt or "").splitlines():
+        if zeile.startswith("## "):
+            abschnitt = zeile.strip()
+            continue
+        m = _E_ZEILE.match(zeile.rstrip())
+        if not m:
+            continue
+        hoechste = max(hoechste, int(m.group(2)))
+        ziel = offen if abschnitt == _E_OFFEN else erledigt if abschnitt == _E_ERLEDIGT else None
+        if ziel is not None:
+            ziel.append((m.group(1), m.group(3)))
+    m = _E_NAECHSTE.search(inhalt or "")
+    naechste = max(int(m.group(1)) if m else 1, hoechste + 1)
+    return {"offen": offen, "erledigt": erledigt, "naechste": naechste}
+
+
+def rendere_entscheidungen(e: dict) -> str:
+    teile = [_E_KOPF.format(naechste=e["naechste"]), "\n", _E_OFFEN, "\n\n"]
+    teile += [f"- {i} · {t}\n" for i, t in e["offen"]] or ["_(keine)_\n"]
+    teile += ["\n", _E_ERLEDIGT, "\n\n"]
+    teile += [f"- {i} · {t}\n" for i, t in e["erledigt"][-_E_ERLEDIGT_MAX:]] \
+        or ["_(keine)_\n"]
+    return "".join(teile)
+
+
+def _nur_privat(ort, was: str) -> str | None:
+    if _ort(ort).alt:
+        return (f"{was} gibt es nur im privaten Tafel-Repo — nicht mit "
+                "LIGHTOS_TAFEL=alt.")
+    return None
+
+
+def cmd_entscheidung(args, repo) -> int:
+    fehler = _nur_privat(repo, "ENTSCHEIDUNGEN.md")
+    if fehler:
+        print(fehler, file=sys.stderr)
+        return 2
+    if args.aktion == "list":
+        e = parse_entscheidungen(lade_datei(repo, DATEI_ENTSCHEIDUNGEN)[0])
+        if not e["offen"]:
+            print("Keine offenen Entscheidungen.")
+        for i, t in e["offen"]:
+            print(f"{i:<6} {t}")
+        if getattr(args, "alle", False) and e["erledigt"]:
+            print("\nErledigt:")
+            for i, t in e["erledigt"]:
+                print(f"{i:<6} {t}")
+        return 0
+    if not args.session:
+        print("--session angeben.", file=sys.stderr)
+        return 2
+    if args.aktion == "add":
+        text = " ".join(z.strip() for z in (args.text or "").splitlines() if z.strip())
+        if not text:
+            print("Text der Entscheidung fehlt.", file=sys.stderr)
+            return 2
+        funde = pruefe_zugangsdaten(text)
+        if funde:
+            print(f"Abgelehnt — Zugangsdaten-Muster: {', '.join(funde)}",
+                  file=sys.stderr)
+            return 2
+    for _versuch in range(5):
+        inhalt, eltern = lade_datei(repo, DATEI_ENTSCHEIDUNGEN)
+        e = parse_entscheidungen(inhalt)
+        t = stempel(jetzt())
+        if args.aktion == "add":
+            eid = f"E-{e['naechste']}"
+            e["offen"].append((eid, f"{t} ({args.session}) {text}"))
+            e["naechste"] += 1
+            meldung = f"{eid} vermerkt"
+        else:                                         # done
+            eid = (args.text or "").strip().upper()
+            treffer = [x for x in e["offen"] if x[0].upper() == eid]
+            if not treffer:
+                print(f"{eid}: keine offene Entscheidung mit dieser Nummer.",
+                      file=sys.stderr)
+                return 1
+            e["offen"].remove(treffer[0])
+            notiz = f": {args.notiz.strip()}" if args.notiz else ""
+            e["erledigt"].append((treffer[0][0], f"{treffer[0][1]} — erledigt "
+                                  f"{t} ({args.session}){notiz}"))
+            meldung = f"{treffer[0][0]} erledigt"
+        if _schreibe_dateien(repo, {DATEI_ENTSCHEIDUNGEN: rendere_entscheidungen(e)},
+                             eltern, f"entscheidung {args.aktion} {eid} ({args.session})"):
+            print(meldung)
+            return 0
+        print(f"[entscheidung] Rennen verloren, lese neu …", file=sys.stderr)
+    print("konnte nicht schreiben — zu viele gleichzeitige Aenderungen")
+    return 1
+
+
+# ─── PROC-25: einmaliger Umzug der Tafel ins private Repo ────────────────────
+
+def umzug_hinweis(datum: str) -> str:
+    """Was auf ``origin/sessions`` stehen bleibt — geht ins OEFFENTLICHE Repo."""
+    return (f"# SESSIONS.md — umgezogen\n\n"
+            f"Die Sitzungs-Tafel ist {UMZUG_MARKE} am {datum}; Historie bleibt "
+            f"hier:\n`git log -p origin/sessions -- SESSIONS.md`.\n\n"
+            f"Einrichtung und Regeln: `COORDINATION.md` auf `main`. Dieser "
+            f"Branch bleibt bestehen und wird nicht mehr beschrieben.\n")
+
+
+def ist_umgezogen(ort, spitze: str | None) -> bool:
+    if not spitze:
+        return False
+    repo = _ort(ort).repo
+    return UMZUG_MARKE in _git("show", f"{spitze}:{DATEI}", repo=repo, pruefen=False)
+
+
+def _zeilen_nur_in(a: str, b: str) -> list[str]:
+    """Claim-, Blocker- und Verlaufszeilen, die in ``a`` stehen, in ``b`` nicht."""
+    def wichtig(text):
+        return [z for z in text.splitlines()
+                if z.startswith("- ") or (z.startswith("| ") and not z.startswith("| Item")
+                                          and not z.startswith("| _"))]
+    rest = set(wichtig(b))
+    return [z for z in wichtig(a) if z not in rest]
+
+
+def cmd_umzug(args) -> int:
+    """Tafel von ``origin/sessions`` ins Tafel-Repo — idempotent, ``--trocken``.
+
+    Reihenfolge mit Absicht: erst das NEUE Repo beschreiben, dann den Hinweis
+    auf ``sessions`` setzen. Bricht dazwischen etwas ab, ist nichts verloren —
+    die alte Tafel steht noch, der zweite Lauf erkennt die neue und setzt nur
+    noch den Hinweis.
+    """
+    code = os.path.abspath(args.repo)
+    ziel = tafel_pfad(code, args.tafel)
+    grund = _ist_eigener_klon(ziel)
+    if grund:
+        print(TafelFehlt(ziel, grund), file=sys.stderr)
+        return 3
+    neu = TafelOrt(ziel, BRANCH, False)
+    alt = TafelOrt(code, BRANCH_ALT, True)
+    datum = jetzt().strftime("%Y-%m-%d")
+    wer = args.session or "A"
+
+    alt_inhalt, alt_spitze = lade_datei(alt, DATEI)
+    neu_inhalt, neu_spitze = lade_datei(neu, DATEI)
+    alt_umgezogen = UMZUG_MARKE in alt_inhalt
+    neu_da = bool(neu_inhalt.strip())
+    if alt_umgezogen and neu_da:
+        print(f"Umzug schon erledigt: origin/{BRANCH_ALT} traegt den Hinweis, "
+              f"{TAFEL_ORDNER} hat die Tafel. Nichts zu tun.")
+        return 0
+
+    if alt_umgezogen:
+        # Hinweis steht, neue Tafel fehlt (von Hand gesetzt?) — der Inhalt
+        # ist der Stand direkt davor.
+        quelle = _git("show", f"{alt_spitze}^:{DATEI}", repo=code, pruefen=False)
+    else:
+        quelle = alt_inhalt
+    if not neu_da and not quelle.strip():
+        print(f"Keine alte Tafel auf origin/{BRANCH_ALT} gefunden — nichts "
+              "umzuziehen. Eine neue Tafel entsteht beim ersten `claim`.",
+              file=sys.stderr)
+        return 1
+    funde = pruefe_zugangsdaten(quelle) if not neu_da else []
+    if funde:
+        print(f"Abgelehnt — die alte Tafel traegt Zugangsdaten-Muster "
+              f"({', '.join(funde)}). Erst von Hand bereinigen, dann umzug.",
+              file=sys.stderr)
+        return 2
+    hinweis = umzug_hinweis(datum)
+    assert not pruefe_oeffentlich(hinweis), "Hinweistext ist nicht oeffentlich tauglich"
+
+    nachtrag = []
+    if neu_da and not alt_umgezogen:
+        # Zweiter Lauf nach halbem Umzug: kam auf `sessions` seither etwas dazu?
+        nachtrag = _zeilen_nur_in(alt_inhalt, neu_inhalt)
+    e_da = bool(lade_datei(neu, DATEI_ENTSCHEIDUNGEN)[0].strip())
+    t = parse(quelle)
+    print(f"Umzug der Tafel nach {TAFEL_ORDNER} ({ziel}):")
+    print(f"  1) {TAFEL_ORDNER} origin/{BRANCH}: "
+          + ("uebersprungen — Tafel schon da" if neu_da else
+             f"SESSIONS.md ({len(quelle.encode('utf-8'))} Bytes, "
+             f"{len(t['claims'])} Claims, {len(t['blocker'])} Blocker)"
+             + ("" if e_da else " + leere ENTSCHEIDUNGEN.md")))
+    print(f"  2) origin/{BRANCH_ALT}: "
+          + ("uebersprungen — Hinweis steht schon" if alt_umgezogen else
+             f"letzter Commit, SESSIONS.md -> Hinweis „{UMZUG_MARKE} am "
+             f"{datum}; Historie bleibt hier“ (Branch bleibt bestehen)"))
+    if nachtrag:
+        print(f"⚠ Auf origin/{BRANCH_ALT} stehen {len(nachtrag)} Zeile(n), die "
+              f"in {TAFEL_ORDNER} fehlen — nach dem Umzug von Hand uebertragen:",
+              file=sys.stderr)
+        for z in nachtrag:
+            print(f"    {z}", file=sys.stderr)
+    if args.trocken:
+        print("(--trocken: nichts geschrieben)")
+        return 0
+
+    if not neu_da:
+        dateien = {DATEI: quelle if quelle.endswith("\n") else quelle + "\n"}
+        if not e_da:
+            dateien[DATEI_ENTSCHEIDUNGEN] = rendere_entscheidungen(
+                parse_entscheidungen(""))
+        if not _schreibe_dateien(neu, dateien, neu_spitze,
+                                 f"umzug: Tafel aus origin/{BRANCH_ALT} ({wer}, {datum})"):
+            print(f"{TAFEL_ORDNER}: Push abgelehnt — dort hat jemand gleichzeitig "
+                  "geschrieben. Nichts verloren; umzug erneut ausfuehren.",
+                  file=sys.stderr)
+            return 1
+        print(f"  ✓ {TAFEL_ORDNER}: Tafel geschrieben")
+    if not alt_umgezogen:
+        if not _schreibe_dateien(alt, {DATEI: hinweis}, alt_spitze,
+                                 f"umzug: Tafel {UMZUG_MARKE} am {datum}"):
+            print(f"origin/{BRANCH_ALT}: Push abgelehnt — dort hat jemand "
+                  "waehrend des Umzugs geschrieben. Die neue Tafel steht; umzug "
+                  "erneut ausfuehren, er zeigt die nachzutragenden Zeilen.",
+                  file=sys.stderr)
+            return 1
+        print(f"  ✓ origin/{BRANCH_ALT}: Hinweis gesetzt (Branch bleibt, Historie bleibt)")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("--repo", default=os.path.dirname(
-        os.path.dirname(os.path.abspath(__file__))))
+    p.add_argument("--repo", default=code_repo_wurzel(),
+                   help="Code-Repo (fuer LIGHTOS_TAFEL=alt und umzug; "
+                        "Vorgabe: das Repo dieses Werkzeugs)")
+    p.add_argument("--tafel", metavar="PFAD",
+                   help="Klon des privaten Tafel-Repos (Vorgabe: "
+                        "LIGHTOS_TAFEL_REPO, sonst <Projektordner>/lightos-intern)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("list", help="Wer arbeitet gerade woran?")
@@ -950,8 +1470,33 @@ def main(argv=None) -> int:
     s.add_argument("--remove", action="store_true")
     s.set_defaults(fn=cmd_blocker)
 
+    s = sub.add_parser("entscheidung", help="offene Entscheidungen (ENTSCHEIDUNGEN.md)")
+    s.add_argument("aktion", choices=["add", "list", "done"])
+    s.add_argument("text", nargs="?", help="add: die Frage; done: die Nummer (E-3)")
+    s.add_argument("--session")
+    s.add_argument("--notiz", help="done: wie entschieden wurde")
+    s.add_argument("--alle", action="store_true", help="list: auch erledigte")
+    s.set_defaults(fn=cmd_entscheidung)
+
+    s = sub.add_parser("umzug", help="PROC-25: Tafel einmalig von origin/sessions "
+                                     "ins private Tafel-Repo ziehen")
+    s.add_argument("--session", help="wer umzieht (nur fuer die Commit-Nachricht)")
+    s.add_argument("--trocken", action="store_true", help="nur anzeigen")
+    s.set_defaults(fn=None)
+
     args = p.parse_args(argv)
-    return args.fn(args, args.repo)
+    try:
+        if args.cmd == "umzug":
+            return cmd_umzug(args)
+        try:
+            ort = tafel_ort(args.repo, args.tafel)
+        except TafelFehlt as e:
+            print(e, file=sys.stderr)
+            return 3
+        return args.fn(args, ort)
+    except ZugangsdatenGesperrt as e:
+        print(e, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

@@ -49,12 +49,19 @@ sind:
    Modelldisziplin — COORDINATION.md verlangt den Claim, aber nichts hat ihn
    durchgesetzt, und genau so ist ENG-20 (#743/#744) entstanden: zwei
    Sitzungen am selben Item, weil eine nie auf der Tafel stand. Jetzt muss der
-   Zweig des PR einen Claim auf ``origin/sessions`` haben; sonst ist der PR
+   Zweig des PR einen Claim auf der Tafel haben (seit PROC-25 im privaten
+   Tafel-Repo ``lightos-intern``, davor ``origin/sessions``); sonst ist der PR
    nicht bereit, und bei der **Merge-Pruefung** (PR-Nummern angegeben) endet
    das Werkzeug mit Exit 1 — **auch ohne** ``--strict``, denn ein fehlender
    Claim ist keine Frage der Geduld, sondern eine Regel. Gelesen wird ueber
    die Lesefunktionen von ``session_claim.py`` (dieselbe Tafel, derselbe
    Verfall).
+
+   ★ **PROC-25: Fehlt der Tafel-Klon**, ist die Claim-Pruefung NICHT gelaufen
+   — das ist weder „Claim da" noch „Claim fehlt". Das Urteil heisst dann
+   „Claim ungeprueft" (⚠, nicht ✓), der Klon-Befehl steht dabei; Exit 1 gibt
+   es dafuer nur mit ``--strict``. Jeder ANDERE Lesefehler bleibt im Zweifel
+   rot.
 
    ★ **Verfallen ist nicht fehlend.** Der Claim wird erst nach dem Merge
    released; ein PR, der laenger als ``session_claim.VERFALL`` (4 h) auf CI
@@ -107,6 +114,9 @@ FRISCH = "gerade gepusht"
 # gewaehlt: ein Fehlalarm kostet Vertrauen, ein paar Minuten Geduld nichts.
 FRISCH_SEKUNDEN = 180
 ROT = "rot"
+#: PROC-25: Checks gruen, aber die Claim-Pruefung konnte nicht laufen
+#: (Tafel-Klon fehlt) — eine Warnung, kein gruen.
+CLAIM_UNGEPRUEFT = "Claim ungeprueft"
 UNFERTIG = "laeuft noch"
 ALT = "gruen auf altem Stand"
 KONFLIKT = "Konflikt"
@@ -255,9 +265,10 @@ def mit_claim(u: str, grund: str, claim_ok: bool, claim_grund: str,
 
 
 def _lade_tafel() -> dict:
-    """Tafel von ``origin/sessions`` — Werkzeug-Wurzel ist das Repo."""
-    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    tafel, _spitze = session_claim.lade_tafel(repo)
+    """Tafel ueber ``session_claim`` (PROC-25: privates Tafel-Repo neben
+    ``repo/``). Wirft ``session_claim.TafelFehlt``, wenn der Klon fehlt."""
+    ort = session_claim.tafel_ort(session_claim.code_repo_wurzel())
+    tafel, _spitze = session_claim.lade_tafel(ort)
     return tafel
 
 
@@ -304,8 +315,16 @@ def main(argv=None) -> int:
 
     # PROC-14: die Tafel EINMAL lesen, nicht je PR. Ist sie nicht lesbar, faellt
     # die Claim-Pruefung durch (im Zweifel rot) — mit Grund statt Absturz.
+    tafel_warnung = None
     try:
         tafel, tafel_fehler = _lade_tafel(), None
+    except session_claim.TafelFehlt as e:
+        # PROC-25: kein Klon = Pruefung nicht gelaufen. Nicht gruen, nicht rot.
+        befehl = next((z.strip() for z in str(e).splitlines()
+                       if z.strip().startswith("gh repo clone")), "")
+        tafel, tafel_fehler = {"claims": []}, None
+        tafel_warnung = (f"Warnung: Claim-Pruefung NICHT gelaufen — Tafel-Klon "
+                         f"fehlt ({befehl})")
     except Exception as e:  # noqa: BLE001 — git fehlt, kein Netz, …
         tafel, tafel_fehler = {"claims": []}, f"Tafel nicht lesbar ({e})"
     t = session_claim.jetzt()
@@ -334,12 +353,17 @@ def main(argv=None) -> int:
         u, grund = urteil(len(liste), schluesse, zurueck,
                           info.get("mergeable"), alter,
                           bool(info.get("isDraft")), beobachtet)
-        if tafel_fehler:
+        if tafel_warnung:
+            claim_ok, claim_grund = True, tafel_warnung
+            if u == BEREIT:
+                u = CLAIM_UNGEPRUEFT
+        elif tafel_fehler:
             claim_ok, claim_grund = False, tafel_fehler
         else:
             claim_ok, claim_grund = claim_pruefung(
                 tafel, info.get("headRefName") or "", t)
-        verfallen += claim_ok and claim_grund.startswith("Warnung")
+        verfallen += (claim_ok and claim_grund.startswith("Warnung")
+                      and not tafel_warnung)
         u, grund, fehlt = mit_claim(u, grund, claim_ok, claim_grund,
                                     args.ohne_claim,
                                     bool(info.get("isDraft")))
@@ -356,6 +380,8 @@ def main(argv=None) -> int:
 
     print()
     print(f"{len(zeilen) - nicht_bereit} von {len(zeilen)} bereit.")
+    if tafel_warnung:
+        print(f"⚠ {tafel_warnung} — Exit 1 dafuer nur mit --strict (PROC-25).")
     if verfallen:
         print(f"{verfallen} PR(s) mit verfallenem Claim — kein Hindernis, "
               "aber besser `session_claim.py refresh` (PROC-14).")
