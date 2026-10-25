@@ -293,11 +293,16 @@ class WebCuelisteUeberallTest(_Grundaufbau):
         webapp._get_state = lambda: self.state
         self.app, self.sio = webapp.create_app()
         self.app.config["TESTING"] = True
-        self.app.config["LIGHTOS_REMOTE_TOKEN"] = "testtoken"
+        # WEB-12: feste Fernbedienung mit eigenem Schluessel, ab Werk aus.
+        from src.web import remote_settings
+        self._rs = remote_settings
+        remote_settings.set_feste_seite_enabled(True)
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "testtoken"
         self.client = self.app.test_client()
         self.client.get("/?k=testtoken")
 
     def tearDown(self):
+        self._rs.set_feste_seite_enabled(False)
         self.webapp._get_state = self._orig_get_state
         super().tearDown()
 

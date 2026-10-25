@@ -285,9 +285,9 @@ sACN-Eingang zu und hält den Stand auf Knopfdruck als Szene fest.
    gehört. Eine Geräteliste lässt sich auch aus einer Tabelle einlesen, siehe
    [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md).
 2. **Der Eingang ist eingeschaltet:** Menü **Ausgabe → Konfigurieren...**, Reiter
-   **DMX Input**. Dort **Art-Net Input aktivieren** oder **sACN Input aktivieren**
-   anhaken, bei **Eingehendes Universe** das Universum des anderen Programms und bei
-   **Merge in Universe** das LightOS-Universum deines Patches eintragen, dann
+   **DMX-Eingang**. Dort **Art-Net-Eingang aktivieren** oder **sACN-Eingang aktivieren**
+   anhaken, bei **Eingehendes Universum** das Universum des anderen Programms und bei
+   **Mischen in Universum** das LightOS-Universum deines Patches eintragen, dann
    **Übernehmen**.
 3. **Das andere Programm sendet an diesen Rechner** (Art-Net oder sACN, im selben Netz).
 

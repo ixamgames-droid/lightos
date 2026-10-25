@@ -80,10 +80,10 @@ AUSWAHL_TEXT = {
 }
 
 HILFE_EINGANG = (
-    "So schaltest du den Eingang ein: Menü „Ausgabe“ → „Konfigurieren...“ → "
-    "Reiter „DMX Input“. Dort „Art-Net Input aktivieren“ oder „sACN Input "
-    "aktivieren“ anhaken, bei „Eingehendes Universe“ das Universum des anderen "
-    "Programms und bei „Merge in Universe“ das LightOS-Universum deines Patches "
+    "Eingang einschalten: Menü „Ausgabe“ → „Konfigurieren...“ → "
+    "Reiter „DMX-Eingang“. Dort „Art-Net-Eingang aktivieren“ oder „sACN-Eingang "
+    "aktivieren“ anhaken, bei „Eingehendes Universum“ das Universum des anderen "
+    "Programms und bei „Mischen in Universum“ das LightOS-Universum deines Patches "
     "eintragen, dann „Übernehmen“. Das andere Programm muss an diesen Rechner "
     "senden.")
 HINWEIS_NUR_LESEN = (

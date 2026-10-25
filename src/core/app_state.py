@@ -273,6 +273,32 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
 # ruft die Oberflaeche nur nach der Rueckfrage (``src/ui/laser_notaus.py``).
 # Waechter: tests/test_las36_notaus_nur_mit_rueckfrage.py.
 
+# WEB-08: Der Laser-NOT-AUS ist aus der Ferne nur AUSLOESBAR, nie aufhebbar.
+# Seit LAS-36 loest ohnehin kein Programmer-Wert den Latch mehr (s. o.); der
+# einzige Weg ist ``AppState.laser_notaus_loesen``. Die Fernausloesung (Handy:
+# VC-Fader auf ``shutter``, Snap-/Snapshot-Taste mit Laser-Werten, verzoegerte
+# Zusatzaktionen) laeuft in ``laser_notaus_nicht_loesbar()``; dort verweigert
+# ``laser_notaus_loesen`` das Loesen zusaetzlich — zweite Sperre, falls ein
+# Fernpfad je bis zur Rueckfrage-Funktion durchgreift. Je Thread gezaehlt: ein
+# gleichzeitiger Griff am Pult (anderer Thread) ist nicht betroffen.
+_notaus_sperre = threading.local()
+
+
+@contextlib.contextmanager
+def laser_notaus_nicht_loesbar():
+    """Kontext: in diesem Thread loest ``set_programmer_value`` den
+    Laser-NOT-AUS nicht. Verschachtelbar."""
+    _notaus_sperre.tiefe = getattr(_notaus_sperre, "tiefe", 0) + 1
+    try:
+        yield
+    finally:
+        _notaus_sperre.tiefe = max(0, getattr(_notaus_sperre, "tiefe", 1) - 1)
+
+
+def laser_notaus_loesen_gesperrt() -> bool:
+    """True, solange dieser Thread in ``laser_notaus_nicht_loesbar()`` steht."""
+    return getattr(_notaus_sperre, "tiefe", 0) > 0
+
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
 LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
 
@@ -3193,7 +3219,13 @@ class AppState:
         Werte, die waehrend des NOT-AUS gesetzt wurden.
 
         Meldet ``SyncEvent.LASER_ESTOP`` (Daten ``False`` = geloest), damit die
-        Anzeigen nachziehen; Abonnenten lesen ``laser_estop_active``."""
+        Anzeigen nachziehen; Abonnenten lesen ``laser_estop_active``.
+
+        WEB-08: innerhalb von ``laser_notaus_nicht_loesbar()`` (Fernausloesung)
+        bleibt der Latch stehen — vom Handy nie loesbar."""
+        if laser_notaus_loesen_gesperrt():
+            print("[AppState] Laser-NOT-AUS: Loesen aus der Ferne verweigert")
+            return
         self.set_laser_estop(False)
         try:
             from .sync import get_sync, SyncEvent

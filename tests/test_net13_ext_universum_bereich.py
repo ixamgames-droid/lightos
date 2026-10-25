@@ -263,7 +263,7 @@ class _MeldungsBox:
 
     def ext_meldungen(self) -> list[str]:
         return [txt for art, t, txt in self.meldungen
-                if art == "warn" and t == "Externe Universe-Nummer angepasst"]
+                if art == "warn" and t == "Externe Universumsnummer angepasst"]
 
 
 class TestSpeichernMitGuard(unittest.TestCase):
@@ -300,12 +300,17 @@ class TestSpeichernMitGuard(unittest.TestCase):
                 for opt in ("Disabled", "Enttec", "sACN", "ArtNet"):
                     combo.addItem(opt)
                 t.setCellWidget(i, 2, combo)
-            combo.setCurrentText(typ)
+            # UI-100: das Combo zeigt „Aus“ und traegt den Wert als Daten.
+            idx = combo.findData(typ)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+            else:
+                combo.setCurrentText(typ)
             t.setItem(i, 3, QTableWidgetItem(""))
             t.setItem(i, 4, QTableWidgetItem(ext))
         # Hausregel 2: die Sonde muss ihren Gegenstand nachweislich erreichen.
         for i, (typ, ext) in enumerate(zeilen):
-            assert t.cellWidget(i, 2).currentText() == typ, f"Zeile {i}: Typ nicht gesetzt"
+            assert oc.ausgabe_typ_wert(t.cellWidget(i, 2)) == typ, f"Zeile {i}: Typ nicht gesetzt"
             assert t.item(i, 4).text() == ext, f"Zeile {i}: Ext-Feld nicht gesetzt"
         return t
 
@@ -449,7 +454,7 @@ class TestSpeichernMitGuard(unittest.TestCase):
         rows = self._speichern_und_lesen()
         self.assertEqual(rows[0]["num"], 32)
         self.assertEqual(rows[0]["out_universe"], 63999)
-        self.assertIn("Universe-Nummer angepasst", self.box.titel())
+        self.assertIn("Universumsnummer angepasst", self.box.titel())
         self.assertEqual(len(self.box.ext_meldungen()), 1)
 
 

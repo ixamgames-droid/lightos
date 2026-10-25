@@ -288,9 +288,9 @@ the old program outputs them one after another, LightOS listens on its Art-Net o
 input and stores the current state as a scene at the press of a button.
 
 **Before you start:** the patch exists in LightOS (same fixtures on the same addresses),
-the input is switched on (menu **Ausgabe → Konfigurieren...**, tab **DMX Input**:
-tick **Art-Net Input aktivieren** or **sACN Input aktivieren**, set **Eingehendes
-Universe** and **Merge in Universe**, press **Übernehmen**), and the other program
+the input is switched on (menu **Ausgabe → Konfigurieren...**, tab **DMX-Eingang**:
+tick **Art-Net-Eingang aktivieren** or **sACN-Eingang aktivieren**, set **Eingehendes
+Universum** and **Mischen in Universum**, press **Übernehmen**), and the other program
 sends to this computer.
 
 **Capture:** in the Programmer open the tab **Assistent** and choose

@@ -62,8 +62,15 @@ class _FakeCueStack:
 class _FakeOM:
     def __init__(self):
         self.blackout = None
+        self.blackout_epoch = 0
+
+    @property
+    def blackout_schalter(self):        # WEB-12: wie OutputManager
+        return bool(self.blackout)
 
     def set_blackout(self, enabled):
+        if bool(enabled) != bool(self.blackout):
+            self.blackout_epoch += 1
         self.blackout = enabled
 
 
@@ -136,37 +143,59 @@ class TestWebRemote(unittest.TestCase):
         # NET-01: bekanntes Token setzen + Session authentisieren, damit die
         # /api-Routen hinter dem Auth-Gate erreichbar sind. Der test_client haelt
         # das Session-Cookie ueber Requests hinweg.
-        self.app.config["LIGHTOS_REMOTE_TOKEN"] = "testtoken"
+        # WEB-12: die feste Fernbedienung hat einen eigenen Schluessel und ist
+        # ab Werk aus — hier (Wegwerf-Einstellungen der Testsuite) samt Roh-DMX
+        # eingeschaltet.
+        from src.web import remote_settings
+        self._rs = remote_settings
+        remote_settings.set_feste_seite_enabled(True)
+        remote_settings.set_roh_dmx_enabled(True)
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "testtoken"
         self.client = self.app.test_client()
         self.client.get("/?k=testtoken")
 
     def tearDown(self):
+        self._rs.set_feste_seite_enabled(False)
+        self._rs.set_roh_dmx_enabled(False)
         webapp._get_state = self._orig_get_state
 
-    # ── Clamping ──────────────────────────────────────────────────────────────
-    def test_fader_clamps_high(self):
-        self.client.post("/api/executor/1/fader", json={"level": 5.0})
+    # ── Werte ausserhalb des Bereichs (WEB-12, QA96-17) ───────────────────────
+    # Frueher wurde geklemmt bzw. ein Standard (hell!) genommen. Jetzt gilt:
+    # eine ungueltige Fern-Anfrage aendert nichts und antwortet mit Fehler.
+    def test_fader_ueber_dem_bereich_wird_abgelehnt(self):
+        r = self.client.post("/api/executor/1/fader", json={"level": 5.0})
+        self.assertEqual(r.status_code, 400)
+        self.assertIsNone(self.state.executors[0].fader_value)
+
+    def test_fader_unter_dem_bereich_wird_abgelehnt(self):
+        r = self.client.post("/api/executor/1/fader", json={"level": -3.0})
+        self.assertEqual(r.status_code, 400)
+        self.assertIsNone(self.state.executors[0].fader_value)
+
+    def test_kanal_ueber_dem_bereich_wird_abgelehnt(self):
+        r = self.client.post("/api/channel/1/10", json={"value": 999})
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(self.state.universes[1].channels, {})
+
+    def test_fader_und_kanal_im_bereich(self):
+        self.assertEqual(self.client.post("/api/executor/1/fader",
+                                          json={"level": 1}).status_code, 200)
         self.assertEqual(self.state.executors[0].fader_value, 1.0)
-
-    def test_fader_clamps_low(self):
-        self.client.post("/api/executor/1/fader", json={"level": -3.0})
-        self.assertEqual(self.state.executors[0].fader_value, 0.0)
-
-    def test_channel_clamps(self):
-        self.client.post("/api/channel/1/10", json={"value": 999})
+        self.assertEqual(self.client.post("/api/channel/1/10",
+                                          json={"value": 255}).status_code, 200)
         self.assertEqual(self.state.universes[1].channels[10], 255)
 
     # ── Bereichs-Guards (No-op, kein IndexError/Wraparound) ───────────────────
     def test_fader_out_of_range_slot_is_noop(self):
         r = self.client.post("/api/executor/99/fader", json={"level": 0.5})
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
         self.assertIsNone(self.state.executors[0].fader_value)
         self.assertIsNone(self.state.executors[1].fader_value)
 
     def test_fader_slot_zero_no_wraparound(self):
         # slot=0 -> idx=-1: muss durch 0<=idx geblockt werden (nicht auf executors[-1] schreiben)
         r = self.client.post("/api/executor/0/fader", json={"level": 0.5})
-        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.status_code, 404)
         self.assertIsNone(self.state.executors[-1].fader_value)
 
     def test_channel_out_of_range_is_noop(self):
@@ -176,15 +205,18 @@ class TestWebRemote(unittest.TestCase):
 
     # ── Payload-Fehlertoleranz (WEB-02: kein HTTP 500) ────────────────────────
     def test_fader_non_numeric_payload_no_500(self):
-        for bad in ("abc", None, [1]):
+        # WEB-12 (QA96-17): kein 500 — und auch kein „heller“ Standardwert mehr
+        for bad in ("abc", None, [1], True, float("nan")):
             r = self.client.post("/api/executor/1/fader", json={"level": bad})
-            self.assertEqual(r.status_code, 200, f"level={bad!r} sollte kein 500 sein")
+            self.assertEqual(r.status_code, 400, f"level={bad!r}")
+        r = self.client.post("/api/executor/1/fader", json={})
+        self.assertEqual(r.status_code, 400)
+        self.assertIsNone(self.state.executors[0].fader_value)
 
     def test_channel_non_numeric_payload_no_500(self):
         r = self.client.post("/api/channel/1/10", json={"value": "xyz"})
-        self.assertEqual(r.status_code, 200)
-        # Default 0 -> geschrieben (0 ist gültig)
-        self.assertEqual(self.state.universes[1].channels.get(10), 0)
+        self.assertEqual(r.status_code, 400)
+        self.assertNotIn(10, self.state.universes[1].channels)
 
     # ── Routing ───────────────────────────────────────────────────────────────
     def test_go_routes_to_first_cuestack(self):
@@ -268,9 +300,13 @@ class TestWebRemote(unittest.TestCase):
     def test_socketio_fader_without_payload_no_crash(self):
         sio_client = self.sio.test_client(self.app, flask_test_client=self.client)
         self.assertTrue(sio_client.is_connected())
-        # Emit OHNE Payload -> Handler bekommt data=None -> darf nicht crashen.
-        sio_client.emit("fader")
-        sio_client.emit("blackout")
+        # Emit OHNE Payload -> Handler bekommt data=None -> darf nicht crashen,
+        # und (WEB-12, QA96-17) aendert nichts: kein Fader auf 100 %, kein
+        # aufgehobener Blackout.
+        self.assertEqual(sio_client.emit("fader", callback=True)["ok"], False)
+        self.assertEqual(sio_client.emit("blackout", callback=True)["ok"], False)
+        self.assertIsNone(self.state.executors[0].fader_value)
+        self.assertIsNone(self.state.output_manager.blackout)
         # Und mit gültigem Payload wirkt es:
         sio_client.emit("fader", {"slot": 1, "level": 0.5})
         self.assertEqual(self.state.executors[0].fader_value, 0.5)
@@ -278,9 +314,10 @@ class TestWebRemote(unittest.TestCase):
 
     def test_socketio_fader_bad_payload_no_crash(self):
         sio_client = self.sio.test_client(self.app, flask_test_client=self.client)
-        sio_client.emit("fader", {"slot": "x", "level": "y"})   # nicht-numerisch
-        # Kein Crash; Default slot=1/level=1.0 -> executors[0] = 1.0
-        self.assertEqual(self.state.executors[0].fader_value, 1.0)
+        r = sio_client.emit("fader", {"slot": "x", "level": "y"}, callback=True)
+        # Kein Crash — und WEB-12: kein Standardwert (frueher slot 1 auf 100 %)
+        self.assertEqual(r, {"ok": False, "fehler": "wert_ungueltig"})
+        self.assertIsNone(self.state.executors[0].fader_value)
         sio_client.disconnect()
 
     def test_socketio_stop_routes_to_cuestack(self):

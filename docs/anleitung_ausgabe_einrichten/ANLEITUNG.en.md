@@ -47,7 +47,7 @@ the pictures are made on a computer without a connected ENTTEC, which is why it 
    (`Enttec: …`). It opens the same dialog.
 
 The dialog **Ausgabe konfigurieren** has six tabs: **Enttec Pro USB**, **uDMX (USB)**, **Art-Net**,
-**sACN (E1.31)**, **DMX Input** and **Universen** (universes). There are two ways:
+**sACN (E1.31)**, **DMX-Eingang** (DMX input) and **Universen** (universes). There are two ways:
 
 - **Individual tabs** (steps 2–4): put one universe on one output and connect right
   away.
@@ -58,7 +58,7 @@ Both write to the same file `universes.json` in the LightOS data folder
 (Windows `%APPDATA%\LightOS`, Linux `~/.local/share/LightOS`), so you can mix them. On the next start LightOS automatically sets up the outputs saved there again.
 **Schließen** (close) ends the dialog; afterwards LightOS updates the status bar.
 
-The **DMX Input** tab is not part of the output: there LightOS receives DMX from
+The **DMX-Eingang** tab is not part of the output: there LightOS receives DMX from
 outside (Art-Net on port 6454, sACN on port 5568) and mixes it into a universe of its
 own.
 
@@ -82,13 +82,13 @@ Tab **Enttec Pro USB**:
 2. **Ports aktualisieren** (refresh ports) — read the list in again after plugging in.
    The selection is kept; if nothing was selected yet, the ENTTEC you just plugged in
    is preselected.
-3. **Universe:** — which LightOS universe goes out through this adapter. The field is
+3. **Universum:** (universe) — which LightOS universe goes out through this adapter. The field is
    pre-filled with the saved value; set it deliberately **before** you click
    **Verbinden** (connect).
 4. **Verbinden** — removes any other output of this universe, opens the adapter and
    saves the assignment. **One adapter carries exactly one universe:** if the same
    adapter was on another universe before, that row loses it (the row stays as
-   `Disabled`), and the status says so, for example
+   `Aus` (off)), and the status says so, for example
    `… · war Universe 2 — jetzt Universe 1` (was universe 2 — now universe 1). The status
    then first reports
    `Eingerichtet: … (gespeichert), verbinde …` (set up: … (saved), connecting …) and
@@ -118,7 +118,7 @@ yet.
   LightOS searches when the tab is first opened and on **Adapter suchen** (search
   adapters). The saved adapter stays in the list even when it is missing
   (`— derzeit nicht gefunden` = currently not found).
-- **Universe:** and **Verbinden** (connect) — as with the ENTTEC. The status first says
+- **Universum:** and **Verbinden** (connect) — as with the ENTTEC. The status first says
   `Eingerichtet: … (gespeichert), verbinde …` and then `Verbunden: …` (connected) or
   `sendet nicht — gespeichert, aber es geht kein DMX raus` (not sending — saved, but no
   DMX is going out).
@@ -188,7 +188,7 @@ Tab **Art-Net**:
    selected, Art-Net goes to that card's broadcast instead of `255.255.255.255` —
    routers do not pass that one on. The choice applies to **this computer**, not to the
    show; new connections use it immediately, existing ones from the next start.
-3. **Universe:** — the LightOS universe that **Übernehmen** acts on. Only this one;
+3. **Universum:** — the LightOS universe that **Übernehmen** acts on. Only this one;
    other universes stay unchanged.
 4. **Ziel-IP / Broadcast:** (target IP / broadcast) — the address of the node (here
    `192.168.1.50`) or `255.255.255.255` for everyone on the network. Empty also means
@@ -209,7 +209,7 @@ Tab **sACN (E1.31)**:
 
 1. **sACN (E1.31) aktivieren** (enable sACN (E1.31)) — tick the box (without the tick,
    **Übernehmen** removes the sACN output again).
-2. **Universe:** — the LightOS universe. It sends on the sACN universe number with the
+2. **Universum:** — the LightOS universe. It sends on the sACN universe number with the
    same number.
 3. **Multicast (239.255.0.x)** — the default. Every sACN receiver on the network that
    listens to this universe gets the data.
@@ -226,12 +226,12 @@ Tab **Universen** — here you see and edit all outputs in one table:
 
 Each row is one universe: **#** (1–32), **Name** (free to choose) and:
 
-1. **Output** — `Disabled`, `Enttec`, `uDMX`, `sACN` or `ArtNet`.
+1. **Ausgang** (output) — `Aus` (off), `Enttec`, `uDMX`, `sACN` or `ArtNet`.
 2. **Patch (Port/IP)** — depending on the output: for `Enttec` the port (`COM3`,
    `/dev/ttyUSB0`), for `ArtNet` the target IP (empty = `255.255.255.255`), for `sACN` a
    unicast IP (empty = multicast), for `uDMX` the adapter key (for example
    `2008:1066@1-2`; easiest to have the **uDMX (USB)** tab enter it).
-3. **Ext-Universe** — optionally the universe number on the network. If empty, the
+3. **Ext. Universum** (external universe) — optionally the universe number on the network. If empty, the
    default applies: Art-Net `#` minus 1, sACN `#`.
    **Dongle** (read-only) — for `Enttec` the serial number of the adapter this universe
    looks for, shortened (`Seriennr. …5123`). LightOS remembers it once the adapter has
@@ -246,7 +246,7 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    start, the adapter that is plugged into its port at that moment. If the ports were
    swapped just then, the **Dongle** column shows the other adapter's number — use
    **Dongle neu zuordnen** and **Speichern**.
-4. **+ Universe hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
+4. **+ Universum hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
    removes the selected rows from the table; this only takes effect with **Speichern**
    (save).
 5. **Speichern** — writes `universes.json` (in the LightOS data folder) and applies the configuration
@@ -255,8 +255,8 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
 
 When saving, LightOS checks the table and speaks up if
 
-- a **#** is outside 1–32 (*Universe-Nummer angepasst* = universe number adjusted),
-- an **Ext-Universe** does not fit the output type (*Externe Universe-Nummer angepasst*
+- a **#** is outside 1–32 (*Universumsnummer angepasst* = universe number adjusted),
+- a number under **Ext. Universum** does not fit the output type (*Externe Universumsnummer angepasst*
   = external universe number adjusted),
 - **two rows end up at the same target** (*Zwei Universen auf demselben Ziel* = two
   universes on the same target). This leads to flickering at the receiver; it is saved
@@ -422,7 +422,7 @@ first:
   0, lasers to their **off values** (not simply 0, see the laser guide).
   Pan/tilt, gobo and optics of moving heads with a dimmer stay where they are, so
   the heads do not travel to their home position.
-- **When an output is removed** (universe deleted, output set to „Disabled“,
+- **When an output is removed** (universe deleted, output set to „Aus“ (off),
   Art-Net or sACN unticked): the same frame to exactly that output.
 - **When you switch to a different adapter:** if you move a universe from ENTTEC
   to Art-Net, to another port, another uDMX adapter, another target IP or
