@@ -523,7 +523,10 @@ def pruefe_oeffentlich(text: str) -> list[str]:
     if re.search(r"[A-Za-z]:[\\/]+Users[\\/]+(?![Xx]\b|user\b|Public\b)[A-Za-z]", text):
         funde.append("Windows-Nutzerpfad (nutze C:\\Users\\X\\…)")
     for name in _klarnamen():
-        if re.search(r"(?<![\w])" + re.escape(name) + r"s?(?![\w])", text, re.IGNORECASE):
+        # PRIV-06: Unterstrich zaehlt als Grenze — sonst rutscht Markdown-Kursiv
+        # (``_Name-Auftrag …_``) durch, und so stand der Name im Backlog.
+        if re.search(r"(?<![^\W_])" + re.escape(name) + r"s?(?![^\W_])", text,
+                     re.IGNORECASE):
             funde.append(f"Klarname aus der lokalen Namensliste (im Repo heisst der "
                          f"Betreiber „Robin“): {name[:1]}…")
     if "claude.ai/code/session" in text:
