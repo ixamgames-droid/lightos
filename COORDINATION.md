@@ -260,6 +260,27 @@ bleibt lokal liegen), `.gitignore` nachziehen, in `SESSIONS.md` unter Blocker
 vermerken. **Die Git-Historie behaelt die Datei trotzdem** — sie umzuschreiben
 ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
 
+### Dependabot-Sicherheits-PRs (PROC-24, seit 25.10.2026)
+
+Eingeschaltet sind **nur** die Sicherheitswarnungen und die automatischen
+Sicherheits-PRs (Repo-Einstellung „Dependabot security updates“). Es gibt
+bewusst **keine** `.github/dependabot.yml` mit regelmaessigen Versions-Updates:
+die wuerden bei drei CI-Plattformen die Warteschlange fluten. Erkannt werden
+`requirements.txt`, `requirements-dev.txt` und die GitHub-Actions-Workflows.
+
+* Ein Dependabot-PR geht wie jeder PR durch die **Merge-Warteschlange von A**:
+  CI auf allen Plattformen gruen, `tests/test_keine_privaten_dateien.py` gruen,
+  sonst kein Merge. Keine Sitzung merged ihn an der Warteschlange vorbei.
+* A prueft vorher, ob der Sprung nur die Untergrenze in `requirements*.txt`
+  anhebt und ob `THIRD_PARTY_NOTICES.md`/Lizenzlisten nachzuziehen sind.
+* **PySide6/PySide6-Addons** (auch Neben-Sprung 6.x → 6.y): erst nach einer
+  Pruefung unter Linux, Windows x64 **und** Windows-ARM (Sitzung B) — dort
+  liegen die bekannten Abbau- und Schriftfallen. Bis dahin bleibt der PR offen,
+  mit Vermerk auf der Tafel.
+* Kann ein Sicherheits-PR nicht gemergt werden (Tests rot, Plattform faellt
+  weg), bleibt die Warnung offen und kommt als Backlog-Fragment mit Begruendung
+  hinein — nicht stillschweigend schliessen.
+
 ---
 
 ## 4. Fallen der Parallelarbeit (gemessen, nicht vermutet)
