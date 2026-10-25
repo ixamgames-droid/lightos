@@ -387,7 +387,7 @@ def _bild_geraet(ui):
         (rechteck(dlg, dlg._search), 1, "rechts"),
         (zeile, 2, "links"),
         (rechteck(dlg, feld(dlg, "Modus:")), 3, "rechts"),
-        (rechteck(dlg, feld(dlg, "Universe:")), 4, "rechts"),
+        (rechteck(dlg, feld(dlg, "Universum:")), 4, "rechts"),
         (rechteck(dlg, feld(dlg, "DMX-Adresse:")), 5, "rechts"),
         (rechteck(dlg, knopf(dlg, "Hinzufügen")), 6, "rechts"),
     ], titel=dlg.windowTitle())

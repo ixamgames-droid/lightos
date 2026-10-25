@@ -89,7 +89,7 @@ Tab **Enttec Pro USB**:
    saves the assignment. **One adapter carries exactly one universe:** if the same
    adapter was on another universe before, that row loses it (the row stays as
    `Aus` (off)), and the status says so, for example
-   `… · war Universe 2 — jetzt Universe 1` (was universe 2 — now universe 1). The status
+   `… · war Universum 2 — jetzt Universum 1` (was universe 2 — now universe 1). The status
    then first reports
    `Eingerichtet: … (gespeichert), verbinde …` (set up: … (saved), connecting …) and
    shortly afterwards the result: `Verbunden: … (gespeichert)` (connected: … (saved)),
@@ -97,7 +97,7 @@ Tab **Enttec Pro USB**:
    cannot be opened — saved, but no DMX is going out), or
    `antwortet nicht — Port/Kabel prüfen` (not responding — check port/cable).
 5. **Status:** — when the dialog opens, this shows what is **saved**
-   (`Gespeichert: /dev/ttyUSB0 → Universe 1` = saved: …). Whether the adapter really
+   (`Gespeichert: /dev/ttyUSB0 → Universum 1` = saved: …). Whether the adapter really
    sends is only shown by the status bar (step 8).
 
 **Question before replacing.** If a **different** output is already running on the
@@ -197,9 +197,9 @@ Tab **Art-Net**:
    the node expects. It is pre-filled with the LightOS universe minus 1: so Universe 2
    sends on Art-Net universe `1`, Universe 1 on `0`.
 6. **Übernehmen** — sets up the output and saves it. The status then shows
-   `Aktiv → <Adresse> · Universe <n> (gespeichert)` (active → \<address> · Universe \<n>
+   `Aktiv → <Adresse> · Universum <n> (gespeichert)` (active → \<address> · Universe \<n>
    (saved)); when the dialog opens, it shows the saved state
-   (`Gespeichert: 192.0.2.50 · Universe 2`).
+   (`Gespeichert: 192.0.2.50 · Universum 2`).
 
 ## 4. sACN (E1.31)
 
@@ -216,7 +216,7 @@ Tab **sACN (E1.31)**:
 4. **Unicast Ziel-IP:** (unicast target IP) — only when the Multicast box is
    **unticked**: the address of a single receiver. If it stays empty, it is multicast.
 5. **Übernehmen** — sets up the output and saves it; the status reads, for example,
-   `Aktiv · Multicast (239.255.0.x) · Universe 1 (gespeichert)`.
+   `Aktiv · Multicast (239.255.0.x) · Universum 1 (gespeichert)`.
 
 ## 5. All universes at once: the Universen tab
 
@@ -276,7 +276,7 @@ documentation demo show are set to red and PAR 5–8 to blue, each with a full d
 
 ![The Output monitor](img/06_output_monitor.png)
 
-1. **Universe:** — which universe is shown (1–32).
+1. **Universum:** (universe) — which universe is shown (1–32).
 2. One tile per channel: the value at the top (0–255), the channel number small at the
    bottom. Channels above 0 have a blue background. PAR 1 occupies channels 1–4 here
    (dimmer, red, green, blue): `255 255 0 0`.
@@ -289,18 +289,18 @@ Tab **DMX Monitor** next to it — the same values, but with fixture names:
 
 ![The DMX Monitor](img/07_dmx_monitor.png)
 
-1. **Universe:** — choice of `Universe 1` to `Universe 32`.
+1. **Universum:** (universe) — choice of `Universum 1` to `Universum 32`.
 2. **Hervorgehobene Kanäle:** (highlighted channels) — for example `1,5,10-20`; these
    channels get a yellow frame.
 3. The output display says the same as the status bar and the banner (step 8):
 
    | Display | Meaning |
    |---|---|
-   | `Universe 1 geht raus` (is going out; green) | The universe has an output, and it is sending. |
-   | `⚠ Universe <n>: <Weg> sendet NICHT` (\<route> is NOT sending; red) | The output is set up but is not sending – for example an ENTTEC whose port cannot be opened. The tooltip gives the reason. |
-   | `Universe <n>: <Weg> verbindet …` (is connecting; orange) | The port is being opened right now. |
-   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (has no output — only calculated; orange) | The values are calculated, but no adapter outputs them. |
-   | `Universe <n> ist nicht angelegt — keine Werte` (does not exist — no values; grey) | Nothing is patched in this universe and no output is set up. The grid is then dimmed and empty. |
+   | `Universum 1 geht raus` (is going out; green) | The universe has an output, and it is sending. |
+   | `⚠ Universum <n>: <Weg> sendet NICHT` (\<route> is NOT sending; red) | The output is set up but is not sending – for example an ENTTEC whose port cannot be opened. The tooltip gives the reason. |
+   | `Universum <n>: <Weg> verbindet …` (is connecting; orange) | The port is being opened right now. |
+   | `⚠ Universum <n> hat keinen Ausgang — nur gerechnet` (has no output — only calculated; orange) | The values are calculated, but no adapter outputs them. |
+   | `Universum <n> ist nicht angelegt — keine Werte` (does not exist — no values; grey) | Nothing is patched in this universe and no output is set up. The grid is then dimmed and empty. |
 
    If a universe has **several outputs** (for example ENTTEC and Art-Net), the choice
    **Ausgang:** (output) appears next to it – the monitor shows what goes to the chosen
@@ -343,16 +343,16 @@ Universe 1 had its output removed while fixtures are patched on it:
 
 ![Warnings: universe without an output](img/08_warnungen.png)
 
-1. The DMX Monitor reports `⚠ Universe 1 hat keinen Ausgang — nur gerechnet`.
+1. The DMX Monitor reports `⚠ Universum 1 hat keinen Ausgang — nur gerechnet`.
 2. **Enttec indicator** at the bottom left:
 
    | Display | Meaning |
    |---|---|
    | `Enttec: nicht gefunden` (red) | No ENTTEC set up and none plugged in. Without an ENTTEC (pure Art-Net/sACN) this is normal. |
-   | `Enttec: <Port> erkannt, kein Universe` (= detected, no universe; orange) | The adapter is plugged in, but no universe outputs through it → assign one in step 2 or 5. |
+   | `Enttec: <Port> erkannt, kein Universum` (= detected, no universe; orange) | The adapter is plugged in, but no universe outputs through it → assign one in step 2 or 5. |
    | `Enttec: <Port> verbindet …` (= connecting …; orange) | The port is being opened right now. If it stays like that, the adapter cannot be reached. |
-   | `Enttec: <Port> aktiv (1 Universe)` (= active; green) | Set up, and the adapter is sending. |
-   | `Enttec: <Port> sendet NICHT (Universe <n>)` (= is NOT sending; red) | Set up, but the port is not open — no DMX is going out. Check the USB cable and the port. |
+   | `Enttec: <Port> aktiv (1 Universum)` (= active; green) | Set up, and the adapter is sending. |
+   | `Enttec: <Port> sendet NICHT (Universum <n>)` (= is NOT sending; red) | Set up, but the port is not open — no DMX is going out. Check the USB cable and the port. |
    | `Enttec: falsch konfiguriert` (= misconfigured; orange) | The port entered cannot be right on this computer (e.g. a Windows `COM` port on Linux), or the same adapter is on several universes and is therefore set up for none of them. The tooltip gives the reason. |
 
 3. **Output indicator** at the bottom right: normally a list such as
@@ -405,7 +405,7 @@ while the fault persists:
   and DMX monitor show the fault unchanged.
 
 The same red bar appears if the saved configuration has **one adapter on several
-universes** (`… — steht auf Universe 1 und 2, für keines eingerichtet` = is on universes 1
+universes** (`… — steht auf Universum 1 und 2, für keines eingerichtet` = is on universes 1
 and 2, set up for none). LightOS does not guess which one was meant and sets the adapter
 up for none of them — otherwise a rig might receive the values of another universe. To
 fix it: choose the right universe in the **Enttec Pro USB** tab and click **Verbinden**.

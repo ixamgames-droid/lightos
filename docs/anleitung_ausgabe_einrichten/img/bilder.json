@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c7743974",
+  "stand": "000e51c2",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "66b060e8becbb5570bf2c25429f7ae81"
+      "md5": "41bf0756c318650e0ce6632227643bea"
     },
     {
       "datei": "03_artnet.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "b7a078058a709d4869638c538f5627dc"
+      "md5": "f95be89b933d950a087d3431752ba912"
     },
     {
       "datei": "04_sacn.png",
@@ -64,13 +64,13 @@
     {
       "datei": "06_output_monitor.png",
       "szene": "06_output_monitor",
-      "titel": "E/A → Output: Kanalwerte von Universe 1",
+      "titel": "E/A → Output: Kanalwerte von Universum 1",
       "groesse": [
         1600,
         900
       ],
       "marken": [],
-      "md5": "3ffefd4d71ff18463e0af0c273ef7f06"
+      "md5": "727bb85c8ff903482e1a7cafe132a40e"
     },
     {
       "datei": "07_dmx_monitor.png",
@@ -81,18 +81,18 @@
         900
       ],
       "marken": [],
-      "md5": "da2bafb18b6146119ba66aa02bf1470d"
+      "md5": "f0c4c22ad5ae8c3ec04893079019cba8"
     },
     {
       "datei": "08_warnungen.png",
       "szene": "08_warnungen",
-      "titel": "Warnungen: Universe ohne Ausgang",
+      "titel": "Warnungen: Universum ohne Ausgang",
       "groesse": [
         1600,
         900
       ],
       "marken": [],
-      "md5": "784aa977fc449d0ce269e539539c6192"
+      "md5": "e300f3ef8653fee74b52bbf8a634f81e"
     },
     {
       "datei": "09_blackout_dmx_monitor.png",
@@ -103,7 +103,7 @@
         325
       ],
       "marken": [],
-      "md5": "5376758b05a54c0dffa406565d5f3d50"
+      "md5": "2db48f98d2e0afb99d6dfb970d9c60f7"
     }
   ]
 }

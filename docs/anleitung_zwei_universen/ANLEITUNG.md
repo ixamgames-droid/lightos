@@ -25,13 +25,13 @@ Adapter — ein Typwechsel schließt den alten Adapter sauber, bevor der neue ö
 
 Sektion **Patchen** → Tab **Patch**. Mit **+ Gerät hinzufügen** öffnet sich der
 Dialog *Gerät hinzufügen*: links das Profil wählen, rechts unter *Patch-Optionen*
-den **Modus** (Kanal-Layout), das Feld **Universe:** und die **DMX-Adresse:**
+den **Modus** (Kanal-Layout), das Feld **Universum:** und die **DMX-Adresse:**
 setzen, dann **Hinzufügen**.
 
-Das **Universe:**-Feld entscheidet, auf welchem Universe das Gerät landet:
+Das **Universum:**-Feld entscheidet, auf welchem Universum das Gerät landet:
 
-- Geräte, die am Enttec hängen sollen → **Universe: 1**.
-- Geräte, die über Art-Net gehen sollen → **Universe: 2**.
+- Geräte, die am Enttec hängen sollen → **Universum: 1**.
+- Geräte, die über Art-Net gehen sollen → **Universum: 2**.
 
 Das Feld ist mit dem Universe des **zuletzt gepatchten** Geräts vorbelegt — nach dem
 U2-Block steht es also auf `2`. Vor jedem Block kurz prüfen.
@@ -40,7 +40,7 @@ Mehrere gleiche Geräte auf einmal: Feld **Anzahl:** hochzählen und den
 **Adress-Offset:** setzen (0 = dicht hintereinander). Reicht ein Universe nicht
 mehr aus (über Kanal 512), rollt LightOS automatisch ins nächste — willst du eine
 saubere Trennung zwischen U1 und U2, patch die beiden Blöcke also getrennt und
-prüfe das **Universe:**-Feld pro Block.
+prüfe das **Universum:**-Feld pro Block.
 
 Bereits gepatchte Geräte umziehen: **Doppelklick** auf die Zeile öffnet *Gerät
 bearbeiten*, dort lässt sich **Universe** (und Adresse) ändern. In der Tabelle
@@ -130,13 +130,13 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
 - **Tab „Enttec Pro USB":** **COM-Port** wählen (Knopf **Ports aktualisieren**,
   falls das Interface neu angesteckt wurde; ein erkanntes Enttec ist mit
   `[Enttec Pro]` markiert), Feld **Universum:** auf `1` stellen, **Verbinden**.
-  Der Status zeigt erst `Eingerichtet: COM3 → Universe 1 (gespeichert), verbinde …` und nach
-  wenigen Sekunden `Verbunden: COM3 → Universe 1 (gespeichert)`. Steht dort „antwortet nicht"
+  Der Status zeigt erst `Eingerichtet: COM3 → Universum 1 (gespeichert), verbinde …` und nach
+  wenigen Sekunden `Verbunden: COM3 → Universum 1 (gespeichert)`. Steht dort „antwortet nicht"
   oder „Port lässt sich nicht öffnen", Port und Kabel prüfen.
 - **Tab „Art-Net":** **Art-Net aktivieren** anhaken, Feld **Universum:** auf `2`
   stellen, **Ziel-IP / Broadcast** eintragen (z. B. `192.0.2.50`), bei Bedarf
   das **Art-Net Startuniversum** (die *externe* Art-Net-Universe-Nummer am Node)
-  setzen, dann **Übernehmen**. Status: `Aktiv → … · Universe 2 (gespeichert)`.
+  setzen, dann **Übernehmen**. Status: `Aktiv → … · Universum 2 (gespeichert)`.
 
 > **Wichtig — kein „alle Universen"-Effekt mehr:** Die **Übernehmen**/**Verbinden**-
 > Knöpfe wirken **nur** auf das Universum, das im **„Universum:"**-Feld desselben
@@ -158,18 +158,18 @@ sofort den neuen Stand — du musst den Dialog dafür nicht schließen und neu �
 
 Sektion **E/A** (Eingabe / Ausgabe) → Tab **Output**. Der **Output-Monitor** zeigt
 die 512 DMX-Kanäle eines Universums als Live-Kacheln (Wert `0–255`, aktive Kanäle
-werden blau/hell). Oben links steht das Feld **Universe:** (Bereich 1–32).
+werden blau/hell). Oben links steht das Feld **Universum:** (Bereich 1–32).
 
 So prüfst du beide Ausgänge:
 
-1. **Universe:** auf `1` stellen → an den Kanälen deiner U1-Geräte müssen Werte
+1. **Universum:** auf `1` stellen → an den Kanälen deiner U1-Geräte müssen Werte
    erscheinen, sobald du Fader/Effekte/Programmer bewegst. Kommen keine Werte an,
    ist auf U1 nichts gepatcht bzw. nichts aktiv, oder Blackout/Grand Master steht
    auf 0. Ein falscher Enttec-Port zeigt sich hier **nicht** (siehe unten).
-2. **Universe:** auf `2` stellen → an den Kanälen deiner U2-Geräte müssen Werte
+2. **Universum:** auf `2` stellen → an den Kanälen deiner U2-Geräte müssen Werte
    erscheinen — damit ist der **Patch** von U2 bestätigt.
 3. **Ob ein Universe wirklich über seinen Adapter rausgeht**, zeigt der Tab
-   **DMX Monitor** („Universe 2 geht raus" bzw. „⚠ Universe 2 hat keinen Ausgang —
+   **DMX Monitor** („Universum 2 geht raus" bzw. „⚠ Universum 2 hat keinen Ausgang —
    nur gerechnet") und die Anzeige **„Ausgabe: …"** rechts in der Statusleiste.
 4. Zum Gegencheck einen Master/Blackout ziehen: die Werte müssen in **beiden**
    Universen reagieren.
@@ -189,6 +189,6 @@ vor dem Adapter.
 
 - [ ] Geräte im **Patch** aufgeteilt: U1-Block auf **Universe 1**, U2-Block auf **Universe 2** (Spalte *Univ.* kontrollieren).
 - [ ] **Ausgabe → Konfigurieren... → Universen:** Zeile 1 = `Enttec` / COM-Port, Zeile 2 = `ArtNet` / Ziel-IP → **Speichern**.
-- [ ] (Alternativ) Einzel-Tabs: **Universe:**-Feld je Tab bewusst auf 1 bzw. 2 gestellt, dann **Verbinden** / **Übernehmen**.
+- [ ] (Alternativ) Einzel-Tabs: **Universum:**-Feld je Tab bewusst auf 1 bzw. 2 gestellt, dann **Verbinden** / **Übernehmen**.
 - [ ] **E/A → Output:** Universe **1** und **2** durchgeschaltet, beide zeigen Live-Werte.
 - [ ] **E/A → DMX Monitor:** für Universe **1** und **2** steht „geht raus".

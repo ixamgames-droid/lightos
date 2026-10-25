@@ -1,8 +1,8 @@
 {
   "anleitung": "fixture_generator",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "8a2206ad",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "000e51c2",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py fixture_generator'.",
   "bilder": [

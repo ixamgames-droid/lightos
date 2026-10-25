@@ -255,11 +255,11 @@ class NichtAngelegtesUniversumTest(_MitAnsicht):
         self.assertEqual(self._werte()[4], 200)
         self._waehle(7)
         self.assertEqual(self._werte(), [0] * 512,
-                         "sonst stehen unter „Universe 7“ die Werte von Universe 1")
+                         "sonst stehen unter „Universum 7“ die Werte von Universum 1")
 
     def test_das_raster_und_die_zeile_sagen_warum(self):
         self._waehle(7)
-        self.assertIn("Universe 7", self.ansicht._grid.leer_text())
+        self.assertIn("Universum 7", self.ansicht._grid.leer_text())
         self.assertIn("nicht angelegt", self.ansicht._grid.leer_text())
         self.assertIn("nicht angelegt", self.ansicht._lbl_ausgang.text())
         self.assertNotIn("geht raus", self.ansicht._lbl_ausgang.text())

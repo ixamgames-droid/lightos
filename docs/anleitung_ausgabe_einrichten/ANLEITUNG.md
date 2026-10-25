@@ -86,12 +86,12 @@ Reiter **Enttec Pro USB**:
    und speichert die Zuordnung. **Ein Adapter trägt genau ein Universum:** lag derselbe
    Adapter bisher auf einem anderen Universum, verliert jene Zeile ihn (sie bleibt als
    `Aus` stehen), und der Status sagt es dazu, zum Beispiel
-   `… · war Universe 2 — jetzt Universe 1`. Danach meldet der Status erst
+   `… · war Universum 2 — jetzt Universum 1`. Danach meldet der Status erst
    `Eingerichtet: … (gespeichert), verbinde …` und wenig später das Ergebnis:
    `Verbunden: … (gespeichert)`, oder `Port lässt sich nicht öffnen — gespeichert, aber
    es geht kein DMX raus`, oder `antwortet nicht — Port/Kabel prüfen`.
 5. **Status:** — beim Öffnen steht hier, was **gespeichert** ist
-   (`Gespeichert: /dev/ttyUSB0 → Universe 1`). Ob der Adapter wirklich sendet, zeigt
+   (`Gespeichert: /dev/ttyUSB0 → Universum 1`). Ob der Adapter wirklich sendet, zeigt
    erst die Statusleiste (Schritt 8).
 
 **Rückfrage vor dem Ersetzen.** Läuft auf dem gewählten Universum schon eine **andere**
@@ -188,8 +188,8 @@ Reiter **Art-Net**:
    Vorbelegt ist LightOS-Universum minus 1: Universe 2 sendet also auf Art-Net-Universum
    `1`, Universe 1 auf `0`.
 6. **Übernehmen** — richtet den Ausgang ein und speichert ihn. Der Status zeigt dann
-   `Aktiv → <Adresse> · Universe <n> (gespeichert)`; beim Öffnen des Dialogs steht dort
-   der gespeicherte Stand (`Gespeichert: 192.0.2.50 · Universe 2`).
+   `Aktiv → <Adresse> · Universum <n> (gespeichert)`; beim Öffnen des Dialogs steht dort
+   der gespeicherte Stand (`Gespeichert: 192.0.2.50 · Universum 2`).
 
 ## 4. sACN (E1.31)
 
@@ -206,7 +206,7 @@ Reiter **sACN (E1.31)**:
 4. **Unicast Ziel-IP:** — nur wenn der Haken bei Multicast **aus** ist: die Adresse eines
    einzelnen Empfängers. Leer bleibt es Multicast.
 5. **Übernehmen** — richtet den Ausgang ein und speichert ihn; Status zum Beispiel
-   `Aktiv · Multicast (239.255.0.x) · Universe 1 (gespeichert)`.
+   `Aktiv · Multicast (239.255.0.x) · Universum 1 (gespeichert)`.
 
 ## 5. Alle Universen auf einmal: Reiter Universen
 
@@ -263,7 +263,7 @@ und PAR 5–8 auf Blau, jeweils mit vollem Dimmer:
 
 ![Output-Monitor](img/06_output_monitor.png)
 
-1. **Universe:** — welches Universum angezeigt wird (1–32).
+1. **Universum:** — welches Universum angezeigt wird (1–32).
 2. Je Kanal eine Kachel: oben der Wert (0–255), unten klein die Kanalnummer. Kanäle über
    0 sind blau hinterlegt. PAR 1 belegt hier die Kanäle 1–4 (Dimmer, Rot, Grün, Blau):
    `255 255 0 0`.
@@ -276,18 +276,18 @@ Reiter **DMX Monitor** daneben — dieselben Werte, aber mit Gerätenamen:
 
 ![DMX Monitor](img/07_dmx_monitor.png)
 
-1. **Universe:** — Auswahl `Universe 1` bis `Universe 32`.
+1. **Universum:** — Auswahl `Universum 1` bis `Universum 32`.
 2. **Hervorgehobene Kanäle:** — zum Beispiel `1,5,10-20`; diese Kanäle bekommen einen
    gelben Rahmen.
 3. Die Ausgangs-Anzeige sagt dasselbe wie Statusleiste und Banner (Schritt 8):
 
    | Anzeige | Bedeutung |
    |---|---|
-   | `Universe 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
-   | `⚠ Universe <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
-   | `Universe <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
-   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
-   | `Universe <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
+   | `Universum 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
+   | `⚠ Universum <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
+   | `Universum <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
+   | `⚠ Universum <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
+   | `Universum <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
 
    Hat ein Universum **mehrere Ausgänge** (zum Beispiel ENTTEC und Art-Net), erscheint
    daneben die Auswahl **Ausgang:** – der Monitor zeigt, was an den gewählten Ausgang
@@ -327,16 +327,16 @@ der Ausgang genommen, während dort Geräte gepatcht sind:
 
 ![Warnungen: Universe ohne Ausgang](img/08_warnungen.png)
 
-1. Der DMX Monitor meldet `⚠ Universe 1 hat keinen Ausgang — nur gerechnet`.
+1. Der DMX Monitor meldet `⚠ Universum 1 hat keinen Ausgang — nur gerechnet`.
 2. **Enttec-Anzeige** unten links:
 
    | Anzeige | Bedeutung |
    |---|---|
    | `Enttec: nicht gefunden` (rot) | Kein ENTTEC eingerichtet und keiner angesteckt. Ohne ENTTEC (reines Art-Net/sACN) ist das normal. |
-   | `Enttec: <Port> erkannt, kein Universe` (orange) | Der Adapter steckt, aber kein Universum gibt über ihn aus → in Schritt 2 oder 5 zuweisen. |
+   | `Enttec: <Port> erkannt, kein Universum` (orange) | Der Adapter steckt, aber kein Universum gibt über ihn aus → in Schritt 2 oder 5 zuweisen. |
    | `Enttec: <Port> verbindet …` (orange) | Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter nicht erreichbar. |
-   | `Enttec: <Port> aktiv (1 Universe)` (grün) | Eingerichtet, und der Adapter sendet. |
-   | `Enttec: <Port> sendet NICHT (Universe <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
+   | `Enttec: <Port> aktiv (1 Universum)` (grün) | Eingerichtet, und der Adapter sendet. |
+   | `Enttec: <Port> sendet NICHT (Universum <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
    | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux), oder derselbe Adapter steht auf mehreren Universen und ist deshalb für keines eingerichtet. Der Tooltip nennt den Grund. |
 
 3. **Ausgabe-Anzeige** unten rechts: normal eine Liste wie `Ausgabe: U1 Art-Net`
@@ -389,7 +389,7 @@ die Störungsmeldung nicht, solange die Störung anliegt:
   Balken. Statusleiste und DMX-Monitor zeigen die Störung unverändert an.
 
 Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
-mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
+mehreren Universen** steht (`… — steht auf Universum 1 und 2, für keines eingerichtet`).
 LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
 sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
 **Enttec Pro USB** das richtige Universum wählen und **Verbinden**.

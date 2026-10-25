@@ -10,7 +10,7 @@
 
 Sektion **Patchen** → Tab **Patch**. Mit **+ Gerät hinzufügen** öffnet sich der Dialog
 *Gerät hinzufügen*: links das Profil im Baum wählen, rechts unter *Patch-Optionen* den
-**Modus** (= Kanal-Layout), **Universe:** und die **DMX-Adresse:** setzen (unter dem Feld
+**Modus** (= Kanal-Layout), **Universum:** und die **DMX-Adresse:** setzen (unter dem Feld
 schlägt LightOS automatisch den nächsten freien Bereich vor), dann **Hinzufügen**.
 
 Mehrere gleiche Geräte auf einmal: Feld **Anzahl:** hochzählen und mit **Adress-Offset:**
@@ -38,7 +38,7 @@ Hilfen:
 - **Löschen** entfernt die markierten Zeilen (mit Rückfrage). Doppelklick auf eine Zeile öffnet
   *Gerät bearbeiten* (Label, Modus, Universe, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
   bei Lasern die Laser-Ausrichtung — siehe unten).
-- Die Leiste **„Belegte DMX-Kanäle — Universe:"** unten (mit der Universe-Auswahl direkt daneben)
+- Die Leiste **„Belegte DMX-Kanäle — Universum:"** unten (mit der Universum-Auswahl direkt daneben)
   zeigt pro Universe als farbige Blöcke, welche Kanäle belegt sind. **Adresskonflikte** erkennst du
   direkt in der **Tabelle**: betroffene Zeilen werden rot eingefärbt und die FID mit **⚠** markiert.
   Oben rechts erscheint dann der Knopf **„⚠ N Adresskonflikt(e) — auflösen…"**: ein Klick öffnet

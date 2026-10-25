@@ -252,7 +252,7 @@ def _dmx_monitor(ui):
 def _bild_dmx_monitor(ui):
     w = ui.win
     dm = w._dmx_monitor_view
-    if not dm._lbl_ausgang.text().startswith("Universe 1 geht raus"):
+    if not dm._lbl_ausgang.text().startswith("Universum 1 geht raus"):
         raise SzenenFehler(f"DMX-Monitor meldet '{dm._lbl_ausgang.text()}'")
     # Das DMX-Raster malt Werte und Kanalnamen selbst -> ganze Flaeche als
     # Hindernis. Darunter ist also kein Platz, darueber liegen die Reiter:
@@ -436,13 +436,13 @@ SZENEN = [
           titel="Reiter Universen mit zwei Beispiel-Universen"),
     Szene("06_output_monitor", sektion="E/A", vorher=_monitor,
           dialog=_bild_output, nachher=_monitor_zurueck,
-          titel="E/A → Output: Kanalwerte von Universe 1"),
+          titel="E/A → Output: Kanalwerte von Universum 1"),
     Szene("07_dmx_monitor", sektion="E/A", vorher=_dmx_monitor,
           dialog=_bild_dmx_monitor, nachher=_monitor_zurueck,
           titel="E/A → DMX Monitor"),
     Szene("08_warnungen", sektion="E/A", vorher=_ohne_ausgang,
           dialog=_bild_warnungen, nachher=_ausgang_zurueck,
-          titel="Warnungen: Universe ohne Ausgang"),
+          titel="Warnungen: Universum ohne Ausgang"),
     Szene("09_blackout_dmx_monitor", sektion="E/A", vorher=_blackout_an,
           dialog=_bild_blackout, nachher=_blackout_aus, groesse=(1600, STREIFEN_H),
           titel="BLACKOUT im DMX-Monitor: Licht 0, Pan/Tilt bleibt"),

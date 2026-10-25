@@ -484,8 +484,9 @@ class AusgabeLabelTest(unittest.TestCase):
     def test_ohne_jeden_ausgang_behauptet_es_keine_ausgabe_mehr(self):
         om = OutputManager()
         _, lbl = _statusbalken({}, om=om)
-        self.assertNotIn("Universe 1", lbl.text,
-                         "das war die alte, immer gleiche Behauptung")
+        for alt in ("Universe 1", "Universum 1"):
+            self.assertNotIn(alt, lbl.text,
+                             "das war die alte, immer gleiche Behauptung")
         self.assertIn("—", lbl.text)
 
     def test_ausfall_schlaegt_die_aufzaehlung(self):

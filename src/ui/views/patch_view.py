@@ -192,7 +192,7 @@ class PatchFixtureEditDialog(QDialog):
         self._spin_universe.setRange(1, 32)
         self._spin_universe.setValue(max(1, min(32, int(self._fixture.universe))))
         self._spin_universe.valueChanged.connect(self._validate)
-        form.addRow("Universe:", self._spin_universe)
+        form.addRow("Universum:", self._spin_universe)
 
         self._spin_address = QSpinBox()
         self._spin_address.setRange(1, 512)
@@ -207,7 +207,7 @@ class PatchFixtureEditDialog(QDialog):
         self._edit_net_host = None
         if (self._fixture.fixture_type or "").lower() == "laser":
             self._combo_protocol = QComboBox()
-            self._combo_protocol.addItem("DMX (Universe/Adresse)", "dmx")
+            self._combo_protocol.addItem("DMX (Universum/Adresse)", "dmx")
             self._combo_protocol.addItem("Ether Dream (Netzwerk)", "etherdream")
             self._combo_protocol.addItem("IDN / ILDA Digital Network", "idn")
             current_proto = (getattr(self._fixture, "protocol", "dmx")
@@ -218,7 +218,7 @@ class PatchFixtureEditDialog(QDialog):
                 self._on_protocol_changed)
             self._combo_protocol.setToolTip(
                 "Wie wird dieser Laser angesteuert?\n"
-                "DMX: klassisch über Universe/Adresse.\n"
+                "DMX: klassisch über Universum/Adresse.\n"
                 "Ether Dream / IDN: Punkt-Streaming über das Netzwerk an eine\n"
                 "Laser-DAC (IP unten angeben). Not-Aus/BLACKOUT wirken\n"
                 "auch auf den Netzwerk-Pfad.")
@@ -838,7 +838,7 @@ class PatchView(QWidget):
 
         # Universe-Leiste mit Universe-Umschalter (zeigt nicht mehr nur Univ 1)
         bar_head = QHBoxLayout()
-        bar_head.addWidget(QLabel("Belegte DMX-Kanäle — Universe:"))
+        bar_head.addWidget(QLabel("Belegte DMX-Kanäle — Universum:"))
         self._univ_select = QComboBox()
         self._univ_select.setMinimumWidth(120)
         self._univ_select.currentIndexChanged.connect(self._on_univ_select)
@@ -937,7 +937,7 @@ class PatchView(QWidget):
         zeilen = []
         if gerollt and dlg.result_fixture:
             alle = [dlg.result_fixture] + list(getattr(dlg, "extra_fixtures", []))
-            zeilen = [f"• {alle[i].label}: Universe {alle[i].universe}, Adresse 1"
+            zeilen = [f"• {alle[i].label}: Universum {alle[i].universe}, Adresse 1"
                       for i in gerollt if i < len(alle)]
         if dlg.result_fixture:
             self._state.add_fixture(dlg.result_fixture)
@@ -948,13 +948,13 @@ class PatchView(QWidget):
             QMessageBox.warning(
                 self, "Nicht alle Geräte gepatcht",
                 f"{skipped} Gerät(e) konnten nicht gepatcht werden — "
-                "ab Universe 32 war kein Platz mehr.")
+                "ab Universum 32 war kein Platz mehr.")
         # FM-39: ein Ausweichen ins naechste Universe nicht still passieren lassen.
         if zeilen:
             QMessageBox.information(
-                self, "Ins nächste Universe verschoben",
+                self, "Ins nächste Universum verschoben",
                 "Diese Geräte hätten über Kanal 512 hinausgereicht und liegen "
-                "deshalb im nächsten Universe:\n\n" + "\n".join(zeilen[:12])
+                "deshalb im nächsten Universum:\n\n" + "\n".join(zeilen[:12])
                 + (f"\n… und {len(zeilen) - 12} weitere" if len(zeilen) > 12 else ""))
 
     # ── IMP-1: Patch aus einer Tabelle ──────────────────────────────────────
@@ -1086,7 +1086,7 @@ class PatchView(QWidget):
         reply = QMessageBox.question(
             self, "Auto-Patch bestätigen",
             f"Auto-Patch weist allen {len(fixtures)} Geräten neue, "
-            "fortlaufende Adressen zu (überschreibt Universe und Adresse).\n"
+            "fortlaufende Adressen zu (überschreibt Universum und Adresse).\n"
             "Fortfahren? (rückgängig mit Strg+Z möglich)",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -1193,7 +1193,7 @@ class PatchView(QWidget):
         self._univ_select.blockSignals(True)
         self._univ_select.clear()
         for u in univs:
-            self._univ_select.addItem(f"Universe {u}", u)
+            self._univ_select.addItem(f"Universum {u}", u)
         target = prev if prev in univs else univs[0]
         idx = self._univ_select.findData(target)
         self._univ_select.setCurrentIndex(max(0, idx))

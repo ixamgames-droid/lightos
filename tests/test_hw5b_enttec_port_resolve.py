@@ -279,7 +279,7 @@ class StatusbalkenTests(unittest.TestCase):
     def test_adapter_da_aber_keinem_universe_zugewiesen(self):
         lbl = self._run(gefunden="/dev/ttyUSB0", offene={}, notes={})
         self.assertNotIn("9DFF52", lbl.style)
-        self.assertIn("kein Universe", lbl.text)
+        self.assertIn("kein Universum", lbl.text)
 
     def test_gar_kein_adapter(self):
         lbl = self._run(gefunden=None, offene={}, notes={})
