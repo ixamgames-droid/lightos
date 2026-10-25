@@ -505,8 +505,13 @@ def _messen(monkeypatch, haken, frames=300):
 
 
 def test_leistung_haken_aus_und_an(monkeypatch):
-    aus = _messen(monkeypatch, False)
-    an = _messen(monkeypatch, True)
+    # Abwechselnd messen und je den besten Lauf nehmen: nacheinander gemessen
+    # kippte der Vergleich auf der CI, wenn die Maschine zwischen den beiden
+    # Bloecken langsamer wurde (25.10.2026: 874 us gegen 492 us).
+    aus = an = float("inf")
+    for _ in range(4):
+        aus = min(aus, _messen(monkeypatch, False, frames=150))
+        an = min(an, _messen(monkeypatch, True, frames=150))
     print(f"\nENG-42 write() 48 Lampen: Haken aus {aus * 1e6:.1f} us, "
           f"an {an * 1e6:.1f} us je Frame (44 Hz-Budget 22727 us)")
     # Mit Haken werden dunkle Lampen übersprungen — nie deutlich teurer.
