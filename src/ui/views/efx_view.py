@@ -1456,6 +1456,50 @@ class EfxView(QWidget):
         self._btn_reseed.clicked.connect(self._reseed_random)
         vform.addRow("Random:", self._btn_reseed)
         ec.addWidget(vis_box)
+
+        # ── Gruppe 5: Modify (ENG-43) — Bewegung als Versatz ────────────
+        # Feste Felder; ohne Haken nur ausgegraut, nie neu gebaut (STAB-38).
+        mod_box = QGroupBox("Modify")
+        mod_box.setStyleSheet(_box_style)
+        mform = _formular(mod_box)
+        self._modify_chk = QCheckBox("Modify-Effekt")
+        self._modify_chk.setToolTip(
+            "Die Bewegung setzt keine Position, sondern verschiebt die "
+            "laufende Position jedes Geräts um die Figur — z. B. ein Nicken "
+            "über eine gesetzte Position oder über einen anderen "
+            "Bewegungs-Effekt. Dimmer und Farbe bleiben unberührt. "
+            "Laser werden nie verschoben.")
+        self._modify_chk.toggled.connect(self._on_modify_toggled)
+        mform.addRow("", self._modify_chk)
+        self._modify_mode_combo = QComboBox()
+        self._modify_mode_combo.addItem("Addieren", "add")
+        self._modify_mode_combo.addItem("Abziehen", "sub")
+        self._modify_mode_combo.setToolTip(
+            "Addieren: verschiebt in Richtung der Figur.\n"
+            "Abziehen: verschiebt gespiegelt (Gegenrichtung).")
+        self._modify_mode_combo.currentIndexChanged.connect(self._on_param_change)
+        mform.addRow("Betriebsart:", self._modify_mode_combo)
+        from src.core.engine.efx import (MODIFY_VERSATZ_MAX, MODIFY_VERSATZ_MIN,
+                                         MODIFY_VERSATZ_VORGABE)
+        self._modify_versatz_spin = dspin(MODIFY_VERSATZ_MIN, MODIFY_VERSATZ_MAX,
+                                          1.0, MODIFY_VERSATZ_VORGABE)
+        self._modify_versatz_spin.setSuffix(" °")
+        self._modify_versatz_spin.setToolTip(
+            "Größter Ausschlag der Figur in Grad. Je Gerät über dessen "
+            "Schwenk-/Neigebereich in DMX umgerechnet und an den Gerätegrenzen "
+            "gekappt.")
+        mform.addRow("Versatz:", self._modify_versatz_spin)
+        self._modify_strength_spin = QSpinBox()
+        self._modify_strength_spin.setRange(0, 100)
+        self._modify_strength_spin.setValue(100)
+        self._modify_strength_spin.setSuffix(" %")
+        self._modify_strength_spin.setToolTip(
+            "Skaliert den Versatz. Die Helligkeit des Effekts und seine "
+            "Ein-/Ausblendzeit wirken ebenfalls nur auf diese Stärke.")
+        self._modify_strength_spin.valueChanged.connect(self._on_param_change)
+        mform.addRow("Stärke:", self._modify_strength_spin)
+        ec.addWidget(mod_box)
+        self._modify_felder_freigeben(False)
         ec.addStretch(1)
 
         # Kein eigener Scroll mehr um die Formspalte (das erzeugte sonst eine
@@ -1970,6 +2014,18 @@ class EfxView(QWidget):
             self._loop_chk.blockSignals(True)
             self._loop_chk.setChecked(bool(efx.loop))
             self._loop_chk.blockSignals(False)
+            # ENG-43: Modify-Felder
+            _mod = bool(getattr(efx, "modify", False))
+            self._modify_chk.blockSignals(True)
+            self._modify_chk.setChecked(_mod)
+            self._modify_chk.blockSignals(False)
+            _mi = self._modify_mode_combo.findData(getattr(efx, "modify_mode", "add"))
+            self._modify_mode_combo.setCurrentIndex(_mi if _mi >= 0 else 0)
+            self._modify_versatz_spin.setValue(
+                float(getattr(efx, "modify_versatz_grad", 20.0)))
+            self._modify_strength_spin.setValue(
+                int(getattr(efx, "modify_strength", 100)))
+            self._modify_felder_freigeben(_mod)
             self._refresh_path_combo()
             # Fixtures
             # FM-14b: DIESELBE Beschriftung wie beim Zuweisen/Hinzufuegen
@@ -2037,7 +2093,22 @@ class EfxView(QWidget):
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
+        # ENG-43: Modify (Bewegung als Versatz)
+        self._current.modify = self._modify_chk.isChecked()
+        self._current.modify_mode = self._modify_mode_combo.currentData() or "add"
+        self._current.modify_versatz_grad = self._modify_versatz_spin.value()
+        self._current.modify_strength = self._modify_strength_spin.value()
         self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
+
+    def _modify_felder_freigeben(self, an: bool) -> None:
+        for w in (self._modify_mode_combo, self._modify_versatz_spin,
+                  self._modify_strength_spin):
+            w.setEnabled(bool(an))
+
+    def _on_modify_toggled(self, checked: bool = False):
+        """ENG-43: Haken „Modify-Effekt" — Felder freigeben, ins Modell."""
+        self._modify_felder_freigeben(checked)
+        self._on_param_change()
 
     def _reseed_random(self):
         """E1: würfelt eine neue Random-Bahn (VC/MIDI-Aktion „reseed“)."""

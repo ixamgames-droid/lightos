@@ -22,6 +22,7 @@ test_doc[0-9]*.py                  # test_doc13_..., test_doc62_installdoku ...
 test_doc72_externe_pulte.py        # Anleitung Externe Pulte: Ports/Beschriftungen gegen den Code (vom Muster darueber schon erfasst)
 test_ui85_hilfe_menue.py           # Hilfe-Menue oeffnet docs/ANLEITUNGEN.md + Erste Schritte (Pfade muessen existieren)
 test_ui87_hilfe_oeffnen.py         # doku_ziel bleibt nur lokal, wenn docs/ANLEITUNGEN.md existiert
+test_qa100_anleitung_ueberschriften_einmalig.py # jede ##-Ueberschrift (und Abschnittsnummer) einer Anleitung nur einmal
 test_cdx58_codex_nachlese.py       # liest docs/ (Solo-Ausnahme, Lint-Meldungen)
 test_web06_socketio_lokal.py       # liest THIRD_PARTY_NOTICES.md (Lizenzhinweis Socket.IO)
 test_xplat46_*.py                  # ARM-Empfehlung/venv-Architektur: lesen INSTALL.md
@@ -51,6 +52,7 @@ test_out76_setup_bringt_usb_mit.py # THIRD_PARTY_NOTICES.md + licenses/: pyusb u
 test_liz2_fremdlizenzen_setup.py   # THIRD_PARTY_NOTICES.md + licenses/ + requirements.txt: Fremdlizenzen im Windows-Setup
 test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UND_TESTZUGANG.md
 test_liz2_rest_sammeldateien.py    # THIRD_PARTY_NOTICES.md, INSTALL.md, licenses/: Sammeldateien Qt WebEngine/Mesa, mido/winrt raus
+test_liz3_ueber_dialog_lgpl.py     # licenses/: „Über LightOS“ nennt die LGPL-Bibliotheken und zeigt auf die Lizenztexte
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
@@ -100,6 +102,7 @@ test_tool1_verwaiste_werkzeuge.py
 !test_fm53_bibliothek_download.py  # "README.md" nur als Eintrag eines Test-Archivs
 !test_fm56_review.py               # tools/README.md ist keine Doku -> volle Suite
 !test_session_claim.py             # "docs/y.md" nur als Beispielwert fuer --files
+!test_proc25_tafel_privat.py       # "SESSIONS.md" nur als Datei in Wegwerf-Repos (Tafel), keine Doku
 !test_tool11_bildschirm_windows.py # docs/.../img nur als Beispielpfade
 !test_tool3_generator_annahmen.py  # "docs" nur in erzeugtem Beispielcode
 !test_tool5_demo_global_bus.py     # prueft ein Werkzeug, liest keine Doku

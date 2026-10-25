@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QDialog, QCheckBox, QMenu, QFormLayout, QLineEdit,
     QDoubleSpinBox, QComboBox, QDialogButtonBox, QToolButton,
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QCursor, QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.flow_layout import FlowLayout
@@ -156,6 +156,18 @@ def scope_ohne_werte(state, programmer: dict) -> bool:
         return False
     return not _im_scope(programmer, scope_fids=kw.get("scope_fids"),
                          scope_heads=kw.get("scope_heads"))
+
+
+def _knopf_mindestmass(btn: QPushButton, *, symbol: bool = False) -> None:
+    """UI-104: Mindesthöhe (und bei Symbolknöpfen -breite) aus den
+    fontMetrics — nie ein festes Höchstmaß; die Wunschgröße setzt das Theme."""
+    fm = btn.fontMetrics()
+    # 2×4 px Innenabstand + 2×1 px Rahmen (dark.qss) + Luft.
+    btn.setMinimumHeight(max(24, fm.height() + 12))
+    if symbol:
+        # 2×10 px Innenabstand + 2×1 px Rahmen; mindestens 32 px, damit
+        # ein einzelnes Zeichen wie „↻“ nicht zum „:“ zusammenfällt.
+        btn.setMinimumWidth(max(32, fm.horizontalAdvance(btn.text()) + 24))
 
 
 class ChannelSelectDialog(QDialog):
@@ -567,8 +579,13 @@ class SnapFilePanel(QWidget):
     _midi_learned_sig = Signal(object)
 
     def __init__(self, parent=None, *, drag_to_canvas: bool = False, canvas=None,
-                 show_header: bool = True):
+                 show_header: bool = True, mindest_spalten: int = 1):
         super().__init__(parent)
+        # UI-104: so viele Knöpfe der Leiste sollen mindestens nebeneinander
+        # passen (s. minimumSizeHint). Die Snapshots-Ansicht setzt 2 — dort
+        # drückt das 12-spaltige Raster die Bibliothek sonst auf Knopfbreite.
+        self._mindest_spalten = max(1, int(mindest_spalten))
+        self._leisten_knoepfe: list[QPushButton] = []
         # VC-Modus: Baum-Items lassen sich auf das VC-Canvas ziehen und per
         # Kontextmenue direkt auf eine Taste legen. Muss VOR _setup_ui() stehen
         # (der Baum liest das Flag im Konstruktor).
@@ -649,34 +666,37 @@ class SnapFilePanel(QWidget):
         tb = FlowLayout(tb_host, margin=0, h_spacing=4, v_spacing=4)
 
         b_save = QPushButton("Speichern")
-        b_save.setFixedHeight(24)
         b_save.setToolTip("Aktuellen Programmer hier speichern")
         b_save.clicked.connect(self._save_snap)
 
         b_folder = QPushButton("Ordner +")
-        b_folder.setFixedHeight(24)
         b_folder.clicked.connect(self._new_folder)
 
         b_apply = QPushButton("Anwenden")
-        b_apply.setFixedHeight(24)
         b_apply.clicked.connect(self._apply_selected)
 
         b_chase = QPushButton("Chase +")
-        b_chase.setFixedHeight(24)
         b_chase.setToolTip("Aus mehreren selektierten Snaps eine Sequence/Chase erzeugen")
         b_chase.clicked.connect(self._create_chase_from_selection)
 
         b_del = QPushButton("Löschen")
-        b_del.setFixedHeight(24)
         b_del.setStyleSheet("color: #ff6666;")
         b_del.clicked.connect(self._delete_selected)
 
         b_ref = QPushButton("↻")
-        b_ref.setFixedSize(24, 24)
         b_ref.setToolTip("Aktualisieren")
         b_ref.clicked.connect(self._refresh_tree)
 
-        for btn in [b_save, b_folder, b_apply, b_chase, b_del, b_ref]:
+        # UI-104: keine festen 24 px mehr. Das Stylesheet (min-height 22 px +
+        # 2×4 px Innenabstand) setzt die Mindesthöhe auf 32 px, die feste
+        # Höchsthöhe blieb 24 -> das Flow-Layout plante 32-px-Zeilen, setzte die
+        # Knöpfe aber 4 px tiefer (Höchst- gegen Mindestmaß), die zweite Zeile
+        # ragte unten 4 px aus der Leiste. „↻“ war auf 24 px Breite gezwungen,
+        # hinter 2×10 px Innenabstand blieb vom Zeichen nur ein „:“.
+        # Jetzt: Mindestmaße aus der Schrift, Wunschgröße bestimmt das Theme.
+        self._leisten_knoepfe = [b_save, b_folder, b_apply, b_chase, b_del, b_ref]
+        for btn in self._leisten_knoepfe:
+            _knopf_mindestmass(btn, symbol=btn is b_ref)
             tb.addWidget(btn)
         layout.addWidget(tb_host)
 
@@ -698,6 +718,22 @@ class SnapFilePanel(QWidget):
         self._tree.itemExpanded.connect(self._on_item_expanded)
         self._tree.itemCollapsed.connect(self._on_item_collapsed)
         layout.addWidget(self._tree, stretch=1)
+
+    def minimumSizeHint(self) -> QSize:  # noqa: N802
+        """UI-104: bei ``mindest_spalten`` > 1 mindestens so breit, dass die
+        breitesten Knöpfe der Leiste nebeneinander passen. Sonst bricht die
+        Leiste (Touch-QSS: 52-px-Knöpfe) in sechs Zeilen um und nimmt dem Baum
+        die ganze Höhe. Wunschbreiten aus dem Theme, nicht fest."""
+        s = super().minimumSizeHint()
+        if self._mindest_spalten <= 1 or not self._leisten_knoepfe:
+            return s
+        breiten = sorted((b.sizeHint().width() for b in self._leisten_knoepfe
+                          if not b.isHidden()), reverse=True)
+        n = min(self._mindest_spalten, len(breiten))
+        m = self.layout().contentsMargins() if self.layout() else None
+        rand = (m.left() + m.right()) if m is not None else 0
+        soll = sum(breiten[:n]) + 4 * (n - 1) + rand
+        return QSize(max(s.width(), soll), s.height())
 
     # ── Ordner-Zustand (auf-/zugeklappt) ──────────────────────────────────────
 

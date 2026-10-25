@@ -285,13 +285,16 @@ class TafelUndFragmenteTest(unittest.TestCase):
         def git(*args):
             if args[:1] == ("show",) and args[1].endswith(":BACKLOG.md"):
                 return 0, tabelle_main
-            if args[:1] == ("show",) and "SESSIONS.md" in args[1]:
-                return 0, "DOC-43  C  -  seit 2026-10-02"
             if args[:1] == ("ls-tree",):
                 return 0, "2026-10-02-DOC-22.md\n"
             return 0, ""
         B._git = git
         B.offene_pr_zweige = lambda: ([], None)
+        # PROC-25: die Tafel kommt aus dem privaten Tafel-Repo — ueber die
+        # gemeinsame Lesehilfe, hier durch eine Attrappe ersetzt.
+        orig_tafel = B._tafel_text
+        B._tafel_text = lambda: B.session_claim.TafelText(
+            "DOC-43  C  -  seit 2026-10-02", None, None, "attrappe:SESSIONS.md")
         try:
             import io
             from contextlib import redirect_stdout
@@ -300,6 +303,7 @@ class TafelUndFragmenteTest(unittest.TestCase):
                 B.main(["--gruppe", "DOC", "--kein-fetch"])
         finally:
             B._git, B.offene_pr_zweige = orig
+            B._tafel_text = orig_tafel
         self.assertIn("DOC-44", buf.getvalue())
 
 
@@ -369,8 +373,6 @@ class BacklogFragmenteTest(unittest.TestCase):
         def git(*args):
             if args[:1] == ("show",) and args[1].endswith(":BACKLOG.md"):
                 return 0, tabelle_main
-            if args[:1] == ("show",) and "SESSIONS.md" in args[1]:
-                return 0, ""
             for ref, dateien in fragmente.items():
                 if args[:1] == ("ls-tree",) and args[-2:] == (ref, "backlog.d/"):
                     return 0, "".join(f"backlog.d/{n}\n" for n in dateien) + "backlog.d/README.md\n"
@@ -384,6 +386,9 @@ class BacklogFragmenteTest(unittest.TestCase):
             return 0, ""
         B._git = git
         B.offene_pr_zweige = lambda: (["a", "b"], None)
+        # PROC-25: leere Tafel als Attrappe — nie der echte Tafel-Klon.
+        orig_tafel = B._tafel_text
+        B._tafel_text = lambda: B.session_claim.TafelText("", None, None, "attrappe")
         try:
             import io
             from contextlib import redirect_stdout
@@ -392,6 +397,7 @@ class BacklogFragmenteTest(unittest.TestCase):
                 rc = B.main(list(argv) + ["--kein-fetch"])
         finally:
             B._git, B.offene_pr_zweige = orig
+            B._tafel_text = orig_tafel
         return rc, buf.getvalue()
 
     _DOC22 = "ID: DOC-22\nPrioritaet: P3\nStatus: review\nTitel: {}\n"
