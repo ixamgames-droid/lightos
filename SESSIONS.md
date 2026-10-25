@@ -37,7 +37,6 @@
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-25T12:03Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-25T12:03Z | - |
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-25T12:04Z | - |
-| VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-25T12:04Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
 | NET-15 | A | feat/net15-dmx-fernsteuerung | 2026-10-25T12:04Z | src/core/artnet_input.py · src/core/sacn_input.py |
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-25T12:04Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | XPLAT-52 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-25T12:04Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
@@ -99,7 +98,6 @@
 
 ## Verlauf
 
-- 2026-10-20T17:45Z A done FM-77
 - 2026-10-20T18:01Z A claim QA-104
 - 2026-10-20T18:24Z A done LAS-41
 - 2026-10-20T18:31Z A done XPLAT-51
@@ -129,3 +127,4 @@
 - 2026-10-25T13:15Z A done SAMMEL-BACKLOG-1020
 - 2026-10-25T13:20Z A done SAMMEL-VERLOREN-1020
 - 2026-10-25T13:23Z A claim PRIV-07
+- 2026-10-25T13:47Z A done VCB-48
