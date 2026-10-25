@@ -568,6 +568,34 @@ class LoeschenLaesstLosTest(_Basis):
 
 # ── Spaete Antwort der Oberflaeche ───────────────────────────────────────────
 
+class ZusatzaktionBlackoutAusTest(_Basis):
+    """„Fertig, wenn“: ein Blackout wird nie von fern aufgehoben, den nicht
+    dieses Handy gesetzt hat — auch nicht ueber die Zusatzaktion „Blackout aus“
+    einer Taste."""
+
+    def _taste_blackout_aus(self):
+        t = self._taste(ButtonAction.TAP)
+        t.actions = [{"type": "blackout", "mode": "off"}]
+        self._auf_seite(t)
+        return t
+
+    def test_zusatzaktion_blackout_aus_abgelehnt_solange_er_steht(self):
+        t = self._taste_blackout_aus()
+        om = self.state.output_manager
+        om.set_blackout(True)                           # am Pult gesetzt
+        for aktion in ("umschalten", "druecken"):
+            with self.subTest(aktion):
+                r = self._aktion(t, aktion)
+                self.assertEqual(r, {"ok": False, "fehler": "blackout_nicht_von_hier"})
+                self.assertTrue(om.blackout_schalter)
+        self.assertEqual(vc_remote.status_fuer(r), 403)
+
+    def test_ohne_blackout_geht_die_taste(self):
+        t = self._taste_blackout_aus()
+        self.assertFalse(self.state.output_manager.blackout_schalter)
+        self.assertTrue(self._aktion(t, "umschalten")["ok"])
+
+
 class SpaeteAntwortTest(_Basis):
 
     def test_begonnene_aktion_meldet_ihr_ergebnis_statt_fehler(self):
