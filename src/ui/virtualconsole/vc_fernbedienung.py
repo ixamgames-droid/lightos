@@ -427,8 +427,13 @@ def _taste_ausfuehren(widget, aktion: str) -> dict:
     elif aktion == "loslassen":
         ausgeloest = widget.fern_taste(False)
     else:                                   # ein Tipp: Druck und Loslassen
+        # WEB-12: haelt schon jemand die Taste (Pult, MIDI, ein anderes Handy),
+        # tut ein Tipp nichts. Sonst liesse sein Loslassen eine fremd gehaltene
+        # Taste los — bei einer Blackout-Taste hiesse das: ein fremder Blackout
+        # wird von fern aufgehoben.
         ausgeloest = widget.fern_taste(True)
-        widget.fern_taste(False)
+        if ausgeloest:
+            widget.fern_taste(False)
     # WEB-12: ``ausgeloest`` = DIESER Druck hat die Taste gedrueckt (sie war
     # nicht schon gehalten) — daran haengt, wer sie wieder loslassen darf.
     return {"ok": True, "ausgeloest": bool(ausgeloest)}

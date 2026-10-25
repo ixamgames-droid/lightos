@@ -485,6 +485,35 @@ class HalterTest(_Basis):
         vc_remote.zuschauer_weg("handy")
         self.assertTrue(self.state.output_manager.blackout)
 
+    def test_tipp_auf_fremd_gehaltene_blackout_taste_hebt_nichts_auf(self):
+        # Nacharbeit WEB-12: ein „umschalten“ (Tipp = Druck + Loslassen) auf
+        # eine Taste, die schon das Pult oder ein anderes Handy haelt, liess sie
+        # bisher los — bei der Blackout-Taste ein fremder Blackout von fern
+        # aufgehoben. Die Handy-Seite schickt fuer Halten-Tasten „druecken“,
+        # ein eigener Client (HTTP oder Socket) aber auch „umschalten“.
+        t = self._taste(ButtonAction.BLACKOUT)
+        self._auf_seite(t)
+        t.fern_taste(True)                              # Pult haelt den Blackout
+        self.assertTrue(self.state.output_manager.blackout)
+        r = self._aktion(t, "umschalten")
+        self.assertTrue(r["ok"])
+        self.assertFalse(r.get("ausgeloest"))
+        self.assertTrue(t._pressed)
+        self.assertTrue(self.state.output_manager.blackout)
+        t.fern_taste(False)                             # Pult laesst los
+        self.assertFalse(self.state.output_manager.blackout)
+        # dasselbe, wenn ein anderes Handy haelt
+        self.assertTrue(vc_remote.halten("a", t.widget_id)["ausgeloest"])
+        self.assertTrue(vc_remote.widget_aktion(t.widget_id, "umschalten")["ok"])
+        self.assertTrue(self.state.output_manager.blackout)
+        self.assertEqual(vc_remote.gehaltene("a"), {t.widget_id})
+        vc_remote.loslassen_von("a", t.widget_id)
+        self.assertFalse(self.state.output_manager.blackout)
+        # ungehalten bleibt der Tipp ein Tipp: kurz dunkel, danach hell
+        self.assertTrue(self._aktion(t, "umschalten")["ausgeloest"])
+        self.assertFalse(t._pressed)
+        self.assertFalse(self.state.output_manager.blackout)
+
     def test_http_halten_gibt_es_nicht(self):
         if not HAS_FLASK:
             self.skipTest("flask fehlt")
