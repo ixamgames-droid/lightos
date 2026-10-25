@@ -133,6 +133,7 @@ venv\Scripts\python main.py
 **Windows auf ARM:** Ein **x64-Python** nehmen (läuft in der Emulation, mit allen Funktionen).
 Natives ARM64-Python ist **nicht unterstützt (instabil, kein 3D) — x64-Python nehmen**: LightOS
 stürzte damit in 6 von 12 Starts ab, und die ARM64-Pakete von PySide6 enthalten kein QtWebEngine.
+`install.py` bricht mit nativem ARM64-Python deshalb ab und nennt den Weg zu x64-Python.
 
 ### Linux (Debian/Ubuntu/Mint, X11)
 

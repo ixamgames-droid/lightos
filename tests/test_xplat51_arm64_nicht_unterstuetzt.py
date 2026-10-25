@@ -7,9 +7,9 @@ fehlt unter ARM64 QtWebEngine (XPLAT-45). Installer, Plattform-Hinweis,
 Startskripte und Doku sagten trotzdem "laeuft ohne 3D-Visualizer".
 
 Neuer Wortlaut je Stelle: "nicht unterstuetzt (instabil, kein 3D) - x64-Python
-nehmen". Ob der Installer dann abbricht, hat der Projektinhaber nicht
-entschieden - er warnt deutlich und laeuft weiter; auch das ist hier
-festgehalten.
+nehmen". Seit XPLAT-56 (Entscheidung E-2 vom 25.10.2026) bricht der Installer
+dann ab, die Startskripte warnen weiter nur; beides ist hier festgehalten, das
+Abbruchverhalten je Fall in tests/test_xplat56_installer_arm64_abbruch.py.
 """
 from __future__ import annotations
 
@@ -62,13 +62,14 @@ class TestInstaller:
         for alt in _ALT:
             assert alt not in out
 
-    def test_installer_bricht_nicht_ab(self, installer, monkeypatch, capsys):
-        # Abbrechen hat der Projektinhaber nicht entschieden: deutlich warnen,
-        # aber weiterlaufen - und das auch sagen.
+    def test_warnblock_kuendigt_den_abbruch_an(self, installer, monkeypatch, capsys):
+        # XPLAT-56: der Warnblock sagt "bricht ab" statt "laeuft trotzdem
+        # weiter"; abgebrochen wird in pruefe_arm64_vorab, nicht hier.
         monkeypatch.setattr(installer, "detect_arch", lambda: "arm64")
         assert installer.check_arm_runtime() is None
         out = capsys.readouterr().out
-        assert "laeuft trotzdem weiter" in out
+        assert "bricht deshalb ab" in out
+        assert "laeuft trotzdem weiter" not in out
         quelle = inspect.getsource(installer.check_arm_runtime)
         assert "sys.exit" not in quelle and "raise" not in quelle
 
@@ -154,10 +155,11 @@ class TestDoku:
         for alt in _ALT:
             assert " ".join(alt.split()) not in text, (rel, alt)
 
-    def test_install_md_nennt_absturzrate_und_kein_abbruch(self):
+    def test_install_md_nennt_absturzrate_und_abbruch(self):
         text = " ".join(_text("INSTALL.md").split())
         assert "6 von 12 Starts" in text
-        assert "brechen aber nicht ab" in text
+        assert "Der Installer bricht in diesem Fall ab" in text
+        assert "brechen aber nicht ab" not in text
 
     def test_install_md_tabelle_gibt_keine_freigabe(self):
         # Gegenpruefung: "OK" neben "instabil" wirkt wie eine Freigabe - die
