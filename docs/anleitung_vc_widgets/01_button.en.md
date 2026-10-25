@@ -85,6 +85,7 @@ Depending on the selected **Aktion**, the dialog only shows the fields that appl
 | Funktion (nur gehalten) | Starts the function(s) on press and stops them on release (flash at effect level) |
 | Effekt-Aktion (Live) | Triggers a live action on the bound or the active effect (see the effect actions) |
 | Gruppe auswählen (select group) | Selects the fixtures of the given group into the programmer (live selection via pad/MIDI) |
+| Pop-up-Feld öffnen/schließen (open/close pop-up field) | Opens the chosen pop-up field on top of the console; pressing again closes it. The button lights up while the field is open — see [Container → Pop-up buttons](17_container.en.md#pop-up-buttons) |
 | Bibliothek-Farbe/Snap | Sets a snap (color/look) from the show library into the programmer; the behavior depends on the key mode (Umschalten/Setzen/Halten) |
 | Snapshot abrufen (recall snapshot) | Writes the values of the selected snapshot into the programmer |
 | Programmer leeren (Clear) | Clears the programmer (releases manual colors/snaps) |

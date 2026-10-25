@@ -30,6 +30,9 @@ from .vc_frame import VCFrame
 class VCEffectEditor(VCFrame):
     """Beweglicher Container fuer die Bedien-Widgets eines Effekts + Live-Vorschau."""
 
+    # VCB-48: die Effekt-Box ist kein freier Behaelter -> nie ein Pop-up-Feld.
+    POPUP_FAEHIG = False
+
     def __init__(self, caption: str = "Effekt-Editor", parent=None):
         super().__init__(caption, parent)
         self.effect_id: int | None = None
