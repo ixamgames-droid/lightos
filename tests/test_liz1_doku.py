@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import os
-import re
 
+from backlog_eintrag import eintrag
 from src.core import lizenz
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -81,5 +81,6 @@ def test_datenordner_in_der_doku_passt_zur_pfadschicht():
 
 
 def test_fragmente_nennen_die_id():
-    assert re.search(r"^ID: LIZ-1$", _lies("backlog.d", "LIZ-1.md"), re.M)
+    # Fragment oder (nach dem Einsammeln) Zeile in BACKLOG.md — beides gilt.
+    assert "LIZ-1" in eintrag(ROOT, "LIZ-1")
     assert "(LIZ-1)" in _lies("changelog.d", "2026-10-12-LIZ-1.md").splitlines()[0]
