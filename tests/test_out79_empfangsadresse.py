@@ -621,3 +621,45 @@ def test_stop_verlaesst_gruppen_ueber_die_gewaehlte_karte(ersatz_socket, monkeyp
                  for o in sock.optionen
                  if len(o) == 3 and o[1] == socket.IP_DROP_MEMBERSHIP]
     assert austritte == [("239.255.0.3", KARTE), ("239.255.0.4", KARTE)]
+
+
+def test_quellport_auch_wenn_getsockname_ungebunden_wirft(monkeypatch):
+    """Windows (D, 25.10.2026): getsockname() auf einem ungebundenen UDP-Socket
+    wirft WinError 10022 statt Port 0 — der Quell-Port muss trotzdem VOR dem
+    ersten Senden feststehen und eingetragen sein."""
+    from src.core.dmx import artnet as an
+
+    class _WieWindows:
+        def __init__(self):
+            self.gebunden = None
+            self.gesendet = []
+
+        def setsockopt(self, *a):
+            pass
+
+        def getsockname(self):
+            if self.gebunden is None:
+                raise OSError(10022, "WSAEINVAL")
+            return ("0.0.0.0", 45678)
+
+        def bind(self, adr):
+            self.gebunden = adr
+
+        def sendto(self, paket, ziel):
+            # zum Zeitpunkt des Sendens muss der Port schon eingetragen sein
+            self.gesendet.append(45678 in an.eigene_quellports())
+
+        def close(self):
+            pass
+
+    sock = _WieWindows()
+    monkeypatch.setattr(an.socket, "socket", lambda *a, **k: sock)
+    tx = an.ArtNetSender("127.0.0.1")
+    try:
+        tx.send_dmx(0, bytes(4))
+        assert sock.gebunden == ("", 0)
+        assert sock.gesendet == [True]
+        assert tx._quellport == 45678
+    finally:
+        tx.close()
+    assert 45678 not in an.eigene_quellports()

@@ -68,7 +68,12 @@ class ArtNetSender:
         dann sehen, bevor der Port eingetragen war (unter Last gemessen). Die
         Bindung an ('', 0) ist genau die, die ``sendto`` sonst implizit macht."""
         try:
-            port = int(self._sock.getsockname()[1])
+            try:
+                port = int(self._sock.getsockname()[1])
+            except OSError:
+                # Windows: getsockname() auf einem noch ungebundenen UDP-Socket
+                # wirft WinError 10022 (WSAEINVAL) statt Port 0 zu melden.
+                port = 0
             if not port:
                 self._sock.bind(("", 0))
                 port = int(self._sock.getsockname()[1])
