@@ -50,6 +50,7 @@
 | PRIV-06 | A | chore/priv06-backlog-pseudonym | 2026-10-25T12:39Z | BACKLOG.md · BACKLOG_ARCHIVE.md · backlog.d/* · tests/test_keine_privaten_dateien.py |
 | PROC-25 | A | chore/tafel-privates-repo | 2026-10-25T13:10Z | tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-25T13:10Z | src/ui/views |
+| LIZ-4 | D | fix/liz4-vc-laufzeit-oben | 2026-10-25T13:14Z | packaging/windows/LightOS.spec · packaging/windows/vc_laufzeit.py · src/core/selbsttest.py · tests/test_liz4_vc_laufzeit.py · backlog.d/LIZ-4.md |
 
 ## Blocker & Fallen
 
@@ -95,7 +96,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z B done VIZ-108
 - 2026-10-20T16:56Z D done OUT-76
 - 2026-10-20T16:57Z A claim SAMMEL-VERLOREN-1020
 - 2026-10-20T17:07Z A done IMP-4
@@ -125,3 +125,4 @@
 - 2026-10-25T13:10Z A aktualisiert PROC-25: Dateien tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md -> tools/session_claim.py
 - 2026-10-25T13:10Z A aktualisiert PROC-25: Dateien tools/session_claim.py -> tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md
 - 2026-10-25T13:11Z A done ENG-43
+- 2026-10-25T13:14Z D claim LIZ-4
