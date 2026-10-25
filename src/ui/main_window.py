@@ -594,6 +594,14 @@ class MainWindow(QMainWindow):
         # Fenster GC-unsichtbar fest (Fallenklasse STAB-09/10).
         self._hw_timer.timeout.connect(self._check_hardware)
         self._hw_timer.start()
+        # NET-15: DMX-Fernsteuerung (Art-Net/sACN-Eingang -> Executor/GM/GO).
+        # Laedt die gespeicherte Zuordnung und richtet die Uebergabe in den
+        # GUI-Thread ein; Empfaenger starten nur, wenn sie aktiv gespeichert ist.
+        try:
+            from src.core.dmx import fernsteuerung
+            fernsteuerung.beim_start()
+        except Exception as e:
+            print(f"[main_window] DMX-Fernsteuerung: {e}")
 
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
@@ -1216,7 +1224,9 @@ class MainWindow(QMainWindow):
         # nichts mehr (vorher rutschten alle Tasten der Virtual Console, auch
         # im Kiosk-Modus). Der Stapel liegt unter Menue-, NOT-AUS- und
         # Sektionsleiste: Laser-NOT-AUS, STOP ALL, BLACKOUT und Grand Master
-        # werden nie verdeckt.
+        # werden nie verdeckt. UI-103: ebenso wenig die Unterreiter der
+        # Sektionen (das Banner steht neben den Reitern) und die Leiste der
+        # Virtual Console (dort steht es in der Zeile „Aktiver Effekt“).
         from src.ui.ausgabe_banner import AusgabeBannerSteuerung
         self._ausgabe_banner = AusgabeBannerSteuerung(
             kiosk=self._kiosk_mode, parent=central)

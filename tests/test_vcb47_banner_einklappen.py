@@ -505,8 +505,10 @@ class _ImFenster(unittest.TestCase):
         self.assertTrue(self.banner.isVisible())
         self.assertFalse(self.chip.isVisible())
         self.assertFalse(self.steuerung.eingeklappt)
-        self.assertEqual(self._im_fenster(self.banner).topLeft(), inhalt.topLeft())
-        self.assertEqual(self.banner.width(), inhalt.width())
+        # UI-103: wieder an seinem Platz (Virtual Console: rechts in der
+        # Zeile „Aktiver Effekt“, sonst oben am Inhaltsbereich).
+        self.assertEqual(self.banner.geometry(), self.banner.ziel_rechteck())
+        self.assertTrue(inhalt.contains(self._im_fenster(self.banner)))
         # Nichts hat sich dabei verschoben.
         self.assertEqual(self._im_fenster(self.w._stack), inhalt)
         self.assertEqual(self._im_fenster(self.view._canvas), konsole)
@@ -769,9 +771,11 @@ class _ImFenster(unittest.TestCase):
             self.assertFalse(self.chip.isVisible(), name)
             self.assertFalse(self.steuerung.eingeklappt, name)
             inhalt = self._im_fenster(self.w._stack)
-            self.assertEqual(self._im_fenster(self.banner).topLeft(),
-                             inhalt.topLeft(), name)
-            self.assertIs(self.w.childAt(inhalt.topLeft() + QPoint(30, 5)),
+            rechteck = self._im_fenster(self.banner)
+            self.assertEqual(self.banner.geometry(),
+                             self.banner.ziel_rechteck(), name)
+            self.assertTrue(inhalt.contains(rechteck), name)
+            self.assertIs(self.w.childAt(rechteck.topLeft() + QPoint(30, 5)),
                           self.banner, name)
 
     def test_wiederkehr_nach_pause_klappt_im_fenster_auf(self):
