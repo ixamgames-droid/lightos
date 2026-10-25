@@ -57,15 +57,21 @@ class ArtNetSender:
         """Sendet ein ArtDmx Paket. universe = 0-32767, data = 2-512 Bytes."""
         self._sequence = (self._sequence % 255) + 1
         packet = _build_artdmx(universe, data, self._sequence)
-        self._sock.sendto(packet, (self.target_ip, ARTNET_PORT))
         if self._quellport is None:
             self._quellport_merken()
+        self._sock.sendto(packet, (self.target_ip, ARTNET_PORT))
 
     def _quellport_merken(self):
-        """Nach dem ersten Senden steht der (vom System gewählte) Quell-Port
-        fest — für den Echo-Filter des Eingangs (OUT-79)."""
+        """Quell-Port VOR dem ersten Senden festlegen und merken — für den
+        Echo-Filter des Eingangs (OUT-79). Ohne eigene Bindung vergibt das
+        System den Port erst in ``sendto``; der Eingang konnte das erste Paket
+        dann sehen, bevor der Port eingetragen war (unter Last gemessen). Die
+        Bindung an ('', 0) ist genau die, die ``sendto`` sonst implizit macht."""
         try:
             port = int(self._sock.getsockname()[1])
+            if not port:
+                self._sock.bind(("", 0))
+                port = int(self._sock.getsockname()[1])
         except (OSError, TypeError, ValueError, IndexError):
             return
         if port:
