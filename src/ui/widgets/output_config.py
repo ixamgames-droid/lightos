@@ -1033,8 +1033,27 @@ class OutputConfigDialog(QDialog):
         sin_l.addRow("Status:", self._lbl_sacn_in_status)
         if_l.addWidget(sin_box)
 
+        # NET-15: Fernsteuerung (Kanal -> Executor-Fader / Grand Master / GO)
+        from src.ui.widgets.dmx_fernsteuerung_box import FernsteuerungBox
+        self._fernsteuerung_box = FernsteuerungBox()
+        if_l.addWidget(self._fernsteuerung_box)
+
         if_l.addStretch(1)
-        tabs.addTab(input_tab, "DMX Input")
+        # NET-15: mit der Fernsteuerungs-Tabelle passt der Reiter nicht mehr in
+        # die Standardhoehe — rollbar statt zusammengequetscht (sonst ueberlappten
+        # Tabelle und Knoepfe).
+        from PySide6.QtWidgets import QScrollArea as _QScrollArea
+        input_rollen = _QScrollArea()
+        input_rollen.setWidgetResizable(True)
+        input_rollen.setFrameShape(_QScrollArea.Shape.NoFrame)
+        input_rollen.setWidget(input_tab)
+        # Die Dialog-Standardgroesse bleibt wie vor NET-15: so hoch wie der
+        # Reiter OHNE die neue Gruppe; die Fernsteuerung erreicht man per Rollen.
+        input_rollen.setMinimumHeight(
+            input_tab.minimumSizeHint().height()
+            - self._fernsteuerung_box.minimumSizeHint().height()
+            - if_l.spacing())
+        tabs.addTab(input_rollen, "DMX Input")
 
         # ── Universe Manager Tab ───────────────────────────────────────────────
         univ_tab = QWidget()

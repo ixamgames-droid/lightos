@@ -158,6 +158,9 @@ class Eingangsbild:
     nicht_zugeordnet: list[tuple[str, int]] = field(default_factory=list)
     #: LightOS-Universen, auf die mehr als eine Quelle zeigt (die juengste gilt)
     doppelt: list[int] = field(default_factory=list)
+    #: NET-15: je LightOS-Universum die Adressen, die der DMX-Fernsteuerung
+    #: gehoeren — sie sind keine Geraetewerte und werden nicht mitgeschnitten
+    ausgelassen: dict[int, frozenset[int]] = field(default_factory=dict)
 
     @property
     def hat_signal(self) -> bool:
@@ -167,13 +170,28 @@ class Eingangsbild:
         return self.hat_signal and self.ruhig_seit >= float(ruhezeit)
 
 
+def _fernsteuer_kanaele(protokoll: str, universum: int) -> frozenset[int]:
+    try:
+        from src.core.dmx.fernsteuerung import reservierte_kanaele
+        return reservierte_kanaele(protokoll, universum)
+    except Exception:
+        return frozenset()
+
+
 def eingangsbild(puffer: Eingangspuffer,
-                 ziel: Callable[[str, int], int | None]) -> Eingangsbild:
+                 ziel: Callable[[str, int], int | None],
+                 reserviert: Callable[[str, int], Iterable[int]] | None = None,
+                 ) -> Eingangsbild:
     """Fasst den Puffer zu einem Bild je LightOS-Universum zusammen.
 
     ``ziel(protokoll, universum)`` nennt das LightOS-Universum einer Quelle
     oder ``None``, wenn sie nicht zugeordnet ist — solche Quellen werden
-    genannt, aber NICHT mitgeschnitten (es wird keine Zuordnung geraten)."""
+    genannt, aber NICHT mitgeschnitten (es wird keine Zuordnung geraten).
+
+    ``reserviert(protokoll, universum)`` nennt die Kanaele, die der
+    DMX-Fernsteuerung (NET-15) gehoeren; sie landen in
+    :attr:`Eingangsbild.ausgelassen`. Vorgabe: die App-Fernsteuerung."""
+    reserviert = reserviert or _fernsteuer_kanaele
     ergebnis = Eingangsbild()
     juengstes: dict[int, float] = {}
     ruhig: list[float] = []
@@ -199,6 +217,11 @@ def eingangsbild(puffer: Eingangspuffer,
                 continue
         juengstes[nach] = st.letztes_paket_vor
         ergebnis.abbild[nach] = daten
+        frei = frozenset(int(k) for k in (reserviert(st.protokoll, st.universum) or ()))
+        if frei:
+            ergebnis.ausgelassen[nach] = frei
+        else:
+            ergebnis.ausgelassen.pop(nach, None)
     ergebnis.ruhig_seit = min(ruhig) if ruhig else 0.0
     ergebnis.signal_seit = min(seit) if seit else 0.0
     return ergebnis
@@ -310,7 +333,8 @@ def lies_abbild(abbild: dict[int, bytes], patch: Iterable, *,
                 bezug: dict[int, bytes] | None = None,
                 laser_mitnehmen: bool = False,
                 kanaele_fuer: Callable | None = None,
-                ist_laser: Callable | None = None) -> Mitschnitt:
+                ist_laser: Callable | None = None,
+                auslassen: dict[int, Iterable[int]] | None = None) -> Mitschnitt:
     """Leitet aus einem DMX-Abbild die Werte je gepatchtem Geraet ab.
 
     ``abbild``: Bytes je LightOS-Universum (kuerzer als 512 = der Rest ist 0).
@@ -325,7 +349,11 @@ def lies_abbild(abbild: dict[int, bytes], patch: Iterable, *,
     Laser bleiben ohne ``laser_mitnehmen=True`` draussen und werden in
     ``laser_ausgelassen`` genannt. Netzwerk-Laser haben gar keine DMX-Adresse
     und werden nie gelesen. Ein Geraet, fuer dessen Universum kein Bild
-    vorliegt, bekommt keine Werte (es werden keine Nullen erfunden)."""
+    vorliegt, bekommt keine Werte (es werden keine Nullen erfunden).
+
+    ``auslassen``: je LightOS-Universum Adressen, die NICHT gelesen werden —
+    die Kanaele der DMX-Fernsteuerung (NET-15, :attr:`Eingangsbild.ausgelassen`).
+    Ein GO- oder Fader-Kanal des Pults ist kein Geraetewert."""
     if auswahl not in AUSWAHLEN:
         raise ValueError(f"Unbekannte Auswahl: {auswahl!r}")
     kanaele_fuer = kanaele_fuer or _kanaele_aus_profil
@@ -352,6 +380,7 @@ def lies_abbild(abbild: dict[int, bytes], patch: Iterable, *,
             ergebnis.ohne_bild.append(name)
             continue
         alt = (bezug or {}).get(uni)
+        sperre = set((auslassen or {}).get(uni) or ())
         start = int(getattr(fx, "address", 0) or 0)
         schluessel = _schluessel_je_kanal(fx, profil_kanaele)
 
@@ -361,7 +390,7 @@ def lies_abbild(abbild: dict[int, bytes], patch: Iterable, *,
         werte: dict[int, int] = {}
         for nr in schluessel:
             adresse = start + nr - 1
-            if 1 <= adresse <= 512:
+            if 1 <= adresse <= 512 and adresse not in sperre:
                 werte[nr] = _wert(daten, adresse)
         ergebnis.geraete_gesehen += 1
         if any(werte.values()):
