@@ -3,8 +3,10 @@
 Die nativen ``win_arm64``-Wheels von PySide6-Addons bringen KEIN QtWebEngine
 mit (XPLAT-45, gemessen an 6.11.2) - mit nativem ARM64-Python fehlt also der
 3D-Visualizer. Emuliertes x64-Python hat alles. Entscheidung des
-Projektinhabers vom 05.10.2026: auf Windows-ARM wird x64-Python empfohlen,
-ARM64-Python nur als Hinweis "ohne 3D".
+Projektinhabers vom 05.10.2026: auf Windows-ARM wird x64-Python empfohlen.
+XPLAT-51: mit nativem ARM64-Python stuerzte LightOS ausserdem in 6 von 12
+Starts ab (Access Violation), mit x64-Python nie - natives ARM64-Python gilt
+deshalb als "nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen".
 
 Die Architektur des INTERPRETERS kommt aus ``sysconfig.get_platform()``;
 ``platform.machine()`` meldet auf emuliertem x64-Python teils 'ARM64' (Host).
@@ -15,6 +17,10 @@ import os
 import platform
 import sysconfig
 
+#: Einheitlicher Wortlaut fuer natives ARM64-Python (XPLAT-51).
+ARM64_NICHT_UNTERSTUETZT = (
+    "Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - "
+    "x64-Python nehmen.")
 #: Ein Befehl, den die Hinweise woertlich nennen (winget kennt ``--architecture``).
 X64_PYTHON_BEFEHL = "winget install Python.Python.3.12 --architecture x64"
 #: Eindeutiger Aufruf mit dem x64-Interpreter (Codex #967: "py -3.12-64"
@@ -71,9 +77,11 @@ def visualizer_startfehler_text(exc: BaseException | None = None, *,
             system=system, py_arch=py_arch):
         return (
             kopf
-            + "LightOS laeuft hier mit nativem ARM64-Python. Dessen PySide6-"
-            "Pakete enthalten kein QtWebEngine - ohne das gibt es keinen "
-            "3D-Visualizer.\n\n"
+            + "LightOS laeuft hier mit nativem ARM64-Python. "
+            + ARM64_NICHT_UNTERSTUETZT
+            + "\nDessen PySide6-Pakete enthalten kein QtWebEngine - ohne das "
+            "gibt es keinen 3D-Visualizer. Ausserdem stuerzt LightOS damit "
+            "immer wieder ab (XPLAT-51).\n\n"
             "Abhilfe: x64-Python installieren (laeuft auf Windows-ARM per "
             "Emulation, mit allen Funktionen) und install.py damit erneut "
             "ausfuehren - \"--neu-venv\" ersetzt das vorhandene ARM64-venv, "

@@ -3,9 +3,10 @@ r"""LightOS Installer.
 Installiert alle Abhaengigkeiten in einer virtuellen Umgebung und legt eine
 Desktop-Verknuepfung sowie Default-Daten an.
 
-Funktioniert auf Windows x64 UND ARM64. Auf Windows-ARM ist x64-Python
-(per Emulation) der empfohlene Weg; natives ARM64-Python laeuft ohne
-3D-Visualizer (XPLAT-46).
+Funktioniert auf Windows x64 und auf Windows-ARM mit x64-Python (per
+Emulation, XPLAT-46). Natives ARM64-Python ist nicht unterstuetzt (instabil,
+kein 3D) - x64-Python nehmen (XPLAT-51). Der Installer warnt dann deutlich,
+bricht aber nicht ab.
 
 Usage:
     python install.py [--no-venv] [--no-shortcut] [--dev] [--neu-venv]
@@ -168,6 +169,14 @@ def detect_native_os_arch() -> str:
 # XPLAT-46 (Entscheidung 05.10.2026): auf Windows-ARM ist x64-Python der
 # empfohlene Weg. Die nativen win_arm64-Wheels von PySide6-Addons haben kein
 # QtWebEngine (XPLAT-45) - mit ARM64-Python fehlt der 3D-Visualizer.
+# XPLAT-51: dazu stuerzte LightOS mit einem ARM64-venv in 6 von 12 Starts ab
+# (Access Violation nach 8,6 bis 9,5 s, wechselnde Stelle im Hauptthread), mit
+# x64-Python und derselben PySide6-Version nie. Natives ARM64-Python gilt
+# deshalb als nicht unterstuetzt. Ob der Installer dann abbricht, hat der
+# Projektinhaber nicht entschieden - bis dahin warnt er nur, laut.
+ARM64_NICHT_UNTERSTUETZT = (
+    "Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - "
+    "x64-Python nehmen.")
 X64_PYTHON_BEFEHL = "winget install Python.Python.3.12 --architecture x64"
 # Codex #967: "py -3.12-64" heisst seit Python 3.11 nur "nicht 32-bit" und
 # waehlt bei parallel installiertem ARM64-Python nicht sicher x64. Eindeutig
@@ -220,25 +229,45 @@ def x64_installer_aufruf(pfad: str | None = None) -> str:
     return f'"{pfad or X64_PYTHON_STANDARDPFAD}" install.py --neu-venv'
 
 
-def check_arm_runtime():
-    """Hinweise zur Python-Architektur auf Windows-ARM (XPLAT-46)."""
+def check_arm_runtime(use_venv: bool = True, neu_venv: bool = False):
+    """Hinweise zur Python-Architektur auf Windows-ARM (XPLAT-46).
+
+    Der Warnblock betrifft das Python, das install.py ausfuehrt. Bleibt ein
+    vorhandenes venv anderer Architektur stehen (``create_venv`` fragt erst
+    danach), sagt ein Zusatz, was fuer das venv gilt - sonst widersprachen
+    sich Anfang und Zusammenfassung eines Laufs (Gegenpruefung XPLAT-52)."""
     py_arch = detect_arch()
     os_arch = detect_native_os_arch()
     info(f"Python-Architektur: {py_arch} | OS-Architektur: {os_arch}")
     if os.name != "nt" or os_arch != "arm64":
         return
+    va = venv_arch() if use_venv and not neu_venv else "unknown"
+    if va == py_arch:
+        va = "unknown"
     if py_arch == "arm64":
+        warn("!" * 60)
+        warn(ARM64_NICHT_UNTERSTUETZT)
         warn(
-            "Natives ARM64-Python: LightOS laeuft, aber OHNE 3D-Visualizer - "
-            "die ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine. "
-            "python-rtmidi baut hier nur mit MSVC Build Tools (MIDI geht sonst "
-            "ueber den eingebauten WinMM-Weg)."
+            "Instabil: mit nativem ARM64-Python stuerzte LightOS in 6 von 12 "
+            "Starts ab (Access Violation). Kein 3D-Visualizer: die ARM64-Pakete von "
+            "PySide6-Addons enthalten kein QtWebEngine. python-rtmidi baut hier "
+            "nur mit MSVC Build Tools (MIDI geht sonst ueber den WinMM-Weg)."
         )
-        warn(f"Empfohlen auf Windows-ARM: x64-Python ({X64_PYTHON_BEFEHL}), "
+        warn(f"So geht es: x64-Python installieren ({X64_PYTHON_BEFEHL}), "
              f"dann: {x64_installer_aufruf(finde_x64_python())}")
+        warn("Die Installation laeuft trotzdem weiter - auf eigenes Risiko.")
+        if va != "unknown":
+            warn(f"Das gilt fuer dieses Python. Das vorhandene venv ist {va}-Python "
+                 "und bleibt, wenn es nicht neu angelegt wird (Rueckfrage folgt) - "
+                 f"LightOS laeuft dann mit {va}-Python.")
+        warn("!" * 60)
     else:
         info("x64-Python unter Emulation auf Windows-ARM - empfohlener Weg, "
              "der 3D-Visualizer ist verfuegbar.")
+        if va == "arm64":
+            warn(f"Das vorhandene venv ist ARM64-Python. {ARM64_NICHT_UNTERSTUETZT} "
+                 "Bei der folgenden Rueckfrage mit j antworten "
+                 "(oder: install.py --neu-venv), sonst bleibt es.")
 
 
 def venv_arch() -> str:
@@ -257,7 +286,9 @@ def venv_arch() -> str:
         return "unknown"
     if plat == "win32":
         return "x86"
-    return normalize_arch(plat.split("-", 1)[1] if plat.startswith("win-") else plat)
+    # 'win-amd64' -> 'amd64'; sonst steht die Maschine am Ende:
+    # 'linux-x86_64' -> 'x86_64', 'macosx-14.0-arm64' -> 'arm64'.
+    return normalize_arch(plat.rsplit("-", 1)[-1])
 
 
 def _frage_ja(frage: str) -> bool:
@@ -466,8 +497,23 @@ def create_shortcut(use_venv: bool = True):
         return None
 
 
-def write_manifest(created_dirs: list[str], shortcut: str | None):
-    py_arch = detect_arch()
+def ziel_arch(use_venv: bool = True) -> str:
+    """Architektur des Python, mit dem LightOS laufen wird (XPLAT-52).
+
+    Bei vorhandenem venv ist das dessen Architektur (``venv_arch()``) - nicht
+    die des Python, das install.py ausfuehrt: bleibt ein x64-venv stehen und
+    install.py laeuft mit ARM64-Python (oder umgekehrt), zaehlt das venv.
+    Ohne venv (``--no-venv`` oder venv nicht startbar) das ausfuehrende."""
+    if use_venv:
+        va = venv_arch()
+        if va != "unknown":
+            return va
+    return detect_arch()
+
+
+def write_manifest(created_dirs: list[str], shortcut: str | None,
+                   use_venv: bool = True):
+    py_arch = ziel_arch(use_venv)
     os_arch = detect_native_os_arch()
     manifest = {
         "version": "1.0",
@@ -481,6 +527,7 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
         "os_arch": os_arch,
         "python_emulated_on_arm64": bool(os_arch == "arm64" and py_arch != "arm64"),
         "arch": py_arch,
+        "installer_python_arch": detect_arch(),
         "platform": platform.platform(),
     }
     with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
@@ -489,7 +536,8 @@ def write_manifest(created_dirs: list[str], shortcut: str | None):
 
 
 def show_summary(use_venv: bool = True):
-    py_arch = detect_arch()
+    py_arch = ziel_arch(use_venv)
+    installer_arch = detect_arch()
     os_arch = detect_native_os_arch()
     # Mit --no-venv gibt es kein venv/: die Befehle nennen dann das Python, in
     # das installiert wurde (Codex-Review zu DOC-62).
@@ -497,11 +545,13 @@ def show_summary(use_venv: bool = True):
     info("=" * 60)
     info("Installation abgeschlossen!")
     info("=" * 60)
-    info(f"Python-Architektur: {py_arch}")
+    info(f"Python-Architektur: {py_arch}" + (" (venv)" if use_venv else ""))
+    if py_arch != installer_arch:
+        info(f"install.py lief mit:  {installer_arch}-Python")
     info(f"OS-Architektur:     {os_arch}")
     if os.name == "nt" and os_arch == "arm64" and py_arch == "arm64":
-        warn("Natives ARM64-Python: kein 3D-Visualizer. Mit x64-Python geht alles "
-             f"({X64_PYTHON_BEFEHL}).")
+        warn(f"{ARM64_NICHT_UNTERSTUETZT} Mit x64-Python geht alles "
+             f"({X64_PYTHON_BEFEHL}, dann {x64_installer_aufruf()}).")
     info(f"venv:        {VENV_DIR if use_venv else '- (--no-venv)'}")
     info(f"AppData:     {APPDATA_DIR}")
     info("")
@@ -534,9 +584,9 @@ def main():
 
     info(f"LightOS Installer - Arch: {detect_arch()}")
     check_python()
-    check_arm_runtime()
-
     use_venv = not args.no_venv
+    check_arm_runtime(use_venv, args.neu_venv)
+
     if use_venv:
         create_venv(neu=args.neu_venv)
     else:
@@ -555,7 +605,7 @@ def main():
     if not args.no_shortcut:
         shortcut = create_shortcut(use_venv)
 
-    write_manifest(created, shortcut)
+    write_manifest(created, shortcut, use_venv)
     show_summary(use_venv)
 
 

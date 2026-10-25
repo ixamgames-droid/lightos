@@ -646,7 +646,7 @@ def test_ausgabe_dialog_hat_die_tabelle(tmp_path, monkeypatch):
         # sitzt im Reiter „DMX Input" neben den Merge-Gruppen
         from PySide6.QtWidgets import QTabWidget
         tabs = dlg.findChild(QTabWidget)
-        i = next(i for i in range(tabs.count()) if tabs.tabText(i) == "DMX Input")
+        i = next(i for i in range(tabs.count()) if tabs.tabText(i) == "DMX-Eingang")
         assert tabs.widget(i).isAncestorOf(box)
         assert tabs.widget(i).isAncestorOf(dlg._check_artnet_in)
         # Standardgroesse: Tabelle und Knoepfe ueberlappen nicht (rollbar)

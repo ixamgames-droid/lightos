@@ -169,7 +169,7 @@ def test_ohne_signal_erklaert_der_knopf_und_legt_nichts_an(state, rig, aufbau):
     dlg.aktualisiere()
     assert dlg._btn_festhalten.isEnabled()
     assert dlg._btn_festhalten.toolTip() == D.GRUND_KEIN_SIGNAL
-    assert not dlg._lbl_hilfe.isHidden() and "DMX Input" in dlg._lbl_hilfe.text()
+    assert not dlg._lbl_hilfe.isHidden() and "DMX-Eingang" in dlg._lbl_hilfe.text()
     assert "kein Signal" in dlg._lbl_status[M.ARTNET].text()
     assert "Universum 1 → LightOS-Universum 2" in dlg._lbl_status[M.ARTNET].text()
     assert dlg._lbl_status[M.SACN].text() == "sACN: Eingang ist aus."
@@ -179,7 +179,7 @@ def test_ohne_signal_erklaert_der_knopf_und_legt_nichts_an(state, rig, aufbau):
     # eingeblendet wird (sie kann eingeklappt gewesen sein).
     assert dlg._lbl_meldung.text() == D.GRUND_KEIN_SIGNAL + " " + D.VERWEIS_HILFE
     assert not dlg._lbl_hilfe.isHidden() and dlg._btn_hilfe.isChecked()
-    assert "Art-Net Input aktivieren" in dlg._lbl_hilfe.text()
+    assert "Art-Net-Eingang aktivieren" in dlg._lbl_hilfe.text()
     assert state.function_manager.all() == []
     assert not get_undo_stack().can_undo()
 
@@ -189,8 +189,8 @@ def test_hilfetext_nennt_was_im_einstellungsdialog_wirklich_steht():
     wurzel = pathlib.Path(__file__).resolve().parents[1] / "src" / "ui"
     ausgabe = (wurzel / "widgets" / "output_config.py").read_text(encoding="utf-8")
     haupt = (wurzel / "main_window.py").read_text(encoding="utf-8")
-    for wort in ("DMX Input", "Art-Net Input aktivieren", "sACN Input aktivieren",
-                 "Eingehendes Universe", "Merge in Universe", "Übernehmen"):
+    for wort in ("DMX-Eingang", "Art-Net-Eingang aktivieren", "sACN-Eingang aktivieren",
+                 "Eingehendes Universum", "Mischen in Universum", "Übernehmen"):
         assert wort in D.HILFE_EINGANG and wort in ausgabe, wort
     assert '"&Ausgabe"' in haupt and '"Konfigurieren..."' in haupt
     assert "„Ausgabe“ → „Konfigurieren...“" in D.HILFE_EINGANG

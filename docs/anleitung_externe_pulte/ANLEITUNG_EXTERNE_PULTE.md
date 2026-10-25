@@ -39,7 +39,7 @@ Universum (HTP, LTP oder REPLACE) und gibt das Ergebnis an die Geräte aus.
 ```
   externes Pult                      LightOS-Rechner                 Geräte
  ┌──────────────┐  Art-Net / sACN   ┌────────────────┐  ENTTEC /   ┌────────┐
- │ sendet DMX   │ ────────────────► │ DMX Input      │  Art-Net /  │ Lampen │
+ │ sendet DMX   │ ────────────────► │ DMX-Eingang    │  Art-Net /  │ Lampen │
  └──────────────┘     (Netzwerk)    │ + eigenes Bild │ ──────────► └────────┘
                                     └────────────────┘    sACN
 ```
@@ -142,21 +142,21 @@ die roten Zahlen gehören zum Text dort.*
 
 1. **Art-Net aktivieren** anhaken.
 2. **Netzwerkkarte:** die Karte im Pult-Netz wählen.
-3. **Universe:** das LightOS-Universum, das an das Pult gehen soll.
+3. **Universum:** das LightOS-Universum, das an das Pult gehen soll.
 4. **Ziel-IP / Broadcast:** die Adresse des Pults (zum Beispiel `2.0.0.10`) — dann geht
    das Universum nur an das Pult (Unicast). Mit `255.255.255.255` oder leerem Feld geht es
    als Broadcast an alle im Netz; ist eine Netzwerkkarte gewählt, an den Broadcast dieser
    Karte.
 5. **Art-Net Startuniversum:** die Art-Net-Universumsnummer, auf der das Pult hört.
-   Vorbelegt ist LightOS-Universum minus 1 — Universe 1 sendet auf Art-Net-Universum `0`.
+   Vorbelegt ist LightOS-Universum minus 1 — Universum 1 sendet auf Art-Net-Universum `0`.
 6. **Übernehmen**. Der Status zeigt `Aktiv → <Adresse> · Universe <n> (gespeichert)`.
 
 **Mit sACN** (Reiter **sACN (E1.31)**):
 
 1. **sACN (E1.31) aktivieren** anhaken.
-2. **Universe:** das LightOS-Universum. Es sendet auf die sACN-Universumsnummer mit
+2. **Universum:** das LightOS-Universum. Es sendet auf die sACN-Universumsnummer mit
    derselben Zahl; eine andere Nummer trägst du im Reiter **Universen** in der Spalte
-   **Ext-Universe** ein.
+   **Ext. Universum** ein.
 3. **Multicast (239.255.0.x)** angehakt lassen — oder den Haken entfernen und unter
    **Unicast Ziel-IP:** die Adresse des Pults eintragen.
 4. **Übernehmen**.
@@ -177,17 +177,17 @@ Vorher: Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk)
    du einen Ausgang einrichtest, zeigt
    [Ausgabe einrichten](../anleitung_ausgabe_einrichten/ANLEITUNG.md).
 2. Dialog **Ausgabe konfigurieren** (Menü **Ausgabe** → **Konfigurieren...**), Reiter
-   **DMX Input** öffnen. Für das Mischen gibt es zwei Kästen: **Art-Net Input** und
-   **sACN Input**. Beide sind gleich aufgebaut.
+   **DMX-Eingang** öffnen. Für das Mischen gibt es zwei Kästen: **Art-Net-Eingang** und
+   **sACN-Eingang**. Beide sind gleich aufgebaut.
 
    > Darunter liegt der Kasten **Fernsteuerung**: Damit *bedient* das Pult LightOS über
    > einzelne Kanäle (Executor-Fader, Grand Master, GO/Zurück/Stop), statt nur DMX
    > durchzumischen. Beschrieben in [Art-Net → Fernsteuerung](../ARTNET.md#fernsteuerung-pult-bedient-lightos).
-3. **Art-Net Input aktivieren** bzw. **sACN Input aktivieren** anhaken.
-4. **Eingehendes Universe:** die Nummer, auf der das Pult sendet. Bei Art-Net zählt LightOS
+3. **Art-Net-Eingang aktivieren** bzw. **sACN-Eingang aktivieren** anhaken.
+4. **Eingehendes Universum:** die Nummer, auf der das Pult sendet. Bei Art-Net zählt LightOS
    hier ab 1: Sendet das Pult auf Art-Net-Universum `0`, trägst du `1` ein. Bei sACN gilt
    die Nummer unverändert.
-5. **Merge in Universe:** das LightOS-Universum (1–32), in das gemischt wird.
+5. **Mischen in Universum:** das LightOS-Universum (1–32), in das gemischt wird.
 6. **Merge-Modus:** wählen — siehe Tabelle. Vorgabe ist `HTP`; damit kann das Pult für
    den ersten Versuch nichts dunkel machen.
 7. **Übernehmen**. Der Status zeigt `Aktiv: U<ein> -> U<ziel> (<Modus>)`. Der Dialog darf
@@ -334,7 +334,7 @@ eine Rückmeldung an das Pult einrichten — siehe
 |---|---|---|
 | A | Statusleiste unten rechts | `Ausgabe: U<n> Art-Net` bzw. `sACN`. Orange oder rot mit `⚠` heißt: Dieses Universum geht nicht hinaus; der Tooltip nennt den Grund. |
 | A | Sektion **E/A** → **DMX Monitor** | `Universe <n> geht raus` und die Werte, die LightOS sendet. Ob sie beim Pult ankommen, zeigt nur das Pult. |
-| B | Dialog **Ausgabe konfigurieren** → **DMX Input** → **Status:** | `Aktiv: U<ein> -> U<ziel> (<Modus>)`. Das heißt: Der Eingang ist eingeschaltet — nicht, dass schon etwas ankommt. Die Zeile gilt nur, solange der Dialog offen bleibt. |
+| B | Dialog **Ausgabe konfigurieren** → **DMX-Eingang** → **Status:** | `Aktiv: U<ein> -> U<ziel> (<Modus>)`. Das heißt: Der Eingang ist eingeschaltet — nicht, dass schon etwas ankommt. Die Zeile gilt nur, solange der Dialog offen bleibt. |
 | B | Sektion **E/A** → **Output** oder **DMX Monitor**, Ziel-Universum wählen | Einen Fader am Pult bewegen: Der Kanal muss sich im Monitor mitbewegen. |
 | C | Sektion **E/A** → **MIDI** → **MIDI Monitor (Eingehende Nachrichten)**, **Monitor aktiv** angehakt | Je Befehl eine Zeile wie `MSC   [<Quelle>] GO Cue=1 Liste=2`. Die Quelle ist der MIDI-Port oder `MSC/UDP` für den Netzwerkweg. |
 
@@ -387,14 +387,14 @@ Betreibe sie nur in einem eigenen Lichtnetz, nicht im Gäste-WLAN.
 | Was du siehst | Wahrscheinliche Ursache | Was hilft |
 |---|---|---|
 | **Es kommt nichts an** (B): Status `Aktiv`, Monitor bleibt leer. | Geräte in verschiedenen Adressbereichen, Firewall, oder das Pult sendet nicht bzw. an eine andere Adresse. | Adressen und Maske vergleichen (Schritt 3). Eingehend UDP 6454 (Art-Net) bzw. 5568 (sACN) freigeben. Am Pult prüfen, ob die Ausgabe eingeschaltet ist; versuchsweise per Unicast an die Adresse des LightOS-Rechners senden. |
-| **Es kommt nichts an** (B), obwohl Adressen und Firewall stimmen. | Ein zweites Programm auf dem LightOS-Rechner empfängt ebenfalls Art-Net bzw. sACN und bekommt die Pakete — oder LightOS konnte den Port nicht öffnen. Der Status zeigt trotzdem `Aktiv`. | Das andere Programm schließen, im Reiter **DMX Input** Haken entfernen, **Übernehmen**, Haken setzen, **Übernehmen**. |
+| **Es kommt nichts an** (B), obwohl Adressen und Firewall stimmen. | Ein zweites Programm auf dem LightOS-Rechner empfängt ebenfalls Art-Net bzw. sACN und bekommt die Pakete — oder LightOS konnte den Port nicht öffnen. Der Status zeigt trotzdem `Aktiv`. | Das andere Programm schließen, im Reiter **DMX-Eingang** Haken entfernen, **Übernehmen**, Haken setzen, **Übernehmen**. |
 | **Es kommt nichts an** (B, sACN, Rechner mit mehreren Netzwerkkarten). | LightOS meldet sich für Multicast über die Standardkarte des Betriebssystems an — das ist womöglich nicht die im Pult-Netz. | Das Pult per Unicast an die Adresse des LightOS-Rechners senden lassen. |
 | **Es kommt nichts an** (A): LightOS zeigt `Aktiv`, das Pult sieht nichts. | Falsche **Netzwerkkarte:**, falsche Ziel-IP oder das Pult hört auf einem anderen Universum. | Reiter **Art-Net**: Karte und **Ziel-IP / Broadcast:** prüfen. Statusleiste und DMX Monitor müssen „geht raus“ zeigen. |
-| **Falsches Universum:** Werte kommen an, aber um eins verschoben oder gar nicht. | Art-Net zählt auf der Leitung ab 0, LightOS ab 1. | Eingang: Pult-Universum plus 1 bei **Eingehendes Universe:** eintragen. Ausgang: **Art-Net Startuniversum:** auf die Nummer des Pults stellen. Bei sACN sind die Nummern gleich. |
+| **Falsches Universum:** Werte kommen an, aber um eins verschoben oder gar nicht. | Art-Net zählt auf der Leitung ab 0, LightOS ab 1. | Eingang: Pult-Universum plus 1 bei **Eingehendes Universum:** eintragen. Ausgang: **Art-Net Startuniversum:** auf die Nummer des Pults stellen. Bei sACN sind die Nummern gleich. |
 | Status `Aktiv, aber wirkungslos (… nicht als Output gepatcht)`. | Das Ziel-Universum gibt es in LightOS nicht. | Reiter **Universen**: Universum anlegen, Ausgang wählen, **Speichern**. |
 | **Flackern bei zwei Quellen.** | Zwei Absender auf demselben eingehenden Universum, Art-Net **und** sACN in dasselbe Ziel-Universum, oder LightOS empfängt per Broadcast sein eigenes Art-Net wieder. | Je eingehendem Universum nur ein Absender. Art-Net und sACN in verschiedene Ziel-Universen mischen. Für Ein- und Ausgang verschiedene Art-Net-Universen nehmen oder per Unicast senden. |
 | Werte bleiben nach dem Abziehen des Pults kurz stehen. | Gewollt: LightOS wartet 2,5 Sekunden, bevor es die Quelle verwirft. | Nichts — siehe [Sicherheit](#6-sicherheit). |
-| Der Eingang ist nach dem Neustart weg. | Der DMX-Eingang wird nicht gespeichert. | Reiter **DMX Input**: neu anhaken und **Übernehmen**. |
+| Der Eingang ist nach dem Neustart weg. | Der DMX-Eingang wird nicht gespeichert. | Reiter **DMX-Eingang**: neu anhaken und **Übernehmen**. |
 | **MSC reagiert nicht**, im MIDI Monitor erscheint keine Zeile. | Über MIDI: Eingang nicht offen, **MSC an** aus, Device-ID passt nicht, oder das Pult sendet ein anderes Command-Format als Licht. Über Netzwerk: **GMA-MSC über Netzwerk** aus, **Schnittstelle:** steht auf `nur dieser Rechner`, falscher Port, Firewall, oder das Pult sendet ein anderes Paketformat. | **Eingang öffnen**; **Device-ID:** auf `127`; versuchsweise **alle Formate annehmen**; Schnittstelle und Port prüfen, **Übernehmen**; UDP 6004 eingehend freigeben. |
 | **MSC reagiert nicht**, aber die Zeile steht im MIDI Monitor. | Der Befehl kommt an, trifft aber nichts: Executor ohne Cueliste, falsche Nummer im Feld „Cue-Liste“, falsche Executor-Seite, Cue-Nummer gibt es nicht — oder es ist LOAD, RESTORE oder RESET. | `Liste=` und `Cue=` in der Monitorzeile mit Executor und Cueliste in LightOS vergleichen. |
 | SET bewegt den falschen oder keinen Fader. | **SET-Belegung:** passt nicht zum Pult. | Die andere Belegung wählen, **Übernehmen**. |
