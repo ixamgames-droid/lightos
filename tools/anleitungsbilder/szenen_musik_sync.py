@@ -14,10 +14,14 @@ Seit BPM-31 (20.10.2026) startet ``MusicShowDirector.start_show`` den
 Lied-Look des ersten Titels auch ohne globale Funktionsliste. ``_spielt``
 loest ihn ueber den angebundenen Director aus: im Bild laufen Farb-Lauflicht
 und Kreis (Zeile „Aktiver Effekt“), passend zu Schritt 2 der Anleitung, und
-das Tempo steht auf der Nominal-BPM des Titels (Fallback ``_ensure_bpm``,
-auch bei Quelle „Aus“). ``_stopp`` haelt danach alles wieder an. (Bis
-BPM-31 kam der Lied-Look erst beim naechsten Trackwechsel; das Bild zeigte
-deshalb keinen laufenden Effekt.)
+``_stopp`` haelt danach alles wieder an. (Bis BPM-31 kam der Lied-Look erst
+beim naechsten Trackwechsel; das Bild zeigte deshalb keinen laufenden Effekt.)
+
+Seit BPM-32 (25.10.2026) setzt die Auto-Show bei Quelle „Aus“ keinen
+Titel-Takt mehr (bis dahin stand im Bild 124 BPM bei Quelle „Aus“). Die
+VC-Musik-Anzeige zeigt stattdessen die gelbe Zeile „Kein Takt“; Bild
+``05_takt_hinweis`` zeigt den Hinweis mit dem Knopf „Takt aus Titel
+uebernehmen“ im Musik-Tab.
 
 Die VC-Bank „Tempo & Musik“ legt ``szenen_vc.bank2_anlegen`` an.
 """
@@ -163,6 +167,28 @@ def _stopp(ui):
     ui.pump(0.5)
 
 
+def _vorher_hinweis(ui):
+    """Wie ``_spielt`` (Quelle „Aus“, Zustand „spielt“): der Director meldet
+    „kein Takt“, der Musik-Tab zeigt den Hinweis."""
+    quelle_aus(ui)
+    _playlist(ui)
+    mp = _player()
+    mp.index = 0
+    mp._set_playing(True)
+    ui.pump(1.0)
+    if _musik(ui)._takt_hinweis.isHidden():
+        raise SzenenFehler("Hinweis „Kein Takt“ erscheint nicht")
+
+
+def _bild_hinweis(ui):
+    view = _musik(ui)
+    w = ui.win
+    return bild(ui, kreise=[
+        (rechteck(w, view._lbl_takt_hinweis), 1, "oben"),
+        (rechteck(w, view._btn_takt_titel), 2, "oben"),
+    ])
+
+
 def _bild_quelle(ui):
     quelle_aus(ui)
     view = ui.win._bpm_manager_view
@@ -187,4 +213,7 @@ SZENEN = [
     Szene("04_bpm_quelle", sektion="BPM", unterreiter="Erkennung",
           dialog=_bild_quelle,
           titel="BPM-Sektion, Erkennung: Quelle (hier „Aus“), TAP, Auto"),
+    Szene("05_takt_hinweis", sektion="E/A", unterreiter="Musik", vorher=_vorher_hinweis,
+          dialog=_bild_hinweis, nachher=_stopp,
+          titel="Musik-Tab: Hinweis „Kein Takt“ mit „Takt aus Titel übernehmen“"),
 ]

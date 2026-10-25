@@ -1,6 +1,8 @@
 """Chaser function — steps through a list of functions in sequence."""
 from __future__ import annotations
 import random
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, RunOrder, Direction
@@ -9,6 +11,28 @@ from . import fade_curve as fc
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
     from src.core.database.models import PatchedFixture
+
+
+# BPM-32: Die Auto-Show startet ihre Funktionen bei gewaehlter BPM-Quelle
+# „Aus"/„OS2L" in diesem Rahmen. Beat-Chaser setzen dann keinen stillen
+# 120-BPM-Default (sonst liefe ein Takt gegen die Nutzerwahl bzw. das DJ-
+# Programm). Thread-lokal: ein anderer Thread startet unveraendert.
+_sperre = threading.local()
+
+
+@contextmanager
+def ohne_default_takt():
+    """Rahmen, in dem ``Chaser._on_start`` keinen 120-BPM-Default setzt."""
+    tiefe = getattr(_sperre, "tiefe", 0)
+    _sperre.tiefe = tiefe + 1
+    try:
+        yield
+    finally:
+        _sperre.tiefe = tiefe
+
+
+def default_takt_gesperrt() -> bool:
+    return getattr(_sperre, "tiefe", 0) > 0
 
 
 @dataclass
@@ -75,7 +99,9 @@ class Chaser(Function):
             try:
                 from .bpm_manager import get_bpm_manager
                 bm = get_bpm_manager()
-                if bm.bpm <= 0:
+                if bm.bpm <= 0 and not default_takt_gesperrt():
+                    # BPM-32: in der Auto-Show bei Quelle Aus/OS2L gesperrt
+                    # (s. ``ohne_default_takt``) — dort zeigt sie den Hinweis.
                     # CDX-14b: Quelle MITGEBEN. Ohne source liesse set_bpm() aus dem
                     # Off-Zustand _source=='off' stehen (leitet 'off' nur aus bpm<=0
                     # ab) -> _bpm>0 bei Quelle 'off' (Timer laeuft trotz Anzeige

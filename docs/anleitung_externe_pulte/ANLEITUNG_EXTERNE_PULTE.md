@@ -336,6 +336,11 @@ ist — dafür gibt es derzeit keinen Schalter in der Oberfläche, nur den Eintr
 [Web-Remote](../anleitung_web_remote/ANLEITUNG.md)). Dann ist zusätzlich UDP 7770
 freizugeben.
 
+Sendet dein Pult andere Adressen, ordnest du sie unter **Ausgabe** →
+**OSC-Zuordnungen & Rückmeldung…** frei zu oder lässt sie lernen; dort lässt sich auch
+eine Rückmeldung an das Pult einrichten — siehe
+[OSC: freie Adressen, Lernen und Rückmeldung](../anleitung_osc/ANLEITUNG.md).
+
 ## 5. Prüfen, ob es ankommt
 
 | Aufbau | Wo nachsehen | Was du sehen solltest |
