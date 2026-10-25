@@ -53,9 +53,16 @@ from __future__ import annotations
 
 import argparse
 import collections
+import os
 import re
 import subprocess
 import sys
+
+# PROC-25: die Tafel liegt im privaten Tafel-Repo — gelesen wird ueber die
+# gemeinsame Lesehilfe von session_claim.py, nicht ueber eine eigene Kopie von
+# Ort und Branch.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import session_claim  # noqa: E402
 
 # | FM-30 | P2 | todo | **Titel** | …
 ZEILE = re.compile(r"^\|\s*([A-Za-z][A-Za-z0-9-]*)\s*\|\s*(P[0-9])\s*\|([^|]*)\|([^|]*)\|")
@@ -294,7 +301,17 @@ def fragmente_je_zweig(refs: list) -> dict:
     return je_zweig
 
 
-TAFEL = "origin/sessions:SESSIONS.md"
+#: Nur noch Beschreibung fuer Meldungen — gelesen wird ueber
+#: ``session_claim.lies_tafel_text`` (PROC-25: privates Tafel-Repo).
+TAFEL = "lightos-intern:origin/main:SESSIONS.md"
+
+#: ``main`` setzt das auf ``False`` bei ``--kein-fetch``.
+_TAFEL_HOLEN = False
+
+
+def _tafel_text() -> "session_claim.TafelText":
+    """Die Tafel ueber die gemeinsame Lesehilfe (Tests ersetzen diese Funktion)."""
+    return session_claim.lies_tafel_text(holen=_TAFEL_HOLEN)
 
 
 def weitere_belegte_ids(refs: list) -> tuple:
@@ -302,21 +319,32 @@ def weitere_belegte_ids(refs: list) -> tuple:
     den Dateinamen unter ``changelog.d/`` und ``backlog.d/`` (PROC-20) jedes Refs.
 
     TOOL-23: ein Lesefehler ist eine LUECKE und wird gemeldet. Bisher wurde er
-    still uebergangen: liess sich die Tafel nicht lesen (Zweig ``sessions``
-    nicht geholt), rechnete das Werkzeug ohne sie weiter und bot eine Nummer
-    an, die dort laengst belegt sein konnte — derselbe Schaden wie bei einem
-    unlesbaren Zweig (CDX-57), nur ohne jede Warnung.
+    still uebergangen: liess sich die Tafel nicht lesen, rechnete das Werkzeug
+    ohne sie weiter und bot eine Nummer an, die dort laengst belegt sein
+    konnte — derselbe Schaden wie bei einem unlesbaren Zweig (CDX-57), nur ohne
+    jede Warnung.
+
+    PROC-25: FEHLT der Klon des privaten Tafel-Repos ganz (etwa auf einem
+    Rechner, der ihn noch nicht eingerichtet hat), wird der Tafel-Teil mit
+    Hinweis und Klon-Befehl uebersprungen — keine Luecke. Ein Klon, der da ist,
+    sich aber nicht lesen laesst, bleibt eine.
 
     Ein Ref OHNE ``changelog.d/`` bzw. ``backlog.d/`` ist keine Luecke: ``git ls-tree <ref> <pfad>``
     liefert dann Exit 0 und nichts. Erst ein Fehler des Aufrufs zaehlt.
     """
     ids: set = set()
     luecken: list = []
-    rc, text = _git("show", TAFEL)
-    if rc == 0:
-        ids |= ids_aus_text(text)
+    tt = _tafel_text()
+    if tt.klon_fehlt:
+        befehl = next((z.strip() for z in tt.klon_fehlt.splitlines()
+                       if z.strip().startswith("gh repo clone")), "")
+        print(f"[ids] HINWEIS: Tafel-Klon fehlt — Tafel-Teil uebersprungen "
+              f"(einrichten: {befehl}).")
+    elif tt.fehler or tt.text is None:
+        grund = (tt.fehler or "").splitlines()[0] if tt.fehler else "kein Inhalt"
+        luecken.append(f"Belegungstafel `{tt.quelle or TAFEL}` nicht lesbar ({grund})")
     else:
-        luecken.append(f"Belegungstafel `{TAFEL}` nicht lesbar")
+        ids |= ids_aus_text(tt.text)
     for ref in refs:
         for ordner in ("changelog.d", "backlog.d"):
             rc, out = _git("ls-tree", "--name-only", ref, ordner + "/")
@@ -336,6 +364,8 @@ def main(argv=None) -> int:
     ap.add_argument("--kein-fetch", action="store_true",
                     help="nicht vorher `git fetch` — dann gilt der zuletzt geholte Stand")
     args = ap.parse_args(argv)
+    global _TAFEL_HOLEN
+    _TAFEL_HOLEN = not args.kein_fetch
 
     if not args.kein_fetch:
         rc, _ = _git("fetch", "--quiet", "--prune", "origin")

@@ -4519,10 +4519,16 @@ class AppState:
 
     # ── Zentraler Per-Frame-Renderer ──────────────────────────────────────────
 
-    def apply_input_merge(self, out_univ: int, data, mode: str = "HTP"):
+    def apply_input_merge(self, out_univ: int, data, mode: str = "HTP",
+                          skip=None):
         """F-20: Empfangene DMX-Werte (Art-Net/sACN) in die Eingangs-Schicht legen.
         Thread-safe; wird vom RX-Thread aufgerufen, ``_render_frame`` mischt sie pro
-        Frame deterministisch. ``data`` = bytes/bytearray (Kanal 1 == Index 0)."""
+        Frame deterministisch. ``data`` = bytes/bytearray (Kanal 1 == Index 0).
+
+        NET-15: ``skip`` = Kanaele (1..512), die der DMX-Fernsteuerung gehoeren —
+        sie landen NICHT in der Schicht (und ein frueher dort liegender Wert
+        faellt heraus), damit ein GO-/Fader-Kanal nicht zugleich ein Geraet
+        steuert."""
         if mode not in ("HTP", "LTP", "REPLACE"):
             mode = "HTP"
         out_univ = int(out_univ)
@@ -4532,8 +4538,15 @@ class AppState:
                 layer = {}
                 self.input_layer[out_univ] = layer
             self.input_merge_modes[out_univ] = mode
-            for i in range(min(len(data), 512)):
-                layer[i + 1] = data[i] & 0xFF
+            if skip:
+                for i in range(min(len(data), 512)):
+                    if i + 1 in skip:
+                        layer.pop(i + 1, None)
+                    else:
+                        layer[i + 1] = data[i] & 0xFF
+            else:
+                for i in range(min(len(data), 512)):
+                    layer[i + 1] = data[i] & 0xFF
             # NET-05: Empfang stempeln (defensiv, falls Stub das Feld nicht init).
             ls = getattr(self, "input_last_seen", None)
             if ls is None:

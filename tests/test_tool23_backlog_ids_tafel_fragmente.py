@@ -16,8 +16,8 @@ Zwei Befunde aus dem Codex-Review #876 (TOOL-11, Punkt 4):
    Nummer, die nur auf der Tafel oder in einem Fragment steht, zaehlte nicht —
    und wurde als frei angeboten.
 
-2. **Unlesbare Tafel ohne Warnung.** Liess sich
-   ``origin/sessions:SESSIONS.md`` nicht lesen, rechnete das Werkzeug ohne sie
+2. **Unlesbare Tafel ohne Warnung.** Liess sich die Tafel ``SESSIONS.md``
+   (damals ``origin/sessions``, seit PROC-25 im privaten Tafel-Repo) nicht lesen, rechnete das Werkzeug ohne sie
    weiter und endete mit Exit 0.
 
 Gemessen wird an den reinen Funktionen und am Exit-Code von ``main()`` — der
@@ -129,23 +129,31 @@ class LesefehlerTest(unittest.TestCase):
         def git(*args):
             if args[:1] == ("show",) and args[1].endswith(":BACKLOG.md"):
                 return 0, self._TABELLE
-            if args[:1] == ("show",) and "SESSIONS.md" in args[1]:
-                return tafel_rc, ("| DOC-43 | C | - |" if tafel_rc == 0 else "")
             if args[:1] == ("ls-tree",):
                 gefragt.append(args)
                 return fragmente_rc, ("changelog.d/2026-10-02-DOC-22.md\n"
                                       if fragmente_rc == 0 else "")
             return 0, ""
 
-        orig = (B._git, B.offene_pr_zweige)
+        # PROC-25: die Tafel kommt ueber die gemeinsame Lesehilfe aus dem
+        # privaten Tafel-Repo; hier eine Attrappe (lesbar / Lesefehler).
+        def tafel():
+            if tafel_rc == 0:
+                return B.session_claim.TafelText("| DOC-43 | C | - |", None, None,
+                                                 B.TAFEL)
+            return B.session_claim.TafelText(None, f"git show Exit {tafel_rc}",
+                                             None, B.TAFEL)
+
+        orig = (B._git, B.offene_pr_zweige, B._tafel_text)
         B._git = git
         B.offene_pr_zweige = lambda: (list(zweige), None)
+        B._tafel_text = tafel
         puffer = io.StringIO()
         try:
             with redirect_stdout(puffer):
                 code = B.main(["--gruppe", "DOC", "--kein-fetch"])
         finally:
-            B._git, B.offene_pr_zweige = orig
+            B._git, B.offene_pr_zweige, B._tafel_text = orig
         return code, puffer.getvalue(), gefragt
 
     def test_alles_lesbar_gibt_die_nummer(self):
@@ -182,12 +190,13 @@ class LesefehlerTest(unittest.TestCase):
         self.assertEqual({a[3] for a in gefragt}, {"changelog.d/", "backlog.d/"})
 
     def test_weitere_belegte_ids_liefert_ids_und_luecken(self):
-        orig = B._git
+        orig = B._git, B._tafel_text
         B._git = lambda *a: (128, "") if a[0] == "show" else (0, "changelog.d/2026-10-02-FM-46b.md\n")
+        B._tafel_text = lambda: B.session_claim.TafelText(None, "fatal: x", None, B.TAFEL)
         try:
             ids, luecken = B.weitere_belegte_ids(["origin/main"])
         finally:
-            B._git = orig
+            B._git, B._tafel_text = orig
         self.assertEqual(ids, {"FM-46b"})
         self.assertEqual(len(luecken), 1)
         self.assertIn("SESSIONS.md", luecken[0])

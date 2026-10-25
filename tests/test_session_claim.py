@@ -71,7 +71,7 @@ class _TafelRepos(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="lightos_claim_")
-        self.bare = os.path.join(self.tmp, "origin.git")
+        self.bare = os.path.join(self.tmp, "lightos-intern.git")
         _git("init", "--quiet", "--bare", self.bare)
         self.a = self._klon("a")
         self.b = self._klon("b")
@@ -144,10 +144,10 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
     beim Merge an (COORDINATION.md, Fall 4)."""
 
     def test_zwei_claims_auf_dieselbe_datei_warnen(self):
-        self.assertEqual(self._main("--repo", self.a, "claim", "OUT-51",
+        self.assertEqual(self._main("--tafel", self.a, "claim", "OUT-51",
                                     "--session", "A", "--files",
                                     "src/core/app_state.py")[0], 0)
-        rc, out, err = self._main("--repo", self.b, "claim", "QA-50",
+        rc, out, err = self._main("--tafel", self.b, "claim", "QA-50",
                                   "--session", "B", "--files",
                                   "src\\core\\app_state.py")
         self.assertEqual(rc, 0, "ohne --strikt nur warnen")
@@ -159,9 +159,9 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
         self.assertEqual(items, {"OUT-51", "QA-50"})
 
     def test_strikt_belegt_nicht_und_endet_mit_2(self):
-        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+        self._main("--tafel", self.a, "claim", "OUT-51", "--session", "A",
                    "--files", "src/core/")
-        rc, out, err = self._main("--repo", self.b, "claim", "QA-50",
+        rc, out, err = self._main("--tafel", self.b, "claim", "QA-50",
                                   "--session", "B", "--strikt", "--files",
                                   "src/core/dmx/output_manager.py")
         self.assertEqual(rc, 2)
@@ -170,12 +170,12 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
         self.assertEqual(items, {"OUT-51"}, "--strikt darf nicht schreiben")
 
     def test_verfallener_fremder_claim_zaehlt_nicht(self):
-        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+        self._main("--tafel", self.a, "claim", "OUT-51", "--session", "A",
                    "--files", "src/x.py")
         tafel, eltern = sc.lade_tafel(self.a)
         tafel["claims"][0]["seit"] = sc.stempel(sc.jetzt() - timedelta(hours=9))
         sc.schreibe_tafel(self.a, tafel, eltern, "altern")
-        rc, out, err = self._main("--repo", self.b, "claim", "QA-50",
+        rc, out, err = self._main("--tafel", self.b, "claim", "QA-50",
                                   "--session", "B", "--strikt",
                                   "--files", "src/x.py")
         self.assertEqual(rc, 0)
@@ -185,9 +185,9 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
         """★ Die leitende Sitzung laesst mehrere Worktree-Agenten parallel
         unter DERSELBEN Kennung arbeiten. Bis 2026-10-01 wurden eigene Claims
         komplett uebersprungen — der haeufigste reale Konflikt blieb stumm."""
-        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+        self._main("--tafel", self.a, "claim", "OUT-51", "--session", "A",
                    "--files", "src/x.py")
-        rc, out, err = self._main("--repo", self.a, "claim", "QA-50",
+        rc, out, err = self._main("--tafel", self.a, "claim", "QA-50",
                                   "--session", "A", "--files", "src/x.py")
         self.assertEqual(rc, 0, "ohne --strikt nur Hinweis")
         self.assertIn("eigenes Item OUT-51", err)
@@ -197,9 +197,9 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
         self.assertEqual(items, {"OUT-51", "QA-50"})
 
     def test_eigenes_anderes_item_zaehlt_bei_strikt(self):
-        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+        self._main("--tafel", self.a, "claim", "OUT-51", "--session", "A",
                    "--files", "src/x.py")
-        rc, out, err = self._main("--repo", self.a, "claim", "QA-50",
+        rc, out, err = self._main("--tafel", self.a, "claim", "QA-50",
                                   "--session", "A", "--strikt",
                                   "--files", "src/x.py")
         self.assertEqual(rc, 2)
@@ -208,9 +208,9 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
         self.assertEqual(items, {"OUT-51"}, "--strikt darf nicht schreiben")
 
     def test_erneuter_claim_desselben_items_meldet_nichts(self):
-        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+        self._main("--tafel", self.a, "claim", "OUT-51", "--session", "A",
                    "--files", "src/x.py")
-        rc, out, err = self._main("--repo", self.a, "claim", "OUT-51",
+        rc, out, err = self._main("--tafel", self.a, "claim", "OUT-51",
                                   "--session", "A", "--strikt",
                                   "--files", "src/x.py")
         self.assertEqual(rc, 0)
@@ -219,15 +219,15 @@ class UeberschneidungBeimClaimTest(_TafelRepos):
     def test_ohne_files_wird_gewarnt_aber_belegt(self):
         for files in ([], ["--files", "-"]):
             item = f"QA-{len(files)}"
-            rc, out, err = self._main("--repo", self.a, "claim", item,
+            rc, out, err = self._main("--tafel", self.a, "claim", item,
                                       "--session", "A", *files)
             self.assertEqual(rc, 0, files)
             self.assertIn("ohne --files", err, files)
 
     def test_refresh_warnt_nicht_wegen_fehlender_files(self):
-        self._main("--repo", self.a, "claim", "OUT-51", "--session", "A",
+        self._main("--tafel", self.a, "claim", "OUT-51", "--session", "A",
                    "--files", "src/x.py")
-        rc, out, err = self._main("--repo", self.a, "refresh", "OUT-51",
+        rc, out, err = self._main("--tafel", self.a, "refresh", "OUT-51",
                                   "--session", "A")
         self.assertEqual(rc, 0)
         self.assertEqual(err, "")
@@ -309,7 +309,7 @@ class BlockerAusStdinTest(_TafelRepos):
 
     def test_stdin_mit_crlf_und_backticks(self):
         roh = "AN B: bitte `rm -rf` NICHT ausfuehren\r\nzweite Zeile — Ü\r\n".encode()
-        rc, out, err = self._mit_stdin(roh, "--repo", self.a, "blocker",
+        rc, out, err = self._mit_stdin(roh, "--tafel", self.a, "blocker",
                                        "--session", "A", "--datei", "-")
         self.assertEqual(rc, 0, err)
         tafel, _ = sc.lade_tafel(self.b)
@@ -322,21 +322,25 @@ class BlockerAusStdinTest(_TafelRepos):
         pfad = os.path.join(self.tmp, "brief.txt")
         with open(pfad, "wb") as f:
             f.write(b"AN B: aus der Datei\r\n")
-        rc, out, err = self._main("--repo", self.a, "blocker", "--session",
+        rc, out, err = self._main("--tafel", self.a, "blocker", "--session",
                                   "A", "--datei", pfad)
         self.assertEqual(rc, 0, err)
         self.assertIn("aus der Datei", sc.lade_tafel(self.a)[0]["blocker"][0])
 
     def test_text_und_datei_zugleich_ist_ein_fehler(self):
-        rc, out, err = self._main("--repo", self.a, "blocker", "x",
+        rc, out, err = self._main("--tafel", self.a, "blocker", "x",
                                   "--session", "A", "--datei", "-")
         self.assertEqual(rc, 2)
         self.assertEqual(sc.lade_tafel(self.a)[0]["blocker"], [])
 
     def test_privates_aus_stdin_wird_ebenso_abgelehnt(self):
+        # PROC-25: abgelehnt wird Privates nur noch, wenn die Tafel im
+        # OEFFENTLICHEN Repo liegt (Uebergangsweg LIGHTOS_TAFEL=alt).
+        from unittest import mock
         roh = ("liegt unter " + "/home/" + "martin" + "/x").encode()
-        rc, out, err = self._mit_stdin(roh, "--repo", self.a, "blocker",
-                                       "--session", "A", "--datei", "-")
+        with mock.patch.dict(os.environ, {"LIGHTOS_TAFEL": "alt"}):
+            rc, out, err = self._mit_stdin(roh, "--repo", self.a, "blocker",
+                                           "--session", "A", "--datei", "-")
         self.assertEqual(rc, 2)
 
     def test_verlorene_umlaute_aus_stdin_werden_angemahnt(self):
@@ -344,7 +348,7 @@ class BlockerAusStdinTest(_TafelRepos):
         (US-ASCII): aus „für“ wird still „f?r“ — gueltiges UTF-8, die
         Dekodierung merkt nichts. Nur das Muster verraet es."""
         rc, out, err = self._mit_stdin(b"AN B: f?r die Gr??e bitte warten",
-                                       "--repo", self.a, "blocker",
+                                       "--tafel", self.a, "blocker",
                                        "--session", "A", "--datei", "-")
         self.assertEqual(rc, 0, "nur Hinweis, geschrieben wird trotzdem")
         self.assertIn("verlorene Umlaute", err)
@@ -354,27 +358,27 @@ class BlockerAusStdinTest(_TafelRepos):
 
     def test_gewolltes_fragezeichen_bleibt_still(self):
         rc, out, err = self._mit_stdin("AN B: fertig? Ja — für 1?2 nicht"
-                                       .encode(), "--repo", self.a, "blocker",
+                                       .encode(), "--tafel", self.a, "blocker",
                                        "--session", "A", "--datei", "-")
         self.assertEqual(rc, 0, err)
         self.assertNotIn("Umlaute", err)
 
     def test_langer_text_wird_angemahnt_aber_geschrieben(self):
-        rc, out, err = self._main("--repo", self.a, "blocker", "x" * 300,
+        rc, out, err = self._main("--tafel", self.a, "blocker", "x" * 300,
                                   "--session", "A")
         self.assertEqual(rc, 0)
         self.assertIn("300 Zeichen", err)
         self.assertEqual(len(sc.lade_tafel(self.a)[0]["blocker"]), 1)
-        rc, out, err = self._main("--repo", self.a, "blocker", "kurz",
+        rc, out, err = self._main("--tafel", self.a, "blocker", "kurz",
                                   "--session", "A")
         self.assertNotIn("Zeichen", err)
 
     def test_list_fuer_ueber_die_echte_tafel(self):
-        self._main("--repo", self.a, "blocker", "AN B: Frage eins", "--session", "A")
-        self._main("--repo", self.b, "blocker", "gelesen", "--session", "B")
-        self._main("--repo", self.a, "blocker", "AN A UND B: Frage zwei",
+        self._main("--tafel", self.a, "blocker", "AN B: Frage eins", "--session", "A")
+        self._main("--tafel", self.b, "blocker", "gelesen", "--session", "B")
+        self._main("--tafel", self.a, "blocker", "AN A UND B: Frage zwei",
                    "--session", "C")
-        rc, out, err = self._main("--repo", self.b, "list", "--fuer", "B")
+        rc, out, err = self._main("--tafel", self.b, "list", "--fuer", "B")
         self.assertEqual(rc, 0)
         self.assertIn("Frage zwei", out)
         self.assertNotIn("Frage eins", out)
@@ -508,7 +512,7 @@ class EchtesRennenTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="lightos_claim_")
-        self.bare = os.path.join(self.tmp, "origin.git")
+        self.bare = os.path.join(self.tmp, "lightos-intern.git")
         _git("init", "--quiet", "--bare", self.bare)
         self.a = self._klon("a")
         self.b = self._klon("b")
@@ -525,7 +529,7 @@ class EchtesRennenTest(unittest.TestCase):
         return pfad
 
     def _claim(self, repo, item, sitzung):
-        return sc.main(["--repo", repo, "claim", item, "--session", sitzung,
+        return sc.main(["--tafel", repo, "claim", item, "--session", sitzung,
                         "--branch", f"fix/{item.lower()}"])
 
     def test_genau_einer_gewinnt(self):
@@ -568,19 +572,19 @@ class EchtesRennenTest(unittest.TestCase):
 
     def test_freigeben_macht_das_item_wieder_belegbar(self):
         self._claim(self.a, "OUT-51", "A")
-        self.assertEqual(sc.main(["--repo", self.a, "release", "OUT-51",
+        self.assertEqual(sc.main(["--tafel", self.a, "release", "OUT-51",
                                   "--session", "A", "--status", "done"]), 0)
         self.assertEqual(self._claim(self.b, "OUT-51", "B"), 0)
 
     def test_fremdes_item_nicht_versehentlich_freigeben(self):
         self._claim(self.a, "OUT-51", "A")
-        self.assertEqual(sc.main(["--repo", self.b, "release", "OUT-51",
+        self.assertEqual(sc.main(["--tafel", self.b, "release", "OUT-51",
                                   "--session", "B"]), 1,
                          "B darf A's Item nicht ohne --force freigeben")
 
     def test_eigener_claim_laesst_sich_auffrischen(self):
         self._claim(self.a, "OUT-51", "A")
-        self.assertEqual(sc.main(["--repo", self.a, "refresh", "OUT-51",
+        self.assertEqual(sc.main(["--tafel", self.a, "refresh", "OUT-51",
                                   "--session", "A"]), 0)
         tafel, _ = sc.lade_tafel(self.a)
         self.assertEqual(len(tafel["claims"]), 1)
@@ -599,7 +603,7 @@ class EchtesRennenTest(unittest.TestCase):
         dieses Werkzeug nicht haben darf, denn es existiert genau dafuer.
         """
         self._claim(self.a, "OUT-51", "A")
-        rc = sc.main(["--repo", self.a, "claim", "OUT-51", "--session", "A",
+        rc = sc.main(["--tafel", self.a, "claim", "OUT-51", "--session", "A",
                       "--branch", "feature/zweiter-zweig",
                       "--files", "src/x.py", "src/y.py"])
         self.assertEqual(rc, 0)
@@ -615,7 +619,7 @@ class EchtesRennenTest(unittest.TestCase):
         neuen Endzustand — sonst merkt niemand, dass sich der Zuschnitt
         verschoben hat."""
         self._claim(self.a, "OUT-51", "A")
-        sc.main(["--repo", self.a, "claim", "OUT-51", "--session", "A",
+        sc.main(["--tafel", self.a, "claim", "OUT-51", "--session", "A",
                  "--branch", "feature/zweiter-zweig", "--files", "src/x.py"])
         tafel, _ = sc.lade_tafel(self.a)
         verlauf = " ".join(tafel["verlauf"])
@@ -627,9 +631,9 @@ class EchtesRennenTest(unittest.TestCase):
         ``args.files is not None``: ``refresh`` reicht bewusst ``None`` durch
         und darf den Zuschnitt NICHT loeschen. Ohne diese Abgrenzung haette
         der Fix aus einem stillen Verschweigen ein stilles Vergessen gemacht."""
-        sc.main(["--repo", self.a, "claim", "OUT-51", "--session", "A",
+        sc.main(["--tafel", self.a, "claim", "OUT-51", "--session", "A",
                  "--branch", "fix/eins", "--files", "src/x.py"])
-        sc.main(["--repo", self.a, "refresh", "OUT-51", "--session", "A"])
+        sc.main(["--tafel", self.a, "refresh", "OUT-51", "--session", "A"])
         eintrag = sc.lade_tafel(self.a)[0]["claims"][0]
         self.assertEqual(eintrag["branch"], "fix/eins")
         self.assertIn("src/x.py", eintrag["dateien"])
@@ -648,14 +652,18 @@ class EchtesRennenTest(unittest.TestCase):
                         "eine Uebernahme muss nachvollziehbar bleiben")
 
     def test_blocker_mit_privatem_pfad_wird_abgelehnt(self):
-        self.assertEqual(sc.main(["--repo", self.a, "blocker",
-                                  f"kaputt: {_BEISPIEL_HOME}/shows/x.lshow",
-                                  "--session", "A"]), 2)
-        tafel, _ = sc.lade_tafel(self.a)
+        # PROC-25: nur auf der alten, OEFFENTLICHEN Tafel (LIGHTOS_TAFEL=alt).
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"LIGHTOS_TAFEL": "alt"}), \
+                mock.patch("sys.stderr"):
+            self.assertEqual(sc.main(["--repo", self.a, "blocker",
+                                      f"kaputt: {_BEISPIEL_HOME}/shows/x.lshow",
+                                      "--session", "A"]), 2)
+        tafel, _ = sc.lade_tafel(sc.TafelOrt(self.a, sc.BRANCH_ALT, True))
         self.assertEqual(tafel["blocker"], [])
 
     def test_blocker_landet_fuer_die_andere_sitzung_sichtbar(self):
-        self.assertEqual(sc.main(["--repo", self.a, "blocker",
+        self.assertEqual(sc.main(["--tafel", self.a, "blocker",
                                   "Rig laeuft — App nicht neu starten",
                                   "--session", "A"]), 0)
         tafel, _ = sc.lade_tafel(self.b)

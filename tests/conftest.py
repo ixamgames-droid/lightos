@@ -364,6 +364,13 @@ os.environ.setdefault(
 os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
     _TEST_ROOT, f"lightos_test_universes_{_TEST_TOKEN}.json")
 
+# NET-15: dieselbe harte Trennung fuer die Zuordnung der DMX-Fernsteuerung
+# (`paths.dmx_fernsteuerung_path`). Ohne sie schriebe jedes „Uebernehmen" im
+# Ausgabe-Dialog-Test in den echten Datenordner. Reste alter Laeufe raeumt das
+# Muster `lightos_test_fernsteuerung_*.json` weiter unten ab.
+os.environ["LIGHTOS_DMX_FERNSTEUERUNG"] = os.path.join(
+    _TEST_ROOT, f"lightos_test_fernsteuerung_{_TEST_TOKEN}.json")
+
 
 def _purge_test_dbs():
     """Die PROZESS-EIGENE Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
@@ -671,6 +678,7 @@ def _purge_old_test_crash_logs():
         muster = ("lightos_test_crash_*.log", "lightos_test_appdata_*",
                   "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
                   "lightos_test_universes_*.json",
+                  "lightos_test_fernsteuerung_*.json",
                   "lightos_test_fixtures_*.db*")
         for m in muster:
             for path in glob.glob(os.path.join(_TEST_ROOT, m)):

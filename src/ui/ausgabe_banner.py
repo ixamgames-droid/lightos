@@ -12,7 +12,9 @@ Dieses Modul rechnet nichts neu. Es nimmt dieselbe Quelle
 (``OutputManager.ausgabe_status()``, in der ``sende_probleme()`` und der echte
 Portstatus schon zusammengefuehrt sind) und macht daraus ein Banner oben im
 Hauptfenster. Seit VCB-47 UEBERLAGERT es den oberen Rand des Inhaltsbereichs,
-statt den Inhalt nach unten zu schieben (siehe :class:`AusgabeBanner`):
+statt den Inhalt nach unten zu schieben — seit UI-103 aber nie die Unterreiter
+einer Sektion und nie die Bedienleiste der Virtual Console (siehe
+:class:`AusgabeBanner`):
 
 * ``ART_STOERUNG`` — „Ausgabe gestört: <Weg> — <Grund>". Kommt sofort, geht von
   selbst, sobald die Ausgabe :data:`HALTE_S` lang wieder laeuft.
@@ -38,6 +40,7 @@ die Statusleiste nennt sie weiter) und Universen ohne Ausgang neben sendenden
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 
@@ -192,7 +195,7 @@ class BannerDrossel:
 # ── Qt ───────────────────────────────────────────────────────────────────────
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt, Signal    # noqa: E402
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter  # noqa: E402
-from PySide6.QtWidgets import QLabel                            # noqa: E402
+from PySide6.QtWidgets import QLabel, QTabWidget                # noqa: E402
 
 # Je Darstellung: (Stylesheet-Rumpf ohne padding, Polster oben/unten, Polster
 # links, Schriftgroesse des Einklapp-Knopfs in px, Farbe des Knopfs).
@@ -221,12 +224,62 @@ _STIL_CHIP = {
 
 _ANKER_EREIGNISSE = (QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show)
 _PLATZ_EREIGNISSE = _ANKER_EREIGNISSE + (QEvent.Type.Hide,)
+_REITER_EREIGNISSE = _PLATZ_EREIGNISSE + (QEvent.Type.LayoutRequest,)
 # Bewusst OHNE Leertaste: sie ist im Hauptfenster das Kuerzel fuer „GO“ und
 # muss das auch bleiben, wenn Banner oder Chip gerade den Fokus haben.
 _KLAPP_TASTEN = (Qt.Key.Key_Return, Qt.Key.Key_Enter)
 
 #: Abstand des Chips zum Rand seines Platzes (px).
 CHIP_RAND = 4
+
+#: UI-103: Abstand des Banners zum letzten Unterreiter (px).
+REITER_LUECKE = 12
+
+
+def _unterreiter(anker, eltern):
+    """UI-103: die Unterreiter-Zeile der gezeigten Ansicht — oder ``None``.
+
+    Fast jede Sektion des Hauptfensters ist ein ``QTabWidget`` mit Reitern
+    oben (Attribute/Snapshots/…, Output/DMX Monitor/MIDI/Musik, …). Diese
+    Reiter sind Navigation: Banner und Chip duerfen sie nie verdecken.
+
+    Rueckgabe ``(zeile, belegt_bis, frei_bis)`` in Koordinaten von ``eltern``:
+    ``zeile`` ist die ganze Reiterzeile ueber die Breite des Inhaltsbereichs,
+    ``belegt_bis`` die x-Koordinate hinter dem letzten Reiter (laufen die
+    Reiter ueber, mit Pfeilknoepfen: das Ende der Leiste), ``frei_bis`` das
+    Ende des freien Felds rechts davon (vor einem etwaigen Eck-Widget).
+    """
+    try:
+        ansicht = getattr(anker, "currentWidget", lambda: None)()
+        if (not isinstance(ansicht, QTabWidget) or eltern is None
+                or ansicht.tabPosition() != QTabWidget.TabPosition.North):
+            return None
+        leiste = ansicht.tabBar()
+        if (leiste is None or not leiste.isVisibleTo(eltern)
+                or leiste.height() <= 0 or leiste.count() <= 0):
+            return None
+        bereich_links = anker.mapTo(eltern, QPoint(0, 0)).x()
+        lo = leiste.mapTo(eltern, QPoint(0, 0))
+        zeile = QRect(bereich_links, lo.y(), anker.width(), leiste.height())
+        # Passen die Reiter nicht, ist die Leiste so breit wie moeglich und
+        # traegt Pfeilknoepfe — dann gilt sie ganz als belegt.
+        belegt_bis = lo.x() + min(leiste.sizeHint().width(), leiste.width())
+        frei_bis = zeile.left() + zeile.width()
+        ecke = ansicht.cornerWidget(Qt.Corner.TopRightCorner)
+        if ecke is not None and ecke.isVisibleTo(eltern):
+            frei_bis = min(frei_bis, ecke.mapTo(eltern, QPoint(0, 0)).x())
+        return zeile, belegt_bis, frei_bis
+    except Exception:
+        return None
+
+
+def _trenne_wechsel(anker, slot) -> None:
+    wechsel = getattr(anker, "currentChanged", None)
+    if wechsel is not None:
+        try:
+            wechsel.disconnect(slot)
+        except (RuntimeError, TypeError):
+            pass
 
 
 def _hat_fokus(w) -> bool:
@@ -247,7 +300,75 @@ def _verstecke(w) -> None:
     w.hide()
 
 
-class AusgabeBanner(QLabel):
+def _hinweis_platz(anker, eltern):
+    """Das Widget, das die gezeigte Ansicht fuer Banner und Chip freigibt —
+    oder ``None``.
+
+    Eine Ansicht ohne Unterreiter (Virtual Console) nennt mit
+    ``ausgabe_chip_platz()`` eine Flaeche ohne Bedienfunktion (VC: die Zeile
+    „Aktiver Effekt“ zwischen Werkzeugleiste und Konsole). Seit UI-103 legen
+    sich dort Chip UND Banner hin — oben am Stapel lagen sonst die
+    Bank-Blaetterknoepfe und die Beschriftungen der VC-Werkzeugleiste."""
+    ansicht = getattr(anker, "currentWidget", lambda: None)()
+    frage = getattr(ansicht, "ausgabe_chip_platz", None)
+    if not callable(frage):
+        return None
+    try:
+        platz = frage()
+        if (platz is not None and eltern is not None
+                and eltern.isAncestorOf(platz)
+                and platz.isVisibleTo(eltern)
+                and platz.width() > 0 and platz.height() > 0):
+            return platz
+    except Exception:
+        pass
+    return None
+
+
+class _FolgtAnsicht:
+    """UI-103: der Unterreiter-Leiste und dem freigegebenen Platz der
+    gezeigten Ansicht folgen.
+
+    Kommen Reiter hinzu oder waechst die Schrift, aendert sich die Breite der
+    Reiter, ohne dass der Inhaltsbereich (``anker``) ein Ereignis bekommt.
+    Beobachtet werden deshalb auch die Ansicht (``LayoutRequest``, wenn die
+    Leiste neu vermessen werden muss), die Leiste selbst und der Platz aus
+    :func:`_hinweis_platz`."""
+
+    def _merke_platz(self, platz) -> None:
+        if platz is self._platz:
+            return
+        if self._platz is not None:
+            try:
+                self._platz.removeEventFilter(self)
+            except RuntimeError:            # Ansicht schon abgebaut
+                pass
+        self._platz = platz
+        if platz is not None:
+            platz.installEventFilter(self)
+
+    def _ist_platz_ereignis(self, obj, ev) -> bool:
+        return obj is self._platz and ev.type() in _PLATZ_EREIGNISSE
+
+    def _merke_reiter(self, ansicht) -> None:
+        neu = (ansicht, ansicht.tabBar()) if ansicht is not None else ()
+        if neu == self._reiter:
+            return
+        for obj in self._reiter:
+            try:
+                obj.removeEventFilter(self)
+            except RuntimeError:            # Ansicht schon abgebaut
+                pass
+        self._reiter = neu
+        for obj in neu:
+            obj.installEventFilter(self)
+
+    def _ist_reiter_ereignis(self, obj, ev) -> bool:
+        return (bool(self._reiter) and any(obj is o for o in self._reiter)
+                and ev.type() in _REITER_EREIGNISSE)
+
+
+class AusgabeBanner(_FolgtAnsicht, QLabel):
     """Nicht-modale Zeile oben im Hauptfenster. Kennt nur Darstellung.
 
     **VCB-47: ueberlagert, verschiebt nicht.** Das Banner lag frueher im
@@ -257,6 +378,18 @@ class AusgabeBanner(QLabel):
     oberen Rand des Inhaltsbereichs (``anker``), in voller Breite, und folgt
     dessen Lage und Groesse per Ereignisfilter. Es bleibt immer EINE Zeile hoch:
     ein zu langer Text wird mit „…“ gekuerzt, der volle Text steht im Tooltip.
+
+    **UI-103: nie ueber den Unterreitern.** Der obere Rand des Inhaltsbereichs
+    ist in fast jeder Sektion die Unterreiter-Zeile (Attribute/Snapshots/…,
+    Output/DMX Monitor/MIDI/Musik, Playback/Show Manager/Kurven) — das Banner
+    lag halb ueber den Beschriftungen. Hat die gezeigte Ansicht Unterreiter,
+    steht es rechts neben dem letzten Reiter in derselben Zeile (passt der
+    Text nicht ganz, gekuerzt; nur wenn nicht einmal „Probenmodus…“ passt,
+    direkt unter der Reiterzeile). Ansichten ohne Reiter, die mit
+    ``ausgabe_chip_platz()`` eine freie Zeile nennen (Virtual Console, auch
+    im Kiosk), bekommen es rechtsbuendig in diese Zeile — nicht mehr ueber
+    Bank-Blaetterknoepfe und Werkzeugleiste. Siehe :meth:`ziel_rechteck`.
+    Es ueberlagert weiter, verschiebt also nichts.
 
     Mausklicks enden am Banner (Qt reicht sie nie an verdeckte Geschwister
     weiter; die Ereignisse werden zusaetzlich angenommen, damit auch das
@@ -285,6 +418,9 @@ class AusgabeBanner(QLabel):
         self._voll = ""             # ungekuerzter Text (siehe text())
         self._tip = ""
         self._anker = None
+        self._reiter = ()
+        self._platz = None
+        self._polster = None        # (stil, rahmen, oben) wie zuletzt gesetzt
         self._kuerzt = False
         self._knopf_font = QFont(self.font())
         self._knopf_breite = 0
@@ -307,6 +443,7 @@ class AusgabeBanner(QLabel):
             super().setText("")
             self.setToolTip("")
             _verstecke(self)
+            self._merke_platz(None)
             return
         self._voll = z.text
         self._tip = z.tooltip
@@ -316,7 +453,7 @@ class AusgabeBanner(QLabel):
         self.lege_an()
 
     def _stil(self, stil, rahmen: bool) -> None:
-        rumpf, oben, links, knopf_px, farbe = stil
+        _rumpf, oben, _links, knopf_px, farbe = stil
         font = QFont(self.font())
         font.setBold(False)
         font.setPixelSize(knopf_px)
@@ -325,10 +462,38 @@ class AusgabeBanner(QLabel):
         self._knopf_rahmen = rahmen
         self._knopf_breite = (
             QFontMetrics(font).horizontalAdvance(TEXT_EINKLAPPEN) + 14)
+        if self._polster is None or self._polster[:2] != (stil, rahmen):
+            self._setze_polster(stil, rahmen, oben)
+        # sonst bleibt ein (fuer eine niedrige Zeile) verkleinertes Polster
+        # stehen; lege_an() rechnet es ohnehin neu — kein Neu-Stylen im Takt.
+
+    def _setze_polster(self, stil, rahmen: bool, oben: int) -> None:
+        if self._polster == (stil, rahmen, oben):
+            return
+        self._polster = (stil, rahmen, oben)
+        rumpf, _oben, links = stil[0], stil[1], stil[2]
         rechts = self._knopf_breite + links + 6
         self.setStyleSheet(
             f"QLabel#ausgabeBanner {{ {rumpf} padding:{oben}px {rechts}px"
             f" {oben}px {links}px; }}")
+
+    def _hoehe_hoechstens(self, max_h: int) -> int:
+        """UI-103: die Bannerhoehe fuer eine Zeile von ``max_h`` px.
+
+        Ist die Zeile (Reiterzeile, VC-Zeile „Aktiver Effekt“) niedriger als
+        das Banner, wird nur das Polster oben/unten kleiner — Schrift, Farben
+        und Rahmen bleiben. Sonst gilt das volle Polster der Darstellung."""
+        if self._polster is None:
+            return min(self.sizeHint().height(), max(max_h, 0))
+        stil, rahmen, jetzt = self._polster
+        voll = stil[1]
+        self.ensurePolished()
+        hoehe_voll = self.sizeHint().height() + 2 * (voll - jetzt)
+        oben = voll
+        if hoehe_voll > max_h:
+            oben = max(voll - (hoehe_voll - max_h + 1) // 2, 0)
+        self._setze_polster(stil, rahmen, oben)
+        return self.sizeHint().height()
 
     def knopf_rechteck(self) -> QRect:
         """Das Feld „▴ einklappen“ (Trefferflaeche: volle Hoehe, bis zum
@@ -392,22 +557,97 @@ class AusgabeBanner(QLabel):
         Hauptfenster: der Ansichtsstapel unter Kopf- und Sektionsleiste)."""
         if self._anker is not None:
             self._anker.removeEventFilter(self)
+            _trenne_wechsel(self._anker, self._ansicht_gewechselt)
         self._anker = anker
         anker.installEventFilter(self)
+        # UI-103: beim Sektionswechsel neu legen — die neue Ansicht hat
+        # vielleicht Unterreiter, die alte nicht (oder andersherum).
+        wechsel = getattr(anker, "currentChanged", None)
+        if wechsel is not None:
+            wechsel.connect(self._ansicht_gewechselt)
         self.lege_an()
+
+    def _ansicht_gewechselt(self, *_a) -> None:
+        self.lege_an()
+
+    def _volle_breite(self) -> int:
+        """So breit muss das Banner sein, damit der Text NICHT gekuerzt wird
+        (samt Polster und Einklapp-Knopf)."""
+        self.ensurePolished()
+        fm = self.fontMetrics()
+        gezeigt = super().text()
+        rand = max(super().sizeHint().width() - fm.horizontalAdvance(gezeigt), 0)
+        # +2: sizeHint() rundet die Textbreite anders als horizontalAdvance();
+        # ohne Zugabe fehlte dem ungekuerzten Text mitunter 1 px.
+        return fm.horizontalAdvance(" ".join(self._voll.splitlines())) + rand + 2
+
+    def _mindest_breite(self) -> int:
+        """UI-103: so schmal darf das Banner in der Reiterzeile werden — der
+        Anfang der Meldung bis zum ersten „:“/„—“ (also „Probenmodus…“ bzw.
+        „Ausgabe gestört…“) muss lesbar bleiben; der Rest wird gekuerzt und
+        steht im Tooltip."""
+        self.ensurePolished()
+        fm = self.fontMetrics()
+        gezeigt = super().text()
+        rand = max(super().sizeHint().width() - fm.horizontalAdvance(gezeigt), 0)
+        kopf = re.split(r"\s*[:—]", " ".join(self._voll.splitlines()), maxsplit=1)[0]
+        return fm.horizontalAdvance(kopf.strip() + "…") + rand
+
+    def ziel_rechteck(self) -> QRect:
+        """Wo das Banner liegen soll (Koordinaten des Elternwidgets).
+
+        UI-103: Hat die gezeigte Ansicht Unterreiter, liegt es NIE darueber —
+        rechts neben dem letzten Reiter in derselben Zeile (passt der volle
+        Text dort nicht, gekuerzt mit „…“, der volle Text steht im Tooltip).
+        Nur wenn dort nicht einmal „Probenmodus…“/„Ausgabe gestört…“ Platz
+        hat, liegt es direkt unter der Reiterzeile. Ohne Unterreiter nennt die
+        Ansicht ihren freien Platz (Virtual Console, auch im Kiosk: die Zeile
+        „Aktiver Effekt“, rechtsbuendig), sonst wie bisher am oberen Rand."""
+        anker, eltern = self._anker, self.parentWidget()
+        ecke = anker.mapTo(eltern, QPoint(0, 0))
+        bereich = QRect(ecke, anker.size())
+        reiter = _unterreiter(anker, eltern)
+        self._merke_reiter(anker.currentWidget() if reiter is not None else None)
+        platz = _hinweis_platz(anker, eltern) if reiter is None else None
+        self._merke_platz(platz)
+        if platz is not None:
+            feld = QRect(platz.mapTo(eltern, QPoint(0, 0)), platz.size())
+            if bereich.contains(feld):
+                hoehe = min(self._hoehe_hoechstens(feld.height()), feld.height())
+                breite = min(self._volle_breite(), feld.width())
+                oben = feld.top() + (feld.height() - hoehe) // 2
+                return QRect(feld.left() + feld.width() - breite, oben,
+                             breite, hoehe)
+        if reiter is None:
+            hoehe = min(self._hoehe_hoechstens(1 << 20), max(anker.height(), 0))
+            return QRect(bereich.left(), bereich.top(), bereich.width(), hoehe)
+        zeile, belegt_bis, frei_bis = reiter
+        links = belegt_bis + REITER_LUECKE
+        breite = frei_bis - links
+        hoehe = self._hoehe_hoechstens(zeile.height())
+        if breite >= self._mindest_breite() and zeile.height() >= hoehe:
+            oben = zeile.top() + (zeile.height() - hoehe) // 2
+            return QRect(links, oben, breite, hoehe)
+        hoehe = min(self._hoehe_hoechstens(1 << 20), max(anker.height(), 0))
+        oben = zeile.top() + zeile.height()
+        rest = bereich.top() + bereich.height() - oben
+        return QRect(bereich.left(), oben, bereich.width(),
+                     max(min(hoehe, rest), 0))
 
     def lege_an(self) -> None:
         anker, eltern = self._anker, self.parentWidget()
         if anker is None or eltern is None or self.isHidden():
             return
-        ecke = anker.mapTo(eltern, QPoint(0, 0))
-        hoehe = min(self.sizeHint().height(), max(anker.height(), 0))
-        self.setGeometry(ecke.x(), ecke.y(), anker.width(), hoehe)
+        ziel = self.ziel_rechteck()
+        if self.geometry() != ziel:
+            self.setGeometry(ziel)
         self._kuerze()
         self.raise_()
 
     def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
-        if obj is self._anker and ev.type() in _ANKER_EREIGNISSE:
+        if ((obj is self._anker and ev.type() in _ANKER_EREIGNISSE)
+                or self._ist_platz_ereignis(obj, ev)
+                or self._ist_reiter_ereignis(obj, ev)):
             self.lege_an()
         return False
 
@@ -446,7 +686,7 @@ class AusgabeBanner(QLabel):
         self.update()
 
 
-class AusgabeChip(QLabel):
+class AusgabeChip(_FolgtAnsicht, QLabel):
     """VCB-47 (Nachtrag 2): das eingeklappte Banner.
 
     Ein kleines Schild, das an der Stelle des Banners steht, solange der
@@ -476,6 +716,7 @@ class AusgabeChip(QLabel):
         self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self._anker = None
         self._platz = None
+        self._reiter = ()
         self.hide()
 
     def zeige(self, z: BannerZustand) -> None:
@@ -504,12 +745,7 @@ class AusgabeChip(QLabel):
     def ueberlagere(self, anker) -> None:
         if self._anker is not None:
             self._anker.removeEventFilter(self)
-            wechsel = getattr(self._anker, "currentChanged", None)
-            if wechsel is not None:
-                try:
-                    wechsel.disconnect(self._ansicht_gewechselt)
-                except (RuntimeError, TypeError):
-                    pass
+            _trenne_wechsel(self._anker, self._ansicht_gewechselt)
         self._anker = anker
         anker.installEventFilter(self)
         wechsel = getattr(anker, "currentChanged", None)
@@ -520,42 +756,14 @@ class AusgabeChip(QLabel):
     def _ansicht_gewechselt(self, *_a) -> None:
         self.lege_an()
 
-    def _suche_platz(self):
-        """Das Widget, in dem der Chip nichts verdeckt — oder ``None``."""
-        anker, eltern = self._anker, self.parentWidget()
-        ansicht = getattr(anker, "currentWidget", lambda: None)()
-        frage = getattr(ansicht, "ausgabe_chip_platz", None)
-        if not callable(frage):
-            return None
-        try:
-            platz = frage()
-            if (platz is not None and eltern is not None
-                    and eltern.isAncestorOf(platz)
-                    and platz.isVisibleTo(eltern)
-                    and platz.width() > 0 and platz.height() > 0):
-                return platz
-        except Exception:
-            pass
-        return None
-
-    def _merke_platz(self, platz) -> None:
-        if platz is self._platz:
-            return
-        if self._platz is not None:
-            try:
-                self._platz.removeEventFilter(self)
-            except RuntimeError:            # Ansicht schon abgebaut
-                pass
-        self._platz = platz
-        if platz is not None:
-            platz.installEventFilter(self)
-
     def lege_an(self) -> None:
         anker, eltern = self._anker, self.parentWidget()
         if anker is None or eltern is None or self.isHidden():
             return
-        platz = self._suche_platz()
+        platz = _hinweis_platz(anker, eltern)
         self._merke_platz(platz)
+        reiter = _unterreiter(anker, eltern)
+        self._merke_reiter(anker.currentWidget() if reiter is not None else None)
         wunsch = self.sizeHint()
         bereich = QRect(anker.mapTo(eltern, QPoint(0, 0)), anker.size())
         ziel = None
@@ -575,6 +783,17 @@ class AusgabeChip(QLabel):
             hoehe = min(wunsch.height(), max(bereich.height() - CHIP_RAND, 0))
             ziel = self._rechts_in(bereich, bereich.top() + CHIP_RAND, hoehe,
                                    wunsch.width())
+            # UI-103: in der Unterreiter-Zeile nur rechts neben den Reitern;
+            # reicht der Platz dort nicht, unter die Zeile.
+            if reiter is not None:
+                zeile, belegt_bis, frei_bis = reiter
+                if ziel.left() < belegt_bis + CHIP_RAND or ziel.right() >= frei_bis:
+                    unten = zeile.top() + zeile.height()
+                    rest = bereich.top() + bereich.height() - unten
+                    ziel = self._rechts_in(
+                        bereich, unten + CHIP_RAND,
+                        min(wunsch.height(), max(rest - CHIP_RAND, 0)),
+                        wunsch.width())
         if self.geometry() != ziel:
             self.setGeometry(ziel)
         self.raise_()
@@ -587,7 +806,8 @@ class AusgabeChip(QLabel):
 
     def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
         if ((obj is self._anker and ev.type() in _ANKER_EREIGNISSE)
-                or (obj is self._platz and ev.type() in _PLATZ_EREIGNISSE)):
+                or self._ist_platz_ereignis(obj, ev)
+                or self._ist_reiter_ereignis(obj, ev)):
             self.lege_an()
         return False
 

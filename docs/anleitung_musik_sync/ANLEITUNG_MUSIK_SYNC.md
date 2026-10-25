@@ -66,13 +66,8 @@ sind show-spezifisch), passiert automatisch:
 2. Die **Auto-Show startet** die zugewiesenen Funktionen — die Geräte laufen los, die
    Statuszeile der VC nennt den laufenden Effekt.
 3. Beim **Trackwechsel** läuft die Playlist selbsttätig weiter; die Auto-Show bleibt aktiv und
-   tauscht den Lied-Look aus.
-
-> **Bekannte Grenze (Stand Oktober 2026):** Ist nur ein Lied-Look zugewiesen (über
-> „Auto-Show für Lied…") und keine globale Auto-Show-Funktion, startet beim **ersten** Play
-> aus dem Stillstand noch nichts — der Lied-Look kommt erst beim nächsten Trackwechsel
-> (oder per Doppelklick auf ein Lied, während die Musik schon läuft). Gemeldet im Backlog
-> unter DOC-16 (Nebenbefund).
+   tauscht den Lied-Look aus. Der Lied-Look des **ersten** Titels startet schon beim ersten
+   Play — auch wenn keine globale Auto-Show-Funktion eingetragen ist.
 
 ## 4. Tempo / BPM folgt der Musik
 
