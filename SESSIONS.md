@@ -35,7 +35,7 @@
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-25T12:03Z | - |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-25T12:03Z | - |
-| ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-20T14:08Z | - |
+| ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-25T12:03Z | - |
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-20T14:26Z | - |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-20T14:26Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
