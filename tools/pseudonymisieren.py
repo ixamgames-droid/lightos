@@ -12,6 +12,8 @@ Werkzeug statt Handarbeit — und deshalb **zwei getrennte Schritte**:
 
     python tools/pseudonymisieren.py --pruefen      # nur zaehlen, nichts aendern
     python tools/pseudonymisieren.py --anwenden     # ersetzen
+    python tools/pseudonymisieren.py --anwenden --nur BACKLOG.md backlog.d
+                                                    # nur diese Pfade (PRIV-06)
 
 ★ **Der richtige Zeitpunkt ist wichtiger als das Werkzeug.** Die Ersetzung
 beruehrt fast jede Datei des Repos. Laeuft dabei eine zweite Sitzung mit
@@ -63,12 +65,50 @@ def _dateien(repo: str) -> list[str]:
             if p and p.endswith(ENDUNGEN)]
 
 
+def _norm(pfad: str) -> str:
+    return pfad.replace("\\", "/").strip("/")
+
+
+def _im_bereich(rel: str, nur: list[str] | None) -> bool:
+    """PRIV-06: ``--nur`` schraenkt auf Dateien bzw. Ordner ein (Praefix je
+    Pfadsegment — ``backlog.d`` trifft ``backlog.d/X.md``, nicht
+    ``backlog.dx/``)."""
+    if not nur:
+        return True
+    return any(rel == n or rel.startswith(n + "/") for n in map(_norm, nur))
+
+
+def _ist_protokoll_ausgenommen(rel: str, protokolle: bool,
+                               nur: list[str] | None) -> bool:
+    """Protokolle bleiben draussen — es sei denn ``--protokolle``, oder die
+    Datei ist in ``--nur`` AUSDRUECKLICH genannt (ein Ordner reicht dafuer
+    nicht: wer eine Protokolldatei umschreibt, soll sie beim Namen nennen)."""
+    if protokolle or os.path.basename(rel) not in PROTOKOLLE:
+        return False
+    return not (nur and rel in map(_norm, nur))
+
+
+# PRIV-06: Wortgrenze OHNE den Unterstrich. ``\\b`` sieht ``_`` als
+# Wortzeichen — damit rutschte Markdown-Kursiv (``_Name-Auftrag …_``) durch.
+_VOR = r"(?<![^\W_])"
+_NACH = r"(?![^\W_])"
+
+
 def _muster(name: str) -> re.Pattern:
-    """Wortgenau, mit deutschem Genitiv-s.
+    """Wortgenau, mit deutschem Genitiv-s, ohne Ruecksicht auf Gross/klein.
 
     ``\\b`` allein reicht nicht: „Davids" soll mitgehen, „Davidson" nicht.
     """
-    return re.compile(rf"\b{re.escape(name)}(s)?\b")
+    return re.compile(rf"{_VOR}({re.escape(name)})(s)?{_NACH}", re.IGNORECASE)
+
+
+def _ersatz(gefunden: str, pseudo: str) -> str:
+    """Schreibweise mitnehmen: GROSS bleibt GROSS, klein bleibt klein."""
+    if gefunden.isupper() and len(gefunden) > 1:
+        return pseudo.upper()
+    if gefunden.islower():
+        return pseudo.lower()
+    return pseudo
 
 
 def _ist_bezeichner(zeile: str, name: str) -> bool:
@@ -81,14 +121,18 @@ def _ist_bezeichner(zeile: str, name: str) -> bool:
 
 
 def lauf(repo: str, klar: str, pseudo: str, anwenden: bool,
-         protokolle: bool) -> int:
+         protokolle: bool, nur: list[str] | None = None) -> int:
     muster = _muster(klar)
     gesamt = 0
     betroffen = 0
     bezeichner: list[str] = []
+    uebersprungen: list[str] = []
 
     for rel in _dateien(repo):
-        if not protokolle and os.path.basename(rel) in PROTOKOLLE:
+        if not _im_bereich(rel, nur):
+            continue
+        if _ist_protokoll_ausgenommen(rel, protokolle, nur):
+            uebersprungen.append(rel)
             continue
         pfad = os.path.join(repo, rel)
         try:
@@ -106,7 +150,9 @@ def lauf(repo: str, klar: str, pseudo: str, anwenden: bool,
                     neu.append(zeile)
                     continue
                 treffer += len(muster.findall(zeile))
-                neu.append(muster.sub(lambda m: pseudo + (m.group(1) or ""), zeile))
+                neu.append(muster.sub(
+                    lambda m: _ersatz(m.group(1), pseudo) + (m.group(2) or ""),
+                    zeile))
             else:
                 neu.append(zeile)
 
@@ -122,9 +168,9 @@ def lauf(repo: str, klar: str, pseudo: str, anwenden: bool,
     kopf = "ERSETZT" if anwenden else "GEFUNDEN (nichts geaendert)"
     print(f"\n{kopf}: {gesamt} Stellen in {betroffen} Dateien "
           f"({klar!r} -> {pseudo!r})")
-    if not protokolle:
-        print(f"  Protokolle uebersprungen: {', '.join(PROTOKOLLE)} "
-              f"(--protokolle nimmt sie mit)")
+    if uebersprungen:
+        print(f"  Protokolle uebersprungen: {', '.join(uebersprungen)} "
+              f"(--protokolle oder --nur <datei> nimmt sie mit)")
     if bezeichner:
         print(f"\n⚠️  {len(bezeichner)} Stellen sehen nach Bezeichnern/Datenwerten "
               f"aus und wurden NICHT angefasst — bitte einzeln ansehen:")
@@ -149,6 +195,9 @@ def main(argv=None) -> int:
     p.add_argument("--pruefen", action="store_true", help="nur zaehlen (Default)")
     p.add_argument("--protokolle", action="store_true",
                    help="CHANGELOG/BACKLOG_ARCHIVE mitnehmen")
+    p.add_argument("--nur", nargs="+", metavar="PFAD",
+                   help="nur diese Dateien/Ordner (relativ zum Repo); eine "
+                        "Protokolldatei zaehlt nur, wenn sie hier beim Namen steht")
     args = p.parse_args(argv)
 
     if not args.klarname:
@@ -160,7 +209,7 @@ def main(argv=None) -> int:
         print("Klarname und Pseudonym sind gleich.", file=sys.stderr)
         return 2
     return lauf(_repo(), args.klarname, args.pseudonym,
-                args.anwenden and not args.pruefen, args.protokolle)
+                args.anwenden and not args.pruefen, args.protokolle, args.nur)
 
 
 if __name__ == "__main__":
