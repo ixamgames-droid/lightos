@@ -18,6 +18,9 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 
+#: os.name des Rechners, auf dem die Tests laufen - vor jedem Monkeypatch.
+ECHTES_OS_NAME = __import__("os").name
+
 #: (Architektur des venv, Architektur des ausfuehrenden Python)
 MISCHFAELLE = [("x64", "arm64"), ("arm64", "x64")]
 
@@ -111,32 +114,45 @@ class _Lauf:
         self.stdout, self.returncode = ausgabe + "\n", 0
 
 
+def _venv_wie_unter_linux(installer, monkeypatch, tmp_path) -> Path:
+    """Legt ein venv-Python im Linux-Layout (``bin/python``) in tmp_path an.
+
+    os.name wird NICHT auf 'posix' umgestellt: pathlib benutzt dasselbe
+    os-Modul und baut danach unter Windows einen PosixPath, den Python dort
+    nicht anlegen kann (Gegenprobe Sitzung D). Umgekehrt macht das 'nt' der
+    Fixture unter Linux aus jedem neuen Path einen WindowsPath ('\\tmp\\...'),
+    den es nicht gibt - deshalb gilt hier wieder das echte os.name. Massgeblich
+    fuer venv_arch() ist nur der Plattformstring aus dem venv, und der kommt
+    aus dem Monkeypatch."""
+    monkeypatch.setattr(installer.os, "name", ECHTES_OS_NAME)
+    py = tmp_path / "venv" / "bin" / "python"
+    py.parent.mkdir(parents=True)
+    py.write_text("", encoding="utf-8")
+    monkeypatch.setattr(installer, "venv_python", lambda: str(py))
+    return py
+
+
 @pytest.mark.parametrize("plat,erwartet", [
     ("linux-x86_64", "x64"), ("linux-aarch64", "arm64"),
     ("macosx-14.0-arm64", "arm64"), ("macosx-10.9-x86_64", "x64"),
     ("win-amd64", "x64"), ("win-arm64", "arm64"), ("win32", "x86"),
 ])
-def test_venv_arch_normalisiert_jede_plattform(installer, monkeypatch, plat, erwartet):
+def test_venv_arch_normalisiert_jede_plattform(installer, monkeypatch, tmp_path,
+                                               plat, erwartet):
     # sysconfig.get_platform() im venv: unter Linux/macOS 'linux-x86_64' usw. -
     # vorher kam der ganze String zurueck und stand so im Manifest.
-    monkeypatch.setattr(installer.os, "name", "posix")
-    py = Path(installer.venv_python())
-    py.parent.mkdir(parents=True)
-    py.write_text("", encoding="utf-8")
+    _venv_wie_unter_linux(installer, monkeypatch, tmp_path)
     monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: _Lauf(plat))
     assert installer.venv_arch() == erwartet
 
 
 @pytest.mark.parametrize("plat", ["linux-x86_64", "linux-aarch64"])
 def test_linux_manifest_und_create_venv_ohne_falsche_abweichung(
-        installer, monkeypatch, capsys, plat):
-    monkeypatch.setattr(installer.os, "name", "posix")
+        installer, monkeypatch, capsys, tmp_path, plat):
     monkeypatch.setattr(installer, "detect_native_os_arch", lambda: "x64")
     arch = "x64" if plat.endswith("x86_64") else "arm64"
     monkeypatch.setattr(installer, "detect_arch", lambda: arch)
-    py = Path(installer.venv_python())
-    py.parent.mkdir(parents=True)
-    py.write_text("", encoding="utf-8")
+    _venv_wie_unter_linux(installer, monkeypatch, tmp_path)
     monkeypatch.setattr(installer.subprocess, "run", lambda *a, **k: _Lauf(plat))
     m = _manifest(installer)
     assert m["python_arch"] == m["arch"] == arch
