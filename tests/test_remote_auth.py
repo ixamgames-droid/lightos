@@ -67,9 +67,14 @@ class TestRemoteAuth(unittest.TestCase):
         r2 = self.client.get("/api/status")
         self.assertEqual(r2.status_code, 403)
 
-    # (b) '/?k=<richtig>' -> authed, danach /api/* erlaubt
+    # (b) '/?k=<richtig>' -> authed, danach /api/* erlaubt — WEB-12: mit dem
+    # Schluessel der festen Fernbedienung und nur, wenn sie eingeschaltet ist.
     def test_handshake_then_api_allowed(self):
-        r = self.client.get("/?k=geheim123")
+        from src.web import remote_settings
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "fest456"
+        r = self.client.get("/?k=fest456")
         self.assertEqual(r.status_code, 200)
         r2 = self.client.post("/api/go")
         self.assertEqual(r2.status_code, 200)
@@ -114,20 +119,35 @@ class TestRemoteAuth(unittest.TestCase):
         # bestehende Session sofort abweisen (auth_epoch++), (b) das ALTE ?k=-Link
         # entwerten (app.config uebernimmt das neue Token), (c) mit dem NEUEN Token
         # wieder Zugang geben.
+        # WEB-12: gilt fuer beide Schluesselarten — geprueft an der
+        # Handy-Konsole (/api/vc/konsole) und der festen Seite (/api/go).
         from src.web import remote_settings
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "fest456"
         self.client.get("/?k=geheim123")
+        self.client.get("/?k=fest456")
+        self.assertEqual(self.client.get("/api/vc/konsole").status_code, 200)
         self.assertEqual(self.client.post("/api/go").status_code, 200)   # authed
 
         new_tok = remote_settings.regenerate_token()                     # epoch++ + neues Token
         webapp.refresh_token(self.app)                                   # laufender Server uebernimmt
+        neu_fest = remote_settings.get_feste_token()
+        self.assertNotIn(neu_fest, ("fest456", new_tok))
 
         # (a) alte Session (alte Epoche) -> 403
         self.assertEqual(self.client.post("/api/go").status_code, 403)
-        # (b) altes Token authet nicht mehr
+        self.assertEqual(self.client.get("/api/vc/konsole").status_code, 403)
+        # (b) alte Schluessel authen nicht mehr
         self.client.get("/?k=geheim123")
+        self.client.get("/?k=fest456")
         self.assertEqual(self.client.post("/api/go").status_code, 403)
-        # (c) neues Token -> wieder rein
+        self.assertEqual(self.client.get("/api/vc/konsole").status_code, 403)
+        # (c) neue Schluessel -> wieder rein, jeder nur in seine Rolle
         self.client.get(f"/?k={new_tok}")
+        self.assertEqual(self.client.get("/api/vc/konsole").status_code, 200)
+        self.assertEqual(self.client.post("/api/go").status_code, 403)
+        self.client.get(f"/?k={neu_fest}")
         self.assertEqual(self.client.post("/api/go").status_code, 200)
 
 
@@ -276,7 +296,9 @@ class TestRemoteSettings(unittest.TestCase):
 
     def test_toggles_default_and_roundtrip(self):
         from src.web import remote_settings
-        self.assertTrue(remote_settings.is_lan_remote_enabled())    # Default AN
+        # WEB-12 (QA96-36): ab Werk nur dieser PC
+        self.assertFalse(remote_settings.load_settings()["lan_remote_enabled"])
+        self.assertIs(remote_settings.DEFAULTS["lan_remote_enabled"], False)
         self.assertFalse(remote_settings.is_osc_network_enabled())  # Default AUS
         remote_settings.set_lan_remote_enabled(False)
         self.assertFalse(remote_settings.is_lan_remote_enabled())

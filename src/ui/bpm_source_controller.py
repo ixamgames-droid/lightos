@@ -523,3 +523,31 @@ def song_may_lead() -> bool:
         _log(f"gewaehlte Quelle nicht ermittelbar: {e}")
         return True
     return True if kind is None else kind == "song"
+
+
+# BPM-32: Quellen, bei denen die Auto-Show keinen Titel-Takt setzen darf.
+FALLBACK_GESPERRT = ("off", "os2l")
+
+
+def nominal_fallback_blocked() -> bool:
+    """Darf die Auto-Show (``MusicShowDirector._ensure_bpm``) bei BPM 0 die
+    Nominal-BPM des Titels **nicht** setzen? (BPM-32)
+
+    **Gesperrt bei gewaehlter Quelle „Aus" und „OS2L"** (Entscheidung des
+    Projektinhabers, 25.10.2026): die Wahl des Nutzers gilt, und bei OS2L
+    schreibt kein Titel-Takt gegen das DJ-Programm. Die Auto-Show zeigt dann
+    stattdessen den Hinweis „Takt aus Titel uebernehmen".
+
+    Bei Lied-Analyse sowie PC-Audio/Eingang bleibt der Fallback wie bisher
+    (bei Live-Audio verwirft ``request_bpm`` ihn ohnehin, sobald der Detektor
+    fuehrt). Das ist bewusst enger als ``song_may_lead`` — sonst verloere der
+    Fallback bei PC-Audio vor dem Einrasten seinen Zweck.
+
+    **Fail-open** wie ``song_may_lead``: ist die Quelle nicht ermittelbar,
+    gilt das Verhalten von vorher (nicht gesperrt)."""
+    try:
+        kind = get_source_controller().chosen_kind()
+    except Exception as e:      # pragma: no cover - Verteidigung, s. Docstring
+        _log(f"gewaehlte Quelle nicht ermittelbar: {e}")
+        return False
+    return kind in FALLBACK_GESPERRT
