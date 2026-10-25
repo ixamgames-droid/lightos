@@ -126,10 +126,10 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
 
     def test_genannte_schalter_gibt_es_im_code(self):
         fundorte = {
-            "Art-Net Input aktivieren": ("src", "ui", "widgets", "output_config.py"),
-            "sACN Input aktivieren": ("src", "ui", "widgets", "output_config.py"),
-            "DMX Input": ("src", "ui", "widgets", "output_config.py"),
-            "Merge in Universe:": ("src", "ui", "widgets", "output_config.py"),
+            "Art-Net-Eingang aktivieren": ("src", "ui", "widgets", "output_config.py"),
+            "sACN-Eingang aktivieren": ("src", "ui", "widgets", "output_config.py"),
+            "DMX-Eingang": ("src", "ui", "widgets", "output_config.py"),
+            "Mischen in Universum:": ("src", "ui", "widgets", "output_config.py"),
             "Netzwerkkarte:": ("src", "ui", "widgets", "output_config.py"),
             "Web-Interface (Port 5000)": ("src", "ui", "main_window.py"),
             "OS2L-Server (Port 1234)": ("src", "ui", "main_window.py"),

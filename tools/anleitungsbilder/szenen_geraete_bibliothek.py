@@ -247,8 +247,8 @@ def _bild_editor(ui):
         (reiter_rechteck(dlg, dlg, "6-Kanal"), 2, "rechts"),
         (zeilen, 3, "rechts"),
         (rechteck(dlg, attr), 4, "unten"),
-        (rechteck(dlg, knopf(tab, "+ Channel")), 5, "unten"),
-        (rechteck(dlg, knopf(dlg, "+ Mode")), 6, "unten"),
+        (rechteck(dlg, knopf(tab, "+ Kanal")), 5, "unten"),
+        (rechteck(dlg, knopf(dlg, "+ Modus")), 6, "unten"),
         (rechteck(dlg, speichern), 7, "oben"),
     ], titel=dlg.windowTitle())
 
