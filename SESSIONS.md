@@ -49,7 +49,7 @@
 | WEB-12 | A | feat/web12-handy-konsole-sicher | 2026-10-25T12:04Z | src/web/app.py · src/web/ |
 | PROC-24 | A | chore/dependabot-sicherheitsregel | 2026-10-25T12:07Z | COORDINATION.md |
 | PRIV-06 | A | chore/priv06-backlog-pseudonym | 2026-10-25T12:39Z | BACKLOG.md · BACKLOG_ARCHIVE.md · backlog.d/* · tests/test_keine_privaten_dateien.py |
-| PROC-25 | A | chore/tafel-privates-repo | 2026-10-25T12:42Z | tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md |
+| PROC-25 | A | chore/tafel-privates-repo | 2026-10-25T13:10Z | tools/session_claim.py |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-25T13:10Z | src/ui/views |
 
 ## Blocker & Fallen
@@ -95,7 +95,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z D done DOC-70
 - 2026-10-20T16:56Z D done TOOL-21
 - 2026-10-20T16:56Z B done VIZ-106
 - 2026-10-20T16:56Z B done VIZ-108
@@ -125,3 +124,4 @@
 - 2026-10-25T12:42Z A claim PROC-25
 - 2026-10-25T13:10Z A claim ENG-35
 - 2026-10-25T13:10Z A aktualisiert SAMMEL-BACKLOG-1020: Dateien - -> backlog.d/*
+- 2026-10-25T13:10Z A aktualisiert PROC-25: Dateien tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md -> tools/session_claim.py
