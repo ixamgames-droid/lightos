@@ -50,6 +50,7 @@
 | PROC-24 | A | chore/dependabot-sicherheitsregel | 2026-10-25T12:07Z | COORDINATION.md |
 | PRIV-06 | A | chore/priv06-backlog-pseudonym | 2026-10-25T12:39Z | BACKLOG.md · BACKLOG_ARCHIVE.md · backlog.d/* · tests/test_keine_privaten_dateien.py |
 | PROC-25 | A | chore/tafel-privates-repo | 2026-10-25T12:42Z | tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md |
+| ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-25T13:10Z | src/ui/views |
 
 ## Blocker & Fallen
 
@@ -94,7 +95,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z A done OUT-67
 - 2026-10-20T16:56Z D done QA-91
 - 2026-10-20T16:56Z D done DOC-70
 - 2026-10-20T16:56Z D done TOOL-21
@@ -124,3 +124,4 @@
 - 2026-10-25T12:08Z 1 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-25T12:39Z A claim PRIV-06
 - 2026-10-25T12:42Z A claim PROC-25
+- 2026-10-25T13:10Z A claim ENG-35
