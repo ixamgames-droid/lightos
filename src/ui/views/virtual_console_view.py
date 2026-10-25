@@ -2,7 +2,7 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QPushButton,
-    QLabel, QSizePolicy, QSplitter,
+    QLabel, QSizePolicy, QSplitter, QMessageBox,
 )
 from PySide6.QtCore import Qt, QEvent, QPoint, QSize, QTimer
 
@@ -461,6 +461,35 @@ class VirtualConsoleView(QWidget):
         self._btn_inspector.toggled.connect(self._toggle_inspector)
         tb_layout.addWidget(self._btn_inspector)
 
+        # WEB-10: Seitenleiste „Handy-Konsole" ein-/ausblenden. Immer sichtbar:
+        # im Betrieb ist die Leiste eine Vorschau (und der Schalter „an/aus"
+        # bleibt ein Griff), gebaut wird im Bearbeiten-Modus. Ersetzt den
+        # vorlaeufigen Knopf „Handy füllen" aus WEB-09 — „Automatisch füllen"
+        # steht jetzt in der Leiste.
+        self._btn_handy = QPushButton("📱 Handy-Konsole")
+        self._btn_handy.setObjectName("vc_handy_konsole")
+        self._btn_handy.setCheckable(True)
+        self._btn_handy.setChecked(False)
+        self._btn_handy.setFixedHeight(26)
+        self._btn_handy.setToolTip(
+            "Seitenleiste „Handy-Konsole“: hier baust du, was am Handy zu sehen "
+            "ist.\nElemente im Bearbeiten-Modus hineinziehen oder per Rechtsklick "
+            "→ „Auf Handy-Konsole legen“.")
+        self._btn_handy.setStyleSheet("""
+            QPushButton { background:#21262d; color:#7ee787; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#12351d; color:#7ee787; border-color:#2ea043; }
+            QPushButton:hover { background:#30363d; }
+        """)
+        self._btn_handy.toggled.connect(self._toggle_handy_leiste)
+        tb_layout.addWidget(self._btn_handy)
+        if self._kiosk:
+            # UI-96: im Kiosk keine Bearbeitungswege — die Leiste baut
+            # Handy-Seiten und schaltet den Fernzugriff, beides gehoert nicht
+            # an die reine Bedien-Konsole.
+            self._btn_handy.setEnabled(False)
+            self._btn_handy.setVisible(False)
+
         layout.addWidget(toolbar)
         self._toolbar_widget = toolbar
 
@@ -513,7 +542,36 @@ class VirtualConsoleView(QWidget):
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
+        # WEB-08: die Konsole fuer die Fernausloesung anmelden. Die Bruecke
+        # haengt als Kind am Canvas (stirbt mit ihm) und reicht Aufrufe des
+        # Web-Threads in den UI-Thread. Ob sie etwas ausfuehren darf,
+        # entscheidet die Einstellung in ``src.web.vc_remote`` — Standard AUS.
+        self._fernbedienung = None
+        try:
+            from src.ui.virtualconsole.vc_fernbedienung import VCFernbedienung
+            from src.web import vc_remote
+            self._fernbedienung = VCFernbedienung(self._canvas)
+            # Kein ``destroyed``-Lambda zum Abmelden (STAB-09: so eine Connection
+            # pinnt ihre Fangvariablen GC-unsichtbar). Eine Bruecke, deren
+            # Konsole abgebaut ist, antwortet von selbst mit „keine Konsole".
+            vc_remote.registriere(self._fernbedienung)
+        except Exception as e:
+            print(f"[virtual_console_view] ERROR: Fernbedienung nicht angemeldet: {e}")
         splitter.addWidget(self._main_scroll)
+
+        # WEB-10: Seitenleiste „Handy-Konsole" — direkt neben der Konsole, damit
+        # der Weg beim Hineinziehen kurz ist. UI-96: im Kiosk gar nicht erst
+        # gebaut (sie baut Handy-Seiten und schaltet den Fernzugriff).
+        self._handy_leiste = None
+        if not self._kiosk:
+            from src.ui.virtualconsole.vc_handy_leiste import HandyKonsolenLeiste
+            self._handy_leiste = HandyKonsolenLeiste(self._canvas)
+            self._handy_leiste.setVisible(False)
+            self._handy_leiste.verbinden_angefragt.connect(self._handy_verbinden)
+            # Rechtsklick „Auf Handy-Konsole legen" bei ausgeblendeter Leiste: sie
+            # erscheint, damit man sieht, wo das Element gelandet ist.
+            self._canvas.handy_abgelegt.connect(self._handy_abgelegt)
+            splitter.addWidget(self._handy_leiste)
 
         # Inspector-Panel (Eigenschaften des gewaehlten Widgets, nur im Edit-Modus).
         self._inspector = VCInspectorPanel()
@@ -534,11 +592,17 @@ class VirtualConsoleView(QWidget):
             splitter.addWidget(self._sidebar)
 
         # Größenverhältnis: Canvas viel breiter als Inspector/Sidebar
+        # (Spalten ueber indexOf: im Kiosk fehlen Handy-Leiste und Sidebar, UI-96)
         splitter.setStretchFactor(0, 4)
-        splitter.setStretchFactor(1, 0)
+        if self._handy_leiste is not None:  # Handy-Konsole: feste Breite
+            i = splitter.indexOf(self._handy_leiste)
+            splitter.setStretchFactor(i, 0)
+            splitter.setCollapsible(i, False)
+        i = splitter.indexOf(self._inspector)
+        splitter.setStretchFactor(i, 0)
+        splitter.setCollapsible(i, True)
         if self._sidebar is not None:
-            splitter.setStretchFactor(2, 1)
-        splitter.setCollapsible(1, True)
+            splitter.setStretchFactor(splitter.indexOf(self._sidebar), 1)
         self._splitter = splitter
 
         # Stretch=1: der Canvas-/Sidebar-Splitter bekommt den gesamten
@@ -805,6 +869,9 @@ class VirtualConsoleView(QWidget):
             else:
                 self._inspector.clear()
                 self._inspector.setVisible(False)
+        # WEB-10: die Handy-Seitenleiste ist nur im Bearbeiten-Modus bedienbar.
+        if getattr(self, "_handy_leiste", None) is not None:
+            self._handy_leiste.set_edit_mode(enabled)
 
     def _toggle_snap(self, checked: bool):
         self._canvas.set_snap_to_grid(checked)
@@ -1078,6 +1145,39 @@ class VirtualConsoleView(QWidget):
     def _clear_all(self):
         if self._edit_mode:
             self._canvas._clear()
+
+    # ── WEB-10: Handy-Konsole ────────────────────────────────────────────────
+
+    def _toggle_handy_leiste(self, checked: bool):
+        self._btn_handy.setText("📱 Handy-Konsole ✓" if checked else "📱 Handy-Konsole")
+        if self._handy_leiste is None:
+            return          # UI-96: Kiosk ohne Handy-Leiste
+        self._handy_leiste.setVisible(bool(checked))
+        if checked:
+            self._handy_leiste.set_edit_mode(self._edit_mode)
+
+    def _handy_abgelegt(self, _kennung: str):
+        if not self._btn_handy.isChecked():
+            self._btn_handy.setChecked(True)
+
+    def _handy_verbinden(self):
+        """„📱 Handy verbinden" in der Seitenleiste: der Dialog „Web-Remote:
+        Verbindung & Token", der gleich alles Noetige einschaltet (WEB-12)."""
+        fenster = self.window()
+        oeffnen = getattr(fenster, "_open_web_remote_dialog", None)
+        if callable(oeffnen):
+            try:
+                oeffnen(verbinden=True)
+            except Exception as e:
+                print(f"[virtual_console_view] ERROR: Web-Remote-Dialog: {e}")
+                QMessageBox.warning(self, "Handy-Konsole", str(e))
+        else:
+            QMessageBox.information(
+                self, "Handy-Konsole",
+                "Link und Schlüssel fürs Handy stehen unter\n"
+                "Ausgabe → „Web-Remote: Verbindung & Token…“.")
+        if self._handy_leiste is not None:
+            self._handy_leiste._verbindung_zeigen()
 
     def _save(self):
         self._canvas._save()

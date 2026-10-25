@@ -242,14 +242,16 @@ Prozess-ID:
 
 Steht beim Web-Remote `127.0.0.1:5000` statt `0.0.0.0:5000`, ist in LightOS der Schalter
 **LAN-/Handy-Remote** aus — dann erreicht ihn nur dieser Rechner, ganz gleich, was die
-Firewall erlaubt.
+Firewall erlaubt. Ab Werk ist er aus; **Handy verbinden** im Dialog **Ausgabe → Web-Remote:
+Verbindung & Token…** schaltet ihn zusammen mit der Handy-Konsole ein.
 
 **Kommt etwas von außen an?** Das zeigt nur ein **zweites Gerät**. Ein Test vom selben
 Rechner sagt über die Firewall nichts aus — er gelingt auch dann, wenn von außen alles
 zu ist.
 
-- **Web-Remote:** am Handy `http://<PC-IP>:5000/?k=<token>` öffnen (Adresse und Token:
-  [Web-Remote](../anleitung_web_remote/ANLEITUNG.md)). Von einem zweiten Windows-Rechner
+- **Web-Remote:** am Handy den QR-Code aus **Handy verbinden** scannen bzw. den Link
+  `http://<PC-IP>:5000/konsole?k=<schlüssel>` öffnen
+  ([Web-Remote](../anleitung_web_remote/ANLEITUNG.md)). Von einem zweiten Windows-Rechner
   aus:
 
   ```powershell
@@ -268,7 +270,7 @@ zu ist.
 |---|---|---|
 | Handy: Die Seite lädt nicht, der Browser läuft in eine Zeitüberschreitung. | Freigabe für TCP 5000 fehlt oder gilt für das andere Profil. Oder das Handy hängt im Gastnetz, das Geräte voneinander trennt. | Schritt 2 und 4. Handy ins selbe Netz wie den Rechner bringen. |
 | Am Rechner selbst geht `http://localhost:5000`, vom Handy nicht. | Firewall — oder **LAN-/Handy-Remote** ist aus. | Schritt 5: steht `127.0.0.1:5000` in `netstat`, den Schalter in LightOS einschalten. Sonst Schritt 4. |
-| Handy: Antwort „403“. | Kein Netzwerkfehler — der Rechner wurde erreicht, es fehlt das Token. | Den Direkt-Link aus dem Verbindungs-Dialog verwenden ([Web-Remote](../anleitung_web_remote/ANLEITUNG.md)). |
+| Handy: Antwort „403“ oder „Kein Zugang“. | Kein Netzwerkfehler — der Rechner wurde erreicht, es fehlt der Schlüssel. | Den QR-Code bzw. Link aus dem Verbindungs-Dialog verwenden ([Web-Remote](../anleitung_web_remote/ANLEITUNG.md)). |
 | Art-Net: Der Dialog meldet „Aktiv“, der Node bleibt dunkel. | Rechner und Node liegen in verschiedenen Netzen, oder Art-Net geht über die falsche Karte hinaus. Mit der Firewall hat das nichts zu tun. | Schritt 3, `ping` zum Node, **Netzwerkkarte:** wählen. Ein laufendes VPN trennen. |
 | `ipconfig` zeigt `169.254.x.x`. | Im Lichtnetz verteilt niemand Adressen. | Schritt 3: feste Adresse. |
 | Art-Net-/sACN-Eingang ist eingeschaltet, es kommt nichts an. | Freigabe für UDP 6454 bzw. 5568 fehlt. Oder der Sender schickt an eine andere Adresse oder ein anderes Universum. | Schritt 4. Am Sender Ziel und Universum prüfen (Art-Net zählt ab 0). |
