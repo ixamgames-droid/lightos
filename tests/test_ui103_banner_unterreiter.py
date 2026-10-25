@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import io
 import os
+import re
 import unittest
 from contextlib import redirect_stdout
 
@@ -44,7 +45,7 @@ from PySide6.QtWidgets import (QAbstractButton, QAbstractSpinBox,  # noqa: E402
 
 from src.ui.ausgabe_banner import (ART_KEIN, ART_PROBE,              # noqa: E402
                                    ART_STOERUNG, HALTE_S, AusgabeBanner,
-                                   AusgabeChip, BannerZustand)
+                                   AusgabeChip, BannerZustand, _STIL)
 
 from _qt_lifecycle import destroy_all_top_level_widgets              # noqa: E402
 
@@ -181,12 +182,15 @@ class TestImHauptfenster(unittest.TestCase):
             self.assertFalse(rechteck.intersects(_im(sicher, w)),
                              f"{hinweis}: verdeckt {name}")
         # Am Bildschirm liegt an jedem Reiter der Reiter selbst, nicht das Banner.
+        # Bei voller Zeile liegen Qts Blaetterpfeile (Kinder der Reiterleiste)
+        # ueber manchen Reitern - auch das ist die Leiste (Windows-Gegenprobe D).
         leiste = tabs.tabBar()
         for i in range(leiste.count()):
             mitte = leiste.mapTo(w, leiste.tabRect(i).center())
             if leiste.rect().contains(leiste.tabRect(i).center()):
-                self.assertIs(w.childAt(mitte), leiste,
-                              f"{hinweis}: Reiter {leiste.tabText(i)!r}")
+                x = w.childAt(mitte)
+                self.assertTrue(x is leiste or leiste.isAncestorOf(x),
+                                f"{hinweis}: Reiter {leiste.tabText(i)!r} -> {x!r}")
 
     # -- der Befund ----------------------------------------------------------
 
@@ -577,10 +581,28 @@ class TestOhneHauptfenster(unittest.TestCase):
             self.app.processEvents()
             self.assertTrue(zeile.contains(self.chip.geometry()), art)
             self.chip.verstecke()
-        # Zurueck zu den Reitern: volles Polster wieder da.
+        # Zurueck zu den Reitern: volles Polster wieder da, sobald das Banner
+        # damit in die Reiterzeile passt. Ist sie (z. B. mit Windows-Schriften)
+        # niedriger, bleibt es bewusst kleiner - dann aber nur so weit wie
+        # noetig, und das Banner liegt ganz in der Zeile (Windows-Gegenprobe D:
+        # der Test darf nicht von Linux-Schriftmassen ausgehen).
         self.stapel.setCurrentWidget(self.tabs)
         self.app.processEvents()
-        self.assertIn("padding:5px", self.banner.styleSheet())
+        voll = _STIL[ART_STOERUNG][1]
+        m = re.search(r"padding:(\d+)px", self.banner.styleSheet())
+        self.assertIsNotNone(m, self.banner.styleSheet())
+        jetzt = int(m.group(1))
+        self.assertLessEqual(jetzt, voll)
+        zeile = _im(self.tabs.tabBar(), self.eltern)
+        r = self.banner.geometry()
+        self.assertTrue(zeile.top() <= r.top() and r.bottom() <= zeile.bottom(),
+                        (r, zeile))
+        hoehe_voll = r.height() + 2 * (voll - jetzt)
+        if hoehe_voll <= zeile.height():
+            self.assertEqual(jetzt, voll, "volles Polster passt, ist aber nicht da")
+        elif jetzt > 0:
+            # nur so weit zurueckgenommen wie noetig
+            self.assertGreater(r.height() + 2, zeile.height(), (r, zeile, jetzt))
 
     def test_leiste_waechst_banner_folgt(self):
         self.banner.zeige(BannerZustand(ART_PROBE, "Probenmodus", ""))
