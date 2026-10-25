@@ -9,6 +9,16 @@ BPM-Quelle bleibt VirtualDJ→OS2L bzw. Tap/Audio; der Director stellt nur siche
 überhaupt ein BPM-Takt läuft (Nominal-BPM des Tracks, sonst 120 als Fallback), damit
 beat-getriggerte Chaser/Cuelisten sofort mitlaufen.
 
+BPM-32 (25.10.2026): Steht die gewählte BPM-Quelle auf **„Aus"** oder **„OS2L"**,
+setzt der Director **keinen** Titel-Takt mehr (Nutzerwahl gilt, keine Konkurrenz
+zum DJ-Programm). Stattdessen meldet er per ``taktHinweisChanged(bpm)`` einen
+sichtbaren Hinweis (Musik-Tab, VC-Musik-Anzeige) mit dem Ein-Klick
+:meth:`MusicShowDirector.uebernehme_titel_takt`. ``bpm`` ist die Titel-BPM, die
+der Klick übernähme; 0 = kein Hinweis. Der Hinweis verschwindet, sobald ein Takt
+da ist, die Quelle wechselt oder die Show stoppt. BPM-Änderungen kommen aus
+Audio-/OS2L-Threads — sie werden über ``_pruefen_sig`` in den GUI-Thread des
+Directors gereicht, das Hinweis-Signal feuert nur dort.
+
 Singleton, einmalig in ``main_window`` per ``get_music_director().attach()`` verdrahtet.
 Liest ``state.music_autoshow`` bei jedem Play **live** — ein Show-Wechsel wirkt also sofort.
 Headless-/Test-tauglich: alle Engine-Imports sind lazy.
@@ -17,15 +27,23 @@ from __future__ import annotations
 import time
 import bisect
 
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 
 
 class MusicShowDirector(QObject):
     """Startet/stoppt die Auto-Lichtshow synchron zum In-App-Player."""
 
+    # BPM-32: Titel-BPM fuer den Hinweis „Takt aus Titel uebernehmen" (0 = weg).
+    taktHinweisChanged = Signal(float)
+    # BPM-/Quellen-Rueckrufe aus beliebigem Thread → Pruefung im GUI-Thread.
+    _pruefen_sig = Signal()
+
     def __init__(self):
         super().__init__()
         self._attached = False
+        self._hinweis_bpm: float = 0.0
+        self._hinweis_abo = False
+        self._pruefen_sig.connect(self._pruefe_hinweis)
         self._started_ids: list[int] = []
         self._per_track_ids: list[int] = []    # AUTODJ-(a): aktueller Per-Song-Look
         # BPM-Generator: gecachte Timeline des aktuellen Tracks + zuletzt
@@ -69,6 +87,7 @@ class MusicShowDirector(QObject):
             self._grid_timer.setInterval(15)
             self._grid_timer.timeout.connect(self._grid_tick)
             self._attached = True
+            self._abo_hinweis()
         except Exception as e:
             print(f"[MusicShowDirector] attach error: {e}")
 
@@ -356,6 +375,7 @@ class MusicShowDirector(QObject):
 
     def stop_show(self):
         """Stoppt die Auto-Show-Funktionen (zuletzt gestartete + aktuell konfigurierte)."""
+        self._set_hinweis(0.0)             # BPM-32: ohne laufende Show kein Hinweis
         self._stop_track_functions()       # AUTODJ-(a): Per-Song-Look zuerst
         try:
             from src.core.engine.function_manager import get_function_manager
@@ -367,26 +387,116 @@ class MusicShowDirector(QObject):
             print(f"[MusicShowDirector] stop error: {e}")
         self._started_ids = []
 
+    def _titel_bpm(self) -> float:
+        """Nominal-BPM des aktuellen Titels, sonst 120."""
+        try:
+            from src.core.audio.media_player import get_media_player
+            t = get_media_player().current_track
+            if t is not None and t.bpm > 0:
+                return float(t.bpm)
+        except Exception:
+            pass
+        return 120.0
+
+    @staticmethod
+    def _fallback_gesperrt() -> bool:
+        """BPM-32: Quelle „Aus"/„OS2L" gewaehlt? Fail-open (nicht gesperrt)."""
+        try:
+            from src.ui.bpm_source_controller import nominal_fallback_blocked
+            return nominal_fallback_blocked()
+        except Exception as e:
+            print(f"[MusicShowDirector] gewaehlte Quelle nicht ermittelbar: {e}")
+            return False
+
     def _ensure_bpm(self):
         """Sorgt dafür, dass ein BPM-Takt läuft (sonst stehen Beat-Effekte still).
         OS2L/Tap/Audio haben Vorrang; nur wenn noch keine BPM gesetzt ist, wird die
-        Nominal-BPM des aktuellen Tracks (sonst 120) verwendet."""
+        Nominal-BPM des aktuellen Tracks (sonst 120) verwendet.
+
+        BPM-32: bei gewählter Quelle „Aus"/„OS2L" wird NICHTS gesetzt, sondern der
+        Hinweis „Takt aus Titel übernehmen" gemeldet (``taktHinweisChanged``)."""
         try:
             from src.core.engine.bpm_manager import get_bpm_manager
             bm = get_bpm_manager()
             if bm.bpm > 0:
+                self._set_hinweis(0.0)
                 return
-            bpm = 120.0
-            try:
-                from src.core.audio.media_player import get_media_player
-                t = get_media_player().current_track
-                if t is not None and t.bpm > 0:
-                    bpm = float(t.bpm)
-            except Exception:
-                pass
+            bpm = self._titel_bpm()
+            if self._fallback_gesperrt():
+                self._abo_hinweis()
+                self._set_hinweis(bpm)
+                return
+            self._set_hinweis(0.0)
             bm.request_bpm(bpm, "file")
         except Exception as e:
             print(f"[MusicShowDirector] bpm error: {e}")
+
+    # ── BPM-32: Hinweis „Takt aus Titel übernehmen" ─────────────────────────────
+    def takt_hinweis(self) -> float:
+        """Titel-BPM, die der Hinweis anbietet; 0 = kein Hinweis sichtbar."""
+        return self._hinweis_bpm
+
+    def _set_hinweis(self, bpm: float) -> None:
+        bpm = float(bpm or 0.0)
+        if bpm == self._hinweis_bpm:
+            return
+        self._hinweis_bpm = bpm
+        self.taktHinweisChanged.emit(bpm)
+
+    def _abo_hinweis(self) -> None:
+        """BPM- und Quellenwechsel abonnieren (idempotent). Die Rueckrufe kommen
+        aus Audio-/OS2L-Threads und emittieren nur ``_pruefen_sig`` (queued)."""
+        if self._hinweis_abo:
+            return
+        try:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            get_bpm_manager().subscribe_bpm_change(self._bpm_rueckruf)
+            from src.ui.bpm_source_controller import get_source_controller
+            get_source_controller().subscribe_change(self._quelle_rueckruf)
+            self._hinweis_abo = True
+        except Exception as e:
+            print(f"[MusicShowDirector] Hinweis-Abo: {e}")
+
+    def _bpm_rueckruf(self, *_):
+        if self._hinweis_bpm > 0:
+            self._pruefen_sig.emit()
+
+    def _quelle_rueckruf(self, *_):
+        if self._hinweis_bpm > 0:
+            self._pruefen_sig.emit()
+
+    def _pruefe_hinweis(self) -> None:
+        """GUI-Thread: Hinweis wegnehmen, sobald ein Takt da ist oder die Quelle
+        nicht mehr „Aus"/„OS2L" ist. Im zweiten Fall greift der Fallback der
+        neuen Quelle wie beim Play (``_ensure_bpm``), sonst stuende der Takt
+        z. B. nach einem Wechsel auf Lied-Analyse ohne Analyse weiter auf 0."""
+        if self._hinweis_bpm <= 0:
+            return
+        try:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            if get_bpm_manager().bpm > 0:
+                self._set_hinweis(0.0)
+            elif not self._fallback_gesperrt():
+                self._ensure_bpm()
+        except Exception as e:
+            print(f"[MusicShowDirector] Hinweis pruefen: {e}")
+
+    def uebernehme_titel_takt(self) -> float:
+        """Ein-Klick aus dem Hinweis: BPM-Quelle auf **Lied-Analyse (Player)**
+        stellen (die Datei-Quelle) und die Nominal-BPM des Titels als „file"
+        übernehmen. Liefert die BPM danach (0 = nichts gesetzt)."""
+        try:
+            from src.ui.bpm_source_controller import get_source_controller
+            get_source_controller().apply("song")
+        except Exception as e:
+            print(f"[MusicShowDirector] Quelle Lied-Analyse: {e}")
+        self._ensure_bpm()          # jetzt nicht mehr gesperrt → Nominal-BPM
+        self._pruefe_hinweis()
+        try:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            return float(get_bpm_manager().bpm or 0.0)
+        except Exception:
+            return 0.0
 
 
 # ── Singleton ─────────────────────────────────────────────────────────────────────
