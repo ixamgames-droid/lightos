@@ -187,6 +187,36 @@ def lizenz_zeile() -> str:
         return "unbekannt"
 
 
+def fremd_hinweis() -> str:
+    """LIZ-3: Hinweis auf die Bestandteile unter der LGPL fuer „Über LightOS“.
+
+    Ein Programm, das waehrend des Laufs Urhebervermerke zeigt, muss dort auch
+    den Vermerk der LGPL-Bibliothek und einen Verweis auf die Lizenztexte
+    zeigen (LGPL-3.0 Abschnitt 4 c, LGPL-2.1 Abschnitt 6). Welche Teile unter
+    der LGPL stehen, fuehrt ``packaging/windows/fremdkomponenten.py``; der Test
+    gleicht beide ab. Der Verweis zeigt auf den Ordner ``licenses`` neben den
+    Programmdateien (im Setup-Build ``_internal``, im Quellbetrieb das Repo) —
+    auf den Ordner, nicht auf die .md-Datei: die oeffnet Windows ohne
+    zugeordnetes Programm nur mit „App auswaehlen“ (s. ``_windows_zuordnung``)."""
+    from html import escape
+    from pathlib import Path
+    ordner = os.path.join(programm_dir(), "licenses")
+    if os.path.isdir(ordner):
+        verweis = (f"<a href='{escape(Path(ordner).as_uri(), quote=True)}'>"
+                   "Ordner „licenses“</a>")
+    else:
+        verweis = "Ordner „licenses“ im Programmordner"
+    return (
+        "LightOS enthält Bestandteile anderer Urheber unter eigenen Lizenzen, "
+        "darunter Qt&nbsp;6 und Qt for Python (PySide6, Shiboken6), "
+        "© The Qt Company Ltd. und andere, unter der GNU LGPL 3.0, sowie "
+        "FFmpeg (© die FFmpeg-Entwickler) und libusb unter der GNU LGPL 2.1. "
+        "Sie liegen als eigene, austauschbare Bibliotheken bei. "
+        "Aufstellung: THIRD_PARTY_NOTICES.md; Lizenztexte (GNU LGPL, GNU GPL "
+        f"und weitere): {verweis}."
+    )
+
+
 def ueber_text() -> str:
     """HTML fuer „Über LightOS“."""
     from html import escape
@@ -204,7 +234,8 @@ def ueber_text() -> str:
         f"<tr><td>Datenordner:</td><td>{escape(daten)}</td></tr>"
         f"<tr><td>Anleitungen:</td><td><a href='{DOKU_URL}'>{DOKU_URL}</a></td></tr>"
         "</table><br>"
-        "Enttec Pro USB &middot; Art-Net 4 &middot; sACN &middot; MIDI"
+        "Enttec Pro USB &middot; Art-Net 4 &middot; sACN &middot; MIDI<br><br>"
+        f"<small>{fremd_hinweis()}</small>"
     )
 
 
