@@ -47,6 +47,7 @@
 | BPM-31 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-25T12:04Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
 | UI-105 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-25T12:04Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
 | WEB-12 | A | feat/web12-handy-konsole-sicher | 2026-10-25T12:04Z | src/web/app.py · src/web/ |
+| PROC-24 | A | chore/dependabot-sicherheitsregel | 2026-10-25T12:07Z | COORDINATION.md |
 
 ## Blocker & Fallen
 
@@ -81,7 +82,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z A done NET-14
 - 2026-10-20T16:56Z A done MIDI-16
 - 2026-10-20T16:56Z A done MIDI-4
 - 2026-10-20T16:56Z A done XPLAT-50
@@ -111,3 +111,4 @@
 - 2026-10-20T20:54Z A done QA-104
 - 2026-10-25T12:03Z 5 Blocker verfallen (aelter als 7 Tage, gelesen; Volltext in der Historie)
 - 2026-10-25T12:04Z A done ENG-35
+- 2026-10-25T12:07Z A claim PROC-24
