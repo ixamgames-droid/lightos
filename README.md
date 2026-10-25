@@ -130,9 +130,9 @@ venv\Scripts\python main.py
 ```
 
 `install.py` legt ein `venv/` an, installiert die Abhängigkeiten und eine Desktop-Verknüpfung.
-**Windows auf ARM:** Für den 3D-Visualizer ein **x64-Python** nehmen (läuft in der Emulation).
-Die nativen ARM64-Pakete von PySide6 enthalten kein QtWebEngine — mit ARM64-Python startet
-LightOS, aber ohne 3D-Ansicht.
+**Windows auf ARM:** Ein **x64-Python** nehmen (läuft in der Emulation, mit allen Funktionen).
+Natives ARM64-Python ist **nicht unterstützt (instabil, kein 3D) — x64-Python nehmen**: LightOS
+stürzte damit in 6 von 12 Starts ab, und die ARM64-Pakete von PySide6 enthalten kein QtWebEngine.
 
 ### Linux (Debian/Ubuntu/Mint, X11)
 

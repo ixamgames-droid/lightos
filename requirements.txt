@@ -1,6 +1,8 @@
 # LightOS - Python Abhaengigkeiten
 # Python 3.11+ erforderlich (3.12+ empfohlen)
-# Laeuft auf Windows x64 UND ARM64 (Snapdragon, Apple via Wine)
+# Laeuft auf Windows x64 und auf Windows-ARM64 (Snapdragon, Apple via Wine)
+# mit x64-Python per Emulation. Natives ARM64-Python: nicht unterstuetzt
+# (instabil, kein 3D) - x64-Python nehmen (XPLAT-51).
 
 # ── GUI ─────────────────────────────────────────────────────────────────────
 PySide6>=6.7.0           # Qt6 - ARM64 wheels ab 6.6
