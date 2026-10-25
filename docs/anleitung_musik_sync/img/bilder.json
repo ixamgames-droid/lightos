@@ -1,7 +1,7 @@
 {
   "anleitung": "musik_sync",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "29c25bfc",
+  "stand": "4178600a",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py musik_sync'.",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "53335cbca4d7bf0fa25a3bc363e1841e"
+      "md5": "307b7057a537589e8c212b3e910a15d3"
     },
     {
       "datei": "04_bpm_quelle.png",
@@ -49,6 +49,17 @@
       ],
       "marken": [],
       "md5": "a6a6fd9e3537115fc007f8354c69c3e0"
+    },
+    {
+      "datei": "05_takt_hinweis.png",
+      "szene": "05_takt_hinweis",
+      "titel": "Musik-Tab: Hinweis „Kein Takt“ mit „Takt aus Titel übernehmen“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "b035fdc0bde8a85f39ae5c48c5723f02"
     }
   ]
 }
