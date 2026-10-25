@@ -49,6 +49,7 @@
 | PROC-25 | A | chore/tafel-privates-repo | 2026-10-25T13:10Z | tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md |
 | ENG-35 | A | feat/eng35-wer-gewinnt-live | 2026-10-25T13:10Z | src/ui/views |
 | LIZ-4 | D | fix/liz4-vc-laufzeit-oben | 2026-10-25T13:14Z | packaging/windows/LightOS.spec · packaging/windows/vc_laufzeit.py · src/core/selbsttest.py · tests/test_liz4_vc_laufzeit.py · backlog.d/LIZ-4.md |
+| PRIV-07 | A | chore/priv07-beispieladressen | 2026-10-25T13:23Z | backlog.d/PRIV-07.md |
 
 ## Blocker & Fallen
 
@@ -96,7 +97,6 @@
 
 ## Verlauf
 
-- 2026-10-20T17:07Z A done IMP-4
 - 2026-10-20T17:45Z A done FM-77
 - 2026-10-20T18:01Z A claim QA-104
 - 2026-10-20T18:24Z A done LAS-41
@@ -126,3 +126,4 @@
 - 2026-10-25T13:14Z D claim LIZ-4
 - 2026-10-25T13:15Z A done SAMMEL-BACKLOG-1020
 - 2026-10-25T13:20Z A done SAMMEL-VERLOREN-1020
+- 2026-10-25T13:23Z A claim PRIV-07
