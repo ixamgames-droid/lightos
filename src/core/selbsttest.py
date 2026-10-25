@@ -254,6 +254,114 @@ def pruefe_fremdlizenzen(wurzel: str | None = None,
     return fehler
 
 
+#: LIZ-4: Microsoft-Laufzeit, die oben im Programmordner liegt und von dort fuer
+#: den ganzen Prozess geladen wird (Namen klein; s. packaging/windows/vc_laufzeit.py).
+VC_LAUFZEIT_OBEN: tuple[str, ...] = ("vcruntime140.dll", "vcruntime140_1.dll")
+
+
+def datei_fassung(pfad: str) -> tuple[int, ...] | None:
+    """Dateiversion einer Windows-DLL (``(14, 44, 35211, 0)``) ueber die
+    Windows-API; ``None`` ohne Versionsressource und ausserhalb von Windows."""
+    if not sys.platform.startswith("win"):
+        return None
+    import ctypes
+    from ctypes import wintypes
+    ver = ctypes.WinDLL("version")
+    ver.GetFileVersionInfoSizeW.argtypes = [wintypes.LPCWSTR, wintypes.LPDWORD]
+    ver.GetFileVersionInfoSizeW.restype = wintypes.DWORD
+    ver.GetFileVersionInfoW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD,
+                                        wintypes.DWORD, wintypes.LPVOID]
+    ver.VerQueryValueW.argtypes = [wintypes.LPCVOID, wintypes.LPCWSTR,
+                                   ctypes.POINTER(ctypes.c_void_p),
+                                   ctypes.POINTER(wintypes.UINT)]
+    groesse = ver.GetFileVersionInfoSizeW(pfad, None)
+    if not groesse:
+        return None
+    puffer = ctypes.create_string_buffer(groesse)
+    if not ver.GetFileVersionInfoW(pfad, 0, groesse, puffer):
+        return None
+    zeiger, laenge = ctypes.c_void_p(), wintypes.UINT()
+    if (not ver.VerQueryValueW(puffer, "\\", ctypes.byref(zeiger), ctypes.byref(laenge))
+            or not zeiger.value or laenge.value < 16):
+        return None
+    # VS_FIXEDFILEINFO: Signatur, Strukturversion, FileVersionMS, FileVersionLS …
+    sig, _struktur, ms, ls = (ctypes.c_uint32 * 4).from_address(zeiger.value)
+    if sig != 0xFEEF04BD:
+        return None
+    return (ms >> 16, ms & 0xFFFF, ls >> 16, ls & 0xFFFF)
+
+
+def geladene_datei(name: str) -> str | None:
+    """Pfad der Datei, aus der dieser Prozess die DLL ``name`` geladen hat
+    (``None``: nicht geladen, oder nicht Windows)."""
+    if not sys.platform.startswith("win"):
+        return None
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32")
+    k32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+    k32.GetModuleHandleW.restype = wintypes.HMODULE
+    k32.GetModuleFileNameW.argtypes = [wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
+    k32.GetModuleFileNameW.restype = wintypes.DWORD
+    modul = k32.GetModuleHandleW(name)
+    if not modul:
+        return None
+    puffer = ctypes.create_unicode_buffer(32768)
+    return puffer.value if k32.GetModuleFileNameW(modul, puffer, len(puffer)) else None
+
+
+def _fassung_text(fassung) -> str:
+    return ".".join(str(t) for t in fassung) if fassung else "?"
+
+
+def pruefe_vc_laufzeit(wurzel: str | None = None, gefroren: bool | None = None,
+                       plattform: str | None = None, geladen=geladene_datei,
+                       fassung=datei_fassung) -> tuple[list[str], str | None]:
+    """LIZ-4: ``(fehler, berichtszeile)`` zur Microsoft-Laufzeit eines
+    gepackten Windows-Builds.
+
+    Windows laedt je Name nur EINE ``VCRUNTIME140(_1).dll``. Geprueft wird am
+    laufenden Prozess: die geladene Datei liegt im Programmordner (ein PC ohne
+    VC++-Redistributable hat keine andere) und keine gleichnamige Datei im
+    Bundle ist neuer als sie (Qt ist mit einer neueren Laufzeit gebaut als
+    Python). Quellbetrieb und andere Systeme: nichts (``([], None)``).
+    """
+    gefroren = ist_gefroren() if gefroren is None else gefroren
+    plattform = sys.platform if plattform is None else plattform
+    if not gefroren or not plattform.startswith("win"):
+        return [], None
+    wurzel = os.path.abspath(wurzel or programm_dir())
+    kopien: dict[str, list[str]] = {n: [] for n in VC_LAUFZEIT_OBEN}
+    for ordner, _unter, dateien in os.walk(wurzel):
+        for d in dateien:
+            if d.lower() in kopien:
+                kopien[d.lower()].append(os.path.join(ordner, d))
+    fehler, teile = [], []
+    for name in VC_LAUFZEIT_OBEN:
+        pfad = geladen(name)
+        if pfad is None:
+            teile.append(f"{name} nicht geladen")
+            continue
+        f_geladen = fassung(pfad)
+        innen = os.path.normcase(os.path.abspath(pfad)).startswith(
+            os.path.normcase(wurzel) + os.sep)
+        teile.append(f"{name} {_fassung_text(f_geladen)} "
+                     + ("(Programmordner)" if innen else f"(aus {os.path.dirname(pfad)})"))
+        if not innen:
+            fehler.append(f"Laufzeit: {name} kommt aus {os.path.dirname(pfad)}, nicht "
+                          "aus dem Programmordner — ohne VC++-Redistributable fehlte sie")
+        if f_geladen is None:
+            fehler.append(f"Laufzeit: {name} ({pfad}) hat keine lesbare Dateiversion")
+            continue
+        for k in kopien[name]:
+            f = fassung(k)
+            if f is not None and f > f_geladen:
+                fehler.append(f"Laufzeit: geladen ist {name} {_fassung_text(f_geladen)}, "
+                              f"im Bundle liegt {os.path.relpath(k, wurzel)} in "
+                              f"{_fassung_text(f)} (packaging/windows/vc_laufzeit.py)")
+    return fehler, "Microsoft-Laufzeit: " + ", ".join(teile)
+
+
 def pruefe_code_stand() -> list[str]:
     """Der Builtin-Fingerabdruck darf nicht leer sein (sonst laeuft der
     Abgleich nach einem Update nie wieder, s. ``fixture_db._code_stand``)."""
@@ -294,6 +402,11 @@ def bericht() -> tuple[int, list[str]]:
     demo_fehler, demo_zeile = pruefe_demo_shows()
     fehler += demo_fehler
     zeilen.append(demo_zeile)
+    # LIZ-4: nach pruefe_module — dann sind Python UND Qt geladen.
+    vc_fehler, vc_zeile = pruefe_vc_laufzeit()
+    fehler += vc_fehler
+    if vc_zeile:
+        zeilen.append(vc_zeile)
     try:
         from src.core import diagnose_log
         zeilen.append(f"Commit: {diagnose_log.commit_text() or 'unbekannt'}")
