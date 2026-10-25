@@ -177,8 +177,12 @@ Vorher: Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk)
    du einen Ausgang einrichtest, zeigt
    [Ausgabe einrichten](../anleitung_ausgabe_einrichten/ANLEITUNG.md).
 2. Dialog **Ausgabe konfigurieren** (Menü **Ausgabe** → **Konfigurieren...**), Reiter
-   **DMX Input** öffnen. Er hat zwei Kästen: **Art-Net Input** und **sACN Input**.
-   Beide sind gleich aufgebaut.
+   **DMX Input** öffnen. Für das Mischen gibt es zwei Kästen: **Art-Net Input** und
+   **sACN Input**. Beide sind gleich aufgebaut.
+
+   > Darunter liegt der Kasten **Fernsteuerung**: Damit *bedient* das Pult LightOS über
+   > einzelne Kanäle (Executor-Fader, Grand Master, GO/Zurück/Stop), statt nur DMX
+   > durchzumischen. Beschrieben in [Art-Net → Fernsteuerung](../ARTNET.md#fernsteuerung-pult-bedient-lightos).
 3. **Art-Net Input aktivieren** bzw. **sACN Input aktivieren** anhaken.
 4. **Eingehendes Universe:** die Nummer, auf der das Pult sendet. Bei Art-Net zählt LightOS
    hier ab 1: Sendet das Pult auf Art-Net-Universum `0`, trägst du `1` ein. Bei sACN gilt

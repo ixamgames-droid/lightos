@@ -77,6 +77,21 @@ weiterhin fuer beide (Test-Gate gruen, CI gruen vor dem Merge, PROC-03).
 
 ## 2. Der Ablauf pro Item
 
+**Einmal je Rechner: die Tafel klonen (PROC-25).** Die Tafel liegt in einem
+privaten Repo `lightos-intern`; `tools/session_claim.py` arbeitet auf einem
+Klon davon **neben `repo/`** (im Projektordner, Geschwister der Worktrees):
+
+```
+gh repo clone ixamgames-droid/lightos-intern ../lightos-intern   # aus repo/ heraus
+```
+
+Ein anderer Ort geht ueber die Umgebungsvariable `LIGHTOS_TAFEL_REPO=<pfad>`
+(oder `--tafel <pfad>`). Fehlt der Klon, bricht jeder Befehl mit Exit 3 ab und
+nennt genau diesen Klon-Befehl — es gibt **keinen** stillen Rueckfall auf die
+alte Tafel. Ebenso Exit 3, wenn der Ordner kein eigener Klon ist oder sein
+`origin` nicht auf `lightos-intern` zeigt (etwa ein Klon des Code-Repos am
+falschen Ort) — sonst landete die Tafel auf `main` des oeffentlichen Repos.
+
 ```
 git fetch origin                      # 1. Was ist passiert, waehrend ich dachte?
 ./venv/bin/python tools/session_claim.py list        # 2. Wer macht gerade was?
@@ -88,7 +103,7 @@ git fetch origin                      # 1. Was ist passiert, waehrend ich dachte
 ```
 
 **`claim` ist die eine Stelle, die zaehlt.** Es
-1. holt den aktuellen Stand von `origin/sessions`,
+1. holt den aktuellen Stand der Tafel (`origin/main` im Klon von `lightos-intern`),
 2. prueft, ob das Item frei ist,
 3. schreibt die Zeile und **pusht sofort**,
 4. und faengt den Fall ab, dass die andere Sitzung im selben Moment schneller
@@ -104,7 +119,8 @@ deshalb erst **nach** dem Merge `release`. Ein verfallener Claim (laenger als
 4 h ohne `refresh`, etwa weil CI lange dauert) haelt den Merge nicht auf, er
 wird nur als Warnung gemeldet. Der Bericht ohne PR-Nummern zeigt fehlende
 Claims nur an (Exit 1 erst mit `--strict`), Entwuerfe zaehlen nie als
-„Claim fehlt". Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
+„Claim fehlt". Fehlt der Tafel-Klon, ist der Claim „ungeprueft": bei der
+Merge-Pruefung (PR-Nummern) Exit 1 wie ohne Claim, im Bericht nur Warnung. Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
 `pr_bereit.py <PR> --ohne-claim "Begruendung"`.
 
 **Reine Doku-/Backlog-PRs sind schnell gruen (PROC-19):** aendert ein PR nur
@@ -115,23 +131,47 @@ Wer Status-Pflege und Code trennt, haelt die Warteschlange kurz: ein einziger
 Code-, Test- oder Werkzeug-Pfad im PR bedeutet volle Suite. Details:
 `WORKFLOW.md`, Abschnitt „CI-Schnellweg".
 
-### Warum ein eigener Branch `sessions`
+### Warum ein eigenes, privates Repo fuer die Tafel (PROC-25)
 
-Die Tafel liegt auf dem Branch **`sessions`**, nicht auf `main`:
+Die Tafel liegt seit dem 25.10.2026 in einem **privaten** Repo
+`lightos-intern` (Datei `SESSIONS.md` auf `main`), nicht mehr auf dem Branch
+`sessions` dieses oeffentlichen Repos:
 
 * **`main` bleibt geschuetzt.** Die Loop-Guardrail „kein direkter Push auf
-  `main`" gilt weiter unveraendert. Ein Claim ist keine Codeaenderung und
+  `main`" gilt hier weiter unveraendert. Ein Claim ist keine Codeaenderung und
   durchlaeuft deshalb auch keinen PR — er muss in Sekunden sichtbar sein, nicht
-  nach einem Review.
-* **Keine Konflikte mit der eigentlichen Arbeit.** `sessions` enthaelt genau
-  eine Datei. Er wird **nie** nach `main` gemergt.
+  nach einem Review. Im Tafel-Repo wird deshalb direkt gepusht.
+* **Keine Konflikte mit der eigentlichen Arbeit.** Das Tafel-Repo enthaelt nur
+  `SESSIONS.md` und `ENTSCHEIDUNGEN.md`.
+* **Die Tafel ist Arbeitsgespraech, keine Veroeffentlichung.** Briefe zwischen
+  den Sitzungen muessen nicht mehr pseudonymisiert werden. **Zugangsdaten nie**
+  — auch nicht im privaten Repo: vor jedem Schreiben sperrt das Werkzeug
+  Token-, Kennwort- und Schluessel-Muster und bricht ab.
+* **Die oeffentliche CI braucht die Tafel nie.** Kein Workflow liest sie, es
+  gibt dafuer kein Secret; die Tests laufen gegen lokale Wegwerf-Repos.
+
+Der alte Branch `sessions` bleibt bestehen; sein letzter Commit ersetzt die
+Tafel durch einen Hinweis auf den Umzug, die Historie bleibt dort lesbar
+(`git log -p origin/sessions -- SESSIONS.md`). Eingerichtet wurde einmalig mit
+`session_claim.py umzug` (`--trocken` zeigt nur an; ein zweiter Lauf erkennt
+den Umzug). Steht im neuen Repo schon eine Tafel (frueher `claim`, halber
+Umzug), uebernimmt `umzug` fehlende Claims, Blocker und Verlaufszeilen von
+`sessions`, bevor der Hinweis gesetzt wird; ist dasselbe Item auf beiden
+Tafeln von verschiedenen Sitzungen belegt, bricht er ohne Hinweis ab. Nur fuer den Uebergangstag nimmt `LIGHTOS_TAFEL=alt` noch einmal
+den alten Branch (mit Warnung; nach dem Umzug schreibt er dort nichts mehr).
+
+**Offene Entscheidungen** stehen daneben in `ENTSCHEIDUNGEN.md`:
+`session_claim.py entscheidung add "<Frage>" --session A`,
+`entscheidung list` (`--alle` mit erledigten),
+`entscheidung done E-3 --session A --notiz "<wie entschieden>"`.
 
 ### Was gehoert wohin
 
 | Frage | Ort |
 |---|---|
 | *Was ist zu tun? Was wurde gefunden?* | `BACKLOG.md` (unveraendert die einzige Wahrheit) — Neues und Statusaenderungen kommen als Fragment `backlog.d/<ID>.md` dorthin |
-| *Wer arbeitet gerade woran?* | `SESSIONS.md` auf Branch `sessions` |
+| *Wer arbeitet gerade woran?* | `SESSIONS.md` im privaten Tafel-Repo `lightos-intern` |
+| *Was muss der Projektinhaber entscheiden?* | `ENTSCHEIDUNGEN.md` im Tafel-Repo |
 | *Worueber stolpert man gerade?* | Blocker-Abschnitt in `SESSIONS.md` |
 | *Was haben wir daraus gelernt?* | Second Brain — **nur `A` schreibt** |
 
@@ -177,6 +217,11 @@ Konfliktkandidat waere.
 Ein Blocker ist ein Listenpunkt auf der Tafel; eine Frage an eine bestimmte
 Sitzung beginnt mit `AN B:` (bzw. `AN A UND B:`, `AN ALLE:`).
 
+* **Was hinein darf:** die Tafel ist privat — Klarnamen und lokale Pfade
+  sind dort erlaubt. **Zugangsdaten nie** (Token, Kennwoerter, Schluessel):
+  das Werkzeug lehnt sie vor jedem Schreiben ab. Was aus einem Brief ins
+  oeffentliche Repo wandert (Backlog, Changelog, Commit), folgt weiter
+  Abschnitt 3.
 * **Text ueber stdin, nicht als Argument:** `session_claim.py blocker
   --session A --datei - <<'EOF'` … `EOF`. Als Shell-Argument fuehrt die Shell
   Backticks im Text AUS. Mehrere Zeilen werden zu einem Listenpunkt verbunden;
@@ -195,6 +240,7 @@ Sitzung beginnt mit `AN B:` (bzw. `AN A UND B:`, `AN ALLE:`).
   dem **letzten Eintrag jeder Sitzung** (die Lesemarke fuer `list --fuer`) und
   Eintraegen ohne lesbaren Zeitstempel. Der Verlauf vermerkt, wie viele
   verfallen sind; der Volltext bleibt in der Historie:
+  im Tafel-Klon `git log -p origin/main -- SESSIONS.md`, vor dem Umzug
   `git log -p origin/sessions -- SESSIONS.md`. Wer einen Hinweis laenger
   braucht (etwa „Rig nicht neu starten"), schreibt ihn neu. Gemessen vor der
   Regel: 144 Blocker / 253 kB, die Probe danach 37 / 44 kB — und `list --fuer`
@@ -209,6 +255,10 @@ gemeinsame Gedaechtnis der Sitzungen — Befunde zurueckzuhalten waere also kein
 Datenschutz, sondern Arbeitsverweigerung.
 
 **Deshalb die Regel: Inhalt vollstaendig, Person und Nutzdaten pseudonym.**
+
+(Ausgenommen ist die Tafel selbst: sie liegt seit PROC-25 im privaten Repo
+`lightos-intern`, dort gilt nur „keine Zugangsdaten" — siehe Abschnitt 2.
+Was von dort in dieses Repo uebernommen wird, folgt wieder dieser Regel.)
 
 > ★ **Entscheidung vom 26.08.2026 (PRIV-03): die Regel gilt ab jetzt, NICHT
 > rueckwirkend.** Der Bestand — 495 Stellen in 184 Dateien — bleibt stehen;
@@ -335,7 +385,7 @@ Ehrliche Bestandsaufnahme: **was faengt dieser Prozess — und was nicht.**
 
 | # | Fehlerfall | Wird gefangen? | Wodurch |
 |---|---|---|---|
-| 1 | Beide nehmen dasselbe Item | **Ja** | `claim` prueft gegen `origin/sessions`; bei Gleichzeitigkeit lehnt Git den zweiten Push ab, das Werkzeug liest neu und meldet „belegt" |
+| 1 | Beide nehmen dasselbe Item | **Ja** | `claim` prueft gegen den frisch geholten Stand der Tafel; bei Gleichzeitigkeit lehnt Git den zweiten Push ab, das Werkzeug liest neu und meldet „belegt" |
 | 2 | Claim nur lokal, nie gepusht | **Ja** | `claim` pusht selbst; ohne Push gibt es keinen Claim |
 | 3 | Sitzung stirbt, Item bleibt ewig belegt | **Teilweise** | Claims verfallen nach 4 h; das Uebernehmen wird protokolliert. Eine echte Sitzung, die laenger als 4 h an einem Item sitzt, muss `claim --refresh` fahren |
 | 4 | Beide aendern dieselbe Datei aus verschiedenen Items | **Ja (Warnung), seit PROC-16** — sofern beide `--files` angeben | `claim` vergleicht `--files` mit nicht verfallenen Claims anderer Items (Ordner-Praefix, Trenner egal) und warnt — eigene parallele Items als Hinweis; `--strikt` verweigert den Claim (Exit 2). **Vorher gar nicht** verglichen, nur gespeichert. Grenze: eine Datei, die erst waehrend der Arbeit dazukommt, sieht die Pruefung nur, wenn man `claim … --files` nachzieht |

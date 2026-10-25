@@ -529,6 +529,10 @@ class ApcMk2Feedback:
             # Bibliothek-Snap-Toggle: aktiv = Snap liegt im Programmer.
             if getattr(w, "action", None) == ButtonAction.LIBRARY_SNAP:
                 return bool(getattr(w, "_snap_active", False))
+            # VCB-48: Pop-up-Taste leuchtet, solange ihr Feld offen ist.
+            if getattr(w, "action", None) == ButtonAction.POPUP_TOGGLE:
+                offen = getattr(w, "popup_offen", None)
+                return bool(offen()) if callable(offen) else False
             st = get_state()
             fid = getattr(w, "function_id", None)
             if fid is None:

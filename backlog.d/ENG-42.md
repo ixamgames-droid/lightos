@@ -1,6 +1,7 @@
 ID: ENG-42
 Prioritaet: P2
-Status: todo
+Status: review
+Status-Notiz: Haken „Dunkle Lampen durchlassen“ im Matrix-Editor (Stil Dimmer); Untergrund 40 % + Läufer 70 % = genau 70/40 %, Schreib-Protokoll nur helle Lampen; Farbe und Konsolen-Parameter offen; Gegenprüfung: Haken wirkt bei Modify nicht, Cueliste aus den Texten gestrichen (liegt über den Effekten)
 Titel: Echter Läufer über Untergrund -- Haken „dunkle Lampen durchlassen“ (setzt die hellen Lampen genau, statt zu addieren)
 
 **Herkunft:** ENG-35 Schritt 5 „Läufer über Untergrund“; Entscheidung des Projektinhabers vom 19.10.2026: der Modify-Effekt *Addieren* (ENG-37) reicht NICHT allein, zusätzlich soll es einen echten Läufer geben.

@@ -594,6 +594,14 @@ class MainWindow(QMainWindow):
         # Fenster GC-unsichtbar fest (Fallenklasse STAB-09/10).
         self._hw_timer.timeout.connect(self._check_hardware)
         self._hw_timer.start()
+        # NET-15: DMX-Fernsteuerung (Art-Net/sACN-Eingang -> Executor/GM/GO).
+        # Laedt die gespeicherte Zuordnung und richtet die Uebergabe in den
+        # GUI-Thread ein; Empfaenger starten nur, wenn sie aktiv gespeichert ist.
+        try:
+            from src.core.dmx import fernsteuerung
+            fernsteuerung.beim_start()
+        except Exception as e:
+            print(f"[main_window] DMX-Fernsteuerung: {e}")
 
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
