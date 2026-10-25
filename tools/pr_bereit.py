@@ -354,16 +354,29 @@ def main(argv=None) -> int:
                           info.get("mergeable"), alter,
                           bool(info.get("isDraft")), beobachtet)
         if tafel_warnung:
-            claim_ok, claim_grund = True, tafel_warnung
+            # PROC-25 (Gegenpruefung): ungeprueft ist bei der Merge-Pruefung
+            # (PR-Nummern) KEIN gruen — `pr_bereit.py N && gh pr merge N`
+            # haengt am Exit-Code. Dort zaehlt der fehlende Klon wie ein
+            # fehlender Claim (Exit 1, nur `--ohne-claim` hebt ihn auf); beim
+            # Bericht ueber alle offenen PRs bleibt es eine Warnung.
             if u == BEREIT:
                 u = CLAIM_UNGEPRUEFT
-        elif tafel_fehler:
+            entwurf = bool(info.get("isDraft"))
+            if args.ohne_claim:
+                grund = f"{grund}; Claim-Pruefung uebersteuert: {args.ohne_claim}"
+            else:
+                grund = f"{grund}; {tafel_warnung}"
+                ohne_claim += bool(args.pr) and not entwurf
+            if u != BEREIT:
+                nicht_bereit += 1
+            zeilen.append((nr, u, grund, info["title"], info.get("isDraft")))
+            continue
+        if tafel_fehler:
             claim_ok, claim_grund = False, tafel_fehler
         else:
             claim_ok, claim_grund = claim_pruefung(
                 tafel, info.get("headRefName") or "", t)
-        verfallen += (claim_ok and claim_grund.startswith("Warnung")
-                      and not tafel_warnung)
+        verfallen += claim_ok and claim_grund.startswith("Warnung")
         u, grund, fehlt = mit_claim(u, grund, claim_ok, claim_grund,
                                     args.ohne_claim,
                                     bool(info.get("isDraft")))
@@ -381,7 +394,11 @@ def main(argv=None) -> int:
     print()
     print(f"{len(zeilen) - nicht_bereit} von {len(zeilen)} bereit.")
     if tafel_warnung:
-        print(f"⚠ {tafel_warnung} — Exit 1 dafuer nur mit --strict (PROC-25).")
+        print(f"⚠ {tafel_warnung} — "
+              + ("bei der Merge-Pruefung Exit 1 wie ohne Claim (PROC-25); "
+                 "bewusst weiter nur mit --ohne-claim \"Begruendung\"."
+                 if args.pr and not args.ohne_claim else
+                 "Exit 1 dafuer nur mit PR-Nummern oder --strict (PROC-25)."))
     if verfallen:
         print(f"{verfallen} PR(s) mit verfallenem Claim — kein Hindernis, "
               "aber besser `session_claim.py refresh` (PROC-14).")

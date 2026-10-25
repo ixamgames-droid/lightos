@@ -557,9 +557,27 @@ _ZUGANGSMUSTER = (
      re.compile(r"(?<![A-Za-z0-9])xox[abprs]-[A-Za-z0-9-]{10,}")),
     ("Bearer-Token",
      re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{20,}")),
-    ("Kennwort/Geheimnis mit Wert (password=, Kennwort: …)",
-     re.compile(r"(?i)(?<![\w-])(?:password|passwort|passwd|kennwort|"
-                r"secret|api[_-]?key|access[_-]?key)\s*[=:]\s*[^\s,;]")),
+    # ★ Gegenpruefung PROC-25: frueher stand hier ein Lookbehind
+    # ``(?<![\w-])`` — der liess genau die haeufigsten Formen durch:
+    # Umgebungsvariablen (``DB_PASSWORD=``, ``GH_TOKEN=``, ``OPENAI_API_KEY=``)
+    # und deutsche Komposita (``WLAN-Kennwort:``, ``router_kennwort=``). Jetzt
+    # zaehlt nur noch ein BUCHSTABE davor als „anderes Wort" (``Einmalkennwort``
+    # bleibt also ungeprueft — lieber so als ``Zuweisung`` fehlzuschlagen).
+    ("Kennwort/Geheimnis mit Wert (password=, Kennwort: …, DB_PASSWORD=)",
+     re.compile(r"(?i)(?<![a-z])(?:password|passwort|passwd|kennwort|secret|"
+                r"api[_-]?key|access[_-]?key|private[_-]?key)"
+                r"(?![a-z])[ \t]*[=:][ \t]*\n?[ \t]*[^\s,;]")),
+    # Kurze/mehrdeutige Woerter (``Token: der``, ``const PW = 0.5``) nur bei
+    # dichter Zuweisung (``GH_TOKEN=…``, ``pw=…``) oder einem Wert mit Ziffer.
+    ("Token/PIN mit Wert (GH_TOKEN=, token: …, pw=)",
+     re.compile(r"(?i)(?<![a-z])(?:token|pat|pwd|pw|pin)(?![a-z])"
+                r"(?:=[^\s,;]|[ \t]*:[ \t]*\n?[ \t]*[^\s,;]*\d)")),
+    ("Kennwort/Geheimnis in Prosa (Kennwort ist/lautet …, Kennwort fuer X: …)",
+     re.compile(r"(?i)(?<![a-z])(?:passwor[dt]|kennwort|zugangscode)"
+                r"(?![a-z-])[^\n=:.)*]{0,40}?(?:\bist\b|\blautet\b|\bis\b|:)"
+                r"[ \t]*\S")),
+    ("Zugangsdaten in einer URL (://name:kennwort@)",
+     re.compile(r"://[^/\s:@]+:[^/\s@]+@")),
 )
 
 
@@ -628,7 +646,24 @@ def tafel_alt_gewuenscht() -> bool:
     return os.environ.get("LIGHTOS_TAFEL", "").strip().lower() == "alt"
 
 
-def _ist_eigener_klon(pfad: str) -> str | None:
+def _remote_url(repo: str) -> str | None:
+    r = subprocess.run(["git", "remote", "get-url", "origin"], cwd=repo,
+                       capture_output=True)
+    return r.stdout.decode("utf-8", "replace").strip() if r.returncode == 0 else None
+
+
+def _url_kern(url: str) -> str:
+    """``git@github.com:org/x.git``, ``https://…/org/x/`` und ``/tmp/x.git``
+    auf einen Vergleichskern bringen (ohne Schema/Host-Trenner, ohne ``.git``)."""
+    u = url.strip().rstrip("/")
+    if u.endswith(".git"):
+        u = u[:-4]
+    u = re.sub(r"^[a-z+]+://", "", u)
+    u = re.sub(r"^[^@/]+@", "", u)
+    return u.replace(":", "/").lower()
+
+
+def _ist_eigener_klon(pfad: str, code_repo: str | None = None) -> str | None:
     """``None`` = brauchbarer Klon; sonst der Grund, warum nicht.
 
     ★ Nicht nur „``git rev-parse`` geht": ein leerer Ordner INNERHALB eines
@@ -645,10 +680,21 @@ def _ist_eigener_klon(pfad: str) -> str | None:
     echt = os.path.realpath(pfad)
     if gitdir not in (echt, os.path.join(echt, ".git")):
         return "Ordner liegt in einem anderen Repo, ist kein eigener Klon"
-    r = subprocess.run(["git", "remote", "get-url", "origin"], cwd=pfad,
-                       capture_output=True)
-    if r.returncode != 0:
+    url = _remote_url(pfad)
+    if url is None:
         return "Klon ohne Remote 'origin'"
+    # ★ Gegenpruefung PROC-25: ein Klon des OEFFENTLICHEN Code-Repos am Tafel-
+    # Ort (falsches LIGHTOS_TAFEL_REPO, versehentlich `git clone lightos
+    # lightos-intern`) war sonst ein „Tafel-Klon" — Claims samt Klarnamen
+    # landeten per Fast-Forward auf `main` des oeffentlichen Repos.
+    kern = _url_kern(url)
+    if kern.rsplit("/", 1)[-1] != TAFEL_ORDNER:
+        return (f"origin zeigt nicht auf {TAFEL_ORDNER} ({url}) — "
+                "falsches Repo, Tafel bleibt unberuehrt")
+    code = os.path.abspath(code_repo or code_repo_wurzel())
+    code_url = _remote_url(code) if os.path.isdir(code) else None
+    if code_url and _url_kern(code_url) == kern:
+        return "origin ist dasselbe Repo wie das Code-Repo — falsches Repo"
     return None
 
 
@@ -668,7 +714,7 @@ def tafel_ort(code_repo: str | None = None, pfad: str | None = None,
         return TafelOrt(os.path.abspath(code_repo or code_repo_wurzel()),
                         BRANCH_ALT, True)
     ziel = tafel_pfad(code_repo, pfad)
-    grund = _ist_eigener_klon(ziel)
+    grund = _ist_eigener_klon(ziel, code_repo)
     if grund:
         raise TafelFehlt(ziel, grund)
     return TafelOrt(ziel, BRANCH, False)
@@ -1306,14 +1352,40 @@ def ist_umgezogen(ort, spitze: str | None) -> bool:
     return UMZUG_MARKE in _git("show", f"{spitze}:{DATEI}", repo=repo, pruefen=False)
 
 
-def _zeilen_nur_in(a: str, b: str) -> list[str]:
-    """Claim-, Blocker- und Verlaufszeilen, die in ``a`` stehen, in ``b`` nicht."""
-    def wichtig(text):
-        return [z for z in text.splitlines()
-                if z.startswith("- ") or (z.startswith("| ") and not z.startswith("| Item")
-                                          and not z.startswith("| _"))]
-    rest = set(wichtig(b))
-    return [z for z in wichtig(a) if z not in rest]
+def _stempel_schluessel(zeile: str) -> str:
+    """Blocker-/Verlaufszeilen beginnen mit ihrem Stempel — danach sortieren."""
+    return zeile.split(" ", 1)[0]
+
+
+def umzug_nachtrag(alt_inhalt: str, neu_inhalt: str):
+    """``(zusammengefuehrte Tafel | None, Liste der Konflikte, Zaehler)``.
+
+    ★ Gegenpruefung PROC-25: frueher setzte ``umzug`` den Hinweis auch dann,
+    wenn auf ``sessions`` Claims/Blocker standen, die der neuen Tafel fehlten
+    (neue Tafel schon durch einen fruehen ``claim`` entstanden, oder halber
+    Umzug und danach alt weitergeschrieben) — nur eine stderr-Zeile nannte
+    sie, danach war der alte Weg gesperrt. Jetzt werden fehlende Claims,
+    Blocker und Verlaufszeilen UEBERNOMMEN. Ein Item, das auf beiden Tafeln
+    von VERSCHIEDENEN Sitzungen belegt ist, ist ein Konflikt: dann kein
+    Schreiben, kein Hinweis, Exit 1.
+    """
+    alt_t, neu_t = parse(alt_inhalt), parse(neu_inhalt)
+    neu_items = {c["item"].upper(): c for c in neu_t["claims"]}
+    konflikte = [f"{c['item']}: alt {c['sitzung']}, neu "
+                 f"{neu_items[c['item'].upper()]['sitzung']}"
+                 for c in alt_t["claims"]
+                 if c["item"].upper() in neu_items
+                 and neu_items[c["item"].upper()]["sitzung"] != c["sitzung"]]
+    claims = [c for c in alt_t["claims"] if c["item"].upper() not in neu_items]
+    blocker = [b for b in alt_t["blocker"] if b not in set(neu_t["blocker"])]
+    verlauf = [v for v in alt_t["verlauf"] if v not in set(neu_t["verlauf"])]
+    zaehler = (len(claims), len(blocker), len(verlauf))
+    if konflikte or not any(zaehler):
+        return None, konflikte, zaehler
+    neu_t["claims"] += claims
+    neu_t["blocker"] = sorted(neu_t["blocker"] + blocker, key=_stempel_schluessel)
+    neu_t["verlauf"] = sorted(neu_t["verlauf"] + verlauf, key=_stempel_schluessel)
+    return neu_t, konflikte, zaehler
 
 
 def cmd_umzug(args) -> int:
@@ -1321,12 +1393,13 @@ def cmd_umzug(args) -> int:
 
     Reihenfolge mit Absicht: erst das NEUE Repo beschreiben, dann den Hinweis
     auf ``sessions`` setzen. Bricht dazwischen etwas ab, ist nichts verloren —
-    die alte Tafel steht noch, der zweite Lauf erkennt die neue und setzt nur
-    noch den Hinweis.
+    die alte Tafel steht noch, der zweite Lauf erkennt die neue, uebernimmt,
+    was auf ``sessions`` seither dazukam (:func:`umzug_nachtrag`), und setzt
+    erst dann den Hinweis.
     """
     code = os.path.abspath(args.repo)
     ziel = tafel_pfad(code, args.tafel)
-    grund = _ist_eigener_klon(ziel)
+    grund = _ist_eigener_klon(ziel, code)
     if grund:
         print(TafelFehlt(ziel, grund), file=sys.stderr)
         return 3
@@ -1364,15 +1437,25 @@ def cmd_umzug(args) -> int:
     hinweis = umzug_hinweis(datum)
     assert not pruefe_oeffentlich(hinweis), "Hinweistext ist nicht oeffentlich tauglich"
 
-    nachtrag = []
+    zusammen, konflikte, zaehler = None, [], (0, 0, 0)
     if neu_da and not alt_umgezogen:
-        # Zweiter Lauf nach halbem Umzug: kam auf `sessions` seither etwas dazu?
-        nachtrag = _zeilen_nur_in(alt_inhalt, neu_inhalt)
+        # Neue Tafel schon da (frueher `claim` oder halber Umzug): was auf
+        # `sessions` steht und neu fehlt, wird uebernommen — nicht nur genannt.
+        zusammen, konflikte, zaehler = umzug_nachtrag(alt_inhalt, neu_inhalt)
+    if konflikte:
+        print(f"Abgebrochen — Items auf beiden Tafeln von verschiedenen "
+              f"Sitzungen belegt: {'; '.join(konflikte)}. Nichts geschrieben, "
+              f"kein Hinweis auf origin/{BRANCH_ALT}. Erst klaeren (release auf "
+              f"einer Seite), dann umzug erneut.", file=sys.stderr)
+        return 1
     e_da = bool(lade_datei(neu, DATEI_ENTSCHEIDUNGEN)[0].strip())
     t = parse(quelle)
     print(f"Umzug der Tafel nach {TAFEL_ORDNER} ({ziel}):")
     print(f"  1) {TAFEL_ORDNER} origin/{BRANCH}: "
-          + ("uebersprungen — Tafel schon da" if neu_da else
+          + ((f"Tafel schon da — uebernimmt von origin/{BRANCH_ALT} "
+              f"{zaehler[0]} Claim(s), {zaehler[1]} Blocker, {zaehler[2]} "
+              f"Verlaufszeile(n)" if zusammen else
+              "uebersprungen — Tafel schon da") if neu_da else
              f"SESSIONS.md ({len(quelle.encode('utf-8'))} Bytes, "
              f"{len(t['claims'])} Claims, {len(t['blocker'])} Blocker)"
              + ("" if e_da else " + leere ENTSCHEIDUNGEN.md")))
@@ -1380,12 +1463,6 @@ def cmd_umzug(args) -> int:
           + ("uebersprungen — Hinweis steht schon" if alt_umgezogen else
              f"letzter Commit, SESSIONS.md -> Hinweis „{UMZUG_MARKE} am "
              f"{datum}; Historie bleibt hier“ (Branch bleibt bestehen)"))
-    if nachtrag:
-        print(f"⚠ Auf origin/{BRANCH_ALT} stehen {len(nachtrag)} Zeile(n), die "
-              f"in {TAFEL_ORDNER} fehlen — nach dem Umzug von Hand uebertragen:",
-              file=sys.stderr)
-        for z in nachtrag:
-            print(f"    {z}", file=sys.stderr)
     if args.trocken:
         print("(--trocken: nichts geschrieben)")
         return 0
@@ -1402,12 +1479,21 @@ def cmd_umzug(args) -> int:
                   file=sys.stderr)
             return 1
         print(f"  ✓ {TAFEL_ORDNER}: Tafel geschrieben")
+    elif zusammen:
+        if not _schreibe_dateien(neu, {DATEI: rendere(zusammen)}, neu_spitze,
+                                 f"umzug: Nachtrag aus origin/{BRANCH_ALT} "
+                                 f"({wer}, {datum})"):
+            print(f"{TAFEL_ORDNER}: Push abgelehnt — dort hat jemand gleichzeitig "
+                  "geschrieben. Kein Hinweis gesetzt; umzug erneut ausfuehren.",
+                  file=sys.stderr)
+            return 1
+        print(f"  ✓ {TAFEL_ORDNER}: fehlende Eintraege uebernommen")
     if not alt_umgezogen:
         if not _schreibe_dateien(alt, {DATEI: hinweis}, alt_spitze,
                                  f"umzug: Tafel {UMZUG_MARKE} am {datum}"):
             print(f"origin/{BRANCH_ALT}: Push abgelehnt — dort hat jemand "
                   "waehrend des Umzugs geschrieben. Die neue Tafel steht; umzug "
-                  "erneut ausfuehren, er zeigt die nachzutragenden Zeilen.",
+                  "erneut ausfuehren, er uebernimmt die neuen Zeilen.",
                   file=sys.stderr)
             return 1
         print(f"  ✓ origin/{BRANCH_ALT}: Hinweis gesetzt (Branch bleibt, Historie bleibt)")

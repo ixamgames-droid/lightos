@@ -114,7 +114,7 @@ class SchreibSeiteTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="lightos_proc08_")
-        bare = os.path.join(self.tmp, "origin.git")
+        bare = os.path.join(self.tmp, "lightos-intern.git")
         _git("init", "--quiet", "--bare", bare)
         self.a, self.b = (self._klon(bare, n) for n in ("a", "b"))
 

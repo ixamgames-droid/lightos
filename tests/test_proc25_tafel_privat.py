@@ -43,6 +43,21 @@ _FALSCH = {
     "password": "pass" + "word=" + "hunter2",
     "kennwort": "Kenn" + "wort: " + "Sommer2026",
     "sk": "s" + "k-ant-" + "abcdefghij" * 3,
+    # Gegenpruefung: Praefixe/Komposita, Token, URL, Prosa
+    "db_password": "DB_PASS" + "WORD=" + "hunter2",
+    "openai": "OPENAI_API" + "_KEY=" + "abcdef",
+    "client_secret": "client_sec" + "ret=" + "xyz",
+    "aws_secret": "AWS_SECRET_ACC" + "ESS_KEY=" + "abc",
+    "wlan": "WLAN-Kenn" + "wort: " + "abc",
+    "router": "router_kenn" + "wort=" + "abc",
+    "gh_token": "GH_TO" + "KEN=" + "abc123def",
+    "token": "to" + "ken: " + "abc123",
+    "url": "https://user:" + "hunter2" + "@github.com/x",
+    "prosa_ist": "Pass" + "wort ist: " + "hunter2",
+    "prosa_fuer": "Kenn" + "wort für den Router: " + "abc",
+    "prosa_lautet": "Kenn" + "wort lautet " + "hunter2",
+    "pw": "p" + "w=" + "hunter2",
+    "zeilenumbruch": "PASS" + "WORD:\n" + "hunter2",
 }
 
 
@@ -77,7 +92,7 @@ class _Projekt(unittest.TestCase):
         self.projekt = os.path.join(self.tmp, "projekt")
         os.makedirs(self.projekt)
         self.code_bare = self._bare("code.git")
-        self.tafel_bare = self._bare("tafel.git")
+        self.tafel_bare = self._bare("lightos-intern.git")
         self.code = self._klon(self.code_bare, os.path.join(self.projekt, "repo"))
         self.klon = os.path.join(self.projekt, sc.TAFEL_ORDNER)
         self.namen = os.path.join(self.tmp, "klarnamen.txt")
@@ -169,6 +184,60 @@ class OrtTest(_Projekt):
         with self.assertRaises(sc.TafelFehlt) as e:
             sc.tafel_ort(self.code, drin)
         self.assertIn("gh repo clone", str(e.exception))
+
+    def test_klon_ohne_origin_ist_exit_3(self):
+        os.makedirs(self.klon)
+        _git("init", "--quiet", self.klon)
+        rc, _, err = self._main("claim", "X-1", "--session", "A", "--files", "x")
+        self.assertEqual(rc, 3)
+        self.assertIn("ohne Remote 'origin'", err)
+
+    def test_klon_des_code_repos_am_tafel_ort_wird_abgelehnt(self):
+        # Gegenpruefung: `git clone lightos lightos-intern` aus Versehen —
+        # sonst landete die Tafel per Fast-Forward auf `main` des Code-Repos.
+        self._klon(self.code_bare, self.klon)
+        rc, _, err = self._main("blocker", "hallo", "--session", "A")
+        self.assertEqual(rc, 3)
+        self.assertIn("nicht auf lightos-intern", err)
+        self.assertNotIn("SESSIONS.md", _git("ls-tree", "-r", "--name-only",
+                                             "main", repo=self.code_bare)
+                         if _git("branch", "--list", "main", repo=self.code_bare) else "")
+
+    def test_tafel_repo_gleich_code_repo_wird_abgelehnt(self):
+        with mock.patch.dict(os.environ, {"LIGHTOS_TAFEL_REPO": self.code}):
+            rc, _, err = self._main("claim", "X-1", "--session", "A", "--files", "x")
+        self.assertEqual(rc, 3)
+        self.assertEqual(_git("branch", "--list", "main", repo=self.code_bare), "")
+
+    def test_code_repo_mit_namen_lightos_intern_wird_abgelehnt(self):
+        # Selbst wenn die URL zufaellig passt: dasselbe Repo wie der Code -> nein.
+        zwilling = self._bare(os.path.join("x", sc.TAFEL_ORDNER + ".git"))
+        _git("remote", "set-url", "origin", zwilling, repo=self.code)
+        self._klon(zwilling, self.klon)
+        rc, _, err = self._main("claim", "X-1", "--session", "A", "--files", "x")
+        self.assertEqual(rc, 3)
+        self.assertIn("dasselbe Repo", err)
+
+    def test_worktree_des_code_repos_wird_abgelehnt(self):
+        # Ein Worktree hat sein Git-Verzeichnis unter `repo/.git/worktrees/…`
+        # (gemeinsames git-common-dir) — die Pruefung „eigener Klon" faengt
+        # ihn schon, auch wenn die URL-Pruefung (hier vorgetaeuscht) passte.
+        _git("commit", "--quiet", "--allow-empty", "-m", "basis", repo=self.code)
+        _git("worktree", "add", "--quiet", "--detach", self.klon, repo=self.code)
+        echt = os.path.realpath(self.klon)
+        urls = lambda repo: ("/x/" + sc.TAFEL_ORDNER + ".git"
+                             if os.path.realpath(repo) == echt else "/x/lightos.git")
+        with mock.patch.object(sc, "_remote_url", urls):
+            grund = sc._ist_eigener_klon(self.klon, self.code)
+        self.assertIn("kein eigener Klon", grund or "")
+
+    def test_url_formen_von_github(self):
+        for url in ("git@github.com:ixamgames-droid/lightos-intern.git",
+                    "https://github.com/ixamgames-droid/lightos-intern",
+                    "https://github.com/ixamgames-droid/lightos-intern.git/"):
+            self.assertTrue(sc._url_kern(url).endswith("/lightos-intern"), url)
+        self.assertFalse(sc._url_kern(
+            "https://github.com/ixamgames-droid/lightos.git").endswith("/lightos-intern"))
 
     def test_mit_klon_schreibt_auf_main_des_tafel_repos(self):
         self._tafel_klonen()
@@ -264,21 +333,73 @@ class UmzugTest(_Projekt):
         self.assertEqual(self._sessions_spitze(), alt)
         self.assertEqual(_git("ls-remote", self.tafel_bare), neu)
 
-    def test_halber_umzug_setzt_nur_noch_den_hinweis_und_nennt_nachtraege(self):
+    def _neue_tafel(self):
+        return _git("show", f"origin/{sc.BRANCH}:{sc.DATEI}", repo=self.klon) \
+            if not _git("fetch", "--quiet", "origin", repo=self.klon) else ""
+
+    def test_halber_umzug_uebernimmt_nachtraege_und_setzt_dann_den_hinweis(self):
+        # Gegenpruefung: frueher nur auf stderr genannt, Hinweis trotzdem
+        # gesetzt — der Blocker fehlte danach auf der lebenden Tafel.
         neu = sc.TafelOrt(self.klon)
         self.assertTrue(sc._schreibe_dateien(neu, {sc.DATEI: self.alt_inhalt},
                                              None, "umzug: halb"))
         tafel = sc.parse(self.alt_inhalt)
         tafel["blocker"].append("2026-10-25T09:00Z (B) nach dem ersten Lauf")
+        tafel["claims"].append({"item": "ALT-2", "sitzung": "B", "branch": "-",
+                                "seit": "2026-10-25T09:00Z", "dateien": "-"})
         ort = sc.TafelOrt(self.code, sc.BRANCH_ALT, True)
         _, spitze = sc.lade_tafel(ort)
         self.assertTrue(sc._schreibe_dateien(ort, {sc.DATEI: sc.rendere(tafel)},
                                              spitze, "B schreibt noch alt"))
         rc, out, err = self._main("umzug")
         self.assertEqual(rc, 0, err)
-        self.assertIn("nach dem ersten Lauf", err)
+        lebend = self._neue_tafel()
+        self.assertIn("nach dem ersten Lauf", lebend)
+        self.assertIn("ALT-2", lebend)
+        self.assertIn("OUT-51", lebend)
         self.assertIn(sc.UMZUG_MARKE, _git("show", f"{self._sessions_spitze()}:{sc.DATEI}",
                                            repo=self.code))
+
+    def test_frueher_claim_auf_neuer_tafel_verliert_die_alte_nicht(self):
+        self.assertEqual(self._main("claim", "NEU-1", "--session", "C",
+                                    "--files", "x")[0], 0)
+        rc, out, err = self._main("umzug")
+        self.assertEqual(rc, 0, err)
+        lebend = self._neue_tafel()
+        for wort in ("NEU-1", "OUT-51", "Rig laeuft"):
+            self.assertIn(wort, lebend)
+        t = sc.parse(lebend)
+        self.assertEqual(sorted(c["item"] for c in t["claims"]), ["NEU-1", "OUT-51"])
+
+    def test_trocken_mit_nachtrag_schreibt_nichts(self):
+        self._main("claim", "NEU-1", "--session", "C", "--files", "x")
+        vorher = _git("ls-remote", self.tafel_bare)
+        alt = self._sessions_spitze()
+        rc, out, _ = self._main("umzug", "--trocken")
+        self.assertEqual(rc, 0)
+        self.assertIn("uebernimmt", out)
+        self.assertEqual(_git("ls-remote", self.tafel_bare), vorher)
+        self.assertEqual(self._sessions_spitze(), alt)
+
+    def test_konflikt_beim_nachtrag_bricht_ohne_hinweis_ab(self):
+        self._main("claim", "OUT-51", "--session", "C", "--files", "x")
+        alt = self._sessions_spitze()
+        rc, _, err = self._main("umzug")
+        self.assertEqual(rc, 1)
+        self.assertIn("OUT-51", err)
+        self.assertEqual(self._sessions_spitze(), alt)
+        self.assertNotIn(sc.UMZUG_MARKE, _git("show", f"{alt}:{sc.DATEI}", repo=self.code))
+
+    def test_hinweis_von_hand_gesetzt_neue_tafel_traegt_den_vorgaenger(self):
+        ort = sc.TafelOrt(self.code, sc.BRANCH_ALT, True)
+        _, spitze = sc.lade_tafel(ort)
+        self.assertTrue(sc._schreibe_dateien(
+            ort, {sc.DATEI: sc.umzug_hinweis("2026-10-25")}, spitze, "von Hand"))
+        rc, out, err = self._main("umzug")
+        self.assertEqual(rc, 0, err)
+        lebend = self._neue_tafel()
+        self.assertIn("OUT-51", lebend)
+        self.assertNotIn(sc.UMZUG_MARKE, lebend)
 
     def test_umzug_ohne_klon_bricht_ab(self):
         shutil.rmtree(self.klon)
@@ -320,7 +441,13 @@ class ZugangsdatenTest(_Projekt):
                      "GITHUB_TOKEN kommt aus den Actions",
                      "Kennwort nie auf die Tafel",
                      "ghp ist ein Praefix", "sk-1 kurz", "AKIA kurz",
-                     "secrets: sind in CI nicht noetig"):
+                     "secrets: sind in CI nicht noetig",
+                     "Kennwort-Sperre gebaut (PROC-25)", "Token-Pruefung ergaenzt",
+                     "Das Kennwort steht im Tresor", "neues Token: der Server",
+                     "DMX-Pin 3 belegt", "nur ohne Bus-Pin erreichbar). **Abnahme:** ok",
+                     "PAT anlegen ist Aufgabe von A", "tokenize.py: Fehler behoben",
+                     "Siehe https://github.com/ixamgames-droid/lightos/pull/12",
+                     "const PW = 0.5"):
             with self.subTest(text=text):
                 self.assertEqual(sc.pruefe_zugangsdaten(text), [])
 
@@ -429,7 +556,9 @@ class LeserTest(_Projekt):
         def fehlt():
             raise sc.TafelFehlt(self.klon)
 
-        for argv, erwartet in ((["900"], 0), (["900", "--strict"], 1)):
+        # Gegenpruefung: Merge-Pruefung (PR-Nummern) ohne Klon = Exit 1 wie
+        # ohne Claim — `pr_bereit.py N && gh pr merge N` darf nicht durchlaufen.
+        for argv, erwartet in ((["900"], 1), (["900", "--strict"], 1)):
             with self.subTest(argv=argv), \
                     mock.patch.object(pr_bereit, "_gh_json", gh_json), \
                     mock.patch.object(pr_bereit, "_lade_tafel", fehlt):
@@ -439,6 +568,32 @@ class LeserTest(_Projekt):
             self.assertIn("gh repo clone", out)
             self.assertNotIn("✓ #900", out)
             self.assertNotIn("verfallenem Claim", out)
+
+        with mock.patch.object(pr_bereit, "_gh_json", gh_json), \
+                mock.patch.object(pr_bereit, "_lade_tafel", fehlt):
+            rc, out, _ = _ruhig(pr_bereit.main, ["900", "--ohne-claim", "Rig-Test"])
+        self.assertEqual(rc, 0, out)
+        self.assertIn("uebersteuert: Rig-Test", out)
+
+        def gh_json_liste(*args):
+            if args[:2] == ("pr", "list"):
+                return [{"number": 900}]
+            return gh_json(*args)
+        with mock.patch.object(pr_bereit, "_gh_json", gh_json_liste), \
+                mock.patch.object(pr_bereit, "_lade_tafel", fehlt):
+            rc, out, _ = _ruhig(pr_bereit.main, [])
+        self.assertEqual(rc, 0, out)            # Bericht: nur Warnung
+        self.assertIn(pr_bereit.CLAIM_UNGEPRUEFT, out)
+
+    def test_lies_tafel_text_holt_mit_holen_den_neuen_stand(self):
+        self._tafel_klonen()
+        self._main("claim", "DOC-1", "--session", "A", "--files", "x")
+        sc.lies_tafel_text(self.code, holen=True)
+        zweit = self._klon(self.tafel_bare, os.path.join(self.tmp, "zweit"))
+        self.assertEqual(_ruhig(sc.main, ["--tafel", zweit, "claim", "DOC-2",
+                                          "--session", "B", "--files", "y"])[0], 0)
+        self.assertNotIn("DOC-2", sc.lies_tafel_text(self.code).text)
+        self.assertIn("DOC-2", sc.lies_tafel_text(self.code, holen=True).text)
 
 
 class CiBrauchtDieTafelNieTest(unittest.TestCase):

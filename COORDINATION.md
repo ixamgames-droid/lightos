@@ -88,7 +88,9 @@ gh repo clone ixamgames-droid/lightos-intern ../lightos-intern   # aus repo/ her
 Ein anderer Ort geht ueber die Umgebungsvariable `LIGHTOS_TAFEL_REPO=<pfad>`
 (oder `--tafel <pfad>`). Fehlt der Klon, bricht jeder Befehl mit Exit 3 ab und
 nennt genau diesen Klon-Befehl — es gibt **keinen** stillen Rueckfall auf die
-alte Tafel.
+alte Tafel. Ebenso Exit 3, wenn der Ordner kein eigener Klon ist oder sein
+`origin` nicht auf `lightos-intern` zeigt (etwa ein Klon des Code-Repos am
+falschen Ort) — sonst landete die Tafel auf `main` des oeffentlichen Repos.
 
 ```
 git fetch origin                      # 1. Was ist passiert, waehrend ich dachte?
@@ -117,7 +119,8 @@ deshalb erst **nach** dem Merge `release`. Ein verfallener Claim (laenger als
 4 h ohne `refresh`, etwa weil CI lange dauert) haelt den Merge nicht auf, er
 wird nur als Warnung gemeldet. Der Bericht ohne PR-Nummern zeigt fehlende
 Claims nur an (Exit 1 erst mit `--strict`), Entwuerfe zaehlen nie als
-„Claim fehlt". Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
+„Claim fehlt". Fehlt der Tafel-Klon, ist der Claim „ungeprueft": bei der
+Merge-Pruefung (PR-Nummern) Exit 1 wie ohne Claim, im Bericht nur Warnung. Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
 `pr_bereit.py <PR> --ohne-claim "Begruendung"`.
 
 **Reine Doku-/Backlog-PRs sind schnell gruen (PROC-19):** aendert ein PR nur
@@ -151,7 +154,10 @@ Der alte Branch `sessions` bleibt bestehen; sein letzter Commit ersetzt die
 Tafel durch einen Hinweis auf den Umzug, die Historie bleibt dort lesbar
 (`git log -p origin/sessions -- SESSIONS.md`). Eingerichtet wurde einmalig mit
 `session_claim.py umzug` (`--trocken` zeigt nur an; ein zweiter Lauf erkennt
-den Umzug). Nur fuer den Uebergangstag nimmt `LIGHTOS_TAFEL=alt` noch einmal
+den Umzug). Steht im neuen Repo schon eine Tafel (frueher `claim`, halber
+Umzug), uebernimmt `umzug` fehlende Claims, Blocker und Verlaufszeilen von
+`sessions`, bevor der Hinweis gesetzt wird; ist dasselbe Item auf beiden
+Tafeln von verschiedenen Sitzungen belegt, bricht er ohne Hinweis ab. Nur fuer den Uebergangstag nimmt `LIGHTOS_TAFEL=alt` noch einmal
 den alten Branch (mit Warnung; nach dem Umzug schreibt er dort nichts mehr).
 
 **Offene Entscheidungen** stehen daneben in `ENTSCHEIDUNGEN.md`:

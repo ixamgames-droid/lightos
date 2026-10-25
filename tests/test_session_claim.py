@@ -71,7 +71,7 @@ class _TafelRepos(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="lightos_claim_")
-        self.bare = os.path.join(self.tmp, "origin.git")
+        self.bare = os.path.join(self.tmp, "lightos-intern.git")
         _git("init", "--quiet", "--bare", self.bare)
         self.a = self._klon("a")
         self.b = self._klon("b")
@@ -512,7 +512,7 @@ class EchtesRennenTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="lightos_claim_")
-        self.bare = os.path.join(self.tmp, "origin.git")
+        self.bare = os.path.join(self.tmp, "lightos-intern.git")
         _git("init", "--quiet", "--bare", self.bare)
         self.a = self._klon("a")
         self.b = self._klon("b")
