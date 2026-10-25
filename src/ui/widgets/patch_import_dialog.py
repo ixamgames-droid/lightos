@@ -313,6 +313,9 @@ class PatchImportDialog(QDialog):
                 item.setText(text)
                 item.setToolTip(text)
             status = self._table.item(zeile, S_STATUS)
+            # IMP-4: fasst der Satz mehrere Ueberschneidungen zusammen, nennt
+            # der Tooltip alle einzeln.
+            status.setToolTip(pz.status_tooltip)
             status.setForeground(QColor(_FARBE[pz.status]))
             # IMP-3: ein umbenanntes Geraet faellt in der Spalte „Name“ auf
             # (fett, Hinweisfarbe); der Tooltip nennt alten und neuen Namen.
@@ -447,6 +450,9 @@ class PatchImportDialog(QDialog):
 
     def status_text(self, zeile: int) -> str:
         return self._table.item(zeile, S_STATUS).text()
+
+    def status_tooltip(self, zeile: int) -> str:
+        return self._table.item(zeile, S_STATUS).toolTip()
 
     def anwenden_moeglich(self) -> bool:
         return self._btn_anwenden.isEnabled()
