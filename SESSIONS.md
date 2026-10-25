@@ -38,7 +38,7 @@
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-25T12:03Z | - |
 | SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-25T12:03Z | - |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-25T12:03Z | - |
-| UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-20T14:26Z | - |
+| UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-25T12:03Z | - |
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-20T15:21Z | - |
 | VCB-48 | A | feat/vcb48-popup-tasten | 2026-10-20T16:15Z | src/ui/virtualconsole/vc_button.py · src/ui/virtualconsole/vc_frame.py · src/ui/virtualconsole/vc_canvas.py |
 | NET-15 | A | feat/net15-dmx-fernsteuerung | 2026-10-20T16:55Z | src/core/artnet_input.py · src/core/sacn_input.py |
