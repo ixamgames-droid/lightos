@@ -35,7 +35,7 @@
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-25T12:03Z | - |
 | ENG-43 | A | feat/eng43-bewegung-modify-versatz | 2026-10-25T12:03Z | - |
-| SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-25T12:03Z | - |
+| SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-25T13:10Z | backlog.d/* |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-25T12:03Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-25T12:03Z | - |
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-25T12:04Z | - |
@@ -95,7 +95,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z D done QA-91
 - 2026-10-20T16:56Z D done DOC-70
 - 2026-10-20T16:56Z D done TOOL-21
 - 2026-10-20T16:56Z B done VIZ-106
@@ -125,3 +124,4 @@
 - 2026-10-25T12:39Z A claim PRIV-06
 - 2026-10-25T12:42Z A claim PROC-25
 - 2026-10-25T13:10Z A claim ENG-35
+- 2026-10-25T13:10Z A aktualisiert SAMMEL-BACKLOG-1020: Dateien - -> backlog.d/*
