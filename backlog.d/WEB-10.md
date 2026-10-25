@@ -1,7 +1,7 @@
 ID: WEB-10
 Prioritaet: P2
 Status: review
-Status-Notiz: zusammengeführt in WEB-12 (Zweig feat/web12-handy-konsole-sicher, Entwurfs-PR #1039); Merge erst nach den Sicherheits-Korrekturen aus QA-96
+Status-Notiz: zusammengeführt in WEB-12-PR (Zweig feat/web12-handy-konsole-sicher), ersetzt #1039
 Titel: Handy-Konsole, Slice 3: Seitenleiste „Handy-Konsole“ im VC-Editor — die Handy-Konsole selbst bauen
 Nach: WEB-09
 

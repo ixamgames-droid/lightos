@@ -1,7 +1,7 @@
 ID: WEB-11
 Prioritaet: P2
 Status: review
-Status-Notiz: zusammengeführt in WEB-12 (Zweig feat/web12-handy-konsole-sicher, Entwurfs-PR #1041); Merge erst nach den Sicherheits-Korrekturen aus QA-96
+Status-Notiz: zusammengeführt in WEB-12-PR (Zweig feat/web12-handy-konsole-sicher), ersetzt #1041
 Titel: Handy-Konsole, Slice 4: QR-Code zum Verbinden und „App auf dem Startbildschirm“
 Nach: WEB-10
 

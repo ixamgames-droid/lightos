@@ -1,7 +1,7 @@
 ID: WEB-08
 Prioritaet: P2
 Status: review
-Status-Notiz: zusammengeführt in WEB-12 (Zweig feat/web12-handy-konsole-sicher, Entwurfs-PR #1028); Merge erst nach den Sicherheits-Korrekturen aus QA-96
+Status-Notiz: zusammengeführt in WEB-12-PR (Zweig feat/web12-handy-konsole-sicher), ersetzt #1028
 Titel: Handy-Konsole, Slice 1: feste Kennung je VC-Widget + Fernauslösung über die Kennung
 Nach: WEB-07
 

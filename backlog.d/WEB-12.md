@@ -1,7 +1,7 @@
 ID: WEB-12
 Prioritaet: P1
 Status: review
-Status-Notiz: umgesetzt auf Zweig feat/web12-handy-konsole-sicher zusammen mit WEB-08…11 (PRs #1028, #1030, #1039, #1041)
+Status-Notiz: umgesetzt auf Zweig feat/web12-handy-konsole-sicher zusammen mit WEB-08…11 (ersetzt PRs #1028, #1030, #1039, #1041); Bestandsaufnahme 25.10.: jeder Punkt der Fertig-Liste mit Test und Gegenprobe, Nacharbeit Tipp auf fremd gehaltene Taste und Anleitungs-Wächter
 Titel: Handy-Konsole: Sicherheits-Korrekturen aus QA-96 — getrennte Rechte, kein ungewollter Weg zum Laser, Schlüssel nicht im Log, NOT-AUS am Handy
 
 **Herkunft:** großer Bedientest QA-96 (11./12.10.2026, Sitzung A). Von A auf der Tafel belegt (Zweig `fix/web12-handy-rechte-laser`, nie begonnen) und als Auftrag ausformuliert; nie als Backlog-Zeile angelegt — nachgetragen am 20.10.2026. Die vier Handy-PRs WEB-08…11 stehen seitdem als Entwurf.

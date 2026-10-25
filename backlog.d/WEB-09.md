@@ -1,7 +1,7 @@
 ID: WEB-09
 Prioritaet: P2
 Status: review
-Status-Notiz: zusammengeführt in WEB-12 (Zweig feat/web12-handy-konsole-sicher, Entwurfs-PR #1030); Merge erst nach den Sicherheits-Korrekturen aus QA-96
+Status-Notiz: zusammengeführt in WEB-12-PR (Zweig feat/web12-handy-konsole-sicher), ersetzt #1030
 Titel: Handy-Konsole, Slice 2: Handy-Seiten in der Show, Freigabe nur für diese, Rückmeldung Pult → Handy, Handy-Ansicht `/konsole`
 Nach: WEB-08
 
