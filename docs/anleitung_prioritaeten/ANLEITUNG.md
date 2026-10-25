@@ -60,12 +60,27 @@ der Effekte darunter und rechnet deshalb absichtlich direkt nach der Stufe „Ef
    Gobo oder Sonstiges. Steht dort **unbekannt**, lässt sich das nicht aus der Show ablesen
    (zum Beispiel bei einem Skript oder einer Szene mit Geräten, die nicht mehr gepatcht sind).
 4. Ein laufender Effekt ist fett und trägt **● läuft**.
-5. Stufe ändern — vier Wege, alle auch für mehrere Zeilen (Strg oder Umschalt beim Klicken):
+5. Die Spalte **Verdeckt** zeigt live, ob ein laufender Effekt wirklich ankommt. Liegt
+   jemand darüber, steht dort zum Beispiel **verdeckt von Blinder auf 4 Geräten** — oder
+   **verdeckt von Programmer auf 2 Geräten**, **verdeckt von Snap auf 1 Gerät**,
+   **verdeckt von Cueliste auf 3 Geräten**. Leer heißt: der Effekt läuft nicht, schreibt
+   gerade nichts oder kommt auf allen seinen Geräten an. Der Tooltip der Zelle nennt
+   zusätzlich, auf wie vielen Geräten der Effekt **gewinnt**, und alle Verdecker.
+   - Ein Gerät zählt als verdeckt, sobald **ein** Kanal, den der Effekt dort schreibt, am
+     Ende von jemand anderem kommt (zum Beispiel nur der Dimmer).
+   - **Modify-Effekte** verdecken nie: sie rechnen auf das fertige Bild drauf.
+   - **Snap** heißt eine Snap-Taste mit dem Haken **übersteuert laufende Dimmer-Effekte**;
+     alle anderen Werte aus Programmer und Snap-Tasten heißen **Programmer**.
+   - Läuft ein Effekt in einer **Sammlung** oder **Show**, schreibt er für sie — die Spalte
+     steht dann an der Zeile der Sammlung bzw. Show, an der des Mitglieds bleibt sie leer.
+   - Die Spalte zieht etwa dreimal je Sekunde nach, nur solange der Reiter zu sehen ist.
+     Ausgeblendet kostet sie nichts.
+6. Stufe ändern — vier Wege, alle auch für mehrere Zeilen (Strg oder Umschalt beim Klicken):
    - die Zeile in eine andere Stufe **ziehen**,
    - **▲ Stufe höher** / **▼ Stufe tiefer**,
    - im Feld **Auswahl in Stufe** die Stufe wählen,
    - Rechtsklick → **In Stufe „…“**.
-6. Jede Änderung ist **ein** Schritt für **Bearbeiten → Rückgängig**, auch wenn sie mehrere
+7. Jede Änderung ist **ein** Schritt für **Bearbeiten → Rückgängig**, auch wenn sie mehrere
    Effekte betrifft.
 
 Nicht in der Liste stehen Audio-Funktionen (sie schreiben kein DMX) und ungespeicherte
@@ -206,11 +221,12 @@ alle Geräte der Mitglieder und die Stufe des Behälters.
 - **Kein „Untergrund“:** Ein Dimmer-Lauflicht schreibt für *jede* seiner Lampen einen Wert,
   auch 0 für die gerade dunklen. Liegt es über einem anderen Dimmer-Effekt, verdeckt es ihn
   auf diesen Lampen vollständig — eine höhere Stufe macht daraus keinen Läufer *über* einem
-  Untergrund. Einen Läufer über einem Untergrund baust du heute mit einem **Modify-Effekt** in
-  der Betriebsart *Addieren*: er legt auf die Läufer-Lampen obendrauf und lässt alle anderen
-  unberührt (Anleitung [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md)).
-  Geplant ist zusätzlich ein echter Läufer mit dem Haken „dunkle Lampen durchlassen“, der die
-  hellen Lampen genau setzt statt zu addieren (Backlog ENG-42).
+  Untergrund. Dafür gibt es im Matrix-Editor (Stil Dimmer) den Haken **Dunkle Lampen
+  durchlassen**: dann setzt der Effekt nur seine hellen Lampen (auch den Schweif) genau auf
+  seinen Wert, in seiner Stufe — die dunklen gehören dem, was darunter läuft. Anders als ein
+  **Modify-Effekt** in der Betriebsart *Addieren* (legt obendrauf, 40 % + 70 % = 100 %;
+  Anleitung [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md))
+  stehen dort genau 70 %.
 - **Master und Blackout:** Grand Master, Gruppen-Fader, Blackout und Laser-NOT-AUS wirken
   nach allen Effekten, egal auf welcher Stufe.
 
@@ -227,3 +243,4 @@ Diese Anleitung ist bewusst noch ohne Bilder; aufzunehmen sind:
 7. Eigenschaften einer Snap-Taste mit dem Haken „übersteuert laufende Dimmer-Effekte“.
 8. Blinder-Taste gegen ein Dimmer-Lauflicht, ohne und mit Haken (zwei Bilder).
 9. Eigenschaften einer Taste mit dem gelben Hinweis bei einer Überschneidung.
+10. Ansicht **Prioritäten** mit der Spalte **Verdeckt** („verdeckt von … auf n Geräten“).

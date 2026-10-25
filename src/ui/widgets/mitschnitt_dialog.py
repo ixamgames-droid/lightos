@@ -578,7 +578,8 @@ class MitschnittDialog(QDialog):
             bild.abbild, self._patch(),
             auswahl=auswahl or self._combo_auswahl.currentData(),
             bezug=self._bezug,
-            laser_mitnehmen=self._check_laser.isChecked())
+            laser_mitnehmen=self._check_laser.isChecked(),
+            auslassen=bild.ausgelassen)
 
     def grund_gesperrt(self, bild: M.Eingangsbild | None = None) -> str:
         """Warum jetzt nicht festgehalten werden kann — leer, wenn es geht."""

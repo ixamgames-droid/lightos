@@ -14,6 +14,9 @@ from typing import Callable
 SACN_PORT = 5568
 SACN_ACN_PACKET_ID = b"ASC-E1.17\x00\x00\x00"
 SACN_VECTOR_DATA = 0x00000002
+#: Framing-Options (E1.31 §6.2.6): Preview-Daten / Stream beendet
+SACN_OPT_PREVIEW = 0x80
+SACN_OPT_TERMINATED = 0x40
 
 
 def _multicast_addr(universe: int) -> str:
@@ -31,15 +34,21 @@ class SACNReceiver:
         self._thread: threading.Thread | None = None
         self._running = False
         self._callbacks: list[Callable[[int, bytes], None]] = []
+        self._callbacks_absender: list[Callable[..., None]] = []   # NET-15
         self._joined_universes: list[int] = []
         # Merge-Config wie ArtNet
         self._merges: dict[int, tuple[int, str]] = {}
         self._merge_cb_installed = False
 
-    def start(self, universes: list[int] | None = None):
-        """Starte Listener. Wenn universes=None -> bind ohne multicast join."""
+    def start(self, universes: list[int] | None = None,
+              host: str = "0.0.0.0", port: int | None = None):
+        """Starte Listener auf ``universes`` (Multicast-Join; ``None`` -> [1]).
+        ``host``/``port`` nur fuer Tests (127.0.0.1 + freier Port, NET-15);
+        ``port=None`` liest ``SACN_PORT`` erst hier."""
         if self._running:
             return
+        if port is None:
+            port = SACN_PORT
         if universes is None:
             universes = [1]
         try:
@@ -49,7 +58,7 @@ class SACNReceiver:
                 self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
             except (AttributeError, OSError):
                 pass  # Not on Windows
-            self._sock.bind(("0.0.0.0", SACN_PORT))
+            self._sock.bind((host, int(port)))
             self._sock.settimeout(0.5)
             # Multicast Join
             for u in universes:
@@ -64,7 +73,7 @@ class SACNReceiver:
         )
         self._thread.start()
         self._install_merge_handler()
-        print(f"[sACN-In] listening on 0.0.0.0:{SACN_PORT}, universes={universes}")
+        print(f"[sACN-In] listening on {host}:{port}, universes={universes}")
 
     def stop(self):
         self._running = False
@@ -121,6 +130,20 @@ class SACNReceiver:
         if cb in self._callbacks:
             self._callbacks.remove(cb)
 
+    def subscribe_absender(self, cb: Callable[..., None]):
+        """NET-15: ``cb(universe, dmx, absender, prioritaet)`` — mit Absender,
+        damit die Fernsteuerung zwei Pulte auf demselben Universum trennen
+        kann. Absender = CID (hex), Prioritaet aus dem Framing-
+        Layer. Preview- und Stream-Ende-Pakete bekommen diese Zuhoerer NICHT
+        (Preview ist nicht fuer den Live-Betrieb, Stream-Ende-Daten sind laut
+        E1.31 zu ignorieren)."""
+        if cb not in self._callbacks_absender:
+            self._callbacks_absender.append(cb)
+
+    def unsubscribe_absender(self, cb: Callable[..., None]):
+        if cb in self._callbacks_absender:
+            self._callbacks_absender.remove(cb)
+
     # ── Merge ────────────────────────────────────────────────────────────────
 
     def set_merge(self, in_universe: int, out_universe: int, mode: str = "HTP"):
@@ -155,7 +178,13 @@ class SACNReceiver:
         # gepatchte Kanaele. ``_render_frame`` mischt die Schicht deterministisch.
         try:
             from src.core.app_state import get_state
-            get_state().apply_input_merge(out_univ, data, mode)
+            # NET-15: Kanaele der DMX-Fernsteuerung nicht in die Ausgabe mischen.
+            from src.core.dmx.fernsteuerung import reservierte_kanaele
+            skip = reservierte_kanaele("sacn", in_univ)
+            if skip:
+                get_state().apply_input_merge(out_univ, data, mode, skip=skip)
+            else:
+                get_state().apply_input_merge(out_univ, data, mode)
         except Exception as e:
             print(f"[sACN-In] merge error: {e}")
 
@@ -174,6 +203,14 @@ class SACNReceiver:
                         cb(universe, dmx)
                     except Exception as e:
                         print(f"[sACN-In] cb error: {e}")
+                if self._callbacks_absender:
+                    kopf = self._parse_kopf(data)
+                    if kopf is not None and not kopf[2]:
+                        for cb in list(self._callbacks_absender):
+                            try:
+                                cb(universe, dmx, kopf[0], kopf[1])
+                            except Exception as e:
+                                print(f"[sACN-In] cb error: {e}")
             except socket.timeout:
                 continue
             except OSError as e:
@@ -187,6 +224,18 @@ class SACNReceiver:
                     print(f"[sACN-In] loop error: {e}")
                 self._running = False   # NET-06
                 break
+
+    @staticmethod
+    def _parse_kopf(packet: bytes) -> tuple[str, int, bool] | None:
+        """NET-15: ``(cid_hex, prioritaet, verwerfen)`` eines schon von
+        :meth:`_parse` angenommenen Pakets. ``verwerfen`` = Preview-Daten oder
+        Stream beendet (Options-Byte, Offset 112). CID: Root-Layer 22..38,
+        Prioritaet: Framing-Layer Offset 108."""
+        if len(packet) < 126:
+            return None
+        opt = packet[112]
+        return (bytes(packet[22:38]).hex(), int(packet[108]),
+                bool(opt & (SACN_OPT_PREVIEW | SACN_OPT_TERMINATED)))
 
     def _parse(self, packet: bytes) -> tuple[int, bytes] | None:
         """Parse E1.31 paket -> (universe, dmx bytes). None bei Fehler."""

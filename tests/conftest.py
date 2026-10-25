@@ -17,6 +17,36 @@ import time
 import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+# QA-99: Unter Windows bringt die Qt-Plattform „offscreen“ keine Schriftquelle
+# mit. Ohne QT_QPA_FONTDIR kennt sie KEINE Schrift (QFontDatabase.families()
+# leer), jeder Text wird mit Ersatzkaestchen vermessen — „Probe Text 123“ ist
+# dann 168 statt 78 Pixel breit. Layout-Tests (sizeHint, Textbreiten,
+# abgeschnittene Knoepfe) werden davon rot, ohne dass am Code etwas ist:
+# gemessen 18.10.2026 auf main, 9 Dateien im Windows-Gate. Linux und macOS
+# finden Schriften ueber fontconfig/CoreText — dort bleibt alles, wie es ist.
+# Ein vom Aufrufer gesetztes QT_QPA_FONTDIR gewinnt. Muss vor der ersten
+# QApplication stehen (die Plattform liest die Variable beim Start).
+def _offscreen_schriftordner(umgebung, plattform=sys.platform):
+    """Setzt in ``umgebung`` QT_QPA_FONTDIR auf den Windows-Schriftordner, wenn
+    die Plattform „offscreen“ ist und noch kein Schriftordner gesetzt ist.
+    Gibt den gesetzten Ordner zurueck, sonst None."""
+    if not plattform.startswith("win"):
+        return None
+    if umgebung.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen":
+        return None
+    if umgebung.get("QT_QPA_FONTDIR"):
+        return None
+    windows = umgebung.get("WINDIR") or umgebung.get("SystemRoot") or r"C:\Windows"
+    ordner = os.path.join(windows, "Fonts")
+    if not os.path.isdir(ordner):
+        return None
+    umgebung["QT_QPA_FONTDIR"] = ordner
+    return ordner
+
+
+_offscreen_schriftordner(os.environ)
 # Tests auf SEPARATE, PRO-PROZESS-EINDEUTIGE Datenbanken umlenken. So fasst kein
 # Test je die echten DBs der laufenden App an UND zwei gleichzeitige pytest-Laeufe
 # (oder ein abgebrochener Vorlauf) teilen sich NICHTS mehr.
@@ -334,6 +364,13 @@ os.environ.setdefault(
 os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
     _TEST_ROOT, f"lightos_test_universes_{_TEST_TOKEN}.json")
 
+# NET-15: dieselbe harte Trennung fuer die Zuordnung der DMX-Fernsteuerung
+# (`paths.dmx_fernsteuerung_path`). Ohne sie schriebe jedes „Uebernehmen" im
+# Ausgabe-Dialog-Test in den echten Datenordner. Reste alter Laeufe raeumt das
+# Muster `lightos_test_fernsteuerung_*.json` weiter unten ab.
+os.environ["LIGHTOS_DMX_FERNSTEUERUNG"] = os.path.join(
+    _TEST_ROOT, f"lightos_test_fernsteuerung_{_TEST_TOKEN}.json")
+
 
 def _purge_test_dbs():
     """Die PROZESS-EIGENE Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
@@ -641,6 +678,7 @@ def _purge_old_test_crash_logs():
         muster = ("lightos_test_crash_*.log", "lightos_test_appdata_*",
                   "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
                   "lightos_test_universes_*.json",
+                  "lightos_test_fernsteuerung_*.json",
                   "lightos_test_fixtures_*.db*")
         for m in muster:
             for path in glob.glob(os.path.join(_TEST_ROOT, m)):

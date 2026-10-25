@@ -18,6 +18,14 @@ import time
 
 from src.core.engine.bpm_manager import BPMManager
 
+# Der erste Beat importiert function_manager/chaser und app_state (sqlalchemy,
+# 0,4-0,9 s, unter Gate-Last mehr). Hier vorab laden, sonst frisst der Import das join-Zeitfenster
+# von reset()/shutdown() (1 s) und der Test wird zufaellig rot -- geprueft wird das
+# Abwarten eines haengenden Callbacks, nicht die Importzeit.
+from src.core.engine import chaser as _chaser  # noqa: F401,E402
+from src.core.engine import function_manager as _fm  # noqa: F401,E402
+from src.core import app_state as _app_state  # noqa: F401,E402
+
 
 def _manager_mit_haengendem_beat(dauer: float = 0.3):
     """Manager, dessen erster Beat ``dauer`` Sekunden im Callback steckt."""

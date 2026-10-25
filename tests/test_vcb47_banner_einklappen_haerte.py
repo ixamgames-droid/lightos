@@ -501,8 +501,13 @@ class _ImFenster(unittest.TestCase):
             self.assertIs(zeigt, self.banner,
                           "Ein weiterer Ausfall muss aufklappen.")
             self.assertIn("(+1 weitere)", self.banner.text())
-            self.assertEqual(self._im_fenster(self.banner).topLeft(),
-                             self._im_fenster(self.w._stack).topLeft())
+            # UI-103: das Banner weicht Unterreitern und der VC-Werkzeugleiste
+            # aus (neben/unter die Reiter, in die Zeile „Aktiver Effekt“) —
+            # es gilt sein Zielrechteck, immer innerhalb des Inhaltsbereichs.
+            self.assertEqual(self.banner.geometry(), self.banner.ziel_rechteck())
+            self.assertTrue(QRect(
+                self.w._stack.mapTo(self.w.centralWidget(), QPoint(0, 0)),
+                self.w._stack.size()).contains(self.banner.geometry()))
             self._takt([dict(_A), _ok(_B)])
             self._ein()
 
