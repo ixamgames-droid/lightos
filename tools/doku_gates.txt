@@ -117,3 +117,5 @@ test_tool1_verwaiste_werkzeuge.py
 test_imp3_dialog_und_patch.py      # Anleitung Patch & Gruppen: Knopf „Tabellen-Import ▾“, Eingabetaste, doppelte Namen
 test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)
 test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen
+test_bpm32_takt_hinweis.py         # Musik-Anleitung erklaert den Hinweis „Takt aus Titel übernehmen“ (Quelle Aus/OS2L)
+test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen
