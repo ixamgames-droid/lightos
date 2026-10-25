@@ -609,6 +609,14 @@ def _register_routes(app):
                 "</style></head><body><h1 style=\"font-size:20px\">LightOS Remote</h1>"
                 "<p>{text}</p></body></html>")
 
+    @app.after_request
+    def _ohne_referer(antwort):
+        # WEB-12: Seiten, die mit ``?k=`` geoeffnet werden (/ und /konsole),
+        # geben die Adresse mit Schluessel nie als Referer weiter.
+        if request.path in ("/", "/konsole"):
+            antwort.headers["Referrer-Policy"] = "no-referrer"
+        return antwort
+
     @app.route("/")
     def index():
         _handshake()
@@ -892,6 +900,10 @@ def _register_socketio(sio):
     # Ende auf einem Zwischenstand stehen.
     folge: dict = {}
     folge_lock = threading.Lock()
+    # WEB-12: Obergrenze der gemerkten Nummern je Verbindung — eine Flut
+    # erfundener Kennungen belegt sonst Speicher bis zum Abbau der Verbindung.
+    FOLGE_MAX_JE_SID = 1024
+    sio.lightos_vc_folge = folge            # nur lesend, fuer Tests
 
     def _senden(ereignis, daten):
         sio.emit(ereignis, daten, to=RAUM)
@@ -906,7 +918,8 @@ def _register_socketio(sio):
             je_sid = folge.setdefault(sid, {})
             if nummer <= je_sid.get(schluessel, float("-inf")):
                 return True
-            je_sid[schluessel] = nummer
+            if schluessel in je_sid or len(je_sid) < FOLGE_MAX_JE_SID:
+                je_sid[schluessel] = nummer
             return False
 
     @sio.on("vc_hallo")
@@ -934,6 +947,12 @@ def _register_socketio(sio):
         # Nur Text kommt weiter: eine Liste oder ein Objekt als Kennung taugte
         # nicht einmal als Schluessel der Folgenummern (TypeError im Handler).
         if not isinstance(kennung, str) or not isinstance(aktion, str):
+            return {"ok": False, "fehler": "anfrage_ungueltig"}
+        # WEB-12: Kennung VOR jeder Buchfuehrung pruefen — eine erfundene,
+        # beliebig lange Kennung legt sonst einen Eintrag in ``folge`` an und
+        # einen Auftrag in den UI-Thread.
+        from src.ui.virtualconsole.vc_widget import kennung_gueltig
+        if not kennung_gueltig(kennung):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         if aktion == "setzen" and _veraltet(request.sid, kennung, data.get("n")):
             return {"ok": True, "veraltet": True}

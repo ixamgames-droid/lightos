@@ -88,18 +88,80 @@ def fids_treffen_laser(state, fids) -> bool:
     return False
 
 
+#: Funktionstypen, deren Geraete sich statisch vollstaendig bestimmen lassen
+#: (``FunctionManager.affected_fids`` plus die Aufloesung unten). Jeder andere
+#: Typ — auch ein kuenftiger — gilt als Laser, sobald ein Laser im Patch steht
+#: und er keine Geraete meldet („im Zweifel Laser“).
+_BEKANNTE_TYPEN = frozenset({
+    "Scene", "Chaser", "Collection", "Sequence", "EfxInstance", "Carousel",
+    "LayeredEffect", "RgbMatrixInstance", "AudioFunction", "Show",
+    "MappedChannelChange",
+})
+
+
+def _funktion_laser(state, fm, function_id, gesehen) -> bool:
+    try:
+        fid = int(function_id)
+    except (TypeError, ValueError):
+        return False
+    if fid in gesehen:
+        return False
+    gesehen.add(fid)
+    f = fm.get(fid)
+    if f is None:
+        return False                        # unbekannte Funktion tut nichts
+    typ = type(f).__name__
+    # Skript: ``start function``/``setdmx``/``setfixture`` lassen sich statisch
+    # nicht sicher auswerten → immer Laser.
+    if typ == "ScriptFunction" or getattr(f, "is_script", False) is True:
+        return True
+    eigene = set(fm.affected_fids(fid) or ())
+    # Kanal-Mapping: Ziel-Geraete stehen in ``fids`` (affected_fids liest es nicht)
+    for sub in (getattr(f, "fids", None) if isinstance(getattr(f, "fids", None),
+                                                       (list, tuple, set)) else ()):
+        eigene.add(sub)
+    if fids_treffen_laser(state, eigene):
+        return True
+    # Kinder durch DIESE Pruefung laufen lassen (nicht nur affected_fids), damit
+    # eine Collection mit Show/Skript/Mapping darin ebenfalls erkannt wird.
+    kinder = []
+    v = getattr(f, "function_ids", None)
+    if isinstance(v, (list, tuple, set)):
+        kinder.extend(v)
+    v = getattr(f, "steps", None)
+    if isinstance(v, (list, tuple)):
+        for st in v:
+            ref = getattr(st, "function_id", None)
+            if ref is None:
+                ref = getattr(st, "scene_id", None)
+            if ref is not None:
+                kinder.append(ref)
+    v = getattr(f, "tracks", None)
+    if isinstance(v, (list, tuple)):
+        for spur in v:
+            for sf in list(getattr(spur, "show_functions", None) or ()):
+                ref = getattr(sf, "function_id", None)
+                if ref is not None:
+                    kinder.append(ref)
+    for ref in kinder:
+        if _funktion_laser(state, fm, ref, gesehen):
+            return True
+    if typ not in _BEKANNTE_TYPEN and not eigene and not kinder:
+        return True                         # unbekannter Typ: im Zweifel Laser
+    return False
+
+
 def funktion_trifft_laser(state, function_id) -> bool:
-    """Steuert die Funktion (auch ueber Chaser/Collection/Sequence) einen
-    Laser an? Unbekannte Funktion: nein (sie tut nichts)."""
+    """Steuert die Funktion (auch ueber Chaser/Collection/Sequence/Show) einen
+    Laser an? Skripte und unbekannte Funktionstypen ohne erkennbare Geraete
+    gelten als Laser, sobald ein Laser im Patch steht. Funktion, die es nicht
+    gibt: nein (sie tut nichts)."""
     if function_id is None:
         return False
     if not gibt_laser(state):
         return False
     try:
-        fm = state.function_manager
-        if fm.get(int(function_id)) is None:
-            return False
-        return fids_treffen_laser(state, fm.affected_fids(int(function_id)))
+        return _funktion_laser(state, state.function_manager, function_id, set())
     except Exception as e:
         print(f"[fern_freigabe] ERROR: Funktion {function_id}: {type(e).__name__}")
         return True                         # im Zweifel Laser

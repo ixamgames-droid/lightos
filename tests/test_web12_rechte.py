@@ -468,6 +468,44 @@ class BlackoutUrheberTest(_Basis):
 # ── Schluessel nie im Log / Diagnosepaket ────────────────────────────────────
 
 @unittest.skipUnless(HAS_FLASK, "flask / flask-socketio nicht installiert")
+class GegenpruefungWebTest(_Basis):
+    """WEB-12 Gegenpruefung: Socket-Flut mit erfundenen Kennungen, Schluessel
+    in der Adresse, Referer."""
+
+    def _folge(self):
+        return self.sio.lightos_vc_folge
+
+    def test_ungueltige_kennung_wird_vor_der_buchfuehrung_abgelehnt(self):
+        sc = self._socket(self._client(KONSOLE_K))
+        for kennung in ("x" * 5000, "1234", "ab", "w b c d"):
+            with self.subTest(kennung=kennung[:10]):
+                r = sc.emit("vc_aktion", {"id": kennung, "aktion": "setzen", "n": 1},
+                            callback=True)
+                self.assertEqual(r, {"ok": False, "fehler": "anfrage_ungueltig"})
+        self.assertFalse(any(self._folge().values()))
+
+    def test_folgenummern_je_verbindung_begrenzt(self):
+        sc = self._socket(self._client(KONSOLE_K))
+        for i in range(1100):
+            sc.emit("vc_aktion", {"id": f"w{i:06d}", "aktion": "setzen", "n": 1,
+                                  "wert": 1}, callback=True)
+        self.assertLessEqual(max(len(v) for v in self._folge().values()), 1024)
+
+    def test_schluessel_verlaesst_die_adresse(self):
+        for name in ("konsole.html", "index.html"):
+            with open(os.path.join(_REPO, "src", "web", "templates", name),
+                      encoding="utf-8") as fh:
+                self.assertIn("history.replaceState", fh.read(), name)
+
+    def test_feste_seite_ohne_referer(self):
+        remote_settings.set_feste_seite_enabled(True)
+        c = self.app.test_client()
+        for pfad in (f"/?k={FEST_K}", "/", f"/konsole?k={KONSOLE_K}"):
+            with self.subTest(pfad=pfad.split("?")[0]):
+                self.assertEqual(c.get(pfad).headers.get("Referrer-Policy"),
+                                 "no-referrer")
+
+
 class SchluesselNichtImLogTest(unittest.TestCase):
     """Eigener Prozess: ``install_tee`` haengt stdout/stderr prozessweit um."""
 

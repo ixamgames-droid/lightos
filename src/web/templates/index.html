@@ -82,6 +82,9 @@
 <!-- WEB-06: lokal ausgeliefert (kein CDN) — die Seite muss ohne Internet laufen. -->
 <script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
 <script>
+// WEB-12: der Schluessel steht nach der Anmeldung (Sitzung) nicht mehr in der
+// Adresse - nicht im Verlauf, nicht in Screenshots, nicht beim Teilen.
+try { if (/[?&]k=/.test(window.location.search)) { window.history.replaceState(null, '', '/'); } } catch (e) { /* alter Browser */ }
 const socket = io();
 let blackout = false;
 

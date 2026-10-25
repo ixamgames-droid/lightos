@@ -15,8 +15,12 @@ Zurück zur Anleitung: [Web-Remote — das Handy als Konsole](ANLEITUNG.md)
 Gesperrt ist ein Element der Handy-Konsole, wenn es einen Laser ansteuern kann:
 
 - eine **Laser-Muster**-Taste,
-- eine Taste, deren Funktion (Szene, Effekt, Chaser, Collection, auch über eine
-  Zusatzaktion) ein Gerät enthält, das LightOS als **Laser** erkennt,
+- eine Taste, deren Funktion (Szene, Effekt, Chaser, Collection, Show,
+  Kanal-Mapping, auch über eine Zusatzaktion) ein Gerät enthält, das LightOS als
+  **Laser** erkennt,
+- eine Taste mit einem **Skript** — was ein Skript startet oder setzt, lässt sich
+  vorab nicht sicher sagen, darum zählt es als Laser-Inhalt, sobald ein Laser im
+  Patch steht,
 - eine Taste für **Bibliothek-Farbe/Snap** oder **Snapshot** mit einem Laser darin,
 - eine **Effekt-Aktion** ohne festes Ziel (sie wirkt auf den gerade aktiven Effekt),
 - ein **Fader** auf einem DMX-Kanal eines Lasers, auf einer Funktion mit Laser
@@ -32,7 +36,9 @@ keine Sperre (außer für Laser-Muster-Tasten).
 
 Geprüft wird **bei jedem Druck neu**. Eine Taste, die du nachträglich auf eine
 Laser-Szene umstellst, oder ein Laser, den du später patchst, ist sofort
-gesperrt — auch wenn die Taste schon auf dem Handy liegt.
+gesperrt — auch wenn die Taste schon auf dem Handy liegt. Eine **verzögerte
+Zusatzaktion** wird beim Ausführen noch einmal geprüft: ist der Schalter in der
+Wartezeit aus gegangen, läuft sie nicht.
 
 Am Handy erscheinen gesperrte Elemente grau mit **„🔒 Laser – Freigabe am Pult"**.
 **„Automatisch füllen"** legt sie nicht aufs Handy, und von Hand lassen sie sich

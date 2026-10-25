@@ -1561,8 +1561,15 @@ class VCButton(VCWidget):
                 self._execute_extra(entry)
 
     def _execute_extra_fern(self, entry: dict):
-        """WEB-08: verzoegerte Zusatzaktion eines Drucks aus der Ferne."""
+        """WEB-08: verzoegerte Zusatzaktion eines Drucks aus der Ferne.
+
+        WEB-12: beim Ausfuehren NEU geprueft, nicht nur beim Druck — in der
+        Wartezeit kann am Pult der Blackout gesetzt oder „Laser vom Handy
+        erlauben“ ausgeschaltet worden sein."""
         from src.core.app_state import laser_notaus_nicht_loesbar
+        from .vc_fernbedienung import verzoegert_erlaubt
+        if not verzoegert_erlaubt(entry):
+            return
         with laser_notaus_nicht_loesbar():
             self._execute_extra(entry)
 

@@ -430,6 +430,8 @@ function ladeStand(nurPruefen) {
   // Angemeldet: den Schlüssel aus der Adresse merken (nur einen, der gilt),
   // damit der Start vom Startbildschirm ohne ?k= wieder hineinfindet.
   if (r.ok && urlK) { merkSetze(MERK_K, urlK); }
+  // WEB-12: danach den Schluessel aus der Adresse nehmen (Verlauf, Screenshot, Teilen).
+  if (r.ok && urlK) { try { window.history.replaceState(null, '', '/konsole'); } catch (e) { /* alter Browser */ } }
   if (r.ok) { merkeVersuch(''); }
   if (r.ok && !nurPruefen) { zeigeTipp(); }
   // Vom Pult getrennt, der Zugang gilt aber noch (z. B. Web-Interface neu

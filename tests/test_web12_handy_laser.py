@@ -270,6 +270,132 @@ class LaserJedeArtTest(_Basis):
         self.assertEqual(ex.gedrueckt, ["stop"])
 
 
+class LaserJedeFunktionsArtTest(_Basis):
+    """WEB-12 Gegenpruefung: Show (Zeitleiste), Skript, Kanal-Mapping und
+    unbekannte Funktionstypen — ``affected_fids`` liest sie nicht, die
+    Laser-Sperre muss sie trotzdem erkennen."""
+
+    def _neu(self, f):
+        self.fm.add(f)
+        self._funktionen.append(f)
+        return f
+
+    def _show_mit(self, kind):
+        from src.core.engine.show_engine import ShowFunction
+        show = self.fm.new_show("WEB12 Show")
+        self._funktionen.append(show)
+        show.add_track("Spur").add_function(
+            ShowFunction(function_id=kind.id, start_time=0.0, duration=1.0))
+        return show
+
+    def _skript(self, text):
+        from src.core.engine.script_func import ScriptFunction
+        f = self._neu(ScriptFunction("WEB12 Skript"))
+        f.script = text
+        return f
+
+    def _faelle(self):
+        from src.core.engine.function import Function
+        from src.core.engine.mapped_channel import MappedChannelChange
+        laser_szene = self._szene(LASER, "WEB12 Laser")
+        mapping = self._neu(MappedChannelChange("WEB12 Mapping"))
+        mapping.fids = [LASER]
+        sammlung = self.fm.new_collection("WEB12 Sammlung")
+        self._funktionen.append(sammlung)
+        sammlung.function_ids = [self._skript("setdmx 1 401 255").id]
+
+        class _NeuerTyp(Function):
+            pass
+        return [
+            ("Show mit Laser-Szene", self._show_mit(laser_szene)),
+            ("Skript start function", self._skript(f"start function {laser_szene.id}")),
+            ("Skript setdmx", self._skript("setdmx 1 401 255")),
+            ("Skript setfixture", self._skript(f"setfixture {LASER} shutter 255")),
+            ("Kanal-Mapping auf Laser", mapping),
+            ("Collection mit Skript", sammlung),
+            ("Show mit Kanal-Mapping", self._show_mit(mapping)),
+            ("unbekannter Funktionstyp", self._neu(_NeuerTyp("WEB12 Neu"))),
+        ]
+
+    def test_jede_funktionsart_trifft_laser(self):
+        from src.core.laser import fern_freigabe as ff
+        for name, f in self._faelle():
+            with self.subTest(name):
+                self.assertTrue(ff.funktion_trifft_laser(self.state, f.id), name)
+
+    def test_taste_zusatzaktion_und_fader_gesperrt(self):
+        for name, f in self._faelle():
+            with self.subTest(name):
+                t = self._taste(fid=f.id, x=10)
+                z = self._taste(ButtonAction.TAP, x=60)
+                z.actions = [{"type": "function", "function_id": f.id, "mode": "on"}]
+                eff = self._fader(SliderMode.EFFECT_INTENSITY, x=110)
+                eff.function_id = f.id
+                self._auf_seite(t, z, eff)
+                for w, aktion, wert in ((t, "umschalten", None), (z, "umschalten", None),
+                                        (eff, "setzen", 200)):
+                    self.assertEqual(self._aktion(w, aktion, wert),
+                                     {"ok": False, "fehler": "laser_gesperrt"}, name)
+                self.assertFalse(self.fm.is_running(f.id), name)
+
+    def test_ohne_laser_bleiben_show_und_mapping_frei(self):
+        from src.core.engine.mapped_channel import MappedChannelChange
+        from src.core.laser import fern_freigabe as ff
+        licht = self._szene(LICHT, "WEB12 Licht")
+        mapping = self._neu(MappedChannelChange("WEB12 Mapping Licht"))
+        mapping.fids = [LICHT]
+        self.assertFalse(ff.funktion_trifft_laser(self.state, self._show_mit(licht).id))
+        self.assertFalse(ff.funktion_trifft_laser(self.state, mapping.id))
+        # ohne Laser im Patch ist auch ein Skript frei
+        self.state._laser_fids = frozenset()
+        self.state._laser_estop_addrs = {}
+        self.assertFalse(ff.funktion_trifft_laser(
+            self.state, self._skript("setdmx 1 1 255").id))
+
+
+class VerzoegerteZusatzaktionTest(_Basis):
+    """WEB-12 Gegenpruefung: eine verzoegerte Zusatzaktion eines Fern-Drucks
+    wird beim AUSFUEHREN neu geprueft, nicht nur beim Druck."""
+
+    def _warten(self, sekunden=0.3):
+        ende = time.monotonic() + sekunden
+        while time.monotonic() < ende:
+            _app.processEvents()
+            time.sleep(0.01)
+
+    def test_blackout_aus_verzoegert_hebt_spaeter_gesetzten_nicht_auf(self):
+        om = self.state.output_manager
+        t = self._taste(ButtonAction.TAP)
+        t.actions = [{"type": "blackout", "mode": "off", "delay": 0.05}]
+        self._auf_seite(t)
+        self.assertTrue(self._aktion(t, "umschalten")["ok"])   # Blackout steht nicht
+        om.set_blackout(True)                                  # am Pult, in der Wartezeit
+        self._warten()
+        self.assertTrue(om.blackout_schalter)
+
+    def test_laser_verzoegert_nach_ausschalten_des_schalters_nicht(self):
+        laser_szene = self._szene(LASER, "WEB12 Spaet-Laser")
+        remote_settings.set_laser_vom_handy(True)
+        t = self._taste(ButtonAction.TAP)
+        t.actions = [{"type": "function", "function_id": laser_szene.id,
+                      "mode": "on", "delay": 0.05}]
+        self._auf_seite(t)
+        self.assertTrue(self._aktion(t, "umschalten")["ok"])
+        remote_settings.set_laser_vom_handy(False)             # in der Wartezeit
+        self._warten()
+        self.assertFalse(self.fm.is_running(laser_szene.id))
+
+    def test_harmlose_verzoegerte_aktion_laeuft(self):
+        licht = self._szene(LICHT, "WEB12 Spaet-Licht")
+        t = self._taste(ButtonAction.TAP)
+        t.actions = [{"type": "function", "function_id": licht.id,
+                      "mode": "on", "delay": 0.05}]
+        self._auf_seite(t)
+        self.assertTrue(self._aktion(t, "umschalten")["ok"])
+        self._warten()
+        self.assertTrue(self.fm.is_running(licht.id))
+
+
 class LaserNachtraeglichTest(_Basis):
 
     def test_taste_nachtraeglich_auf_laser_umgestellt(self):

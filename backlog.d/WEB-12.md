@@ -1,7 +1,7 @@
 ID: WEB-12
 Prioritaet: P1
 Status: review
-Status-Notiz: umgesetzt auf Zweig feat/web12-handy-konsole-sicher zusammen mit WEB-08…11 (ersetzt PRs #1028, #1030, #1039, #1041); Bestandsaufnahme 25.10.: jeder Punkt der Fertig-Liste mit Test und Gegenprobe, Nacharbeit Tipp auf fremd gehaltene Taste und Anleitungs-Wächter
+Status-Notiz: umgesetzt auf Zweig feat/web12-handy-konsole-sicher zusammen mit WEB-08…11 (ersetzt PRs #1028, #1030, #1039, #1041); Bestandsaufnahme 25.10.: jeder Punkt der Fertig-Liste mit Test und Gegenprobe, Nacharbeit Tipp auf fremd gehaltene Taste und Anleitungs-Wächter; Sicherheits-Gegenprüfung 25.10.: Laser-Sperre erkennt Show, Skript (immer Laser, wenn ein Laser gepatcht ist), Kanal-Mapping und unbekannte Funktionstypen; verzögerte Zusatzaktionen vom Handy beim Ausführen neu geprüft (Blackout, Laser-Schalter); Socket prüft Kennung vor der Folgenummer, höchstens 1024 je Verbindung; Schlüssel per replaceState aus der Adresse, Referrer-Policy auch für /
 Titel: Handy-Konsole: Sicherheits-Korrekturen aus QA-96 — getrennte Rechte, kein ungewollter Weg zum Laser, Schlüssel nicht im Log, NOT-AUS am Handy
 
 **Herkunft:** großer Bedientest QA-96 (11./12.10.2026, Sitzung A). Von A auf der Tafel belegt (Zweig `fix/web12-handy-rechte-laser`, nie begonnen) und als Auftrag ausformuliert; nie als Backlog-Zeile angelegt — nachgetragen am 20.10.2026. Die vier Handy-PRs WEB-08…11 stehen seitdem als Entwurf.

@@ -410,6 +410,32 @@ def _hebt_blackout_auf(widget) -> bool:
     return False
 
 
+def verzoegert_erlaubt(eintrag) -> bool:
+    """WEB-12: darf eine VERZOEGERTE Zusatzaktion eines Fern-Drucks jetzt noch
+    laufen? Dieselben Regeln wie beim Druck, zum Zeitpunkt der Ausfuehrung:
+    kein Aufheben eines (inzwischen) stehenden Blackouts, kein Laser-Inhalt
+    ohne den Schalter. Im Zweifel nein; wirft nie."""
+    try:
+        if not isinstance(eintrag, dict):
+            return False
+        from src.core.app_state import get_state
+        from src.core.laser import fern_freigabe as ff
+        state = get_state()
+        typ = str(eintrag.get("type", ""))
+        if typ == "blackout" and eintrag.get("mode") == "off":
+            if state.output_manager.blackout_schalter:
+                print("[vc_fernbedienung] verzoegertes Blackout-aus verworfen: "
+                      "Blackout steht")
+                return False
+        if not ff.laser_erlaubt() and _eintrag_laser(state, typ, eintrag):
+            print("[vc_fernbedienung] verzoegerte Zusatzaktion verworfen: Laser gesperrt")
+            return False
+        return True
+    except Exception as e:
+        print(f"[vc_fernbedienung] ERROR: verzoegerte Zusatzaktion: {type(e).__name__}")
+        return False
+
+
 def _taste_ausfuehren(widget, aktion: str) -> dict:
     from .vc_button import ButtonAction
     druck = aktion in ("druecken", "umschalten")
