@@ -79,6 +79,17 @@ print(f"LIZ-2: {len(_qt['entfernt'])} Qt-Dateien entfallen; es bleiben "
 if _qt["fehler"]:
     raise SystemExit("LIZ-2 (Qt-Umfang):\n  " + "\n  ".join(_qt["fehler"]))
 
+# LIZ-4: oben (neben python312.dll) die neueste VCRUNTIME140/_1 des Bundles —
+# Windows laedt je Name nur die obere, Qt ist mit einer neueren gebaut als Python.
+import vc_laufzeit  # noqa: E402
+
+a.binaries, a.datas, _vc = vc_laufzeit.angleichen(a.binaries, a.datas)
+print("LIZ-4: Microsoft-Laufzeit oben: "
+      + ", ".join(f"{n} {v}" for n, v in _vc["oben"].items())
+      + ("; ersetzt: " + "; ".join(_vc["ersetzt"]) if _vc["ersetzt"] else ""))
+if _vc["fehler"]:
+    raise SystemExit("LIZ-4 (Microsoft-Laufzeit):\n  " + "\n  ".join(_vc["fehler"]))
+
 # LIZ-2: jede Datei des Bundles ihrer Herkunft zuordnen und gegen die Liste der
 # erlaubten Fremd-Komponenten pruefen; die Lizenztexte der Pakete (in der
 # installierten Fassung) und die Liste dieses Builds kommen ins Bundle. Ein
