@@ -80,17 +80,61 @@ Worker-Loop).
   der Ausgang dort verbunden ist; `close_enttec_on_port` verdrängt einen toten Ausgang
   dort also nicht. Die NOT-AUS-Sperre liest zusätzlich `port_zuletzt` (bleibt nach dem
   Ausfall stehen — lieber eine Nummer zu viel gesperrt).
-- **Grenze — Neustart (→ OUT-80):** die Seriennummer lebt nur zur Laufzeit. Vertauscht
-  Linux beim Booten `ttyUSB0`/`ttyUSB1`, öffnet jedes Universum den Dongle des anderen
-  und lernt ihn als eigenen (bestand schon vor OUT-66, Konfiguration über den
-  Portnamen). Abhilfe geplant in OUT-80: Seriennummer in der Universums-Konfiguration,
-  unter Linux `/dev/serial/by-id`.
-- **Grenze — „Übernehmen“ nach Vertauschen zur Laufzeit (→ OUT-80):** „Übernehmen“ in der
-  Ausgabe-Konfiguration legt jede Ausgabe neu an, ohne die gelernte Seriennummer und ohne
-  die „früher eigenen“ Nummern. Wurden die Dongles vorher zur Laufzeit vertauscht
-  eingesteckt, lernt danach jedes Universum den Dongle an seinem konfigurierten Port —
-  also den des anderen. Ohne OUT-66 war das genauso; OUT-80 behebt beides, indem die
-  Nummer in der Konfiguration steht und beim Anlegen mitgegeben wird.
+- **Seriennummer in der Konfiguration (OUT-80):** die gelernte Nummer steht je Enttec-Zeile
+  in `universes.json` (Feld `enttec_seriennr`, [`enttec_konfig`](../../../src/core/dmx/enttec_konfig.py)).
+  `apply_output_config` meldet alle gespeicherten Nummern vorab an
+  (`OutputManager.enttec_seriennr_vormerken`, sie gelten für jede andere Ausgabe als fremd)
+  und gibt jeder Ausgabe ihre mit (`add_enttec(…, seriennr=…)` → `EnttecPro(port,
+  seriennr=…)` bzw. vor dem ersten Worker-Start ins gemeinsame Feld des Proxys). Das erste
+  Öffnen sucht damit seinen Dongle wie ein neu gestarteter Worker (OUT-66) — nach einem
+  Neustart mit vertauschten `ttyUSB0`/`ttyUSB1` und nach „Übernehmen“ sendet jedes
+  Universum wieder auf seinem Dongle. `close_enttec_on_port` verdrängt einen Ausgang, der
+  seinem Dongle an diese Portnummer gefolgt ist, nicht mehr, wenn die neue Ausgabe eine
+  andere Nummer sucht. Fehlt der eigene Dongle und steckt am eigenen Port einer, den eine
+  andere Zeile kennt, bleibt der Ausgang dunkel mit Hinweis „Nicht übernommen: … gehört
+  einer anderen Ausgabe“.
+- **Gespeichert wird** nur bei Änderung (Abgleich im 1-s-Takt des Ausgabe-Threads,
+  Rückruf `bei_enttec_seriennr`), im Hintergrund-Thread und atomar (Hilfsdatei +
+  `os.replace`, dieselbe Sperre wie der Dialog). Eine übernommene Ersatz-Nummer ersetzt
+  die gespeicherte. Fehlt das Feld (alte Zeile), gilt die Nummer des laufenden Geräts;
+  ein leeres Feld (`""`) heißt „vergessen“ (Dialog: **Dongle neu zuordnen**) — dann wird
+  keine mitgegeben, die nächste gelernte wird eingetragen. Ein **ausdrücklicher Portwechsel**
+  im Dialog (Reiter Universen oder „Verbinden“ im Reiter Enttec) schreibt `""`: der
+  Bediener meint den Dongle am neuen Port, die Ausgabe sendet nicht still weiter auf dem
+  alten (Gegenprüfung). Nur die Windows-Schreibweise (`com3`/`COM3`) gilt nicht als
+  Wechsel (`_gleicher_port`; Symlinks werden bewusst nicht aufgelöst). Zieht der Adapter im Reiter Enttec auf ein anderes
+  Universum um, ersetzt seine Nummer die der Zielzeile.
+- **Ein Dongle, eine Zeile (Gegenprüfung):** `seriennr_eintragen` entfernt die gelernte
+  Nummer aus jeder anderen Zeile; der Dialog gibt einer neuen Zeile keine Nummer aus der
+  Datei mit und liest die Nummern erst unmittelbar vor dem Schreiben unter `DATEI_LOCK`.
+  Steht trotzdem dieselbe Nummer in mehreren Enttec-Zeilen (Handbearbeitung, ältere
+  Datei), bekommt sie keine davon (`enttec_konfig.doppelte`) — die Universen verhalten
+  sich wie alte Zeilen und lernen neu; der Hinweis „Enttec-Seriennummer steht auch bei
+  Universe …“ steht in der Statusleiste. Die Nummer des laufenden Geräts ergänzt eine Zeile
+  ohne Feld nur, wenn keine andere Zeile sie ausdrücklich trägt.
+- **Keine stabilen Linux-Namen im Port-Feld (Gegenprüfung 2):** `/dev/serial/by-id`-Namen
+  bietet der Reiter Enttec bewusst nicht an — sie galten in den NOT-AUS-Weg-Schlüsseln
+  (OUT-64) als anderer Anschluss als `ttyUSB1`. Von Hand eingetippt ging ein solcher Name
+  schon immer; darum nimmt `_wege_enttec` zu jedem Portnamen zusätzlich (nie statt) den
+  normalisierten Schlüssel `enttec_pro._port_key` (POSIX: Symlink aufgelöst, Windows:
+  Großschreibung) — by-id und tty desselben Anschlusses treffen dieselbe Sperre. Das
+  Anbieten im Port-Feld ist als OUT-81 vorgemerkt.
+- **Schreiben (Gegenprüfung 2):** `_persist_output` liest und schreibt `universes.json` unter
+  `DATEI_LOCK`. `atomar_schreiben` ersetzt bei einem Symlink dessen Ziel und scheitert
+  sichtbar (`False`), wenn die vorhandene Datei schreibgeschützt ist — `os.replace` hätte
+  den Schutz sonst still entfernt. „Verbinden“ schreibt die Nummer, die `add_enttec` schon
+  gelernt hat (In-Prozess-Pfad öffnet sofort), und meldet dem Manager danach, was in der
+  Datei steht (`enttec_seriennr_gespeichert`) — eine erst später gelernte meldet der
+  Abgleich so erneut.
+- **Grenze — erste Inbetriebnahme:** eine alte Zeile ohne Nummer lernt beim ersten Start nach
+  dem Update den Dongle, der gerade am konfigurierten Port steckt. Sind die Ports genau dann
+  vertauscht, wird der falsche dauerhaft gespeichert (bewusst keine Code-Änderung) — nach
+  dem Update einmal prüfen, ob die Spalte **Dongle** stimmt, sonst **Dongle neu
+  zuordnen** bzw. den Port korrigieren. Die „früher eigenen“ Nummern (OUT-66, Runde 3) werden bewusst nicht
+  gespeichert; sie gelten weiter nur bis zum Neustart.
+- **Grenze — zwei Namen für einen Anschluss:** ein von Hand eingetippter by-id-Name und
+  `ttyUSB0` in zwei Zeilen erkennt die Doppel-Prüfung (OUT-74) nicht als denselben
+  Adapter; die NOT-AUS-Sperre greift trotzdem (normalisierter Weg-Schlüssel, s. oben).
 - `close()` bricht/leert vorher den Output-Puffer, damit `CloseHandle()` nicht mit einem
   ausstehenden `WriteFile` kollidiert. Idempotent, fehlertolerant.
 
@@ -109,6 +153,7 @@ Worker-Loop).
 - `tests/test_out66_enttec_reconnect_eigener_port.py` (OUT-66)
 - `tests/test_out66_ersatz_dongle_review2.py` (OUT-66, Ersatzgerät, Worker-Argumente, toter Ausgang)
 - `tests/test_out66_ersatz_runde3.py` (OUT-66, kein Tausch mit ungelernter Ausgabe, Einzel-Dongle, „früher eigen“)
+- `tests/test_out80_enttec_seriennummer_konfiguration.py` (OUT-80, Neustart/„Übernehmen“ mit vertauschten Ports, alte Zeilen, Ersatz, NOT-AUS, „vergessen“, Dialog, NOT-AUS bei zwei Namen eines Anschlusses, Schreibschutz/Symlink, Diagnose)
 
 ## Quelle
 

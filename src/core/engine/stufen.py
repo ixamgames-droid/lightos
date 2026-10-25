@@ -116,6 +116,50 @@ def ist_modify(funktion) -> bool:
     return True
 
 
+def _kinder_ids(funktion) -> list:
+    """IDs der Kinder einer Sammel-Funktion (Chaser, Sammlung, Show); leer sonst."""
+    typ = getattr(getattr(funktion, "function_type", None), "value", "")
+    if typ == "Chaser":
+        return [getattr(s, "function_id", None)
+                for s in getattr(funktion, "steps", None) or ()]
+    if typ == "Collection":
+        return list(getattr(funktion, "function_ids", None) or ())
+    if typ == "Show":
+        return [getattr(sf, "function_id", None)
+                for spur in getattr(funktion, "tracks", None) or ()
+                for sf in getattr(spur, "show_functions", None) or ()]
+    return []
+
+
+def modify_unter(funktion, aufloesen: Callable[[int], object | None] | None = None,
+                 _tiefe: int = 0, _gesehen: set | None = None) -> list:
+    """ENG-37-A: Modify-Effekte in ``funktion`` selbst oder (ueber ``aufloesen``)
+    in ihren Kindern — Sammlung, Show, verschachtelter Chaser. Grundlage fuer den
+    Hinweis im Chaser-Editor: als Chaser-Schritt gibt ein Modify-Effekt NICHTS
+    aus, auch nicht tief in einer Sammlung (Engine: ``Chaser._render_child_target``).
+    Zyklen und zu tiefe Verschachtelung brechen still ab."""
+    if funktion is None or _tiefe > _MAX_TIEFE:
+        return []
+    gesehen = set() if _gesehen is None else _gesehen
+    if id(funktion) in gesehen:
+        return []
+    gesehen.add(id(funktion))
+    if ist_modify(funktion):
+        return [funktion]
+    if aufloesen is None:
+        return []
+    out: list = []
+    for kid in _kinder_ids(funktion):
+        try:
+            kind = aufloesen(int(kid))
+        except Exception:
+            kind = None
+        for f in modify_unter(kind, aufloesen, _tiefe + 1, gesehen):
+            if all(f is not g for g in out):
+                out.append(f)
+    return out
+
+
 # ── Bausteine: was fasst ein Effekt an? ──────────────────────────────────────
 
 DIMMER, FARBE, BEWEGUNG, GOBO, SONSTIGES = "D", "F", "B", "G", "S"

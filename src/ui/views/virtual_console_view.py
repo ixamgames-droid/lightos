@@ -680,8 +680,17 @@ class VirtualConsoleView(QWidget):
             # Bei JEDEM Wechsel des Laufzustands die funktionsgebundenen VC-Widgets
             # neu zeichnen — sonst bleibt ein Toggle-Pad „aus", obwohl sein Effekt
             # noch laeuft (oder „an", obwohl er sich selbst/per StopAll beendet hat).
-            if running_ids != getattr(self, "_last_running_ids", None):
+            # ENG-37-B: ebenso, wenn ein Modify-Haken oder eine Betriebsart
+            # umgestellt wurde — Taste/Fader zeigen das Zeichen der Betriebsart.
+            try:
+                from src.ui.widgets.modify_zeichen import modify_signatur
+                modify_sig = modify_signatur(funcs)
+            except Exception:
+                modify_sig = None
+            if (running_ids != getattr(self, "_last_running_ids", None)
+                    or modify_sig != getattr(self, "_last_modify_sig", None)):
                 self._last_running_ids = running_ids
+                self._last_modify_sig = modify_sig
                 if self._canvas_alive():
                     from src.ui.virtualconsole.vc_button import VCButton
                     from src.ui.virtualconsole.vc_slider import VCSlider
