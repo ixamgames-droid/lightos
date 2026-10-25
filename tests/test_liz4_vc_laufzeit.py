@@ -254,8 +254,10 @@ def test_selbsttest_laufzeit_von_ausserhalb_ist_ein_fehler(tmp_path):
     system.mkdir()
     (system / "vcruntime140.dll").write_text("14.51.36247", encoding="utf-8")
 
+    oben = _oben_geladen(wurzel)     # Linux: Gross-/Kleinschreibung zaehlt
+
     def geladen(name):
-        return str(system / name) if name == "vcruntime140.dll" else str(wurzel / name)
+        return str(system / name) if name == "vcruntime140.dll" else oben(name)
     fehler, zeile = selbsttest.pruefe_vc_laufzeit(
         str(wurzel), gefroren=True, plattform="win32", geladen=geladen, fassung=_fassung)
     assert len(fehler) == 1 and "nicht aus dem Programmordner" in fehler[0], fehler
