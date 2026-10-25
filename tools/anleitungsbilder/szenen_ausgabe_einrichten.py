@@ -129,7 +129,7 @@ def _bild_enttec(ui):
     return bild(ui, dlg, [
         (rechteck(dlg, feld(dlg, "COM-Port:")), 1, "rechts"),
         (rechteck(dlg, knopf(dlg, "Ports aktualisieren")), 2, "rechts"),
-        (rechteck(dlg, feld(dlg, "Universe:")), 3, "rechts"),
+        (rechteck(dlg, feld(dlg, "Universum:")), 3, "rechts"),
         (rechteck(dlg, knopf(dlg, "Verbinden")), 4, "rechts"),
         (rechteck(dlg, _status(dlg, "Gespeichert:")), 5, "unten"),
     ], titel=dlg.windowTitle())
@@ -140,7 +140,7 @@ def _bild_artnet(ui):
     return bild(ui, dlg, [
         (rechteck(dlg, knopf(dlg, "Art-Net aktivieren")), 1, "rechts"),
         (rechteck(dlg, feld(dlg, "Netzwerkkarte:")), 2, "rechts"),
-        (rechteck(dlg, feld(dlg, "Universe:")), 3, "rechts"),
+        (rechteck(dlg, feld(dlg, "Universum:")), 3, "rechts"),
         (rechteck(dlg, feld(dlg, "Ziel-IP / Broadcast:")), 4, "rechts"),
         (rechteck(dlg, feld(dlg, "Art-Net Startuniversum:")), 5, "rechts"),
         (rechteck(dlg, knopf(dlg, "Übernehmen")), 6, "rechts"),
@@ -151,7 +151,7 @@ def _bild_sacn(ui):
     dlg = _dialog(ui, "sACN (E1.31)")
     return bild(ui, dlg, [
         (rechteck(dlg, knopf(dlg, "sACN (E1.31) aktivieren")), 1, "rechts"),
-        (rechteck(dlg, feld(dlg, "Universe:")), 2, "rechts"),
+        (rechteck(dlg, feld(dlg, "Universum:")), 2, "rechts"),
         (rechteck(dlg, knopf(dlg, "Multicast (239.255.0.x)")), 3, "rechts"),
         (rechteck(dlg, feld(dlg, "Unicast Ziel-IP:")), 4, "rechts"),
         (rechteck(dlg, knopf(dlg, "Übernehmen")), 5, "rechts"),
@@ -165,7 +165,7 @@ def _bild_universen(ui):
     if tab.rowCount() != len(BEISPIEL_UNIVERSEN):
         raise SzenenFehler("Universen-Tabelle zeigt die Beispiel-Konfiguration nicht")
     kopf = [tab.horizontalHeaderItem(c).text() for c in range(tab.columnCount())]
-    if kopf != ["#", "Name", "Output", "Patch (Port/IP)", "Ext-Universe"]:
+    if kopf[:5] != ["#", "Name", "Ausgang", "Patch (Port/IP)", "Ext. Universum"]:
         raise SzenenFehler(f"Spalten der Universen-Tabelle geaendert: {kopf}")
 
     def _spalte(c):
@@ -181,7 +181,7 @@ def _bild_universen(ui):
         (_spalte(2), 1, "unten"),
         (_spalte(3), 2, "unten"),
         (_spalte(4), 3, "unten"),
-        (rechteck(dlg, knopf(dlg, "+ Universe hinzufügen")), 4, "oben"),
+        (rechteck(dlg, knopf(dlg, "+ Universum hinzufügen")), 4, "oben"),
         (rechteck(dlg, knopf(dlg, "Speichern")), 5, "oben"),
     ], titel=dlg.windowTitle())
 

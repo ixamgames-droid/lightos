@@ -58,25 +58,25 @@ getrennte Adressräume).
 ## 2. Ausgabe pro Universum konfigurieren
 
 Menü **Ausgabe → Konfigurieren...** öffnet den Dialog **„Ausgabe konfigurieren"**
-mit mehreren Tabs. Es gibt zwei Wege — der **Universe-Manager** (empfohlen) setzt
+mit mehreren Tabs. Es gibt zwei Wege — der Tab **Universen** (empfohlen) setzt
 beide Universen in einer Tabelle, die Einzel-Tabs richten je Universe live eine
 Verbindung ein.
 
 ### Weg A (empfohlen): Tab „Universen" — beide auf einmal
 
-Tab **Universen**. Die Tabelle hat die Spalten **#** · **Name** · **Output** ·
-**Patch (Port/IP)** · **Ext-Universe** (optional: die externe Art-Net/sACN-Universe-Nummer,
+Tab **Universen**. Die Tabelle hat die Spalten **#** · **Name** · **Ausgang** ·
+**Patch (Port/IP)** · **Ext. Universum** (optional: die externe Art-Net/sACN-Universumsnummer,
 leer = Standard, siehe unten). Pro Zeile ein Universe:
 
-1. Zeile 1 → **#** `1`, **Name** z. B. *Bühne*, **Output** = `Enttec`,
+1. Zeile 1 → **#** `1`, **Name** z. B. *Bühne*, **Ausgang** = `Enttec`,
    **Patch** = dein COM-Port, z. B. `COM3`.
-2. **+ Universe hinzufügen** → neue Zeile. **#** `2`, **Name** z. B. *Art-Net*,
-   **Output** = `ArtNet`, **Patch** = Ziel-IP oder Broadcast, z. B.
+2. **+ Universum hinzufügen** → neue Zeile. **#** `2`, **Name** z. B. *Art-Net*,
+   **Ausgang** = `ArtNet`, **Patch** = Ziel-IP oder Broadcast, z. B.
    `192.168.0.50` (leer = Standard-Broadcast `255.255.255.255`).
 3. **Speichern**. LightOS schreibt die Konfiguration nach `universes.json` im Datenordner
    **und** wendet sie **sofort ohne Neustart** an (Bestätigung mit dem Pfad).
 
-Die **Output**-Spalte ist ein Auswahlfeld mit `Disabled / Enttec / sACN /
+Die **Ausgang**-Spalte ist ein Auswahlfeld mit `Aus / Enttec / uDMX / sACN /
 ArtNet`. Bedeutung der **Patch**-Spalte je Typ:
 
 - **Enttec** → COM-Port (z. B. `COM3`).
@@ -129,17 +129,17 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
 
 - **Tab „Enttec Pro USB":** **COM-Port** wählen (Knopf **Ports aktualisieren**,
   falls das Interface neu angesteckt wurde; ein erkanntes Enttec ist mit
-  `[Enttec Pro]` markiert), Feld **Universe:** auf `1` stellen, **Verbinden**.
+  `[Enttec Pro]` markiert), Feld **Universum:** auf `1` stellen, **Verbinden**.
   Der Status zeigt erst `Eingerichtet: COM3 → Universe 1 (gespeichert), verbinde …` und nach
   wenigen Sekunden `Verbunden: COM3 → Universe 1 (gespeichert)`. Steht dort „antwortet nicht"
   oder „Port lässt sich nicht öffnen", Port und Kabel prüfen.
-- **Tab „Art-Net":** **Art-Net aktivieren** anhaken, Feld **Universe:** auf `2`
+- **Tab „Art-Net":** **Art-Net aktivieren** anhaken, Feld **Universum:** auf `2`
   stellen, **Ziel-IP / Broadcast** eintragen (z. B. `192.168.0.50`), bei Bedarf
   das **Art-Net Startuniversum** (die *externe* Art-Net-Universe-Nummer am Node)
   setzen, dann **Übernehmen**. Status: `Aktiv → … · Universe 2 (gespeichert)`.
 
 > **Wichtig — kein „alle Universen"-Effekt mehr:** Die **Übernehmen**/**Verbinden**-
-> Knöpfe wirken **nur** auf das Universe, das im **„Universe:"**-Feld desselben
+> Knöpfe wirken **nur** auf das Universum, das im **„Universum:"**-Feld desselben
 > Tabs steht. Stelle das Feld also **vor** jedem Klick bewusst ein (Enttec-Tab
 > auf `1`, Art-Net-Tab auf `2`). So überschreibt die Art-Net-Zuweisung nicht die
 > Enttec-Zuweisung — jede Zeile in `universes.json` bleibt für sich erhalten.

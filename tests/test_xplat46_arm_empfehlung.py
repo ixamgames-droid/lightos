@@ -1,5 +1,9 @@
 """XPLAT-46: auf Windows-ARM wird x64-Python empfohlen, ARM64 nur "ohne 3D".
 
+Seit XPLAT-51 heisst natives ARM64-Python "nicht unterstuetzt (instabil, kein
+3D) - x64-Python nehmen" (6 von 12 Starts stuerzten ab); der Wortlaut wird in
+tests/test_xplat51_arm64_nicht_unterstuetzt.py geprueft, hier die Wege dahin.
+
 Entscheidung des Projektinhabers vom 05.10.2026. Hintergrund (XPLAT-45): die
 nativen win_arm64-Wheels von PySide6-Addons haben kein QtWebEngine, mit
 ARM64-Python fehlt also der 3D-Visualizer. Vorher rieten Installer, INSTALL.md
@@ -25,9 +29,11 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture
-def installer(monkeypatch):
+def installer(monkeypatch, tmp_path):
     monkeypatch.syspath_prepend(str(ROOT))
     import install
+    # check_arm_runtime fragt ein vorhandenes venv: nie das echte des Checkouts.
+    monkeypatch.setattr(install, "VENV_DIR", tmp_path / "venv")
     return install
 
 
@@ -64,13 +70,15 @@ class TestInstaller:
     def test_zusammenfassung_warnt_nur_bei_nativem_arm64(self, installer, monkeypatch, capsys):
         monkeypatch.setattr(installer.os, "name", "nt")
         monkeypatch.setattr(installer, "detect_native_os_arch", lambda: "arm64")
+        # Ohne (startbares) venv zaehlt das ausfuehrende Python (XPLAT-52).
+        monkeypatch.setattr(installer, "venv_arch", lambda: "unknown")
         monkeypatch.setattr(installer, "detect_arch", lambda: "x64")
         installer.show_summary()
         assert "WARN" not in capsys.readouterr().out
         monkeypatch.setattr(installer, "detect_arch", lambda: "arm64")
         installer.show_summary()
         out = capsys.readouterr().out
-        assert "WARN" in out and "3D-Visualizer" in out
+        assert "WARN" in out and "kein 3D" in out  # Wortlaut seit XPLAT-51
 
     def test_winget_befehl_nutzt_die_echte_option(self, installer):
         # winget kennt "--architecture" (Kurzform "-a"), keine Option "--arch".
@@ -82,7 +90,8 @@ class TestDoku:
         text = (ROOT / "INSTALL.md").read_text(encoding="utf-8")
         assert "--arch arm64" not in text
         assert "winget install Python.Python.3.12 --architecture x64" in text
-        assert "ohne 3D-Visualizer" in text
+        # XPLAT-51: frueher "ohne 3D-Visualizer" - jetzt "nicht unterstuetzt".
+        assert "nicht unterstuetzt (instabil, kein 3D)" in text
         assert "| PySide6-Addons | OK (ARM64-Wheel) |" not in text
         assert "tools/qt_module_befund.py" in text
 
@@ -90,7 +99,7 @@ class TestDoku:
         text = (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8")
         assert "nicht x64-Emulation" not in text
         zeile = next(z for z in text.splitlines() if z.startswith("**Windows ARM64:**"))
-        assert "x64-Python" in zeile and "ohne 3D-Visualizer" in zeile
+        assert "x64-Python" in zeile and "nicht unterstützt (instabil, kein 3D)" in zeile
 
 
 class TestVisualizerMeldung:

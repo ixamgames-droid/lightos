@@ -2939,7 +2939,7 @@ class MainWindow(QMainWindow):
             dlg = FixtureEditorDialog(self)
             dlg.exec()
         except Exception as e:
-            QMessageBox.warning(self, "Fixture Editor", str(e))
+            QMessageBox.warning(self, "Fixture-Editor", str(e))
 
     def _open_profil_auswahl(self):
         try:
