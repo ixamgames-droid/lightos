@@ -189,7 +189,11 @@ class FernsteuerungBox(QGroupBox):
             })
             if z is not None:
                 zs.append(z)
-        return Konfig(aktiv=self.check_aktiv.isChecked(), zuordnungen=zs)
+        # OUT-79: die Empfangsadresse steht in derselben Datei, wird aber im
+        # Kopf des Reiters gewaehlt — beim Speichern mitnehmen, nicht verlieren.
+        adresse = fs_mod.lade_konfig(self._pfad).empfangsadresse
+        return Konfig(aktiv=self.check_aktiv.isChecked(), zuordnungen=zs,
+                      empfangsadresse=adresse)
 
     def laden(self):
         konfig = fs_mod.lade_konfig(self._pfad)

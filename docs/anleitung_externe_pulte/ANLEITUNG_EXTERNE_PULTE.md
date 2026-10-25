@@ -109,7 +109,10 @@ Rechner eine feste Adresse gibst, zeigt für Windows
 im Dialog **Ausgabe konfigurieren**, Reiter **Art-Net**, unter **Netzwerkkarte:** die
 Karte im Pult-Netz. Die Wahl gilt für das **Senden** von Art-Net und sACN: für neu
 eingerichtete Ausgänge sofort, für einen schon laufenden ab dem nächsten Programmstart.
-Der Eingang lauscht auf allen Karten.
+Worauf der **Eingang** lauscht, legst du im Reiter **DMX-Eingang** unter **Empfangen auf:**
+fest: alle Netzwerkkarten (Vorgabe), eine bestimmte Karte oder nur dieser Rechner
+(`127.0.0.1`). Die Wahl gilt für Art-Net, sACN und die Fernsteuerung gemeinsam; Einzelheiten in
+[Ausgabe einrichten](../anleitung_ausgabe_einrichten/ANLEITUNG.md#dmx-empfangen-die-firewall-abfrage).
 
 **Firewall.** Für das Senden (Aufbau A) braucht es in der Regel keine Freigabe. Für alles,
 was LightOS **empfängt**, muss die Firewall des Rechners eingehende Pakete durchlassen:
@@ -125,6 +128,14 @@ Gib die Ports nur für das Lichtnetz frei, nicht für öffentliche Netze. Die Sc
 Windows stehen in
 [Netzwerk vorbereiten (Windows)](../anleitung_netzwerk_windows/ANLEITUNG.md#4-firewall-freigaben-anlegen).
 LightOS ändert selbst keine Firewall- oder Netzwerkeinstellungen.
+
+**Die Windows-Abfrage.** Hat `LightOS.exe` noch keine Regel, fragt Windows beim ersten
+Einschalten des Eingangs („Windows-Sicherheitswarnung“). LightOS kündigt das im Reiter
+**DMX-Eingang** vorher an. Für das Pult im Lichtnetz: **Zulassen** (privates Netzwerk). Wer
+die Abfrage wegklickt, bekommt je nach Antwort eine Sperr-Regel — dann kommt vom Pult
+nichts an, nur was auf dem Rechner selbst gesendet wird. Mit **Empfangen auf:**
+`Nur dieser Rechner (127.0.0.1)` fragt Windows nicht; dann erreicht dich aber auch kein Pult
+im Netz.
 
 ## 4. Schritt für Schritt
 
@@ -191,7 +202,9 @@ Vorher: Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk)
 6. **Merge-Modus:** wählen — siehe Tabelle. Vorgabe ist `HTP`; damit kann das Pult für
    den ersten Versuch nichts dunkel machen.
 7. **Übernehmen**. Der Status zeigt `Aktiv: U<ein> -> U<ziel> (<Modus>)`. Der Dialog darf
-   danach geschlossen werden, der Empfang läuft weiter.
+   danach geschlossen werden, der Empfang läuft weiter. Kommt bei offenem Dialog 5 s
+   lang gar nichts an, hängt der Status einen Hinweis auf die Firewall an und sagt, wo du
+   die Freigabe nachsiehst.
 8. **Am Pult** die Art-Net- bzw. sACN-Ausgabe für dieses Universum einschalten. Als Ziel
    die Adresse des LightOS-Rechners eintragen (Unicast, zum Beispiel `2.0.0.20`) oder
    Broadcast (Art-Net) bzw. Multicast (sACN) wählen. Wie das geht, steht im Handbuch des

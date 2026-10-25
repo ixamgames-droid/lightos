@@ -41,7 +41,8 @@ Speicherort: eigene Datei ``dmx_fernsteuerung.json`` im App-Datenordner
 (:func:`src.core.paths.dmx_fernsteuerung_path`, Override
 ``LIGHTOS_DMX_FERNSTEUERUNG``). ``universes.json`` bleibt unberuehrt — alte
 Konfigurationen laden also unveraendert; fehlt die Datei, ist nichts
-zugeordnet.
+zugeordnet. OUT-79: dieselbe Datei traegt die Empfangsadresse des gemeinsamen
+Empfaengers (:mod:`src.core.dmx.empfangsadresse`, Feld ``empfangsadresse``).
 """
 from __future__ import annotations
 
@@ -152,6 +153,10 @@ class Zuordnung:
 class Konfig:
     aktiv: bool = False
     zuordnungen: list[Zuordnung] = field(default_factory=list)
+    #: OUT-79: Empfangsadresse des gemeinsamen Art-Net-/sACN-Empfaengers
+    #: (gilt auch fuer den Merge-Eingang). ``""`` = alle Netzwerkkarten —
+    #: fehlt das Feld (alte Datei), bleibt es also wie bisher.
+    empfangsadresse: str = ""
 
     @classmethod
     def aus_dict(cls, d) -> "Konfig":
@@ -162,11 +167,18 @@ class Konfig:
             zz = Zuordnung.aus_dict(z)
             if zz is not None:
                 zs.append(zz)
-        return cls(aktiv=bool(d.get("aktiv", False)), zuordnungen=zs)
+        from src.core.dmx.empfangsadresse import normiere
+        return cls(aktiv=bool(d.get("aktiv", False)), zuordnungen=zs,
+                   empfangsadresse=normiere(d.get("empfangsadresse")))
 
     def als_dict(self) -> dict:
-        return {"version": FORMAT_VERSION, "aktiv": bool(self.aktiv),
-                "zuordnungen": [z.als_dict() for z in self.zuordnungen]}
+        d = {"version": FORMAT_VERSION, "aktiv": bool(self.aktiv),
+             "zuordnungen": [z.als_dict() for z in self.zuordnungen]}
+        if self.empfangsadresse:
+            # Nur wenn gewaehlt: eine Datei mit „alle Karten" sieht aus wie
+            # vor OUT-79 (aeltere Programmstaende lesen sie unveraendert).
+            d["empfangsadresse"] = self.empfangsadresse
+        return d
 
 
 def konfig_pfad() -> str:
@@ -530,6 +542,10 @@ def beim_start() -> list[str]:
     einrichten und — nur wenn die Fernsteuerung aktiv gespeichert ist — die
     noetigen Empfaenger starten. Ohne Datei passiert nichts (kein Port)."""
     konfig = lade_konfig()
+    # OUT-79: die gespeicherte Empfangsadresse gilt, bevor ein Empfaenger
+    # startet (auch fuer einen spaeter eingeschalteten Merge-Eingang).
+    from src.core.dmx import empfangsadresse
+    empfangsadresse.setze(konfig.empfangsadresse)
     fs = get_fernsteuerung()
     fs.konfigurieren(konfig)
     installiere_qt_wecker()
