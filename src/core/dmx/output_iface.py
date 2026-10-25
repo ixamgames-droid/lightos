@@ -6,7 +6,7 @@ ALLEN Interfaces, Linux nur über die Route-NIC — auf einem Rig mit dem Lichtn
 einer 2./USB-Ethernet-NIC (≠ Default-Route) erreichen die Pakete unter Linux die
 Nodes evtl. nicht (reale Ausgabe verpufft).
 
-``LIGHTOS_OUTPUT_IFACE`` = IP der gewünschten Ausgangs-NIC (z. B. ``192.168.1.50``)
+``LIGHTOS_OUTPUT_IFACE`` = IP der gewünschten Ausgangs-NIC (z. B. ``192.0.2.50``)
 bindet die Sende-Sockets an dieses Interface. **Opt-in** — ohne die Env-Variable
 bleibt alles beim bisherigen OS-Routing (Windows unverändert). Alle Setzer sind
 best-effort: eine falsche/verschwundene IP wird geschluckt → Fallback auf OS-Routing.
@@ -87,7 +87,7 @@ def set_multicast_iface(sock) -> bool:
 #   (b) die GERICHTETE Broadcast-Adresse der gewaehlten NIC ableiten.
 #
 # ★ Die Produktentscheidung dahinter, bewusst SICHER geschnitten: der gerichtete
-# Broadcast (z. B. 192.168.1.255 statt 255.255.255.255) gilt **nur, wenn eine NIC
+# Broadcast (z. B. 192.0.2.255 statt 255.255.255.255) gilt **nur, wenn eine NIC
 # ausdruecklich gewaehlt wurde**. Ohne Auswahl bleibt alles beim bisherigen
 # Verhalten. Der Default global umzustellen waere die groessere Verbesserung —
 # und genau deshalb falsch: er wuerde bestehende, funktionierende Rigs still

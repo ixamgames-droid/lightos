@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "26ec5bba",
+  "stand": "c7743974",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "e912765d204812c22364cb940f0f902b"
+      "md5": "a3b9f2073ce32b444a3c851b2dc19126"
     },
     {
       "datei": "02_enttec.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "3dc290758968d12fa4fc327861ed1f42"
+      "md5": "66b060e8becbb5570bf2c25429f7ae81"
     },
     {
       "datei": "03_artnet.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "dfde82c010b4fdcdc36e601212ce31b8"
+      "md5": "b7a078058a709d4869638c538f5627dc"
     },
     {
       "datei": "04_sacn.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "a6cbf223ae4da6448424f7fea245c907"
+      "md5": "cedee8cdd56e82bbe400003bbf93922f"
     },
     {
       "datei": "05_universen.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "6dbfeb4b10e242f51f7c8f2547d80b9f"
+      "md5": "349221520d104208a1c4b2231e6fb91c"
     },
     {
       "datei": "06_output_monitor.png",

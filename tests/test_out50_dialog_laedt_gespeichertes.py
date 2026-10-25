@@ -208,13 +208,13 @@ class GespeicherteAusgabeZeileTest(_MitKonfig):
 # ══════════════════════════════════════════════════════════════════════════════
 
 class ArtNetTabWirdVorbelegtTest(_MitKonfig):
-    zeilen = [{"num": 4, "name": "Bar", "output": "ArtNet", "patch": "192.168.1.99"}]
+    zeilen = [{"num": 4, "name": "Bar", "output": "ArtNet", "patch": "192.0.2.99"}]
 
     def test_universum_ip_und_haken(self):
         dlg = self._dialog()
         self.assertEqual(dlg._spin_artnet_univ.value(), 4,
                          "sonst legt „Uebernehmen“ eine Phantom-Zeile auf U1 an")
-        self.assertEqual(dlg._edit_artnet_ip.text(), "192.168.1.99")
+        self.assertEqual(dlg._edit_artnet_ip.text(), "192.0.2.99")
         self.assertTrue(dlg._check_artnet.isChecked())
 
     def test_das_belegte_universum_ist_abwaehlbar(self):
@@ -322,7 +322,7 @@ class RoundTripTest(_MitKonfig):
 
     zeilen = [
         {"num": 3, "name": "Balken", "output": "Enttec", "patch": "/dev/ttyUSB1"},
-        {"num": 4, "name": "Bar", "output": "ArtNet", "patch": "192.168.1.99"},
+        {"num": 4, "name": "Bar", "output": "ArtNet", "patch": "192.0.2.99"},
         {"num": 6, "name": "Dach", "output": "sACN", "patch": "10.0.0.5"},
     ]
     ports = [_FakePort("/dev/ttyUSB0"), _FakePort("/dev/ttyUSB1")]
@@ -336,7 +336,7 @@ class RoundTripTest(_MitKonfig):
     def test_artnet_uebernehmen_ohne_aenderung_legt_keine_phantom_zeile_an(self):
         dlg = self._dialog()
         dlg._apply_artnet()
-        self.assertEqual(self._zeile(4)["patch"], "192.168.1.99")
+        self.assertEqual(self._zeile(4)["patch"], "192.0.2.99")
         self.assertEqual(self._zeile(4)["output"], "ArtNet")
         # Vor dem Fix entstand hier eine zweite Art-Net-Zeile auf Universum 1.
         self.assertIsNone(self._zeile(1),
@@ -380,7 +380,7 @@ class RoundTripTest(_MitKonfig):
         self.assertEqual(zweiter._spin_enttec_univ.value(), 3)
         self.assertEqual(zweiter._combo_port.currentData(), "/dev/ttyUSB1")
         self.assertEqual(zweiter._spin_artnet_univ.value(), 4)
-        self.assertEqual(zweiter._edit_artnet_ip.text(), "192.168.1.99")
+        self.assertEqual(zweiter._edit_artnet_ip.text(), "192.0.2.99")
         self.assertEqual(zweiter._spin_sacn_univ.value(), 6)
         self.assertEqual(zweiter._edit_sacn_ip.text(), "10.0.0.5")
 

@@ -1,7 +1,7 @@
 ID: PRIV-07
 Prioritaet: P3
-Status: todo
-Status-Notiz: nach dem Merge von #1134 (aendert dieselbe Anleitung)
+Status: review
+Status-Notiz: Doku-Beispiele auf 192.0.2.x/198.51.100.x (RFC 5737), Waechter test_priv07_doku_beispieladressen, keine Warnung in pruefe_oeffentlich (begruendet)
 Titel: Beispiel-Netzadressen in Doku und Tests aus dem Dokumentationsbereich (192.0.2.x, RFC 5737)
 
 **Herkunft:** Befund der Verwalter-Sitzung (Laptop), 25.10.2026, niedrig: `docs/anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md` nennt mehrfach eine Adresse aus einem typischen Heimnetz-Bereich. Eine Bestandsaufnahme zeigt weitere private Adressen in Anleitungen und Tests (`192.168.x.y` in rund 15 Dateien) — die meisten sind erkennbare Beispiele, einzelne koennten aus dem echten Aufbau stammen.

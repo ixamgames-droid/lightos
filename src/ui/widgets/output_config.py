@@ -931,7 +931,7 @@ class OutputConfigDialog(QDialog):
             "Ueber welche Netzwerkkarte Art-Net und sACN hinausgehen.\n"
             "Automatisch = wie bisher ueber die Standardroute des Systems.\n"
             "Mit gewaehlter Karte geht Art-Net an deren gerichteten\n"
-            "Broadcast (z. B. 192.168.1.255) statt an 255.255.255.255 —\n"
+            "Broadcast (z. B. 192.0.2.255) statt an 255.255.255.255 —\n"
             "der wird von Routern nicht weitergereicht.\n"
             "Gilt fuer diesen Rechner, nicht fuer die Show. Neue Verbindungen\n"
             "nutzen die Karte sofort, bestehende ab dem naechsten Start.")

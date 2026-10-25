@@ -92,14 +92,14 @@ aneinander. WLAN funktioniert, für den Live-Betrieb ist Kabel die sichere Wahl.
 **Adressen.** Beide Geräte brauchen eine Adresse im **selben Bereich**. Viele Pulte und
 Art-Net-Geräte arbeiten ab Werk im Bereich `2.x.x.x` oder `10.x.x.x` mit der Maske
 `255.0.0.0`: Dann zählt nur die erste Zahl als Netz, alle Geräte mit derselben ersten Zahl
-erreichen sich. In einem üblichen Hausnetz (`192.168.1.x`, Maske `255.255.255.0`) müssen
-die ersten drei Zahlen gleich sein.
+erreichen sich. In einem üblichen Hausnetz mit der Maske `255.255.255.0` (im Beispiel unten `192.0.2.x`)
+müssen die ersten drei Zahlen gleich sein.
 
 | Beispiel | Pult | LightOS-Rechner | Maske |
 |---|---|---|---|
 | Art-Net-Bereich | `2.0.0.10` | `2.0.0.20` | `255.0.0.0` |
 | Art-Net-Bereich | `10.0.0.10` | `10.0.0.20` | `255.0.0.0` |
-| Hausnetz | `192.168.1.10` | `192.168.1.20` | `255.255.255.0` |
+| Hausnetz | `192.0.2.10` | `192.0.2.20` | `255.255.255.0` |
 
 Die Adressen sind Beispiele. Jede Adresse darf im Netz nur einmal vorkommen. Wie du dem
 Rechner eine feste Adresse gibst, zeigt für Windows

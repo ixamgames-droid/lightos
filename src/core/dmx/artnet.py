@@ -25,7 +25,7 @@ class ArtNetSender:
     def __init__(self, target_ip: str = "255.255.255.255"):
         # NET-04: Steht als Ziel der LIMITED Broadcast (255.255.255.255) UND ist
         # eine Ausgangs-NIC gewaehlt, geht es an deren GERICHTETEN Broadcast
-        # (z. B. 192.168.178.255). Limited Broadcast wird von Routern nicht
+        # (z. B. 192.0.2.255). Limited Broadcast wird von Routern nicht
         # weitergereicht und unter Linux nur ueber die Default-Route gesendet —
         # auf einem Venue-PC mit Lichtnetz an der zweiten NIC verpufft er
         # lautlos. Ein ausdruecklich eingetragenes Unicast-/Broadcast-Ziel bleibt

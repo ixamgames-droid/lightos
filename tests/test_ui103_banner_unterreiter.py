@@ -79,7 +79,7 @@ def _reiter_flaechen(tabs: QTabWidget, bezug) -> list:
 _BEDIENUNG = (QAbstractButton, QLineEdit, QComboBox, QAbstractSpinBox,
               QSlider)
 #: Gegenpruefung UI-103: der laengste realistische Stoerungstext.
-_STOER_LANG = ("Ausgabe gestört: Art-Net Universum 1 → 192.168.178.50 — "
+_STOER_LANG = ("Ausgabe gestört: Art-Net Universum 1 → 192.0.2.50 — "
                "Zeitüberschreitung beim Senden  (+3 weitere)")
 
 

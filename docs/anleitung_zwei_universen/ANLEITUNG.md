@@ -14,7 +14,7 @@
 | Universe | Adapter | „Patch" (Ziel) | Wofür |
 |---|---|---|---|
 | **U1** | Enttec USB Pro | COM-Port (z. B. `COM3`) | Geräte direkt am USB-Interface |
-| **U2** | Art-Net | Ziel-IP / Broadcast (z. B. `192.168.0.50` oder `255.255.255.255`) | Netzwerk-Nodes, Dimmer, weitere Interfaces |
+| **U2** | Art-Net | Ziel-IP / Broadcast (z. B. `192.0.2.50` oder `255.255.255.255`) | Netzwerk-Nodes, Dimmer, weitere Interfaces |
 
 Beide Universen laufen **gleichzeitig**. LightOS hält pro Universe genau **einen**
 Adapter — ein Typwechsel schließt den alten Adapter sauber, bevor der neue öffnet.
@@ -72,7 +72,7 @@ leer = Standard, siehe unten). Pro Zeile ein Universe:
    **Patch** = dein COM-Port, z. B. `COM3`.
 2. **+ Universum hinzufügen** → neue Zeile. **#** `2`, **Name** z. B. *Art-Net*,
    **Ausgang** = `ArtNet`, **Patch** = Ziel-IP oder Broadcast, z. B.
-   `192.168.0.50` (leer = Standard-Broadcast `255.255.255.255`).
+   `192.0.2.50` (leer = Standard-Broadcast `255.255.255.255`).
 3. **Speichern**. LightOS schreibt die Konfiguration nach `universes.json` im Datenordner
    **und** wendet sie **sofort ohne Neustart** an (Bestätigung mit dem Pfad).
 
@@ -92,7 +92,7 @@ ArtNet`. Bedeutung der **Patch**-Spalte je Typ:
 
 Beim **Speichern** prüft LightOS, ob zwei Zeilen am Ende an dieselbe Stelle
 senden. Ist das so, erscheint ein Hinweis mit den betroffenen Zeilennummern —
-zum Beispiel *„sACN → 10.0.0.5, externes Universum 1 · Betroffen: Zeile 1,
+zum Beispiel *„sACN → 192.0.2.5, externes Universum 1 · Betroffen: Zeile 1,
 Zeile 2."*
 
 **Warum das ein Problem ist:** beide Zeilen schicken dann abwechselnd
@@ -134,7 +134,7 @@ Alternativ pro Universe direkt eine Verbindung aufbauen:
   wenigen Sekunden `Verbunden: COM3 → Universe 1 (gespeichert)`. Steht dort „antwortet nicht"
   oder „Port lässt sich nicht öffnen", Port und Kabel prüfen.
 - **Tab „Art-Net":** **Art-Net aktivieren** anhaken, Feld **Universum:** auf `2`
-  stellen, **Ziel-IP / Broadcast** eintragen (z. B. `192.168.0.50`), bei Bedarf
+  stellen, **Ziel-IP / Broadcast** eintragen (z. B. `192.0.2.50`), bei Bedarf
   das **Art-Net Startuniversum** (die *externe* Art-Net-Universe-Nummer am Node)
   setzen, dann **Übernehmen**. Status: `Aktiv → … · Universe 2 (gespeichert)`.
 

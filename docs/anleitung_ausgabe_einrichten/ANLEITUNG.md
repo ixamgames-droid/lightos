@@ -26,7 +26,7 @@
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
 
 Die Bilder zeigen eine **Beispiel-Konfiguration**: Universe 1 über einen ENTTEC an
-`/dev/ttyUSB0`, Universe 2 über Art-Net an einen Node mit der Adresse `192.168.1.50`.
+`/dev/ttyUSB0`, Universe 2 über Art-Net an einen Node mit der Adresse `192.0.2.50`.
 Port und Adressen sind Beispiele — bei dir stehen dort deine eigenen. Unter Windows
 heißt der Port zum Beispiel `COM3`, unter Linux meist `/dev/ttyUSB0`.
 Die **Statusleiste** unten in den Bildern gehört nicht zu dieser Beispiel-Konfiguration: Die Bilder
@@ -176,20 +176,20 @@ Reiter **Art-Net**:
 2. **Netzwerkkarte:** — über welche Karte Art-Net **und** sACN hinausgehen.
    `Automatisch (Betriebssystem entscheidet)` nimmt die Standardroute. Die übrigen
    Einträge zeigen je Karte Name, Adresse und Broadcast, zum Beispiel
-   `eth0 — 192.168.1.10  (Broadcast 192.168.1.255)`. Mit einer gewählten Karte geht
+   `eth0 — 192.0.2.10  (Broadcast 192.0.2.255)`. Mit einer gewählten Karte geht
    Art-Net an deren Broadcast statt an `255.255.255.255` — den reichen Router nicht
    weiter. Die Wahl gilt für **diesen Rechner**, nicht für die Show; neue Verbindungen
    nutzen sie sofort, bestehende ab dem nächsten Start.
 3. **Universum:** — das LightOS-Universum, auf das **Übernehmen** wirkt. Nur dieses eine;
    andere Universen bleiben unverändert.
-4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.168.1.50`) oder
+4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.0.2.50`) oder
    `255.255.255.255` für alle im Netz. Leer bedeutet ebenfalls `255.255.255.255`.
 5. **Art-Net Startuniversum:** — die Art-Net-Universumsnummer, die der Node erwartet.
    Vorbelegt ist LightOS-Universum minus 1: Universe 2 sendet also auf Art-Net-Universum
    `1`, Universe 1 auf `0`.
 6. **Übernehmen** — richtet den Ausgang ein und speichert ihn. Der Status zeigt dann
    `Aktiv → <Adresse> · Universe <n> (gespeichert)`; beim Öffnen des Dialogs steht dort
-   der gespeicherte Stand (`Gespeichert: 192.168.1.50 · Universe 2`).
+   der gespeicherte Stand (`Gespeichert: 192.0.2.50 · Universe 2`).
 
 ## 4. sACN (E1.31)
 
@@ -449,12 +449,12 @@ dort eine andere Adresse – er hört sonst weiter auf die alte.
 
 ## Netzwerk-Falle bei Art-Net und sACN
 
-Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.168.1.50`,
-braucht die Netzwerkkarte des Rechners eine Adresse `192.168.1.x` (Maske
+Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.0.2.50`,
+braucht die Netzwerkkarte des Rechners eine Adresse `192.0.2.x` (Maske
 `255.255.255.0`). Häufiger Fehler: ein USB-Netzwerkadapter ohne DHCP bekommt nur eine
 Adresse `169.254.x.x` — dann erreicht Art-Net den Node nicht, obwohl der Dialog
 „Aktiv" meldet. Abhilfe: dem Adapter eine feste Adresse im Netz des Nodes geben und mit
-`ping 192.168.1.50` prüfen. Hat der Rechner mehrere Karten (WLAN und Lichtnetz), wähle
+`ping 192.0.2.50` prüfen. Hat der Rechner mehrere Karten (WLAN und Lichtnetz), wähle
 in Schritt 3 die richtige **Netzwerkkarte:**.
 
 Mehr zu Art-Net (Port 6454, Universumsnummern): [ARTNET.md](../ARTNET.md). Grundlagen zu

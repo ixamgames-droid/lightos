@@ -6,7 +6,7 @@
 > Universen).
 >
 > Beispiel dieser Anleitung (live verifiziert): **EventPar** (Universe 1) über **Art-Net** an
-> einen Node (`192.168.178.99`) + **Hydrabeam 4000** (Universe 3) über **Enttec** auf `COM3`.
+> einen Node (`192.0.2.99`) + **Hydrabeam 4000** (Universe 3) über **Enttec** auf `COM3`.
 
 ## Kurz-Prinzip
 
@@ -14,7 +14,7 @@ Ausgabe-Backend gilt **pro Universum**, nicht global:
 
 | Universum | Geräte darauf | Ausgabe | Ziel |
 |---|---|---|---|
-| 1 | EventPar (Art-Net-Node) | **Art-Net** | Node-IP `192.168.178.99` (oder Broadcast) |
+| 1 | EventPar (Art-Net-Node) | **Art-Net** | Node-IP `192.0.2.99` (oder Broadcast) |
 | 3 | Hydrabeam 4000 (USB-Interface) | **Enttec** | COM-Port `COM3` |
 
 Ein Gerät hängt immer an dem Universum, das über das gewünschte Interface läuft. Also:
@@ -42,7 +42,7 @@ Setze:
 
 | # | Name | Ausgang | Patch (Port/IP) |
 |---|---|---|---|
-| 1 | EventPar (Art-Net) | **ArtNet** | `192.168.178.99` *(Node-IP; oder `255.255.255.255` für Broadcast)* |
+| 1 | EventPar (Art-Net) | **ArtNet** | `192.0.2.99` *(Node-IP; oder `255.255.255.255` für Broadcast)* |
 | 3 | Hydra (Enttec) | **Enttec** | `COM3` *(dein Enttec-COM-Port)* |
 
 Fehlt ein Universum, mit **`+ Universum hinzufügen`** anlegen; dann Ausgang und Patch
@@ -53,7 +53,7 @@ eintragen. Mit **`Speichern`** übernehmen.
 > „Patch" ein. `Ports aktualisieren` frischt die Liste nach dem Einstecken auf.
 
 Im **Universen**-Tab siehst du dann beide Zeilen nebeneinander — Universum 1 mit Ausgang
-`ArtNet` / Patch `192.168.178.99` und Universum 3 mit Ausgang `Enttec` / Patch `COM3`: das
+`ArtNet` / Patch `192.0.2.99` und Universum 3 mit Ausgang `Enttec` / Patch `COM3`: das
 ist „Enttec und Art-Net gleichzeitig".
 
 ## 3. Prüfen, dass beide laufen
@@ -72,11 +72,11 @@ ist „Enttec und Art-Net gleichzeitig".
 Art-Net ist Netzwerk-Ausgabe. Dein PC (bzw. der USB-Netzwerk-Adapter, an dem der Node hängt)
 **muss eine IP im selben Subnetz wie der Node** haben:
 
-- Node = `192.168.178.99` → der PC braucht z. B. `192.168.178.x` (gleiche `192.168.178`).
+- Node = `192.0.2.99` → der PC braucht z. B. `192.0.2.x` (gleiche `192.0.2`).
 - **Häufiger Fehler:** Ein USB-Ethernet-Adapter ohne DHCP bekommt nur eine **APIPA-Adresse**
   (`169.254.x.x`) → dann findet Art-Net den Node **nicht**. Lösung: dem Adapter eine **feste
-  IP** im Node-Subnetz geben (z. B. `192.168.178.50`, Maske `255.255.255.0`).
-- Prüfen: `ping 192.168.178.99` muss antworten. Alternativ **Broadcast** (`255.255.255.255`)
+  IP** im Node-Subnetz geben (z. B. `192.0.2.50`, Maske `255.255.255.0`).
+- Prüfen: `ping 192.0.2.99` muss antworten. Alternativ **Broadcast** (`255.255.255.255`)
   im Patch nutzen — dann erreicht Art-Net alle Nodes im lokalen Netz, unabhängig von der
   Node-IP (aber die Subnetz-Regel oben gilt trotzdem).
 

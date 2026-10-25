@@ -622,9 +622,9 @@ class RueckfrageTest(unittest.TestCase):
         den gerichteten Broadcast, der Dialog kennt 255.255.255.255."""
         from unittest import mock
         om = types.SimpleNamespace(ausgabe_status=lambda: [
-            {"universum": 1, "weg": "Art-Net", "ziel": "192.168.178.255"}])
+            {"universum": 1, "weg": "Art-Net", "ziel": "192.0.2.255"}])
         with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
-                        return_value="192.168.178.255"):
+                        return_value="192.0.2.255"):
             self.assertEqual(oc._andere_ausgaben(om, 1, "Art-Net", "255.255.255.255"), [])
             # Ein anderes Ziel bleibt eine andere Ausgabe.
             self.assertEqual(len(oc._andere_ausgaben(om, 1, "Art-Net", "10.0.0.5")), 1)

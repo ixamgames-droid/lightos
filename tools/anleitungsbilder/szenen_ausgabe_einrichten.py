@@ -12,7 +12,7 @@ Datenschutz — der Dialog zeigt sonst Dinge DIESES Rechners:
 * Die Portliste (``serial.tools.list_ports.comports``) und die Liste der
   Netzwerkkarten (``output_config._list_ifaces``) werden NUR waehrend des
   Dialog-Aufbaus durch feste Beispiele ersetzt (``/dev/ttyUSB0``,
-  ``192.168.1.x``) — echte Portnamen, Seriennummern oder IP-Adressen landen so
+  ``192.0.2.x``, RFC 5737) — echte Portnamen, Seriennummern oder IP-Adressen landen so
   nie im Bild.
 * Die Beispiel-Konfiguration steht nur in der ``universes.json`` der Sandbox
   und wird danach wieder auf den Stand davor zurueckgesetzt. Angewendet wird
@@ -39,16 +39,16 @@ from anleitungsbilder.szenen_erste_schritte import (
 ZIEL = "docs/anleitung_ausgabe_einrichten/img"
 
 # Beispiel-Konfiguration: U1 ueber einen Enttec an USB, U2 ueber Art-Net an
-# einen Node im Heimnetz. Nur Beispieladressen.
+# einen Node im Lichtnetz. Nur Beispieladressen (RFC 5737, PRIV-07).
 BEISPIEL_PORT = "/dev/ttyUSB0"
-BEISPIEL_NODE = "192.168.1.50"
+BEISPIEL_NODE = "192.0.2.50"
 BEISPIEL_UNIVERSEN = [
     {"num": 1, "name": "Bühne", "output": "Enttec", "patch": BEISPIEL_PORT},
     {"num": 2, "name": "Traverse", "output": "ArtNet", "patch": BEISPIEL_NODE},
 ]
 BEISPIEL_NICS = [
-    {"name": "eth0", "ip": "192.168.1.10", "broadcast": "192.168.1.255"},
-    {"name": "wlan0", "ip": "192.168.178.20", "broadcast": "192.168.178.255"},
+    {"name": "eth0", "ip": "192.0.2.10", "broadcast": "192.0.2.255"},
+    {"name": "wlan0", "ip": "198.51.100.20", "broadcast": "198.51.100.255"},
 ]
 
 

@@ -225,7 +225,7 @@ class PatchFixtureEditDialog(QDialog):
             form.addRow("Protokoll:", self._combo_protocol)
             self._edit_net_host = QLineEdit(
                 getattr(self._fixture, "net_host", "") or "")
-            self._edit_net_host.setPlaceholderText("z. B. 192.168.1.50")
+            self._edit_net_host.setPlaceholderText("z. B. 192.0.2.50")
             form.addRow("Netzwerk-Adresse:", self._edit_net_host)
             # NUR Enabled-Zustaende syncen — _on_protocol_changed() wuerde
             # _validate() rufen, aber _lbl_channels/_lbl_warn existieren an
