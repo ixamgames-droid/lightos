@@ -28,6 +28,8 @@ Bildschirm rollt nur der obere Teil.
 """
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
@@ -614,6 +616,7 @@ class MitschnittDialog(QDialog):
                 lage = f"Signal seit {_dauer(st.signal_seit)}"
             teile.append(f"Universum {von} → LightOS-Universum {nach}: {lage}")
         text = f"{protokoll}: " + "; ".join(teile)
+        text += self._firewall_zusatz(protokoll)
         fremd = sorted(u for p, u in bild.nicht_zugeordnet if p == protokoll)
         if fremd:
             text += (" — außerdem empfangen, aber nicht zugeordnet und deshalb "
@@ -621,6 +624,17 @@ class MitschnittDialog(QDialog):
                      + ", ".join(str(u) for u in fremd)
                      + " (es gilt ein Universum je Protokoll).")
         return text
+
+    def _firewall_zusatz(self, protokoll: str) -> str:
+        """OUT-79: kam seit dem Einschalten des Eingangs gar nichts an, die
+        Firewall als mögliche Ursache nennen — und wo man nachsieht."""
+        from src.core import netz_hinweis as nh
+        rx = self._leser.empfaenger().get(protokoll)
+        if rx is None or not nh.empfaenger_ohne_empfang(rx):
+            return ""
+        seit = time.monotonic() - (getattr(rx, "gestartet_um", None) or 0.0)
+        return " — " + nh.kein_empfang_text(getattr(rx, "host", None),
+                                             sekunden=seit)
 
     def _lebt(self, sid: int) -> bool:
         """Ist die festgehaltene Szene noch DIESELBE Funktion in der Show?"""

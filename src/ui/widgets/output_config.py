@@ -976,6 +976,11 @@ class OutputConfigDialog(QDialog):
             "Empfängt DMX-Daten via Art-Net (Port 6454) oder sACN (Port 5568)\n"
             "und mergt sie in lokale Universen (HTP / LTP / REPLACE)."
         ))
+        # OUT-79: Empfangsadresse (gilt auch fuer die Fernsteuerung) und der
+        # Firewall-Hinweis VOR dem Einschalten.
+        from src.ui.widgets.dmx_empfang_box import EmpfangsBox
+        self._empfang_box = EmpfangsBox()
+        if_l.addWidget(self._empfang_box)
 
         # Art-Net Input
         ain_box = QGroupBox("Art-Net Input")
@@ -1038,6 +1043,19 @@ class OutputConfigDialog(QDialog):
         self._fernsteuerung_box = FernsteuerungBox()
         if_l.addWidget(self._fernsteuerung_box)
 
+        # OUT-79: erster Haken -> Vorwarnung (Windows, einmal); Statuszeilen
+        # nennen die Firewall, wenn nach dem Einschalten nichts ankommt.
+        for _check in (self._check_artnet_in, self._check_sacn_in,
+                       self._fernsteuerung_box.check_aktiv):
+            _check.toggled.connect(self._empfang_box.beim_haken)
+        self._empfang_box.ueberwache(
+            self._lbl_artnet_in_status, self._check_artnet_in, ("artnet",))
+        self._empfang_box.ueberwache(
+            self._lbl_sacn_in_status, self._check_sacn_in, ("sacn",))
+        self._empfang_box.ueberwache(
+            self._fernsteuerung_box.lbl_status,
+            self._fernsteuerung_box.check_aktiv)
+
         if_l.addStretch(1)
         # NET-15: mit der Fernsteuerungs-Tabelle passt der Reiter nicht mehr in
         # die Standardhoehe — rollbar statt zusammengequetscht (sonst ueberlappten
@@ -1052,7 +1070,8 @@ class OutputConfigDialog(QDialog):
         input_rollen.setMinimumHeight(
             input_tab.minimumSizeHint().height()
             - self._fernsteuerung_box.minimumSizeHint().height()
-            - if_l.spacing())
+            - self._empfang_box.minimumSizeHint().height()   # OUT-79
+            - 2 * if_l.spacing())
         tabs.addTab(input_rollen, "DMX Input")
 
         # ── Universe Manager Tab ───────────────────────────────────────────────
