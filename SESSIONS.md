@@ -46,7 +46,7 @@
 | XPLAT-51 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-25T12:04Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | XPLAT-52 | A | fix/xplat51-arm64-nicht-unterstuetzt | 2026-10-25T12:04Z | install.py · src/core/plattform_hinweis.py · start.bat · start.ps1 · INSTALL.md |
 | BPM-31 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-25T12:04Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
-| UI-105 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-20T18:50Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
+| UI-105 | A | fix/bpm31-ui105-nebenbefunde | 2026-10-25T12:04Z | src/core/audio/music_show.py · src/ui/views/fixture_group_view.py |
 | WEB-12 | A | feat/web12-handy-konsole-sicher | 2026-10-20T19:40Z | src/web/app.py · src/web/ |
 
 ## Blocker & Fallen
