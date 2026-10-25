@@ -143,6 +143,29 @@ AUFRUFE = {
     "/api/vc/pult": ("post", "/api/vc/pult", {"gm": 200}),
 }
 
+#: Die Rechte-Matrix FEST im Test — nicht aus ``webapp.ROUTEN_RECHTE``
+#: abgeleitet, sonst prueft die Matrix die Tabelle gegen sich selbst (eine
+#: Route, die versehentlich das Konsolen-Recht bekommt, fiele nicht auf).
+SOLL_ROUTEN = {
+    "/api/status": "fest",
+    "/api/go": "fest",
+    "/api/back": "fest",
+    "/api/stop": "fest",
+    "/api/blackout": "fest",
+    "/api/executor/<int:slot>/fader": "fest",
+    "/api/executor/<int:slot>/go": "fest",
+    "/api/programmer/clear": "fest",
+    "/api/channel/<int:universe>/<int:channel>": "roh_dmx",
+    "/api/vc/widgets": "konsole",
+    "/api/vc/widget/<kennung>/aktion": "konsole",
+    "/api/vc/konsole": "konsole",
+    "/api/vc/pult": "konsole",
+}
+SOLL_EREIGNISSE = {
+    "go": "fest", "back": "fest", "stop": "fest", "fader": "fest", "blackout": "fest",
+    "vc_hallo": "konsole", "vc_aktion": "konsole", "vc_pult": "konsole",
+}
+
 #: Schluesselarten der Matrix: (Name, Schluessel, feste Seite an, Roh-DMX an)
 ARTEN = (
     ("ohne", None, True, True),
@@ -248,14 +271,16 @@ class RechteMatrixTest(_Basis):
         self.assertEqual(ohne, set(), "Route ohne Recht — im Gate fuer jeden gesperrt, "
                                       "aber hier bewusst einzutragen")
         self.assertEqual(set(AUFRUFE), set(webapp.ROUTEN_RECHTE))
+        self.assertEqual(webapp.ROUTEN_RECHTE, SOLL_ROUTEN)
 
     def test_jedes_socket_ereignis_steht_in_der_tabelle(self):
         ereignisse = set(self.sio.server.handlers.get("/", {})) - {"connect", "disconnect"}
         self.assertEqual(ereignisse, set(webapp.EREIGNIS_RECHTE))
+        self.assertEqual(webapp.EREIGNIS_RECHTE, SOLL_EREIGNISSE)
 
     def test_matrix_http(self):
         for art, schluessel, fest, roh in ARTEN:
-            for regel, recht in webapp.ROUTEN_RECHTE.items():
+            for regel, recht in SOLL_ROUTEN.items():
                 with self.subTest(art=art, route=regel):
                     self.state = _State()
                     c = self._client(schluessel, fest, roh)
@@ -271,7 +296,7 @@ class RechteMatrixTest(_Basis):
                  "vc_hallo": {}, "vc_aktion": {"id": "wabcdef", "aktion": "umschalten"},
                  "vc_pult": {"gm": 200}}
         for art, schluessel, fest, roh in ARTEN:
-            for ereignis, recht in webapp.EREIGNIS_RECHTE.items():
+            for ereignis, recht in SOLL_EREIGNISSE.items():
                 with self.subTest(art=art, ereignis=ereignis):
                     self.state = _State()
                     c = self._client(schluessel, fest, roh)
