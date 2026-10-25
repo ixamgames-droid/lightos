@@ -8,9 +8,9 @@ from PySide6.QtWidgets import (
     QDialog, QListWidget, QListWidgetItem, QAbstractItemView, QDialogButtonBox,
     QMenu,
 )
-from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, Signal
+from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, QRect, Signal
 from PySide6.QtGui import (
-    QPainter, QColor, QPen, QDrag, QFont, QBrush,
+    QPainter, QColor, QPen, QDrag, QFont, QBrush, QFontMetrics,
 )
 from src.core.app_state import get_state
 from src.ui.widgets.menue_knopf import MenueKnopf
@@ -247,6 +247,27 @@ class FixtureGridWidget(QWidget):
             return f"{fid}"
         from src.core.app_state import head_label_short
         return f"{fid}·{head_label_short(self._models.get(fid, ''), head)}"
+
+    @staticmethod
+    def zell_text_rechtecke(rect: QRect, big_font: QFont,
+                            small_font: QFont) -> "tuple[QRect, QRect | None]":
+        """UI-105: wohin Geraetenummer (gross) und Kurzname (klein) einer Zelle
+        gezeichnet werden.
+
+        Bis 2026-10-20 standen beide mittig in der Zelle, der Name nur 14 px
+        tiefer gerechnet — also 7 px versetzt, und sie ueberlappten in jeder
+        Zellgroesse. Jetzt bilden beide einen Block, dessen Zeilenhoehen aus den
+        ``fontMetrics`` kommen (skaliert also mit Schrift und Bildschirm-
+        Skalierung mit). Reicht die Hoehe fuer beide nicht, entfaellt der
+        Kurzname (``None``); die Nummer steht dann allein mittig.
+        """
+        hb = QFontMetrics(big_font).height()
+        hs = QFontMetrics(small_font).height()
+        x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
+        if hb + hs <= h:
+            top = y + (h - hb - hs) // 2
+            return QRect(x, top, w, hb), QRect(x, top + hb, w, hs)
+        return QRect(x, y + (h - hb) // 2, w, hb), None
 
     def zell_tooltip(self, wert) -> str:
         """Der VOLLE Name derselben Zelle — ``"Spiider · Pixel 3"``.
@@ -658,6 +679,7 @@ class FixtureGridWidget(QWidget):
         font = QFont("Segoe UI", 9)
         font.setBold(True)
         p.setFont(font)
+        small = QFont("Segoe UI", 7)
 
         # FM-HEADLAYOUT Slice 4: Farbton je Geraet, Helligkeit je Kopf. Reihenfolge
         # EINMAL pro Paint bestimmen (nicht je Zelle) — dieselbe Quelle wie alle
@@ -683,15 +705,17 @@ class FixtureGridWidget(QWidget):
                     fid, index if achse else head, fid_order, achse)
             p.fillRect(rect[0], rect[1], rect[2], rect[3], QBrush(fill_color))
             p.setPen(QColor("#ffffff"))
+            # UI-105: Nummer und Kurzname als Block uebereinander, Hoehen aus
+            # den fontMetrics; passt der Name nicht mehr, entfaellt er.
+            big_r, small_r = self.zell_text_rechtecke(QRect(*rect), font, small)
             p.setFont(font)
-            big = self.zell_beschriftung(v)
-            p.drawText(rect[0], rect[1], rect[2], rect[3],
-                       Qt.AlignmentFlag.AlignCenter, big)
-            label = self._labels.get(fid, str(fid if fid is not None else v))
-            small = QFont("Segoe UI", 7)
-            p.setFont(small)
-            p.drawText(rect[0], rect[1] + 14, rect[2], rect[3] - 14,
-                       Qt.AlignmentFlag.AlignCenter, label[:8])
+            p.drawText(big_r, Qt.AlignmentFlag.AlignCenter, self.zell_beschriftung(v))
+            if small_r is not None:
+                label = self._labels.get(fid, str(fid if fid is not None else v))
+                p.setFont(small)
+                p.drawText(small_r, Qt.AlignmentFlag.AlignCenter,
+                           QFontMetrics(small).elidedText(
+                               label[:8], Qt.TextElideMode.ElideRight, small_r.width()))
 
         # Visual feedback: highlight drop target during internal drag
         if self._drag_from is not None and self._drag_current is not None:

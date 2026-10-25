@@ -2,6 +2,7 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QCheckBox,
                                 QSpinBox, QDialogButtonBox, QMenu, QSizePolicy)
+from . import vc_popup
 from PySide6.QtCore import Qt, QRect, QPoint
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
@@ -9,6 +10,10 @@ from .vc_widget import VCWidget
 
 class VCFrame(VCWidget):
     """Container that holds child VCWidgets. Supports multiple pages."""
+
+    # VCB-48: darf dieser Rahmentyp ein Pop-up-Feld sein? Die Effekt-Box
+    # (VCEffectEditor) erbt von VCFrame, ist aber kein freier Behaelter.
+    POPUP_FAEHIG = True
 
     def __init__(self, caption: str = "Frame", parent=None):
         super().__init__(caption, parent)
@@ -19,8 +24,79 @@ class VCFrame(VCWidget):
         self._bg_color = QColor("#161b22")
         self._fg_color = QColor("#8b949e")
         self._tab_height = 22
+        # VCB-48: Pop-up-Feld. ``_popup`` + ``popup_id`` werden gespeichert,
+        # ``_popup_offen`` ist Laufzeit (nach dem Laden immer geschlossen).
+        self._popup: bool = False
+        self.popup_id: str = ""
+        self._popup_offen: bool = False
         self.resize(300, 200)
         self.setAcceptDrops(True)
+
+    # ── VCB-48: Pop-up-Feld ──────────────────────────────────────────────────
+
+    def is_popup(self) -> bool:
+        return bool(self._popup)
+
+    def popup_offen(self) -> bool:
+        return bool(self._popup and self._popup_offen)
+
+    def popup_hinderungsgrund(self) -> str:
+        """Leerer Text = darf Pop-up-Feld werden; sonst der Hinweis, warum nicht."""
+        if not self.POPUP_FAEHIG:
+            return vc_popup.HINWEIS_FELD_NICHT_OBEN
+        cv = self._canvas()
+        if cv is not None and self.parent() is not cv:
+            return vc_popup.HINWEIS_FELD_NICHT_OBEN
+        if vc_popup.popup_vorfahr(self) is not None:
+            return vc_popup.HINWEIS_FELD_NICHT_OBEN
+        if vc_popup.enthaelt_popup_elemente(self):
+            return vc_popup.HINWEIS_FELD_ENTHAELT_POPUP
+        return ""
+
+    def set_popup(self, on: bool, *, modal: bool = False) -> bool:
+        """Eigenschaft „Pop-up-Feld“ setzen. Verstoesst das Einschalten gegen
+        die Verschachtelungs-Sperre, bleibt alles wie es war und der Editor
+        zeigt einen Hinweis — Rueckgabe False. Ein frisch zum Pop-up gemachtes
+        Feld bleibt OFFEN (man will es gleich befuellen)."""
+        on = bool(on)
+        if on == self._popup:
+            return True
+        if on:
+            grund = self.popup_hinderungsgrund()
+            if grund:
+                vc_popup.hinweis(self, grund, modal=modal)
+                return False
+            if not self.popup_id:
+                self.popup_id = vc_popup.neue_kennung()
+            self._popup = True
+            self._popup_offen = True
+        else:
+            self._popup = False
+            self._popup_offen = False
+        self._popup_sichtbarkeit()
+        return True
+
+    def set_popup_offen(self, offen: bool) -> None:
+        """Pop-up oeffnen/schliessen (Laufzeit). Offen liegt es ganz oben."""
+        if not self._popup:
+            return
+        self._popup_offen = bool(offen)
+        self._popup_sichtbarkeit()
+
+    def popup_umschalten(self) -> None:
+        self.set_popup_offen(not self._popup_offen)
+
+    def _popup_sichtbarkeit(self) -> None:
+        cv = self._canvas()
+        if cv is not None and hasattr(cv, "soll_sichtbar"):
+            self.setVisible(cv.soll_sichtbar(self))
+        elif self._popup:
+            self.setVisible(self._popup_offen)
+        if self._popup and self._popup_offen:
+            self.raise_()            # ueberlagert alle anderen VC-Elemente
+        self.update()
+        if cv is not None and hasattr(cv, "popup_tasten_auffrischen"):
+            cv.popup_tasten_auffrischen(self.popup_id)
 
     # ── Solo-Frame Logik ─────────────────────────────────────────────────────
 
@@ -194,7 +270,11 @@ class VCFrame(VCWidget):
             act.setData(wtype)
 
         menu.addSeparator()
-        menu.addAction("Einstellungen...").triggered.connect(self._open_properties)
+        menu.addAction("Einstellungen...").triggered.connect(self._edit_properties)
+        if self._popup:
+            # VCB-48: im Bearbeiten-Modus das Feld zum Befuellen auf-/zuklappen.
+            menu.addAction("Pop-up-Feld schließen").triggered.connect(
+                lambda: self.set_popup_offen(False))
         # Bank-Zuweisung — wie bei normalen Widgets (VCWidget._set_bank). Erlaubt,
         # einen bestehenden Frame nachtraeglich auf eine andere Bank zu legen; der
         # Frame folgt als EINHEIT der Bank-Sichtbarkeit (Kinder blenden mit aus/ein).
@@ -234,7 +314,18 @@ class VCFrame(VCWidget):
         if self._edit_mode:
             super().mousePressEvent(event)
             return
+        if self._popup:
+            # VCB-48: Klicks auf die Flaeche des offenen Pop-ups gehoeren ihm —
+            # nichts darunter (auch nicht die Canvas) bekommt sie.
+            event.accept()
+            return
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if not self._edit_mode and self._popup:
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
     # ── Effekt-Gruppen-Highlight (Box als Einheit) ─────────────────────────────
 
@@ -258,6 +349,8 @@ class VCFrame(VCWidget):
         p.fillRect(self.rect(), self._bg_color)
         if self._solo:
             p.setPen(QPen(QColor("#e63946"), 2))
+        elif self._popup:
+            p.setPen(QPen(QColor("#a371f7"), 2))      # VCB-48: Pop-up-Feld (violett)
         else:
             p.setPen(QPen(QColor("#30363d"), 1))
         p.drawRect(self.rect().adjusted(0, 0, -1, -1))
@@ -271,7 +364,8 @@ class VCFrame(VCWidget):
             if self._page_count <= 1:
                 p.setPen(self._fg_color)
                 p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
-                p.drawText(header, Qt.AlignmentFlag.AlignCenter, self.caption)
+                titel = f"▣ {self.caption}" if self._popup else self.caption
+                p.drawText(header, Qt.AlignmentFlag.AlignCenter, titel)
             else:
                 w = max(40, self.width() // self._page_count)
                 for i in range(self._page_count):
@@ -332,6 +426,10 @@ class VCFrame(VCWidget):
         solo = QCheckBox("Solo-Frame (nur 1 Button gleichzeitig aktiv)")
         solo.setChecked(self._solo)
         form.addRow("Modus:", solo)
+        popup_cb = QCheckBox("Pop-up-Feld (öffnet/schließt per Pop-up-Taste, liegt dann über der Konsole)")
+        popup_cb.setChecked(self._popup)
+        popup_cb.setEnabled(self.POPUP_FAEHIG)
+        form.addRow("Pop-up:", popup_cb)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -342,6 +440,10 @@ class VCFrame(VCWidget):
             self._page_count = pages.value()
             self._show_header = header.isChecked()
             self._solo = solo.isChecked()
+            # VCB-48: Pop-up-Eigenschaft — die Verschachtelungs-Sperre meldet
+            # sich selbst mit Hinweis und laesst den Rahmen dann normal.
+            if popup_cb.isChecked() != self._popup:
+                self.set_popup(popup_cb.isChecked(), modal=True)
             # VCB-03: die Seitenanzahl koennte reduziert worden sein -> _current_page
             # ueber den neuen Bereich hinaus. switch_page klemmt selbst und wendet die
             # Sichtbarkeit neu an (statt nur update(), das den alten Index liesse).
@@ -354,6 +456,11 @@ class VCFrame(VCWidget):
         d["page_count"] = self._page_count
         d["show_header"] = self._show_header
         d["solo"] = self._solo
+        # VCB-48: nur schreiben, wenn der Rahmen ein Pop-up-Feld ist — ein
+        # normaler Rahmen bleibt im Layout Zeichen fuer Zeichen wie bisher.
+        if self._popup:
+            d["popup"] = True
+            d["popup_id"] = self.popup_id
         children = []
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
@@ -368,6 +475,14 @@ class VCFrame(VCWidget):
         self._page_count = max(1, int(d.get("page_count", 1)))
         self._show_header = d.get("show_header", True)
         self._solo = d.get("solo", False)
+        # VCB-48: Pop-up-Feld (beim Laden IMMER geschlossen). Ohne lesbare
+        # Kennung bekommt es eine neue — dann findet es keine Taste, bleibt
+        # aber im Bearbeiten-Modus erreichbar (Canvas-Menue „Pop-up-Felder“).
+        self._popup = bool(d.get("popup", False)) and self.POPUP_FAEHIG
+        _pid = d.get("popup_id", "")
+        self.popup_id = _pid if isinstance(_pid, str) and _pid.strip() else (
+            vc_popup.neue_kennung() if self._popup else "")
+        self._popup_offen = False
         # Kinder wiederherstellen
         from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
         for cd in d.get("children", []):
@@ -377,6 +492,11 @@ class VCFrame(VCWidget):
                 continue
             child = cls(parent=self)
             child.apply_dict(cd)
+            if isinstance(child, VCFrame) and child._popup:
+                # VCB-48: Pop-up-Felder gibt es nur direkt auf der Konsole —
+                # ein (handbearbeitetes) verschachteltes wird normaler Rahmen.
+                child._popup = False
+                child._popup_offen = False
             page = cd.get("vc_page", 0)
             child.setProperty("vc_page", page)
             # Edit-Mode/Snap des Frames an die wiederhergestellten Kinder
