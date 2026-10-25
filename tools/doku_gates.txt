@@ -105,6 +105,7 @@ test_tool1_verwaiste_werkzeuge.py
 !test_fm53_bibliothek_download.py  # "README.md" nur als Eintrag eines Test-Archivs
 !test_fm56_review.py               # tools/README.md ist keine Doku -> volle Suite
 !test_session_claim.py             # "docs/y.md" nur als Beispielwert fuer --files
+!test_proc25_tafel_privat.py       # "SESSIONS.md" nur als Datei in Wegwerf-Repos (Tafel), keine Doku
 !test_tool11_bildschirm_windows.py # docs/.../img nur als Beispielpfade
 !test_tool3_generator_annahmen.py  # "docs" nur in erzeugtem Beispielcode
 !test_tool5_demo_global_bus.py     # prueft ein Werkzeug, liest keine Doku
@@ -114,3 +115,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
 test_imp3_dialog_und_patch.py      # Anleitung Patch & Gruppen: Knopf „Tabellen-Import ▾“, Eingabetaste, doppelte Namen
 test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)
+test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen

@@ -304,6 +304,9 @@ class ButtonAction(str, Enum):
     LASER_ARM    = "LaserArm"     # Scharf/Unscharf-Toggle des LaserOutputManagers (unscharf = Ausgabe geblankt)
     LASER_ESTOP  = "LaserEstop"   # Laser-Not-Aus: sofort dunkel + entwaffnen (Trigger)
     LASER_PATTERN = "LaserPattern"  # LAS-18: gespeichertes Laser-Muster (PaletteType.LASER) abrufen
+    # VCB-48: oeffnet/schliesst ein Pop-up-Feld (VCFrame mit popup=True) ueber
+    # dessen stabile Kennung ``popup_target``. Dieselbe Taste schliesst wieder.
+    POPUP_TOGGLE = "PopupToggle"
 
 
 # Benutzerfreundliche deutsche Labels für die Aktions-Auswahl (statt der rohen
@@ -313,6 +316,7 @@ BUTTON_ACTION_LABELS: list[tuple[str, str]] = [
     (ButtonAction.FUNCTION_FLASH,  "Funktion (nur gehalten)"),
     (ButtonAction.EFFECT_ACTION,   "Effekt-Aktion (Live)"),
     (ButtonAction.SELECT_GROUP,    "Gruppe auswählen"),
+    (ButtonAction.POPUP_TOGGLE,    "Pop-up-Feld öffnen/schließen"),
     (ButtonAction.LIBRARY_SNAP,    "Bibliothek-Farbe/Snap"),
     (ButtonAction.SNAPSHOT,        "Snapshot abrufen"),
     (ButtonAction.CLEAR,           "Programmer leeren (Clear)"),
@@ -459,6 +463,9 @@ class VCButton(VCWidget):
         self.group_name: str = ""
         # LAS-18: Name des Laser-Musters (PaletteType.LASER) fuer LASER_PATTERN.
         self.laser_palette: str = ""
+        # VCB-48: Kennung (popup_id) des Pop-up-Felds fuer POPUP_TOGGLE —
+        # nicht der Name, damit Umbenennen die Verknuepfung nicht bricht.
+        self.popup_target: str = ""
         # VCB-11: Ziel einer BLACKOUT-Taste — einzelne Geraete (fids) und/oder
         # Fixture-Gruppen (zur Laufzeit aufgeloest). Alles leer = globaler
         # Blackout wie bisher (alte Layouts ohne die Felder laden genau so).
@@ -1450,6 +1457,14 @@ class VCButton(VCWidget):
         p.restore()
 
     def _extend_context_menu(self, menu):
+        if self._popup_ziel() is not None:
+            # VCB-48: im Bearbeiten-Modus loest ein Klick nichts aus — hier
+            # oeffnet man das Feld zum Befuellen (und schliesst es wieder).
+            menu.addSeparator()
+            _f = self._popup_ziel()
+            menu.addAction("Pop-up-Feld schließen" if _f.popup_offen()
+                           else "Pop-up-Feld öffnen").triggered.connect(
+                lambda checked=False, ff=_f: ff.popup_umschalten())
         menu.addSeparator()
         menu.addAction("Hintergrundbild wählen…").triggered.connect(self._pick_bg_image)
         rm = menu.addAction("Hintergrundbild entfernen")
@@ -1531,6 +1546,46 @@ class VCButton(VCWidget):
         return None
 
     # ── Action ───────────────────────────────────────────────────────────────
+
+    # ── VCB-48: Pop-up-Taste ──────────────────────────────────────────────────
+
+    def _popup_ziel(self):
+        """Das Pop-up-Feld, das diese Taste schaltet — oder None."""
+        from . import vc_popup
+        if self.action != ButtonAction.POPUP_TOGGLE or not self.popup_target:
+            return None
+        return vc_popup.finde_popup(self._find_canvas(), self.popup_target)
+
+    def popup_offen(self) -> bool:
+        """Taste (und APC-Pad) zeigt „offen“ nur, wenn das Feld offen ist UND
+        auf der aktiven Bank liegt — sonst leuchtete sie fuer ein Feld, das man
+        gar nicht sieht."""
+        f = self._popup_ziel()
+        if f is None or not f.popup_offen():
+            return False
+        cv = self._find_canvas()
+        if cv is not None and hasattr(cv, "on_active_bank"):
+            return bool(cv.on_active_bank(f))
+        return True
+
+    def _popup_umschalten(self) -> None:
+        from . import vc_popup
+        if vc_popup.popup_vorfahr(self) is not None:
+            # Verschachtelung (z. B. aus einer handbearbeiteten Show): wirkungslos.
+            vc_popup.hinweis(self, vc_popup.HINWEIS_TASTE_IM_POPUP)
+            return
+        f = self._popup_ziel()
+        if f is None:
+            vc_popup.hinweis(self, vc_popup.HINWEIS_ZIEL_FEHLT)
+            return
+        cv = self._find_canvas()
+        if (cv is not None and hasattr(cv, "on_active_bank")
+                and not cv.on_active_bank(f)):
+            # Feld liegt auf einer anderen Bank: nichts unsichtbar umschalten.
+            vc_popup.hinweis(self, vc_popup.HINWEIS_FELD_ANDERE_BANK)
+            return
+        f.popup_umschalten()
+        self.update()
 
     def _trigger(self, press: bool):
         """Primaer-Aktion + (auf Druck) die zusaetzlichen Multi-Aktionen (BTN-01)."""
@@ -1653,6 +1708,12 @@ class VCButton(VCWidget):
                     p = p.parent()
             except Exception:
                 pass
+
+        if self.action == ButtonAction.POPUP_TOGGLE:
+            # VCB-48: reine Oberflaechen-Aktion, kein AppState noetig.
+            if press:
+                self._popup_umschalten()
+            return
 
         from src.core.app_state import get_state
         state = get_state()
@@ -2152,6 +2213,8 @@ class VCButton(VCWidget):
         ohne sie zu malen.
         """
         try:
+            if self.action == ButtonAction.POPUP_TOGGLE:
+                return self.popup_offen()    # VCB-48: offen = Taste leuchtet
             if self.action == ButtonAction.FREEZE:
                 # EINE Quelle: der globale Freeze-Zustand (er friert den Tempo-Bus
                 # mit, die Anzeige darf also nicht mehr am Bus haengen).
@@ -2536,6 +2599,20 @@ class VCButton(VCWidget):
             "Gruppen dunkel (Dimmer/Farbe auf 0, Pan/Tilt/Gobo bleiben); der Rest "
             "läuft weiter. Gruppen werden beim Drücken aufgelöst.")
 
+        # VCB-48: Ziel der Pop-up-Taste — die Pop-up-Felder der Konsole nach
+        # Namen, gespeichert wird ihre Kennung.
+        from . import vc_popup as _vp
+        popup_combo = QComboBox()
+        popup_combo.addItem("(kein Pop-up-Feld)", "")
+        for _f in _vp.alle_popups(self._find_canvas()):
+            popup_combo.addItem(_f.caption or "(ohne Namen)", _f.popup_id)
+        if self.popup_target and popup_combo.findData(self.popup_target) < 0:
+            popup_combo.addItem("(Feld nicht gefunden)", self.popup_target)
+        popup_combo.setCurrentIndex(max(0, popup_combo.findData(self.popup_target)))
+        popup_combo.setToolTip(
+            "Welches Pop-up-Feld diese Taste öffnet und wieder schließt. Ein Rahmen "
+            "wird in seinen Einstellungen zum Pop-up-Feld.")
+
         # LAS-18: Auswahl des Laser-Musters (PaletteType.LASER) für LASER_PATTERN.
         laser_pal_combo = QComboBox()
         laser_pal_combo.setEditable(True)
@@ -2674,6 +2751,7 @@ class VCButton(VCWidget):
         AW = ButtonAction.ALL_WHITE   # bindet die (hochpriore) Weiss-Szene wie ein Flash
         LP = ButtonAction.LASER_PATTERN   # LAS-18: Laser-Muster abrufen
         BO = ButtonAction.BLACKOUT        # VCB-11: Blackout mit optionalem Ziel
+        PT = ButtonAction.POPUP_TOGGLE    # VCB-48: Pop-up-Feld öffnen/schließen
 
         # VCB-44: ob ein Blackout OHNE Ziel ausdruecklich bestaetigt wurde
         # (Rueckfrage beim OK des Dialogs). ``apply`` liest es.
@@ -2681,7 +2759,17 @@ class VCButton(VCWidget):
 
         def apply():
             self.caption = cap.text() or self.caption
-            self.action = ButtonAction(act.currentData() or self.action.value)
+            _neu = ButtonAction(act.currentData() or self.action.value)
+            if _neu == PT and self.action != PT and _vp.popup_vorfahr(self) is not None:
+                # VCB-48: keine Pop-up-Taste in einem Pop-up-Feld. Aktion bleibt,
+                # die Auswahl springt zurueck, der Editor sagt warum.
+                _vp.hinweis(self, _vp.HINWEIS_TASTE_IM_POPUP)
+                _neu = self.action
+                act.blockSignals(True)
+                act.setCurrentIndex(max(0, act.findData(self.action.value)))
+                act.blockSignals(False)
+            self.action = _neu
+            self.popup_target = (popup_combo.currentData() or "") if _neu == PT else ""
             try:
                 _fid = int(slot.text())
                 self.function_id = _fid if _fid >= 0 else None
@@ -2781,6 +2869,7 @@ class VCButton(VCWidget):
                 group_combo:      a == SG,
                 blackout_editor:  a == BO,
                 laser_pal_combo:  a == LP,
+                popup_combo:      a == PT,
                 bus_combo:        a in (TB, SB, AB),
                 edit_slot_edit:   a in (FT, FF, EA),
                 exclusive_cb:     a in (FT, FF),
@@ -2815,6 +2904,7 @@ class VCButton(VCWidget):
             group_combo.currentTextChanged.connect(lambda *_: _live())
             blackout_editor.changed.connect(lambda *_: _live())
             laser_pal_combo.currentTextChanged.connect(lambda *_: _live())
+            popup_combo.currentIndexChanged.connect(lambda *_: _live())
             bus_combo.currentIndexChanged.connect(lambda *_: _live())
             edit_slot_edit.textChanged.connect(lambda *_: _live())
             exclusive_cb.toggled.connect(lambda *_: _live())
@@ -2832,6 +2922,7 @@ class VCButton(VCWidget):
             "blackout_entscheid": blackout_entscheid,
             "update_visibility": update_visibility,
             "action_combo": act,
+            "popup_combo": popup_combo,
             "pad_combo": pad_style_combo,
             "ueberschneidungs_hinweis": ueberschn_hinweis,
             "top": [("Beschriftung:", cap), ("Aktion:", act)],
@@ -2846,6 +2937,7 @@ class VCButton(VCWidget):
                     ("Gruppe (SelectGroup):", group_combo),
                     ("Blackout-Ziel:", blackout_editor),
                     ("Laser-Muster (Palette):", laser_pal_combo),
+                    ("Pop-up-Feld:", popup_combo),
                     ("Tempo-Bus:", bus_combo),
                     ("Live-Edit-Slot:", edit_slot_edit),
                     ("Exklusiv:", exclusive_cb),
@@ -2926,6 +3018,13 @@ class VCButton(VCWidget):
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok |
                                 QDialogButtonBox.StandardButton.Cancel)
         def _ok():
+            # VCB-48: Pop-up-Taste in einem Pop-up-Feld -> Hinweis, Dialog bleibt offen.
+            from . import vc_popup as _vp
+            if (S["action_combo"].currentData() == ButtonAction.POPUP_TOGGLE.value
+                    and self.action != ButtonAction.POPUP_TOGGLE
+                    and _vp.popup_vorfahr(self) is not None):
+                _vp.hinweis(dlg, _vp.HINWEIS_TASTE_IM_POPUP, modal=True)
+                return
             # VCB-44: erst fragen, dann schliessen — bei „Nein“ bleibt der
             # Dialog offen, damit das Ziel gewaehlt werden kann.
             if self._blackout_leer_bestaetigt(S, dlg):
@@ -3084,6 +3183,9 @@ class VCButton(VCWidget):
         d["effect_action_key"] = self.effect_action_key
         d["group_name"] = self.group_name
         d["laser_palette"] = self.laser_palette
+        # VCB-48: nur bei der Pop-up-Taste — andere Tasten bleiben byte-gleich.
+        if self.action == ButtonAction.POPUP_TOGGLE:
+            d["popup_target"] = self.popup_target
         # VCB-11: Ziel der Blackout-Taste (leer = global).
         d["blackout_fids"] = list(self.blackout_fids)
         jetzt = self._blackout_ziele_nachziehen()   # VCB-42: Umbenanntes mitnehmen
@@ -3170,6 +3272,8 @@ class VCButton(VCWidget):
         self.effect_action_key = d.get("effect_action_key", "next_color")
         self.group_name = d.get("group_name", "")
         self.laser_palette = d.get("laser_palette", "")
+        _pt = d.get("popup_target", "")
+        self.popup_target = _pt if isinstance(_pt, str) else ""
         # VCB-11: Blackout-Ziel; fehlende Felder (altes Layout) = globaler Blackout.
         _bf = []
         _bf_roh = d.get("blackout_fids", None)

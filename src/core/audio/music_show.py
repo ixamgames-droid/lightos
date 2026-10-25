@@ -258,11 +258,37 @@ class MusicShowDirector(QObject):
 
     # ── Show steuern ────────────────────────────────────────────────────────────
     def start_show(self):
-        """Startet die konfigurierten Auto-Show-Funktionen (No-op wenn aus/leer)."""
+        """Startet die konfigurierten Auto-Show-Funktionen und den Lied-Look des
+        aktuellen Titels (No-op wenn aus oder beides leer).
+
+        BPM-31: Bis 2026-10-20 kehrte die Methode bei leerer *globaler*
+        Funktionsliste sofort zurueck — der Lied-Look des ersten Titels startete
+        dann erst beim naechsten Trackwechsel. Die globale Liste und der Lied-Look
+        sind jetzt getrennt: fehlt die eine, startet die andere trotzdem."""
         cfg = self._config()
-        if not cfg["enabled"] or not cfg["function_ids"]:
+        if not cfg["enabled"]:
+            return
+        track_ids = self._current_track_ids()
+        if not cfg["function_ids"] and not track_ids:
             return
         self._ensure_bpm()
+        if cfg["function_ids"]:
+            self._start_global_functions(cfg)
+        # AUTODJ-(a): zusätzlich den Per-Song-Look des aktuellen Tracks starten.
+        if track_ids:
+            self._start_track_functions(track_ids)
+
+    def _current_track_ids(self) -> list[int]:
+        """Funktions-IDs des Lied-Looks des aktuellen Titels (leer, wenn keiner)."""
+        try:
+            from src.core.audio.media_player import get_media_player
+            t = get_media_player().current_track
+            return [int(x) for x in (getattr(t, "autoshow_function_ids", []) or [])] if t else []
+        except Exception:
+            return []
+
+    def _start_global_functions(self, cfg: dict):
+        """Startet die globale Auto-Show (``function_ids``) samt Live-Edit-Slots."""
         try:
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
@@ -286,15 +312,6 @@ class MusicShowDirector(QObject):
                     pass
         except Exception as e:
             print(f"[MusicShowDirector] start error: {e}")
-        # AUTODJ-(a): zusätzlich den Per-Song-Look des aktuellen Tracks starten.
-        try:
-            from src.core.audio.media_player import get_media_player
-            t = get_media_player().current_track
-            ids = list(getattr(t, "autoshow_function_ids", []) or []) if t else []
-            if ids:
-                self._start_track_functions(ids)
-        except Exception:
-            pass
 
     def _start_track_functions(self, ids: list[int]):
         """AUTODJ-(a): die Per-Song-Look-Funktionen eines Tracks starten."""

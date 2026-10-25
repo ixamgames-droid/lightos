@@ -794,7 +794,9 @@ class VirtualConsoleView(QWidget):
     def ausgabe_chip_platz(self):
         """VCB-47 (Nachtrag 2): wo der eingeklappte Hinweis „Ausgabe gestört“
         des Hauptfensters (``ausgabe_banner.AusgabeChip``) nichts verdeckt — das
-        rechte Ende der Zeile „Aktiver Effekt“. Sie liegt zwischen Werkzeugleiste
+        rechte Ende der Zeile „Aktiver Effekt“. Seit UI-103 liegt dort auch das
+        aufgeklappte Banner (Probenmodus/Stoerung), statt ueber den
+        Bank-Knoepfen und der Werkzeugleiste. Sie liegt zwischen Werkzeugleiste
         und Konsole, hat einen festen Platz und traegt keine Bedienung; der Chip
         beruehrt dort in keiner Fensterbreite einen Knopf oder eine Taste."""
         return self._lbl_active_fx
