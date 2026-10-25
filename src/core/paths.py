@@ -88,6 +88,20 @@ def sacn_cid_path() -> str:
     return os.path.join(app_data_dir(), "sacn_cid")
 
 
+def dmx_fernsteuerung_path() -> str:
+    """NET-15: Zuordnung der DMX-Fernsteuerung (Art-Net/sACN-Eingang ->
+    Executor/Grand Master/GO). Bauart wie :func:`sacn_cid_path`:
+    ``LIGHTOS_DMX_FERNSTEUERUNG`` hat Vorrang, sonst der Datenordner.
+
+    ``tests/conftest.py`` setzt den Override hart auf eine Wegwerf-Datei —
+    auf Linux lenkt die Suite ``XDG_DATA_HOME`` nicht um, ohne Override
+    schriebe ein Test also in den echten Datenordner."""
+    override = os.environ.get("LIGHTOS_DMX_FERNSTEUERUNG")
+    if override:
+        return override
+    return os.path.join(app_data_dir(), "dmx_fernsteuerung.json")
+
+
 # ── XPLAT-44: Nutzerdaten, die frueher CWD-relativ unter ``data/`` lagen ──────
 #
 # Entscheidung des Projektinhabers (2026-10-05): ALLE Nutzerdaten liegen im

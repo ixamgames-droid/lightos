@@ -340,7 +340,11 @@ class Doc72ExternePulteTest(unittest.TestCase):
                 self.assertNotIn("ArtPollReply", quelle, pfad)
         # IMP-2: der Mitschnitt-Assistent holt sich die Empfaenger ebenfalls —
         # aber nur zum Zuhoeren. Er startet, stoppt und verstellt nichts.
+        # NET-15: die Fernsteuerung startet sie (beim Start nur, wenn sie aktiv
+        # gespeichert ist) — richtet aber keinen Merge ein; der Merge-Eingang
+        # bleibt also ungespeichert, wie die Anleitung sagt.
         self.assertEqual(sorted(nutzer), ["src/core/dmx/artnet_input.py",
+                                          "src/core/dmx/fernsteuerung.py",
                                           "src/core/dmx/sacn_input.py",
                                           "src/core/mitschnitt.py",
                                           "src/ui/widgets/output_config.py"])
@@ -348,6 +352,10 @@ class Doc72ExternePulteTest(unittest.TestCase):
         for eingriff in (".start(", ".stop(", ".set_merge(", ".add_merge(",
                          ".remove_merge(", ".clear_merges("):
             self.assertNotIn(eingriff, mitschnitt, eingriff)
+        fernsteuerung = _lies("src", "core", "dmx", "fernsteuerung.py")
+        for eingriff in (".stop(", ".set_merge(", ".add_merge(",
+                         ".remove_merge(", ".clear_merges("):
+            self.assertNotIn(eingriff, fernsteuerung, eingriff)
         self.assertIn("Der DMX-Eingang wird nicht gespeichert.", self.text)
         self.assertIn("ArtPoll", self.text)
 
