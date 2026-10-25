@@ -236,7 +236,11 @@ def test_server_neustart_auf_demselben_port():
     srv = OscServer("127.0.0.1", port)
     srv.start()
     assert srv.is_running()
+    alt = srv._server
     srv.stop()
     assert not srv.is_running()
+    # Der Socket ist wirklich zu — nicht erst, wenn der Garbage Collector das
+    # alte Server-Objekt einsammelt (darauf verliess sich der Neustart sonst).
+    assert alt.socket.fileno() == -1
     srv.start()                                   # frueher: Address already in use
     srv.stop()

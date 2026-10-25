@@ -35,7 +35,11 @@ ihre Zahl. Der Haken **Zuordnungen aktiv** schaltet alle freien Zuordnungen auf 
 | `?` | genau ein Zeichen außer `/` |
 | `[abc]`, `[a-z]`, `[!0-9]` | ein Zeichen aus der Menge bzw. nicht aus der Menge |
 | `{go,start}` | eine der Alternativen |
-| `{n}` | eine Zahl — sie ist die **Zielnummer** (höchstens einmal je Adresse) |
+| `{n}` | eine Zahl mit 1–6 Ziffern — sie ist die **Zielnummer** (höchstens einmal je Adresse) |
+
+Grenzen: höchstens **zwei `*` je Adressteil** (zwischen zwei `/`; `**` zählt als einer),
+kein `/` in `[..]` oder `{..}`. Adressen über 256 Zeichen werden nicht verglichen. So
+kann keine lange oder seltsame Adresse aus dem Netz LightOS ausbremsen.
 
 Zielnummer = `n` + Versatz. Beispiel: `/Page1/Fader{n}` mit Versatz `-200` macht aus
 `/Page1/Fader201` den Executor 1.
@@ -62,9 +66,14 @@ wirkt auf beiden Wegen. Deshalb feste Adressen nicht zusätzlich frei zuordnen.
 LightOS trägt die Adresse ein und macht aus der **letzten Zahl** `{n}`, schlägt ein Ziel
 vor (Fader, GO, Zurück …) und bei Nummern wie 201 den Versatz `-200`; der Bereich wird
 aus dem Wert geraten. Die Statuszeile zeigt Adresse, `n` und den Absender. Vorschläge
-prüfen, dann **Übernehmen**. Die gelernte Nachricht löst keine freie Zuordnung aus
-(eine feste `/lightos/…`-Adresse wirkt trotzdem). Ein zweiter
-Druck auf den Knopf oder Schließen bricht das Lernen ab.
+prüfen, dann **Übernehmen**. Die gelernte Nachricht löst keine freie Zuordnung aus.
+Ein zweiter Druck auf den Knopf oder Schließen bricht das Lernen ab.
+
+Beim Lernen **übergangen** (das Lernen wartet weiter, die Nachricht wirkt normal):
+feste `/lightos/…`-Adressen — sie wirken schon ohne Zuordnung, zugeordnet lösten sie
+doppelt aus — und das Echo der eigenen Rückmeldung (derselbe Wert auf einer eben
+gesendeten Adresse). Sendet das Pult ständig etwas anderes (z. B. Eos `/eos/out/…`),
+kann das zuerst gelernt werden: dann einfach noch einmal lernen.
 
 ## 3. Rückmeldung an Pult oder Tablet
 
@@ -85,6 +94,11 @@ Reiter **Rückmeldung**: Haken **Rückmeldung senden**, Ziel-IP und Port des Emp
   30 Durchgänge je Sekunde). Ein nicht gesendeter Wert wird beim nächsten Durchgang
   nachgeholt. **Alles neu senden** schickt alle Werte erneut, etwa nach dem
   Neustart des Tablets.
+- **Echo-Schutz:** Viele Pulte und Oberflächen (grandMA3, MagicQ, TouchOSC) schicken
+  einen empfangenen Fader-Wert wieder zurück. Kommt innerhalb von 0,5 s genau ein
+  Wert zurück, den LightOS eben selbst für dasselbe Ziel (Fader, Grand Master,
+  Blackout) gemeldet hat, wird er verworfen — sonst sprang ein lokal gezogener Fader
+  auf den alten Wert zurück. Bewegungen am Pult selbst wirken weiter.
 - Leere Adresse = dieser Zustand wird nicht gesendet. Als Ziel-IP gilt nur eine
   IP-Adresse, kein Rechnername.
 

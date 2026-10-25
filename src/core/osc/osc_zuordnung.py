@@ -10,6 +10,8 @@ Muster (Spalte „Adresse“):
 * OSC-Platzhalter nach OSC 1.0: ``*`` (beliebig viele Zeichen ausser ``/``),
   ``?`` (ein Zeichen ausser ``/``), ``[abc]`` / ``[a-z]`` / ``[!abc]`` und
   ``{go,start}`` (Alternativen).
+* Grenzen: hoechstens zwei ``*`` je Adressteil, ``{n}`` 1–6 Ziffern, Adressen
+  ueber :data:`ADRESSE_MAX` Zeichen werden nicht verglichen (ReDoS-Schutz).
 * ``{n}`` liefert die **Zielnummer** aus der Adresse (eine Ziffernfolge), z. B.
   ``/Page1/Fader{n}`` oder ``/exec/{n}/go``. Zielnummer = n + ``versatz``
   (grandMA3 ``/Page1/Fader201`` -> Executor 1 mit Versatz -200).
@@ -33,7 +35,10 @@ Rueckmeldung (:class:`OscRueckmeldung`): sendet Executor-Fader, Executor
 aktiv, Cue-Nummer (GO-Index), Grand Master und Blackout an ein Ziel
 (IP:Port) ueber den :class:`~src.core.osc.osc_server.OscSender` — nur bei
 Aenderung, hoechstens ``rate_hz`` Durchgaenge je Sekunde, laeuft im GUI-Thread
-(QTimer), liest dort den Zustand.
+(QTimer), liest dort den Zustand. Echo-Schutz: ein eingehender Wert, der einem
+binnen :data:`ECHO_FENSTER` selbst gemeldeten Wert desselben Ziels entspricht,
+wird verworfen (:meth:`OscRueckmeldung.ist_echo`); Werte, die selbst vom Pult
+kamen, sind keine Echo-Kandidaten.
 
 Speicherort: eigene Datei ``osc_zuordnungen.json`` im App-Datenordner
 (:func:`src.core.paths.osc_zuordnungen_path`, Override
@@ -129,36 +134,42 @@ def wert_aus_argument(arg, bereich: str = BEREICH_1) -> float | None:
 PLATZHALTER = "{n}"
 
 
-def muster_zu_regex(muster: str) -> re.Pattern | None:
-    """OSC-Adressmuster (mit ``{n}``) in einen regulaeren Ausdruck uebersetzen.
-    ``{n}`` wird die Gruppe ``n`` (Ziffern), hoechstens einmal. Ungueltig
-    (leer, ohne fuehrenden ``/``, offene Klammer, zweimal ``{n}``) -> ``None``."""
-    if not isinstance(muster, str):
-        return None
-    muster = muster.strip()
-    if not muster.startswith("/") or any(c.isspace() for c in muster):
-        return None
-    aus = ["^"]
+#: Laengere Adressen werden nicht verglichen (Schutz vor teuren Mustern).
+ADRESSE_MAX = 256
+#: Hoechstens so viele ``*`` je Adressteil (eine Folge ``**`` zaehlt als einer).
+STERNE_JE_TEIL = 2
+#: ``{n}`` liest hoechstens so viele Ziffern.
+N_ZIFFERN = 6
+
+
+def _teil_zu_regex(teil: str, zustand: dict) -> str | None:
+    """Einen Adressteil (zwischen zwei ``/``) uebersetzen; ``None`` = ungueltig."""
+    aus = []
     i = 0
-    hat_n = False
-    while i < len(muster):
-        c = muster[i]
-        if muster.startswith(PLATZHALTER, i):
-            if hat_n:
+    sterne = 0
+    while i < len(teil):
+        c = teil[i]
+        if teil.startswith(PLATZHALTER, i):
+            if zustand["hat_n"]:
                 return None
-            hat_n = True
-            aus.append(r"(?P<n>\d+)")
+            zustand["hat_n"] = True
+            aus.append(r"(?P<n>[0-9]{1,%d})" % N_ZIFFERN)
             i += len(PLATZHALTER)
             continue
         if c == "*":
+            while i + 1 < len(teil) and teil[i + 1] == "*":
+                i += 1
+            sterne += 1
+            if sterne > STERNE_JE_TEIL:
+                return None
             aus.append(r"[^/]*")
         elif c == "?":
             aus.append(r"[^/]")
         elif c == "[":
-            ende = muster.find("]", i + 1)
+            ende = teil.find("]", i + 1)
             if ende < 0:
                 return None
-            inhalt = muster[i + 1:ende]
+            inhalt = teil[i + 1:ende]
             neg = inhalt.startswith("!")
             if neg:
                 inhalt = inhalt[1:]
@@ -170,10 +181,10 @@ def muster_zu_regex(muster: str) -> re.Pattern | None:
             aus.append("[" + ("^" if neg else "") + "".join(teile) + "]")
             i = ende
         elif c == "{":
-            ende = muster.find("}", i + 1)
+            ende = teil.find("}", i + 1)
             if ende < 0:
                 return None
-            alternativen = muster[i + 1:ende].split(",")
+            alternativen = teil[i + 1:ende].split(",")
             aus.append("(?:" + "|".join(re.escape(a) for a in alternativen) + ")")
             i = ende
         elif c in "]}":
@@ -181,14 +192,39 @@ def muster_zu_regex(muster: str) -> re.Pattern | None:
         else:
             aus.append(re.escape(c))
         i += 1
-    aus.append("$")
+    return "".join(aus)
+
+
+def muster_zu_regex(muster: str) -> re.Pattern | None:
+    """OSC-Adressmuster (mit ``{n}``) in einen regulaeren Ausdruck uebersetzen.
+    ``{n}`` wird die Gruppe ``n`` (1–6 Ziffern), hoechstens einmal. Ungueltig
+    (leer, ohne fuehrenden ``/``, offene Klammer, ``/`` in Klammern, zweimal
+    ``{n}``, mehr als zwei ``*`` in einem Adressteil) -> ``None``.
+
+    Jeder Adressteil ist eine atomare Gruppe, die nur am naechsten ``/`` bzw.
+    am Ende enden darf: da kein Platzhalter ``/`` ueberspringt, ist dieses Ende
+    eindeutig — die Bedeutung bleibt gleich, aber ein Fehlschlag spaeter in der
+    Adresse verfolgt fruehere Teile nicht mehr zurueck (sonst wuchs die
+    Rechenzeit mit Sternen in mehreren Teilen exponentiell)."""
+    if not isinstance(muster, str):
+        return None
+    muster = muster.strip()
+    if not muster.startswith("/") or any(c.isspace() for c in muster):
+        return None
+    zustand = {"hat_n": False}
+    stuecke = []
+    for teil in muster[1:].split("/"):
+        rx = _teil_zu_regex(teil, zustand)
+        if rx is None:
+            return None
+        stuecke.append("(?>" + rx + "(?=/|$))")
     try:
-        return re.compile("".join(aus))
+        return re.compile("^/" + "/".join(stuecke) + "$")
     except re.error:
         return None
 
 
-_ZIFFERN = re.compile(r"\d+")
+_ZIFFERN = re.compile(r"[0-9]+")
 
 
 def vorschlag_muster(adresse: str) -> tuple[str, int | None]:
@@ -200,6 +236,8 @@ def vorschlag_muster(adresse: str) -> tuple[str, int | None]:
     if not treffer:
         return adresse, None
     m = treffer[-1]
+    if len(m.group()) > N_ZIFFERN:      # passt nie auf {n}
+        return adresse, None
     return adresse[:m.start()] + PLATZHALTER + adresse[m.end():], int(m.group())
 
 
@@ -274,6 +312,11 @@ RM_JE_EXECUTOR = (RM_FADER, RM_AKTIV, RM_CUE)
 
 RATE_STANDARD = 30
 RATE_MAX = 60
+
+#: Echo-Schutz: ein eingehender Wert, der einem in diesem Zeitfenster (s)
+#: selbst gemeldeten Wert desselben Ziels entspricht, gilt als Echo.
+ECHO_FENSTER = 0.5
+ECHO_TOLERANZ = 0.0025      # 0..1; deckt das Runden auf 0-255 ab
 
 
 @dataclass(frozen=True)
@@ -484,6 +527,14 @@ class Aktion:
 
 _LOSGELASSEN = object()
 
+#: Die festen Adressen des OscServers — Lernen uebergeht sie (sie wirken
+#: schon ohne Zuordnung; zugeordnet loesten sie doppelt aus).
+_FESTE = re.compile(r"^/lightos/(go|back|blackout|programmer/clear|exec/.*|ch/.*)$")
+
+
+def ist_feste_adresse(adresse: str) -> bool:
+    return bool(_FESTE.match(str(adresse or "")))
+
 
 def _zahl(arg) -> int | None:
     """Zielnummer aus einem Argument: ganze Zahl (int, float ohne Rest,
@@ -496,7 +547,7 @@ def _zahl(arg) -> int | None:
         return int(arg) if math.isfinite(arg) and arg == int(arg) else None
     if isinstance(arg, str):
         t = arg.strip()
-        if t.lstrip("-").isdigit():
+        if re.fullmatch(r"-?[0-9]{1,%d}" % N_ZIFFERN, t):
             return int(t)
     return None
 
@@ -524,8 +575,15 @@ class OscZuordnung:
         self._queue: "queue.SimpleQueue[Aktion]" = queue.SimpleQueue()
         self._wecker: Callable[[], None] | None = None
         self._lerner: Callable[[str, tuple, object], None] | None = None
+        self._rueckmeldung: "OscRueckmeldung | None" = None
         self.angewandt = 0
         self.verworfen = 0      # Treffer mit kaputtem Argument / Nummer
+        self.echos = 0          # verworfene Echos der eigenen Rueckmeldung
+
+    def set_rueckmeldung(self, rm: "OscRueckmeldung | None") -> None:
+        """Fuer den Echo-Schutz: Werte, die die Rueckmeldung gerade selbst
+        gesendet hat, kommen als Echo zurueck und werden verworfen."""
+        self._rueckmeldung = rm
 
     @property
     def konfig(self) -> Konfig:
@@ -562,12 +620,23 @@ class OscZuordnung:
         """Im OSC-Thread: Treffer suchen, Aktionen einreihen. Liefert die Zahl
         neu eingereihter Aktionen; wendet NICHTS selbst an."""
         args = tuple(args)
+        if not isinstance(adresse, str) or len(adresse) > ADRESSE_MAX:
+            return 0
+        rm = self._rueckmeldung
+        # Lernen uebergeht feste /lightos-Adressen und Echos der eigenen
+        # Rueckmeldung; sie laufen normal weiter, das Lernen wartet weiter.
+        uebergehen = self._lerner is not None and (
+            ist_feste_adresse(adresse)
+            or (rm is not None and rm.ist_echo_adresse(adresse, args)))
         with self._lock:
-            lerner = self._lerner
+            lerner = None if uebergehen else self._lerner
             if lerner is not None:
                 self._lerner = None
-            treffer = [] if lerner is not None else [
-                (rx.match(adresse), z) for rx, z in self._kompiliert]
+            kompiliert = self._kompiliert
+        # Vergleichen ausserhalb der Sperre: konfigurieren()/lerne() aus dem
+        # GUI-Thread warten nie auf ein Paket.
+        treffer = [] if lerner is not None else [
+            (rx.match(adresse), z) for rx, z in kompiliert]
         if lerner is not None:
             try:
                 lerner(adresse, args, absender)
@@ -579,7 +648,12 @@ class OscZuordnung:
         for m, z in treffer:
             if m is None:
                 continue
-            a = self._aktion(m, z, args)
+            try:
+                a = self._aktion(m, z, args)
+            except Exception as e:          # kostet nur diesen Treffer
+                from src.core.diagnose_log import melde_still
+                melde_still("osc.zuordnung", e, text=str(adresse)[:80])
+                a = None
             if a is _LOSGELASSEN:
                 continue
             if a is None:
@@ -673,9 +747,15 @@ class OscZuordnung:
             else:
                 reihe.append(a)
         n = 0
+        rm = self._rueckmeldung
         for eintrag in reihe:
             a = letzte[eintrag] if isinstance(eintrag, tuple) else eintrag
             try:
+                if rm is not None and a.ziel in WERT_ZIELE:
+                    if rm.ist_echo(a.ziel, a.nummer, a.wert):
+                        self.echos += 1
+                        continue
+                    rm.extern_gesetzt(a.ziel, a.nummer, a.wert)
                 if self._anwenden(state, a):
                     n += 1
             except Exception as e:
@@ -766,6 +846,10 @@ class OscRueckmeldung:
         self._cache: dict[str, object] = {}
         self._letzter_tick = -1e9
         self.gesendet = 0
+        # Echo-Schutz (GUI-Thread schreibt; der OSC-Thread liest nur per get)
+        self._echo: dict[tuple, list[tuple[float, float]]] = {}
+        self._extern: dict[tuple, float] = {}
+        self._zuletzt: dict[str, tuple[object, float]] = {}
 
     @staticmethod
     def _standard_sender(ip: str, port: int):
@@ -780,6 +864,9 @@ class OscRueckmeldung:
         alt = self._sender
         self._konfig = konfig
         self._cache.clear()
+        self._echo.clear()
+        self._extern.clear()
+        self._zuletzt.clear()
         self._sender = None
         if alt is not None:
             try:
@@ -813,19 +900,25 @@ class OscRueckmeldung:
 
     def zustaende(self, state) -> dict[str, object]:
         """Soll-Werte {Adresse: Wert} aus dem App-Zustand."""
+        return {a: w for a, (w, _s, _r) in self._soll(state).items()}
+
+    def _soll(self, state) -> dict[str, tuple]:
+        """{Adresse: (Wert, Echo-Schluessel oder None, Wert 0..1)}."""
         k = self._konfig
         ad = k.adressen
-        aus: dict[str, object] = {}
+        aus: dict[str, tuple] = {}
         om = getattr(state, "output_manager", None)
         if om is not None:
             if ad.get(RM_GM):
                 try:
-                    aus[ad[RM_GM]] = self._wert(float(om.grand_master), k.bereich)
+                    roh = float(om.grand_master)
+                    aus[ad[RM_GM]] = (self._wert(roh, k.bereich), (ZIEL_GM, 0), roh)
                 except Exception:
                     pass
             if ad.get(RM_BLACKOUT):
                 try:
-                    aus[ad[RM_BLACKOUT]] = 1 if om.blackout else 0
+                    an = 1 if om.blackout else 0
+                    aus[ad[RM_BLACKOUT]] = (an, (ZIEL_BLACKOUT, 0), float(an))
                 except Exception:
                     pass
         pe = getattr(state, "playback_engine", None)
@@ -845,12 +938,64 @@ class OscRueckmeldung:
                     continue
                 adresse = muster.replace(PLATZHALTER, nr)
                 if art == RM_FADER:
-                    aus[adresse] = self._wert(float(ex.fader_value), k.bereich)
+                    roh = float(ex.fader_value)
+                    aus[adresse] = (self._wert(roh, k.bereich), (ZIEL_FADER, n), roh)
                 elif art == RM_AKTIV:
-                    aus[adresse] = 1 if idx >= 0 else 0
+                    aus[adresse] = (1 if idx >= 0 else 0, None, 0.0)
                 else:
-                    aus[adresse] = idx + 1 if idx >= 0 else 0
+                    aus[adresse] = (idx + 1 if idx >= 0 else 0, None, 0.0)
         return aus
+
+    # ── Echo-Schutz ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def _gleich(ziel: str, a: float, b: float) -> bool:
+        if ziel == ZIEL_BLACKOUT:
+            return (a >= 0.5) == (b >= 0.5)
+        return abs(a - b) <= ECHO_TOLERANZ
+
+    def _merken(self, schluessel: tuple, roh: float, jetzt: float) -> None:
+        ext = self._extern.pop(schluessel, None)
+        if ext is not None and self._gleich(schluessel[0], ext, roh):
+            # Der Wert kam selbst vom Pult: sein Echo ist harmlos, und eine
+            # spaetere echte Pultbewegung auf denselben Wert soll wirken.
+            return
+        liste = [e for e in self._echo.get(schluessel, ())
+                 if jetzt - e[1] <= ECHO_FENSTER]
+        liste.append((roh, jetzt))
+        self._echo[schluessel] = liste
+
+    def ist_echo(self, ziel: str, nummer: int, wert, jetzt: float | None = None) -> bool:
+        """GUI-Thread: ist dieser eingehende Wert (0..1) das Echo eines eben
+        selbst gemeldeten Werts desselben Ziels? Dann nicht anwenden — sonst
+        ueberschriebe ein verspaetetes Echo eine lokale Bewegung."""
+        if wert is None or ziel not in WERT_ZIELE:
+            return False
+        jetzt = self._uhr() if jetzt is None else jetzt
+        schluessel = (ziel, int(nummer) if ziel == ZIEL_FADER else 0)
+        return any(jetzt - t <= ECHO_FENSTER and self._gleich(ziel, w, float(wert))
+                   for w, t in self._echo.get(schluessel, ()))
+
+    def extern_gesetzt(self, ziel: str, nummer: int, wert) -> None:
+        """GUI-Thread: dieser Wert kam vom Pult (kein Echo-Kandidat)."""
+        if wert is None or ziel not in WERT_ZIELE:
+            return
+        self._extern[(ziel, int(nummer) if ziel == ZIEL_FADER else 0)] = float(wert)
+
+    def ist_echo_adresse(self, adresse: str, args, jetzt: float | None = None) -> bool:
+        """OSC-Thread (fuer Lernen): kam auf genau dieser Adresse eben der
+        eigene Wert zurueck?"""
+        e = self._zuletzt.get(adresse)
+        if e is None or not args:
+            return False
+        wert, t = e
+        jetzt = self._uhr() if jetzt is None else jetzt
+        if jetzt - t > ECHO_FENSTER:
+            return False
+        try:
+            return abs(float(args[0]) - float(wert)) <= 1e-3 * max(1.0, abs(float(wert)))
+        except (TypeError, ValueError, OverflowError):
+            return False
 
     def tick(self, state=None, jetzt: float | None = None) -> int:
         """Einen Durchgang senden, wenn die Drossel es erlaubt. Liefert die
@@ -865,7 +1010,7 @@ class OscRueckmeldung:
             from src.core.app_state import get_state
             state = get_state()
         n = 0
-        for adresse, wert in self.zustaende(state).items():
+        for adresse, (wert, schluessel, roh) in self._soll(state).items():
             if self._cache.get(adresse, object()) == wert:
                 continue
             if n >= self.MAX_JE_TICK:
@@ -874,6 +1019,9 @@ class OscRueckmeldung:
             if ok is False:
                 continue        # nicht merken -> naechster Durchgang
             self._cache[adresse] = wert
+            self._zuletzt[adresse] = (wert, jetzt)
+            if schluessel is not None:
+                self._merken(schluessel, roh, jetzt)
             n += 1
         self.gesendet += n
         return n
@@ -961,6 +1109,7 @@ def installiere_qt_bruecke():
 
 def anwenden(konfig: Konfig) -> None:
     """Konfiguration in Eingang und Rueckmeldung uebernehmen (GUI-Thread)."""
+    get_osc_zuordnung().set_rueckmeldung(get_osc_rueckmeldung())
     get_osc_zuordnung().konfigurieren(konfig)
     get_osc_rueckmeldung().konfigurieren(konfig.rueckmeldung)
     if _qt_bruecke is not None:

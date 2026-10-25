@@ -151,7 +151,8 @@ def test_n_ausserhalb_executorbereich_tut_nichts():
     for a in ("/exec/0/go", "/exec/21/go", "/exec/99999999999999/go"):
         assert _senden(zu, st, a, 1.0) == 0
     assert all(not ex.gedrueckt for ex in st.playback_engine.executors)
-    assert zu.verworfen == 3
+    # 0 und 21: verworfen; mehr als 6 Ziffern passen gar nicht auf {n}
+    assert zu.verworfen == 2
 
 
 # ── Argumente ────────────────────────────────────────────────────────────
@@ -587,3 +588,152 @@ def test_pfad_ist_in_der_testumgebung_umgelenkt():
     assert osc_zuordnungen_path() == os.environ["LIGHTOS_OSC_ZUORDNUNGEN"]
     assert oz.konfig_pfad() == os.environ["LIGHTOS_OSC_ZUORDNUNGEN"]
     assert "lightos_test_osc_zuordnungen_" in os.path.basename(oz.konfig_pfad())
+
+
+# ── Gegenpruefung (Haertung) ─────────────────────────────────────────────
+
+def test_viele_sterne_und_lange_adresse_blockieren_nicht():
+    """ReDoS: Muster mit Sternen ueber mehrere Adressteile duerfen bei einer
+    boesartigen Adresse nicht exponentiell zurueckverfolgen; ueberlange
+    Adressen werden gar nicht verglichen."""
+    import time as _t
+    zu, st = _zu(Zuordnung("/*a*b/*a*b/*a*b/*a*b/*a*b/*a*b", oz.ZIEL_GO))
+    teil = "a" * 24 + "b"
+    # fuenf Teile passen, der letzte nie (kein b) -> vorher Sekunden lang
+    boese = "/" + "/".join([teil] * 5 + ["a" * 24])
+    assert len(boese) < oz.ADRESSE_MAX
+    t0 = _t.perf_counter()
+    assert zu.empfange(boese, ()) == 0
+    assert zu.empfange("/" + "a" * 5000, ()) == 0
+    assert _t.perf_counter() - t0 < 0.5
+    lang, _st = _zu(Zuordnung("/*", oz.ZIEL_GO))
+    assert lang.empfange("/" + "a" * oz.ADRESSE_MAX, ()) == 0
+    assert lang.empfange("/" + "a" * (oz.ADRESSE_MAX - 1), ()) == 1
+    # passende kurze Adresse wirkt weiterhin
+    assert _senden(zu, st, "/xab/ab/ab/ab/ab/aXb") == 1
+
+
+def test_drei_sterne_je_adressteil_ungueltig_zwei_gueltig():
+    assert oz.muster_zu_regex("/*a*a*b") is None
+    assert oz.muster_zu_regex("/x/*a*") is not None
+    assert oz.muster_zu_regex("/***a") is not None      # Folge = ein Stern
+    assert oz.muster_zu_regex("/k/[a/b]") is None       # / in Klammern
+    rx = oz.muster_zu_regex("/y/{a,ab}/z")
+    assert rx.match("/y/ab/z") and rx.match("/y/a/z")
+
+
+def test_n_mit_riesenzahl_und_kaputte_nummer_brechen_nichts_ab(monkeypatch):
+    gerufen = []
+    zu = OscZuordnung()
+    zu.konfigurieren(Konfig(zuordnungen=[
+        Zuordnung("/a/{n}", oz.ZIEL_GO),
+        Zuordnung("/a/*", oz.ZIEL_STOP, nummer=2),
+        Zuordnung("/h", oz.ZIEL_GO, nummer_aus_argument=True),
+    ]))
+    zu.set_wecker(lambda: gerufen.append(1))
+    assert zu.empfange("/a/" + "1" * 200, ()) == 1    # nur der Stern-Treffer
+    assert gerufen == [1]
+    for arg in ("--5", "²", "٣", "1" * 5000):
+        assert zu.empfange("/h", (arg,)) == 0
+    assert zu.verworfen == 4
+    assert oz.vorschlag_muster("/a/" + "1" * 5000)[1] is None
+    # Ein Fehler in einem Treffer kostet nur diesen: der naechste wird noch
+    # eingereiht und der Wecker laeuft.
+    echt = OscZuordnung._aktion
+
+    def kaputt(m, z, args):
+        if z.ziel == oz.ZIEL_GO:
+            raise ValueError("kaputt")
+        return echt(m, z, args)
+    monkeypatch.setattr(OscZuordnung, "_aktion", staticmethod(kaputt))
+    assert zu.empfange("/a/3", ()) == 1
+    assert gerufen == [1, 1]
+
+
+@pytest.mark.parametrize("bereich,wert", [(BEREICH_1, 0.5), (BEREICH_100, 50)])
+def test_tastenschwelle_genau_halbe_skala_loest_aus(bereich, wert):
+    zu, st = _zu(Zuordnung("/k{n}", oz.ZIEL_GO, bereich=bereich))
+    _senden(zu, st, "/k1", wert)
+    assert st.playback_engine.get_executor(1).gedrueckt == ["go"]
+
+
+class _Uhr:
+    def __init__(self):
+        self.t = 100.0
+
+    def __call__(self):
+        return self.t
+
+
+def _echo_aufbau():
+    uhr = _Uhr()
+    sender: list = []
+
+    def fabrik(ip, port):
+        s = _Sender(ip, port)
+        sender.append(s)
+        return s
+    rm = OscRueckmeldung(sender_fabrik=fabrik, uhr=uhr)
+    rm.konfigurieren(RueckmeldeKonfig(aktiv=True, executoren="1"))
+    zu, st = _zu(Zuordnung("/lightos/exec/{n}/fader", oz.ZIEL_FADER))
+    zu.set_rueckmeldung(rm)
+    return uhr, rm, zu, st, sender[0]
+
+
+def test_echo_der_rueckmeldung_ueberschreibt_lokale_bewegung_nicht():
+    uhr, rm, zu, st, s = _echo_aufbau()
+    ex = st.playback_engine.get_executor(1)
+    adresse = "/lightos/exec/1/fader"
+    offen = None
+    for v in (0.2, 0.3, 0.4, 0.5, 0.6, 0.7):
+        uhr.t += 0.034
+        ex.fader_value = v                      # Nutzer zieht lokal
+        if offen is not None:                   # Echo des letzten Werts
+            zu.empfange(adresse, (offen,))
+            zu.abarbeiten(st)
+        rm.tick(st, jetzt=uhr.t)
+        offen = dict(s.gesendet).get(adresse)
+    for _ in range(3):
+        uhr.t += 0.034
+        zu.empfange(adresse, (offen,))
+        zu.abarbeiten(st)
+        rm.tick(st, jetzt=uhr.t)
+    assert ex.fader_value == pytest.approx(0.7)
+    assert [w for a, w in s.gesendet if a == adresse][-1] == pytest.approx(0.7)
+
+
+def test_echo_schutz_laesst_pultbewegungen_durch():
+    uhr, rm, zu, st, s = _echo_aufbau()
+    ex = st.playback_engine.get_executor(1)
+    adresse = "/lightos/exec/1/fader"
+    for v in (0.5, 0.3, 0.5, 0.3):              # Pult schnell hin und her
+        uhr.t += 0.034
+        _senden(zu, st, adresse, v)
+        assert ex.fader_value == pytest.approx(v)
+        rm.tick(st, jetzt=uhr.t)
+    # nach dem Fenster gilt auch ein frueher gesendeter Wert wieder
+    ex.fader_value = 0.9
+    rm.tick(st, jetzt=uhr.t + 0.04)
+    uhr.t += 0.04 + oz.ECHO_FENSTER + 0.01
+    _senden(zu, st, adresse, 0.9)
+    _senden(zu, st, adresse, 0.1)
+    assert ex.fader_value == pytest.approx(0.1)
+
+
+def test_lernen_ueberspringt_feste_adressen_und_echo():
+    uhr, rm, zu, st, s = _echo_aufbau()
+    k = RueckmeldeKonfig(aktiv=True, executoren="1")
+    k.vorlage_anwenden("touchosc")              # Ausgang /1/fader{n}
+    rm.konfigurieren(k)
+    rm.tick(st, jetzt=uhr.t)                    # meldet Fader 1 = 1.0
+    gelernt = []
+    zu.lerne(lambda a, args, von: gelernt.append(a))
+    zu.empfange("/lightos/exec/2/go", (1.0,))   # feste Adresse
+    zu.empfange("/lightos/go", ())
+    zu.empfange("/1/fader1", (1.0,))            # Echo der Rueckmeldung
+    assert gelernt == [] and zu.lernt
+    zu.empfange("/1/fader1", (0.3,))            # echte Bewegung: wird gelernt
+    assert gelernt == ["/1/fader1"]
+    zu.lerne(lambda a, args, von: gelernt.append(a))
+    zu.empfange("/Page1/Fader201", (40.0,))
+    assert gelernt == ["/1/fader1", "/Page1/Fader201"] and not zu.lernt
