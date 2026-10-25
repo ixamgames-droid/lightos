@@ -62,7 +62,8 @@ wirkt auf beiden Wegen. Deshalb feste Adressen nicht zusätzlich frei zuordnen.
 LightOS trägt die Adresse ein und macht aus der **letzten Zahl** `{n}`, schlägt ein Ziel
 vor (Fader, GO, Zurück …) und bei Nummern wie 201 den Versatz `-200`; der Bereich wird
 aus dem Wert geraten. Die Statuszeile zeigt Adresse, `n` und den Absender. Vorschläge
-prüfen, dann **Übernehmen**. Die gelernte Nachricht selbst löst nichts aus. Ein zweiter
+prüfen, dann **Übernehmen**. Die gelernte Nachricht löst keine freie Zuordnung aus
+(eine feste `/lightos/…`-Adresse wirkt trotzdem). Ein zweiter
 Druck auf den Knopf oder Schließen bricht das Lernen ab.
 
 ## 3. Rückmeldung an Pult oder Tablet
