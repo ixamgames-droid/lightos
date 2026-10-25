@@ -13,6 +13,8 @@ aendern soll.
 """
 from __future__ import annotations
 
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigener Datenordner, nie die echte Show/DMX)
+
 import os
 import sys
 
