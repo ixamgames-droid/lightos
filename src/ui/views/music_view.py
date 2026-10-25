@@ -103,7 +103,7 @@ class MusicView(QWidget):
         th.addWidget(self._lbl_takt_hinweis, 1)
         self._btn_takt_titel = QPushButton("Takt aus Titel übernehmen")
         self._btn_takt_titel.setToolTip(
-            "Stellt die BPM-Quelle auf „Lied-Analyse (Player)“ und übernimmt die BPM "
+            "Stellt die Quelle der BPM-Erkennung auf „Lied-Analyse (Player)“ und übernimmt die BPM "
             "des Titels — die Auto-Show taktet dann sofort.")
         self._btn_takt_titel.clicked.connect(self._on_takt_titel)
         th.addWidget(self._btn_takt_titel)
@@ -209,10 +209,10 @@ class MusicView(QWidget):
     def takt_hinweis_text(kind: str | None) -> str:
         """Hinweistext je gewählter BPM-Quelle (rein, testbar)."""
         if kind == "os2l":
-            grund = ("die BPM-Quelle ist „OS2L (DJ-Software)“, aber vom DJ-Programm "
+            grund = ("die Quelle der BPM-Erkennung ist „OS2L (DJ-Software)“, aber vom DJ-Programm "
                      "kommt noch kein Takt")
         else:
-            grund = "die BPM-Quelle steht auf „Aus“"
+            grund = "die Quelle der BPM-Erkennung steht auf „Aus“"
         return (f"⚠ Kein Takt für die Auto-Show — {grund}. Beat-Effekte stehen still, "
                 "bis ein Takt da ist.")
 

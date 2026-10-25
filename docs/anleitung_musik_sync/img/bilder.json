@@ -1,7 +1,7 @@
 {
   "anleitung": "musik_sync",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "4178600a",
+  "stand": "e0cf8e17",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py musik_sync'.",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "b035fdc0bde8a85f39ae5c48c5723f02"
+      "md5": "faba105f76d1fa0d83c00782d3051be8"
     }
   ]
 }

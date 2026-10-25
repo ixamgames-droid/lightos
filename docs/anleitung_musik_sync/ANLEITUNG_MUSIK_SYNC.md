@@ -62,7 +62,7 @@ sind show-spezifisch), passiert automatisch:
    ![Musik-Anzeige in der VC (spielt)](img/03_play_vc.png)
 
    1. Musik-Anzeige mit den Media-Tasten **`<<` / `> / ||` / `>>`**. Im Bild steht die
-      BPM-Quelle auf „Aus" — deshalb zeigt die Anzeige die gelbe Zeile „Kein Takt" (siehe
+      **Quelle** der BPM-Erkennung auf „Aus" — deshalb zeigt die Anzeige die gelbe Zeile „Kein Takt" (siehe
       unten, „Takt aus Titel übernehmen").
 
 2. Die **Auto-Show startet** die zugewiesenen Funktionen — die Geräte laufen los, die
@@ -75,7 +75,7 @@ sind show-spezifisch), passiert automatisch:
 
 Die Auto-Show braucht einen BPM-Takt, sonst stehen alle Beat-Effekte still. Ist beim Play
 noch keiner da, nimmt sie die BPM des Titels (aus der Spalte **BPM**, sonst 120) — **aber nur,
-wenn du das zulässt**: Steht die BPM-Quelle (Abschnitt 4) auf **„Aus"** oder auf **„OS2L
+wenn du das zulässt**: Steht die **Quelle** der BPM-Erkennung (Abschnitt 4) auf **„Aus"** oder auf **„OS2L
 (DJ-Software)"**, setzt die Auto-Show **keinen** Takt von selbst. Deine Wahl gilt, und bei
 OS2L schreibt LightOS nicht gegen das DJ-Programm an.
 
@@ -87,7 +87,7 @@ Stattdessen erscheint im **Musik-Tab** unter „Now Playing" ein gelber Hinweis
 ![Musik-Tab: Hinweis „Kein Takt" mit dem Knopf „Takt aus Titel übernehmen"](img/05_takt_hinweis.png)
 
 1. Der Hinweis nennt den Grund (Quelle „Aus" bzw. OS2L ohne Takt vom DJ-Programm).
-2. **„Takt aus Titel übernehmen"** stellt die BPM-Quelle auf **„Lied-Analyse (Player)"** und
+2. **„Takt aus Titel übernehmen"** stellt die Quelle auf **„Lied-Analyse (Player)"** und
    übernimmt die BPM des Titels — die Auto-Show taktet sofort.
 
 Der Hinweis verschwindet von selbst, sobald ein Takt da ist (z. B. sendet das DJ-Programm per
