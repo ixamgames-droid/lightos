@@ -312,10 +312,11 @@ class MusicShowDirector(QObject):
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
             started: list[int] = []
-            for fid in cfg["function_ids"]:
-                if fm.get(fid) is not None:
-                    fm.start(fid)
-                    started.append(fid)
+            with self._start_rahmen():
+                for fid in cfg["function_ids"]:
+                    if fm.get(fid) is not None:
+                        fm.start(fid)
+                        started.append(fid)
             self._started_ids = started
             # Live-Edit-Slots der gestarteten Funktionen setzen, damit Bank-Pads
             # desselben Slots sie sauber ablösen (layer-getrennt, ohne stop_all).
@@ -338,10 +339,11 @@ class MusicShowDirector(QObject):
             from src.core.engine.function_manager import get_function_manager
             fm = get_function_manager()
             started: list[int] = []
-            for fid in ids:
-                if fm.get(fid) is not None:
-                    fm.start(fid)
-                    started.append(fid)
+            with self._start_rahmen():
+                for fid in ids:
+                    if fm.get(fid) is not None:
+                        fm.start(fid)
+                        started.append(fid)
             self._per_track_ids = started
             slots = self._config().get("slots") or {}
             if slots:
@@ -407,6 +409,15 @@ class MusicShowDirector(QObject):
         except Exception as e:
             print(f"[MusicShowDirector] gewaehlte Quelle nicht ermittelbar: {e}")
             return False
+
+    def _start_rahmen(self):
+        """BPM-32: Rahmen fuer ``fm.start`` der Auto-Show. Bei Quelle „Aus"/„OS2L"
+        setzen Beat-Chaser darin keinen stillen 120-BPM-Default."""
+        from contextlib import nullcontext
+        if not self._fallback_gesperrt():
+            return nullcontext()
+        from src.core.engine.chaser import ohne_default_takt
+        return ohne_default_takt()
 
     def _ensure_bpm(self):
         """Sorgt dafür, dass ein BPM-Takt läuft (sonst stehen Beat-Effekte still).
@@ -478,6 +489,10 @@ class MusicShowDirector(QObject):
                 self._set_hinweis(0.0)
             elif not self._fallback_gesperrt():
                 self._ensure_bpm()
+            else:
+                # weiter gesperrt (z. B. „Aus" → „OS2L"): gleiche BPM, aber der
+                # Text haengt an der Quelle → Anzeigen neu aufbauen lassen.
+                self.taktHinweisChanged.emit(self._hinweis_bpm)
         except Exception as e:
             print(f"[MusicShowDirector] Hinweis pruefen: {e}")
 

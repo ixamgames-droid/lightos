@@ -275,6 +275,26 @@ def test_wechsel_zwischen_gesperrten_quellen_haelt_hinweis(monkeypatch, mgr, sho
     assert mgr.bpm == 0.0
 
 
+@pytest.mark.parametrize("von,nach,erwartet", [("off", "os2l", "OS2L"),
+                                               ("os2l", "off", "„Aus“")])
+def test_musik_tab_text_folgt_wechsel_zwischen_gesperrten_quellen(
+        monkeypatch, mgr, show, echter_player, von, nach, erwartet):
+    ctrl = _quelle(monkeypatch, von)
+    d = _director_echt(monkeypatch)
+    from src.ui.views.music_view import MusicView
+    view = MusicView()
+    try:
+        d.start_show()
+        assert erwartet not in view._lbl_takt_hinweis.text()
+        ctrl.apply(nach)
+        _app.processEvents()
+        assert not view._takt_hinweis.isHidden()
+        assert erwartet in view._lbl_takt_hinweis.text()
+        assert mgr.bpm == 0.0
+    finally:
+        view.deleteLater()
+
+
 def test_stop_nimmt_hinweis_weg(monkeypatch, mgr, show):
     _quelle(monkeypatch, "off")
     d, seen = _director(monkeypatch, _player(124.0))
@@ -300,6 +320,93 @@ def test_bpm_aus_fremdem_thread_landet_im_gui_thread(monkeypatch, mgr, show):
     _app.processEvents()
     assert d.takt_hinweis() == 0.0
     assert threads == [threading.main_thread()]
+
+
+# ── 5b. Beat-Chaser in der Auto-Show (Gegenpruefung BPM-32) ─────────────────────
+
+@pytest.fixture
+def beat_chaser():
+    """Beat-getriggerter Chaser (audio_triggered) — sein _on_start setzt bei BPM 0
+    sonst still 120 BPM (CDX-14b)."""
+    from src.core.engine.function_manager import get_function_manager
+    fm = get_function_manager()
+    c = fm.new_chaser("BPM32-Beat")
+    c.audio_triggered = True
+    yield c
+    try:
+        fm.stop(c.id)
+    except Exception:
+        pass
+
+
+def _autoshow_mit(ids):
+    from src.core.app_state import get_state
+    get_state().music_autoshow = {"enabled": True, "function_ids": list(ids),
+                                  "bank": 0, "slots": {}}
+
+
+@pytest.mark.parametrize("kind", ["off", "os2l"])
+def test_beat_chaser_in_autoshow_setzt_keinen_default_takt(monkeypatch, mgr, show,
+                                                           beat_chaser, kind):
+    _autoshow_mit([show.id, beat_chaser.id])
+    _quelle(monkeypatch, kind)
+    d, seen = _director(monkeypatch, _player(124.0))
+    d.start_show()
+    _app.processEvents()
+    from src.core.engine.function_manager import get_function_manager
+    assert get_function_manager().is_running(beat_chaser.id)
+    assert mgr.bpm == 0.0, "kein stiller 120er-Takt bei gesperrter Quelle"
+    assert d.takt_hinweis() == 124.0
+    assert seen == [124.0]
+
+
+@pytest.mark.parametrize("kind", ["off", "os2l"])
+def test_beat_chaser_im_lied_look_beim_trackwechsel(monkeypatch, mgr, beat_chaser,
+                                                    kind):
+    _autoshow_mit([])
+    _quelle(monkeypatch, kind)
+    player = _player(124.0)
+    d, _seen = _director(monkeypatch, player)
+    d.start_show()
+    player.current_track = SimpleNamespace(autoshow_function_ids=[beat_chaser.id],
+                                           bpm=132.0, path="b.mp3", title="B",
+                                           bpm_timeline=None)
+    d._on_track_changed(1)
+    _app.processEvents()
+    assert mgr.bpm == 0.0
+    assert d.takt_hinweis() == 132.0
+
+
+def test_beat_chaser_in_autoshow_gegenprobe_lied_analyse(monkeypatch, mgr, show,
+                                                         beat_chaser):
+    _autoshow_mit([show.id, beat_chaser.id])
+    _quelle(monkeypatch, "song")
+    d, _seen = _director(monkeypatch, _player(124.0))
+    d.start_show()
+    assert mgr.bpm == 124.0                 # Titel-Takt, nicht der 120er-Default
+    assert d.takt_hinweis() == 0.0
+
+
+def test_beat_chaser_ausserhalb_autoshow_unveraendert(monkeypatch, mgr, beat_chaser):
+    """Gegenprobe: von Hand gestartet (ohne Auto-Show) gilt CDX-14b weiter."""
+    _quelle(monkeypatch, "off")
+    from src.core.engine.function_manager import get_function_manager
+    get_function_manager().start(beat_chaser.id)
+    assert mgr.bpm == 120.0
+
+
+def test_sperre_gilt_nur_im_eigenen_thread(mgr, beat_chaser):
+    """Die Sperre ist thread-lokal: ein anderer Thread startet waehrenddessen
+    weiter mit dem 120er-Default."""
+    from src.core.engine import chaser as ch
+    ergebnis = []
+    with ch.ohne_default_takt():
+        assert ch.default_takt_gesperrt()
+        t = threading.Thread(target=lambda: ergebnis.append(ch.default_takt_gesperrt()))
+        t.start()
+        t.join()
+    assert ergebnis == [False]
+    assert not ch.default_takt_gesperrt()
 
 
 # ── 6. Trackwechsel ──────────────────────────────────────────────────────────────
@@ -397,18 +504,37 @@ def test_musik_tab_zeigt_bestehenden_hinweis_beim_aufbau(monkeypatch, mgr, show,
         view.deleteLater()
 
 
+def _gelbe_pixel(img) -> int:
+    """Pixel im Gelb der Hinweiszeile (#ffd866, mit Kantenglaettung)."""
+    n = 0
+    for y in range(img.height()):
+        for x in range(img.width()):
+            c = img.pixelColor(x, y)
+            if c.red() > 170 and c.green() > 140 and c.blue() < 120 \
+                    and c.red() - c.blue() > 90:
+                n += 1
+    return n
+
+
 def test_vc_musik_anzeige_kennt_hinweis(monkeypatch, mgr, show, echter_player):
     _quelle(monkeypatch, "off")
     d = _director_echt(monkeypatch)
     from src.ui.virtualconsole.vc_song_info import VCSongInfo
     w = VCSongInfo()
     try:
-        assert w.takt_hinweis() == 0.0
-        d.start_show()
+        w.resize(320, 200)
+        gelb_ohne = _gelbe_pixel(w.grab().toImage())   # Grundbild (ohne Hinweis)
+        with mock.patch.object(w, "update") as upd:
+            d.start_show()
+            assert upd.called, "Hinweis-Signal muss neu zeichnen"
         assert w.takt_hinweis() == 124.0
-        w.grab()                             # paintEvent mit Hinweiszeile laeuft
-        d.stop_show()
+        mit = w.grab().toImage()
+        assert _gelbe_pixel(mit) > gelb_ohne + 20, "gelbe Hinweiszeile wird gezeichnet"
+        with mock.patch.object(w, "update") as upd:
+            d.stop_show()
+            assert upd.called
         assert w.takt_hinweis() == 0.0
+        assert _gelbe_pixel(w.grab().toImage()) == gelb_ohne
     finally:
         w.deleteLater()
 
