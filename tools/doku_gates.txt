@@ -103,6 +103,7 @@ test_tool1_verwaiste_werkzeuge.py
 !test_fm56_review.py               # tools/README.md ist keine Doku -> volle Suite
 !test_session_claim.py             # "docs/y.md" nur als Beispielwert fuer --files
 !test_proc25_tafel_privat.py       # "SESSIONS.md" nur als Datei in Wegwerf-Repos (Tafel), keine Doku
+!test_pseudonymisieren.py         # "BACKLOG.md" nur als Datei in Wegwerf-Repos, keine Doku
 !test_tool11_bildschirm_windows.py # docs/.../img nur als Beispielpfade
 !test_tool3_generator_annahmen.py  # "docs" nur in erzeugtem Beispielcode
 !test_tool5_demo_global_bus.py     # prueft ein Werkzeug, liest keine Doku
