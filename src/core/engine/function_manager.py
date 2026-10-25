@@ -17,6 +17,7 @@ from .rgb_matrix import RgbMatrixInstance
 from .modify import (ModifySammler, ist_modify, modify_posten,
                      normalize_channels, normalize_mode, normalize_strength,
                      posten_anwenden, setze_sammler)
+from . import wer_gewinnt
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -46,6 +47,11 @@ class FunctionManager:
         self._dim_map_key: int = -1
         # ENG-30: die Patch-Liste mit fid-Tabelle, die ``write`` bekommt.
         self._patch_liste: PatchListe | None = None
+        # ENG-35 Schritt 4: „wer gewinnt“ — Protokoll nur, solange eine Anzeige
+        # es angefordert hat (Zaehler). 0 = aus, der Takt bleibt wie bisher.
+        self._wg_zaehler = 0
+        self._wg_protokoll: wer_gewinnt.SchreibProtokoll | None = None
+        self._wg_oben: dict | None = None
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -442,6 +448,45 @@ class FunctionManager:
             liste = self._patch_liste = PatchListe(patch_cache)
         return liste
 
+    # ── ENG-35 Schritt 4: wer gewinnt ─────────────────────────────────────────
+
+    def wer_gewinnt_anfordern(self) -> None:
+        """Eine Anzeige will das Protokoll „Adresse -> letzter Schreiber“.
+        Jede Anforderung braucht genau ein ``wer_gewinnt_freigeben``."""
+        with self._lock:
+            self._wg_zaehler += 1
+
+    def wer_gewinnt_freigeben(self) -> None:
+        with self._lock:
+            self._wg_zaehler = max(0, self._wg_zaehler - 1)
+            if self._wg_zaehler == 0:
+                self._wg_protokoll = None
+                self._wg_oben = None
+
+    @property
+    def wer_gewinnt_aktiv(self) -> bool:
+        return getattr(self, "_wg_zaehler", 0) > 0
+
+    def wer_gewinnt_oben(self, oben: dict | None) -> None:
+        """Der Renderer meldet die Schicht ueber den Funktionen dieses Frames:
+        ``{universum: {adresse: "Cueliste"|"Programmer"|"Snap"}}``. Wird
+        als Ganzes getauscht (der Leser bekommt nie einen halben Stand)."""
+        if self.wer_gewinnt_aktiv:
+            self._wg_oben = oben
+
+    def wer_gewinnt(self, patch) -> dict[int, "wer_gewinnt.Ergebnis"]:
+        """Je Funktion des letzten Frames: gewinnt auf n / verdeckt auf m
+        Geraeten von X. Leer, solange niemand das Protokoll angefordert hat
+        oder noch kein Frame gelaufen ist."""
+        protokoll = getattr(self, "_wg_protokoll", None)
+        oben = getattr(self, "_wg_oben", None)
+
+        def name_von(fid):
+            f = self._functions.get(fid)
+            return getattr(f, "name", None) if f is not None else None
+
+        return wer_gewinnt.auswerten(protokoll, oben, patch, name_von)
+
     def modify_aufschieben(self, an: bool = True) -> None:
         """ENG-37: den NAECHSTEN ``tick`` anweisen, die Modify-Posten nur zu
         sammeln (``True``) — der Aufrufer verrechnet sie dann selbst ueber
@@ -507,11 +552,23 @@ class FunctionManager:
         # (Layer-Prioritaet, darin Start-Reihenfolge).
         sammler = ModifySammler()
         sammler_alt = setze_sammler(sammler)
+        # ENG-35 Schritt 4: Protokoll nur, wenn angefordert — sonst None und
+        # der Takt laeuft exakt wie bisher.
+        protokoll = (wer_gewinnt.SchreibProtokoll()
+                     if getattr(self, "_wg_zaehler", 0) > 0 else None)
         try:
-            self._tick_funktionen(ordered, universes, patch_cache, dt,
-                                  finished, sammler, patch_fn)
+            if protokoll is None:
+                self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                      finished, sammler, patch_fn)
+            else:
+                self._tick_mitgeschnitten(ordered, universes, patch_cache, dt,
+                                          finished, sammler, patch_fn,
+                                          protokoll)
         finally:
             setze_sammler(sammler_alt)
+        if protokoll is not None and self._wg_zaehler > 0:
+            # (zwischendurch freigegeben -> nichts Veraltetes liegen lassen)
+            self._wg_protokoll = protokoll
         self._modify_posten = sammler.posten
         if not (modify_spaeter or getattr(self, "_modify_aufschieben", False)):
             self.modify_anwenden(universes)
@@ -524,8 +581,36 @@ class FunctionManager:
                 self._start_order = [fid for fid in self._start_order
                                      if fid in self._running_ids]
 
+    def _tick_mitgeschnitten(self, ordered, universes, patch_cache, dt,
+                             finished, sammler, patch_fn, protokoll) -> None:
+        """ENG-35 Schritt 4: der Funktions-Durchlauf mit Protokoll.
+
+        Je Universum wird EINMAL je Takt ein :class:`wer_gewinnt.Mitschnitt`
+        an Stelle des Schreib-Protokolls eingehaengt (ein evtl. laufendes
+        Protokoll des Renderers bekommt jede Adresse unveraendert
+        weitergereicht). Je Funktion wird nur ``takt.fid`` umgesetzt — der
+        Mehraufwand waechst mit den geschriebenen Adressen, nicht mit
+        (laufende Funktionen x Universen)."""
+        takt = wer_gewinnt.Takt()
+        mitschnitte = {}
+        for u, su in universes.items():
+            tauschen = getattr(su, "write_log_tauschen", None)
+            if tauschen is None:
+                continue
+            m = wer_gewinnt.Mitschnitt(None, takt)
+            m.aussen = tauschen(m)
+            mitschnitte[u] = (su, m)
+        try:
+            self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                  finished, sammler, patch_fn, takt=takt)
+        finally:
+            for u, (su, m) in mitschnitte.items():
+                su.write_log_tauschen(m.aussen)
+                for fid, adressen in m.je_fid.items():
+                    protokoll.eintragen(fid, u, adressen)
+
     def _tick_funktionen(self, ordered, universes, patch_cache, dt,
-                         finished, sammler, patch_fn=None):
+                         finished, sammler, patch_fn=None, takt=None):
         """Schleife ueber die laufenden Funktionen (Rumpf von ``tick``).
 
         ENG-30: ``patch_fn`` ist ``patch_cache`` mit fid-Tabelle (siehe
@@ -540,6 +625,8 @@ class FunctionManager:
             if f is None or not f.is_running:
                 finished.add(fid)
                 continue
+            if takt is not None:
+                takt.fid = fid          # ENG-35 Schritt 4: wer schreibt jetzt
             try:
                 inten = f.intensity
                 try:
