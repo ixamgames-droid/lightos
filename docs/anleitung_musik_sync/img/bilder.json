@@ -1,7 +1,7 @@
 {
   "anleitung": "musik_sync",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "161a0039",
+  "stand": "29c25bfc",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py musik_sync'.",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "6f89e88a66276d0719a3c9d5666dff7a"
+      "md5": "53335cbca4d7bf0fa25a3bc363e1841e"
     },
     {
       "datei": "04_bpm_quelle.png",
