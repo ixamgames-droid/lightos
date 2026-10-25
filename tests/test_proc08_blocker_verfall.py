@@ -114,7 +114,7 @@ class SchreibSeiteTest(unittest.TestCase):
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="lightos_proc08_")
-        bare = os.path.join(self.tmp, "origin.git")
+        bare = os.path.join(self.tmp, "lightos-intern.git")
         _git("init", "--quiet", "--bare", bare)
         self.a, self.b = (self._klon(bare, n) for n in ("a", "b"))
 
@@ -156,7 +156,7 @@ class SchreibSeiteTest(unittest.TestCase):
         import contextlib
         import io
         with contextlib.redirect_stdout(io.StringIO()):
-            rc = sc.main(["--repo", self.b, "blocker", "--session", "B", "B neu"])
+            rc = sc.main(["--tafel", self.b, "blocker", "--session", "B", "B neu"])
         self.assertEqual(rc, 0)
         texte = [x.split(") ", 1)[1] for x in sc.lade_tafel(self.a)[0]["blocker"]]
         # „alt" verfaellt; „A zuletzt" bleibt als Lesemarke von A.

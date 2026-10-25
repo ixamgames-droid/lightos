@@ -967,6 +967,12 @@ class RgbMatrixView(QWidget):
         self._cb_modify.toggled.connect(self._on_modify_toggled)
         fg.addRow("", self._cb_modify)
 
+        # ENG-42: echter Läufer über einem Untergrund. FESTES Feld (STAB-38),
+        # nur freigegeben/gesperrt, nie neu gebaut.
+        self._cb_durchlassen = QCheckBox("Dunkle Lampen durchlassen")
+        self._cb_durchlassen.toggled.connect(self._on_durchlassen_toggled)
+        fg.addRow("", self._cb_durchlassen)
+
         self._cols_spin = SelectAllSpinBox()   # UXT-11a
         self._cols_spin.setRange(1, 64)
         self._cols_spin.setValue(8)
@@ -1723,6 +1729,8 @@ class RgbMatrixView(QWidget):
         self._smax_spin.setVisible(is_shutter)
         # ENG-37/ENG-38: Modify gibt es in den Stilen Dimmer, RGB und RGBW.
         self._apply_modify_visibility(style)
+        # ENG-42: „dunkle Lampen durchlassen" gibt es (vorerst) nur im Stil Dimmer.
+        self._apply_durchlassen_visibility(style)
         # Farben-Zeile (C1/C2/C3 bzw. Sequence): Anzahl haengt von Style UND
         # Algorithmus ab. ZULETZT aufrufen, damit die Sichtbarkeit der ganzen
         # "Farben"-Gruppe den vollstaendigen, gerade gesetzten Zustand sieht.
@@ -1841,6 +1849,40 @@ class RgbMatrixView(QWidget):
         """Haken „Modify-Effekt": Gruppe ein-/ausblenden, Wert uebernehmen."""
         self._apply_modify_visibility()
         self._param_change()
+
+    def _on_durchlassen_toggled(self, _checked: bool = False):
+        """ENG-42: Haken „Dunkle Lampen durchlassen" uebernehmen."""
+        self._param_change()
+
+    def _apply_durchlassen_visibility(self, style: MatrixStyle | None = None):
+        """ENG-42: Haken freigeben/sperren — reine ``setEnabled``/Tooltip auf
+        einem FESTEN Feld (STAB-38). Wirkt nur im Stil Dimmer und nicht bei
+        einem Modify-Effekt (der setzt ohnehin nichts)."""
+        if style is None:
+            try:
+                style = MatrixStyle(self._style_combo.currentText())
+            except ValueError:
+                style = MatrixStyle.RGB
+        dimmer = style == MatrixStyle.DIMMER
+        modify = self._cb_modify.isChecked() and self._cb_modify.isEnabled()
+        self._cb_durchlassen.setEnabled(dimmer and not modify)
+        if not dimmer:
+            tip = ("„Dunkle Lampen durchlassen“ gibt es nur im Stil „Dimmer“. "
+                   "Ein hier noch gesetzter Haken bleibt gemerkt, wirkt aber nicht.")
+        elif modify:
+            tip = ("Ein Modify-Effekt setzt keine Werte, er verrechnet sie — "
+                   "eine dunkle Lampe verändert dort ohnehin nichts. Der Haken "
+                   "wirkt nur bei einem normalen Effekt.")
+        else:
+            tip = ("Echter Läufer über einem Untergrund: Der Effekt setzt nur die "
+                   "Lampen, die er gerade hell macht (Wert über 0, auch der "
+                   "Schweif) — genau auf seinen Wert, wie ein normaler Effekt "
+                   "in seiner Stufe. Die dunklen gibt er an das zurück, was "
+                   "darunter läuft (anderer Effekt, Snap, Grundhelligkeit).\n"
+                   "Anders als Modify „Addieren“: der legt obendrauf "
+                   "(40 % + 70 % = 100 %), hier stehen genau 70 %.\n"
+                   "Steht „Min“ im Dimmer-Bereich über 0, ist keine Lampe dunkel.")
+        self._cb_durchlassen.setToolTip(tip)
 
     def _apply_color_visibility(self, style: MatrixStyle | None = None):
         """Zeigt nur so viele Farbfelder, wie der aktive Algorithmus auswertet.
@@ -2009,6 +2051,11 @@ class RgbMatrixView(QWidget):
             self._cb_modify.blockSignals(True)
             self._cb_modify.setChecked(bool(getattr(m, "modify", False)))
             self._cb_modify.blockSignals(False)
+            # ENG-42: Haken „Dunkle Lampen durchlassen".
+            self._cb_durchlassen.blockSignals(True)
+            self._cb_durchlassen.setChecked(
+                bool(getattr(m, "dunkle_durchlassen", False)))
+            self._cb_durchlassen.blockSignals(False)
             self._modify_mode_combo.blockSignals(True)
             _mi = self._modify_mode_combo.findData(getattr(m, "modify_mode", "add"))
             self._modify_mode_combo.setCurrentIndex(_mi if _mi >= 0 else 0)
@@ -2080,6 +2127,9 @@ class RgbMatrixView(QWidget):
         # im Stil Dimmer gemerkt.
         self._current.modify_channels = self._modify_kanalwahl_aus_feldern()
         self._apply_modify_visibility()
+        # ENG-42: bleibt auch in anderen Stilen gemerkt (wirkt dort nicht).
+        self._current.dunkle_durchlassen = self._cb_durchlassen.isChecked()
+        self._apply_durchlassen_visibility()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
