@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMessageBox, QFileDialog, QTabWidget, QSizePolicy, QFrame,
     QMenu, QSlider, QInputDialog,
 )
-from PySide6.QtCore import Qt, QEvent, QSize, QTimer, Signal
+from PySide6.QtCore import Qt, QEvent, QPoint, QSize, QTimer, Signal
 from PySide6.QtGui import (
     QAction, QKeySequence, QIcon, QPixmap, QColor, QPainter, QShortcut,
 )
@@ -477,6 +477,42 @@ class _GmReglerOhneRad(QSlider):
             super().wheelEvent(event)
         else:
             event.ignore()
+
+
+class _KioskNotausMeldung(QLabel):
+    """LAS-41: rote NOT-AUS-Bestaetigung im Kiosk (dort fehlt die
+    Statusleiste). Freies Kind ueber dem oberen Rand des Ansichtsstapels;
+    folgt dessen Lage per Ereignisfilter (``lege_an`` setzt das Fenster).
+    Nimmt keinen Fokus und schluckt Mausereignisse — Qt reicht sie ohnehin
+    nie an verdeckte Geschwister weiter, angenommen sieht auch das
+    Elternfenster nichts davon."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setWordWrap(True)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setStyleSheet(
+            "QLabel{background:#b31414; color:#ffffff; font-weight:bold;"
+            " padding:6px 10px; border-bottom:2px solid #ff5050;}")
+        self.lege_an = lambda: None
+        self.hide()
+
+    def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
+        if ev.type() in (QEvent.Type.Resize, QEvent.Type.Move,
+                         QEvent.Type.Show):
+            self.lege_an()
+        return False
+
+    def mousePressEvent(self, ev):  # noqa: N802 (Qt-Name)
+        ev.accept()
+
+    def mouseReleaseEvent(self, ev):  # noqa: N802 (Qt-Name)
+        ev.accept()
+
+    def mouseDoubleClickEvent(self, ev):  # noqa: N802 (Qt-Name)
+        ev.accept()
 
 
 class MainWindow(QMainWindow):
@@ -1587,6 +1623,9 @@ class MainWindow(QMainWindow):
             except Exception:
                 banner_wege = wege
             banner.aktualisiere(om, banner_wege)
+            # LAS-41: die Kiosk-Bestaetigung rueckt unter ein neues Banner.
+            if getattr(self, "_kiosk_notaus_meldung", None) is not None:
+                self._kiosk_notaus_meldung_lege_an()
         # OUT-56: gepatchte Universen ohne jeden Adapter. `sendet_wirklich` ist
         # dieselbe Frage, die der DMX-Monitor stellt (OUT-52) — eine zweite
         # Antwort darauf soll es nicht geben.
@@ -3497,6 +3536,8 @@ class MainWindow(QMainWindow):
         # „ausgelöst“ gehoert nur zum stehenden Latch.
         if getattr(self._state, "laser_estop_active", False):
             self._on_laser_estop()
+        else:
+            self._kiosk_notaus_meldung_weg()      # LAS-41: geloest → weg
         self._sync_notaus_button()
 
     def _on_laser_estop(self, *_):
@@ -3517,11 +3558,81 @@ class MainWindow(QMainWindow):
                 unvollstaendig = ""
             if unvollstaendig:
                 text += " · " + unvollstaendig
-            sb.showMessage(text, 6000)
+            sb.showMessage(text, self._NOTAUS_BESTAETIGUNG_MS)
             sb.setStyleSheet(
                 "QStatusBar{background:#b31414; color:#ffffff; font-weight:bold;}")
-            QTimer.singleShot(6000, lambda: self._reset_statusbar_style())
+            QTimer.singleShot(self._NOTAUS_BESTAETIGUNG_MS,
+                              lambda: self._reset_statusbar_style())
+            if getattr(self, "_kiosk_mode", False):
+                self._kiosk_notaus_meldung_zeigen(text)
         except Exception:
+            pass
+
+    # LAS-41: Anzeigedauer der Bestaetigung — Statusleiste und Kiosk gleich.
+    _NOTAUS_BESTAETIGUNG_MS = 6000
+
+    def _kiosk_notaus_meldung_zeigen(self, text: str) -> None:
+        """LAS-41: Im Kiosk ist die Statusleiste ausgeblendet — dieselbe rote
+        Bestaetigung erscheint dort als Balken UNTER dem Kiosk-Streifen.
+
+        Wie das Ausgabe-Banner (VCB-47) liegt der Balken nicht im Layout,
+        sondern ueberlagert den oberen Rand des Ansichtsstapels: nichts
+        rutscht, und der Streifen mit GM, STOP ALL, BLACKOUT und LASER NOT-AUS
+        liegt darueber und bleibt frei. Steht das Ausgabe-Banner gerade, liegt
+        der Balken direkt darunter. Er nimmt keinen Fokus, schluckt Klicks
+        (eine verdeckte VC-Taste loest nicht aus) und verschwindet nach
+        ``_NOTAUS_BESTAETIGUNG_MS`` — oder sofort, wenn der NOT-AUS geloest
+        wird."""
+        lbl = getattr(self, "_kiosk_notaus_meldung", None)
+        if lbl is None:
+            lbl = _KioskNotausMeldung(self._stack.parentWidget())
+            lbl.setObjectName("kioskNotausMeldung")
+            self._stack.installEventFilter(lbl)
+            lbl.lege_an = lambda: self._kiosk_notaus_meldung_lege_an()
+            self._kiosk_notaus_meldung = lbl
+            t = QTimer(self)
+            t.setSingleShot(True)
+            t.timeout.connect(self._kiosk_notaus_meldung_weg)
+            self._kiosk_notaus_timer = t
+        lbl.setText(text)
+        lbl.setToolTip(text)
+        lbl.show()
+        self._kiosk_notaus_meldung_lege_an()
+        self._kiosk_notaus_timer.start(self._NOTAUS_BESTAETIGUNG_MS)
+
+    def _kiosk_notaus_meldung_lege_an(self) -> None:
+        lbl = getattr(self, "_kiosk_notaus_meldung", None)
+        if lbl is None or lbl.isHidden():
+            return
+        try:
+            eltern = lbl.parentWidget()
+            ecke = self._stack.mapTo(eltern, QPoint(0, 0))
+            y = ecke.y()
+            # Ausgabe-Banner bzw. sein Chip (VCB-47) bleiben lesbar.
+            steuerung = getattr(self, "_ausgabe_banner", None)
+            for teil in (getattr(steuerung, "widget", None),
+                         getattr(steuerung, "chip", None)):
+                if teil is not None and not teil.isHidden():
+                    y = max(y, teil.geometry().bottom() + 1)
+            breite = self._stack.width()
+            hoehe = lbl.heightForWidth(breite)
+            if hoehe <= 0:
+                hoehe = lbl.sizeHint().height()
+            lbl.setGeometry(ecke.x(), y, breite, hoehe)
+            lbl.raise_()
+        except RuntimeError:
+            pass
+
+    def _kiosk_notaus_meldung_weg(self) -> None:
+        lbl = getattr(self, "_kiosk_notaus_meldung", None)
+        if lbl is None:
+            return
+        try:
+            t = getattr(self, "_kiosk_notaus_timer", None)
+            if t is not None:
+                t.stop()
+            lbl.hide()
+        except RuntimeError:
             pass
 
     def _reset_statusbar_style(self):

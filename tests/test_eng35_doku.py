@@ -102,3 +102,16 @@ def test_button_anleitung_nennt_den_haken():
 def test_merge_vertrag_nennt_die_snap_ausnahme():
     vertrag = _text(REPO / "docs" / "OUTPUT_MERGE_CONTRACT.md")
     assert "VCB-46" in vertrag and "snap_dimmer_override" in vertrag
+
+
+def test_anleitung_nennt_die_spalte_verdeckt_wie_im_code():
+    """ENG-35 Schritt 4: Spalte „Verdeckt“ — Name und Wortlaut wie im Code."""
+    from src.core.engine import wer_gewinnt
+    text = _text(ANLEITUNG)
+    ansicht = _text(REPO / "src/ui/views/prioritaeten_view.py")
+    assert "**Verdeckt**" in text and '"Verdeckt"' in ansicht
+    beispiel = wer_gewinnt.Ergebnis(gewinnt=0, verdeckt=4, von=[("Blinder", 4)])
+    assert f"**{beispiel.text()}**" in text
+    for name in (wer_gewinnt.PROGRAMMER, wer_gewinnt.SNAP, wer_gewinnt.CUELISTE):
+        assert f"verdeckt von {name} auf" in text, name
+    assert "**Modify-Effekte** verdecken nie" in text

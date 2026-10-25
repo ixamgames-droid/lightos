@@ -24,6 +24,9 @@ Nuetzliche Schalter:
                          --abdruck die Zeit "vorher" ohne zweiten Checkout
     --profil "Look Drop" cProfile dieses Falls (die 40 teuersten Funktionen)
     --basis ORDNER       Sandbox/Show dort ablegen und wiederverwenden
+    --wer-gewinnt        ENG-35 Schritt 4: je Fall abwechselnd OHNE und MIT dem
+                         Protokoll „wer gewinnt“ messen (wie bei sichtbarem
+                         Reiter Prioritäten) und die Auswertung selbst timen
 
 Zeiten haengen vom Rechner und von dem ab, was nebenher laeuft. Gezeigt wird
 deshalb der KLEINSTE Mittelwert aus mehreren Runden; zum Vergleichen zweier
@@ -56,6 +59,8 @@ def _argumente(argv=None):
                     help="Tabelle fid->Geraet und Adress-Plan abschalten (alter Weg)")
     ap.add_argument("--profil", default="", metavar="FALL", help="cProfile dieses Falls")
     ap.add_argument("--basis", default="", help="Ordner fuer Sandbox und Show (Standard: temporaer)")
+    ap.add_argument("--wer-gewinnt", action="store_true",
+                    help="je Fall ohne/mit Protokoll 'wer gewinnt' (ENG-35 Schritt 4)")
     return ap.parse_args(argv)
 
 
@@ -274,6 +279,33 @@ class Messung:
         return h.hexdigest()[:16], belegt
 
 
+def _wer_gewinnt_messen(m: "Messung", fm, st, faelle) -> None:
+    """ENG-35 Schritt 4: je Fall abwechselnd aus/an (je zweimal, kleinster
+    Wert zaehlt) — so trifft Rauschen beide Seiten gleich."""
+    print(f"\nZeit je Frame in ms, Protokoll 'wer gewinnt' aus/an "
+          f"(kleinster Mittelwert aus 2 x {m.runden} x {m.bilder} Frames)\n")
+    print("| Fall | aus | an | Mehrzeit | Auswertung (ms, 1x je Anzeige-Takt) |")
+    print("|---|---|---|---|---|")
+    for name, ids in faelle.items():
+        aus, an = [], []
+        for _ in range(2):
+            aus.append(m.zeit(ids)["mittel"])
+            fm.wer_gewinnt_anfordern()
+            try:
+                an.append(m.zeit(ids)["mittel"])
+                patch = st.get_patched_fixtures()
+                t = time.perf_counter()
+                for _ in range(20):
+                    fm.wer_gewinnt(patch)
+                ausw = (time.perf_counter() - t) * 1000.0 / 20
+            finally:
+                fm.wer_gewinnt_freigeben()
+        a, b = min(aus), min(an)
+        mehr = (b - a) / a * 100.0 if a > 0 else 0.0
+        print(f"| {name} | {a:.2f} | {b:.2f} | {mehr:+.1f} % | {ausw:.2f} |",
+              flush=True)
+
+
 def main(argv=None) -> int:
     arg = _argumente(argv)
     basis = os.path.abspath(arg.basis) if arg.basis else tempfile.mkdtemp(prefix="lightos_eng30_")
@@ -306,6 +338,12 @@ def main(argv=None) -> int:
               f"Tabelle {zaehler['tabelle']}-mal befragt, "
               f"Adresslisten {zaehler['ableitungen']}-mal im Frame abgeleitet")
         fm.stop_all()
+        return 0
+
+    if arg.wer_gewinnt:
+        _wer_gewinnt_messen(m, fm, st, faelle)
+        fm.stop_all()
+        sys.stdout.flush()
         return 0
 
     print(f"\nZeit je Frame in ms (kleinster Mittelwert aus {arg.runden} x {arg.bilder} Frames)"

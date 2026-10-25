@@ -28,6 +28,16 @@ class Universe:
             self._write_log = None
             return log
 
+    def write_log_tauschen(self, neu):
+        """ENG-35 Schritt 4: das Schreib-Protokoll gegen ``neu`` tauschen und
+        das bisherige (oder ``None``) liefern. ``neu`` braucht nur ``add`` und
+        ``update`` — der Mitschnitt „wer gewinnt“ haengt sich so einmal je Takt
+        und Universum ein und reicht an ein evtl. aeusseres Protokoll weiter."""
+        with self._lock:
+            alt = self._write_log
+            self._write_log = neu
+            return alt
+
     def set_channel(self, channel: int, value: int):
         """Setzt einen Kanal (1-basiert, Wert 0-255).
 
