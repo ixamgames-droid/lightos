@@ -29,7 +29,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, QRect, Qt                         # noqa: E402
 from PySide6.QtTest import QTest                                     # noqa: E402
-from PySide6.QtWidgets import QApplication, QPushButton, QWidget     # noqa: E402
+from PySide6.QtWidgets import (QApplication, QPushButton,            # noqa: E402
+                               QTabWidget, QWidget)
 
 from src.ui.ausgabe_banner import (ART_KEIN, ART_PROBE,              # noqa: E402
                                    ART_STOERUNG, HALTE_S, AusgabeBanner)
@@ -39,6 +40,14 @@ from _qt_lifecycle import destroy_all_top_level_widgets              # noqa: E40
 _AUSFALL = {"universum": 1, "weg": "Enttec", "ziel": "COM9",
             "verbunden": False, "problem": ""}
 _LAEUFT = dict(_AUSFALL, verbunden=True)
+
+
+def _hinweis_zeile(ansicht):
+    """UI-103: der Platz, den eine Ansicht ohne Unterreiter fuer Banner und
+    Chip freigibt (Virtual Console: Zeile „Aktiver Effekt“) — oder ``None``."""
+    frage = getattr(ansicht, "ausgabe_chip_platz", None)
+    platz = frage() if callable(frage) else None
+    return platz if platz is not None and platz.isVisible() else None
 
 
 class _Manager:
@@ -124,8 +133,23 @@ class _Haerte(unittest.TestCase):
         self.assertTrue(banner.isVisible(), hinweis)
         inhalt = self._im_fenster(w._stack)
         rechteck = self._im_fenster(banner)
-        self.assertEqual(rechteck.topLeft(), inhalt.topLeft(), hinweis)
-        self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
+        ansicht = w._stack.currentWidget()
+        if isinstance(ansicht, QTabWidget):
+            # UI-103: neben oder unter den Unterreitern, nie darueber.
+            leiste = ansicht.tabBar()
+            belegt = self._im_fenster(leiste)
+            belegt.setWidth(min(leiste.width(), leiste.sizeHint().width()))
+            self.assertTrue(inhalt.contains(rechteck), hinweis)
+            self.assertFalse(rechteck.intersects(belegt), hinweis)
+        elif _hinweis_zeile(ansicht) is not None:
+            # UI-103: Virtual Console — rechtsbuendig in der Zeile „Aktiver
+            # Effekt“, nie ueber Bank-Knoepfen oder der VC-Werkzeugleiste.
+            feld = self._im_fenster(_hinweis_zeile(ansicht))
+            self.assertTrue(feld.contains(rechteck), hinweis)
+            self.assertEqual(rechteck.right(), feld.right(), hinweis)
+        else:
+            self.assertEqual(rechteck.topLeft(), inhalt.topLeft(), hinweis)
+            self.assertEqual(rechteck.width(), inhalt.width(), hinweis)
         self.assertGreaterEqual(rechteck.height(), 10, hinweis)
         self.assertTrue(w.rect().contains(rechteck),
                         f"Banner ragt aus dem Fenster {hinweis}")

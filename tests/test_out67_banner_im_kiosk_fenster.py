@@ -85,9 +85,14 @@ class BannerImKioskFensterTest(unittest.TestCase):
         from PySide6.QtWidgets import QWidget
         zentral = win.centralWidget()
         self.assertEqual(zentral.layout().indexOf(banner), -1)
-        self.assertEqual(banner.mapTo(win, QPoint(0, 0)),
-                         win._stack.mapTo(win, QPoint(0, 0)))
-        self.assertEqual(banner.width(), win._stack.width())
+        # UI-103: im Kiosk (Virtual Console) rechts in der Zeile „Aktiver
+        # Effekt“ — nie ueber Bank-Knoepfen oder der VC-Werkzeugleiste.
+        from PySide6.QtCore import QRect
+        self.assertEqual(banner.geometry(), banner.ziel_rechteck())
+        zeile = win._vc_view.ausgabe_chip_platz()
+        self.assertTrue(QRect(zeile.mapTo(win, QPoint(0, 0)), zeile.size())
+                        .contains(QRect(banner.mapTo(win, QPoint(0, 0)),
+                                        banner.size())))
         kinder = [k for k in zentral.children() if isinstance(k, QWidget)]
         self.assertIs(kinder[-1], banner)
 
