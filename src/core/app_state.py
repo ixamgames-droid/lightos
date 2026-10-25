@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .database.models import PatchedFixture, create_all_idempotent
 from .database.fixture_db import get_channels
 from .dmx.universe import Universe
+from .engine import wer_gewinnt as _wer_gewinnt
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .dmx import adapter_zeilen
@@ -4905,6 +4906,11 @@ class AppState:
                     present = True
                     break
             effect_present[fidi] = present
+        # ENG-35 Schritt 4: „wer gewinnt“ — nur wenn eine Anzeige das
+        # Protokoll angefordert hat, merken, welche Adressen Cuelisten bzw.
+        # Programmer/Snaps nach den Funktionen ueberschreiben.
+        wg_oben: dict[int, dict[int, str]] | None = (
+            {} if getattr(_fm, "wer_gewinnt_aktiv", False) is True else None)
         # 3. Executoren (Cue-Playback) darueber.
         exec_dimmer_fids: set[int] = set()
         if self.playback_engine is not None:
@@ -4925,6 +4931,9 @@ class AppState:
                 # geschuetzt, cue-uebernommene faellt der Programmer korrekt wieder an.
                 for _univ, _su in scratch.items():
                     _ex = _su.end_write_log()
+                    if _ex and wg_oben is not None:
+                        wg_oben.setdefault(_univ, {}).update(
+                            dict.fromkeys(_ex, _wer_gewinnt.CUELISTE))
                     if _ex and _univ in func_driven:
                         func_driven[_univ] = func_driven[_univ] - _ex
                 # Fixtures, deren Intensitaet ein Cue setzt (auch 0) → 4a² laesst
@@ -5036,10 +5045,35 @@ class AppState:
                 if univ in protect:
                     for a in dim_addrs.get(fidi, ()):
                         protect[univ].discard(a)
+        if wg_oben is not None:
+            for _su in scratch.values():
+                _su.begin_write_log()
         self._apply_fixture_map(scratch, programmer,
                                 skip_intensity_for=set(prog_factor) | owned_by_func,
                                 protect_addrs=protect, fix_index=fix_index,
                                 intensitaet_nur=snap_dimmer_nur)
+        if wg_oben is not None:
+            # Snap-Tasten mit „übersteuert laufende Dimmer-Effekte“ heissen an
+            # ihren Dimmern „Snap“, alles andere aus dem Programmer „Programmer“.
+            snap_adr: dict[int, set[int]] = {}
+            for fidi in snap_dimmer_nur:
+                entry = fix_index.get(fidi)
+                if entry:
+                    snap_adr.setdefault(entry[0].universe, set()).update(
+                        dim_addrs.get(fidi, ()))
+            for _univ, _su in scratch.items():
+                _pw = _su.end_write_log()
+                if not _pw:
+                    continue
+                ziel = wg_oben.setdefault(_univ, {})
+                ziel.update(dict.fromkeys(_pw, _wer_gewinnt.PROGRAMMER))
+                for a in snap_adr.get(_univ, ()):
+                    if a in _pw:
+                        ziel[a] = _wer_gewinnt.SNAP
+            try:
+                _fm.wer_gewinnt_oben(wg_oben)
+            except Exception:
+                pass
 
         # 4a². Implizite Grundhelligkeit — „Farbe heisst sichtbar". Ein Fixture mit
         #      eigenem Dimmer-/Intensitaets-Kanal, dessen Farbe aktiv ist (durch

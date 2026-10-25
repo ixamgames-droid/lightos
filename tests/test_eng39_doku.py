@@ -6,6 +6,7 @@ Bedienelemente mit dem Wortlaut der Oberflaeche.
 from pathlib import Path
 from types import SimpleNamespace
 
+from backlog_eintrag import eintrag
 from src.core.engine import ueberschneidung as U
 
 REPO = Path(__file__).resolve().parent.parent
@@ -87,8 +88,8 @@ def test_button_anleitung_nennt_die_hinweiszeile():
 
 
 def test_fragmente_liegen_vor():
-    backlog = _text(REPO / "backlog.d" / "ENG-39.md")
-    assert backlog.startswith("ID: ENG-39\n")
+    # Fragment oder (nach dem Einsammeln) Zeile in BACKLOG.md — beides gilt.
+    assert "ENG-39" in eintrag(REPO, "ENG-39")
     assert list((REPO / "changelog.d").glob("*-ENG-39.md"))
 
 
