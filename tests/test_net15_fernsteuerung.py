@@ -14,9 +14,12 @@ import os
 import socket
 import threading
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -573,6 +576,62 @@ def test_box_uebernehmen_speichert_und_laedt(tmp_path, monkeypatch):
     box.deleteLater()
     box2.deleteLater()
     monkeypatch.setattr(fsm, "_qt_wecker", None)
+
+
+
+def _auswahl_lesbar(box):
+    """Quelle/Ziel: Spalte und Feld mindestens so breit wie der sizeHint der
+    Combo - der deckt den laengsten Eintrag samt Pfeil ab."""
+    from src.ui.widgets.dmx_fernsteuerung_box import SP_QUELLE, SP_ZIEL
+    kopf = box.tabelle.horizontalHeader()
+    for r in range(box.tabelle.rowCount()):
+        for sp in (SP_QUELLE, SP_ZIEL):
+            combo = box.tabelle.cellWidget(r, sp)
+            noetig = combo.sizeHint().width()
+            laengster = max(combo.fontMetrics().horizontalAdvance(combo.itemText(i))
+                            for i in range(combo.count()))
+            assert noetig > laengster
+            assert kopf.sectionSize(sp) >= noetig, (r, sp, kopf.sectionSize(sp), noetig)
+            assert combo.width() >= noetig, (r, sp, combo.width(), noetig)
+
+
+@pytest.mark.parametrize("skala", [1.0, 1.25, 1.5])
+@pytest.mark.parametrize("breite", [737, 300])
+def test_quelle_und_ziel_ganz_lesbar(tmp_path, skala, breite):
+    # Windows-Gegenprobe D: ResizeToContents mass nur den Kopftext, die
+    # Auswahlfelder zeigten „Art-N", „E:" bzw. „G". Wie in der App mit dem
+    # Theme des Hauptfensters (Polster im QComboBox-Stil).
+    app = _app()
+    from PySide6.QtWidgets import QVBoxLayout, QWidget
+    from src.ui.widgets.dmx_fernsteuerung_box import FernsteuerungBox
+    fenster = QWidget()
+    # Das Theme setzt font-size: 12px fest; groessere Schrift (Windows-
+    # Textskalierung) daher ueber dieselbe Regel. QT_SCALE_FACTOR allein
+    # aendert die logischen Masse nicht.
+    fenster.setStyleSheet(
+        (ROOT / "assets" / "themes" / "dark.qss").read_text(encoding="utf-8")
+        + f"\nQWidget {{ font-size: {round(12 * skala)}px; }}\n")
+    box = FernsteuerungBox(fenster, pfad=str(tmp_path / "fs.json"))
+    QVBoxLayout(fenster).addWidget(box)
+    try:
+        # Wie der Bediener: Dialog offen, dann „+ Zuordnung" - die Spalte
+        # wurde beim Einfuegen der Zeile gemessen, noch ohne Auswahlfeld.
+        fenster.resize(breite, 420)
+        fenster.show()
+        app.processEvents()
+        for ziel in (ZIEL_FADER, ZIEL_GO, ZIEL_GM):
+            box.zeile_hinzu(Zuordnung(ziel=ziel))
+            app.processEvents()
+        _auswahl_lesbar(box)
+        kopf = box.tabelle.horizontalHeader()
+        if kopf.length() > box.tabelle.viewport().width():
+            # zu eng: waagerecht rollen statt abschneiden
+            assert box.tabelle.horizontalScrollBar().maximum() > 0
+        if breite < 400:
+            assert kopf.length() > box.tabelle.viewport().width()
+    finally:
+        fenster.close()
+        fenster.deleteLater()
 
 
 def test_ausgabe_dialog_hat_die_tabelle(tmp_path, monkeypatch):

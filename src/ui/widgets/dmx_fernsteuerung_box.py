@@ -5,6 +5,7 @@ Datenformat und Thread-Uebergabe stehen in :mod:`src.core.dmx.fernsteuerung`.
 """
 from __future__ import annotations
 
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QGroupBox, QHBoxLayout,
     QHeaderView, QLabel, QPushButton, QSpinBox, QTableWidget, QVBoxLayout,
@@ -54,9 +55,16 @@ class FernsteuerungBox(QGroupBox):
         kopf = self.tabelle.horizontalHeader()
         kopf.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         # „GO (Weiter)" / „Executor-Fader" sollen lesbar bleiben, auch schmal.
+        # ResizeToContents misst nur Kopftext und Items, nicht die per
+        # setCellWidget gesetzten Auswahlfelder (Windows-Gegenprobe D: „Art-N",
+        # „E:", „G"). Deshalb feste Breite aus dem sizeHint der Combo mit
+        # allen Eintraegen; wird es zu eng, schrumpfen nur die Zahlenspalten,
+        # danach rollt die Tabelle waagerecht statt abzuschneiden.
         for sp in (SP_QUELLE, SP_ZIEL):
-            kopf.setSectionResizeMode(sp, QHeaderView.ResizeMode.ResizeToContents)
+            kopf.setSectionResizeMode(sp, QHeaderView.ResizeMode.Fixed)
+        self.tabelle.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tabelle.setMinimumHeight(130)
+        self._spalten_anpassen()
         lay.addWidget(self.tabelle)
 
         knoepfe = QHBoxLayout()
@@ -78,6 +86,38 @@ class FernsteuerungBox(QGroupBox):
         self.laden()
 
     # ── Tabelle ───────────────────────────────────────────────────────────
+
+    def _combo_breite(self, texte) -> int:
+        """sizeHint-Breite einer Combo mit diesen Eintraegen - gemessen als
+        Kind der Tabelle, damit Schrift und Stylesheet dieselben sind wie in
+        den Zellen."""
+        probe = QComboBox(self.tabelle)
+        probe.setVisible(False)
+        for _key, text in texte:
+            probe.addItem(text)
+        probe.ensurePolished()
+        breite = probe.sizeHint().width()
+        probe.setParent(None)
+        probe.deleteLater()
+        return breite
+
+    def _spalten_anpassen(self):
+        """Quelle/Ziel so breit wie Kopf und laengster Eintrag (mit Pfeil)."""
+        kopf = self.tabelle.horizontalHeader()
+        for sp, texte in ((SP_QUELLE, QUELLEN_TEXT), (SP_ZIEL, ZIELE_TEXT)):
+            breite = max(self._combo_breite(texte), kopf.sectionSizeHint(sp))
+            for r in range(self.tabelle.rowCount()):
+                w = self.tabelle.cellWidget(r, sp)
+                if w is not None:
+                    breite = max(breite, w.sizeHint().width())
+            # Die Zelle ist um die Gitterlinie schmaler als die Spalte.
+            kopf.resizeSection(sp, breite + (1 if self.tabelle.showGrid() else 0))
+
+    def changeEvent(self, ev):
+        super().changeEvent(ev)
+        if (ev.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange)
+                and getattr(self, "tabelle", None) is not None):
+            self._spalten_anpassen()
 
     def zeile_hinzu(self, z: Zuordnung) -> int:
         r = self.tabelle.rowCount()
@@ -109,6 +149,7 @@ class FernsteuerungBox(QGroupBox):
             self.tabelle.setCellWidget(r, sp, w)
         ziel.currentIndexChanged.connect(lambda _i, w=ziel: self._ziel_geaendert(w))
         self._felder_schalten(r)
+        self._spalten_anpassen()
         return r
 
     def _ziel_geaendert(self, combo):
