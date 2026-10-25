@@ -161,6 +161,15 @@ class TestDoku:
         assert "Der Installer bricht in diesem Fall ab" in text
         assert "brechen aber nicht ab" not in text
 
+    def test_install_md_no_venv_satz_nennt_die_ausnahme(self):
+        # Gegenpruefung XPLAT-56: mit --arm64-trotzdem laeuft auch --no-venv
+        # mit ARM64-Python durch (nur Warnung) - "bricht immer ab" waere falsch.
+        text = " ".join(_text("INSTALL.md").split())
+        assert "bricht immer ab" not in text
+        satz = next(s for s in text.split(". ")
+                    if "`--no-venv` mit ARM64-Python" in s)
+        assert "--arm64-trotzdem" in satz, satz
+
     def test_install_md_tabelle_gibt_keine_freigabe(self):
         # Gegenpruefung: "OK" neben "instabil" wirkt wie eine Freigabe - die
         # Abstuerze liegen in nativem Code (PySide6/shiboken6, numpy ...).

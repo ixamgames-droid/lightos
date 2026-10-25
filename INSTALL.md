@@ -89,7 +89,8 @@ starten trotzdem. Massgeblich ist das Python, mit dem LightOS danach laeuft:
 bleibt ein vorhandenes x64-`venv` stehen, laeuft install.py auch mit
 ARM64-Python durch (das `venv` wird dann nicht neu angelegt); ein x64-Installer
 bricht ab, wenn ein vorhandenes ARM64-`venv` nicht neu angelegt werden darf
-(Rueckfrage mit Nein). `--no-venv` mit ARM64-Python bricht immer ab.
+(Rueckfrage mit Nein). `--no-venv` mit ARM64-Python bricht ab (ausser mit dem
+Test-Schalter `--arm64-trotzdem`, s. u.).
 `python-rtmidi` baut dort nur mit den MSVC Build Tools
 (https://visualstudio.microsoft.com/visual-cpp-build-tools/, "Desktop
 Development with C++") - ohne sie laeuft MIDI ueber den eingebauten WinMM-Weg.
