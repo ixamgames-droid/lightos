@@ -60,7 +60,8 @@ Both write to the same file `universes.json` in the LightOS data folder
 
 The **DMX-Eingang** tab is not part of the output: there LightOS receives DMX from
 outside (Art-Net on port 6454, sACN on port 5568) and mixes it into a universe of its
-own.
+own. Receiving triggers a firewall prompt once on Windows — see
+[Receiving DMX: the firewall prompt](#receiving-dmx-the-firewall-prompt).
 
 ## 2. ENTTEC DMX USB Pro
 
@@ -473,6 +474,39 @@ choose the right **Netzwerkkarte:** in step 3.
 
 More about Art-Net (port 6454, universe numbers): [ARTNET.md](../ARTNET.md) (German).
 Basics of DMX and universes: [DMX_PROTOCOL.md](../DMX_PROTOCOL.md) (German).
+
+## Receiving DMX: the firewall prompt
+
+Sending needs no permission, **receiving** does. As soon as you switch on the Art-Net or
+sACN input (or the **Fernsteuerung**, remote control) in the **DMX-Eingang** tab, LightOS
+listens on UDP 6454 (Art-Net) or 5568 (sACN).
+
+- **Windows** then asks once with a "Windows Security Alert" whether `LightOS.exe` may
+  receive data from the network. LightOS announces this beforehand: a note sits at the top
+  of the tab, and the first tick shows a short window once. For a console on the same
+  network: **Allow** (private network). Without permission only what is sent on this
+  computer itself arrives. Every answer creates a rule in Windows — you can change it under
+  Windows Security → Firewall & network protection → "Allow an app through firewall".
+- **Linux** does not ask. If a firewall is active (e.g. `ufw`), it blocks silently;
+  `sudo ufw status` shows whether it is running.
+- **macOS** asks on the first incoming data if its firewall is switched on.
+
+LightOS itself changes nothing in the firewall.
+
+**Empfangen auf:** (receive on, at the top of the **DMX-Eingang** tab) sets where LightOS
+listens. The choice applies to the Art-Net and sACN input and the remote control together,
+takes effect immediately and is saved on this computer:
+
+| Choice | What arrives | Windows prompt |
+|---|---|---|
+| **Alle Netzwerkkarten (Vorgabe)** (all network cards, default) | everything, as before | yes |
+| one network card, e.g. `eth1 — 192.0.2.10` | only what comes in through this card; sACN joins its multicast groups there | yes |
+| **Nur dieser Rechner (127.0.0.1)** (this computer only) | only a second program on the same computer; sACN only as unicast to `127.0.0.1` | no |
+
+If **nothing at all** arrives for 5 seconds after switching on, the input's status line
+(and the Mitschnitt assistant) names the firewall as a possible cause and says where to
+check the permission. If something arrived before, it is not the firewall.
+In detail for Windows: [Netzwerk vorbereiten (Windows)](../anleitung_netzwerk_windows/ANLEITUNG.md) (German).
 
 ## Further reading
 
