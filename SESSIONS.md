@@ -34,7 +34,6 @@
 | QA-101 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:53Z | backlog.d/QA-101.md |
 | QA-102 | D | fix/qa99-windows-offscreen-schriften | 2026-10-18T21:54Z | backlog.d/QA-102.md |
 | ENG-42 | A | feat/eng42-laeufer-dunkle-lampen-durchlassen | 2026-10-25T12:03Z | - |
-| SAMMEL-BACKLOG-1020 | A | chore/backlog-befunde-d-1020 | 2026-10-25T13:10Z | backlog.d/* |
 | UI-103 | A | fix/ui103-probenmodus-balken-unterreiter | 2026-10-25T12:03Z | - |
 | UI-104 | A | fix/ui104-bibliothek-knopfzeile | 2026-10-25T12:03Z | - |
 | UI-100 | A | fix/ui100-englische-reste | 2026-10-25T12:04Z | - |
@@ -97,7 +96,6 @@
 
 ## Verlauf
 
-- 2026-10-20T16:56Z D done OUT-76
 - 2026-10-20T16:57Z A claim SAMMEL-VERLOREN-1020
 - 2026-10-20T17:07Z A done IMP-4
 - 2026-10-20T17:45Z A done FM-77
@@ -127,3 +125,4 @@
 - 2026-10-25T13:10Z A aktualisiert PROC-25: Dateien tools/session_claim.py -> tools/session_claim.py · tools/backlog_ids.py · tools/pr_bereit.py · COORDINATION.md
 - 2026-10-25T13:11Z A done ENG-43
 - 2026-10-25T13:14Z D claim LIZ-4
+- 2026-10-25T13:15Z A done SAMMEL-BACKLOG-1020
