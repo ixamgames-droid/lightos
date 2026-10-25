@@ -170,12 +170,19 @@ class EmpfangsBox(QGroupBox):
         if laeuft:
             self.vorwarnen()        # neu binden auf eine Karte fragt Windows
         gespeichert = ea.speichere(wahl, self._pfad)
-        neu = ea.anwenden(wahl, rx.get("artnet"), rx.get("sacn"))
+        fehler: dict = {}
+        neu = ea.anwenden(wahl, rx.get("artnet"), rx.get("sacn"), fehler=fehler)
         self._hinweis_zeigen()
         teil = "(gespeichert)" if gespeichert else "(NICHT gespeichert!)"
         text = f"Empfang: {ea.beschreibung(wahl)} {teil}."
         if neu:
             text += " Laufender Empfang neu gestartet."
+        if fehler:
+            namen = {"artnet": "Art-Net", "sacn": "sACN"}
+            teile = "; ".join(f"{namen.get(k, k)}: {v}"
+                              for k, v in fehler.items())
+            text += (f"{MARKE}Neustart gescheitert — kein Empfang ({teile}). "
+                     "Andere Adresse wählen oder Karte anschließen.")
         self.lbl_status.setText(text)
 
     # ── Hinweis ───────────────────────────────────────────────────────────
@@ -238,17 +245,22 @@ class EmpfangsBox(QGroupBox):
             rx = rx_alle.get(p)
             if rx is None:
                 continue
+            # Erst ein bekannter Fehler (Karte fehlt, Bind gescheitert) —
+            # sonst zeigte der Firewall-Hinweis in die falsche Richtung.
+            fehler = getattr(rx, "letzter_fehler", "")
+            if fehler and not rx.is_running():
+                return (f"Empfang konnte nicht starten ({fehler}). Ist die "
+                        "gewählte Netzwerkkarte da, und nutzt kein anderes "
+                        "Programm den Port allein?")
+            if fehler:
+                return (f"Empfang gestört: {fehler}. Karte anschließen oder "
+                        "unter „Empfangen auf“ eine andere wählen.")
             if nh.empfaenger_ohne_empfang(rx, jetzt):
                 start = getattr(rx, "gestartet_um", None)
                 seit = jetzt - (jetzt if start is None else start)
                 return nh.kein_empfang_text(
                     getattr(rx, "host", None), sekunden=seit,
                     sys_platform=self._plattform)
-            fehler = getattr(rx, "letzter_fehler", "")
-            if fehler and not rx.is_running():
-                return (f"Empfang konnte nicht starten ({fehler}). Ist die "
-                        "gewählte Netzwerkkarte da, und nutzt kein anderes "
-                        "Programm den Port allein?")
         return ""
 
     def pruefen(self, jetzt: float | None = None) -> None:

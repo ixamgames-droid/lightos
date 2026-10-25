@@ -45,6 +45,10 @@ class ArtNetReceiver:
         self.letztes_paket_um: float | None = None
         self.pakete = 0
         self.letzter_fehler: str = ""
+        # Letzter Start gewollt, aber am Binden gescheitert -> ein Wahlwechsel
+        # (neu_binden) versucht es erneut, statt still aus zu bleiben.
+        self.start_gescheitert = False
+        self._eigene_ips: frozenset = frozenset()
 
     def start(self, host: str | None = None, port: int | None = None,
               wahl: str | None = None):
@@ -68,6 +72,7 @@ class ArtNetReceiver:
             self._absender_netz = None
         self.wahl = w
         self.letzter_fehler = ""
+        self._port = int(port)
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -92,8 +97,15 @@ class ArtNetReceiver:
             except Exception:
                 pass
             self._sock = None
+            self.start_gescheitert = True
             return
+        self.start_gescheitert = False
         self.host, self._port = host, int(port)
+        self._eigene_ips = ea.eigene_ips()
+        if ea.karte_vorhanden(w) is False:
+            # Linux/macOS binden dann trotzdem (0.0.0.0) — sagen, warum nichts
+            # kommt, statt nach 5 s auf die Firewall zu zeigen.
+            self.letzter_fehler = ea.karte_fehlt_text(w)
         self.gestartet_um = time.monotonic()
         self.letztes_paket_um = None
         self.pakete = 0
@@ -107,6 +119,7 @@ class ArtNetReceiver:
 
     def stop(self):
         self._running = False
+        self.start_gescheitert = False
         if self._sock:
             try:
                 self._sock.close()
@@ -132,14 +145,18 @@ class ArtNetReceiver:
 
     def neu_binden(self, wahl: str) -> bool:
         """OUT-79: laufenden Empfang an eine andere Empfangsadresse binden.
-        Zuhoerer und Merge-Zuordnung bleiben. ``False``, wenn er nicht lief
-        (dann gilt die Wahl beim naechsten Start)."""
+        Zuhoerer und Merge-Zuordnung bleiben. Ist der letzte Start an der
+        vorigen Wahl gescheitert, wird mit der neuen erneut gestartet.
+        Liefert, ob er danach WIRKLICH laeuft; ``False`` ohne Startversuch,
+        wenn er nicht lief (dann gilt die Wahl beim naechsten Start)."""
         if not self.is_running():
-            return False
-        port = self._port
-        self.stop()
-        self.start(port=port, wahl=wahl)
-        return True
+            if not self.start_gescheitert:
+                self.letzter_fehler = ""   # alter Fehler gilt fuer alte Wahl
+                return False
+        else:
+            self.stop()
+        self.start(port=self._port, wahl=wahl)
+        return self.is_running()
 
     def is_running(self) -> bool:
         # NET-06: nicht nur das Flag pruefen — ein ueber `break` gestorbener RX-Thread
@@ -221,6 +238,17 @@ class ArtNetReceiver:
 
     # ── Loop ─────────────────────────────────────────────────────────────────
 
+    def _ist_echo(self, addr) -> bool:
+        """Paket der eigenen Art-Net-Ausgabe (eigene Adresse + Quell-Port
+        eines eigenen Senders)? Nur fuer die Empfangs-Diagnose (OUT-79)."""
+        if not addr or len(addr) < 2:
+            return False
+        from src.core.dmx.artnet import eigene_quellports
+        if addr[1] not in eigene_quellports():
+            return False
+        from src.core.dmx.empfangsadresse import ist_eigene_adresse
+        return ist_eigene_adresse(addr[0], self._eigene_ips)
+
     def _loop(self):
         while self._running and self._sock is not None:
             try:
@@ -230,10 +258,13 @@ class ArtNetReceiver:
                     from src.core.dmx.empfangsadresse import absender_passt
                     if not absender_passt(netz, addr[0] if addr else None):
                         continue   # OUT-79: nicht aus dem Netz der Karte
-                # OUT-79: jedes Paket zaehlt — „seit dem Einschalten kam gar
-                # nichts" ist der Fingerabdruck einer blockierenden Firewall.
-                self.letztes_paket_um = time.monotonic()
-                self.pakete += 1
+                # OUT-79: jedes fremde Paket zaehlt — „seit dem Einschalten kam
+                # gar nichts" ist der Fingerabdruck einer blockierenden Firewall.
+                # Das Echo der eigenen Art-Net-Ausgabe (Broadcast kommt lokal
+                # zurueck) zaehlt nicht, es kommt auch bei Firewall-Sperre an.
+                if not self._ist_echo(addr):
+                    self.letztes_paket_um = time.monotonic()
+                    self.pakete += 1
                 if len(data) < 18 or data[:8] != ARTNET_HEADER:
                     continue
                 opcode = struct.unpack("<H", data[8:10])[0]

@@ -263,3 +263,50 @@ def test_mitschnitt_status_nennt_firewall(monkeypatch):
     assert "Firewall" not in D.MitschnittDialog._status_text(ns, M.ARTNET, bild)
     # Gegenprobe: Empfänger ohne Zeitstempel (nicht gestartet) -> nichts
     assert "Firewall" not in D.MitschnittDialog._status_text(ns, M.SACN, bild)
+
+
+# ── Gegenprüfung ──────────────────────────────────────────────────────────
+
+class _ScheiterndRx(_Rx):
+    """Läuft, aber der Neustart auf die neue Wahl scheitert (Karte fehlt)."""
+    start_gescheitert = False
+
+    def neu_binden(self, wahl):
+        self.laeuft = False
+        self.start_gescheitert = True
+        self.letzter_fehler = f"{wahl}:6454 — WSAEADDRNOTAVAIL"
+        return False
+
+
+def test_gescheiterter_neustart_ist_keine_erfolgsmeldung(tmp_path, prefs, fenster):
+    rx = {"artnet": _ScheiterndRx(laeuft=True, gestartet_um=0.0), "sacn": _Rx()}
+    box, _ = _box(tmp_path, plattform="win32", rx=rx)
+    box.combo_adresse.setCurrentIndex(box.combo_adresse.findData("192.0.2.10"))
+    text = box.lbl_status.text()
+    assert "neu gestartet" not in text
+    assert "Neustart gescheitert" in text and "Art-Net" in text
+    assert "WSAEADDRNOTAVAIL" in text
+
+
+def test_vorwarnung_beim_wechsel_auf_karte_nur_mit_laufendem_empfang(
+        tmp_path, prefs, fenster):
+    # Gegenprobe zuerst: nichts läuft -> der Wechsel fragt Windows nicht
+    box, _ = _box(tmp_path, plattform="win32")
+    box.combo_adresse.setCurrentIndex(box.combo_adresse.findData("192.0.2.10"))
+    assert fenster == []
+    ea.speichere(ea.ALLE, str(tmp_path / "f.json"))
+    rx = {"artnet": _Rx(laeuft=True, gestartet_um=0.0), "sacn": _Rx()}
+    box2, _ = _box(tmp_path, plattform="win32", rx=rx)
+    box2.combo_adresse.setCurrentIndex(box2.combo_adresse.findData("192.0.2.10"))
+    assert len(fenster) == 1 and fenster[0].startswith("Windows fragt gleich")
+
+
+def test_bekannter_fehler_geht_vor_firewall_hinweis(tmp_path, prefs):
+    rx = {"artnet": _Rx(laeuft=True, gestartet_um=0.0), "sacn": _Rx()}
+    rx["artnet"].letzter_fehler = ea.karte_fehlt_text("192.0.2.10")
+    box, _ = _box(tmp_path, plattform="linux", rx=rx, uhr=lambda: 60.0)
+    text = box.meldung(("artnet",))
+    assert "nicht gefunden" in text and "Firewall" not in text
+    # Gegenprobe: ohne Fehler nach der Frist -> Firewall (ufw)
+    rx["artnet"].letzter_fehler = ""
+    assert "ufw" in box.meldung(("artnet",))

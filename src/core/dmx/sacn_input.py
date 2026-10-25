@@ -51,6 +51,7 @@ class SACNReceiver:
         self.letztes_paket_um: float | None = None
         self.pakete = 0
         self.letzter_fehler: str = ""
+        self.start_gescheitert = False   # s. ArtNetReceiver (OUT-79)
 
     def start(self, universes: list[int] | None = None,
               host: str | None = None, port: int | None = None,
@@ -82,6 +83,7 @@ class SACNReceiver:
         self.wahl = w
         self.letzter_fehler = ""
         self._universen_soll = []
+        self._port = int(port)
         try:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -104,8 +106,14 @@ class SACNReceiver:
                 pass
             self._sock = None
             self._joined_universes.clear()
+            # Universen trotzdem merken: ein Wahlwechsel startet damit neu.
+            self._universen_soll = [int(u) for u in universes]
+            self.start_gescheitert = True
             return
+        self.start_gescheitert = False
         self.host, self._port = host, int(port)
+        if ea.karte_vorhanden(w) is False:
+            self.letzter_fehler = ea.karte_fehlt_text(w)
         self.gestartet_um = time.monotonic()
         self.letztes_paket_um = None
         self.pakete = 0
@@ -119,6 +127,7 @@ class SACNReceiver:
 
     def stop(self):
         self._running = False
+        self.start_gescheitert = False
         if self._sock:
             try:
                 # Leave multicast groups (best effort)
@@ -165,15 +174,20 @@ class SACNReceiver:
 
     def neu_binden(self, wahl: str) -> bool:
         """OUT-79: laufenden Empfang an eine andere Empfangsadresse binden.
-        Zuhoerer, Merge-Zuordnung und Universen bleiben. ``False``, wenn er
-        nicht lief (dann gilt die Wahl beim naechsten Start)."""
+        Zuhoerer, Merge-Zuordnung und Universen bleiben. Ist der letzte Start
+        an der vorigen Wahl gescheitert, wird mit der neuen erneut gestartet.
+        Liefert, ob er danach WIRKLICH laeuft; ``False`` ohne Startversuch,
+        wenn er nicht lief (dann gilt die Wahl beim naechsten Start)."""
         if not self.is_running():
-            return False
+            if not self.start_gescheitert:
+                self.letzter_fehler = ""   # alter Fehler gilt fuer alte Wahl
+                return False
         universen = list(self._universen_soll) or [1]
         port = self._port
-        self.stop()
+        if self.is_running():
+            self.stop()
         self.start(universes=universen, port=port, wahl=wahl)
-        return True
+        return self.is_running()
 
     def _join_universe(self, universe: int):
         if self._sock is None:
@@ -189,6 +203,13 @@ class SACNReceiver:
             self._joined_universes.append(universe)
         except Exception as e:
             print(f"[sACN-In] multicast join error for U{universe}: {e}")
+            from src.core.dmx import empfangsadresse as ea
+            if ea.ist_karte(self._mc_iface or ""):
+                # OUT-79: Beitritt ueber die gewaehlte Karte gescheitert —
+                # sichtbar machen statt spaeter die Firewall zu verdaechtigen.
+                self.letzter_fehler = (
+                    f"Multicast-Beitritt über {self._mc_iface} gescheitert "
+                    f"(U{universe}: {e})")
 
     def join_universe(self, universe: int):
         """Spaeter weitere Multicast Group joinen."""
@@ -273,8 +294,11 @@ class SACNReceiver:
                     from src.core.dmx.empfangsadresse import absender_passt
                     if not absender_passt(netz, _addr[0] if _addr else None):
                         continue   # OUT-79: nicht aus dem Netz der Karte
-                self.letztes_paket_um = time.monotonic()   # OUT-79
-                self.pakete += 1
+                # OUT-79: das Echo der eigenen sACN-Ausgabe (Multicast-Loop,
+                # erkennbar an der eigenen CID) zaehlt nicht als Empfang.
+                if not self._ist_echo(data):
+                    self.letztes_paket_um = time.monotonic()
+                    self.pakete += 1
                 parsed = self._parse(data)
                 if parsed is None:
                     continue
@@ -305,6 +329,12 @@ class SACNReceiver:
                     print(f"[sACN-In] loop error: {e}")
                 self._running = False   # NET-06
                 break
+
+    @staticmethod
+    def _ist_echo(data: bytes) -> bool:
+        from src.core.dmx.sacn_source import eigene_cid
+        cid = eigene_cid()
+        return cid is not None and len(data) >= 38 and bytes(data[22:38]) == cid
 
     @staticmethod
     def _parse_kopf(packet: bytes) -> tuple[str, int, bool] | None:

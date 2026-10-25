@@ -267,6 +267,14 @@ def sacn_cid() -> bytes:
     return sacn_source().cid
 
 
+def eigene_cid() -> bytes | None:
+    """CID dieses Prozesses, NUR wenn hier schon eine Quelle besteht (sonst
+    ``None``, ohne die CID-Datei anzulegen). Für den Echo-Filter des
+    sACN-Eingangs (OUT-79): ohne Quelle sendet LightOS auch kein sACN."""
+    s = _source
+    return None if s is None else s.cid
+
+
 def reset_for_tests() -> None:
     """Verwirft die Prozess-Quelle — simuliert einen Neustart der Anwendung.
 

@@ -7,6 +7,16 @@ ARTNET_HEADER = b"Art-Net\x00"
 OPCODE_DMX = 0x5000
 ARTNET_VERSION = 14
 
+#: OUT-79: Quell-Ports der eigenen Sender. Der Art-Net-Eingang bekommt die
+#: eigene Broadcast-Ausgabe zurück (das System liefert Broadcasts auch lokal
+#: aus) — die darf nicht als „es kommt etwas an“ zählen, sonst schwiege der
+#: Firewall-Hinweis gerade im Normalfall (Ausgabe an, Pult blockiert).
+_eigene_quellports: set[int] = set()
+
+
+def eigene_quellports() -> frozenset:
+    return frozenset(_eigene_quellports)
+
 
 def _build_artdmx(universe: int, data: bytes, sequence: int) -> bytes:
     length = len(data)
@@ -41,14 +51,31 @@ class ArtNetSender:
         from src.core.dmx.output_iface import bind_to_output_iface
         bind_to_output_iface(self._sock)
         self._sequence = 0
+        self._quellport: int | None = None
 
     def send_dmx(self, universe: int, data: bytes):
         """Sendet ein ArtDmx Paket. universe = 0-32767, data = 2-512 Bytes."""
         self._sequence = (self._sequence % 255) + 1
         packet = _build_artdmx(universe, data, self._sequence)
         self._sock.sendto(packet, (self.target_ip, ARTNET_PORT))
+        if self._quellport is None:
+            self._quellport_merken()
+
+    def _quellport_merken(self):
+        """Nach dem ersten Senden steht der (vom System gewählte) Quell-Port
+        fest — für den Echo-Filter des Eingangs (OUT-79)."""
+        try:
+            port = int(self._sock.getsockname()[1])
+        except (OSError, TypeError, ValueError, IndexError):
+            return
+        if port:
+            self._quellport = port
+            _eigene_quellports.add(port)
 
     def close(self):
+        if self._quellport is not None:
+            _eigene_quellports.discard(self._quellport)
+            self._quellport = None
         self._sock.close()
 
     def __enter__(self):

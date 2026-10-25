@@ -630,6 +630,10 @@ class MitschnittDialog(QDialog):
         Firewall als mögliche Ursache nennen — und wo man nachsieht."""
         from src.core import netz_hinweis as nh
         rx = self._leser.empfaenger().get(protokoll)
+        fehler = getattr(rx, "letzter_fehler", "") if rx is not None else ""
+        if fehler and isinstance(fehler, str):
+            # Bekannte Ursache (Karte fehlt, Bind gescheitert) vor der Firewall
+            return f" — Empfang gestört: {fehler}."
         if rx is None or not nh.empfaenger_ohne_empfang(rx):
             return ""
         seit = time.monotonic() - (getattr(rx, "gestartet_um", None) or 0.0)

@@ -110,6 +110,50 @@ def _netzmaske(ip: str) -> str | None:
     return None
 
 
+def karte_vorhanden(wahl: str, liste=None) -> bool | None:
+    """Gibt es die gewählte Karte auf diesem Rechner? ``None`` = unbekannt
+    (Liste nicht lesbar) oder keine Karte gewählt. Unter Linux/macOS bindet
+    der Empfang bei fehlender Karte trotzdem (an 0.0.0.0) — ohne diese
+    Prüfung stünde später der Firewall-Hinweis da statt „Karte fehlt“."""
+    w = normiere(wahl)
+    if not w or ist_lokal(w):
+        return None
+    try:
+        if liste is None:
+            from src.core.dmx.output_iface import list_output_interfaces
+            liste = list_output_interfaces()
+        ips = {e.get("ip") for e in liste}
+    except Exception:
+        return None
+    if not ips:
+        return None
+    return w in ips
+
+
+def karte_fehlt_text(wahl: str) -> str:
+    return (f"Netzwerkkarte {normiere(wahl)} nicht gefunden — über sie kommt "
+            "nichts an")
+
+
+def eigene_ips() -> frozenset:
+    """Adressen dieses Rechners (Karten + Loopback) — um das Echo der eigenen
+    Ausgabe von echtem Empfang zu trennen. Leer = unbekannt."""
+    try:
+        from src.core.dmx.output_iface import list_output_interfaces
+        return frozenset(e.get("ip") for e in list_output_interfaces()
+                         if e.get("ip"))
+    except Exception:
+        return frozenset()
+
+
+def ist_eigene_adresse(absender, ips: frozenset) -> bool:
+    try:
+        adr = ipaddress.IPv4Address(str(absender))
+    except (ipaddress.AddressValueError, ValueError):
+        return False
+    return adr.is_loopback or str(adr) in ips
+
+
 def absender_netz(wahl: str, plattform: str | None = None,
                   netzmaske=None) -> ipaddress.IPv4Network | None:
     """Unter Linux/macOS mit gewählter Karte: nur Absender aus diesem Netz
@@ -188,9 +232,13 @@ def zuruecksetzen() -> None:
         _aktuell = None
 
 
-def anwenden(wahl: str, artnet_rx=None, sacn_rx=None) -> list[str]:
+def anwenden(wahl: str, artnet_rx=None, sacn_rx=None,
+             fehler: dict | None = None) -> list[str]:
     """Wahl setzen und laufende Empfänger neu binden (Merges, Zuhörer und
-    sACN-Universen bleiben). Liefert die neu gebundenen Protokolle."""
+    sACN-Universen bleiben). Ein Empfänger, dessen letzter Start an der
+    vorigen Wahl gescheitert ist, wird mit der neuen Wahl erneut gestartet.
+    Liefert die Protokolle, die danach WIRKLICH laufen; gescheiterte
+    Neustarts landen mit ihrem Fehlertext in ``fehler``."""
     w = setze(wahl)
     if artnet_rx is None:
         from src.core.dmx.artnet_input import get_artnet_receiver
@@ -201,8 +249,14 @@ def anwenden(wahl: str, artnet_rx=None, sacn_rx=None) -> list[str]:
     neu = []
     for name, rx in (("artnet", artnet_rx), ("sacn", sacn_rx)):
         try:
+            gewollt = rx.is_running() or bool(
+                getattr(rx, "start_gescheitert", False))
             if rx.neu_binden(w):
                 neu.append(name)
+            elif gewollt and fehler is not None:
+                fehler[name] = getattr(rx, "letzter_fehler", "") or "?"
         except Exception as e:
             print(f"[empfangsadresse] {name}: {e}")
+            if fehler is not None:
+                fehler[name] = str(e)
     return neu
