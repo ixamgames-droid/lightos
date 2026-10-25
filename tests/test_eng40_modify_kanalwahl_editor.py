@@ -240,10 +240,10 @@ def test_vorschau_zeigt_die_betroffenen_kanaele(ansicht):
     m.modify_mode = "dim"
     schraffiert = farben()
     assert (200, 200, 200) in schraffiert and (13, 17, 23) in schraffiert
-    assert vorschau.modify_eckentext() == "× nur Rot, Weiß"
+    assert vorschau.modify_eckentext() == "◐ nur Rot, Weiß"
     # Stil Dimmer: die Auswahl wirkt nicht und steht nicht in der Ecke.
     from src.core.engine.rgb_matrix import MatrixStyle
     m.style = MatrixStyle.DIMMER
-    assert vorschau.modify_eckentext() == "×"
+    assert vorschau.modify_eckentext() == "◐"
     m.modify = False
     assert vorschau.modify_eckentext() == ""
