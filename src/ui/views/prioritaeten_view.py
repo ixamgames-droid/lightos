@@ -6,6 +6,12 @@ Programmers: die liegen immer ueber allen Stufen und lassen sich nicht
 einsortieren. Je Zeile: Name, Art, was der Effekt anfasst (Dimmer / Farbe /
 Bewegung / Gobo) und ob er gerade laeuft.
 
+ENG-35 Schritt 4: die Spalte „Verdeckt“ sagt live, ob ein laufender Effekt
+wirklich ankommt — „verdeckt von X auf n Geräten“, wenn ein anderer Effekt,
+eine Cueliste, der Programmer oder eine Snap-Taste darueber liegt. Das
+Protokoll dafuer (``FunctionManager.wer_gewinnt_anfordern``) laeuft nur,
+solange der Reiter zu sehen ist.
+
 Die Stufe aendert man durch Ziehen in eine andere Stufe, ueber „Stufe höher /
 tiefer“, ueber das Auswahlfeld oder per Rechtsklick — auch fuer mehrere Zeilen
 auf einmal. Jede Aenderung ist ein Rueckgaengig-Schritt.
@@ -36,9 +42,23 @@ from src.ui.widgets.stufe_auswahl import (StufeAuswahl, setze_stufen,
 
 _ROLLE_FID = Qt.ItemDataRole.UserRole          # Funktions-ID einer Effekt-Zeile
 _ROLLE_ZAHL = Qt.ItemDataRole.UserRole + 1     # Zahl einer Stufen-Zeile
-_SPALTEN = ("Effekt", "Art", "Fasst an", "Zustand")
+_SPALTEN = ("Effekt", "Art", "Fasst an", "Zustand", "Verdeckt")
+_SP_VERDECKT = 4
+WG_INTERVALL_MS = 333           # ENG-35 Schritt 4: 3 Hz, nur sichtbar
 _BERNSTEIN = QColor("#ffb000")
 _GRAU = QColor("#7d8590")
+_ROT = QColor("#ff7b72")
+
+
+def _wg_freigeben(fm, zustand: dict) -> None:
+    """Protokoll-Anforderung zurueckgeben (auch beim Zerstoeren der Ansicht,
+    darum ohne Verweis auf das Widget)."""
+    if zustand.get("an"):
+        zustand["an"] = False
+        try:
+            fm.wer_gewinnt_freigeben()
+        except Exception:
+            pass
 
 
 class _StufenBaum(QTreeWidget):
@@ -113,6 +133,15 @@ class PrioritaetenView(QWidget):
         self._vc_timer.setInterval(2000)
         self._vc_timer.timeout.connect(self._vc_takt)
         self._vc_timer.start()
+        # ENG-35 Schritt 4: „wer gewinnt“ — 3 Hz, nur solange sichtbar. Die
+        # Anforderung ist ein Zaehler am FunctionManager; beim Ausblenden und
+        # beim Zerstoeren der Ansicht wird sie zurueckgegeben.
+        self._wg_zustand = {"an": False}
+        self._wg_timer = QTimer(self)
+        self._wg_timer.setInterval(WG_INTERVALL_MS)
+        self._wg_timer.timeout.connect(self._wg_takt)
+        fm, zustand = self._fm, self._wg_zustand
+        self.destroyed.connect(lambda *_a: _wg_freigeben(fm, zustand))
 
         stufen_melder().geaendert.connect(self._melde_veraltet)
         try:
@@ -183,7 +212,7 @@ class PrioritaetenView(QWidget):
         # letzte Spalte („Zustand“) breit und teilt den Platz haelftig.
         kopfzeile.setStretchLastSection(False)
         kopfzeile.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for spalte in (1, 2, 3):
+        for spalte in (1, 2, 3, _SP_VERDECKT):
             kopfzeile.setSectionResizeMode(
                 spalte, QHeaderView.ResizeMode.ResizeToContents)
         root.addWidget(self._baum, 1)
@@ -191,7 +220,8 @@ class PrioritaetenView(QWidget):
         fuss = QLabel(
             "Zeilen in eine andere Stufe ziehen — oder auswählen und oben die "
             "Stufe setzen (Strg/Umschalt für mehrere). Die Stufe einer Sammlung, "
-            "eines Chasers oder einer Show gilt für alles, was darin läuft.")
+            "eines Chasers oder einer Show gilt für alles, was darin läuft. "
+            "„Verdeckt“ zeigt live, wer über einem laufenden Effekt liegt.")
         fuss.setWordWrap(True)
         fuss.setStyleSheet("color:#7d8590;")
         root.addWidget(fuss)
@@ -366,6 +396,63 @@ class PrioritaetenView(QWidget):
         self._vc_geaendert_pruefen()
         if self._veraltet:
             self._neu_timer.start()
+        self._wg_einschalten()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._wg_ausschalten()
+
+    # ── ENG-35 Schritt 4: wer gewinnt ─────────────────────────────────────────
+
+    def _wg_einschalten(self) -> None:
+        if not self._wg_zustand["an"]:
+            try:
+                self._fm.wer_gewinnt_anfordern()
+                self._wg_zustand["an"] = True
+            except Exception as e:
+                print(f"[prioritaeten_view] wer gewinnt: {e}")
+        if not self._wg_timer.isActive():
+            self._wg_timer.start()
+
+    def _wg_ausschalten(self) -> None:
+        self._wg_timer.stop()
+        _wg_freigeben(self._fm, self._wg_zustand)
+
+    def _wg_takt(self) -> None:
+        if not self.isVisible() or self.window().isMinimized():
+            # Minimiert: Protokoll abgeben, beim naechsten sichtbaren Takt wieder.
+            _wg_freigeben(self._fm, self._wg_zustand)
+            return
+        if not self._wg_zustand["an"]:
+            self._wg_einschalten()
+            return
+        self.verdeckt_nachziehen()
+
+    def verdeckt_nachziehen(self) -> None:
+        """Spalte „Verdeckt“ aus dem letzten Frame fuellen. Leer, wenn der
+        Effekt nicht laeuft, nichts schreibt oder ueberall ankommt."""
+        if self._veraltet:
+            return
+        try:
+            from src.core.app_state import get_state
+            patch = get_state().get_patched_fixtures()
+        except Exception:
+            patch = []
+        try:
+            ergebnisse = self._fm.wer_gewinnt(patch)
+        except Exception as e:
+            print(f"[prioritaeten_view] wer gewinnt: {e}")
+            ergebnisse = {}
+        for it in self._effekt_zeilen():
+            fid = it.data(0, _ROLLE_FID)
+            erg = ergebnisse.get(fid) if it.text(3) else None
+            text = erg.text() if erg is not None else ""
+            tipp = erg.tooltip() if erg is not None else it.toolTip(0)
+            if it.text(_SP_VERDECKT) != text:
+                it.setText(_SP_VERDECKT, text)
+                it.setForeground(_SP_VERDECKT, QBrush(_ROT))
+            if it.toolTip(_SP_VERDECKT) != tipp:
+                it.setToolTip(_SP_VERDECKT, tipp)
 
     def neu_aufbauen(self):
         """Liste aus den Funktionen neu bauen; Auswahl bleibt erhalten."""
