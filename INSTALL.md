@@ -431,6 +431,17 @@ liegen wie bei der Python-Installation in `%APPDATA%\LightOS` — der Programmor
 ist schreibgeschützt, LightOS schreibt dort nichts hin. Deinstallieren lässt die
 Daten deshalb stehen; ein späteres Setup findet sie wieder.
 
+**Firewall-Abfrage beim ersten Empfang:** Das Setup legt **keine** Firewall-Regel an.
+Schaltest du in LightOS zum ersten Mal einen Eingang ein, der aus dem Netzwerk empfängt
+(Art-Net-/sACN-Eingang, DMX-Fernsteuerung, Web-Remote), fragt Windows mit
+„Windows-Sicherheitswarnung“, ob `LightOS.exe` Daten aus dem Netzwerk empfangen darf.
+Beim DMX-Eingang kündigt LightOS das vorher an. Für ein Pult oder Handy im selben Netz: **Zulassen**
+(privates Netzwerk); ohne Freigabe kommt nur an, was auf diesem Rechner gesendet wird.
+Nachsehen und ändern: Windows-Sicherheit → Firewall- & Netzwerkschutz → „Zugriff von App
+durch Firewall zulassen“ → `LightOS.exe`. Details:
+[Ausgabe einrichten](docs/anleitung_ausgabe_einrichten/ANLEITUNG.md#dmx-empfangen-die-firewall-abfrage)
+und [Netzwerk vorbereiten (Windows)](docs/anleitung_netzwerk_windows/ANLEITUNG.md).
+
 **Windows auf ARM (Snapdragon):** Das Setup ist ein **x64-Paket**. Windows 11 auf ARM
 führt es in der x64-Emulation aus — **inklusive 3D-Visualizer** (QtWebEngine gibt es
 nur für x64, nicht in den nativen ARM64-Wheels, siehe XPLAT-45/46). Ein eigenes
@@ -548,6 +559,7 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | `python-rtmidi` Build-Fehler auf ARM64 | x64-Python nehmen (siehe oben) oder MSVC Build Tools installieren; MIDI geht auch ohne (WinMM-Weg) |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
 | "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
+| Art-Net-/sACN-Eingang: „Seit 5 s ist nichts angekommen … Firewall“ | Windows: Windows-Sicherheit → Firewall- & Netzwerkschutz → „Zugriff von App durch Firewall zulassen“ → bei `LightOS.exe` (aus den Quellen: `python.exe`) „Privat“ anhaken. Linux: `sudo ufw status`. Oder im Reiter **DMX Input** unter **Empfangen auf:** die richtige Karte wählen |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
 | uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber von Hand zuweisen (Windows; LightOS liefert und installiert keine Treiber) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |

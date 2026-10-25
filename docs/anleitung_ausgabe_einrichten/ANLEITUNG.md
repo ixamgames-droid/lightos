@@ -57,7 +57,8 @@ die Statusleiste.
 
 Der Reiter **DMX Input** gehört nicht zur Ausgabe: dort empfängt LightOS DMX von
 außen (Art-Net auf Port 6454, sACN auf Port 5568) und mischt es in ein eigenes
-Universum.
+Universum. Empfangen löst unter Windows einmal eine Firewall-Abfrage aus — siehe
+[DMX empfangen: die Firewall-Abfrage](#dmx-empfangen-die-firewall-abfrage).
 
 ## 2. ENTTEC DMX USB Pro
 
@@ -459,6 +460,40 @@ in Schritt 3 die richtige **Netzwerkkarte:**.
 
 Mehr zu Art-Net (Port 6454, Universumsnummern): [ARTNET.md](../ARTNET.md). Grundlagen zu
 DMX und Universen: [DMX_PROTOCOL.md](../DMX_PROTOCOL.md).
+
+## DMX empfangen: die Firewall-Abfrage
+
+Senden braucht keine Freigabe, **Empfangen** schon. Sobald du im Reiter **DMX Input**
+den Art-Net- oder sACN-Eingang (oder die **Fernsteuerung**) einschaltest, lauscht LightOS
+auf UDP 6454 (Art-Net) bzw. 5568 (sACN).
+
+- **Windows** fragt dann beim ersten Mal mit „Windows-Sicherheitswarnung“, ob
+  `LightOS.exe` Daten aus dem Netzwerk empfangen darf. LightOS sagt das vorher an: oben
+  im Reiter steht ein Hinweis, und beim ersten Haken erscheint einmal ein kurzes
+  Fenster. Für ein Pult im selben Netz: **Zulassen** (privates Netzwerk). Ohne
+  Freigabe kommt nur an, was auf diesem Rechner selbst gesendet wird. Jede Antwort legt
+  in Windows eine Regel an — ändern lässt sie sich unter Windows-Sicherheit →
+  Firewall- & Netzwerkschutz → „Zugriff von App durch Firewall zulassen“.
+- **Linux** fragt nicht. Ist eine Firewall aktiv (z. B. `ufw`), blockiert sie still;
+  `sudo ufw status` zeigt, ob sie läuft.
+- **macOS** fragt beim ersten Empfang, sofern die Firewall eingeschaltet ist.
+
+LightOS ändert selbst nichts an der Firewall.
+
+**Empfangen auf:** (oben im Reiter **DMX Input**) legt fest, worauf LightOS lauscht. Die
+Wahl gilt für Art-Net- und sACN-Eingang und die Fernsteuerung gemeinsam, wird sofort
+wirksam und bleibt auf diesem Rechner gespeichert:
+
+| Wahl | Was ankommt | Windows-Abfrage |
+|---|---|---|
+| **Alle Netzwerkkarten (Vorgabe)** | alles, wie bisher | ja |
+| eine Netzwerkkarte, z. B. `eth1 — 192.0.2.10` | nur, was über diese Karte kommt; sACN tritt dort den Multicast-Gruppen bei | ja |
+| **Nur dieser Rechner (127.0.0.1)** | nur ein zweites Programm auf demselben Rechner; sACN nur als Unicast an `127.0.0.1` | nein |
+
+Kommt nach dem Einschalten **5 Sekunden lang gar nichts** an, ergänzt die Statuszeile des
+Eingangs (und der Mitschnitt-Assistent) die Firewall als mögliche Ursache und sagt, wo du
+die Freigabe nachsiehst. Kam vorher schon etwas an, ist es nicht die Firewall.
+Ausführlich für Windows: [Netzwerk vorbereiten (Windows)](../anleitung_netzwerk_windows/ANLEITUNG.md).
 
 ## Weiterlesen
 
