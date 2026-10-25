@@ -10,11 +10,14 @@ uebernimmt die Lied-BPM wie beim echten Play (``_apply_track_bpm``) — Musik-
 und BPM-Anzeige folgen ueber ihre echten Signale. Zu hoeren ist nichts, und
 nach dem Bild steht der Player wieder.
 
-Nebenbefund beim Bauen (DOC-16, 14.10.2026): ``MusicShowDirector.start_show``
-kehrt zurueck, wenn die GLOBALE Funktionsliste leer ist — und startet dann
-auch den Lied-Look des ersten Titels nicht (der Lied-Look kommt erst beim
-naechsten Trackwechsel). Das Bild zeigt deshalb bewusst keinen laufenden
-Effekt.
+Seit BPM-31 (20.10.2026) startet ``MusicShowDirector.start_show`` den
+Lied-Look des ersten Titels auch ohne globale Funktionsliste. ``_spielt``
+loest ihn ueber den angebundenen Director aus: im Bild laufen Farb-Lauflicht
+und Kreis (Zeile „Aktiver Effekt“), passend zu Schritt 2 der Anleitung, und
+das Tempo steht auf der Nominal-BPM des Titels (Fallback ``_ensure_bpm``,
+auch bei Quelle „Aus“). ``_stopp`` haelt danach alles wieder an. (Bis
+BPM-31 kam der Lied-Look erst beim naechsten Trackwechsel; das Bild zeigte
+deshalb keinen laufenden Effekt.)
 
 Die VC-Bank „Tempo & Musik“ legt ``szenen_vc.bank2_anlegen`` an.
 """

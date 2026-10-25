@@ -54,6 +54,7 @@ test_liz1_doku.py                  # LICENSE, README, INSTALL.md, docs/LIZENZ_UN
 test_liz2_rest_sammeldateien.py    # THIRD_PARTY_NOTICES.md, INSTALL.md, licenses/: Sammeldateien Qt WebEngine/Mesa, mido/winrt raus
 test_liz3_ueber_dialog_lgpl.py     # licenses/: „Über LightOS“ nennt die LGPL-Bibliotheken und zeigt auf die Lizenztexte
 test_xplat50_startskripte_arm.py   # INSTALL.md / Startskripte
+test_xplat51_arm64_nicht_unterstuetzt.py # INSTALL.md/README/CONTRIBUTING/DMX_PROTOCOL: ARM64 "nicht unterstuetzt"
 test_audit_bilder_stand.py
 test_audit_coverage_docs_exist.py
 test_anleitungsbilder.py           # u. a. jedes GIF unter docs/ <= 2 MB
@@ -112,3 +113,4 @@ test_tool1_verwaiste_werkzeuge.py
 !test_xplat20_werkzeuge_utf8.py    # eigene Wegwerf-Dateien im Temp-Ordner
 test_imp3_dialog_und_patch.py      # Anleitung Patch & Gruppen: Knopf „Tabellen-Import ▾“, Eingabetaste, doppelte Namen
 test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldungen beim Oeffnen (CDX-59)
+test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen

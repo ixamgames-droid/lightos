@@ -25,7 +25,7 @@ ZIELE_TEXT = [
     (ZIEL_BACK, "Zurück"),
     (ZIEL_STOP, "Stop"),
 ]
-SPALTEN = ["Quelle", "Universe", "Kanal", "Ziel", "Executor", "Schwelle %"]
+SPALTEN = ["Quelle", "Universum", "Kanal", "Ziel", "Executor", "Schwelle %"]
 SP_QUELLE, SP_UNIV, SP_KANAL, SP_ZIEL, SP_EXEC, SP_SCHWELLE = range(6)
 
 

@@ -410,7 +410,7 @@ class _GeneratorFall(unittest.TestCase):
             QTest.keyClicks(feld, text)
         dlg._cb_type.setCurrentText("matrix")
         tab = dlg._tabs.currentWidget()
-        knopf = _knopf(tab, "+ Channel")
+        knopf = _knopf(tab, "+ Kanal")
         for _ in range(4):
             QTest.mouseClick(knopf, Qt.MouseButton.LeftButton)
         felder = _geo_eingaben(tab)
@@ -435,7 +435,7 @@ class _GeneratorFall(unittest.TestCase):
         dlg._edit_name.setText(name)
         dlg._edit_short.setText(short_name)
         tab = dlg._tabs.currentWidget()
-        QTest.mouseClick(_knopf(tab, "+ Channel"), Qt.MouseButton.LeftButton)
+        QTest.mouseClick(_knopf(tab, "+ Kanal"), Qt.MouseButton.LeftButton)
         self._speichern_klicken(dlg, editor_module.__name__)
         return dlg
 

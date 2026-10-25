@@ -234,7 +234,7 @@ class UmzugTest(_MitKonfig):
     def test_die_universen_tabelle_zeigt_es_sofort(self):
         self._umziehen()
         tabelle = self.dlg._univ_table
-        stand = {tabelle.item(r, 0).text(): tabelle.cellWidget(r, 2).currentText()
+        stand = {tabelle.item(r, 0).text(): oc.ausgabe_typ_wert(tabelle.cellWidget(r, 2))
                  for r in range(tabelle.rowCount())}
         self.assertEqual(stand, {"1": "Enttec", "2": "Disabled"})
 
@@ -354,7 +354,7 @@ class DoppelterAdapterBeimLadenTest(_MitKonfig):
     def test_der_dialog_sagt_es_statt_eine_der_zeilen_als_gespeichert_zu_zeigen(self):
         dlg = self._dialog()
         text = dlg._lbl_enttec_status.text()
-        self.assertIn("Universe 1 und 2", text)
+        self.assertIn("Universum 1 und 2", text)
         self.assertIn("für keines", text)
         self.assertNotIn("Gespeichert:", text)
 
@@ -477,7 +477,7 @@ class UdmxDoppeltBeimLadenTest(_MitKonfig):
     def test_der_udmx_reiter_sagt_es(self):
         dlg = self._dialog()
         text = dlg._lbl_udmx_status.text()
-        self.assertIn("Universe 1 und 2", text)
+        self.assertIn("Universum 1 und 2", text)
         self.assertIn("für keines", text)
 
     def test_zwei_udmx_ohne_angabe_sind_derselbe_adapter(self):
@@ -589,7 +589,7 @@ class TabelleSpeichernTest(_MitKonfig):
         self.assertNotIn("Zwei Universen auf demselben Ziel", m.titel())
         text = next(t for _a, titel, t in m.liste
                     if titel == "Ein Adapter auf mehreren Universen")
-        self.assertIn("Universe 1 und 2", text)
+        self.assertIn("Universum 1 und 2", text)
         self.assertIn("KEINES", text)
 
     def test_nach_dem_speichern_sendet_der_adapter_auf_keinem_der_beiden(self):

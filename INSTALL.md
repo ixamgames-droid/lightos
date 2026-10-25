@@ -28,7 +28,7 @@ python install.py
 
 Das war's. Das Script:
 - Prueft Python-Version (>= 3.11)
-- Prueft Python-Architektur vs. OS-Architektur (auf Windows-ARM: x64-Python empfohlen, siehe unten)
+- Prueft Python-Architektur vs. OS-Architektur (auf Windows-ARM: x64-Python nehmen, natives ARM64-Python ist nicht unterstuetzt, siehe unten)
 - Erstellt `venv/`
 - Installiert Kern-Abhaengigkeiten + optionale Pakete separat
 - Legt App-Verzeichnisse an
@@ -77,9 +77,13 @@ fuehrt es per Emulation aus, und damit geht alles - auch der 3D-Visualizer.
   `venv` bestehen (und damit weiter kein 3D). Erkennt der Installer selbst, dass
   das `venv` eine andere Architektur hat, fragt er nach.
 
-**Natives ARM64-Python geht auch, aber ohne 3D-Visualizer.** Die ARM64-Pakete
-von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11, XPLAT-45);
-das Menue "3D-Visualizer" meldet dann "Visualizer nicht verfuegbar".
+**Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python
+nehmen.** Instabil: mit einem venv aus nativem ARM64-Python stuerzte LightOS in
+6 von 12 Starts nach rund 9 s mit Access Violation ab, an wechselnden Stellen
+(XPLAT-51); mit x64-Python und derselben PySide6-Version nie. Kein 3D: die
+ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11,
+XPLAT-45); das Menue "3D-Visualizer" meldet dann "Visualizer nicht verfuegbar".
+Installer und Startskripte warnen in diesem Fall deutlich, brechen aber nicht ab.
 `python-rtmidi` baut dort nur mit den MSVC Build Tools
 (https://visualstudio.microsoft.com/visual-cpp-build-tools/, "Desktop
 Development with C++") - ohne sie laeuft MIDI ueber den eingebauten WinMM-Weg.
@@ -180,14 +184,15 @@ Welche Option loescht was:
 
 ## ARM64-Kompatibilitaet (Snapdragon-Geraete)
 
-Gilt nur fuer **natives** ARM64-Python - mit dem empfohlenen x64-Python
-(siehe oben) gibt es diese Einschraenkungen nicht.
+Gilt nur fuer **natives** ARM64-Python - das ist nicht unterstuetzt (instabil,
+kein 3D) - x64-Python nehmen (siehe oben); damit gibt es diese Einschraenkungen
+nicht.
 
 | Paket | ARM64 Status |
 |---|---|
-| PySide6 | OK (ARM64-Wheel) |
+| PySide6 | ARM64-Wheel vorhanden - Abstuerze ungeklaert (XPLAT-51) |
 | PySide6-Addons | ARM64-Wheel **ohne QtWebEngine** - kein 3D-Visualizer |
-| numpy | OK (ARM64-Wheel) |
+| numpy | ARM64-Wheel vorhanden - Abstuerze ungeklaert (XPLAT-51) |
 | soundcard | OK (pure-Python) |
 | flask-socketio | OK (pure-Python) |
 | Flask | OK (pure-Python) |
@@ -555,11 +560,12 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
 | `install.py` nimmt die falsche Python-Version | Mit dem Launcher waehlen: `py -0p` zeigt die installierten, `py -3.12 install.py` installiert mit 3.12 (s. Schnellstart) |
 | Test-Gate meldet „0/… Segmente gruen", im Segment-Log `No module named pytest` | Test-Abhaengigkeiten fehlen: `venv\Scripts\python -m pip install -r requirements-dev.txt` (s. [Entwickeln und Tests](#entwickeln-und-tests)) |
-| Installer meldet "Natives ARM64-Python: ... OHNE 3D-Visualizer" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
+| Installer meldet "Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D)" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
 | `python-rtmidi` Build-Fehler auf ARM64 | x64-Python nehmen (siehe oben) oder MSVC Build Tools installieren; MIDI geht auch ohne (WinMM-Weg) |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
-| "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
-| Art-Net-/sACN-Eingang: „Seit 5 s ist nichts angekommen … Firewall“ | Windows: Windows-Sicherheit → Firewall- & Netzwerkschutz → „Zugriff von App durch Firewall zulassen“ → bei `LightOS.exe` (aus den Quellen: `python.exe`) „Privat“ anhaken. Linux: `sudo ufw status`. Oder im Reiter **DMX Input** unter **Empfangen auf:** die richtige Karte wählen |
+| "Visualizer nicht verfuegbar" auf Windows-ARM | Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen (siehe "Python auf Windows-ARM") |
+| LightOS stuerzt auf Windows-ARM beim Start ab (Access Violation) | Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
+| Art-Net-/sACN-Eingang: „Seit 5 s ist nichts angekommen … Firewall“ | Windows: Windows-Sicherheit → Firewall- & Netzwerkschutz → „Zugriff von App durch Firewall zulassen“ → bei `LightOS.exe` (aus den Quellen: `python.exe`) „Privat“ anhaken. Linux: `sudo ufw status`. Oder im Reiter **DMX-Eingang** unter **Empfangen auf:** die richtige Karte wählen |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
 | uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber von Hand zuweisen (Windows; LightOS liefert und installiert keine Treiber) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |

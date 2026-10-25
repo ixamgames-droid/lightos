@@ -43,7 +43,7 @@ entstehen auf einem Rechner ohne angeschlossenen ENTTEC, deshalb steht dort „E
    (`Enttec: …`). Sie öffnet denselben Dialog.
 
 Der Dialog **Ausgabe konfigurieren** hat sechs Reiter: **Enttec Pro USB**, **uDMX (USB)**, **Art-Net**,
-**sACN (E1.31)**, **DMX Input** und **Universen**. Es gibt zwei Wege:
+**sACN (E1.31)**, **DMX-Eingang** und **Universen**. Es gibt zwei Wege:
 
 - **Einzel-Reiter** (Schritte 2–4): ein Universum auf einen Ausgang legen und sofort
   verbinden.
@@ -55,7 +55,7 @@ Beide schreiben in dieselbe Datei `universes.json` im LightOS-Datenordner
 automatisch wieder ein. **Schließen** beendet den Dialog; danach aktualisiert LightOS
 die Statusleiste.
 
-Der Reiter **DMX Input** gehört nicht zur Ausgabe: dort empfängt LightOS DMX von
+Der Reiter **DMX-Eingang** gehört nicht zur Ausgabe: dort empfängt LightOS DMX von
 außen (Art-Net auf Port 6454, sACN auf Port 5568) und mischt es in ein eigenes
 Universum. Empfangen löst unter Windows einmal eine Firewall-Abfrage aus — siehe
 [DMX empfangen: die Firewall-Abfrage](#dmx-empfangen-die-firewall-abfrage).
@@ -80,13 +80,13 @@ Reiter **Enttec Pro USB**:
 2. **Ports aktualisieren** — nach dem Einstecken die Liste neu einlesen. Die Auswahl
    bleibt dabei erhalten; war noch nichts gewählt, wird der eben eingesteckte ENTTEC
    vorgewählt.
-3. **Universe:** — welches LightOS-Universum über diesen Adapter hinausgeht. Das Feld
+3. **Universum:** — welches LightOS-Universum über diesen Adapter hinausgeht. Das Feld
    ist mit dem gespeicherten Wert vorbelegt; stell es **vor** dem Klick auf
    **Verbinden** bewusst ein.
 4. **Verbinden** — entfernt einen anderen Ausgang dieses Universums, öffnet den Adapter
    und speichert die Zuordnung. **Ein Adapter trägt genau ein Universum:** lag derselbe
    Adapter bisher auf einem anderen Universum, verliert jene Zeile ihn (sie bleibt als
-   `Disabled` stehen), und der Status sagt es dazu, zum Beispiel
+   `Aus` stehen), und der Status sagt es dazu, zum Beispiel
    `… · war Universe 2 — jetzt Universe 1`. Danach meldet der Status erst
    `Eingerichtet: … (gespeichert), verbinde …` und wenig später das Ergebnis:
    `Verbunden: … (gespeichert)`, oder `Port lässt sich nicht öffnen — gespeichert, aber
@@ -112,7 +112,7 @@ Reiter hat noch kein Bild.
   Anschluss. Gesucht wird beim ersten Öffnen des Reiters und mit **Adapter suchen**.
   Der gespeicherte Adapter bleibt in der Liste, auch wenn er gerade fehlt
   (`— derzeit nicht gefunden`).
-- **Universe:** und **Verbinden** — wie beim ENTTEC. Der Status meldet erst
+- **Universum:** und **Verbinden** — wie beim ENTTEC. Der Status meldet erst
   `Eingerichtet: … (gespeichert), verbinde …` und danach `Verbunden: …` oder
   `sendet nicht — gespeichert, aber es geht kein DMX raus`.
 - Unter dem Status steht dann der **Grund** und was zu tun ist. Die häufigsten:
@@ -181,7 +181,7 @@ Reiter **Art-Net**:
    Art-Net an deren Broadcast statt an `255.255.255.255` — den reichen Router nicht
    weiter. Die Wahl gilt für **diesen Rechner**, nicht für die Show; neue Verbindungen
    nutzen sie sofort, bestehende ab dem nächsten Start.
-3. **Universe:** — das LightOS-Universum, auf das **Übernehmen** wirkt. Nur dieses eine;
+3. **Universum:** — das LightOS-Universum, auf das **Übernehmen** wirkt. Nur dieses eine;
    andere Universen bleiben unverändert.
 4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.168.1.50`) oder
    `255.255.255.255` für alle im Netz. Leer bedeutet ebenfalls `255.255.255.255`.
@@ -200,7 +200,7 @@ Reiter **sACN (E1.31)**:
 
 1. **sACN (E1.31) aktivieren** — Haken setzen (ohne Haken entfernt **Übernehmen** den
    sACN-Ausgang wieder).
-2. **Universe:** — das LightOS-Universum. Es sendet auf die sACN-Universumsnummer
+2. **Universum:** — das LightOS-Universum. Es sendet auf die sACN-Universumsnummer
    mit derselben Zahl.
 3. **Multicast (239.255.0.x)** — Standard. Jeder sACN-Empfänger im Netz, der dieses
    Universum hört, bekommt die Daten.
@@ -217,12 +217,12 @@ Reiter **Universen** — hier siehst und bearbeitest du alle Ausgänge in einer 
 
 Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
 
-1. **Output** — `Disabled`, `Enttec`, `uDMX`, `sACN` oder `ArtNet`.
-2. **Patch (Port/IP)** — je nach Output: bei `Enttec` der Port (`COM3`,
+1. **Ausgang** — `Aus`, `Enttec`, `uDMX`, `sACN` oder `ArtNet`.
+2. **Patch (Port/IP)** — je nach Ausgang: bei `Enttec` der Port (`COM3`,
    `/dev/ttyUSB0`), bei `ArtNet` die Ziel-IP (leer = `255.255.255.255`), bei `sACN` eine
    Unicast-IP (leer = Multicast), bei `uDMX` der Adapter-Schlüssel (zum Beispiel
    `2008:1066@1-2`; am einfachsten über den Reiter **uDMX (USB)** eintragen lassen).
-3. **Ext-Universe** — optional die Universumsnummer im Netzwerk. Leer gilt der Standard:
+3. **Ext. Universum** — optional die Universumsnummer im Netzwerk. Leer gilt der Standard:
    Art-Net `#` minus 1, sACN `#`.
    **Dongle** (nur lesbar) — bei `Enttec` die Seriennummer des Adapters, den das
    Universum sucht, gekürzt (`Seriennr. …5123`). LightOS merkt sie sich, sobald der
@@ -237,15 +237,15 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    Start den Adapter, der gerade an ihrem Port steckt. Waren die Ports genau dann
    vertauscht, steht in der Spalte **Dongle** die Nummer des anderen Adapters — dann
    **Dongle neu zuordnen** und **Speichern**.
-4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
+4. **+ Universum hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
    markierten Zeilen aus der Tabelle; wirksam wird das erst mit **Speichern**.
 5. **Speichern** — schreibt `universes.json` (im LightOS-Datenordner) und wendet die Konfiguration
    **sofort** an, ohne Neustart. Zur Bestätigung zeigt LightOS den Pfad der Datei.
 
 Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
 
-- eine **#** außerhalb von 1–32 liegt (*Universe-Nummer angepasst*),
-- eine **Ext-Universe** nicht zum Ausgabetyp passt (*Externe Universe-Nummer angepasst*),
+- eine **#** außerhalb von 1–32 liegt (*Universumsnummer angepasst*),
+- eine Zahl unter **Ext. Universum** nicht zum Ausgabetyp passt (*Externe Universumsnummer angepasst*),
 - **zwei Zeilen am selben Ziel** landen (*Zwei Universen auf demselben Ziel*). Das führt
   am Empfänger zu Flackern; gespeichert wird trotzdem. Was dabei als „dasselbe Ziel"
   zählt, erklärt
@@ -255,7 +255,7 @@ Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
   Adapter sendet nur ein Universum.
   Gespeichert wird trotzdem, eingerichtet wird der Adapter so aber für **keines** davon,
   bis nur noch eine Zeile ihn nennt. Am schnellsten behebt es der Reiter
-  **Enttec Pro USB**: Universe wählen und **Verbinden** (Schritt 2).
+  **Enttec Pro USB**: Universum wählen und **Verbinden** (Schritt 2).
 
 ## 6. Kontrolle: der Output-Monitor
 
@@ -393,7 +393,7 @@ Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Ad
 mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
 LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
 sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
-**Enttec Pro USB** das richtige Universe wählen und **Verbinden**.
+**Enttec Pro USB** das richtige Universum wählen und **Verbinden**.
 
 ## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
 
@@ -407,7 +407,7 @@ vorher **ein letztes Bild**:
   Lichtkanäle auf 0, Laser auf ihre **Aus-Werte** (nicht einfach 0, siehe
   Laser-Anleitung). Pan/Tilt, Gobo und Optik von Moving Heads mit Dimmer bleiben
   stehen; die Köpfe fahren also nicht in die Grundstellung.
-- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Disabled“
+- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Aus“
   gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
 - **Beim Wechsel auf einen anderen Adapter:** stellst du ein Universum von
   ENTTEC auf Art-Net um, auf einen anderen Port, einen anderen uDMX-Adapter,
@@ -463,7 +463,7 @@ DMX und Universen: [DMX_PROTOCOL.md](../DMX_PROTOCOL.md).
 
 ## DMX empfangen: die Firewall-Abfrage
 
-Senden braucht keine Freigabe, **Empfangen** schon. Sobald du im Reiter **DMX Input**
+Senden braucht keine Freigabe, **Empfangen** schon. Sobald du im Reiter **DMX-Eingang**
 den Art-Net- oder sACN-Eingang (oder die **Fernsteuerung**) einschaltest, lauscht LightOS
 auf UDP 6454 (Art-Net) bzw. 5568 (sACN).
 
@@ -480,7 +480,7 @@ auf UDP 6454 (Art-Net) bzw. 5568 (sACN).
 
 LightOS ändert selbst nichts an der Firewall.
 
-**Empfangen auf:** (oben im Reiter **DMX Input**) legt fest, worauf LightOS lauscht. Die
+**Empfangen auf:** (oben im Reiter **DMX-Eingang**) legt fest, worauf LightOS lauscht. Die
 Wahl gilt für Art-Net- und sACN-Eingang und die Fernsteuerung gemeinsam, wird sofort
 wirksam und bleibt auf diesem Rechner gespeichert:
 
