@@ -1,8 +1,8 @@
 {
   "anleitung": "geraete_bibliothek",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "4355a3ee",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "26ec5bba",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py geraete_bibliothek'.",
   "bilder": [
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "724a1bce14e98748c7a55c3994819102"
+      "md5": "67297352f18ddea9b457eca8fc9c787e"
     },
     {
       "datei": "02_menue_datenbank.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "ab6085301106de90638998a3e6e25fea"
+      "md5": "a8e4edf25f20289ebbf6a76cec1cf29e"
     },
     {
       "datei": "03_download_dialog.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "37ea5b1aa53104a7aa1a489ca0b904a9"
+      "md5": "778a986bf986727d3817327fa4329eaf"
     },
     {
       "datei": "04_fixture_editor.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "e9cc26d3cb5218918fef5c73cc4c3ca7"
+      "md5": "0f5ede28ec4920e31c5066c465dad9a2"
     },
     {
       "datei": "05_lightos_profil.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "3b645780616229e9a6471da6009963c3"
+      "md5": "9914c582524602ce40c46551cb8c819e"
     },
     {
       "datei": "06_weiss_segment_hinweis.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "ab902005efa424995217fbd663adb6fc"
+      "md5": "022e14875d8daf52ef5bce44e05b3a36"
     },
     {
       "datei": "07_weiss_segment_gesetzt.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "bb0fa10873005df34bd9cbf7ac226424"
+      "md5": "bd4d8650831ef375f7c6616163875b1f"
     },
     {
       "datei": "08_matrix_hinweis.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "46ad042406c60d84e535b15bc727bf0c"
+      "md5": "ea466cd7f6ec6f447cff13b823d3f21b"
     },
     {
       "datei": "09_3d_modelle.png",

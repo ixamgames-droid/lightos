@@ -197,7 +197,7 @@ Seit NET-15 können eingehende Art-Net- oder sACN-Kanäle LightOS **bedienen** �
 universelle Weg für jedes Pult und jedes Programm, das DMX übers Netz senden kann,
 ohne MIDI.
 
-**Einrichten:** *Ausgabe → Reiter „DMX Input" → Gruppe „Fernsteuerung"*. Je Zeile:
+**Einrichten:** *Ausgabe → Reiter „DMX-Eingang" → Gruppe „Fernsteuerung"*. Je Zeile:
 Quelle (Art-Net/sACN), eingehendes Universum, Kanal und Ziel. „Fernsteuerung aktiv"
 anhaken, **Übernehmen** — die Zuordnung wird gespeichert und die nötigen Empfänger
 starten (auch beim nächsten Programmstart, solange „aktiv" gespeichert ist).

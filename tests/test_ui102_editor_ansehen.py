@@ -154,7 +154,7 @@ class AnsehenTest(_TempDB):
         tab_a, tab_e = dlg._tabs.widget(0), eigen._tabs.widget(0)
         paare = [(dlg._edit_short, eigen._edit_short, "Kurzname"),
                  (dlg._spin_power, eigen._spin_power, "Leistung"),
-                 (tab_a._edit_name, tab_e._edit_name, "Mode-Name")]
+                 (tab_a._edit_name, tab_e._edit_name, "Modus-Name")]
         for a, e, name in paare:
             with self.subTest(feld=name):
                 self.assertEqual(self._hintergrund(a), "#2e2e2e")

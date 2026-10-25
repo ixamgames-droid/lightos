@@ -118,7 +118,8 @@ Das **Open DMX USB** (günstigere Version) hat keine eigene Firmware — der PC 
 - Windows 11 ARM enthält FTDI-Treiber bereits inbox (seit Build 22H2+)
 - pyserial ist reines Python und spricht den COM-Port über Windows an — das geht
   mit dem auf Windows-ARM empfohlenen x64-Python (läuft per Emulation, siehe
-  [INSTALL.md](../INSTALL.md)) genauso wie mit nativem ARM64-Python
+  [INSTALL.md](../INSTALL.md)); natives ARM64-Python ist nicht unterstützt
+  (instabil, kein 3D) — x64-Python nehmen
 
 ### Praxis-Hinweise
 - Auf Snapdragon-Geräten: USB-A via USB-C Adapter

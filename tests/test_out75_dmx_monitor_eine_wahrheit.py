@@ -491,7 +491,7 @@ class RueckfrageTest(unittest.TestCase):
         self.assertEqual(len(self.fragen), 1)
         self.assertIn("Art-Net → 2.0.0.1", self.fragen[0])
         self.assertIn("Enttec → COM3", self.fragen[0])
-        self.assertIn("Universe 1", self.fragen[0])
+        self.assertIn("Universum 1", self.fragen[0])
 
     def test_nein_laesst_alles_wie_es_war(self):
         self._laeuft("Art-Net", "2.0.0.1")

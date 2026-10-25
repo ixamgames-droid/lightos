@@ -111,10 +111,13 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
         self.assertEqual(ip, "127.0.0.1")
         self.assertIs(remote_settings.DEFAULTS["osc_network_enabled"], False)
 
-    def test_web_remote_lauscht_in_der_voreinstellung_im_ganzen_netz(self):
+    def test_web_remote_lauscht_ab_werk_nur_auf_diesem_rechner(self):
+        # WEB-12 (QA96-36): LAN-/Handy-Remote ist ab Werk AUS; „Handy
+        # verbinden“ schaltet es ein. Die Anleitung sagt das.
         from src.web import remote_settings
 
-        self.assertIs(remote_settings.DEFAULTS["lan_remote_enabled"], True)
+        self.assertIs(remote_settings.DEFAULTS["lan_remote_enabled"], False)
+        self.assertIn("Handy verbinden", self.text)
         quelle = _lies("src", "web", "app.py")
         self.assertIn('host = "0.0.0.0"', quelle)
         self.assertIn('host = "127.0.0.1"', quelle)
@@ -126,15 +129,16 @@ class Doc70NetzwerkWindowsTest(unittest.TestCase):
 
     def test_genannte_schalter_gibt_es_im_code(self):
         fundorte = {
-            "Art-Net Input aktivieren": ("src", "ui", "widgets", "output_config.py"),
-            "sACN Input aktivieren": ("src", "ui", "widgets", "output_config.py"),
-            "DMX Input": ("src", "ui", "widgets", "output_config.py"),
-            "Merge in Universe:": ("src", "ui", "widgets", "output_config.py"),
+            "Art-Net-Eingang aktivieren": ("src", "ui", "widgets", "output_config.py"),
+            "sACN-Eingang aktivieren": ("src", "ui", "widgets", "output_config.py"),
+            "DMX-Eingang": ("src", "ui", "widgets", "output_config.py"),
+            "Mischen in Universum:": ("src", "ui", "widgets", "output_config.py"),
             "Netzwerkkarte:": ("src", "ui", "widgets", "output_config.py"),
             "Web-Interface (Port 5000)": ("src", "ui", "main_window.py"),
             "OS2L-Server (Port 1234)": ("src", "ui", "main_window.py"),
             "OSC-Server (Port 7770)": ("src", "ui", "main_window.py"),
-            "LAN-/Handy-Remote": ("src", "ui", "main_window.py"),
+            # WEB-12: der Verbindungs-Dialog steht in einer eigenen Datei
+            "LAN-/Handy-Remote": ("src", "ui", "widgets", "web_remote_dialog.py"),
         }
         for beschriftung, pfad in fundorte.items():
             with self.subTest(beschriftung):

@@ -59,6 +59,9 @@ CHANNEL_ATTRS = [
 ]
 
 CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Weiß-Segment"]
+#: UI-100: Fenstertitel — so, wie die Anleitungen den Dialog nennen
+#: („Fixture-Editor“; vorher englisch „Fixture Editor“).
+TITEL = "Fixture-Editor"
 # FM-46: Spalte der Zuordnung Dimmer -> Weiss-Segment.
 SEGMENT_COL = 5
 #: Anzeige fuer „keine Zuordnung" in der Segment-Auswahl.
@@ -234,7 +237,7 @@ class _ModeTab(QWidget):
         layout = QVBoxLayout(self)
 
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("Mode-Name:"))
+        name_row.addWidget(QLabel("Modus-Name:"))
         self._edit_name = QLineEdit(name)
         self._edit_name.editingFinished.connect(self._on_name_changed)
         name_row.addWidget(self._edit_name, 1)
@@ -312,9 +315,9 @@ class _ModeTab(QWidget):
         layout.addWidget(self._tbl, 1)
 
         btn_row = QHBoxLayout()
-        btn_add = QPushButton("+ Channel")
+        btn_add = QPushButton("+ Kanal")
         btn_add.clicked.connect(self._add_channel)
-        btn_del = QPushButton("- Channel")
+        btn_del = QPushButton("- Kanal")
         btn_del.clicked.connect(self._del_channel)
         btn_up = QPushButton("Hoch")
         btn_up.clicked.connect(lambda: self._move(-1))
@@ -397,7 +400,7 @@ class _ModeTab(QWidget):
     def _add_channel(self):
         self._sync_from_table()   # Live-Edits sichern (Tabelle<->channels aligned)
         self.channels.append({
-            "name": f"Channel {len(self.channels) + 1}",
+            "name": f"Kanal {len(self.channels) + 1}",
             "attribute": "raw",
             "default": 0,
             "highlight": 255,
@@ -575,7 +578,7 @@ class _ModeTab(QWidget):
             ch = self.channels[i]
             name_item = self._tbl.item(i, 1)
             if name_item:
-                ch["name"] = name_item.text() or ch.get("name", f"Channel {i+1}")
+                ch["name"] = name_item.text() or ch.get("name", f"Kanal {i+1}")
             try:
                 if self._tbl.item(i, 3):
                     ch["default"] = max(0, min(255, int(self._tbl.item(i, 3).text())))
@@ -616,7 +619,7 @@ class FixtureEditorDialog(QDialog):
     def __init__(self, parent=None, fixture_id: int | None = None, *,
                  nur_ansehen: bool = False, als_kopie: bool = False):
         super().__init__(parent)
-        self.setWindowTitle("Fixture Editor")
+        self.setWindowTitle(TITEL)
         # FM-74: kleines Mindestmass — der Inhalt liegt in einem Rollbereich,
         # die Startgroesse setzt `showEvent` aus dem Bedarf des Inhalts.
         self.setMinimumSize(560, 400)
@@ -664,7 +667,7 @@ class FixtureEditorDialog(QDialog):
                 self._fixture_id = None
                 self._name_geladen = None
                 self._edit_name.setText(f"{self._edit_name.text()} (eigen)")
-                self.setWindowTitle("Fixture Editor — Kopie als eigenes Profil")
+                self.setWindowTitle(f"{TITEL} — Kopie als eigenes Profil")
             else:
                 # UI-74 (Review): der Editor prueft die Quelle SELBST — ein
                 # Aufrufer ohne Flag ueberschrieb sonst ein mitgeliefertes
@@ -682,7 +685,7 @@ class FixtureEditorDialog(QDialog):
     def _sperren_zum_ansehen(self) -> None:
         """UI-74: Ansehen-Modus — Speichern, Import und alle Knoepfe, die Modi
         oder Kanaele aendern, sind gesperrt. Export bleibt offen."""
-        self.setWindowTitle("Fixture Editor — nur ansehen (mitgeliefertes Profil)")
+        self.setWindowTitle(f"{TITEL} — nur ansehen (mitgeliefertes Profil)")
         # UI-102: der Hinweis steht IM Dialog, nicht nur im Fenstertitel;
         # die Felder sind sichtbar schreibgeschuetzt.
         self._lbl_nur_ansehen.setHidden(False)
@@ -744,18 +747,18 @@ class FixtureEditorDialog(QDialog):
         root.addLayout(form)
 
         # Modes tabs
-        modes_box = QGroupBox("Modes")
+        modes_box = QGroupBox("Modi && Kanäle")
         mb_layout = QVBoxLayout(modes_box)
 
         self._tabs = QTabWidget()
         mb_layout.addWidget(self._tabs)
 
         mode_btn_row = QHBoxLayout()
-        self._btn_add_mode = QPushButton("+ Mode")
+        self._btn_add_mode = QPushButton("+ Modus")
         self._btn_add_mode.clicked.connect(lambda: self._add_mode())
-        self._btn_rename_mode = QPushButton("Umbenennen")
+        self._btn_rename_mode = QPushButton("Modus umbenennen")
         self._btn_rename_mode.clicked.connect(self._rename_mode)
-        self._btn_del_mode = QPushButton("- Mode")
+        self._btn_del_mode = QPushButton("- Modus")
         self._btn_del_mode.clicked.connect(self._del_mode)
         mode_btn_row.addWidget(self._btn_add_mode)
         mode_btn_row.addWidget(self._btn_rename_mode)
@@ -984,9 +987,9 @@ class FixtureEditorDialog(QDialog):
         if name is None:
             existing = [self._tabs.tabText(i) for i in range(self._tabs.count())]
             i = 1
-            while f"Mode {i}" in existing:
+            while f"Modus {i}" in existing:
                 i += 1
-            name = f"Mode {i}"
+            name = f"Modus {i}"
         tab = _ModeTab(name, description=description, grid=grid, weiss=weiss)
         if channels:
             tab.load_mode_data(name, channels, description=description)
@@ -1000,7 +1003,7 @@ class FixtureEditorDialog(QDialog):
             return
         tab = self._tabs.widget(idx)
         new_name, ok = QInputDialog.getText(
-            self, "Mode umbenennen", "Neuer Name:", text=tab.mode_name)
+            self, "Modus umbenennen", "Neuer Name:", text=tab.mode_name)
         if ok and new_name.strip():
             tab.mode_name = new_name.strip()
             tab._edit_name.setText(tab.mode_name)
@@ -1009,8 +1012,8 @@ class FixtureEditorDialog(QDialog):
     def _del_mode(self):
         idx = self._tabs.currentIndex()
         if idx < 0 or self._tabs.count() <= 1:
-            QMessageBox.information(self, "Mode löschen",
-                                    "Mindestens ein Mode muss existieren.")
+            QMessageBox.information(self, "Modus löschen",
+                                    "Mindestens ein Modus muss existieren.")
             return
         self._tabs.removeTab(idx)
 
@@ -1161,7 +1164,7 @@ class FixtureEditorDialog(QDialog):
             QMessageBox.warning(self, "Speichern", beanstandung)
             return
         if self._tabs.count() == 0:
-            QMessageBox.warning(self, "Speichern", "Mindestens ein Mode nötig.")
+            QMessageBox.warning(self, "Speichern", "Mindestens ein Modus nötig.")
             return
 
         # Sync alle Modes
@@ -1171,7 +1174,7 @@ class FixtureEditorDialog(QDialog):
             mname, chans, description, grid, weiss = tab.get_data()
             if not chans:
                 QMessageBox.warning(self, "Speichern",
-                                    f"Mode '{mname}' hat keine Channels.")
+                                    f"Modus '{mname}' hat keine Kanäle.")
                 return
             modes_data.append((mname, chans, description, grid, weiss))
 

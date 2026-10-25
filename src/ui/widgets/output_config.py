@@ -86,6 +86,36 @@ def _ext_universe_bereich(typ) -> tuple[int, int] | None:
 #: OUT-68: ``uDMX`` ergaenzt; alle anderen unveraendert an ihrer Stelle.
 AUSGABE_TYPEN = ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet")
 
+#: UI-100: ANZEIGE-Texte der Ausgabetypen. Gespeichert und verglichen wird
+#: weiter der Wert aus ``AUSGABE_TYPEN`` (steht als ``userData`` im Combo);
+#: nur „Disabled“ bekommt einen deutschen Text, die anderen sind Eigennamen.
+AUSGABE_TYP_TEXTE = {"Disabled": "Aus"}
+
+
+def ausgabe_typ_text(typ: str) -> str:
+    """UI-100: Anzeige-Text eines Ausgabetyps (``"Disabled"`` -> ``"Aus"``)."""
+    return AUSGABE_TYP_TEXTE.get(typ, typ)
+
+
+def ausgabe_typ_wert(combo) -> str:
+    """UI-100: gespeicherter Wert (``AUSGABE_TYPEN``) des Typ-Combos einer Zeile —
+    NIE ``currentText()``, das ist seit UI-100 nur noch der Anzeige-Text."""
+    wert = combo.currentData()
+    return str(wert) if wert else combo.currentText()
+
+
+def _ausgabe_typ_combo(wert: str = "Disabled"):
+    """UI-100: Typ-Combo der Universen-Tabelle — Anzeige deutsch, Daten = Wert
+    aus ``universes.json``. Ein unbekannter Wert faellt wie bisher (nicht
+    editierbares Combo, ``setCurrentText`` ohne Treffer) auf den ersten Eintrag."""
+    combo = QComboBox()
+    for opt in AUSGABE_TYPEN:
+        combo.addItem(ausgabe_typ_text(opt), opt)
+    i = combo.findData(str(wert or "").strip())
+    if i >= 0:
+        combo.setCurrentIndex(i)
+    return combo
+
 
 def _udmx_suchen() -> dict:
     """OUT-68: uDMX-Adapter aufzaehlen — laeuft in einem HILFS-THREAD.
@@ -793,7 +823,7 @@ class OutputConfigDialog(QDialog):
         #  * Die Auswahl „hielt nicht": Tab zu, Tab auf, wieder Universum 1.
         #  * Und es erklaert HW-5c — den seit Wochen offenen „Rueckfall in
         #    universes.json, Ursache offen". Die Ursache war dieses Widget.
-        ef.addRow("Universe:", self._spin_enttec_univ)
+        ef.addRow("Universum:", self._spin_enttec_univ)
 
         connect_btn = QPushButton("Verbinden")
         connect_btn.clicked.connect(self._connect_enttec)
@@ -815,7 +845,7 @@ class OutputConfigDialog(QDialog):
         xf.addRow("", udmx_such_btn)
         self._spin_udmx_univ = QSpinBox()
         self._spin_udmx_univ.setRange(1, 32)
-        xf.addRow("Universe:", self._spin_udmx_univ)
+        xf.addRow("Universum:", self._spin_udmx_univ)
         udmx_btn = QPushButton("Verbinden")
         udmx_btn.clicked.connect(self._connect_udmx)
         self._lbl_udmx_status = QLabel("Nicht verbunden")
@@ -913,7 +943,7 @@ class OutputConfigDialog(QDialog):
         # die EXTERNE Universe-Nummer und gehört zu OUT-03.)
         self._spin_artnet_univ = QSpinBox()
         self._spin_artnet_univ.setRange(1, 32)
-        af.addRow("Universe:", self._spin_artnet_univ)
+        af.addRow("Universum:", self._spin_artnet_univ)
 
         self._edit_artnet_ip = QLineEdit("255.255.255.255")
         af.addRow("Ziel-IP / Broadcast:", self._edit_artnet_ip)
@@ -923,7 +953,7 @@ class OutputConfigDialog(QDialog):
         # Stelle) — dieses Feld IST die externe Art-Net-Universe-Nummer.
         self._spin_artnet_start_univ.setRange(*_ext_universe_bereich("ArtNet"))
         self._spin_artnet_start_univ.setToolTip(
-            'Externe Art-Net-Universe-Nummer für "Übernehmen". Default = '
+            'Externe Art-Net-Universumsnummer für „Übernehmen“. Standard = '
             'internes Universum − 1 (abwärtskompatibel).')
         af.addRow("Art-Net Startuniversum:", self._spin_artnet_start_univ)
         # A3D-15: die externe Universe folgt standardmaessig dem internen Universum
@@ -951,7 +981,7 @@ class OutputConfigDialog(QDialog):
         # OUT-04: Ziel-Universum, auf das „Übernehmen" wirkt (nicht mehr alle).
         self._spin_sacn_univ = QSpinBox()
         self._spin_sacn_univ.setRange(1, 32)
-        sf.addRow("Universe:", self._spin_sacn_univ)
+        sf.addRow("Universum:", self._spin_sacn_univ)
 
         self._check_sacn_multicast = QCheckBox("Multicast (239.255.0.x)")
         self._check_sacn_multicast.setChecked(True)
@@ -974,24 +1004,24 @@ class OutputConfigDialog(QDialog):
         if_l = QVBoxLayout(input_tab)
         if_l.addWidget(QLabel(
             "Empfängt DMX-Daten via Art-Net (Port 6454) oder sACN (Port 5568)\n"
-            "und mergt sie in lokale Universen (HTP / LTP / REPLACE)."
+            "und mischt sie in lokale Universen (HTP / LTP / REPLACE)."
         ))
 
         # Art-Net Input
-        ain_box = QGroupBox("Art-Net Input")
+        ain_box = QGroupBox("Art-Net-Eingang")
         ain_l = QFormLayout(ain_box)
-        self._check_artnet_in = QCheckBox("Art-Net Input aktivieren")
+        self._check_artnet_in = QCheckBox("Art-Net-Eingang aktivieren")
         ain_l.addRow(self._check_artnet_in)
 
         self._spin_artnet_in_univ = QSpinBox()
         self._spin_artnet_in_univ.setRange(1, 32767)
         self._spin_artnet_in_univ.setValue(1)
-        ain_l.addRow("Eingehendes Universe:", self._spin_artnet_in_univ)
+        ain_l.addRow("Eingehendes Universum:", self._spin_artnet_in_univ)
 
         self._spin_artnet_in_out = QSpinBox()
         self._spin_artnet_in_out.setRange(1, 32)
         self._spin_artnet_in_out.setValue(1)
-        ain_l.addRow("Merge in Universe:", self._spin_artnet_in_out)
+        ain_l.addRow("Mischen in Universum:", self._spin_artnet_in_out)
 
         self._combo_artnet_in_mode = QComboBox()
         self._combo_artnet_in_mode.addItems(["HTP", "LTP", "REPLACE"])
@@ -1005,9 +1035,9 @@ class OutputConfigDialog(QDialog):
         if_l.addWidget(ain_box)
 
         # sACN Input
-        sin_box = QGroupBox("sACN Input")
+        sin_box = QGroupBox("sACN-Eingang")
         sin_l = QFormLayout(sin_box)
-        self._check_sacn_in = QCheckBox("sACN Input aktivieren")
+        self._check_sacn_in = QCheckBox("sACN-Eingang aktivieren")
         sin_l.addRow(self._check_sacn_in)
 
         self._spin_sacn_in_univ = QSpinBox()
@@ -1015,12 +1045,12 @@ class OutputConfigDialog(QDialog):
         # BEIDE Richtungen; dieselbe Quelle wie der Guard der Ext-Spalte.
         self._spin_sacn_in_univ.setRange(*_ext_universe_bereich("sACN"))
         self._spin_sacn_in_univ.setValue(1)
-        sin_l.addRow("Eingehendes Universe:", self._spin_sacn_in_univ)
+        sin_l.addRow("Eingehendes Universum:", self._spin_sacn_in_univ)
 
         self._spin_sacn_in_out = QSpinBox()
         self._spin_sacn_in_out.setRange(1, 32)
         self._spin_sacn_in_out.setValue(1)
-        sin_l.addRow("Merge in Universe:", self._spin_sacn_in_out)
+        sin_l.addRow("Mischen in Universum:", self._spin_sacn_in_out)
 
         self._combo_sacn_in_mode = QComboBox()
         self._combo_sacn_in_mode.addItems(["HTP", "LTP", "REPLACE"])
@@ -1053,19 +1083,23 @@ class OutputConfigDialog(QDialog):
             input_tab.minimumSizeHint().height()
             - self._fernsteuerung_box.minimumSizeHint().height()
             - if_l.spacing())
-        tabs.addTab(input_rollen, "DMX Input")
+        tabs.addTab(input_rollen, "DMX-Eingang")
 
         # ── Universe Manager Tab ───────────────────────────────────────────────
         univ_tab = QWidget()
         uf = QVBoxLayout(univ_tab)
-        uf.addWidget(QLabel(
-            "Universen verwalten - bis zu 32 Universen.\n"
-            "Pro Universe: Name, Output-Typ (Disabled / Enttec / uDMX / sACN / ArtNet), "
-            "Patch-Adresse, optionale externe Universe-Nummer."
-        ))
+        # UI-100: deutsch und mit Zeilenumbruch — bei schmalem Dialog wurde die
+        # Zeile vorher hart abgeschnitten.
+        self._lbl_univ_hinweis = QLabel(
+            "Universen verwalten – bis zu 32 Universen. "
+            "Pro Universum: Name, Ausgang ("
+            + " / ".join(ausgabe_typ_text(t) for t in AUSGABE_TYPEN)
+            + "), Patch-Adresse, optionale externe Universumsnummer.")
+        self._lbl_univ_hinweis.setWordWrap(True)
+        uf.addWidget(self._lbl_univ_hinweis)
         self._univ_table = QTableWidget(0, 6)
         self._univ_table.setHorizontalHeaderLabels(
-            ["#", "Name", "Output", "Patch (Port/IP)", "Ext-Universe", "Dongle"]
+            ["#", "Name", "Ausgang", "Patch (Port/IP)", "Ext. Universum", "Dongle"]
         )
         # OUT-80: gespeicherte Enttec-Seriennummer, gekuerzt (OUT-77).
         self._univ_table.horizontalHeaderItem(5).setToolTip(
@@ -1076,10 +1110,10 @@ class OutputConfigDialog(QDialog):
             Qt.ContextMenuPolicy.CustomContextMenu)
         self._univ_table.customContextMenuRequested.connect(
             self._univ_kontextmenue)
-        # OUT-03: "Ext-Universe" = optionale externe Art-Net/sACN-Universe-Nummer.
+        # OUT-03: "Ext. Universum" = optionale externe Art-Net/sACN-Universe-Nummer.
         # Leer = Default (Art-Net num-1, sACN num).
         self._univ_table.horizontalHeaderItem(4).setToolTip(
-            "Optionale externe Art-Net/sACN-Universe-Nummer. "
+            "Optionale externe Art-Net/sACN-Universumsnummer. "
             "Leer = Standard (Art-Net #-1, sACN #)."
         )
         self._univ_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -1092,7 +1126,7 @@ class OutputConfigDialog(QDialog):
         uf.addWidget(self._univ_table, 1)
 
         uf_btns = QHBoxLayout()
-        b_add = QPushButton("+ Universe hinzufügen")
+        b_add = QPushButton("+ Universum hinzufügen")
         b_add.clicked.connect(self._univ_add)
         b_del = QPushButton("Löschen")
         b_del.setObjectName("btn_danger")
@@ -1174,10 +1208,10 @@ class OutputConfigDialog(QDialog):
         for d in adapter_zeilen.doppelte(_load_universe_config()):
             if d.typ == "Enttec":
                 self._lbl_enttec_status.setText(
-                    f"⚠ {d.patch} steht auf Universe "
+                    f"⚠ {d.patch} steht auf Universum "
                     f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
                     f"sendet nur ein Universum, eingerichtet ist er für keines. "
-                    f"Universe wählen und „Verbinden“: die anderen Zeilen "
+                    f"Universum wählen und „Verbinden“: die anderen Zeilen "
                     f"werden abgeräumt.")
                 break
 
@@ -1194,10 +1228,10 @@ class OutputConfigDialog(QDialog):
         for d in adapter_zeilen.doppelte(_load_universe_config()):
             if d.typ == "uDMX":
                 self._lbl_udmx_status.setText(
-                    f"⚠ {d.patch or 'Der uDMX-Adapter'} steht auf Universe "
+                    f"⚠ {d.patch or 'Der uDMX-Adapter'} steht auf Universum "
                     f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
                     f"sendet nur ein Universum, eingerichtet ist er für keines. "
-                    f"Universe wählen und „Verbinden“: die anderen Zeilen "
+                    f"Universum wählen und „Verbinden“: die anderen Zeilen "
                     f"werden abgeräumt.")
                 break
 
@@ -1473,7 +1507,7 @@ class OutputConfigDialog(QDialog):
             for e in andere)
         antwort = QMessageBox.question(
             self, "Laufende Ausgabe ersetzen?",
-            f"Universe {univ} gibt gerade aus über:\n{liste}\n\n"
+            f"Universum {univ} gibt gerade aus über:\n{liste}\n\n"
             f"Soll das durch {_ausgabe_text(weg, ziel)} ersetzt werden? "
             f"Die bisherige Ausgabe endet dann.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -1873,10 +1907,7 @@ class OutputConfigDialog(QDialog):
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._univ_table.setItem(i, 0, num_item)
             self._univ_table.setItem(i, 1, QTableWidgetItem(str(r.get("name", "Universe"))))
-            combo = QComboBox()
-            for opt in AUSGABE_TYPEN:
-                combo.addItem(opt)
-            combo.setCurrentText(str(r.get("output", "Disabled")))
+            combo = _ausgabe_typ_combo(str(r.get("output", "Disabled")))
             self._univ_table.setCellWidget(i, 2, combo)
             self._univ_table.setItem(i, 3, QTableWidgetItem(_patch_text(r)))
             # OUT-03: externe Universe-Nummer (leer = Default). None/fehlt -> "".
@@ -1991,10 +2022,7 @@ class OutputConfigDialog(QDialog):
         self._univ_table.insertRow(row)
         self._univ_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self._univ_table.setItem(row, 1, QTableWidgetItem(f"Universe {row + 1}"))
-        combo = QComboBox()
-        for opt in AUSGABE_TYPEN:
-            combo.addItem(opt)
-        self._univ_table.setCellWidget(row, 2, combo)
+        self._univ_table.setCellWidget(row, 2, _ausgabe_typ_combo())
         self._univ_table.setItem(row, 3, QTableWidgetItem(""))
         self._univ_table.setItem(row, 4, QTableWidgetItem(""))
         self._univ_dongle_zelle(row)                       # OUT-80
@@ -2027,7 +2055,7 @@ class OutputConfigDialog(QDialog):
             entry = {
                 "num": num,
                 "name": name_item.text() if name_item else f"Universe {num}",
-                "output": combo.currentText() if combo else "Disabled",
+                "output": ausgabe_typ_wert(combo) if combo else "Disabled",
                 "patch": patch_item.text() if patch_item else "",
             }
             # OUT-03: externe Universe-Nummer nur speichern, wenn gesetzt & gueltig
@@ -2053,8 +2081,8 @@ class OutputConfigDialog(QDialog):
         if adjusted:
             _lst = ", ".join(f"Zeile {r}: → {n}" for r, n in adjusted)
             QMessageBox.warning(
-                self, "Universe-Nummer angepasst",
-                f"Universe-Nummern müssen zwischen {_UNIVERSE_MIN} und "
+                self, "Universumsnummer angepasst",
+                f"Universumsnummern müssen zwischen {_UNIVERSE_MIN} und "
                 f"{_UNIVERSE_MAX} liegen. Angepasst: {_lst}.")
         # NET-13: dieselbe Meldungsform wie darueber — sichtbar statt still.
         # Der Typ steht mit in der Zeile, weil die Grenze von ihm abhaengt und
@@ -2065,8 +2093,8 @@ class OutputConfigDialog(QDialog):
             _grenzen = " · ".join(f"{t} {lo}..{hi}"
                                   for t, (lo, hi) in _EXT_UNIVERSE_BEREICHE.items())
             QMessageBox.warning(
-                self, "Externe Universe-Nummer angepasst",
-                f"Die externe Universe-Nummer muss zum Ausgabetyp der Zeile "
+                self, "Externe Universumsnummer angepasst",
+                f"Die externe Universumsnummer muss zum Ausgabetyp der Zeile "
                 f"passen ({_grenzen}). Angepasst: {_ext_lst}.")
 
         # OUT-07: zwei Universen auf DASSELBE Ziel sind ein Bedienfehler, den die
@@ -2083,7 +2111,7 @@ class OutputConfigDialog(QDialog):
         for d in adapter_zeilen.doppelte(rows):
             QMessageBox.warning(
                 self, "Ein Adapter auf mehreren Universen",
-                f"{d.name} steht auf Universe "
+                f"{d.name} steht auf Universum "
                 f"{adapter_zeilen.aufzaehlung(d.universen)}.\n\n"
                 f"Ein Adapter sendet nur ein Universum. Gespeichert wird "
                 f"trotzdem — eingerichtet wird er so aber für KEINES davon, "
