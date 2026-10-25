@@ -2,7 +2,8 @@
 
 > Ab Werk lässt die Handy-Konsole **nichts** bedienen, was einen Laser ansteuert.
 > Mit dem Schalter **„Laser vom Handy erlauben"** (Ausgabe → **Web-Remote:
-> Verbindung & Token…**) hebst du diese Sperre auf. Vorher fragt LightOS nach;
+> Verbindung & Token…**) hebst du diese Sperre auf. Vorher fragt LightOS nach
+> (vorgewählt ist **„Abbrechen"** — ein versehentliches Enter gibt nichts frei);
 > diese Seite erklärt, was du damit zusagst und was LightOS trotzdem sperrt.
 
 Zurück zur Anleitung: [Web-Remote — das Handy als Konsole](ANLEITUNG.md)
@@ -18,9 +19,11 @@ Gesperrt ist ein Element der Handy-Konsole, wenn es einen Laser ansteuern kann:
   Zusatzaktion) ein Gerät enthält, das LightOS als **Laser** erkennt,
 - eine Taste für **Bibliothek-Farbe/Snap** oder **Snapshot** mit einem Laser darin,
 - eine **Effekt-Aktion** ohne festes Ziel (sie wirkt auf den gerade aktiven Effekt),
-- ein **Fader** auf einem DMX-Kanal eines Lasers, auf einer Funktion mit Laser,
-  ein **Submaster** oder **Gruppen-Dimmer** über einen Laser, ein **Programmer-Fader**
-  für alle bzw. die Auswahl, und ein **Grand-Master-Fader**,
+- ein **Fader** auf einem DMX-Kanal eines Lasers, auf einer Funktion mit Laser
+  (auch Effekt-Tempo und -Parameter), ein **Playback-Fader** auf einem Executor
+  mit Laser-Cues, ein **Submaster** oder **Gruppen-Dimmer** über einen Laser, ein
+  **Programmer-Fader** für alle, die Auswahl oder eine Gruppe mit Laser, und ein
+  **Grand-Master-Fader**,
 - eine **Cueliste**, deren Cues einen Laser enthalten.
 
 „Laser" erkennt LightOS genauso wie beim **Laser-NOT-AUS**: dieselben Geräte,

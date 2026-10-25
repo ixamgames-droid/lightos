@@ -155,7 +155,7 @@ rückgängig, ist auch die Verknüpfung wieder da.
 
 | Element | Am Handy |
 |---|---|
-| **Taste** | Antippen löst aus. Der Zustand kommt vom Pult zurück: läuft die Funktion, leuchtet die Taste in ihrer Farbe aus der Konsole. Tasten mit dem Zusatz **„halten"** (Flash, „nur gehalten", Blackout, Alles Weiß) wirken, solange der Finger darauf liegt. |
+| **Taste** | Antippen löst aus. Der Zustand kommt vom Pult zurück: läuft die Funktion, leuchtet die Taste in ihrer Farbe aus der Konsole. Tasten mit dem Zusatz **„halten"** (Flash, „nur gehalten", Blackout, Alles Weiß, Bibliothek-Snap im Flash-Modus) wirken, solange der Finger darauf liegt. Hält das Pult oder ein anderes Handy eine solche Taste gerade, ändert ein Antippen nichts. |
 | **Fader** | Senkrecht oder waagerecht, mit Prozentanzeige. Gezogen wird **relativ**: ein versehentliches Antippen verstellt nichts. Bewegt jemand den Fader am Pult, wandert er am Handy mit. |
 | **Cueliste** | Laufende Cue, die nächste Cue und **GO / BACK / STOP** — für genau diese Cueliste. |
 | **Master** (unten, immer da) | Grand Master als waagerechter Fader. |
