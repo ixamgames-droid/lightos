@@ -14,6 +14,21 @@ except ImportError:
     HAS_OSC = False
 
 
+if HAS_OSC:
+    class _ZuordnungsDispatcher(osc_dispatcher.Dispatcher):
+        """Dispatcher, der JEDE Nachricht zusaetzlich an einen Beobachter gibt
+        (OSC-06: freie Zuordnung + Learn), unabhaengig davon, ob eine feste
+        Adresse passt. Die festen Handler bleiben unberuehrt."""
+
+        def __init__(self, beobachter: Callable):
+            super().__init__()
+            self._beobachter = osc_dispatcher.Handler(beobachter, [], True)
+
+        def handlers_for_address(self, address_pattern: str):
+            yield from super().handlers_for_address(address_pattern)
+            yield self._beobachter
+
+
 class OscServer:
     """Listens for OSC messages and maps them to app-state actions.
 
@@ -25,6 +40,10 @@ class OscServer:
       /lightos/ch/{u}/{c} {v}      → Universe u, channel c, value v (0–255)
       /lightos/programmer/clear    → Clear programmer
       /lightos/blackout {1|0}      → Blackout
+
+    OSC-06: zusaetzlich sieht jede eingehende Nachricht die freie
+    Zuordnungstabelle (:mod:`src.core.osc.osc_zuordnung`) — beliebige Adressen
+    mit Mustern und OSC-Learn. Die festen Adressen oben bleiben unveraendert.
     """
 
     def __init__(self, ip: str = "127.0.0.1", port: int = 7770):
@@ -38,6 +57,9 @@ class OscServer:
         self._thread: threading.Thread | None = None
         self._running = False
         self._custom_handlers: list[tuple[str, Callable]] = []
+        # OSC-06: Ziel der freien Zuordnungen; None = App-Singleton (Tests
+        # setzen eine eigene Instanz).
+        self._zuordnung = None
 
     def set_bind_ip(self, ip: str) -> None:
         """Bind-Adresse setzen, bevor ``start`` laeuft (z. B. '0.0.0.0', wenn der
@@ -48,7 +70,7 @@ class OscServer:
     def start(self):
         if not HAS_OSC:
             raise RuntimeError("python-osc not installed: pip install python-osc")
-        d = osc_dispatcher.Dispatcher()
+        d = _ZuordnungsDispatcher(self._freie_zuordnung)
         d.map("/lightos/go",          self._handle_go)
         d.map("/lightos/back",        self._handle_back)
         d.map("/lightos/blackout",    self._handle_blackout)
@@ -69,11 +91,36 @@ class OscServer:
         self._running = False
         if self._server:
             self._server.shutdown()
+            # OSC-06: Socket freigeben — sonst blieb der Port bis Prozessende
+            # belegt und ein Neustart des Servers scheiterte an „Address in use".
+            try:
+                self._server.server_close()
+            except OSError:
+                pass
             self._server = None
 
     def add_handler(self, address: str, fn: Callable):
         """Register a custom OSC address handler."""
         self._custom_handlers.append((address, fn))
+
+    def is_running(self) -> bool:
+        return self._server is not None
+
+    def _freie_zuordnung(self, client_address, address, *args):
+        """OSC-06: jede Nachricht (auch /lightos/...) an die freie Zuordnung
+        bzw. an OSC-Learn. Laeuft im OSC-Thread; die Zuordnung rechnet nur und
+        uebergibt per Signal an den GUI-Thread. Gibt nie etwas zurueck (ein
+        Rueckgabewert ginge sonst als Antwort an den Absender)."""
+        try:
+            zu = self._zuordnung
+            if zu is None:
+                from src.core.osc.osc_zuordnung import get_osc_zuordnung
+                zu = get_osc_zuordnung()
+            absender = client_address[0] if client_address else None
+            zu.empfange(address, args, absender)
+        except Exception as _e:
+            _melde_still("osc", _e, text=str(address))
+        return None
 
     # ── Built-in handlers ─────────────────────────────────────────────────────
 
@@ -232,13 +279,30 @@ class OscSender:
         from pythonosc import udp_client
         self._client = udp_client.SimpleUDPClient(*self._target)
 
-    def send(self, address: str, *args):
+    @property
+    def ziel(self) -> tuple[str, int]:
+        return self._target
+
+    def send(self, address: str, *args) -> bool:
+        """Senden. ``True`` = an den Socket uebergeben (OSC-06: die Rueckmeldung
+        merkt sich einen Wert erst danach)."""
         if self._client is None:
-            return
+            return False
         try:
             self._client.send_message(address, list(args) if len(args) != 1 else args[0])
+            return True
         except Exception as _e:
             _melde_still("osc", _e, text=str(address))   # STAB-30
+            return False
+
+    def close(self) -> None:
+        client, self._client = self._client, None
+        sock = getattr(client, "_sock", None)
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
 
 
 _server: OscServer | None = None
