@@ -138,6 +138,88 @@ class EchoNachFremdemWegTest(_Wege):
         self.assertAlmostEqual(self.ex.fader_value, 4000 / 16383)
 
 
+class NachlaufTest(_Wege):
+    """Gegenpruefung: ein Motor, der seine Endstellung erst NACH dem Echo-
+    Fenster meldet, darf den fremd gesetzten Wert nicht ueberschreiben — und
+    zwei Motoren auf demselben Ziel duerfen sich nicht aufschaukeln."""
+
+    def test_spaeter_bericht_ueberschreibt_osc_nicht(self):
+        self._fader()
+        self._takt()
+        self.midi.pitch.clear()
+        _osc_fader(self.zustand, 1, 1.0)
+        self._takt()
+        self.assertEqual(self.midi.pitch, [("X-Touch", 1, 16383)])
+        for unterwegs in (6000, 12000, 16000):          # 0,1 / 0,2 / 0,3 s
+            self._spaeter(0.1)
+            self.mapper._on_midi(_pb(1, unterwegs))
+            self._takt()
+        self.assertEqual(self.ex.fader_value, 1.0)
+        self._spaeter(1.0)
+        self._takt()
+        self.assertEqual(self.midi.pitch, [("X-Touch", 1, 16383)],
+                         "der Motor wurde auf den Nachlauf zurueckgefahren")
+
+    def test_mit_sensor_zaehlt_ohne_beruehrung_auch_ein_weiter_weg(self):
+        """Hat sich der Beruehrungssensor einmal gemeldet, ist ein Bericht
+        ohne Beruehrung im Nachlauf nie die Hand — auch weit vom Ziel."""
+        self._fader()
+        self.mapper._on_midi(_note(1, 104, 127))
+        self.mapper._on_midi(_note(1, 104, 0))
+        self._spaeter(1.0)
+        self._takt()
+        self.midi.pitch.clear()
+        _net15_fader(self.zustand, 1, 1.0)
+        self._takt()
+        self._spaeter(0.6)
+        self.mapper._on_midi(_pb(1, 9000))              # langsamer Motor
+        self.assertEqual(self.ex.fader_value, 1.0)
+
+    def test_nach_dem_nachlauf_zaehlt_auch_ein_feiner_schritt(self):
+        self._fader()
+        _osc_fader(self.zustand, 1, 0.5)
+        self._takt()
+        self._spaeter(mm.MOTOR_NACHLAUF_S + 0.01)
+        self.mapper._on_midi(_pb(1, round(0.51 * 16383)))
+        self.assertAlmostEqual(self.ex.fader_value, round(0.51 * 16383) / 16383)
+
+    def test_zwei_motoren_auf_einem_executor_schaukeln_nicht(self):
+        self._fader(kanal=1, geraet="Pult A")
+        self._fader(kanal=2, geraet="Pult B")
+        self._takt()
+        self.midi.pitch.clear()
+        _osc_fader(self.zustand, 1, 8000 / 16383)
+        self._takt()
+        self.assertEqual(sorted(self.midi.pitch),
+                         [("Pult A", 1, 8000), ("Pult B", 2, 8000)])
+        verlauf = []
+        for _ in range(20):
+            # jeder Motor meldet 0,3 s nach seiner Sendung knapp daneben
+            gesendet = list(self.midi.pitch)
+            self.midi.pitch.clear()
+            verlauf += gesendet
+            self._spaeter(0.3)
+            for port, kanal, wert in gesendet:
+                self.mapper._on_midi(_pb(kanal, wert - 20, port=port))
+            self._spaeter(0.5)
+            self._takt()
+        self.assertEqual(sorted(verlauf), [("Pult A", 1, 8000), ("Pult B", 2, 8000)],
+                         "die Motoren schaukeln sich auf")
+        self.assertAlmostEqual(self.ex.fader_value, 8000 / 16383)
+
+    def test_grand_master_mit_bereich_wird_zurueckgelesen(self):
+        """Nur das Zuruecklesen rechnet durch continuous_min/max — ein
+        Durchreichen des rohen GM-Werts ergaebe 4096 statt 8192."""
+        self._fader(action=mm.ACTION_GRAND_MASTER, param="",
+                    continuous_min=0.0, continuous_max=0.5)
+        self._takt()
+        self.midi.pitch.clear()
+        _osc_gm(self.zustand, 0.25)
+        self._spaeter(0.1)
+        self._takt()
+        self.assertEqual(self.midi.pitch, [("X-Touch", 1, 8192)])
+
+
 class BeruehrtWaehrendFremdemWegTest(_Wege):
 
     def test_osc_waehrend_der_hand_wartet_bis_zum_loslassen(self):

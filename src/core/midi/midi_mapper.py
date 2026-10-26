@@ -11,6 +11,7 @@ from typing import Callable
 from uuid import uuid4
 
 from .midi_manager import (MidiMessage, geraet_passt, get_midi_manager,
+                           port_basisname,
                            stabiler_portname, fader_wert)
 
 # Action types (legacy-compatible)
@@ -41,6 +42,17 @@ MOTOR_HAND_RUHE_S = 0.35
 #: Sperre durchliefe ein Executor-Fader, der von 0 auf 100 % springt (Seiten-
 #: wechsel), am Ausgang alle Zwischenstellungen, die der Motor meldet.
 MOTOR_ECHO_FENSTER_S = 0.25
+#: Nachlauf: ein Motor, der langsam ankommt, meldet seine Endstellung auch
+#: noch nach dem Echo-Fenster. Bis zu dieser Zeit nach der Sendung gilt ein
+#: Bericht weiter als Echo, wenn er hoechstens ``MOTOR_ECHO_TOLERANZ`` neben
+#: dem gesendeten Ziel liegt und die Hand seit der Sendung nichts gemeldet hat
+#: — bei einem Fader, dessen Beruehrungssensor sich schon gemeldet hat, jeder
+#: Bericht ohne Beruehrung (die Hand meldet sich dort immer erst per Sensor).
+#: Danach ist alles wieder die Hand, auch ein feines Nachstellen.
+MOTOR_NACHLAUF_S = 1.0
+#: Abstand zum gesendeten Ziel (0..1), bis zu dem ein spaeter Bericht noch als
+#: Einschwingen des Motors gilt (3 % ~ 490 von 16383).
+MOTOR_ECHO_TOLERANZ = 0.03
 #: Ab dieser Aenderung der Stellung (0..1) wird ein Motorfader nachgefuehrt —
 #: feiner als die 1 % der LED-Rueckmeldung, damit eine Ueberblendung nicht ruckt.
 MOTOR_SCHRITT = 0.002
@@ -55,6 +67,9 @@ _MOTOR_LESBAR = (ACTION_EXECUTOR_FADER, ACTION_GRAND_MASTER)
 #: Anschlag > 0 = beruehrt, 0 (oder Note-Off) = losgelassen.
 TOUCH_KANAL = 1
 TOUCH_NOTE_FADER_1 = 104
+#: Geht das Loslassen verloren (Kabel gezogen, Pult neu gestartet), loest sich
+#: die Sperre nach dieser Zeit ohne Beruehrungs-Note und ohne Wert vom Fader.
+MOTOR_BERUEHRT_MAX_S = 10.0
 
 
 def mackie_touch_note(fader_kanal: int) -> int | None:
@@ -504,6 +519,12 @@ class MidiMapper:
         # die Stellung (0..1), die jeder Fader zuletzt selbst gemeldet hat.
         self._motor_beruehrt: set[str] = set()
         self._motor_hand_wert: dict[str, float] = {}
+        # Wann sich die Hand auf einem beruehrten Fader zuletzt gemeldet hat
+        # (Zeitlimit der Sperre), welche Fader einen Sensor HABEN (schon einmal
+        # beruehrt) und von welchem Port ihr Fader zuletzt kam.
+        self._motor_beruehrt_ts: dict[str, float] = {}
+        self._motor_sensor: set[str] = set()
+        self._motor_port: dict[str, str] = {}
         self._feedback_queue: queue.Queue[tuple[MidiMapping, float]] = queue.Queue(maxsize=2048)
         self._feedback_running = True
         self._last_state_poll_ts = 0.0
@@ -1199,19 +1220,84 @@ class MidiMapper:
         if not ist_motorfader(mapping) or msg.msg_type != "pitchbend":
             return False
         jetzt = self._uhr()
+        mid = mapping.mapping_id
+        wert = fader_wert(msg)
         with self._motor_lock:
-            if mapping.mapping_id in self._motor_beruehrt:
+            if msg.port_name:
+                self._motor_port[mid] = msg.port_name
+            if mid in self._motor_beruehrt:
                 # MIDI-15: der Sensor sagt, die Hand liegt auf dem Fader — was
                 # jetzt kommt, ist nie der Bericht einer Motorfahrt.
-                self._motor_hand_ts[mapping.mapping_id] = jetzt
-                self._motor_hand_wert[mapping.mapping_id] = fader_wert(msg)
+                self._motor_hand_ts[mid] = jetzt
+                self._motor_hand_wert[mid] = wert
+                self._motor_beruehrt_ts[mid] = jetzt
                 return False
-            gesendet = self._motor_send_ts.get(mapping.mapping_id)
-            if gesendet is not None and (jetzt - gesendet) < MOTOR_ECHO_FENSTER_S:
-                return True
-            self._motor_hand_ts[mapping.mapping_id] = jetzt
-            self._motor_hand_wert[mapping.mapping_id] = fader_wert(msg)
+            gesendet = self._motor_send_ts.get(mid)
+            if gesendet is not None:
+                seit = jetzt - gesendet
+                if seit < MOTOR_ECHO_FENSTER_S:
+                    return True
+                if seit < MOTOR_NACHLAUF_S:
+                    if mid in self._motor_sensor:
+                        return True     # ohne Beruehrung keine Hand
+                    hand = self._motor_hand_ts.get(mid, float("-inf"))
+                    ziel = self._motor_wert.get(mid)
+                    if (hand <= gesendet and ziel is not None
+                            and abs(wert - ziel / 16383.0) <= MOTOR_ECHO_TOLERANZ):
+                        return True     # der Motor schwingt noch ein
+            self._motor_hand_ts[mid] = jetzt
+            self._motor_hand_wert[mid] = wert
         return False
+
+    def _beruehrung_gilt(self, mapping: MidiMapping, port_name: str,
+                         geraete: set[str]) -> bool:
+        """Kommt die Beruehrungs-Note vom Pult DIESES Faders? Mit Eingangs-
+        geraet wie jede Eingabe; ohne (aelteres Mapping) gegen den Port, von
+        dem der Fader zuletzt kam, sonst gegen den Ausgang des Motors."""
+        geraet = mapping.midi_in.device
+        if geraet:
+            return geraet_passt(geraet, port_name, _offene_eingaenge(), geraete)
+        with self._motor_lock:
+            bezug = self._motor_port.get(mapping.mapping_id, "")
+        bezug = bezug or str(mapping.midi_out.device or "").strip()
+        if not bezug or not port_name:
+            return True
+        return port_basisname(bezug) == port_basisname(port_name)
+
+    def _motor_losgelassen(self, mapping: MidiMapping) -> None:
+        """Unter ``_motor_lock``: Sperre aufheben und sofort nachtragen."""
+        mid = mapping.mapping_id
+        war = mid in self._motor_beruehrt
+        self._motor_beruehrt.discard(mid)
+        self._motor_beruehrt_ts.pop(mid, None)
+        if not war:
+            return
+        # sofort nachtragen: die Hand ist weg, keine Wartezeit
+        self._motor_hand_ts.pop(mid, None)
+        self._motor_wert.pop(mid, None)     # auch wenn der Wert gleich ist
+        if mapping.action in _MOTOR_LESBAR:
+            # der Wert zaehlt nicht: gesendet wird der echte Stand
+            self._motor_offen.setdefault(mid, (mapping, 0.0))
+        elif mid in self._motor_hand_wert:
+            # Ziel ohne lesbaren Stand: nur, was der Fader selbst
+            # gemeldet hat — nie eine geratene Stellung
+            self._motor_offen[mid] = (mapping, self._motor_hand_wert[mid])
+
+    def _motor_sperre_abgelaufen(self, jetzt: float) -> None:
+        """Unter ``_motor_lock``: Sperren, zu denen seit
+        ``MOTOR_BERUEHRT_MAX_S`` nichts mehr kam, wie ein Loslassen loesen."""
+        alt = [mid for mid in self._motor_beruehrt
+               if jetzt - self._motor_beruehrt_ts.get(mid, jetzt) >= MOTOR_BERUEHRT_MAX_S]
+        if not alt:
+            return
+        nach_id = {m.mapping_id: m for m in self._mappings}
+        for mid in alt:
+            mapping = nach_id.get(mid)
+            if mapping is None:
+                self._motor_beruehrt.discard(mid)
+                self._motor_beruehrt_ts.pop(mid, None)
+            else:
+                self._motor_losgelassen(mapping)
 
     def _motor_beruehrung(self, msg: MidiMessage) -> None:
         """MIDI-15: Beruehrungs-Note eines Motorfaders auswerten.
@@ -1229,28 +1315,16 @@ class MidiMapper:
         for mapping in mappings:
             if not ist_motorfader(mapping) or mapping.midi_out.touch_note != msg.data1:
                 continue
-            geraet = mapping.midi_in.device
-            if geraet and not geraet_passt(geraet, msg.port_name,
-                                           _offene_eingaenge(), geraete):
+            if not self._beruehrung_gilt(mapping, msg.port_name, geraete):
                 continue                    # dieselbe Note von einem anderen Pult
             mid = mapping.mapping_id
             with self._motor_lock:
                 if beruehrt:
                     self._motor_beruehrt.add(mid)
+                    self._motor_beruehrt_ts[mid] = self._uhr()
+                    self._motor_sensor.add(mid)
                     continue
-                war = mid in self._motor_beruehrt
-                self._motor_beruehrt.discard(mid)
-                if war:
-                    # sofort nachtragen: die Hand ist weg, keine Wartezeit
-                    self._motor_hand_ts.pop(mid, None)
-                    self._motor_wert.pop(mid, None)     # auch wenn der Wert gleich ist
-                    if mapping.action in _MOTOR_LESBAR:
-                        # der Wert zaehlt nicht: gesendet wird der echte Stand
-                        self._motor_offen.setdefault(mid, (mapping, 0.0))
-                    elif mid in self._motor_hand_wert:
-                        # Ziel ohne lesbaren Stand: nur, was der Fader selbst
-                        # gemeldet hat — nie eine geratene Stellung
-                        self._motor_offen[mid] = (mapping, self._motor_hand_wert[mid])
+                self._motor_losgelassen(mapping)
 
     def _motor_stellung(self, mapping: MidiMapping, vorgabe: float) -> float:
         """Wohin der Fader gehoert (0..1). Bei einem lesbaren Ziel der echte
@@ -1288,6 +1362,7 @@ class MidiMapper:
         jetzt = self._uhr()
         faellig = []
         with self._motor_lock:
+            self._motor_sperre_abgelaufen(jetzt)
             for mid, (mapping, value) in list(self._motor_offen.items()):
                 if mid in self._motor_beruehrt:         # MIDI-15: erst loslassen
                     continue
@@ -1337,9 +1412,15 @@ class MidiMapper:
             if mapping_id is None:
                 self._motor_beruehrt.clear()
                 self._motor_hand_wert.clear()
+                self._motor_beruehrt_ts.clear()
+                self._motor_sensor.clear()
+                self._motor_port.clear()
             else:
                 self._motor_beruehrt.discard(mapping_id)
                 self._motor_hand_wert.pop(mapping_id, None)
+                self._motor_beruehrt_ts.pop(mapping_id, None)
+                self._motor_sensor.discard(mapping_id)
+                self._motor_port.pop(mapping_id, None)
 
     @staticmethod
     def _sende(midi, geraet: str, msg_type: str, ch: int, trigger: int,

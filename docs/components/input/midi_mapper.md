@@ -69,7 +69,12 @@ Schleife sendet die Stellung mit 14 Bit auf dem Kanal des Faders zurück
   Wert.
 - **Echo ist keine Eingabe.** Was binnen `MOTOR_ECHO_FENSTER_S` (0,25 s) nach einer eigenen
   Sendung vom selben Fader kommt, ist der Bericht der Motorfahrt und wird nicht ausgeführt
-  (`_motor_eingang`).
+  (`_motor_eingang`). **Nachlauf:** bis `MOTOR_NACHLAUF_S` (1 s) nach der Sendung gilt ein
+  später Bericht weiter als Echo, wenn er höchstens `MOTOR_ECHO_TOLERANZ` (3 %) neben dem
+  gesendeten Ziel liegt und die Hand seither nichts gemeldet hat – bei einem Fader, dessen
+  Berührungssensor sich schon gemeldet hat (MIDI-15), jeder Bericht ohne Berührung. Sonst
+  überschriebe ein langsamer Motor einen per OSC/NET-15/WEB-12 gesetzten Wert, und zwei
+  Motorfader auf demselben Executor schaukelten sich auf. Danach ist alles wieder die Hand.
 - **Nichts raten.** Nachgeführt wird aus dem echten Stand (`_motor_stellung`,
   zurückgerechnet durch `continuous_min/max`) – nur bei Executor-Fader und Grand Master
   (`_MOTOR_LESBAR`). Andere stufenlose Ziele bekommen nur ihre eigene Stellung zurück.
@@ -87,7 +92,10 @@ eine laufende Überblendung). Losgelassen: die Stellung wird sofort nachgetragen
 Wartezeit – bei Zielen ohne lesbaren Stand nur, was der Fader selbst gemeldet hat. Ohne
 `touch_note` (Kanal 10..16, anderes Pult) gelten allein die Regeln aus MIDI-14; dort
 gewinnt bei einer laufenden Fahrt der Motor. Kommt das Loslassen nie an (Kabel gezogen),
-steht der Fader still, bis er wieder berührt und losgelassen wird.
+löst sich die Sperre nach `MOTOR_BERUEHRT_MAX_S` (10 s) ohne Berührungs-Note und ohne Wert
+vom Fader wie ein Loslassen (`_motor_sperre_abgelaufen`). Mappings ohne `midi_in.device`
+nehmen die Note nur vom Port, von dem ihr Fader zuletzt kam, sonst vom Pult ihres
+Motor-Ausgangs (`_beruehrung_gilt`) – ein Extender mit derselben Note sperrt nicht mit.
 
 ## Gekoppelte VC-/Engine-Teile
 

@@ -227,6 +227,50 @@ class BeruehrtTest(_Basis):
         self.assertEqual(self.midi.pitch, [])
 
 
+class SperreLoestSichTest(_Basis):
+    """Gegenpruefung: ein verlorenes Loslassen darf den Motor nicht fuer
+    immer stilllegen; die Note eines anderen Pults sperrt nicht."""
+
+    def test_verlorenes_loslassen_loest_sich_nach_der_zeit(self):
+        self._fader()
+        self.mapper._on_midi(_note(1, 104, 127))        # danach kein Loslassen
+        self.ex.fader_value = 0.7
+        self._spaeter(mm.MOTOR_BERUEHRT_MAX_S - 0.5)
+        self._takt()
+        self.assertEqual(self.midi.pitch, [])
+        self._spaeter(1.0)
+        self._takt()
+        self.assertEqual(self.midi.pitch, [("X-Touch", 1, round(0.7 * 16383))])
+        self.assertNotIn(self.mapper._mappings[0].mapping_id,
+                         self.mapper._motor_beruehrt)
+
+    def test_bewegte_hand_haelt_die_sperre(self):
+        self._fader()
+        self.mapper._on_midi(_note(1, 104, 127))
+        self.ex.fader_value = 0.7
+        for i in range(30):                             # 30 s lang bewegt
+            self._spaeter(1.0)
+            self.mapper._on_midi(_pb(1, 5000 + i))
+            self._takt()
+        self.assertEqual(self.midi.pitch, [])
+
+    def test_ohne_eingangsgeraet_zaehlt_nur_das_pult_des_faders(self):
+        m = self._fader()                               # midi_in.device leer
+        self.assertEqual(m.midi_in.device, "")
+        self.mapper._on_midi(_note(1, 104, 127, port="X-Touch Extender"))
+        self.assertNotIn(m.mapping_id, self.mapper._motor_beruehrt)
+        self.mapper._on_midi(_note(1, 104, 127, port="X-Touch"))
+        self.assertIn(m.mapping_id, self.mapper._motor_beruehrt)
+
+    def test_ohne_eingangsgeraet_gilt_der_port_des_faders(self):
+        m = self._fader(geraet="")                      # auch kein Ausgang
+        self.mapper._on_midi(_pb(1, 3000, port="Pult A"))
+        self.mapper._on_midi(_note(1, 104, 127, port="Pult B"))
+        self.assertNotIn(m.mapping_id, self.mapper._motor_beruehrt)
+        self.mapper._on_midi(_note(1, 104, 127, port="Pult A"))
+        self.assertIn(m.mapping_id, self.mapper._motor_beruehrt)
+
+
 class AnsichtTest(unittest.TestCase):
 
     def test_die_frage_nennt_die_beruehrungs_note(self):
