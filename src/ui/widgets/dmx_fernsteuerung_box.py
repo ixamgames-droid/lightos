@@ -16,6 +16,7 @@ from src.core.dmx.fernsteuerung import (
     QUELLE_ARTNET, QUELLE_SACN, ZIEL_BACK, ZIEL_FADER, ZIEL_GM, ZIEL_GO,
     ZIEL_STOP, TASTEN_ZIELE, Konfig, Zuordnung,
 )
+from src.ui.widgets.tabellen_spalten import combo_breite, spalte_fest
 
 QUELLEN_TEXT = [(QUELLE_ARTNET, "Art-Net"), (QUELLE_SACN, "sACN")]
 ZIELE_TEXT = [
@@ -88,30 +89,14 @@ class FernsteuerungBox(QGroupBox):
     # ── Tabelle ───────────────────────────────────────────────────────────
 
     def _combo_breite(self, texte) -> int:
-        """sizeHint-Breite einer Combo mit diesen Eintraegen - gemessen als
-        Kind der Tabelle, damit Schrift und Stylesheet dieselben sind wie in
-        den Zellen."""
-        probe = QComboBox(self.tabelle)
-        probe.setVisible(False)
-        for _key, text in texte:
-            probe.addItem(text)
-        probe.ensurePolished()
-        breite = probe.sizeHint().width()
-        probe.setParent(None)
-        probe.deleteLater()
-        return breite
+        """sizeHint-Breite einer Combo mit diesen Eintraegen (gemeinsame Hilfe
+        ``tabellen_spalten.combo_breite``, seit OSC-07 auch im OSC-Dialog)."""
+        return combo_breite(self.tabelle, texte)
 
     def _spalten_anpassen(self):
         """Quelle/Ziel so breit wie Kopf und laengster Eintrag (mit Pfeil)."""
-        kopf = self.tabelle.horizontalHeader()
         for sp, texte in ((SP_QUELLE, QUELLEN_TEXT), (SP_ZIEL, ZIELE_TEXT)):
-            breite = max(self._combo_breite(texte), kopf.sectionSizeHint(sp))
-            for r in range(self.tabelle.rowCount()):
-                w = self.tabelle.cellWidget(r, sp)
-                if w is not None:
-                    breite = max(breite, w.sizeHint().width())
-            # Die Zelle ist um die Gitterlinie schmaler als die Spalte.
-            kopf.resizeSection(sp, breite + (1 if self.tabelle.showGrid() else 0))
+            spalte_fest(self.tabelle, sp, self._combo_breite(texte))
 
     def changeEvent(self, ev):
         super().changeEvent(ev)
