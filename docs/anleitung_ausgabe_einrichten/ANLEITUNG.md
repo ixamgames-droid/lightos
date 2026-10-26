@@ -25,8 +25,8 @@
   Netzwerkeingang) und einen Rechner **im selben Netz**, siehe
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
 
-Die Bilder zeigen eine **Beispiel-Konfiguration**: Universe 1 über einen ENTTEC an
-`/dev/ttyUSB0`, Universe 2 über Art-Net an einen Node mit der Adresse `192.0.2.50`.
+Die Bilder zeigen eine **Beispiel-Konfiguration**: Universum 1 über einen ENTTEC an
+`/dev/ttyUSB0`, Universum 2 über Art-Net an einen Node mit der Adresse `192.0.2.50`.
 Port und Adressen sind Beispiele — bei dir stehen dort deine eigenen. Unter Windows
 heißt der Port zum Beispiel `COM3`, unter Linux meist `/dev/ttyUSB0`.
 Die **Statusleiste** unten in den Bildern gehört nicht zu dieser Beispiel-Konfiguration: Die Bilder
@@ -186,8 +186,8 @@ Reiter **Art-Net**:
 4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.0.2.50`) oder
    `255.255.255.255` für alle im Netz. Leer bedeutet ebenfalls `255.255.255.255`.
 5. **Art-Net Startuniversum:** — die Art-Net-Universumsnummer, die der Node erwartet.
-   Vorbelegt ist LightOS-Universum minus 1: Universe 2 sendet also auf Art-Net-Universum
-   `1`, Universe 1 auf `0`.
+   Vorbelegt ist LightOS-Universum minus 1: Universum 2 sendet also auf Art-Net-Universum
+   `1`, Universum 1 auf `0`.
 6. **Übernehmen** — richtet den Ausgang ein und speichert ihn. Der Status zeigt dann
    `Aktiv → <Adresse> · Universum <n> (gespeichert)`; beim Öffnen des Dialogs steht dort
    der gespeicherte Stand (`Gespeichert: 192.0.2.50 · Universum 2`).
@@ -323,10 +323,10 @@ auch zum **Laser-NOT-AUS**: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER
 
 ## 8. Warnungen in der Statusleiste lesen
 
-Die Statusleiste meldet dauerhaft, ob etwas nicht hinausgeht. Im Bild wurde Universe 1
+Die Statusleiste meldet dauerhaft, ob etwas nicht hinausgeht. Im Bild wurde Universum 1
 der Ausgang genommen, während dort Geräte gepatcht sind:
 
-![Warnungen: Universe ohne Ausgang](img/08_warnungen.png)
+![Warnungen: Universum ohne Ausgang](img/08_warnungen.png)
 
 1. Der DMX Monitor meldet `⚠ Universum 1 hat keinen Ausgang — nur gerechnet`.
 2. **Enttec-Anzeige** unten links:
@@ -498,7 +498,7 @@ Ausführlich für Windows: [Netzwerk vorbereiten (Windows)](../anleitung_netzwer
 ## Weiterlesen
 
 - [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md) — ENTTEC
-  auf Universe 1 und Art-Net auf Universe 2 Schritt für Schritt, mit den Regeln für
+  auf Universum 1 und Art-Net auf Universum 2 Schritt für Schritt, mit den Regeln für
   doppelte Ziele.
 - [Enttec und Art-Net gleichzeitig](../anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md)
   — dasselbe Prinzip an einem zweiten Beispiel.

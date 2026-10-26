@@ -243,7 +243,9 @@ def rueckfrage_abfangen(aufruf):
     Liefert ``(titel, text, knoepfe)`` genau so, wie der Code sie stellt, und
     antwortet ``No`` — es passiert also nichts.
     """
-    from PySide6.QtWidgets import QMessageBox
+    # UI-92: das Hauptfenster fragt ueber seine eigene Unterklasse
+    # (feste Knopftexte) — nur dort greift die Falle, sonst blockiert exec().
+    from src.ui.main_window import QMessageBox
     gefangen = {}
     alt = QMessageBox.question
 
@@ -262,7 +264,9 @@ def rueckfrage_abfangen(aufruf):
 
 def mit_antwort_ja(aufruf):
     """``aufruf()`` mit ``QMessageBox.question`` -> ``Yes`` (wie ein Klick)."""
-    from PySide6.QtWidgets import QMessageBox
+    # UI-92: das Hauptfenster fragt ueber seine eigene Unterklasse
+    # (feste Knopftexte) — nur dort greift die Falle, sonst blockiert exec().
+    from src.ui.main_window import QMessageBox
     alt = QMessageBox.question
     QMessageBox.question = staticmethod(
         lambda *_a, **_k: QMessageBox.StandardButton.Yes)
@@ -538,7 +542,9 @@ def _bild_beenden(ui):
     mit eigener Rueckfrage), und nachher, dass das Ereignis ignoriert wurde.
     """
     from PySide6.QtGui import QCloseEvent
-    from PySide6.QtWidgets import QMessageBox
+    # UI-92: das Hauptfenster fragt ueber seine eigene Unterklasse
+    # (feste Knopftexte) — nur dort greift die Falle, sonst blockiert exec().
+    from src.ui.main_window import QMessageBox
     from src.ui import main_window
     if not ui.win._has_unsaved_changes():
         raise SzenenFehler("Keine ungespeicherte Änderung — Beenden fragte nicht")

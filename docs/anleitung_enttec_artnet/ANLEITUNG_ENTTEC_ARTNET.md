@@ -5,8 +5,8 @@
 > ausgeben — **gleichzeitig**. Enttec, Art-Net und sACN lassen sich frei mischen (bis zu 32
 > Universen).
 >
-> Beispiel dieser Anleitung (live verifiziert): **EventPar** (Universe 1) über **Art-Net** an
-> einen Node (`192.0.2.99`) + **Hydrabeam 4000** (Universe 3) über **Enttec** auf `COM3`.
+> Beispiel dieser Anleitung (live verifiziert): **EventPar** (Universum 1) über **Art-Net** an
+> einen Node (`192.0.2.99`) + **Hydrabeam 4000** (Universum 3) über **Enttec** auf `COM3`.
 
 ## Kurz-Prinzip
 
@@ -22,10 +22,10 @@ Ein Gerät hängt immer an dem Universum, das über das gewünschte Interface l�
 
 ## 1. Geräte auf die passenden Universen patchen
 
-Beim Patchen (Sektion **Patchen**) je Gerät das **Universe** wählen:
+Beim Patchen (Sektion **Patchen**) je Gerät das **Universum** wählen:
 
-- EventPar → **Universe 1** (kommt über Art-Net raus).
-- Hydrabeam 4000 → **Universe 3** (kommt über Enttec raus).
+- EventPar → **Universum 1** (kommt über Art-Net raus).
+- Hydrabeam 4000 → **Universum 3** (kommt über Enttec raus).
 
 Die DMX-Adresse ist pro Universum normal (1–512) — zwei Geräte auf verschiedenen Universen
 dürfen dieselbe Adresse haben.
@@ -83,7 +83,7 @@ Art-Net ist Netzwerk-Ausgabe. Dein PC (bzw. der USB-Netzwerk-Adapter, an dem der
 ## Merksätze
 
 - **Ausgabe-Typ ist pro Universum** — Enttec, Art-Net und sACN beliebig mischen.
-- **Gerät → Universum → Backend:** erst patchen (Universe), dann das Universum auf das
+- **Gerät → Universum → Backend:** erst patchen (Universum), dann das Universum auf das
   richtige Interface stellen.
 - **Enttec:** COM-Port aus dem Enttec-Tab; Status „`… aktiv (…)`" (grün) in der Statusleiste = verbunden.
 - **Art-Net:** Node-IP oder Broadcast, und der PC muss **im selben Subnetz** liegen (sonst
