@@ -103,7 +103,8 @@ Eine Szene legst du im Reiter **Assistent** an:
 
 Daneben: **+ Szene** legt eine leere Szene an und öffnet sie zum Bearbeiten,
 **+ Chaser** ebenso einen Chaser, **Effekt-Assistent...** baut Effekte mit einem
-Assistenten.
+Assistenten. **Mitschnitt-Assistent...** übernimmt Szenen aus einem anderen
+Lichtprogramm, siehe [Schritt 11](#11-szenen-aus-einem-anderen-programm-übernehmen-mitschnitt).
 
 Eine laufende Szene liegt *unter* dem Programmer: Stehen dort noch Werte für dieselben
 Kanäle, siehst du die Szene erst nach **Alles löschen**.
@@ -268,6 +269,102 @@ legst du mit **Funktion an/aus** auf eine Taste, Snapshots mit **Snapshot abrufe
 Alle Einstellungen im Detail:
 [Button](../anleitung_vc_widgets/01_button.md) und
 [Cue-Liste](../anleitung_vc_widgets/08_cue_liste.md).
+
+---
+
+## 11. Szenen aus einem anderen Programm übernehmen (Mitschnitt)
+
+Wer von einem anderen Lichtprogramm umsteigt, muss seine Szenen nicht neu bauen: Das
+alte Programm gibt sie nacheinander aus, LightOS hört über den Art-Net- oder
+sACN-Eingang zu und hält den Stand auf Knopfdruck als Szene fest.
+
+**Vorher:**
+
+1. **Der Patch steht in LightOS** — dieselben Geräte auf denselben Adressen wie im
+   alten Programm. Ohne Patch weiß LightOS nicht, welcher Kanal zu welchem Gerät
+   gehört. Eine Geräteliste lässt sich auch aus einer Tabelle einlesen, siehe
+   [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md).
+2. **Der Eingang ist eingeschaltet:** Menü **Ausgabe → Konfigurieren...**, Reiter
+   **DMX-Eingang**. Dort **Art-Net-Eingang aktivieren** oder **sACN-Eingang aktivieren**
+   anhaken, bei **Eingehendes Universum** das Universum des anderen Programms und bei
+   **Mischen in Universum** das LightOS-Universum deines Patches eintragen, dann
+   **Übernehmen**.
+3. **Das andere Programm sendet an diesen Rechner** (Art-Net oder sACN, im selben Netz).
+
+**Mitschneiden:**
+
+1. Im Programmer den Reiter **Assistent** öffnen und **Mitschnitt-Assistent...** wählen.
+   Der Assistent ist ein eigenes Fenster über LightOS und sperrt nichts: DMX-Monitor,
+   3D-Fenster und Funktionsliste bleiben daneben bedienbar. Es gibt ihn nur einmal —
+   ein zweiter Klick auf den Knopf holt das offene Fenster nach vorn.
+2. Oben steht je Protokoll, was ankommt: „Signal seit …“ oder „kein Signal“, dazu
+   welches Universum in welches LightOS-Universum geht und wie viele gepatchte Geräte
+   gerade Werte bekommen. Ohne Signal zeigt **Hilfe zum Eingang einblenden** den Weg
+   zur Eingangs-Einstellung.
+3. Im alten Programm die erste Szene aufrufen und warten, bis sie steht.
+4. **Als Szene festhalten** drücken (oder die **Leertaste**). Die Szene erscheint in
+   der Liste, der Name zählt von selbst weiter: „Mitschnitt 1“, „Mitschnitt 2“ …
+   Einen eigenen Namen trägst du vorher ins Feld **Name:** ein. Die Leertaste hält nur
+   fest, solange das Fenster des Assistenten das aktive ist — im Hauptfenster bleibt
+   sie **GO**, auch während der Assistent offen ist.
+   Weil die Leertaste hier festhält, bedienst du Knöpfe und Haken des Assistenten
+   per Tastatur mit der **Eingabetaste** (mit der Tabulatortaste hin, dann Eingabe).
+   Schaltest du den Eingang ab, während der Assistent offen ist, gibt es sofort kein
+   Bild mehr — aus dem zuletzt empfangenen entsteht dann keine Szene.
+5. Nächste Szene im alten Programm aufrufen, wieder festhalten — so oft wie nötig.
+6. Sollen die Szenen nacheinander ablaufen: **Am Ende als Chaser zusammenfassen**
+   anhaken und die **Schrittzeit:** einstellen.
+7. **Fertig** schließt den Assistenten (er schließt auch mit dem Hauptfenster). Die Szenen (und der Chaser) stehen im Reiter
+   **Assistent** in der Liste und in der Bibliothek.
+
+**Was der Assistent dabei beachtet:**
+
+- **Nur ein ruhiges Bild.** Läuft im alten Programm noch eine Überblendung, lehnt der
+  Knopf ab und sagt es. Als ruhig gilt ein Bild, das sich 0,5 Sekunden lang nicht
+  geändert hat (**Ruhig nach:**). Für eine Quelle, die nie stillsteht, gibt es den
+  Haken **Auch festhalten, wenn sich das Bild noch ändert**.
+- **Welche Kanäle:** Vorgabe ist **Alle gepatchten Kanäle** — die Szene ist dann das
+  ganze Bild, auch was dunkel war, bleibt dunkel. **Nur Kanäle ungleich 0** und **Nur
+  was sich seit dem letzten Festhalten geändert hat** lassen Kanäle weg; solche Szenen
+  lassen andere Funktionen auf diesen Kanälen durch. Die Dimmer-Kanäle eines
+  aufgenommenen Geräts kommen dabei immer mit, auch mit Wert 0 — eine Farbe ohne
+  Dimmer bleibt so dunkel wie im alten Programm.
+- **Laser werden ausgelassen.** Das ist eine Sicherheitsvorgabe; nur mit dem Haken
+  **Laser mit aufnehmen** kommen ihre Kanäle mit in die Szene.
+- **Rückgängig:** Jede festgehaltene Szene ist ein eigener Schritt für **Strg+Z**, der
+  Chaser am Ende ein weiterer. **Entfernen** löscht die markierte Szene wieder. Nimmst
+  du im Hauptfenster eine Szene mit **Strg+Z** zurück, verschwindet sie auch aus der
+  Liste des Assistenten und kommt nicht in den Chaser.
+- **Show oder Patch geändert, während der Assistent offen ist?** Er bleibt offen und
+  zieht nach. Den Patch liest er bei jedem Festhalten neu — eine neue Szene enthält
+  nur Geräte, die es jetzt gibt; bereits festgehaltene Szenen bleiben, wie sie sind.
+  Nach einem Show-Wechsel beginnt die Liste neu, und der Assistent sagt es: Was vorher
+  festgehalten wurde, gehört zur vorherigen Show und kommt nicht in den Chaser.
+- **Kleine Bildschirme:** Name, **Als Szene festhalten**, die Meldung darunter, die
+  Liste mit **Entfernen**, die Chaser-Zeile und **Fertig** stehen fest im Fenster.
+  Reicht die Höhe nicht, rollt nur der obere Teil mit Eingang und Einstellungen, und
+  die Wegbeschreibung zum Eingang startet eingeklappt.
+- **Der Assistent liest nur.** Er gibt selbst nichts aus und ändert weder den
+  Programmer noch laufende Funktionen. Unverändert bleibt auch, was der Eingang ohnehin
+  tut: Mit eingeschaltetem Eingang mischt LightOS das empfangene DMX in das
+  eingestellte Universum der eigenen Ausgabe.
+
+**Grenzen — was der Mitschnitt nicht kann:**
+
+- **Nur Kanalwerte.** Übernommen wird, was in diesem Augenblick auf den Kanälen steht.
+- **Keine Effekte als Effekte.** Ein Lauflicht oder eine Bewegung des alten Programms
+  wird zu einzelnen Standbildern, nicht zu einem Effekt in LightOS.
+- **Keine Tasten.** Belegungen von Tasten, Fadern und Seiten des alten Programms
+  kommen nicht mit.
+- **Ein Universum je Protokoll.** Der Eingang ordnet je Protokoll ein Universum zu.
+  Weitere empfangene Universen nennt der Assistent, schneidet sie aber nicht mit. Für
+  ein zweites Universum stellst du den Eingang um und schneidest noch einmal mit;
+  Geräte in einem nicht empfangenen Universum fehlen in der Szene.
+- **Zeiten musst du von Hand setzen.** Überblend- und Haltezeiten stehen nicht im DMX.
+  Die Szenen entstehen ohne Einblendzeit, der Chaser mit einer Schrittzeit für alle
+  Schritte und ohne Überblendung.
+- **Kein Signal seit mehr als 5 Sekunden** gilt als „kein Signal“ — dann lässt sich
+  nichts festhalten.
 
 ---
 

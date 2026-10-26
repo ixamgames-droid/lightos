@@ -9,7 +9,7 @@ Je Eintrag (``kind``, ``device``):
 | ``input``   | ``set_source_mode("input", device)`` | stop   | ``use_audio_source(True)``                 |
 | ``os2l``    | stop                                 | start  | ``use_audio_source(False)``                |
 | ``song``    | stop                                 | stop   | ``use_audio_source(False)`` + aktueller Player-Track (``request_bpm``, nur in AUTO) |
-| ``off``     | stop                                 | stop   | ``use_audio_source(False)``                |
+| ``off``     | stop                                 | stop   | ``use_audio_source(False)`` + ``reset()`` (Takt 0 ausser von Hand gesetzt, BPM-33) |
 
 ``sink`` (S5) ist die ``sink_id`` eines Ausgabegeraets aus
 ``AudioCapture.list_loopback_sinks()``; alles andere (z. B. ein Mikrofonname aus
@@ -95,6 +95,18 @@ def _known_sink(device: str | None) -> str | None:
         return None
     return device if device in ids else None
 KINDS = ("loopback", "input", "os2l", "song", "off")
+# BPM-33: Takt-Herkuenfte, die „Aus" nicht nullt (von Hand gesetzt).
+HANDQUELLEN = ("manual", "tap", "nudge")
+
+
+def _von_hand(mgr) -> bool:
+    """BPM-33: Takt von Hand gesetzt (Eingabe/Tap/Nudge) — Quelle UND Modus MANUAL."""
+    try:
+        from src.core.engine.bpm_manager import BpmMode
+        return (getattr(mgr, "current_source", None) in HANDQUELLEN
+                and getattr(mgr, "mode", None) == BpmMode.MANUAL)
+    except Exception:
+        return False
 
 
 def _log(msg: str) -> None:
@@ -273,6 +285,24 @@ class SourceController:
                     self._safe("os2l start", srv.start)
             else:
                 self._os2l_stop()
+            if kind == "off":
+                # BPM-33 (Entscheidung des Projektinhabers, 25.10.2026): „Aus" setzt
+                # den Takt auf 0 — Beat-Effekte stehen, und die Auto-Show zeigt beim
+                # Abspielen den BPM-32-Hinweis „Takt aus Titel uebernehmen". Vorher
+                # blieb der zuletzt erkannte Takt stehen (gemessen 60 BPM nach PC-Audio),
+                # die Leiste erschien nicht und die Show taktete mit dem alten Wert.
+                # ``reset`` statt ``turn_off``: der Modus (Auto/Manuell) bleibt, sonst
+                # fuehrte die naechste Wahl von PC-Audio/Eingang nicht mehr (``apply``
+                # stellt den Modus von vorher wieder her). OS2L bleibt bewusst
+                # unveraendert (dort fuehrt das DJ-Programm den Takt).
+                # Ein von Hand gesetzter Takt (Eingabe/Tap/Nudge) gehoert nicht der
+                # Quelle und bleibt — „Manuell + Aus" ist die Arbeitslage fuer Tap.
+                # „Von Hand" heisst: Quelle manual/tap/nudge UND Modus MANUAL
+                # (``_set_manual`` kippt immer in MANUAL). Der Chaser-Standardtakt
+                # (``set_bpm(120, source="manual")`` bei Takt 0, Modus bleibt AUTO)
+                # ist keine Eingabe und wird genullt.
+                if not _von_hand(mgr):
+                    self._safe("reset", lambda: mgr.reset())
             if kind == "song":
                 self.apply_player_track()
         self._notify()
@@ -523,3 +553,31 @@ def song_may_lead() -> bool:
         _log(f"gewaehlte Quelle nicht ermittelbar: {e}")
         return True
     return True if kind is None else kind == "song"
+
+
+# BPM-32: Quellen, bei denen die Auto-Show keinen Titel-Takt setzen darf.
+FALLBACK_GESPERRT = ("off", "os2l")
+
+
+def nominal_fallback_blocked() -> bool:
+    """Darf die Auto-Show (``MusicShowDirector._ensure_bpm``) bei BPM 0 die
+    Nominal-BPM des Titels **nicht** setzen? (BPM-32)
+
+    **Gesperrt bei gewaehlter Quelle „Aus" und „OS2L"** (Entscheidung des
+    Projektinhabers, 25.10.2026): die Wahl des Nutzers gilt, und bei OS2L
+    schreibt kein Titel-Takt gegen das DJ-Programm. Die Auto-Show zeigt dann
+    stattdessen den Hinweis „Takt aus Titel uebernehmen".
+
+    Bei Lied-Analyse sowie PC-Audio/Eingang bleibt der Fallback wie bisher
+    (bei Live-Audio verwirft ``request_bpm`` ihn ohnehin, sobald der Detektor
+    fuehrt). Das ist bewusst enger als ``song_may_lead`` — sonst verloere der
+    Fallback bei PC-Audio vor dem Einrasten seinen Zweck.
+
+    **Fail-open** wie ``song_may_lead``: ist die Quelle nicht ermittelbar,
+    gilt das Verhalten von vorher (nicht gesperrt)."""
+    try:
+        kind = get_source_controller().chosen_kind()
+    except Exception as e:      # pragma: no cover - Verteidigung, s. Docstring
+        _log(f"gewaehlte Quelle nicht ermittelbar: {e}")
+        return False
+    return kind in FALLBACK_GESPERRT

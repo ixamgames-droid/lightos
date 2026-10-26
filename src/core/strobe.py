@@ -1,0 +1,221 @@
+"""VIZ-104: Blitzfrequenz eines Shutter-/Strobe-Kanals — EINE Quelle fuer die
+2D-Live-Ansicht und den 3D-Visualizer.
+
+Bis VIZ-104 stand die Formel in ``ui/views/live_view.py`` (FM-48), und nur die
+2D-Ansicht blinkte. Die 3D-Szene bekam vom Strobe nichts mit: dort hiess
+„Shutter im Strobe-Bereich" schlicht „hell" (``color_utils.visual_intensity``).
+
+Woher die Frequenz kommt, in dieser Reihenfolge:
+
+1. **Bereichsdaten des Profils.** Nur ein Bereich der Art ``strobe`` blitzt
+   (``app_state.shutter_bereich_art``); „offen"/„zu" und alles andere nicht.
+   Nennt der Bereichsname eine Frequenz („Strobe 1-25 Hz", „Strobe 10 Hz"),
+   gilt diese Spanne. Sonst steigt die Frequenz innerhalb des Bereichs linear
+   von :data:`HZ_MIN` auf :data:`HZ_MAX`. Heisst der Bereich erkennbar
+   „schnell -> langsam", laeuft die Spanne rueckwaerts.
+2. **Ohne Bereichsdaten** die VORSICHTIGE Regel: geblitzt wird nur, wenn der
+   Kanal ausdruecklich ein Strobe-Kanal ist (Attribut ``strobe`` oder ein Name
+   mit „Strobe"/„Flash"/„Blitz"/„Frequenz"). Dort gilt die gaengige Belegung „0 = aus,
+   darueber langsam -> schnell": Werte ueber 10 linear :data:`HZ_MIN` ..
+   :data:`HZ_MAX`. Ein reiner „Shutter"-Kanal ohne Bereiche blitzt NICHT —
+   bei ihm heisst 255 meist „offen", und ein Dauerlicht als Strobe zu zeigen
+   waere schlimmer, als einen unbelegten Strobe nicht zu zeigen.
+
+Warum Bereichsdaten Vorrang haben (FM-48): bis 2026-09-28 galt pauschal
+„> 10 = Strobe" — damit blinkten Geraete mit OFFENEM Shutter (Spider 14ch
+„Offen" 8-15, Hero Spot 90 „Open" 251-255, ZQ02001 „Strobe aus (offen)"
+250-255). Bis 2026-10-12 galt die pauschale Regel noch fuer alle Kanaele ohne
+Bereiche; seither (Entscheidung des Projektinhabers: „anzeigen, wie es in echt
+ist") nur noch fuer ausdrueckliche Strobe-Kanaele.
+
+Das Ergebnis ist eine Naeherung fuer die ANZEIGE. An der DMX-Ausgabe aendert
+sich nichts, und Farbe/Dimmer bleiben davon unberuehrt.
+"""
+from __future__ import annotations
+
+import re
+
+#: Naeherung ohne Frequenzangabe im Profil (Hz am unteren/oberen Bereichsende).
+HZ_MIN = 0.5
+HZ_MAX = 20.0
+#: Ohne Bereichsdaten: Werte bis einschliesslich dieser Schwelle = kein Strobe.
+OHNE_BEREICHE_SCHWELLE = 10
+#: Obergrenze fuer Frequenzen aus Bereichsnamen (Tippfehler im Profil).
+HZ_NAME_MAX = 60.0
+
+#: Darstellung im Bildtakt (3D-Szene UND 2D-Live-Ansicht) — dieselben Zahlen
+#: wie ``ui/visualizer/scene_src/fixtures/strobe.js``; der Test haelt sie gleich.
+#: Anteil der Periode, in dem ein blitzendes Geraet leuchtet.
+TAST = 0.25
+#: Hoechste dargestellte Blitzfrequenz (Hz).
+DECKEL_HZ = 10
+#: So viele Bilder hat eine Periode mindestens (eins an, der Rest aus).
+BILDER_JE_BLITZ = 3
+
+_SHUTTER_ATTRS = ("shutter", "strobe")
+#: Namensteile, die einen Kanal ausdruecklich als Strobe-Kanal ausweisen.
+#: „frequen": ein Shutter-Kanal, der „Frequenz"/„Frequency" heisst, stellt die
+#: Blitzfrequenz (eingebautes Profil „Strobe 2ch").
+_STROBE_WORTE = ("strob", "stobe", "flash", "blitz", "frequen")
+
+_ZAHL = r"(\d+(?:[.,]\d+)?)"
+_HZ_SPANNE = re.compile(_ZAHL + r"\s*(?:hz)?\s*(?:-|–|—|\.\.+|bis|to)\s*" + _ZAHL + r"\s*hz",
+                        re.IGNORECASE)
+_HZ_EINZEL = re.compile(_ZAHL + r"\s*hz", re.IGNORECASE)
+_RUECKWAERTS = re.compile(
+    r"(fast|schnell)\s*(?:-+>?|–|—|→|to|bis|nach|\.\.+)\s*(slow|langsam)", re.IGNORECASE)
+
+
+def _zahl(text: str) -> float:
+    return float(text.replace(",", "."))
+
+
+def hz_spanne_aus_name(name) -> tuple[float, float] | None:
+    """Frequenzspanne ``(von, bis)`` aus einem Bereichsnamen, sonst ``None``.
+
+    „Strobe 1-25 Hz" -> (1.0, 25.0); „Strobe 10 Hz" -> (10.0, 10.0);
+    „Strobe fast to slow" -> (HZ_MAX, HZ_MIN). Die Reihenfolge im Namen ist die
+    Reihenfolge im Wertebereich (erste Zahl = unteres Bereichsende)."""
+    text = str(name or "")
+    m = _HZ_SPANNE.search(text)
+    if m:
+        a, b = _zahl(m.group(1)), _zahl(m.group(2))
+    else:
+        m = _HZ_EINZEL.search(text)
+        if m:
+            a = b = _zahl(m.group(1))
+        elif _RUECKWAERTS.search(text):
+            return (HZ_MAX, HZ_MIN)
+        else:
+            return None
+    if not (0.0 < a <= HZ_NAME_MAX and 0.0 < b <= HZ_NAME_MAX):
+        return None
+    return (a, b)
+
+
+def strobe_hz(ch, val) -> float:
+    """Blitzfrequenz in Hz fuer den Wert ``val`` des Kanals ``ch``; ``0.0`` =
+    kein Strobe (Shutter offen, zu, oder ein Bereich anderer Art)."""
+    from src.core.app_state import shutter_bereich_art
+    try:
+        val = int(val)
+    except (TypeError, ValueError):
+        return 0.0
+    ranges = list(getattr(ch, "ranges", None) or ())
+    if ranges:
+        for r in ranges:
+            try:
+                lo, hi = int(r.range_from), int(r.range_to)
+            except (TypeError, ValueError):
+                continue
+            if lo <= val <= hi:
+                if shutter_bereich_art(r) != "strobe":
+                    return 0.0
+                spanne = hz_spanne_aus_name(getattr(r, "name", ""))
+                von, bis = spanne if spanne else (HZ_MIN, HZ_MAX)
+                return von + (val - lo) / max(1, hi - lo) * (bis - von)
+        return 0.0
+    if not ist_ausdruecklicher_strobe_kanal(ch) or val <= OHNE_BEREICHE_SCHWELLE:
+        return 0.0
+    return HZ_MIN + (val - (OHNE_BEREICHE_SCHWELLE + 1)) / 244.0 * (HZ_MAX - HZ_MIN)
+
+
+def ist_ausdruecklicher_strobe_kanal(ch) -> bool:
+    """Ist der Kanal dem Profil nach ein STROBE-Kanal (nicht bloss ein Shutter)?
+    Attribut ``strobe`` oder ein Name mit „Strobe"/„Flash"/„Blitz"/„Frequenz". Nur dann
+    darf ein Kanal OHNE Bereichsdaten blitzen."""
+    if (getattr(ch, "attribute", "") or "").lower() == "strobe":
+        return True
+    n = (getattr(ch, "name", "") or "").lower()
+    return any(w in n for w in _STROBE_WORTE)
+
+
+def _kanaele_nach_schluessel(channels) -> dict:
+    """``attr`` / ``attr#N`` -> Kanal, dieselbe Vergabe wie im Visualizer-
+    Service (Kopf 0 = ``attr``, das N-te weitere Vorkommen = ``attr#N``)."""
+    out: dict = {}
+    seen: dict[str, int] = {}
+    for ch in channels or ():
+        a = getattr(ch, "attribute", None)
+        if a not in _SHUTTER_ATTRS:
+            continue
+        h = seen.get(a, 0)
+        seen[a] = h + 1
+        out[a if h == 0 else f"{a}#{h}"] = ch
+    return out
+
+
+def strobe_hz_aus_attrs(attrs, channels, sfx: str | None = None) -> float:
+    """Blitzfrequenz eines Geraets aus seinen Attribut-Werten (``attrs`` wie im
+    Visualizer-Service: ``shutter``, ``strobe``, ``shutter#1`` ...).
+
+    ``sfx=None``: das ganze Geraet — die hoechste Frequenz ALLER Shutter-/
+    Strobe-Kanaele (so rechnet auch die 2D-Ansicht). ``sfx=""`` / ``"#1"`` ...:
+    nur die Kanaele dieses Kopfes, plus ein Kanal, den alle Koepfe teilen. Geraet ohne Shutter-Kanal -> ``0.0``."""
+    if not attrs or not channels:
+        return 0.0
+    nach = _kanaele_nach_schluessel(channels)
+    # Ein Kanal, den es nur EINMAL gibt, waehrend ein anderer je Kopf vorkommt
+    # (z. B. Shutter je Kopf + ein gemeinsamer Strobe), gilt fuer alle Koepfe.
+    mehrfach = {k.partition("#")[0] for k in nach if "#" in k}
+    hz = 0.0
+    for key, ch in nach.items():
+        if key not in attrs:
+            continue
+        attr, raute, nr = key.partition("#")
+        if sfx is not None and attr in mehrfach and raute + nr != sfx:
+            continue
+        hz = max(hz, strobe_hz(ch, attrs[key]))
+    return hz
+
+
+def hat_kopf_shutter(channels, kopfzahl: int | None = None) -> bool:
+    """Hat das Geraet einen Shutter-/Strobe-Kanal je Kopf?
+
+    Ohne ``kopfzahl``: mehr als einen Kanal derselben Art. Mit ``kopfzahl``
+    (Codex-Review #1071): nur, wenn es von einer Art GENAU so viele Kanaele
+    gibt wie Koepfe. Zwei Shutter bei zwoelf Farbkoepfen (Varytec Colors
+    Nervestrobe HP, Modi mit 56/68 Kanaelen) sind kein Shutter je Kopf — sonst
+    bekaemen nur die Koepfe 0 und 1 eine Frequenz, und 2 bis 11 leuchteten im
+    Bild durch. Dann blitzt das Geraet als Ganzes."""
+    zahl: dict[str, int] = {}
+    for k in _kanaele_nach_schluessel(channels):
+        art = k.partition("#")[0]
+        zahl[art] = zahl.get(art, 0) + 1
+    if kopfzahl is None:
+        return any(n > 1 for n in zahl.values())
+    return int(kopfzahl) > 1 and any(n == int(kopfzahl) for n in zahl.values())
+
+
+def blitz_bilder(hz: float, fps: float, deckel_hz: float = DECKEL_HZ,
+                 tast: float = TAST) -> tuple[int, int]:
+    """Periode und Blitzlaenge in GANZEN Bildern: ``(periode, an)``.
+
+    Zielfrequenz = ``min(hz, deckel_hz)``; ``periode = max(runde(fps / ziel),
+    BILDER_JE_BLITZ)``; ``an = max(1, runde(periode * tast))``. Kein Strobe ->
+    ``(0, 0)``. Dieselbe Rechnung wie ``strobeBilder`` in der 3D-Szene.
+
+    Warum in Bildern: eine Phase aus der laufenden Uhr gegen ein Bildraster
+    abzutasten ergibt eine Schwebung — die 2D-Ansicht (10 Bilder/s) zeigte
+    einen 5-Hz-Strobe als unregelmaessiges, langsames Blinken. Im Bildraster
+    ist die Folge exakt periodisch. Gezeigt werden damit hoechstens
+    ``fps / BILDER_JE_BLITZ`` Blitze je Sekunde."""
+    try:
+        hz, fps = float(hz), float(fps)
+    except (TypeError, ValueError):
+        return 0, 0
+    if not (hz > 0 and fps > 0 and deckel_hz > 0):
+        return 0, 0
+    ziel = min(hz, float(deckel_hz))
+    periode = max(int(fps / ziel + 0.5), BILDER_JE_BLITZ)
+    an = min(periode - 1, max(1, int(periode * tast + 0.5)))
+    return periode, an
+
+
+def blitz_an(bild: int, hz: float, fps: float, deckel_hz: float = DECKEL_HZ,
+             tast: float = TAST) -> bool:
+    """Leuchtet das Geraet im Bild Nummer ``bild``? Ohne Strobe immer ``True``."""
+    periode, an = blitz_bilder(hz, fps, deckel_hz, tast)
+    if not periode:
+        return True
+    return int(bild) % periode < an

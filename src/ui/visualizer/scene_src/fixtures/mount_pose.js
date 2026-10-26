@@ -24,6 +24,15 @@
 //     Unterkante der Traverse anliegt. Der Betrag kommt aus der gemessenen
 //     Hoehe der Teile (Bounding-Box), nicht aus einer zweiten festen Zahl.
 //
+// VIZ-103: „Unterkante der Traverse“ ist die WIRKLICHE Unterkante des
+// Traegers (position.y - size.y / 2), nicht „Ursprung + DOCK_HANG_OFFSET“.
+// Beides ist nur gleich, wenn die Hoehe frisch vom Andocken stammt. In der
+// Buehnen-Show 2026 liegt der Ursprung 0,20 m statt 0,25 m unter der
+// Unterkante (0,4 m dicke Traversen) — der Sockel ragte 5 cm in die Traverse.
+// Dasselbe passiert, wenn jemand die Hoehe von Hand eintraegt oder die
+// Traverse nachtraeglich dicker bzw. hoeher macht. Die gespeicherte Position
+// bleibt auch hier unangetastet; nur das Modell rueckt an die Kante.
+//
 // Bewusst NICHT haengend: Stuetzen (truss_v) — dort gibt es kein "darunter",
 // und alle Geraete ohne Buegel (PAR, Leisten, Strobe ...), deren Modelle
 // schon um den Ursprung herum bzw. nach unten gebaut sind.
@@ -87,7 +96,30 @@ function _oberkante(f) {
   return isFinite(top) ? top : 0;
 }
 
-function _setze(f, haengt) {
+// VIZ-103: so weit unter der Unterkante darf der Ursprung liegen, damit das
+// Modell an die Kante rueckt. Darueber hinaus (und wenn der Ursprung UEBER der
+// Traverse liegt) hat jemand das Geraet bewusst woanders hingesetzt, die
+// Bindung aber stehen lassen: dann bleibt das Modell im festen Abstand bei
+// seiner gespeicherten Position, statt meterweit davon entfernt zu erscheinen.
+const HAENGE_NAH = 2 * DOCK_HANG_OFFSET;
+const _EPS = 1e-6;
+
+// Abstand Geraete-Ursprung -> Unterkante des Traegers, an dem das Geraet haengt
+// (positiv = Ursprung liegt darunter). Fehlen Masse, gilt der feste Abstand.
+function _haengeAbstand(f) {
+  const so = stageObjects[f.dockedTo];
+  const d = so && so.data;
+  const py = d && d.position ? +d.position.y : NaN;
+  const sy = d && d.size ? +d.size.y : NaN;
+  if (!isFinite(py) || !isFinite(sy) || sy < 0) return DOCK_HANG_OFFSET;
+  const abstand = (py - sy / 2) - f.group.position.y;
+  if (!isFinite(abstand) || abstand > HAENGE_NAH + _EPS || abstand < -sy - _EPS) {
+    return DOCK_HANG_OFFSET;
+  }
+  return abstand;
+}
+
+function _setze(f, haengt, abstand) {
   const modell = f.yoke.parent;
   for (const teil of _festeTeile(f)) {
     const s = _stand(teil);
@@ -101,16 +133,21 @@ function _setze(f, haengt) {
   const g = _stand(f.yoke), k = _stand(f.head), mo = _stand(modell);
   f.yoke.position.y = haengt ? -g.y : g.y;
   f.head.position.y = haengt ? -k.y : k.y;     // Kopf selbst bleibt ungedreht
-  modell.position.y = haengt ? mo.y + DOCK_HANG_OFFSET - _oberkante(f) : mo.y;
+  modell.position.y = haengt ? mo.y + abstand - _oberkante(f) : mo.y;
   f._haengt = haengt;
+  f._haengeAbstand = haengt ? abstand : 0;
 }
 
-/** Haltung eines Geraets an seine Montage angleichen. true = umgeschaltet. */
+/** Haltung eines Geraets an seine Montage angleichen. true = umgeschaltet
+ *  ODER nachgezogen (VIZ-103: Traverse oder Geraetehoehe haben sich geaendert,
+ *  waehrend es haengt) — der Aufrufer zielt in beiden Faellen neu. */
 export function syncMountPose(f) {
   if (!f || !f.yoke || !f.head || !HAENGE_MODELLE[f.type]) return false;
   const soll = haengtAnTraverse(f);
-  if (!!f._haengt === soll) return false;
-  _setze(f, soll);
+  const abstand = soll ? _haengeAbstand(f) : 0;
+  if (!!f._haengt === soll
+      && (!soll || Math.abs((f._haengeAbstand || 0) - abstand) < _EPS)) return false;
+  _setze(f, soll, abstand);
   return true;
 }
 

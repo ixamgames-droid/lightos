@@ -12,7 +12,7 @@ Drei Funktionen machen ihn nützlich:
 
 - **Gruppieren & abgrenzen** — ein abgesetzter Rahmen mit Kopfzeile (Header) hält zusammengehörige Bedienelemente optisch beisammen.
 - **Seiten / Tabs** — der Container kann bis zu 10 Seiten haben. Jedes Kind-Element gehört zu einer Seite; über die Tabs in der Kopfzeile blendest du jeweils nur die Elemente einer Seite ein. So bekommst du mehrere Element-Sätze auf demselben Platz.
-- **Solo-Modus** — sorgt dafür, dass innerhalb des Containers immer nur **ein** Button gleichzeitig aktiv ist; beim Drücken eines Buttons werden die anderen automatisch ausgeschaltet (klassische Radio-/Solo-Logik).
+- **Solo-Modus** — sorgt dafür, dass innerhalb des Containers immer nur **ein** Button gleichzeitig aktiv ist; beim Drücken eines Buttons werden die anderen automatisch ausgeschaltet (klassische Radio-/Solo-Logik). Ausnahme: zwei Buttons, die dieselbe Funktion schalten — siehe „Tipps & Fallen".
 
 ## So sieht es aus & Bedienung im Betrieb
 
@@ -26,7 +26,7 @@ Wie die Kopfzeile aussieht, hängt von der Seitenanzahl ab:
 Klickzonen und Gesten:
 
 - **Klick auf einen Tab** (in der Kopfzeile, nur bei mehr als einer Seite) → wechselt auf die zugehörige Seite. Alle Kind-Elemente der gewählten Seite werden eingeblendet, die der anderen Seiten ausgeblendet. Der Seitenwechsel funktioniert **auch im Bearbeiten-Modus**, damit du die Elemente jeder Seite bearbeiten kannst.
-- **Solo-Modus aktiv** → drückst du im Betrieb einen Button innerhalb des Containers, schaltet der Container alle anderen gerade aktiven (gedrückten) Buttons in derselben Box automatisch aus. Es bleibt also immer nur ein Button aktiv. Ist der Rahmen im Solo-Modus, wird er zusätzlich mit einem **roten Rahmen** (`#e63946`, 2 px) gezeichnet statt mit dem normalen grauen.
+- **Solo-Modus aktiv** → drückst du im Betrieb einen Button innerhalb des Containers, schaltet der Container alle anderen gerade aktiven (gedrückten) Buttons in derselben Box automatisch aus. Es bleibt also immer nur ein Button aktiv. **Ausnahme:** Schaltet ein anderer Button dieselbe Funktion wie der gedrückte, bleibt diese Funktion vom Solo unberührt — der gedrückte Button schaltet sie um (läuft sie, geht sie aus; steht sie, geht sie an), genau wie ein einzelner Button. Ist der Rahmen im Solo-Modus, wird er zusätzlich mit einem **roten Rahmen** (`#e63946`, 2 px) gezeichnet statt mit dem normalen grauen.
 - **Effekt-Highlight (Gruppe als Einheit)** → gehört der Container bzw. eines seiner Elemente zu einem ausgewählten/angetippten Effekt, leuchtet der ganze Container als Einheit mit einem **amberfarbenen Rahmen** (`#ff9500`, 3 px) auf. Das ist nur eine optische Hervorhebung.
 
 Im **Bearbeiten-Modus** fügst du Inhalte hinzu:
@@ -46,11 +46,31 @@ Der Dialog „Frame Einstellungen" enthält genau diese Felder:
 | Beschriftung | Text, der bei **einer** Seite in der Kopfzeile zentriert angezeigt wird. Bei mehreren Seiten tragen die Tabs stattdessen feste Namen `P1…Pn`. | freier Text (leer = bisherige Beschriftung bleibt erhalten) |
 | Seitenanzahl | Anzahl der Seiten/Tabs des Containers. Bei `1` zeigt die Kopfzeile die Beschriftung; ab `2` erscheinen umschaltbare Tabs. | Ganzzahl 1–10 (Standard 1) |
 | Header anzeigen | Blendet die obere Kopfzeile (mit Beschriftung bzw. Tabs) ein oder aus. Ohne Header beginnt der Inhaltsbereich ganz oben — dann gibt es **keine Tabs** zum Seitenwechsel mehr. | An / Aus (Standard An) |
-| Modus → Solo-Frame | „Solo-Frame (nur 1 Button gleichzeitig aktiv)": Schaltet beim Drücken eines Buttons die übrigen aktiven Buttons im Container automatisch aus. Aktiv erkennbar am roten Rahmen. | An / Aus (Standard Aus) |
+| Modus → Solo-Frame | „Solo-Frame (nur 1 Button gleichzeitig aktiv)": Schaltet beim Drücken eines Buttons die übrigen aktiven Buttons im Container automatisch aus; eine Funktion, die der gedrückte Button selbst schaltet (dieselbe Funktion auf zwei Buttons), wird dabei umgeschaltet statt ausgeschaltet. Aktiv erkennbar am roten Rahmen. | An / Aus (Standard Aus) |
+| Pop-up → Pop-up-Feld | „Pop-up-Feld (öffnet/schließt per Pop-up-Taste, liegt dann über der Konsole)": Der Container ist normalerweise unsichtbar und wird von einer Pop-up-Taste geöffnet und geschlossen — siehe [Pop-up-Tasten](#pop-up-tasten). Erkennbar am violetten Rahmen und `▣` in der Kopfzeile. | An / Aus (Standard Aus) |
 
 Hintergrund- und Vordergrundfarbe des Containers stellst du nicht in diesem Dialog ein, sondern über das Rechtsklick-Kontextmenü („Vordergrund-Farbe" / „Hintergrund-Farbe").
 
-Gespeichert werden Seitenanzahl, Header-Sichtbarkeit, Solo-Modus sowie alle enthaltenen Kind-Elemente samt ihrer Seitenzuordnung (jedes Kind merkt sich, auf welcher Seite es liegt). Beim Laden wird nur die aktuelle Seite eingeblendet.
+Gespeichert werden Seitenanzahl, Header-Sichtbarkeit, Solo-Modus, die Pop-up-Eigenschaft sowie alle enthaltenen Kind-Elemente samt ihrer Seitenzuordnung (jedes Kind merkt sich, auf welcher Seite es liegt). Beim Laden wird nur die aktuelle Seite eingeblendet.
+
+## Pop-up-Tasten
+
+Ein Container kann ein **Pop-up-Feld** werden: Es ist normalerweise unsichtbar und erscheint erst, wenn du eine **Pop-up-Taste** drückst. Offen liegt es **über** allen anderen Elementen der Konsole — Klicks auf das Feld erreichen nichts, was darunter liegt. **Dieselbe Taste** schließt es wieder; solange es offen ist, leuchtet die Taste.
+
+So richtest du es ein (Bearbeiten-Modus):
+
+1. Container anlegen, an die gewünschte Stelle schieben und auf die gewünschte Größe ziehen — dort erscheint das Pop-up später auch.
+2. Doppelklick auf den Container → **„Pop-up: Pop-up-Feld …"** anhaken. Der Rahmen wird violett, die Kopfzeile zeigt `▣`. Das Feld bleibt zum Befüllen offen.
+3. Tasten, Fader usw. hineinlegen (Rechtsklick → „Widget hinzufügen" oder hineinziehen). Ziehst du eine Funktion, einen Snapshot oder einen Snap auf die freie Fläche des offenen Felds, landet die neue Taste im Feld.
+4. Eine Taste auf der Konsole anlegen, Aktion **„Pop-up-Feld öffnen/schließen"** wählen und unter **„Pop-up-Feld"** den Container auswählen.
+
+- **Im Bearbeiten-Modus** löst ein Klick auf die Pop-up-Taste nichts aus. Zum Befüllen öffnest du das Feld per Rechtsklick auf die Taste („Pop-up-Feld öffnen") oder per Rechtsklick auf die freie Konsole → **„Pop-up-Felder"** (dort findest du auch Felder ohne Taste). Rechtsklick auf das offene Feld → „Pop-up-Feld schließen".
+- **Beim Laden einer Show** sind alle Pop-up-Felder geschlossen. Gespeichert wird nur das Layout, nicht ob ein Feld offen war.
+- **MIDI und Tastatur:** Tasten im geschlossenen Pop-up bleiben über ihre MIDI-Note bzw. ihren Hotkey auslösbar und behalten ihren Zustand (wie Elemente einer anderen Container-Seite). Auch die Pop-up-Taste selbst lässt sich per MIDI/Hotkey bedienen; auf dem APC leuchtet ihr Pad, solange das Feld offen ist.
+- **Kiosk-Modus:** Pop-up-Tasten funktionieren normal; bearbeiten lässt sich dort nichts.
+- **Keine Verschachtelung:** Ein Pop-up-Feld darf keine Pop-up-Taste (und kein weiteres Pop-up-Feld) enthalten. Der Editor verhindert das mit einem Hinweis — beim Umstellen der Aktion, beim Hineinziehen einer Pop-up-Taste und beim Anhaken „Pop-up-Feld" an einem Container, der schon eine Pop-up-Taste enthält. Nur Container direkt auf der Konsole können Pop-up-Felder sein.
+- **Umbenennen ist sicher:** Die Taste merkt sich das Feld über eine feste Kennung, nicht über die Beschriftung.
+- Die Banks gelten wie sonst: Ein Pop-up-Feld auf Bank 2 erscheint nur, wenn Bank 2 aktiv ist. Leg **Taste und Feld auf dieselbe Bank** (oder das Feld auf „alle Bänke"). Liegt das Feld auf einer anderen Bank, leuchtet die Taste dort nicht, und ein Druck zeigt nur einen Hinweis.
 
 ## Tipps & Fallen
 
@@ -58,5 +78,6 @@ Gespeichert werden Seitenanzahl, Header-Sichtbarkeit, Solo-Modus sowie alle enth
 - **Kein Container im Container:** Das Untermenü „Widget hinzufügen" listet bewusst keinen weiteren Container — Container lassen sich nicht verschachteln.
 - **Seite beachten beim Einfügen:** Per „Widget hinzufügen" und per Snap-in landet ein Element immer auf der **aktuell sichtbaren Seite**. Willst du es auf eine andere Seite legen, erst per Tab dorthin wechseln (geht auch im Bearbeiten-Modus), dann einfügen.
 - **Solo wirkt nur auf Buttons im Container:** Die Solo-Logik schaltet nur die gedrückten **Buttons** innerhalb desselben Containers gegeneinander aus — andere Elementtypen (Slider, Farb-Kacheln usw.) sind davon nicht betroffen.
+- **Zwei Knöpfe, dieselbe Funktion:** Liegt dieselbe Funktion auf zwei Buttons eines Solo-Containers (z. B. einmal allein, einmal zusammen mit einer zweiten Funktion), entscheidet über sie allein der Button, den du drückst: Er schaltet sie um, statt dass der andere Button sie erst stoppt und der gedrückte sie sofort neu startet. So lässt sie sich mit **jedem** der beiden Buttons auch wieder ausschalten. Alle **anderen** Funktionen des zweiten Buttons stoppt das Solo wie gewohnt.
 - **Löschen geht mit:** Löschst du ein Element im Container (Kontextmenü „Löschen"), übernimmt der Container das Entfernen. Das ist über die Canvas-Undo-Funktion (Strg+Z) rückgängig zu machen.
 - Der Container selbst lässt sich **nicht** an einen Effekt binden und unterstützt **kein** MIDI-/Tasten-Teach — er ist reiner Behälter. Allgemeine VC-Bedienung (Bearbeiten-Modus, Anlegen, Kontextmenü, Banks) siehe Übersicht (README.md).

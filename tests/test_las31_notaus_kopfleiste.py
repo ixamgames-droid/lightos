@@ -24,6 +24,8 @@ import src.core.app_state as A                                       # noqa: E40
 from src.core.app_state import AppState                              # noqa: E402
 from src.core.dmx.output_manager import OutputManager                # noqa: E402
 import src.ui.main_window as MW                                      # noqa: E402
+from _qt_lifecycle import flush_deferred_deletes                     # noqa: E402
+from src.ui import laser_notaus                                      # noqa: E402
 
 
 def _app():
@@ -119,8 +121,17 @@ class _Basis(unittest.TestCase):
     def tearDownClass(cls):
         cls.w._state = cls._echter_state
         cls.w.hide()
+        # QA-97: das Fenster muss WIRKLICH sterben. ``processEvents()`` stellt
+        # ``DeferredDelete`` nicht zu (tests/_qt_lifecycle.py) — das Fenster
+        # lebte weiter, haelt seine Bus-Abos und verbrauchte in spaeteren
+        # Dateien den Sperrzonen-Wechselhinweis (test_las32_nachbesserung).
+        # Bewusst ohne ``close()``: dessen closeEvent faehrt Ausgabe/MIDI des
+        # echten State herunter, das gehoert nicht zum Abbau eines Testfensters.
         cls.w.deleteLater()
+        flush_deferred_deletes()
         _app().processEvents()
+        flush_deferred_deletes()
+        cls.w = None
         A.get_channels_for_patched = cls._orig_channels
 
     def setUp(self):
@@ -129,8 +140,13 @@ class _Basis(unittest.TestCase):
         self.w._notaus_sperre_bis = 0.0
         self.w._sync_notaus_button()
         self.btn = self.w._btn_laser_notaus
-        # Eine unerwartete Rueckfrage darf den Lauf nie blockieren.
-        p = mock.patch.object(MW.QMessageBox, "warning",
+        # Eine unerwartete Rueckfrage darf den Lauf nie blockieren. Ersetzt
+        # wird sie dort, wo sie gestellt wird (LAS-36: src/ui/laser_notaus.py).
+        # ``main_window.QMessageBox`` ist seit UI-92 eine Unterklasse — ein
+        # Ersatz dort erreicht die Rueckfrage des NOT-AUS nicht mehr; der
+        # Ersatz an ``laser_notaus.QMessageBox`` (seit LAS-40 ebenfalls eine
+        # Unterklasse mit festen Knopftexten) trifft genau diese Rueckfrage.
+        p = mock.patch.object(laser_notaus.QMessageBox, "warning",
                               side_effect=AssertionError("unerwartete Rueckfrage"))
         self.frage = p.start()
         self.addCleanup(p.stop)
@@ -222,9 +238,9 @@ class KnopfTest(_Basis):
         self.assertEqual(self.btn.text(), "LASER NOT-AUS AKTIV")
 
     def test_folgt_stillem_setzen_und_loesen(self):
-        """Der Latch kann ohne Ereignis wechseln (Muster-Abruf im Programmer
-        loest ihn). Der Knopf liest ihn darum im Takt nach — er fuehrt keinen
-        eigenen Zustand."""
+        """Der Latch kann ohne Ereignis wechseln (``set_laser_estop`` meldet
+        nichts; seit LAS-36 loest ihn kein Programmer-Wert mehr). Der Knopf
+        liest ihn darum im Takt nach — er fuehrt keinen eigenen Zustand."""
         self.st.set_laser_estop(True)
         self.w._notaus_tick()
         self.assertEqual(self.btn.text(), "LASER NOT-AUS AKTIV")

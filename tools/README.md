@@ -18,6 +18,7 @@
 | `_showcase.py` | DEMO-07: gemeinsame Bausteine der Showcase-Generatoren (``build_showcase_*.py``). |
 | `_showpath.py` | Show-Datei-Aufloesung fuer tools/-Skripte: shows/ mit Fallback shows/_archiv/. |
 | `_shutter.py` | ENG-28: Shutter in Generatoren nur mit Beleg oeffnen — nie mit dem Vorgabewert 255. |
+| `_werkzeug_sandbox.py` | TOOL-27: Eigene Sandbox fuer jedes Werkzeug, das die App oder Teile davon baut. |
 | `anleitungsbilder.py` | DOC-16: Anleitungsbilder reproduzierbar aus dem Code erzeugen. |
 | `app.ps1` | LightOS App-Treiber — App starten/stoppen/warten/screenshotten aus EINEM Skript. |
 | `app.sh` | tools/app.sh — Linux-Pendant zu tools/app.ps1 (App-Steuerung fuer UI-Verifikation). |
@@ -26,6 +27,7 @@
 | `audit_tooltip_coverage.py` | QA-13 Tooltip-/Label-Coverage-Audit fuer interaktive Steuerelemente. |
 | `backlog_compact.py` | Backlog-Verdichter + Queue-View fuer BACKLOG.md (Loop-Werkzeug). |
 | `backlog_ids.py` | Naechste freie Backlog-ID — ueber ALLE Zweige, nicht nur den eigenen. |
+| `backlog_sammeln.py` | BACKLOG-Fragmente sammeln — und direkte BACKLOG-Aenderungen melden (PROC-20). |
 | `backlog_status_drift.py` | QA-64 — misst, ob der Status im BACKLOG.md noch zum CODE auf `main` passt. |
 | `benchmark_universes.py` | T-8 / RM-Benchmark — Render-Performance fuer mehrere Universen. |
 | `bibliothek_profil.py` | FM-56: Werkzeug fuer die eigene Geraete-Bibliothek (LightOS-Profile). |
@@ -70,6 +72,7 @@
 | `check_doc_links.py` | QA-17 Doc-Link-Checker: findet TOTE relative Markdown-Querverweise. |
 | `collect_crash_report.py` | Crash-/Session-Log ernten und als Loop-Bug-Intake ausgeben (TOOLS-CRASHINTAKE). |
 | `crop_vc_widgets.py` | Cropper fuer die VC-Widget-Doku: schneidet aus EINEM Vollbild-Screenshot |
+| `engine_frame_zeit.py` | ENG-30 — Engine-Zeit je DMX-Frame an der Buehnen-Show messen (Verteilung je Funktionsart). |
 | `fixture_herkunft.py` | QA-72 — was weiss die Bibliothek ueber die HERKUNFT ihrer Profile? |
 | `gallery_server.py` | DOC-11 Galerie-Render-Server (Dev-/Doku-Werkzeug). |
 | `geaenderte_dateien_klasse.py` | PROC-19 — aendert ein Zweig NUR Doku-/Verwaltungsdateien? Gibt ``doku`` oder ``voll`` aus. |
@@ -100,6 +103,7 @@
 | `verify_stage_reload.py` | VIZ-STAGE-RELOAD-PACING — ueberlebt das volle Rig einen Renderer-Neustart? |
 | `viz_dmx_latency_bench.py` | VIZ-71 — wie schnell und wie schlank kommen die Lichtdaten im 3D-Viewer an? |
 | `viz_render_benchmark.py` | Render-Kosten der 3D-Szene messen — die Zahl, die bis 2026-08-03 fehlte. |
+| `web11_symbole.py` | WEB-11: Symbole der Handy-Konsole fuer den Startbildschirm zeichnen. |
 | `zeitbomben_gate.py` | Waechter gegen Zeitbomben — Tests, die von selbst rot werden (QA-63). |
 
 ## _archiv/ — ausgemustert

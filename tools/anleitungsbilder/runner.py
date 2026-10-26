@@ -501,6 +501,35 @@ def ist_gleich(pfad: str, neu: bytes) -> bool:
     return fast_gleich(pfad, neu)
 
 
+#: DOC-16: die Schrift, die das Theme wuenscht (``assets/themes/dark.qss``:
+#: „Roboto Condensed"), liegt dem Werkzeug bei — SIL Open Font License 1.1,
+#: Herkunft und Lizenztext in ``THIRD_PARTY_NOTICES.md``. Ohne sie nahm Qt je
+#: Rechner einen anderen Ersatz (Linux Noto Sans, Windows Arial): dieselbe
+#: Szene sah auf zwei Rechnern verschieden aus, ``--pruefen`` meldete jede
+#: fremd gerenderte Anleitung als abweichend. Nur das Werkzeug laedt sie, die
+#: App bleibt unveraendert.
+SCHRIFT_DATEI = os.path.join(PAKET, "schrift", "RobotoCondensed-wght.ttf")
+SCHRIFT_FAMILIE = "Roboto Condensed"
+
+
+def schrift_laden() -> str | None:
+    """Mitgelieferte Schrift bei Qt anmelden (nach der QApplication, vor dem
+    ersten Widget). Rueckgabe: die angemeldete Familie oder ``None`` (dann
+    bleibt es beim Ersatz des Rechners, der Lauf geht weiter)."""
+    from PySide6.QtGui import QFontDatabase
+    if not os.path.isfile(SCHRIFT_DATEI):
+        print(f"[anleitungsbilder] Hinweis: {os.path.relpath(SCHRIFT_DATEI, REPO)} "
+              "fehlt — es gilt die Ersatzschrift dieses Rechners.", flush=True)
+        return None
+    fid = QFontDatabase.addApplicationFont(SCHRIFT_DATEI)
+    familien = QFontDatabase.applicationFontFamilies(fid) if fid >= 0 else []
+    if SCHRIFT_FAMILIE not in familien:
+        print(f"[anleitungsbilder] Hinweis: Schrift nicht ladbar ({familien}) — "
+              "es gilt die Ersatzschrift dieses Rechners.", flush=True)
+        return None
+    return SCHRIFT_FAMILIE
+
+
 def schrift(win) -> str:
     """Tatsaechlich gerenderte Schrift (QSS-Wunsch -> Ersatz dieses Rechners)."""
     from PySide6.QtGui import QFontInfo
@@ -546,6 +575,69 @@ def git_stand() -> str:
 
 # ── Lauf ────────────────────────────────────────────────────────────────────
 
+def fehlstand_im_repo(ziel_rel: str, datei: str, repo: str = REPO) -> list[str]:
+    """TOOL-18: was einer Szene im Repo fehlt — „das Bild" und/oder „der Eintrag
+    in bilder.json". Leere Liste = beides da.
+
+    Gefragt wird das REPO (``<repo>/<ziel_rel>``), nicht der Zielordner des
+    Laufs: bei ``--pruefen``/``--ausgabe`` ist der ein leerer Temp-Ordner und
+    sagt ueber den Bestand nichts.
+    """
+    ordner = os.path.join(repo, ziel_rel)
+    fehlt = []
+    if not os.path.exists(os.path.join(ordner, datei)):
+        fehlt.append("das Bild")
+    try:
+        with open(os.path.join(ordner, "bilder.json"), encoding="utf-8") as f:
+            bekannt = {b.get("datei") for b in json.load(f).get("bilder", [])}
+    except (OSError, ValueError, AttributeError, TypeError):
+        bekannt = set()
+    if datei not in bekannt:
+        fehlt.append("der Eintrag in bilder.json")
+    return fehlt
+
+
+def uebersprungen(szene, *, bildschirm: bool, offscreen: bool) -> str | None:
+    """Warum ``lauf`` diese Szene in DIESEM Lauf nicht aufnimmt — oder ``None``.
+
+    * ``"offscreen"``: der Lauf steht am echten Bildschirm (``--bildschirm``)
+      und nimmt nur 3D-Szenen auf; diese entsteht im gewoehnlichen Lauf.
+    * ``"gpu"``: die Szene braucht eine GPU, der Lauf ist offscreen.
+    """
+    if bildschirm and not szene.braucht_gpu:
+        return "offscreen"
+    if szene.braucht_gpu and offscreen:
+        return "gpu"
+    return None
+
+
+def uebersprungen_text(grund: str, anleitung: str, datei: str, ziel_rel: str,
+                       repo: str = REPO) -> tuple[str | None, bool]:
+    """``(Meldung, fehlt_etwas)`` fuer eine uebersprungene Szene.
+
+    TOOL-18: bisher stand bei einer 3D-Szene nur „UEBERSPRUNGEN" — ob ihr Bild
+    im Repo ueberhaupt existiert, sah niemand nach. Eine neue 3D-Szene, die nie
+    mit ``--bildschirm`` aufgenommen wurde, blieb so unbemerkt ohne Bild und
+    ohne Manifest-Eintrag. Jetzt nennt die Meldung, was fehlt, und den Aufruf,
+    der es nachholt. Dasselbe umgekehrt fuer ``--bildschirm``-Laeufe (dort
+    nur, wenn etwas fehlt — sonst waere es eine Zeile je Szene ohne Aussage).
+    """
+    fehlt = fehlstand_im_repo(ziel_rel, datei, repo)
+    kopf = f"[anleitungsbilder] {anleitung}/{datei}: "
+    if grund == "gpu":
+        text = kopf + ("UEBERSPRUNGEN — braucht eine GPU (3D/WebGL bleibt "
+                       "offscreen schwarz).")
+        if fehlt:
+            text += (f" ACHTUNG: {' und '.join(fehlt)} fehlt in {ziel_rel}/ — "
+                     f"aufnehmen mit: tools/anleitungsbilder.py {anleitung} --bildschirm")
+        return text, bool(fehlt)
+    if fehlt:
+        return (kopf + f"nicht in diesem Lauf (--bildschirm nimmt nur 3D-Szenen auf). "
+                f"ACHTUNG: {' und '.join(fehlt)} fehlt in {ziel_rel}/ — "
+                f"aufnehmen mit: tools/anleitungsbilder.py {anleitung}", True)
+    return None, False
+
+
 def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
          nur: set | None = None, bildschirm: bool = False) -> int:
     """``auftraege``: Liste ``(anleitung, szenen, ziel_relativ)``. Rueckgabe = Exit-Code.
@@ -566,6 +658,7 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
     QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication.instance() or QApplication(["lightos-anleitungsbilder"])
     app.setApplicationName("LightOS")
+    schrift_laden()
     lo_main._install_font_substitutions()
     # Wie main.main(): Qt-Standardknoepfe (Yes/No/Cancel …) deutsch — sonst
     # zeigten die Bilder englische Knoepfe, die App aber deutsche (UI-64h).
@@ -605,6 +698,8 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
           f"Schrift {schrift(win)}", flush=True)
 
     fehler = 0
+    luecken: list[str] = []        # TOOL-18: uebersprungen UND im Repo unvollstaendig
+    offscreen = os.environ.get("QT_QPA_PLATFORM") == "offscreen"
     stand = git_stand()
     for anleitung, szenen, ziel_rel in auftraege:
         if ausgabe:
@@ -625,11 +720,13 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
             if nur and szene.name not in nur:
                 continue
             datei = szene.datei
-            if bildschirm and not szene.braucht_gpu:
-                continue
-            if szene.braucht_gpu and os.environ.get("QT_QPA_PLATFORM") == "offscreen":
-                print(f"[anleitungsbilder] {anleitung}/{datei}: UEBERSPRUNGEN — braucht "
-                      "eine GPU (3D/WebGL bleibt offscreen schwarz).", flush=True)
+            grund = uebersprungen(szene, bildschirm=bildschirm, offscreen=offscreen)
+            if grund:
+                text, fehlt_etwas = uebersprungen_text(grund, anleitung, datei, ziel_rel)
+                if text:
+                    print(text, flush=True)
+                if fehlt_etwas:
+                    luecken.append(f"{anleitung}/{datei}")
                 continue
             gif_info = None
             try:
@@ -694,4 +791,10 @@ def lauf(auftraege, *, sb, pruefen: bool = False, ausgabe: str | None = None,
             with open(manifest_pfad, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, ensure_ascii=False, indent=2)
                 f.write("\n")
+    if luecken:
+        # TOOL-18: am Ende noch einmal gesammelt — die Einzelzeilen gehen in
+        # einem langen Lauf unter.
+        print(f"[anleitungsbilder] HINWEIS: {len(luecken)} uebersprungene Szene(n) "
+              f"ohne Bild bzw. Manifest-Eintrag im Repo: {', '.join(luecken)}",
+              flush=True)
     return 1 if fehler else 0

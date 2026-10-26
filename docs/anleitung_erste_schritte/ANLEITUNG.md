@@ -50,7 +50,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    denn bei manchen Lasern heißt DMX 0 „Auto“ und würde sie einschalten.
    Kennt das Profil keinen Aus-Wert, strahlt ein Laser ohne Dimmer womöglich
    weiter; sicher aus ist ein Laser nur mit dem **Laser-NOT-AUS**
-   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf.
+   (Details: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). Der Knopf rastet ein; ein zweiter Klick hebt den Blackout wieder auf. Im Kiosk-Modus, in dem diese Leiste ausgeblendet ist, stehen **GM**, **STOP ALL** und **BLACKOUT** oben rechts in einem Streifen, in dieser Reihenfolge links neben **LASER NOT-AUS**. Sie wirken wie ihre Gegenstücke in der Sektionsleiste und zeigen denselben Zustand — auch der GM-Regler folgt, wenn ein VC-Fader, MIDI oder die Fernbedienung den Grand Master ändert. Das Mausrad verstellt den GM dort nicht (ziehen oder klicken), und die Leertaste löst keinen der Knöpfe aus.
    Wie das im DMX-Monitor aussieht, zeigt
    [Ausgabe einrichten, Schritt 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    Nur einzelne Geräte oder Gruppen dunkel schaltet eine
@@ -60,7 +60,10 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    (auch im Kiosk-Modus oben rechts; Tastenkürzel `Strg+Umschalt+L`): ein Klick schaltet
    alle Laser sofort dunkel, ohne Rückfrage, und der Knopf blinkt dann als
    **LASER NOT-AUS AKTIV**. Gelöst wird er nur bewusst — noch einmal klicken und die
-   Rückfrage bestätigen.
+   Rückfrage bestätigen. Nichts anderes löst ihn: kein Regler, keine Taste der Virtual
+   Console, kein MIDI-Controller, kein Tastenkürzel. Solange er aktiv ist, werden
+   Laser-Werte gemerkt, der Laser bleibt dunkel; nach dem Lösen gibt er sofort wieder
+   aus, was eingestellt ist.
 7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,
@@ -226,11 +229,37 @@ LightOS-Datenordner (Linux: `~/.local/share/LightOS/shows`, Windows:
 `%APPDATA%\LightOS\shows`). Nach dem Speichern steht der Pfad im Fenstertitel und kurz
 in der Statusleiste (`Gespeichert: …`).
 
+**Meldungen beim Öffnen.** Konnte LightOS Teile einer Show nicht lesen, erscheint das
+Fenster **Show unvollstaendig geladen** mit der Liste dieser Teile — wer dann speichert,
+schreibt den Verlust fest, also vorher eine Kopie der Datei sichern. Steht dagegen nur
+ein Geräteprofil zweimal in der Geräte-Bibliothek und ist es für die Show gleich, welches
+genommen wurde (gleicher Modus mit denselben Kanälen und Werten), ist nichts verloren:
+dann kommt kein Fenster, sondern für 15 Sekunden ein **Hinweis: …** in der Statusleiste,
+hinter der Meldung, die dort gerade steht. Unterscheiden sich die beiden Profile, bleibt
+es beim Fenster.
+
 **Automatisch gesichert** wird zusätzlich alle 5 Minuten in die Datei `auto_save.lshow`
 im LightOS-Datenordner. Das Intervall stellst du unter **Datei → Auto-Save-Intervall...**
 ein (1–60 Minuten). Ist beim nächsten Start diese Sicherung neuer als deine zuletzt
 gespeicherte Show — etwa nach einem Absturz —, bietet LightOS an, sie
 wiederherzustellen.
+
+**Ältere Versionen.** Zusätzlich hebt LightOS mehrere Stände jeder Show im Ordner
+`sicherungen` im LightOS-Datenordner auf: bei jedem Auto-Save, vor jedem Speichern, das
+eine vorhandene Datei überschreibt, und bevor du ungespeicherte Änderungen verwirfst
+(Neue Show, andere Show öffnen, Beenden). Über **Datei → Ältere Version öffnen…** siehst
+du die Sicherungen der aktuellen Show mit Datum, Uhrzeit auf die Sekunde (fallen mehrere in
+dieselbe Sekunde, mit laufender Nummer), Anlass, Größe und Geräte- und Funktionszahl; mit dem Haken **Sicherungen aller Shows anzeigen** auch die der anderen.
+**Öffnen** lädt die gewählte Version als neue, ungespeicherte Show — im Fenstertitel
+steht dann `Name (Sicherung vom …)`. Deine Show-Datei und die Sicherung bleiben dabei
+unverändert; behalten willst du die alte Version erst, wenn du sie mit *Speichern
+unter...* ablegst.
+
+Aufgehoben werden je Show die letzten 10 Sicherungen, dazu eine pro Stunde der letzten
+24 Stunden und eine pro Tag der letzten 14 Tage — Auto-Saves und die Sicherungen vor
+einem Überschreiben oder Verwerfen zählen dabei getrennt, damit Auto-Saves keinen solchen
+Stand verdrängen. Wird der Ordner größer als 500 MB,
+löscht LightOS die ältesten zuerst.
 
 **Beenden mit ungespeicherten Änderungen.** Hast du seit dem letzten Speichern oder
 Öffnen etwas am Inhalt der Show geändert — Patch, Cuelisten, Funktionen, VC-Layout

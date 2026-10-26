@@ -46,11 +46,23 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    taps in time set the tempo.
 5. **STOP ALL** — stops everything that is running: cue lists on all pages and all started
    functions (scenes, chasers, effects).
-6. **BLACKOUT** — makes everything dark: all channels go to 0, only moving heads with a
+6. **BLACKOUT** — makes everything dark: all channels go to 0 (lasers: off value, see
+   below), only moving heads with a
    dimmer channel keep their position (including gobo/prism/zoom) — so they do not drive
    to their home position and back again when you release the blackout. Unpatched
-   channels, fixtures without a dimmer, lasers and fog machines go completely off. The
-   button latches; a second click releases the blackout.
+   channels, fixtures without a dimmer and fog machines go completely off. **Lasers**
+   get the **off value from their fixture profile** instead of 0 (for example the
+   operating mode “Laser off”) — it is not always 0, because on some lasers DMX 0
+   means “Auto” and would switch them on. If the profile knows no off value, a laser
+   without a dimmer may keep emitting; a laser is reliably off only with the **laser
+   emergency stop** (LASER NOT-AUS; details in the
+   [laser manual](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)). The
+   button latches; a second click releases the blackout. In kiosk mode, where this bar is
+   hidden, **GM**, **STOP ALL** and **BLACKOUT** sit top right in one strip, in this order to the
+   left of **LASER NOT-AUS**. They work like their counterparts in the section bar and show the
+   same state — the GM slider also follows when a VC fader, MIDI or the remote changes the grand
+   master. The mouse wheel does not move the GM there (drag or click it), and the space bar
+   triggers none of the buttons.
    What this looks like in the DMX monitor is shown in
    [Ausgabe einrichten, step 7](../anleitung_ausgabe_einrichten/ANLEITUNG.md#7-kontrolle-der-dmx-monitor).
    To black out only some fixtures or groups, use a
@@ -60,7 +72,9 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    (laser emergency stop; also top right in kiosk mode; shortcut `Ctrl+Shift+L`): one click
    makes all lasers dark at once, without a confirmation, and the button then flashes as
    **LASER NOT-AUS AKTIV**. It is released only deliberately — click it again and confirm
-   the prompt.
+   the prompt. Nothing else releases it: no slider, no Virtual Console button, no MIDI
+   controller, no keyboard shortcut. While it is active, laser values are remembered and
+   the laser stays dark; once released, the laser immediately outputs whatever is set.
 7. **Command line** — for keyboard commands such as `1 thru 5 @ 80`. Examples are shown as
    placeholder text in the field.
 8. **Status bar** — on the left the state of the ENTTEC adapter
@@ -232,11 +246,36 @@ folder inside the LightOS data folder (Linux: `~/.local/share/LightOS/shows`, Wi
 `%APPDATA%\LightOS\shows`). After saving, the path is shown in the window title and
 briefly in the status bar (`Gespeichert: …` = saved).
 
+**Messages when opening.** If LightOS could not read parts of a show, the window
+**Show unvollstaendig geladen** (show loaded incompletely) lists them — saving then makes
+the loss permanent, so back up the file first. If, on the other hand, a fixture profile
+merely exists twice in the fixture library and it makes no difference to the show which
+one was taken (same mode with the same channels and values), nothing is lost: there is no
+window, only a **Hinweis: …** (note) in the status bar for 15 seconds, behind whatever
+message is shown there. If the two profiles differ, the window stays.
+
 **Automatic backup:** in addition, LightOS saves every 5 minutes to the file
 `auto_save.lshow` in the LightOS data folder. Set the interval under
 **Datei → Auto-Save-Intervall...** (1–60 minutes). If on the next start this backup is
 newer than the show you saved last — for example after a crash — LightOS offers to
 restore it.
+
+**Older versions.** In addition, LightOS keeps several states of every show in the
+`sicherungen` (backups) folder inside the LightOS data folder: on every auto-save, before
+every save that overwrites an existing file, and before you discard unsaved changes (new
+show, opening another show, quitting). **Datei → Ältere Version öffnen…** (open older
+version) lists the backups of the current show with date, time to the second (with a
+running number if several fall into the same second), reason, size and the number of
+fixtures and functions; tick **Sicherungen aller Shows anzeigen** (show backups
+of all shows) to see the others as well. **Öffnen** (open) loads the selected version as
+a new, unsaved show — the window title then reads `Name (Sicherung vom …)`. Your show
+file and the backup stay untouched; the old version is only kept once you store it with
+*Speichern unter...*.
+
+Per show LightOS keeps the last 10 backups, plus one per hour of the last 24 hours and
+one per day of the last 14 days — auto-saves and the backups taken before overwriting or
+discarding are counted separately, so auto-saves never push such a version out. If the folder grows beyond 500 MB, the oldest are
+deleted first.
 
 **Quitting with unsaved changes.** If you changed anything in the content of the show
 since the last save or open — patch, cue lists, functions, VC layout and so on — LightOS

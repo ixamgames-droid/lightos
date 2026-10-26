@@ -247,8 +247,8 @@ def _bild_editor(ui):
         (reiter_rechteck(dlg, dlg, "6-Kanal"), 2, "rechts"),
         (zeilen, 3, "rechts"),
         (rechteck(dlg, attr), 4, "unten"),
-        (rechteck(dlg, knopf(tab, "+ Channel")), 5, "unten"),
-        (rechteck(dlg, knopf(dlg, "+ Mode")), 6, "unten"),
+        (rechteck(dlg, knopf(tab, "+ Kanal")), 5, "unten"),
+        (rechteck(dlg, knopf(dlg, "+ Modus")), 6, "unten"),
         (rechteck(dlg, speichern), 7, "oben"),
     ], titel=dlg.windowTitle())
 
@@ -393,7 +393,9 @@ def _matrix_vorher(ui):
     if idx < 0:
         raise SzenenFehler("Matrix nicht in der Liste des Matrix-Editors")
     view._list.setCurrentRow(idx)
-    view._sync_follow_selection()
+    # UI-91: eine vorhandene Matrix folgt der Auswahl nicht von selbst — das
+    # Gruppen-Raster ausdruecklich uebernehmen (Knopf „Auswahl übernehmen").
+    view._assign_from_selection()
     ui.pump(0.4)
 
 

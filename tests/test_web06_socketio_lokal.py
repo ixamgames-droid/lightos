@@ -182,7 +182,12 @@ class AuslieferungTest(unittest.TestCase):
         self.assertEqual(self.client.get("/api/status").status_code, 403)
 
     def test_startseite_verweist_auf_die_lokale_route(self):
-        r = self.client.get("/")
+        # WEB-12: die feste Seite gibt es nur mit ihrem Schluessel und Schalter.
+        from src.web import remote_settings
+        remote_settings.set_feste_seite_enabled(True)
+        self.addCleanup(remote_settings.set_feste_seite_enabled, False)
+        self.app.config["LIGHTOS_FESTE_TOKEN"] = "fest456"
+        r = self.client.get("/?k=fest456")
         self.assertEqual(r.status_code, 200)
         html = r.get_data(as_text=True)
         self.assertEqual(externe_verweise(html), [])

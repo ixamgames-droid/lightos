@@ -212,10 +212,15 @@ def validate_show_dict(show: dict, caps: Capabilities | None = None) -> list[Fin
     # ── Virtuelle Konsole ───────────────────────────────────────────────────────
     vc = show.get("virtual_console") or {}
     widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
+    # CDX-58: ein LEERER Katalog ist ein bekannter Katalog — jeder Verweis
+    # haengt dann (letzte Funktion geloescht). Nur wenn der ``functions``-Block
+    # ganz fehlt (Teil-Dict), ist unbekannt, welche Funktionen es gibt.
+    katalog = known_fids if isinstance(
+        show.get("functions"), (dict, list)) else None
     for j, w in enumerate(widgets):
         if isinstance(w, dict):
             findings += _check_widget(
-                w, f"virtual_console.widgets[{j}]", caps, known_fids, fid_to_fn)
+                w, f"virtual_console.widgets[{j}]", caps, katalog, fid_to_fn)
 
     # TOOL-25: Snap-Verweise der Knoepfe gegen die Snap-Bibliothek der Show.
     # Nur mit ``library``-Block: Alt-Shows ohne ihn erben beim Laden die
@@ -333,9 +338,17 @@ _WIDGET_ENUM_FIELDS = {
 }
 
 
+# Mehrfach-Aktionen, die ``actions[n].function_id`` auswerten
+# (``VCButton._execute_extra``).
+_AKTIONEN_MIT_FUNKTION = ("function", "effect_action")
+
+
 def _check_widget(w: dict, where: str, caps: Capabilities,
-                  known_fids: set[int],
+                  known_fids: set[int] | None,
                   fid_to_fn: dict[int, dict] | None = None) -> list[Finding]:
+    """``known_fids``: IDs aller Funktionen der Show. ``None`` = Katalog
+    unbekannt (keine Verweis-Pruefung); eine LEERE Menge = es gibt keine
+    Funktion, jeder Verweis haengt (CDX-58)."""
     fid_to_fn = fid_to_fn or {}
     out: list[Finding] = []
     wtype = w.get("type")
@@ -430,18 +443,25 @@ def _check_widget(w: dict, where: str, caps: Capabilities,
         ref = w.get(ref_key)
         refs = ref if isinstance(ref, list) else ([ref] if ref is not None else [])
         for r in refs:
-            if isinstance(r, int) and r > 0 and known_fids and r not in known_fids:
+            if (isinstance(r, int) and r > 0 and known_fids is not None
+                    and r not in known_fids):
                 out.append(Finding(
                     WARNING, "VC-DANGLING", label,
                     f"{ref_key} {r} zeigt auf keine existierende Funktion",
                     "vc_widget.py (function_id-Bindung)"))
     # TOOL-25: Mehrfach-Aktionen tragen je Eintrag eine eigene function_id
     # (vc_button.py, _run_actions) — die blieben bisher ungeprueft.
+    # CDX-58: nur die Aktionstypen, die das Feld LESEN (_execute_extra) — ein
+    # uebrig gebliebener Wert an ``library_snap``/``snapshot``/… ist inert.
     acts = w.get("actions")
     if isinstance(acts, list):
         for n, entry in enumerate(acts):
-            r = entry.get("function_id") if isinstance(entry, dict) else None
-            if isinstance(r, int) and r > 0 and known_fids and r not in known_fids:
+            if not isinstance(entry, dict) \
+                    or entry.get("type") not in _AKTIONEN_MIT_FUNKTION:
+                continue
+            r = entry.get("function_id")
+            if (isinstance(r, int) and r > 0 and known_fids is not None
+                    and r not in known_fids):
                 out.append(Finding(
                     WARNING, "VC-DANGLING", label,
                     f"actions[{n}].function_id {r} zeigt auf keine existierende "
@@ -540,6 +560,89 @@ def _snap_konflikte(ids: list[int], tabelle: dict[int, dict]) -> list[str]:
                 teile.append(f"Snap {b} überschreibt Snap {a} auf "
                              + ", ".join(sorted(kanaele)))
     return teile
+
+
+def blackout_ziel_befunde(widgets, gruppen) -> list[Finding]:
+    """VCB-44: Blackout-Tasten, deren Ziel nicht (mehr) gilt.
+
+    ``gruppen`` — ``{id: (Name, Ordner, Kennung)}`` der Fixture-Gruppen der Show
+    (``AppState.gruppen_steckbriefe``). Geprueft wird mit derselben Regel, mit
+    der die Taste ihr Ziel beim Druecken aufloest (``group_ref.ziel_gilt``):
+
+    * ``VC-BLACKOUT-ZIEL`` (Warnung): ein Gruppen-Ziel ist verloren — die Gruppe
+      gibt es nicht mehr, oder ihre Nummer gehoert jetzt einer anderen. Die
+      Taste schaltet dafuer nichts (und wird dadurch NICHT zum globalen
+      Blackout).
+    * dito fuer einen Gruppen-NAMEN aus einem alten Layout, den es nicht mehr
+      oder mehrfach gibt.
+
+    Nur melden: welche Gruppe gemeint war, weiss nur der Bediener. Rein ueber
+    Dicts, ohne Qt und ohne App-Zustand.
+    """
+    from src.core.group_ref import uid_lesbar, ziel_gilt
+    gruppen = gruppen or {}
+    je_name: dict[str, int] = {}
+    for _gid, (g_name, _ordner, _uid) in gruppen.items():
+        je_name[g_name] = je_name.get(g_name, 0) + 1
+    out: list[Finding] = []
+    hinweis = "vc_button.py (_blackout_pruefen: verlorenes Ziel schaltet nichts)"
+
+    def _pruefe(w: dict, name: str):
+        ids = [i for i in (w.get("blackout_group_ids") or [])
+               if isinstance(i, int) and not isinstance(i, bool) and i > 0]
+        refs = {}
+        for r in (w.get("blackout_group_refs") or []):
+            if isinstance(r, dict) and isinstance(r.get("id"), int) and "name" in r:
+                refs.setdefault(r["id"], r)
+        for gid in ids:
+            ref = refs.get(gid)
+            gemerkt = None if ref is None else (
+                ref.get("name"), ref.get("folder") or "", uid_lesbar(ref.get("uid")))
+            if ziel_gilt(gemerkt, gruppen.get(gid)):
+                continue
+            wie = (ref or {}).get("name") or f"#{gid}"
+            ordner = (ref or {}).get("folder") or ""
+            out.append(Finding(
+                WARNING, "VC-BLACKOUT-ZIEL", name,
+                f"Blackout-Ziel verloren: Gruppe „{wie}“"
+                + (f" ({ordner})" if ordner else "")
+                + " gibt es nicht mehr (gelöscht oder aus einer anderen Show) — "
+                  "die Taste schaltet dafür nichts. Ziel im Dialog der Taste neu wählen",
+                hinweis))
+        namen = w.get("blackout_groups_nur_name" if ids else "blackout_groups") or []
+        for g_name in namen:
+            if not isinstance(g_name, str) or not g_name.strip():
+                continue
+            anzahl = je_name.get(g_name, 0)
+            if anzahl == 1:
+                continue
+            grund = ("gibt es nicht" if anzahl == 0
+                     else f"ist mehrdeutig — {anzahl} Gruppen heißen so")
+            out.append(Finding(
+                WARNING, "VC-BLACKOUT-ZIEL", name,
+                f"Blackout-Ziel: Gruppe „{g_name}“ {grund} — die Taste schaltet "
+                "dafür nichts. Ziel im Dialog der Taste neu wählen",
+                hinweis))
+
+    def _gehe(liste, ort: str, rahmen: str):
+        for j, w in enumerate(liste if isinstance(liste, list) else []):
+            if not isinstance(w, dict):
+                continue
+            pfad = f"{ort}[{j}]"
+            seite = w.get("vc_page")
+            wo_teile = [t for t in (
+                f"in '{rahmen}'" if rahmen else "",
+                f"Seite {int(seite) + 1}" if _als_int(seite) is not None and rahmen else "",
+                pfad) if t]
+            if w.get("action") == "Blackout":
+                _pruefe(w, _knopf_name(w, ", ".join(wo_teile)))
+            kinder = w.get("children")
+            if isinstance(kinder, list):
+                _gehe(kinder, f"{pfad}.children",
+                      str(w.get("caption", "") or w.get("type", "")))
+
+    _gehe(widgets, "widgets", "")
+    return out
 
 
 def snap_verweis_befunde(widgets, library) -> list[Finding]:

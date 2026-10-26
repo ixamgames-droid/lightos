@@ -80,7 +80,7 @@ class TestVenvArchitektur:
                      "create_directories", "create_shortcut", "write_manifest",
                      "show_summary"):
             monkeypatch.setattr(installer, name, lambda *a, **k: [])
-        monkeypatch.setattr(installer, "create_venv", lambda neu=False: gesehen.append(neu))
+        monkeypatch.setattr(installer, "create_venv", lambda neu=False, **k: gesehen.append(neu))
         monkeypatch.setattr(sys, "argv", ["install.py", "--neu-venv", "--no-shortcut"])
         installer.main()
         monkeypatch.setattr(sys, "argv", ["install.py", "--no-shortcut"])

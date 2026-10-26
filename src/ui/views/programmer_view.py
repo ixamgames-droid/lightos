@@ -17,10 +17,10 @@ from PySide6.QtWidgets import (
     QLineEdit, QGroupBox, QScrollArea, QFrame,
     QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter,
     QStackedWidget, QButtonGroup, QInputDialog, QRadioButton, QComboBox,
-    QWhatsThis
+    QWhatsThis, QSpacerItem
 )
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
 from src.core.app_state import (
     get_state, AppState, get_channels_for_patched, resolve_attr_channels,
     color_head_count, pan_tilt_head_count, attr_head_count_for_channels,
@@ -37,6 +37,7 @@ from src.core.group_cells import (ACHSE_WEISS, parse_group_cell, parse_zelle,
 from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.core import programmer_verlauf as _pv
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.flow_layout import FlowLayout
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
 _PREFS_DIR = app_data_dir()
@@ -125,15 +126,15 @@ _PROGRAMMER_HELP = {
     "Kopieren": "Kopiert die aktuellen Programmer-Werte in die Zwischenablage.",
     "Einfügen": "Fügt zuvor kopierte Programmer-Werte wieder ein.",
     # FM-52: eigener Programmer-Verlauf — Patch/Geraete gehoeren zu Strg+Z.
-    # Kuerzel nur fuer Rueckgaengig (Strg+Z ist ueberall gleich); Wiederherstellen
-    # ist plattformabhaengig (Linux Strg+Umschalt+Z, Windows Strg+Y) -> Menuepfad.
+    # UI-93: Wiederholen traegt auf jeder Plattform beide Folgen
+    # (Strg+Y und Strg+Umschalt+Z), siehe src/ui/undo_kuerzel.py.
     "Rückgängig": "Nimmt den letzten Programmer-Schritt zurück (Regler-Zug, "
                   "Kachel, Palette, Hervorheben, Löschen …). Geräte- und "
                   "Patch-Änderungen nimmt Bearbeiten → Rückgängig (Strg+Z) "
                   "zurück.",
     "Wiederholen": "Stellt einen im Programmer zurückgenommenen Schritt wieder "
-                   "her. Geräte- und Patch-Änderungen stellt Bearbeiten → "
-                   "Wiederherstellen wieder her.",
+                   "her. Geräte- und Patch-Änderungen holt Bearbeiten → "
+                   "Wiederholen (Strg+Y oder Strg+Umschalt+Z) wieder.",
     "Farb-Werkzeug...": "Öffnet den Farbwähler als eigenes, frei platzierbares Fenster "
                      "für die ausgewählten Fixtures.",
     "Positions-Werkzeug...": "Öffnet das Pan/Tilt-Pad für Moving Heads als eigenes Fenster "
@@ -260,8 +261,25 @@ class ProgrammerView(QWidget):
         self._build_body()
 
     def _build_toolbar(self):
-        """Gemeinsame Toolbar (beide Layouts) inkl. Layout-Umschalter."""
+        """Gemeinsame Toolbar (beide Layouts) inkl. Layout-Umschalter.
+
+        UI-98: Bearbeiten- und Werkzeug-Knoepfe liegen in einem umbrechenden
+        :class:`FlowLayout`. In einer starren ``QHBoxLayout`` passten sie bei
+        1000×640 nicht in eine Zeile; Qt quetschte sie dann unter ihre
+        Wunschbreite („Alles lösche“, „arb-Werkzeug.“, „itions-Werkzeu“).
+        Jetzt bricht die Leiste in eine zweite Zeile um, Hilfe- und
+        Layout-Knopf bleiben rechts oben.
+        """
         tb = QHBoxLayout()
+        tb.setContentsMargins(0, 0, 0, 0)
+        self._toolbar_flow_host = QWidget()
+        _sp = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        _sp.setHeightForWidth(True)
+        self._toolbar_flow_host.setSizePolicy(_sp)
+        # Zeilen mittig: die Bearbeiten-Knöpfe sind niedriger als die
+        # Werkzeug-Knöpfe und stünden sonst oben versetzt.
+        flow = FlowLayout(self._toolbar_flow_host, margin=0, h_spacing=6,
+                          v_spacing=4, zeilen_zentrieren=True)
         for label, slot, color in [
             ("Hervorheben", self._highlight, "#FFD700"),
             ("Abdunkeln",  self._lowlight,  "#888888"),
@@ -287,26 +305,44 @@ class ProgrammerView(QWidget):
                 # Breite auf die LAENGERE der beiden Fassungen festnageln, sonst
                 # huepft die halbe Toolbar bei jedem Auswahlwechsel.
                 self._btn_clear = b
-                b.setMinimumWidth(b.fontMetrics().horizontalAdvance(
-                    self._clear_button_labels(99)[0]) + 24)
-            tb.addWidget(b)
+                # UI-98: mit FETTER Schrift messen (das Stylesheet setzt
+                # font-weight: bold) und beide Fassungen beruecksichtigen —
+                # mit der normalen Schrift gemessen war „Alles löschen“
+                # breiter als der Knopf.
+                _f = QFont(b.font())
+                _f.setBold(True)
+                _fm = QFontMetrics(_f)
+                b.setMinimumWidth(max(
+                    _fm.horizontalAdvance(self._clear_button_labels(n)[0])
+                    for n in (0, 99)) + 24)
+            flow.addWidget(b)
         self._sync_clear_button()
         self._sync_verlauf_buttons()
-        tb.addSpacing(20)
+        flow.addItem(QSpacerItem(14, 26, QSizePolicy.Policy.Fixed,
+                                 QSizePolicy.Policy.Fixed))
 
-        # Tool-Buttons (Color, Position, Fan)
+        # Tool-Buttons (Color, Position, Fan) — als eine Gruppe, damit der
+        # Umbruch sie nur gemeinsam in die nächste Zeile nimmt.
+        self._toolbar_werkzeuge = QWidget()
+        _wz = QHBoxLayout(self._toolbar_werkzeuge)
+        _wz.setContentsMargins(0, 0, 0, 0)
+        _wz.setSpacing(6)
         for label, slot in [
             ("Farb-Werkzeug...",    self._open_color_tool),
             ("Positions-Werkzeug...", self._open_position_tool),
             ("Fächer...",           self._open_fan_tool),
         ]:
             b = QPushButton(label)
-            b.setFixedHeight(26)
+            # dark.qss (min-height + Innenabstand) macht die Knöpfe ohnehin
+            # 32 px hoch; mit 26 px fester Höhe zentrierte die Gruppe sie
+            # versetzt.
+            b.setFixedHeight(32)
             b.clicked.connect(slot)
             b.setWhatsThis(_PROGRAMMER_HELP.get(label, ""))   # U-3
-            tb.addWidget(b)
+            _wz.addWidget(b)
+        flow.addWidget(self._toolbar_werkzeuge)
 
-        tb.addStretch(1)
+        tb.addWidget(self._toolbar_flow_host, 1)
 
         # U-3 (P-08): Hilfe-Modus. Aktiviert Qts "What's This?" — der naechste Klick
         # auf ein Bedienelement zeigt dessen Hilfetext (setWhatsThis) als Sprechblase,
@@ -323,7 +359,7 @@ class ProgrammerView(QWidget):
             "an, um zu erfahren, was es tut."
         )
         self._btn_help.clicked.connect(lambda: QWhatsThis.enterWhatsThisMode())
-        tb.addWidget(self._btn_help)
+        tb.addWidget(self._btn_help, 0, Qt.AlignmentFlag.AlignTop)
 
         self._btn_layout = QPushButton()
         self._btn_layout.setFixedHeight(26)
@@ -335,7 +371,7 @@ class ProgrammerView(QWidget):
         )
         self._btn_layout.clicked.connect(self._toggle_layout)
         self._update_layout_button()
-        tb.addWidget(self._btn_layout)
+        tb.addWidget(self._btn_layout, 0, Qt.AlignmentFlag.AlignTop)
 
         self._root.addLayout(tb)
 
@@ -678,6 +714,21 @@ class ProgrammerView(QWidget):
         create_row.addWidget(b_capture)
         create_row.addStretch(1)
         v.addLayout(create_row)
+        # IMP-2: Szenen aus einem anderen Lichtprogramm ueber den DMX-Eingang
+        # mitschneiden. Eigene Zeile, damit die obere nicht breiter wird.
+        import_row = QHBoxLayout()
+        b_mitschnitt = QPushButton("Mitschnitt-Assistent...")
+        b_mitschnitt.setToolTip(
+            "Szenen aus einem anderen Lichtprogramm übernehmen: LightOS hält das "
+            "über Art-Net/sACN empfangene DMX auf Knopfdruck als Szene fest.\n"
+            "Der Assistent liest nur den Eingang und gibt selbst nichts aus.\n"
+            "Er öffnet als eigenes Fenster — LightOS bleibt daneben bedienbar."
+        )
+        b_mitschnitt.clicked.connect(self._open_mitschnitt)
+        import_row.addWidget(b_mitschnitt)
+        import_row.addStretch(1)
+        v.addLayout(import_row)
+        self._btn_mitschnitt = b_mitschnitt
         self._effects_list = QListWidget()
         self._effects_list.itemDoubleClicked.connect(self._on_effect_toggle)
         v.addWidget(self._effects_list, stretch=1)
@@ -814,6 +865,19 @@ class ProgrammerView(QWidget):
                 self._refresh_effects_list()
         except Exception as e:
             QMessageBox.warning(self, "Effekt-Assistent", str(e))
+
+    def _open_mitschnitt(self):
+        """IMP-2: Mitschnitt-Assistent — legt Szenen (und auf Wunsch einen
+        Chaser) aus dem empfangenen DMX an."""
+        # Nicht modal: der Assistent ist ein eigenes Fenster, daneben bleiben
+        # DMX-Monitor, 3D-Fenster und Funktionsliste bedienbar. Ein zweiter
+        # Klick holt den offenen nach vorn. Die Funktionsliste zieht ueber
+        # FUNCTION_CHANGED von selbst nach.
+        try:
+            from src.ui.widgets.mitschnitt_dialog import zeige_assistent
+            zeige_assistent(self)
+        except Exception as e:
+            QMessageBox.warning(self, "Mitschnitt-Assistent", str(e))
 
     def _new_effect(self, kind: str):
         """Legt eine Szene/einen Chaser an und öffnet direkt den Editor."""
@@ -1308,7 +1372,10 @@ class ProgrammerView(QWidget):
         # F-1: Gruppenklick oeffnet direkt die Matrix-Ansicht der Gruppe.
         try:
             idx = getattr(self, "_matrix_tab_index", -1)
-            if idx is not None and idx >= 0:
+            # UI-89: nur, wenn die Auswahl eine Matrix treiben kann — der
+            # Reiter ist sonst ausgeblendet (z. B. eine reine Laser-Gruppe).
+            if (idx is not None and idx >= 0
+                    and self._main_tabs.isTabVisible(idx)):
                 self._main_tabs.setCurrentIndex(idx)
         except Exception:
             pass
@@ -1569,82 +1636,166 @@ class ProgrammerView(QWidget):
                     lay.addWidget(weiss_block)
                     lay.addStretch(1)
 
-            # FM-48: Farbe/Weitere ohne passende Kanaele ausblenden (Nebel ohne
-            # Farbe, Pixel-Balken ohne Sonderkanaele) — wie Gobo/Position. Die
-            # Intensitaet bleibt immer: dort steht der Hinweis „Helligkeit laeuft
-            # ueber die Farbe" fuer Geraete ohne Dimmer.
-            for key in ("Color", "Weitere"):
-                idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
-                if idx >= 0:
-                    sichtbar = bool(groups.get(key)) or (
-                        key == "Color" and weiss_block is not None)
-                    self._main_tabs.setTabVisible(idx, sichtbar)
-            # M2.1: Gobo-Tab nur bei vorhandenen Gobo-Kanaelen einblenden.
-            if getattr(self, "_gobo_tab_index", -1) >= 0:
-                self._main_tabs.setTabVisible(
-                    self._gobo_tab_index, bool(groups.get("Gobo")))
-            # M-Map: Mapping-Tab sichtbar, sobald EIN Pan/Tilt-Geraet (Moving Head/
-            # Spider) in der Auswahl ist — gegen alle selektierten Geraete geprueft,
-            # nicht nur das Template (sonst bleibt es bei MH-an-2.-Stelle versteckt).
-            if getattr(self, "_mapping_tab_index", -1) >= 0:
-                cap = any(
-                    any((getattr(ch, "attribute", "") or "") in ("pan", "tilt")
-                        for ch in get_channels_for_patched(f))
-                    for f in selected)
-                self._main_tabs.setTabVisible(self._mapping_tab_index, cap)
-            # Position- und EFX-Tab: nur sichtbar, wenn die Auswahl Pan/Tilt-
-            # Kanaele enthaelt. Strahler/RGB-Spider (keine Bewegung) -> ausgeblendet;
-            # Moving Heads / Tilt-Spider -> eingeblendet.
-            has_pos = bool(groups.get("Position"))
-            if getattr(self, "_position_tab_index", -1) >= 0:
-                self._main_tabs.setTabVisible(self._position_tab_index, has_pos)
-            if getattr(self, "_efx_tab_index", -1) >= 0:
-                # LAS-22: auch fuer Laser, die ihr Bild ueber laser_x/laser_y
-                # bewegen — der EFX-Editor schreibt dann diese Achsen.
-                has_efx = has_pos
-                if not has_efx:
-                    try:
-                        from src.ui.views.efx_view import laser_achsen_attrs
-                        has_efx = any(
-                            laser_achsen_attrs(
-                                getattr(ch, "attribute", "")
-                                for ch in get_channels_for_patched(f))
-                            for f in selected)
-                    except Exception:
-                        has_efx = False
-                self._main_tabs.setTabVisible(self._efx_tab_index, has_efx)
-            # LAS-02: Laser-Tab sichtbar, sobald EIN Laser-Geraet in der
-            # Auswahl ist (gegen alle selektierten Geraete geprueft, wie beim
-            # Mapping-Tab — nicht nur gegen das Template).
-            if getattr(self, "_laser_tab_index", -1) >= 0:
-                try:
-                    from src.ui.views.laser_view import (
-                        fixture_has_laser_capability)
-                    has_laser = any(fixture_has_laser_capability(f)
-                                    for f in selected)
-                except Exception:
-                    has_laser = False
-                self._main_tabs.setTabVisible(self._laser_tab_index, has_laser)
+            # UI-89: EINE Stelle entscheidet ueber die Reiterleiste und setzt
+            # sie in einem Zug (nur Aenderungen, offener Reiter bleibt).
+            self._reiter_anwenden(
+                self._reiter_sichtbarkeit(selected, normal,
+                                          weiss_block is not None),
+                laser_zuerst=all(self._ist_laser(f) for f in selected))
         except RuntimeError:
             pass  # Widgets beim Layout-Wechsel zwischenzeitlich geloescht
+
+    @staticmethod
+    def _ist_laser(fx) -> bool:
+        try:
+            from src.ui.views.laser_view import fixture_has_laser_capability
+            return bool(fixture_has_laser_capability(fx))
+        except Exception:
+            return False
+
+    def _reiter_sichtbarkeit(self, selected, normal, hat_weiss: bool) -> dict:
+        """UI-89: welche Reiter die Auswahl braucht — ``{Seite: sichtbar}``.
+
+        Entschieden wird ueber die FAEHIGKEITEN der Auswahl (Vereinigung aller
+        gewaehlten Geraete), nicht ueber den Geraetetyp. Ein Reiter erscheint
+        nur, wenn er fuer die Auswahl etwas Bedienbares enthaelt:
+
+        * Was ein Laser allein ueber seinen eigenen Reiter bedient
+          (``nur_im_laser_reiter``: Betriebsart, Musterauswahl, Groesse,
+          Geschwindigkeiten, Laserfarbe …), zaehlt nicht fuer Intensity/Gobo/
+          Weitere. Vorher standen diese Reiter bei einem reinen Laser, weil
+          die Betriebsart ein ``shutter``-, die Musterauswahl ein
+          ``gobo_wheel``-Kanal ist. Dimmer/RGB/Strobe eines Kombi-Lasers und
+          alles, was der Laser-Reiter nicht kennt, zaehlen weiter.
+        * Intensity: bei Dimmer-/Shutter-Kanaelen — oder bei Farbe (FM-48/
+          UXT-10: dort steht der Hinweis „Helligkeit laeuft ueber die Farbe").
+        * Matrix: nur wenn die Auswahl etwas hat, das eine Matrix treiben
+          kann (Dimmer oder Farbe). Vorher hing der Reiter gar nicht an der
+          Auswahl.
+        * Assistent und Paletten bleiben immer: Szene/Chaser anlegen,
+          „Programmer → Szene" und die Funktionsliste haengen nicht an der
+          Geraeteart, und Paletten gibt es auch fuer Laser-Muster.
+        """
+        from src.core.app_state import _DIM_INTENSITY_ATTRS
+        try:
+            from src.ui.views.laser_view import nur_im_laser_reiter
+        except Exception:
+            def nur_im_laser_reiter(_attr):
+                return False
+        alle: set[str] = set()       # jedes Attribut der Auswahl
+        zaehlt: set[str] = set()     # … ohne das Laser-Eigene der Laser
+        hat_laser = False
+        for f in selected:
+            ist_laser = self._ist_laser(f)
+            hat_laser = hat_laser or ist_laser
+            for ch in get_channels_for_patched(f):
+                attr = getattr(ch, "attribute", "") or ""
+                alle.add(attr)
+                if f in normal and not (ist_laser
+                                        and nur_im_laser_reiter(attr)):
+                    zaehlt.add(attr)
+        gruppen = {_classify_attribute(a) for a in zaehlt}
+        hat_farbe = "Color" in gruppen or hat_weiss
+        hat_pos = "Position" in gruppen
+        hat_efx = hat_pos
+        if not hat_efx:
+            # LAS-22: auch fuer Laser, die ihr Bild ueber laser_x/laser_y
+            # bewegen — der EFX-Editor schreibt dann diese Achsen.
+            try:
+                from src.ui.views.efx_view import laser_achsen_attrs
+                hat_efx = any(
+                    laser_achsen_attrs(
+                        getattr(ch, "attribute", "")
+                        for ch in get_channels_for_patched(f))
+                    for f in selected)
+            except Exception:
+                hat_efx = False
+        tabs = self._attr_group_tabs
+        plan = {
+            tabs["Intensity"]: "Intensity" in gruppen or hat_farbe,
+            tabs["Color"]: hat_farbe,
+            tabs["Position"]: hat_pos,
+            # M2.1: Gobo-Tab nur bei vorhandenen Gobo-Kanaelen.
+            tabs["Gobo"]: "Gobo" in gruppen,
+            # FM-48: kein leeres „Weitere" (Beam + Effect + Other).
+            tabs["Weitere"]: bool(
+                gruppen - {"Intensity", "Color", "Position", "Gobo"}),
+            # M-Map: sobald EIN Pan/Tilt-Geraet in der Auswahl ist.
+            self._mapping_page: bool(alle & {"pan", "tilt"}),
+            self._efx_page: hat_efx,
+            self._rgb_page: hat_farbe or bool(zaehlt & _DIM_INTENSITY_ATTRS),
+            # LAS-02: sobald EIN Laser in der Auswahl ist.
+            self._laser_page: hat_laser,
+        }
+        return plan
+
+    def _reiter_anwenden(self, plan: dict, laser_zuerst: bool = False):
+        """UI-89: Reiter-Sichtbarkeit in einem Zug setzen.
+
+        Nur ECHTE Aenderungen gehen an Qt — eine unveraenderte Auswahl baut
+        die Leiste nicht um (kein Flackern). Der offene Reiter bleibt, wenn es
+        ihn danach noch gibt; sonst springt die Ansicht auf den ersten
+        sinnvollen (``_erster_reiter``). ``currentChanged`` feuert dabei
+        hoechstens EINMAL — Qt waehlt beim Ausblenden des offenen Reiters
+        selbst einen Nachbarn, der als Zwischenhalt den Programmer-Fokus
+        (ENG-02) kurz falsch gesetzt haette.
+        """
+        t = self._main_tabs
+        offen = t.currentWidget()
+        offen_idx = t.currentIndex()
+        geblockt = t.blockSignals(True)
+        try:
+            for seite, sichtbar in plan.items():
+                idx = t.indexOf(seite)
+                if idx >= 0 and t.isTabVisible(idx) != bool(sichtbar):
+                    t.setTabVisible(idx, bool(sichtbar))
+            idx = t.indexOf(offen) if offen is not None else -1
+            if idx < 0 or not t.isTabVisible(idx):
+                idx = self._erster_reiter(laser_zuerst)
+            if idx >= 0 and idx != t.currentIndex():
+                t.setCurrentIndex(idx)
+        finally:
+            t.blockSignals(geblockt)
+        if t.currentIndex() != offen_idx:
+            t.currentChanged.emit(t.currentIndex())
+
+    def _erster_reiter(self, laser_zuerst: bool = False) -> int:
+        """Erster sinnvoller Reiter: der erste sichtbare Attribut-Reiter; gibt
+        es keinen oder besteht die Auswahl nur aus Lasern, der Laser-Reiter;
+        sonst der erste sichtbare ueberhaupt."""
+        t = self._main_tabs
+
+        def _sichtbar(seite) -> int:
+            idx = t.indexOf(seite)
+            return idx if idx >= 0 and t.isTabVisible(idx) else -1
+
+        attr = [i for i in map(_sichtbar, self._attr_group_tabs.values())
+                if i >= 0]
+        laser = _sichtbar(getattr(self, "_laser_page", None))
+        if laser >= 0 and (laser_zuerst or not attr):
+            return laser
+        if attr:
+            return attr[0]
+        return next((i for i in range(t.count()) if t.isTabVisible(i)), -1)
 
     def _tabs_grundzustand(self):
         """UI-70: Reiter-Sichtbarkeit wie beim Aufbau ohne Auswahl.
 
-        Faehigkeits-Reiter (Gobo, Position, Mapping, EFX, Laser) aus, Color und
-        Weitere AN — dort steht der Hinweis „erst ein Geraet waehlen". Eine
-        Quelle fuer den Leer-Zweig von ``_rebuild_attr_editor``; ein Reiter, der
-        hier fehlt, bliebe nach dem Leeren mit dem Stand der alten Auswahl offen.
+        Faehigkeits-Reiter (Gobo, Position, Mapping, EFX, Laser) aus;
+        Intensity, Color und Weitere AN — dort steht der Hinweis „erst ein
+        Geraet waehlen" — und Matrix AN (arbeitet auch auf Gruppen). Eine
+        Quelle fuer den Leer-Zweig von ``_rebuild_attr_editor``; ein Reiter,
+        der hier fehlt, bliebe nach dem Leeren mit dem Stand der alten Auswahl
+        offen.
         """
-        for name in ("_gobo_tab_index", "_mapping_tab_index", "_position_tab_index",
-                     "_efx_tab_index", "_laser_tab_index"):
-            idx = getattr(self, name, -1)
-            if idx >= 0:
-                self._main_tabs.setTabVisible(idx, False)
-        for key in ("Color", "Weitere"):     # Hinweis „erst waehlen" zeigen
-            idx = self._main_tabs.indexOf(self._attr_group_tabs[key])
-            if idx >= 0:
-                self._main_tabs.setTabVisible(idx, True)
+        tabs = self._attr_group_tabs
+        plan = {tabs[k]: k in ("Intensity", "Color", "Weitere") for k in tabs}
+        for name, sichtbar in (("_mapping_page", False), ("_efx_page", False),
+                               ("_laser_page", False), ("_rgb_page", True)):
+            seite = getattr(self, name, None)
+            if seite is not None:
+                plan[seite] = sichtbar
+        self._reiter_anwenden(plan)
 
     def _build_group_tab(self, group_name: str,
                          channels: list[FixtureChannel],

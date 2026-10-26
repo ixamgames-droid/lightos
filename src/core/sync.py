@@ -62,8 +62,26 @@ class SyncEvent(str, Enum):
     SELECTION_CHANGED = "selection_changed"    # Programmer-Geraeteauswahl geaendert
     LIVE_VIEW_CHANGED = "live_view_changed"    # Live-View-Layout (Positionen/Zoom/Grid) geaendert
     LASER_ARMED_CHANGED = "laser_armed_changed"  # Laser scharf/unscharf/Not-Aus (LAS-10) — Anzeige-Sync
-    LASER_ESTOP = "laser_estop"                # Laser-NOT-AUS ausgelöst (UXT-09) — globale Bestätigung
+    LASER_ESTOP = "laser_estop"                # Laser-NOT-AUS ausgelöst (UXT-09) oder gelöst (LAS-36, Daten False) — Zustand: AppState.laser_estop_active
     REFRESH_ALL = "refresh_all"                # Globale "Alle neu laden"
+    # Codex-Review #1078: Show-Inhalt geaendert, fuer den es kein eigenes Event
+    # gibt (Klonen in Grundwerte und Konsolen-Tasten). Gehoert nur dem Auto-Save.
+    SHOW_INHALT_CHANGED = "show_inhalt_changed"
+
+
+def _name_von(cb) -> str:
+    """Name eines Abonnenten fuer die Fehlerzeile — wirft nie.
+
+    LAS-36: ``repr`` der Methode eines abgebauten Fensters wirft selbst
+    („Internal C++ object already deleted“). Frueher stand ``repr(cb)`` als
+    Vorgabewert im ``getattr`` und wurde IMMER ausgewertet; der Fehler brach
+    ``emit`` mitten in der Fehlerbehandlung ab, und alle Abonnenten dahinter
+    bekamen das Ereignis nicht (z. B. „Laser-NOT-AUS geloest“)."""
+    try:
+        name = getattr(cb, "__name__", None)
+        return str(name) if name else repr(cb)
+    except Exception:
+        return "<Abonnent>"
 
 
 class StateSync:
@@ -142,15 +160,27 @@ class StateSync:
                 # Selbstheilung: abmelden, damit kein weiterer Emit ins
                 # geloeschte Objekt laeuft (Vorstufe der Access-Violation-
                 # Crashes aus crash.log).
-                if "already deleted" in str(e).lower():
-                    self.unsubscribe(event, cb)
+                # LAS-36: ebenso „Signal source has been deleted“ — so meldet
+                # sich die Methode eines abgebauten Fensters, die nur ein Signal
+                # weiterreicht (``MainWindow._laser_estop_melden``).
+                text = str(e).lower()
+                if "already deleted" in text or "has been deleted" in text:
+                    self._toten_abmelden(event, cb)
                     print(f"[StateSync] toter Subscriber entfernt ({event.value}): {e}")
                 else:
-                    name = getattr(cb, "__name__", repr(cb))
-                    print(f"[StateSync] error in {name} for {event.value}: {e}")
+                    print(f"[StateSync] error in {_name_von(cb)} for {event.value}: {e}")
             except Exception as e:
-                name = getattr(cb, "__name__", repr(cb))
-                print(f"[StateSync] error in {name} for {event.value}: {e}")
+                print(f"[StateSync] error in {_name_von(cb)} for {event.value}: {e}")
+
+    def _toten_abmelden(self, event: SyncEvent, cb):
+        """Entfernt genau dieses Objekt (Identitaet, kein Vergleich — der
+        koennte ein geloeschtes Qt-Objekt anfassen). Wirft nie."""
+        try:
+            liste = self._subscribers.get(event)
+            if liste is not None:
+                liste[:] = [c for c in liste if c is not cb]
+        except Exception:
+            pass
 
     def refresh_all(self):
         """Broadcast: alle Views sollen sich frisch aus dem State aufbauen."""
@@ -175,11 +205,16 @@ def get_sync() -> StateSync:
 class ValidationIssue:
     """Ein gefundenes Problem mit Severity, Ort und Nachricht."""
 
-    def __init__(self, severity: str, location: str, message: str, auto_fixed: bool = False):
+    def __init__(self, severity: str, location: str, message: str,
+                 auto_fixed: bool = False, reparierbar: bool = False):
         self.severity = severity   # 'info', 'warn', 'error'
         self.location = location
         self.message = message
         self.auto_fixed = auto_fixed
+        # VCB-44: nur gemeldet (``fix=False``), liesse sich aber reparieren —
+        # der Dialog „Show prüfen“ bietet dafuer „Reparieren“ an, statt es
+        # ungefragt zu tun.
+        self.reparierbar = reparierbar
 
     def __str__(self):
         prefix = '[OK]' if self.auto_fixed else f'[{self.severity.upper()}]'
@@ -187,6 +222,34 @@ class ValidationIssue:
 
     def __repr__(self):
         return self.__str__()
+
+
+BANNER_FEHLER = "#ff4444"
+BANNER_WARNUNG = "#ffaa00"
+BANNER_HINWEIS = "#58a6ff"
+
+
+def banner_zusammenfassung(issues) -> tuple[str, str] | None:
+    """Text und Farbe des „Issues"-Banners; ``None`` = nichts zu melden.
+
+    Fehler und Warnungen wie bisher („N Issues", rot bzw. gelb). CDX-58: gibt
+    es NUR Hinweise (Schwere ``info``, z. B. „Snaps widersprechen sich"),
+    erscheint das Banner trotzdem — ruhiger gefaerbt und als „Hinweis"
+    benannt. Vorher blieb so ein Befund unsichtbar, bis jemand von sich aus
+    „Show pruefen & reparieren" oeffnete.
+    """
+    issues = list(issues or ())
+    fehler = sum(1 for i in issues if getattr(i, "severity", "") == "error")
+    warnungen = sum(1 for i in issues if getattr(i, "severity", "") == "warn")
+    if fehler or warnungen:
+        zeichen, farbe = ("!", BANNER_FEHLER) if fehler else ("*", BANNER_WARNUNG)
+        return f" {zeichen} {fehler + warnungen} Issues ", farbe
+    hinweise = sum(1 for i in issues if getattr(i, "severity", "") == "info"
+                   and not getattr(i, "auto_fixed", False))
+    if hinweise:
+        wort = "Hinweis" if hinweise == 1 else "Hinweise"
+        return f" i {hinweise} {wort} ", BANNER_HINWEIS
+    return None
 
 
 def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
@@ -202,6 +265,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
     7. CueStack-Cues referenzieren nur gepatchte Fixtures
     8. Function-Manager Functions referenzieren nur gepatchte Fixtures
     9. VC-Knoepfe verweisen nur auf vorhandene Bibliothek-Snaps (nur Meldung)
+    10. Blackout-Tasten haben ein gueltiges Ziel (VCB-44, nur Meldung)
 
     Returns: Liste von Issues. Wenn fix=True werden auto-fixable Issues behoben.
     Validation darf NIE crashen - alle Fehler werden abgefangen.
@@ -355,6 +419,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                      if _renamed else
                                      f"Mode '{mode_name}' fehlt - wäre ersetzt "
                                      f"durch '{fallback.name}'"),
+                                    reparierbar=True,
                                 ))
                         else:
                             issues.append(ValidationIssue(
@@ -403,6 +468,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                             'info', location,
                                             f"fixture_type '{current_type}' wäre -> '{profile_type}' "
                                             f"(aus FixtureProfile {profile_id})",
+                                            reparierbar=True,
                                         ))
                     except Exception as e_type:
                         # Defensive: profile lookup failure must not interrupt validation.
@@ -498,6 +564,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     issues.append(ValidationIssue(
                         'info', 'Programmer',
                         f"{len(stale_progs)} verwaiste fids: {stale_progs}",
+                        reparierbar=True,
                     ))
         except Exception as e:
             issues.append(ValidationIssue('error', 'Programmer', f"Fehler: {e}"))
@@ -530,6 +597,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                 f"Cue {getattr(cue, 'number', '?')} '{getattr(cue, 'label', '')}' "
                                 f"(Stack '{stack_name}')",
                                 f"{len(stale_in_cue)} verwaiste fids",
+                                reparierbar=True,
                             ))
         except Exception as e:
             issues.append(ValidationIssue('error', 'CueStacks', f"Fehler: {e}"))
@@ -557,6 +625,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                                 issues.append(ValidationIssue(
                                     'info', f"Scene '{getattr(func, 'name', '?')}'",
                                     f"{len(stale_vals)} verwaiste SceneValues",
+                                    reparierbar=True,
                                 ))
                 except Exception as e_func:
                     issues.append(ValidationIssue(
@@ -590,5 +659,21 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     f"VC {b.where}", b.message))
     except Exception as e:
         issues.append(ValidationIssue('error', 'VC-Snap-Verweise', f"Fehler: {e}"))
+
+    # 10. VCB-44: Blackout-Tasten mit verlorenem Ziel. Bis hierhin meldete die
+    #     Pruefung „sauber“, waehrend eine Taste auf eine geloeschte Gruppe
+    #     zeigte (und damit nichts schaltete). NUR melden. Ist die Show-DB
+    #     nicht lesbar (``None``), wird nichts behauptet.
+    try:
+        vc = getattr(state, "_vc_layout", None)
+        widgets = vc.get("widgets", []) if isinstance(vc, dict) else []
+        lesen = getattr(state, "gruppen_steckbriefe", None)
+        gruppen = lesen() if (widgets and callable(lesen)) else None
+        if gruppen is not None:
+            from src.core.capability.validate import blackout_ziel_befunde
+            for b in blackout_ziel_befunde(widgets, gruppen):
+                issues.append(ValidationIssue('warn', f"VC {b.where}", b.message))
+    except Exception as e:
+        issues.append(ValidationIssue('error', 'VC-Blackout-Ziele', f"Fehler: {e}"))
 
     return issues

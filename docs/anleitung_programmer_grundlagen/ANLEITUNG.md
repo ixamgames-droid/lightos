@@ -147,17 +147,22 @@ Die Reiterleiste zeigt nur, was zur Auswahl passt. Ohne Auswahl stehen dort
 
 | Reiter | Wann sichtbar | Inhalt |
 |---|---|---|
-| **Intensity** | immer | Dimmer, Shutter/Strobe |
+| **Intensity** | Auswahl hat Dimmer, Shutter/Strobe oder Farbe | Dimmer, Shutter/Strobe |
 | **Color** | Auswahl hat Farbkanäle | Schnellwahl, Farbregler |
 | **Position** | Auswahl hat Pan/Tilt | siehe Schritt 5 |
-| **Gobo** | Auswahl hat ein Goborad | Gobo-Kacheln, Rotation |
+| **Gobo** | Auswahl hat ein Goborad (die Musterauswahl eines Lasers zählt nicht) | Gobo-Kacheln, Rotation |
 | **Weitere** | Auswahl hat weitere Kanäle | Optik (Zoom, Fokus, Prisma, Iris), Effekt, Programme, alles Übrige |
 | **Mapping** | Auswahl hat Pan/Tilt | eine Position auf andere Kanäle abbilden |
 | **Assistent** | immer | Effekt-Assistent, **+ Szene**, **+ Chaser**, **Programmer → Szene**, Liste aller Funktionen mit **Start**/**Stop** |
-| **EFX** | Auswahl hat Pan/Tilt | Bewegungseffekte |
-| **Matrix** | immer | Farb- und Dimmer-Matrizen der Auswahl ([Matrix-Effekte](../anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md)) |
+| **EFX** | Auswahl hat Pan/Tilt oder einen Laser mit X/Y-Bewegung | Bewegungseffekte |
+| **Matrix** | Auswahl hat Dimmer oder Farbe | Farb- und Dimmer-Matrizen der Auswahl ([Matrix-Effekte](../anleitung_matrix_effekte/ANLEITUNG_MATRIX_EFFEKTE.md)) |
 | **Laser** | Auswahl enthält einen Laser | siehe [Laser bedienen](../anleitung_laser/ANLEITUNG_LASER.md) |
 | **Paletten** | immer | gespeicherte Farben, Positionen … zum Abrufen |
+
+Ein reiner Laser (kein Dimmer, keine Farbmischung) zeigt deshalb nur **Assistent**,
+**EFX**, **Laser** und **Paletten** — alles, was er kann, steht im Reiter **Laser**.
+Bringt ein Laser Dimmer oder RGB mit, kommen **Intensity**, **Color** und **Matrix** dazu.
+Der offene Reiter bleibt beim Wechsel der Auswahl stehen, solange es ihn noch gibt.
 
 ![Reiter Paletten mit einer aufgezeichneten Farbe](img/06_paletten.png)
 
@@ -264,12 +269,12 @@ Helligkeitsrampe über acht PARs oder einen Pan-Fächer über Moving Heads.
    **ein** Schritt, ebenso ein Knopfdruck, auch wenn er viele Geräte trifft.
    **Rückgängig** stellt den Stand vor diesem Schritt wieder her, **Wiederholen** holt
    ihn zurück. Beide Knöpfe sind nur aktiv, wenn es etwas zurückzunehmen bzw.
-   wiederherzustellen gibt; der Tooltip nennt den Schritt.
+   zu wiederholen gibt; der Tooltip nennt den Schritt.
 
    Änderungen am Patch und an den Geräte-Einstellungen, etwa die Ausrichtungs-Haken
    aus Schritt 5 (**Pan invertieren** …), stehen **nicht** in diesem Verlauf. Die nimmst
-   du über **Bearbeiten → Rückgängig** (**Strg+Z**) zurück und über **Bearbeiten →
-   Wiederherstellen** wieder her. **Neue Show** und **Show öffnen** leeren beide
+   du über **Bearbeiten → Rückgängig** (**Strg+Z**) zurück und holst sie über **Bearbeiten →
+   Wiederholen** (**Strg+Y** oder **Strg+Umschalt+Z**) wieder. **Neue Show** und **Show öffnen** leeren beide
    Verläufe.
 
 **Kopieren** merkt sich die Programmer-Werte der gewählten Geräte, **Einfügen** legt

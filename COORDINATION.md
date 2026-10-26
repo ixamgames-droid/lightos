@@ -23,14 +23,28 @@ Daraus folgt die Grundregel, aus der alles andere abgeleitet ist:
 | Rolle | Wer | Zustaendig fuer |
 |---|---|---|
 | **Leitende Sitzung** (`A`) | die Sitzung, die diese Datei pflegt | **Arbeitsverteilung**, Second Brain, Prozess/Regeln, Konfliktentscheidung, Freigabe strittiger Merges |
-| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten **oder sich freie aus `BACKLOG.md` nehmen**, Befunde ins `BACKLOG.md`, Blocker in `SESSIONS.md` |
+| **Mitarbeitende Sitzung** (`B`, `C`, …) | jede weitere | Zugeteilte Items abarbeiten; selbst suchen **nur, wenn `A` auf der Tafel abgemeldet ist** (PROC-23), Befunde als Fragment unter `backlog.d/` (PROC-20), Blocker in `SESSIONS.md` |
 
 **★ `A` teilt zu, `B` arbeitet ab (Ansage vom Betreiber, 2026-09-03).** Das ist
 die Grundform: `A` entscheidet, was als Naechstes drankommt und wer es macht,
-und legt es auf der Tafel ab. `B` muss dafuer **nicht warten** — was im
-`BACKLOG.md` frei steht (Status `todo`, kein Claim), darf `B` jederzeit selbst
-nehmen. Nur was `A` ausdruecklich fuer sich reserviert oder als `decision`
-markiert hat, bleibt liegen.
+und legt es auf der Tafel ab.
+
+**★ Seit 2026-10-19 (Ansage vom Betreiber, PROC-23): `A` ist der Master.**
+Mitarbeitende Sitzungen arbeiten ab, was `A` ihnen zuteilt (Tafel-Eintrag
+„A AN B/C/D“ oder Auftrag beim Start der Sitzung). Laeuft eine Sitzung leer,
+meldet sie das auf der Tafel und wartet auf die naechste Zuteilung.
+
+**Selbst suchen** darf eine Sitzung nur, wenn klar ist, dass von `A` nichts mehr
+kommt — `A` hat sich auf der Tafel **abgemeldet** (Blocker „A abgemeldet …“). Auch
+dann nur:
+* Items, die **nur diese Sitzung** erledigen kann (Windows, Windows-ARM, am Rig,
+  zweiter Bildschirm …) — die duerfen auch gross sein, oder
+* **allgemeine kleine** Items.
+
+**Immer:** `A` prueft das Ergebnis nach (adversariale Gegenpruefung), und
+gemergt wird **nur ueber die Merge-Warteschlange von `A`** (Gate +
+`pr_bereit --strict`) — die Sitzung meldet „bereit“ mit PR-Nummer auf der Tafel.
+Grund: `A` haelt den Ueberblick ueber Warteschlange, Konflikte und Reihenfolge.
 
 Woran `A` sich dabei halten muss, damit aus „Leitung" keine Sackgasse wird:
 
@@ -63,6 +77,21 @@ weiterhin fuer beide (Test-Gate gruen, CI gruen vor dem Merge, PROC-03).
 
 ## 2. Der Ablauf pro Item
 
+**Einmal je Rechner: die Tafel klonen (PROC-25).** Die Tafel liegt in einem
+privaten Repo `lightos-intern`; `tools/session_claim.py` arbeitet auf einem
+Klon davon **neben `repo/`** (im Projektordner, Geschwister der Worktrees):
+
+```
+gh repo clone ixamgames-droid/lightos-intern ../lightos-intern   # aus repo/ heraus
+```
+
+Ein anderer Ort geht ueber die Umgebungsvariable `LIGHTOS_TAFEL_REPO=<pfad>`
+(oder `--tafel <pfad>`). Fehlt der Klon, bricht jeder Befehl mit Exit 3 ab und
+nennt genau diesen Klon-Befehl — es gibt **keinen** stillen Rueckfall auf die
+alte Tafel. Ebenso Exit 3, wenn der Ordner kein eigener Klon ist oder sein
+`origin` nicht auf `lightos-intern` zeigt (etwa ein Klon des Code-Repos am
+falschen Ort) — sonst landete die Tafel auf `main` des oeffentlichen Repos.
+
 ```
 git fetch origin                      # 1. Was ist passiert, waehrend ich dachte?
 ./venv/bin/python tools/session_claim.py list        # 2. Wer macht gerade was?
@@ -74,7 +103,7 @@ git fetch origin                      # 1. Was ist passiert, waehrend ich dachte
 ```
 
 **`claim` ist die eine Stelle, die zaehlt.** Es
-1. holt den aktuellen Stand von `origin/sessions`,
+1. holt den aktuellen Stand der Tafel (`origin/main` im Klon von `lightos-intern`),
 2. prueft, ob das Item frei ist,
 3. schreibt die Zeile und **pusht sofort**,
 4. und faengt den Fall ab, dass die andere Sitzung im selben Moment schneller
@@ -90,7 +119,8 @@ deshalb erst **nach** dem Merge `release`. Ein verfallener Claim (laenger als
 4 h ohne `refresh`, etwa weil CI lange dauert) haelt den Merge nicht auf, er
 wird nur als Warnung gemeldet. Der Bericht ohne PR-Nummern zeigt fehlende
 Claims nur an (Exit 1 erst mit `--strict`), Entwuerfe zaehlen nie als
-„Claim fehlt". Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
+„Claim fehlt". Fehlt der Tafel-Klon, ist der Claim „ungeprueft": bei der
+Merge-Pruefung (PR-Nummern) Exit 1 wie ohne Claim, im Bericht nur Warnung. Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
 `pr_bereit.py <PR> --ohne-claim "Begruendung"`.
 
 **Reine Doku-/Backlog-PRs sind schnell gruen (PROC-19):** aendert ein PR nur
@@ -101,36 +131,97 @@ Wer Status-Pflege und Code trennt, haelt die Warteschlange kurz: ein einziger
 Code-, Test- oder Werkzeug-Pfad im PR bedeutet volle Suite. Details:
 `WORKFLOW.md`, Abschnitt „CI-Schnellweg".
 
-### Warum ein eigener Branch `sessions`
+### Warum ein eigenes, privates Repo fuer die Tafel (PROC-25)
 
-Die Tafel liegt auf dem Branch **`sessions`**, nicht auf `main`:
+Die Tafel liegt seit dem 25.10.2026 in einem **privaten** Repo
+`lightos-intern` (Datei `SESSIONS.md` auf `main`), nicht mehr auf dem Branch
+`sessions` dieses oeffentlichen Repos:
 
 * **`main` bleibt geschuetzt.** Die Loop-Guardrail „kein direkter Push auf
-  `main`" gilt weiter unveraendert. Ein Claim ist keine Codeaenderung und
+  `main`" gilt hier weiter unveraendert. Ein Claim ist keine Codeaenderung und
   durchlaeuft deshalb auch keinen PR — er muss in Sekunden sichtbar sein, nicht
-  nach einem Review.
-* **Keine Konflikte mit der eigentlichen Arbeit.** `sessions` enthaelt genau
-  eine Datei. Er wird **nie** nach `main` gemergt.
+  nach einem Review. Im Tafel-Repo wird deshalb direkt gepusht.
+* **Keine Konflikte mit der eigentlichen Arbeit.** Das Tafel-Repo enthaelt nur
+  `SESSIONS.md` und `ENTSCHEIDUNGEN.md`.
+* **Die Tafel ist Arbeitsgespraech, keine Veroeffentlichung.** Briefe zwischen
+  den Sitzungen muessen nicht mehr pseudonymisiert werden. **Zugangsdaten nie**
+  — auch nicht im privaten Repo: vor jedem Schreiben sperrt das Werkzeug
+  Token-, Kennwort- und Schluessel-Muster und bricht ab.
+* **Die oeffentliche CI braucht die Tafel nie.** Kein Workflow liest sie, es
+  gibt dafuer kein Secret; die Tests laufen gegen lokale Wegwerf-Repos.
+
+Der alte Branch `sessions` bleibt bestehen; sein letzter Commit ersetzt die
+Tafel durch einen Hinweis auf den Umzug, die Historie bleibt dort lesbar
+(`git log -p origin/sessions -- SESSIONS.md`). Eingerichtet wurde einmalig mit
+`session_claim.py umzug` (`--trocken` zeigt nur an; ein zweiter Lauf erkennt
+den Umzug). Steht im neuen Repo schon eine Tafel (frueher `claim`, halber
+Umzug), uebernimmt `umzug` fehlende Claims, Blocker und Verlaufszeilen von
+`sessions`, bevor der Hinweis gesetzt wird; ist dasselbe Item auf beiden
+Tafeln von verschiedenen Sitzungen belegt, bricht er ohne Hinweis ab. Nur fuer den Uebergangstag nimmt `LIGHTOS_TAFEL=alt` noch einmal
+den alten Branch (mit Warnung; nach dem Umzug schreibt er dort nichts mehr).
+
+**Offene Entscheidungen** stehen daneben in `ENTSCHEIDUNGEN.md`:
+`session_claim.py entscheidung add "<Frage>" --session A`,
+`entscheidung list` (`--alle` mit erledigten),
+`entscheidung done E-3 --session A --notiz "<wie entschieden>"`.
 
 ### Was gehoert wohin
 
 | Frage | Ort |
 |---|---|
-| *Was ist zu tun? Was wurde gefunden?* | `BACKLOG.md` (unveraendert die einzige Wahrheit) |
-| *Wer arbeitet gerade woran?* | `SESSIONS.md` auf Branch `sessions` |
+| *Was ist zu tun? Was wurde gefunden?* | `BACKLOG.md` (unveraendert die einzige Wahrheit) — Neues und Statusaenderungen kommen als Fragment `backlog.d/<ID>.md` dorthin |
+| *Wer arbeitet gerade woran?* | `SESSIONS.md` im privaten Tafel-Repo `lightos-intern` |
+| *Was muss der Projektinhaber entscheiden?* | `ENTSCHEIDUNGEN.md` im Tafel-Repo |
 | *Worueber stolpert man gerade?* | Blocker-Abschnitt in `SESSIONS.md` |
 | *Was haben wir daraus gelernt?* | Second Brain — **nur `A` schreibt** |
 
-Der Backlog-Status (`todo` → `wip` → `done`) bleibt wie gehabt Teil des
-Arbeits-Commits. Er ist die **menschliche** Sicht; `SESSIONS.md` ist die
-**maschinelle** — bewusst getrennt, weil `BACKLOG.md` 1500 Zeilen hat und bei
-jedem Claim ein Konfliktkandidat waere.
+Der Backlog-Status bleibt Teil des Arbeits-Commits — seit 2026-10-10 (PROC-20)
+aber als **Fragment** `backlog.d/<ID>.md` statt als Aenderung an `BACKLOG.md`.
+Er ist die **menschliche** Sicht; `SESSIONS.md` ist die **maschinelle** —
+bewusst getrennt, weil `BACKLOG.md` 1500 Zeilen hat und bei jedem Claim ein
+Konfliktkandidat waere.
+
+### Backlog-Fragmente: so laeuft es fuer alle Sitzungen (PROC-20)
+
+1. **Im eigenen PR:** je Item eine Datei `backlog.d/<ID>.md`; `BACKLOG.md`
+   bleibt unberuehrt. Beispiel fuer ein neues Item, das der PR umsetzt:
+
+   ```
+   ID: UI-99
+   Prioritaet: P2
+   Status: review
+   Titel: Kurzer Titel des Items
+
+   Was fehlt, woran man es merkt, wann es erledigt ist.
+   ```
+
+   Fuer ein vorhandenes Item genuegen `ID:` und `Status:`. Ein Befund ohne
+   Umsetzung bekommt `Status: todo`. Alle Kopfzeilen:
+   [`backlog.d/README.md`](backlog.d/README.md).
+2. **Nach dem Merge:** nichts. Niemand setzt mehr von Hand `review` auf `done`.
+3. **Sammeln — nur `A`**, regelmaessig, als kleiner eigener PR auf frischem
+   `main`: `tools/backlog_sammeln.py --pruefen`, `--dry-run`, dann ohne
+   Schalter; Betreff `backlog: sammeln`. Aus `review` wird dabei
+   `done (<Datum>, PR #N)`. Bis dahin steht das Item nur im Fragment — das
+   Dashboard (liest nur `BACKLOG.md`) zeigt es erst nach dem Sammeln.
+4. **Arbeit an einem Item, dessen Fragment noch in `backlog.d/` liegt:** diese
+   Datei aendern, keine zweite anlegen. Sammelt `A` sie inzwischen ein, meldet
+   Git beim Aktualisieren des Zweigs „geaendert/geloescht" — die eigene Fassung
+   behalten; der naechste Sammel-Lauf ersetzt dann nur den Status der Zeile.
+5. **Uebergang:** offene PRs, die `BACKLOG.md` noch direkt aendern, bleiben
+   gueltig. `tests/test_backlog_fragmente.py` meldet es als Hinweis, kein Gate
+   wird davon rot.
 
 ### Blocker und Briefe an eine Sitzung (PROC-17)
 
 Ein Blocker ist ein Listenpunkt auf der Tafel; eine Frage an eine bestimmte
 Sitzung beginnt mit `AN B:` (bzw. `AN A UND B:`, `AN ALLE:`).
 
+* **Was hinein darf:** die Tafel ist privat — Klarnamen und lokale Pfade
+  sind dort erlaubt. **Zugangsdaten nie** (Token, Kennwoerter, Schluessel):
+  das Werkzeug lehnt sie vor jedem Schreiben ab. Was aus einem Brief ins
+  oeffentliche Repo wandert (Backlog, Changelog, Commit), folgt weiter
+  Abschnitt 3.
 * **Text ueber stdin, nicht als Argument:** `session_claim.py blocker
   --session A --datei - <<'EOF'` … `EOF`. Als Shell-Argument fuehrt die Shell
   Backticks im Text AUS. Mehrere Zeilen werden zu einem Listenpunkt verbunden;
@@ -149,6 +240,7 @@ Sitzung beginnt mit `AN B:` (bzw. `AN A UND B:`, `AN ALLE:`).
   dem **letzten Eintrag jeder Sitzung** (die Lesemarke fuer `list --fuer`) und
   Eintraegen ohne lesbaren Zeitstempel. Der Verlauf vermerkt, wie viele
   verfallen sind; der Volltext bleibt in der Historie:
+  im Tafel-Klon `git log -p origin/main -- SESSIONS.md`, vor dem Umzug
   `git log -p origin/sessions -- SESSIONS.md`. Wer einen Hinweis laenger
   braucht (etwa „Rig nicht neu starten"), schreibt ihn neu. Gemessen vor der
   Regel: 144 Blocker / 253 kB, die Probe danach 37 / 44 kB — und `list --fuer`
@@ -163,6 +255,10 @@ gemeinsame Gedaechtnis der Sitzungen — Befunde zurueckzuhalten waere also kein
 Datenschutz, sondern Arbeitsverweigerung.
 
 **Deshalb die Regel: Inhalt vollstaendig, Person und Nutzdaten pseudonym.**
+
+(Ausgenommen ist die Tafel selbst: sie liegt seit PROC-25 im privaten Repo
+`lightos-intern`, dort gilt nur „keine Zugangsdaten" — siehe Abschnitt 2.
+Was von dort in dieses Repo uebernommen wird, folgt wieder dieser Regel.)
 
 > ★ **Entscheidung vom 26.08.2026 (PRIV-03): die Regel gilt ab jetzt, NICHT
 > rueckwirkend.** Der Bestand — 495 Stellen in 184 Dateien — bleibt stehen;
@@ -213,6 +309,27 @@ Zwei Waechter halten das:
 bleibt lokal liegen), `.gitignore` nachziehen, in `SESSIONS.md` unter Blocker
 vermerken. **Die Git-Historie behaelt die Datei trotzdem** — sie umzuschreiben
 ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
+
+### Dependabot-Sicherheits-PRs (PROC-24, seit 25.10.2026)
+
+Eingeschaltet sind **nur** die Sicherheitswarnungen und die automatischen
+Sicherheits-PRs (Repo-Einstellung „Dependabot security updates“). Es gibt
+bewusst **keine** `.github/dependabot.yml` mit regelmaessigen Versions-Updates:
+die wuerden bei drei CI-Plattformen die Warteschlange fluten. Erkannt werden
+`requirements.txt`, `requirements-dev.txt` und die GitHub-Actions-Workflows.
+
+* Ein Dependabot-PR geht wie jeder PR durch die **Merge-Warteschlange von A**:
+  CI auf allen Plattformen gruen, `tests/test_keine_privaten_dateien.py` gruen,
+  sonst kein Merge. Keine Sitzung merged ihn an der Warteschlange vorbei.
+* A prueft vorher, ob der Sprung nur die Untergrenze in `requirements*.txt`
+  anhebt und ob `THIRD_PARTY_NOTICES.md`/Lizenzlisten nachzuziehen sind.
+* **PySide6/PySide6-Addons** (auch Neben-Sprung 6.x → 6.y): erst nach einer
+  Pruefung unter Linux, Windows x64 **und** Windows-ARM (Sitzung B) — dort
+  liegen die bekannten Abbau- und Schriftfallen. Bis dahin bleibt der PR offen,
+  mit Vermerk auf der Tafel.
+* Kann ein Sicherheits-PR nicht gemergt werden (Tests rot, Plattform faellt
+  weg), bleibt die Warnung offen und kommt als Backlog-Fragment mit Begruendung
+  hinein — nicht stillschweigend schliessen.
 
 ---
 
@@ -275,8 +392,11 @@ ist ein Eingriff, den nur der Mensch entscheidet, nicht die Sitzung.
   Segments: `pgrep -fa "python main.py"`. Und `app.sh restart` waehrend die
   andere Sitzung am Rig misst, ist ein Eingriff in fremde Arbeit — erst in
   `SESSIONS.md` nachsehen.
-* **`BACKLOG.md` bearbeiten beide.** Aenderungen klein halten und zeitnah
-  mergen; ein tagealter Branch mit Backlog-Aenderungen konfliktet garantiert.
+* **`BACKLOG.md` fasst im normalen PR niemand mehr an** (PROC-20): Neues und
+  Statusaenderungen als Fragment `backlog.d/<ID>.md`, eingesammelt von `A`. Wer
+  die Datei doch direkt aendert (Uebergang, bewusste Korrektur), haelt die
+  Aenderung klein und mergt zeitnah — ein tagealter Branch mit
+  Backlog-Aenderungen konfliktet garantiert.
 
 ---
 
@@ -286,7 +406,7 @@ Ehrliche Bestandsaufnahme: **was faengt dieser Prozess — und was nicht.**
 
 | # | Fehlerfall | Wird gefangen? | Wodurch |
 |---|---|---|---|
-| 1 | Beide nehmen dasselbe Item | **Ja** | `claim` prueft gegen `origin/sessions`; bei Gleichzeitigkeit lehnt Git den zweiten Push ab, das Werkzeug liest neu und meldet „belegt" |
+| 1 | Beide nehmen dasselbe Item | **Ja** | `claim` prueft gegen den frisch geholten Stand der Tafel; bei Gleichzeitigkeit lehnt Git den zweiten Push ab, das Werkzeug liest neu und meldet „belegt" |
 | 2 | Claim nur lokal, nie gepusht | **Ja** | `claim` pusht selbst; ohne Push gibt es keinen Claim |
 | 3 | Sitzung stirbt, Item bleibt ewig belegt | **Teilweise** | Claims verfallen nach 4 h; das Uebernehmen wird protokolliert. Eine echte Sitzung, die laenger als 4 h an einem Item sitzt, muss `claim --refresh` fahren |
 | 4 | Beide aendern dieselbe Datei aus verschiedenen Items | **Ja (Warnung), seit PROC-16** — sofern beide `--files` angeben | `claim` vergleicht `--files` mit nicht verfallenen Claims anderer Items (Ordner-Praefix, Trenner egal) und warnt — eigene parallele Items als Hinweis; `--strikt` verweigert den Claim (Exit 2). **Vorher gar nicht** verglichen, nur gespeichert. Grenze: eine Datei, die erst waehrend der Arbeit dazukommt, sieht die Pruefung nur, wenn man `claim … --files` nachzieht |

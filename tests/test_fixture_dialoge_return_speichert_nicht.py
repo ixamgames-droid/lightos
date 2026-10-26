@@ -376,7 +376,7 @@ class EditorReturnTest(_DialogBasis):
         dlg._edit_name.setText("FM30 Editorprobe")
         dlg._edit_short.setText("FM30ED")
         tab = dlg._tabs.currentWidget()
-        knopf = [b for b in tab.findChildren(QPushButton) if b.text() == "+ Channel"]
+        knopf = [b for b in tab.findChildren(QPushButton) if b.text() == "+ Kanal"]
         self.assertEqual(len(knopf), 1, "Kein '+ Channel'-Knopf im Mode-Tab.")
         QTest.mouseClick(knopf[0], Qt.MouseButton.LeftButton)
         _app.processEvents()

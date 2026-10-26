@@ -15,12 +15,15 @@ fehl, degradiert nur dieser Satz (leer), der Rest bleibt nutzbar.
 """
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 
-# Die VC-Widget-Module sind QWidgets -> headless-Plattform setzen, falls noch
-# nicht geschehen (Import allein braucht kein QApplication).
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from ..qt_plattform import offscreen_fuer_werkzeuge
+
+# Die VC-Widget-Module sind QWidgets -> fuer Werkzeuge „kein Fenster noetig“
+# vorgeben (Import allein braucht kein QApplication). STAB-34: NUR solange noch
+# keine Qt-Anwendung laeuft — die App laedt dieses Modul ueber ihre Lade-Pruefung
+# nach, und die Variable in der laufenden App schaltete „Show speichern?“ ab.
+offscreen_fuer_werkzeuge()
 
 
 # Die EINE hand-gepflegte Liste (bewusst, vom Plan akzeptiert): die universellen
@@ -33,6 +36,9 @@ _UNIVERSAL_MATRIX_PARAMS: frozenset[str] = frozenset({
     "tempo_bus_id", "tempo_multiplier", "phase_offset",
     "env_fade_in", "env_fade_out", "env_fade",
     "direction", "colors",
+    # ENG-37/ENG-38: nur bei gesetztem Modify-Haken (Stil Dimmer/RGB/RGBW)
+    # in list_params.
+    "modify_strength", "modify_mode",
     # Legacy-/Sonder-Keys, die get_param/set_param real verarbeiten, aber NICHT
     # mehr in list_params auftauchen (rgb_matrix.py:1285-1290) — sonst falsch als
     # unbekannt gemeldet (z. B. ein white_amount-Fader in einer Alt-Show).

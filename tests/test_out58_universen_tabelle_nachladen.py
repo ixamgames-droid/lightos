@@ -66,7 +66,7 @@ class UniversenTabNachAusgabeTest(unittest.TestCase):
         t = self.dlg._univ_table
         for r in range(t.rowCount()):
             if t.item(r, 0) and t.item(r, 0).text() == str(num):
-                return t.cellWidget(r, 2).currentText(), t.item(r, 3).text()
+                return oc.ausgabe_typ_wert(t.cellWidget(r, 2)), t.item(r, 3).text()
         self.fail(f"Universum {num} fehlt in der Tabelle")
 
     def _datei(self, num):

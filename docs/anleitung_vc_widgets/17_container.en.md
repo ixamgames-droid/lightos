@@ -14,7 +14,7 @@ Three functions make it useful:
 
 - **Grouping & separating** — a set-off frame with a header line (header) keeps related controls visually together.
 - **Pages / tabs** — the container can have up to 10 pages. Each child element belongs to one page; with the tabs in the header line you show only the elements of one page at a time. This gives you several sets of elements in the same space.
-- **Solo mode** — makes sure that only **one** button inside the container is ever active at a time; when you press a button, the others are switched off automatically (classic radio/solo logic).
+- **Solo mode** — makes sure that only **one** button inside the container is ever active at a time; when you press a button, the others are switched off automatically (classic radio/solo logic). Exception: two buttons that switch the same function — see "Tips & pitfalls".
 
 ## What it looks like & how to use it during operation
 
@@ -28,7 +28,7 @@ What the header line looks like depends on the number of pages:
 Click zones and gestures:
 
 - **Click on a tab** (in the header line, only with more than one page) → switches to that page. All child elements of the selected page are shown, those of the other pages are hidden. Switching pages works **in edit mode too**, so that you can edit the elements of every page.
-- **Solo mode active** → if you press a button inside the container during operation, the container automatically switches off all other currently active (pressed) buttons in the same box. So only one button ever stays active. If the frame is in solo mode, it is also drawn with a **red border** (`#e63946`, 2 px) instead of the normal grey one.
+- **Solo mode active** → if you press a button inside the container during operation, the container automatically switches off all other currently active (pressed) buttons in the same box. **Exception:** if another button switches the same function as the one you pressed, solo leaves that function alone — the pressed button toggles it (running → off, stopped → on), exactly like a single button. So only one button ever stays active. If the frame is in solo mode, it is also drawn with a **red border** (`#e63946`, 2 px) instead of the normal grey one.
 - **Effect highlight (group as a unit)** → if the container or one of its elements belongs to a selected/tapped effect, the whole container lights up as a unit with an **amber border** (`#ff9500`, 3 px). This is only a visual highlight.
 
 In **edit mode** you add content:
@@ -48,11 +48,31 @@ The „Frame Einstellungen" (frame settings) dialog contains exactly these field
 | Beschriftung (caption) | Text shown centered in the header line when there is **one** page. With several pages, the tabs carry fixed names `P1…Pn` instead. | free text (empty = the previous caption is kept) |
 | Seitenanzahl (number of pages) | Number of pages/tabs of the container. With `1` the header line shows the caption; from `2` on, switchable tabs appear. | Integer 1–10 (default 1) |
 | Header anzeigen (show header) | Shows or hides the top header line (with caption or tabs). Without a header the content area starts at the very top — and then there are **no tabs** for switching pages any more. | On / off (default on) |
-| Modus → Solo-Frame (mode → solo frame) | „Solo-Frame (nur 1 Button gleichzeitig aktiv)" (solo frame, only 1 button active at a time): when a button is pressed, the other active buttons in the container are switched off automatically. When active, you can recognize it by the red border. | On / off (default off) |
+| Modus → Solo-Frame (mode → solo frame) | „Solo-Frame (nur 1 Button gleichzeitig aktiv)" (solo frame, only 1 button active at a time): when a button is pressed, the other active buttons in the container are switched off automatically; a function that the pressed button switches itself (the same function on two buttons) is toggled instead of switched off. When active, you can recognize it by the red border. | On / off (default off) |
+| Pop-up → Pop-up-Feld (pop-up field) | „Pop-up-Feld (öffnet/schließt per Pop-up-Taste, liegt dann über der Konsole)" (pop-up field, opened/closed by a pop-up button, then lies on top of the console): the container is normally invisible and is opened and closed by a pop-up button — see [Pop-up buttons](#pop-up-buttons). Recognizable by the violet border and `▣` in the header. | On / off (default off) |
 
 You don't set the container's background and foreground color in this dialog but via the right-click context menu („Vordergrund-Farbe" (foreground color) / „Hintergrund-Farbe" (background color)).
 
 Saved are the number of pages, header visibility, solo mode and all contained child elements together with their page assignment (each child remembers which page it is on). On loading, only the current page is shown.
+
+## Pop-up buttons
+
+A container can become a **pop-up field** (Pop-up-Feld): normally it is invisible and only appears when you press a **pop-up button**. While open it lies **on top of** all other console elements — clicks on the field reach nothing underneath. **The same button** closes it again; while it is open, the button lights up.
+
+How to set it up (edit mode):
+
+1. Create a container, move it to the desired place and drag it to the desired size — that is where the pop-up will appear later.
+2. Double-click the container → tick **„Pop-up: Pop-up-Feld …"**. The frame turns violet, the header shows `▣`. The field stays open so you can fill it.
+3. Put buttons, faders etc. into it (right-click → „Widget hinzufügen" (add widget) or drag them in). If you drop a function, snapshot or snap onto the free area of the open field, the new button lands inside the field.
+4. Create a button on the console, choose the action **„Pop-up-Feld öffnen/schließen"** (open/close pop-up field) and select the container under **„Pop-up-Feld"**.
+
+- **In edit mode** a click on the pop-up button triggers nothing. To fill the field, open it by right-clicking the button („Pop-up-Feld öffnen", open pop-up field) or by right-clicking the empty console → **„Pop-up-Felder"** (pop-up fields; fields without a button are listed there too). Right-click the open field → „Pop-up-Feld schließen" (close pop-up field).
+- **When a show is loaded** all pop-up fields are closed. Only the layout is saved, not whether a field was open.
+- **MIDI and keyboard:** buttons in a closed pop-up stay triggerable via their MIDI note or hotkey and keep their state (like elements on another container page). The pop-up button itself also works via MIDI/hotkey; on the APC its pad lights up while the field is open.
+- **Kiosk mode:** pop-up buttons work normally; nothing can be edited there.
+- **No nesting:** a pop-up field may not contain a pop-up button (or another pop-up field). The editor prevents this with a hint — when changing the action, when dragging a pop-up button in, and when ticking „Pop-up-Feld" on a container that already contains a pop-up button. Only containers placed directly on the console can be pop-up fields.
+- **Renaming is safe:** the button remembers the field by a fixed ID, not by its caption.
+- Banks apply as usual: a pop-up field on bank 2 only appears while bank 2 is active. Put **button and field on the same bank** (or the field on „all banks"). If the field is on another bank, the button does not light up there and pressing it only shows a hint.
 
 ## Tips & pitfalls
 
@@ -60,5 +80,6 @@ Saved are the number of pages, header visibility, solo mode and all contained ch
 - **No container inside a container:** The „Widget hinzufügen" submenu deliberately lists no further container — containers cannot be nested.
 - **Mind the page when inserting:** With „Widget hinzufügen" and with snap-in, an element always lands on the **currently visible page**. If you want it on another page, first switch there by tab (also works in edit mode), then insert it.
 - **Solo only affects buttons in the container:** The solo logic only switches pressed **buttons** within the same container off against each other — other element types (sliders, color tiles, etc.) are not affected.
+- **Two buttons, same function:** If the same function sits on two buttons of a solo container (for example once on its own and once together with a second function), the button you press alone decides about it: it toggles the function, instead of the other button stopping it first and the pressed one starting it again right away. That way you can also switch it off again with **either** of the two buttons. All **other** functions of the second button are stopped by solo as usual.
 - **Deletion is handled by the container:** If you delete an element inside the container (context menu „Löschen" (delete)), the container takes care of removing it. This can be undone with the canvas undo function (Strg+Z, where **Strg** = Ctrl).
 - The container itself **cannot** be bound to an effect and supports **no** MIDI/key teach — it is purely a holder. For general VC operation (edit mode, creating elements, context menu, banks), see the overview (README.en.md).

@@ -11,12 +11,13 @@ Aufruf:  venv/Scripts/python.exe tools/benchmark_universes.py [frames]   (Defaul
          (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
 Ergebnis: Tabelle auf stdout + geschrieben nach docs/PERFORMANCE.md.
 
-Hinweis: get_state() wendet beim ersten Aufruf die Output-Konfig aus
-universes.json (App-Datenordner) an und oeffnet ggf. den dort konfigurierten Enttec-/sACN-Port.
-Fuer die Messung ist das irrelevant (Output-Thread aus, send_dmx() wird nie
-gerufen) — auf einer Maschine ohne den Port erscheint nur eine Warnzeile.
+Hinweis (TOOL-19): die Ausgabe-Konfiguration wird auf eine Datei umgelenkt, die
+es nicht gibt (``LIGHTOS_UNIVERSES_JSON``). Vorher wendete get_state() die echte
+universes.json an und oeffnete den dort eingetragenen Enttec-/sACN-Ausgang — fuer
+eine Messung ohne Ausgabe unnoetig und am Rig ein Griff nach dem echten Port.
 """
 from __future__ import annotations
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import os
 import sys
 import time
@@ -35,6 +36,11 @@ import tempfile
 os.environ.setdefault(
     "LIGHTOS_SHOW_DB",
     os.path.join(tempfile.gettempdir(), f"lightos_bench_{os.getpid()}.db"),
+)
+# TOOL-19: keinen echten Ausgang oeffnen (s. Modulkopf) — Datei wird nie angelegt.
+os.environ.setdefault(
+    "LIGHTOS_UNIVERSES_JSON",
+    os.path.join(tempfile.gettempdir(), f"lightos_bench_{os.getpid()}_universes.json"),
 )
 
 from PySide6.QtWidgets import QApplication
@@ -198,11 +204,17 @@ alle aktiv. {frames} gemessene Frames je Konfiguration (nach 10 Warmup-Frames),
   `FunctionManager.new_rgb_matrix` / `new_efx` + `start(id)`.
 - Nur die Render-Pipeline wird vermessen; das Senden (Enttec/sACN/Art-Net) ist
   bewusst deaktiviert und nicht Teil der Zahlen.
-- Werte sind stark maschinen-, last- und thermik-abhängig (auf diesem ARM64-Gerät
-  schwankten die Absolutzeiten zwischen Läufen um ~2×, v.a. bei 16/32 Universen unter
-  Dauerlast). Aussagekräftig ist primär der **Trend**: super-lineares Wachstum mit der
-  Universen-Zahl, und ab 16–32 Universen liegt die Render-Zeit über dem 44-Hz-Budget
-  (≈ 22,7 ms). Für stabile Absolutzahlen auf einer idle Maschine mehrfach laufen lassen.
+- Werte sind stark maschinen-, last- und thermik-abhängig; zwischen zwei Läufen
+  können die Absolutzeiten um den Faktor 2 auseinanderliegen. Aussagekräftig ist der
+  **Trend** über die Universen-Zahl. Für stabile Absolutzahlen auf einer unbelasteten
+  Maschine mehrfach laufen lassen und den kleinsten Wert nehmen.
+- **Verlauf:** Bis ENG-30 (Oktober 2026) wuchs die Zeit super-linear — jede Matrix-Zelle
+  und jeder EFX-Kopf suchte sein Gerät per Durchlauf durch die ganze Patch-Liste, und
+  der Renderer leitete je Frame für jedes Gerät die Dimmer-/Farbadressen neu ab. Auf
+  einem Rechner gemessen (Windows 11 / x64, p50): 8 / 16 / 32 Universen vorher
+  5,6 / 14,1 / 39,9 ms, danach 3,1 / 6,0 / 12,0 ms — 32 Universen liegen damit unter
+  dem 44-Hz-Budget. Verteilung je Funktionsart an einer echten Show:
+  [ENGINE_FRAME_ZEIT.md](ENGINE_FRAME_ZEIT.md).
 - Bei Vergleichen dieselbe Konfiguration (PARs/Universum, Frames) verwenden; neu
   erzeugen nach Engine-Änderungen, die den Render-Pfad betreffen.
 """

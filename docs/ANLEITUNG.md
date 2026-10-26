@@ -54,7 +54,11 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
   nur Position, Gobo, Prisma, Fokus/Zoom und Farbrad von Moving Heads mit
   Dimmerkanal bleiben stehen, damit sie beim Lösen nicht sichtbar zurückfahren.
   Ungepatchte Kanäle (z. B. ein Dimmerpack übers Simple Desk), Geräte ohne
-  Dimmerkanal, Laser und Nebelmaschinen gehen komplett aus.
+  Dimmerkanal und Nebelmaschinen gehen komplett aus. **Laser** bekommen den
+  **Aus-Wert aus ihrem Geräteprofil** (nicht immer 0), ihre übrigen Kanäle
+  gehen auf 0; kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich
+  weiter (Einzelheiten, auch zum Laser-NOT-AUS:
+  [Laser-Anleitung](anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 > Der frühere **Snap**-Button in der Leiste ist entfallen — Snapshots nimmst du
 > jetzt über **Programmer → Snapshots** oder das Menü **Programmer → Snapshot
@@ -132,7 +136,8 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
 ### 4.2 Attribute einstellen
 Rechts erscheinen Tabs je nach Gerätetyp:
 **Intensity · Color · Position · Gobo · Weitere** (Gobo nur bei Gobo-Geräten)
-sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
+sowie **Assistent · EFX · Matrix · Paletten** — jeweils nur die, die zur Auswahl
+passen (ein reiner Laser zeigt z. B. nur Assistent, EFX, Laser, Paletten). Pro Kanal ein Fader
 (0–255 / 0–100 %); `↺` setzt einen Kanal auf den Standardwert.
 - **Intensity-Tab:** Dimmer + **Strobe** (Status-Kacheln „Auf" / „Zu" sowie
   „Strobe langsam" / „Strobe mittel" / „Strobe schnell", dazu der Slider
@@ -155,8 +160,10 @@ sowie **Assistent · EFX · Matrix · Paletten**. Pro Kanal ein Fader
   im Programmer — **Assistent** („Effekt-Assistent…", „+ Szene", „+ Chaser",
   „Programmer → Szene" sowie eine Funktionsliste mit „Start"/„Stop"; mehr in §5),
   **EFX** (Pan/Tilt-Figuren für Moving Heads), **Matrix** (Pixel-/Farbeffekte)
-  und **Paletten** (gespeicherte Attributwerte). EFX und Matrix folgen der
-  aktuellen Auswahl — erst Geräte/Gruppe wählen, dann den Effekt. Schritt für
+  und **Paletten** (gespeicherte Attributwerte). Ein neuer EFX und eine neue
+  Matrix nehmen die aktuelle Auswahl — erst Geräte/Gruppe wählen, dann den
+  Effekt anlegen; ein gespeicherter Effekt ändert seine Geräte nur über
+  **Auswahl übernehmen**. Schritt für
   Schritt: [EFFEKTE.md](EFFEKTE.md).
 
 ![Programmer – Color-Editor mit Farbwähler](tutorial_matrix/web/m1_color_editor.png)
@@ -279,7 +286,41 @@ Schritt für Schritt:
 - **Datei → Zuletzt verwendet** öffnet frühere Shows schnell.
 - **Datei → Demo-Show öffnen** lädt eine mitgelieferte Beispiel-Show als neue,
   ungespeicherte Show (Speichern legt deine Kopie an).
-- **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) findet/behebt Probleme.
+- **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) prüft die Show und zeigt, was gefunden wurde. Geändert wird dabei nichts; erst der Knopf **Reparieren** im Dialog behebt, was sich automatisch beheben lässt.
+
+### Das „Issues"-Banner und die Meldungen zu Knöpfen
+
+Findet LightOS beim Laden oder nach einer Patch-Änderung etwas, erscheint oben in der
+Leiste ein farbiges Feld; ein Klick darauf öffnet die Liste.
+
+| Feld | Bedeutung |
+| --- | --- |
+| rot „! N Issues" | mindestens ein Fehler |
+| gelb „* N Issues" | nur Warnungen |
+| blau „i N Hinweis(e)" | nur Hinweise — nichts ist kaputt, aber einen Blick wert |
+
+Zwei Meldungen betreffen Knöpfe der Virtuellen Konsole mit der Aktion
+„Bibliothek-Snap". LightOS meldet sie nur und ändert nichts — welcher Snap gemeint
+war, weißt nur du:
+
+- **Warnung „… zeigt auf keinen Snap der Bibliothek (gelöscht?)":** Der Knopf verweist
+  auf einen Snap, den es nicht mehr gibt, und schaltet ihn deshalb still nicht.
+  Abhilfe: Knopf-Einstellungen öffnen und einen vorhandenen Snap wählen oder den
+  Verweis entfernen.
+- **Hinweis „Snap B überschreibt Snap A auf …":** Ein Knopf schaltet mehrere Snaps, die
+  auf demselben Kanal desselben Geräts verschiedene Werte setzen; der spätere gewinnt.
+  Das kann gewollt sein. Ein Hinweis allein öffnet beim Laden keinen Dialog, er steht
+  nur im blauen Feld.
+
+Dieselbe Prüfung gibt es für eine Show-Datei ohne die App:
+`python tools/lint_show.py <show.lshow>` (mit `--strict` gilt jede Warnung als Fehler,
+Hinweise nicht). Die Codes dort:
+
+| Code | Schwere | Bedeutung |
+| --- | --- | --- |
+| `VC-SNAP-DANGLING` | Warnung | `snap_id`, `snap_ids` oder `actions[n].snap_id` zeigt auf einen Snap, der in der Bibliothek der Show fehlt. Nur bei Shows mit eigenem Bibliotheks-Block. |
+| `VC-SNAP-KONFLIKT` | Hinweis | Snaps eines Knopfs widersprechen sich auf demselben Kanal. |
+| `VC-DANGLING` | Warnung | `function_id`/`function_ids` oder `actions[n].function_id` zeigt auf eine Funktion, die es nicht gibt — auch dann, wenn die Show gar keine Funktion mehr enthält. Bei Mehrfach-Aktionen zählt das Feld nur für die Typen „Funktion" und „Effekt-Aktion"; an anderen Typen ist ein Restwert wirkungslos und wird nicht gemeldet. |
 
 ---
 

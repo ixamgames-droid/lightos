@@ -136,15 +136,15 @@ Tabelle „DMX-Kanäle“ oder „DMX chart“.
    `smoke` …) und **Leistung:**. Der Typ entscheidet unter anderem, welches 3D-Modell
    das Gerät bekommt (Schritt 5).
 2. **Modus-Reiter** — je DMX-Modus ein Reiter. Den Namen änderst du im Feld
-   **Mode-Name:** darüber oder mit **Umbenennen**.
+   **Modus-Name:** darüber oder mit **Modus umbenennen**.
 3. **Kanaltabelle** — eine Zeile je DMX-Kanal, in DMX-Reihenfolge. **Name** frei;
    **Default** ist der Grundwert, **Highlight** der Wert beim Hervorheben.
 4. **Attribut** — was der Kanal tut: `intensity` (Dimmer), `color_r/g/b/w`, `pan`,
    `tilt`, `shutter` (Strobe/Shutter) … Erst das Attribut macht aus dem Kanal einen
    Regler im Programmer. Gibt es kein passendes, nimm `raw`.
-5. **+ Channel** — hängt einen Kanal an. **- Channel** löscht die markierte Zeile,
+5. **+ Kanal** — hängt einen Kanal an. **- Kanal** löscht die markierte Zeile,
    **Hoch**/**Runter** verschieben sie.
-6. **+ Mode** — legt einen weiteren Modus an (**- Mode** löscht den aktuellen).
+6. **+ Modus** — legt einen weiteren Modus an (**- Modus** löscht den aktuellen).
 7. **Speichern** — legt das Profil in der Geräte-Datenbank an. `Return` in einem Feld
    speichert bewusst **nicht**; nur dieser Knopf tut es.
 

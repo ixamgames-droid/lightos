@@ -8,9 +8,10 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QComboBox, QLabel, QCheckBox, QLineEdit,
                                 QSizePolicy, QScrollArea, QDialog, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, QRect, QPoint
-from PySide6.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics
+from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_phase
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.widgets.flow_layout import FlowLayout
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
@@ -21,6 +22,59 @@ DIRECTION_LABELS = {
     "backward": "Rückwärts",
     "bounce":   "Pendel",
 }
+
+
+def _formular(parent=None) -> QFormLayout:
+    """Formular der Editor-Spalte: zu breite Felder rutschen UNTER ihre
+    Beschriftung, statt abgeschnitten zu werden (UI-78).
+
+    Eingebettet im Programmer teilt sich die Spalte die Breite mit der
+    Vorschau. Neben den Beschriftungen blieben dann z. B. 177 px fuer ein
+    Auswahlfeld, das 189 px braucht — „Gleichmäßig verteilt (Fächer“. Mit
+    ``WrapLongRows`` braucht das Formular nur noch die Breite seines breitesten
+    FELDES; wie viel Platz die Schrift verlangt, entscheidet damit nicht mehr
+    ueber die Lesbarkeit, sondern nur noch ueber die Zahl der Umbrueche."""
+    f = QFormLayout(parent)
+    f.setVerticalSpacing(4)
+    f.setHorizontalSpacing(0)       # der Abstand steckt in der Beschriftung, s. u.
+    f.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
+    return f
+
+
+class _MitwachsendeAuswahl(QComboBox):
+    """Auswahlfeld, das nie schmaler ist als sein laengster Eintrag — auch fuer
+    Eintraege, die erst NACH dem ersten Anzeigen dazukommen (UI-78).
+
+    Die Qt-Vorgabe misst nur beim ersten Anzeigen. ``AdjustToContents`` allein
+    genuegt nicht: Qt verwirft beim Einfuegen den Groessenhinweis, den
+    gemerkten MINDEST-Hinweis aber nicht — und nur der haelt das Layout davon
+    ab, das Feld zusammenzuschieben."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+
+    def minimumSizeHint(self):
+        return self.sizeHint()
+
+
+_FELD_ABSTAND = 4       # px zwischen Beschriftung und Feld
+
+
+def _abstand_in_die_beschriftungen(spalte: QWidget) -> None:
+    """Legt den Abstand Beschriftung → Feld in die Beschriftung selbst.
+
+    Qt entscheidet den Umbruch mit ``Breite < Beschriftung + Feld`` — OHNE den
+    waagrechten Abstand des Formulars. Lag die Breite genau in dieser Luecke,
+    blieb das Feld neben der Beschriftung und wurde um den Abstand schmaler als
+    sein Text (nachgemessen: Auswahlfeld 166 statt 169 px). Als rechter Rand der
+    Beschriftung rechnet der Abstand in der Umbruch-Entscheidung mit."""
+    for f in spalte.findChildren(QFormLayout):
+        for zeile in range(f.rowCount()):
+            item = f.itemAt(zeile, QFormLayout.ItemRole.LabelRole)
+            beschriftung = item.widget() if item is not None else None
+            if beschriftung is not None:
+                beschriftung.setContentsMargins(0, 0, _FELD_ABSTAND, 0)
 
 
 def _head_beschriftung():
@@ -674,11 +728,6 @@ class EfxView(QWidget):
         self._loading = False
         # M0.1: im Programmer eingebettet folgt EFX automatisch der Auswahl
         self._follow = bool(follow_selection)
-        # UI-84: >0, solange das PROGRAMM die Listenzeile setzt (Laden, Refresh,
-        # Gruppenwechsel in _rebuild_from_state). Dann ist die Selektion keine
-        # Benutzeraktion -> _select_efx darf die Geraeteliste NICHT aus der
-        # Auswahl neu bilden (Laden/Refresh veraendert nie Funktionsdaten).
-        self._programm_waehlt = 0
         # E2: EFX editiert die Live-Instanz direkt (gewollt fuer Live-Programming),
         # informiert aber Bibliothek/andere EFX-Ansicht ueber Aenderungen —
         # entprellt, damit Spin-/Tipp-Folgen nicht je Tick FUNCTION_CHANGED feuern.
@@ -902,8 +951,9 @@ class EfxView(QWidget):
         self._rebuild_from_state()
 
     def _on_group_changed(self):
-        """GROUP_CHANGED: im Folgemodus die gefilterte Liste + Geraete-Zuweisung
-        aus der (ggf. geaenderten) aktiven Gruppe neu ableiten."""
+        """GROUP_CHANGED: im Folgemodus die gefilterte Liste aus der (ggf.
+        geaenderten) aktiven Gruppe neu ableiten; Geraete bekommt dabei nur der
+        eigene Entwurf (UI-91)."""
         if self._follow:
             try:
                 self._sync_follow_selection()
@@ -946,12 +996,9 @@ class EfxView(QWidget):
             # currentRowChanged -> _select_efx setzt _current auf die richtige
             # (gefilterte) Instanz, auch wenn der Index gleich bleibt.
             target = next((i for i, e in enumerate(vis) if e.id == prev_id), -1)
-            # UI-84: programmatische Selektion — keine Folge-Zuweisung.
-            self._programm_waehlt += 1
-            try:
-                self._list.setCurrentRow(target if target >= 0 else 0)
-            finally:
-                self._programm_waehlt -= 1
+            # UI-84/UI-91: _select_efx weist nie Geraete zu — die vom Programm
+            # vorgewaehlte Zeile wird nur angezeigt.
+            self._list.setCurrentRow(target if target >= 0 else 0)
             self._update_group_header()
             self._update_save_state()
         except RuntimeError:
@@ -962,9 +1009,10 @@ class EfxView(QWidget):
         # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
         super().showEvent(event)
         self._rebuild_from_state()
-        # Folgemodus: die gefilterte Liste + Geraete-Zuweisung sofort aus der
-        # aktiven Gruppe ableiten, sobald die EFX-Ansicht sichtbar wird (analog
-        # rgb_matrix_view.showEvent — set_selected_group_id feuert kein Event).
+        # Folgemodus: die Liste sofort auf die aktive Gruppe filtern, sobald die
+        # EFX-Ansicht sichtbar wird (analog rgb_matrix_view.showEvent —
+        # set_selected_group_id feuert kein Event). UI-91: Sichtbarwerden weist
+        # keinem gespeicherten EFX Geraete zu.
         if self._follow:
             try:
                 self._sync_follow_selection()
@@ -1082,8 +1130,7 @@ class EfxView(QWidget):
         self._name_edit = QLineEdit()
         self._name_edit.setPlaceholderText("Name des Effekts")
         self._name_edit.textChanged.connect(self._on_name_change)
-        name_row = QFormLayout()
-        name_row.setSpacing(4)
+        name_row = _formular()
         name_row.addRow("Name:", self._name_edit)
         ec.addLayout(name_row)
 
@@ -1098,8 +1145,7 @@ class EfxView(QWidget):
         # ── Gruppe 1: Form & Geometrie ──────────────────────────────────
         form_box = QGroupBox("Form && Geometrie")
         form_box.setStyleSheet(_box_style)
-        form = QFormLayout(form_box)
-        form.setSpacing(4)
+        form = _formular(form_box)
 
         self._algo_combo = QComboBox()
         for a in EfxAlgorithm:
@@ -1112,7 +1158,10 @@ class EfxView(QWidget):
         path_row = QHBoxLayout(path_row_w)
         path_row.setContentsMargins(0, 0, 0, 0)
         path_row.setSpacing(4)
-        self._path_combo = QComboBox()
+        # UI-78: Pfadnamen vergibt der Benutzer, und sie kommen NACH dem ersten
+        # Anzeigen dazu. Mit der Qt-Vorgabe blieb das Feld bei der Breite des
+        # Platzhalters „—“ — neben den beiden Knoepfen rund 80 px fuer den Namen.
+        self._path_combo = _MitwachsendeAuswahl()
         self._path_combo.currentTextChanged.connect(self._on_path_selected)
         path_row.addWidget(self._path_combo, stretch=1)
         self._btn_path_new  = QPushButton("+ Aufzeichnen…")
@@ -1127,16 +1176,15 @@ class EfxView(QWidget):
                 QPushButton:hover { background:#30363d; }
             """)
             path_row.addWidget(b)
-        # EFX-PATH-BTN-LABEL: Die Text-Buttons duerfen nicht mehr vom stretchenden
-        # Combo zusammengequetscht werden ("eich"/"beit"). Mindestbreite = echte
-        # Label-Breite (10px-Font aus dem StyleSheet) + Rand fuer Padding/Border,
-        # damit die Beschriftung immer vollstaendig passt.
-        _btn_font = QFont(self._btn_path_new.font())
-        _btn_font.setPixelSize(10)
-        _fm = QFontMetrics(_btn_font)
+        # EFX-PATH-BTN-LABEL: Die Text-Buttons duerfen nicht vom stretchenden
+        # Combo zusammengequetscht werden ("eich"/"beit"). Ihre Untergrenze ist
+        # der eigene Groessenhinweis (Text + Innenabstand + Rand des Themes).
+        # UI-78: KEINE selbst gerechnete Mindestbreite mehr — „Textbreite + 20“
+        # lag mit dem Theme (10 px Innenabstand je Seite + Rand) 4–6 px UNTER dem
+        # Hinweis, und eine gesetzte Mindestbreite ERSETZT ihn: sie erlaubte dem
+        # Layout genau das Quetschen, das sie verhindern sollte.
         for b in (self._btn_path_new, self._btn_path_edit):
-            b.setMinimumWidth(_fm.horizontalAdvance(b.text()) + 20)
-            b.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+            b.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Fixed)
         self._btn_path_new.clicked.connect(self._record_new_path)
         self._btn_path_edit.clicked.connect(self._edit_current_path)
         self._btn_path_del.clicked.connect(self._delete_current_path)
@@ -1193,8 +1241,7 @@ class EfxView(QWidget):
             pat_grid.addWidget(b, i // 3, i % 3)
         spv.addLayout(pat_grid)
 
-        sp_form = QFormLayout()
-        sp_form.setSpacing(4)
+        sp_form = _formular()
         self._spider_amp_spin = QSpinBox()
         self._spider_amp_spin.setRange(0, 255)
         self._spider_amp_spin.setSingleStep(5)
@@ -1226,8 +1273,7 @@ class EfxView(QWidget):
         # ── Gruppe 2: Tempo & Richtung ──────────────────────────────────
         tempo_box = QGroupBox("Tempo && Richtung")
         tempo_box.setStyleSheet(_box_style)
-        tform = QFormLayout(tempo_box)
-        tform.setSpacing(4)
+        tform = _formular(tempo_box)
         self._speed_spin = dspin(0.01, 10, 0.1, 0.5)
         tform.addRow("Geschwindigkeit (Hz):", self._speed_spin)
         self._tempo_bus_combo = QComboBox()
@@ -1278,15 +1324,12 @@ class EfxView(QWidget):
                                   "und hält am Endpunkt an")
         self._loop_chk.toggled.connect(self._on_param_change)
         tform.addRow("Loop:", self._loop_chk)
-        # F-17: Layer-Prioritaet beim Engine-Merge.
-        self._priority_spin = QSpinBox()
-        self._priority_spin.setRange(-99, 99)
-        self._priority_spin.setValue(0)
-        self._priority_spin.setToolTip(
-            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
-            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
-        self._priority_spin.valueChanged.connect(self._on_param_change)
-        tform.addRow("Layer-Priorität:", self._priority_spin)
+        # ENG-35: Stufe statt Zahlenfeld „Layer-Priorität“ (F-17). Lose
+        # Betriebsart — _on_param_change schreibt alle Felder gemeinsam.
+        self._stufe_combo = StufeAuswahl()
+        self._stufe_combo.stufe_gewaehlt.connect(self._on_param_change)
+        tform.addRow("Stufe:", self._stufe_combo)
+        stufen_melder().geaendert.connect(self._stufe_von_aussen)
         # ARC-04: Ein-/Ausblend-Hüllkurve (Sekunden, 0 = sofort).
         self._env_in_spin = QDoubleSpinBox()
         self._env_in_spin.setRange(0.0, 60.0)
@@ -1319,8 +1362,7 @@ class EfxView(QWidget):
         # daneben, weil es ebenfalls das Zusammenspiel der Köpfe formt.
         rel_box = QGroupBox("Verhältnis der Geräte zueinander")
         rel_box.setStyleSheet(_box_style)
-        relf = QFormLayout(rel_box)
-        relf.setSpacing(4)
+        relf = _formular(rel_box)
         self._phase_mode_combo = QComboBox()
         for key, label in PHASE_MODE_LABELS:
             self._phase_mode_combo.addItem(label, key)
@@ -1379,8 +1421,7 @@ class EfxView(QWidget):
         # ── Gruppe 4: Sichtbarkeit & Sonstiges ──────────────────────────
         vis_box = QGroupBox("Sichtbarkeit && Sonstiges")
         vis_box.setStyleSheet(_box_style)
-        vform = QFormLayout(vis_box)
-        vform.setSpacing(4)
+        vform = _formular(vis_box)
         self._open_beam_chk = QCheckBox("Dimmer/Shutter mit öffnen")
         self._open_beam_chk.toggled.connect(self._on_param_change)
         vform.addRow("Sichtbarkeit:", self._open_beam_chk)
@@ -1415,12 +1456,63 @@ class EfxView(QWidget):
         self._btn_reseed.clicked.connect(self._reseed_random)
         vform.addRow("Random:", self._btn_reseed)
         ec.addWidget(vis_box)
+
+        # ── Gruppe 5: Modify (ENG-43) — Bewegung als Versatz ────────────
+        # Feste Felder; ohne Haken nur ausgegraut, nie neu gebaut (STAB-38).
+        mod_box = QGroupBox("Modify")
+        mod_box.setStyleSheet(_box_style)
+        mform = _formular(mod_box)
+        self._modify_chk = QCheckBox("Modify-Effekt")
+        self._modify_chk.setToolTip(
+            "Die Bewegung setzt keine Position, sondern verschiebt die "
+            "laufende Position jedes Geräts um die Figur — z. B. ein Nicken "
+            "über eine gesetzte Position oder über einen anderen "
+            "Bewegungs-Effekt. Dimmer und Farbe bleiben unberührt. "
+            "Laser werden nie verschoben.")
+        self._modify_chk.toggled.connect(self._on_modify_toggled)
+        mform.addRow("", self._modify_chk)
+        self._modify_mode_combo = QComboBox()
+        self._modify_mode_combo.addItem("Addieren", "add")
+        self._modify_mode_combo.addItem("Abziehen", "sub")
+        self._modify_mode_combo.setToolTip(
+            "Addieren: verschiebt in Richtung der Figur.\n"
+            "Abziehen: verschiebt gespiegelt (Gegenrichtung).")
+        self._modify_mode_combo.currentIndexChanged.connect(self._on_param_change)
+        mform.addRow("Betriebsart:", self._modify_mode_combo)
+        from src.core.engine.efx import (MODIFY_VERSATZ_MAX, MODIFY_VERSATZ_MIN,
+                                         MODIFY_VERSATZ_VORGABE)
+        self._modify_versatz_spin = dspin(MODIFY_VERSATZ_MIN, MODIFY_VERSATZ_MAX,
+                                          1.0, MODIFY_VERSATZ_VORGABE)
+        self._modify_versatz_spin.setSuffix(" °")
+        self._modify_versatz_spin.setToolTip(
+            "Größter Ausschlag der Figur in Grad. Je Gerät über dessen "
+            "Schwenk-/Neigebereich in DMX umgerechnet und an den Gerätegrenzen "
+            "gekappt.")
+        mform.addRow("Versatz:", self._modify_versatz_spin)
+        self._modify_strength_spin = QSpinBox()
+        self._modify_strength_spin.setRange(0, 100)
+        self._modify_strength_spin.setValue(100)
+        self._modify_strength_spin.setSuffix(" %")
+        self._modify_strength_spin.setToolTip(
+            "Skaliert den Versatz. Die Helligkeit des Effekts und seine "
+            "Ein-/Ausblendzeit wirken ebenfalls nur auf diese Stärke.")
+        self._modify_strength_spin.valueChanged.connect(self._on_param_change)
+        mform.addRow("Stärke:", self._modify_strength_spin)
+        ec.addWidget(mod_box)
+        self._modify_felder_freigeben(False)
         ec.addStretch(1)
 
         # Kein eigener Scroll mehr um die Formspalte (das erzeugte sonst eine
         # zweite, horizontale Not-Scrollleiste). Die GANZE rechte Seite liegt
         # jetzt in EINEM aeusseren Scrollbereich (siehe unten).
-        editor_col.setMinimumWidth(280)
+        # UI-78: KEIN ``setMinimumWidth(280)`` mehr. Eine gesetzte Mindestbreite
+        # ERSETZT die aus dem Inhalt berechnete — 280 lag darunter, und das
+        # Layout durfte die Spalte schmaler machen, als ihre Texte sind
+        # („jedes 2. Gerät entgegengesetz“). Jetzt gilt die Breite des
+        # breitesten Feldes (siehe ``_formular``); reicht der Platz dafuer
+        # nicht, schiebt der aeussere Scrollbereich, statt abzuschneiden.
+        self._editor_col = editor_col
+        _abstand_in_die_beschriftungen(editor_col)
         top_row.addWidget(editor_col, stretch=2)
 
         # Vorschau (Pfad + animierte Fixture-Punkte) — interaktiv: Zentrum/Figur
@@ -1486,6 +1578,18 @@ class EfxView(QWidget):
             fx_btns.addWidget(b)
         btn_fx_add.clicked.connect(self._add_fixture)
         btn_fx_rem.clicked.connect(self._remove_fixture)
+        # UI-91: im Programmer (Folgemodus) die EINE ausdrueckliche Handlung, mit
+        # der ein gespeicherter EFX die aktuelle Auswahl als Geraete bekommt.
+        self._btn_fx_take = QPushButton("Auswahl übernehmen")
+        self._btn_fx_take.setFixedHeight(24)
+        self._btn_fx_take.setStyleSheet(btn_fx_add.styleSheet())
+        self._btn_fx_take.setToolTip(
+            "Setzt die Geräte dieses EFX auf die im Programmer gewählten "
+            "beweglichen Geräte. Ein gespeicherter EFX ändert seine Geräte nur "
+            "über diesen Knopf.")
+        self._btn_fx_take.setVisible(False)
+        self._btn_fx_take.clicked.connect(self._auswahl_uebernehmen)
+        fx_btns.addWidget(self._btn_fx_take)
         fx_l.addLayout(fx_btns)
         body.addWidget(fx_box)
 
@@ -1541,10 +1645,10 @@ class EfxView(QWidget):
         # UI-04: Im Standalone-EFX-Tab bekommt eine frische Bewegung sofort
         # Geraete (aktuelle Auswahl, sonst alle gepatchten Movingheads) — sonst
         # laeuft ein spaeteres ▶ Start stumm (write() bricht bei leerer Liste ab).
-        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung. UI-84:
-        # ausdruecklich hier — die Zeilenwahl laeuft ueber _rebuild_from_state
-        # (programmatisch, also ohne Folge-Zuweisung in _select_efx), und ein
-        # zweites setCurrentRow auf dieselbe Zeile feuert kein Signal mehr.
+        # Im Follow-Modus uebernimmt _assign_from_selection die Zuweisung —
+        # ausdruecklich hier, denn die Zeilenwahl (_select_efx) weist nie
+        # Geraete zu (UI-84/UI-91). Danach folgt der Entwurf der Auswahl, bis er
+        # gespeichert ist (_folgt_auswahl).
         if self._follow:
             if self._current is efx and self._editor_sichtbar():
                 self._assign_from_selection()
@@ -1646,18 +1750,17 @@ class EfxView(QWidget):
         self._load_to_ui(self._current)
         if self._popout is not None:
             self._popout.bind(self._current)
-        # Im Follow-Modus uebernimmt die neu gewaehlte EFX sofort die Auswahl —
-        # UI-84: aber NUR, wenn der Benutzer die Zeile im sichtbaren Editor
-        # waehlt. Setzt das Programm die Zeile (Show laden, REFRESH_ALL,
-        # FUNCTION_CHANGED, Gruppenwechsel), bleibt die Geraeteliste der EFX
-        # unangetastet; sonst wurde beim Laden im Hauptfenster die erste EFX auf
-        # die gerade aktuelle (oft leere) Auswahl umgeschrieben und danach von
-        # der Auto-Zuweisung mit ALLEN Movern gefuellt. Die gewollte Folge-
-        # Zuweisung bei Auswahl-/Gruppenwechsel macht _sync_follow_selection
-        # (dort ebenfalls nur bei sichtbarem Editor).
-        if (self._follow and self._programm_waehlt == 0
-                and self._editor_sichtbar() and not _show_laedt()):
-            self._assign_from_selection()
+        # UI-91: Eine Zeile anzuzeigen ist KEINE Zuweisung — egal ob das
+        # Programm sie setzt (Reiter oeffnen, Laden, Refresh, Gruppenwechsel)
+        # oder der Benutzer sie anklickt. Frueher band ein Klick den EFX an die
+        # Programmer-Auswahl, und showEvent/_sync_follow_selection taten
+        # dasselbe mit der vom Programm vorgewaehlten Zeile 1: Reiter „EFX"
+        # oeffnen genuegte, und der erste EFX hatte statt 20 nur noch die 2
+        # gewaehlten Geraete. Die Liste aendert sich nur noch ueber „Auswahl
+        # übernehmen" oder am eigenen Entwurf (_folgt_auswahl); hier wird nur
+        # angezeigt.
+        if self._follow:
+            self._geraete_anzeige_aktualisieren()
         self._update_save_state()
 
     def _editor_sichtbar(self) -> bool:
@@ -1669,13 +1772,16 @@ class EfxView(QWidget):
     # ── Follow-Selection (M0.1, eingebettet im Programmer) ────────────────────
 
     def _enable_follow_selection(self):
-        """EFX folgt automatisch der Programmer-Geraeteauswahl; manuelle
-        Fixture-Zuweisung wird ausgeblendet. Die Liste ist auf die aktive Gruppe
-        gefiltert (siehe _visible_instances)."""
+        """Programmer-Einbettung: die Liste ist auf die aktive Gruppe gefiltert
+        (siehe _visible_instances); statt „+ Fixture/Entfernen" gibt es den Knopf
+        „Auswahl übernehmen". Der Auswahl FOLGT nur der eigene, noch nicht
+        gespeicherte Entwurf (UI-91, siehe _folgt_auswahl)."""
         try:
             self._btn_fx_add.setVisible(False)
             self._btn_fx_rem.setVisible(False)
-            self._fx_box.setTitle("Geräte (folgen der Auswahl)")
+            self._btn_fx_take.setVisible(True)
+            self._btn_fx_take.setEnabled(False)
+            self._fx_box.setTitle("Geräte")
         except Exception:
             pass
         # KEIN Auto-Anlegen mehr: frueher wurde hier eine Standard-EFX erzeugt.
@@ -1695,12 +1801,10 @@ class EfxView(QWidget):
         self._sync_follow_selection()
 
     def _sync_follow_selection(self):
-        """Folgt der Programmer-Auswahl: Liste auf die aktive Gruppe filtern und der
-        ausgewaehlten EFX die Geraete der Auswahl/Gruppe zuweisen.
-
-        Die Liste zeigt nur EFX der aktiven Gruppe (+ ungebundene/verwaiste); die
-        ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
-        sodass die Geraete-Zuweisung korrekt ist. Spiegelt
+        """Auswahl-/Gruppenwechsel im Programmer: Liste auf die aktive Gruppe
+        filtern. Nur der eigene ENTWURF bekommt dabei die Auswahl als Geraete
+        (UI-91, _folgt_auswahl); an einem gespeicherten EFX wird nur angezeigt,
+        ob seine Geraete von der Auswahl abweichen. Spiegelt
         rgb_matrix_view._sync_follow_selection."""
         # WURZEL-FIX (2026-06-24): Follow-Assignment NUR, waehrend diese
         # eingebettete EFX-Editor-Seite wirklich sichtbar/aktiv ist. Sonst wuerde
@@ -1727,50 +1831,120 @@ class EfxView(QWidget):
             # Auswahl als Nebenwirkung neu (Live View bei patch_changed ->
             # SELECTION_CHANGED). Das ist kein Benutzer-Auswahlwechsel: nur die
             # Anzeige neu aufbauen, die geladene Geraeteliste nicht anfassen.
-            if not _show_laedt():
+            if self._folgt_auswahl() and not _show_laedt():
                 self._assign_from_selection()
+            else:
+                self._geraete_anzeige_aktualisieren()
             self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel geloescht
 
+    def _folgt_auswahl(self) -> bool:
+        """UI-91: Folgt der gerade angezeigte EFX der Programmer-Auswahl?
+
+        Nur der in DIESEM Editor frisch angelegte, noch nicht gespeicherte
+        Entwurf („+ Neu" bis „💾 Speichern"). Ein gespeicherter EFX aendert
+        seine Geraeteliste nie von selbst — nicht beim Oeffnen des Reiters,
+        nicht bei einer vom Programm gesetzten Zeile, nicht beim Anklicken und
+        nicht beim Auswahlwechsel —, sondern nur ueber „Auswahl übernehmen"."""
+        cur = self._current
+        return bool(self._follow and cur is not None
+                    and self._draft_id is not None
+                    and getattr(cur, "id", None) == self._draft_id)
+
+    def _auswahl_bewegliche(self):
+        """(movers, spiders, laser): bewegliche Geraete der Programmer-Auswahl in
+        Auswahl-/Gruppenreihenfolge (wichtig fuer Fan/Spread) samt Anzahl der
+        Spider und Laser darunter. Nur lesend."""
+        from src.core.app_state import (get_state, get_channels_for_patched,
+                                        is_dual_tilt_fixture)
+        state = get_state()
+        try:
+            fids = [int(f) for f in state.get_selected_fids()]
+        except Exception:
+            fids = []
+        patched = {f.fid: f for f in state.get_patched_fixtures()}
+        movers = []
+        spiders = 0
+        laser = 0
+        for fid in fids:
+            fx = patched.get(fid)
+            if fx is None:
+                continue
+            attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
+            # Moving Heads: Pan UND Tilt. Spider/Doppeltilter: >=2 Tilts, KEIN
+            # Pan — die wuerden sonst durchs Raster fallen, obwohl die EFX-
+            # Engine ihren Tilt (mit Auto-Schere) bewegen kann.
+            if "pan" in attrs and "tilt" in attrs:
+                movers.append(fid)
+            elif is_dual_tilt_fixture(fx):
+                movers.append(fid)
+                spiders += 1
+            elif laser_achsen_attrs(attrs):
+                # LAS-22: Laser-Bild ueber laser_x/laser_y.
+                movers.append(fid)
+                laser += 1
+        return movers, spiders, laser
+
+    def _geraete_anzeige_aktualisieren(self):
+        """UI-91: Geraete-Box eines NICHT folgenden EFX im Programmer — zeigt die
+        gespeicherten Geraete und sagt, ob die Auswahl davon abweicht. Schreibt
+        nichts in den EFX."""
+        if not self._follow:
+            return
+        try:
+            cur = self._current
+            if cur is None:
+                self._fx_box.setTitle("Geräte")
+                self._btn_fx_take.setEnabled(False)
+                return
+            if self._folgt_auswahl():
+                # Der Entwurf haelt seine Liste selbst aktuell
+                # (_assign_from_selection setzt Titel und Liste).
+                self._btn_fx_take.setEnabled(False)
+                return
+            try:
+                movers, _sp, _la = self._auswahl_bewegliche()
+                ziel = [(t.fid, getattr(t, "head", None))
+                        for t in self._targets_for(movers)]
+            except Exception:
+                ziel = []
+            ist = [(f.fid, getattr(f, "head", None)) for f in cur.fixtures]
+            n = len(ist)
+            weicht_ab = bool(ziel) and ziel != ist
+            if not n:
+                title = "Geräte: keine zugewiesen"
+            else:
+                title = f"Geräte: {n} gespeichert"
+            if weicht_ab:
+                title += " – Auswahl weicht ab"
+            self._fx_box.setTitle(title)
+            self._btn_fx_take.setEnabled(weicht_ab)
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel geloescht
+
+    def _auswahl_uebernehmen(self):
+        """UI-91: Knopf „Auswahl übernehmen" — die ausdrueckliche Handlung, mit
+        der ein (auch gespeicherter) EFX die aktuelle Auswahl als Geraete
+        bekommt."""
+        if self._current is None:
+            return
+        self._assign_from_selection()
+        self._notify_timer.start()      # Bibliothek/2. Ansicht aktualisieren
+        self._geraete_anzeige_aktualisieren()
+
     def _assign_from_selection(self):
         """Baut die Fixture-Liste der aktiven EFX aus der aktuellen Auswahl —
         nur Geraete mit Pan UND Tilt (Moving Heads). Reihenfolge = Auswahl-/
-        Gruppenreihenfolge (wichtig fuer Fan/Spread)."""
+        Gruppenreihenfolge (wichtig fuer Fan/Spread).
+
+        UI-91: SCHREIBT in den EFX. Aufrufer sind nur ausdrueckliche Handlungen
+        („+ Neu", „Auswahl übernehmen") und der eigene Entwurf, solange er der
+        Auswahl folgt — nie eine blosse Anzeige."""
         try:
             if self._current is None:
-                if self._visible_instances():
-                    self._list.setCurrentRow(0)
-                if self._current is None:
-                    return
-            from src.core.app_state import (get_state, get_channels_for_patched,
-                                            is_dual_tilt_fixture)
-            state = get_state()
-            try:
-                fids = [int(f) for f in state.get_selected_fids()]
-            except Exception:
-                fids = []
-            patched = {f.fid: f for f in state.get_patched_fixtures()}
-            movers = []
-            spiders = 0
-            laser = 0
-            for fid in fids:
-                fx = patched.get(fid)
-                if fx is None:
-                    continue
-                attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
-                # Moving Heads: Pan UND Tilt. Spider/Doppeltilter: >=2 Tilts, KEIN
-                # Pan — die wuerden sonst durchs Raster fallen, obwohl die EFX-
-                # Engine ihren Tilt (mit Auto-Schere) bewegen kann.
-                if "pan" in attrs and "tilt" in attrs:
-                    movers.append(fid)
-                elif is_dual_tilt_fixture(fx):
-                    movers.append(fid)
-                    spiders += 1
-                elif laser_achsen_attrs(attrs):
-                    # LAS-22: Laser-Bild ueber laser_x/laser_y.
-                    movers.append(fid)
-                    laser += 1
+                return
+            movers, spiders, laser = self._auswahl_bewegliche()
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
             _kopf = _head_beschriftung()
@@ -1779,12 +1953,13 @@ class EfxView(QWidget):
             if not movers:
                 title = "Geräte: keine beweglichen Geräte in der Auswahl"
             elif spiders == len(movers):
-                title = f"Geräte: {len(movers)} Spider (folgen der Auswahl)"
+                title = f"Geräte: {len(movers)} Spider"
             elif laser == len(movers):
-                title = (f"Geräte: {len(movers)} Laser — bewegt X/Y "
-                         "(folgen der Auswahl)")
+                title = f"Geräte: {len(movers)} Laser — bewegt X/Y"
             else:
-                title = f"Geräte: {len(movers)} Gerät(e) (folgen der Auswahl)"
+                title = f"Geräte: {len(movers)} Gerät(e)"
+            if movers and self._folgt_auswahl():
+                title += " (folgen der Auswahl)"
             self._fx_box.setTitle(title)
             # Editor-Modus (Moving Head vs. Spider) an die neue Auswahl anpassen.
             self._update_spider_mode()
@@ -1817,7 +1992,7 @@ class EfxView(QWidget):
             self._tempo_phase_spin.setValue(
                 float(getattr(efx, "phase_offset", 0.0)))
             self._tempo_align_check.setChecked(bool(getattr(efx, "align_on_start", True)))
-            self._priority_spin.setValue(int(getattr(efx, "priority", 0)))
+            self._stufe_combo.setze_zahl(getattr(efx, "priority", 0))
             self._env_in_spin.setValue(float(getattr(efx, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(efx, "env_fade_out", 0.0)))
             _ci = self._env_curve_combo.findData(getattr(efx, "env_curve", "linear"))
@@ -1839,6 +2014,18 @@ class EfxView(QWidget):
             self._loop_chk.blockSignals(True)
             self._loop_chk.setChecked(bool(efx.loop))
             self._loop_chk.blockSignals(False)
+            # ENG-43: Modify-Felder
+            _mod = bool(getattr(efx, "modify", False))
+            self._modify_chk.blockSignals(True)
+            self._modify_chk.setChecked(_mod)
+            self._modify_chk.blockSignals(False)
+            _mi = self._modify_mode_combo.findData(getattr(efx, "modify_mode", "add"))
+            self._modify_mode_combo.setCurrentIndex(_mi if _mi >= 0 else 0)
+            self._modify_versatz_spin.setValue(
+                float(getattr(efx, "modify_versatz_grad", 20.0)))
+            self._modify_strength_spin.setValue(
+                int(getattr(efx, "modify_strength", 100)))
+            self._modify_felder_freigeben(_mod)
             self._refresh_path_combo()
             # Fixtures
             # FM-14b: DIESELBE Beschriftung wie beim Zuweisen/Hinzufuegen
@@ -1865,6 +2052,19 @@ class EfxView(QWidget):
                 self._list.item(row).setText(text)
             self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
 
+    def _stufe_von_aussen(self, ids):
+        """ENG-35: Die Stufe des geoeffneten Effekts wurde anderswo geaendert
+        (Ansicht „Prioritäten“, Rueckgaengig) — nur das Feld nachziehen, kein
+        Neuaufbau. Sonst schriebe die naechste Parameter-Aenderung den alten
+        Feldwert zurueck."""
+        cur = getattr(self, "_current", None)
+        if cur is None or getattr(cur, "id", None) not in ids:
+            return
+        try:
+            self._stufe_combo.setze_zahl(getattr(cur, "priority", 0))
+        except RuntimeError:
+            pass
+
     def _on_param_change(self):
         if self._current is None or self._loading:
             return
@@ -1889,11 +2089,26 @@ class EfxView(QWidget):
         self._current.relative  = self._relative_chk.isChecked()
         self._current.bit16     = self._bit16_chk.isChecked()
         self._current.loop      = self._loop_chk.isChecked()
-        self._current.priority  = self._priority_spin.value()
+        self._current.priority  = self._stufe_combo.zahl()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
+        # ENG-43: Modify (Bewegung als Versatz)
+        self._current.modify = self._modify_chk.isChecked()
+        self._current.modify_mode = self._modify_mode_combo.currentData() or "add"
+        self._current.modify_versatz_grad = self._modify_versatz_spin.value()
+        self._current.modify_strength = self._modify_strength_spin.value()
         self._notify_timer.start()   # E2: Bibliothek/2. Ansicht aktualisieren
+
+    def _modify_felder_freigeben(self, an: bool) -> None:
+        for w in (self._modify_mode_combo, self._modify_versatz_spin,
+                  self._modify_strength_spin):
+            w.setEnabled(bool(an))
+
+    def _on_modify_toggled(self, checked: bool = False):
+        """ENG-43: Haken „Modify-Effekt" — Felder freigeben, ins Modell."""
+        self._modify_felder_freigeben(checked)
+        self._on_param_change()
 
     def _reseed_random(self):
         """E1: würfelt eine neue Random-Bahn (VC/MIDI-Aktion „reseed“)."""
@@ -2307,6 +2522,8 @@ class EfxView(QWidget):
                 self._fx_list.addItem(self._target_label(_t, _kopf))
             if not self._follow:
                 self._fx_box.setTitle(f"Geräte: {len(movers)} automatisch zugewiesen")
+            else:
+                self._geraete_anzeige_aktualisieren()
             self._notify_timer.start()  # Bibliothek/2. Ansicht aktualisieren
         return len(self._current.fixtures)
 

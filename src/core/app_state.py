@@ -11,10 +11,14 @@ from sqlalchemy.orm import Session
 from .database.models import PatchedFixture, create_all_idempotent
 from .database.fixture_db import get_channels
 from .dmx.universe import Universe
+from .engine import wer_gewinnt as _wer_gewinnt
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
+from .dmx import adapter_zeilen
 from .debug_log import debug_swallow
 from .attr_groups import ATTR_GROUPS, attr_label, classify_attr
+from .laser.erkennung import ist_laser, ist_laserkanal
+from .laser import erkennung as laser_erkennung
 from .programmer_verlauf import ProgrammerVerlauf
 from .stage.scene_graph import SceneGraph
 from .stage.scene_adapters import _DockView, _LiveViewDict, _SceneBackedDict, _ViewRegistry
@@ -213,6 +217,14 @@ INPUT_SOURCE_TIMEOUT_S = 2.5
 # Drift mehr): genau diese Gruppe MINUS shutter/strobe. Die Beziehung lockt
 # tests/test_dim_intensity_sentinel.py -> aendert jemand attr_groups, schlaegt er an.
 _DIM_INTENSITY_ATTRS = frozenset(ATTR_GROUPS["Intensity"]) - frozenset({"shutter", "strobe"})
+
+
+def ist_dimmer_attribut(attr) -> bool:
+    """Ist ``attr`` ein Dimmer-/Intensitaets-Attribut im Sinne des Renderers
+    (ohne Shutter/Strobe, Mehrkopf-Zusatz ``#N`` zaehlt mit)?"""
+    return str(attr or "").lower().split("#", 1)[0] in _DIM_INTENSITY_ATTRS
+
+
 _DIM_COLOR_ATTRS = frozenset({
     "color_r", "color_g", "color_b", "color_w", "color_a", "color_uv",
     "red", "green", "blue", "white", "amber", "uv",
@@ -250,24 +262,42 @@ _BLACKOUT_ERHALTEN_ATTRS = frozenset({
     "color_wheel", "colour_wheel", "color",
 })
 
-# A3D-02: Nur diese Laser-Attribute sind "output-/emissions-relevant" und heben den
-# DMX-Laser-NOT-AUS-Latch wieder auf ("wieder an" = bewusstes Einschalten): die
-# Betriebsart/Musterbank (laser_bank), die Muster-/Gobo-Auswahl (gobo_wheel), der
-# Shutter und die Effekt-/Programm-Auswahl (macro — treibt bei macro-basierten
-# Party-Lasern wie dem PARTYLASER-Builtin ohne laser_bank/gobo_wheel die Emission).
-# Ein harmloses Attribut (Position laser_x/laser_y, Zoom, Punktfarbe, Twist, Raster,
-# …) darf den NOT-AUS NICHT lösen — sonst öffnet ein Positions-/Farb-Nudge den Laser
-# trotz gedrücktem Not-Aus wieder. Annahme wie bei UXT-12: Betriebsart/Shutter/Macro
-# 0 = Laser aus; die genannten Attribute sind die Betriebsart-/Emissions-Gates.
-# CDX-13 (David-Entscheidung 2026-07-20, SAFETY vor Usability): `intensity` bleibt
-# BEWUSST DRAUSSEN. Ein FB4-/Streaming-Laser exponiert seine Helligkeit als
-# `intensity`, könnte also per Helligkeitsregler nicht wieder scharfgeschaltet
-# werden — das ist gewollt: `intensity` ist zu breit, ein Szenen-/Snapshot-/
-# Palette-Apply mit Laser-`intensity>0` (über set_programmer_value) würde den
-# NOT-AUS sonst UNGEWOLLT lösen. Bewusstes Wieder-Scharfschalten läuft über den
-# FB4-„Cue"-Kanal (= `gobo_wheel`, bereits whitelisted). Regressionstest:
-# tests/test_laser_dmx_estop.py::test_intensity_on_laser_keeps_latch.
-_LASER_REARM_ATTRS = frozenset({"shutter", "laser_bank", "gobo_wheel", "macro"})
+# LAS-36: KEIN Programmer-Wert loest den Laser-NOT-AUS. Frueher (A3D-02) hob
+# ``set_programmer_value`` den Latch auf, sobald Betriebsart, Musterbank, Muster,
+# Shutter oder Macro eines Lasers gesetzt wurden („wieder an“). Damit liess sich
+# die Rueckfrage am NOT-AUS-Knopf umgehen — ueber den Laser-Tab, einen VC-Fader,
+# eine Snap-/Muster-Taste, Rueckgaengig und den MIDI-Regler „Programmer Attribut“,
+# der ohne Auswahl auf ALLE gepatchten Geraete schreibt (Befund S-01, QA-96).
+# Jetzt wird der Wert gemerkt, der Latch bleibt stehen, die Ausgabe bleibt auf den
+# Aus-Werten. Geloest wird allein ueber ``AppState.laser_notaus_loesen`` — und das
+# ruft die Oberflaeche nur nach der Rueckfrage (``src/ui/laser_notaus.py``).
+# Waechter: tests/test_las36_notaus_nur_mit_rueckfrage.py.
+
+# WEB-08: Der Laser-NOT-AUS ist aus der Ferne nur AUSLOESBAR, nie aufhebbar.
+# Seit LAS-36 loest ohnehin kein Programmer-Wert den Latch mehr (s. o.); der
+# einzige Weg ist ``AppState.laser_notaus_loesen``. Die Fernausloesung (Handy:
+# VC-Fader auf ``shutter``, Snap-/Snapshot-Taste mit Laser-Werten, verzoegerte
+# Zusatzaktionen) laeuft in ``laser_notaus_nicht_loesbar()``; dort verweigert
+# ``laser_notaus_loesen`` das Loesen zusaetzlich — zweite Sperre, falls ein
+# Fernpfad je bis zur Rueckfrage-Funktion durchgreift. Je Thread gezaehlt: ein
+# gleichzeitiger Griff am Pult (anderer Thread) ist nicht betroffen.
+_notaus_sperre = threading.local()
+
+
+@contextlib.contextmanager
+def laser_notaus_nicht_loesbar():
+    """Kontext: in diesem Thread loest ``set_programmer_value`` den
+    Laser-NOT-AUS nicht. Verschachtelbar."""
+    _notaus_sperre.tiefe = getattr(_notaus_sperre, "tiefe", 0) + 1
+    try:
+        yield
+    finally:
+        _notaus_sperre.tiefe = max(0, getattr(_notaus_sperre, "tiefe", 1) - 1)
+
+
+def laser_notaus_loesen_gesperrt() -> bool:
+    """True, solange dieser Thread in ``laser_notaus_nicht_loesbar()`` steht."""
+    return getattr(_notaus_sperre, "tiefe", 0) > 0
 
 # LAS-04: Netzwerk-Protokolle ohne DMX-Adressraum (PatchedFixture.protocol).
 LASER_NETWORK_PROTOCOLS = ("etherdream", "idn")
@@ -301,6 +331,81 @@ class FeatureDimmer:
     level: float = 1.0
 
 
+
+def _enttec_seriennr_vorbereiten(state, path: str, rows,
+                                 doppelt_hinweise: dict | None = None) -> dict:
+    """OUT-80: Seriennummer je Enttec-Zeile (``{universum: nummer}``).
+
+    Fehlt das Feld (alte Zeile, oder der Dialog schrieb seine Tabelle,
+    bevor die Nummer gespeichert war), gilt die des LAUFENDEN Geraets —
+    sonst verloere „Übernehmen“ ohne Aenderung die gelernte Nummer. Ein
+    leeres Feld heisst „vergessen“ (Dialog) und gibt keine mit.
+
+    Haengt ausserdem den Rueckruf an den OutputManager, der neu gelernte
+    Nummern in ``path`` schreibt (im Hintergrund, nur bei Aenderung).
+    Fehler hier halten das Einrichten nie auf.
+
+    Gegenpruefung: die Nummer des laufenden Geraets gilt nur, wenn keine
+    andere Zeile sie ausdruecklich traegt (umnummerierte Zeile, neue Zeile mit
+    der alten Nummer). Steht dieselbe Nummer trotzdem in mehreren Zeilen, ist
+    sie mehrdeutig: KEINE dieser Zeilen bekommt sie (Verhalten wie eine alte
+    Zeile), und ``doppelt_hinweise`` bekommt je Universum einen Hinweis."""
+    om = state.output_manager
+    zuordnung: dict[int, str] = {}
+    try:
+        from src.core.dmx import enttec_konfig
+        laufend = getattr(om, "enttec_seriennr", None)
+        ohne_feld: list[int] = []
+        for r in rows or []:
+            if not isinstance(r, dict):
+                continue
+            if str(r.get("output") or "").strip() != "Enttec":
+                continue
+            try:
+                num = int(r.get("num", 1))
+            except (TypeError, ValueError):
+                continue
+            sn = enttec_konfig.aus_zeile(r)
+            if sn is None:
+                ohne_feld.append(num)
+            elif sn:
+                zuordnung.setdefault(num, sn)
+                if zuordnung[num] != sn:            # zwei Zeilen, ein Universum
+                    zuordnung[num] = ""
+        ausdruecklich = set(zuordnung.values())
+        for num in ohne_feld:
+            sn = (laufend(num) or None) if callable(laufend) else None
+            if sn and sn not in ausdruecklich and num not in zuordnung:
+                zuordnung[num] = sn
+        doppelt = enttec_konfig.doppelte(zuordnung)
+        for num, sn in sorted(zuordnung.items()):
+            if sn in doppelt:
+                andere = sorted(u for u, s in zuordnung.items()
+                                if s == sn and u != num)
+                text = (f"Enttec-Seriennummer steht auch bei Universe "
+                        f"{', '.join(map(str, andere))} — nicht verwendet; "
+                        f"Dongle im Ausgabe-Dialog neu zuordnen (OUT-80).")
+                print(f"[app_state] Universe {num} (Enttec): {text}")
+                if doppelt_hinweise is not None:
+                    doppelt_hinweise[num] = text
+        zuordnung = {u: sn for u, sn in zuordnung.items()
+                     if sn and sn not in doppelt}
+        vormerken = getattr(om, "enttec_seriennr_vormerken", None)
+        if callable(vormerken):
+            vormerken(zuordnung)
+        state._universes_json_pfad = path
+        speicher = getattr(state, "_enttec_sn_speicher", None)
+        if speicher is None:
+            speicher = enttec_konfig.SeriennrSpeicher(
+                lambda: getattr(state, "_universes_json_pfad", None))
+            state._enttec_sn_speicher = speicher
+        if hasattr(om, "enttec_seriennr_vormerken"):
+            om.bei_enttec_seriennr = speicher.vormerken
+    except Exception as e:
+        print(f"[app_state] ERROR: Enttec-Seriennummern (OUT-80): {e}")
+    return zuordnung
+
+
 class AppState:
     def __init__(self):
         self._show_engine = None
@@ -311,6 +416,11 @@ class AppState:
         # nicht — benutze /dev/ttyUSB0"). Der Statusbalken liest das, damit ein
         # falsch konfigurierter Adapter nicht laenger als gruen durchgeht.
         self.enttec_port_notes: dict[int, str | None] = {}
+        # OUT-74: Adapter, die in universes.json in mehr als einer Zeile stehen
+        # und deshalb fuer keine eingerichtet sind (`adapter_zeilen.Doppelt`).
+        # Das Ausfall-Banner liest das — im Kiosk-Modus gibt es keine
+        # Statusleiste, die den Hinweis aus `enttec_port_notes` zeigen koennte.
+        self.adapter_konflikte: list = []
         self.programmer: dict[int, dict[str, int]] = {}
         # Schuetzt jeden Lese-/Schreibzugriff auf self.programmer. Der MIDI-/OSC-/
         # Web-Thread mutiert den Programmer (set_programmer_value), waehrend der
@@ -332,6 +442,23 @@ class AppState:
         # add_fixture() nicht 1×/Fixture re-entrant patch_changed feuert; der
         # Aufrufer macht danach EINEN gebündelten Refresh.
         self._suppress_emits: bool = False
+        # IMP-3: Sammelweg fuer viele Patch-Aenderungen am Stueck (Tabellen-
+        # Import, sein Rueckgaengig/Wiederholen) — s. patch_sammeln().
+        self._patch_sammel_tiefe: int = 0
+        self._patch_sammel_thread: int | None = None
+        self._patch_sammel_neuaufbau: bool = False
+        self._patch_sammel_ereignisse: list[str] = []
+        # Die Geraeteliste, aus der der GELTENDE Render-Plan gebaut wurde
+        # (unter _plan_lock mit ihm getauscht). Die Funktionen im Renderer
+        # bekommen IMMER diese Liste statt _patch_cache — sonst schriebe eine
+        # laufende Funktion ein Geraet, das der Plan (und die NOT-AUS-Maske)
+        # noch nicht kennt: waehrend patch_sammeln(), nach einem gescheiterten
+        # Neuaufbau, im Augenblick zwischen Listen- und Plantausch.
+        # Anfangs LEER (wie der anfangs leere Plan unten), nicht None: scheitert
+        # schon der erste Neuaufbau (Show laden), bekaemen die Funktionen sonst
+        # ueber den Rueckfall in _render_frame _patch_cache zum leeren Plan.
+        # None gibt es nur im nackten Zustand ohne __init__ (Test-Stubs).
+        self._plan_patch: list | None = []
         # UI-84: „Show wird geladen" (Zaehler, verschachtelbar). Waehrenddessen
         # duerfen Views, die der Auswahl folgen (EFX-/Matrix-Folge-Editor im
         # Programmer), keine Funktionsdaten aus der Auswahl ableiten — das
@@ -363,6 +490,12 @@ class AppState:
         # None = kein Fokus -> Funktion besitzt einen direkt getriebenen Dimmer
         # (Default). Wird nur lesend im Output-Thread benutzt -> einfaches Attribut.
         self.programmer_focus: str | None = None
+        # VCB-46: Geraete, deren Programmer-DIMMER gerade von einer Snap-Taste mit
+        # dem Haken „übersteuert laufende Dimmer-Effekte“ gehalten wird:
+        # {fid: {attribut: wert}}. Gepflegt von den VC-Tasten (vc_button.py),
+        # gelesen vom Renderer; wird immer als Ganzes ersetzt (eine Zuweisung).
+        # Leer = Verhalten wie bisher.
+        self.snap_dimmer_override: dict[int, dict[str, int]] = {}
         # Visualizer-Persistenz — gehen mit in die .lshow (siehe show_file.py).
         # VIZ-11 (Schritt 3+4): kanonischer Store ist ab jetzt der SceneGraph
         # (state._scene); die 5 Legacy-Felder darunter sind schreibende
@@ -443,6 +576,9 @@ class AppState:
         # Vorberechneter Render-Plan (bei Patch-Aenderung erneuert) fuer den
         # zentralen Per-Frame-Renderer _render_frame().
         self._fix_index: dict[int, tuple] = {}          # fid -> (fixture, channels)
+        # ENG-30: fid -> (Eintrag aus _fix_index, Adresse, Universum,
+        #                 Intensitaets-, Dimmer-, Farb-Adressen) — s. _adress_listen.
+        self._adress_plan: dict[int, tuple] = {}
         # VCB-11: slot -> (fids, gruppen) der gedrueckten Blackout-Tasten mit Ziel.
         self._ziel_blackout_specs: dict = {}
         self._default_frame: dict[int, bytes] = {}      # univ -> 512B Default-Frame
@@ -575,6 +711,10 @@ class AppState:
         # LAS-18b: gemerkte WERKSMUSTER-Slots für DMX-Muster-Laser (Bank/Wert
         # + optionales Nutzer-Foto) — Kachel-Picker der Laser-Steuerseite.
         self.laser_patterns: list = []
+        # LAS-32 (S1): Sperrzonen + Maximalfeld je Laser — NUR ANZEIGE. Die
+        # Ausgabe (OutputManager/Render-Pfad) liest dieses Feld nicht.
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        self.sperrzonen = SperrzonenDaten()
         self.playback_engine = None  # wird in start_playback() gesetzt
         # Musik-Playlist (In-App-Player): Liste von {path,title,genre,bpm}.
         # SSOT für die .lshow; der MediaPlayer (core/audio/media_player.py) wird
@@ -862,6 +1002,17 @@ class AppState:
             bound = next(
                 (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
             )
+            # LAS-37: gilt das Geraet NUR ueber einen Namen als Laser (Lichtset
+            # mit „Laser: Red“, Moving Head mit Laserdiode), das beim Patchen
+            # sagen — NOT-AUS und Blackout schalten dann das GANZE Geraet dunkel.
+            try:
+                if bound is not None:
+                    from .laser.erkennung import hinweis_text
+                    laser_hinweis = hinweis_text(bound, get_channels_for_patched(bound))
+                    if laser_hinweis:
+                        self._emit("hinweis", laser_hinweis)
+            except Exception as e:
+                debug_swallow("app_state.add_fixture.laser_hinweis", e)
             # FM-HEADLAYOUT: head_mode == "single" ("als EINE Lampe") unterdrueckt
             # die automatische Kopf-Matrix-Gruppe. "auto" (Default, Alt-Shows) und
             # "heads" legen sie wie bisher an.
@@ -878,14 +1029,16 @@ class AppState:
             # Die AKTUELLE fid wird mitgefuehrt: nach einem Redo kann das Geraet
             # per fid-Guard eine neue Nummer haben — ein Undo auf die alte
             # loeschte sonst ein FREMDES Geraet (Review FM-38, gemessen).
-            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": []}
+            gemerkt: dict = {"fid": snapshot["fid"], "gruppen": [], "feld": None}
 
             def _undo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt   # LAS-32
 
             def _redo(s=snapshot, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             self._push_undo(
                 label=f"Fixture +{snapshot.get('label', '')}",
@@ -897,8 +1050,13 @@ class AppState:
 
     # FM-38: Felder EINER Fixture-Gruppe, die ein Undo feldweise zurueckholt —
     # EINE Liste fuer Schnappschuss UND Wiederherstellung (zwei driften).
-    # Die id gehoert bewusst NICHT dazu: keine Bindung haengt an ihr (VC/Matrix/
-    # EFX binden ueber den NAMEN, die .lshow speichert sie gar nicht).
+    # Die id gehoert NICHT in diese Liste (sie ist kein Feld, das man einer neuen
+    # Zeile einfach mitgibt — die Nummer kann inzwischen belegt sein). Seit
+    # VCB-36 haengt aber eine Bindung an ihr (Blackout-Ziel einer VC-Taste):
+    # der Schnappschuss merkt sie unter ``id`` und das Undo gibt sie zurueck,
+    # wenn sie frei ist (``_restore_fixture_with_groups``). Dasselbe gilt seit
+    # VCB-42 fuer die Kennung (``uid``): ohne sie waere die zurueckgeholte
+    # Gruppe fuer die Taste eine andere, sobald ihr Name nicht mehr stimmt.
     _GROUP_SNAP_FIELDS = ("name", "cols", "rows", "positions_json", "folder")
 
     @staticmethod
@@ -928,7 +1086,10 @@ class AppState:
 
     @classmethod
     def _group_to_dict(cls, g) -> dict:
-        return {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
+        d = {k: getattr(g, k) for k in cls._GROUP_SNAP_FIELDS}
+        d["id"] = getattr(g, "id", None)        # VCB-36, s. _GROUP_SNAP_FIELDS
+        d["uid"] = getattr(g, "uid", None)      # VCB-42, dito
+        return d
 
     @staticmethod
     def _zellen_umschreiben(positions_json: str, alt_fid: int, neu_fid: int) -> str:
@@ -969,18 +1130,27 @@ class AppState:
             return neu_fid
         from sqlalchemy import select as _select
         from src.core.database.models import FixtureGroup as _FG
+        from .group_ref import uid_lesbar as _uid_lesbar
         gescheitert: list[str] = []
         with self._session() as s:
             eingefuegt: list = []
+            alte_ids: dict = {}
             for gd in gruppen:
                 try:
                     with s.begin_nested():
                         felder = {k: gd[k] for k in self._GROUP_SNAP_FIELDS if k in gd}
                         felder["positions_json"] = self._zellen_umschreiben(
                             felder.get("positions_json") or "{}", alt_fid, neu_fid)
+                        # VCB-42: die Kennung zurueckgeben, wenn sie frei ist
+                        # (sonst vergibt das Modell eine neue — nie doppelt).
+                        uid = _uid_lesbar(gd.get("uid"))
+                        if uid and s.execute(_select(_FG.id).where(
+                                _FG.uid == uid)).first() is None:
+                            felder["uid"] = uid
                         g_neu = _FG(**felder)
                         s.add(g_neu)
                     eingefuegt.append(g_neu)
+                    alte_ids[g_neu] = gd.get("id")
                 except Exception as e:
                     gescheitert.append(f"{gd.get('name', '?')} ({e})")
             if eingefuegt:
@@ -998,6 +1168,22 @@ class AppState:
                                 s.delete(g)
                 except Exception as e:
                     gescheitert.append(f"Werks-Gruppe nicht entfernt ({e})")
+                # VCB-36: die alte ID zurueckgeben — eine VC-Taste meint ihr
+                # Blackout-Ziel ueber sie und schaltete nach Ctrl+Z sonst nichts
+                # mehr. ERST JETZT: die Werks-Gruppe von add_fixture sass oft
+                # genau auf dieser Nummer. Ist sie anderweitig belegt, behaelt
+                # die Gruppe ihre neue (lieber kein Ziel als ein fremdes).
+                for g_neu in eingefuegt:
+                    alt_id = alte_ids.get(g_neu)
+                    try:
+                        with s.begin_nested():
+                            s.flush()
+                            if (isinstance(alt_id, int) and alt_id != g_neu.id
+                                    and s.get(_FG, alt_id) is None):
+                                g_neu.id = alt_id
+                                s.flush()
+                    except Exception as e:
+                        debug_swallow("app_state._restore_fixture_with_groups.id", e)
             try:
                 s.commit()
             except Exception as e:
@@ -1353,6 +1539,12 @@ class AppState:
             s.commit()
         removed_group = bool(gruppen_snaps)
         self.programmer.pop(fid, None)
+        # LAS-32: die Randwinkel dieses Lasers gehen mit dem Geraet. Die Nummer
+        # wird neu vergeben — ein anderer Laser auf ihr erbte sonst ein fremdes
+        # Feld und koennte faelschlich „erreicht keine Zone" melden. Das
+        # Rueckgaengig (unten bzw. in add_fixture) holt sie wieder.
+        feld_snap = self._sperrzonen_feld_nehmen(fid)
+        self._sperrzonen_feld_entfernt = feld_snap
         self._reload_patch_cache()
         self._emit("patch_changed")
         if removed_group:
@@ -1364,14 +1556,17 @@ class AppState:
             # FM-38: aktuelle fid und JUENGSTE Gruppen-Schnappschuesse mitfuehren
             # (Undo kann umnummern; ein Redo auf die alte Nummer loeschte das
             # Fremdgeraet, und ein veralteter Schnappschuss verwarf Umbenennungen).
-            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps}
+            gemerkt: dict = {"fid": fid, "gruppen": gruppen_snaps,
+                             "feld": feld_snap}
 
             def _undo(s=snap, m=gemerkt):
                 m["fid"] = self._restore_fixture_with_groups(
                     dict(s, fid=m["fid"]), m["gruppen"])
+                self._sperrzonen_feld_zurueck(m["fid"], m["feld"])
 
             def _redo(m=gemerkt):
                 m["gruppen"] = self.remove_fixture(m["fid"], undoable=False) or []
+                m["feld"] = self._sperrzonen_feld_entfernt
 
             self._push_undo(
                 label=f"Fixture -{snap.get('label', '')}",
@@ -1380,6 +1575,28 @@ class AppState:
                 redo=_redo,
             )
         return gruppen_snaps
+
+    # ── LAS-32: Laser-Feld beim Loeschen/Zurueckholen eines Geraets ──────────
+    #: Das Feld, das der letzte ``remove_fixture`` herausgenommen hat (oder
+    #: ``None``) — fuer Aufrufer, die es selbst aufheben (Undo von add_fixture).
+    _sperrzonen_feld_entfernt = None
+
+    def _sperrzonen_feld_nehmen(self, fid: int):
+        try:
+            daten = getattr(self, "sperrzonen", None)
+            return daten.nimm_feld(fid) if daten is not None else None
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_nehmen", e)
+            return None
+
+    def _sperrzonen_feld_zurueck(self, fid, feld) -> None:
+        if feld is None or fid is None:
+            return
+        try:
+            self.sperrzonen.setze_feld(int(fid), feld)
+            self._emit("sperrzonen_changed", None)
+        except Exception as e:
+            debug_swallow("app_state.sperrzonen_feld_zurueck", e)
 
     def clear_patch(self):
         """Loescht ALLE gepatchten Fixtures hart aus der Show-DB — auch Zeilen,
@@ -1436,6 +1653,7 @@ class AppState:
             self._patch_cache = list(fixtures)
             self._rebuild_universes()
             clear_channel_cache()
+            self._laser_profile_bestimmen()      # LAS-38
             self._rebuild_render_plan()
             self._emit("patch_changed")
             return
@@ -1646,8 +1864,149 @@ class AppState:
                 s.execute(select(PatchedFixture).order_by(PatchedFixture.fid)).scalars()
             )
         self._rebuild_universes()
+        if self._patch_sammelt():
+            # IMP-3: Geraeteliste und Universen stimmen sofort (das naechste
+            # add_fixture braucht sie: freie Nummer, gebundenes Objekt fuer
+            # Kopf-Gruppe und Laser-Hinweis). Kanal-Cache, Laser-Profile und
+            # Render-Plan baut patch_sammeln() EINMAL am Ende neu.
+            self._patch_sammel_neuaufbau = True
+            return
         clear_channel_cache()
+        self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
+
+    def _laser_profile_bestimmen(self):
+        """LAS-38: je Profil der gepatchten Geraete EINMAL bestimmen, ob
+        irgendeiner seiner Modi einen Laserkanal hat — beim Patchen und Laden,
+        vor dem Render-Plan. Der Plan (und jede andere Sicherheits-Stelle)
+        liest danach nur noch die gemerkte Antwort aus ``laser.erkennung``.
+
+        Eine Abfrage fuer alle noch unbekannten Profile zusammen. Schlaegt sie
+        fehl, bleibt die Antwort offen: ``erkennung`` fragt dann beim ersten
+        Bedarf je Profil nach (``_profil_hat_laserkanal``) — der Patch darf an
+        dieser Stelle nie scheitern.
+
+        LAS-39: Eine gescheiterte Abfrage fuehrt die Profile als OFFEN — sie
+        gelten bis zur Antwort als Laser (``erkennung.GRUND_PROFIL_UNBEKANNT``).
+        Offene Profile werden hier bei jedem Aufruf erneut gefragt (das ist das
+        Nachholen). Rueckgabe: ob eine bisher offene Auskunft jetzt da ist.
+        """
+        offen = set()
+        for fx in getattr(self, "_patch_cache", None) or ():
+            profil_id = getattr(fx, "fixture_profile_id", None)
+            if profil_id is not None and not laser_erkennung.profil_bekannt(profil_id):
+                offen.add(profil_id)
+        if not offen:
+            return False
+        vorher_offen = laser_erkennung.offene_profile()
+        try:
+            antworten = _profile_mit_laserkanal(offen)
+        except Exception as e:
+            debug_swallow("app_state.laser_profile_bestimmen", e)
+            for profil_id in offen:
+                laser_erkennung.merke_offen(profil_id)
+            return False
+        for profil_id, hat_laser in antworten.items():
+            laser_erkennung.merke_profil(profil_id, hat_laser)
+        return bool(vorher_offen & set(antworten))
+
+    def _laser_erkennung_offen_zahl(self, fix_index=None) -> int:
+        """LAS-39: wie viele gepatchte Geraete gelten nur deshalb als Laser,
+        weil die Profil-Auskunft fehlt?"""
+        offen = laser_erkennung.offene_profile()
+        if not offen:
+            return 0
+        if fix_index is None:
+            geraete = list(getattr(self, "_patch_cache", None) or ())
+        else:
+            geraete = [fx for fx, _ch in fix_index.values()]
+        return sum(1 for fx in geraete
+                   if getattr(fx, "fixture_profile_id", None) in offen)
+
+    def laser_erkennung_hinweis(self) -> str:
+        """LAS-39: Satz fuer NOT-AUS-Knopf und Statuszeile, solange die
+        Laser-Erkennung unvollstaendig ist — sonst leer."""
+        return laser_erkennung.hinweis_unvollstaendig(
+            self._laser_erkennung_offen_zahl())
+
+    def _laser_erkennung_melden(self, fix_index=None, immer=False):
+        """LAS-39: Wechsel „unvollstaendig“ <-> „vollstaendig“ dem Betreiber
+        sagen (Statuszeile ueber ``hinweis`` und Log). ``immer``: den Hinweis
+        auch ohne Wechsel erneut zeigen (frisch ausgeloester NOT-AUS)."""
+        n = self._laser_erkennung_offen_zahl(fix_index)
+        war = bool(getattr(self, "_laser_erkennung_unvollstaendig", False))
+        self._laser_erkennung_unvollstaendig = n > 0
+        if n > 0 and (immer or not war):
+            text = laser_erkennung.hinweis_unvollstaendig(n)
+        elif n == 0 and war:
+            text = laser_erkennung.hinweis_vollstaendig()
+        else:
+            return
+        print(f"[AppState] {text}")
+        try:
+            self._emit("hinweis", text)
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_melden", e)
+
+    def laser_erkennung_nachholen(self):
+        """LAS-39: beim ausgeloesten NOT-AUS fehlende Profil-Auskuenfte
+        nachholen. Ist eine da, wird der Render-Plan neu gebaut: eine normale
+        Lampe faellt dann aus der Laser-Menge (die klebrige Maske haelt sie bis
+        zum Loesen dunkel, der naechste NOT-AUS laesst sie frei). Ohne offene
+        Profile kostet das nichts.
+
+        Aufgerufen wird es von ``LaserOutputManager.estop_all`` erst NACH dem
+        DMX-Latch UND dem Netzwerk-NOT-AUS (``conn.estop()``) — nie aus
+        ``set_laser_estop``: eine gesperrte Datenbank antwortet erst nach dem
+        SQLite-Timeout (Sekunden), und darauf darf kein Teil des NOT-AUS warten
+        (CDX-25: das Billige zuerst, das Teure danach).
+
+        Codex-Review #1095: und es blockiert den Aufrufer nicht. Mit
+        registriertem UI-Marshaller (die App) laeuft die Datenbank-Abfrage in
+        einem eigenen Faden; Neuaufbau bzw. Hinweis kommen danach im UI-Faden
+        — die Oberflaeche friert waehrend eines SQLite-Timeouts nicht ein.
+        Ohne Marshaller (Werkzeuge, Tests) laeuft alles wie bisher sofort."""
+        if not laser_erkennung.offene_profile():
+            return
+        marshaller = getattr(self, "_ui_marshaller", None)
+        if marshaller is None:
+            self._laser_erkennung_abschliessen(self._laser_erkennung_fragen())
+            return
+        if getattr(self, "_laser_nachholen_laeuft", False):
+            return                       # eine Abfrage laeuft schon
+        self._laser_nachholen_laeuft = True
+
+        def faden():
+            try:
+                bekannt = self._laser_erkennung_fragen()
+            finally:
+                self._laser_nachholen_laeuft = False
+            try:
+                marshaller(lambda: self._laser_erkennung_abschliessen(bekannt))
+            except Exception as e:
+                debug_swallow("app_state.laser_erkennung_nachholen", e)
+
+        threading.Thread(target=faden, name="laser-erkennung-nachholen",
+                         daemon=True).start()
+
+    def _laser_erkennung_fragen(self) -> bool:
+        """Der langsame Teil des Nachholens (Datenbank). Wirft nie."""
+        try:
+            return bool(self._laser_profile_bestimmen())
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_nachholen", e)
+            return False
+
+    def _laser_erkennung_abschliessen(self, bekannt: bool) -> None:
+        """Nach der Abfrage: Neuaufbau, wenn eine Auskunft da ist, sonst den
+        Hinweis erneut zeigen."""
+        try:
+            if bekannt:
+                self._rebuild_render_plan()
+                return
+        except Exception as e:
+            debug_swallow("app_state.laser_erkennung_nachholen", e)
+        self._laser_erkennung_melden(immer=True)
 
     def profil_geaendert(self, profile_id=None) -> bool:
         """UI-81: ein Fixture-Profil wurde in der Bibliothek geaendert (Editor/
@@ -1693,7 +2052,10 @@ class AppState:
         addrs: dict[int, set] = {}
         laser_addrs: dict[int, set] = {}   # UXT-12: Adressen aller DMX-Laser
         laser_fids: set = set()
-        for fx in self._patch_cache:
+        # IMP-3: die Liste, aus der DIESER Plan entsteht — wird unten mit ihm
+        # getauscht (s. _plan_patch).
+        plan_patch = list(self._patch_cache)
+        for fx in plan_patch:
             chans = get_channels_for_patched(fx)
             # FM-12: Override-Cache hier mit vorwaermen (gleiche Stelle, an der
             # der Channel-Cache nach clear_channel_cache wieder befuellt wird) —
@@ -1706,12 +2068,13 @@ class AppState:
             # ihre Platzhalter-Adresse darf nie ins Live-Universe committen.
             if not fixture_uses_dmx(fx):
                 continue
-            # UXT-12: DMX-Laser erkennen (fixture_type 'laser' ODER laser_*-Kanäle
-            # — dieselbe Definition wie capability.is_laser_fixture, aber mit den
-            # schon geladenen chans, ohne Zweit-Load).
-            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
-                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
-                               for ch in chans))
+            # UXT-12/LAS-37: DMX-Laser erkennen — die EINE, weite Regel aller
+            # Sicherheits-Stellen (laser.erkennung: Typ, laser_*-Kanal, „Laser“
+            # im Kanal- oder Geraetenamen), mit den schon geladenen chans. Die
+            # NOT-AUS-Maske deckt ALLE Adressen eines erkannten Geraets — auch
+            # bei einem Lichtset, dessen Laser nur zwei Kanaele belegt: lieber
+            # das ganze Geraet dunkel als ein Laserkanal, den niemand kannte.
+            is_laser = ist_laser(fx, chans)
             if is_laser:
                 laser_fids.add(fx.fid)
             for ch in chans:
@@ -1770,6 +2133,20 @@ class AppState:
         # getauschte Kombination (neuer fix_index + alte spans/defaults) sieht.
         new_default_frame = {u: bytes(b) for u, b in defaults.items()}
         new_patched_set = {u: frozenset(s) for u, s in addrs.items()}
+        # ENG-30: die Adresslisten, die _render_frame je Geraet braucht, EINMAL
+        # hier ableiten statt in jedem Frame (bei 80 Geraeten rund 5700
+        # Attributzugriffe auf Datenbank-Objekte je Frame, die Haelfte der
+        # Grundlast). Ein Geraet, bei dem das Ableiten wirft, bleibt ohne
+        # Eintrag — der Frame rechnet es dann wie bisher selbst (und meldet
+        # den Fehler dort, wo er bisher auch auffiel).
+        adress_plan: dict[int, tuple] = {}
+        for _fid, _eintrag in fix_index.items():
+            try:
+                _fx = _eintrag[0]
+                adress_plan[_fid] = (_eintrag, _fx.address, _fx.universe,
+                                     *self._adress_listen(_fx, _eintrag[1]))
+            except Exception:
+                continue
         new_laser_estop_addrs = {u: frozenset(s) for u, s in laser_addrs.items()}
         new_laser_fids = frozenset(laser_fids)
         # A3D-18: Snapshot der bisher gepatchten Adressen VOR dem Tausch — Adressen,
@@ -1842,7 +2219,9 @@ class AppState:
                 # wirft unten etwas, bezoege sich der naechste Uebergang sonst
                 # auf die Maske des vorigen Plans.
                 self._blackout_keep_gesetzt = new_keep_mask
+                self._plan_patch = plan_patch
                 self._fix_index = fix_index
+                self._adress_plan = adress_plan
                 self._default_frame = new_default_frame
                 self._commit_spans = spans
                 self._patched_set = new_patched_set
@@ -1854,6 +2233,17 @@ class AppState:
         # A3D-18: zuvor gepatchte, jetzt ungepatchte Adressen (entferntes/umadressiertes
         # Fixture) im Live-Universe freigeben — der Commit (Schritt 5) beruehrt nur noch
         # die NEUEN Spans, _release_engine_extra nur ungepatchte Roh-Kanaele.
+        # OUT-72: Aus-Werte von Lasern, die mit diesem Plan aus dem Patch
+        # gefallen sind, stehen lassen — sonst faellt ihre Adresse auf 0, und
+        # 0 heisst bei manchem Laser „an“.
+        # ★ Codex-Review #1056: VOR der Freigabe. ``_release_now`` schreibt die
+        # alten Laser-Adressen sofort auf 0, und gegen ``_send_all`` gibt es
+        # ausserhalb von ``_plan_lock`` keine Sperre — stand die Maske erst
+        # danach, konnte dazwischen ein Frame mit 0 („Auto run“) hinausgehen.
+        try:
+            self._laser_aus_verwaist_nachfuehren(new_laser_aus, new_patched_set)
+        except Exception as e:
+            print(f"[AppState] laser aus verwaist error: {e}")
         self._release_unpatched_addrs(old_patched, new_patched_set,
                                      never_defer=old_laser_addrs)
         # Grand-Master-Adressmaske: nur Intensitaets-/Farbadressen je Universum,
@@ -1894,6 +2284,11 @@ class AppState:
         # A3D-01: die Laser-Estop-Maske am OutputManager mitpflegen (Adressen
         # koennen sich geaendert haben, waehrend der NOT-AUS-Latch aktiv ist).
         self._push_laser_estop_mask()
+        # LAS-39: fehlende Profil-Auskunft sichtbar machen bzw. zuruecknehmen.
+        try:
+            self._laser_erkennung_melden(fix_index)
+        except Exception as e:
+            debug_swallow("app_state.rebuild_render_plan.laser_erkennung", e)
 
     def _release_engine_extra(self):
         """STAB-14: gibt die zuletzt als Engine-Extra committeten Roh-Kanaele
@@ -1941,6 +2336,46 @@ class AppState:
                 for a in prev_addrs:
                     uni.set_channel(a, 0)
         self._engine_extra_prev = {}
+
+    def _laser_aus_verwaist_nachfuehren(self, neue_maske, gepatcht) -> None:
+        """OUT-72: Aus-Werte nicht mehr gepatchter Laser festhalten.
+
+        Wird ein Laser entpatcht, umadressiert oder mit einem Show-Wechsel
+        ersetzt, gibt ``_release_unpatched_addrs`` seine Adressen frei — sie
+        fallen auf 0. Bei einem Laser, dessen Betriebsart bei DMX 0 „Auto run“
+        heisst, ist das AN, und niemand kann das Geraet mehr steuern: es steht
+        in keiner Maske. Am Geraet selbst hat sich nichts geaendert; es hoert
+        weiter auf seine Adresse.
+
+        Deshalb bleibt der zuletzt bekannte Aus-Wert jeder solchen Adresse auf
+        der Leitung (``OutputManager.set_laser_aus_verwaist``), bis
+
+        * die Adresse wieder gepatcht ist — dann bestimmt das neue Geraet —, oder
+        * die Ausgabe endet (das Schlussbild traegt die Werte ebenfalls).
+
+        Gemerkt wird nur, was nicht 0 ist: 0 ist der Wert einer freien Adresse
+        ohnehin. ``neue_maske`` ist die Aus-Maske des neuen Plans
+        (``_build_gm_laser_aus_mask``), ``gepatcht`` seine belegten Adressen je
+        Universum. Mit ``getattr``, weil Testhelfer den Zustand ohne
+        ``__init__`` bauen.
+        """
+        kandidaten = {u: dict(m) for u, m in
+                      (getattr(self, "_laser_aus_verwaist", None) or {}).items()}
+        for u, m in (getattr(self, "_laser_aus_plan", None) or {}).items():
+            kandidaten.setdefault(u, {}).update(m)      # der juengere Wert gewinnt
+        verwaist: dict[int, dict[int, int]] = {}
+        for u, m in kandidaten.items():
+            belegt = (gepatcht or {}).get(u) or ()
+            for addr, wert in m.items():
+                if wert and addr not in belegt:
+                    verwaist.setdefault(u, {})[addr] = wert
+        if neue_maske is not None:
+            self._laser_aus_plan = {u: dict(m) for u, m in neue_maske.items()}
+        self._laser_aus_verwaist = verwaist
+        setze = getattr(getattr(self, "output_manager", None),
+                        "set_laser_aus_verwaist", None)
+        if callable(setze):
+            setze(verwaist)
 
     def _release_unpatched_addrs(self, old_patched: dict, new_patched: dict,
                                  *, never_defer: dict | None = None):
@@ -2032,6 +2467,108 @@ class AppState:
     # (der singleShot(0) unten feuert dann nie). In der App beendet der
     # singleShot den Nachlauf im naechsten Durchlauf der Ereignisschleife.
     _SHOW_LADE_NACHLAUF_S = 1.0
+
+    # ── IMP-3: viele Patch-Aenderungen, EIN Neuaufbau ────────────────────────
+
+    #: Ereignisse, die patch_sammeln() zurueckhaelt und am Ende je EINMAL
+    #: sendet — in dieser Reihenfolge. Alles andere (``hinweis`` mit dem
+    #: Laser-Hinweis, ``group_changed`` MIT Daten, …) geht sofort durch.
+    _PATCH_SAMMEL_EREIGNISSE = ("patch_changed", "group_changed")
+
+    def _patch_sammelt(self) -> bool:
+        """True nur im Thread, der patch_sammeln() geoeffnet hat — ein
+        anderer Thread (MIDI/OSC/Web) baut und sendet wie immer."""
+        return (getattr(self, "_patch_sammel_tiefe", 0) > 0
+                and getattr(self, "_patch_sammel_thread", None)
+                == threading.get_ident())
+
+    @contextlib.contextmanager
+    def patch_sammeln(self):
+        """IMP-3: Kontext um VIELE Patch-Aenderungen am Stueck (Tabellen-
+        Import mit N-mal ``add_fixture``, sein Rueckgaengig/Wiederholen).
+
+        Ohne ihn baut jede einzelne Aenderung Kanal-Cache, Laser-Profile und
+        Render-Plan neu und sendet ``patch_changed`` — jede Ansicht (Patch,
+        Programmer, 2D/3D, Live View) baut sich N-mal neu auf. Im Kontext:
+
+        * ``_reload_patch_cache`` laedt nur Geraeteliste und Universen; der
+          volle Neuaufbau (Kanal-Cache, Laser-Profile, RENDER-PLAN) laeuft
+          EINMAL beim Verlassen.
+        * ``patch_changed`` und ``group_changed`` (ohne Daten) werden
+          gemerkt und beim Verlassen je EINMAL gesendet — erst
+          ``patch_changed``, dann ``group_changed``, beide NACH dem
+          Neuaufbau. Jeder Empfaenger sieht also den fertigen Stand.
+        * Alles andere bleibt, wie es ist: Kopf-Gruppen werden je Geraet
+          angelegt, der Laser-Hinweis (``hinweis``) kommt je Geraet sofort,
+          Rueckgaengig-Schritte entstehen wie immer. Das ist der Unterschied
+          zu ``_suppress_emits`` (Show-Laden), das auch Kopf-Gruppen und
+          Laser-Hinweis abschaltet.
+
+        Sicherheit: beim Verlassen ist der Render-Plan garantiert aktuell —
+        auch wenn der Block wirft (``finally``); ein importierter Laser ist
+        damit sofort in NOT-AUS und Blackout erfasst. WAEHREND des Blocks
+        gilt der alte Plan MIT seiner Geraeteliste (``_plan_patch``): der
+        Ausgabe-Thread gibt den Funktionen nie ``_patch_cache``, sondern
+        immer die Liste, aus der der geltende Plan gebaut wurde. Ein neues Geraet
+        gibt damit noch nichts aus (kein Default, kein Span, keine Funktion
+        schreibt es — sonst ginge sein Wert als „nicht gepatchte Roh-Adresse“
+        an der NOT-AUS-Maske vorbei aufs Kabel), ein gerade entferntes wird
+        bis zum Ende weiter wie bisher gerendert und dann freigegeben. Der
+        Block laeuft im UI-Thread am Stueck; das Fenster ist kurz.
+
+        Verschachtelbar (Tiefenzaehler); nur die aeusserste Ebene baut und
+        sendet. Gilt nur fuer den Thread, der den Kontext geoeffnet hat.
+        NUR DER GUI-THREAD darf den Block oeffnen: Tiefenzaehler und
+        Besitzer-Thread sind nicht gesperrt — zwei Threads, die gleichzeitig
+        oeffnen und schliessen, koennten den abschliessenden Neuaufbau
+        verlieren.
+        Wurde im Block nichts am Patch geaendert, passiert am Ende nichts."""
+        if (getattr(self, "_patch_sammel_tiefe", 0) > 0
+                and getattr(self, "_patch_sammel_thread", None)
+                != threading.get_ident()):
+            # Ein zweiter Thread sammelt nicht mit (und stoert den ersten nicht).
+            yield
+            return
+        if getattr(self, "_patch_sammel_tiefe", 0) == 0:
+            self._patch_sammel_thread = threading.get_ident()
+            self._patch_sammel_neuaufbau = False
+            self._patch_sammel_ereignisse = []
+            # Der Ausgabe-Thread rendert die Funktionen mit der Geraeteliste
+            # des geltenden Plans (s. _render_frame). Gibt es noch keinen
+            # Plan, die jetzige Liste festhalten — BEVOR die erste Aenderung
+            # _patch_cache austauscht.
+            with self._get_plan_lock():
+                if getattr(self, "_plan_patch", None) is None:
+                    self._plan_patch = list(getattr(self, "_patch_cache", None) or ())
+        self._patch_sammel_tiefe = getattr(self, "_patch_sammel_tiefe", 0) + 1
+        try:
+            yield
+        finally:
+            self._patch_sammel_tiefe = max(0, self._patch_sammel_tiefe - 1)
+            if self._patch_sammel_tiefe == 0:
+                self._patch_sammeln_abschliessen()
+
+    def _patch_sammeln_abschliessen(self) -> None:
+        """Aeusserste Ebene verlassen: einmal voll neu aufbauen, dann die
+        gemerkten Ereignisse je einmal senden. Scheitert der Neuaufbau, wird
+        trotzdem gesendet (die Ansichten zeigen dann wenigstens die
+        Geraeteliste) und der Fehler geht weiter nach oben — ein nicht
+        aktueller Render-Plan darf nicht still bleiben."""
+        self._patch_sammel_thread = None
+        neuaufbau = getattr(self, "_patch_sammel_neuaufbau", False)
+        ereignisse = list(getattr(self, "_patch_sammel_ereignisse", ()) or ())
+        self._patch_sammel_neuaufbau = False
+        self._patch_sammel_ereignisse = []
+        try:
+            if neuaufbau:
+                self._reload_patch_cache()
+        finally:
+            # Scheitert der Neuaufbau, bleiben Plan UND seine Geraeteliste
+            # (_plan_patch) alt — der Renderer rechnet stimmig mit dem alten
+            # Stand weiter, bis ein Neuaufbau gelingt.
+            for ereignis in self._PATCH_SAMMEL_EREIGNISSE:
+                if ereignis in ereignisse:
+                    self._emit(ereignis)
 
     @contextlib.contextmanager
     def show_wird_geladen(self):
@@ -2194,6 +2731,13 @@ class AppState:
         except Exception as e:
             print(f"[app_state] apply_output_config: konnte {path} nicht lesen: {e}")
             return
+        # ★ OUT-80: gelernte Enttec-Seriennummern in DIESE Datei zurueckschreiben
+        # und die gespeicherten allen Ausgaben vorab bekanntgeben.
+        # Modul-Funktion statt Methode: Bestandstests rufen diese Methode auf
+        # einem SimpleNamespace-Stub auf (s. HW-5b weiter unten).
+        enttec_sn_doppelt: dict[int, str] = {}
+        enttec_sn = _enttec_seriennr_vorbereiten(self, path, rows,
+                                                 enttec_sn_doppelt)
         # ★★ OUT-52: Zuerst die Ausgaenge raeumen, deren Zeile GELOESCHT wurde.
         #
         # Die Schleife unten laeuft nur ueber die Zeilen, die es noch GIBT —
@@ -2209,9 +2753,51 @@ class AppState:
         try:
             for eintrag in self.output_manager.ausgabe_status():
                 if eintrag["universum"] not in konfiguriert:
-                    self.output_manager.remove_output(eintrag["universum"])
+                    # OUT-71: dieses Universum gibt es nicht mehr — sein Adapter
+                    # soll dunkel enden, nicht das letzte Bild halten.
+                    self.output_manager.remove_output(eintrag["universum"],
+                                                      schlussbild=True)
         except Exception as e:
             print(f"[app_state] apply_output_config: raeumen fehlgeschlagen: {e}")
+
+        # ★ OUT-74: derselbe Adapter in mehr als einer Zeile.
+        #
+        # Bisher richtete die Schleife unten beide Zeilen nacheinander ein;
+        # `add_enttec` schliesst den Anschluss auf dem jeweils anderen
+        # Universum, also gewann die Zeile, die zufaellig weiter hinten in der
+        # Datei steht. Der Adapter sendete dann moeglicherweise das falsche
+        # Universum — ohne Meldung. Welche Zeile gemeint war, steht nicht in
+        # der Datei; die erste oder letzte zu nehmen hiesse raten. Deshalb: der
+        # Adapter wird fuer KEINE der Zeilen eingerichtet, und es wird gesagt
+        # (Statusleiste ueber `enttec_port_notes`, Dialog, Konsole).
+        try:
+            doppelt = {adapter_zeilen.schluessel(d.typ, d.patch): d
+                       for d in adapter_zeilen.doppelte(rows)}
+        except Exception as e:
+            print(f"[app_state] apply_output_config: Adapter-Pruefung: {e}")
+            doppelt = {}
+        for d in doppelt.values():
+            print(f"[app_state] apply_output_config: {d.text}")
+        self.adapter_konflikte = list(doppelt.values())
+
+        def _merke_hinweis(universum, text):
+            # Lazy-Init wie unten begruendet (HW-5b): Stubs in Bestandstests
+            # bringen `enttec_port_notes` nicht mit.
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes is None:
+                notes = {}
+                self.enttec_port_notes = notes
+            notes[universum] = text
+
+        def _vergiss_hinweis(universum):
+            notes = getattr(self, "enttec_port_notes", None)
+            if notes:
+                notes.pop(universum, None)
+
+        # Hinweise zu Universen, die es nicht mehr gibt, gehen mit ihnen.
+        for universum in list(getattr(self, "enttec_port_notes", None) or {}):
+            if universum not in konfiguriert:
+                _vergiss_hinweis(universum)
 
         for r in rows or []:
             try:
@@ -2238,7 +2824,38 @@ class AppState:
                 # existiert — sonst sendet nach einem Typ-Wechsel der alte Adapter
                 # weiter mit (Doppel-Output) bzw. ein "Disabled"-Universe gibt weiter
                 # Licht aus.
-                self.output_manager.remove_output(num)
+                konflikt = doppelt.get(adapter_zeilen.schluessel(output, patch))
+                # OUT-71: nur wenn KEIN Nachfolger kommt („Disabled“), endet der
+                # alte Adapter mit einem dunklen Bild — sonst blitzte bei jedem
+                # „Uebernehmen“ die Buehne dunkel.
+                # OUT-72: kommt ein ANDERER Adapter (Typwechsel Enttec ->
+                # Art-Net, anderer Anschluss, andere Adresse), geht der alte
+                # ebenfalls wirklich. Der Manager erfaehrt deshalb vorher, was
+                # gleich kommt, und gibt jedem Adapter, der nicht genau dieser
+                # ist, sein Schlussbild; der unveraenderte bekommt keines.
+                # OUT-74: wie bei „Disabled“ bei einer Zeile mit doppeltem Adapter —
+                # der Adapter wird fuer KEINE der Zeilen eingerichtet, es kommt
+                # also kein Nachfolger. Ohne Schlussbild hielte er sein letztes
+                # Bild und die Buehne bliebe stehen, obwohl nichts mehr sendet.
+                if output == "Disabled" or konflikt is not None:
+                    self.output_manager.remove_output(num, schlussbild=True)
+                else:
+                    nachfolger = _ausgabe_nachfolger(output, patch, out_u)
+                    ansagen = getattr(self.output_manager,
+                                      "nachfolger_ansagen", None)
+                    if nachfolger is not None and callable(ansagen):
+                        ansagen(num, *nachfolger)
+                    self.output_manager.remove_output(num)
+                if konflikt is not None:
+                    # OUT-74: nicht einrichten, s. o. — der Ausgang ist
+                    # entfernt, das Universum bleibt ohne Adapter.
+                    _merke_hinweis(num, konflikt.text)
+                    continue
+                if output != "Enttec":
+                    # Ein Hinweis aus einem frueheren Lauf (falscher Port,
+                    # doppelter Adapter) gilt nicht mehr, sobald die Zeile
+                    # keinen Enttec mehr meint.
+                    _vergiss_hinweis(num)
                 if output == "Enttec" and patch:
                     # HW-5b: den Port BEGUTACHTEN, bevor wir ihn oeffnen. Ein Name
                     # von einer anderen Plattform ("COM_FAKE" aus der Windows-Zeit
@@ -2261,12 +2878,19 @@ class AppState:
                     hinweis = diagnose_enttec_port(patch)
                     if hinweis:
                         print(f"[app_state] Universe {num} (Enttec): {hinweis}")
-                    notes = getattr(self, "enttec_port_notes", None)
-                    if notes is None:
-                        notes = {}
-                        self.enttec_port_notes = notes
-                    notes[num] = hinweis
-                    self.output_manager.add_enttec(num, patch)
+                    # OUT-80 (Gegenpruefung): mehrdeutige Seriennummer sagen.
+                    if enttec_sn_doppelt.get(num):
+                        hinweis = "; ".join(
+                            t for t in (hinweis, enttec_sn_doppelt[num]) if t)
+                    _merke_hinweis(num, hinweis)
+                    # OUT-80: die gespeicherte Seriennummer mitgeben — das
+                    # erste Oeffnen sucht SEINEN Dongle, nicht den, der nach
+                    # dem Booten zufaellig an diesem Port haengt.
+                    sn = enttec_sn.get(num)
+                    if sn:
+                        self.output_manager.add_enttec(num, patch, seriennr=sn)
+                    else:
+                        self.output_manager.add_enttec(num, patch)
                 elif output == "uDMX":
                     # OUT-68: ``patch`` = Adapter-Schluessel (Kennung +
                     # Seriennummer/Anschluss); leer = der einzige vorhandene.
@@ -2490,14 +3114,16 @@ class AppState:
         Fixtures, die über normale DMX-Kanäle ein Muster ausgeben, erreicht das
         nicht. Ist dieser Latch aktiv, zwingt der Renderer alle Laser-Kanäle als
         oberste Ebene auf 0 (Betriebsart/Shutter 0 = Laser aus); zusätzlich erzwingt
-        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01). Der
-        Latch wird bewusst durch das nächste Setzen eines Laser-Werts wieder gelöst
-        (Muster-Abruf/Regler = „wieder an") — ein Show-Load lässt ihn absichtlich
-        stehen (dunkel = sicher)."""
+        der OutputManager sie final nach dem Channel-Modifier-Pass (A3D-01).
+        LAS-36: Kein Programmer-Wert, kein Show-Load und keine Patch-Aenderung
+        nimmt den Latch zurueck (dunkel = sicher). ``set_laser_estop(False)`` ruft
+        im Programm nur ``laser_notaus_loesen`` — der eine Loese-Weg."""
         # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
         # CDX-12: Reihenfolge ist ASYMMETRISCH und failt in beide Richtungen sicher.
         # Der Sende-/Renderpfad liest ``laser_estop_active`` roh (ohne _get_estop_lock)
         # und die OutputManager-Maske (Ebene 2) wird separat angewandt.
+        # LAS-39: KEIN Nachholen der Profil-Auskunft hier — das macht
+        # ``estop_all`` nach dem Netzwerk-NOT-AUS (``laser_erkennung_nachholen``).
         with self._get_estop_lock():
             if active and not getattr(self, "laser_estop_active", False):
                 # OUT-63: frischer Latch -> klebrige Maske neu beginnen (nur
@@ -2534,27 +3160,78 @@ class AppState:
         gesetzt und gemeldet — ein NOT-AUS darf nicht an einem Folgefehler
         haengen bleiben. Idempotent: bei stehendem Latch schaltet ein weiterer
         Aufruf erneut ab (z. B. einen wieder scharf geschalteten Laser)."""
+        # Jeder Schritt laeuft fuer sich: eine Ausnahme in einem Schritt darf
+        # die folgenden nicht ueberspringen (sonst bliebe ein Netzwerk-Laser
+        # scharf, weil estop_all geworfen hat). Die Geraete-Verriegelung wird
+        # nur geloest, wenn der Manager nachweislich unscharf ist — im Zweifel
+        # bleibt der Laser verriegelt und dunkel.
+        lo = None
         try:
             lo = self.ensure_laser_output()
-            lo.estop_all()
-            lo.set_armed(False)
-            lo.clear_estop_all()
         except Exception as e:
-            print(f"[AppState] Laser-NOT-AUS: Netzwerk-Teil fehlgeschlagen: {e}")
+            print(f"[AppState] Laser-NOT-AUS: Laser-Ausgang nicht verfuegbar: {e}")
+            # Ein Manager, dessen Start gescheitert ist, steht trotzdem hier.
+            lo = getattr(self, "_laser_output", None)
+        verriegelt = False
+        if lo is not None:
+            try:
+                lo.estop_all()
+                verriegelt = True
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: estop_all fehlgeschlagen: {e}")
+            try:
+                lo.set_armed(False)
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Entwaffnen fehlgeschlagen: {e}")
+        if not verriegelt:
             # Latch notfalls direkt (estop_all setzt ihn als Erstes — steht er
             # schon, ist das ein No-Op) und die Anzeige trotzdem benachrichtigen.
-            self.set_laser_estop(True)
+            try:
+                self.set_laser_estop(True)
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Latch nicht gesetzt: {e}")
+            # LAS-39: auch hier erst nach dem Verriegeln nachholen.
+            try:
+                self.laser_erkennung_nachholen()
+            except Exception as e2:
+                debug_swallow("app_state.laser_notaus.nachholen", e2)
             try:
                 from .sync import get_sync, SyncEvent
                 get_sync().emit(SyncEvent.LASER_ESTOP, None)
             except Exception:
                 pass
+        if lo is not None and not bool(getattr(lo, "armed", True)):
+            try:
+                lo.clear_estop_all()
+            except Exception as e:
+                print(f"[AppState] Laser-NOT-AUS: Geraete-Verriegelung "
+                      f"nicht geloest (bleibt dunkel): {e}")
 
     def laser_notaus_loesen(self):
-        """LAS-31: den Laser-NOT-AUS bewusst loesen (die Oberflaeche fragt vorher
-        nach). Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
-        unscharf — Scharfschalten ist ein eigener Schritt."""
+        """LAS-31/LAS-36: den Laser-NOT-AUS bewusst loesen — der EINZIGE Weg, auf
+        dem der Latch faellt. Aufrufer ist die Rueckfrage der Oberflaeche
+        (``src/ui/laser_notaus.loesen_mit_rueckfrage``); nichts sonst ruft das,
+        auch kein Tastenkuerzel, kein MIDI und keine Fernbedienung.
+
+        Loest NUR den DMX-Latch samt Ausgabe-Maske; Netzwerk-Laser bleiben
+        unscharf — Scharfschalten ist ein eigener Schritt. DMX-Laser geben danach
+        sofort wieder aus, was Programmer, Szenen und Effekte vorgeben — auch
+        Werte, die waehrend des NOT-AUS gesetzt wurden.
+
+        Meldet ``SyncEvent.LASER_ESTOP`` (Daten ``False`` = geloest), damit die
+        Anzeigen nachziehen; Abonnenten lesen ``laser_estop_active``.
+
+        WEB-08: innerhalb von ``laser_notaus_nicht_loesbar()`` (Fernausloesung)
+        bleibt der Latch stehen — vom Handy nie loesbar."""
+        if laser_notaus_loesen_gesperrt():
+            print("[AppState] Laser-NOT-AUS: Loesen aus der Ferne verweigert")
+            return
         self.set_laser_estop(False)
+        try:
+            from .sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.LASER_ESTOP, False)
+        except Exception:
+            pass
 
     def laser_anzahl(self) -> int:
         """LAS-31: Zahl der als Laser erkannten gepatchten Geraete — DMX-Laser
@@ -2569,6 +3246,13 @@ class AppState:
         except Exception:
             pass
         return len(fids)
+
+    def laser_universen(self) -> frozenset:
+        """LAS-37: die DMX-Universen, in denen ein als Laser erkanntes Geraet
+        steht (dieselbe Erkennung wie die NOT-AUS-Maske) — fuer Sperren, die ein
+        ganzes Universum betreffen, z. B. ein Testsignal."""
+        adressen = getattr(self, "_laser_estop_addrs", {}) or {}
+        return frozenset(u for u, a in adressen.items() if a)
 
     def _channels_for_fid(self, fid: int):
         """Kanalliste des gepatchten Fixtures — oder ``None``, wenn es (noch)
@@ -2679,21 +3363,11 @@ class AppState:
             # FM-52: mitgezogene Master-/Anker-Schluessel gehoeren zum Schritt.
             aenderungen = self._prog_unterschied(fid, vorher, self.programmer.get(fid, {}))
         self._verlauf_notiere(aenderungen, attr_label(key))
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
-        # UXT-12 / A3D-02: bewusstes Setzen eines OUTPUT-relevanten Laser-Werts
-        # (Betriebsart/Musterbank/Gobo/Shutter/Macro = Muster-Abruf/„wieder an") hebt
-        # den Laser-NOT-AUS auf. Ein harmloses Attribut (Position/Zoom/Farbe/…) darf
-        # ihn NICHT lösen — sonst öffnet ein Positions-Nudge den Laser trotz Not-Aus.
-        # Auf den Basisnamen prüfen: Snap-/VC-Restore-Pfade reichen den Composite-Key
-        # "attr#N" (Kopf>0) direkt als attribute durch -> vor dem Whitelist-Check das
-        # "#N"-Suffix abspalten, sonst entriegelt ein Kopf>0-Gate den Not-Aus nicht.
-        if (getattr(self, "laser_estop_active", False)
-                and str(attribute).split("#", 1)[0] in _LASER_REARM_ATTRS
-                and int(fid) in getattr(self, "_laser_fids", frozenset())):
-            # A3D-01: Flag-Wechsel und Mask-Push atomar koppeln (siehe _get_estop_lock).
-            with self._get_estop_lock():
-                self.laser_estop_active = False
-                self._push_laser_estop_mask()
+        # LAS-36: ein Laser-Wert loest den NOT-AUS NICHT (frueher A3D-02). Er steht
+        # jetzt im Programmer; solange der Latch steht, haelt der Renderer die
+        # Laser-Adressen auf den Aus-Werten. Loesen: ``laser_notaus_loesen``.
         self._emit("programmer_changed", fid)
         if undoable and old != new_val:
             self._push_undo(
@@ -2741,6 +3415,7 @@ class AppState:
                 self.programmer.pop(fid, None)
         if alt is not None:
             self._verlauf_notiere([(fid, attribute, alt, None)], "Wert entfernen")
+        self._snap_dimmer_override_pruefen()                    # VCB-46
         self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", fid)
 
@@ -2775,6 +3450,9 @@ class AppState:
                 self.clear_remote_input()
             except Exception as e:
                 print(f"[app_state] clear_remote_input error: {e}")
+        # VCB-46: mit dem Wert geht auch sein Vorrang vor Dimmer-Effekten —
+        # auch wenn die Snap-Taste noch gehalten ist.
+        self._snap_dimmer_override_pruefen()
         if flush:
             self._flush_all_to_dmx()
         self._emit("programmer_changed", None)
@@ -2834,8 +3512,8 @@ class AppState:
     def _programmer_werte_anwenden(self, werte: dict):
         """FM-52: schreibt ``{(fid, key): wert|None}`` direkt in den Programmer
         (``None`` = Schluessel entfernen). Bewusst NICHT ueber
-        set_programmer_value: das wuerde den Laser-NOT-AUS aufheben (UXT-12) —
-        ein Rueckgaengig darf einen Laser nie wieder scharf schalten. Ebenso kein
+        set_programmer_value (eigener Verlaufs-/Undo-Eintrag). Den Laser-NOT-AUS
+        hebt ein Rueckgaengig nie auf — seit LAS-36 tut das kein Wert mehr. Ebenso kein
         clear_remote_input. Nicht mehr gepatchte Geraete werden uebersprungen
         (remove_fixture entfernt deren Eintrag ohne Ereignis)."""
         gepatcht = {f.fid for f in getattr(self, "_patch_cache", [])}
@@ -2854,6 +3532,7 @@ class AppState:
                     else:
                         self.programmer.setdefault(fid, {})[key] = int(wert)
                     betroffen.add(fid)
+            self._snap_dimmer_override_pruefen()                # VCB-46
             for fid in betroffen:
                 self._flush_programmer_to_dmx(fid)
         self._emit("programmer_changed", None)
@@ -3432,6 +4111,23 @@ class AppState:
         except Exception:
             return None, {}
 
+    def gruppen_steckbriefe(self) -> dict | None:
+        """VCB-42: ``{id: (Name, Ordner, Kennung)}`` aller Fixture-Gruppen —
+        woran ``group_ref.ziel_gilt`` eine Gruppe wiedererkennt.
+
+        ``None``, wenn die Show-DB nicht lesbar ist. Das ist NICHT „es gibt
+        keine Gruppen“: wer daraus „Ziel verloren“ schloesse, meldete bei jedem
+        Lesefehler einen Verlust (und ein Aufrufer, der nachzieht, vergaesse)."""
+        try:
+            from sqlalchemy import select
+            from .database.models import FixtureGroup
+            with self._session() as s:
+                return {int(g.id): (g.name or "", g.folder or "", g.uid or "")
+                        for g in s.execute(select(FixtureGroup)).scalars().all()}
+        except Exception as e:
+            debug_swallow("app_state.gruppen_steckbriefe", e)
+            return None
+
     def _group_lookup(self, name_or_ref):
         """(gid, fids in Raster-Reihenfolge) einer Fixture-Gruppe; (None, []) wenn
         nicht da."""
@@ -3625,7 +4321,27 @@ class AppState:
         return out
 
     def _flush_programmer_to_dmx(self, fid: int):
-        fixture = next((f for f in self._patch_cache if f.fid == fid), None)
+        # IMP-3 (zweite Pruefung): Geraet und Kanaele kommen aus dem GELTENDEN
+        # Render-Plan, nicht aus _patch_cache. Ein Geraet, das der Plan noch
+        # nicht kennt (gerade im Sammelblock angelegt oder umadressiert),
+        # steht in keinem Span und in keiner NOT-AUS-Maske — ein Direkt-
+        # Schreiben auf seine Adressen ginge an beiden NOT-AUS-Ebenen vorbei
+        # aufs Kabel. Der Wert bleibt im Programmer und kommt mit dem
+        # naechsten Frame nach dem Neuaufbau ueber den Renderer hinaus.
+        with self._get_plan_lock():
+            plan = getattr(self, "_fix_index", None)
+            eintrag = plan.get(fid) if plan is not None else None
+        if plan is None:
+            # Noch gar kein Plan (nackter Zustand ohne __init__, nur in
+            # Tests): wie frueher ueber die Geraeteliste. Ein echter AppState
+            # hat ab __init__ immer einen (anfangs leeren) Plan.
+            fixture = next((f for f in (getattr(self, "_patch_cache", None) or ())
+                            if f.fid == fid), None)
+            channels = get_channels_for_patched(fixture) if fixture else ()
+        elif eintrag is None:
+            return
+        else:
+            fixture, channels = eintrag
         if not fixture or fixture.universe not in self.universes:
             return
         # LAS-04: Netzwerk-Laser haben keinen DMX-Adressraum — ihre Werte
@@ -3634,7 +4350,6 @@ class AppState:
             return
         universe = self.universes[fixture.universe]
         prog = apply_pan_tilt_orientation(fixture, self.programmer.get(fid, {}))
-        channels = get_channels_for_patched(fixture)
         seen: dict[str, int] = {}
         for ch in channels:
             a = ch.attribute
@@ -3654,8 +4369,14 @@ class AppState:
                 universe.set_channel(dmx_addr, val)
 
     def _flush_all_to_dmx(self):
-        for f in self._patch_cache:
-            self._flush_programmer_to_dmx(f.fid)
+        # Ueber den geltenden Plan (s. _flush_programmer_to_dmx), in dessen
+        # Reihenfolge — die der Geraeteliste, aus der er gebaut wurde.
+        with self._get_plan_lock():
+            plan = getattr(self, "_fix_index", None)
+            fids = (list(plan) if plan is not None else
+                    [f.fid for f in (getattr(self, "_patch_cache", None) or ())])
+        for fid in fids:
+            self._flush_programmer_to_dmx(fid)
 
     # ── Simple Desk (manuelle Roh-Override-Ebene, ISO-03) ──────────────────────
 
@@ -3830,10 +4551,16 @@ class AppState:
 
     # ── Zentraler Per-Frame-Renderer ──────────────────────────────────────────
 
-    def apply_input_merge(self, out_univ: int, data, mode: str = "HTP"):
+    def apply_input_merge(self, out_univ: int, data, mode: str = "HTP",
+                          skip=None):
         """F-20: Empfangene DMX-Werte (Art-Net/sACN) in die Eingangs-Schicht legen.
         Thread-safe; wird vom RX-Thread aufgerufen, ``_render_frame`` mischt sie pro
-        Frame deterministisch. ``data`` = bytes/bytearray (Kanal 1 == Index 0)."""
+        Frame deterministisch. ``data`` = bytes/bytearray (Kanal 1 == Index 0).
+
+        NET-15: ``skip`` = Kanaele (1..512), die der DMX-Fernsteuerung gehoeren —
+        sie landen NICHT in der Schicht (und ein frueher dort liegender Wert
+        faellt heraus), damit ein GO-/Fader-Kanal nicht zugleich ein Geraet
+        steuert."""
         if mode not in ("HTP", "LTP", "REPLACE"):
             mode = "HTP"
         out_univ = int(out_univ)
@@ -3843,8 +4570,15 @@ class AppState:
                 layer = {}
                 self.input_layer[out_univ] = layer
             self.input_merge_modes[out_univ] = mode
-            for i in range(min(len(data), 512)):
-                layer[i + 1] = data[i] & 0xFF
+            if skip:
+                for i in range(min(len(data), 512)):
+                    if i + 1 in skip:
+                        layer.pop(i + 1, None)
+                    else:
+                        layer[i + 1] = data[i] & 0xFF
+            else:
+                for i in range(min(len(data), 512)):
+                    layer[i + 1] = data[i] & 0xFF
             # NET-05: Empfang stempeln (defensiv, falls Stub das Feld nicht init).
             ls = getattr(self, "input_last_seen", None)
             if ls is None:
@@ -4097,11 +4831,19 @@ class AppState:
         # getauschte Feld-Kombination in diesen Frame einschleusen.
         with self._get_plan_lock():
             fix_index = self._fix_index
+            # ENG-30: defensiv wie _laser_estop_addrs (Test-Stubs ohne das Feld).
+            adress_plan = getattr(self, "_adress_plan", None) or {}
             default_frame = self._default_frame
             commit_spans = self._commit_spans
             patched_set = self._patched_set
             # _laser_estop_addrs wie zuvor defensiv (Test-Stubs ohne das Feld).
             laser_estop_addrs = getattr(self, "_laser_estop_addrs", {})
+            # IMP-3: die Geraeteliste DIESES Plans, im selben Schnappschuss —
+            # _patch_cache kann dem Plan voraus sein (s. _plan_patch). Nur
+            # ohne Plan (nackter Zustand) die Geraeteliste selbst.
+            plan_patch = getattr(self, "_plan_patch", None)
+            if plan_patch is None:
+                plan_patch = self._patch_cache
         # 1. Scratch-Universen mit Default-Frame vorbelegen (= Per-Frame-Clear).
         scratch: dict[int, Universe] = {}
         for univ, _live in live_universes:
@@ -4126,10 +4868,27 @@ class AppState:
             print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
             su.begin_write_log()
+        # ENG-37: Modify-Effekte schreiben im Funktions-Durchlauf nichts — der
+        # Manager sammelt ihre Betraege, verrechnet wird in 4a²b auf das fertige
+        # Bild. ``tick`` wird bewusst mit denselben drei Argumenten gerufen wie
+        # immer (Manager-Ersatz und gepatchte ``tick`` in Tests kennen keinen
+        # Schalter); das Aufschieben wird vorher am Manager angemeldet.
+        _fm = self.function_manager
+        _modify_anwenden = getattr(_fm, "modify_anwenden", None)
+        _modify_aufschieben = getattr(_fm, "modify_aufschieben", None)
         try:
-            self.function_manager.tick(scratch, self._patch_cache, dt)
+            if _modify_aufschieben is not None and _modify_anwenden is not None:
+                _modify_aufschieben(True)
+            # IMP-3: immer die Geraeteliste des geltenden Plans (nicht _patch_cache).
+            _fm.tick(scratch, plan_patch, dt)
         except Exception as exc:
             print(f"[AppState] render functions error: {exc}")
+        finally:
+            if _modify_aufschieben is not None:
+                try:
+                    _modify_aufschieben(False)
+                except Exception:
+                    pass
         func_touched: dict[int, set[int]] = {}
         for univ, su in scratch.items():
             func_touched[univ] = su.end_write_log()
@@ -4165,26 +4924,26 @@ class AppState:
         effect_present: dict[int, bool] = {}
         for fidi, entry in fix_index.items():
             fx, chans = entry
-            addrs = self._fixture_intensity_addrs(fx, chans)
+            fx_univ = fx.universe
+            # ENG-30: Listen aus dem Plan — aber nur, wenn der Eintrag noch
+            # GENAU zu diesem Geraet passt: derselbe (Geraet, Kanaele)-Eintrag
+            # und unveraenderte Adresse/Universum. Sonst (von Hand gesetzter
+            # _fix_index, Adresse am Objekt geaendert) wie bisher ableiten.
+            # Die Listen sind geteilt und werden NUR gelesen.
+            plan = adress_plan.get(fidi)
+            if (plan is not None and plan[0] is entry
+                    and plan[1] == fx.address and plan[2] == fx_univ):
+                addrs, dims, cols = plan[3], plan[4], plan[5]
+            else:
+                addrs, dims, cols = self._adress_listen(fx, chans)
             inten_addrs[fidi] = addrs
-            dims: list[int] = []
-            cols: list[int] = []
-            for ch in chans:
-                a_l = (getattr(ch, "attribute", "") or "").lower()
-                ad = fx.address + ch.channel_number - 1
-                if not (1 <= ad <= 512):
-                    continue
-                if a_l in _DIM_INTENSITY_ATTRS:
-                    dims.append(ad)
-                elif a_l in _DIM_COLOR_ATTRS:
-                    cols.append(ad)
             dim_addrs[fidi] = dims
             color_addrs[fidi] = cols
-            su = scratch.get(fx.universe)
+            su = scratch.get(fx_univ)
             if su is None:
                 effect_present[fidi] = False
                 continue
-            base = default_frame.get(fx.universe)
+            base = default_frame.get(fx_univ)
             present = False
             for a in addrs:
                 dv = base[a - 1] if (base and a - 1 < len(base)) else 0
@@ -4192,6 +4951,11 @@ class AppState:
                     present = True
                     break
             effect_present[fidi] = present
+        # ENG-35 Schritt 4: „wer gewinnt“ — nur wenn eine Anzeige das
+        # Protokoll angefordert hat, merken, welche Adressen Cuelisten bzw.
+        # Programmer/Snaps nach den Funktionen ueberschreiben.
+        wg_oben: dict[int, dict[int, str]] | None = (
+            {} if getattr(_fm, "wer_gewinnt_aktiv", False) is True else None)
         # 3. Executoren (Cue-Playback) darueber.
         exec_dimmer_fids: set[int] = set()
         if self.playback_engine is not None:
@@ -4212,6 +4976,9 @@ class AppState:
                 # geschuetzt, cue-uebernommene faellt der Programmer korrekt wieder an.
                 for _univ, _su in scratch.items():
                     _ex = _su.end_write_log()
+                    if _ex and wg_oben is not None:
+                        wg_oben.setdefault(_univ, {}).update(
+                            dict.fromkeys(_ex, _wer_gewinnt.CUELISTE))
                     if _ex and _univ in func_driven:
                         func_driven[_univ] = func_driven[_univ] - _ex
                 # Fixtures, deren Intensitaet ein Cue setzt (auch 0) → 4a² laesst
@@ -4259,6 +5026,34 @@ class AppState:
             if getattr(self, "selected_cells", None):
                 sel.update(self.auswahl_referenzierte_fids())
             intensity_wins = func_inten_fids & sel
+        # VCB-46: Snap-Taste mit Haken „übersteuert laufende Dimmer-Effekte“.
+        # Solange die Taste aktiv ist, gewinnt IHR Dimmer-Wert an IHREN Geraeten
+        # gegen einen laufenden Dimmer-Effekt — derselbe Weg wie der Intensity-
+        # Reiter eine Zeile hoeher (Programmer-Dimmer absolut statt uebergangen),
+        # also keine zweite Schicht. Nur der Dimmer: Farb-, Bewegungs- und
+        # Gobo-Kanaele eines Effekts bleiben ueber ``protect`` beim Effekt.
+        # Es zaehlt nur, was WIRKLICH noch im Programmer steht: hat jemand den
+        # Wert inzwischen ueberschrieben oder den Programmer geleert, gilt wieder
+        # die alte Regel. Master, Fader, Blackout und NOT-AUS liegen dahinter.
+        # Codex-Review #1081: und NUR die Dimmer-Schluessel, deren Wert noch
+        # der des Snaps ist — ein Geraet mit mehreren Dimmern behaelt an einem
+        # unbeteiligten (manuell gesetzten) Dimmer den Effekt
+        # (``snap_dimmer_nur``: fid -> erlaubte Schluessel).
+        snap_dimmer_nur: dict[int, set[str]] = {}
+        _snap_ovr = getattr(self, "snap_dimmer_override", None)
+        if _snap_ovr and func_inten_fids:
+            for fidi, erwartet in list(_snap_ovr.items()):
+                if fidi not in func_inten_fids or fidi in intensity_wins:
+                    continue
+                pa = programmer.get(fidi)
+                if pa is None:
+                    pa = programmer.get(str(fidi))
+                if not pa:
+                    continue
+                treffer = {k for k, v in erwartet.items() if pa.get(k) == v}
+                if treffer:
+                    intensity_wins = intensity_wins | {fidi}
+                    snap_dimmer_nur[fidi] = treffer
         owned_by_func = func_inten_fids - intensity_wins   # hier wirkt Programmer NICHT
 
         prog_factor: dict[int, float] = {}
@@ -4295,9 +5090,35 @@ class AppState:
                 if univ in protect:
                     for a in dim_addrs.get(fidi, ()):
                         protect[univ].discard(a)
+        if wg_oben is not None:
+            for _su in scratch.values():
+                _su.begin_write_log()
         self._apply_fixture_map(scratch, programmer,
                                 skip_intensity_for=set(prog_factor) | owned_by_func,
-                                protect_addrs=protect, fix_index=fix_index)
+                                protect_addrs=protect, fix_index=fix_index,
+                                intensitaet_nur=snap_dimmer_nur)
+        if wg_oben is not None:
+            # Snap-Tasten mit „übersteuert laufende Dimmer-Effekte“ heissen an
+            # ihren Dimmern „Snap“, alles andere aus dem Programmer „Programmer“.
+            snap_adr: dict[int, set[int]] = {}
+            for fidi in snap_dimmer_nur:
+                entry = fix_index.get(fidi)
+                if entry:
+                    snap_adr.setdefault(entry[0].universe, set()).update(
+                        dim_addrs.get(fidi, ()))
+            for _univ, _su in scratch.items():
+                _pw = _su.end_write_log()
+                if not _pw:
+                    continue
+                ziel = wg_oben.setdefault(_univ, {})
+                ziel.update(dict.fromkeys(_pw, _wer_gewinnt.PROGRAMMER))
+                for a in snap_adr.get(_univ, ()):
+                    if a in _pw:
+                        ziel[a] = _wer_gewinnt.SNAP
+            try:
+                _fm.wer_gewinnt_oben(wg_oben)
+            except Exception:
+                pass
 
         # 4a². Implizite Grundhelligkeit — „Farbe heisst sichtbar". Ein Fixture mit
         #      eigenem Dimmer-/Intensitaets-Kanal, dessen Farbe aktiv ist (durch
@@ -4354,6 +5175,24 @@ class AppState:
                 continue   # keine (zusaetzliche) Farbe aktiv → dunkel lassen
             for a in dims:
                 su.set_channel(a, 255)
+
+        # 4a²b. ENG-37: Modify-Effekte — der EINE spaete Rechengang. Verrechnet
+        #      wird mit dem FERTIGEN Wert der Schichten darunter: Effekte,
+        #      Cuelisten, Programmer/Snaps und die implizite Grundhelligkeit von
+        #      eben. Ein Modify-Effekt hat in Schritt 2 nichts geschrieben — er
+        #      steht in keinem Schreib-Protokoll, besitzt keinen Dimmer und
+        #      schaltet die Grundhelligkeit nicht ab; wo sein Betrag 0 ist,
+        #      bleibt der Wert unveraendert. Bewusst HIER, also VOR Szenen-
+        #      Vorschau, „Alles Weiss“, Submastern/Fixture-Dimmern (4b),
+        #      DMX-Eingang, Simple Desk und Laser-NOT-AUS (4d) sowie vor Grand
+        #      Master/Blackout im OutputManager: die behalten das letzte Wort,
+        #      ein Modify kann Blackout und NOT-AUS nie aufhellen.
+        #      Kosten ohne laufenden Modify-Effekt: ein leerer Listen-Test.
+        if _modify_anwenden is not None:
+            try:
+                _modify_anwenden(scratch)
+            except Exception as exc:
+                print(f"[AppState] render modify error: {exc}")
 
         # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
         # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen
@@ -4663,10 +5502,63 @@ class AppState:
                         if 1 <= a <= 512 and a not in patched:
                             live.set_channel(a, 0)
 
+    def set_snap_dimmer_override(self, ziel: dict | None) -> None:
+        """VCB-46: setzt, wessen Programmer-Dimmer laufende Dimmer-Effekte
+        uebersteuert — ``{fid: {attribut: wert}}`` der gerade aktiven Snap-Tasten
+        mit Haken. Ersetzt den bisherigen Stand als Ganzes (der Renderer liest
+        im Ausgabe-Thread; eine einzelne Zuweisung ist dafuer atomar)."""
+        neu: dict[int, dict[str, int]] = {}
+        for fid, attrs in (ziel or {}).items():
+            try:
+                fidi = int(fid)
+            except (TypeError, ValueError):
+                continue
+            eintrag = {}
+            for attr, wert in (attrs or {}).items():
+                if not ist_dimmer_attribut(attr):
+                    continue
+                try:
+                    eintrag[str(attr)] = int(wert)
+                except (TypeError, ValueError):
+                    continue
+            if eintrag:
+                neu[fidi] = eintrag
+        self.snap_dimmer_override = neu
+
+    def _snap_dimmer_override_pruefen(self) -> None:
+        """VCB-46: streicht jeden Eintrag aus ``snap_dimmer_override``, dessen
+        Wert NICHT mehr im Programmer steht.
+
+        Laeuft nach jeder Aenderung am Programmer. Ohne das bliebe der Eintrag
+        einer noch gehaltenen Taste nach „Programmer leeren“ (oder nachdem
+        jemand den Wert ueberschrieben hat) stehen — und ein spaeter von Hand
+        gezogener, zufaellig gleicher Dimmerwert uebersteuerte den Effekt, obwohl
+        er gar nicht von der Taste kommt. Was hier gestrichen wurde, kommt erst
+        zurueck, wenn eine Taste ihren Wert neu schreibt
+        (``dimmer_override_abgleich``). Ohne Eintraege ein einziger Vergleich.
+        """
+        alt = getattr(self, "snap_dimmer_override", None)
+        if not alt:
+            return
+        neu: dict[int, dict[str, int]] = {}
+        with self._prog_lock:
+            for fidi, erwartet in alt.items():
+                pa = self.programmer.get(fidi)
+                if pa is None:
+                    pa = self.programmer.get(str(fidi))
+                if not pa:
+                    continue
+                bleibt = {k: v for k, v in erwartet.items() if pa.get(k) == v}
+                if bleibt:
+                    neu[fidi] = bleibt
+        if neu != alt:
+            self.snap_dimmer_override = neu
+
     def _apply_fixture_map(self, scratch: dict, fixmap: dict,
                            skip_intensity_for: set | None = None,
                            protect_addrs: dict | None = None,
-                           fix_index: dict | None = None):
+                           fix_index: dict | None = None,
+                           intensitaet_nur: dict | None = None):
         """Malt eine {fid: {attr: val}}-Schicht in die Scratch-Universen (LTP:
         nur vorhandene Attribute ueberschreiben, Rest bleibt aus tieferer Schicht).
 
@@ -4676,6 +5568,11 @@ class AppState:
         Funktions-Layer (Matrix/EFX) treibt und die dieser Layer NICHT ueberschreiben
         darf (WP-6/Abschnitt 8). Intensitaet bleibt unberuehrt von protect (sie wird
         ueber skip_intensity_for multipliziert).
+        intensitaet_nur: {fid: set(schluessel)} — fuer diese Geraete schreibt der
+        Layer nur die Intensitaets-Kanaele dieser Schluessel (``dimmer#1``; ein
+        gespiegelter Kopf zaehlt unter dem Schluessel, den er liest). Die
+        uebrigen Intensitaets-Kanaele bleiben bei der Schicht darunter
+        (VCB-46/Codex-Review #1081: Snap-Uebersteuerung nur fuer IHRE Dimmer).
 
         Mehrkopf (X-6): wiederholt sich ein Attribut in den Kanaelen (z. B. zwei
         Farb-/Tilt-Baenke eines Spiders), liest das N-te Vorkommen den Schluessel
@@ -4708,6 +5605,7 @@ class AppState:
             if su is None:
                 continue
             skip_inten = fidi in skip
+            nur_inten = (intensitaet_nur or {}).get(fidi)
             prot = protect.get(fx.universe, ())
             seen_attr: dict[str, int] = {}
             for ch in chans:
@@ -4728,6 +5626,8 @@ class AppState:
                 attr_l = (a or "").lower()
                 is_inten = attr_l in _DIM_INTENSITY_ATTRS
                 if skip_inten and is_inten:
+                    continue
+                if is_inten and nur_inten is not None and key not in nur_inten:
                     continue
                 addr = fx.address + ch.channel_number - 1
                 if not (1 <= addr <= 512):
@@ -4813,6 +5713,31 @@ class AppState:
                 # dienen; subtraktives CMY NICHT (Skalieren Richtung 0 hellt auf).
                 color.append(addr)
         return inten if inten else color
+
+    def _adress_listen(self, fx, chans) -> tuple[list[int], list[int], list[int]]:
+        """ENG-30: die drei Adresslisten, die ``_render_frame`` je Geraet braucht.
+
+        ``(intensitaet, dimmer, farbe)``: die Adressen, die der Dimmer-Master
+        skaliert (``_fixture_intensity_addrs``), NUR die echten Dimmer-/
+        Intensitaets-Kanaele und NUR die Farb-Kanaele (hier MIT CMY — die
+        implizite Grundhelligkeit 4a² fragt „ist eine Farbe aktiv", nicht
+        „darf ich skalieren").
+
+        Reine Ableitung aus Geraet und Kanaelen. ``_rebuild_render_plan`` legt
+        das Ergebnis in den Plan; EINE Stelle fuer Plan und Frame."""
+        addrs = self._fixture_intensity_addrs(fx, chans)
+        dims: list[int] = []
+        cols: list[int] = []
+        for ch in chans:
+            a_l = (getattr(ch, "attribute", "") or "").lower()
+            ad = fx.address + ch.channel_number - 1
+            if not (1 <= ad <= 512):
+                continue
+            if a_l in _DIM_INTENSITY_ATTRS:
+                dims.append(ad)
+            elif a_l in _DIM_COLOR_ATTRS:
+                cols.append(ad)
+        return addrs, dims, cols
 
     def _fixture_head_intensity_addr_map(self, fx, chans) -> dict:
         """FM-HEADLAYOUT A4: ``{head: [addr]}`` — welche Adressen ein KOPF-genauer
@@ -4990,6 +5915,18 @@ class AppState:
             return 0
         return None
 
+    @staticmethod
+    def _raw_laser_aus_wert(ch) -> int:
+        """LAS-37: „aus“ eines Roh-Kanals mit „Laser“ im Namen: die Untergrenze
+        eines Bereichs der Art ``closed``, sonst 0."""
+        for rg in getattr(ch, "ranges", None) or ():
+            if (getattr(rg, "kind", "") or "").lower() == "closed":
+                try:
+                    return max(0, min(255, int(rg.range_from)))
+                except (TypeError, ValueError):
+                    continue
+        return 0
+
     def _build_gm_laser_aus_mask(self, fix_index) -> dict[int, dict[int, int]]:
         """LAS-24: ``{universum: {adresse: aus_wert}}`` fuer DMX-Laser, die der
         Grand Master ueber Dimmer/Farbe nicht (sicher) erreicht.
@@ -5007,17 +5944,22 @@ class AppState:
         for _fid, (fx, chans) in fix_index.items():
             if not fixture_uses_dmx(fx):
                 continue
-            is_laser = ((getattr(fx, "fixture_type", "") or "").lower() == "laser"
-                        or any((getattr(ch, "attribute", "") or "").startswith("laser_")
-                               for ch in chans))
-            if not is_laser:
+            if not ist_laser(fx, chans):           # LAS-37: dieselbe Regel wie der NOT-AUS
                 continue
             nur_eindeutig = bool(self._fixture_intensity_addrs(fx, chans))
             for ch in chans:
                 attr = (getattr(ch, "attribute", "") or "").lower()
-                if attr not in self._GM_LASER_AUS_ATTRS:
+                if attr in self._GM_LASER_AUS_ATTRS:
+                    wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
+                elif attr == "raw" and ist_laserkanal(ch):
+                    # LAS-37: ein Roh-Kanal, der „Laser“ im Namen traegt (KLS
+                    # Laser Bar „Laser: Red“, Multi FX Bar „Laser Red Strobe“),
+                    # ist Helligkeit oder Takt des Lasers — „aus“ ist dort 0,
+                    # sofern das Profil nicht ausdruecklich einen geschlossenen
+                    # Bereich nennt.
+                    wert = self._raw_laser_aus_wert(ch)
+                else:
                     continue
-                wert = self._laser_aus_wert(ch, nur_eindeutig=nur_eindeutig)
                 if wert is None:
                     continue
                 try:
@@ -5119,14 +6061,43 @@ class AppState:
         Das ZIEL (nicht die aufgeloesten Adressen) wird gemerkt: Gruppen loesen
         sich bei jeder Gruppen- oder Patch-Aenderung neu auf
         (``_refresh_target_blackouts``), eine spaeter geaenderte Gruppe wirkt also
-        auch auf eine schon gedrueckte Taste."""
+        auch auf eine schon gedrueckte Taste.
+
+        VCB-36: ein Eintrag in ``groups`` ist ein Name (alte Layouts) ODER ein
+        ``(gid, name)``-Ref — der meint genau EINE Gruppe, auch wenn zwei gleich
+        heissen (``_group_positions`` loest einen Ref ueber die ID auf).
+
+        VCB-42: ODER ein ``(gid, name, ordner, kennung)``-Ref mit Steckbrief. Der
+        wird bei JEDEM Aufloesen geprueft (``group_ref.ziel_gilt``): traegt die
+        Nummer inzwischen eine andere Gruppe, schaltet das Ziel nichts — auch
+        nicht bei einer schon gedrueckten Taste."""
         spec = (tuple(int(f) for f in (fids or ()) if f is not None),
-                tuple(str(g) for g in (groups or ()) if g))
+                tuple(z for z in (self._blackout_gruppen_ziel(g)
+                                  for g in (groups or ())) if z is not None))
         specs = getattr(self, "_ziel_blackout_specs", None)
         if specs is None:
             specs = self._ziel_blackout_specs = {}
         specs[slot] = spec
         self._push_target_blackout(slot, spec)
+
+    @staticmethod
+    def _blackout_gruppen_ziel(g):
+        """VCB-36: ein Gruppen-Ziel in die Form bringen, die
+        ``group_cells_by_name`` versteht — ``(gid, name)`` oder Name; ``None``
+        fuer Leeres und Unlesbares (kein Ziel ist NICHT „alle Gruppen“)."""
+        if isinstance(g, (tuple, list)):
+            try:
+                if len(g) >= 4:
+                    # VCB-42: Ref mit Steckbrief. Ein Name ``None`` bleibt
+                    # ``None`` (= die Gruppe gab es beim Uebernehmen nicht).
+                    return (int(g[0]), None if g[1] is None else str(g[1]),
+                            str(g[2] or ""), str(g[3] or ""))
+                return (int(g[0]), str(g[1] if len(g) > 1 else ""))
+            except (TypeError, ValueError, IndexError):
+                return None
+        if isinstance(g, int) and not isinstance(g, bool):
+            return (g, "")
+        return str(g) if g else None
 
     def clear_target_blackout(self, slot):
         """VCB-11: Gezielten Blackout eines Slots freigeben (no-op wenn keiner)."""
@@ -5155,10 +6126,19 @@ class AppState:
         dasselbe Geraet auch als ganze Zelle oder als direktes fid-Ziel da,
         gewinnt das ganze Geraet."""
         from .group_cells import base_fids_in_cells, head_restrictions
+        from .group_ref import ziel_gilt
         fids, groups = spec
         ganz: set = set(fids)
         koepfe: dict = {}
+        steckbriefe = None
         for g in groups:
+            if isinstance(g, tuple) and len(g) == 4:
+                # VCB-42: ist die Gruppe mit dieser Nummer noch die gemeinte?
+                if steckbriefe is None:
+                    steckbriefe = self.gruppen_steckbriefe() or {}
+                if not ziel_gilt(g[1:], steckbriefe.get(g[0])):
+                    continue
+                g = (g[0], "")
             try:
                 cells = list(self.group_cells_by_name(g) or [])
             except Exception:
@@ -5378,6 +6358,8 @@ class AppState:
         # Ist das Sync-Abo aktiv, kommt der Refresh ueber GROUP_CHANGED (aus dem
         # _emit unten) — hier nicht zusaetzlich, sonst liefe er doppelt. Ein
         # unterdrueckter Emit (Bulk-Laden) erreicht das Abo nicht -> dann direkt.
+        # IMP-3: im Sammelweg kommt GROUP_CHANGED einmal am Ende — das Abo
+        # zieht die Blackout-Ziele dann nach.
         if not self._gruppen_sync_aktiv() or getattr(self, "_suppress_emits", False):
             self._refresh_target_blackouts()
         self._emit("group_changed", data)
@@ -5399,6 +6381,13 @@ class AppState:
         # vollständigen Aufbau EINEN gebündelten Refresh.
         if getattr(self, "_suppress_emits", False):
             return
+        # IMP-3: im Sammelweg patch_changed/group_changed (ohne Daten) nur
+        # merken — patch_sammeln() sendet sie am Ende je einmal.
+        if (data is None and event in self._PATCH_SAMMEL_EREIGNISSE
+                and self._patch_sammelt()):
+            if event not in self._patch_sammel_ereignisse:
+                self._patch_sammel_ereignisse.append(event)
+            return
         marshaller = self._ui_marshaller
         if marshaller is not None and threading.get_ident() != self._ui_thread_id:
             try:
@@ -5412,6 +6401,13 @@ class AppState:
         # Legacy callbacks — ueber eine Kopie iterieren, damit ein Callback, der
         # sich (un)subscribed, die Iteration nicht sprengt.
         for cb in list(self._callbacks):
+            # QA-97: gebundene Methode eines schon zerstoerten Qt-Objekts (View
+            # eines abgebauten Fensters, das sich nie abgemeldet hat) — abmelden
+            # statt aufrufen. Ihr Python-Teil liefe sonst bis zur ersten
+            # Qt-Beruehrung weiter und koennte noch den State veraendern.
+            if _gebunden_an_totes_qt_objekt(cb):
+                self.unsubscribe(cb)
+                continue
             try:
                 cb(event, data)
             except Exception as exc:
@@ -5435,6 +6431,22 @@ class AppState:
         self._ui_thread_id = threading.get_ident()
 
 
+def _gebunden_an_totes_qt_objekt(cb) -> bool:
+    """QA-97: ist ``cb`` eine gebundene Methode eines Qt-Objekts, dessen
+    C++-Seite schon zerstoert ist? Ohne shiboken (oder fuer Nicht-Qt-Objekte)
+    immer ``False`` — dann bleibt alles beim alten Verhalten."""
+    obj = getattr(cb, "__self__", None)
+    if obj is None:
+        return False
+    try:
+        from .sync import _qt_is_valid
+        if _qt_is_valid is None:
+            return False
+        return not _qt_is_valid(obj)
+    except Exception:
+        return False
+
+
 # Cache: (profile_id, mode_name, channel_count) -> list[FixtureChannel] (detached).
 # Ohne Cache macht get_channels_for_patched pro Fixture pro Frame (44 Hz) eine
 # neue DB-Session — viel zu teuer fuer den zentralen Per-Frame-Renderer.
@@ -5451,6 +6463,28 @@ def profil_geaendert(profile_id=None) -> bool:
         clear_channel_cache()
         return False
     return st.profil_geaendert(profile_id)
+
+
+def _ausgabe_nachfolger(output: str, patch: str, out_u):
+    """OUT-72: ``(typ, ziel, externes Universum)`` des Adapters, den
+    ``apply_output_config`` fuer diese Zeile gleich einrichtet — fuer
+    ``OutputManager.nachfolger_ansagen``. ``None`` fuer Ausgabetypen, die hier
+    nicht eingerichtet werden.
+
+    Ein Enttec ohne Anschluss wird nicht eingerichtet: die Ansage nennt dann
+    ein Ziel, das kein laufender Adapter hat — alles Bisherige geht also und
+    bekommt sein Schlussbild.
+    """
+    if output == "Enttec":
+        return ("enttec", patch, None)
+    if output == "uDMX":
+        # OUT-68: ``patch`` = Adapter-Schluessel, leer = der einzige vorhandene.
+        return ("udmx", str(patch or "").strip(), None)
+    if output == "ArtNet":
+        return ("artnet", patch or "255.255.255.255", out_u)
+    if output == "sACN":
+        return ("sacn", patch or "", out_u)
+    return None
 
 
 def clear_channel_cache():
@@ -5474,6 +6508,62 @@ def clear_channel_cache():
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
     _head_map_cache.clear()
     _cached_channel_list_ids.clear()
+    # LAS-38: ob ein Profil in irgendeinem Modus einen Laser traegt, haengt an
+    # denselben Profildaten — ein im Editor ergaenzter Laserkanal muss gelten.
+    laser_erkennung.vergiss_profile()
+
+
+def _profile_mit_laserkanal(profil_ids) -> dict:
+    """LAS-38: ``{profil_id: bool}`` — hat das Profil in IRGENDEINEM Modus einen
+    Laserkanal (Attribut ``laser_*`` oder „Laser“ im Kanalnamen) oder den Typ
+    ``laser``?
+
+    Eine Sitzung, zwei Abfragen fuer alle gefragten Profile zusammen; gelesen
+    werden nur Name und Attribut der Kanaele. Ein Profil, das es in der
+    Geraete-Datenbank nicht gibt, bekommt ``False`` (es hat keine Kanaele).
+    """
+    ids = [i for i in profil_ids if i is not None]
+    if not ids:
+        return {}
+    from sqlalchemy import select
+    from .database.fixture_db import engine
+    from .database.models import FixtureChannel, FixtureMode, FixtureProfile
+    antwort = {i: False for i in ids}
+    with Session(engine()) as s:
+        for profil_id, typ in s.execute(
+                select(FixtureProfile.id, FixtureProfile.fixture_type)
+                .where(FixtureProfile.id.in_(ids))).all():
+            if (typ or "").strip().lower() == "laser":
+                antwort[profil_id] = True
+        for profil_id, name, attribute in s.execute(
+                select(FixtureMode.fixture_id, FixtureChannel.name,
+                       FixtureChannel.attribute)
+                .join(FixtureChannel, FixtureChannel.mode_id == FixtureMode.id)
+                .where(FixtureMode.fixture_id.in_(ids))).all():
+            if antwort.get(profil_id):
+                continue
+            if laser_erkennung.ist_laserkanal(
+                    _KanalAngabe(name or "", attribute or "")):
+                antwort[profil_id] = True
+    return antwort
+
+
+class _KanalAngabe:
+    """Name und Attribut eines Kanals — mehr braucht ``ist_laserkanal`` nicht."""
+
+    __slots__ = ("name", "attribute")
+
+    def __init__(self, name, attribute):
+        self.name = name
+        self.attribute = attribute
+
+
+def _profil_hat_laserkanal(profil_id):
+    """Quelle fuer ``laser.erkennung``: ein einzelnes, noch unbekanntes Profil."""
+    return _profile_mit_laserkanal([profil_id]).get(profil_id)
+
+
+laser_erkennung.setze_profil_quelle(_profil_hat_laserkanal)
 
 
 # FM-12: Cache profile_id -> viz_model-Override ("" = Automatik). Wie der

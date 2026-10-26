@@ -189,6 +189,20 @@ class FixtureChannel(Base):
     # (``migrate_fixtures_db``) fuer jeden Kanal „keine Zuordnung" traegt.
     segment: Mapped[int | None] = mapped_column(Integer, nullable=True,
                                                 default=None)
+    # LAS-33: Laser-Angaben dieses Kanals als JSON-Text — Musterliste,
+    # Farbtabelle, Richtung (umgekehrt / sprechende Enden / Mittelbereich) und
+    # Bedeutung der Betriebsart-Bereiche. Aufbau, Pruefung und die Lese-Schicht
+    # stehen in ``src/core/laser/profilangaben.py``; das JSON traegt seine
+    # eigene ``version``. Leer/NULL = keine Angaben, und das ist der Normalfall
+    # (jedes Nicht-Laser-Profil, jedes Alt-Profil).
+    #
+    # ★ Warum EIN Textfeld am Kanal und keine eigenen Tabellen: die Angaben
+    #   werden nie abgefragt, nur als Ganzes gelesen und geschrieben — und sie
+    #   muessen jeden Weg mitgehen, der einen Kanal kopiert (Bibliotheksdatei,
+    #   Export/Import, Editor, Generator). Ein Feld am Kanal reist dort mit;
+    #   drei Tabellen muesste jeder dieser Wege einzeln kennen.
+    laser_angaben: Mapped[str | None] = mapped_column(Text, nullable=True,
+                                                      default="")
 
     mode: Mapped[FixtureMode] = relationship(back_populates="channels")
     ranges: Mapped[list[ChannelRange]] = relationship(
@@ -298,6 +312,11 @@ class PatchedFixture(Base):
     fixture_type: Mapped[str] = mapped_column(String(40), default="other")
 
 
+def _neue_gruppen_uid() -> str:
+    from ..group_ref import neue_uid
+    return neue_uid()
+
+
 class FixtureGroup(Base):
     """Spatial grouping of fixtures on a 2D grid (used by RGB Matrix)."""
     __tablename__ = "fixture_groups"
@@ -310,6 +329,20 @@ class FixtureGroup(Base):
     positions_json: Mapped[str] = mapped_column(Text, default="{}")
     # FLD-01b: "/"-getrennter Ordnerpfad (z. B. "Front/Wash"); "" = Wurzel.
     folder: Mapped[str] = mapped_column(String(200), default="")
+    # VCB-42: Kennung DIESER Gruppe. Die id sagt nicht, welche Gruppe gemeint
+    # ist — SQLite vergibt die Nummer einer geloeschten neu, und in einer anderen
+    # Show gehoert sie einer anderen. Die Kennung bleibt beim Umbenennen und
+    # Verschieben; jede neu angelegte Zeile bekommt von selbst eine neue (auch
+    # die, die eine Ansicht direkt anlegt). Regel: ``group_ref.ziel_gilt``.
+    #
+    # Bewusst KEINE Pflichtspalte, mit '' als Datenbank-Vorgabe — so sieht sie
+    # auch in einer per ``migrate_show_db`` nachgezogenen DB aus. Wer eine Zeile
+    # ohne sie schreibt (eine aeltere Programmversion auf derselben Show-DB,
+    # rohes SQL), scheitert sonst an „NOT NULL“ und kann keine Gruppe mehr
+    # anlegen. Eine leere Kennung fuellt ``migrate_show_db`` beim naechsten
+    # Start; bis dahin erkennt ``ziel_gilt`` die Gruppe an Name und Ordner.
+    uid: Mapped[str | None] = mapped_column(
+        String(64), default=_neue_gruppen_uid, server_default="", nullable=True)
 
 
 class QuarantinedFixture(Base):
@@ -353,6 +386,17 @@ def migrate_show_db(engine) -> None:
             if cols and "folder" not in cols:
                 conn.execute(text(
                     "ALTER TABLE fixture_groups ADD COLUMN folder VARCHAR DEFAULT ''"))
+            # VCB-42: Kennung je Gruppe. Bestehende Zeilen bekommen jetzt eine —
+            # bei JEDEM Lauf auch die ohne (eine aeltere Programmversion kennt
+            # die Spalte nicht und schreibt ''). randomblob() wird je Zeile
+            # ausgewertet: 32 Hex-Zeichen wie ``group_ref.neue_uid``.
+            if cols and "uid" not in cols:
+                conn.execute(text(
+                    "ALTER TABLE fixture_groups ADD COLUMN uid VARCHAR DEFAULT ''"))
+            if cols:
+                conn.execute(text(
+                    "UPDATE fixture_groups SET uid = lower(hex(randomblob(16))) "
+                    "WHERE uid IS NULL OR uid = ''"))
             # Spider-Doppelbar: Spalte spider_mirrored (Default gespiegelt = 1).
             pcols = {row[1] for row in conn.execute(text("PRAGMA table_info(patched_fixtures)"))}
             if pcols and "spider_mirrored" not in pcols:
@@ -469,6 +513,11 @@ def migrate_fixtures_db(engine) -> None:
             ccols = {row[1] for row in conn.execute(text("PRAGMA table_info(channels)"))}
             if ccols and "segment" not in ccols:
                 conn.execute(text("ALTER TABLE channels ADD COLUMN segment INTEGER"))
+            # LAS-33: Laser-Angaben je Kanal (JSON-Text). Dieselbe Falle wie
+            # oben — ohne die Spalte waere jede bestehende fixtures.db unladbar.
+            if ccols and "laser_angaben" not in ccols:
+                conn.execute(text(
+                    "ALTER TABLE channels ADD COLUMN laser_angaben TEXT DEFAULT ''"))
     except Exception as e:
         print(f"[models] migrate_fixtures_db error: {e}")
 

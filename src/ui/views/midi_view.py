@@ -6,18 +6,20 @@ from PySide6.QtWidgets import (
     QComboBox, QListWidget, QListWidgetItem, QPlainTextEdit,
     QGroupBox, QFormLayout, QSplitter, QTableWidget,
     QTableWidgetItem, QHeaderView, QCheckBox, QAbstractItemView,
-    QInputDialog, QMessageBox
+    QInputDialog, QMessageBox, QSpinBox, QScrollArea, QFrame
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import QTabWidget
-from src.core.midi.midi_manager import get_midi_manager, MidiMessage, RTMIDI_OK
+from src.core.midi.midi_manager import (
+    get_midi_manager, MidiMessage, RTMIDI_OK, fader_wert, wert14)
 from src.core.midi.midi_mapper import (
     MidiMapping, MidiOutFeedback, get_midi_mapper,
     BUTTON_TOGGLE, BUTTON_FLASH, BUTTON_CONTINUOUS, BUTTON_PRESS,
     normalize_button_mode,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
-    ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE
+    ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE,
+    _binding_type_from_msg_type,
 )
 from src.core.app_state import get_state
 try:
@@ -35,7 +37,31 @@ ACTION_LABELS = {
     ACTION_NONE:           "Keine Aktion",
 }
 
-MAP_COLS = ["Name", "Target", "Typ", "Ch", "D1", "Mode", "ON", "OFF", "Port"]
+# UI-97: Nur die ANZEIGE der Spaltenköpfe ist deutsch. Gespeichert wird über
+# MidiMapping.to_dict() (feste Feldnamen) — die Spaltenindizes in
+# _refresh_map_table/_on_map_item_changed bleiben unverändert.
+MAP_COLS = ["Name", "Ziel", "Typ", "Kanal", "Daten 1", "Modus", "An", "Aus", "Port"]
+MAP_COL_TIPS = [
+    "Frei wählbarer Name des Mappings",
+    "Was gesteuert wird, z. B. executor_go:1 oder grand_master",
+    "MIDI-Nachrichtentyp: note_on, cc oder pitchbend",
+    "MIDI-Kanal 1–16",
+    "Daten 1 = Noten- bzw. Controller-Nummer (0–127)",
+    "Tastenverhalten: press, toggle, flash oder continuous",
+    "LED-Feedback: Velocity-Wert für „an“ (0–127)",
+    "LED-Feedback: Velocity-Wert für „aus“ (0–127)",
+    "Nur Nachrichten von diesem Eingang (leer = alle)",
+]
+# UI-97: Die Mapping-Tabelle zeigt immer mindestens so viele Zeilen. Mehr
+# kostet bei 1440×900 (Seitenfläche ≈ 1380×730) den Platz ohne Rollbalken.
+MAP_MIN_ROWS = 3
+
+
+def pitchbend_zeile(msg) -> str:
+    """Zeile des MIDI-Monitors fuer einen Pitchbend (MIDI-10): der 14-Bit-Wert
+    und Prozent statt zweier Datenbytes, die fuer sich nichts sagen."""
+    return (f"PITCH [{msg.port_name[:20]}] CH{msg.channel:2d} "
+            f"Wert={wert14(msg):5d} ({fader_wert(msg) * 100:5.1f} %)")
 
 
 class MidiLogSignal(QObject):
@@ -66,6 +92,11 @@ class MidiView(QWidget):
         self._setup_ui()
         self._midi.subscribe_log(self._log_callback)
         self._midi.subscribe(self._midi_callback)
+        # NET-14: per UDP empfangene MSC-Befehle kommen nicht ueber den
+        # MIDI-Manager — beim Mapper mithoeren, sonst fehlen sie im Monitor.
+        sub = getattr(self._mapper, "subscribe_msc", None)
+        if callable(sub):
+            sub(self._midi_callback)
 
         # Auto-Refresh Ports alle 2 Sek - erkennt USB-Hotplug
         from PySide6.QtCore import QTimer
@@ -80,6 +111,9 @@ class MidiView(QWidget):
             timer.stop()
         try:
             self._midi.unsubscribe(self._midi_callback)
+            unsub = getattr(self._mapper, "unsubscribe_msc", None)
+            if callable(unsub):
+                unsub(self._midi_callback)
             self._midi.unsubscribe_log(self._log_callback)
         except Exception:
             pass
@@ -93,10 +127,25 @@ class MidiView(QWidget):
         super().closeEvent(event)
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        # UI-97: Bei kleinem Fenster (1000×640) scrollt die Seite, statt
+        # Geräte-Felder übereinander und die Mapping-Tabelle auf ihre
+        # Kopfzeile zu quetschen. Der Scrollbereich gibt dem Inhalt immer
+        # mindestens dessen minimumSizeHint.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        outer.addWidget(self._scroll)
+        content = QWidget()
+        self._scroll.setWidget(content)
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(8, 8, 8, 8)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
+        # Kein Bereich darf sich auf null ziehen lassen (sonst wäre die
+        # Tabelle wieder weg) — der Splitter achtet so auf Mindesthöhen.
+        splitter.setChildrenCollapsible(False)
 
         # ── Oberer Bereich: Geräteverwaltung + Konsole ────────────────────────
         top = QWidget()
@@ -105,33 +154,42 @@ class MidiView(QWidget):
 
         # Linke Seite: Geräte
         dev_box = QGroupBox("MIDI-Geräte")
+        self._dev_box = dev_box
         dev_l = QFormLayout(dev_box)
 
         self._combo_in = QComboBox()
         btn_refresh = QPushButton("↻")
         btn_refresh.setFixedWidth(28)
         btn_refresh.clicked.connect(self._refresh_ports)
+        # UI-97: „… öffnen“ steht in der Zeile seiner Auswahl und beide
+        # Häkchen teilen sich eine Zeile — drei Zeilen weniger, damit die
+        # Seite bei 1440×900 ohne Rollbalken auskommt (die Breite des Kastens
+        # bestimmt ohnehin der Status-Text).
+        btn_open_in = QPushButton("Eingang öffnen")
+        btn_open_in.clicked.connect(self._open_input)
         in_row = QHBoxLayout()
         in_row.addWidget(self._combo_in, 1)
         in_row.addWidget(btn_refresh)
+        in_row.addWidget(btn_open_in)
         dev_l.addRow("Eingang:", in_row)
 
-        btn_open_in = QPushButton("Eingang öffnen")
-        btn_open_in.clicked.connect(self._open_input)
-        dev_l.addRow(btn_open_in)
-
         self._combo_out = QComboBox()
-        dev_l.addRow("Ausgang:", self._combo_out)
         btn_open_out = QPushButton("Ausgang öffnen")
         btn_open_out.clicked.connect(self._open_output)
-        dev_l.addRow(btn_open_out)
+        out_row = QHBoxLayout()
+        out_row.addWidget(self._combo_out, 1)
+        out_row.addWidget(btn_open_out)
+        dev_l.addRow("Ausgang:", out_row)
 
         self._check_virt_in = QCheckBox("Virtuellen Eingang erstellen")
         self._check_virt_out = QCheckBox("Virtuellen Ausgang erstellen")
         self._check_virt_in.toggled.connect(self._toggle_virtual_in)
         self._check_virt_out.toggled.connect(self._toggle_virtual_out)
-        dev_l.addRow(self._check_virt_in)
-        dev_l.addRow(self._check_virt_out)
+        virt_row = QHBoxLayout()
+        virt_row.addWidget(self._check_virt_in)
+        virt_row.addWidget(self._check_virt_out)
+        virt_row.addStretch(1)
+        dev_l.addRow(virt_row)
 
         self._lbl_midi_status = QLabel("Nicht verbunden")
         self._lbl_midi_status.setStyleSheet("color: #888;")
@@ -186,7 +244,7 @@ class MidiView(QWidget):
         btn_learn.setToolTip("Wähle eine Zeile, dann klicke MIDI-Learn\nund sende eine MIDI-Nachricht")
         btn_learn.clicked.connect(self._start_learn)
         btn_feedback = QPushButton("Feedback...")
-        btn_feedback.setToolTip("LED-Farben für ON/OFF (Velocity) setzen")
+        btn_feedback.setToolTip("LED-Farben für An/Aus (Velocity) setzen")
         btn_feedback.clicked.connect(self._edit_feedback_values)
         btn_save = QPushButton("Speichern")
         btn_save.clicked.connect(self._save_mappings)
@@ -206,7 +264,15 @@ class MidiView(QWidget):
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        map_l.addWidget(self._map_table)
+        for col, tip in enumerate(MAP_COL_TIPS):
+            kopf = self._map_table.horizontalHeaderItem(col)
+            if kopf is not None:
+                kopf.setToolTip(tip)
+        self._map_table.setMinimumHeight(
+            hdr.sizeHint().height()
+            + MAP_MIN_ROWS * self._map_table.verticalHeader().defaultSectionSize()
+            + 2 * self._map_table.frameWidth())
+        map_l.addWidget(self._map_table, 1)
 
         # Schnell-Mapping-Vorlagen
         tmpl_box = QGroupBox("Schnell-Vorlagen")
@@ -217,6 +283,8 @@ class MidiView(QWidget):
         btn_tmpl_notes.clicked.connect(self._template_notes_go)
         tmpl_l.addWidget(btn_tmpl_faders)
         tmpl_l.addWidget(btn_tmpl_notes)
+        self._btn_tmpl_faders = btn_tmpl_faders
+        self._btn_tmpl_notes = btn_tmpl_notes
         map_l.addWidget(tmpl_box)
 
         splitter.addWidget(map_box)
@@ -228,6 +296,12 @@ class MidiView(QWidget):
             self._build_mtc_box(layout)
         except Exception as e:
             print(f"[MidiView] MTC box init error: {e}")
+
+        # ── MIDI Show Control (MIDI-5 / NET-14) ──────────────────────────────
+        try:
+            self._build_msc_box(layout)
+        except Exception as e:
+            print(f"[MidiView] MSC box init error: {e}")
 
         # Ports laden
         self._refresh_ports()
@@ -379,7 +453,7 @@ class MidiView(QWidget):
         # CC-Strom (Fader) auf ~60 Hz drosseln, damit die Qt-Event-Loop nicht überflutet
         # wird. Betrifft nur die Monitor-Anzeige; die Fader-Steuerung im MidiMapper
         # bleibt ungedrosselt.
-        if msg.msg_type == "cc":
+        if msg.msg_type in ("cc", "pitchbend"):     # MIDI-10: Motorfader ebenso
             now = time.monotonic()
             if now - self._last_monitor_emit < 0.015:
                 return
@@ -388,16 +462,40 @@ class MidiView(QWidget):
 
     def _on_midi_msg_ui(self, msg: MidiMessage):
         # Läuft thread-sicher im GUI-Thread (queued Signal aus _on_midi_msg).
+        if msg.msg_type == "pitchbend":             # MIDI-10
+            self._console.appendPlainText(pitchbend_zeile(msg))
+            return
         prefixes = {
             "cc":       "CC   ",
             "note_on":  "NOTE+",
             "note_off": "NOTE-",
             "pc":       "PC   ",
         }
+        if msg.msg_type == "msc" and msg.msc is not None:
+            self._console.appendPlainText(self._msc_zeile(msg))
+            return
         prefix = prefixes.get(msg.msg_type, msg.msg_type.upper()[:5])
         line = (f"{prefix} [{msg.port_name[:20]}] "
                 f"CH{msg.channel:2d} D1={msg.data1:3d} D2={msg.data2:3d}")
         self._console.appendPlainText(line)
+
+    @staticmethod
+    def _msc_zeile(msg: MidiMessage) -> str:
+        """Monitorzeile fuer einen MSC-Befehl; Quelle = Portname bzw.
+        ``MSC/UDP`` fuer den Netzwerkweg."""
+        from src.core.midi import msc as _msc
+        c = msg.msc
+        kopf = f"MSC   [{msg.port_name[:20]}] {c.name.upper()} "
+        if c.command == _msc.SET:
+            if _msc.get_settings().set_layout == _msc.SET_GRANDMA:
+                gma = _msc.set_grandma(getattr(c, "set_data", ()) or ())
+                if gma is not None:
+                    return (kopf + f"Executor={gma[0]} Seite={gma[1]} "
+                                   f"Wert={gma[2] * 100:.1f}%")
+            return kopf + f"Regler={c.control} Wert={c.value}"
+        if c.command == _msc.FIRE:
+            return kopf + f"Makro={c.macro}"
+        return kopf + f"Cue={c.cue or '-'} Liste={c.cue_list or '-'}"
 
     def _set_monitor_active(self, active: bool):
         self._monitor_active = bool(active)
@@ -502,8 +600,10 @@ class MidiView(QWidget):
             m.midi_in.device = m.port_filter
             m.midi_in.channel = m.channel
             m.midi_in.trigger_id = m.data1
-            m.midi_in.message_type = "cc" if m.msg_type == "cc" else "note"
-            if m.midi_out:
+            # MIDI-10: "pitchbend" in der Spalte Typ bleibt Pitchbend.
+            m.midi_in.message_type = _binding_type_from_msg_type(m.msg_type)
+            if m.midi_out and m.msg_type != "pitchbend":
+                # (MIDI-10: ein Pitchbend-Fader hat keine LED mit seiner Nummer)
                 if m.midi_out.trigger_id < 0:
                     m.midi_out.trigger_id = m.data1
                 m.midi_out.channel = m.channel
@@ -523,8 +623,10 @@ class MidiView(QWidget):
         # QueuedConnection auf dem GUI-Thread. Frueher lief der Handler direkt im
         # MIDI-Thread und oeffnete dort einen MODALEN QInputDialog + mutierte die
         # Mapping-Tabelle (Cross-Thread-Qt, Absturzgefahr).
+        # MIDI-10: die Mapping-Tabelle kann Pitchbend-Fader (Mackie, X-Touch).
         self._mapper.start_learn(
-            lambda msg: self._log_signal.learn_received.emit(msg))
+            lambda msg: self._log_signal.learn_received.emit(msg),
+            pitchbend=True)
 
     def _on_learn_received(self, msg: MidiMessage):
         row = self._learn_target_row
@@ -533,6 +635,13 @@ class MidiView(QWidget):
             return
         m = mappings[row]
         m.set_from_learn_message(msg)
+        if msg.msg_type == "pitchbend":
+            # MIDI-10: ein Fader ohne Nummer und ohne LED — keine Frage nach
+            # Velocity ON/OFF; der Typ in der Tabelle heisst "pitchbend".
+            self._refresh_map_table()
+            self._append_log(
+                f"✓ Learn: Pitchbend-Fader CH{msg.channel} (14 Bit)")
+            return
         self._prompt_feedback_values(m)
         self._refresh_map_table()
         self._append_log(f"✓ Learn: {msg.msg_type} CH{msg.channel} D1={msg.data1}")
@@ -546,6 +655,13 @@ class MidiView(QWidget):
         mappings = self._mapper.get_mappings()
         if row < 0 or row >= len(mappings):
             return
+        if mappings[row].msg_type == "pitchbend":      # MIDI-10
+            QMessageBox.information(
+                self, "Feedback",
+                "Ein Pitchbend-Fader hat keine LED, die sich über Velocity "
+                "schalten lässt.\nDas Nachführen von Motorfadern ist ein "
+                "eigener Punkt (MIDI-14).")
+            return
         self._prompt_feedback_values(mappings[row])
         self._refresh_map_table()
 
@@ -555,12 +671,12 @@ class MidiView(QWidget):
         default_off = mapping.midi_out.state_off
         default_on = mapping.midi_out.state_on
         off_val, ok = QInputDialog.getInt(
-            self, "Feedback OFF", "Velocity OFF (0-127):", default_off, 0, 127, 1
+            self, "Feedback Aus", "Velocity für Aus (0–127):", default_off, 0, 127, 1
         )
         if not ok:
             return
         on_val, ok = QInputDialog.getInt(
-            self, "Feedback ON", "Velocity ON (0-127):", default_on, 0, 127, 1
+            self, "Feedback An", "Velocity für An (0–127):", default_on, 0, 127, 1
         )
         if not ok:
             return
@@ -637,6 +753,136 @@ class MidiView(QWidget):
                 "wuerde die Datei damit ueberschreiben.")
 
     # ── MTC (MIDI Time Code) ─────────────────────────────────────────────────
+
+    def _build_msc_box(self, parent_layout):
+        """MIDI-5/NET-14: MSC-Empfang (an/aus, Device-ID) und GMA-MSC per UDP."""
+        from src.core.midi import msc as _msc
+        st = _msc.get_settings()
+        box = QGroupBox("MIDI Show Control (MSC)")
+        box_l = QVBoxLayout(box)
+        bl = QHBoxLayout()
+        box_l.addLayout(bl)
+        self._chk_msc = QCheckBox("MSC an")
+        self._chk_msc.setChecked(st.enabled)
+        self._chk_msc.setToolTip("Cue-Befehle (GO/STOP/RESUME/SET/FIRE) von "
+                                 "grandMA, Hog, Eos, Titan per MIDI-SysEx annehmen")
+        bl.addWidget(self._chk_msc)
+        bl.addWidget(QLabel("Device-ID:"))
+        self._spin_msc_dev = QSpinBox()
+        self._spin_msc_dev.setRange(0, 127)
+        self._spin_msc_dev.setValue(st.device_id)
+        self._spin_msc_dev.setToolTip("Eigene MSC-Geräte-ID; 127 = alle annehmen")
+        bl.addWidget(self._spin_msc_dev)
+        self._chk_msc_udp = QCheckBox("GMA-MSC über Netzwerk")
+        self._chk_msc_udp.setChecked(st.udp_enabled)
+        bl.addWidget(self._chk_msc_udp)
+        bl.addWidget(QLabel("Schnittstelle:"))
+        self._cmb_msc_host = QComboBox()
+        self._cmb_msc_host.setToolTip("Netzwerkschnittstelle, auf der gelauscht "
+                                      "wird (z. B. die Karte im Pult-Netz)")
+        self._fill_msc_ifaces(st.udp_host)
+        bl.addWidget(self._cmb_msc_host, stretch=1)
+        self._lbl_msc_hint = QLabel("")
+        self._lbl_msc_hint.setStyleSheet("color: #d0a040;")
+        self._cmb_msc_host.currentIndexChanged.connect(self._update_msc_hint)
+        self._update_msc_hint()
+        bl.addWidget(QLabel("Port:"))
+        self._spin_msc_port = QSpinBox()
+        self._spin_msc_port.setRange(1, 65535)
+        self._spin_msc_port.setValue(int(st.udp_port) or _msc.GMA_PORT)
+        bl.addWidget(self._spin_msc_port)
+        # Zweite Zeile: SET-Belegung und Gewerke-Filter.
+        bl2 = QHBoxLayout()
+        box_l.addLayout(bl2)
+        bl2.addWidget(QLabel("SET-Belegung:"))
+        self._cmb_msc_set = QComboBox()
+        self._cmb_msc_set.addItem("grandMA (Executor, Seite)", _msc.SET_GRANDMA)
+        self._cmb_msc_set.addItem("Standard (14-Bit-Regler)", _msc.SET_STANDARD)
+        self._cmb_msc_set.setToolTip(
+            "Wie der MSC-Befehl SET gelesen wird.\n"
+            "grandMA: Byte 1 = Executor (ab 0), Byte 2 = Seite (ab 1), "
+            "Wert in Prozent — setzt den Fader auf der genannten "
+            "Executor-Seite.\n"
+            "Standard: 14-Bit-Reglernummer n setzt Executor n+1 der "
+            "aktuellen Seite, Wert 0…16383.")
+        self._cmb_msc_set.setCurrentIndex(
+            max(0, self._cmb_msc_set.findData(st.set_layout)))
+        bl2.addWidget(self._cmb_msc_set)
+        self._chk_msc_allfmt = QCheckBox("alle Formate annehmen")
+        self._chk_msc_allfmt.setChecked(bool(st.all_formats))
+        self._chk_msc_allfmt.setToolTip(
+            "Aus (Standard): nur Befehle für Licht (Command-Format 01–0F) "
+            "und „alle“ (7F). An: auch Befehle für Ton, Maschinerie, Video "
+            "usw. lösen Cues aus.")
+        bl2.addWidget(self._chk_msc_allfmt)
+        bl2.addStretch(1)
+        btn = QPushButton("Übernehmen")
+        btn.clicked.connect(self._apply_msc)
+        bl2.addWidget(btn)
+        outer = QVBoxLayout()
+        outer.addWidget(box)
+        outer.addWidget(self._lbl_msc_hint)
+        parent_layout.addLayout(outer)
+
+    def _fill_msc_ifaces(self, current: str):
+        """Schnittstellenliste wie bei Art-Net/sACN (``list_output_interfaces``)
+        plus „nur dieser Rechner" und „alle (0.0.0.0)"."""
+        cmb = self._cmb_msc_host
+        cmb.clear()
+        cmb.addItem("nur dieser Rechner (127.0.0.1)", "127.0.0.1")
+        try:
+            from src.core.dmx.output_iface import list_output_interfaces
+            ifaces = list_output_interfaces()
+        except Exception:
+            ifaces = []
+        for e in ifaces:
+            ip = str(e.get("ip") or "")
+            if not ip or ip.startswith("127."):
+                continue
+            cmb.addItem(f"{e.get('name') or '?'} ({ip})", ip)
+        cmb.addItem("alle Schnittstellen (0.0.0.0)", "0.0.0.0")
+        cur = (current or "").strip() or "127.0.0.1"
+        i = cmb.findData(cur)
+        if i < 0:
+            # gespeicherte NIC gerade nicht vorhanden — trotzdem anzeigen
+            cmb.addItem(f"{cur} (nicht gefunden)", cur)
+            i = cmb.count() - 1
+        cmb.setCurrentIndex(i)
+
+    def _update_msc_hint(self, *_):
+        host = self._cmb_msc_host.currentData() or ""
+        if host == "0.0.0.0":
+            text = ("Hinweis: lauscht auf allen Schnittstellen — jedes Gerät in "
+                    "jedem angeschlossenen Netz kann Cues auslösen.")
+        elif host.startswith("127."):
+            text = ("Hinweis: 127.0.0.1 erreicht nur Programme auf diesem Rechner, "
+                    "kein Pult im Netz — für ein Pult dessen Netzwerkkarte wählen.")
+        else:
+            text = ""
+        self._lbl_msc_hint.setText(text)
+        self._lbl_msc_hint.setVisible(bool(text))
+
+    def _apply_msc(self):
+        from src.core.midi import msc as _msc
+        st = _msc.get_settings()
+        st.enabled = self._chk_msc.isChecked()
+        st.device_id = int(self._spin_msc_dev.value())
+        st.udp_enabled = self._chk_msc_udp.isChecked()
+        st.udp_host = str(self._cmb_msc_host.currentData() or "127.0.0.1")
+        st.udp_port = int(self._spin_msc_port.value())
+        st.set_layout = str(self._cmb_msc_set.currentData() or _msc.SET_GRANDMA)
+        st.all_formats = self._chk_msc_allfmt.isChecked()
+        if not _msc.save_settings():
+            self._append_log("MSC: Einstellungen konnten nicht gespeichert werden")
+        ok = False
+        if self._mapper is not None:
+            ok = self._mapper.apply_msc_udp()
+        if st.udp_enabled:
+            self._append_log(
+                f"GMA-MSC: lausche auf {st.udp_host}:{st.udp_port}" if ok
+                else f"GMA-MSC Fehler: {st.udp_host}:{st.udp_port} nicht belegbar")
+        else:
+            self._append_log("GMA-MSC: Netzwerkempfang aus")
 
     def _build_mtc_box(self, parent_layout):
         """Append a MTC Reader groupbox to parent_layout."""

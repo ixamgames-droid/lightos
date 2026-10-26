@@ -106,6 +106,9 @@ MH_GOBO = {"offen": 0, "g1": 24, "g2": 40, "g3": 56}
 # SH-LASER3W: Shutter 42-83 = „Manual Control" (offen); Farben im Farbkanal.
 LASER_OFFEN = 60
 LASER_FARBE = {"gruen": 35, "cyan": 43, "blau": 51, "lila": 59, "rot": 19}
+# DEMO-9: Die Schluessel sind ASCII, die Funktionsnamen nicht — „Laser Farbe
+# gruen" stand sonst in der Funktionsliste neben „Laser grün".
+LASER_FARBNAME = {"gruen": "grün"}
 LASER_NOTAUS_ROT = "#b00000"
 EFX_SEED = 2026
 
@@ -296,7 +299,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         laser_gruen.fn.set_value(f, kanal(f, "color_wheel"), LASER_FARBE["gruen"])
     laser_farben = []
     for farbe in ("gruen", "cyan", "blau", "lila", "rot"):
-        s = b.scene(f"Laser Farbe {farbe}")
+        s = b.scene(f"Laser Farbe {LASER_FARBNAME.get(farbe, farbe)}")
         for f in laser:
             s.fn.set_value(f, kanal(f, "color_wheel"), LASER_FARBE[farbe])
         laser_farben.append(s)

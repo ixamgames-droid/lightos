@@ -48,6 +48,7 @@
     "MediaNext",
     "MediaPlayPause",
     "MediaPrev",
+    "PopupToggle",
     "SelectGroup",
     "Snapshot",
     "StopAll",
@@ -407,6 +408,15 @@
           "kind": "int",
           "range": [
             1,
+            16
+          ]
+        },
+        {
+          "key": "runner_step",
+          "label": "Schrittweite",
+          "kind": "int",
+          "range": [
+            0,
             16
           ]
         },

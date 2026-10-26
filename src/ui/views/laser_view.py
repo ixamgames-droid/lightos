@@ -77,6 +77,32 @@ _ADVANCED_GROUP = "Weitere Kanäle"
 _GROUPED_ATTRS = frozenset(a for _n, attrs in _ROW_GROUPS for a in attrs)
 
 
+# UI-89: Dimmer, RGB-Mischung und Strobe bedeuten an einem Laser dasselbe wie
+# an jedem anderen Geraet. Ein Laser, der sie mitbringt, ist ein Kombi-Geraet
+# und bekommt im Programmer zusaetzlich die allgemeinen Reiter (Intensity,
+# Color, Matrix). Alles andere, was der Laser-Reiter fuehrt, ist auf einem
+# Laser laser-eigen (``shutter`` = Betriebsart, ``gobo_wheel`` = Musterauswahl,
+# ``zoom`` = Bildgroesse …) und zaehlt dort NICHT als Intensity/Gobo/Weitere.
+LASER_KOMBI_ATTRS = frozenset(
+    {"intensity", "color_r", "color_g", "color_b", "strobe"})
+
+
+def im_laser_reiter(attr: str) -> bool:
+    """True, wenn der Laser-Reiter dieses Attribut eines Lasers bedient —
+    die EINE Regel fuer Regler-Aufbau, Kopf-Zaehlung und (UI-89) die
+    Reiter-Sichtbarkeit des Programmers."""
+    attr = attr or ""
+    return attr.startswith("laser_") or attr in LASER_EXTRA_ATTRS
+
+
+def nur_im_laser_reiter(attr: str) -> bool:
+    """True fuer Attribute, die auf einem Laser allein in den Laser-Reiter
+    gehoeren (siehe ``LASER_KOMBI_ATTRS``). Was hier False liefert, zaehlt
+    auch bei einem Laser fuer die allgemeinen Reiter des Programmers — so
+    verschwindet kein Kanal, den der Laser-Reiter nicht selbst traegt."""
+    return im_laser_reiter(attr) and (attr or "") not in LASER_KOMBI_ATTRS
+
+
 def fixture_has_laser_capability(fx) -> bool:
     """True, wenn das gepatchte Gerät als Laser steuerbar ist. Delegiert an den
     kanonischen Klassifikator (:func:`capability.is_laser_fixture`); der Name
@@ -356,9 +382,9 @@ class LaserView(QWidget):
             "border:1px solid #b30000;border-radius:5px;padding:6px 14px;}"
             "QPushButton:hover{background:#b30000;}")
         self._btn_dmx_estop.setToolTip(
-            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert "
-            "(bis Betriebsart oder Muster neu gewählt wird), Netzwerk-Laser "
-            "werden unscharf.")
+            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert, "
+            "Netzwerk-Laser werden unscharf. Dieser Knopf löst nur aus — "
+            "gelöst wird der NOT-AUS mit dem Knopf oben rechts (Rückfrage).")
         self._btn_dmx_estop.clicked.connect(weak_slot(self._on_estop))
         dsb.addWidget(self._btn_dmx_estop)
         self._lbl_dmx_estop = QLabel("")
@@ -366,6 +392,16 @@ class LaserView(QWidget):
         dsb.addWidget(self._lbl_dmx_estop, stretch=1)
         self._dmx_safety_box.setVisible(False)
         root.addWidget(self._dmx_safety_box)
+
+        # LAS-32 (S1): Sperrzonen-Meldung je Laser — nur Anzeige, schaltet
+        # nichts ab (eigenes Widget, unsichtbar ohne DMX-Laser).
+        try:
+            from src.ui.visualizer.sperrzonen_ui import SperrzonenHinweis
+            self._sperrzonen_hinweis = SperrzonenHinweis(get_state(), self)
+            root.addWidget(self._sperrzonen_hinweis)
+        except Exception as e:                           # noqa: BLE001
+            self._sperrzonen_hinweis = None
+            print(f"[laser_view] Sperrzonen-Hinweis: {e}")
 
         # Mustergruppe (Kopf 0/1) — nur sichtbar, wenn das Gerät doppelte
         # Laser-Attribute hat (z. B. L2600 34ch: Gruppe A + B).
@@ -467,7 +503,8 @@ class LaserView(QWidget):
             # der Laser scharf ist (Täuschung in die gefährliche Richtung).
             sync.subscribe_widget(SyncEvent.LASER_ARMED_CHANGED, self,
                                   lambda *_: self._sync_arm_from_manager())
-            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen.
+            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen;
+            # LAS-36: dasselbe Ereignis kommt beim Loesen oben rechts.
             sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
                                   lambda *_: self._update_dmx_estop_label())
         except Exception as e:
@@ -578,8 +615,8 @@ class LaserView(QWidget):
         try:
             if aktiv:
                 self._lbl_dmx_estop.setText(
-                    "NOT-AUS aktiv — alle DMX-Laser sind dunkel. Wieder an: "
-                    "Betriebsart oder Muster neu wählen.")
+                    "NOT-AUS aktiv — Werte werden gemerkt, der Laser bleibt "
+                    "dunkel. Lösen: Knopf oben rechts.")
                 self._lbl_dmx_estop.setStyleSheet(
                     "color:#ff7b72;font-weight:bold;")
             else:
@@ -625,21 +662,27 @@ class LaserView(QWidget):
         self._update_arm_button()
 
     def _on_estop(self):
-        lo = self._laser_output()
-        if lo is not None:
-            # Reihenfolge ist sicherheitskritisch: (1) estop_all() setzt sofort
-            # das Verriegelungs-Flag (Tick sendet nichts mehr), (2) EXPLIZIT
-            # entwaffnen — NICHT nur implizit über setChecked→toggled, damit die
-            # Sicherheit nicht an der Qt-Signal-Synchronität hängt, (3) erst
-            # DANACH die Geräte-Verriegelung lösen. So bleibt der Laser dunkel
-            # (unscharf), auch nachdem clear_estop_all die Session wieder öffnet.
-            lo.estop_all()
-            lo.set_armed(False)
-        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten nötig.
+        # LAS-31: derselbe EINE Weg wie Kopfleiste, Tastenkuerzel und VC-Taste.
+        # AppState.laser_notaus_ausloesen haelt die sicherheitskritische
+        # Reihenfolge: (1) estop_all() verriegelt sofort (DMX-Latch + Tick sendet
+        # nichts mehr), (2) EXPLIZIT entwaffnen — nicht ueber setChecked->toggled,
+        # damit die Sicherheit nicht an der Qt-Signal-Synchronitaet haengt,
+        # (3) erst danach die Geraete-Verriegelung loesen (armed=False haelt
+        # dunkel). Der Knopf loest nur aus.
+        try:
+            get_state().laser_notaus_ausloesen()
+        except Exception as e:
+            print(f"[laser_view] Laser-NOT-AUS Fehler: {e}")
+        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten
+        # nötig. Signale NICHT gesperrt: toggled -> set_armed(False) ist ein
+        # zweites, harmloses Netz (idempotent, meldet nichts doppelt), falls der
+        # Manager im einen Weg nicht entwaffnet werden konnte — die Anzeige
+        # darf nie „unscharf“ zeigen, waehrend der Manager scharf ist.
         self._btn_arm.setChecked(False)
+        # Danach den ECHTEN Stand des Managers spiegeln (blieb er wider
+        # Erwarten scharf, zeigt der Knopf das auch).
+        self._sync_arm_from_manager()
         self._update_arm_button()
-        if lo is not None:
-            lo.clear_estop_all()
         self._update_dmx_estop_label()
 
     def _on_figure_changed(self):
@@ -755,7 +798,7 @@ class LaserView(QWidget):
                 continue
             for ch in channels:
                 attr = getattr(ch, "attribute", "") or ""
-                if not (attr.startswith("laser_") or attr in LASER_EXTRA_ATTRS):
+                if not im_laser_reiter(attr):
                     continue
                 prev = union.get(attr)
                 if prev is None or (not getattr(prev, "ranges", None)
@@ -778,7 +821,7 @@ class LaserView(QWidget):
             counts: dict[str, int] = {}
             for ch in channels:
                 attr = getattr(ch, "attribute", "") or ""
-                if attr.startswith("laser_") or attr in LASER_EXTRA_ATTRS:
+                if im_laser_reiter(attr):
                     counts[attr] = counts.get(attr, 0) + 1
             if counts:
                 best = max(best, max(counts.values()))
@@ -804,9 +847,14 @@ class LaserView(QWidget):
                 self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
 
         # Alles Übrige = technische Kanäle → eingeklappte „Weitere"-Gruppe.
+        # `shutter` steckt in den Betriebsart-Kacheln — aber nur, wenn der
+        # Kanal Wertebereiche hat. Ohne Bereiche gibt es keine Kacheln; dann
+        # bekommt er hier seinen Regler (UI-89: der Programmer zeigt ihn fuer
+        # einen Laser sonst nirgends mehr).
         rest = [ch for ch in template
                 if getattr(ch, "attribute", "") not in _GROUPED_ATTRS
-                and getattr(ch, "attribute", "") != "shutter"]
+                and not (getattr(ch, "attribute", "") == "shutter"
+                         and _sorted_ranges(ch))]
         if rest:
             box = self._make_row_group(_ADVANCED_GROUP, rest, collapsed=True)
             self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
@@ -1025,7 +1073,8 @@ class LaserView(QWidget):
                 continue
             for head in self._heads_for(f, attr):
                 state.set_programmer_value(fid, attr, int(value), head=head)
-        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen.
+        # LAS-36: ein Wert loest den NOT-AUS nicht mehr; die Anzeige sagt weiter,
+        # warum der Laser dunkel bleibt.
         self._update_dmx_estop_label()
 
     def _load_values(self):

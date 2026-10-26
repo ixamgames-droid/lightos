@@ -87,6 +87,43 @@ GitHub keine CI.
   neuen leeren `## [Unreleased]`-Kopf setzen): erzeugt Zeilen ohne Fragment,
   daher Commit-Betreff `changelog: release x.y.z` — sonst meldet der Waechter.
 
+### BACKLOG-Fragmente (PROC-20)
+
+Ein PR schreibt seine Backlog-Zeile bzw. seinen Status **nicht** in
+`BACKLOG.md`, sondern legt je Item eine Datei `backlog.d/<ID>.md` an (Vorlage
+und alle Kopfzeilen in [`backlog.d/README.md`](backlog.d/README.md)). Grund:
+bisher aenderte jeder Feature-PR dieselbe Datei — nach jedem Merge kollidierten
+die naechsten PRs, und gemergte Items blieben auf `review` stehen.
+
+Beispiel `backlog.d/UI-99.md` (neues Item, das dieser PR auch umsetzt):
+
+```
+ID: UI-99
+Prioritaet: P2
+Status: review
+Titel: Kurzer Titel des Items
+
+Was fehlt, woran man es merkt, wann es erledigt ist.
+```
+
+- **Statusaenderung an einem vorhandenen Item:** nur `ID:` und `Status:`
+  (`todo`, `review`, `done`, `teils`, `blocked`), optional `Status-Notiz:`.
+- **ID holen:** `./venv/bin/python tools/backlog_ids.py --gruppe <GRUPPE>` —
+  sieht auch die Fragmente der offenen PR-Zweige.
+- **Sammeln** regelmaessig durch die leitende Sitzung, als kleiner eigener PR
+  auf frischem `main`: `./venv/bin/python tools/backlog_sammeln.py --pruefen`,
+  dann `--dry-run`, dann ohne Schalter; Commit-Betreff `backlog: sammeln`. Neue
+  Items bekommen eine Zeile hinter der hoechsten Nummer ihrer Gruppe, bei
+  vorhandenen wird nur die Statusspalte ersetzt, `review` wird zu
+  `done (<Datum>, PR #N)` (Nummer aus dem Merge-Betreff oder `--pr N`). Ein
+  `review`-Fragment ohne PR-Nummer bleibt liegen; ein zweiter Lauf aendert
+  nichts.
+- **Das Dashboard** liest weiter nur `BACKLOG.md` — sein Stand ist so frisch
+  wie der letzte Sammel-Lauf.
+- **Uebergang:** offene PRs, die `BACKLOG.md` noch direkt aendern, bleiben
+  gueltig. `tests/test_backlog_fragmente.py` (bzw.
+  `tools/backlog_sammeln.py --waechter`) meldet das als Hinweis, nie als Fehler.
+
 ## Tests vor jedem Commit
 
 Ein Befehl, ueberall derselbe (auch in `CONTRIBUTING.md` und `INSTALL.md`):
@@ -416,6 +453,73 @@ gemessen werden dadurch drei kerngesunde Dateien rot (`test_vc_asset_gc`,
 `test_janitor`, `test_qa58_bibliothek_schema_unberuehrt`), bei null
 zusaetzlichen Funden.
 
+## Werkzeuge starten gefahrlos (TOOL-27)
+
+Viele Skripte unter `tools/` bauen die App oder Teile davon (`QApplication`,
+`AppState`, Ansichten, das Hauptfenster). Ohne Schutz arbeiten sie dabei auf dem
+Bestand des Rechners: der Show-Datenbank, den Einstellungen, der
+Geraete-Bibliothek — und sie richten die gespeicherten DMX-Ausgaenge ein. Am
+13.10.2026 hat ein direkt gestartetes Inventar-Werkzeug genau das getan.
+
+Deshalb gilt:
+
+- **Jedes Werkzeug, das die App baut, laedt als erste Import-Zeile die gemeinsame
+  Sandbox** — vor jedem `src`-Import, weil viele Module ihre Pfade beim Import
+  einfrieren:
+
+  ```python
+  import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
+  ```
+
+  Generatoren, die `_gen_env` oder `_builder` laden, haben sie damit schon.
+- **Was die Sandbox tut** (`tools/_werkzeug_sandbox.py`): Sie lenkt den
+  Datenordner der App (`XDG_DATA_HOME` bzw. `APPDATA`), die Show-Datenbank, die
+  Ausgabe-Konfiguration und das Absturzprotokoll in einen Wegwerf-Ordner, der am
+  Ende des Laufs verschwindet. Die Geraete-Bibliothek bekommt das Werkzeug als
+  Kopie — gleicher Bestand, gleiche Profil-IDs, aber kein Schreiben ins Original.
+  Ausgabe-Thread, serieller Kindprozess, rohes USB, Audio-Aufnahme und
+  Datenumzug sind aus; ein Hauptfenster oeffnet die MIDI-Eingaenge des Rechners
+  nicht von selbst (`LIGHTOS_NO_MIDI_AUTOCONNECT`).
+- **Bewusste Vorgaben bleiben stehen.** Wer eine der Variablen selbst setzt
+  (Testlauf, Bild-Sandbox, Sichtproben-Sandkasten), behaelt seinen Wert. Fuer den
+  Datenordner, die Show-Datenbank, die Ausgabe-Konfiguration, das
+  Absturzprotokoll und die Bibliothek zaehlt dabei nur eine Vorgabe im
+  Temp-Bereich als bewusst — `APPDATA` ist unter Windows immer gesetzt, und eine
+  Vorgabe auf die echte `universes.json` oder `current_show.db` wird umgelenkt
+  (eine gesetzte Bibliothek ausserhalb des Temp-Bereichs wird kopiert).
+- **Echte Daten nur auf Ansage.** Zwei Werkzeuge sollen am Bestand des Bedieners
+  arbeiten und bekommen ihn nur mit `--echte-daten` (mit Warnzeile, App vorher
+  schliessen, Ausgaenge bleiben auch dann zu): `tools/patch_quarantaene.py`
+  (verwaiste Patch-Zeilen der eigenen Show) und `tools/build_full_show.py`
+  (Alt-Generator auf dem vorhandenen Patch). Die Liste steht in
+  `_werkzeug_sandbox.ECHTE_DATEN_ERLAUBT`; jedes andere Werkzeug bricht bei dem
+  Schalter ab.
+- **Nur lesen geht weiter:** `_werkzeug_sandbox.ECHTER_DATENORDNER` und
+  `_gen_env.echte_universes_json()` nennen, was ohne Umlenkung gaelte
+  (`build_spot90_testshow.py` waehlt so das Universum mit Ausgang).
+- **Eigene Sandbox statt der gemeinsamen** haben `tools/app_messung.py`,
+  `tools/verify_stage_reload.py` und das Bild-Werkzeug (`tools/anleitungsbilder/`)
+  — sie setzen hart und pruefen sich selbst.
+- **Nicht gemeint** sind Werkzeuge, die die App nicht bauen und deren Zweck der
+  Bestand ist: `library_testreste.py`, `bibliothek_profil.py`,
+  `fixture_herkunft.py` (Geraete-Bibliothek), `collect_crash_report.py`
+  (Absturzprotokoll), `import_qlc_input_profile.py` (Controller-Profil ablegen),
+  `hw5_longrun.py` und `mh_einmessen.py` (senden mit Absicht an den echten
+  Port — **nie nebenbei starten**: `hw5_longrun.py` sucht sich ohne `--port`
+  selbst den Enttec und sendet Blackout). Die Liste steht mit Begruendung im
+  Waechter (`AM_BESTAND`); **jedes** Skript, das `src` laedt, muss geschuetzt
+  sein oder dort stehen — und ein Bestands-Werkzeug darf weder den `AppState`
+  noch die Show noch die Oberflaeche laden.
+- **Inventar-Listen nachziehen**, ohne ins Repo zu schreiben:
+  `tools/audit_tooltip_coverage.py --ausgabe DATEI` und
+  `tools/ui_verification_checklist.py --ausgabe DATEI`.
+
+Waechter: `tests/test_tool27_werkzeug_sandbox.py` (statisch ueber alle Skripte,
+dazu beide Inventar-Werkzeuge nackt gestartet — `python tools/<name>.py` aus
+einem fremden Arbeitsordner — gegen einen nachgestellten Datenordner samt
+Gegenprobe; serielle Ports, USB, MIDI, Netz-Sockets und Kindprozesse werden
+dabei mitgeschrieben) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
+
 ## Token-schonende Regeln fuer Agents
 
 - Bei groesseren Implementierungen **Sub-Tasks parallelisieren**
@@ -437,6 +541,7 @@ zusaetzlichen Funden.
 - Bei neuen Dependencies: `requirements.txt` aktualisieren
 - Bei Architektur-Aenderungen: `README.md` oder `INSTALL.md` synchron halten
 - Nutzer-sichtbare Aenderung: CHANGELOG-Fragment unter `changelog.d/` (nicht `CHANGELOG.md` direkt)
+- Neues Item oder neuer Status: BACKLOG-Fragment unter `backlog.d/` (nicht `BACKLOG.md` direkt)
 
 ## Plattform-Kompatibilitaet
 

@@ -14,7 +14,7 @@ Danke für dein Interesse an LightOS! Diese Anleitung erklärt, wie du die Entwi
 | Git | 2.40 | https://git-scm.com |
 | Visual Studio Code oder PyCharm | aktuell | optional |
 
-**Windows ARM64:** Verwende das **x64-Python** von python.org (laeuft per Emulation). Natives ARM64-Python geht nur ohne 3D-Visualizer, weil dessen PySide6-Addons kein QtWebEngine enthalten (XPLAT-45/46, Details in `INSTALL.md`).
+**Windows ARM64:** Verwende das **x64-Python** von python.org (laeuft per Emulation). Natives ARM64-Python ist nicht unterstützt (instabil, kein 3D) — x64-Python nehmen: LightOS stürzte damit in 6 von 12 Starts ab (XPLAT-51), und dessen PySide6-Addons enthalten kein QtWebEngine, also gibt es keinen 3D-Visualizer (XPLAT-45/46, Details in `INSTALL.md`). `install.py` bricht damit ab (XPLAT-56); `--arm64-trotzdem` umgeht das nur für Tests und Entwicklung.
 
 ### Repository klonen und Setup
 
@@ -166,6 +166,28 @@ src/
    Die volle Suite unter Windows-ARM läuft nur beobachtend mit: Ein Fehlschlag dort
    hält den PR nicht auf, das Log sollte man sich trotzdem ansehen. Einen Linter
    fährt die CI nicht.
+
+**Backlog und Changelog als Fragment:** Ein PR ändert weder `BACKLOG.md` noch
+`CHANGELOG.md` direkt — beide Dateien würden sonst mit jedem parallelen PR
+kollidieren. Stattdessen je eine eigene Datei:
+
+- `changelog.d/JJJJ-MM-TT-<ID>.md` — der fertige Changelog-Abschnitt
+  (Vorlage: [`changelog.d/README.md`](changelog.d/README.md)).
+- `backlog.d/<ID>.md` — das Backlog-Item bzw. sein neuer Status
+  (Vorlage: [`backlog.d/README.md`](backlog.d/README.md)), zum Beispiel:
+
+  ```
+  ID: UI-99
+  Prioritaet: P2
+  Status: review
+  Titel: Kurzer Titel des Items
+
+  Was fehlt, woran man es merkt, wann es erledigt ist.
+  ```
+
+Eingetragen werden die Fragmente später gesammelt mit
+`tools/changelog_sammeln.py` bzw. `tools/backlog_sammeln.py`; aus `review` wird
+dabei `done` mit der PR-Nummer.
 
 **Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) lokal ausführen.
 

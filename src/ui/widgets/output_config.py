@@ -10,9 +10,13 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer
 import serial.tools.list_ports
+from src.core.dmx import adapter_zeilen
+from src.core.dmx.enttec_pro import diagnose_port as _diagnose_enttec_port
 from src.core.app_state import get_state
 from src.core.paths import user_data_file
 from src.core.dmx.enttec_pro import EnttecPro, ENTTEC_VID, ENTTEC_PID
+from src.core.dmx import anschluss_auswahl
+from src.core.dmx import enttec_konfig
 
 # ⚠️ Umlenkbar — und das ist keine Test-Bequemlichkeit, sondern Datenschutz.
 #
@@ -82,6 +86,44 @@ def _ext_universe_bereich(typ) -> tuple[int, int] | None:
 #: OUT-68: ``uDMX`` ergaenzt; alle anderen unveraendert an ihrer Stelle.
 AUSGABE_TYPEN = ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet")
 
+#: UI-100: ANZEIGE-Texte der Ausgabetypen. Gespeichert und verglichen wird
+#: weiter der Wert aus ``AUSGABE_TYPEN`` (steht als ``userData`` im Combo);
+#: nur „Disabled“ bekommt einen deutschen Text, die anderen sind Eigennamen.
+AUSGABE_TYP_TEXTE = {"Disabled": "Aus"}
+
+
+def ausgabe_typ_text(typ: str) -> str:
+    """UI-100: Anzeige-Text eines Ausgabetyps (``"Disabled"`` -> ``"Aus"``)."""
+    return AUSGABE_TYP_TEXTE.get(typ, typ)
+
+
+def ausgabe_typ_wert(combo) -> str:
+    """UI-100: gespeicherter Wert (``AUSGABE_TYPEN``) des Typ-Combos einer Zeile —
+    NIE ``currentText()``, das ist seit UI-100 nur noch der Anzeige-Text."""
+    wert = combo.currentData()
+    return str(wert) if wert else combo.currentText()
+
+
+def _ausgabe_typ_combo(wert: str = "Disabled"):
+    """UI-100: Typ-Combo der Universen-Tabelle — Anzeige deutsch, Daten = Wert
+    aus ``universes.json``. Ein unbekannter Wert faellt wie bisher (nicht
+    editierbares Combo, ``setCurrentText`` ohne Treffer) auf den ersten Eintrag."""
+    combo = QComboBox()
+    for opt in AUSGABE_TYPEN:
+        combo.addItem(ausgabe_typ_text(opt), opt)
+    i = combo.findData(str(wert or "").strip())
+    if i >= 0:
+        combo.setCurrentIndex(i)
+    return combo
+
+
+def _port_kennzeichnung(p) -> str:
+    """OUT-70: Zusatz in der Portliste — „[Enttec DMX USB Pro]“ nur, wenn sich
+    das Geraet so ausweist; sonst „[FTDI-Adapter, Typ unklar]“. Die Regel
+    steht in :func:`anschluss_auswahl.kennzeichnung` (dieselbe Liste)."""
+    text = anschluss_auswahl.kennzeichnung(p)
+    return f"  [{text}]" if text else ""
+
 
 def _udmx_suchen() -> dict:
     """OUT-68: uDMX-Adapter aufzaehlen — laeuft in einem HILFS-THREAD.
@@ -89,36 +131,34 @@ def _udmx_suchen() -> dict:
     Das Aufzaehlen liest USB-Beschreibungen (mit Zeitlimit) und gehoert deshalb
     nicht in den UI-Thread. Zurueck kommen nur einfache Daten, kein
     Geraete-Objekt: ``{"geraete": [(beschriftung, schluessel)], "unklar": n,
-    "code": G_*, "text": str}``.
+    "code": G_*, "text": str, "treiber": [...]}``.
+
+    OUT-76: ``treiber`` = was WINDOWS ueber die angesteckten bekannten Adapter
+    sagt (``udmx_treiber_text.befund_daten``; leer ausserhalb von Windows).
+    Die Frage braucht kein pyusb und oeffnet kein Geraet — ein Adapter ohne
+    Treiber wird so auch dann gefunden und erklaert, wenn die Suche ueber
+    pyusb gar nicht moeglich ist.
     """
     from src.core.dmx import udmx
+    from src.core.dmx.udmx_treiber_text import befund_daten
     try:
-        geraete = udmx.liste_geraete()
+        befunde = udmx.windows_treiber()
+    except Exception:                                    # noqa: BLE001
+        befunde = None
+    treiber = [befund_daten(b) for b in befunde or []]
+    try:
+        geraete = udmx.liste_geraete(treiber=befunde)
     except udmx.UdmxFehler as e:
-        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e)}
+        return {"geraete": [], "unklar": 0, "code": e.code, "text": str(e),
+                "treiber": treiber}
     except Exception as e:                               # noqa: BLE001
         return {"geraete": [], "unklar": 0, "code": udmx.G_ANTWORTET_NICHT,
-                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}"}
+                "text": f"Adapter-Suche gescheitert: {type(e).__name__}: {e}",
+                "treiber": treiber}
     return {"geraete": [(g.beschriftung(), g.schluessel)
                         for g in geraete if g.bestaetigt],
             "unklar": sum(1 for g in geraete if not g.bestaetigt),
-            "code": udmx.G_OK, "text": ""}
-
-
-def _port_kennzeichnung(p) -> str:
-    """OUT-70: Zusatz in der Portliste — „[Enttec DMX USB Pro]“ nur, wenn sich
-    das Geraet so ausweist; sonst „[FTDI-Adapter, Typ unklar]“."""
-    try:
-        from src.core.dmx.interfaces import ordne_ein, FAMILIEN
-        e = ordne_ein(p.vid, p.pid, str(getattr(p, "manufacturer", "") or ""),
-                      str(getattr(p, "product", "") or ""))
-        if e is None:
-            return ""
-        if FAMILIEN[e.familie].typ_unklar:
-            return "  [FTDI-Adapter, Typ unklar]"
-        return f"  [{e.name}]"
-    except Exception:                                    # noqa: BLE001
-        return ""
+            "code": udmx.G_OK, "text": "", "treiber": treiber}
 
 
 def _list_ifaces() -> list:
@@ -328,14 +368,82 @@ def _save_universe_config(rows: list[dict]) -> bool:
     Vorbild ist ``channel_groups_view.py``, das schon so gebaut ist: bool
     zurueckgeben, der Aufrufer prueft und meldet.
     """
-    try:
-        os.makedirs(os.path.dirname(_UNIV_CONFIG_PATH), exist_ok=True)
-        with open(_UNIV_CONFIG_PATH, "w", encoding="utf-8") as f:
-            json.dump(rows, f, indent=2, ensure_ascii=False)
+    # OUT-80: atomar (Hilfsdatei + os.replace) und unter derselben Sperre wie
+    # der Hintergrund-Speicher der gelernten Enttec-Seriennummern.
+    if enttec_konfig.atomar_schreiben(_UNIV_CONFIG_PATH, rows):
         return True
-    except Exception as e:
-        print(f"[output_config] save universes error: {e}")
+    print("[output_config] save universes error: nicht geschrieben")
+    return False
+
+
+def _kurz(seriennr) -> str:
+    """OUT-80: Seriennummer fuer die Anzeige gekuerzt wie im Diagnosepaket
+    (OUT-77) — genug, um zwei Dongles auseinanderzuhalten."""
+    from src.core.diagnose_log import kuerze_seriennummer
+    return kuerze_seriennummer(str(seriennr or ""))
+
+
+def _gleicher_port(a, b) -> bool:
+    """OUT-80: derselbe Portname — gleichgesetzt wird nur die Gross-/
+    Kleinschreibung eines Windows-Namens (``com3``/``COM3``). Bewusst KEIN
+    Aufloesen von Symlinks (``/dev/serial/by-id``): zwei Namen fuer einen
+    Anschluss bietet der Dialog nicht an (Gegenpruefung 2)."""
+    a, b = str(a or "").strip(), str(b or "").strip()
+    if not a:
         return False
+    if a.upper().startswith("COM") and b.upper().startswith("COM"):
+        return a.upper() == b.upper()
+    return a == b
+
+
+def _laufende_seriennr(om, univ) -> str | None:
+    f = getattr(om, "enttec_seriennr", None)
+    if not callable(f):
+        return None
+    try:
+        return f(int(univ)) or None
+    except Exception:
+        return None
+
+
+def _enttec_seriennr_fuer(univ: int, port: str, om=None) -> str | None:
+    """OUT-80: die Seriennummer, mit der „Verbinden“ den Enttec von ``univ``
+    an ``port`` anlegt (``None`` = keine).
+
+    * Gleicher Anschluss wie in der Zeile von ``univ``: deren Nummer
+      (``""`` = bewusst vergessen -> keine; fehlt sie, die des laufenden
+      Geraets).
+    * Anderer Anschluss (Gegenpruefung): der Bediener hat ausdruecklich einen
+      anderen Port gewaehlt — die alte Nummer gilt NICHT mehr, sonst sendete
+      das Universum still weiter auf dem alten Dongle. Gemeint ist der Dongle
+      dieses Ports: die Nummer einer ANDEREN Enttec-Zeile mit diesem
+      Anschluss (der Adapter zieht um, OUT-74; sonst deren laufende), oder
+      keine — dann lernt das Universum den Dongle an ``port``.
+    """
+    rows = [r for r in _load_universe_config() if isinstance(r, dict)]
+
+    def _num(r):
+        try:
+            return int(r.get("num", -1))
+        except (TypeError, ValueError):
+            return None
+
+    eigene = next((r for r in rows if _num(r) == int(univ)), None)
+    if (eigene is not None
+            and str(eigene.get("output") or "").strip() == "Enttec"
+            and _gleicher_port(eigene.get("patch"), port)):
+        sn = enttec_konfig.aus_zeile(eigene)
+        if sn is not None:
+            return sn or None
+        return _laufende_seriennr(om, univ)
+    for r in rows:
+        if (r is not eigene and str(r.get("output") or "").strip() == "Enttec"
+                and _gleicher_port(r.get("patch"), port)):
+            sn = enttec_konfig.aus_zeile(r)
+            if sn is not None:
+                return sn or None
+            return _laufende_seriennr(om, _num(r))
+    return None
 
 
 def _gespeicherte_ausgabe_zeile(typ: str) -> dict | None:
@@ -445,7 +553,24 @@ def _ext_zeile_pruefen(r: dict) -> bool:
     return angepasst
 
 
-def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> bool:
+def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET,
+                    abgeraeumt: list | None = None,
+                    enttec_seriennr=_UNSET) -> bool:
+    """Lesen-Aendern-Schreiben von ``universes.json`` unter
+    ``enttec_konfig.DATEI_LOCK`` (OUT-80, Gegenpruefung 2) — sonst konnte der
+    Hintergrund-Speicher der gelernten Seriennummern dazwischen schreiben und
+    wurde mit dem alten Stand ueberschrieben. Beschreibung s.
+    :func:`_persist_output_ungesperrt`."""
+    with enttec_konfig.DATEI_LOCK:
+        return _persist_output_ungesperrt(
+            num, output, patch, out_universe=out_universe,
+            abgeraeumt=abgeraeumt, enttec_seriennr=enttec_seriennr)
+
+
+def _persist_output_ungesperrt(num: int, output: str, patch: str,
+                               out_universe=_UNSET,
+                               abgeraeumt: list | None = None,
+                               enttec_seriennr=_UNSET) -> bool:
     """Schreibt/aktualisiert eine Zeile in universes.json, damit eine zur
     Laufzeit hergestellte Ausgabe-Verbindung beim naechsten Start automatisch
     wieder eingerichtet wird (apply_output_config). Ohne das war jede Verbindung
@@ -464,6 +589,18 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
     QA-50: Gibt jetzt zurueck, ob die Datei wirklich geschrieben wurde. Die
     Aufrufer haengen ihre „(gespeichert)"-Meldung daran — sonst steht dort
     Erfolg, waehrend die Einstellung den naechsten Start nicht ueberlebt.
+
+    OUT-80: ``enttec_seriennr`` — ``_UNSET`` = Feld nicht anfassen (nur beim
+    Umzug wandert die Nummer mit), sonst der Wert, der in der Zeile steht
+    (``""`` = keine bekannt, das Universum lernt den Dongle an ``patch``).
+    Dieselbe Nummer verschwindet aus jeder anderen Zeile.
+
+    OUT-74: ``abgeraeumt`` — eine Liste, die der Aufrufer mitgibt, wenn die
+    Zeile einen ADAPTER meint (Enttec, uDMX). Dann verliert jede ANDERE Zeile
+    denselben Adapter, im selben Schreibvorgang, und ihre Universumsnummern
+    stehen danach in der Liste. Ohne das blieb beim Umziehen eines Adapters die
+    alte Zeile stehen, und nach dem Neustart sendete er auf dem Universum, das
+    zufaellig weiter hinten in der Datei stand.
     """
     rows = _load_universe_config()
     found = False
@@ -502,7 +639,115 @@ def _persist_output(num: int, output: str, patch: str, out_universe=_UNSET) -> b
             entry["out_universe"] = int(out_universe)
         _ext_zeile_pruefen(entry)          # NET-13, auch fuer neue Zeilen
         rows.append(entry)
+    if abgeraeumt is not None:
+        # OUT-80: zieht der Adapter um, zieht seine Seriennummer mit — die
+        # alte Zeile verliert sie, die neue bekommt sie (falls sie keine hat).
+        key = adapter_zeilen.schluessel(output, patch)
+        ziel = next((r for r in rows if isinstance(r, dict)
+                     and str(r.get("num")) == str(int(num))), None)
+        mitnehmen = None
+        for r in rows:
+            if (r is not ziel and isinstance(r, dict) and key is not None
+                    and adapter_zeilen.schluessel(r.get("output"),
+                                                  r.get("patch")) == key):
+                mitnehmen = mitnehmen or enttec_konfig.aus_zeile(r)
+        geraeumt = adapter_zeilen.andere_abraeumen(rows, output, patch, num)
+        for r in rows:
+            if isinstance(r, dict) and r is not ziel:
+                try:
+                    if int(r.get("num", -1)) in geraeumt:
+                        r.pop(enttec_konfig.FELD, None)
+                except (TypeError, ValueError):
+                    pass
+        # Gegenpruefung: die mitgenommene Nummer ERSETZT die alte der Zielzeile
+        # (der Adapter dieses Ports ist jetzt ihrer), statt sie nur zu ergaenzen.
+        if output == "Enttec" and mitnehmen and ziel is not None:
+            ziel[enttec_konfig.FELD] = mitnehmen
+        abgeraeumt.extend(geraeumt)
+    if enttec_seriennr is not _UNSET:
+        ziel = next((r for r in rows if isinstance(r, dict)
+                     and str(r.get("num")) == str(int(num))), None)
+        sn = str(enttec_seriennr or "").strip()
+        if ziel is not None:
+            ziel[enttec_konfig.FELD] = sn
+        if sn:
+            for r in rows:
+                if (isinstance(r, dict) and r is not ziel
+                        and enttec_konfig.aus_zeile(r) == sn):
+                    r.pop(enttec_konfig.FELD, None)
     return _save_universe_config(rows)
+
+
+def _nachfolger_ansagen(om, universe: int, name: str, ziel: str = "",
+                        out_universe=None) -> None:
+    """OUT-72: dem Ausgabe-Manager sagen, welcher Adapter GLEICH nach dem
+    folgenden ``remove_output`` fuer dieses Universum kommt. Jeder entfernte
+    Adapter, der nicht genau dieser ist (anderer Typ, Anschluss, Adresse),
+    bekommt dann sein Schlussbild — ein Enttec, der auf Art-Net umgestellt
+    wird, hielte sonst sein letztes Bild. Attrappen ohne die Methode bleiben
+    beim bisherigen Verhalten."""
+    ansagen = getattr(om, "nachfolger_ansagen", None)
+    if callable(ansagen):
+        ansagen(universe, name, ziel, out_universe)
+
+
+def _mit_umzug(dialog, text: str, feld: str = "_enttec_umzug") -> str:
+    """OUT-74: haengt „war Universe 2 — jetzt Universe 1" an eine Statusmeldung.
+
+    Der Satz muss auch die spaeteren Meldungen ueberleben
+    (`_enttec_status_nachtragen` ersetzt den Text nach knapp einer Sekunde) —
+    sonst stuende er nur einen Augenblick da. Bewusst eine Funktion und keine
+    Methode: Bestandstests rufen `_enttec_status_nachtragen` auf einem Stub, der
+    nur die Felder des Dialogs mitbringt.
+    """
+    umzug = getattr(dialog, feld, "")
+    return f"{text} · {umzug}" if umzug else text
+
+
+def _andere_ausgaben(om, universum: int, weg: str, ziel: str) -> list[dict]:
+    """OUT-75 (d): die Ausgaben dieses Universums, die ein „Verbinden“/
+    „Uebernehmen“ auf ``weg`` → ``ziel`` ERSETZEN wuerde — also alles, was dort
+    gerade laeuft und nicht genau dieser Weg mit genau diesem Ziel ist.
+
+    Gelesen aus ``ausgabe_status()``, derselben Quelle wie Statusleiste, Banner
+    und DMX-Monitor. Kann der Manager das nicht beantworten, gilt „nichts“ —
+    eine Rueckfrage ohne Grundlage waere schlimmer als keine.
+    """
+    status = getattr(om, "ausgabe_status", None)
+    if not callable(status):
+        return []
+    try:
+        eintraege = list(status() or [])
+    except Exception:
+        return []
+    soll = _ziel_wie_gesendet(weg, ziel)
+    return [e for e in eintraege
+            if e.get("universum") == universum
+            and not (e.get("weg") == weg
+                     and _ziel_wie_gesendet(weg, e.get("ziel")) == soll)]
+
+
+def _ziel_wie_gesendet(weg: str, ziel) -> str:
+    """Das Ziel so, wie der Sender es fuehrt.
+
+    Codex-Review #1057: ``ArtNetSender`` rechnet den Limited Broadcast
+    ``255.255.255.255`` bei gewaehlter NIC in deren gerichteten Broadcast um
+    (NET-04), und ``ausgabe_status()`` meldet dieses umgerechnete Ziel. Der
+    Dialog kennt die konfigurierte Adresse — woertlich verglichen galt das
+    unveraenderte Uebernehmen als „andere Ausgabe“, und es kam eine
+    Rueckfrage ohne Grund."""
+    text = str(ziel or "")
+    if weg == "Art-Net" and text == "255.255.255.255":
+        try:
+            from src.core.dmx.output_iface import artnet_broadcast_target
+            return str(artnet_broadcast_target(text))
+        except Exception:
+            return text
+    return text
+
+
+def _ausgabe_text(weg: str, ziel: str) -> str:
+    return f"{weg} → {ziel}" if ziel else weg
 
 
 class OutputConfigDialog(QDialog):
@@ -545,8 +790,24 @@ class OutputConfigDialog(QDialog):
         ef = QFormLayout(enttec_tab)
 
         self._combo_port = QComboBox()
+        # OUT-73: Anschluesse ohne USB-Geraet (leere ttyS…, COM1, Bluetooth)
+        # stehen nur auf Wunsch in der Liste — der Haken und die Hinweiszeile
+        # muessen VOR dem ersten `_refresh_ports` existieren.
+        self._check_alle_ports = QCheckBox("Alle Anschlüsse zeigen")
+        self._check_alle_ports.setToolTip(
+            "Zeigt auch serielle Anschlüsse, hinter denen kein USB-Gerät\n"
+            "erkannt wird (eingebaute Schnittstelle, Bluetooth, leere\n"
+            "Anschlüsse). Ein Enttec Pro ist ein USB-Gerät und steht auch\n"
+            "ohne diesen Haken in der Liste.")
+        self._lbl_port_hinweis = QLabel("")
+        self._lbl_port_hinweis.setWordWrap(True)
         self._refresh_ports()
         ef.addRow("COM-Port:", self._combo_port)
+        ef.addRow("", self._check_alle_ports)
+        ef.addRow("", self._lbl_port_hinweis)
+        # Parameterlose Bound-Methods, s. Begruendung beim Knopf darunter.
+        self._check_alle_ports.toggled.connect(self._ports_neu_einlesen)
+        self._combo_port.currentIndexChanged.connect(self._port_hinweis_nachziehen)
 
         refresh_btn = QPushButton("Ports aktualisieren")
         # ★ Bewusst eine parameterlose Bound-Method statt eines Lambdas — aus
@@ -583,11 +844,12 @@ class OutputConfigDialog(QDialog):
         #  * Die Auswahl „hielt nicht": Tab zu, Tab auf, wieder Universum 1.
         #  * Und es erklaert HW-5c — den seit Wochen offenen „Rueckfall in
         #    universes.json, Ursache offen". Die Ursache war dieses Widget.
-        ef.addRow("Universe:", self._spin_enttec_univ)
+        ef.addRow("Universum:", self._spin_enttec_univ)
 
         connect_btn = QPushButton("Verbinden")
         connect_btn.clicked.connect(self._connect_enttec)
         self._lbl_enttec_status = QLabel("Nicht verbunden")
+        self._lbl_enttec_status.setWordWrap(True)   # OUT-74: lange Hinweise
         ef.addRow("", connect_btn)
         ef.addRow("Status:", self._lbl_enttec_status)
 
@@ -604,7 +866,7 @@ class OutputConfigDialog(QDialog):
         xf.addRow("", udmx_such_btn)
         self._spin_udmx_univ = QSpinBox()
         self._spin_udmx_univ.setRange(1, 32)
-        xf.addRow("Universe:", self._spin_udmx_univ)
+        xf.addRow("Universum:", self._spin_udmx_univ)
         udmx_btn = QPushButton("Verbinden")
         udmx_btn.clicked.connect(self._connect_udmx)
         self._lbl_udmx_status = QLabel("Nicht verbunden")
@@ -618,9 +880,30 @@ class OutputConfigDialog(QDialog):
             "uDMX-Adapter (z. B. Anyma uDMX, CYL-6602 „USB-DMX512“) hängen "
             "direkt am USB, ohne COM-Port. Ein Adapter trägt ein Universum.")
         self._lbl_udmx_hinweis.setWordWrap(True)
+        # OUT-76: die Schritte zum Windows-Treiber tragen Links (Zadig,
+        # Microsoft). Sie oeffnen sich nur auf einen Klick, nie von selbst.
+        self._lbl_udmx_hinweis.setOpenExternalLinks(True)
         self._lbl_udmx_hinweis.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        xf.addRow(self._lbl_udmx_hinweis)
+            Qt.TextInteractionFlag.TextSelectableByMouse
+            | Qt.TextInteractionFlag.LinksAccessibleByMouse
+            | Qt.TextInteractionFlag.LinksAccessibleByKeyboard)
+        # Die Schritte sind laenger, als der Reiter hoch ist: rollen statt
+        # unten abschneiden (das Fenster soll dafuer nicht wachsen).
+        from PySide6.QtWidgets import QFrame, QScrollArea
+        self._lbl_udmx_hinweis.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self._udmx_hinweis_rollen = QScrollArea()
+        self._udmx_hinweis_rollen.setWidgetResizable(True)
+        self._udmx_hinweis_rollen.setFrameShape(QFrame.Shape.NoFrame)
+        self._udmx_hinweis_rollen.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # Kein eigener Hintergrund: der Bereich sieht aus wie der Reiter.
+        self._udmx_hinweis_rollen.setStyleSheet(
+            "QScrollArea { background: transparent; }")
+        self._udmx_hinweis_rollen.viewport().setStyleSheet(
+            "background: transparent;")
+        self._udmx_hinweis_rollen.setWidget(self._lbl_udmx_hinweis)
+        xf.addRow(self._udmx_hinweis_rollen)
         tabs.addTab(udmx_tab, "uDMX (USB)")
         self._udmx_tab_index = tabs.indexOf(udmx_tab)
         self._udmx_gesucht = False
@@ -681,7 +964,7 @@ class OutputConfigDialog(QDialog):
         # die EXTERNE Universe-Nummer und gehört zu OUT-03.)
         self._spin_artnet_univ = QSpinBox()
         self._spin_artnet_univ.setRange(1, 32)
-        af.addRow("Universe:", self._spin_artnet_univ)
+        af.addRow("Universum:", self._spin_artnet_univ)
 
         self._edit_artnet_ip = QLineEdit("255.255.255.255")
         af.addRow("Ziel-IP / Broadcast:", self._edit_artnet_ip)
@@ -691,7 +974,7 @@ class OutputConfigDialog(QDialog):
         # Stelle) — dieses Feld IST die externe Art-Net-Universe-Nummer.
         self._spin_artnet_start_univ.setRange(*_ext_universe_bereich("ArtNet"))
         self._spin_artnet_start_univ.setToolTip(
-            'Externe Art-Net-Universe-Nummer für "Übernehmen". Default = '
+            'Externe Art-Net-Universumsnummer für „Übernehmen“. Standard = '
             'internes Universum − 1 (abwärtskompatibel).')
         af.addRow("Art-Net Startuniversum:", self._spin_artnet_start_univ)
         # A3D-15: die externe Universe folgt standardmaessig dem internen Universum
@@ -720,7 +1003,7 @@ class OutputConfigDialog(QDialog):
         # OUT-04: Ziel-Universum, auf das „Übernehmen" wirkt (nicht mehr alle).
         self._spin_sacn_univ = QSpinBox()
         self._spin_sacn_univ.setRange(1, 32)
-        sf.addRow("Universe:", self._spin_sacn_univ)
+        sf.addRow("Universum:", self._spin_sacn_univ)
 
         self._check_sacn_multicast = QCheckBox("Multicast (239.255.0.x)")
         self._check_sacn_multicast.setChecked(True)
@@ -743,24 +1026,29 @@ class OutputConfigDialog(QDialog):
         if_l = QVBoxLayout(input_tab)
         if_l.addWidget(QLabel(
             "Empfängt DMX-Daten via Art-Net (Port 6454) oder sACN (Port 5568)\n"
-            "und mergt sie in lokale Universen (HTP / LTP / REPLACE)."
+            "und mischt sie in lokale Universen (HTP / LTP / REPLACE)."
         ))
+        # OUT-79: Empfangsadresse (gilt auch fuer die Fernsteuerung) und der
+        # Firewall-Hinweis VOR dem Einschalten.
+        from src.ui.widgets.dmx_empfang_box import EmpfangsBox
+        self._empfang_box = EmpfangsBox()
+        if_l.addWidget(self._empfang_box)
 
         # Art-Net Input
-        ain_box = QGroupBox("Art-Net Input")
+        ain_box = QGroupBox("Art-Net-Eingang")
         ain_l = QFormLayout(ain_box)
-        self._check_artnet_in = QCheckBox("Art-Net Input aktivieren")
+        self._check_artnet_in = QCheckBox("Art-Net-Eingang aktivieren")
         ain_l.addRow(self._check_artnet_in)
 
         self._spin_artnet_in_univ = QSpinBox()
         self._spin_artnet_in_univ.setRange(1, 32767)
         self._spin_artnet_in_univ.setValue(1)
-        ain_l.addRow("Eingehendes Universe:", self._spin_artnet_in_univ)
+        ain_l.addRow("Eingehendes Universum:", self._spin_artnet_in_univ)
 
         self._spin_artnet_in_out = QSpinBox()
         self._spin_artnet_in_out.setRange(1, 32)
         self._spin_artnet_in_out.setValue(1)
-        ain_l.addRow("Merge in Universe:", self._spin_artnet_in_out)
+        ain_l.addRow("Mischen in Universum:", self._spin_artnet_in_out)
 
         self._combo_artnet_in_mode = QComboBox()
         self._combo_artnet_in_mode.addItems(["HTP", "LTP", "REPLACE"])
@@ -774,9 +1062,9 @@ class OutputConfigDialog(QDialog):
         if_l.addWidget(ain_box)
 
         # sACN Input
-        sin_box = QGroupBox("sACN Input")
+        sin_box = QGroupBox("sACN-Eingang")
         sin_l = QFormLayout(sin_box)
-        self._check_sacn_in = QCheckBox("sACN Input aktivieren")
+        self._check_sacn_in = QCheckBox("sACN-Eingang aktivieren")
         sin_l.addRow(self._check_sacn_in)
 
         self._spin_sacn_in_univ = QSpinBox()
@@ -784,12 +1072,12 @@ class OutputConfigDialog(QDialog):
         # BEIDE Richtungen; dieselbe Quelle wie der Guard der Ext-Spalte.
         self._spin_sacn_in_univ.setRange(*_ext_universe_bereich("sACN"))
         self._spin_sacn_in_univ.setValue(1)
-        sin_l.addRow("Eingehendes Universe:", self._spin_sacn_in_univ)
+        sin_l.addRow("Eingehendes Universum:", self._spin_sacn_in_univ)
 
         self._spin_sacn_in_out = QSpinBox()
         self._spin_sacn_in_out.setRange(1, 32)
         self._spin_sacn_in_out.setValue(1)
-        sin_l.addRow("Merge in Universe:", self._spin_sacn_in_out)
+        sin_l.addRow("Mischen in Universum:", self._spin_sacn_in_out)
 
         self._combo_sacn_in_mode = QComboBox()
         self._combo_sacn_in_mode.addItems(["HTP", "LTP", "REPLACE"])
@@ -802,25 +1090,71 @@ class OutputConfigDialog(QDialog):
         sin_l.addRow("Status:", self._lbl_sacn_in_status)
         if_l.addWidget(sin_box)
 
+        # NET-15: Fernsteuerung (Kanal -> Executor-Fader / Grand Master / GO)
+        from src.ui.widgets.dmx_fernsteuerung_box import FernsteuerungBox
+        self._fernsteuerung_box = FernsteuerungBox()
+        if_l.addWidget(self._fernsteuerung_box)
+
+        # OUT-79: erster Haken -> Vorwarnung (Windows, einmal); Statuszeilen
+        # nennen die Firewall, wenn nach dem Einschalten nichts ankommt.
+        for _check in (self._check_artnet_in, self._check_sacn_in,
+                       self._fernsteuerung_box.check_aktiv):
+            _check.toggled.connect(self._empfang_box.beim_haken)
+        self._empfang_box.ueberwache(
+            self._lbl_artnet_in_status, self._check_artnet_in, ("artnet",))
+        self._empfang_box.ueberwache(
+            self._lbl_sacn_in_status, self._check_sacn_in, ("sacn",))
+        self._empfang_box.ueberwache(
+            self._fernsteuerung_box.lbl_status,
+            self._fernsteuerung_box.check_aktiv)
+
         if_l.addStretch(1)
-        tabs.addTab(input_tab, "DMX Input")
+        # NET-15: mit der Fernsteuerungs-Tabelle passt der Reiter nicht mehr in
+        # die Standardhoehe — rollbar statt zusammengequetscht (sonst ueberlappten
+        # Tabelle und Knoepfe).
+        from PySide6.QtWidgets import QScrollArea as _QScrollArea
+        input_rollen = _QScrollArea()
+        input_rollen.setWidgetResizable(True)
+        input_rollen.setFrameShape(_QScrollArea.Shape.NoFrame)
+        input_rollen.setWidget(input_tab)
+        # Die Dialog-Standardgroesse bleibt wie vor NET-15: so hoch wie der
+        # Reiter OHNE die neue Gruppe; die Fernsteuerung erreicht man per Rollen.
+        input_rollen.setMinimumHeight(
+            input_tab.minimumSizeHint().height()
+            - self._fernsteuerung_box.minimumSizeHint().height()
+            - self._empfang_box.minimumSizeHint().height()   # OUT-79
+            - 2 * if_l.spacing())
+        tabs.addTab(input_rollen, "DMX-Eingang")
 
         # ── Universe Manager Tab ───────────────────────────────────────────────
         univ_tab = QWidget()
         uf = QVBoxLayout(univ_tab)
-        uf.addWidget(QLabel(
-            "Universen verwalten - bis zu 32 Universen.\n"
-            "Pro Universe: Name, Output-Typ (Disabled / Enttec / uDMX / sACN / ArtNet), "
-            "Patch-Adresse, optionale externe Universe-Nummer."
-        ))
-        self._univ_table = QTableWidget(0, 5)
+        # UI-100: deutsch und mit Zeilenumbruch — bei schmalem Dialog wurde die
+        # Zeile vorher hart abgeschnitten.
+        self._lbl_univ_hinweis = QLabel(
+            "Universen verwalten – bis zu 32 Universen. "
+            "Pro Universum: Name, Ausgang ("
+            + " / ".join(ausgabe_typ_text(t) for t in AUSGABE_TYPEN)
+            + "), Patch-Adresse, optionale externe Universumsnummer.")
+        self._lbl_univ_hinweis.setWordWrap(True)
+        uf.addWidget(self._lbl_univ_hinweis)
+        self._univ_table = QTableWidget(0, 6)
         self._univ_table.setHorizontalHeaderLabels(
-            ["#", "Name", "Output", "Patch (Port/IP)", "Ext-Universe"]
+            ["#", "Name", "Ausgang", "Patch (Port/IP)", "Ext. Universum", "Dongle"]
         )
-        # OUT-03: "Ext-Universe" = optionale externe Art-Net/sACN-Universe-Nummer.
+        # OUT-80: gespeicherte Enttec-Seriennummer, gekuerzt (OUT-77).
+        self._univ_table.horizontalHeaderItem(5).setToolTip(
+            "Enttec: Seriennummer des Dongles, den dieses Universum sucht — "
+            "auch wenn er nach einem Neustart an einem anderen Port hängt. "
+            "Rechtsklick → „Dongle neu zuordnen“ vergisst sie beim Speichern.")
+        self._univ_table.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu)
+        self._univ_table.customContextMenuRequested.connect(
+            self._univ_kontextmenue)
+        # OUT-03: "Ext. Universum" = optionale externe Art-Net/sACN-Universe-Nummer.
         # Leer = Default (Art-Net num-1, sACN num).
         self._univ_table.horizontalHeaderItem(4).setToolTip(
-            "Optionale externe Art-Net/sACN-Universe-Nummer. "
+            "Optionale externe Art-Net/sACN-Universumsnummer. "
             "Leer = Standard (Art-Net #-1, sACN #)."
         )
         self._univ_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -829,17 +1163,26 @@ class OutputConfigDialog(QDialog):
         self._univ_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self._univ_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self._univ_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self._univ_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         uf.addWidget(self._univ_table, 1)
 
         uf_btns = QHBoxLayout()
-        b_add = QPushButton("+ Universe hinzufügen")
+        b_add = QPushButton("+ Universum hinzufügen")
         b_add.clicked.connect(self._univ_add)
         b_del = QPushButton("Löschen")
         b_del.setObjectName("btn_danger")
         b_del.clicked.connect(self._univ_delete)
         b_save = QPushButton("Speichern")
         b_save.clicked.connect(self._univ_save)
+        # OUT-80: gespeicherte Dongle-Seriennummer der gewaehlten Zeile vergessen.
+        self._btn_dongle_neu = QPushButton("Dongle neu zuordnen")
+        self._btn_dongle_neu.setToolTip(
+            "Vergisst die gespeicherte Enttec-Seriennummer der gewählten Zeile "
+            "(beim Speichern). Danach lernt das Universum den Dongle, der an "
+            "seinem Port steckt.")
+        self._btn_dongle_neu.clicked.connect(self._univ_dongle_vergessen)
         uf_btns.addWidget(b_add); uf_btns.addWidget(b_del); uf_btns.addWidget(b_save)
+        uf_btns.addWidget(self._btn_dongle_neu)
         uf_btns.addStretch(1)
         uf.addLayout(uf_btns)
         tabs.addTab(univ_tab, "Universen")
@@ -898,6 +1241,40 @@ class OutputConfigDialog(QDialog):
                 self._enttec_port_waehlen(port)
                 self._lbl_enttec_status.setText(
                     f"Gespeichert: {port} → Universe {num}")
+        # ★ OUT-74: derselbe Adapter in mehr als einer Zeile. Der Reiter kann
+        # nur EINE Zeile zeigen (die mit der kleinsten Nummer) — still eine
+        # davon als „Gespeichert" auszugeben hiesse, den Fehler zu verstecken:
+        # eingerichtet ist der Adapter in diesem Zustand fuer keine (s.
+        # `apply_output_config`). Also sagen, und sagen, was ihn behebt.
+        for d in adapter_zeilen.doppelte(_load_universe_config()):
+            if d.typ == "Enttec":
+                self._lbl_enttec_status.setText(
+                    f"⚠ {d.patch} steht auf Universum "
+                    f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
+                    f"sendet nur ein Universum, eingerichtet ist er für keines. "
+                    f"Universum wählen und „Verbinden“: die anderen Zeilen "
+                    f"werden abgeräumt.")
+                break
+
+        # ── uDMX (OUT-68) ─────────────────────────────────────────────────────
+        udmx_zeile = _gespeicherte_ausgabe_zeile("uDMX")
+        if udmx_zeile is not None:
+            num = int(udmx_zeile.get("num", 1))
+            schluessel = _patch_text(udmx_zeile)
+            self._spin_udmx_univ.setValue(num)
+            self._udmx_adapter_waehlen(schluessel, "gespeichert")
+            self._lbl_udmx_status.setText(
+                f"Gespeichert: {schluessel or 'einziger Adapter'} → Universe {num}")
+        # OUT-74: derselbe uDMX-Adapter in mehr als einer Zeile (s. Enttec oben).
+        for d in adapter_zeilen.doppelte(_load_universe_config()):
+            if d.typ == "uDMX":
+                self._lbl_udmx_status.setText(
+                    f"⚠ {d.patch or 'Der uDMX-Adapter'} steht auf Universum "
+                    f"{adapter_zeilen.aufzaehlung(d.universen)} — ein Adapter "
+                    f"sendet nur ein Universum, eingerichtet ist er für keines. "
+                    f"Universum wählen und „Verbinden“: die anderen Zeilen "
+                    f"werden abgeräumt.")
+                break
 
         # ── uDMX (OUT-68) ─────────────────────────────────────────────────────
         udmx_zeile = _gespeicherte_ausgabe_zeile("uDMX")
@@ -974,22 +1351,59 @@ class OutputConfigDialog(QDialog):
         Port da, und „Verbinden" nahm ihn. Jetzt gewinnt in dieser Reihenfolge:
         ein ausdruecklich uebergebener Port, sonst die aktuelle Auswahl, sonst
         der in ``universes.json`` gespeicherte.
+
+        OUT-73: und wenn es keinen davon gibt — frischer Datenordner — NICHT
+        mehr der erste Eintrag des Betriebssystems. Das war auf einem
+        Linux-Rechner ein ``/dev/ttyS…`` ohne Geraet, unter Windows ``COM1``:
+        „Verbinden" richtete einen toten Anschluss ein und speicherte ihn, der
+        eingesteckte Enttec blieb ohne Universum. Jetzt steht der erkannte
+        Adapter oben und ist vorgewaehlt; Anschluesse ohne USB-Geraet stehen nur
+        mit „Alle Anschlüsse zeigen" in der Liste. Ohne erkannten Adapter bleibt
+        die Auswahl leer (Regeln in ``anschluss_auswahl``).
         """
         aktuell = (bevorzugt or self._combo_port.currentData()
                    or _gespeicherter_enttec_port())
-        self._combo_port.clear()
-        for p in serial.tools.list_ports.comports():
-            label = f"{p.device}"
-            if p.description:
-                label += f"  —  {p.description}"
-            if p.vid == ENTTEC_VID and p.pid == ENTTEC_PID:
-                # OUT-70: 0403:6001 ist der FTDI-Chip, kein Beweis fuer einen
-                # Enttec Pro — nur sagen, was sich ablesen laesst.
-                label += _port_kennzeichnung(p)
-            self._combo_port.addItem(label, p.device)
-        self._enttec_port_waehlen(aktuell)
-        if self._combo_port.count() == 0:
-            self._combo_port.addItem("Kein Port gefunden", "")
+        alle_zeigen = self._check_alle_ports.isChecked()
+        anschluesse = anschluss_auswahl.ordnen(
+            serial.tools.list_ports.comports())
+        self._anschluesse = anschluesse
+        # Der Neuaufbau meldet jede Zwischenauswahl — die Hinweiszeile wird
+        # einmal am Ende gesetzt, nicht je Eintrag.
+        war_blockiert = self._combo_port.blockSignals(True)
+        try:
+            self._combo_port.clear()
+            for a in anschluss_auswahl.sichtbare(
+                    anschluesse, alle_zeigen, immer=(aktuell,)):
+                self._combo_port.addItem(a.text, a.device)
+            if aktuell:
+                self._enttec_port_waehlen(aktuell)
+            else:
+                vorschlag = anschluss_auswahl.vorschlag(anschluesse)
+                if vorschlag:
+                    self._enttec_port_waehlen(vorschlag)
+                elif self._combo_port.count():
+                    # Nur fremde USB-Geraete (oder, mit Haken, Anschluesse ohne
+                    # Geraet): keinen davon von selbst waehlen.
+                    self._combo_port.insertItem(0, "— Anschluss wählen —", "")
+                    self._combo_port.setCurrentIndex(0)
+            if self._combo_port.count() == 0:
+                self._combo_port.addItem("Kein Port gefunden", "")
+        finally:
+            self._combo_port.blockSignals(war_blockiert)
+        self._port_hinweis_nachziehen()
+
+    def _port_hinweis_nachziehen(self):
+        """OUT-73: die Zeile unter der Portliste (leer = unsichtbar).
+
+        Rechnet mit der zuletzt eingelesenen Liste — ein Wechsel der Auswahl
+        fragt das Betriebssystem nicht neu ab.
+        """
+        text = anschluss_auswahl.hinweis(
+            getattr(self, "_anschluesse", ()),
+            self._combo_port.currentData() or "",
+            self._check_alle_ports.isChecked())
+        self._lbl_port_hinweis.setText(text)
+        self._lbl_port_hinweis.setVisible(bool(text))
 
     def _enttec_port_waehlen(self, port: str | None):
         """Einen Port in der Liste auswaehlen; fehlt er, ihn sichtbar machen.
@@ -1022,6 +1436,13 @@ class OutputConfigDialog(QDialog):
         state = get_state()
         om = state.output_manager
 
+        # OUT-75 (d): laeuft auf diesem Universum schon eine ANDERE Ausgabe,
+        # ersetzt „Verbinden“ sie. Bisher ohne ein Wort — vorher fragen.
+        if not self._ersetzen_bestaetigt(om, univ, "Enttec", port):
+            self._lbl_enttec_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
+
         # Sicherstellen dass das Universe existiert
         if univ not in state.universes:
             state.universes[univ] = om.add_universe(univ)
@@ -1034,10 +1455,37 @@ class OutputConfigDialog(QDialog):
             # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen
             # (auch ArtNet/sACN), sonst bleibt bei einem Cross-Typ-Wechsel der alte
             # Adapter aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
+            # OUT-80: die gespeicherte Seriennummer kommt mit, solange der Port
+            # derselbe ist. Ein ausdruecklich anderer Port meint einen anderen
+            # Dongle (Gegenpruefung) — dann die Nummer des Dongles dort oder
+            # keine, s. ``_enttec_seriennr_fuer``.
+            sn = _enttec_seriennr_fuer(univ, port, om)
+            _nachfolger_ansagen(om, univ, "enttec", port)      # OUT-72
             om.remove_output(univ)
-            om.add_enttec(univ, port)
+            if sn:
+                om.add_enttec(univ, port, seriennr=sn)
+            else:
+                om.add_enttec(univ, port)
             # QA-50: „(gespeichert)" nur sagen, wenn es auch gespeichert ist.
-            gespeichert = _persist_output(univ, "Enttec", port)
+            # ★ OUT-74: der Adapter gehoert jetzt DIESEM Universum — jede
+            # andere Zeile mit demselben Anschluss wird im selben
+            # Schreibvorgang abgeraeumt. `add_enttec` hat den Anschluss auf dem
+            # anderen Universum schon geschlossen; ohne das Abraeumen stand er
+            # dort weiter in der Datei und kam beim naechsten Start zurueck.
+            geraeumt: list[int] = []
+            # OUT-80 (Gegenpruefung 2): ``add_enttec`` kann den Dongle schon
+            # geoeffnet und seine Nummer gelernt haben (In-Prozess-Pfad) — die
+            # gilt, nicht ``""``. Danach erfaehrt der Manager, was in der Datei
+            # steht; eine erst spaeter gelernte meldet er so erneut.
+            sn = _laufende_seriennr(om, univ) or sn or ""
+            gespeichert = _persist_output(univ, "Enttec", port,
+                                          abgeraeumt=geraeumt,
+                                          enttec_seriennr=sn)
+            gemerkt = getattr(om, "enttec_seriennr_gespeichert", None)
+            if gespeichert and callable(gemerkt):
+                gemerkt(univ, sn)
+            self._enttec_umzug = adapter_zeilen.umzug_text(geraeumt, univ)
+            self._enttec_hinweise_nachfuehren(state, univ, port, geraeumt)
             self._univ_tabelle_nachladen()   # OUT-58, wie A3D-15 beim Art-Net
             # ★ OUT-51: NICHT „Verbunden" melden. `add_enttec` startet den
             # Serial-Worker, mehr weiss es in diesem Moment nicht — der Port
@@ -1045,15 +1493,77 @@ class OutputConfigDialog(QDialog):
             # Der Erfolg, den dieser Zweig sicher kennt, ist „eingerichtet und
             # gespeichert"; ob DMX rausgeht, sagt erst der Adapter selbst,
             # gleich, und dann traegt es `_enttec_status_nachtragen` nach.
-            self._lbl_enttec_status.setText(
+            self._lbl_enttec_status.setText(_mit_umzug(self,
                 f"Eingerichtet: {port} → Universe {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
-                f"verbinde …")
+                f"verbinde …"))
             self._enttec_pruef_univ = univ
             self._enttec_pruef_versuche = 0
             self._enttec_status_pruefen_spaeter()
         except Exception as e:
             self._lbl_enttec_status.setText(f"Fehler: {e}")
+
+    # ── OUT-74: ein Adapter, ein Universum ───────────────────────────────────
+
+    @staticmethod
+    def _enttec_hinweise_nachfuehren(state, univ: int, port: str, geraeumt):
+        """Die Hinweise der Statusleiste auf den Stand nach „Verbinden" bringen.
+
+        ``enttec_port_notes`` fuellt sonst nur ``apply_output_config`` (beim
+        Start). Stand dort „Adapter auf zwei Universen" oder ein falscher
+        Anschluss, blieb „Enttec: falsch konfiguriert" bis zum Neustart
+        stehen, obwohl der Bediener es eben behoben hat.
+        """
+        OutputConfigDialog._adapter_hinweise_nachfuehren(state, univ, geraeumt)
+        notes = getattr(state, "enttec_port_notes", None)
+        if not isinstance(notes, dict):
+            return
+        try:
+            notes[univ] = _diagnose_enttec_port(port)
+        except Exception:
+            notes.pop(univ, None)
+
+    @staticmethod
+    def _adapter_hinweise_nachfuehren(state, univ: int, geraeumt):
+        """Was fuer JEDEN Adaptertyp gilt (Enttec, uDMX): die Liste der
+        doppelten Adapter neu lesen (Banner) und die Hinweise der beteiligten
+        Universen verwerfen — sie stammen aus dem Stand vor „Verbinden“."""
+        if hasattr(state, "adapter_konflikte"):
+            try:
+                state.adapter_konflikte = adapter_zeilen.doppelte(
+                    _load_universe_config())
+            except Exception as e:
+                print(f"[output_config] Adapter-Pruefung: {e}")
+        notes = getattr(state, "enttec_port_notes", None)
+        if not isinstance(notes, dict):
+            return
+        for nummer in list(geraeumt) + [univ]:
+            notes.pop(nummer, None)
+
+    # ── OUT-75: Rueckfrage vor dem Ersetzen einer laufenden Ausgabe ──────────
+
+    def _ersetzen_bestaetigt(self, om, univ: int, weg: str, ziel: str) -> bool:
+        """``True`` = es darf eingerichtet werden.
+
+        Gefragt wird nur, wenn auf diesem Universum gerade eine ANDERE Ausgabe
+        laeuft (anderer Weg oder anderes Ziel). Dieselbe Ausgabe noch einmal
+        einzurichten ist kein Ersetzen. Vorgabe ist „Nein“: ein versehentliches
+        Enter darf eine laufende Ausgabe nicht beenden.
+        """
+        andere = _andere_ausgaben(om, univ, weg, ziel)
+        if not andere:
+            return True
+        liste = "\n".join(
+            "  •  " + _ausgabe_text(str(e.get("weg") or ""), str(e.get("ziel") or ""))
+            for e in andere)
+        antwort = QMessageBox.question(
+            self, "Laufende Ausgabe ersetzen?",
+            f"Universum {univ} gibt gerade aus über:\n{liste}\n\n"
+            f"Soll das durch {_ausgabe_text(weg, ziel)} ersetzt werden? "
+            f"Die bisherige Ausgabe endet dann.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        return antwort == QMessageBox.StandardButton.Yes
 
     # ── OUT-51: den echten Verbindungsstatus nachtragen ──────────────────────
 
@@ -1104,52 +1614,21 @@ class OutputConfigDialog(QDialog):
                 return
             # Nach der Anlaufzeit immer noch „verbindet": das ist keine
             # Erfolgsmeldung mehr, aber auch kein bewiesener Ausfall.
-            self._lbl_enttec_status.setText(
-                f"{port} → Universe {univ}: antwortet nicht — Port/Kabel prüfen")
+            self._lbl_enttec_status.setText(_mit_umzug(self,
+                f"{port} → Universe {univ}: antwortet nicht — Port/Kabel prüfen"))
             return
         if zustand == ZUSTAND_SENDET:
-            self._lbl_enttec_status.setText(
-                f"Verbunden: {port} → Universe {univ} (gespeichert)")
+            self._lbl_enttec_status.setText(_mit_umzug(self,
+                f"Verbunden: {port} → Universe {univ} (gespeichert)"))
         elif zustand == ZUSTAND_TOT:
-            self._lbl_enttec_status.setText(
+            self._lbl_enttec_status.setText(_mit_umzug(self,
                 f"{port} → Universe {univ}: Port lässt sich nicht öffnen — "
-                f"gespeichert, aber es geht kein DMX raus")
+                f"gespeichert, aber es geht kein DMX raus"))
         else:
             # Der Adapter kann keine Auskunft geben (In-Prozess-Fallback ohne
             # Statusfeld). Dann bleibt die ehrliche Teilaussage stehen.
-            self._lbl_enttec_status.setText(
-                f"Eingerichtet: {port} → Universe {univ} (gespeichert)")
-
-    # ── OUT-70: Assistent „Interface einrichten…“ ────────────────────────────
-
-    def _assistent_oeffnen(self):
-        """Den Assistenten zeigen. Er richtet ueber :meth:`_assistent_einrichten`
-        ein — also ueber dieselben Wege wie die Reiter, nicht ueber einen
-        zweiten. Danach ggf. in den Art-Net-Reiter wechseln."""
-        from src.ui.widgets.interface_assistent import InterfaceAssistent
-        dlg = InterfaceAssistent(self, state=get_state(),
-                                 einrichten=self._assistent_einrichten)
-        dlg.exec()
-        if dlg.artnet_gewuenscht:
-            self._tabs.setCurrentIndex(self._artnet_tab_index)
-        return dlg
-
-    def _assistent_einrichten(self, art: str, ziel: str, universum: int) -> str:
-        """Eine vom Assistenten gewaehlte Ausgabe anlegen — exakt der Weg des
-        jeweiligen Reiters (Auswahl setzen, „Verbinden“). Liefert den Satz aus
-        dem Status-Label des Reiters."""
-        if art == "Enttec":
-            self._refresh_ports(bevorzugt=ziel)
-            self._spin_enttec_univ.setValue(int(universum))
-            self._connect_enttec()
-            return self._lbl_enttec_status.text()
-        if art == "uDMX":
-            self._udmx_gesucht = True       # Reiter soll die Wahl nicht ersetzen
-            self._udmx_adapter_waehlen(ziel, "vom Assistenten gewählt")
-            self._spin_udmx_univ.setValue(int(universum))
-            self._connect_udmx()
-            return self._lbl_udmx_status.text()
-        return f"Die Ausgabe-Art „{art}“ lässt sich hier nicht einrichten."
+            self._lbl_enttec_status.setText(_mit_umzug(self,
+                f"Eingerichtet: {port} → Universe {univ} (gespeichert)"))
 
     # ── OUT-68: uDMX-Adapter ─────────────────────────────────────────────────
 
@@ -1213,6 +1692,17 @@ class OutputConfigDialog(QDialog):
         if aktuell:
             self._udmx_adapter_waehlen(aktuell, "derzeit nicht gefunden")
         code = int(ergebnis.get("code") or udmx.G_OK)
+        # OUT-76: steckt ein Adapter, dem unter Windows der Treiber fehlt, ist
+        # DAS die Auskunft — mit dem Weg dorthin, statt „eingesteckt?“ oder
+        # einer Liste, die aussieht, als waere alles in Ordnung.
+        from src.ui import udmx_treiber_hinweis
+        treiber = udmx_treiber_hinweis.nach_suche(ergebnis)
+        if treiber is not None:
+            if self._combo_udmx.count() == 0:
+                self._combo_udmx.addItem("Adapter ohne Treiber — siehe unten", "")
+            self._lbl_udmx_status.setText(treiber[0])
+            self._lbl_udmx_hinweis.setText(treiber[1])
+            return
         if code != udmx.G_OK:
             if self._combo_udmx.count() == 0:
                 self._combo_udmx.addItem("Keine Adapter-Suche möglich", "")
@@ -1256,19 +1746,33 @@ class OutputConfigDialog(QDialog):
         univ = self._spin_udmx_univ.value()
         state = get_state()
         om = state.output_manager
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(om, univ, "uDMX", schluessel):
+            self._lbl_udmx_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
+
         if univ not in state.universes:
             state.universes[univ] = om.add_universe(univ)
         try:
             # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen.
+            _nachfolger_ansagen(om, univ, "udmx", schluessel)   # OUT-72
             om.remove_output(univ)
             # Oeffnet nichts im UI-Thread: add_udmx startet nur den Sender.
             om.add_udmx(univ, schluessel)
-            gespeichert = _persist_output(univ, "uDMX", schluessel)
+            # OUT-74: ein Adapter, ein Universum — wie beim Enttec verliert
+            # jede andere Zeile denselben Adapter im selben Schreibvorgang.
+            geraeumt: list[int] = []
+            gespeichert = _persist_output(univ, "uDMX", schluessel,
+                                          abgeraeumt=geraeumt)
+            self._udmx_umzug = adapter_zeilen.umzug_text(geraeumt, univ)
+            self._adapter_hinweise_nachfuehren(state, univ, geraeumt)
             self._univ_tabelle_nachladen()
-            self._lbl_udmx_status.setText(
+            self._lbl_udmx_status.setText(_mit_umzug(
+                self,
                 f"Eingerichtet: {schluessel} → Universe {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
-                f"verbinde …")
+                f"verbinde …", "_udmx_umzug"))
             self._udmx_pruef_univ = univ
             self._udmx_pruef_versuche = 0
             self._udmx_status_pruefen_spaeter()
@@ -1305,12 +1809,15 @@ class OutputConfigDialog(QDialog):
             if self._udmx_pruef_versuche < self._MAX_PRUEF_VERSUCHE:
                 self._udmx_status_pruefen_spaeter()
                 return
-            self._lbl_udmx_status.setText(
-                f"{wer} → Universe {univ}: antwortet nicht — Adapter/Kabel prüfen")
+            self._lbl_udmx_status.setText(_mit_umzug(
+                self,
+                f"{wer} → Universe {univ}: antwortet nicht — Adapter/Kabel prüfen",
+                "_udmx_umzug"))
             return
         if zustand == ZUSTAND_SENDET:
-            self._lbl_udmx_status.setText(
-                f"Verbunden: {wer} → Universe {univ} (gespeichert)")
+            self._lbl_udmx_status.setText(_mit_umzug(
+                self, f"Verbunden: {wer} → Universe {univ} (gespeichert)",
+                "_udmx_umzug"))
             self._lbl_udmx_hinweis.setText("")
             return
         grund = ""
@@ -1320,10 +1827,61 @@ class OutputConfigDialog(QDialog):
                 grund = str(f() or "")
             except Exception:
                 grund = ""
-        self._lbl_udmx_status.setText(
+        self._lbl_udmx_status.setText(_mit_umzug(
+            self,
             f"{wer} → Universe {univ}: sendet nicht — gespeichert, aber es "
-            f"geht kein DMX raus")
+            f"geht kein DMX raus", "_udmx_umzug"))
         self._lbl_udmx_hinweis.setText(grund or "Adapter prüfen und neu einstecken.")
+        self._udmx_treiber_schritte_zeigen(dev, grund)
+
+    def _udmx_treiber_schritte_zeigen(self, dev, grund: str):
+        """OUT-76: scheitert der eingerichtete Adapter unter Windows am
+        Treiber, stehen unter dem Status die Schritte mit Links — nicht nur
+        der eine Satz aus ``grund_text``."""
+        from src.core.dmx import udmx, usb_treiber_windows
+        from src.ui import udmx_treiber_hinweis
+        try:
+            code = int(dev.grund())
+        except Exception:
+            return
+        if code != udmx.G_TREIBER_FEHLT or not usb_treiber_windows.ist_windows():
+            return
+        vid, pid, _serie, _ort = udmx.schluessel_lesen(getattr(dev, "port", ""))
+        kennung = f"{vid:04x}:{pid:04x}" if vid is not None else ""
+        self._lbl_udmx_hinweis.setText(udmx_treiber_hinweis.schritte_html(
+            kennung, "Der Adapter ist da, lässt sich aber nicht öffnen — unter "
+                     "Windows fehlt ihm der Treiber."))
+
+    # ── OUT-70: Assistent „Interface einrichten…“ ────────────────────────────
+
+    def _assistent_oeffnen(self):
+        """Den Assistenten zeigen. Er richtet ueber :meth:`_assistent_einrichten`
+        ein — also ueber dieselben Wege wie die Reiter, nicht ueber einen
+        zweiten. Danach ggf. in den Art-Net-Reiter wechseln."""
+        from src.ui.widgets.interface_assistent import InterfaceAssistent
+        dlg = InterfaceAssistent(self, state=get_state(),
+                                 einrichten=self._assistent_einrichten)
+        dlg.exec()
+        if dlg.artnet_gewuenscht:
+            self._tabs.setCurrentIndex(self._artnet_tab_index)
+        return dlg
+
+    def _assistent_einrichten(self, art: str, ziel: str, universum: int) -> str:
+        """Eine vom Assistenten gewaehlte Ausgabe anlegen — exakt der Weg des
+        jeweiligen Reiters (Auswahl setzen, „Verbinden“). Liefert den Satz aus
+        dem Status-Label des Reiters."""
+        if art == "Enttec":
+            self._refresh_ports(bevorzugt=ziel)
+            self._spin_enttec_univ.setValue(int(universum))
+            self._connect_enttec()
+            return self._lbl_enttec_status.text()
+        if art == "uDMX":
+            self._udmx_gesucht = True       # Reiter soll die Wahl nicht ersetzen
+            self._udmx_adapter_waehlen(ziel, "vom Assistenten gewählt")
+            self._spin_udmx_univ.setValue(int(universum))
+            self._connect_udmx()
+            return self._lbl_udmx_status.text()
+        return f"Die Ausgabe-Art „{art}“ lässt sich hier nicht einrichten."
 
     def _sync_artnet_start_univ_default(self):
         """A3D-15: die Startuniversum-Spinbox auf einen sinnvollen Wert fuer das
@@ -1356,11 +1914,18 @@ class OutputConfigDialog(QDialog):
             # (nicht den aktuellen Spin-Wert — der koennte inzwischen auf ein fremdes
             # Universum zeigen und dessen Adapter faelschlich killen).
             if self._artnet_active_univ is not None:
-                state.output_manager.remove_output(self._artnet_active_univ)
+                # OUT-71: abgewaehlt = der Ausgang geht wirklich -> dunkel enden.
+                state.output_manager.remove_output(self._artnet_active_univ,
+                                                   schlussbild=True)
                 self._artnet_active_univ = None
             self._lbl_artnet_status.setText("Inaktiv")
             return
         ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(state.output_manager, univ, "Art-Net", ip):
+            self._lbl_artnet_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
         # OUT-04: NUR das gewählte Universum belegen. Die frühere Schleife über ALLE
         # Universen überschrieb jede andere Adapter-Zuweisung — live UND in
         # universes.json (`_persist_output` je Universum) → Mixed-Setups zerstört.
@@ -1370,13 +1935,14 @@ class OutputConfigDialog(QDialog):
         # MU-01: erst ALLE Alt-Adapter dieses Universums entfernen/schliessen, sonst
         # bleibt bei einem Cross-Typ-Wechsel (z. B. Enttec->ArtNet) der alte Adapter
         # aktiv -> Doppel-Output/Leak. Analog apply_output_config (OUT-05).
-        state.output_manager.remove_output(univ)
         # A3D-15: externe Art-Net-Universe aus der (bisher toten) Startuniversum-
         # Spinbox durchreichen. Weicht sie NICHT vom Default (univ-1) ab -> None,
         # damit der Send-Pfad den abwaertskompatiblen Default (univ_num-1) nutzt und
         # universes.json sauber bleibt (Konvention "leer = Default", wie die Tabelle).
         start = self._spin_artnet_start_univ.value()
         out_u = start if start != univ - 1 else None
+        _nachfolger_ansagen(state.output_manager, univ, "artnet", ip, out_u)  # OUT-72
+        state.output_manager.remove_output(univ)
         state.output_manager.add_artnet(univ, ip, out_universe=out_u)
         self._artnet_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken
         gespeichert = _persist_output(univ, "ArtNet", ip, out_universe=out_u)
@@ -1423,10 +1989,7 @@ class OutputConfigDialog(QDialog):
             num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._univ_table.setItem(i, 0, num_item)
             self._univ_table.setItem(i, 1, QTableWidgetItem(str(r.get("name", "Universe"))))
-            combo = QComboBox()
-            for opt in AUSGABE_TYPEN:
-                combo.addItem(opt)
-            combo.setCurrentText(str(r.get("output", "Disabled")))
+            combo = _ausgabe_typ_combo(str(r.get("output", "Disabled")))
             self._univ_table.setCellWidget(i, 2, combo)
             self._univ_table.setItem(i, 3, QTableWidgetItem(_patch_text(r)))
             # OUT-03: externe Universe-Nummer (leer = Default). None/fehlt -> "".
@@ -1434,6 +1997,104 @@ class OutputConfigDialog(QDialog):
             ext_item = QTableWidgetItem("" if ext is None else str(ext))
             ext_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self._univ_table.setItem(i, 4, ext_item)
+            # OUT-80: gespeicherte Seriennummer mitfuehren (die Tabelle baut
+            # die Zeilen beim Speichern neu) und gekuerzt zeigen.
+            try:
+                num0 = int(r.get("num", i + 1))
+            except (TypeError, ValueError):
+                num0 = None
+            num_item.setData(Qt.ItemDataRole.UserRole, {
+                "num0": num0, "sn": enttec_konfig.aus_zeile(r),
+                "patch0": str(r.get("patch") or ""), "vergessen": False})
+            self._univ_dongle_zelle(i)
+
+    # ── OUT-80: Dongle-Seriennummer je Zeile ─────────────────────────────────
+
+    def _univ_meta(self, zeile: int) -> dict:
+        item = self._univ_table.item(zeile, 0)
+        meta = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        return dict(meta) if isinstance(meta, dict) else {}
+
+    def _univ_dongle_zelle(self, zeile: int):
+        """Spalte „Dongle“: gekuerzte Seriennummer, „—“ ohne, oder der Hinweis,
+        dass sie beim Speichern vergessen wird. Nur lesbar."""
+        meta = self._univ_meta(zeile)
+        if meta.get("vergessen"):
+            text, tip = "wird neu zugeordnet", (
+                "Beim Speichern wird die Seriennummer vergessen; das Universum "
+                "lernt danach den Dongle an seinem Port.")
+        elif meta.get("sn"):
+            text = f"Seriennr. {_kurz(meta['sn'])}"
+            tip = ("Dieses Universum sucht seinen Enttec an dieser "
+                   "Seriennummer, auch an einem anderen Port.")
+        else:
+            text, tip = "—", "Keine Enttec-Seriennummer gespeichert."
+        item = QTableWidgetItem(text)
+        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        item.setToolTip(tip)
+        self._univ_table.setItem(zeile, 5, item)
+
+    def _univ_kontextmenue(self, pos):
+        from PySide6.QtWidgets import QMenu
+        zeile = self._univ_table.rowAt(pos.y())
+        if zeile < 0:
+            return
+        self._univ_table.selectRow(zeile)
+        menue = QMenu(self)
+        akt = menue.addAction("Dongle neu zuordnen (Seriennummer vergessen)")
+        akt.setEnabled(bool(self._univ_meta(zeile).get("sn")))
+        # Kein selbst fangendes lambda (OUT-50: haelt den Dialog fest).
+        from functools import partial
+        akt.triggered.connect(partial(self._univ_dongle_vergessen, zeile))
+        menue.exec(self._univ_table.viewport().mapToGlobal(pos))
+
+    def _univ_dongle_vergessen(self, zeile=None, *_signal):
+        """„Dongle neu zuordnen“: die gespeicherte Seriennummer der Zeile wird
+        beim naechsten Speichern geloescht (Feld leer = vergessen)."""
+        if not isinstance(zeile, int) or isinstance(zeile, bool):
+            zeilen = sorted({i.row() for i in self._univ_table.selectedIndexes()})
+        else:
+            zeilen = [zeile]
+        for z in zeilen:
+            item = self._univ_table.item(z, 0)
+            if item is None:
+                continue
+            meta = self._univ_meta(z)
+            meta["vergessen"] = True
+            item.setData(Qt.ItemDataRole.UserRole, meta)
+            self._univ_dongle_zelle(z)
+
+    def _univ_seriennr_fuer_speichern(self, zeile: int, entry: dict,
+                                      frisch) -> str | None:
+        """Was beim Speichern im Feld steht: ``""`` nach „neu zuordnen“; sonst
+        die AKTUELLE Nummer der Datei (sie kann seit dem Laden der Tabelle im
+        Hintergrund gelernt worden sein), sonst die geladene; ``None`` = Feld
+        weglassen.
+
+        Gegenpruefung: eine NEUE Zeile erbt nie eine Nummer aus der Datei —
+        auch nicht die einer Zeile, die frueher dieselbe Universumsnummer
+        hatte (sonst standen nach dem Umnummerieren zwei Zeilen auf einem
+        Dongle). Eine Enttec-Zeile mit ausdruecklich geaendertem Port meint
+        einen anderen Dongle: ``""``, das Universum lernt den am neuen Port."""
+        meta = self._univ_meta(zeile)
+        enttec = entry.get("output") == "Enttec"
+        if meta.get("vergessen"):
+            return ""
+        alt = meta.get("num0")
+        if alt is None:
+            return "" if enttec else None
+        if enttec and "patch0" in meta and not _gleicher_port(
+                meta.get("patch0"), entry.get("patch")):
+            return ""
+        for r in frisch:
+            try:
+                if int(r.get("num", -1)) == int(alt):
+                    sn = enttec_konfig.aus_zeile(r)
+                    if sn is not None:
+                        return sn
+            except (TypeError, ValueError):
+                continue
+        return meta.get("sn")
 
     def _univ_add(self):
         row = self._univ_table.rowCount()
@@ -1443,12 +2104,10 @@ class OutputConfigDialog(QDialog):
         self._univ_table.insertRow(row)
         self._univ_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
         self._univ_table.setItem(row, 1, QTableWidgetItem(f"Universe {row + 1}"))
-        combo = QComboBox()
-        for opt in AUSGABE_TYPEN:
-            combo.addItem(opt)
-        self._univ_table.setCellWidget(row, 2, combo)
+        self._univ_table.setCellWidget(row, 2, _ausgabe_typ_combo())
         self._univ_table.setItem(row, 3, QTableWidgetItem(""))
         self._univ_table.setItem(row, 4, QTableWidgetItem(""))
+        self._univ_dongle_zelle(row)                       # OUT-80
 
     def _univ_delete(self):
         rows = sorted({i.row() for i in self._univ_table.selectedIndexes()}, reverse=True)
@@ -1478,7 +2137,7 @@ class OutputConfigDialog(QDialog):
             entry = {
                 "num": num,
                 "name": name_item.text() if name_item else f"Universe {num}",
-                "output": combo.currentText() if combo else "Disabled",
+                "output": ausgabe_typ_wert(combo) if combo else "Disabled",
                 "patch": patch_item.text() if patch_item else "",
             }
             # OUT-03: externe Universe-Nummer nur speichern, wenn gesetzt & gueltig
@@ -1504,8 +2163,8 @@ class OutputConfigDialog(QDialog):
         if adjusted:
             _lst = ", ".join(f"Zeile {r}: → {n}" for r, n in adjusted)
             QMessageBox.warning(
-                self, "Universe-Nummer angepasst",
-                f"Universe-Nummern müssen zwischen {_UNIVERSE_MIN} und "
+                self, "Universumsnummer angepasst",
+                f"Universumsnummern müssen zwischen {_UNIVERSE_MIN} und "
                 f"{_UNIVERSE_MAX} liegen. Angepasst: {_lst}.")
         # NET-13: dieselbe Meldungsform wie darueber — sichtbar statt still.
         # Der Typ steht mit in der Zeile, weil die Grenze von ihm abhaengt und
@@ -1516,8 +2175,8 @@ class OutputConfigDialog(QDialog):
             _grenzen = " · ".join(f"{t} {lo}..{hi}"
                                   for t, (lo, hi) in _EXT_UNIVERSE_BEREICHE.items())
             QMessageBox.warning(
-                self, "Externe Universe-Nummer angepasst",
-                f"Die externe Universe-Nummer muss zum Ausgabetyp der Zeile "
+                self, "Externe Universumsnummer angepasst",
+                f"Die externe Universumsnummer muss zum Ausgabetyp der Zeile "
                 f"passen ({_grenzen}). Angepasst: {_ext_lst}.")
 
         # OUT-07: zwei Universen auf DASSELBE Ziel sind ein Bedienfehler, den die
@@ -1527,7 +2186,21 @@ class OutputConfigDialog(QDialog):
         # Nur WARNEN, nicht korrigieren: welches der beiden Universen gemeint
         # war, weiß nur der Bediener. Eine automatische Umnummerierung würde
         # raten und dabei möglicherweise das falsche Rig dunkel schalten.
+        # ★ OUT-74: fuer einen ADAPTER (Enttec, uDMX) stimmt der Satz darunter
+        # nicht — dort senden nicht beide, sondern keiner: `apply_output_config`
+        # richtet einen Adapter, der in zwei Zeilen steht, fuer keine ein. Das
+        # bekommt seine eigene Meldung; die allgemeine gilt fuer Netz-Ziele.
+        for d in adapter_zeilen.doppelte(rows):
+            QMessageBox.warning(
+                self, "Ein Adapter auf mehreren Universen",
+                f"{d.name} steht auf Universum "
+                f"{adapter_zeilen.aufzaehlung(d.universen)}.\n\n"
+                f"Ein Adapter sendet nur ein Universum. Gespeichert wird "
+                f"trotzdem — eingerichtet wird er so aber für KEINES davon, "
+                f"bis nur noch eine Zeile ihn nennt.")
         for zeilen, was in _doppelte_ziele(rows):
+            if was.split(" → ", 1)[0] in adapter_zeilen.ADAPTER_TYPEN:
+                continue                   # oben schon gemeldet
             QMessageBox.warning(
                 self, "Zwei Universen auf demselben Ziel",
                 f"{was}\n\nBetroffen: {zeilen}.\n\nBeide senden dorthin — der "
@@ -1540,13 +2213,46 @@ class OutputConfigDialog(QDialog):
         # hat. Beide Fehler waren nur im Terminal zu sehen, das im Betrieb
         # niemand offen hat. Ein Dialog, der Erfolg behauptet, ist schlimmer als
         # gar keine Rueckmeldung: er beendet die Suche nach dem Fehler.
-        if not _save_universe_config(rows):
+        # OUT-80: die Seriennummern erst JETZT aus der Datei nachlesen, unter
+        # derselben Sperre wie der Hintergrund-Speicher und ohne Dialog
+        # dazwischen (Gegenpruefung) — die Warnungen oben laufen in eigenen
+        # Ereignisschleifen; eine dort gelernte Nummer ginge sonst verloren.
+        with enttec_konfig.DATEI_LOCK:
+            frisch = [r for r in _load_universe_config() if isinstance(r, dict)]
+            seriennr_je_zeile: list[str | None] = []
+            for z, entry in enumerate(rows):
+                sn = self._univ_seriennr_fuer_speichern(z, entry, frisch)
+                if sn is not None:
+                    entry[enttec_konfig.FELD] = sn
+                seriennr_je_zeile.append(sn)
+            # Ein Dongle, ein Universum: steht eine Nummer jetzt in mehreren
+            # Zeilen (z. B. im Hintergrund fuer eine andere gelernt), behaelt
+            # sie keine — die Universen lernen neu, statt sich zu sperren.
+            doppelt = enttec_konfig.doppelte(
+                {z: e.get(enttec_konfig.FELD) for z, e in enumerate(rows)
+                 if e.get("output") == "Enttec"})
+            for z, entry in enumerate(rows):
+                if entry.get(enttec_konfig.FELD) in doppelt:
+                    entry[enttec_konfig.FELD] = ""
+                    seriennr_je_zeile[z] = ""
+            gespeichert = _save_universe_config(rows)
+        if not gespeichert:
             QMessageBox.critical(
                 self, "Nicht gespeichert",
                 f"Die Universen-Konfiguration konnte nicht geschrieben werden:\n"
                 f"{_UNIV_CONFIG_PATH}\n\nDie Aenderungen gelten nur bis zum "
                 f"Beenden. Schreibrechte und freien Speicherplatz pruefen.")
             return
+        # OUT-80: gespeichert — „neu zuordnen“ ist erledigt, die Zeilen merken
+        # sich ihren jetzigen Stand.
+        for z, sn in enumerate(seriennr_je_zeile):
+            item = self._univ_table.item(z, 0)
+            if item is None:
+                continue
+            item.setData(Qt.ItemDataRole.UserRole, {
+                "num0": rows[z]["num"], "sn": sn,
+                "patch0": rows[z]["patch"], "vergessen": False})
+            self._univ_dongle_zelle(z)
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
         angewandt, fehler = True, ""
         try:
@@ -1570,12 +2276,20 @@ class OutputConfigDialog(QDialog):
             # MU-02 (+Review): das beim Apply belegte Universum raeumen, nicht den
             # aktuellen Spin-Wert (koennte auf ein fremdes Universum zeigen).
             if self._sacn_active_univ is not None:
-                state.output_manager.remove_output(self._sacn_active_univ)
+                # OUT-71: abgewaehlt = der Ausgang geht wirklich -> dunkel enden.
+                state.output_manager.remove_output(self._sacn_active_univ,
+                                                   schlussbild=True)
                 self._sacn_active_univ = None
             self._lbl_sacn_status.setText("Inaktiv")
             return
         ip_text = self._edit_sacn_ip.text().strip()
         target_ip = None if (self._check_sacn_multicast.isChecked() or not ip_text) else ip_text
+        # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
+        if not self._ersetzen_bestaetigt(state.output_manager, univ, "sACN",
+                                         target_ip or ""):
+            self._lbl_sacn_status.setText(
+                "Abgebrochen — die bisherige Ausgabe läuft weiter")
+            return
         try:
             # OUT-04: NUR das gewählte Universum belegen (nicht mehr alle über eine
             # Schleife überschreiben); andere universes.json-Zeilen bleiben erhalten.
@@ -1593,6 +2307,8 @@ class OutputConfigDialog(QDialog):
             # Gemessen: 5 von 5 Uebernahmen mit unveraenderter Konfiguration.
             # Der MU-01-Grund fuer diesen Aufruf bleibt erhalten — die FREMDEN
             # Adaptertypen werden weiterhin entfernt.
+            # OUT-72: die FREMDEN Adapter gehen wirklich -> Schlussbild.
+            _nachfolger_ansagen(state.output_manager, univ, "sacn", target_ip or "")
             state.output_manager.remove_output(univ, ausser="sacn")
             state.output_manager.add_sacn(univ, target_ip)
             self._sacn_active_univ = univ   # MU-02: fuer korrektes Abwaehlen merken

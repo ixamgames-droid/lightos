@@ -48,7 +48,7 @@ Die Aktion wird im Button-Editor über deutsche Labels
 | `TAP_BUS` / `SYNC_BUS` / `ARM_BUS` | Tempo-Bus tap/sync/arm | Wirkt auf benannten Bus `tempo_bus_id` | `tempo_bus_id` |
 | `MEDIA_PLAY_PAUSE` / `MEDIA_NEXT` / `MEDIA_PREV` | Musik-Player | `media_player.toggle/next/prev()` | — |
 | `LASER_ARM` | Laser scharf/unscharf | `LaserOutputManager.set_armed(...)` (Safety-Toggle) | — |
-| `LASER_ESTOP` | Laser NOT-AUS | `estop_all()` + entwaffnen | — |
+| `LASER_ESTOP` | Laser NOT-AUS | `estop_all()` + entwaffnen; löst nur aus — gelöst wird am Knopf oben rechts im Hauptfenster mit Rückfrage (LAS-36) | — |
 | `LASER_PATTERN` | Laser-Muster abrufen | Wendet `PaletteType.LASER`-Palette auf ihre Fixtures an | `laser_palette` |
 
 ### Start-Modifikatoren (nur `FUNCTION_TOGGLE`/`FLASH`)
@@ -85,8 +85,14 @@ Die Aktion wird im Button-Editor über deutsche Labels
   `LIBRARY_SNAP`; `_snap_prev` merkt vorherige Programmer-Werte für Restore.
 - **Tempo/BPM:** `src/core/engine/bpm_manager` und `tempo_bus` (Freeze/AutoSync/Bus).
 - **Laser:** `state.ensure_laser_output()` (LaserOutputManager) + `palette`.
-- **Solo-Frame:** `vc_frame.VCFrame` ruft `deactivate_for_solo()`, wenn im selben
-  Solo-Container ein anderer Button gedrückt wird.
+- **Solo-Frame:** `vc_frame.VCFrame.on_child_activated` ruft
+  `deactivate_for_solo(activator=…)`, wenn im selben Solo-Container ein anderer
+  Button gedrückt wird. **Ausnahme „gleiche Funktion" (VCB-41):** Funktionen, die
+  der auslösende Button selbst steuert (`activator._all_function_ids()`, nur bei
+  `FunctionToggle`/`FunctionFlash`), fasst der Partner nicht an — sonst stoppte er
+  sie, und der gedrückte Umschalt-Knopf startete sie sofort neu (Ausschalten
+  unmöglich). Über diese Funktionen entscheidet allein der Auslöser; alle anderen
+  Funktionen des Partners werden wie gewohnt gestoppt (ohne Fade-Out).
 - **Serialisierung:** `to_dict()`/`apply_dict()` schreiben/lesen **alle** obigen
   Felder in die `.lshow`-Datei. `apply_dict` castet IDs defensiv auf `int`
   (float-Schutz gegen `executors[float]`-Crash), fällt bei unbekannter Aktion auf

@@ -32,6 +32,14 @@ Fix (Single-Point, kein Guard in ~40 Dateien noetig):
         Wegwerf-Show-DB statt der geteilten ``current_show.db`` (App-Datenordner)
         (STAB-CURSHOW (a): Generator-Laeufe duerfen Davids echten Show-Zustand
         nicht anfassen; Muster aus ``build_mega_arena_2026.py`` verallgemeinert).
+      * ``LIGHTOS_UNIVERSES_JSON=<tmp>/lightos_gen_<skript>_<pid>_universes.json``
+        -> eine Ausgabe-Konfiguration, die es nicht gibt (TOOL-19). ``get_state()``
+        ruft ``apply_output_config()`` IMMER auf, und das richtete bisher ein, was
+        in der ECHTEN ``universes.json`` steht: bei einem Enttec-Eintrag oeffnete
+        ein Generator-Lauf den echten seriellen Port, bei Art-Net/sACN die
+        Sende-Sockets. ``LIGHTOS_NO_OUTPUT_THREAD`` verhindert nur den Sende-Thread,
+        nicht das Oeffnen. Die Datei wird nie angelegt — fehlt sie, richtet
+        ``apply_output_config()`` nichts ein.
 
     ``setdefault`` respektiert eine bereits gesetzte Umgebung (z. B. wenn jemand den
     Generator bewusst mit echtem Output-Prozess oder gegen eine echte DB laufen
@@ -51,6 +59,17 @@ import os
 import sys
 import tempfile
 
+# TOOL-27: zuerst die gemeinsame Sandbox aller Werkzeuge — Datenordner,
+# Geraete-Bibliothek (als Kopie), Absturzprotokoll, USB. Sie haelt ausserdem
+# fest, was VOR der Umlenkung galt (``echte_universes_json()`` unten). Was hier
+# folgt, bleibt als zweite Lage stehen; ``setdefault`` macht es wirkungslos, wo
+# die Sandbox schon gesetzt hat. Beide Schreibweisen, weil dieses Modul als
+# ``_gen_env`` (Skript-Start) wie als ``tools._gen_env`` geladen wird.
+try:
+    import _werkzeug_sandbox
+except ImportError:                                    # pragma: no cover
+    from tools import _werkzeug_sandbox
+
 # Robust gegen verschobene Imports: setzt die Schalter sofort beim Import dieses
 # Moduls. setdefault -> eine bereits gesetzte (bewusste) Umgebung gewinnt.
 os.environ.setdefault("LIGHTOS_SERIAL_INPROC", "1")
@@ -66,10 +85,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # laufende Generatoren sich keine Temp-DB teilen.
 _stem = os.path.splitext(os.path.basename(sys.argv[0] or ""))[0] or "interactive"
 _stem = "".join(c if (c.isalnum() or c in "-_") else "_" for c in _stem)
-os.environ.setdefault(
-    "LIGHTOS_SHOW_DB",
-    os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}.db"),
-)
+# TOOL-27: mit ``--echte-daten`` (nur fuer die Werkzeuge in
+# ``_werkzeug_sandbox.ECHTE_DATEN_ERLAUBT``) bleibt die Show-DB die des Bedieners.
+if not _werkzeug_sandbox.ECHTE_DATEN:
+    os.environ.setdefault(
+        "LIGHTOS_SHOW_DB",
+        os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}.db"),
+    )
 # QA-83: dasselbe fuer den VC-Asset-Cache. ``import_to_cache`` (Galerie-Bilder,
 # z. B. build_mega_arena_2026.py) und das Selbstpruef-Laden der fertigen Show
 # legten die Bilder sonst in den ECHTEN Datenordner. Die Show bettet sie beim
@@ -78,3 +100,37 @@ os.environ.setdefault(
     "LIGHTOS_VC_ASSETS_DIR",
     os.path.join(tempfile.gettempdir(), f"lightos_gen_{_stem}_{os.getpid()}_vc_assets"),
 )
+# TOOL-19: kein Generator oeffnet einen echten DMX-Ausgang. ``get_state()``
+# wendet die Ausgabe-Konfiguration an, sobald es sie findet — also zeigt die
+# Variable auf eine Datei, die es nicht gibt (sie wird auch nie angelegt).
+# ``setdefault`` wie bei den Schaltern oben: ein schon gesetzter Wert ist eine
+# bewusste Umlenkung (Testlauf, Bild-Sandbox, ``verify_stage_reload``) und
+# gewinnt. Die Startskripte setzen die Variable nicht.
+# TOOL-27: die Sandbox hat die Variable inzwischen selbst gesetzt — der Stand
+# davor steht in ihren ``VORGABEN``.
+_UNIVERSES_VOR_DER_UMLENKUNG = _werkzeug_sandbox.VORGABEN.get("LIGHTOS_UNIVERSES_JSON")
+os.environ.setdefault(
+    "LIGHTOS_UNIVERSES_JSON",
+    os.path.join(tempfile.gettempdir(),
+                 f"lightos_gen_{_stem}_{os.getpid()}_universes.json"),
+)
+
+
+def echte_universes_json() -> str:
+    """Pfad der Ausgabe-Konfiguration, die OHNE die Umlenkung oben gelten wuerde
+    — nur zum LESEN.
+
+    Die Umlenkung trifft jeden Leser von ``user_data_file("universes.json")``,
+    auch den, der gar keinen Ausgang oeffnen, sondern nur nachsehen will:
+    ``build_spot90_testshow.py`` waehlt aus der echten Konfiguration das
+    Universum mit Ausgang und prueft seinen Patch am Ende dagegen. Mit der
+    Umlenkung fiel es still auf Universum 1 zurueck, und die Schlusspruefung
+    las dieselbe fehlende Datei — am Rig mit dem Ausgang auf Universum 3 waere
+    eine Test-Show entstanden, die nichts sendet (Codex-Review #1017).
+
+    Hatte der Aufrufer die Variable selbst gesetzt (Testlauf, Sandbox), ist
+    SEIN Wert die gemeinte Konfiguration."""
+    if _UNIVERSES_VOR_DER_UMLENKUNG:
+        return _UNIVERSES_VOR_DER_UMLENKUNG
+    # TOOL-27: nicht mehr ``app_data_dir()`` — der Datenordner ist umgelenkt.
+    return os.path.join(_werkzeug_sandbox.ECHTER_DATENORDNER, "universes.json")

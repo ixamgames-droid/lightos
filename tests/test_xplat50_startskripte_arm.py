@@ -35,9 +35,10 @@ class TestStartskripte:
                 assert "emuliert" not in zeile, zeile
 
     def test_natives_arm64_bekommt_den_hinweis_ohne_3d(self, name):
+        # Wortlaut seit XPLAT-51: "nicht unterstuetzt (instabil, kein 3D)".
         text = _text(name)
-        assert "ohne 3D-Visualizer" in text
-        assert "x64-Python empfohlen" in text
+        assert "kein 3D" in text
+        assert "x64-Python nehmen" in text
         assert "--architecture x64" in text
 
     def test_geprueft_wird_das_python_nicht_die_shell(self, name):

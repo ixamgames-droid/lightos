@@ -28,7 +28,7 @@ python install.py
 
 Das war's. Das Script:
 - Prueft Python-Version (>= 3.11)
-- Prueft Python-Architektur vs. OS-Architektur (auf Windows-ARM: x64-Python empfohlen, siehe unten)
+- Prueft Python-Architektur vs. OS-Architektur (auf Windows-ARM: x64-Python nehmen, natives ARM64-Python ist nicht unterstuetzt, siehe unten)
 - Erstellt `venv/`
 - Installiert Kern-Abhaengigkeiten + optionale Pakete separat
 - Legt App-Verzeichnisse an
@@ -38,6 +38,17 @@ Das war's. Das Script:
 
 Die Test-Abhaengigkeiten (pytest & Co.) installiert das Script **nicht** — wer
 die Testsuite fahren will, siehe [Entwickeln und Tests](#entwickeln-und-tests).
+
+## Lizenz und Testzugang
+
+LightOS ist in der Testphase und startet nur mit einer gueltigen **Lizenzdatei**
+(Urheber: [ixamgames-droid](https://github.com/ixamgames-droid/lightos), alle
+Rechte vorbehalten - siehe [LICENSE](LICENSE)). Beim ersten Start fragt LightOS
+danach: **Lizenzdatei auswaehlen…** anklicken und die erhaltene Datei waehlen.
+Von Hand gehoert sie als `lightos-lizenz.lic` in den App-Datenordner
+(`%APPDATA%\LightOS` bzw. `~/.local/share/LightOS`). Geprueft wird nur beim
+Start, ohne Internet; eine laufende Show wird nie unterbrochen. Testzugang und
+Einzelheiten: [docs/LIZENZ_UND_TESTZUGANG.md](docs/LIZENZ_UND_TESTZUGANG.md).
 
 ## Voraussetzungen
 
@@ -66,9 +77,20 @@ fuehrt es per Emulation aus, und damit geht alles - auch der 3D-Visualizer.
   `venv` bestehen (und damit weiter kein 3D). Erkennt der Installer selbst, dass
   das `venv` eine andere Architektur hat, fragt er nach.
 
-**Natives ARM64-Python geht auch, aber ohne 3D-Visualizer.** Die ARM64-Pakete
-von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11, XPLAT-45);
-das Menue "3D-Visualizer" meldet dann "Visualizer nicht verfuegbar".
+**Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python
+nehmen.** Instabil: mit einem venv aus nativem ARM64-Python stuerzte LightOS in
+6 von 12 Starts nach rund 9 s mit Access Violation ab, an wechselnden Stellen
+(XPLAT-51); mit x64-Python und derselben PySide6-Version nie. Kein 3D: die
+ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11,
+XPLAT-45); das Menue "3D-Visualizer" meldet dann "Visualizer nicht verfuegbar".
+Der Installer bricht in diesem Fall ab (Exit-Code 3, XPLAT-56) und nennt den
+winget-Befehl und den Aufruf mit `--neu-venv`; die Startskripte warnen nur und
+starten trotzdem. Massgeblich ist das Python, mit dem LightOS danach laeuft:
+bleibt ein vorhandenes x64-`venv` stehen, laeuft install.py auch mit
+ARM64-Python durch (das `venv` wird dann nicht neu angelegt); ein x64-Installer
+bricht ab, wenn ein vorhandenes ARM64-`venv` nicht neu angelegt werden darf
+(Rueckfrage mit Nein). `--no-venv` mit ARM64-Python bricht ab (ausser mit dem
+Test-Schalter `--arm64-trotzdem`, s. u.).
 `python-rtmidi` baut dort nur mit den MSVC Build Tools
 (https://visualstudio.microsoft.com/visual-cpp-build-tools/, "Desktop
 Development with C++") - ohne sie laeuft MIDI ueber den eingebauten WinMM-Weg.
@@ -82,7 +104,12 @@ python install.py                # Standard (venv + shortcut)
 python install.py --no-venv      # In aktuelles Python installieren
 python install.py --no-shortcut  # Keine Desktop-Verknuepfung
 python install.py --dev          # Mit pyinstaller fuer Builds (KEINE Test-Pakete)
+python install.py --neu-venv     # Vorhandenes venv mit diesem Python neu anlegen
 ```
+
+`--arm64-trotzdem` ist nur fuer Tests und Entwicklung: damit installiert
+install.py auf Windows-ARM auch mit nativem ARM64-Python weiter, statt
+abzubrechen - das Ergebnis bleibt nicht unterstuetzt (instabil, kein 3D).
 
 Statt `python` geht ueberall auch `py -3.12` (bzw. die gewuenschte Version), s. o.
 
@@ -169,21 +196,21 @@ Welche Option loescht was:
 
 ## ARM64-Kompatibilitaet (Snapdragon-Geraete)
 
-Gilt nur fuer **natives** ARM64-Python - mit dem empfohlenen x64-Python
-(siehe oben) gibt es diese Einschraenkungen nicht.
+Gilt nur fuer **natives** ARM64-Python - das ist nicht unterstuetzt (instabil,
+kein 3D) - x64-Python nehmen (siehe oben); damit gibt es diese Einschraenkungen
+nicht.
 
 | Paket | ARM64 Status |
 |---|---|
-| PySide6 | OK (ARM64-Wheel) |
+| PySide6 | ARM64-Wheel vorhanden - Abstuerze ungeklaert (XPLAT-51) |
 | PySide6-Addons | ARM64-Wheel **ohne QtWebEngine** - kein 3D-Visualizer |
-| numpy | OK (ARM64-Wheel) |
+| numpy | ARM64-Wheel vorhanden - Abstuerze ungeklaert (XPLAT-51) |
 | soundcard | OK (pure-Python) |
 | flask-socketio | OK (pure-Python) |
 | Flask | OK (pure-Python) |
 | python-osc | OK (pure-Python) |
 | pyserial | OK (pure-Python) |
 | SQLAlchemy | OK (pure-Python) |
-| mido | OK (pure-Python) |
 | **python-rtmidi** | optional, Build noetig (MSVC Build Tools) |
 
 Stand: 2026-05-25 (PyPI Latest Stable), QtWebEngine-Befund 2026-10 (XPLAT-45)
@@ -278,10 +305,12 @@ angeschlossen sind.
 Gemeint sind Adapter ohne COM-Port, die direkt ueber USB angesprochen werden: der
 *Anyma uDMX* samt Nachbauten (USB-Kennung `16c0:05dc`) und der *CYL-6602 „USB-DMX512“*
 (meldet sich als „Sun-light USBDMX512“, Kennung `2008:1066`). In LightOS ist das die
-Ausgabe-Art **uDMX (USB)**. Drei Dinge sind einmalig noetig; LightOS richtet keines
-davon selbst ein (kein sudo, keine Treiber-Installation):
+Ausgabe-Art **uDMX (USB)**. Drei Dinge sind noetig; die Treiber-Zuweisung (Windows)
+und das Zugriffsrecht (Linux) richtet LightOS nicht selbst ein (kein sudo, keine
+Treiber-Installation):
 
-**1. Das Zusatzpaket `pyusb`** (optional — ohne es fehlt nur diese Ausgabe-Art):
+**1. Das Zusatzpaket `pyusb`** (im Windows-Installationspaket enthalten, sonst
+optional — ohne es fehlt nur diese Ausgabe-Art):
 
 ```bash
 # Linux
@@ -297,6 +326,19 @@ venv\Scripts\python -m pip install pyusb libusb-package
 Ob beides gefunden wird, zeigt der Selbsttest (Zeile `optional uDMX: …`) und das
 Diagnosepaket (Abschnitt „uDMX (USB)“).
 
+**Windows-Installationspaket (x64):** das LightOS aus `LightOS-Setup.exe` bringt
+`pyusb` und die Bibliothek libusb **mit** — dort ist fuer diesen Punkt nichts zu tun.
+uDMX laeuft nach der Installation, sobald dem Adapter der Windows-Treiber zugewiesen
+ist (Punkt 3). Beides sind Bibliotheken, keine Treiber; ihre Lizenzen stehen in
+`THIRD_PARTY_NOTICES.md`, das Setup installiert die Datei mit.
+- Installationspakete, die vor dem 12.10.2026 gebaut wurden, enthalten sie noch
+  nicht. Der Reiter **uDMX (USB)** sagt das dann und raet zum Aktualisieren;
+  nachinstallieren laesst sich in einem installierten LightOS nichts.
+- Windows auf ARM64: fuer libusb gibt es dort kein fertiges Python-Paket; uDMX ist
+  auf ARM64 nicht enthalten.
+- LightOS aus dem Quelltext unter Windows x64: `pip install -r requirements.txt`
+  installiert beides mit.
+
 **2. Linux: Zugriffsrecht per udev-Regel.** Ohne sie darf nur root den Adapter
 ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Die Regeldatei liegt im Repo:
 
@@ -311,9 +353,32 @@ Gruppe `plugdev` und das gerade angemeldete Konto frei — die geteilte Kennung
 `16c0:05dc` nur zusammen mit dem Produktnamen „uDMX“.
 
 **3. Windows: WinUSB-Treiber zuweisen.** Windows hat fuer diese Adapter keinen eigenen
-Treiber. Dem Geraet muss einmalig der generische WinUSB-Treiber zugewiesen werden, zum
-Beispiel mit dem Programm Zadig (https://zadig.akeo.ie, Adminrechte noetig): Adapter
-einstecken, in Zadig das Geraet waehlen, als Treiber „WinUSB“ einstellen, installieren.
+Treiber, und LightOS liefert und installiert keine Treiber. Dem Geraet muss einmalig
+von Hand der allgemeine Treiber „WinUSB“ zugewiesen werden. Ob er fehlt, sagt LightOS
+selbst: im Reiter **uDMX (USB)** steht nach **Adapter suchen** hinter dem Adapter
+`— Treiber fehlt (WinUSB zuweisen)`, darunter stehen dieselben Schritte wie hier; das
+Diagnosepaket nennt die Lage im Abschnitt „uDMX (USB)“.
+
+1. Das Programm Zadig laden: https://zadig.akeo.ie — ein freies Programm eines anderen
+   Anbieters.
+2. Den Adapter einstecken und Zadig starten (Windows fragt nach Administratorrechten).
+3. In Zadig im Menue „Options“ den Punkt „List All Devices“ einschalten und in der
+   Liste den Adapter waehlen — zu erkennen an der USB ID `2008 1066` (CYL-6602) oder
+   `16C0 05DC` (Anyma uDMX).
+4. Als Treiber „WinUSB“ einstellen und auf „Install Driver“ (oder „Replace Driver“)
+   klicken; das dauert bis zu einer Minute.
+5. Zurueck in LightOS: im Reiter **uDMX (USB)** auf **Adapter suchen** und dann auf
+   **Verbinden** klicken.
+
+**Achtung:** in Zadig genau den Adapter waehlen. Zadig ersetzt den Treiber des
+gewaehlten Geraets — eine Maus, eine Tastatur oder ein anderes Geraet funktioniert
+danach nicht mehr, bis man es im Geraete-Manager von Windows deinstalliert (mit
+„Treiber loeschen“) und neu einsteckt. Die Kennung `16C0 05DC` tragen auch andere
+Bastelgeraete: nur zuweisen, wenn es sicher der uDMX-Adapter ist.
+
+Hintergrund bei Microsoft:
+https://learn.microsoft.com/windows-hardware/drivers/usbcon/winusb-installation
+
 **Noch nicht am Geraet erprobt** — weder unter Windows x64 noch auf Windows-ARM. Wenn
 es nicht gelingt: einen Art-Net-Node verwenden.
 
@@ -375,7 +440,10 @@ Python, kein venv und kein `install.py`**.
 - legt eine Startmenü-Verknüpfung an, auf Wunsch auch eine auf dem Desktop,
 - trägt einen Deinstaller ein (Einstellungen → Apps, oder Startmenü „LightOS
   deinstallieren“),
-- legt die Lizenzen der Fremd-Komponenten bei (`THIRD_PARTY_NOTICES.md`, `licenses\`),
+- legt die Lizenzen der mitgelieferten Bibliotheken bei: `THIRD_PARTY_NOTICES.md` und der
+  Ordner `licenses\` neben `LightOS.exe` – darin die Lizenztexte und
+  `BUNDLE-KOMPONENTEN.txt` mit Name, Version, Lizenz und Bezugsquelle jeder Bibliothek
+  dieses Setups (Python, Qt/PySide6 unter LGPL, die Python-Pakete),
 - bringt fünf **Demo-Shows** mit: **Datei → Demo-Show öffnen**. Eine Demo öffnet sich als
   neue, ungespeicherte Show; **Speichern** fragt nach einem Namen und legt deine Kopie in
   `%APPDATA%\LightOS\shows` an. Das Original im Programmordner bleibt unverändert.
@@ -384,6 +452,17 @@ Python, kein venv und kein `install.py`**.
 liegen wie bei der Python-Installation in `%APPDATA%\LightOS` — der Programmordner
 ist schreibgeschützt, LightOS schreibt dort nichts hin. Deinstallieren lässt die
 Daten deshalb stehen; ein späteres Setup findet sie wieder.
+
+**Firewall-Abfrage beim ersten Empfang:** Das Setup legt **keine** Firewall-Regel an.
+Schaltest du in LightOS zum ersten Mal einen Eingang ein, der aus dem Netzwerk empfängt
+(Art-Net-/sACN-Eingang, DMX-Fernsteuerung, Web-Remote), fragt Windows mit
+„Windows-Sicherheitswarnung“, ob `LightOS.exe` Daten aus dem Netzwerk empfangen darf.
+Beim DMX-Eingang kündigt LightOS das vorher an. Für ein Pult oder Handy im selben Netz: **Zulassen**
+(privates Netzwerk); ohne Freigabe kommt nur an, was auf diesem Rechner gesendet wird.
+Nachsehen und ändern: Windows-Sicherheit → Firewall- & Netzwerkschutz → „Zugriff von App
+durch Firewall zulassen“ → `LightOS.exe`. Details:
+[Ausgabe einrichten](docs/anleitung_ausgabe_einrichten/ANLEITUNG.md#dmx-empfangen-die-firewall-abfrage)
+und [Netzwerk vorbereiten (Windows)](docs/anleitung_netzwerk_windows/ANLEITUNG.md).
 
 **Windows auf ARM (Snapdragon):** Das Setup ist ein **x64-Paket**. Windows 11 auf ARM
 führt es in der x64-Emulation aus — **inklusive 3D-Visualizer** (QtWebEngine gibt es
@@ -469,7 +548,7 @@ DMX-Ausgaenge, MIDI-Geraete), eine Liste der Einstellungen (nur Zahlen/Schalter 
 Texte, Pfade und Geheimnisse wie das Remote-Token nur als Platzhalter) und die
 Datei-Namen im Datenordner. **Nicht im Paket:** Show-Dateien, Datenbanken,
 Snaps, Buehnen. Dein Benutzername in Pfaden wird durch `~` bzw. `%USERNAME%`
-ersetzt.
+ersetzt; die Seriennummer eines uDMX-Adapters wird gekuerzt (`16c0:05dc#…8isP`).
 
 **`Windows fatal exception: code 0x8001010d` in `crash.log` ist kein Absturz.**
 Windows meldet damit intern einen abgelehnten COM-Aufruf (typisch, wenn ein
@@ -498,14 +577,15 @@ kommentarlos geschluckt hat, `[diagnose]` die erkannte Umgebung.
 | `ModuleNotFoundError: PySide6` | venv nicht aktiv - `venv\Scripts\activate` oder direkt `venv\Scripts\python main.py` |
 | `install.py` nimmt die falsche Python-Version | Mit dem Launcher waehlen: `py -0p` zeigt die installierten, `py -3.12 install.py` installiert mit 3.12 (s. Schnellstart) |
 | Test-Gate meldet „0/… Segmente gruen", im Segment-Log `No module named pytest` | Test-Abhaengigkeiten fehlen: `venv\Scripts\python -m pip install -r requirements-dev.txt` (s. [Entwickeln und Tests](#entwickeln-und-tests)) |
-| Installer meldet "Natives ARM64-Python: ... OHNE 3D-Visualizer" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
+| Installer meldet "Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D)" | x64-Python installieren (`winget install Python.Python.3.12 --architecture x64`) und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
 | `python-rtmidi` Build-Fehler auf ARM64 | x64-Python nehmen (siehe oben) oder MSVC Build Tools installieren; MIDI geht auch ohne (WinMM-Weg) |
 | "Visualizer nicht verfuegbar" | `PySide6` + `PySide6-Addons` erneut installieren (`python -m pip install --upgrade PySide6 PySide6-Addons`) |
-| "Visualizer nicht verfuegbar" auf Windows-ARM | Mit nativem ARM64-Python gibt es kein QtWebEngine - x64-Python installieren (siehe "Python auf Windows-ARM") |
+| "Visualizer nicht verfuegbar" auf Windows-ARM | Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen (siehe "Python auf Windows-ARM") |
+| LightOS stuerzt auf Windows-ARM beim Start ab (Access Violation) | Natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen und install.py damit mit `--neu-venv` erneut ausfuehren (siehe "Python auf Windows-ARM") |
+| Art-Net-/sACN-Eingang: „Seit 5 s ist nichts angekommen … Firewall“ | Windows: Windows-Sicherheit → Firewall- & Netzwerkschutz → „Zugriff von App durch Firewall zulassen“ → bei `LightOS.exe` (aus den Quellen: `python.exe`) „Privat“ anhaken. Linux: `sudo ufw status`. Oder im Reiter **DMX-Eingang** unter **Empfangen auf:** die richtige Karte wählen |
 | Enttec nicht erkannt | `pip install pyserial` neu, FTDI-Treiber pruefen |
-| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber (Windows) |
+| uDMX-Adapter „Kein Zugriffsrecht“ / „pyusb fehlt“ / „laesst sich nicht oeffnen“ | siehe [uDMX-Adapter (USB)](#udmx-adapter-usb): udev-Regel (Linux), `pip install pyusb`, WinUSB-Treiber von Hand zuweisen (Windows; LightOS liefert und installiert keine Treiber) |
 | APC mini mk2 in MIDI-View leer | Class-Compliant-Mode (Pad UL beim Anschluss halten), oder Akai APC Editor installieren |
-| `mido.backend` ist None | `pip install python-rtmidi` neu installieren |
 | **Linux:** `pip install` bricht bei `python-rtmidi` ab | `sudo apt-get install build-essential libasound2-dev`, dann erneut installieren |
 | **Linux:** kein MIDI trotz angeschlossenem Geraet | `python-rtmidi` fehlt (kein WinMM-Fallback auf Linux) → wie oben nachinstallieren |
 | **Linux:** 3D-Visualizer bleibt schwarz | QtWebEngine-Sandbox — LightOS setzt automatisch `--no-sandbox`; falls doch: sicherstellen, dass `LIGHTOS_WEBENGINE_NO_SANDBOX` nicht auf `0` steht; ggf. `QT_QPA_PLATFORM` pruefen |

@@ -24,11 +24,17 @@ class FlowLayout(QLayout):
         margin: int = 0,
         h_spacing: int = 6,
         v_spacing: int = 4,
+        zeilen_zentrieren: bool = False,
     ) -> None:
         super().__init__(parent)
         self._items: list[QLayoutItem] = []
         self._h_space = h_spacing
         self._v_space = v_spacing
+        # UI-98: Elemente unterschiedlicher Höhe innerhalb ihrer Zeile
+        # senkrecht mittig ausrichten (sonst oben bündig).
+        self._zentrieren = zeilen_zentrieren
+        # UI-104: zuletzt gemeldete Höhe für die aktuelle Breite (s. minimumSize).
+        self._hfw_gemeldet = -1
         self.setContentsMargins(margin, margin, margin, margin)
 
     # ── Pflicht-Overrides ────────────────────────────────────────────────────
@@ -66,7 +72,13 @@ class FlowLayout(QLayout):
 
     def setGeometry(self, rect: QRect) -> None:  # noqa: N802
         super().setGeometry(rect)
-        self._do_layout(rect, test_only=False)
+        hoehe = self._do_layout(rect, test_only=False)
+        if hoehe != self._hfw_gemeldet:
+            # UI-104: Zeilenzahl hat sich mit der Breite geändert -> die
+            # Mindesthöhe (minimumSize) auch; Eltern-Layouts neu fragen lassen.
+            # Die Breite hängt nicht von der Höhe ab, das konvergiert.
+            self._hfw_gemeldet = hoehe
+            self.invalidate()
 
     def sizeHint(self) -> QSize:  # noqa: N802
         return self.minimumSize()
@@ -83,6 +95,14 @@ class FlowLayout(QLayout):
             margins.left() + margins.right(),
             margins.top() + margins.bottom(),
         )
+        # UI-104: Bei bekannter Breite die umbrochene Höhe als Mindesthöhe
+        # melden. Nur der größte Einzelknopf reichte nicht: jenseits eines
+        # QSplitter fragt niemand heightForWidth, das Eltern-Layout stauchte
+        # die Leiste bei Platzmangel unter ihre Zeilenhöhe (Touch-Modus,
+        # schmale Bibliothek: „↻“ als Strich, „Löschen“ im Baum).
+        breite = self.geometry().width()
+        if breite > 0:
+            size.setHeight(max(size.height(), self.heightForWidth(breite)))
         return size
 
     # ── Layout-Kern ──────────────────────────────────────────────────────────
@@ -94,6 +114,13 @@ class FlowLayout(QLayout):
         x = effective.x()
         y = effective.y()
         line_height = 0
+        zeile: list[tuple[QLayoutItem, QPoint, QSize]] = []
+
+        def _zeile_setzen() -> None:
+            for it, pos, hint in zeile:
+                dy = (line_height - hint.height()) // 2 if self._zentrieren else 0
+                it.setGeometry(QRect(pos + QPoint(0, dy), hint))
+            zeile.clear()
 
         for item in self._items:
             w = item.widget()
@@ -103,13 +130,17 @@ class FlowLayout(QLayout):
             next_x = x + hint.width() + self._h_space
             if next_x - self._h_space > effective.right() and line_height > 0:
                 # In die nächste Zeile umbrechen.
+                if not test_only:
+                    _zeile_setzen()
                 x = effective.x()
                 y = y + line_height + self._v_space
                 next_x = x + hint.width() + self._h_space
                 line_height = 0
             if not test_only:
-                item.setGeometry(QRect(QPoint(x, y), hint))
+                zeile.append((item, QPoint(x, y), hint))
             x = next_x
             line_height = max(line_height, hint.height())
 
+        if not test_only:
+            _zeile_setzen()
         return y + line_height - rect.y() + margins.bottom()

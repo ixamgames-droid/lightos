@@ -20,6 +20,7 @@ Verhindert strukturell Fehler wie den vertauschten ZQ02001 Dimmer/Strobe-Kanal.
 """
 from __future__ import annotations
 
+import html
 from dataclasses import dataclass, field
 
 from PySide6.QtWidgets import (
@@ -29,7 +30,9 @@ from PySide6.QtWidgets import (
     QDialogButtonBox, QTabWidget, QWidget, QCheckBox, QSlider,
     QSplitter, QTextEdit, QFileDialog, QGridLayout,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QSize, QTimer
+from src.ui.widgets.dialog_groesse import (InhaltsRollbereich,
+                                           beim_ersten_zeigen_anpassen)
 
 # Wiederverwendung der bereits gepflegten Listen aus dem einfachen Editor.
 from src.ui.widgets.fixture_editor import FIXTURE_TYPES, CHANNEL_ATTRS
@@ -48,6 +51,9 @@ from src.core.dimmer_segmente import (HINWEIS_TEXT, SegmentZiele,
                                       vorschlag_dimmer_segmente,
                                       zuordnung_fehlt, zuordnung_probleme)
 from src.core.database.fixture_db import segment_wert
+# LAS-33: Laser-Angaben (Muster, Farben, Richtungen) — reine Daten und Pruefung.
+from src.core.laser.profilangaben import (bereichs_hinweise,
+                                          bereinige as laser_bereinige)
 from src.ui.widgets.fixture_editor import (KEIN_SEGMENT,
                                            frage_vorschlag_ueberschreiben,
                                            leerzelle_hintergrund,
@@ -115,6 +121,10 @@ class GenChannel:
     # ``None`` = keine Zuordnung). Gespeichert als ``FixtureChannel.segment``;
     # an Nicht-Dimmern verwirft ``build_profile_payload`` den Wert.
     segment: int | None = None
+    # LAS-33: Laser-Angaben dieses Kanals — Musterliste, Farbtabelle, Richtung,
+    # Betriebsart (Aufbau: ``src/core/laser/profilangaben.py``). Leer = keine.
+    # Die Laser-Seiten des Dialogs schreiben direkt hinein.
+    laser: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -158,6 +168,15 @@ class GeneratorModel:
     # FM-12: expliziter 3D-Modell-Override ("" = Automatik/Vorschlag).
     viz_model: str = ""
     modes: list[GenMode] = field(default_factory=list)
+    # FM-76: Herkunft der geladenen Vorlage — die vier Felder ``quelle``/
+    # ``herkunft``/``geprueft``/``autor`` wie in der Bibliotheksdatei.
+    # ``None`` = frei gebaut („eigen“). Bleibt beim Umbauen im Dialog stehen:
+    # die Lizenzpflicht folgt dem Ursprung, nicht dem Umfang der Aenderung.
+    herkunft: dict | None = None
+    # FM-76: nicht leer = das Modell kommt aus einer Vorlage, deren Herkunft
+    # sich nicht belegen laesst (Grund im Text). Dann wird nicht gespeichert —
+    # sonst ginge die Vorlage still als „eigen“ durch (wie UI-82).
+    herkunft_fehlt: str = ""
 
     def to_payload(self) -> dict:
         return build_profile_payload(self)
@@ -189,6 +208,8 @@ def build_profile_payload(model: GeneratorModel) -> dict:
                 # fuer Dimmer-Attribute in `channels_for_axis`).
                 "segment": (segment_wert(ch.segment)
                             if ist_dimmer(ch.attribute) else None),
+                # LAS-33: nur was gueltig ist (mit Version), sonst ``None``.
+                "laser": laser_bereinige(ch.laser),
                 "ranges": [
                     {"range_from": _clamp(r.range_from),
                      "range_to": _clamp(r.range_to),
@@ -253,13 +274,62 @@ def _clamp_geo(v) -> int:
 
 # ── Speichern in die Fixture-DB ──────────────────────────────────────────────
 
-def save_generated_profile(payload: dict, *, engine=None) -> int:
+def save_generated_profile(payload: dict, *, engine=None,
+                           herkunft: dict | None = None) -> int:
     """Speichert ein von :func:`build_profile_payload` erzeugtes Payload als
     neues FixtureProfile (source="user") in der Fixture-DB. Gibt die neue
     Profil-ID zurueck. ``engine`` erlaubt eine Test-DB (Default: globale DB).
+    ``herkunft`` (FM-76): die Herkunft der Vorlage, siehe
+    :func:`herkunft_zum_speichern`; ``None`` = eigenes Profil.
     """
     from src.core.database import fixture_db as fdb
-    return fdb.create_user_profile(payload, engine=engine)
+    return fdb.create_user_profile(payload, engine=engine, herkunft=herkunft)
+
+
+def herkunft_zum_speichern(model: GeneratorModel) -> dict | None:
+    """FM-76: die Herkunft, mit der ``model`` gespeichert wird — die der
+    geladenen Vorlage, bei QLC+/OFL mit dem Vermerk, dass sie im Generator
+    bearbeitet wurde; ``None`` fuer ein frei gebautes Profil."""
+    if not model.herkunft:
+        return None
+    from src.core.database import bibliothek_format as BF
+    h = BF.mit_vermerk(model.herkunft, BF.GENERATOR_VERMERK)
+    # Herkunft und Lizenz folgen der Vorlage — ihr Pruefvermerk nicht: der
+    # Inhalt kann im Generator veraendert worden sein.
+    h["geprueft"] = {"ok": False,
+                     "wie": "im Fixture-Generator aus einer Vorlage gebaut, "
+                            "nicht erneut geprueft"}
+    return h
+
+
+def herkunft_text(model: GeneratorModel) -> str:
+    """FM-76: kurze Anzeige der mitgetragenen Herkunft fuer die Hinweisliste
+    (leer bei einem frei gebauten Profil)."""
+    if model.herkunft_fehlt:
+        return ""
+    h = model.herkunft
+    if not h:
+        return ""
+    art = h["herkunft"].get("art", "")
+    lizenz = h["herkunft"].get("lizenz", "")
+    titel = h.get("quelle", {}).get("titel", "")
+    return (f"Herkunft der Vorlage: {_HERKUNFT_ARTEN.get(art, art)}, Lizenz {lizenz}"
+            + (f" — {titel}" if titel else "")
+            + ". Sie wird beim Speichern übernommen, auch wenn du das Profil "
+              "umbaust.")
+
+
+HERKUNFT_FEHLT_TITEL = "Herkunft nicht belegbar"
+
+
+def herkunft_fehlt_hinweis(model: GeneratorModel) -> str:
+    """FM-76: Text, warum ein Profil aus einer Vorlage ohne belegbare
+    Herkunft nicht gespeichert wird (Wortlaut wie UI-82)."""
+    return ("Die Herkunft der geladenen Vorlage lässt sich nicht belegen — "
+            "das neue Profil würde ihre Lizenz- und Herkunftsangabe verlieren. "
+            "Es wurde nichts gespeichert.\n\n" + model.herkunft_fehlt +
+            "\n\nAbhilfe: die Vorlage als Bibliotheksdatei (.json) oder als "
+            "QLC+-Datei (.qxf) laden — dann wird ihre Herkunft übernommen.")
 
 
 # ── Validierung (nicht-blockierende Hinweise) ────────────────────────────────
@@ -332,6 +402,9 @@ def validate_model(model: GeneratorModel) -> list[tuple[str, str]]:
 
         # LAS-26: Laser — gibt es einen Aus-Wert, und ist er der Grundwert?
         issues.extend(_check_laser_aus(model, mode, loc))
+
+        # LAS-33: Musterliste/Farbtabelle — Ueberlappungen und Luecken.
+        issues.extend(_check_laser_angaben(mode, loc))
 
     # Modus-Vergleich (gleiche Funktionen, andere Reihenfolge).
     issues.extend(_compare_modes(model.modes))
@@ -487,6 +560,32 @@ def _check_laser_aus(model: GeneratorModel, mode: GenMode,
     return []
 
 
+def _check_laser_angaben(mode: GenMode, loc: str) -> list[tuple[str, str]]:
+    """LAS-33: Hinweise zu den Laser-Angaben eines Modus — ueberlappende oder
+    lueckenhafte Bereiche in Musterliste, Farbtabelle und Betriebsart, und
+    Eintraege, die unvollstaendig sind und deshalb nicht gespeichert wuerden.
+    Nie eine Sperre: ein Laser mit erst acht gemessenen Mustern HAT Luecken."""
+    out: list[tuple[str, str]] = []
+    for i, ch in enumerate(mode.channels, 1):
+        laser = ch.laser if isinstance(ch.laser, dict) else {}
+        sauber = laser_bereinige(laser) or {}
+        for feld, was in (("muster", "Muster"), ("farben", "Farben"),
+                          ("betriebsart", "Betriebsart")):
+            roh = laser.get(feld) or []
+            if not roh:
+                continue
+            chloc = f"{loc}, Kanal {i} ('{ch.name}')"
+            fehlen = len(roh) - len(sauber.get(feld, ()))
+            if fehlen:
+                out.append(("warn",
+                            f"{chloc}: {fehlen} Eintrag/Einträge in „{was}“ "
+                            f"unvollständig (Name, Bereich oder Form fehlt) — "
+                            f"sie werden nicht gespeichert."))
+            for text in bereichs_hinweise(roh, was):
+                out.append(("warn", f"{chloc}: {text}"))
+    return out
+
+
 def laser_sicherheit_text(model: GeneratorModel) -> str:
     """Bestaetigung fuer die Hinweis-Box: ueber welchen Kanal und Wert LightOS
     jeden Laser-Modus dunkel schaltet. Leer, wenn kein Modus ein Laser ist."""
@@ -501,6 +600,77 @@ def laser_sicherheit_text(model: GeneratorModel) -> str:
         return ""
     return ("Laser-Sicherheit: Blackout, Grand Master 0, gezielter Blackout "
             "und Laser-NOT-AUS schalten auf „aus“ — " + "; ".join(teile) + ".")
+
+
+# ── FM-75: Live-Test mit einem Laser ─────────────────────────────────────────
+#
+# Der Live-Test schreibt beim Start sofort die Default-Werte ALLER Kanaele an
+# das echte Geraet und danach jede Fader-Bewegung — am Renderer, an Blackout
+# und Grand Master vorbei. Bei einem Laser hiess das: ein Klick auf „Test
+# starten“, und er strahlt, ohne Rueckfrage. Der Laser-NOT-AUS wirkt nur auf
+# GEPATCHTE Laser; ein Profil, das hier erst entsteht, ist meist nicht gepatcht.
+
+def live_test_aus_werte(model: GeneratorModel, mode: GenMode | None) -> dict[int, int]:
+    """Kanal-Offset (0-basiert) -> Wert, mit dem der Test einen Laser dunkel
+    schaltet. Leer, wenn der Modus kein Laser ist oder keinen Aus-Wert kennt.
+    Dieselbe Erkennung wie Pruefung und Sende-Pfad (``laser_aus_kanal``)."""
+    treffer = laser_aus_kanal(model, mode) if mode is not None else None
+    if treffer is None:
+        return {}
+    nr, _ch, wert = treffer
+    return {nr - 1: int(wert)}
+
+
+def _default_ist_aus(ch: GenChannel, wert: int) -> bool:
+    band = next((r for r in ch.ranges
+                 if int(r.range_from) <= wert <= int(r.range_to)), None)
+    lo = int(band.range_from) if band is not None else wert
+    hi = int(band.range_to) if band is not None else wert
+    return lo <= int(ch.default_value) <= hi
+
+
+def live_test_laser_hinweis(model: GeneratorModel, mode: GenMode | None,
+                            universe: int, adresse: int) -> str:
+    """Text der Rueckfrage vor einem Live-Test mit einem Laser — leer, wenn
+    der Modus kein Laser ist (dann startet der Test wie bisher ohne Frage)."""
+    if mode is None or not mode.channels or not _ist_laser_modell(model, mode):
+        return ""
+    n = len(mode.channels)
+    bis = min(512, int(adresse) + n - 1)
+    wo = (f"Adresse {adresse}" if bis == adresse
+          else f"Adresse {adresse}–{bis}")
+    teile = [
+        f"Dieses Profil ist ein Laser. Der Live-Test sendet sofort echte "
+        f"DMX-Werte an Universe {universe}, {wo}: zuerst die Default-Werte "
+        f"der {n} Kanäle, danach jede Fader-Bewegung."]
+    treffer = laser_aus_kanal(model, mode)
+    if treffer is None:
+        teile.append(
+            "⚠ Für diesen Modus ist kein Aus-Wert hinterlegt. Ob der Laser mit "
+            "den Default-Werten strahlt, kann LightOS nicht sagen — rechne "
+            "damit. „Blackout“ im Test setzt alle Kanäle auf 0; auch das kann "
+            "bei einem Laser „an“ heißen.")
+    else:
+        nr, ch, wert = treffer
+        if _default_ist_aus(ch, wert):
+            teile.append(
+                f"Mit den Default-Werten bleibt er aus (Kanal {nr} "
+                f"„{ch.name}“ = {int(ch.default_value)}). Er strahlt, sobald "
+                f"du diesen Fader aus dem Aus-Bereich bewegst.")
+        else:
+            teile.append(
+                f"⚠ Mit den Default-Werten strahlt er SOFORT: Kanal {nr} "
+                f"„{ch.name}“ startet auf {int(ch.default_value)}, „aus“ "
+                f"wäre {wert}.")
+        teile.append(
+            f"„Blackout“ im Test stellt Kanal {nr} auf {wert} (aus) und alle "
+            f"anderen Kanäle auf 0.")
+    teile.append(
+        "Vorher prüfen: Niemand steht im Strahlbereich, der Laser ist sicher "
+        "ausgerichtet, und Schlüsselschalter oder Not-Aus am Gerät sind "
+        "erreichbar. Löst jemand den Laser-NOT-AUS von LightOS aus, beendet "
+        "das auch diesen Test.")
+    return "\n\n".join(teile)
 
 
 def _compare_modes(modes: list[GenMode]) -> list[tuple[str, str]]:
@@ -569,22 +739,45 @@ class LiveTester:
                 self._saved[addr] = 0
         self._u.set_channel(addr, _clamp(value))
 
-    def blackout(self):
+    def blackout(self, aus_werte: dict | None = None):
         """Setzt alle bisher angefassten Kanaele auf 0 (Test-Blackout), ohne den
-        gemerkten Restore-Stand zu verwerfen."""
+        gemerkten Restore-Stand zu verwerfen.
+
+        ``aus_werte`` (FM-75): Kanal-Offset -> Wert fuer Kanaele, an denen 0
+        NICHT „aus“ heisst — die Betriebsart eines Lasers (0 = „Auto run“ bei
+        manchen Geraeten). Auch hier nur, was der Test schon angefasst hat."""
         if self._u is None:
             return
+        sonder = {self._base + int(off): _clamp(wert)
+                  for off, wert in (aus_werte or {}).items()}
         for addr in list(self._saved.keys()):
             try:
-                self._u.set_channel(addr, 0)
+                self._u.set_channel(addr, sonder.get(addr, 0))
             except Exception:
                 pass
 
-    def restore(self):
+    def halten(self):
+        """FM-75: den Test beenden, OHNE die Vorwerte zurueckzuschreiben — was
+        zuletzt gesetzt wurde (der Blackout mit Aus-Werten), bleibt stehen.
+        Fuer den Laser-NOT-AUS: die Vorwerte waren meist 0, und 0 kann einen
+        Laser einschalten. Idempotent."""
+        self._saved.clear()
+        self._active = False
+
+    def restore(self, aus_werte: dict | None = None):
         """Stellt alle waehrend des Tests gesetzten Kanaele auf ihren Vorwert
-        zurueck und beendet den Test (idempotent)."""
+        zurueck und beendet den Test (idempotent).
+
+        ``aus_werte`` (FM-75, Kanal-Offset -> Wert): war der Vorwert eines
+        solchen Kanals 0, bleibt stattdessen der Aus-Wert stehen. 0 heisst an
+        der Betriebsart mancher Laser „Auto run“ — „Test stoppen“ schaltete
+        den Laser sonst EIN. Ein Vorwert ungleich 0 (laufende Show) gewinnt."""
+        sonder = {self._base + int(off): _clamp(wert)
+                  for off, wert in (aus_werte or {}).items()}
         if self._u is not None:
             for addr, val in self._saved.items():
+                if not val and sonder.get(addr):
+                    val = sonder[addr]
                 try:
                     self._u.set_channel(addr, val)
                 except Exception:
@@ -594,6 +787,44 @@ class LiveTester:
 
 
 # ── Markdown-Export (optional) ───────────────────────────────────────────────
+
+_HERKUNFT_ARTEN = {"qlcplus": "QLC+", "ofl": "Open Fixture Library",
+                   "lightos": "LightOS", "hersteller-handbuch": "Herstellerhandbuch"}
+
+
+def herkunft_markdown(model: GeneratorModel) -> list[str]:
+    """FM-77: Herkunftsblock fuer den Markdown-Export — dieselben Angaben,
+    mit denen das Profil gespeichert wuerde (:func:`herkunft_zum_speichern`,
+    bei QLC+/OFL samt Vermerk „im LightOS-Fixture-Generator bearbeitet“).
+    Eine Kanaltabelle aus einer Vorlage verlaesst das Programm so nie ohne
+    Lizenz- und Urheberangabe (Apache-2.0 §4, MIT). Frei gebaut = „eigen“;
+    nicht belegbar = ausdruecklich so, nie still „eigen“."""
+    if model.herkunft_fehlt:
+        return ["**Herkunft:** nicht belegbar — " + model.herkunft_fehlt]
+    h = herkunft_zum_speichern(model)
+    if not h:
+        return ["**Herkunft:** eigen (frei im LightOS-Fixture-Generator gebaut)"]
+    hk = h.get("herkunft", {})
+    q = h.get("quelle", {})
+    art = hk.get("art", "")
+    zeilen = ["## Herkunft", ""]
+    quelle = q.get("titel", "")
+    if q.get("url"):
+        quelle = f"{quelle} ({q['url']})" if quelle else q["url"]
+    if quelle:
+        zeilen.append(f"- Quelle: {quelle}")
+    zeilen.append(f"- Art: {_HERKUNFT_ARTEN.get(art, art)}")
+    zeilen.append(f"- Lizenz: {hk.get('lizenz', '') or '—'}")
+    if hk.get("urheber"):
+        zeilen.append(f"- Urheber: {hk['urheber']}")
+    if hk.get("original"):
+        zeilen.append(f"- Original: {hk['original']}")
+    if hk.get("geaendert"):
+        zeilen.append(f"- Geändert: {hk['geaendert']}")
+    if h.get("autor"):
+        zeilen.append(f"- Autor: {h['autor']}")
+    return zeilen
+
 
 def model_to_markdown(model: GeneratorModel) -> str:
     """Kanal-Layout des Modells als Markdown (Tabellen je Modus, wie
@@ -608,6 +839,8 @@ def model_to_markdown(model: GeneratorModel) -> str:
     if model.notes:
         lines.append("")
         lines.append(model.notes)
+    lines.append("")
+    lines.extend(herkunft_markdown(model))
     for mode in model.modes:
         lines.append("")
         lines.append(f"## {mode.name} ({len(mode.channels)} Kanäle)")
@@ -896,7 +1129,33 @@ class _ModeTab(QWidget):
         self._range_editor = _RangeEditor()
         split.addWidget(self._range_editor)
         split.setSizes([420, 320])
-        lay.addWidget(split, 1)
+
+        # ── LAS-33: Laser-Seiten ─────────────────────────────────────────────
+        #
+        # Die Kanaltabelle bleibt die erste Seite; daneben drei Seiten fuer die
+        # Laser-Angaben (Muster, Farben, Richtungen). Bei einem Nicht-Laser
+        # sind sie samt Reiterleiste ausgeblendet — der Dialog sieht dann aus
+        # wie vorher und verliert keine Zeile Hoehe (FM-70).
+        from src.ui.widgets.laser_profil_seiten import (FarbSeite, MusterSeite,
+                                                        RichtungSeite)
+        self._seiten = QTabWidget()
+        self._seiten.setDocumentMode(True)
+        self._seiten.addTab(split, "Kanäle && Bereiche")
+        self.laser_muster = MusterSeite(mode, self._laser_geaendert)
+        self.laser_farben = FarbSeite(mode, self._laser_geaendert)
+        self.laser_richtung = RichtungSeite(mode, self._laser_geaendert)
+        self._laser_seiten = (self.laser_muster, self.laser_farben,
+                              self.laser_richtung)
+        for seite, titel in zip(self._laser_seiten,
+                                ("Laser: Muster", "Laser: Farben",
+                                 "Laser: Richtungen")):
+            self._seiten.addTab(seite, titel)
+        self._seiten.currentChanged.connect(self._seite_gewechselt)
+        lay.addWidget(self._seiten, 1)
+        #: Rueckruf des Dialogs nach einer Aenderung auf einer Laser-Seite.
+        self.laser_geaendert = None
+        self._typ_laser = False
+        self.set_typ_laser(False)
 
         self._refresh()
 
@@ -924,6 +1183,45 @@ class _ModeTab(QWidget):
 
     def _on_name_changed(self):
         self.mode.name = self._edit_name.text().strip() or "Modus"
+
+    # ── LAS-33: Laser-Seiten ─────────────────────────────────────────────
+    def ist_laser(self) -> bool:
+        """Zeigt dieser Modus die Laser-Seiten? Ja, wenn der Geraetetyp
+        „laser“ ist oder ein Kanal ein Laser-Attribut traegt."""
+        return self._typ_laser or any(
+            (c.attribute or "").startswith("laser_") for c in self.mode.channels)
+
+    def set_typ_laser(self, typ_laser: bool) -> None:
+        """Vom Dialog gesetzt, wenn sich der Geraetetyp aendert."""
+        self._typ_laser = bool(typ_laser)
+        self._laser_sichtbarkeit()
+
+    def _laser_sichtbarkeit(self) -> None:
+        laser = self.ist_laser()
+        for i in range(1, self._seiten.count()):
+            self._seiten.setTabVisible(i, laser)
+        self._seiten.tabBar().setVisible(laser)
+        if not laser and self._seiten.currentIndex() != 0:
+            self._seiten.setCurrentIndex(0)
+
+    def laser_seiten_sichtbar(self) -> bool:
+        return self._seiten.isTabVisible(1)
+
+    def zeige_seite(self, index: int) -> None:
+        """0 = Kanaele, 1 = Muster, 2 = Farben, 3 = Richtungen."""
+        self._seiten.setCurrentIndex(index)
+
+    def _seite_gewechselt(self, index: int) -> None:
+        # Kanalnamen/-reihenfolge koennen sich auf der ersten Seite geaendert
+        # haben — die Laser-Seite beim Betreten neu aus dem Modus aufbauen.
+        self.sync_from_widgets()
+        seite = self._seiten.widget(index)
+        if seite in self._laser_seiten:
+            seite.aktualisieren()
+
+    def _laser_geaendert(self) -> None:
+        if self.laser_geaendert is not None:
+            self.laser_geaendert()
 
     def _add(self):
         self.sync_from_widgets()
@@ -1008,6 +1306,8 @@ class _ModeTab(QWidget):
             self._ziele.nachziehen(self.mode.channels)
             self._sync_fine_combo()
             self._refresh_segment_cells()
+            # LAS-33: ein Laser-Attribut blendet die Laser-Seiten ein.
+            self._laser_sichtbarkeit()
 
     # ── FM-46: Spalte „Weiß-Segment“ ─────────────────────────────────────
     # Dieselbe Spalte wie im einfachen Editor (Begruendung dort, an
@@ -1174,15 +1474,41 @@ def _center(widget: QWidget) -> QWidget:
     return w
 
 
+def _laser_test_fragen(parent, text: str) -> bool:
+    """FM-75: die Rueckfrage selbst. Knoepfe mit festen Namen statt Ja/Nein
+    (deren Beschriftung haengt an der Qt-Uebersetzung); Vorgabe und Escape
+    sind „Abbrechen“ — ein versehentliches Enter startet nichts."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Live-Test mit einem Laser starten?")
+    box.setText(text)
+    start = box.addButton("Test starten", QMessageBox.ButtonRole.AcceptRole)
+    abbrechen = box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+    box.setDefaultButton(abbrechen)
+    box.setEscapeButton(abbrechen)
+    box.exec()
+    return box.clickedButton() is start
+
+
 class _LiveTestPanel(QGroupBox):
     """Echter Live-Test: Universe + Startadresse + ein Fader pro Kanal, der
     direkt ins Universe schreibt. 'Wackeln' rampt einen Kanal hin/her.
     Sauberes Restore beim Schliessen."""
 
+    #: FM-75: so oft wird waehrend eines Laser-Tests nach dem NOT-AUS gesehen.
+    NOTAUS_PRUEFEN_MS = 150
+
     def __init__(self, dialog: "FixtureGeneratorDialog", parent=None):
         super().__init__("Live-Test (echte DMX-Ausgabe)", parent)
         self._dialog = dialog
         self._tester: LiveTester | None = None
+        # FM-75: Aus-Werte des laufenden Tests (Kanal-Offset -> Wert) und die
+        # Wache, die einen Laser-Test beim Laser-NOT-AUS beendet. Ein Timer im
+        # UI-Thread statt eines Abonnements: der NOT-AUS kommt auch aus dem
+        # MIDI-/OSC-Thread, und der Test endet so in jedem Fall hier.
+        self._aus_werte: dict[int, int] = {}
+        self._notaus_timer = QTimer(self)
+        self._notaus_timer.timeout.connect(self._notaus_pruefen)
         self._faders: list[QSlider] = []
         self._wiggle_timer = QTimer(self)
         self._wiggle_timer.timeout.connect(self._wiggle_tick)
@@ -1240,11 +1566,56 @@ class _LiveTestPanel(QGroupBox):
         else:
             self._stop()
 
+    def _modell(self) -> GeneratorModel:
+        """Das Modell des Dialogs mit dem Stand der Kopf-Felder (Typ!)."""
+        try:
+            self._dialog._sync_all()
+        except Exception:
+            pass
+        return self._dialog._model
+
+    def _notaus_aktiv(self) -> bool:
+        try:
+            return bool(getattr(self._dialog.get_state(), "laser_estop_active", False))
+        except Exception:
+            return False
+
+    def _laser_test_erlaubt(self, mode: GenMode) -> str:
+        """FM-75: vor einem Live-Test mit einem Laser fragen — und bei
+        stehendem Laser-NOT-AUS gar nicht erst anfangen. Leer = starten,
+        sonst der Satz fuer die Infozeile."""
+        model = self._modell()
+        hinweis = live_test_laser_hinweis(model, mode, self._spin_univ.value(),
+                                          self._spin_addr.value())
+        if not hinweis:
+            return ""
+        if self._notaus_aktiv():
+            QMessageBox.warning(
+                self, "Live-Test",
+                "Der Laser-NOT-AUS ist aktiv. Solange er steht, startet "
+                "LightOS keinen Live-Test mit einem Laser.\n\n"
+                "Erst den NOT-AUS im Hauptfenster lösen — wenn der "
+                "Strahlbereich frei ist.")
+            return "Nicht gestartet — der Laser-NOT-AUS ist aktiv."
+        if not _laser_test_fragen(self, hinweis):
+            return "Nicht gestartet — es wurde nichts gesendet."
+        return ""
+
     def _start(self):
+        self._info.setStyleSheet("color:#9aa4af;")
         mode = self.current_mode()
         if not mode or not mode.channels:
-            self._info.setText("Kein Modus/Kanäle zum Testen.")
+            # Erst den Knopf loesen, dann der Text: das Loesen laeuft ueber
+            # `_stop`, und das schriebe sonst „Test gestoppt“ darueber.
             self._btn_start.setChecked(False)
+            self._info.setText("Kein Modus/Kanäle zum Testen.")
+            return
+        # FM-75: VOR dem ersten gesendeten Wert (und bevor die Ausgabe
+        # gestartet oder ein Universum angelegt wird).
+        absage = self._laser_test_erlaubt(mode)
+        if absage:
+            self._btn_start.setChecked(False)
+            self._info.setText(absage)
             return
         try:
             state = self._dialog.get_state()
@@ -1262,7 +1633,20 @@ class _LiveTestPanel(QGroupBox):
             self._btn_start.setChecked(False)
             return
 
+        ist_laser = _ist_laser_modell(self._modell(), mode)
+        # Codex-Review #1064: die Rueckfrage ist modal — waehrend sie offen
+        # steht, kann der NOT-AUS ueber MIDI/OSC/Web kommen. Deshalb hier,
+        # direkt vor dem ersten gesendeten Wert, noch einmal nachsehen.
+        if ist_laser and self._notaus_aktiv():
+            self._btn_start.setChecked(False)
+            self._info.setText(
+                "Nicht gestartet — der Laser-NOT-AUS wurde während der "
+                "Rückfrage ausgelöst. Es wurde nichts gesendet.")
+            return
         self._tester = LiveTester(universe, self._spin_addr.value())
+        self._aus_werte = live_test_aus_werte(self._modell(), mode)
+        if ist_laser:
+            self._notaus_timer.start(self.NOTAUS_PRUEFEN_MS)
         self._build_faders(mode)
         self._spin_univ.setEnabled(False)
         self._spin_addr.setEnabled(False)
@@ -1271,25 +1655,63 @@ class _LiveTestPanel(QGroupBox):
             f"AKTIV — Universe {univ_num}, Adresse {self._spin_addr.value()}. "
             f"Fader schreiben direkt aufs Gerät.")
 
+    def _notaus_pruefen(self):
+        """FM-75: der Laser-NOT-AUS beendet einen laufenden Laser-Test — der
+        Test schreibt am Renderer vorbei, und ein nicht gepatchtes Geraet
+        steht in keiner NOT-AUS-Maske. Der Laser geht auf seinen Aus-Wert und
+        BLEIBT dort (kein Zurueckschreiben der Vorwerte: die waren meist 0)."""
+        if self._tester is None:
+            self._notaus_timer.stop()
+            return
+        if not self._notaus_aktiv():
+            return
+        tester, self._tester = self._tester, None
+        aus_bekannt = bool(self._aus_werte)
+        tester.blackout(self._aus_werte)
+        tester.halten()
+        self._stop()
+        if aus_bekannt:
+            self._info.setText(
+                "Laser-NOT-AUS — Test beendet, Laser auf „aus“ gestellt.")
+        else:
+            # Codex-Review #1064: ohne hinterlegten Aus-Wert stehen jetzt alle
+            # Kanaele auf 0 — und 0 kann bei so einem Laser „an“ heissen (das
+            # sagt schon die Rueckfrage). Keine Entwarnung melden.
+            self._info.setText(
+                "⚠ Laser-NOT-AUS — Test beendet, alle Kanäle auf 0. Für diesen "
+                "Modus ist kein Aus-Wert hinterlegt: ob der Laser jetzt dunkel "
+                "ist, kann LightOS nicht sagen. Laser am Gerät ausschalten "
+                "(Schlüsselschalter/Not-Aus).")
+            self._info.setStyleSheet("color:#ff6b6b; font-weight:bold;")
+
     def _stop(self):
+        self._notaus_timer.stop()
         self._btn_wiggle.setChecked(False)
         self._wiggle_timer.stop()
+        bleibt = ""
         if self._tester is not None:
-            self._tester.restore()
+            self._tester.restore(self._aus_werte)
             self._tester = None
+            if any(self._aus_werte.values()):
+                off, wert = next((o, w) for o, w in self._aus_werte.items() if w)
+                bleibt = (f" Kanal {off + 1} steht auf {wert} (Laser aus), "
+                          f"falls dort vorher 0 stand.")
+        self._aus_werte = {}
         self._clear_faders()
         self._spin_univ.setEnabled(True)
         self._spin_addr.setEnabled(True)
         self._btn_start.setChecked(False)
         self._btn_start.setText("Test starten")
-        self._info.setText("Test gestoppt — Kanäle zurückgesetzt.")
+        self._info.setText("Test gestoppt — Kanäle zurückgesetzt." + bleibt)
 
     def _on_blackout(self):
         if self._tester is not None:
-            self._tester.blackout()
-            for f in self._faders:
+            # FM-75: bei einem Laser ist 0 nicht immer „aus“ — die Betriebsart
+            # geht auf ihren Aus-Wert, und der Fader zeigt ihn.
+            self._tester.blackout(self._aus_werte)
+            for i, f in enumerate(self._faders):
                 f.blockSignals(True)
-                f.setValue(0)
+                f.setValue(self._aus_werte.get(i, 0))
                 f.blockSignals(False)
 
     def _build_faders(self, mode: GenMode):
@@ -1356,9 +1778,10 @@ class _LiveTestPanel(QGroupBox):
 
     def shutdown(self):
         """Sauberes Restore/Blackout — vom Dialog bei close/reject aufgerufen."""
+        self._notaus_timer.stop()
         self._wiggle_timer.stop()
         if self._tester is not None:
-            self._tester.restore()
+            self._tester.restore(self._aus_werte)
             self._tester = None
 
 
@@ -1370,7 +1793,12 @@ class FixtureGeneratorDialog(QDialog):
     def __init__(self, parent=None, model: GeneratorModel | None = None):
         super().__init__(parent)
         self.setWindowTitle("Fixture Generator")
-        self.setMinimumSize(900, 680)
+        # FM-74: KEIN grosses Mindestmass mehr. `setMinimumSize(900, 680)`
+        # ersetzte den Mindestbedarf des Layouts (~1100 x 970) — der Dialog
+        # durfte kleiner sein als sein Inhalt und schob dann Tabellenkopf,
+        # Knoepfe und Felder uebereinander. Der Inhalt liegt jetzt in einem
+        # Rollbereich; die Startgroesse setzt `showEvent`.
+        self.setMinimumSize(640, 420)
         self.saved_id: int | None = None
         self._model = model or _default_model()
         self._setup_ui()
@@ -1391,7 +1819,13 @@ class FixtureGeneratorDialog(QDialog):
 
     # ── UI-Aufbau ────────────────────────────────────────────────────────
     def _setup_ui(self):
-        root = QVBoxLayout(self)
+        # FM-74: alles ausser der Knopfzeile liegt in einem Rollbereich —
+        # `root` ist das Layout des Inhalts, `aussen` das des Dialogs.
+        aussen = QVBoxLayout(self)
+        inhalt = QWidget()
+        root = QVBoxLayout(inhalt)
+        root.setContentsMargins(0, 0, 0, 0)
+        aussen.addWidget(InhaltsRollbereich(inhalt), 1)
 
         # Kopf — FM-70: zweispaltig. Einspaltig nahm der Kopf ein Drittel der
         # Dialoghoehe; auf einem 1080er-Bildschirm (Dialog max. ~1000 px) blieb
@@ -1424,7 +1858,9 @@ class FixtureGeneratorDialog(QDialog):
         self._spin_power.setValue(self._model.power_w)
         self._edit_notes = QLineEdit(self._model.notes)
         b_import = QPushButton("QLC+ (.qxf) importieren…")
-        b_import.setToolTip("Vorhandene QLC+-Definition als Startpunkt laden.")
+        b_import.setToolTip(
+            "Vorhandene QLC+-Definition als Startpunkt laden. Die Herkunft "
+            "(QLC+, Lizenz Apache-2.0) wird beim Speichern übernommen.")
         b_import.clicked.connect(self._import_qxf)
         felder = [("Hersteller:", self._edit_mfr, "Modell:", self._edit_model),
                   ("Kurzname:", self._edit_short, "Typ:", self._cb_type),
@@ -1434,9 +1870,21 @@ class FixtureGeneratorDialog(QDialog):
             grid.addWidget(w1, r, 1)
             grid.addWidget(QLabel(l2), r, 2)
             grid.addWidget(w2, r, 3)
+        # LAS-33: ein LightOS-Profil (aus dem Fixture-Editor exportiert oder
+        # aus der Bibliothek) als Vorlage laden — samt Laser-Angaben.
+        b_profil = QPushButton("LightOS-Profil (.json) laden…")
+        b_profil.setToolTip(
+            "Ein LightOS-Profil als Startpunkt laden — z. B. um einem Laser "
+            "Muster, Farben und Richtungen nachzutragen. Gespeichert wird ein "
+            "neues Profil; die Herkunft und Lizenz der Vorlage werden "
+            "übernommen.")
+        b_profil.clicked.connect(self._import_profil)
+        laden = QHBoxLayout()
+        laden.addWidget(b_profil)
+        laden.addWidget(b_import)
         grid.addWidget(QLabel("Notizen:"), 3, 0)
-        grid.addWidget(self._edit_notes, 3, 1, 1, 2)
-        grid.addWidget(b_import, 3, 3)
+        grid.addWidget(self._edit_notes, 3, 1)
+        grid.addLayout(laden, 3, 2, 1, 2)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         root.addWidget(head)
@@ -1484,7 +1932,16 @@ class FixtureGeneratorDialog(QDialog):
         self._btn_box.accepted.connect(self._save)
         self._btn_box.rejected.connect(self.reject)
         btns.addWidget(self._btn_box)
-        root.addLayout(btns)
+        # FM-74: ausserhalb des Rollbereichs — Speichern bleibt erreichbar.
+        aussen.addLayout(btns)
+
+    def showEvent(self, e):
+        # FM-74: Startgroesse aus dem Bedarf des Inhalts, begrenzt auf den
+        # Bildschirm. Erst hier, weil erst jetzt Modi und Typ (Laser-Seiten)
+        # stehen; VOR `super()`, damit Qt mit der endgueltigen Groesse einmittet.
+        beim_ersten_zeigen_anpassen(self, wunsch=QSize(1200, 0),
+                                    zugabe=QSize(0, 120))
+        super().showEvent(e)
 
     # ── FM-30: `Return` speichert nicht mehr das ganze Profil ────────────
     #
@@ -1559,6 +2016,9 @@ class FixtureGeneratorDialog(QDialog):
         self._tabs.addTab(tab, tab.mode.name)
         tab._edit_name.editingFinished.connect(
             lambda t=tab: self._reiter_benennen(t))
+        # LAS-33: Laser-Seiten — sichtbar je nach Typ, Aenderungen pruefen.
+        tab.set_typ_laser(self._cb_type.currentText() == "laser")
+        tab.laser_geaendert = self._laser_hinweise
         return tab
 
     def _reiter_benennen(self, tab: "_ModeTab"):
@@ -1634,9 +2094,22 @@ class FixtureGeneratorDialog(QDialog):
         label = VIZ_MODEL_LABELS.get(sug, sug)
         self._cb_vizmodel.setItemText(0, f"Automatisch (Vorschlag: {label})")
 
+    def _laser_hinweise(self):
+        """LAS-33: nach einer Aenderung auf einer Laser-Seite nur die
+        Hinweisliste neu rechnen (kein Zuruecklesen der Tabellen noetig — die
+        Seiten schreiben direkt ins Modell)."""
+        self._zeige_hinweise()
+
     def _revalidate(self):
         self._sync_all()
         self._update_viz_suggestion()
+        # LAS-33: Typ „laser“ blendet die Laser-Seiten der Modi ein.
+        for i in range(self._tabs.count()):
+            self._tabs.widget(i).set_typ_laser(
+                self._model.fixture_type == "laser")
+        self._zeige_hinweise()
+
+    def _zeige_hinweise(self):
         issues = validate_model(self._model)
         # LAS-26: bei Lasern sagen, worueber LightOS ihn dunkel schaltet.
         try:
@@ -1653,6 +2126,17 @@ class FixtureGeneratorDialog(QDialog):
             rows.append(f"<span style='color:{color};'>[{tag}]</span> {text}")
         if laser:
             rows.append(f"<span style='color:#3fb950;'>{laser}</span>")
+        # FM-76: woher die geladene Vorlage stammt (wird mitgespeichert).
+        if self._model.herkunft_fehlt:
+            rows.append("<span style='color:#f85149;'>[FEHLER]</span> "
+                        + html.escape("Herkunft der Vorlage nicht belegbar — "
+                                      "Speichern nicht möglich. "
+                                      + self._model.herkunft_fehlt))
+        else:
+            ht = herkunft_text(self._model)
+            if ht:
+                rows.append("<span style='color:#58a6ff;'>[Herkunft]</span> "
+                            + html.escape(ht))
         self._issues.setHtml("<br>".join(rows))
 
     # ── Import / Export ──────────────────────────────────────────────────
@@ -1666,11 +2150,33 @@ class FixtureGeneratorDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Import", f"Import fehlgeschlagen:\n{e}")
             return
+        self.set_model(model)
+
+    def _import_profil(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "LightOS-Profil (.json) wählen", "", "LightOS-Profil (*.json)")
+        if not path:
+            return
+        try:
+            from src.core.database import bibliothek_format as BF
+            model = model_from_daten(BF.lade_datei(path))
+        except Exception as e:
+            QMessageBox.warning(self, "Laden", f"Laden fehlgeschlagen:\n{e}")
+            return
+        self.set_model(model)
+
+    def set_model(self, model: GeneratorModel) -> None:
+        """Ein anderes Modell in den Dialog laden (Import, Vorlage)."""
         self._model = model
         self._edit_mfr.setText(model.manufacturer)
         self._edit_model.setText(model.model)
         self._edit_short.setText(model.short_name)
+        # Der Typ-Wechsel loest sonst `_revalidate` aus, BEVOR Leistung,
+        # 3D-Modell und Notizen gesetzt sind — `_sync_all` laese dann die
+        # alten Feldinhalte ins neue Modell zurueck.
+        self._cb_type.blockSignals(True)
         self._cb_type.setCurrentText(model.fixture_type)
+        self._cb_type.blockSignals(False)
         vidx = self._cb_vizmodel.findData(model.viz_model or "")
         self._cb_vizmodel.setCurrentIndex(vidx if vidx >= 0 else 0)
         self._spin_power.setValue(model.power_w)
@@ -1713,6 +2219,11 @@ class FixtureGeneratorDialog(QDialog):
             QMessageBox.warning(self, "Speichern",
                                 "Mindestens ein Modus mit Kanälen nötig.")
             return
+        # FM-76: Vorlage ohne belegbare Herkunft — nicht still als „eigen“.
+        if self._model.herkunft_fehlt:
+            QMessageBox.warning(self, HERKUNFT_FEHLT_TITEL,
+                                herkunft_fehlt_hinweis(self._model))
+            return
         # Live-Test sauber beenden, bevor wir speichern.
         self._live.shutdown()
 
@@ -1727,7 +2238,9 @@ class FixtureGeneratorDialog(QDialog):
             if ans != QMessageBox.StandardButton.Yes:
                 return
         try:
-            self.saved_id = save_generated_profile(self._model.to_payload())
+            self.saved_id = save_generated_profile(
+                self._model.to_payload(),
+                herkunft=herkunft_zum_speichern(self._model))
         except Exception as e:
             QMessageBox.warning(self, "Speichern", f"Fehlgeschlagen:\n{e}")
             return
@@ -1776,6 +2289,86 @@ def _default_model() -> GeneratorModel:
             GenChannel("Grün", "color_g", 0, 255),
             GenChannel("Blau", "color_b", 0, 255),
         ])])
+
+
+def model_from_daten(daten: dict) -> GeneratorModel:
+    """LAS-33: ein LightOS-Profil (Aufbau der Bibliotheksdatei,
+    ``fixtures/bibliothek/SCHEMA.md``) als :class:`GeneratorModel` — der Weg,
+    ein vorhandenes Profil im Generator WIEDER ZU OEFFNEN, samt Laser-Angaben.
+
+    Gespeichert wird danach wie immer ein NEUES Profil. FM-76: die Herkunft
+    der Vorlage (``quelle``/``herkunft``/``geprueft``/``autor``) reist mit
+    (``GeneratorModel.herkunft``) — fehlt sie oder ist sie ungueltig, steht
+    der Grund in ``herkunft_fehlt`` und gespeichert wird nicht."""
+    import copy
+    from src.core.database import bibliothek_format as BF
+    modes: list[GenMode] = []
+    for m in daten.get("modi", ()):
+        chans = []
+        for c in m.get("kanaele", ()):
+            chans.append(GenChannel(
+                name=str(c.get("name", "Kanal")),
+                attribute=str(c.get("attribut", "raw") or "raw"),
+                default_value=_clamp(c.get("default", 0)),
+                highlight_value=_clamp(c.get("highlight", 255)),
+                invert=bool(c.get("invert", False)),
+                resolution="16bit" if c.get("aufloesung") == "16bit" else "8bit",
+                ranges=[GenRange(_clamp(b.get("von", 0)), _clamp(b.get("bis", 255)),
+                                 str(b.get("name", "")), str(b.get("art", "") or ""))
+                        for b in c.get("bereiche", ())],
+                segment=segment_wert(c.get("segment")),
+                laser=copy.deepcopy(laser_bereinige(c.get("laser")) or {})))
+        raster, weiss = m.get("raster") or {}, m.get("weiss") or {}
+        modes.append(GenMode(
+            str(m.get("name", "Modus")), chans,
+            grid_rows=_clamp_geo(raster.get("rows", 0)),
+            grid_cols=_clamp_geo(raster.get("cols", 0)),
+            white_rows=_clamp_geo(weiss.get("rows", 0)),
+            white_cols=_clamp_geo(weiss.get("cols", 0))))
+    return GeneratorModel(
+        manufacturer=str(daten.get("hersteller", "Generic")),
+        short_mfr=str(daten.get("hersteller_kurz", "")),
+        model=str(daten.get("modell", PLATZHALTER_MODELL)),
+        short_name=str(daten.get("kurzname", "")),
+        fixture_type=str(daten.get("typ", "other")),
+        power_w=int(daten.get("leistung_w", 0) or 0),
+        notes=str(daten.get("notizen", "")),
+        viz_model=str(daten.get("viz_model", "")),
+        modes=modes,
+        herkunft=BF.herkunft_aus_daten(daten),
+        herkunft_fehlt="" if BF.herkunft_aus_daten(daten) else (
+            f"„{daten.get('hersteller', '?')} / {daten.get('modell', '?')}“: "
+            "die Vorlage nennt keine gültige Herkunft (quelle/herkunft/"
+            "geprueft/autor)."))
+
+
+def model_from_profile(profil_id: int, *, engine=None) -> GeneratorModel:
+    """LAS-33: ein Profil aus der Fixture-DB als :class:`GeneratorModel`
+    (siehe :func:`model_from_daten`)."""
+    from sqlalchemy.orm import Session
+    from src.core.database import bibliothek_format as BF
+    from src.core.database import fixture_db as fdb
+    # FM-76: die Herkunft des Profils (``herkunft_fuer``) reist mit. Laesst
+    # sie sich nicht belegen, wird der Inhalt trotzdem geladen (feste
+    # Platzhalter fuer den Export) — gespeichert wird dann aber nicht.
+    eng = engine if engine is not None else fdb.engine()
+    fehlt = ""
+    with Session(eng) as s:
+        prof = BF._profil_laden(s, profil_id)
+        if prof is None:
+            raise ValueError(f"Profil {profil_id} gibt es nicht")
+        try:
+            herkunft = BF.herkunft_fuer(prof)
+        except BF.ProfilFehler as e:
+            herkunft, fehlt = None, str(e)
+    platzhalter = {"quelle": {"titel": "Vorlage"},
+                   "herkunft": {"art": "lightos", "lizenz": "eigen"},
+                   "geprueft": {"ok": False, "wie": "Vorlage"}, "autor": "Vorlage"}
+    modell = model_from_daten(BF.exportiere(
+        profil_id, engine=eng, **(herkunft or platzhalter)))
+    if fehlt:
+        modell.herkunft, modell.herkunft_fehlt = None, fehlt
+    return modell
 
 
 def model_from_qxf(path: str) -> GeneratorModel:
@@ -1884,7 +2477,20 @@ def model_from_qxf(path: str) -> GeneratorModel:
                                      grid_rows=mode_grid[0],
                                      grid_cols=mode_grid[1]))
 
+    # FM-76: QLC+-Herkunft wie beim Bibliotheks-Import (Apache-2.0, Urheber
+    # aus <Creator>, Pfad in QLC+) — sonst ginge die Lizenz beim Speichern
+    # verloren.
+    from src.core.database.bibliothek_format import qxf_herkunft
+    herkunft = qxf_herkunft(
+        path, root,
+        geaendert="durch den LightOS-Fixture-Generator ins LightOS-Format "
+                  "uebernommen (Kanal-Attribute auf LightOS-Namen abgebildet, "
+                  "Default-/Highlight-Werte von LightOS gesetzt)",
+        autor="LightOS (Fixture-Generator, QXF-Import)",
+        wie="aus QLC+ in den Fixture-Generator geladen, nicht gegen das "
+            "Handbuch geprueft")
     return GeneratorModel(
         manufacturer=mfr, model=model_name,
         short_name=model_name[:40], fixture_type=TYPE_MAP.get(type_str, "other"),
-        notes=f"Importiert aus QLC+ ({type_str}).", modes=modes_out)
+        notes=f"Importiert aus QLC+ ({type_str}).", modes=modes_out,
+        herkunft=herkunft)

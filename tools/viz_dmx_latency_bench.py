@@ -34,6 +34,7 @@ Aufruf (Windows)::
 """
 from __future__ import annotations
 
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import argparse
 import json
 import math
@@ -56,6 +57,12 @@ def _qt(repo: str):
     os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
     os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
     os.environ.setdefault("LIGHTOS_SERIAL_INPROC", "1")
+    # TOOL-19: keinen echten Ausgang oeffnen — get_state() wendet sonst die echte
+    # universes.json an. Die Datei wird nie angelegt.
+    os.environ.setdefault(
+        "LIGHTOS_UNIVERSES_JSON",
+        os.path.join(tempfile.gettempdir(),
+                     f"lightos_vizbench_{os.getpid()}_universes.json"))
     from PySide6.QtWidgets import QApplication
     return QApplication.instance() or QApplication([])
 

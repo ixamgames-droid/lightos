@@ -6,14 +6,20 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QComboBox, QLineEdit, QLabel, QScrollArea,
                                 QColorDialog, QFrame, QSlider, QCheckBox, QDialog)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
-from PySide6.QtGui import QPainter, QColor, QFont, QPen
-from src.core.engine.rgb_matrix import RgbMatrixInstance, RgbAlgorithm, MatrixStyle, Color, is_gap
+from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
+from src.core.engine.rgb_matrix import (RgbMatrixInstance, RgbAlgorithm, MatrixStyle,
+                                        Color, is_gap, _MODIFY_STILE)
 from src.core.engine.rgb_matrix_meta import ALGO_META
+from src.core.engine.modify import (MODIFY_LABELS, MODIFY_MODES, MODIFY_KANAELE,
+                                    MODIFY_KANAL_LABELS, normalize_channels,
+                                    normalize_mode)
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
+from src.ui.widgets.modify_zeichen import MODIFY_VORSCHAU_RGB, MODIFY_ZEICHEN
 from src.ui.widgets.color_sequence_editor import ColorSequenceField
 from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.head_cell_colors import (
     fixture_cell_color, head_count_suffix, head_counts,
 )
@@ -27,7 +33,35 @@ from src.ui.head_cell_colors import (
 # alle Farb-Sequenz-Steuerungen beieinander stehen (statt verstreut im Bewegungs-
 # Block). engineseitig (list_params/VC) bleiben sie unveraendert verfuegbar.
 _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
-                                  "color_order", "color_interval"})
+                                  "color_order", "color_interval",
+                                  # ENG-37: Schrittweite des Lauflichts — festes
+                                  # Feld neben der Richtung, nur ein-/ausgeblendet.
+                                  "runner_step"})
+
+
+# Entscheidung des Betreibers (ENG-37/38): der Schweif gehoert zum Effekt und
+# wird mit verrechnet; der Haken „Modify-Effekt" stellt ihn nicht um. Der Satz
+# steht am Haken und — bei gesetztem Haken — am Feld „Schweif (%)“.
+_SCHWEIF_HINWEIS_MODIFY = (
+    "Bei einem Modify-Effekt zieht auch der Schweif die Veränderung nach. "
+    "Für einen scharfen Läufer den Schweif auf 0 % stellen.")
+
+
+# ENG-40: Vorschau-Farbe je angekreuztem Kanal eines Farb-Modify. Mehrere
+# Kanaele mischen sich additiv (Rot + Blau = Magenta), je Anteil bei 255 gekappt.
+_MODIFY_KANAL_FARBE = {
+    "r": (255, 0, 0), "g": (0, 255, 0), "b": (0, 0, 255),
+    "w": (255, 255, 255), "a": (255, 160, 0), "uv": (140, 0, 255),
+}
+
+
+def modify_kanal_vorschaufarbe(kanaele) -> tuple[int, int, int]:
+    """Mischfarbe der angekreuzten Kanaele fuer die Vorschau (volle Helligkeit)."""
+    r = g = b = 0
+    for k in normalize_channels(kanaele):
+        fr, fg, fb = _MODIFY_KANAL_FARBE[k]
+        r, g, b = r + fr, g + fg, b + fb
+    return (min(255, r), min(255, g), min(255, b))
 
 
 def _show_laedt() -> bool:
@@ -61,6 +95,24 @@ class MatrixPreview(QWidget):
     Rahmen je Zelle in derselben Farbsprache — Farbton je Geraet, Helligkeit je
     Kopf, aus ``src.ui.head_cell_colors`` und damit garantiert identisch zum
     Gruppen-Editor. Der Rahmen liegt UEBER der Effektfarbe, nimmt ihr also nichts."""
+
+    def modify_eckentext(self) -> str:
+        """Text in der Ecke der Vorschau: Zeichen der Betriebsart (ENG-37) und,
+        bei getroffener Kanalwahl im Farb-Modify, die betroffenen Kanaele
+        (ENG-40). Leer, wenn der Effekt kein Modify-Effekt ist."""
+        m = getattr(self, "_matrix", None)
+        mw = getattr(m, "modify_wirksam", None)
+        if mw is None or not mw():
+            return ""
+        # Zeichen aus derselben Quelle wie Taste/Fader (modify_zeichen) — auch
+        # „◐" fuer Abdunkeln (Entscheidung Projektinhaber 19.10.2026).
+        _art = normalize_mode(getattr(m, "modify_mode", "add"))
+        text = MODIFY_ZEICHEN[_art]
+        if getattr(m, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW):
+            kan = normalize_channels(getattr(m, "modify_channels", ()))
+            if kan:
+                text += " nur " + ", ".join(MODIFY_KANAL_LABELS[k] for k in kan)
+        return text
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -234,6 +286,21 @@ class MatrixPreview(QWidget):
         cell_w = (self.width() - 10) / cols
         cell_h = (self.height() - 10) / rows
         grid_assign = self._matrix.fixture_grid
+        modify_art = None
+        _mw = getattr(self._matrix, "modify_wirksam", None)
+        if _mw is not None and _mw():
+            modify_art = normalize_mode(getattr(self._matrix, "modify_mode", "add"))
+        # ENG-38: ein Farb-Modify zeigt seine ECHTEN Farben (das ist der Betrag
+        # je Farbkanal); die Betriebsart steht als Zeichen in der Ecke,
+        # Abdunkeln bleibt schraffiert.
+        modify_farbe = modify_art is not None and getattr(
+            self._matrix, "style", None) in (MatrixStyle.RGB, MatrixStyle.RGBW)
+        # ENG-40: mit Kanalwahl zeigt die Vorschau, WELCHE Kanaele betroffen
+        # sind — die Zelle in der Mischfarbe der angekreuzten Kanaele, so hell
+        # wie der Betrag; die Namen stehen neben dem Zeichen der Betriebsart.
+        modify_kanaele = (normalize_channels(getattr(
+            self._matrix, "modify_channels", ())) if modify_farbe else ())
+        kanal_farbe = modify_kanal_vorschaufarbe(modify_kanaele)
         for row in range(rows):
             for col in range(cols):
                 idx = row * cols + col
@@ -252,7 +319,37 @@ class MatrixPreview(QWidget):
                     p.drawLine(x, y, x + w - 1, y + h - 1)
                     continue
                 r, g, b = self._grid[idx]
-                p.fillRect(x, y, w, h, QColor(r, g, b))
+                if modify_kanaele:
+                    _lvl = max(r, g, b) / 255.0
+                    r, g, b = (int(kanal_farbe[0] * _lvl),
+                               int(kanal_farbe[1] * _lvl),
+                               int(kanal_farbe[2] * _lvl))
+                if modify_art is None:
+                    p.fillRect(x, y, w, h, QColor(r, g, b))
+                elif modify_farbe:
+                    if modify_art == "dim":
+                        p.fillRect(x, y, w, h, QColor("#0d1117"))
+                        p.fillRect(x, y, w, h, QBrush(
+                            QColor(r, g, b), Qt.BrushStyle.BDiagPattern))
+                    else:
+                        p.fillRect(x, y, w, h, QColor(r, g, b))
+                else:
+                    # ENG-37: Modify allein, nach Art eingefaerbt (Betrag = Helligkeit).
+                    lvl = max(r, g, b) / 255.0
+                    # ENG-37-B: Farben aus EINER Quelle (modify_zeichen) — die
+                    # Konsole zeigt das Zeichen der Betriebsart in denselben.
+                    vr, vg, vb = MODIFY_VORSCHAU_RGB[modify_art]
+                    if modify_art in ("add", "sub"):
+                        p.fillRect(x, y, w, h, QColor(
+                            int(vr * lvl), int(vg * lvl), int(vb * lvl)))
+                    else:
+                        p.fillRect(x, y, w, h, QColor("#0d1117"))
+                        p.fillRect(x, y, w, h, QBrush(
+                            QColor(int(vr * lvl), int(vg * lvl), int(vb * lvl)),
+                            Qt.BrushStyle.BDiagPattern))
+        if modify_art is not None:
+            p.setPen(QColor("#e6edf3"))
+            p.drawText(8, 18, self.modify_eckentext())
         # Zuordnungs-Overlay ZULETZT und nur als Rahmen: die Effektfarbe darunter
         # bleibt vollstaendig sichtbar (sie ist der Zweck der Vorschau).
         if self._show_assignment:
@@ -346,6 +443,11 @@ class RgbMatrixView(QWidget):
         # Einbettungs-Modus: die Matrix folgt automatisch der Programmer-Auswahl,
         # statt dass man hier separat Geräte zuweist (siehe R3-Fix).
         self._follow_selection = follow_selection
+        # UI-91: id der Matrix, die in DIESEM Editor frisch mit „+ Neu" angelegt
+        # wurde und deshalb der Programmer-Auswahl folgt — bis sie gespeichert,
+        # eine andere Zeile gewaehlt oder der Reiter verlassen wird. Jede andere
+        # Matrix aendert ihr Raster nur ueber „Auswahl übernehmen".
+        self._folgt_id: int | None = None
         self._setup_ui()
         self._connect_sync()
         self._rebuild_from_state()
@@ -644,11 +746,18 @@ class RgbMatrixView(QWidget):
         self._group_header.setText(txt)
         self._group_header.setVisible(True)
 
+    def _on_show_loaded(self):
+        """SHOW_LOADED: Funktions-ids stehen in der Show-Datei. Traegt eine
+        geladene Matrix zufaellig die id der zuvor hier frisch angelegten, darf
+        sie der Auswahl nicht folgen (UI-91) — geladen = gespeichert."""
+        self._folgt_id = None
+        self._rebuild_from_state()
+
     def _connect_sync(self):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._rebuild_from_state())
+            sync.subscribe_widget(SyncEvent.SHOW_LOADED, self, lambda *_: self._on_show_loaded())
             sync.subscribe_widget(SyncEvent.REFRESH_ALL, self, lambda *_: self._rebuild_from_state())
             # Abschnitt 1: neu erstellte/umbenannte/geloeschte Matrizen erscheinen
             # sofort in beiden Matrix-Ansichten (Programmer-Seite + Sub-Tab).
@@ -692,6 +801,7 @@ class RgbMatrixView(QWidget):
             if not vis:
                 self._saved = None
                 self._current = None
+                self._folgt_id = None
                 self._sync_preview(None)
                 self._update_group_header()
                 return
@@ -706,18 +816,22 @@ class RgbMatrixView(QWidget):
         # zweite Instanz (Sub-Tab vs. Programmer) nicht divergiert.
         super().showEvent(event)
         self._rebuild_from_state()
-        # Folgemodus: das Grid sofort aus der aktiven Auswahl/Gruppe ableiten,
-        # sobald die Matrix-Ansicht sichtbar wird. Ohne das zeigt der erste
-        # Wechsel auf den Matrix-Tab die 8x4-Standardmatrix, weil
-        # set_selected_fids() bei unveraenderter Auswahl kein SELECTION_CHANGED
-        # feuert (und set_selected_group_id() nie eines feuert) — das Grid wurde
-        # dann nie aus der gewaehlten Gruppe uebernommen. _assign_from_selection
-        # liest die selected_group_id direkt, also greift es beim ersten Mal.
+        # Folgemodus: die Liste sofort auf die aktive Gruppe filtern, sobald die
+        # Matrix-Ansicht sichtbar wird (set_selected_group_id() feuert kein
+        # Event). UI-91: Sichtbarwerden schreibt KEIN Raster mehr — frueher
+        # uebernahm die vorgewaehlte Matrix hier die Auswahl, Reiter oeffnen
+        # genuegte fuer eine stille Aenderung der Show.
         if self._follow_selection:
             try:
                 self._sync_follow_selection()
             except RuntimeError:
                 pass
+
+    def hideEvent(self, event):
+        # UI-91: Wer den Reiter verlaesst, hat die frisch angelegte Matrix
+        # fertig gebunden — beim Wiederkommen folgt sie nicht mehr von selbst.
+        super().hideEvent(event)
+        self._folgt_id = None
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -846,6 +960,19 @@ class RgbMatrixView(QWidget):
         self._style_combo.currentTextChanged.connect(self._on_style_change)
         fg.addRow("Stil:", self._style_combo)
 
+        # ENG-37: Modify-Effekt — verrechnen statt setzen. FESTES Feld; die
+        # zugehoerige Gruppe „Modify" (weiter unten) wird nur ein-/ausgeblendet,
+        # nie neu gebaut (STAB-38).
+        self._cb_modify = QCheckBox("Modify-Effekt")
+        self._cb_modify.toggled.connect(self._on_modify_toggled)
+        fg.addRow("", self._cb_modify)
+
+        # ENG-42: echter Läufer über einem Untergrund. FESTES Feld (STAB-38),
+        # nur freigegeben/gesperrt, nie neu gebaut.
+        self._cb_durchlassen = QCheckBox("Dunkle Lampen durchlassen")
+        self._cb_durchlassen.toggled.connect(self._on_durchlassen_toggled)
+        fg.addRow("", self._cb_durchlassen)
+
         self._cols_spin = SelectAllSpinBox()   # UXT-11a
         self._cols_spin.setRange(1, 64)
         self._cols_spin.setValue(8)
@@ -971,14 +1098,12 @@ class RgbMatrixView(QWidget):
         self._tempo_align_check.toggled.connect(self._param_change)
         ft.addRow("", self._tempo_align_check)
 
-        self._priority_spin = QSpinBox()
-        self._priority_spin.setRange(-99, 99)
-        self._priority_spin.setValue(0)
-        self._priority_spin.setToolTip(
-            "Layer-Priorität: höher gewinnt, wenn zwei Effekte denselben Kanal "
-            "schreiben. Gleiche Priorität = der zuletzt gestartete Effekt gewinnt.")
-        self._priority_spin.valueChanged.connect(self._param_change)
-        ft.addRow("Layer-Priorität:", self._priority_spin)
+        # ENG-35: Stufe statt Zahlenfeld „Layer-Priorität“. Lose Betriebsart —
+        # der Editor rechnet auf einer Arbeitskopie und schreibt beim Speichern.
+        self._stufe_combo = StufeAuswahl()
+        self._stufe_combo.stufe_gewaehlt.connect(self._param_change)
+        ft.addRow("Stufe:", self._stufe_combo)
+        stufen_melder().geaendert.connect(self._stufe_von_aussen)
 
         self._env_in_spin = QDoubleSpinBox()
         self._env_in_spin.setRange(0.0, 60.0)
@@ -1130,6 +1255,74 @@ class RgbMatrixView(QWidget):
         fc.addRow(self._shut_form_label, shut_row)
         body.addWidget(grp_colors)
 
+        # ── Gruppe: Modify (ENG-37) — feste Felder, nur ein-/ausgeblendet ─────
+        self._grp_modify = QGroupBox("Modify")
+        self._grp_modify.setStyleSheet(_grp_style)
+        fm_ = QFormLayout(self._grp_modify)
+        fm_.setSpacing(6)
+        self._modify_mode_combo = QComboBox()
+        for _mode in MODIFY_MODES:
+            self._modify_mode_combo.addItem(MODIFY_LABELS[_mode], _mode)
+        self._modify_mode_combo.setToolTip(
+            "Addieren: legt den Betrag obendrauf.\n"
+            "Abziehen: nimmt den Betrag weg.\n"
+            "Abdunkeln: macht um so viel Prozent dunkler.\n"
+            "Wo der Effekt gerade nichts ausgibt, bleibt das Darunterliegende "
+            "unverändert.")
+        self._modify_mode_combo.currentIndexChanged.connect(self._param_change)
+        fm_.addRow("Betriebsart:", self._modify_mode_combo)
+        self._modify_strength_spin = SelectAllSpinBox()
+        self._modify_strength_spin.setRange(0, 100)
+        self._modify_strength_spin.setValue(100)
+        self._modify_strength_spin.setSuffix(" %")
+        self._modify_strength_spin.setToolTip(
+            "Wie kräftig der Modify-Effekt zugreift. Der Regler "
+            "„Helligkeit“ des Effekts und seine Ein-/Ausblendzeit wirken "
+            "ebenfalls nur auf diese Stärke.")
+        self._modify_strength_spin.valueChanged.connect(self._param_change)
+        fm_.addRow("Stärke:", self._modify_strength_spin)
+        # ENG-40: Kanalwahl „Wirkt auf" — feste Felder, nur im Stil RGB/RGBW
+        # sichtbar. Vorgabe: die Modify-Farbe bestimmt die Kanaele (ENG-38).
+        from PySide6.QtWidgets import QGridLayout
+        self._modify_kanal_box = QWidget()
+        _kg = QGridLayout(self._modify_kanal_box)
+        _kg.setContentsMargins(0, 0, 0, 0)
+        _kg.setHorizontalSpacing(10)
+        _kg.setVerticalSpacing(2)
+        self._cb_modify_standard = QCheckBox("Kanäle der Modify-Farbe")
+        self._cb_modify_standard.setChecked(True)
+        self._cb_modify_standard.setToolTip(
+            "Vorgabe: Die Farbe des Modify-Effekts bestimmt, welche Farbkanäle "
+            "er verändert — Rot verändert Rot, bei RGBW läuft der Weißanteil "
+            "über den Weiß-Kanal.\n"
+            "Soll der Effekt nur bestimmte Kanäle verändern, darunter die "
+            "Kanäle ankreuzen. Dieser Haken setzt die Auswahl zurück.")
+        self._cb_modify_standard.toggled.connect(self._on_modify_standard_toggled)
+        _kg.addWidget(self._cb_modify_standard, 0, 0, 1, 3)
+        self._modify_kanal_cbs: dict[str, QCheckBox] = {}
+        for _i, _k in enumerate(MODIFY_KANAELE):
+            _cb = QCheckBox(MODIFY_KANAL_LABELS[_k])
+            _cb.setToolTip(
+                f"Der Modify-Effekt verändert nur den Kanal "
+                f"„{MODIFY_KANAL_LABELS[_k]}“ (und weitere angekreuzte) — mit "
+                "Betriebsart und Stärke von oben. Wie kräftig, bestimmt die "
+                "Helligkeit des Effekts an der Lampe; sein Farbton zählt dann "
+                "nicht mehr.\n"
+                "Lampen ohne diesen Kanal bleiben unberührt, es wird nichts "
+                "auf andere Kanäle umgerechnet. Der Dimmer gehört nicht dazu: "
+                "ihn verrechnet ein Modify-Effekt im Stil „Dimmer“.")
+            _cb.toggled.connect(self._on_modify_kanal_toggled)
+            _kg.addWidget(_cb, 1 + _i // 3, _i % 3)
+            self._modify_kanal_cbs[_k] = _cb
+        self._modify_kanal_label = QLabel("Wirkt auf:")
+        fm_.addRow(self._modify_kanal_label, self._modify_kanal_box)
+        self._modify_hint = QLabel("")
+        self._modify_hint.setWordWrap(True)
+        self._modify_hint.setStyleSheet("color:#8b949e; font-size:11px;")
+        fm_.addRow(self._modify_hint)
+        self._grp_modify.setVisible(False)
+        body.addWidget(self._grp_modify)
+
         # ── Gruppe: Bewegung & Parameter (Richtung + dynamische Algo-Parameter) ─
         # Richtung liegt in einer EIGENEN, dauerhaften Form-Zeile; die dynamischen
         # Felder darunter werden je Algorithmus komplett neu aufgebaut
@@ -1149,10 +1342,29 @@ class RgbMatrixView(QWidget):
         dir_form = QFormLayout()
         dir_form.setSpacing(6)
         dir_form.addRow(self._dir_label, self._dir_combo)
+        # ENG-37: Schrittweite des Lauflichts als FESTES Feld (wird nie neu
+        # gebaut, nur ein-/ausgeblendet — STAB-38). 1 = Lampe fuer Lampe wie
+        # bisher; 0 = „wie Breite“ (erst 1+2, dann 3+4 …).
+        self._runner_step_spin = QSpinBox()
+        self._runner_step_spin.setRange(0, 16)
+        self._runner_step_spin.setSpecialValueText("wie Breite")
+        self._runner_step_spin.setValue(1)
+        self._runner_step_spin.setToolTip(
+            "Um wie viele Lampen der Läufer je Schritt weiterspringt.\n"
+            "1 = Lampe für Lampe (wie bisher). „wie Breite“ = Block an Block: "
+            "bei Läufer-Breite 2 erst Lampe 1+2, dann 3+4, dann 5+6 …")
+        self._runner_step_spin.valueChanged.connect(self._param_change)
+        self._runner_step_label = QLabel("Schrittweite:")
+        dir_form.addRow(self._runner_step_label, self._runner_step_spin)
+        self._runner_step_label.setVisible(False)
+        self._runner_step_spin.setVisible(False)
         pbl.addLayout(dir_form)
-        self._param_form = QFormLayout()
-        self._param_form.setSpacing(6)
-        pbl.addLayout(self._param_form)
+        # STAB-38: die dynamischen Felder sitzen in einem eigenen Traeger-Widget,
+        # das beim Neuaufbau als Ganzes ersetzt wird (_neues_param_formular).
+        self._param_box_layout = pbl
+        self._param_traeger = None
+        self._param_form = None
+        self._neues_param_formular()
         body.addWidget(self._param_box)
 
         # ── Gruppe: Fixture-Grid-Zuweisung ────────────────────────────────────
@@ -1265,7 +1477,10 @@ class RgbMatrixView(QWidget):
                 break
         # Folgemodus: die neue Matrix sofort mit dem Gruppen-Grid versorgen, damit
         # nie die leere 8x4-Standardmatrix als „Phantom" sichtbar bleibt.
+        # UI-91: ausdruecklich hier (Neuanlage) — und nur DIESE Matrix folgt
+        # danach der Auswahl (_folgt_auswahl).
         if self._follow_selection and self._current is not None:
+            self._folgt_id = m.id
             self._assign_from_selection()
 
     def _delete(self):
@@ -1285,10 +1500,14 @@ class RgbMatrixView(QWidget):
             self._sync_preview(None)
             return
         self._saved = vis[row]
+        # UI-91: eine andere Zeile beendet das Folgen der frisch angelegten Matrix.
+        if self._saved.id != self._folgt_id:
+            self._folgt_id = None
         self._make_draft()
         self._sync_preview(self._current)
         self._load_ui(self._current)
         self._update_dirty()
+        self._grid_abweichung_anzeigen()
 
     def _on_style_change(self, text: str):
         """Style-Combo hat sich geaendert: Sichtbarkeit anpassen, style-abhaengige
@@ -1343,6 +1562,33 @@ class RgbMatrixView(QWidget):
             self._load_params_into_widgets(self._current)
         self._param_change()
 
+    def _neues_param_formular(self):
+        """Ersetzt das Formular der dynamischen Parameterfelder durch ein leeres.
+
+        STAB-38: der Neuaufbau laeuft oft IM Signal eines dieser Felder — wer
+        „Bewegung“ auf „Ping-Pong“ stellt, laesst damit „Laeufer-Anzahl“ und
+        „Schweif“ verschwinden. Die alten Felder duerfen deshalb NICHT sofort
+        geloescht werden (``QFormLayout.removeRow`` tat genau das): Qt arbeitet
+        nach dem Signal auf der sendenden Auswahlbox weiter (Aufklappliste
+        schliessen, ``activated`` senden) und griff dann in freigegebenen
+        Speicher — harter Absturz ohne Python-Traceback.
+
+        Darum: den ganzen Traeger aus dem Layout nehmen, verstecken und
+        VERZOEGERT loeschen. Er lebt, bis die Ereignisschleife wieder dran ist,
+        also bis das laufende Signal sicher zurueckgekehrt ist."""
+        alt = self._param_traeger
+        if alt is not None:
+            self._param_box_layout.removeWidget(alt)
+            # Bis das verzoegerte Loeschen greift, bliebe der alte Traeger sonst
+            # an alter Stelle sichtbar (vgl. UI-64a).
+            alt.hide()
+            alt.deleteLater()
+        self._param_traeger = QWidget(self._param_box)
+        self._param_form = QFormLayout(self._param_traeger)
+        self._param_form.setContentsMargins(0, 0, 0, 0)
+        self._param_form.setSpacing(6)
+        self._param_box_layout.addWidget(self._param_traeger)
+
     def _rebuild_param_fields(self, algo):
         """Baut die Param-Felder dynamisch aus den Algorithmus-Metadaten —
         gefiltert nach aktuellem Style und Bedingungen (WP-2): es werden nur die
@@ -1351,8 +1597,7 @@ class RgbMatrixView(QWidget):
         from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox, QCheckBox, QComboBox
         from src.core.engine.rgb_matrix_meta import visible_specs
         # alte Felder entfernen
-        while self._param_form.rowCount():
-            self._param_form.removeRow(0)
+        self._neues_param_formular()
         self._param_widgets = {}
         meta = ALGO_META.get(algo)
         # Richtung je Metadaten — ENG-22: und nur, wenn sie an dieser Stelle
@@ -1363,6 +1608,7 @@ class RgbMatrixView(QWidget):
         has_dir = richtung_wirkt(algo, cur_p)
         self._dir_label.setVisible(has_dir)
         self._dir_combo.setVisible(has_dir)
+        self._apply_runner_step_visibility(algo)
         # Style + aktuelle Werte bestimmen, welche Specs relevant sind.
         style_value = self._style_combo.currentText()
         cur_params = dict(self._current.params) if self._current is not None else {}
@@ -1426,6 +1672,21 @@ class RgbMatrixView(QWidget):
                 self._param_form.addRow(spec.label + ":", w)
             self._param_widgets[spec.key] = w
         self._param_box.setVisible(True)
+        self._apply_schweif_hinweis()
+
+    def _apply_runner_step_visibility(self, algo=None):
+        """ENG-37: Feld „Schrittweite“ nur beim Lauflicht mit linearer Bewegung
+        (normal/Ping-Pong) zeigen. Reines Ein-/Ausblenden eines festen Feldes."""
+        if algo is None:
+            try:
+                algo = RgbAlgorithm(self._algo_combo.currentText())
+            except ValueError:
+                algo = None
+        params = self._current.params if self._current is not None else {}
+        sichtbar = (algo == RgbAlgorithm.CHASE and
+                    str(params.get("movement", "normal")) in ("normal", "bounce"))
+        self._runner_step_label.setVisible(sichtbar)
+        self._runner_step_spin.setVisible(sichtbar)
 
     def _load_params_into_widgets(self, m):
         """Laedt die gespeicherten Param-Werte in die dynamisch erstellten Felder.
@@ -1466,10 +1727,162 @@ class RgbMatrixView(QWidget):
         self._shut_form_label.setVisible(is_shutter)
         self._smin_spin.setVisible(is_shutter)
         self._smax_spin.setVisible(is_shutter)
+        # ENG-37/ENG-38: Modify gibt es in den Stilen Dimmer, RGB und RGBW.
+        self._apply_modify_visibility(style)
+        # ENG-42: „dunkle Lampen durchlassen" gibt es (vorerst) nur im Stil Dimmer.
+        self._apply_durchlassen_visibility(style)
         # Farben-Zeile (C1/C2/C3 bzw. Sequence): Anzahl haengt von Style UND
         # Algorithmus ab. ZULETZT aufrufen, damit die Sichtbarkeit der ganzen
         # "Farben"-Gruppe den vollstaendigen, gerade gesetzten Zustand sieht.
         self._apply_color_visibility(style)
+
+    def _apply_modify_visibility(self, style: MatrixStyle | None = None):
+        """ENG-37: Haken freigeben/sperren und die Gruppe „Modify" zeigen.
+
+        ★ Reine Sichtbarkeit (``setVisible``/``setEnabled``) auf FESTEN Feldern —
+        hier wird nichts gebaut und nichts geloescht; die Methode laeuft auch aus
+        dem ``toggled``-Signal des Hakens selbst (STAB-38)."""
+        if style is None:
+            try:
+                style = MatrixStyle(self._style_combo.currentText())
+            except ValueError:
+                style = MatrixStyle.RGB
+        erlaubt = style in _MODIFY_STILE
+        farbe = style in (MatrixStyle.RGB, MatrixStyle.RGBW)
+        self._cb_modify.setEnabled(erlaubt)
+        self._cb_modify.setToolTip(
+            "Der Effekt setzt seine Werte nicht, sondern verrechnet sie mit dem, "
+            "was die Lampe gerade tut (addieren, abziehen, abdunkeln).\n"
+            "Stil Dimmer: verrechnet die Helligkeit. Stil RGB/RGBW: verrechnet "
+            "jeden Farbkanal einzeln und fasst den Dimmer nie an.\n"
+            + _SCHWEIF_HINWEIS_MODIFY
+            if erlaubt else
+            "Modify-Effekte gibt es in den Stilen „Dimmer“, „RGB“ und „RGBW“.\n"
+            "Ein Shutter ist eine Stellung, keine Menge — dort lässt sich nichts "
+            "addieren oder abziehen. Ein hier noch gesetzter Haken wirkt nicht.")
+        aktiv = erlaubt and self._cb_modify.isChecked()
+        self._grp_modify.setVisible(aktiv)
+        # ENG-40: die Kanalwahl gibt es nur fuer die Farbkanaele. Im Stil
+        # Dimmer ist die Zeile weg — den Dimmer verrechnet der Stil selbst.
+        self._modify_kanal_label.setVisible(farbe)
+        self._modify_kanal_box.setVisible(farbe)
+        kanaele = self._modify_kanalwahl_aus_feldern() if farbe else ()
+        hinweis = ("Wirkt auf das, was die Lampe gerade tut — Effekte, Cuelisten, "
+                   "Snaps und Grundhelligkeit — und vor den Mastern (Fader, "
+                   "Grand Master, Blackout). Als Chaser-Schritt ist er gesperrt.")
+        # ENG-40: „nur Dimmer" ist keine Kanalwahl, sondern der Stil Dimmer.
+        nur_dimmer = ("Nur den Dimmer verrechnet ein Modify-Effekt im Stil "
+                      "„Dimmer“ — er steht deshalb nicht bei „Wirkt auf“. ")
+        if aktiv and farbe and kanaele:
+            namen = ", ".join(MODIFY_KANAL_LABELS[k] for k in kanaele)
+            hinweis = (f"Verändert nur: {namen}. Jeder dieser Kanäle wird um "
+                       "die Helligkeit des Effekts an der Lampe verrechnet und "
+                       "für sich bei 0 und 100 % gekappt; der Farbton des "
+                       "Effekts zählt nicht. Alle anderen Kanäle bleiben "
+                       "stehen. Lampen ohne einen angekreuzten Kanal bleiben "
+                       "unberührt — es wird nichts umgerechnet. "
+                       "Der Dimmer wird nie angefasst: eine dunkle Lampe bleibt "
+                       "dunkel. " + nur_dimmer + hinweis)
+        elif aktiv and farbe:
+            # ENG-38: Farbe und Dimmer bleiben getrennt.
+            hinweis = ("Verrechnet jeden Farbkanal einzeln (Rot, Grün, Blau"
+                       + (", Weiß" if style == MatrixStyle.RGBW else "")
+                       + "), jeder wird für sich bei 0 und 100 % gekappt. "
+                       "Der Dimmer wird nie angefasst: eine dunkle Lampe bleibt "
+                       "dunkel. Lampen nur mit Farbrad bleiben unberührt. "
+                       + nur_dimmer + hinweis)
+        elif aktiv and self._imin_spin.value() > 0:
+            hinweis = ("Dimmer-Bereich „Min“ steht über 0: jede Lampe bekommt "
+                       "diesen Grundbetrag ab. " + hinweis)
+        self._modify_hint.setText(hinweis)
+        self._apply_schweif_hinweis()
+
+    def _apply_schweif_hinweis(self):
+        """Tooltip des Feldes „Schweif (%)“ an den Modify-Haken anpassen.
+
+        Entscheidung des Betreibers: der Schweif gehoert zum Effekt und wird
+        mit verrechnet — der Haken „Modify-Effekt" stellt ihn NICHT um. Damit
+        das nicht ueberrascht, steht es bei gesetztem Haken am Schweif-Feld.
+        Das Feld ist ein dynamisches (wird je Algorithmus neu gebaut), darum
+        laeuft diese Methode auch am Ende von ``_rebuild_param_fields``. Sie
+        setzt nur einen Tooltip — kein Wert, kein Bauen, kein Loeschen."""
+        w = getattr(self, "_param_widgets", {}).get("after_fade")
+        if w is None:
+            return
+        tip = next((s.tooltip for s in getattr(self, "_param_specs", ())
+                    if s.key == "after_fade"), "") or ""
+        if (self._cb_modify.isChecked() and self._cb_modify.isEnabled()):
+            tip = (tip + "\n" if tip else "") + _SCHWEIF_HINWEIS_MODIFY
+        w.setToolTip(tip)
+
+    def _modify_kanalwahl_aus_feldern(self) -> tuple:
+        """ENG-40: die angekreuzten Kanaele in fester Reihenfolge (leer = Vorgabe)."""
+        return tuple(k for k in MODIFY_KANAELE
+                     if self._modify_kanal_cbs[k].isChecked())
+
+    def _setze_modify_kanalwahl(self, kanaele) -> None:
+        """Felder der Kanalwahl ohne Signale auf ``kanaele`` stellen."""
+        gewaehlt = set(normalize_channels(kanaele))
+        for k, cb in self._modify_kanal_cbs.items():
+            cb.blockSignals(True)
+            cb.setChecked(k in gewaehlt)
+            cb.blockSignals(False)
+        self._cb_modify_standard.blockSignals(True)
+        self._cb_modify_standard.setChecked(not gewaehlt)
+        self._cb_modify_standard.blockSignals(False)
+
+    def _on_modify_kanal_toggled(self, _checked: bool = False):
+        """Ein Kanal wurde an-/abgekreuzt: der Vorgabe-Haken folgt (an, sobald
+        kein Kanal mehr angekreuzt ist), dann den Wert uebernehmen."""
+        self._setze_modify_kanalwahl(self._modify_kanalwahl_aus_feldern())
+        self._param_change()
+
+    def _on_modify_standard_toggled(self, checked: bool = False):
+        """Haken „Kanäle der Modify-Farbe": setzen = Auswahl zuruecksetzen.
+        Abwaehlen ohne angekreuzten Kanal gibt es nicht — dann gilt die
+        Vorgabe ohnehin, der Haken springt zurueck."""
+        self._setze_modify_kanalwahl(
+            () if checked else self._modify_kanalwahl_aus_feldern())
+        self._param_change()
+
+    def _on_modify_toggled(self, _checked: bool = False):
+        """Haken „Modify-Effekt": Gruppe ein-/ausblenden, Wert uebernehmen."""
+        self._apply_modify_visibility()
+        self._param_change()
+
+    def _on_durchlassen_toggled(self, _checked: bool = False):
+        """ENG-42: Haken „Dunkle Lampen durchlassen" uebernehmen."""
+        self._param_change()
+
+    def _apply_durchlassen_visibility(self, style: MatrixStyle | None = None):
+        """ENG-42: Haken freigeben/sperren — reine ``setEnabled``/Tooltip auf
+        einem FESTEN Feld (STAB-38). Wirkt nur im Stil Dimmer und nicht bei
+        einem Modify-Effekt (der setzt ohnehin nichts)."""
+        if style is None:
+            try:
+                style = MatrixStyle(self._style_combo.currentText())
+            except ValueError:
+                style = MatrixStyle.RGB
+        dimmer = style == MatrixStyle.DIMMER
+        modify = self._cb_modify.isChecked() and self._cb_modify.isEnabled()
+        self._cb_durchlassen.setEnabled(dimmer and not modify)
+        if not dimmer:
+            tip = ("„Dunkle Lampen durchlassen“ gibt es nur im Stil „Dimmer“. "
+                   "Ein hier noch gesetzter Haken bleibt gemerkt, wirkt aber nicht.")
+        elif modify:
+            tip = ("Ein Modify-Effekt setzt keine Werte, er verrechnet sie — "
+                   "eine dunkle Lampe verändert dort ohnehin nichts. Der Haken "
+                   "wirkt nur bei einem normalen Effekt.")
+        else:
+            tip = ("Echter Läufer über einem Untergrund: Der Effekt setzt nur die "
+                   "Lampen, die er gerade hell macht (Wert über 0, auch der "
+                   "Schweif) — genau auf seinen Wert, wie ein normaler Effekt "
+                   "in seiner Stufe. Die dunklen gibt er an das zurück, was "
+                   "darunter läuft (anderer Effekt, Snap, Grundhelligkeit).\n"
+                   "Anders als Modify „Addieren“: der legt obendrauf "
+                   "(40 % + 70 % = 100 %), hier stehen genau 70 %.\n"
+                   "Steht „Min“ im Dimmer-Bereich über 0, ist keine Lampe dunkel.")
+        self._cb_durchlassen.setToolTip(tip)
 
     def _apply_color_visibility(self, style: MatrixStyle | None = None):
         """Zeigt nur so viele Farbfelder, wie der aktive Algorithmus auswertet.
@@ -1585,7 +1998,7 @@ class RgbMatrixView(QWidget):
             # Bus-spezifische Regler je nach geladenem Tempo-Bus ein-/ausblenden
             # (setCurrentIndex feuert das Signal nicht, wenn der Index gleich bleibt).
             self._update_tempo_mode_visibility()
-            self._priority_spin.setValue(int(getattr(m, "priority", 0)))
+            self._stufe_combo.setze_zahl(getattr(m, "priority", 0))
             self._env_in_spin.setValue(float(getattr(m, "env_fade_in", 0.0)))
             self._env_out_spin.setValue(float(getattr(m, "env_fade_out", 0.0)))
             _ci = self._env_curve_combo.findData(getattr(m, "env_curve", "linear"))
@@ -1621,11 +2034,37 @@ class RgbMatrixView(QWidget):
             self._color_interval_spin.blockSignals(True)
             self._color_interval_spin.setValue(int(m.params.get("color_interval", 1)))
             self._color_interval_spin.blockSignals(False)
+            # ENG-37: Schrittweite (festes Feld).
+            self._runner_step_spin.blockSignals(True)
+            try:
+                self._runner_step_spin.setValue(int(m.params.get("runner_step", 1)))
+            except (TypeError, ValueError):
+                self._runner_step_spin.setValue(1)
+            self._runner_step_spin.blockSignals(False)
             # ENG-08: Dimmer-Sequenz an die Draft-Sequence binden + Checkbox laden.
             self._dimmer_seq_editor.set_sequence(m.dimmer_levels)
             self._cb_dimmer_cycle.blockSignals(True)
             self._cb_dimmer_cycle.setChecked(bool(m.params.get("dimmer_cycle", False)))
             self._cb_dimmer_cycle.blockSignals(False)
+            # ENG-37: Modify-Felder (fest) befuellen; Sichtbarkeit setzt
+            # _apply_style_visibility gleich darunter.
+            self._cb_modify.blockSignals(True)
+            self._cb_modify.setChecked(bool(getattr(m, "modify", False)))
+            self._cb_modify.blockSignals(False)
+            # ENG-42: Haken „Dunkle Lampen durchlassen".
+            self._cb_durchlassen.blockSignals(True)
+            self._cb_durchlassen.setChecked(
+                bool(getattr(m, "dunkle_durchlassen", False)))
+            self._cb_durchlassen.blockSignals(False)
+            self._modify_mode_combo.blockSignals(True)
+            _mi = self._modify_mode_combo.findData(getattr(m, "modify_mode", "add"))
+            self._modify_mode_combo.setCurrentIndex(_mi if _mi >= 0 else 0)
+            self._modify_mode_combo.blockSignals(False)
+            self._modify_strength_spin.blockSignals(True)
+            self._modify_strength_spin.setValue(
+                int(getattr(m, "modify_strength", 100)))
+            self._modify_strength_spin.blockSignals(False)
+            self._setze_modify_kanalwahl(getattr(m, "modify_channels", ()))
             self._apply_style_visibility(m.style)
             # I2.4: Algorithmus-Parameter laden (erst Felder aufbauen, dann Werte laden)
             self._dir_combo.blockSignals(True)
@@ -1678,7 +2117,19 @@ class RgbMatrixView(QWidget):
         self._current.intensity_max = self._imax_spin.value()
         self._current.shutter_min = self._smin_spin.value()
         self._current.shutter_max = self._smax_spin.value()
-        self._current.priority = self._priority_spin.value()
+        self._current.priority = self._stufe_combo.zahl()
+        # ENG-37: Modify-Kennzeichnung. Art und Staerke bleiben auch bei
+        # entferntem Haken gemerkt.
+        self._current.modify = self._cb_modify.isChecked()
+        self._current.modify_mode = self._modify_mode_combo.currentData() or "add"
+        self._current.modify_strength = self._modify_strength_spin.value()
+        # ENG-40: Kanalwahl; bleibt wie Art und Staerke auch ohne Haken und
+        # im Stil Dimmer gemerkt.
+        self._current.modify_channels = self._modify_kanalwahl_aus_feldern()
+        self._apply_modify_visibility()
+        # ENG-42: bleibt auch in anderen Stilen gemerkt (wirkt dort nicht).
+        self._current.dunkle_durchlassen = self._cb_durchlassen.isChecked()
+        self._apply_durchlassen_visibility()
         self._current.env_fade_in = self._env_in_spin.value()
         self._current.env_fade_out = self._env_out_spin.value()
         self._current.env_curve = self._env_curve_combo.currentData() or "linear"
@@ -1704,6 +2155,13 @@ class RgbMatrixView(QWidget):
         # Style + CHASE schreiben, damit fremde Algorithmen/Styles keinen toten Key
         # bekommen (und sich Farb-/Dimmer-Zyklus nicht gegenseitig setzen).
         if self._current.algorithm == RgbAlgorithm.CHASE:
+            # ENG-37: Schrittweite. Die Vorgabe 1 wird NICHT gespeichert — eine
+            # Show ohne Schrittweite bleibt auch nach dem Bearbeiten byte-gleich.
+            _sw = self._runner_step_spin.value()
+            if _sw == 1:
+                self._current.params.pop("runner_step", None)
+            else:
+                self._current.params["runner_step"] = _sw
             if self._current.style in (MatrixStyle.RGB, MatrixStyle.RGBW):
                 self._current.params["color_cycle"] = self._cb_color_cycle.isChecked()
                 # #6: abhaengige Farb-Cycle-Regler (fest in der Farben-Gruppe).
@@ -1738,6 +2196,10 @@ class RgbMatrixView(QWidget):
         if new_keys != list(self._param_widgets.keys()):
             self._rebuild_param_fields(algo)
             self._load_params_into_widgets(self._current)
+        else:
+            # ENG-37: Bewegung kann wechseln, ohne dass sich die Feldmenge
+            # aendert (Ping-Pong <-> Ring) — die Schrittweite trotzdem nachziehen.
+            self._apply_runner_step_visibility(algo)
         # Color-Sequence vs. Einzelfarbe kann ebenfalls vom color_cycle abhaengen.
         self._apply_color_visibility()
 
@@ -1829,12 +2291,50 @@ class RgbMatrixView(QWidget):
 
     # ── Draft / Dirty-State ───────────────────────────────────────────────────
 
+    #: UI-80: Felder der Function-Basis, die NICHT dieser Editor bearbeitet.
+    #: ``speed``/``intensity`` setzen die VC-Regler „Effekt-Tempo" und
+    #: „Effekt-Helligkeit" am laufenden Effekt, ``folder`` die Bibliothek. Der
+    #: Entwurf uebernimmt sie (die Vorschau laeuft so schnell wie der echte
+    #: Effekt), aber sie zaehlen nicht als Aenderung und werden beim Speichern
+    #: nicht zurueckgeschrieben (``apply_dict`` fasst sie nicht an).
+    _FREMDE_BASISFELDER = ("speed", "intensity", "folder")
+
+    def _stufe_von_aussen(self, ids):
+        """ENG-35: Die Stufe der geoeffneten Matrix wurde anderswo geaendert
+        (Ansicht „Prioritäten“, Rueckgaengig). Arbeitskopie und Feld ziehen
+        nach — sonst schriebe das naechste Speichern die alte Stufe zurueck.
+        Kein Neuaufbau, nur dieser eine Wert."""
+        saved = getattr(self, "_saved", None)
+        if saved is None or getattr(saved, "id", None) not in ids:
+            return
+        try:
+            z = int(getattr(saved, "priority", 0))
+            if self._current is not None:
+                self._current.priority = z
+            self._stufe_combo.setze_zahl(z)
+            self._update_dirty()
+        except RuntimeError:
+            pass
+
     def _make_draft(self):
         """Erzeugt einen Draft (Arbeitskopie) aus self._saved."""
         if self._saved is None:
             self._current = None
         else:
             self._current = RgbMatrixInstance.from_dict(self._saved.to_dict())
+            for feld in self._FREMDE_BASISFELDER:
+                setattr(self._current, feld, getattr(self._saved, feld))
+
+    def _editor_dict(self, inst) -> dict:
+        """Was der Editor an ``inst`` bearbeiten kann — der Massstab fuer
+        „ungespeicherte Aenderungen". Ohne die fremden Basisfelder: ein
+        VC-Regler, der das Tempo der Matrix veraendert, ist keine Aenderung
+        im Editor (UI-80: sonst stand der Hinweis an jeder Matrix mit
+        Regler-Tempo ungleich 1, und „Speichern" bekam ihn nie weg)."""
+        d = inst.to_dict()
+        for feld in self._FREMDE_BASISFELDER:
+            d.pop(feld, None)
+        return d
 
     def _save_edit(self):
         """Kopiert alle editierbaren Felder vom Draft in die gespeicherte Instanz."""
@@ -1850,6 +2350,8 @@ class RgbMatrixView(QWidget):
             if gname:
                 self._saved.source_group = gname
                 self._current.source_group = gname  # Draft synchron (kein dirty)
+        # UI-91: gespeichert = fest gebunden, folgt der Auswahl nicht mehr.
+        self._folgt_id = None
         self._update_dirty()
         self._notify_change()
 
@@ -1871,24 +2373,34 @@ class RgbMatrixView(QWidget):
         dirty = (
             self._saved is not None
             and self._current is not None
-            and self._current.to_dict() != self._saved.to_dict()
+            and self._editor_dict(self._current) != self._editor_dict(self._saved)
         )
         self._dirty_lbl.setText("● ungespeicherte Änderungen" if dirty else "")
         self._btn_save.setEnabled(dirty)
         self._btn_reset.setEnabled(dirty)
 
     def _enable_follow_selection(self):
-        """Einbettungs-Modus: Matrix folgt automatisch der Programmer-Auswahl.
-        Manuelle Geräte-Zuweisung wird ausgeblendet."""
-        self._btn_from_sel.setVisible(False)
+        """Einbettungs-Modus im Programmer: die Liste ist auf die aktive Gruppe
+        gefiltert. Der Auswahl FOLGT nur eine hier frisch angelegte Matrix
+        (UI-91, _folgt_auswahl); jede andere bekommt die Auswahl ueber den Knopf
+        „Auswahl übernehmen"."""
+        # UI-91: der Knopf bleibt sichtbar — er ist die ausdrueckliche Handlung.
+        self._btn_from_sel.setText("Auswahl übernehmen")
+        self._btn_from_sel.setToolTip(
+            "Setzt das Raster dieser Matrix auf die links im Programmer gewählte "
+            "Gruppe bzw. Auswahl. Eine gespeicherte Matrix ändert ihr Raster nur "
+            "über diesen Knopf.")
+        self._btn_from_sel.setVisible(True)
         self._btn_auto_assign.setVisible(False)
-        # FM-22: „Raster aus Gerät" setzt das Grid VON HAND — im Folgemodus wuerde
-        # der naechste SELECTION_CHANGED es sofort wieder ueberschreiben. Ein Knopf,
-        # dessen Wirkung Sekunden spaeter verschwindet, ist schlimmer als keiner.
+        # FM-22: „Raster aus Gerät" setzt das Grid VON HAND — an einer frisch
+        # angelegten, folgenden Matrix wuerde der naechste SELECTION_CHANGED es
+        # sofort wieder ueberschreiben. Ein Knopf, dessen Wirkung Sekunden
+        # spaeter verschwindet, ist schlimmer als keiner.
         # Der Muster-Assistent liest das Grid nur und bleibt deshalb sichtbar.
         self._btn_panel_grid.setVisible(False)
-        self._grid_box.setTitle("Geräte (folgen der Programmer-Auswahl)")
-        self._grid_label.setText("Folgt automatisch der links gewählten Gruppe.")
+        self._grid_box.setTitle("Geräte")
+        self._grid_label.setText("Mit „+ Neu“ entsteht eine Matrix für die "
+                                 "links gewählte Gruppe.")
         # KEIN Auto-Anlegen mehr: frueher wurde hier eine 8x4-Standardmatrix erzeugt.
         # Solange noch keine Gruppe/Geraete gewaehlt waren (oder die Grid-Uebernahme
         # nicht griff), blieb diese leere Standardmatrix als „Phantom" sichtbar.
@@ -1909,13 +2421,10 @@ class RgbMatrixView(QWidget):
         self._sync_follow_selection()
 
     def _sync_follow_selection(self):
-        """Folgt der Programmer-Auswahl: Liste auf die aktive Gruppe filtern und das
-        Grid der ausgewaehlten Matrix aus der Gruppe uebernehmen.
-
-        Wichtig: Es wird NICHT mehr blind irgendeine Matrix auf die neue Gruppe
-        umgeschrieben. Die Liste zeigt nur Matrizen der aktiven Gruppe (+ ungebundene);
-        die ausgewaehlte gehoert also immer zur aktuellen Gruppe (oder ist ungebunden),
-        sodass die Grid-Uebernahme korrekt ist."""
+        """Auswahl-/Gruppenwechsel im Programmer: Liste auf die aktive Gruppe
+        filtern. Nur eine hier frisch angelegte Matrix bekommt dabei das Raster
+        der Auswahl (UI-91, _folgt_auswahl); an jeder anderen wird nur angezeigt,
+        ob ihr Raster von der Auswahl abweicht."""
         # WURZEL-FIX (2026-06-24): Follow-Grid-Uebernahme NUR, waehrend diese
         # eingebettete Matrix-Editor-Seite wirklich sichtbar/aktiv ist. Sonst wuerde
         # eine Auswahländerung in einem ANDEREN Tab (z. B. Virtual Console) das
@@ -1941,18 +2450,65 @@ class RgbMatrixView(QWidget):
             # gespeicherte Matrix (_current UND _saved). Waehrend eine Show
             # geladen wird, ist ein SELECTION_CHANGED/GROUP_CHANGED nur
             # Nebenwirkung des Ladens -> nur Anzeige neu, Grid unangetastet.
-            if not _show_laedt():
+            if self._folgt_auswahl() and not _show_laedt():
                 self._assign_from_selection()
+            else:
+                self._grid_abweichung_anzeigen()
             self._update_group_header()
         except RuntimeError:
             pass  # Widget beim Layout-Wechsel gelöscht
 
-    def _assign_from_selection(self):
-        """Bildet das Grid aus dem Programmer: Gruppen-Pfad (echtes 2D-Grid inkl.
-        Luecken) oder Fallback 1×N bei loser Einzel-/Mehrfachauswahl."""
-        if self._current is None:
-            self._grid_label.setText("Erst eine Matrix anlegen/auswählen.")
+    def _folgt_auswahl(self) -> bool:
+        """UI-91: Folgt die angezeigte Matrix der Programmer-Auswahl? Nur die in
+        diesem Editor frisch angelegte (``_folgt_id``). Eine gespeicherte Matrix
+        aendert ihr Raster nie von selbst — nicht beim Oeffnen des Reiters, nicht
+        bei einer vorgewaehlten Zeile und nicht beim Auswahlwechsel."""
+        return bool(self._follow_selection and self._saved is not None
+                    and self._folgt_id is not None
+                    and self._saved.id == self._folgt_id)
+
+    @staticmethod
+    def _raster_schluessel(cols, rows, fixture_grid, head_grid, weiss_grid):
+        """Vergleichsform eines Rasters; eine Achse nur aus None gilt als leer."""
+        def _achse(werte):
+            werte = list(werte or [])
+            return werte if any(w is not None for w in werte) else []
+        return (int(cols), int(rows), list(fixture_grid or []),
+                _achse(head_grid), _achse(weiss_grid))
+
+    def _grid_abweichung_anzeigen(self):
+        """UI-91: Raster-Zeile einer NICHT folgenden Matrix im Programmer — nennt
+        das gespeicherte Raster und ob die Auswahl davon abweicht. Schreibt
+        nichts in die Matrix."""
+        if not self._follow_selection or self._folgt_auswahl():
             return
+        m = self._saved
+        if m is None:
+            return
+        try:
+            n = sum(1 for f in m.fixture_grid if f is not None)
+            text = f"{m.rows}×{m.cols} = {n} Fixtures gespeichert"
+            raster, _t = self._auswahl_raster()
+            if raster is not None and (
+                    self._raster_schluessel(**raster) != self._raster_schluessel(
+                        m.cols, m.rows, m.fixture_grid,
+                        getattr(m, "head_grid", []),
+                        getattr(m, "weiss_grid", []))):
+                text += " – weicht von der Auswahl ab"
+            self._grid_label.setText(text)
+        except RuntimeError:
+            pass  # Widget beim Layout-Wechsel gelöscht
+        except Exception as e:
+            print(f"[rgb_matrix_view] ERROR: Raster-Vergleich: {e}")
+
+    def _auswahl_raster(self):
+        """Raster, das die Programmer-Auswahl ergaebe — nur lesend.
+
+        Liefert ``(raster, text)``: ``raster`` ist ein dict mit ``cols``,
+        ``rows``, ``fixture_grid``, ``head_grid``, ``weiss_grid`` — oder None,
+        wenn es nichts zu uebernehmen gibt (``text`` sagt dann warum).
+        Gruppen-Pfad: echtes 2D-Grid inkl. Luecken; sonst 1×N aus der losen
+        Einzel-/Mehrfachauswahl."""
         from src.core.app_state import get_state
         state = get_state()
 
@@ -1983,22 +2539,6 @@ class RgbMatrixView(QWidget):
                         # so sieht jeder Konsument ohne Achsenkenntnis nichts
                         # statt etwas Falsches (s. `weiss_grid_from_positions`).
                         weiss_grid = weiss_grid_from_positions(positions, g.cols, g.rows)
-                        # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
-                        self._current.cols = g.cols
-                        self._current.rows = g.rows
-                        self._current.fixture_grid = grid
-                        self._current.head_grid = head_grid
-                        self._current.weiss_grid = weiss_grid
-                        if self._saved is not None:
-                            self._saved.cols = g.cols
-                            self._saved.rows = g.rows
-                            self._saved.fixture_grid = list(grid)
-                            self._saved.head_grid = list(head_grid)
-                            self._saved.weiss_grid = list(weiss_grid)
-                        for spin, val in ((self._cols_spin, g.cols), (self._rows_spin, g.rows)):
-                            spin.blockSignals(True)
-                            spin.setValue(val)
-                            spin.blockSignals(False)
                         n = sum(1 for f in grid if f is not None)
                         n_weiss = sum(1 for w in weiss_grid if w is not None)
                         # FM-41: Weiss-Zellen sind in `grid` Luecken — sie hier
@@ -2006,36 +2546,27 @@ class RgbMatrixView(QWidget):
                         # irrefuehrend („da fehlt was", obwohl da etwas steht).
                         luecken = len(grid) - n - n_weiss
                         _weiss_text = f", {n_weiss} Weiß-Segmente" if n_weiss else ""
-                        self._grid_label.setText(
-                            f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
-                            f"{luecken} Lücken (Gruppe »{g.name}«)"
-                        )
-                        self._sync_preview(self._current)
-                        self._update_dirty()
-                        return
+                        return (dict(cols=g.cols, rows=g.rows, fixture_grid=grid,
+                                     head_grid=head_grid, weiss_grid=weiss_grid),
+                                f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
+                                f"{luecken} Lücken (Gruppe »{g.name}«)")
                 except Exception as e:
-                    self._grid_label.setText(f"Gruppen-Grid Fehler: {e}")
+                    print(f"[rgb_matrix_view] ERROR: Gruppen-Grid: {e}")
                     # weiter zum Fallback
 
         # 2) Fallback: lose Auswahl -> 1×N (bisheriges Verhalten)
         try:
             fids = [int(f) for f in state.get_selected_fids()]
         except Exception as e:
-            self._grid_label.setText(f"Fehler: {e}")
-            return
+            return None, f"Fehler: {e}"
         if not fids:
             # FM-51: reine Weiss-Auswahl ist nicht „nichts gewaehlt" — die lose
             # Auswahl kennt keine Weiss-Achse, dafuer gibt es das Gruppen-Raster.
-            self._grid_label.setText(
+            return None, (
                 "Keine Geräte im Programmer ausgewählt." if state.auswahl_ist_leer()
                 else "Nur Weiß-Segmente gewählt – für die Matrix eine Gruppe "
                      "mit Weiß-Raster verwenden.")
-            return
-        # Grid-Zuweisung ist live: sofort in beide Instanzen (kein dirty).
-        self._current.cols = len(fids)
-        self._current.rows = 1
-        self._current.fixture_grid = list(fids)
-        self._current.head_grid = []          # FM-16: lose Auswahl = ganze Fixtures
+        # FM-16: lose Auswahl = ganze Fixtures (head_grid leer).
         # ★★ FM-41 (nachgemessen 05.09.): weiss_grid MUSS hier mit zurueck.
         # Sonst fuhr die Matrix weiter die Weiss-Segmente eines Geraets, das in
         # `fixture_grid` gar nicht mehr vorkommt — gemessen blieb CH154 eines
@@ -2043,22 +2574,28 @@ class RgbMatrixView(QWidget):
         # Laden. Genau die Richtung, die der `to_dict`-Docstring ausschliessen
         # will: eine verlorene Weiss-Angabe darf zu „leuchtet nicht"
         # degradieren, nie zu ungewolltem Licht.
-        self._current.weiss_grid = []
-        if self._saved is not None:
-            self._saved.cols = len(fids)
-            self._saved.rows = 1
-            self._saved.fixture_grid = list(fids)
-            self._saved.head_grid = []
-            self._saved.weiss_grid = []
-        for spin, val in ((self._cols_spin, len(fids)), (self._rows_spin, 1)):
-            spin.blockSignals(True)
-            spin.setValue(val)
-            spin.blockSignals(False)
-        self._grid_label.setText(
-            f"1×{len(fids)} = {len(fids)} Fixtures (aus Auswahl)"
-        )
-        self._sync_preview(self._current)
-        self._update_dirty()
+        return (dict(cols=len(fids), rows=1, fixture_grid=list(fids),
+                     head_grid=[], weiss_grid=[]),
+                f"1×{len(fids)} = {len(fids)} Fixtures (aus Auswahl)")
+
+    def _assign_from_selection(self):
+        """Bildet das Grid aus dem Programmer: Gruppen-Pfad (echtes 2D-Grid inkl.
+        Luecken) oder Fallback 1×N bei loser Einzel-/Mehrfachauswahl.
+
+        UI-91: SCHREIBT in die gespeicherte Matrix (Grid-Zuweisung ist live:
+        sofort in beide Instanzen, kein dirty). Aufrufer sind nur ausdrueckliche
+        Handlungen (Knopf, „+ Neu") und die frisch angelegte Matrix, solange sie
+        der Auswahl folgt — nie eine blosse Anzeige."""
+        if self._current is None:
+            self._grid_label.setText("Erst eine Matrix anlegen/auswählen.")
+            return
+        raster, text = self._auswahl_raster()
+        if raster is None:
+            self._grid_label.setText(text)
+            return
+        self._apply_panel_grid(raster["cols"], raster["rows"],
+                               raster["fixture_grid"], raster["head_grid"], text,
+                               weiss_grid=raster["weiss_grid"])
 
     def _auto_assign(self):
         # Auto-Zuweisung: bevorzugt die aktive Auswahl/Gruppe, damit die Matrix nur

@@ -74,7 +74,7 @@ from PySide6.QtCore import Qt                                  # noqa: E402
 from PySide6.QtTest import QTest                               # noqa: E402
 from PySide6.QtWidgets import (                                # noqa: E402
     QApplication, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLayout,
-    QPushButton, QSpinBox, QWidget)
+    QPushButton, QScrollArea, QSpinBox, QWidget)
 from sqlalchemy import select                                  # noqa: E402
 from sqlalchemy.orm import Session, selectinload               # noqa: E402
 
@@ -129,6 +129,11 @@ def _in_layout_reihenfolge(w: QWidget) -> list[QWidget]:
                 out.append(kind)
                 if kind.layout() is not None:
                     rein(kind.layout())
+                elif (isinstance(kind, QScrollArea) and kind.widget() is not None
+                      and kind.widget().layout() is not None):
+                    # FM-74: der Inhalt des Dialogs liegt in einem Rollbereich
+                    # — der hat kein eigenes Layout, sein Inhalt schon.
+                    rein(kind.widget().layout())
             elif item.layout() is not None:
                 rein(item.layout())
 
@@ -405,7 +410,7 @@ class _GeneratorFall(unittest.TestCase):
             QTest.keyClicks(feld, text)
         dlg._cb_type.setCurrentText("matrix")
         tab = dlg._tabs.currentWidget()
-        knopf = _knopf(tab, "+ Channel")
+        knopf = _knopf(tab, "+ Kanal")
         for _ in range(4):
             QTest.mouseClick(knopf, Qt.MouseButton.LeftButton)
         felder = _geo_eingaben(tab)
@@ -430,7 +435,7 @@ class _GeneratorFall(unittest.TestCase):
         dlg._edit_name.setText(name)
         dlg._edit_short.setText(short_name)
         tab = dlg._tabs.currentWidget()
-        QTest.mouseClick(_knopf(tab, "+ Channel"), Qt.MouseButton.LeftButton)
+        QTest.mouseClick(_knopf(tab, "+ Kanal"), Qt.MouseButton.LeftButton)
         self._speichern_klicken(dlg, editor_module.__name__)
         return dlg
 

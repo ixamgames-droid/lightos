@@ -10,13 +10,19 @@ from PySide6.QtWidgets import (
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QGroupBox,
     QDialogButtonBox, QTabWidget, QWidget,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
+from src.ui.widgets.dialog_groesse import (InhaltsRollbereich,
+                                           beim_ersten_zeigen_anpassen,
+                                           mindestzeilen_setzen)
 from PySide6.QtGui import QBrush, QColor
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 from src.core.database.fixture_db import (als_bearbeitet_markieren, engine,
                                           segment_wert)
 from src.core.database.models import ABLOESBARE_QUELLEN
+# LAS-33: Laser-Angaben eines Kanals reisen durch den Editor mit.
+from src.core.laser.profilangaben import (als_text as laser_als_text,
+                                           aus_text as laser_aus_text)
 from src.core.database.models import (
     Manufacturer, FixtureProfile, FixtureMode, FixtureChannel, ChannelRange,
     GEO_MAX,
@@ -53,6 +59,9 @@ CHANNEL_ATTRS = [
 ]
 
 CHANNEL_COLS = ["#", "Name", "Attribut", "Default", "Highlight", "Weiß-Segment"]
+#: UI-100: Fenstertitel — so, wie die Anleitungen den Dialog nennen
+#: („Fixture-Editor“; vorher englisch „Fixture Editor“).
+TITEL = "Fixture-Editor"
 # FM-46: Spalte der Zuordnung Dimmer -> Weiss-Segment.
 SEGMENT_COL = 5
 #: Anzeige fuer „keine Zuordnung" in der Segment-Auswahl.
@@ -68,6 +77,49 @@ LEERZELLE_FARBE = "#333333"
 def leerzelle_hintergrund() -> QBrush:
     """UI-74: Pinsel der gesperrten Segment-Zellen — fuer Editor UND Generator."""
     return QBrush(QColor(LEERZELLE_FARBE))
+
+
+# ── UI-102: Ansehen-Modus SICHTBAR schreibgeschuetzt ─────────────────────────
+#
+# ★ Bis UI-102 sperrte der Ansehen-Modus nur die Knoepfe; dass nichts
+#   gespeichert wird, stand allein im Fenstertitel. Felder, Kombis und
+#   Tabellenzellen sahen aus wie im Bearbeiten-Modus — man tippte, und erst
+#   der graue Speichern-Knopf verriet, dass alles umsonst war.
+# ★ Die Felder werden schreibgeschuetzt (Text bleibt les- und markierbar),
+#   Auswahlen gesperrt; alle tragen die Eigenschaft ``nurAnsehen`` und
+#   bekommen darueber eine gedaempfte Optik. NICHT die ``:disabled``-Optik des
+#   Themes (#555 auf #2a2a2a): die ist fuer ein Profil, das man LESEN will,
+#   zu schwach.
+NUR_ANSEHEN_EIGENSCHAFT = "nurAnsehen"
+NUR_ANSEHEN_HINWEIS = (
+    "Mitgeliefertes Profil — nur ansehen, Änderungen werden nicht "
+    "gespeichert. Zum Ändern: Fenster schließen und „Als eigenes Profil "
+    "kopieren…“ wählen.")
+NUR_ANSEHEN_STIL = (
+    'QLineEdit[nurAnsehen="true"], QAbstractSpinBox[nurAnsehen="true"], '
+    'QComboBox[nurAnsehen="true"] {'
+    " background-color: #2e2e2e; color: #c8c8c8; border: 1px solid #3a3a3a; }"
+    ' QComboBox[nurAnsehen="true"]::drop-down {'
+    " background: #2e2e2e; border-left: 1px solid #3a3a3a; }"
+    ' QTableWidget[nurAnsehen="true"] { color: #c8c8c8; }')
+
+
+def nur_ansehen_markieren(w) -> None:
+    """UI-102: ein Eingabefeld schreibschuetzen und als solches kennzeichnen.
+
+    Texte/Zahlen werden ``readOnly`` (lesbar, markierbar, Spin-Pfeile weg),
+    Auswahlen (``QComboBox`` hat kein readOnly) gesperrt."""
+    from PySide6.QtWidgets import QAbstractSpinBox
+    if isinstance(w, QLineEdit):
+        w.setReadOnly(True)
+    elif isinstance(w, QAbstractSpinBox):
+        w.setReadOnly(True)
+        w.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+    else:
+        w.setEnabled(False)
+    w.setProperty(NUR_ANSEHEN_EIGENSCHAFT, True)
+    w.style().unpolish(w)
+    w.style().polish(w)
 
 
 def profil_patch_folgen(fixture_id, gepatchte, modi_neu, *,
@@ -180,10 +232,12 @@ class _ModeTab(QWidget):
         # FM-46 (Review): Zuordnungen haengen am Weiss-KANAL, nicht an seiner
         # Nummer — Loeschen/Verschieben eines `color_w` zieht sie mit.
         self._ziele = SegmentZiele()
+        #: UI-102: Ansehen-Modus — auch neu gebaute Zellen-Kombis sperren.
+        self._gesperrt = False
         layout = QVBoxLayout(self)
 
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("Mode-Name:"))
+        name_row.addWidget(QLabel("Modus-Name:"))
         self._edit_name = QLineEdit(name)
         self._edit_name.editingFinished.connect(self._on_name_changed)
         name_row.addWidget(self._edit_name, 1)
@@ -256,12 +310,14 @@ class _ModeTab(QWidget):
             1, QHeaderView.ResizeMode.Stretch)
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked |
                                   QAbstractItemView.EditTrigger.SelectedClicked)
-        layout.addWidget(self._tbl)
+        # FM-74: mindestens fuenf Kanaele sichtbar (vorher 40 px Tabelle).
+        mindestzeilen_setzen(self._tbl)
+        layout.addWidget(self._tbl, 1)
 
         btn_row = QHBoxLayout()
-        btn_add = QPushButton("+ Channel")
+        btn_add = QPushButton("+ Kanal")
         btn_add.clicked.connect(self._add_channel)
-        btn_del = QPushButton("- Channel")
+        btn_del = QPushButton("- Kanal")
         btn_del.clicked.connect(self._del_channel)
         btn_up = QPushButton("Hoch")
         btn_up.clicked.connect(lambda: self._move(-1))
@@ -282,9 +338,36 @@ class _ModeTab(QWidget):
         layout.addLayout(btn_row)
 
     def nur_ansehen(self) -> None:
-        """UI-74: Kanal-Knoepfe sperren (Profil wird nur angesehen)."""
+        """UI-74: Kanal-Knoepfe sperren (Profil wird nur angesehen).
+        UI-102: dazu Mode-Name, Geometrie und Tabelle sichtbar
+        schreibgeschuetzt."""
+        self._gesperrt = True
         for b in self._kanal_knoepfe:
             b.setEnabled(False)
+        for w in (self._edit_name, self._spin_grid_rows, self._spin_grid_cols,
+                  self._spin_white_rows, self._spin_white_cols):
+            nur_ansehen_markieren(w)
+        self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._tbl.setProperty(NUR_ANSEHEN_EIGENSCHAFT, True)
+        self._tbl.style().unpolish(self._tbl)
+        self._tbl.style().polish(self._tbl)
+        self._zellen_sperren()
+
+    def ist_nur_ansehen(self) -> bool:
+        return self._gesperrt
+
+    def _zellen_sperren(self) -> None:
+        """UI-102: Kombis (Attribut, Weiß-Segment) und Textzellen sperren."""
+        if not self._gesperrt:
+            return
+        for r in range(self._tbl.rowCount()):
+            for c in range(self._tbl.columnCount()):
+                w = self._tbl.cellWidget(r, c)
+                if w is not None:
+                    nur_ansehen_markieren(w)
+                it = self._tbl.item(r, c)
+                if it is not None:
+                    it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEditable)
 
     @staticmethod
     def _geo_spin(tooltip: str) -> QSpinBox:
@@ -317,7 +400,7 @@ class _ModeTab(QWidget):
     def _add_channel(self):
         self._sync_from_table()   # Live-Edits sichern (Tabelle<->channels aligned)
         self.channels.append({
-            "name": f"Channel {len(self.channels) + 1}",
+            "name": f"Kanal {len(self.channels) + 1}",
             "attribute": "raw",
             "default": 0,
             "highlight": 255,
@@ -415,6 +498,7 @@ class _ModeTab(QWidget):
                 it.setFlags(Qt.ItemFlag.NoItemFlags)
                 it.setBackground(leerzelle_hintergrund())
                 self._tbl.setItem(i, SEGMENT_COL, it)
+        self._zellen_sperren()
         self._update_segment_hinweis()
 
     def _set_segment(self, row: int, combo_index: int):
@@ -494,7 +578,7 @@ class _ModeTab(QWidget):
             ch = self.channels[i]
             name_item = self._tbl.item(i, 1)
             if name_item:
-                ch["name"] = name_item.text() or ch.get("name", f"Channel {i+1}")
+                ch["name"] = name_item.text() or ch.get("name", f"Kanal {i+1}")
             try:
                 if self._tbl.item(i, 3):
                     ch["default"] = max(0, min(255, int(self._tbl.item(i, 3).text())))
@@ -535,8 +619,10 @@ class FixtureEditorDialog(QDialog):
     def __init__(self, parent=None, fixture_id: int | None = None, *,
                  nur_ansehen: bool = False, als_kopie: bool = False):
         super().__init__(parent)
-        self.setWindowTitle("Fixture Editor")
-        self.setMinimumSize(720, 560)
+        self.setWindowTitle(TITEL)
+        # FM-74: kleines Mindestmass — der Inhalt liegt in einem Rollbereich,
+        # die Startgroesse setzt `showEvent` aus dem Bedarf des Inhalts.
+        self.setMinimumSize(560, 400)
         self._fixture_id = fixture_id   # None = neu, sonst bearbeiten
         # UI-74: mitgelieferte Profile (builtin/lightos) werden NICHT an Ort
         # und Stelle bearbeitet — die naechste Bibliotheks-Aktualisierung
@@ -581,7 +667,7 @@ class FixtureEditorDialog(QDialog):
                 self._fixture_id = None
                 self._name_geladen = None
                 self._edit_name.setText(f"{self._edit_name.text()} (eigen)")
-                self.setWindowTitle("Fixture Editor — Kopie als eigenes Profil")
+                self.setWindowTitle(f"{TITEL} — Kopie als eigenes Profil")
             else:
                 # UI-74 (Review): der Editor prueft die Quelle SELBST — ein
                 # Aufrufer ohne Flag ueberschrieb sonst ein mitgeliefertes
@@ -599,7 +685,15 @@ class FixtureEditorDialog(QDialog):
     def _sperren_zum_ansehen(self) -> None:
         """UI-74: Ansehen-Modus — Speichern, Import und alle Knoepfe, die Modi
         oder Kanaele aendern, sind gesperrt. Export bleibt offen."""
-        self.setWindowTitle("Fixture Editor — nur ansehen (mitgeliefertes Profil)")
+        self.setWindowTitle(f"{TITEL} — nur ansehen (mitgeliefertes Profil)")
+        # UI-102: der Hinweis steht IM Dialog, nicht nur im Fenstertitel;
+        # die Felder sind sichtbar schreibgeschuetzt.
+        self._lbl_nur_ansehen.setHidden(False)
+        self.setStyleSheet(NUR_ANSEHEN_STIL)
+        for w in (self._cb_manufacturer, self._edit_name, self._edit_short,
+                  self._cb_type, self._spin_power):
+            nur_ansehen_markieren(w)
+        self._btn_cancel.setText("Schließen")
         self._btn_save.setEnabled(False)
         self._btn_save.setToolTip(
             "Mitgelieferte Profile werden nicht überschrieben — "
@@ -611,7 +705,20 @@ class FixtureEditorDialog(QDialog):
             self._tabs.widget(i).nur_ansehen()
 
     def _setup_ui(self):
-        root = QVBoxLayout(self)
+        # FM-74: Kopf und Modi liegen in einem Rollbereich (`root` = Layout
+        # des Inhalts); Import/Export und Speichern bleiben darunter stehen.
+        aussen = QVBoxLayout(self)
+        # UI-102: Hinweis im Ansehen-Modus — ueber dem Rollbereich, damit er
+        # beim Blaettern stehen bleibt. Stil wie der FM-46-Hinweis.
+        self._lbl_nur_ansehen = QLabel(NUR_ANSEHEN_HINWEIS)
+        self._lbl_nur_ansehen.setWordWrap(True)
+        self._lbl_nur_ansehen.setStyleSheet("color: #d08a00; padding: 2px 0 4px 0;")
+        self._lbl_nur_ansehen.setHidden(True)
+        aussen.addWidget(self._lbl_nur_ansehen)
+        inhalt = QWidget()
+        root = QVBoxLayout(inhalt)
+        root.setContentsMargins(0, 0, 0, 0)
+        aussen.addWidget(InhaltsRollbereich(inhalt), 1)
 
         # Header form
         form = QFormLayout()
@@ -640,18 +747,18 @@ class FixtureEditorDialog(QDialog):
         root.addLayout(form)
 
         # Modes tabs
-        modes_box = QGroupBox("Modes")
+        modes_box = QGroupBox("Modi && Kanäle")
         mb_layout = QVBoxLayout(modes_box)
 
         self._tabs = QTabWidget()
         mb_layout.addWidget(self._tabs)
 
         mode_btn_row = QHBoxLayout()
-        self._btn_add_mode = QPushButton("+ Mode")
+        self._btn_add_mode = QPushButton("+ Modus")
         self._btn_add_mode.clicked.connect(lambda: self._add_mode())
-        self._btn_rename_mode = QPushButton("Umbenennen")
+        self._btn_rename_mode = QPushButton("Modus umbenennen")
         self._btn_rename_mode.clicked.connect(self._rename_mode)
-        self._btn_del_mode = QPushButton("- Mode")
+        self._btn_del_mode = QPushButton("- Modus")
         self._btn_del_mode.clicked.connect(self._del_mode)
         mode_btn_row.addWidget(self._btn_add_mode)
         mode_btn_row.addWidget(self._btn_rename_mode)
@@ -676,7 +783,7 @@ class FixtureEditorDialog(QDialog):
         lightos_row.addWidget(btn_lightos_import)
         lightos_row.addWidget(btn_lightos_export)
         lightos_row.addStretch(1)
-        root.addLayout(lightos_row)
+        aussen.addLayout(lightos_row)
 
         # Save/Cancel
         btn_box = QDialogButtonBox(
@@ -684,7 +791,15 @@ class FixtureEditorDialog(QDialog):
         btn_box.accepted.connect(self._save)
         btn_box.rejected.connect(self.reject)
         self._btn_save = btn_box.button(QDialogButtonBox.StandardButton.Save)
-        root.addWidget(btn_box)
+        self._btn_cancel = btn_box.button(QDialogButtonBox.StandardButton.Cancel)
+        aussen.addWidget(btn_box)
+
+    def showEvent(self, e):
+        # FM-74: Startgroesse aus dem Bedarf des Inhalts, begrenzt auf den
+        # Bildschirm — erst hier, weil erst jetzt das Profil geladen ist.
+        beim_ersten_zeigen_anpassen(self, wunsch=QSize(760, 0),
+                                    zugabe=QSize(0, 90))
+        super().showEvent(e)
 
     # ── FM-30: `Return` speichert nicht mehr das ganze Profil ────────────
     #
@@ -872,9 +987,9 @@ class FixtureEditorDialog(QDialog):
         if name is None:
             existing = [self._tabs.tabText(i) for i in range(self._tabs.count())]
             i = 1
-            while f"Mode {i}" in existing:
+            while f"Modus {i}" in existing:
                 i += 1
-            name = f"Mode {i}"
+            name = f"Modus {i}"
         tab = _ModeTab(name, description=description, grid=grid, weiss=weiss)
         if channels:
             tab.load_mode_data(name, channels, description=description)
@@ -888,7 +1003,7 @@ class FixtureEditorDialog(QDialog):
             return
         tab = self._tabs.widget(idx)
         new_name, ok = QInputDialog.getText(
-            self, "Mode umbenennen", "Neuer Name:", text=tab.mode_name)
+            self, "Modus umbenennen", "Neuer Name:", text=tab.mode_name)
         if ok and new_name.strip():
             tab.mode_name = new_name.strip()
             tab._edit_name.setText(tab.mode_name)
@@ -897,8 +1012,8 @@ class FixtureEditorDialog(QDialog):
     def _del_mode(self):
         idx = self._tabs.currentIndex()
         if idx < 0 or self._tabs.count() <= 1:
-            QMessageBox.information(self, "Mode löschen",
-                                    "Mindestens ein Mode muss existieren.")
+            QMessageBox.information(self, "Modus löschen",
+                                    "Mindestens ein Modus muss existieren.")
             return
         self._tabs.removeTab(idx)
 
@@ -942,6 +1057,11 @@ class FixtureEditorDialog(QDialog):
                     # loescht und baut die Modi neu — was hier nicht
                     # mitgelesen wird, ist nach dem naechsten Speichern weg.
                     "segment": c.segment,
+                    # LAS-33: Laser-Angaben (Muster/Farben/Richtung). Der
+                    # Editor zeigt sie nicht — aber aus demselben Grund wie
+                    # beim Segment muessen sie hier mitgelesen werden, sonst
+                    # loescht das naechste Speichern sie.
+                    "laser": laser_aus_text(c.laser_angaben),
                     "ranges": [{
                         "range_from": r.range_from, "range_to": r.range_to,
                         "name": r.name, "kind": r.kind,
@@ -959,6 +1079,35 @@ class FixtureEditorDialog(QDialog):
             if self._tabs.count() == 0:
                 self._add_mode()
 
+    def _kopie_herkunft(self, s):
+        """UI-82: ``(Original, Herkunft als JSON)`` der Vorlage einer Kopie.
+
+        ``herkunft_fuer`` nimmt eine GUELTIGE gespeicherte Herkunft und leitet
+        sonst aus der Quelle des Originals ab (aeltere Importe, oder nur die
+        FM-63-Bearbeitet-Marke) — als „user“ ginge die Kopie sonst als „eigen“.
+        ``_herkunft_json`` schreibt nur die Herkunftsschluessel: die
+        Bearbeitet-Marke bleibt beim Original. Ein eigenes Profil
+        (``source='user'``) ist immer ableitbar (Herkunft „eigen“).
+
+        Wirft ``ProfilFehler``, wenn die Vorlage fehlt oder ihre Herkunft
+        sich nicht belegen laesst — dann darf keine Kopie entstehen."""
+        from src.core.database import bibliothek_format as BF
+        orig = s.get(FixtureProfile, self._kopie_von)
+        if orig is None:
+            raise BF.ProfilFehler([
+                "Die Vorlage der Kopie steht nicht mehr in der Bibliothek."])
+        return orig, BF._herkunft_json(BF.herkunft_fuer(orig))
+
+    def _kopie_abgelehnt(self, fehler) -> None:
+        """UI-82: Hinweis, warum die Kopie nicht gespeichert wird."""
+        QMessageBox.warning(
+            self, "Kopie nicht möglich",
+            "Die Herkunft der Vorlage lässt sich nicht belegen — eine Kopie "
+            "würde ihre Lizenz- und Herkunftsangabe verlieren. Es wurde "
+            "nichts gespeichert.\n\n" + str(fehler) + "\n\nAbhilfe: die "
+            "Bibliothek aktualisieren oder das Profil neu importieren und "
+            "dann erneut kopieren.")
+
     def _neues_profil(self, s, mfr, name: str) -> FixtureProfile:
         """Neues eigenes Profil (``source='user'``). Ist es die Kopie eines
         anderen Profils, uebernimmt es dessen Herkunft (Lizenz!), Notizen und
@@ -970,19 +1119,12 @@ class FixtureEditorDialog(QDialog):
             fixture_type=self._cb_type.currentText(),
             power_w=self._spin_power.value(), source="user",
         )
-        orig = (s.get(FixtureProfile, self._kopie_von)
-                if self._kopie_von is not None else None)
-        if orig is not None:
-            from src.core.database import bibliothek_format as BF
-            # ``herkunft_fuer`` nimmt eine GUELTIGE gespeicherte Herkunft und
-            # leitet sonst aus der Quelle des Originals ab (aeltere Importe,
-            # oder nur die FM-63-Bearbeitet-Marke) — als „user“ ginge die
-            # Kopie sonst als „eigen“. ``_herkunft_json`` schreibt nur die
-            # Herkunftsschluessel: die Bearbeitet-Marke bleibt beim Original.
-            try:
-                herkunft = BF._herkunft_json(BF.herkunft_fuer(orig))
-            except BF.ProfilFehler:
-                herkunft = ""
+        if self._kopie_von is not None:
+            # UI-82: ohne belegbare Herkunft KEINE Kopie — ``_kopie_herkunft``
+            # wirft ``ProfilFehler``; ``_save`` fragt vorher und schreibt dann
+            # nichts. Frueher fiel die Herkunft hier still auf leer zurueck — die
+            # Kopie galt als „eigen“ und verlor die Lizenz der Vorlage.
+            orig, herkunft = self._kopie_herkunft(s)
             profile.herkunft = herkunft
             profile.notes = orig.notes or ""
             profile.viz_model = orig.viz_model or ""
@@ -1022,7 +1164,7 @@ class FixtureEditorDialog(QDialog):
             QMessageBox.warning(self, "Speichern", beanstandung)
             return
         if self._tabs.count() == 0:
-            QMessageBox.warning(self, "Speichern", "Mindestens ein Mode nötig.")
+            QMessageBox.warning(self, "Speichern", "Mindestens ein Modus nötig.")
             return
 
         # Sync alle Modes
@@ -1032,7 +1174,7 @@ class FixtureEditorDialog(QDialog):
             mname, chans, description, grid, weiss = tab.get_data()
             if not chans:
                 QMessageBox.warning(self, "Speichern",
-                                    f"Mode '{mname}' hat keine Channels.")
+                                    f"Modus '{mname}' hat keine Kanäle.")
                 return
             modes_data.append((mname, chans, description, grid, weiss))
 
@@ -1050,6 +1192,17 @@ class FixtureEditorDialog(QDialog):
         if self._nur_ansehen and self._fixture_id is not None:
             # UI-74: zweiter Riegel neben dem gesperrten Knopf.
             return
+
+        # UI-82: eine Kopie ohne belegbare Herkunft wird abgelehnt, BEVOR
+        # irgendetwas gefragt oder geschrieben wird.
+        if self._kopie_von is not None:
+            from src.core.database.bibliothek_format import ProfilFehler
+            with Session(engine()) as s:
+                try:
+                    self._kopie_herkunft(s)
+                except ProfilFehler as e:
+                    self._kopie_abgelehnt(e)
+                    return
 
         # UI-74: kein zweites Profil unter demselben Hersteller + Modell —
         # beim Laden einer Show waere die Aufloesung mehrdeutig (FM-43).
@@ -1145,7 +1298,18 @@ class FixtureEditorDialog(QDialog):
                 else:
                     profile = self._neues_profil(s, mfr, name)
             else:
-                profile = self._neues_profil(s, mfr, name)
+                # UI-82: zweiter Riegel — verschwindet die Herkunft zwischen
+                # Pruefung und Schreiben, bleibt die Sitzung ohne Commit.
+                from src.core.database.bibliothek_format import ProfilFehler
+                try:
+                    profile = self._neues_profil(s, mfr, name)
+                except ProfilFehler as e:
+                    # Reine Absicherung: die Sitzung endet ohnehin ohne
+                    # Commit und verwirft alles (auch einen schon geflushten
+                    # neuen Hersteller). Der Test belegt „ohne Commit“.
+                    s.rollback()
+                    self._kopie_abgelehnt(e)
+                    return
 
             for mname, chans, description, grid, weiss in modes_data:
                 mode = FixtureMode(
@@ -1187,6 +1351,8 @@ class FixtureEditorDialog(QDialog):
                         # FM-46: nur an Dimmern gespeichert (s. Spalte).
                         segment=(segment_wert(ch.get("segment"))
                                  if ist_dimmer(ch.get("attribute")) else None),
+                        # LAS-33: unveraendert zurueckschreiben.
+                        laser_angaben=laser_als_text(ch.get("laser")),
                     )
                     s.add(fc)
                     for r in ch.get("ranges", []) or []:
