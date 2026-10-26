@@ -9,7 +9,7 @@ Je Eintrag (``kind``, ``device``):
 | ``input``   | ``set_source_mode("input", device)`` | stop   | ``use_audio_source(True)``                 |
 | ``os2l``    | stop                                 | start  | ``use_audio_source(False)``                |
 | ``song``    | stop                                 | stop   | ``use_audio_source(False)`` + aktueller Player-Track (``request_bpm``, nur in AUTO) |
-| ``off``     | stop                                 | stop   | ``use_audio_source(False)``                |
+| ``off``     | stop                                 | stop   | ``use_audio_source(False)`` + ``reset()`` (Takt 0 ausser von Hand gesetzt, BPM-33) |
 
 ``sink`` (S5) ist die ``sink_id`` eines Ausgabegeraets aus
 ``AudioCapture.list_loopback_sinks()``; alles andere (z. B. ein Mikrofonname aus
@@ -95,6 +95,8 @@ def _known_sink(device: str | None) -> str | None:
         return None
     return device if device in ids else None
 KINDS = ("loopback", "input", "os2l", "song", "off")
+# BPM-33: Takt-Herkuenfte, die „Aus" nicht nullt (von Hand gesetzt).
+HANDQUELLEN = ("manual", "tap", "nudge")
 
 
 def _log(msg: str) -> None:
@@ -273,6 +275,20 @@ class SourceController:
                     self._safe("os2l start", srv.start)
             else:
                 self._os2l_stop()
+            if kind == "off":
+                # BPM-33 (Entscheidung des Projektinhabers, 25.10.2026): „Aus" setzt
+                # den Takt auf 0 — Beat-Effekte stehen, und die Auto-Show zeigt beim
+                # Abspielen den BPM-32-Hinweis „Takt aus Titel uebernehmen". Vorher
+                # blieb der zuletzt erkannte Takt stehen (gemessen 60 BPM nach PC-Audio),
+                # die Leiste erschien nicht und die Show taktete mit dem alten Wert.
+                # ``reset`` statt ``turn_off``: der Modus (Auto/Manuell) bleibt, sonst
+                # fuehrte die naechste Wahl von PC-Audio/Eingang nicht mehr (``apply``
+                # stellt den Modus von vorher wieder her). OS2L bleibt bewusst
+                # unveraendert (dort fuehrt das DJ-Programm den Takt).
+                # Ein von Hand gesetzter Takt (Eingabe/Tap/Nudge) gehoert nicht der
+                # Quelle und bleibt — „Manuell + Aus" ist die Arbeitslage fuer Tap.
+                if getattr(mgr, "current_source", None) not in HANDQUELLEN:
+                    self._safe("reset", lambda: mgr.reset())
             if kind == "song":
                 self.apply_player_track()
         self._notify()
