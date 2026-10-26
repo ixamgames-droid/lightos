@@ -141,14 +141,14 @@ Adapter genügt. Dann vergibt aber niemand automatisch Adressen — du stellst s
 Hand ein. **Die Adresse des PCs stellst du im Betriebssystem ein, nicht in LightOS.**
 
 1. **Adresse des Adapters herausfinden.** Sie steht auf dem Gerät, in seiner Anleitung
-   oder in seinem Einstellprogramm. Beispiel: `192.168.1.50`. Viele Art-Net-Geräte
+   oder in seinem Einstellprogramm. Beispiel: `192.0.2.50`. Viele Art-Net-Geräte
    haben ab Werk eine Adresse `2.x.x.x` oder `10.x.x.x` mit der Maske `255.0.0.0`.
 2. **LAN-Kabel einstecken**, Adapter einschalten. An der Netzwerkbuchse sollte die
    Verbindungslampe leuchten.
 3. **Dem PC eine feste Adresse im selben Netz geben** — im Betriebssystem, an genau
    der Netzwerkkarte, an der das Kabel steckt:
-   - Die ersten Zahlen wie beim Adapter, die letzte anders. Zum Adapter `192.168.1.50`
-     passt zum Beispiel `192.168.1.10`, Maske `255.255.255.0`. Zum Adapter `2.0.0.5`
+   - Die ersten Zahlen wie beim Adapter, die letzte anders. Zum Adapter `192.0.2.50`
+     passt zum Beispiel `192.0.2.10`, Maske `255.255.255.0`. Zum Adapter `2.0.0.5`
      passt `2.0.0.10`, Maske `255.0.0.0`.
    - Gateway und DNS bleiben leer.
    - Windows: *Einstellungen → Netzwerk und Internet → Ethernet → IP-Zuweisung →
@@ -161,7 +161,7 @@ Hand ein. **Die Adresse des PCs stellst du im Betriebssystem ein, nicht in Light
    Dort die richtige **Netzwerkkarte** wählen, als Ziel die Adresse des Adapters
    eintragen (oder Broadcast lassen), Universum wählen, **Übernehmen**. Die Schritte im
    Einzelnen: [Ausgabe einrichten, Abschnitt Art-Net](ANLEITUNG.md#3-art-net).
-6. **Prüfen:** Reagiert nichts, zuerst `ping 192.168.1.50` (mit der Adresse deines
+6. **Prüfen:** Reagiert nichts, zuerst `ping 192.0.2.50` (mit der Adresse deines
    Adapters). Kommt keine Antwort, stimmt die Adresse des PCs oder das Kabel nicht —
    siehe [Netzwerk-Falle](ANLEITUNG.md#netzwerk-falle-bei-art-net-und-sacn).
 

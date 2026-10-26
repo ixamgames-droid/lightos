@@ -43,8 +43,8 @@ NETZ_TEXT = (
     "Ethernet→DMX-Adapter (Art-Net- oder sACN-Nodes) brauchen keinen Treiber: "
     "LightOS schickt die DMX-Daten über das Netzwerk. Das geht auch ohne "
     "Router, mit einem LAN-Kabel direkt vom PC zum Adapter. PC und Adapter "
-    "brauchen dafür Adressen im selben Netz (zum Beispiel 192.168.1.10 und "
-    "192.168.1.50) — die Adresse des PCs stellst du im Betriebssystem ein; "
+    "brauchen dafür Adressen im selben Netz (zum Beispiel 192.0.2.10 und "
+    "192.0.2.50) — die Adresse des PCs stellst du im Betriebssystem ein; "
     "LightOS zeigt sie hier nur an und ändert nichts.")
 
 NETZ_SUCHE = ("Die Adresse des Adapters steht auf dem Gerät oder in seiner "
