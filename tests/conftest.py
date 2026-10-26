@@ -17,6 +17,36 @@ import time
 import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+# QA-99: Unter Windows bringt die Qt-Plattform „offscreen“ keine Schriftquelle
+# mit. Ohne QT_QPA_FONTDIR kennt sie KEINE Schrift (QFontDatabase.families()
+# leer), jeder Text wird mit Ersatzkaestchen vermessen — „Probe Text 123“ ist
+# dann 168 statt 78 Pixel breit. Layout-Tests (sizeHint, Textbreiten,
+# abgeschnittene Knoepfe) werden davon rot, ohne dass am Code etwas ist:
+# gemessen 18.10.2026 auf main, 9 Dateien im Windows-Gate. Linux und macOS
+# finden Schriften ueber fontconfig/CoreText — dort bleibt alles, wie es ist.
+# Ein vom Aufrufer gesetztes QT_QPA_FONTDIR gewinnt. Muss vor der ersten
+# QApplication stehen (die Plattform liest die Variable beim Start).
+def _offscreen_schriftordner(umgebung, plattform=sys.platform):
+    """Setzt in ``umgebung`` QT_QPA_FONTDIR auf den Windows-Schriftordner, wenn
+    die Plattform „offscreen“ ist und noch kein Schriftordner gesetzt ist.
+    Gibt den gesetzten Ordner zurueck, sonst None."""
+    if not plattform.startswith("win"):
+        return None
+    if umgebung.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen":
+        return None
+    if umgebung.get("QT_QPA_FONTDIR"):
+        return None
+    windows = umgebung.get("WINDIR") or umgebung.get("SystemRoot") or r"C:\Windows"
+    ordner = os.path.join(windows, "Fonts")
+    if not os.path.isdir(ordner):
+        return None
+    umgebung["QT_QPA_FONTDIR"] = ordner
+    return ordner
+
+
+_offscreen_schriftordner(os.environ)
 # Tests auf SEPARATE, PRO-PROZESS-EINDEUTIGE Datenbanken umlenken. So fasst kein
 # Test je die echten DBs der laufenden App an UND zwei gleichzeitige pytest-Laeufe
 # (oder ein abgebrochener Vorlauf) teilen sich NICHTS mehr.
@@ -334,6 +364,19 @@ os.environ.setdefault(
 os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(
     _TEST_ROOT, f"lightos_test_universes_{_TEST_TOKEN}.json")
 
+# NET-15: dieselbe harte Trennung fuer die Zuordnung der DMX-Fernsteuerung
+# (`paths.dmx_fernsteuerung_path`). Ohne sie schriebe jedes „Uebernehmen" im
+# Ausgabe-Dialog-Test in den echten Datenordner. Reste alter Laeufe raeumt das
+# Muster `lightos_test_fernsteuerung_*.json` weiter unten ab.
+os.environ["LIGHTOS_DMX_FERNSTEUERUNG"] = os.path.join(
+    _TEST_ROOT, f"lightos_test_fernsteuerung_{_TEST_TOKEN}.json")
+
+# OSC-06: dieselbe harte Trennung fuer die freien OSC-Zuordnungen
+# (`paths.osc_zuordnungen_path`) — sonst schriebe „Übernehmen" im OSC-Dialog-
+# Test in den echten Datenordner. Reste: Muster `lightos_test_osc_zuordnungen_*`.
+os.environ["LIGHTOS_OSC_ZUORDNUNGEN"] = os.path.join(
+    _TEST_ROOT, f"lightos_test_osc_zuordnungen_{_TEST_TOKEN}.json")
+
 
 def _purge_test_dbs():
     """Die PROZESS-EIGENE Show-Test-DB (inkl. SQLite -wal/-shm-Seitendateien)
@@ -502,7 +545,7 @@ def _eigene_testpfade() -> set:
     pfade = set()
     for schluessel in ("LIGHTOS_CRASH_LOG", "LIGHTOS_SHOW_DB",
                        "LIGHTOS_SACN_CID", "LIGHTOS_UNIVERSES_JSON",
-                       "LIGHTOS_FIXTURE_DB"):
+                       "LIGHTOS_FIXTURE_DB", "LIGHTOS_OSC_ZUORDNUNGEN"):
         wert = os.environ.get(schluessel)
         if not wert:
             continue
@@ -641,6 +684,8 @@ def _purge_old_test_crash_logs():
         muster = ("lightos_test_crash_*.log", "lightos_test_appdata_*",
                   "lightos_test_show_*.db*", "lightos_test_sacn_cid_*",
                   "lightos_test_universes_*.json",
+                  "lightos_test_fernsteuerung_*.json",
+                  "lightos_test_osc_zuordnungen_*.json*",
                   "lightos_test_fixtures_*.db*")
         for m in muster:
             for path in glob.glob(os.path.join(_TEST_ROOT, m)):
@@ -729,6 +774,17 @@ os.environ.setdefault("LIGHTOS_KEIN_USB", "1")
 # doppeltes Netz zum offscreen-Check in main_window._recovery_prompt_suppressed;
 # Regressionstest: tests/test_autosave_recovery_headless.py.
 os.environ.setdefault("LIGHTOS_NO_RECOVERY_PROMPT", "1")
+
+# LIZ-1: der echte GUI-Start (main.main()) fragt ohne gueltige Testlizenz nach
+# einer Lizenzdatei — ein modaler Dialog, den headless niemand beantwortet. Die
+# Suite hat keine Lizenz (ihr Datenordner ist ein Wegwerf-Ordner) und soll auch
+# keine brauchen. Dieser Schalter stellt die Abfrage ab; er wirkt NUR unter
+# pytest bzw. in Kindprozessen eines Tests (src/core/lizenz.py::testlauf),
+# ausserhalb davon ist er wirkungslos. Fest gesetzt (nicht setdefault): ein
+# geerbter Wert soll die Suite nicht an den Dialog haengen.
+os.environ["LIGHTOS_LIZENZ_TESTLAUF"] = "1"
+# … und ein geerbter Lizenzpfad des Entwicklers gehoert nicht in die Suite.
+os.environ.pop("LIGHTOS_LIZENZ", None)
 
 import pytest
 
@@ -1042,21 +1098,32 @@ def _reset_sync_subscribers():
     uebersteht KEIN Test-Leak die Test-Grenze; persistente/Modul-Subscriber aus
     dem Schnappschuss bleiben unangetastet. Bewusst OHNE erzwungenes gc.collect ---
     die jetzt unreferenzierten Views sammelt Python regulaer + gefahrlos ein."""
-    from src.core import sync as _S
-    sync = getattr(_S, "_sync", None)   # NICHT get_sync() -> Singleton nicht erzwingen
-    snapshot = None
-    if sync is not None:
-        try:
-            snapshot = {ev: list(cbs) for ev, cbs in sync._subscribers.items()}
-        except Exception:
-            snapshot = None
+    snapshot = _sync_abos_merken()
     yield
+    _sync_abos_zuruecksetzen(snapshot)
+
+
+def _sync_abos_merken():
+    """Der Subscriber-Stand des Bus, oder ``None`` wenn es den Bus noch nicht
+    gibt (NICHT ``get_sync()`` — das Singleton wird hier nicht erzwungen)."""
+    from src.core import sync as _S
+    sync = getattr(_S, "_sync", None)
+    if sync is None:
+        return None
+    try:
+        return {ev: list(cbs) for ev, cbs in sync._subscribers.items()}
+    except Exception:
+        return None
+
+
+def _sync_abos_zuruecksetzen(snapshot) -> None:
+    from src.core import sync as _S
     sync = getattr(_S, "_sync", None)
     if sync is None:
         return
     try:
         if snapshot is None:
-            # Singleton entstand erst WAEHREND des Tests -> alle Subscriber sind Leaks
+            # Singleton entstand erst WAEHREND des Laufs -> alle Subscriber sind Leaks
             for ev in list(sync._subscribers):
                 sync._subscribers[ev] = []
         else:
@@ -1064,6 +1131,43 @@ def _reset_sync_subscribers():
                 sync._subscribers[ev] = list(snapshot.get(ev, []))
     except Exception:
         pass
+
+
+@pytest.fixture(autouse=True, scope="class")
+def _reset_sync_subscribers_je_klasse():
+    """PROC-21: dieselbe Sicherung eine Stufe hoeher — fuer alles, was eine
+    Testklasse in ``setUpClass``/``setup_class`` am Bus anmeldet.
+
+    DIE LUECKE: ``_reset_sync_subscribers`` sichert je TEST. ``setUpClass``
+    laeuft aber VOR dem ersten Test der Klasse — was dort angemeldet wird,
+    steht schon im Schnappschuss des ersten Tests und gilt fortan als
+    „war vorher da“. Es ueberlebt die Klasse und die Datei.
+
+    BELEG: ``test_las31_notaus_kopfleiste`` baut in ``setUpClass`` ein echtes
+    ``MainWindow``; das meldet ``_on_show_loaded`` am Bus an (ohne
+    ``subscribe_widget``). ``deleteLater`` im ``tearDownClass`` meldet nichts
+    ab, der Bus haelt das Fenster am Leben. Laedt ein SPAETERER Test eine
+    Show, laeuft das alte Fenster mit — und verbraucht z. B. den einmaligen
+    Sperrzonen-Hinweis, den ``test_las32_nachbesserung`` gerade pruefen will
+    (dort rot, allein gruen).
+
+    Dieses Fixture wird vor dem ``setUpClass`` der Klasse aufgebaut und nach
+    ihrem ``tearDownClass`` abgebaut (pytest ordnet autouse-Fixtures aus der
+    conftest vor die der Klasse). Bei Tests ohne Klasse wirkt es je Test — wie
+    das Fixture oben, also ohne Folgen."""
+    snapshot = _sync_abos_merken()
+    yield
+    _sync_abos_zuruecksetzen(snapshot)
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _reset_sync_subscribers_je_modul():
+    """PROC-21: und noch eine Stufe hoeher, fuer ``setUpModule``/
+    ``setup_module`` und Fixtures mit ``scope="module"`` — aus demselben Grund
+    wie ``_reset_sync_subscribers_je_klasse``."""
+    snapshot = _sync_abos_merken()
+    yield
+    _sync_abos_zuruecksetzen(snapshot)
 
 
 # ── PROC-05: warum hier NICHT ``QApplication.allWidgets()`` steht ────────────

@@ -1,8 +1,8 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "07a09e56",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "26ec5bba",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
   "bilder": [
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "00c83d436751d4b62da2a4540fb335f9"
+      "md5": "e912765d204812c22364cb940f0f902b"
     },
     {
       "datei": "02_enttec.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "65c98c1c6957ff7ee32b23b5e4a6bcb1"
+      "md5": "3dc290758968d12fa4fc327861ed1f42"
     },
     {
       "datei": "03_artnet.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "52a731414d8ffcd6db8f363bea660f6a"
+      "md5": "dfde82c010b4fdcdc36e601212ce31b8"
     },
     {
       "datei": "04_sacn.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "7ec5f7bad82668340167861b92aac431"
+      "md5": "a6cbf223ae4da6448424f7fea245c907"
     },
     {
       "datei": "05_universen.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "dc293a561ec47c67cbec74424f5047aa"
+      "md5": "6dbfeb4b10e242f51f7c8f2547d80b9f"
     },
     {
       "datei": "06_output_monitor.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "12b6ae424ae176e694ab30b82b2f0f2c"
+      "md5": "3ffefd4d71ff18463e0af0c273ef7f06"
     },
     {
       "datei": "07_dmx_monitor.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "21652b08c2c0936e648b9ee0adc4225b"
+      "md5": "da2bafb18b6146119ba66aa02bf1470d"
     },
     {
       "datei": "08_warnungen.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "5b220ec04fa057ce898e6bfd297978f0"
+      "md5": "784aa977fc449d0ce269e539539c6192"
     },
     {
       "datei": "09_blackout_dmx_monitor.png",
@@ -103,7 +103,7 @@
         325
       ],
       "marken": [],
-      "md5": "1919ecfd60ea2922b6d4b9327b94db85"
+      "md5": "5376758b05a54c0dffa406565d5f3d50"
     }
   ]
 }

@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
 from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
 from .vc_widget import VCWidget
+from src.core import undo as _verlauf      # UI-93: gemeinsame Schrittnummern
 
 
 WIDGET_REGISTRY: dict[str, type] = {}
@@ -104,6 +105,9 @@ class VCCanvas(QWidget):
     snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
     widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
+    handy_seiten_changed = Signal()     # WEB-09: Handy-Seiten geaendert (Editor/Seitenleiste)
+    handy_seite_gewaehlt = Signal(int)  # WEB-10: in der Seitenleiste gezeigte Handy-Seite
+    handy_abgelegt = Signal(str)        # WEB-10: Widget (Kennung) auf eine Handy-Seite gelegt
     # Intern: MIDI aus dem Dispatch-Thread thread-sicher in den UI-Thread holen
     _midi_received = Signal(object)
     # Intern: Page/Bank-Wechsel der Engine (kann aus MIDI-Thread kommen)
@@ -112,12 +116,31 @@ class VCCanvas(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._edit_mode = False
+        # UI-96: Kiosk-Modus — kein Bearbeiten, keine Zuweisungs-/Lern-Modi.
+        self._kiosk = False
         self._snap_to_grid = False
         self._active_bank = 0
         # Undo/Redo: Snapshot-Verlauf der VC-Layouts (Hinzufuegen/Loeschen/…).
         self._undo_stack: list[dict] = []
         self._redo_stack: list[dict] = []
+        # UI-93: Platz jedes Eintrags im gemeinsamen Verlauf (src/core/undo.py),
+        # gleich lang wie die Stapel. Undo: Schrittnummer. Redo: (Ruecknahme-
+        # Marke, Schrittnummer) — die Schrittnummer kehrt beim Wiederholen
+        # auf den Undo-Stapel zurueck.
+        self._undo_marken: list[int] = []
+        self._redo_marken: list[tuple[int, int]] = []
         self._restoring = False
+        self._laedt_layout = False     # WEB-08: from_dict laeuft (Kennungen am Ende pruefen)
+        # WEB-09: Handy-Seiten (Verknuepfungen auf Widgets), s. src/core/handy_seiten.py.
+        # Teil des VC-Layouts — to_dict/from_dict und damit Show, Export und Undo.
+        self._handy_seiten: dict = {"version": 1, "seiten": []}
+        # WEB-10: die Seite, die die Seitenleiste gerade zeigt — dorthin legt
+        # „Auf Handy-Konsole legen". Reiner Anzeigezustand, nicht in der Show.
+        self._handy_seite_nr = 0
+        # WEB-10: die Seitenleiste als Ablageziel beim Ziehen eines Widgets
+        # (schwach gehalten; s. ``handy_ablageziel_setzen``).
+        self._handy_ablageziel = None
+        self.handy_seiten_changed.connect(self._handy_abzeichen_aktualisieren)
         self._UNDO_MAX = 50
         # Basis-Arbeitsflaeche. Die tatsaechliche Mindestgroesse waechst mit dem
         # Inhalt mit (siehe _update_content_extent) — sonst haette die
@@ -401,15 +424,57 @@ class VCCanvas(QWidget):
             obj = obj.parent()
         return True
 
+    def soll_sichtbar(self, w) -> bool:
+        """Sichtbarkeit eines Canvas-Kinds: aktive Bank UND — bei einem
+        Pop-up-Feld (VCB-48) — offen. MIDI/Hotkey fragen weiter nur
+        :meth:`on_active_bank`: Kinder eines geschlossenen Pop-ups bleiben
+        ausloesbar und behalten ihren Zustand (wie Elemente anderer Seiten)."""
+        if not self.on_active_bank(w):
+            return False
+        if getattr(w, "_popup", False):
+            return bool(getattr(w, "_popup_offen", False))
+        return True
+
+    def popups_nach_oben(self) -> None:
+        """VCB-48: offene Pop-up-Felder liegen ueber allen anderen Elementen —
+        auch nachdem ein anderes Widget angelegt/abgelegt (raise_) wurde."""
+        from . import vc_popup
+        for f in vc_popup.alle_popups(self):
+            if f.popup_offen():
+                f.raise_()
+
+    def popup_tasten_auffrischen(self, popup_id: str = "") -> None:
+        """VCB-48: Pop-up-Tasten neu zeichnen (sie zeigen offen/zu)."""
+        from . import vc_popup
+        try:
+            widgets = self.findChildren(VCWidget)
+        except RuntimeError:
+            return
+        for w in widgets:
+            if vc_popup.ist_popup_taste(w) and (
+                    not popup_id or getattr(w, "popup_target", "") == popup_id):
+                w.update()
+
+    def popup_umschalten(self, popup_id: str) -> bool:
+        """Pop-up-Feld mit dieser Kennung oeffnen/schliessen. False = gibt es nicht."""
+        from . import vc_popup
+        f = vc_popup.finde_popup(self, popup_id)
+        if f is None:
+            return False
+        f.popup_umschalten()
+        return True
+
     def _apply_bank_visibility(self):
         for child in self.findChildren(
             VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly
         ):
-            child.setVisible(self.on_active_bank(child))
+            child.setVisible(self.soll_sichtbar(child))
             # Frames haben eigene (Seiten x Bank)-Sichtbarkeit fuer ihre Kinder —
             # sonst blieben Bank-Pins verschachtelter Widgets unbeachtet.
             if hasattr(child, "_apply_bank_visibility"):
                 child._apply_bank_visibility()
+        self.popups_nach_oben()
+        self.popup_tasten_auffrischen()   # VCB-48: offen-Anzeige haengt an der Bank
 
     def _on_midi_raw(self, msg):
         # Laeuft im MidiDispatch-Thread (kein Qt-Event-Loop!). QTimer.singleShot
@@ -457,6 +522,8 @@ class VCCanvas(QWidget):
         Aktiviert MIDI-Learn: der nächste Klick auf einen VCButton bewaffnet ihn,
         die darauf folgende MIDI-Message wird ihm zugewiesen.
         """
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._midi_learn_btn = None
         # Signalisiere allen Buttons dass sie für MIDI-Learn klickbar sind
         self._awaiting_button_click_for = "midi_learn"
@@ -480,6 +547,8 @@ class VCCanvas(QWidget):
         Aktiviert Assign-Modus: nächster Klick auf einen VCButton weist ihm
         den angegebenen Snapshot zu.
         """
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_snapshot_index = snapshot_index
         self._awaiting_button_click_for = "snapshot"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -494,6 +563,8 @@ class VCCanvas(QWidget):
     def start_function_assign(self, function_id: int):
         """Aktiviert Assign-Modus: nächster Klick auf einen VCButton macht ihn
         zum Funktions-Toggle für die gewählte Funktion (Effekt/Matrix/Scene)."""
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_function_id = function_id
         self._awaiting_button_click_for = "function"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -508,6 +579,8 @@ class VCCanvas(QWidget):
     def start_snap_assign(self, snap_id: int):
         """Aktiviert Assign-Modus: naechster Klick auf einen VCButton macht ihn
         zur Farb-/Snap-Taste fuer den gewaehlten Bibliothek-Snap."""
+        if self._kiosk:
+            return          # UI-96: im Kiosk keine Zuweisung
         self._assign_snap_id = snap_id
         self._awaiting_button_click_for = "library_snap"
         self.setCursor(Qt.CursorShape.CrossCursor)
@@ -599,12 +672,31 @@ class VCCanvas(QWidget):
 
     # ── Edit mode ────────────────────────────────────────────────────────────
 
+    def set_kiosk(self, kiosk: bool) -> None:
+        """UI-96: Kiosk-Modus setzen. Beim Einschalten endet ein laufender
+        Bearbeiten-/Zuweisungs-Modus sofort."""
+        self._kiosk = bool(kiosk)
+        if self._kiosk:
+            self.cancel_midi_learn()
+            self.cancel_snapshot_assign()
+            self.cancel_function_assign()
+            self.cancel_snap_assign()
+            if self._edit_mode:
+                self.set_edit_mode(False)
+
+    @property
+    def kiosk(self) -> bool:
+        return self._kiosk
+
     def set_edit_mode(self, enabled: bool):
+        if self._kiosk and enabled:
+            enabled = False     # UI-96: im Kiosk nie Bearbeiten-Modus
         self._edit_mode = enabled
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
         if not enabled:
             self._on_widget_selected(None)   # Inspector leeren, wenn Edit-Modus aus
+        self._handy_abzeichen_aktualisieren()   # WEB-10: Abzeichen nur beim Bearbeiten
         self.update()
 
     def _on_widget_selected(self, w):
@@ -874,6 +966,10 @@ class VCCanvas(QWidget):
         from .vc_button import VCButton, ButtonAction
         from .vc_slider import VCSlider, SliderMode
 
+        # VCB-48: Ablage auf die freie Flaeche eines OFFENEN Pop-up-Felds ->
+        # neue Elemente gehoeren ins Feld (sonst laegen sie verdeckt darunter).
+        feld = self._offenes_popup_an(pos) if target is None else None
+
         if function_id is not None:
             # WS1: gefuehrter Smart-Drop auf leeres Canvas (statt fixem Toggle-Button).
             # Nur im interaktiven Pfad (echter Drag&Drop); Direktaufrufe/Tests bleiben
@@ -886,8 +982,9 @@ class VCCanvas(QWidget):
                 results = panel.run()
                 if not results:
                     return
-                self.build_from_smart_results(results, pos=pos,
-                                              box=getattr(panel, "box_mode", False))
+                created = self.build_from_smart_results(
+                    results, pos=pos, box=getattr(panel, "box_mode", False))
+                self._drop_ins_popup(feld, created, pos)
                 return
             # Funktionsnamen fuer Caption ermitteln
             fn_name: str | None = None
@@ -971,6 +1068,7 @@ class VCCanvas(QWidget):
                         w.caption = fn_name
                     w.setVisible(self.on_active_bank(w))
                     w.show()
+                    self._drop_ins_popup(feld, [w], drop_pos)
 
         elif snapshot_index is not None:
             if isinstance(target, VCButton):
@@ -986,6 +1084,7 @@ class VCCanvas(QWidget):
                     w.snapshot_index = snapshot_index
                     w.setVisible(self.on_active_bank(w))
                     w.show()
+                    self._drop_ins_popup(feld, [w], drop_pos)
 
         elif snap_id is not None:
             if isinstance(target, VCButton):
@@ -997,6 +1096,46 @@ class VCCanvas(QWidget):
                     self._assign_snap_to_button(w, snap_id)
                     w.setVisible(self.on_active_bank(w))
                     w.show()
+                    self._drop_ins_popup(feld, [w], drop_pos)
+
+    def _offenes_popup_an(self, pos):
+        """VCB-48: oberstes OFFENES (sichtbares) Pop-up-Feld an ``pos`` — oder None."""
+        if pos is None:
+            return None
+        from . import vc_popup
+        treffer = None
+        for f in vc_popup.alle_popups(self):
+            if self.soll_sichtbar(f) and f.geometry().contains(pos):
+                treffer = f          # letzter Treffer liegt im Stapel zuoberst
+        return treffer
+
+    def _drop_ins_popup(self, feld, widgets, pos) -> None:
+        """VCB-48: frisch per Drop angelegte Widgets in das offene Pop-up-Feld
+        ``feld`` umhaengen (Position relativ zum Feld, in dessen Inhaltsflaeche).
+        Rahmen bleiben auf der Konsole (keine verschachtelten Rahmen). Der
+        Undo-Punkt liegt schon VOR dem Anlegen — ein Strg+Z nimmt alles zurueck."""
+        if feld is None or not widgets:
+            return
+        from .vc_frame import VCFrame
+        grid = self.GRID if self._snap_to_grid else 0
+        cr = feld._content_rect()
+        for w in widgets:
+            if w is None or isinstance(w, VCFrame):
+                continue
+            local = feld.mapFrom(self, w.pos())
+            lx = min(max(local.x(), cr.x()), max(cr.x(), cr.right() - w.width()))
+            ly = min(max(local.y(), cr.y()), max(cr.y(), cr.bottom() - w.height()))
+            if grid > 0:
+                lx = round(lx / grid) * grid
+                ly = round(ly / grid) * grid
+            feld.add_child_to_page(w, feld._current_page)
+            w.set_snap_grid(grid)
+            w.move(lx, ly)
+            w.raise_()
+            w.update()
+        feld.update()
+        self.popups_nach_oben()
+        self._update_content_extent()
 
     def _build_from_smart_result(self, res, pos):
         """WS1: erzeugt aus einem SmartDropResult ein vorverdrahtetes VC-Widget."""
@@ -1522,8 +1661,11 @@ class VCCanvas(QWidget):
             aspect = self._widget_aspect(widget)
         pos = widget.pos()
         carry = {}
+        # WEB-08: ``widget_id`` wandert mit — gemeint ist dasselbe Bedienelement
+        # an derselben Stelle, eine Verknuepfung der Handy-Konsole soll halten.
         for attr in ("function_id", "function_ids", "param_keys_per_id",
-                     "param_key", "efx_function_id", "caption", "bank"):
+                     "param_key", "efx_function_id", "caption", "bank",
+                     "widget_id"):
             if hasattr(widget, attr):
                 carry[attr] = getattr(widget, attr)
         # VCB-30: Vorher-Stand erst SICHERN, aber den Undo-Schritt erst NACH
@@ -1555,6 +1697,9 @@ class VCCanvas(QWidget):
             self._restoring = _prev
         if _ok:
             self.push_undo_snapshot(_pre_snapshot)   # _restoring wieder aus -> wirkt; nur bei Erfolg
+            # WEB-10: die Kennung ist mitgewandert — Abzeichen und Seitenleiste
+            # zeigen jetzt das neue Widget (das evtl. nicht mehr fernbedienbar ist).
+            self.handy_seiten_changed.emit()
         return new
 
     def build_from_smart_results(self, results, pos=None, origin=None, box=False) -> list:
@@ -1710,6 +1855,19 @@ class VCCanvas(QWidget):
             act = add_menu.addAction(wtype.replace("VC", ""))
             act.setData((wtype, local_pos))
 
+        # VCB-48: Pop-up-Felder sind geschlossen unsichtbar — hier lassen sie
+        # sich im Bearbeiten-Modus zum Befuellen oeffnen (und wiederfinden).
+        from . import vc_popup
+        _pops = vc_popup.alle_popups(self)
+        if _pops:
+            pop_menu = menu.addMenu("Pop-up-Felder")
+            for f in _pops:
+                a = pop_menu.addAction(f.caption or "(ohne Namen)")
+                a.setCheckable(True)
+                a.setChecked(f.popup_offen())
+                a.triggered.connect(
+                    lambda checked=False, ff=f: ff.set_popup_offen(bool(checked)))
+
         menu.addSeparator()
         act_clear = menu.addAction("Alle löschen")
         # UIC-05: Canvas-Export/Import nur noch über die Toolbar (keine Dopplung im
@@ -1736,6 +1894,11 @@ class VCCanvas(QWidget):
         w.set_snap_grid(self.GRID if self._snap_to_grid else 0)
         if d:
             w.apply_dict(d)
+            # WEB-08: ein aus einem Dict gebautes Widget kann eine Kennung
+            # mitbringen, die es auf der Flaeche schon gibt (Kopie, Einfuegen).
+            # Beim Laden einer ganzen Konsole prueft ``from_dict`` einmal am Ende.
+            if not self._laedt_layout:
+                self._kennungen_reparieren()
         else:
             snapped = QPoint(
                 round(pos.x() / self.GRID) * self.GRID,
@@ -1751,7 +1914,8 @@ class VCCanvas(QWidget):
             w.moved.connect(self._on_widget_moved)
         except (AttributeError, RuntimeError):
             pass
-        w.setVisible(self.on_active_bank(w))
+        w.setVisible(self.soll_sichtbar(w))
+        self.popups_nach_oben()          # VCB-48: neues Widget nicht ueber ein offenes Pop-up
         self._update_content_extent()
         return w
 
@@ -1871,12 +2035,26 @@ class VCCanvas(QWidget):
         # reihenfolge liegt zuoberst (raise_() haengt das Widget hinten an).
         target = None
         for f in self.findChildren(VCFrame, options=Qt.FindChildOption.FindDirectChildrenOnly):
-            if f is widget or not self.on_active_bank(f):
+            # VCB-48: ein geschlossenes Pop-up-Feld ist kein Ablageziel.
+            if f is widget or not self.soll_sichtbar(f):
                 continue
             if f.geometry().contains(center_canvas):
                 target = f
         parent = widget.parent()
         grid = self.GRID if self._snap_to_grid else 0
+
+        from . import vc_popup
+        if (target is not None and parent is not target and target.is_popup()
+                and (vc_popup.ist_popup_taste(widget)
+                     or vc_popup.enthaelt_popup_elemente(widget))):
+            # VCB-48: keine Pop-up-Taste in ein Pop-up-Feld — zurueck an den
+            # Ausgangsplatz, mit Hinweis.
+            vc_popup.hinweis(self, vc_popup.HINWEIS_TASTE_IM_POPUP)
+            orig = getattr(widget, "_orig_rect", None)
+            if orig is not None and orig.isValid():
+                widget.setGeometry(orig)
+            widget.update()
+            return
 
         if target is not None and parent is not target:
             # In den Frame hinein.
@@ -1914,6 +2092,7 @@ class VCCanvas(QWidget):
             self._reattach_highlight(widget, had_hl)
             widget.show()
             widget.update()
+        self.popups_nach_oben()
 
     @staticmethod
     def _detach_highlight(widget) -> bool:
@@ -1938,17 +2117,75 @@ class VCCanvas(QWidget):
             except Exception:
                 pass
 
+    @staticmethod
+    def _snap_ansprueche_abmelden(widget) -> None:
+        """VCB-46: eine Taste, die von der Flaeche verschwindet, meldet ihre
+        Snap-Ansprueche ab — auch Tasten IN einem geloeschten Rahmen. Sonst
+        bliebe eine aktive Taste mit Haken „übersteuert laufende Dimmer-Effekte“
+        als Halter stehen und ihr Vorrang gaelte ohne Taste weiter. Geschrieben
+        wird dabei nichts (wie beim Show-Neuladen)."""
+        from .vc_button import VCButton, forget_snap_claims
+        try:
+            betroffen = [widget] + list(widget.findChildren(VCButton))
+        except RuntimeError:
+            return                      # schon abgebaut
+        for w in betroffen:
+            if isinstance(w, VCButton):
+                w._snap_active = False
+                w._snap_prev = {}
+                forget_snap_claims(w)
+
+    def _gehaltene_loslassen(self, widget) -> None:
+        """WEB-12 (Codex zu #1039): eine gedrueckt gehaltene Taste (Handy,
+        MIDI) vor dem Loeschen/Typ-Tausch loslassen. Sonst findet das spaetere
+        Loslassen die Kennung nicht mehr, und Flash oder Blackout bleibt
+        haengen — auch beim Laden einer Show (``_clear``)."""
+        from .vc_button import VCButton
+        try:
+            betroffen = [widget] + list(widget.findChildren(VCButton))
+        except RuntimeError:
+            return
+        kennungen = []
+        for w in betroffen:
+            if not isinstance(w, VCButton):
+                continue
+            kennungen.append(getattr(w, "widget_id", None))
+            try:
+                w.release_if_held()
+            except Exception as e:
+                print(f"[VCCanvas] ERROR: Loslassen vor dem Loeschen: {e}")
+        try:
+            from src.web import vc_remote
+            vc_remote.vergessen(k for k in kennungen if k)
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Halter vergessen: {e}")
+
     def _remove_widget(self, widget: VCWidget):
         if not self._restoring:
             self._push_undo()      # Widget geloescht -> per Strg+Z wiederherstellbar
+        self._gehaltene_loslassen(widget)
+        self._snap_ansprueche_abmelden(widget)
+        # WEB-10: mit dem Widget (und bei einem Kasten: seinem Inhalt) fallen
+        # seine Verknuepfungen weg — Seitenleiste und Abzeichen erfahren es.
+        try:
+            _handy_vorher = self.handy_seiten()
+        except Exception:
+            _handy_vorher = None
         widget.hide()
         widget.setParent(None)
         widget.deleteLater()
         self._update_content_extent()
+        try:
+            if _handy_vorher is not None and self.handy_seiten() != _handy_vorher:
+                self.handy_seiten_changed.emit()
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Seiten nach Loeschen: {e}")
 
     def _clear(self):
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
+            self._gehaltene_loslassen(child)        # WEB-12
+            self._snap_ansprueche_abmelden(child)
             child.setParent(None)
             child.deleteLater()
         self.setMinimumSize(QSize(self.BASE_W, self.BASE_H))
@@ -1966,37 +2203,97 @@ class VCCanvas(QWidget):
             return
         if self._undo_stack and self._undo_stack[-1] == snapshot:
             return
+        self._marken_angleichen()
         self._undo_stack.append(snapshot)
+        self._undo_marken.append(_verlauf.neuer_schritt())
         if len(self._undo_stack) > self._UNDO_MAX:
             self._undo_stack.pop(0)
+            self._undo_marken.pop(0)
         self._redo_stack.clear()
+        self._redo_marken.clear()
+
+    def _marken_angleichen(self) -> None:
+        """UI-93: Marken so lang halten wie die Stapel. Wer einen Stapel direkt
+        leert oder fuellt, bekommt keine Verschiebung: fehlende Marken zaehlen
+        als „aeltester Schritt“ (0), ueberzaehlige fallen unten weg."""
+        for stapel, marken, leer in ((self._undo_stack, self._undo_marken, 0),
+                                     (self._redo_stack, self._redo_marken, (0, 0))):
+            zuviel = len(marken) - len(stapel)
+            if zuviel > 0:
+                del marken[:zuviel]
+            elif zuviel < 0:
+                marken[:0] = [leer] * (-zuviel)
+
+    def _redo_pruefen(self) -> None:
+        """UI-93: Wiederholen-Zweig verwerfen, wenn seit der Ruecknahme in einem
+        ANDEREN Verlauf (Bearbeiten → Rückgängig) ein neuer Schritt gemacht
+        wurde. Eintraege ohne Marke (direkt abgelegt) bleiben gueltig."""
+        self._marken_angleichen()
+        if (self._redo_marken and self._redo_marken[-1][0]
+                and _verlauf.wiederholen_verworfen(self._redo_marken[-1][0])):
+            self._redo_stack.clear()
+            self._redo_marken.clear()
 
     def can_undo(self) -> bool:
         return bool(self._undo_stack)
 
     def can_redo(self) -> bool:
+        self._redo_pruefen()
         return bool(self._redo_stack)
+
+    def undo_schritt(self):
+        """UI-93: Schrittnummer des naechsten Rueckgaengig (None = leer)."""
+        self._marken_angleichen()
+        return self._undo_marken[-1] if self._undo_stack else None
+
+    def redo_marke(self):
+        """UI-93: Ruecknahme-Marke des naechsten Wiederholen (None = leer)."""
+        self._redo_pruefen()
+        return self._redo_marken[-1][0] if self._redo_stack else None
+
+    def verlauf_leeren(self) -> None:
+        """Layout-Verlauf leeren (Bearbeiten → Verlauf löschen)."""
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._undo_marken.clear()
+        self._redo_marken.clear()
 
     def undo(self):
         """Letzte Aenderung rueckgaengig (Strg+Z)."""
         if not self._undo_stack:
             return
+        self._redo_pruefen()
+        schritt = self._undo_marken.pop()
         self._redo_stack.append(self.to_dict())
+        self._redo_marken.append((_verlauf.ruecknahme_marke(), schritt))
         self._restore(self._undo_stack.pop())
 
     def redo(self):
         """Rueckgaengig gemachte Aenderung wiederholen (Strg+Y / Strg+Umschalt+Z)."""
+        self._redo_pruefen()
         if not self._redo_stack:
             return
         self._undo_stack.append(self.to_dict())
+        self._undo_marken.append(self._redo_marken.pop()[1])
         self._restore(self._redo_stack.pop())
 
     def _restore(self, layout: dict):
+        # VCB-48: offen/zu ist Laufzeit und steht nicht im Layout. Ein Undo
+        # im Bearbeiten-Modus soll das gerade befuellte Pop-up nicht zuklappen.
+        from . import vc_popup
+        vorher = vc_popup.alle_popups(self)
+        offen = {f.popup_id for f in vorher if f.popup_offen()}
+        bekannt = {f.popup_id for f in vorher}
         self._restoring = True
         try:
             self.from_dict(layout)
         finally:
             self._restoring = False
+        for f in vc_popup.alle_popups(self):
+            # Im Bearbeiten-Modus bleibt ein Feld, das eben noch kein Pop-up war
+            # (Redo von „Rahmen wird Pop-up-Feld“), offen — wie beim Anhaken.
+            if f.popup_id in offen or (self._edit_mode and f.popup_id not in bekannt):
+                f.set_popup_offen(True)
 
     # ── Serialization ─────────────────────────────────────────────────────────
 
@@ -2030,6 +2327,414 @@ class VCCanvas(QWidget):
         if (self.minimumWidth(), self.minimumHeight()) != (right, bottom):
             self.setMinimumSize(QSize(right, bottom))
 
+    # ── WEB-08: Kennungen ────────────────────────────────────────────────────
+
+    def alle_widgets(self) -> list:
+        """Alle VC-Widgets der Konsole, auch die in Kaesten und auf anderen
+        Baenken — in Anlage-Reihenfolge (ein Kasten vor seinem Inhalt)."""
+        try:
+            return list(self.findChildren(VCWidget))
+        except RuntimeError:
+            return []
+
+    def widget_mit_kennung(self, kennung):
+        """Das Widget zu einer Kennung oder None. Unabhaengig von Bank, Seite
+        und Sichtbarkeit — eine Verknuepfung meint das Widget, nicht den Ort."""
+        if not isinstance(kennung, str) or not kennung:
+            return None
+        for w in self.alle_widgets():
+            if getattr(w, "widget_id", None) == kennung:
+                return w
+        return None
+
+    def _kennungen_reparieren(self) -> int:
+        """Stellt sicher, dass jede Kennung auf der Flaeche genau EINMAL
+        vorkommt. Gibt die Zahl der neu vergebenen Kennungen zurueck.
+
+        Das ERSTE Vorkommen behaelt die Kennung: ein eingefuegtes oder
+        kopiertes Widget haengt hinter den vorhandenen, also bekommt die Kopie
+        die neue und das Original behaelt seine — und beim Laden einer Datei
+        mit Dubletten bleibt die Zuordnung so, wie sie beim naechsten Laden
+        wieder waere.
+        """
+        from .vc_widget import kennung_gueltig, neue_kennung
+        gesehen: set[str] = set()
+        doppelt = []
+        for w in self.alle_widgets():
+            k = getattr(w, "widget_id", None)
+            if not kennung_gueltig(k) or k in gesehen:
+                doppelt.append(w)
+            else:
+                gesehen.add(k)
+        for w in doppelt:
+            k = neue_kennung()
+            while k in gesehen:
+                k = neue_kennung()
+            w.widget_id = k
+            gesehen.add(k)
+        if doppelt:
+            print(f"[VCCanvas] info: {len(doppelt)} VC-Kennung(en) neu vergeben "
+                  f"(doppelt oder ungueltig)")
+        return len(doppelt)
+
+    # ── WEB-09: Handy-Seiten ─────────────────────────────────────────────────
+
+    def _alle_kennungen(self) -> set:
+        return {getattr(w, "widget_id", None) for w in self.alle_widgets()}
+
+    def handy_seiten(self) -> dict:
+        """Die Handy-Seiten als eigener (kopierter) Abschnitt — bereinigt um
+        Verknuepfungen, deren Widget inzwischen geloescht wurde. Der gespeicherte
+        Stand bleibt dabei unberuehrt: ein Rueckgaengig des Loeschens bringt
+        Widget UND Verknuepfung zurueck (der Undo-Schnappschuss entsteht vor dem
+        Loeschen)."""
+        from src.core import handy_seiten as _hs
+        return _hs.normalisiere(self._handy_seiten, self._alle_kennungen())
+
+    def setze_handy_seiten(self, abschnitt, undo: bool = True) -> bool:
+        """Neue Handy-Seiten uebernehmen (ein Rueckgaengig-Schritt). Gibt True
+        zurueck, wenn sich etwas geaendert hat."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.normalisiere(abschnitt, self._alle_kennungen())
+        if neu == self.handy_seiten():
+            return False
+        if undo:
+            self._push_undo()
+        self._handy_seiten = neu
+        self.handy_seiten_changed.emit()
+        return True
+
+    def handy_konsole_automatisch_fuellen(self) -> tuple[int, int]:
+        """WEB-09: alle fernbedienbaren Widgets auf die Handy-Seiten ordnen
+        (ersetzt die bisherigen Seiten; ein Rueckgaengig-Schritt). Rueckgabe:
+        (Zahl der Verknuepfungen, Zahl der Seiten)."""
+        from src.core import handy_seiten as _hs
+        from .vc_fernbedienung import beschreibe
+        auskuenfte = []
+        for w in self.alle_widgets():
+            try:
+                a = beschreibe(w)
+            except Exception as e:
+                print(f"[VCCanvas] ERROR: Auskunft {type(w).__name__}: {e}")
+                a = None
+            # WEB-12 (QA96-05): Laser-Inhalt legt „Automatisch fuellen“ nur
+            # aufs Handy, wenn „Laser vom Handy erlauben“ an ist.
+            if a is not None and a.get("gesperrt") != "laser":
+                auskuenfte.append(a)
+        neu = _hs.automatisch_fuellen(auskuenfte)
+        self.setze_handy_seiten(neu)
+        return _hs.anzahl_eintraege(neu), len(neu["seiten"])
+
+    # ── WEB-10: Handy-Konsole von Hand bauen (Seitenleiste des Editors) ──────
+    #
+    # Jede Aenderung laeuft ueber ``setze_handy_seiten`` und ist damit EIN
+    # Rueckgaengig-Schritt. Die Regeln (was aufs Handy darf, wie gross, wo Platz
+    # ist) stehen hier und nicht in der Seitenleiste: was diese Methoden nicht
+    # ablegen, liegt auf keiner Seite und ist am Handy nicht erreichbar.
+
+    #: Bezeichnungen fuer die Begruendung „nicht fernbedienbar".
+    _HANDY_TYPNAMEN = {
+        "VCXYPad": "XY-Pad", "VCLabel": "Beschriftung", "VCSpeedDial": "Tempo-Rad",
+        "VCFrame": "Kasten", "VCColor": "Farbwähler", "VCEncoder": "Drehregler",
+        "VCColorList": "Chase-Liste", "VCSongInfo": "Musik-Anzeige",
+        "VCBpmDisplay": "BPM-Anzeige", "VCBusSelector": "Tempo-Bus-Wahl",
+        "VCTempoBusController": "Tempo-Controller", "VCEffectColors": "Effekt-Farben",
+        "VCStepper": "Schrittschalter", "VCEffectEditor": "Effekt-Editor",
+        "VCEffectDisplay": "Effekt-Anzeige", "VCMultiLiveEditor": "Live-Editor",
+    }
+
+    def handy_auskunft(self, widget) -> dict | None:
+        """Fernbedien-Auskunft eines Widgets (``vc_fernbedienung.beschreibe``)
+        oder None — wirft nicht."""
+        if widget is None:
+            return None
+        try:
+            from .vc_fernbedienung import beschreibe
+            return beschreibe(widget)
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Auskunft {type(widget).__name__}: {e}")
+            return None
+
+    def handy_ablegbar(self, widget) -> tuple[bool, str]:
+        """Darf dieses Widget auf eine Handy-Seite? (ja/nein, Begruendung).
+
+        Genau das, was die Fernausloesung bedienen kann (WEB-08): Taste, Fader,
+        Cueliste — ohne Laser-Muster. Kein eigener Massstab: ein Widget, das
+        ``beschreibe`` nicht kennt, zeigte das Handy ohnehin nur als leeres Feld.
+        """
+        if widget is None:
+            return False, "Das Element gibt es nicht mehr."
+        auskunft = self.handy_auskunft(widget)
+        if auskunft is not None:
+            # WEB-12: Laser-Inhalt nur mit „Laser vom Handy erlauben“.
+            if auskunft.get("gesperrt") == "laser":
+                return False, ("Steuert einen Laser — aufs Handy nur mit „Laser vom "
+                               "Handy erlauben“ (Ausgabe → Web-Remote: Verbindung & Token).")
+            return True, ""
+        name = type(widget).__name__
+        typ = self._HANDY_TYPNAMEN.get(name, name.replace("VC", ""))
+        return False, (f"{typ} ist nicht fernbedienbar — aufs Handy können "
+                       f"Tasten, Fader und Cuelisten.")
+
+    def handy_kennungen(self) -> set:
+        """Kennungen der Widgets, die auf irgendeiner Handy-Seite liegen."""
+        from src.core import handy_seiten as _hs
+        return _hs.freigegebene_kennungen(self.handy_seiten())
+
+    def handy_seite_nr(self) -> int:
+        """Die in der Seitenleiste gezeigte Handy-Seite (0, wenn es keine gibt)."""
+        n = len(self.handy_seiten()["seiten"])
+        return max(0, min(n - 1, int(self._handy_seite_nr))) if n else 0
+
+    def setze_handy_seite_nr(self, nr) -> None:
+        try:
+            nr = int(nr)
+        except (TypeError, ValueError):
+            return
+        n = len(self.handy_seiten()["seiten"])
+        nr = max(0, min(n - 1, nr)) if n else 0
+        if nr != self._handy_seite_nr:
+            self._handy_seite_nr = nr
+            self.handy_seite_gewaehlt.emit(nr)
+
+    def handy_zielfeld(self, widget, seite: int, spalte: int, zeile: int,
+                       abschnitt=None):
+        """Wohin ein Ablegen bei Zelle (spalte, zeile) fuehrte:
+        ``(spalte, zeile, breite, hoehe, passt)`` — oder None, wenn das Widget
+        nicht ablegbar ist. Liegt es schon auf der Seite, behaelt es seine
+        Groesse (es wird verschoben); sonst gilt die Standardgroesse seiner Art.
+        Ein Feld, das ueber den Rand ragte, wird hereingeschoben."""
+        from src.core import handy_seiten as _hs
+        auskunft = self.handy_auskunft(widget)
+        if auskunft is None:
+            return None
+        if abschnitt is None:
+            abschnitt = self.handy_seiten()
+        vorhanden = _hs.eintrag(abschnitt, seite, widget.widget_id)
+        if vorhanden is not None:
+            breite, hoehe = vorhanden["breite"], vorhanden["hoehe"]
+        else:
+            breite, hoehe = _hs.standard_groesse(auskunft)
+        try:
+            spalte = max(0, min(_hs.SPALTEN - breite, int(spalte)))
+            zeile = max(0, min(_hs.ZEILEN - hoehe, int(zeile)))
+        except (TypeError, ValueError):
+            return None
+        ok = _hs.passt(abschnitt, seite, spalte, zeile, breite, hoehe,
+                       ausser=widget.widget_id)
+        return (spalte, zeile, breite, hoehe, ok)
+
+    def handy_ablegen(self, widget, seite=None, spalte=None, zeile=None) -> tuple[bool, str]:
+        """Legt ein Widget als Verknuepfung auf die Handy-Konsole.
+
+        Ohne Zelle (Rechtsklick „Auf Handy-Konsole legen"): der naechste freie
+        Platz der gezeigten Seite, sonst der einer folgenden, sonst eine neue
+        Seite. Mit Zelle (Ziehen in die Seitenleiste): genau dorthin — liegt das
+        Widget schon auf der Seite, wird es verschoben.
+
+        Ein Widget liegt je Seite hoechstens EINMAL (auf mehreren Seiten darf
+        es liegen): die Kennung ist auf einer Seite der Name des Eintrags, und
+        das Dateiformat aus WEB-09 verwirft ein zweites Vorkommen beim Laden.
+
+        Rueckgabe (ok, Text) — der Text ist die Begruendung bzw. der Ort.
+        """
+        from src.core import handy_seiten as _hs
+        ok, grund = self.handy_ablegbar(widget)
+        if not ok:
+            return False, grund
+        kennung = widget.widget_id
+        abschnitt = self.handy_seiten()
+        if spalte is None or zeile is None:
+            start = self.handy_seite_nr() if seite is None else int(seite)
+            if abschnitt["seiten"] and _hs.eintrag(abschnitt, start, kennung) is not None:
+                return False, (f"Liegt schon auf „{abschnitt['seiten'][start]['name']}“ "
+                               f"— für eine weitere Seite diese zuerst in der "
+                               f"Seitenleiste wählen.")
+            breite, hoehe = _hs.standard_groesse(self.handy_auskunft(widget))
+            platz = _hs.naechster_platz(abschnitt, kennung, breite, hoehe, start)
+            if platz is None:
+                return False, (f"Kein Platz mehr: alle Seiten sind voll und mehr als "
+                               f"{_hs.MAX_SEITEN} Seiten gibt es nicht.")
+            abschnitt, nr, spalte, zeile = platz
+        else:
+            if not abschnitt["seiten"]:
+                abschnitt = _hs.seite_hinzufuegen(abschnitt)   # die erste Seite
+                nr = 0
+            else:
+                nr = self.handy_seite_nr() if seite is None else int(seite)
+            ziel = self.handy_zielfeld(widget, nr, spalte, zeile, abschnitt)
+            if ziel is None:
+                return False, "Dort ist kein Platz."
+            spalte, zeile, breite, hoehe, _passt = ziel
+        neu = _hs.eintrag_setzen(abschnitt, nr, kennung, spalte, zeile, breite, hoehe)
+        if neu is None:
+            return False, "Dort ist kein Platz — das Feld ist belegt."
+        if not self.setze_handy_seiten(neu):
+            return False, "Liegt dort schon."
+        self.setze_handy_seite_nr(nr)
+        self.handy_abgelegt.emit(kennung)
+        return True, neu["seiten"][nr]["name"]
+
+    def handy_eintrag_aendern(self, seite: int, kennung: str, spalte: int, zeile: int,
+                              breite=None, hoehe=None) -> bool:
+        """Verknuepfung im Raster verschieben und/oder ihre Groesse aendern.
+        Die Groesse wird auf das begrenzt, was die Handy-Ansicht fuer diese Art
+        darstellen kann (``handy_seiten.groesse_begrenzen``). False, wenn der
+        Platz belegt ist, ausserhalb liegt oder sich nichts aendert."""
+        from src.core import handy_seiten as _hs
+        abschnitt = self.handy_seiten()
+        alt = _hs.eintrag(abschnitt, seite, kennung)
+        if alt is None:
+            return False
+        breite = alt["breite"] if breite is None else breite
+        hoehe = alt["hoehe"] if hoehe is None else hoehe
+        if (breite, hoehe) != (alt["breite"], alt["hoehe"]):
+            auskunft = self.handy_auskunft(self.widget_mit_kennung(kennung))
+            if auskunft is None:
+                return False            # nicht (mehr) fernbedienbar: nur verschieben
+            breite, hoehe = _hs.groesse_begrenzen(auskunft["typ"], breite, hoehe)
+        neu = _hs.eintrag_setzen(abschnitt, seite, kennung, spalte, zeile, breite, hoehe)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_eintrag_entfernen(self, seite: int, kennung: str) -> bool:
+        """Verknuepfung von der Seite nehmen. Das Original bleibt, wo es ist."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.eintrag_entfernen(self.handy_seiten(), seite, kennung)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_seite_hinzufuegen(self, name=None) -> int | None:
+        """Neue leere Seite am Ende; gibt ihre Nummer zurueck (None bei 12)."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.seite_hinzufuegen(self.handy_seiten(), name)
+        if neu is None or not self.setze_handy_seiten(neu):
+            return None
+        nr = len(neu["seiten"]) - 1
+        self.setze_handy_seite_nr(nr)
+        return nr
+
+    def handy_seite_umbenennen(self, seite: int, name) -> bool:
+        from src.core import handy_seiten as _hs
+        neu = _hs.seite_umbenennen(self.handy_seiten(), seite, name)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_seite_loeschen(self, seite: int) -> bool:
+        from src.core import handy_seiten as _hs
+        neu = _hs.seite_entfernen(self.handy_seiten(), seite)
+        if neu is None:
+            return False
+        # Die gezeigte Seite bleibt dieselbe, wenn eine davor verschwindet.
+        # VOR dem Uebernehmen gesetzt: die Seitenleiste liest sie beim Neuaufbau.
+        gezeigt = self.handy_seite_nr()
+        if seite < gezeigt:
+            gezeigt -= 1
+        self._handy_seite_nr = max(0, min(len(neu["seiten"]) - 1, gezeigt))
+        self.setze_handy_seiten(neu)
+        self.handy_seite_gewaehlt.emit(self._handy_seite_nr)
+        return True
+
+    def handy_seite_verschieben(self, von: int, nach: int) -> bool:
+        """Seite ``von`` an Stelle ``nach`` setzen (Inhalt und Name wandern mit)."""
+        n = len(self.handy_seiten()["seiten"])
+        if not (isinstance(von, int) and isinstance(nach, int)
+                and 0 <= von < n and 0 <= nach < n):
+            return False
+        folge = list(range(n))
+        folge.insert(nach, folge.pop(von))
+        return self.handy_seiten_ordnen(folge)
+
+    def handy_seiten_ordnen(self, reihenfolge) -> bool:
+        """Seiten in neuer Reihenfolge (``reihenfolge[i]`` = bisherige Nummer
+        der Seite an Stelle i) — ein Rueckgaengig-Schritt, auch wenn eine Seite
+        ueber mehrere Plaetze gezogen wurde."""
+        from src.core import handy_seiten as _hs
+        neu = _hs.seiten_ordnen(self.handy_seiten(), reihenfolge)
+        if neu is None or not neu["seiten"]:
+            return False                # ohne Seiten gibt es nichts zu ordnen
+        # Die gezeigte Seite wandert mit ihrem Inhalt. VOR dem Uebernehmen
+        # gesetzt: die Seitenleiste liest sie beim Neuaufbau.
+        vorher = self._handy_seite_nr
+        self._handy_seite_nr = list(reihenfolge).index(self.handy_seite_nr())
+        if not self.setze_handy_seiten(neu):
+            self._handy_seite_nr = vorher
+            return False
+        self.handy_seite_gewaehlt.emit(self._handy_seite_nr)
+        return True
+
+    def handy_alles_leeren(self) -> bool:
+        """Alle Handy-Seiten entfernen (ein Rueckgaengig-Schritt)."""
+        from src.core import handy_seiten as _hs
+        if _hs.ist_leer(self.handy_seiten()):
+            return False
+        self._handy_seite_nr = 0
+        self.setze_handy_seiten(_hs.leer())
+        self.handy_seite_gewaehlt.emit(0)
+        return True
+
+    def _handy_abzeichen_aktualisieren(self) -> None:
+        """Im Bearbeiten-Modus tragen Widgets, die auf einer Handy-Seite
+        liegen, ein kleines Abzeichen. Im Betrieb keines."""
+        try:
+            kennungen = self.handy_kennungen() if self._edit_mode else set()
+            for w in self.alle_widgets():
+                w.setze_handy_abzeichen(getattr(w, "widget_id", None) in kennungen)
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Abzeichen: {e}")
+
+    # Ziehen eines Widgets in die Seitenleiste. Ein VC-Widget wird im
+    # Bearbeiten-Modus mit der Maus VERSCHOBEN (kein Qt-Drag); liegt der Zeiger
+    # dabei ueber dem Raster der Seitenleiste, bleibt das Widget an seinem Platz
+    # und die Seitenleiste zeigt die Zielzelle. Beim Loslassen dort entsteht
+    # die Verknuepfung — das Original wird nicht bewegt.
+
+    def handy_ablageziel_setzen(self, ziel) -> None:
+        """Die Seitenleiste meldet sich als Ablageziel an (None = ab). Sie muss
+        ``zieh_vorschau(widget, global_pos) -> bool``, ``zieh_ablegen(widget,
+        global_pos) -> bool`` und ``zieh_ende()`` haben."""
+        import weakref
+        self._handy_ablageziel = weakref.ref(ziel) if ziel is not None else None
+
+    def _handy_ziel(self):
+        ref = self._handy_ablageziel
+        ziel = ref() if ref is not None else None
+        if ziel is None:
+            return None
+        try:
+            import shiboken6
+            if not shiboken6.isValid(ziel):
+                return None
+        except Exception:
+            pass
+        return ziel
+
+    def handy_zieh_bewegt(self, widget, global_pos) -> bool:
+        """Waehrend ein Widget gezogen wird. True = der Zeiger ist ueber dem
+        Raster der Seitenleiste (das Widget soll dann nicht mitwandern)."""
+        ziel = self._handy_ziel()
+        if ziel is None or not self._edit_mode:
+            return False
+        try:
+            return bool(ziel.zieh_vorschau(widget, global_pos))
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Ablage (Vorschau): {e}")
+            return False
+
+    def handy_zieh_losgelassen(self, widget, global_pos) -> bool:
+        """Beim Loslassen. True = ueber der Seitenleiste losgelassen (ob die
+        Ablage dort gelang oder nicht — das Widget wird nicht verschoben)."""
+        ziel = self._handy_ziel()
+        if ziel is None or not self._edit_mode:
+            return False
+        try:
+            return bool(ziel.zieh_ablegen(widget, global_pos))
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Ablage: {e}")
+            return False
+        finally:
+            try:
+                ziel.zieh_ende()
+            except Exception:
+                pass
+
     def uebersprungene_widgets(self) -> list[str]:
         """QA-50: VC-Widgets, die beim letzten Laden nicht gebaut werden konnten.
 
@@ -2047,13 +2752,19 @@ class VCCanvas(QWidget):
         for child in self.findChildren(VCWidget,
                                        options=Qt.FindChildOption.FindDirectChildrenOnly):
             widgets.append(child.to_dict())
-        return {"widgets": widgets}
+        d = {"widgets": widgets}
+        # WEB-09: Handy-Seiten nur schreiben, wenn es welche gibt — eine Show
+        # ohne Handy-Konsole sieht in der Datei aus wie vorher.
+        seiten = self.handy_seiten()
+        if seiten["seiten"]:
+            from src.core import handy_seiten as _hs
+            d[_hs.SCHLUESSEL] = seiten
+        return d
 
     def from_dict(self, d: dict):
         if not self._restoring:
             # Echtes Laden einer Show -> Undo-Verlauf zuruecksetzen (nicht beim Restore).
-            self._undo_stack.clear()
-            self._redo_stack.clear()
+            self.verlauf_leeren()
         self._clear()
         # ★ QA-50: Was hier uebersprungen wird, ist beim naechsten Speichern
         # WEG — `to_dict()` kennt nur die Widgets, die es auf die Flaeche
@@ -2062,16 +2773,35 @@ class VCCanvas(QWidget):
         # nicht lautlos sein. Gesammelt wird hier, gewarnt wird beim Speichern —
         # dort entsteht der Verlust, und dort ist die Warnung noch nutzbar.
         self._uebersprungen: list[str] = []
-        for wd in d.get("widgets", []):
-            wtype = wd.get("type", "")
-            # Pro-Widget abgesichert: ein einzelnes defektes Widget (unbekannter Typ,
-            # unbekannte Aktion/Feld aus einer anderen Version) darf NICHT das Laden der
-            # restlichen VC abbrechen (sonst verschwindet fast die ganze Konsole).
-            try:
-                self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
-            except Exception as e:
-                print(f"[VCCanvas] Widget '{wtype}' uebersprungen: {e}")
-                self._uebersprungen.append(f"{wtype or '(ohne Typ)'}: {e}")
+        self._laedt_layout = True
+        try:
+            for wd in d.get("widgets", []):
+                wtype = wd.get("type", "")
+                # Pro-Widget abgesichert: ein einzelnes defektes Widget (unbekannter Typ,
+                # unbekannte Aktion/Feld aus einer anderen Version) darf NICHT das Laden der
+                # restlichen VC abbrechen (sonst verschwindet fast die ganze Konsole).
+                try:
+                    self._add_widget(wtype, QPoint(wd.get("x", 0), wd.get("y", 0)), wd)
+                except Exception as e:
+                    print(f"[VCCanvas] Widget '{wtype}' uebersprungen: {e}")
+                    self._uebersprungen.append(f"{wtype or '(ohne Typ)'}: {e}")
+        finally:
+            self._laedt_layout = False
+        # WEB-08: eine von Hand zusammenkopierte Layout-Datei kann dieselbe
+        # Kennung zweimal tragen — einmal pruefen, wenn alles steht.
+        self._kennungen_reparieren()
+        # WEB-09: Handy-Seiten uebernehmen — NACH den Kennungen, damit eine
+        # Verknuepfung auf das Widget zeigt, das die Kennung behalten hat.
+        # Fehlt der Abschnitt (Show/Layout von frueher), gibt es keine Seiten;
+        # Verknuepfungen auf nicht (mehr) vorhandene Widgets fallen weg.
+        try:
+            from src.core import handy_seiten as _hs
+            self._handy_seiten = _hs.normalisiere(
+                d.get(_hs.SCHLUESSEL), self._alle_kennungen())
+        except Exception as e:
+            print(f"[VCCanvas] ERROR: Handy-Seiten nicht lesbar: {e}")
+            self._handy_seiten = {"version": 1, "seiten": []}
+        self.handy_seiten_changed.emit()
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.
         if getattr(self, "_pe", None) is not None:
@@ -2088,6 +2818,8 @@ class VCCanvas(QWidget):
                 json.dump(self.to_dict(), f, indent=2)
 
     def _load(self):
+        if self._kiosk:
+            return          # UI-96: kein Layout-Import im Kiosk
         path, _ = QFileDialog.getOpenFileName(self, "VC Layout laden",
                                                "", "JSON (*.json)")
         if path:

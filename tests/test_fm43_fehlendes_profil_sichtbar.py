@@ -49,14 +49,18 @@ class _Basis(unittest.TestCase):
         from src.core.show import show_file as SF
         self.SF = SF
         SF._ladeprobleme.clear()
+        SF._ladehinweise.clear()
         self.addCleanup(SF._ladeprobleme.clear)
+        self.addCleanup(SF._ladehinweise.clear)
 
     def _loesen(self, pid, mfr, name):
         return self.SF._resolve_fixture_profile_id(pid, mfr, name)
 
     @property
     def meldungen(self):
-        return list(self.SF._ladeprobleme)
+        """Alles, was der Lader dem Menschen sagt: Ladeprobleme UND Hinweise
+        (STAB-37). „Meldet nichts“ heisst: beide Sammler leer."""
+        return list(self.SF._ladeprobleme) + self.SF.letzte_ladehinweise()
 
     def _eine_meldung(self):
         self.assertEqual(len(self.meldungen), 1,
@@ -212,6 +216,12 @@ class MehrdeutigkeitTest(_Basis):
         m = self._eine_meldung()
         self.assertIn(name, m)
         self.assertIn("2", m, "die Anzahl der Treffer gehoert in die Meldung")
+        # STAB-37: hier fragt die Show OHNE Modus — ob das gewaehlte Profil das
+        # richtige ist, laesst sich nicht nachsehen. Das bleibt eine Warnung.
+        # (Steht die Wahl fest, wird daraus ein Hinweis:
+        # test_stab37_bibliotheks_hinweis_kein_verlust.)
+        self.assertEqual(self.SF.letzte_ladeprobleme(), [m])
+        self.assertEqual(self.SF.letzte_ladehinweise(), [])
 
     def test_ein_eindeutiger_treffer_meldet_nichts(self):
         """Positivkontrolle zur Dubletten-Meldung: ohne Zwilling bleibt es still."""

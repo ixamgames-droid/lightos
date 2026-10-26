@@ -596,10 +596,11 @@ class LaserView(QWidget):
             "border:1px solid #d02020;border-radius:3px;padding:0 12px;}"
             "QPushButton:hover{background:#b30000;}")
         self._btn_dmx_estop.setToolTip(
-            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert "
-            "(bis Betriebsart oder Muster neu gewählt wird), Netzwerk-Laser "
-            "werden unscharf. Blackout und Grand Master 0 schalten ebenfalls "
-            "über den Aus-Wert der Betriebsart dunkel.")
+            "Schaltet ALLE Laser sofort dunkel: DMX-Laser auf ihren Aus-Wert, "
+            "Netzwerk-Laser werden unscharf. Dieser Knopf löst nur aus — "
+            "gelöst wird der NOT-AUS mit dem Knopf oben rechts (Rückfrage). "
+            "Blackout schaltet DMX-Laser ebenfalls über ihren Aus-Wert dunkel, "
+            "aber nur, solange er gedrückt ist.")
         self._btn_dmx_estop.clicked.connect(weak_slot(self._on_estop))
         dsb.addWidget(self._btn_dmx_estop)
         self._dmx_safety_box.setVisible(False)
@@ -895,7 +896,8 @@ class LaserView(QWidget):
             # der Laser scharf ist (Täuschung in die gefährliche Richtung).
             sync.subscribe_widget(SyncEvent.LASER_ARMED_CHANGED, self,
                                   lambda *_: self._sync_arm_from_manager())
-            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen.
+            # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen;
+            # LAS-36: dasselbe Ereignis kommt beim Loesen oben rechts.
             sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
                                   lambda *_: self._update_dmx_estop_label())
             # LAS-34: Die Bausteine zeigen einen ZUSTAND (Laser AN/AUS,
@@ -1058,9 +1060,11 @@ class LaserView(QWidget):
             n = len(self._fixtures)
             zahl = f"{n} Laser"
             if aktiv:
-                text, farbe, punkt = "NOT-AUS aktiv", "#ff7b72", "#ff4040"
-                neben = ("· alle DMX-Laser sind dunkel · wieder an: "
-                         "Betriebsart oder Muster neu wählen")
+                text, farbe, punkt = (
+                    "NOT-AUS aktiv — Werte werden gemerkt, der Laser bleibt "
+                    "dunkel. Lösen: Knopf oben rechts.", "#ff7b72", "#ff4040")
+                neben = "· " + " · ".join(
+                    t for t in (self._modell_text(), zahl) if t)
             else:
                 an = [self._laser_an(f) for f in self._fixtures]
                 n_an = sum(1 for a in an if a)
@@ -1183,21 +1187,27 @@ class LaserView(QWidget):
         self._update_arm_button()
 
     def _on_estop(self):
-        lo = self._laser_output()
-        if lo is not None:
-            # Reihenfolge ist sicherheitskritisch: (1) estop_all() setzt sofort
-            # das Verriegelungs-Flag (Tick sendet nichts mehr), (2) EXPLIZIT
-            # entwaffnen — NICHT nur implizit über setChecked→toggled, damit die
-            # Sicherheit nicht an der Qt-Signal-Synchronität hängt, (3) erst
-            # DANACH die Geräte-Verriegelung lösen. So bleibt der Laser dunkel
-            # (unscharf), auch nachdem clear_estop_all die Session wieder öffnet.
-            lo.estop_all()
-            lo.set_armed(False)
-        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten nötig.
+        # LAS-31: derselbe EINE Weg wie Kopfleiste, Tastenkuerzel und VC-Taste.
+        # AppState.laser_notaus_ausloesen haelt die sicherheitskritische
+        # Reihenfolge: (1) estop_all() verriegelt sofort (DMX-Latch + Tick sendet
+        # nichts mehr), (2) EXPLIZIT entwaffnen — nicht ueber setChecked->toggled,
+        # damit die Sicherheit nicht an der Qt-Signal-Synchronitaet haengt,
+        # (3) erst danach die Geraete-Verriegelung loesen (armed=False haelt
+        # dunkel). Der Knopf loest nur aus.
+        try:
+            get_state().laser_notaus_ausloesen()
+        except Exception as e:
+            print(f"[laser_view] Laser-NOT-AUS Fehler: {e}")
+        # Nach Not-Aus zurück auf unscharf — bewusstes Wieder-Scharfschalten
+        # nötig. Signale NICHT gesperrt: toggled -> set_armed(False) ist ein
+        # zweites, harmloses Netz (idempotent, meldet nichts doppelt), falls der
+        # Manager im einen Weg nicht entwaffnet werden konnte — die Anzeige
+        # darf nie „unscharf“ zeigen, waehrend der Manager scharf ist.
         self._btn_arm.setChecked(False)
+        # Danach den ECHTEN Stand des Managers spiegeln (blieb er wider
+        # Erwarten scharf, zeigt der Knopf das auch).
+        self._sync_arm_from_manager()
         self._update_arm_button()
-        if lo is not None:
-            lo.clear_estop_all()
         self._update_dmx_estop_label()
 
     def _on_figure_changed(self):
@@ -2031,8 +2041,9 @@ class LaserView(QWidget):
                 continue
             for head in self._heads_for(f, attr):
                 state.set_programmer_value(fid, attr, int(value), head=head)
-        # Betriebsart/Muster loesen den DMX-NOT-AUS (A3D-02) — Anzeige folgen
-        # (LAS-34: samt Bausteinen: Zustand, Vorschau, Sperre in Musik/Auto).
+        # LAS-36: ein Wert loest den NOT-AUS nicht mehr; die Anzeige sagt weiter,
+        # warum der Laser dunkel bleibt (LAS-34: samt Bausteinen: Zustand,
+        # Vorschau, Sperre in Musik/Auto).
         self._bausteine_laden()
 
     def _load_values(self):

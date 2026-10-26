@@ -18,7 +18,7 @@ Der Editor ist die Werkbank, an der du diese Looks baust und bearbeitest.
 
 ## Wo man ihn findet
 
-- **Im Programmer:** Reiter **„Matrix"**. Dort folgt die Matrix automatisch deiner Geräte-Auswahl (siehe unten „Folge-Modus"), du programmierst also direkt an den gerade gewählten Geräten.
+- **Im Programmer:** Reiter **„Matrix"**. Dort nimmt eine neue Matrix automatisch deine Geräte-Auswahl (siehe unten „Folge-Modus"), du programmierst also direkt an den gerade gewählten Geräten.
 - **Als eigener Sub-Tab / Manager:** dieselbe Oberfläche, aber mit manueller Geräte-Zuweisung (Knöpfe „Aus Auswahl" und „Auto-Zuweisung aus Patch").
 - **Als großes Fenster:** Knopf **„⤢ Großes Fenster"** oben rechts koppelt den kompletten Editor in ein frei vergrößerbares, scrollbares Fenster aus (gut bei vielen Einstellwerten). Erneut tippen oder Fenster schließen dockt ihn wieder an.
 
@@ -69,7 +69,7 @@ Daneben liegt die Gruppe **„Vorschau"** mit dem Live-LED-Raster: Jede Zelle is
 | Feld | Bedeutung |
 |---|---|
 | **Geschwindigkeit** | Animationsrate in Schritten/s (0,01–20). Eigene Matrix-Geschwindigkeit, getrennt vom globalen Speed-Master. |
-| **Layer-Priorität** | −99 … 99. Höhere Priorität gewinnt, wenn zwei Effekte denselben Kanal schreiben. Gleiche Priorität → der zuletzt gestartete Effekt gewinnt. |
+| **Stufe** | Grundlicht · Effekte · Akzente · Strobe & Blinder · Notfall. Die höhere Stufe gewinnt, wenn zwei Effekte denselben Kanal schreiben. Gleiche Stufe → der zuletzt gestartete Effekt gewinnt. Das Feld hieß früher „Layer-Priorität“ und war eine Zahl; siehe [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md). |
 | **Einblenden** | Einblendzeit beim Start in Sekunden (0 = sofort). |
 | **Ausblenden** | Ausblendzeit beim Stoppen in Sekunden (0 = sofort). |
 | **Hüllkurven-Form** | Form der Ein-/Ausblendkurve (linear, weich …). |
@@ -93,7 +93,7 @@ Zeigt – abhängig von Style und Algorithmus – entweder feste Farbknöpfe **C
 | **Aus Auswahl** | Bildet das Grid aus den links im Programmer gewählten Geräten – bei einer echten Gruppe als 2D-Raster inkl. Lücken, sonst als 1 × N. |
 | **Auto-Zuweisung aus Patch** | Füllt das aktuelle Raster mit Geräten der aktiven Auswahl/Gruppe (Fallback: ganzer Patch). |
 
-> Im **Folge-Modus** (Programmer-Reiter „Matrix") sind diese Knöpfe ausgeblendet; die Gruppe heißt dann „Geräte (folgen der Programmer-Auswahl)" und übernimmt die gewählte Gruppe automatisch, sobald du die Auswahl wechselst. Beim Laden einer Show folgt die Matrix der Auswahl nicht — das gespeicherte Raster bleibt, wie es in der Datei steht.
+> Im **Folge-Modus** (Programmer-Reiter „Matrix") heißt die Gruppe „Geräte"; statt der beiden Knöpfe gibt es dort **Auswahl übernehmen** (dieselbe Wirkung wie „Aus Auswahl"). Der Auswahl folgt von selbst nur eine mit **+ Neu** frisch angelegte Matrix — bis du sie speicherst, eine andere Matrix anklickst oder den Reiter verlässt. Eine gespeicherte Matrix behält ihr Raster, auch wenn du den Reiter öffnest oder die Auswahl wechselst; weicht die Auswahl ab, steht in der Statuszeile „… gespeichert – weicht von der Auswahl ab", und **Auswahl übernehmen** setzt das Raster neu. Beim Laden einer Show folgt die Matrix der Auswahl nicht — das gespeicherte Raster bleibt, wie es in der Datei steht.
 
 ## Algorithmen
 
@@ -157,11 +157,11 @@ Sonderfall: **Chase mit „Farbe pro Runde wechseln"** schaltet auf die Multi-Co
 - **Aus einer Gerätegruppe** mit hinterlegten Positionen entsteht ein echtes 2D-Grid inklusive Lücken; aus einer losen Mehrfachauswahl entsteht ein **1 × N**-Streifen.
 - Geräte ohne RGB, aber mit **Farbrad**, werden über den passenden Farbrad-Slot angesteuert; Geräte mit **Dimmer** behalten ihren Dimmer frei, wenn die Matrix ihn nicht selbst treibt (so kombinierbar als reine Farb-Ebene).
 
-## Tempo, Blende & Layer-Priorität
+## Tempo, Blende & Stufe
 
 - **Geschwindigkeit** treibt die Animation (Schritte/s). Über Parameter lässt sich eine Matrix zusätzlich auf einen **Tempo-Bus** (Global/A–D) synchronisieren, mit frei wählbarem **Multiplikator** (×0,5, ×2, ×3 …) und **Versatz in Beats** – so laufen mehrere Effekte taktgenau zusammen.
 - **Einblenden/Ausblenden + Hüllkurven-Form** definieren die weiche Hüllkurve beim Start/Stopp.
-- **Layer-Priorität** entscheidet bei Kanal-Kollisionen, welcher Effekt gewinnt – wichtig, wenn du z. B. eine Farb-Matrix und eine Dimmer-Matrix über dieselben Geräte legst.
+- Die **Stufe** entscheidet, welcher Effekt gewinnt, wenn zwei denselben Kanal schreiben – etwa zwei Dimmer-Matrizen über dieselben Geräte. Eine Farb-Matrix und eine Dimmer-Matrix nehmen sich nichts weg: sie schreiben getrennte Kanäle. Mehr dazu: [Wer gewinnt?](../anleitung_prioritaeten/ANLEITUNG.md).
 
 ## Live-Steuerung aus der VC
 
@@ -183,7 +183,7 @@ Verfügbare **Live-Aktionen** (auf Buttons/MIDI legbar): Farbe +/−, +Farbe, Fa
 - **Speichern nicht vergessen:** Editor-Änderungen sind erst nach **💾 Speichern** in der laufenden Funktion. Start/Stop wirken nur auf den gespeicherten Stand. (Die Grid-Zuweisung ist die einzige Ausnahme – sie greift sofort.)
 - **„Style = Dimmer/Shutter" schaltet Farbe ab.** Wer Farben programmieren will, braucht Style **RGB** oder **RGBW**.
 - **Keine Farbfelder sichtbar?** Entweder erzeugt der Algorithmus eigene Farben (Rainbow) oder der Style ist Dimmer/Shutter.
-- **Reine Farb-Ebene gewünscht?** Lass die Matrix den Dimmer nicht selbst treiben und steuere die Helligkeit über einen separaten Fader/Dimmer-Effekt – dank Layer-Priorität überlagern sich beide sauber.
+- **Reine Farb-Ebene gewünscht?** Lass die Matrix den Dimmer nicht selbst treiben und steuere die Helligkeit über einen separaten Fader/Dimmer-Effekt – Farbe und Dimmer sind getrennte Kanäle, die beiden nehmen sich nichts weg.
 - **Lücken sind gewollt:** Eine leere, gepunktete Zelle in der Vorschau ist kein Fehler, sondern eine unbelegte Grid-Position.
 - **Tote Regler gibt es nicht:** Es erscheinen nur Parameter, die im aktuellen Algorithmus/Style/Modus auch wirken (z. B. Strobe-Rate nur im Strobe-Modus, Läufer-Anzahl/Schweif (%) nur bei Chase-Bewegung „normal").
 - **Großes Fenster** nutzen, wenn der Editor im schmalen Tab eng wird – derselbe Inhalt, frei vergrößerbar.

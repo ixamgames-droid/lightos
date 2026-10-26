@@ -7,11 +7,34 @@ eingetipptes Token weiter gilt.
 Gehaltene Werte:
   * ``token``               — pro Show/Setup persistiertes Auth-Token
                               (``secrets.token_urlsafe(6)`` = kurz & tippbar).
-  * ``lan_remote_enabled``  — sichtbarer Toggle 'LAN-/Handy-Remote' (Default AN;
-                              sicher, weil das Token davor sitzt). Aus -> der
+  * ``lan_remote_enabled``  — sichtbarer Toggle 'LAN-/Handy-Remote'. Aus -> der
                               Web-Server bindet nur an 127.0.0.1 (kein LAN).
+                              WEB-12 (QA96-36): ab Werk AUS — „Handy verbinden"
+                              im Verbindungs-Dialog schaltet es mit ein.
   * ``osc_network_enabled`` — Toggle 'OSC ueber Netzwerk' (Default AUS). Aus ->
                               OSC-Server bindet 127.0.0.1 (nur lokal).
+  * ``vc_remote_enabled``   — WEB-08/WEB-09: die Handy-Konsole (``/konsole``,
+                              ``/api/vc/…``). Default AUS. Eingeschaltet gibt
+                              sie nur die Widgets frei, die auf einer
+                              Handy-Seite der Konsole liegen (WEB-09); im
+                              Dialog „Web-Remote: Verbindung & Token" als
+                              Schalter „Handy-Konsole".
+  * ``feste_seite_enabled`` — WEB-12: die alte feste Fernbedienung (``/``: GO,
+                              Executor-Fader, Blackout). Default AUS, im Dialog
+                              unter „Erweitert". Eigener Schluessel
+                              (``feste_token``) — der Schluessel der
+                              Handy-Konsole oeffnet sie NICHT (QA96-04).
+  * ``roh_dmx_enabled``     — WEB-12: rohe DMX-Kanaele (``/api/channel``) ueber
+                              die feste Fernbedienung. Default AUS, „Erweitert".
+  * ``laser_vom_handy``     — WEB-12: Elemente mit Laser-Inhalt duerfen vom Handy
+                              bedient werden. Default AUS; eingeschaltet nur nach
+                              einem Bestaetigungsfenster (Entscheidung des
+                              Projektinhabers vom 12.10.2026).
+
+**Zwei Schluesselarten (WEB-12):** ``token`` ist der Schluessel der
+Handy-Konsole (QR-Code, ``/konsole?k=…``), ``feste_token`` der der festen
+Fernbedienung (``/?k=…``). „Schluessel erneuern" erneuert beide und erhoeht die
+``auth_epoch`` — alle bisherigen Sitzungen fallen heraus.
 
 Alles offline/stdlib, keine externe Dependency."""
 from __future__ import annotations
@@ -37,13 +60,27 @@ def _prefs_path() -> str:
 
 DEFAULTS: dict = {
     "token": "",
-    "lan_remote_enabled": True,
+    # WEB-12: Schluessel der festen Fernbedienung (eigene Schluesselart).
+    "feste_token": "",
+    # WEB-12 (QA96-36): ab Werk nur dieser PC. „Handy verbinden" schaltet es ein.
+    "lan_remote_enabled": False,
     "osc_network_enabled": False,
+    # WEB-08/WEB-09: s. Modulkopf. Bewusst AUS — der Nutzer schaltet die
+    # Handy-Konsole im Web-Remote-Dialog selbst ein.
+    "vc_remote_enabled": False,
     # Auth-Epoche: wird bei jeder Token-Rotation erhoeht. Die Web-Session speichert
     # die Epoche zum Auth-Zeitpunkt; der Gate weist Sessions mit veralteter Epoche ab
     # -> ein 'Token neu erzeugen' wirft bestehende Sessions SOFORT raus (Security-
     # Review). Im Cookie steht nur die Zahl, nichts Token-Ableitbares.
     "auth_epoch": 0,
+    # WEB-11: die zuletzt fuer den QR-Code der Handy-Konsole gewaehlte eigene
+    # Netzwerkadresse (bei mehreren Netzwerkkarten). Nur ein Merker: gibt es
+    # die Adresse nicht mehr, wird sie nicht benutzt.
+    "handy_ip": "",
+    # WEB-12: s. Modulkopf. Alles ab Werk AUS.
+    "feste_seite_enabled": False,
+    "roh_dmx_enabled": False,
+    "laser_vom_handy": False,
 }
 
 
@@ -144,8 +181,9 @@ def _token_cache_leeren() -> None:
     Ohne das lieferte ``get_token()`` nach ``regenerate_token()`` weiter das
     ALTE Token, und die Rotation waere aus Sicht der Anwendung wirkungslos.
     """
-    global _token_cache
+    global _token_cache, _feste_cache
     _token_cache = ""
+    _feste_cache = ""      # WEB-12: die zweite Schluesselart mit
 
 
 def get_auth_epoch() -> int:
@@ -178,7 +216,11 @@ def regenerate_token() -> str:
     # dieses beim `create_app` in `app.config` gelegt. Es zu verlieren heisst,
     # den laufenden Server unerreichbar zu machen; s. den Restore unten.
     bisher = _token_cache
-    save_settings({"token": tok, "auth_epoch": get_auth_epoch() + 1})
+    # WEB-12: beide Schluesselarten zugleich — „Schluessel erneuern" soll ALLE
+    # bisherigen Links ungueltig machen, auch die der festen Fernbedienung.
+    save_settings({"token": tok, "feste_token": _new_token(),
+                   "auth_epoch": get_auth_epoch() + 1})
+    _feste_cache_leeren()
     # NET-10: den Prozess-Cache VOR der Gegenprobe leeren. Sonst liefert
     # `get_token()` das ALTE Token, die Pruefung unten schlaegt fehl und meldet
     # eine gescheiterte Rotation, obwohl das Speichern geklappt hat — der Cache
@@ -209,8 +251,36 @@ def regenerate_token() -> str:
     return tok
 
 
+_feste_cache: str = ""
+
+
+def get_feste_token() -> str:
+    """WEB-12: Schluessel der festen Fernbedienung (``/?k=…``) — eine eigene
+    Schluesselart neben dem der Handy-Konsole. Wird beim ersten Aufruf erzeugt;
+    wie ``get_token`` mit Prozess-Cache (NET-10). Nie gleich dem Schluessel der
+    Handy-Konsole."""
+    global _feste_cache
+    if _feste_cache:
+        return _feste_cache
+    s = load_settings()
+    tok = s.get("feste_token") or ""
+    if not isinstance(tok, str) or not tok or tok == s.get("token"):
+        tok = _new_token()
+        while tok == s.get("token"):
+            tok = _new_token()
+        save_settings({"feste_token": tok})
+    _feste_cache = tok
+    return tok
+
+
+def _feste_cache_leeren() -> None:
+    global _feste_cache
+    _feste_cache = ""
+
+
 def is_lan_remote_enabled() -> bool:
-    return bool(load_settings().get("lan_remote_enabled", True))
+    # WEB-12: nur ein echtes ``true`` schaltet das LAN frei (Vorgabe aus).
+    return load_settings().get("lan_remote_enabled", False) is True
 
 
 def set_lan_remote_enabled(enabled: bool) -> None:
@@ -223,3 +293,53 @@ def is_osc_network_enabled() -> bool:
 
 def set_osc_network_enabled(enabled: bool) -> None:
     save_settings({"osc_network_enabled": bool(enabled)})
+
+
+def is_vc_remote_enabled() -> bool:
+    """WEB-08/WEB-09: ist die Handy-Konsole eingeschaltet (``/api/vc/…``)?
+    Nur ein echtes ``true`` schaltet ein — ein kaputter Wert in der Datei
+    (Text, Zahl) bleibt AUS."""
+    return load_settings().get("vc_remote_enabled", False) is True
+
+
+def set_vc_remote_enabled(enabled: bool) -> None:
+    save_settings({"vc_remote_enabled": bool(enabled)})
+
+
+def is_feste_seite_enabled() -> bool:
+    """WEB-12: ist die feste Fernbedienung (``/``, ``/api/go`` …) frei?"""
+    return load_settings().get("feste_seite_enabled", False) is True
+
+
+def set_feste_seite_enabled(enabled: bool) -> None:
+    save_settings({"feste_seite_enabled": bool(enabled)})
+
+
+def is_roh_dmx_enabled() -> bool:
+    """WEB-12: rohe DMX-Kanaele ueber die feste Fernbedienung? Nur zusammen mit
+    der festen Fernbedienung wirksam."""
+    return load_settings().get("roh_dmx_enabled", False) is True
+
+
+def set_roh_dmx_enabled(enabled: bool) -> None:
+    save_settings({"roh_dmx_enabled": bool(enabled)})
+
+
+def is_laser_vom_handy_erlaubt() -> bool:
+    """WEB-12: duerfen Elemente mit Laser-Inhalt vom Handy bedient werden?
+    Nur ein echtes ``true`` — ein kaputter Wert in der Datei bleibt AUS."""
+    return load_settings().get("laser_vom_handy", False) is True
+
+
+def set_laser_vom_handy(erlaubt: bool) -> None:
+    save_settings({"laser_vom_handy": bool(erlaubt)})
+
+
+def get_handy_ip() -> str:
+    """WEB-11: die zuletzt fuer den Handy-Link gewaehlte eigene Adresse."""
+    wert = load_settings().get("handy_ip", "")
+    return wert if isinstance(wert, str) else ""
+
+
+def set_handy_ip(ip: str) -> None:
+    save_settings({"handy_ip": str(ip or "")})

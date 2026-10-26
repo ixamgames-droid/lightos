@@ -10,6 +10,7 @@ from PySide6.QtGui import (
 )
 from src.core.engine.script_func import ScriptFunction
 from src.core.engine.function_manager import get_function_manager
+from src.ui.widgets.stufe_auswahl import StufeAuswahl
 
 
 class ScriptHighlighter(QSyntaxHighlighter):
@@ -106,6 +107,13 @@ class ScriptEditor(QWidget):
         self._name_edit = QLineEdit()
         self._name_edit.textChanged.connect(self._on_name_changed)
         top.addWidget(self._name_edit, 1)
+
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        _stufe_lbl = QLabel("Stufe:")
+        _stufe_lbl.setToolTip(StufeAuswahl.TOOLTIP)
+        top.addWidget(_stufe_lbl)
+        self._stufe_combo = StufeAuswahl(self._script)
+        top.addWidget(self._stufe_combo)
 
         self._btn_run = QPushButton("Run")
         self._btn_run.clicked.connect(self._run)

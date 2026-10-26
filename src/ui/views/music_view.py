@@ -5,11 +5,16 @@ Steuert den globalen MediaPlayer (src/core/audio/media_player.py).
 
 BPM: Die genaue Taktung kommt im Betrieb von VirtualDJ → OS2L (Menü Ausgabe →
 OS2L-Server). „BPM koppeln" setzt nur eine grobe Nominal-BPM pro Lied als Fallback.
+
+BPM-32: Steht die BPM-Quelle auf „Aus"/„OS2L" und es gibt noch keinen Takt, setzt
+die Auto-Show keinen Titel-Takt mehr; unter „Now Playing" erscheint dann der gelbe
+Hinweis ``_takt_hinweis`` mit dem Knopf „Takt aus Titel übernehmen"
+(``MusicShowDirector.taktHinweisChanged`` / ``uebernehme_titel_takt``).
 """
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QPushButton, QFrame,
     QTableWidget, QTableWidgetItem, QSlider, QCheckBox, QFileDialog,
     QHeaderView, QAbstractItemView, QDialog, QListWidget, QListWidgetItem,
     QDialogButtonBox, QMessageBox,
@@ -35,6 +40,7 @@ class MusicView(QWidget):
         self._connect()
         self._rebuild_table()
         self._refresh_now_playing()
+        self._on_takt_hinweis(self._director_hinweis())
 
     # ── UI ────────────────────────────────────────────────────────────────────────
 
@@ -83,6 +89,26 @@ class MusicView(QWidget):
         spec_hint.setStyleSheet("color:#6b7480; font-size:10px;")
         np_lay.addWidget(spec_hint)
         root.addWidget(np_box)
+
+        # BPM-32: Hinweis „kein Takt" bei Quelle Aus/OS2L (sonst unsichtbar)
+        self._takt_hinweis = QFrame()
+        self._takt_hinweis.setObjectName("taktHinweis")
+        self._takt_hinweis.setStyleSheet(
+            "#taktHinweis { background:#3a2f0b; border:1px solid #d4a017; border-radius:4px; }")
+        th = QHBoxLayout(self._takt_hinweis)
+        th.setContentsMargins(10, 6, 10, 6)
+        self._lbl_takt_hinweis = QLabel("")
+        self._lbl_takt_hinweis.setWordWrap(True)
+        self._lbl_takt_hinweis.setStyleSheet("color:#ffd866;")
+        th.addWidget(self._lbl_takt_hinweis, 1)
+        self._btn_takt_titel = QPushButton("Takt aus Titel übernehmen")
+        self._btn_takt_titel.setToolTip(
+            "Stellt die Quelle der BPM-Erkennung auf „Lied-Analyse (Player)“ und übernimmt die BPM "
+            "des Titels — die Auto-Show taktet dann sofort.")
+        self._btn_takt_titel.clicked.connect(self._on_takt_titel)
+        th.addWidget(self._btn_takt_titel)
+        self._takt_hinweis.setVisible(False)
+        root.addWidget(self._takt_hinweis)
 
         # Positions-Slider + Zeit
         pos_row = QHBoxLayout()
@@ -164,6 +190,51 @@ class MusicView(QWidget):
         self._mp.playlistChanged.connect(self._rebuild_table)
         self._mp.playingChanged.connect(self._on_playing_changed)
         self._mp.positionChanged.connect(self._on_position)
+        try:
+            from src.core.audio.music_show import get_music_director
+            get_music_director().taktHinweisChanged.connect(self._on_takt_hinweis)
+        except Exception as e:
+            print(f"[MusicView] Takt-Hinweis: {e}")
+
+    # ── BPM-32: Hinweis „Takt aus Titel übernehmen" ────────────────────────────
+    @staticmethod
+    def _director_hinweis() -> float:
+        try:
+            from src.core.audio.music_show import get_music_director
+            return get_music_director().takt_hinweis()
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def takt_hinweis_text(kind: str | None) -> str:
+        """Hinweistext je gewählter BPM-Quelle (rein, testbar)."""
+        if kind == "os2l":
+            grund = ("die Quelle der BPM-Erkennung ist „OS2L (DJ-Software)“, aber vom DJ-Programm "
+                     "kommt noch kein Takt")
+        else:
+            grund = "die Quelle der BPM-Erkennung steht auf „Aus“"
+        return (f"⚠ Kein Takt für die Auto-Show — {grund}. Beat-Effekte stehen still, "
+                "bis ein Takt da ist.")
+
+    def _on_takt_hinweis(self, bpm: float):
+        if not bpm or bpm <= 0:
+            self._takt_hinweis.setVisible(False)
+            return
+        try:
+            from src.ui.bpm_source_controller import get_source_controller
+            kind = get_source_controller().chosen_kind()
+        except Exception:
+            kind = None
+        self._lbl_takt_hinweis.setText(self.takt_hinweis_text(kind))
+        self._btn_takt_titel.setText(f"Takt aus Titel übernehmen ({bpm:.0f} BPM)")
+        self._takt_hinweis.setVisible(True)
+
+    def _on_takt_titel(self):
+        try:
+            from src.core.audio.music_show import get_music_director
+            get_music_director().uebernehme_titel_takt()
+        except Exception as e:
+            print(f"[MusicView] Takt aus Titel: {e}")
 
     def _on_couple(self, on: bool):
         self._mp.couple_bpm = bool(on)

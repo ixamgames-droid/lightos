@@ -178,13 +178,17 @@ class MainWindowWiringTest(unittest.TestCase):
                      if "Token" in b.text())
         antwort = (QMessageBox.StandardButton.Yes if bestaetigen
                    else QMessageBox.StandardButton.No)
-        with mock.patch.object(mw.QMessageBox, "question",
+        # WEB-12: der Dialog steht in src/ui/widgets/web_remote_dialog.py und
+        # fragt dort ueber QMessageBox.question.
+        from src.ui.widgets import web_remote_dialog as wrd
+        self.assertIsNotNone(mw)
+        with mock.patch.object(wrd.QMessageBox, "question",
                                lambda *a, **k: antwort):
             knopf.click()
 
     def _schalte_lan(self, *, laeuft: bool):
         gebaut = self._dialog_bauen(laeuft=laeuft)
-        haken = gebaut["checks"][0]
+        haken = next(c for c in gebaut["checks"] if c.objectName() == "web_remote_lan")
         haken.setChecked(True)      # loest `toggled` aus
 
     def test_dialog_handler_exists(self):

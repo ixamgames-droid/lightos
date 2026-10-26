@@ -172,6 +172,16 @@ So bedienst du den Laser im Live-Betrieb ohne den Programmer:
    **„Laser NOT-AUS"** lassen sich ebenfalls auf VC-Buttons legen (auch per
    MIDI-Pad auslösbar).
 
+> **Ein Weg für den NOT-AUS:** Der Knopf **LASER NOT-AUS** oben rechts im
+> Hauptfenster, das Tastenkürzel `Strg+Umschalt+L`, die VC-Taste „Laser NOT-AUS“
+> und der NOT-AUS-Knopf im Laser-Tab lösen alle genau dasselbe aus: Alle Laser
+> werden verriegelt und dunkel, Netzwerk-Laser werden unscharf. Im Kiosk-Modus
+> stehen **BLACKOUT** und **LASER NOT-AUS** nebeneinander im Streifen oben rechts.
+> Die rote Bestätigung „LASER NOT-AUS ausgelöst — alle Laser dunkel …“ steht
+> im Normalfenster für 6 Sekunden in der Statusleiste; im Kiosk-Modus (ohne
+> Statusleiste) erscheint sie genauso lange als roter Balken direkt unter dem
+> Streifen und verdeckt keinen seiner Knöpfe.
+
 > Muster lassen sich außerdem in **Snaps/Szenen** aufnehmen (Programmer →
 > „Speichern" bzw. Assistent-Tab „Programmer → Szene") und so über Chaser abspielen.
 
@@ -234,10 +244,72 @@ hier — ein Laser bekommt also nicht einfach überall 0:
 - **Laser-NOT-AUS:** schreibt an jede Laser-Adresse mit bekanntem Aus-Wert
   diesen Wert, an alle übrigen Laser-Adressen 0 — und gewinnt immer (auch
   gegen Kanal-Modifier, Grand Master und Blackout).
-- Kennt das Profil **keinen** Aus-Wert (siehe oben), gibt es nichts zu
-  schreiben: Blackout und Ziel-Blackout setzen dann die Lichtkanäle auf 0,
-  ein Laser ohne Dimmer kann trotzdem weiterstrahlen. Im DMX-Monitor sieht man
-  bei Lasern deshalb nach einem Blackout nicht unbedingt überall 0.
+- Alle übrigen Kanäle eines Lasers gehen bei Blackout und Ziel-Blackout auf 0.
+  Im DMX-Monitor sieht man bei Lasern nach einem Blackout deshalb die
+  Aus-Werte und sonst 0 — nicht unbedingt überall 0.
+- Kennt das Profil **keinen** Aus-Wert (siehe oben), bleibt es bei der 0 auf
+  allen Kanälen. Bedeutet 0 an der Betriebsart dieses Lasers nicht „aus“
+  (sondern z. B. „Auto“), strahlt er trotz Blackout weiter.
+- **NOT-AUS lösen:** nur mit dem Knopf **LASER NOT-AUS** oben rechts im
+  Hauptfenster — klicken und in der Rückfrage „Laser-NOT-AUS lösen?“ auf
+  **„NOT-AUS lösen“** klicken. Vorgabe ist **„Abbrechen“**: Eingabetaste,
+  Escape und Leertaste lösen nicht, der NOT-AUS bleibt dann aktiv. Klickst du
+  innerhalb einer Sekunde nach dem Auslösen mit diesem Knopf noch einmal, kommt
+  keine Rückfrage (Schutz vor Doppelklick). Wurde der NOT-AUS anders ausgelöst
+  (Tastenkürzel, Laser-Tab, VC-Taste, MIDI), fragt schon der erste Klick auf den
+  Knopf nach. Der Knopf im Laser-Tab
+  und die VC-Taste „Laser NOT-AUS“ lösen nur aus. Solange der NOT-AUS aktiv
+  ist, werden Werte gemerkt, der Laser bleibt dunkel: Betriebsart, Muster,
+  Regler, Snaps und MIDI lösen ihn nicht. Nach dem Lösen gibt der Laser sofort
+  wieder aus, was eingestellt ist.
+
+### Was als Laser gilt (für NOT-AUS, Blackout und „Alles Weiß“)
+
+An diesen Stellen behandelt LightOS ein Gerät als Laser, wenn **eines** davon
+zutrifft:
+
+- der Gerätetyp ist „Laser“,
+- es hat einen Laser-Kanal (Muster, X/Y, Laserfarbe …),
+- ein Kanal trägt „Laser“ im Namen – z. B. „Laser: Red“ an einem Lichtset oder
+  „Laser Helligkeit“ an einem Moving Head,
+- „Laser“ steht im Geräte-, Hersteller- oder Patch-Namen,
+- ein **anderer Modus** desselben Geräteprofils hat einen Laser-Kanal. Ein
+  Kombigerät im Kurz-Modus (z. B. Chauvet GigBAR 2 im 3-Kanal-Modus, Cameo
+  Multi FX Bar im 2-Kanal-Modus) führt den Laser nicht als eigenen Kanal – er
+  läuft dort über Automatikprogramme –, enthält ihn aber trotzdem.
+
+Für alle gilt dasselbe: **LASER NOT-AUS** und **Blackout** schalten das
+**ganze** Gerät dunkel (bei einem Lichtset also auch Derby und Strahler),
+**„Alles Weiß“** lässt es aus. Wird ein Gerät nur über einen Namen oder über
+einen anderen Modus erkannt, sagt LightOS das beim Patchen in der Statusleiste. Der Tooltip des NOT-AUS-Knopfs
+nennt die Zahl der erkannten Laser – steht dort **0**, schaltet der Knopf über
+DMX nichts dunkel.
+
+- **Lösen des NOT-AUS:** an keinem dieser Geräte durch einen Wert – weder ein
+  Muster-Abruf am Laser noch ein Gobo- oder Shutter-Wert an einem Moving Head
+  mit Laserdiode noch ein Wert an einem Kombigerät im Kurz-Modus. Gelöst wird
+  nur über den Knopf **LASER NOT-AUS** mit Rückfrage.
+- **Grenze:** Erkannt wird, was das Geräteprofil sagt. Führt ein Profil den
+  Laser in **keinem** Modus als Kanal und nennt ihn weder im Typ noch im Namen,
+  kennt LightOS ihn nicht. Wer so ein Gerät betreibt, nimmt „Laser“ in den
+  Patch-Namen auf.
+- **Geräte-Datenbank nicht erreichbar:** Ob ein anderer Modus einen
+  Laser-Kanal hat, steht in der Geräte-Datenbank. Antwortet sie beim Patchen
+  oder Laden nicht, weiß LightOS es für die betroffenen Geräte nicht – und
+  behandelt sie **vorerst als Laser**: LASER NOT-AUS und Blackout schalten sie
+  dunkel, „Alles Weiß“ lässt sie aus, ein Wert daran löst den NOT-AUS nicht.
+  Das gilt dann auch für normale Lampen. Die Statusleiste meldet
+  „Laser-Erkennung unvollständig: Geräte-Datenbank nicht erreichbar“, und der
+  Tooltip des NOT-AUS-Knopfs nennt die Zahl der betroffenen Geräte. LightOS
+  fragt beim nächsten Patchen oder Laden und beim nächsten Auslösen des
+  NOT-AUS nach (erst nachdem der NOT-AUS DMX- und Netzwerk-Laser verriegelt
+  hat; die Bestätigung in der Statusleiste nennt die unvollständige Erkennung
+  dann mit). Antwortet die
+  Datenbank wieder, meldet die Statusleiste „Laser-Erkennung wieder
+  vollständig“ und normale Lampen sind wieder frei – eine Lampe, die der gerade
+  stehende NOT-AUS schon dunkel hält, bleibt es bis zum Lösen.
+- Der **Laser-Tab** erscheint weiterhin nur für Geräte vom Typ „Laser“ oder mit
+  Laser-Kanälen.
 
 ### Laser-EFX (Bewegung)
 

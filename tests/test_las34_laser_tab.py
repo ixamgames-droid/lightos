@@ -127,14 +127,19 @@ class _State:
     def set_programmer_value(self, fid, attr, value, undoable=False, head=0):
         self.programmer.setdefault(fid, {})[attr] = int(value)
         self.geschrieben.append((fid, attr, int(value)))
-        if attr in ("shutter", "gobo_wheel"):       # A3D-02: „wieder an“
-            self.laser_estop_active = False
+        # LAS-36: kein Wert loest den NOT-AUS (wie der echte AppState).
 
     def get_programmer_value(self, fid, attr, head=0):
         return self.programmer.get(fid, {}).get(attr)
 
     def ensure_laser_output(self):
         return self.lo
+
+    # LAS-31: der EINE Ausloese-Weg des echten AppState (Reihenfolge
+    # estop_all -> entwaffnen -> clear_estop_all lebt dort).
+    from src.core.app_state import AppState as _AS
+    laser_notaus_ausloesen = _AS.laser_notaus_ausloesen
+    del _AS
 
 
 def _view(monkeypatch, fixtures):
@@ -218,14 +223,17 @@ def test_not_aus_loest_aus_wie_bisher(monkeypatch):
     # ausdruecklich entwaffnen, erst danach die Geraete-Verriegelung loesen.
     assert st.lo.rufe == ["estop_all", ("set_armed", False), "clear_estop_all"]
     assert st.lo.armed is False
-    assert v._lbl_dmx_estop.text() == "NOT-AUS aktiv"
-    assert "Betriebsart oder Muster" in v._lbl_modell.text()
+    assert v._lbl_dmx_estop.text().startswith("NOT-AUS aktiv")
+    assert "Lösen: Knopf oben rechts" in v._lbl_dmx_estop.text()
+    assert "EL-400RGB MK2" in v._lbl_modell.text()
     # Der NOT-AUS schreibt selbst keinen Programmer-Wert.
     assert [g for g in st.geschrieben if g[1] != "shutter"] == []
-    # Wieder an: Betriebsart bewusst neu waehlen.
+    # LAS-36: die Betriebsart neu waehlen loest den NOT-AUS NICHT mehr — der
+    # Wert wird gemerkt, der Laser bleibt dunkel (geloest wird nur oben
+    # rechts mit Rueckfrage).
     _betriebsart(v, "statisch")
-    assert st.laser_estop_active is False
-    assert v._lbl_dmx_estop.text() == "Laser AN"
+    assert st.laser_estop_active is True
+    assert v._lbl_dmx_estop.text().startswith("NOT-AUS aktiv")
 
 
 def test_farbe_oder_lage_loesen_den_not_aus_nicht(monkeypatch):
@@ -235,7 +243,7 @@ def test_farbe_oder_lage_loesen_den_not_aus_nicht(monkeypatch):
     v._lage_gezogen(0.8, 0.2)
     v._sprech["zoom"].schieber.setValue(40)
     assert st.laser_estop_active is True
-    assert v._lbl_dmx_estop.text() == "NOT-AUS aktiv"
+    assert v._lbl_dmx_estop.text().startswith("NOT-AUS aktiv")
 
 
 def test_sperrzonen_abzeichen_fehlt_ohne_die_funktion(monkeypatch):
@@ -1162,12 +1170,12 @@ def test_echter_el400_not_aus_und_ausgabe(echt):
         assert "EL-400RGB MK2" in lv._lbl_modell.text()
         lv._btn_dmx_estop.click()
         assert st.laser_estop_active is True
-        assert lv._lbl_dmx_estop.text() == "NOT-AUS aktiv"
-        # Farbe loest ihn nicht, die Betriebsart schon (A3D-02).
+        assert lv._lbl_dmx_estop.text().startswith("NOT-AUS aktiv")
+        # Weder Farbe noch Betriebsart loesen ihn (A3D-02, LAS-36).
         lv._farbfelder.felder[0].click()
         assert st.laser_estop_active is True
         _betriebsart(lv, "statisch")
-        assert st.laser_estop_active is False
+        assert st.laser_estop_active is True
     finally:
         pv.close()
         pv.deleteLater()

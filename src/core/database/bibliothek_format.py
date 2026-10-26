@@ -951,12 +951,38 @@ def gespeicherte_herkunft(prof) -> dict | None:
         d = json.loads(getattr(prof, "herkunft", "") or "")
     except ValueError:
         return None
+    return herkunft_aus_daten(d)
+
+
+def herkunft_aus_daten(d) -> dict | None:
+    """Die vier Herkunftsfelder (``quelle``/``herkunft``/``geprueft``/``autor``)
+    aus einem LightOS-Profil (oder einer gespeicherten Angabe) — als Kopie,
+    oder ``None``, wenn eines fehlt oder die Pruefung des Formats es ablehnt.
+
+    FM-76: dieselbe Regel fuer die DB-Spalte und fuer eine in den Fixture
+    Generator geladene Vorlage."""
     if not isinstance(d, dict) or any(k not in d for k in HERKUNFT_SCHLUESSEL):
         return None
     probe = {"format_version": FORMAT_VERSION, **{k: d[k] for k in HERKUNFT_SCHLUESSEL}}
     if any(f.startswith(k) for f in pruefe(probe) for k in HERKUNFT_SCHLUESSEL):
         return None
-    return {k: d[k] for k in HERKUNFT_SCHLUESSEL}
+    return copy.deepcopy({k: d[k] for k in HERKUNFT_SCHLUESSEL})
+
+
+#: FM-76: Vermerk in ``herkunft.geaendert``, wenn eine fremde Vorlage (QLC+,
+#: OFL) im Fixture Generator bearbeitet und als neues Profil gespeichert wird.
+GENERATOR_VERMERK = "im LightOS-Fixture-Generator bearbeitet"
+
+
+def mit_vermerk(herkunft: dict, vermerk: str) -> dict:
+    """Kopie der vier Herkunftsfelder; bei einer fremden Art (QLC+, OFL) mit
+    ``vermerk`` in ``herkunft.geaendert`` (Apache-2.0 §4b) — einmal."""
+    h = copy.deepcopy(herkunft)
+    if h["herkunft"].get("art") in FREMD_ARTEN:
+        alt = h["herkunft"].get("geaendert", "")
+        if vermerk not in alt:
+            h["herkunft"]["geaendert"] = f"{alt}; {vermerk}".strip("; ")
+    return h
 
 
 def _anlegen(s, daten: dict, source: str):
@@ -1017,20 +1043,36 @@ def _abgleichen(s, daten: dict) -> str:
     from sqlalchemy.orm import selectinload
     from .models import (ABLOESBARE_QUELLEN, FixtureChannel, FixtureMode, FixtureProfile,
                          Manufacturer)
+    from .fixture_db import ist_bearbeitet, profil_schluessel
     name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
+    # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand eine
+    # korrigierte Schreibweise das schon eingespielte Profil nicht wieder und
+    # legte es ein zweites Mal an.
+    hersteller_ids = [m.id for m in hersteller_ohne_gross_klein(s, name_h)]
+    # ★ FM-66: dasselbe gilt fuer das MODELL. Der Abgleich verglich es roh
+    # (`FixtureProfile.name == modell`): „PAR 7“ in der Datei fand ein „Par 7“
+    # in der DB nicht — die Datei legte ein zweites Profil an, statt das
+    # vorhandene zu pflegen, und ein gleichnamiges eigenes Profil oder Builtin
+    # verdeckte sie nicht mehr (zwei Eintraege fuer ein Geraet, FM-43).
+    # Verglichen wird ueber `fixture_db.profil_schluessel` — dieselbe
+    # Gleichheit wie beim Abloesen (FM-63) und im Dubletten-Riegel des Editors:
+    # Gross/klein und Leerzeichen zaehlen nicht, Satzzeichen SCHON („PAR-56“
+    # und „PAR 56“ sind zwei Geraete). In Python statt in SQL, weil SQLite nur
+    # ASCII faltet (s. `hersteller_ohne_gross_klein`). Erst die Namen, dann nur
+    # die Treffer mit Modi/Kanaelen laden — ein Hersteller aus einem
+    # QLC+-Import hat schnell mehrere hundert Profile.
+    ziel = profil_schluessel("", modell)[1]
+    treffer_ids = [pid for pid, pname in s.execute(
+        select(FixtureProfile.id, FixtureProfile.name)
+        .where(FixtureProfile.manufacturer_id.in_(hersteller_ids)))
+        if profil_schluessel("", pname)[1] == ziel] if hersteller_ids else []
     vorhanden = s.execute(
         select(FixtureProfile)
-        .join(Manufacturer, FixtureProfile.manufacturer_id == Manufacturer.id)
         .options(selectinload(FixtureProfile.modes)
                  .selectinload(FixtureMode.channels)
                  .selectinload(FixtureChannel.ranges))
-        # UI-74: Hersteller ohne Gross/klein — wie `_hersteller`. Sonst fand
-        # eine korrigierte Schreibweise das schon eingespielte Profil nicht
-        # wieder und legte es ein zweites Mal an.
-        .where(Manufacturer.id.in_(
-                   [m.id for m in hersteller_ohne_gross_klein(s, name_h)]),
-               FixtureProfile.name == modell)
-        .order_by(FixtureProfile.id)).scalars().all()
+        .where(FixtureProfile.id.in_(treffer_ids))
+        .order_by(FixtureProfile.id)).scalars().all() if treffer_ids else []
     if any(p.source not in (SOURCE_LIGHTOS, *ABLOESBARE_QUELLEN) for p in vorhanden):
         return "verdeckt"
     eigene = [p for p in vorhanden if p.source == SOURCE_LIGHTOS]
@@ -1040,12 +1082,14 @@ def _abgleichen(s, daten: dict) -> str:
         # daneben waere also ein dauerhaftes Doppel. Steht das LightOS-Profil
         # schon in der DB (Import erst danach bearbeitet), wird es weiter
         # gepflegt statt still zu veralten.
-        from .fixture_db import ist_bearbeitet
         if any(ist_bearbeitet(p.herkunft) for p in vorhanden):
             return "verdeckt"
         _anlegen(s, daten, SOURCE_LIGHTOS)
         return "neu"
-    prof = eigene[0]
+    # FM-66: die exakte Schreibweise gewinnt, sonst der aelteste Eintrag (wie
+    # beim Hersteller). `_kopf_setzen` uebernimmt danach die Schreibweise der
+    # Datei; die Profil-ID bleibt.
+    prof = next((p for p in eigene if p.name == modell), eigene[0])
     # UI-74: stand das Profil unter einer anderen Schreibweise des Herstellers
     # (alter Datenfehler), zieht es zum richtigen Hersteller um.
     hersteller = _hersteller(s, daten)
@@ -1090,12 +1134,15 @@ def einspielen(s, verzeichnis: str | None = None,
     EINER Datei — werden gemeldet und uebersprungen, nie halb eingespielt; die
     uebrigen Dateien laufen weiter. Liefert, ob die DB geaendert wurde."""
     from sqlalchemy import select
+    from .fixture_db import profil_schluessel
     from .models import FixtureProfile, Manufacturer
     wurzel = verzeichnis or BIBLIOTHEK_DIR
     stempel = stempel or {}
     bericht: dict = {"neu": [], "aktualisiert": [], "verdeckt": [], "fehler": [],
                      "stempel": {}}
-    da = {(m.casefold(), n.casefold()) for m, n in s.execute(
+    # FM-66: dieselbe Gleichheit wie `_abgleichen` — sonst hielte die
+    # Stempel-Abkuerzung ein Profil fuer fehlend, das der Abgleich findet.
+    da = {profil_schluessel(m, n) for m, n in s.execute(
         select(Manufacturer.name, FixtureProfile.name)
         .join(FixtureProfile, FixtureProfile.manufacturer_id == Manufacturer.id)
         .where(FixtureProfile.source == SOURCE_LIGHTOS))}
@@ -1112,7 +1159,7 @@ def einspielen(s, verzeichnis: str | None = None,
             else:
                 daten = lade_datei(pfad)
             name_h, modell = daten["hersteller"].strip(), daten["modell"].strip()
-            schluessel = (name_h.casefold(), modell.casefold())
+            schluessel = profil_schluessel(name_h, modell)
             if schluessel in gesehen:
                 bericht["fehler"].append(f"{pfad}: {name_h} / {modell} doppelt in der "
                                          f"Bibliothek (schon in {gesehen[schluessel]})")
@@ -1214,6 +1261,44 @@ def importiere(pfad_oder_daten, *, engine=None) -> int:
 _QLC_URL = "https://github.com/mcallegari/qlcplus/blob/master/"
 
 
+def qxf_original(pfad: str, original: str | None = None) -> str:
+    """``herkunft.original`` einer ``.qxf``: Pfad in QLC+
+    (``resources/fixtures/…``), sonst der Dateiname."""
+    if original is not None:
+        return original
+    norm = os.path.abspath(pfad).replace(os.sep, "/")
+    i = norm.find("resources/fixtures/")
+    return norm[i:] if i >= 0 else os.path.basename(pfad)
+
+
+def qxf_urheber(root) -> str:
+    """``herkunft.urheber`` einer ``.qxf`` — QLC+-Beitragende plus, falls da,
+    der ``<Creator>``-Block der Datei (QA-72)."""
+    from .qxf_import import herkunft_aus_creator
+    creator = herkunft_aus_creator(root)
+    urheber = "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.)"
+    if creator:
+        urheber += f"; Datei: {creator}"
+    return urheber
+
+
+def qxf_herkunft(pfad: str, root, *, geaendert: str, autor: str, wie: str,
+                 original: str | None = None) -> dict:
+    """Die vier Herkunftsfelder einer ``.qxf`` (art ``qlcplus``, Apache-2.0) —
+    dieselben Angaben wie :func:`qxf_zu_daten` (FM-76: auch fuer den
+    QXF-Import des Fixture Generators)."""
+    original = qxf_original(pfad, original)
+    quelle = {"titel": f"QLC+-Geraetedefinition {os.path.basename(pfad)}"}
+    if original.startswith("resources/"):
+        quelle["url"] = _QLC_URL + original
+    return {"quelle": quelle,
+            "herkunft": {"art": "qlcplus", "lizenz": "Apache-2.0",
+                         "urheber": qxf_urheber(root), "original": original,
+                         "geaendert": geaendert},
+            "geprueft": {"ok": False, "wie": wie},
+            "autor": autor}
+
+
 def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
     """Eine QLC+-``.qxf`` ueber den vorhandenen Importer (``qxf_import``) ins
     LightOS-Format. Der Importer laeuft in einer Speicher-DB — dieselben
@@ -1227,7 +1312,7 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session
     from .models import FixtureProfile, create_all_idempotent
-    from .qxf_import import herkunft_aus_creator, import_qxf_file
+    from .qxf_import import import_qxf_file
 
     try:
         root = ET.parse(pfad).getroot()
@@ -1245,14 +1330,6 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
             s.flush()
             prof = s.query(FixtureProfile).first()
             prof = _profil_laden(s, prof.id)
-            if original is None:
-                norm = os.path.abspath(pfad).replace(os.sep, "/")
-                i = norm.find("resources/fixtures/")
-                original = norm[i:] if i >= 0 else os.path.basename(pfad)
-            creator = herkunft_aus_creator(root)
-            urheber = "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.)"
-            if creator:
-                urheber += f"; Datei: {creator}"
             n_seg = sum(1 for m in prof.modes for c in m.channels if c.segment is not None)
             n_raster = sum(1 for m in prof.modes if m.grid_rows or m.grid_cols)
             n_bereiche = sum(len(c.ranges) for m in prof.modes for c in m.channels)
@@ -1271,19 +1348,10 @@ def qxf_zu_daten(pfad: str, original: str | None = None) -> dict:
                 geaendert.append(f"{n_lang} Bereichsnamen auf 80 Zeichen gekuerzt")
             if n_seg:
                 geaendert.append(f"{n_seg} Dimmer-Weiss-Segment-Zuordnung(en) aus <Head> abgeleitet")
-            daten = profil_zu_daten(
-                prof,
-                quelle={"titel": f"QLC+-Geraetedefinition {os.path.basename(pfad)}",
-                        "url": _QLC_URL + original if original.startswith("resources/")
-                        else ""},
-                herkunft={"art": "qlcplus", "lizenz": "Apache-2.0", "urheber": urheber,
-                          "original": original, "geaendert": "; ".join(geaendert)},
-                geprueft={"ok": False, "wie": "automatisch aus QLC+ konvertiert, "
-                                              "nicht gegen das Handbuch geprueft"},
-                autor="LightOS (QXF-Konverter)")
-            if not daten["quelle"]["url"]:
-                del daten["quelle"]["url"]
-            return daten
+            return profil_zu_daten(prof, **qxf_herkunft(
+                pfad, root, original=original, geaendert="; ".join(geaendert),
+                autor="LightOS (QXF-Konverter)",
+                wie="automatisch aus QLC+ konvertiert, nicht gegen das Handbuch geprueft"))
     finally:
         eng.dispose()
 

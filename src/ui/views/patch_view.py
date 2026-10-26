@@ -18,7 +18,7 @@ from src.core.app_state import (get_state, AppState, color_head_count,
                                  get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
-from src.ui.widgets.fixture_browser import FixtureBrowserDialog
+from src.ui.widgets.fixture_browser import FixtureBrowserDialog, typ_anzeige
 
 TYPE_COLORS = {
     "moving_head": "#1a4a6e",
@@ -778,6 +778,12 @@ class PatchView(QWidget):
             "Ausgewählte(s) Gerät(e) mehrfach mit festem Adress-Abstand patchen "
             "(Anzahl + Offset).")
         btn_copy.clicked.connect(self._copy_with_offset)
+        # ENG-36: was ein Geraet in der Show tut, auf andere uebertragen.
+        self._btn_klonen = QPushButton("Klonen…")
+        self._btn_klonen.setToolTip(
+            "Was die ausgewählten Geräte in der Show tun (Gruppen, Effekte, "
+            "Snaps, Cues …), auf andere Geräte übertragen — mit Vorschau.")
+        self._btn_klonen.clicked.connect(lambda: self._klonen())
         btn_autopatch = QPushButton("Auto-Patch")
         btn_autopatch.clicked.connect(self._auto_patch)
         btn_generator = QPushButton("Gerät erstellen…")
@@ -802,6 +808,8 @@ class PatchView(QWidget):
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
         toolbar.addWidget(btn_copy)
+        toolbar.addWidget(self._btn_klonen)
+        toolbar.addWidget(self._import_knopf())   # IMP-1
         toolbar.addWidget(btn_autopatch)
         toolbar.addWidget(btn_generator)
         toolbar.addStretch()
@@ -855,7 +863,9 @@ class PatchView(QWidget):
                 str(f.universe),
                 str(f.address),
                 str(f.channel_count),
-                f.fixture_type,
+                # UI-101(1): lesbarer Typname („PAR", „LED-Bar") statt des
+                # internen Schluessels — dieselbe Tabelle wie im Geraete-Browser.
+                typ_anzeige(f.fixture_type),
             ]
             bg = QColor(TYPE_COLORS.get(f.fixture_type, "#222233"))
             is_conflict = f.fid in conflicts
@@ -946,6 +956,54 @@ class PatchView(QWidget):
                 "Diese Geräte hätten über Kanal 512 hinausgereicht und liegen "
                 "deshalb im nächsten Universe:\n\n" + "\n".join(zeilen[:12])
                 + (f"\n… und {len(zeilen) - 12} weitere" if len(zeilen) > 12 else ""))
+
+    # ── IMP-1: Patch aus einer Tabelle ──────────────────────────────────────
+    def _import_knopf(self) -> QPushButton:
+        """Knopf „Tabellen-Import“ mit zwei Eintraegen: Tabelle einlesen und
+        Vorlage speichern. Die Vorlage haengt am selben Knopf, weil man sie
+        braucht, BEVOR man eine Tabelle hat.
+
+        STAB-33: ``MenueKnopf`` statt ``QPushButton.setMenu`` — der eingebaute
+        Menue-Pfeil loest unter Windows „QFont::setPointSize: Point size <= 0“
+        aus (s. widgets/menue_knopf.py). Der Pfeil steht als „▾“ im Text; das
+        Menue klappt beim Klick und per Tastatur mit der EINGABETASTE auf dem
+        Knopf auf und laesst sich danach mit den Pfeiltasten bedienen.
+
+        IMP-3: NICHT die Leertaste — die gehoert im Hauptfenster dem
+        globalen Kuerzel GO und kommt beim Knopf nie an. Sie wird dafuer
+        nicht umbelegt; ``MenueKnopf.keyPressEvent`` nimmt die Eingabetaste
+        selbst an, weil ein QPushButton ausserhalb eines Dialogs auf sie
+        sonst nicht reagiert."""
+        from PySide6.QtWidgets import QMenu
+        from src.ui.widgets.menue_knopf import MenueKnopf
+        self._btn_import = MenueKnopf("Tabellen-Import ▾")
+        self._btn_import.setToolTip(
+            "Geräteliste aus einer Tabelle (CSV) übernehmen — für den Umstieg "
+            "von einem anderen Lichtprogramm. Mit Vorschau; vorhandene Geräte "
+            "bleiben unverändert. Mit der Tastatur öffnet die Eingabetaste "
+            "das Menü.")
+        menu = QMenu(self._btn_import)
+        menu.setToolTipsVisible(True)
+        self._act_import = menu.addAction("Aus Tabelle importieren …")
+        self._act_import.setToolTip(
+            "CSV-Tabelle wählen (Name; Profil; Universum; Adresse). Es folgt "
+            "eine Vorschau — angelegt wird erst mit „Anwenden“.")
+        self._act_import.triggered.connect(lambda: self._aus_tabelle_importieren())
+        self._act_vorlage = menu.addAction("Vorlage speichern …")
+        self._act_vorlage.setToolTip(
+            "Beispiel-Tabelle mit Kopfzeile und zwei Zeilen zum Ausfüllen "
+            "im Tabellenprogramm.")
+        self._act_vorlage.triggered.connect(lambda: self._import_vorlage_speichern())
+        self._btn_import.setMenu(menu)
+        return self._btn_import
+
+    def _aus_tabelle_importieren(self, pfad: str | None = None):
+        from src.ui.widgets.patch_import_dialog import importieren_starten
+        return importieren_starten(self, self._state, pfad)
+
+    def _import_vorlage_speichern(self):
+        from src.ui.widgets.patch_import_dialog import vorlage_speichern
+        return vorlage_speichern(self)
 
     def _open_generator(self):
         """Oeffnet den Fixture Generator. Nach erfolgreichem Speichern
@@ -1066,18 +1124,56 @@ class PatchView(QWidget):
         pid = getattr(fixture, "fixture_profile_id", None)
         return int(pid) if pid else None
 
+    def _ausgewaehlte_fids(self) -> list[int]:
+        """fids der markierten Zeilen, in Tabellen-Reihenfolge."""
+        rows = sorted({idx.row() for idx in self._table.selectedIndexes()})
+        return [fid for r in rows if (fid := self._fid_at_row(r)) is not None]
+
+    def _kontextmenue_eintraege(self, row: int) -> list[tuple]:
+        """``[(text, aufruf)]`` fuer die Zeile ``row`` — getrennt vom Anzeigen,
+        damit sich der Inhalt ohne offenes Menue pruefen laesst."""
+        eintraege: list[tuple] = []
+        pid = self._profil_id_an_zeile(row)
+        if pid is not None:
+            eintraege.append(("Profil bearbeiten…",
+                              lambda: self._profil_bearbeiten(pid)))
+        # ENG-36: Quelle ist die Auswahl; liegt die angeklickte Zeile nicht
+        # darin, zaehlt nur sie.
+        fid = self._fid_at_row(row)
+        if fid is not None:
+            auswahl = self._ausgewaehlte_fids()
+            quellen = auswahl if fid in auswahl else [fid]
+            text = ("Klonen auf …" if len(quellen) == 1
+                    else f"{len(quellen)} Geräte klonen auf …")
+            eintraege.append((text, lambda: self._klonen(quellen)))
+        return eintraege
+
     def _kontextmenue(self, pos):
         row = self._table.rowAt(pos.y())
         if row < 0:
             return
-        pid = self._profil_id_an_zeile(row)
-        if pid is None:
+        eintraege = self._kontextmenue_eintraege(row)
+        if not eintraege:
             return
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
-        act = menu.addAction("Profil bearbeiten…")
-        if menu.exec(self._table.viewport().mapToGlobal(pos)) is act:
-            self._profil_bearbeiten(pid)
+        aktionen = {menu.addAction(text): aufruf for text, aufruf in eintraege}
+        gewaehlt = menu.exec(self._table.viewport().mapToGlobal(pos))
+        if gewaehlt in aktionen:
+            aktionen[gewaehlt]()
+
+    def _klonen(self, quellen=None):
+        """ENG-36: Dialog „Klonen" fuer ``quellen`` (sonst die Auswahl)."""
+        from src.ui.widgets.klonen_dialog import klonen_starten
+        if quellen is None:
+            quellen = self._ausgewaehlte_fids()
+        anzahl = klonen_starten(self, self._state, quellen, fenster=self.window())
+        if anzahl:
+            try:
+                self.window().statusBar().showMessage(
+                    f"{anzahl} Stellen geklont — Rückgängig mit Strg+Z", 6000)
+            except Exception:
+                pass
 
     def _profil_bearbeiten(self, profil_id: int):
         from src.ui.widgets.profil_auswahl_dialog import profil_bearbeiten_fuer

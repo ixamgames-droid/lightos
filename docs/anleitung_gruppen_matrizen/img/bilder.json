@@ -1,0 +1,65 @@
+{
+  "anleitung": "gruppen_matrizen",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "161a0039",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py gruppen_matrizen'.",
+  "bilder": [
+    {
+      "datei": "01_gruppen_editor.png",
+      "szene": "01_gruppen_editor",
+      "titel": "Gruppen-Editor: Gruppe, Zusammenlegen, Gerätebaum, Köpfe-Knopf, Raster, Rastergröße",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "252a93ec741e75db00094f243c024f7e"
+    },
+    {
+      "datei": "02_rechtsklick_aufteilen.png",
+      "szene": "02_rechtsklick_aufteilen",
+      "titel": "Rechtsklick auf die Leisten-Zelle: „aufteilen (4 Elemente)“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "cb11d50428f074c3b0466208491ccde1"
+    },
+    {
+      "datei": "03_koepfe_als_zeile.png",
+      "szene": "03_koepfe_als_zeile",
+      "titel": "Nach „als Zeile“: vier Kopf-Zellen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "169076894d07ac80aa6e809d5d3a6e26"
+    },
+    {
+      "datei": "04_leiste_zwischen_par.png",
+      "szene": "04_leiste_zwischen_par",
+      "titel": "PAR / Leiste / PAR — die Leiste als EIN Element",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "4ff02ca735a168c21afe35cc62a69934"
+    },
+    {
+      "datei": "05_matrizen_zusammenlegen.png",
+      "szene": "05_matrizen_zusammenlegen",
+      "titel": "Dialog „Matrizen zusammenlegen“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "ea3f76fa7371acad8963f0f08ea85f2b"
+    }
+  ]
+}
