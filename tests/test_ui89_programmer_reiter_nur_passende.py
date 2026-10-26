@@ -139,9 +139,9 @@ def test_laser_reiter_traegt_alles_was_ausgeblendet_wurde(ansicht):
     fx = next(f for f in pv._state.get_patched_fixtures() if f.fid == LASER)
     attrs = {ch.attribute for ch in get_channels_for_patched(fx)}
     lv = pv._embedded_laser
-    bedienbar = set(lv._rows)
-    if lv._mode_box.isVisibleTo(lv):
-        bedienbar.add("shutter")          # Betriebsart = Kacheln
+    # LAS-34: Regler-Zeilen, Bausteine (Umschalter, Galerie, Farbfelder,
+    # Lage, Regler) und die Betriebsart-Kacheln zusammen.
+    bedienbar = lv.bedienbare_attribute()
     assert attrs <= bedienbar, sorted(attrs - bedienbar)
 
 
