@@ -730,7 +730,7 @@ def bewerte(g: RohGeraet, *, system: str | None = None, zugriff=None,
     fertig = dict(einrichten_als=fam.ausgabe_art, einrichten_ziel=ziel)
     if ziel in eingerichtet:
         return raus(B_EINGERICHTET,
-                    f"Als Ausgabe „{fam.ausgabe_art}“ für Universe "
+                    f"Als Ausgabe „{fam.ausgabe_art}“ für Universum "
                     f"{eingerichtet[ziel]} eingerichtet."
                     + (" Der Typ lässt sich an der USB-Kennung nicht ablesen — "
                        "solange das Licht reagiert, ist alles richtig."
@@ -862,7 +862,7 @@ def diagnose_zeilen(befunde) -> list[str]:
         if g.treiber:
             teile.append("Kernel-Treiber " + ",".join(sorted(set(g.treiber))))
         if b.universum is not None:
-            teile.append(f"Universe {b.universum}")
+            teile.append(f"Universum {b.universum}")
         raus.append(" · ".join(teile))
     return raus
 

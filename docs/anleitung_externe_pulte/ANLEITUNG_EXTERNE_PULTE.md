@@ -184,7 +184,7 @@ Vorher: Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk)
 (eingehend UDP 6454 für Art-Net bzw. UDP 5568 für sACN).
 
 1. **Ziel festlegen:** Das LightOS-Universum, in das gemischt wird, braucht selbst einen
-   Ausgang (ENTTEC, Art-Net, sACN …). Sonst kommt das Mischergebnis nirgends heraus. Wie
+   Ausgang (ENTTEC, uDMX, Art-Net, sACN …). Sonst kommt das Mischergebnis nirgends heraus. Wie
    du einen Ausgang einrichtest, zeigt
    [Ausgabe einrichten](../anleitung_ausgabe_einrichten/ANLEITUNG.md).
 2. Dialog **Ausgabe konfigurieren** (Menü **Ausgabe** → **Konfigurieren...**), Reiter
@@ -427,7 +427,7 @@ Betreibe sie nur in einem eigenen Lichtnetz, nicht im Gäste-WLAN.
 
 ## Weiterlesen
 
-- [Ausgabe einrichten: ENTTEC, Art-Net, sACN](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
+- [Ausgabe einrichten: ENTTEC, uDMX, Art-Net, sACN](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
   — alle Reiter des Dialogs, Monitore und Statusleiste mit Bildern.
 - [Netzwerk vorbereiten (Windows)](../anleitung_netzwerk_windows/ANLEITUNG.md) — feste
   Adresse, Netzwerkprofil und Firewall-Freigaben.

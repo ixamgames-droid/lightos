@@ -184,7 +184,7 @@ def test_befund_ft232_schon_eingerichtet():
     b = ifc.bewerte(FT232, **_frei(eingerichtet={"/dev/ttyUSB0": 3},
                                    belegt=lambda p: [(1, "lightos")]))
     assert b.code == ifc.B_EINGERICHTET and b.universum == 3
-    assert b.ampel == ifc.AMPEL_GRUEN and "Universe 3" in b.text
+    assert b.ampel == ifc.AMPEL_GRUEN and "Universum 3" in b.text
 
 
 def test_befund_cyl_bereit_und_schluessel_passt_zum_udmx_treiber():
@@ -534,7 +534,7 @@ def test_testsignal_gesperrt_bei_laser_im_universum():
     om.set_laser_adressen({1: frozenset({10, 11})})
     ts = testsignal.Testsignal(om, 1)
     grund = ts.start()
-    assert "Laser" in grund and "Universe 1" in grund and not ts.laeuft
+    assert "Laser" in grund and "Universum 1" in grund and not ts.laeuft
     om._send_all()
     assert dev.bilder[-1] == bytes(512) and ts._tick not in om._tick_callbacks
     # Laser in einem ANDEREN Universum sperrt dieses nicht.

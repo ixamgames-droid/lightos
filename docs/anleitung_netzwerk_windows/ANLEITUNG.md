@@ -316,7 +316,7 @@ oder die Port-Regeln aus Schritt 4 anlegen.
 
 ## Weiterlesen
 
-- [Ausgabe einrichten: ENTTEC, Art-Net, sACN](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
+- [Ausgabe einrichten: ENTTEC, uDMX, Art-Net, sACN](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
   — der Dialog **Ausgabe konfigurieren**, Monitore und Warnungen.
 - [Web-Remote — das Handy als Konsole](../anleitung_web_remote/ANLEITUNG.md) — Token,
   Direkt-Link, Sicherheit.

@@ -66,6 +66,7 @@ test_tool18_bilder_hinweis_gpu.py  # Bild-Werkzeug: Fehlstand unter docs/<anleit
 test_las24_gm_laser_aus.py         # Wortlaut in anleitung_erste_schritte
 test_las25_doku_aus_werte.py
 test_out70_interface_*.py          # Kompatibilitaetsliste INTERFACES.md == Tabelle; Assistent oeffnet sie
+test_out70_qa96_befunde.py         # D-09: Ausgabe-Anleitung (de/en), ANLEITUNGEN.md, Bilder 10/11
 test_las36_doku_notaus_loesen.py   # Wortlaut NOT-AUS loesen: Erste Schritte, Laser, Buehnen-Show, Geraete-Generator
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
 test_ui92_kleinkram_qa96.py        # Speichern-Frage: Knopfnamen wie in anleitung_erste_schritte

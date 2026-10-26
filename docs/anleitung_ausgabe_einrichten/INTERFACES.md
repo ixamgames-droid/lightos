@@ -171,15 +171,24 @@ kann LightOS noch nicht.
 
 ## Testsignal
 
-Im Assistenten, Reiter **Testsignal**, steht je eingerichtetem Ausgang ein Knopf
-**Testsignal senden**. Er fährt Kanal 1 fünf Sekunden langsam auf und ab und setzt ihn
-danach auf 0 — ein Dimmer oder Scheinwerfer auf Adresse 1 wird dabei heller und dunkler.
+Im Assistenten, Reiter **Testsignal**, steht je Universum mit Ausgang ein Knopf
+**Testsignal senden** (nach dem Einrichten führt auch **Jetzt testen** in der Karte
+dorthin). Er fährt Kanal 1 fünf Sekunden langsam auf und ab und stellt ihn danach auf
+den Wert von vorher — ein Dimmer oder Scheinwerfer auf Adresse 1 wird dabei heller und
+dunkler. Während des Laufs heißt der Knopf **Stopp**; **Stopp** oder **Schließen**
+beendet das Signal sofort.
 
-- Vor dem Senden fragt LightOS nach, ob an diesem Ausgang keine Laser hängen.
-- **In Universen mit gepatchtem Laser ist das Testsignal gesperrt**, ebenso bei
-  ausgelöstem Laser-NOT-AUS.
+- Vor dem Senden fragt LightOS nach und nennt, was laut Patch auf Adresse 1 liegt. Ist
+  BLACKOUT aktiv oder der Grand Master auf 0 %, sagt die Rückfrage, dass das Signal
+  nicht zu sehen wäre.
+- **Gesperrt** ist das Testsignal bei ausgelöstem Laser-NOT-AUS, an jedem Ausgang, über
+  den ein Laser erreichbar ist (auch über ein anderes Universum, das denselben Ausgang
+  benutzt — als Laser gilt dasselbe wie beim NOT-AUS), und wenn auf Adresse 1 ein
+  Nebel-, Funken-, CO2-, Flammen- oder ähnliches Gerät liegt.
 - Blackout, Grand Master und NOT-AUS gelten weiter: das Testsignal läuft über denselben
   Weg wie jede andere Ausgabe.
+
+Ausführlich mit Bildern: [Ausgabe einrichten → Assistent](ANLEITUNG.md#assistent-interface-einrichten).
 
 ## Hinweis beim Einstecken
 

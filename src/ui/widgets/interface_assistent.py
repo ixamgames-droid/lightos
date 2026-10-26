@@ -8,7 +8,8 @@ Der Assistent rechnet nichts selbst: Befunde und Texte kommen aus
 ``src/core/dmx/interfaces.py``, das Testsignal aus ``testsignal.py``. Er
 
 * sendet nichts an ein Geraet, solange der Nutzer nicht „einrichten“ oder
-  „Testsignal senden“ drueckt,
+  „Testsignal senden“ drueckt (B-02: das sagt auch die Kopfzeile — „Nur der
+  Reiter Testsignal sendet — nach Rückfrage“),
 * installiert nichts und fuehrt keinen Befehl aus (Befehle stehen zum Kopieren
   da, Treiber-Seiten oeffnet der Browser),
 * aendert keine Netzwerkeinstellung — die Adressen werden nur angezeigt.
@@ -51,8 +52,20 @@ NETZ_SUCHE = ("Die Adresse des Adapters steht auf dem Gerät oder in seiner "
               "nicht.")
 
 KOPF_TEXT = ("LightOS liest nur, was das Betriebssystem über angeschlossene "
-             "Geräte weiß. Es wird nichts gesendet, nichts installiert und "
-             "nichts von selbst eingerichtet.")
+             "Geräte weiß. Beim Suchen wird nichts gesendet, nichts "
+             "installiert und nichts von selbst eingerichtet. Nur der Reiter "
+             "Testsignal sendet — nach Rückfrage.")
+
+#: V-07: Knopf in der Karte nach dem Einrichten — fuehrt in den Reiter
+#: Testsignal und startet dort (dieselbe Rueckfrage, dieselbe Sperre).
+TEXT_JETZT_TESTEN = "Jetzt testen"
+TEXT_TEST_SENDEN = "Testsignal senden"
+TEXT_TEST_STOPP = "Stopp"
+
+TEXT_FERTIG = ("Fertig, Kanal 1 steht wieder auf dem Wert von vorher. Hat ein "
+               "Gerät reagiert? Wenn nicht: Blackout und Grand Master prüfen, "
+               "dann Kabel, Adresse 1 am Gerät und Adapter-Typ.")
+TEXT_GESTOPPT = "Gestoppt, Kanal 1 steht wieder auf dem Wert von vorher."
 
 
 def _standard_suche(output_manager=None):
@@ -145,6 +158,14 @@ class GeraeteKarte(QFrame):
         self.lbl_ergebnis.setWordWrap(True)
         self.lbl_ergebnis.setVisible(False)
         lay.addWidget(self.lbl_ergebnis)
+        # V-07: nach dem Einrichten geht der Weg weiter — „Jetzt testen“.
+        self.btn_testen = QPushButton(TEXT_JETZT_TESTEN)
+        self.btn_testen.setToolTip(
+            "Wechselt in den Reiter Testsignal und fragt vor dem Senden nach.")
+        self.btn_testen.clicked.connect(self._testen)
+        self.btn_testen.setVisible(False)
+        self._test_universum = None
+        lay.addWidget(self.btn_testen, 0, Qt.AlignmentFlag.AlignLeft)
 
         # Umbrechend: bei schmalem Fenster rutschen Knoepfe in die naechste
         # Zeile, statt die Karte breiter als das Fenster zu machen.
@@ -157,7 +178,7 @@ class GeraeteKarte(QFrame):
             wahl = QWidget()
             wl = QHBoxLayout(wahl)
             wl.setContentsMargins(0, 0, 0, 0)
-            wl.addWidget(QLabel("Universe:"))
+            wl.addWidget(QLabel("Universum:"))
             self.spin_universum = QSpinBox()
             self.spin_universum.setRange(1, 32)
             self.spin_universum.setValue(universum)
@@ -193,11 +214,20 @@ class GeraeteKarte(QFrame):
         art = "Enttec-Pro-kompatibel" if self.befund.einrichten_als == "Enttec" \
             else self.befund.einrichten_als
         self.btn_einrichten.setText(
-            f"Als Ausgabe für Universe {self.spin_universum.value()} "
+            f"Als Ausgang für Universum {self.spin_universum.value()} "
             f"einrichten ({art})")
 
     def _einrichten(self):
         self._assistent.einrichten_geklickt(self)
+
+    def _testen(self):
+        if self._test_universum is not None:
+            self._assistent.jetzt_testen(self._test_universum)
+
+    def zeige_testen(self, universum):
+        """V-07: „Jetzt testen“ fuer ``universum`` anbieten (``None`` = nicht)."""
+        self._test_universum = universum
+        self.btn_testen.setVisible(universum is not None)
 
     def _treiber_seite(self):
         self._assistent.oeffne_url(self.befund.link)
@@ -256,7 +286,7 @@ class InterfaceAssistent(QDialog):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._baue_usb(), "USB-Geräte")
         self.tabs.addTab(self._baue_netz(), "Netzwerk (Art-Net / sACN)")
-        self.tabs.addTab(self._baue_test(), "Testsignal")
+        self._test_index = self.tabs.addTab(self._baue_test(), "Testsignal")
         self.tabs.currentChanged.connect(self._tab_gewechselt)
         lay.addWidget(self.tabs, 1)
 
@@ -388,23 +418,37 @@ class InterfaceAssistent(QDialog):
         if self._einrichten is None:
             karte.zeige_ergebnis("Einrichten ist hier nicht möglich.")
             return
-        vorhandene = []
-        try:
-            vorhandene = [e for e in self._om().ausgabe_status()
-                          if int(e["universum"]) == universum]
-        except Exception:                                # noqa: BLE001
-            pass
-        if vorhandene and not self._frage(
-                f"Universe {universum} gibt schon über "
-                f"{vorhandene[0].get('weg')} aus. Diese Ausgabe ersetzen?",
-                "Ersetzen"):
-            return
+        # V-06: KEINE eigene Ersetzen-Frage mehr. Der Rueckruf ist der Weg des
+        # Reiters („Verbinden“) und fragt dort mit derselben Rueckfrage
+        # („Laufende Ausgabe ersetzen?“, OUT-75) — eine Frage, ein Wortlaut,
+        # auf beiden Wegen.
         try:
             text = self._einrichten(b.einrichten_als, b.einrichten_ziel, universum)
         except Exception as e:                           # noqa: BLE001
             text = f"Fehler: {e}"
         karte.zeige_ergebnis(str(text or ""))
+        karte.zeige_testen(universum if self._ausgang_da(
+            universum, b.einrichten_als, b.einrichten_ziel) else None)
         self._test_neu()
+
+    def _ausgang_da(self, universum: int, weg: str, ziel: str) -> bool:
+        """Laeuft auf ``universum`` jetzt genau diese Ausgabe?"""
+        try:
+            for e in self._om().ausgabe_status():
+                if (int(e["universum"]) == int(universum)
+                        and str(e.get("weg")) == str(weg)
+                        and (not ziel or str(e.get("ziel") or "") == str(ziel))):
+                    return True
+        except Exception:                                # noqa: BLE001
+            pass
+        return False
+
+    def jetzt_testen(self, universum: int) -> str:
+        """V-07: in den Reiter Testsignal wechseln und dort starten — dieselbe
+        Rueckfrage und dieselbe Sperre wie der Knopf im Reiter."""
+        self.tabs.setCurrentIndex(self._test_index)
+        self._test_neu()
+        return self.testsignal_senden(int(universum))
 
     def oeffne_url(self, link: str):
         if not link.startswith("https://"):
@@ -510,10 +554,12 @@ class InterfaceAssistent(QDialog):
         lay = QVBoxLayout(w)
         text = QLabel(
             f"Das Testsignal fährt Kanal 1 des gewählten Ausgangs "
-            f"{int(testsignal.DAUER_S)} Sekunden langsam auf und ab und setzt "
-            f"ihn danach auf 0. Ein Dimmer oder Scheinwerfer auf Adresse 1 "
-            f"wird dabei heller und dunkler. Blackout und NOT-AUS gelten "
-            f"weiter. Für Universen mit Lasern gibt es kein Testsignal.")
+            f"{int(testsignal.DAUER_S)} Sekunden langsam auf und ab und stellt "
+            f"ihn danach auf den Wert von vorher. Ein Dimmer oder Scheinwerfer "
+            f"auf Adresse 1 wird dabei heller und dunkler. „Stopp“ oder "
+            f"Schließen beendet es sofort. Blackout und NOT-AUS gelten weiter. "
+            f"Kein Testsignal gibt es an Ausgängen mit Laser und, wenn auf "
+            f"Adresse 1 ein Nebel-, Funken-, CO2- oder Flammengerät liegt.")
         text.setWordWrap(True)
         lay.addWidget(text)
         self._test_box = QVBoxLayout()
@@ -552,8 +598,13 @@ class InterfaceAssistent(QDialog):
             box.addWidget(leer)
             return
         fixtures = self._fixtures()
+        # EINE Zeile je Universum: das Signal laeuft im Universum und geht
+        # ueber ALLE seine Ausgaenge (Sichtkontrolle: zwei Zeilen fuer
+        # dasselbe Universum zeigten „Stopp“ nur in einer davon).
+        je_universum: dict[int, list] = {}
         for e in ausgaben:
-            universum = int(e["universum"])
+            je_universum.setdefault(int(e["universum"]), []).append(e)
+        for universum, wege in sorted(je_universum.items()):
             rahmen = QFrame()
             rahmen.setObjectName("ifcTest")
             rahmen.setStyleSheet("#ifcTest { border: 1px solid #3a3a3a; "
@@ -561,17 +612,23 @@ class InterfaceAssistent(QDialog):
             zl = QGridLayout(rahmen)
             zl.setContentsMargins(10, 6, 10, 6)
             zl.setColumnStretch(0, 1)
-            name = QLabel(f"Universe {universum} · {e.get('weg')} → "
-                          f"{e.get('ziel') or 'Standardziel'}")
+            name = QLabel(f"Universum {universum} · " + ", ".join(
+                f"{e.get('weg')} → {e.get('ziel') or 'Standardziel'}"
+                for e in wege))
+            name.setWordWrap(True)
             name.setStyleSheet("font-weight: bold;")
             zl.addWidget(name, 0, 0)
-            knopf = QPushButton("Testsignal senden")
+            knopf = QPushButton(TEXT_TEST_SENDEN)
             zl.addWidget(knopf, 0, 1)
             stand = QLabel("")
             stand.setWordWrap(True)
             zl.addWidget(stand, 1, 0, 1, 2)
             grund = testsignal.sperre_grund(om, universum, fixtures)
-            if grund:
+            lauf = self._laeufe.get(universum)
+            if lauf is not None and lauf.laeuft:
+                knopf.setText(TEXT_TEST_STOPP)
+                stand.setText("Testsignal läuft — Kanal 1 fährt auf und ab …")
+            elif grund:
                 knopf.setEnabled(False)
                 knopf.setText("Testsignal gesperrt")
                 stand.setText(grund)
@@ -598,24 +655,48 @@ class InterfaceAssistent(QDialog):
         return box.clickedButton() is knopf
 
     def _test_geklickt(self):
-        universum = self.sender().property("universum")
-        self.testsignal_senden(int(universum))
+        universum = int(self.sender().property("universum"))
+        lauf = self._laeufe.get(universum)
+        if lauf is not None and lauf.laeuft:
+            self.testsignal_stoppen(universum)
+            return
+        self.testsignal_senden(universum)
+
+    def testsignal_stoppen(self, universum: int):
+        """V-07: „Stopp“ — sofort beenden, Kanal 1 zurueck auf den alten Wert."""
+        lauf = self._laeufe.pop(int(universum), None)
+        if lauf is not None:
+            lauf.stopp()
+        zeile = self._zeile(universum)
+        if zeile is not None:
+            zeile["knopf"].setText(TEXT_TEST_SENDEN)
+            zeile["knopf"].setEnabled(True)
+            zeile["stand"].setText(TEXT_GESTOPPT)
+            zeile["stand"].setVisible(True)
+        if not self._laeufe:
+            self._test_timer.stop()
+
+    def _zeile(self, universum: int):
+        return next((z for z in self.test_zeilen
+                     if z["universum"] == int(universum)), None)
 
     def testsignal_senden(self, universum: int) -> str:
         """Rueckfrage, dann Start. Liefert ``""`` (laeuft), den Sperrgrund oder
         ``"abgebrochen"``."""
-        zeile = next((z for z in self.test_zeilen
-                      if z["universum"] == universum), None)
+        zeile = self._zeile(universum)
         om = self._om()
-        grund = testsignal.sperre_grund(om, universum, self._fixtures())
+        laeuft = self._laeufe.get(universum)
+        if laeuft is not None and laeuft.laeuft:
+            return ""
+        fixtures = self._fixtures()
+        grund = testsignal.sperre_grund(om, universum, fixtures)
         if grund:
             if zeile:
                 zeile["stand"].setText(grund)
                 zeile["stand"].setVisible(True)
             return grund
-        if not self._frage(
-                f"Testsignal auf Universe {universum} senden?\n\n"
-                f"{testsignal.FRAGE}", "Testsignal senden"):
+        if not self._frage(testsignal.frage_text(om, universum, fixtures),
+                           TEXT_TEST_SENDEN):
             return "abgebrochen"
         lauf = testsignal.Testsignal(om, universum, fixtures=self._fixtures)
         grund = lauf.start()
@@ -626,7 +707,9 @@ class InterfaceAssistent(QDialog):
             return grund
         self._laeufe[universum] = lauf
         if zeile:
-            zeile["knopf"].setEnabled(False)
+            # V-07: waehrend des Laufs wird der Knopf zu „Stopp“.
+            zeile["knopf"].setText(TEXT_TEST_STOPP)
+            zeile["knopf"].setEnabled(True)
             zeile["stand"].setStyleSheet("")
             zeile["stand"].setText("Testsignal läuft — Kanal 1 fährt auf und ab …")
             zeile["stand"].setVisible(True)
@@ -638,20 +721,17 @@ class InterfaceAssistent(QDialog):
             if lauf.laeuft:
                 continue
             del self._laeufe[universum]
-            zeile = next((z for z in self.test_zeilen
-                          if z["universum"] == universum), None)
+            zeile = self._zeile(universum)
             if zeile is None:
                 continue
-            zeile["knopf"].setEnabled(True)
-            zeile["stand"].setText(
-                lauf.abbruch_grund or
-                "Fertig, Kanal 1 steht wieder auf 0. Hat ein Gerät reagiert? "
-                "Wenn nicht: Kabel, Adresse 1 am Gerät und Adapter-Typ prüfen.")
+            zeile["knopf"].setText(TEXT_TEST_SENDEN)
+            zeile["knopf"].setEnabled(not lauf.abbruch_grund)
+            zeile["stand"].setText(lauf.abbruch_grund or TEXT_FERTIG)
         if not self._laeufe:
             self._test_timer.stop()
 
     def _tab_gewechselt(self, index: int):
-        if index == 2 and not self._laeufe:
+        if index == self._test_index and not self._laeufe:
             self._test_neu()
 
     def _alle_tests_stoppen(self):

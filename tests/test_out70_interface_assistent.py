@@ -99,9 +99,9 @@ def test_liste_zeigt_befund_ampel_und_passende_aktionen(app):
         assert "0403:6001 · /dev/ttyUSB0" in ft.lbl_kennung.text()
         assert "Open DMX" in ft.lbl_text.text()
         assert ft.btn_einrichten.text() == (
-            "Als Ausgabe für Universe 1 einrichten (Enttec-Pro-kompatibel)")
+            "Als Ausgang für Universum 1 einrichten (Enttec-Pro-kompatibel)")
         ft.spin_universum.setValue(4)
-        assert "Universe 4" in ft.btn_einrichten.text()
+        assert "Universum 4" in ft.btn_einrichten.text()
         assert ft.btn_zugriff is None and ft.btn_treiber is None
         assert ft.hilfe.isHidden()
 
@@ -187,7 +187,9 @@ def test_windows_oeffnet_nur_die_herstellerseite(app):
         dlg.deleteLater()
 
 
-def test_einrichten_laeuft_ueber_den_rueckruf_und_fragt_vor_dem_ersetzen(app):
+def test_einrichten_laeuft_ueber_den_rueckruf_ohne_eigene_ersetzen_frage(app):
+    """QA-96 V-06: die Ersetzen-Frage stellt der Weg des Reiters (OUT-75) —
+    der Assistent fragt nicht ein zweites Mal mit eigenem Wortlaut."""
     state, _om, _g = _state()
     rufe = []
 
@@ -206,12 +208,7 @@ def test_einrichten_laeuft_ueber_den_rueckruf_und_fragt_vor_dem_ersetzen(app):
 
         ft = _karte(dlg, "FTDI-Adapter")
         ft.spin_universum.setValue(1)
-        fragen = []
-        with mock.patch.object(dlg, "_frage",
-                               lambda text, ja: fragen.append(text) or False):
-            ft.btn_einrichten.click()
-        assert len(rufe) == 1 and "Universe 1 gibt schon" in fragen[0]
-        with mock.patch.object(dlg, "_frage", lambda text, ja: True):
+        with mock.patch.object(dlg, "_frage", side_effect=AssertionError):
             ft.btn_einrichten.click()
         assert rufe[-1] == ("Enttec", "/dev/ttyUSB0", 1)
     finally:
@@ -284,7 +281,9 @@ def test_testsignal_nur_nach_ausdruecklicher_rueckfrage(app):
         with mock.patch.object(dlg, "_frage", lambda text, ja: True):
             assert dlg.testsignal_senden(1) == ""
         assert len(om._tick_callbacks) == 1
-        assert not dlg.test_zeilen[0]["knopf"].isEnabled()
+        # QA-96 V-07: waehrend des Laufs wird der Knopf zu „Stopp“.
+        assert dlg.test_zeilen[0]["knopf"].isEnabled()
+        assert dlg.test_zeilen[0]["knopf"].text() == "Stopp"
         lauf = dlg._laeufe[1]
         lauf._t0 -= 1.0                                 # eine Sekunde spaeter
         om._send_all()
@@ -295,7 +294,8 @@ def test_testsignal_nur_nach_ausdruecklicher_rueckfrage(app):
         om._send_all()
         assert geraete[1].bilder[-1] == bytes(512)
         om.set_blackout(False)
-        # Schliessen beendet das Signal: Kanal 1 auf 0, kein Callback mehr.
+        # Schliessen beendet das Signal: Kanal 1 auf den Wert von vorher (0),
+        # kein Callback mehr.
         dlg.reject()
         assert not lauf.laeuft and om._tick_callbacks == []
         om._send_all()

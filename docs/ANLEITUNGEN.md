@@ -40,7 +40,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | Anleitung | Worum geht's | Show |
 |---|---|---|
 | [Erste Schritte](anleitung_erste_schritte/ANLEITUNG.md) · [English](anleitung_erste_schritte/ANLEITUNG.en.md) | Hauptfenster und die acht Sektionen, neue Show anlegen, ein Gerät patchen, erster Wert im Programmer, speichern und öffnen. | Keine Show nötig |
-| [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) · [English](anleitung_ausgabe_einrichten/ANLEITUNG.en.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, Art-Net, sACN, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
+| [Ausgabe einrichten: ENTTEC, uDMX, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) · [English](anleitung_ausgabe_einrichten/ANLEITUNG.en.md) | Dialog **Ausgabe → Konfigurieren...**: ENTTEC USB Pro, uDMX, Art-Net, sACN, Assistent „Interface einrichten…“ mit Testsignal, Universen verwalten, Kontrolle im Output- und DMX-Monitor, Warnungen verstehen. | Keine Show nötig |
 | [Unterstützte DMX-Interfaces](anleitung_ausgabe_einrichten/INTERFACES.md) | Kompatibilitätsliste: welche USB- und Netzwerk-Interfaces LightOS kennt, Treiber-Links, Zugriffsrechte unter Linux, Ethernet→DMX per LAN-Kabel direkt am PC, Testsignal. | Keine Show nötig |
 | [Programmer-Grundlagen](anleitung_programmer_grundlagen/ANLEITUNG.md) · [English](anleitung_programmer_grundlagen/ANLEITUNG.en.md) | Geräte und Gruppen wählen, Reiter Intensity/Color/Position/Paletten, Hervorheben/Abdunkeln, Farb-, Positions- und Fächer-Werkzeug, Löschen und Rückgängig. | Übungs-Rig aus Generic-Profilen, Tabelle zum Nachbauen in der Anleitung |
 | [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) · [English](anleitung_szenen_cues/ANLEITUNG.en.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
@@ -130,7 +130,7 @@ frei kombinieren; das Tempo aller Ebenen hängt an Tempo-Buses (siehe
 
 | Anleitung | Worum geht's | Show |
 |---|---|---|
-| [Ausgabe einrichten: ENTTEC, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Siehe [Einstieg](#einstieg) — der aktuelle Weg mit Bildern. | Keine Show nötig |
+| [Ausgabe einrichten: ENTTEC, uDMX, Art-Net, sACN](anleitung_ausgabe_einrichten/ANLEITUNG.md) | Siehe [Einstieg](#einstieg) — der aktuelle Weg mit Bildern. | Keine Show nötig |
 | [Zwei Universen über zwei Adapter](anleitung_zwei_universen/ANLEITUNG.md) | Universe 1 über ENTTEC USB Pro, Universe 2 über Art-Net, patchen und im Output-Monitor prüfen. | Keine Show nötig |
 | [ENTTEC und Art-Net gleichzeitig](anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md) | Jedes Universum mit eigenem Ausgabe-Backend; ENTTEC, Art-Net und sACN frei mischen. | Keine Show nötig |
 | [Netzwerk vorbereiten (Windows)](anleitung_netzwerk_windows/ANLEITUNG.md) | Welche Funktion welchen Port braucht (Art-Net 6454, sACN 5568, Web-Remote 5000, MSC 6004), Netzwerkprofil, feste Adresse im Lichtnetz, Firewall-Freigaben anlegen und entfernen, typische Fehlerbilder. | Keine Show nötig |

@@ -14,7 +14,7 @@
   mit `venv/bin/python main.py`.
 - **Keine Hardware.** Für diese Anleitung reicht der Rechner. Ob wirklich DMX
   herauskommt, richtest du danach ein:
-  [Ausgabe einrichten (ENTTEC, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md).
+  [Ausgabe einrichten (ENTTEC, uDMX, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md).
 - Als Beispielgerät dient ein eingebautes Profil, das jede Installation mitbringt:
   **Generic — LED PAR Dimmer+RGB 4ch** (4 Kanäle: Dimmer, Rot, Grün, Blau). Hast du
   ein eigenes Gerät, suchst du in Schritt 5 einfach nach dessen Namen.
@@ -282,7 +282,7 @@ Auto-Save wiederhergestellte.
 
 ## Wie geht es weiter?
 
-- **Licht wirklich ausgeben:** [Ausgabe einrichten (ENTTEC, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
+- **Licht wirklich ausgeben:** [Ausgabe einrichten (ENTTEC, uDMX, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
 - **Mehr Geräte und Gruppen:** [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md)
 - **Eigene Bedienoberfläche:** [Virtuelle Konsole bauen](../anleitung_vc/ANLEITUNG_VC.md)
 - **Alle Anleitungen:** [Übersicht](../ANLEITUNGEN.md)

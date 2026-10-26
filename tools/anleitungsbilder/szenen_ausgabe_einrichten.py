@@ -57,6 +57,9 @@ class _BeispielPort:
 
     def __init__(self, device, description, vid=None, pid=None):
         self.device, self.description, self.vid, self.pid = device, description, vid, pid
+        # OUT-70: der Zusatz in der Portliste kommt aus dem Produkttext.
+        self.manufacturer, self.product = "ENTTEC", description
+        self.serial_number = None
 
 
 @contextmanager
@@ -423,6 +426,109 @@ def _bild_blackout(ui):
     return oberer_streifen(flaeche, STREIFEN_H)
 
 
+# ── OUT-70: Assistent „Interface einrichten…“ ───────────────────────────────
+# Nur gestellte Befunde (Beispiel-Ports, Beispiel-Kennungen, keine echte
+# Seriennummer): der Assistent sucht dabei NICHT selbst (``befunde=``), es wird
+# kein Port und kein USB-Geraet angefasst. Fuer den Testsignal-Reiter traegt
+# :func:`_test_vorher` zwei Attrappen-Ausgaenge ein, die nichts senden (der
+# Ausgabe-Thread ist in der Sandbox aus); :func:`_test_nachher` raeumt ab.
+
+class _AttrappeAusgang:
+    def __init__(self, port="", target_ip=""):
+        self.port, self.target_ip = port, target_ip
+
+    def send_dmx(self, data):
+        pass
+
+    def is_connected(self):
+        return True
+
+    def close(self):
+        pass
+
+
+def _beispiel_befunde():
+    from src.core.dmx import interfaces as ifc
+    roh = [
+        ifc.RohGeraet(vid=0x0403, pid=0x6001, produkt="DMX USB PRO",
+                      hersteller="ENTTEC", port=BEISPIEL_PORT, ort="1-2"),
+        ifc.RohGeraet(vid=0x2008, pid=0x1066, produkt="USBDMX512",
+                      hersteller="Sun-light", ort="1-3",
+                      dev_pfad="/dev/bus/usb/001/007"),
+        ifc.RohGeraet(vid=0x1A86, pid=0x7523, produkt="USB Serial",
+                      hersteller="QinHeng", port="/dev/ttyUSB1", ort="1-4"),
+    ]
+    return ifc.erkenne(quellen=(roh, []), system="linux",
+                       zugriff=lambda p: True, belegt=lambda p: [],
+                       usb_bibliothek=True)
+
+
+def _assistent(ui, reiter: int):
+    from src.ui.widgets.interface_assistent import InterfaceAssistent
+    dlg = InterfaceAssistent(ui.win, befunde=_beispiel_befunde(),
+                             state=ui.state,
+                             netzkarten=[dict(n) for n in BEISPIEL_NICS])
+    dlg.resize(820, 640)
+    dlg.tabs.setCurrentIndex(reiter)
+    dlg.show()
+    ui.pump(0.3)
+    return dlg
+
+
+def _bild_assistent(ui):
+    from PySide6.QtWidgets import QLabel
+    dlg = _assistent(ui, 0)
+    pro = next(k for k in dlg.karten if "Enttec" in k.befund.titel)
+    pro.zeige_ergebnis(f"Eingerichtet: {BEISPIEL_PORT} → Universum 1 (gespeichert)")
+    pro.zeige_testen(1)
+    ui.pump(0.3)
+    kopf = next(lab for lab in dlg.findChildren(QLabel)
+                if lab.text().startswith("LightOS liest nur"))
+    cyl = next(k for k in dlg.karten if "CYL" in k.befund.titel)
+    return bild(ui, dlg, [
+        (rechteck(dlg, kopf), 1, "unten"),
+        (rechteck(dlg, pro.lbl_ampel), 2, "links"),
+        (rechteck(dlg, pro.btn_testen), 3, "rechts"),
+        (rechteck(dlg, cyl.btn_einrichten), 4, "rechts"),
+    ], titel=dlg.windowTitle())
+
+
+def _test_vorher(ui):
+    om = ui.state.output_manager
+    om.add_universe(1)
+    om.add_universe(2)
+    om._enttec_outputs[1] = _AttrappeAusgang(port=BEISPIEL_PORT)
+    om._artnet_outputs[2] = _AttrappeAusgang(target_ip=BEISPIEL_NODE)
+    ui.info["_laser_vorher"] = dict(getattr(om, "_laser_adressen", {}) or {})
+    om.set_laser_adressen({2: frozenset({1, 2, 3})})
+
+
+def _test_nachher(ui):
+    om = ui.state.output_manager
+    for cb in list(om._tick_callbacks):
+        if getattr(getattr(cb, "__self__", None), "universum", None) is not None:
+            cb.__self__.stopp()
+    om._enttec_outputs.pop(1, None)
+    om._artnet_outputs.pop(2, None)
+    om.set_laser_adressen(ui.info.pop("_laser_vorher", {}))
+
+
+def _bild_testsignal(ui):
+    from unittest import mock
+    dlg = _assistent(ui, 2)
+    with mock.patch.object(dlg, "_frage", lambda text, ja: True):
+        dlg.testsignal_senden(1)
+    ui.pump(0.3)
+    zeilen = {z["universum"]: z for z in dlg.test_zeilen}
+    if sorted(zeilen) != [1, 2]:
+        raise SzenenFehler(f"unerwartete Ausgaenge im Testsignal-Reiter: {sorted(zeilen)}")
+    laeuft, gesperrt = zeilen[1], zeilen[2]
+    return bild(ui, dlg, [
+        (rechteck(dlg, laeuft["knopf"]), 1, "links"),
+        (rechteck(dlg, gesperrt["stand"]), 2, "unten"),
+    ], titel=dlg.windowTitle())
+
+
 SZENEN = [
     Szene("01_menue_ausgabe", sektion="Programmer", unterreiter="Attribute",
           dialog=_bild_menue, titel="Menü Ausgabe → Konfigurieren…"),
@@ -446,4 +552,9 @@ SZENEN = [
     Szene("09_blackout_dmx_monitor", sektion="E/A", vorher=_blackout_an,
           dialog=_bild_blackout, nachher=_blackout_aus, groesse=(1600, STREIFEN_H),
           titel="BLACKOUT im DMX-Monitor: Licht 0, Pan/Tilt bleibt"),
+    Szene("10_assistent", sektion="Programmer", dialog=_bild_assistent,
+          titel="Assistent „Interface einrichten…“: Reiter USB-Geräte"),
+    Szene("11_testsignal", sektion="Programmer", vorher=_test_vorher,
+          dialog=_bild_testsignal, nachher=_test_nachher,
+          titel="Assistent: Testsignal läuft (Stopp), Laser-Ausgang gesperrt"),
 ]

@@ -1,11 +1,12 @@
-# Ausgabe einrichten: ENTTEC USB Pro, Art-Net und sACN
+# Ausgabe einrichten: ENTTEC USB Pro, uDMX, Art-Net und sACN
 
 > **English:** [Setting up output: ENTTEC USB Pro, Art-Net and sACN](ANLEITUNG.en.md)
 
 > LightOS rechnet für jedes Universum 512 DMX-Kanäle. Damit sie bei deinen Geräten
 > ankommen, braucht jedes Universum einen **Ausgang**: einen **ENTTEC DMX USB Pro** am
-> USB-Anschluss oder einen **Art-Net**- bzw. **sACN (E1.31)**-Empfänger im Netzwerk.
-> Der Ausgang gilt **je Universum** — du kannst die drei Wege frei mischen, bis zu 32
+> USB-Anschluss, einen **uDMX-Adapter** (USB ohne COM-Port) oder einen **Art-Net**- bzw.
+> **sACN (E1.31)**-Empfänger im Netzwerk.
+> Der Ausgang gilt **je Universum** — du kannst die vier Wege frei mischen, bis zu 32
 > Universen. Diese Anleitung zeigt den Dialog *Ausgabe konfigurieren*, die beiden
 > Monitore zur Kontrolle und die Warnungen in der Statusleiste. Die roten Zahlen in den
 > Bildern gehören zu den gleich nummerierten Punkten im Text.
@@ -17,7 +18,7 @@
 - **Für USB:** einen ENTTEC DMX USB Pro. Den Treiber bringt Windows mit, Hinweise
   stehen in [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro).
 - **Für USB ohne COM-Port:** einen uDMX-Adapter, siehe
-  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` (im
+  [uDMX-Adapter (USB)](#2b-udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` (im
   Windows-Installationspaket enthalten) und unter Linux einmalig ein Zugriffsrecht.
   **Unter Windows braucht er einen Treiber, den weder Windows noch LightOS mitbringt** –
   du weist ihn einmalig von Hand zu; danach läuft der Adapter.
@@ -50,12 +51,9 @@ Der Dialog **Ausgabe konfigurieren** hat sechs Reiter: **Enttec Pro USB**, **uDM
 - **Reiter Universen** (Schritt 5): alle Universen in einer Tabelle, mit einem Klick
   speichern und anwenden.
 
-Über den Reitern steht der Knopf **Interface einrichten…**. Er öffnet einen
-Assistenten, der zeigt, welche DMX-Interfaces am Rechner hängen, was jedes braucht
-(Zugriffsrecht, Treiber) und wie es sich einrichten lässt — samt einem Testsignal und
-einer Seite für Netzwerk-Adapter. Was LightOS kennt, steht in
-[Unterstützte DMX-Interfaces](INTERFACES.md). Die Bilder dieser Anleitung zeigen den
-Dialog noch ohne diesen Knopf.
+Über den Reitern steht der Knopf **Interface einrichten…** — er öffnet den
+[Assistenten](#assistent-interface-einrichten), der zeigt, welche DMX-Interfaces am
+Rechner hängen, und sie einrichtet und testet.
 
 Beide schreiben in dieselbe Datei `universes.json` im LightOS-Datenordner
 (Windows `%APPDATA%\LightOS`, Linux `~/.local/share/LightOS`), du kannst sie also mischen. Beim nächsten Start richtet LightOS die dort gespeicherten Ausgänge
@@ -67,6 +65,55 @@ außen (Art-Net auf Port 6454, sACN auf Port 5568) und mischt es in ein eigenes
 Universum. Empfangen löst unter Windows einmal eine Firewall-Abfrage aus — siehe
 [DMX empfangen: die Firewall-Abfrage](#dmx-empfangen-die-firewall-abfrage).
 
+## Assistent „Interface einrichten…“
+
+Der Knopf **Interface einrichten…** über den Reitern (oder **Ausgabe → Interface
+einrichten…**) öffnet einen Assistenten mit drei Reitern. Was LightOS kennt und welchen
+Treiber jedes Interface braucht, steht in [Unterstützte DMX-Interfaces](INTERFACES.md).
+
+![Assistent: Reiter USB-Geräte](img/10_assistent.png)
+
+1. **Kopfzeile** — LightOS liest nur, was das Betriebssystem über die angeschlossenen
+   Geräte weiß. Beim Suchen wird nichts gesendet, nichts installiert und nichts von
+   selbst eingerichtet. **Nur der Reiter Testsignal sendet — nach Rückfrage.**
+2. **Reiter USB-Geräte** — je Adapter eine Karte mit Ampel und Klartext: `bereit`,
+   `eingerichtet`, `Typ unklar`, `Treiber fehlt`, `keine Berechtigung`, `belegt`,
+   `geplant`, `nicht unterstützt`. Darunter, was zu tun ist (unter Linux ein Befehl zum
+   Kopieren — LightOS führt ihn nicht aus; unter Windows die Treiber-Seite des
+   Herstellers).
+3. **Jetzt testen** — erscheint nach dem Einrichten in der Karte. Es führt in den Reiter
+   **Testsignal** und fragt dort vor dem Senden nach.
+4. **Als Ausgang für Universum … einrichten** — richtet den Adapter über denselben Weg
+   ein wie **Verbinden** im passenden Reiter (inklusive der Rückfrage **Laufende Ausgabe
+   ersetzen?**, wenn auf dem Universum schon etwas anderes läuft).
+
+Der Reiter **Netzwerk (Art-Net / sACN)** zeigt die Adressen dieses Rechners (nur
+Anzeige) und führt in den Reiter Art-Net.
+
+![Assistent: Testsignal läuft, Laser-Ausgang gesperrt](img/11_testsignal.png)
+
+Reiter **Testsignal** — eine Zeile je Universum mit Ausgang:
+
+1. **Testsignal senden** fährt Kanal 1 des Ausgangs fünf Sekunden langsam auf und ab,
+   danach steht Kanal 1 wieder auf dem Wert von vorher. Vorher fragt LightOS nach und
+   nennt dabei, was laut Patch auf Adresse 1 liegt; ist **BLACKOUT** aktiv oder steht der
+   **Grand Master** auf 0 %, sagt die Rückfrage, dass das Signal nicht zu sehen wäre.
+   Während des Laufs heißt der Knopf **Stopp**; **Stopp** oder **Schließen** beendet
+   das Signal sofort.
+2. **Gesperrt** ist das Testsignal mit Begründung,
+   - solange der **LASER NOT-AUS** ausgelöst ist,
+   - an jedem Ausgang, über den ein **Laser** erreichbar ist — auch wenn der Laser in
+     einem anderen Universum steht, das über denselben Ausgang sendet (z. B. zwei
+     Universen auf dasselbe Art-Net-Universum). Als Laser gilt dasselbe wie beim NOT-AUS
+     und beim Blackout, siehe [Was als Laser gilt](../anleitung_laser/ANLEITUNG_LASER.md),
+   - wenn auf **Adresse 1** ein Gerät ohne Licht liegt, das ein Kanalwert auslösen
+     könnte (Nebel, Haze, Funken, CO2, Flammen, Konfetti, Seifenblasen). Liegt so ein
+     Gerät auf einer anderen Adresse, sperrt es nicht — das Signal bewegt nur Kanal 1.
+
+   Kommt während des Laufs ein Laser dazu oder wird der NOT-AUS ausgelöst, endet das
+   Signal sofort. Ein Gerät, das LightOS nicht kennt (nicht gepatcht), kann trotzdem
+   reagieren — darum die Rückfrage.
+
 ## 2. ENTTEC DMX USB Pro
 
 Reiter **Enttec Pro USB**:
@@ -74,10 +121,14 @@ Reiter **Enttec Pro USB**:
 ![Reiter Enttec Pro USB](img/02_enttec.png)
 
 1. **COM-Port:** — die seriellen Anschlüsse, an denen ein **USB-Gerät** hängt. Ein
-   erkannter ENTTEC trägt den Zusatz `[Enttec Pro]`, steht **oben** und ist auf einem
+   erkannter ENTTEC trägt den Zusatz `[Enttec DMX USB Pro]`, steht **oben** und ist auf einem
    frischen Rechner **vorgewählt**. Anschlüsse ohne USB-Gerät (die eingebaute
    Schnittstelle `COM1`, Bluetooth, leere `/dev/ttyS…`) sind ausgeblendet; der Haken
-   **Alle Anschlüsse zeigen** darunter holt sie in die Liste. Wird kein ENTTEC
+   **Alle Anschlüsse zeigen** darunter holt sie in die Liste. Ein Adapter mit dem
+   FTDI-Chip des ENTTEC, der sich nicht als ENTTEC ausweist (viele Pro-kompatible
+   Adapter, aber auch „Open DMX“-Kabel), trägt `[FTDI-Adapter, Typ unklar]` — er wird
+   wie bisher vorgewählt; ob er wirklich ein Pro-kompatibler ist, zeigt das Testsignal
+   im [Assistenten](#assistent-interface-einrichten). Wird kein ENTTEC
    erkannt, bleibt die Auswahl leer — LightOS wählt dann keinen Anschluss von selbst.
    Ist der gespeicherte Port gerade nicht da, steht er mit `— derzeit nicht gefunden`
    in der Liste, statt still auf einen anderen Port umzuspringen; hängt an ihm kein
@@ -106,9 +157,11 @@ Reiter **Enttec Pro USB**:
 Ausgabe (anderer Weg, anderer Port, andere Ziel-IP), fragt LightOS vor dem Einrichten
 **Laufende Ausgabe ersetzen?** – mit **Nein** bleibt alles, wie es ist. Das gilt für
 **Verbinden** hier und im Reiter uDMX (USB) und für **Übernehmen** in den Reitern
-Art-Net und sACN. Dieselbe Ausgabe noch einmal einzurichten löst keine Frage aus.
+Art-Net und sACN, und genauso, wenn du im Assistenten **Als Ausgang … einrichten**
+klickst — es ist dieselbe Frage. Dieselbe Ausgabe noch einmal einzurichten löst keine
+Frage aus.
 
-## uDMX-Adapter (USB)
+## 2b. uDMX-Adapter (USB)
 
 Reiter **uDMX (USB)** — für Adapter, die direkt am USB hängen und **keinen COM-Port**
 haben: den *Anyma uDMX* und baugleiche Nachbauten sowie den *CYL-6602 „USB-DMX512“*
@@ -342,6 +395,7 @@ der Ausgang genommen, während dort Geräte gepatcht sind:
    |---|---|
    | `Enttec: nicht gefunden` (rot) | Kein ENTTEC eingerichtet und keiner angesteckt. Ohne ENTTEC (reines Art-Net/sACN) ist das normal. |
    | `Enttec: <Port> erkannt, kein Universe` (orange) | Der Adapter steckt, aber kein Universum gibt über ihn aus → in Schritt 2 oder 5 zuweisen. |
+   | `FTDI-Adapter <Port> erkannt (Typ unklar), kein Universe` (orange) | Ein Adapter mit FTDI-Chip steckt, der sich nicht als ENTTEC ausweist, und kein Universum gibt über ihn aus. Ist er Pro-kompatibel, wie einen ENTTEC einrichten (Schritt 2) und mit dem Testsignal prüfen; reine „Open DMX“-Kabel werden noch nicht unterstützt. |
    | `Enttec: <Port> verbindet …` (orange) | Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter nicht erreichbar. |
    | `Enttec: <Port> aktiv (1 Universe)` (grün) | Eingerichtet, und der Adapter sendet. |
    | `Enttec: <Port> sendet NICHT (Universe <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
