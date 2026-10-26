@@ -2,7 +2,7 @@
 Dokumentationsbereichen (RFC 5737), nicht aus einem Heimnetz.
 
 Befund (Verwalter-Sitzung, 25.10.2026): Anleitungen nannten Adressen wie
-``192.168.178.99`` — typischer Router-Bereich, einzelne stammten erkennbar aus
+``192.168.x.y`` — typischer Router-Bereich, einzelne stammten erkennbar aus
 dem echten Aufbau (ein Stabilitaetsbericht nannte Adresse, Gateway und DNS des
 Rechners). Das Repo ist oeffentlich.
 
@@ -73,9 +73,9 @@ def alle_funde() -> set[tuple[str, str]]:
 class GegenprobeTest(unittest.TestCase):
 
     def test_private_adressen_schlagen_an(self):
-        text = ("Node `192.168.178.99`, Broadcast 192.168.1.255, "
+        text = ("Node `192.168.50.77`, Broadcast 192.168.1.255, "
                 "sACN → 10.0.0.5, Docker 172.17.0.1, Gateway 172.31.255.1")
-        self.assertEqual(funde_in(text), ["192.168.178.99", "192.168.1.255",
+        self.assertEqual(funde_in(text), ["192.168.50.77", "192.168.1.255",
                                           "10.0.0.5", "172.17.0.1", "172.31.255.1"])
 
     def test_dokumentationsbereiche_und_andere_schlagen_nicht_an(self):
