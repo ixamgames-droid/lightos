@@ -382,7 +382,7 @@ def _enttec_seriennr_vorbereiten(state, path: str, rows,
             if sn in doppelt:
                 andere = sorted(u for u, s in zuordnung.items()
                                 if s == sn and u != num)
-                text = (f"Enttec-Seriennummer steht auch bei Universe "
+                text = (f"Enttec-Seriennummer steht auch bei Universum "
                         f"{', '.join(map(str, andere))} — nicht verwendet; "
                         f"Dongle im Ausgabe-Dialog neu zuordnen (OUT-80).")
                 print(f"[app_state] Universe {num} (Enttec): {text}")

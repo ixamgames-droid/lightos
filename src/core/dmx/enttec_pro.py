@@ -163,7 +163,7 @@ def diagnose_port(configured: str) -> str | None:
         gefunden = None
 
     if not want:
-        return ("Fuer dieses Universe ist kein Enttec-Port konfiguriert."
+        return ("Fuer dieses Universum ist kein Enttec-Port konfiguriert."
                 + (f" Vorschlag: {gefunden} (per VID/PID gefunden)."
                    if gefunden else " Es ist auch keiner per VID/PID sichtbar."))
 
@@ -174,7 +174,7 @@ def diagnose_port(configured: str) -> str | None:
              f"Der konfigurierte Port {want!r} existiert auf diesem System nicht.")
     if gefunden:
         return (f"{grund} Es geht kein DMX ueber diesen Adapter raus. "
-                f"Vorschlag: im Universe-Manager auf {gefunden} umstellen "
+                f"Vorschlag: im Reiter „Universen“ (Ausgabe → Konfigurieren…) auf {gefunden} umstellen "
                 f"(dort per VID/PID als Enttec erkannt).")
     return (f"{grund} Es geht kein DMX ueber diesen Adapter raus, und es ist "
             f"auch kein Enttec per VID/PID sichtbar.")

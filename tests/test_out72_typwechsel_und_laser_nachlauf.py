@@ -169,19 +169,19 @@ class NachfolgerAngesagtTest(_MitAttrappen):
         255.255.255.255. Das ist derselbe Knoten — kein Schlussbild."""
         from unittest import mock
         om = _manager()
-        alt = _ArtNet("192.168.178.255")                 # so fuehrt ihn der Sender
+        alt = _ArtNet("192.0.2.255")                 # so fuehrt ihn der Sender
         om._artnet_outputs[1] = alt
         with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
-                        return_value="192.168.178.255"):
+                        return_value="192.0.2.255"):
             om.nachfolger_ansagen(1, "artnet", "255.255.255.255")
             om.remove_output(1)
         self.assertEqual(alt.bilder, [], "unveraendert uebernommen darf nicht blitzen")
         self.assertTrue(alt.zu)
         # Ein wirklich anderes Ziel endet weiter dunkel.
-        alt2 = _ArtNet("192.168.178.255")
+        alt2 = _ArtNet("192.0.2.255")
         om._artnet_outputs[1] = alt2
         with mock.patch("src.core.dmx.output_iface.artnet_broadcast_target",
-                        return_value="192.168.178.255"):
+                        return_value="192.0.2.255"):
             om.nachfolger_ansagen(1, "artnet", "10.0.0.5")
             om.remove_output(1)
         self.assertEqual(alt2.bilder, [(0, DUNKEL)])

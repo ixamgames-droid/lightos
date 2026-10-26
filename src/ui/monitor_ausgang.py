@@ -58,7 +58,7 @@ def aussage(universum: int, wege, gesendet: bool, angelegt: bool = True) -> Auss
     if not angelegt:
         return Aussage(
             ART_NICHT_ANGELEGT,
-            f"Universe {universum} ist nicht angelegt — keine Werte",
+            f"Universum {universum} ist nicht angelegt — keine Werte",
             STIL_NEUTRAL,
             "In diesem Universum ist kein Gerät gepatcht, und kein Ausgang ist "
             "dafür eingerichtet. Es wird nichts gerechnet und nichts gesendet.")
@@ -66,13 +66,13 @@ def aussage(universum: int, wege, gesendet: bool, angelegt: bool = True) -> Auss
     if not meine:
         return Aussage(
             ART_OHNE_AUSGANG,
-            f"⚠ Universe {universum} hat keinen Ausgang — nur gerechnet",
+            f"⚠ Universum {universum} hat keinen Ausgang — nur gerechnet",
             STIL_FEHLT,
             "Diese Werte berechnet LightOS, aber kein Adapter gibt sie "
             "aus. In den Output-Einstellungen einen Ausgang zuweisen.")
     kaputt = [w for w in meine if w.get("verbunden") is False]
     if kaputt:
-        text = f"⚠ Universe {universum}: {kaputt[0].get('weg')} sendet NICHT"
+        text = f"⚠ Universum {universum}: {kaputt[0].get('weg')} sendet NICHT"
         if len(kaputt) > 1:
             text += f" (+{len(kaputt) - 1} weitere)"
         laeuft = [w for w in meine if w.get("verbunden") is not False]
@@ -84,15 +84,15 @@ def aussage(universum: int, wege, gesendet: bool, angelegt: bool = True) -> Auss
     if wartet:
         return Aussage(
             ART_VERBINDET,
-            f"Universe {universum}: {wartet[0].get('weg')} verbindet …",
+            f"Universum {universum}: {wartet[0].get('weg')} verbindet …",
             STIL_FEHLT,
             "Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter "
             "nicht erreichbar.")
     if not gesendet:
         return Aussage(ART_ROHWERTE,
-                       f"Universe {universum}: Rohwerte (noch kein Frame gesendet)",
+                       f"Universum {universum}: Rohwerte (noch kein Frame gesendet)",
                        STIL_NEUTRAL)
-    return Aussage(ART_GEHT_RAUS, f"Universe {universum} geht raus", STIL_OK)
+    return Aussage(ART_GEHT_RAUS, f"Universum {universum} geht raus", STIL_OK)
 
 
 def weg_text(eintrag: dict) -> str:
