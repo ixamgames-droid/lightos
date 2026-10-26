@@ -1276,16 +1276,6 @@ class OutputConfigDialog(QDialog):
                     f"werden abgeräumt.")
                 break
 
-        # ── uDMX (OUT-68) ─────────────────────────────────────────────────────
-        udmx_zeile = _gespeicherte_ausgabe_zeile("uDMX")
-        if udmx_zeile is not None:
-            num = int(udmx_zeile.get("num", 1))
-            schluessel = _patch_text(udmx_zeile)
-            self._spin_udmx_univ.setValue(num)
-            self._udmx_adapter_waehlen(schluessel, "gespeichert")
-            self._lbl_udmx_status.setText(
-                f"Gespeichert: {schluessel or 'einziger Adapter'} → Universe {num}")
-
         # ── Art-Net ───────────────────────────────────────────────────────────
         artnet = _gespeicherte_ausgabe_zeile("ArtNet")
         if artnet is not None:
