@@ -87,6 +87,10 @@ class OscEinstellungenDialog(QDialog):
         unten.addWidget(btn_zu)
         lay.addLayout(unten)
         self.resize(940, 520)
+        # OSC-07: erst hier messen — beim Bau des Reiters hing die Tabelle noch an
+        # keinem Fenster, die Probe-Felder maessen dann ohne Stylesheet (Standard-
+        # schrift); „Funktion" blieb bei leerer Tabelle zu schmal fuer 15/18 px.
+        self._spalten_anpassen()
         self.laden()
 
     # ── Reiter Eingang ────────────────────────────────────────────────────
@@ -118,7 +122,6 @@ class OscEinstellungenDialog(QDialog):
         # eng, rollt die Tabelle waagerecht statt abzuschneiden.
         self.tabelle.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tabelle.setMinimumHeight(180)
-        self._spalten_anpassen()
         lay.addWidget(self.tabelle, 1)
 
         knoepfe = QHBoxLayout()

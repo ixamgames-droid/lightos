@@ -100,3 +100,41 @@ def test_ziel_und_funktion_ganz_lesbar(tmp_path, px, breite):
         fenster.close()
         fenster.deleteLater()
         _app.processEvents()
+
+
+@pytest.mark.parametrize("px", [12, 15, 18])
+def test_funktion_eigene_feste_breite(tmp_path, px):
+    """Gegenpruefung: „Funktion" darf nicht nur als Nebeneffekt der Ziel/Bereich-
+    Breiten lesbar sein (ResizeToContents misst dann zufaellig nach). Die Spalte
+    ist fest und mindestens so breit wie ein unabhaengig gemessenes Feld mit dem
+    Platzhalter — direkt nach dem Bau, mit und ohne Zeile."""
+    from PySide6.QtWidgets import QHeaderView, QLineEdit
+    from src.ui.widgets.osc_einstellungen_dialog import OscEinstellungenDialog, SP_FKT
+    pfad = str(tmp_path / "osc.json")
+    oz.speichere_konfig(Konfig(zuordnungen=[]), pfad)
+    fenster = QWidget()
+    fenster.setStyleSheet(
+        (ROOT / "assets" / "themes" / "dark.qss").read_text(encoding="utf-8")
+        + f"\nQWidget {{ font-size: {px}px; }}\n")
+    fenster.show()
+    _app.processEvents()
+    dlg = OscEinstellungenDialog(fenster, pfad=pfad, server_laeuft=True)
+    try:
+        kopf = dlg.tabelle.horizontalHeader()
+        rand = 1 if dlg.tabelle.showGrid() else 0
+        assert kopf.sectionResizeMode(SP_FKT) == QHeaderView.ResizeMode.Fixed
+        probe = QLineEdit(dlg.tabelle)
+        probe.setPlaceholderText("Name oder Id")
+        probe.ensurePolished()
+        probe.resize(kopf.sectionSize(SP_FKT) - rand, probe.sizeHint().height())
+        text = probe.fontMetrics().horizontalAdvance(probe.placeholderText())
+        assert _platzhalter_flaeche(probe) >= text, (px, kopf.sectionSize(SP_FKT), text)
+        probe.deleteLater()
+    finally:
+        oz.get_osc_zuordnung().lerne(None)
+        oz.anwenden(Konfig())
+        dlg.close()
+        dlg.deleteLater()
+        fenster.close()
+        fenster.deleteLater()
+        _app.processEvents()
