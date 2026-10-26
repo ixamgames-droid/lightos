@@ -83,7 +83,7 @@ Das Umschalten der Quelle auf **„Aus"** setzt den Takt außerdem sofort auf **
 wenn vorher PC-Audio schon einen Takt erkannt hatte (ein von Hand eingegebener oder getippter
 Takt bleibt). Beat-Effekte stehen dann, und beim nächsten Play erscheint der Hinweis unten.
 
-Stattdessen erscheint im **Musik-Tab** unter „Now Playing" ein gelber Hinweis
+Bei Takt 0 erscheint im **Musik-Tab** unter „Now Playing" ein gelber Hinweis
 **„⚠ Kein Takt für die Auto-Show — …"** mit dem Knopf **„Takt aus Titel übernehmen
 (124 BPM)"**; in der VC zeigt die **Musik-Anzeige** zusätzlich die gelbe Zeile
 „⚠ Kein Takt — Hinweis im Musik-Tab".

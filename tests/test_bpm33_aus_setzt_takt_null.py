@@ -172,6 +172,25 @@ def test_erkannter_takt_nach_manuell_wird_genullt(ctrl, mgr):
     assert mgr.mode == BpmMode.MANUAL
 
 
+def test_chaser_standardtakt_wird_genullt(ctrl, mgr):
+    """Gegenpruefung: Ein Beat-Chaser, der bei Takt 0 startet (PC-Audio ohne Musik),
+    setzt 120 BPM mit Quelle ``manual`` — der Modus bleibt AUTO. Das ist keine
+    Eingabe von Hand: „Aus" nullt ihn, sonst liefe der Chaser mit 120 weiter."""
+    from src.core.engine.bpm_manager import BpmMode
+    from src.core.engine.chaser import Chaser
+    ctrl.apply("loopback")
+    assert mgr.bpm == 0.0
+    ch = Chaser("BPM33-Chaser")
+    ch.audio_triggered = True
+    ch._on_start()
+    assert mgr.bpm == 120.0
+    assert mgr.current_source == "manual"
+    assert mgr.mode == BpmMode.AUTO
+    ctrl.apply("off")
+    assert mgr.bpm == 0.0
+    assert mgr.mode == BpmMode.AUTO
+
+
 def test_aus_erneut_gewaehlt_ist_idempotent(ctrl, mgr):
     """Steht schon „Aus", nullt ein erneuter Klick einen danach gesetzten Takt nicht."""
     _pc_audio_mit_takt(ctrl, mgr)

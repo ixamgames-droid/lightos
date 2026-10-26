@@ -99,6 +99,16 @@ KINDS = ("loopback", "input", "os2l", "song", "off")
 HANDQUELLEN = ("manual", "tap", "nudge")
 
 
+def _von_hand(mgr) -> bool:
+    """BPM-33: Takt von Hand gesetzt (Eingabe/Tap/Nudge) — Quelle UND Modus MANUAL."""
+    try:
+        from src.core.engine.bpm_manager import BpmMode
+        return (getattr(mgr, "current_source", None) in HANDQUELLEN
+                and getattr(mgr, "mode", None) == BpmMode.MANUAL)
+    except Exception:
+        return False
+
+
 def _log(msg: str) -> None:
     print(f"[SourceController] {msg}")
 
@@ -287,7 +297,11 @@ class SourceController:
                 # unveraendert (dort fuehrt das DJ-Programm den Takt).
                 # Ein von Hand gesetzter Takt (Eingabe/Tap/Nudge) gehoert nicht der
                 # Quelle und bleibt — „Manuell + Aus" ist die Arbeitslage fuer Tap.
-                if getattr(mgr, "current_source", None) not in HANDQUELLEN:
+                # „Von Hand" heisst: Quelle manual/tap/nudge UND Modus MANUAL
+                # (``_set_manual`` kippt immer in MANUAL). Der Chaser-Standardtakt
+                # (``set_bpm(120, source="manual")`` bei Takt 0, Modus bleibt AUTO)
+                # ist keine Eingabe und wird genullt.
+                if not _von_hand(mgr):
                     self._safe("reset", lambda: mgr.reset())
             if kind == "song":
                 self.apply_player_track()
