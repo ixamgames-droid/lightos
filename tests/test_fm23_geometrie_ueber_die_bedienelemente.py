@@ -41,10 +41,10 @@ im Dialog laege, koennte keine sichtbaren Felder tragen.
 hinterlegt (der Editor darf keine Form erfinden — sonst haette jedes
 selbstgebaute Panel das Weiss-Band zurueck, das CDX-52 abgeschafft hat), und
 das Zuordnen ueber die Beschriftungen darf nicht nur im ersten Tab gelingen,
-sondern muss auch fuer einen ueber den "+ Mode"-Knopf angelegten Modus klappen.
+sondern muss auch fuer einen ueber den "+ Modus"-Knopf angelegten Modus klappen.
 
 ⚠️ **Was diese Datei NICHT behauptet.** Die Kanaele werden ueber den echten
-"+ Channel"-Knopf angelegt, ihre Zahl aber nicht geprueft: ``_save`` legt pro
+"+ Kanal"-Knopf angelegt, ihre Zahl aber nicht geprueft: ``_save`` legt pro
 Modus nur den LETZTEN Kanal an (``s.add(fc)`` steht eine Ebene zu weit links,
 also hinter der Kanalschleife statt darin). Das ist der schon gemeldete
 Nebenbefund aus der Nachbardatei, unabhaengig von FM-23 — die Geometrie sitzt
@@ -63,7 +63,7 @@ from PySide6.QtCore import Qt                                  # noqa: E402
 from PySide6.QtTest import QTest                               # noqa: E402
 from PySide6.QtWidgets import (                                # noqa: E402
     QApplication, QDialogButtonBox, QLabel, QLayout, QPushButton, QSpinBox,
-    QWidget)
+    QScrollArea, QWidget)
 from sqlalchemy import select                                  # noqa: E402
 from sqlalchemy.orm import Session, selectinload               # noqa: E402
 
@@ -110,6 +110,11 @@ def _in_layout_reihenfolge(w: QWidget) -> list[QWidget]:
                 out.append(kind)
                 if kind.layout() is not None:
                     rein(kind.layout())
+                elif (isinstance(kind, QScrollArea) and kind.widget() is not None
+                      and kind.widget().layout() is not None):
+                    # FM-74: der Inhalt des Dialogs liegt in einem Rollbereich
+                    # — der hat kein eigenes Layout, sein Inhalt schon.
+                    rein(kind.widget().layout())
             elif item.layout() is not None:
                 rein(item.layout())
 
@@ -218,7 +223,7 @@ class _EditorFall(unittest.TestCase):
 
     def _kanaele_anlegen(self, tab, anzahl: int = 3):
         """Ueber den echten '+ Channel'-Knopf — ``_save`` verlangt Kanaele."""
-        knopf = _knopf(tab, "+ Channel")
+        knopf = _knopf(tab, "+ Kanal")
         for _ in range(anzahl):
             QTest.mouseClick(knopf, Qt.MouseButton.LeftButton)
 
@@ -377,7 +382,7 @@ class GetipptLandetInDerDatenbankTest(_EditorFall):
         _tippe(_geo_eingaben(erster)["grid_rows"], 1)
         _tippe(_geo_eingaben(erster)["grid_cols"], 1)
 
-        QTest.mouseClick(_knopf(dlg, "+ Mode"), Qt.MouseButton.LeftButton)
+        QTest.mouseClick(_knopf(dlg, "+ Modus"), Qt.MouseButton.LeftButton)
         _app.processEvents()
         zweiter = dlg._tabs.currentWidget()
         self.assertIsNot(zweiter, erster, "'+ Mode' hat keinen Tab angelegt")
@@ -393,7 +398,7 @@ class GetipptLandetInDerDatenbankTest(_EditorFall):
         self._speichern_klicken(dlg)
         modi = self._modi_aus_db("TIPP2M")
         self.assertEqual(modi["Default"], ((1, 1), (0, 0)))
-        self.assertEqual(modi["Mode 1"], ((4, 12), (1, 0)))
+        self.assertEqual(modi["Modus 1"], ((4, 12), (1, 0)))
 
 
 # ════════════════════════════════════════════════════════════════════════════

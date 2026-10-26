@@ -130,9 +130,10 @@ venv\Scripts\python main.py
 ```
 
 `install.py` legt ein `venv/` an, installiert die Abhängigkeiten und eine Desktop-Verknüpfung.
-**Windows auf ARM:** Für den 3D-Visualizer ein **x64-Python** nehmen (läuft in der Emulation).
-Die nativen ARM64-Pakete von PySide6 enthalten kein QtWebEngine — mit ARM64-Python startet
-LightOS, aber ohne 3D-Ansicht.
+**Windows auf ARM:** Ein **x64-Python** nehmen (läuft in der Emulation, mit allen Funktionen).
+Natives ARM64-Python ist **nicht unterstützt (instabil, kein 3D) — x64-Python nehmen**: LightOS
+stürzte damit in 6 von 12 Starts ab, und die ARM64-Pakete von PySide6 enthalten kein QtWebEngine.
+`install.py` bricht mit nativem ARM64-Python deshalb ab und nennt den Weg zu x64-Python.
 
 ### Linux (Debian/Ubuntu/Mint, X11)
 
@@ -286,6 +287,9 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   ein anderes Programm den Port belegt.
 - **Art-Net 4** und **sACN/E1.31** (Ausgang und Eingang, Merge HTP/LTP), Netzwerkkarte wählbar,
   Art-Net-Startuniversum einstellbar; bis zu **32 Universen**, mehrere Adapter gleichzeitig.
+- Betrieb neben einem externen Lichtpult — DMX senden, DMX einmischen oder per MIDI Show
+  Control Cues auslösen lassen:
+  [Externe Pulte über Netzwerk und MIDI](docs/anleitung_externe_pulte/ANLEITUNG_EXTERNE_PULTE.md).
 - Die Statusleiste meldet ein Universum ohne Ausgang; der DMX-Monitor zeigt, ob das Bild
   wirklich rausgeht.
 - **MIDI** mit Profil-Editor (APC mini und APC mini mk2 dabei), LED-Feedback, mehrere Ausgänge
@@ -313,7 +317,7 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   wie sie sind.
 - **STOP ALL** stoppt auch die Musik sofort; der **BLACKOUT**-Knopf zeigt den echten Zustand,
   auch wenn Blackout über VC, Web-Remote, OSC oder die Kommandozeile geschaltet wurde.
-- **Rückgängig/Wiederherstellen** (Menü Bearbeiten) für Patch-Änderungen, 3D-Gesten und
+- **Rückgängig/Wiederholen** (Menü Bearbeiten) für Patch-Änderungen, 3D-Gesten und
   Einmess-Korrekturen; ein gelöschtes Gerät kommt samt gepflegter Kopf-Gruppe zurück. Jede
   geöffnete oder neue Show beginnt mit leerem Verlauf.
 - Ein kaputter Eintrag in der Show-Datei kostet nur sich selbst und wird gemeldet; doppelte
@@ -351,10 +355,25 @@ der 3D-Visualizer startet mit `--no-sandbox` (abschaltbar über
 
 ## Status und Grenzen
 
-LightOS ist ein privates Projekt in aktiver Entwicklung — ohne Garantie, ohne Lizenz, ohne Support.
-Mitgelieferte fremde Komponenten (three.js, Geräteprofile auf QLC+-Basis) stehen unter ihren eigenen
+### Lizenz und Urheber
+
+**Copyright (c) 2026 [ixamgames-droid](https://github.com/ixamgames-droid/lightos) — alle Rechte
+vorbehalten.** Der Quelltext ist öffentlich, damit man ihn **ansehen** kann. Benutzen, Verändern
+und Weitergeben sind nur mit schriftlicher Erlaubnis des Urhebers gestattet — der volle Text steht
+in [LICENSE](LICENSE). Einen **Testzugang** (persönliche, in der Regel befristete Lizenzdatei) gibt es auf
+Anfrage über GitHub; ohne gültige Lizenzdatei startet das Programm nicht. Wie das geht und wohin
+die Datei gehört: [docs/LIZENZ_UND_TESTZUGANG.md](docs/LIZENZ_UND_TESTZUGANG.md).
+
+LightOS ist ein privates Projekt in aktiver Entwicklung und in der Testphase — ohne Garantie und
+ohne Support. Mitgelieferte fremde Komponenten (three.js, Geräteprofile auf QLC+-Basis) stehen unter ihren eigenen
 Lizenzen — siehe [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Die 3D-Modelle im Visualizer
 sind eigene, im Code erzeugte Geometrie.
+
+**Hinweis zu Lichtblitzen:** LightOS steuert Stroboskop-Effekte und zeigt sie auch in der 2D- und
+3D-Vorschau. Schnelle Lichtblitze können bei photosensitiver Epilepsie Anfälle auslösen. In der
+3D-Ansicht lässt sich die Darstellung mit der Einstellung „Strobe im 3D zeigen" (Reiter
+„Einstellungen") auf **Gedämpft** oder **Aus** stellen — siehe
+[Anleitung 3D-Bühne](docs/anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md).
 
 | | Stand |
 |---|---|

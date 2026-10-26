@@ -646,6 +646,33 @@ class VCSlider(VCWidget):
                 ids.append(iv)
         return ids
 
+    def _modify_arten(self) -> list[str]:
+        """ENG-37-B: Betriebsarten der FEST gebundenen Ziel-Effekte, die als
+        Modify-Effekt laufen (nur Effekt-Modi). Der Rueckfall „aktiver Effekt"
+        zeigt bewusst nichts — sein Ziel wechselt mit jedem Start."""
+        if self.mode not in (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
+                             SliderMode.EFFECT_PARAM):
+            return []
+        fids = self._all_target_fids()
+        if not fids:
+            return []
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            from src.ui.widgets.modify_zeichen import modify_arten
+            return modify_arten(fids, get_function_manager())
+        except Exception:
+            return []
+
+    def event(self, e):
+        # ENG-37-B: Tooltip ueber dem Zeichen erklaert die Betriebsart.
+        try:
+            from src.ui.widgets.modify_zeichen import zeige_modify_tooltip
+            if zeige_modify_tooltip(self, e):
+                return True
+        except Exception:
+            pass
+        return super().event(e)
+
     def _autostart_targets(self):
         """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
         An/Aus der Ziel-Effekte. Wert > 0 startet sie (falls noch nicht laufend),
@@ -672,7 +699,12 @@ class VCSlider(VCWidget):
             try:
                 fid = int(fid)
                 if on:
-                    if not fm.is_running(fid):
+                    # ENG-37: Ein Effekt mit Ausblendzeit „laeuft" nach dem Stopp
+                    # noch, waehrend er ausblendet. Zieht man den Fader in dieser
+                    # Zeit wieder auf, muss er neu starten — sonst blendet er zu
+                    # Ende aus und bleibt aus, obwohl der Fader oben steht.
+                    if (not fm.is_running(fid)
+                            or getattr(fm.get(fid), "_releasing", False)):
                         fm.start(fid)
                 elif fm.is_running(fid):
                     fm.stop(fid)
@@ -874,6 +906,17 @@ class VCSlider(VCWidget):
             p.setFont(QFont("Segoe UI", 7))
             mark = "⇅" if self.invert else "▯"
             p.drawText(QRect(2, 0, 12, 12), Qt.AlignmentFlag.AlignCenter, mark)
+
+        # ENG-37-B: Zeichen der Modify-Betriebsart unten links — links neben dem
+        # Spurende, ueber der Beschriftung (die bleibt frei und zentriert).
+        _modify = self._modify_arten()
+        self._modify_zeichen_rect = None
+        if _modify:
+            from src.ui.widgets.modify_zeichen import zeichne_modify_zeichen
+            _h = 14
+            _my = self.height() - 18 - _h - 1
+            _mw = zeichne_modify_zeichen(p, 2, _my, _modify[:1], _h)
+            self._modify_zeichen_rect = QRect(2, _my, _mw, _h)
 
         # MIDI-Bindung-Indikator oben rechts (cyan dot)
         if self.midi_cc >= 0:
@@ -1128,6 +1171,29 @@ class VCSlider(VCWidget):
         _EFFECT_MODES = (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
                          SliderMode.EFFECT_PARAM)
 
+        # ENG-39: gelbe Hinweiszeile gleich unter „Steuert“, wenn eine andere
+        # Taste / ein anderer Fader an denselben Geraeten denselben Baustein
+        # steuert. Reine Auskunft; liest Modus, Ziele und den Haken „bei 0
+        # wirklich stoppen“ aus den FELDERN (noch nichts uebernommen).
+        from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+
+        def _hinweis_ziele():
+            if (mode_cb.currentData() or self.mode) not in _EFFECT_MODES:
+                return []
+            return target_editor.ids()
+
+        ueberschn_hinweis = UeberschneidungsHinweis(
+            self, _hinweis_ziele, subjekt="Fader",
+            haelt_selbst=lambda: not autostart_cb.isChecked())
+        form.insertRow(form.getWidgetPosition(target_editor)[0] + 1,
+                       ueberschn_hinweis)
+        ueberschn_hinweis.sichtbar_setzen = (
+            lambda an: form.setRowVisible(ueberschn_hinweis, bool(an)))
+        ueberschn_hinweis.neu_berechnen()
+        target_editor.changed.connect(ueberschn_hinweis.veraltet)
+        mode_cb.currentIndexChanged.connect(ueberschn_hinweis.veraltet)
+        autostart_cb.toggled.connect(ueberschn_hinweis.veraltet)
+
         def _update_slider_fields():
             m = mode_cb.currentData() or self.mode
             eff = m in _EFFECT_MODES
@@ -1191,7 +1257,11 @@ class VCSlider(VCWidget):
         midi_ch_spin.setSpecialValueText("Alle")
         form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
 
-        if dlg.exec() == QDialog.DialogCode.Accepted:
+        angenommen = dlg.exec() == QDialog.DialogCode.Accepted
+        # ENG-39: der Dialog bleibt als Kind des Faders bestehen — seine
+        # Hinweiszeile soll danach nicht bei jeder Aenderung weiterrechnen.
+        ueberschn_hinweis.stilllegen()
+        if angenommen:
             self.caption = cap.text() or self.caption
             self.mode = mode_cb.currentData() or self.mode
             try:

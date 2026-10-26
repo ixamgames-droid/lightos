@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QComboBox, QListWidget, QListWidgetItem, QPlainTextEdit,
     QGroupBox, QFormLayout, QSplitter, QTableWidget,
     QTableWidgetItem, QHeaderView, QCheckBox, QAbstractItemView,
-    QInputDialog, QMessageBox, QSpinBox
+    QInputDialog, QMessageBox, QSpinBox, QScrollArea, QFrame
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QObject
 from PySide6.QtGui import QColor, QFont
@@ -37,7 +37,24 @@ ACTION_LABELS = {
     ACTION_NONE:           "Keine Aktion",
 }
 
-MAP_COLS = ["Name", "Target", "Typ", "Ch", "D1", "Mode", "ON", "OFF", "Port"]
+# UI-97: Nur die ANZEIGE der Spaltenköpfe ist deutsch. Gespeichert wird über
+# MidiMapping.to_dict() (feste Feldnamen) — die Spaltenindizes in
+# _refresh_map_table/_on_map_item_changed bleiben unverändert.
+MAP_COLS = ["Name", "Ziel", "Typ", "Kanal", "Daten 1", "Modus", "An", "Aus", "Port"]
+MAP_COL_TIPS = [
+    "Frei wählbarer Name des Mappings",
+    "Was gesteuert wird, z. B. executor_go:1 oder grand_master",
+    "MIDI-Nachrichtentyp: note_on, cc oder pitchbend",
+    "MIDI-Kanal 1–16",
+    "Daten 1 = Noten- bzw. Controller-Nummer (0–127)",
+    "Tastenverhalten: press, toggle, flash oder continuous",
+    "LED-Feedback: Velocity-Wert für „an“ (0–127)",
+    "LED-Feedback: Velocity-Wert für „aus“ (0–127)",
+    "Nur Nachrichten von diesem Eingang (leer = alle)",
+]
+# UI-97: Die Mapping-Tabelle zeigt immer mindestens so viele Zeilen. Mehr
+# kostet bei 1440×900 (Seitenfläche ≈ 1380×730) den Platz ohne Rollbalken.
+MAP_MIN_ROWS = 3
 
 
 def pitchbend_zeile(msg) -> str:
@@ -110,10 +127,25 @@ class MidiView(QWidget):
         super().closeEvent(event)
 
     def _setup_ui(self):
-        layout = QVBoxLayout(self)
+        # UI-97: Bei kleinem Fenster (1000×640) scrollt die Seite, statt
+        # Geräte-Felder übereinander und die Mapping-Tabelle auf ihre
+        # Kopfzeile zu quetschen. Der Scrollbereich gibt dem Inhalt immer
+        # mindestens dessen minimumSizeHint.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        outer.addWidget(self._scroll)
+        content = QWidget()
+        self._scroll.setWidget(content)
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(8, 8, 8, 8)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
+        # Kein Bereich darf sich auf null ziehen lassen (sonst wäre die
+        # Tabelle wieder weg) — der Splitter achtet so auf Mindesthöhen.
+        splitter.setChildrenCollapsible(False)
 
         # ── Oberer Bereich: Geräteverwaltung + Konsole ────────────────────────
         top = QWidget()
@@ -122,33 +154,42 @@ class MidiView(QWidget):
 
         # Linke Seite: Geräte
         dev_box = QGroupBox("MIDI-Geräte")
+        self._dev_box = dev_box
         dev_l = QFormLayout(dev_box)
 
         self._combo_in = QComboBox()
         btn_refresh = QPushButton("↻")
         btn_refresh.setFixedWidth(28)
         btn_refresh.clicked.connect(self._refresh_ports)
+        # UI-97: „… öffnen“ steht in der Zeile seiner Auswahl und beide
+        # Häkchen teilen sich eine Zeile — drei Zeilen weniger, damit die
+        # Seite bei 1440×900 ohne Rollbalken auskommt (die Breite des Kastens
+        # bestimmt ohnehin der Status-Text).
+        btn_open_in = QPushButton("Eingang öffnen")
+        btn_open_in.clicked.connect(self._open_input)
         in_row = QHBoxLayout()
         in_row.addWidget(self._combo_in, 1)
         in_row.addWidget(btn_refresh)
+        in_row.addWidget(btn_open_in)
         dev_l.addRow("Eingang:", in_row)
 
-        btn_open_in = QPushButton("Eingang öffnen")
-        btn_open_in.clicked.connect(self._open_input)
-        dev_l.addRow(btn_open_in)
-
         self._combo_out = QComboBox()
-        dev_l.addRow("Ausgang:", self._combo_out)
         btn_open_out = QPushButton("Ausgang öffnen")
         btn_open_out.clicked.connect(self._open_output)
-        dev_l.addRow(btn_open_out)
+        out_row = QHBoxLayout()
+        out_row.addWidget(self._combo_out, 1)
+        out_row.addWidget(btn_open_out)
+        dev_l.addRow("Ausgang:", out_row)
 
         self._check_virt_in = QCheckBox("Virtuellen Eingang erstellen")
         self._check_virt_out = QCheckBox("Virtuellen Ausgang erstellen")
         self._check_virt_in.toggled.connect(self._toggle_virtual_in)
         self._check_virt_out.toggled.connect(self._toggle_virtual_out)
-        dev_l.addRow(self._check_virt_in)
-        dev_l.addRow(self._check_virt_out)
+        virt_row = QHBoxLayout()
+        virt_row.addWidget(self._check_virt_in)
+        virt_row.addWidget(self._check_virt_out)
+        virt_row.addStretch(1)
+        dev_l.addRow(virt_row)
 
         self._lbl_midi_status = QLabel("Nicht verbunden")
         self._lbl_midi_status.setStyleSheet("color: #888;")
@@ -203,7 +244,7 @@ class MidiView(QWidget):
         btn_learn.setToolTip("Wähle eine Zeile, dann klicke MIDI-Learn\nund sende eine MIDI-Nachricht")
         btn_learn.clicked.connect(self._start_learn)
         btn_feedback = QPushButton("Feedback...")
-        btn_feedback.setToolTip("LED-Farben für ON/OFF (Velocity) setzen")
+        btn_feedback.setToolTip("LED-Farben für An/Aus (Velocity) setzen")
         btn_feedback.clicked.connect(self._edit_feedback_values)
         btn_save = QPushButton("Speichern")
         btn_save.clicked.connect(self._save_mappings)
@@ -223,7 +264,15 @@ class MidiView(QWidget):
         hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        map_l.addWidget(self._map_table)
+        for col, tip in enumerate(MAP_COL_TIPS):
+            kopf = self._map_table.horizontalHeaderItem(col)
+            if kopf is not None:
+                kopf.setToolTip(tip)
+        self._map_table.setMinimumHeight(
+            hdr.sizeHint().height()
+            + MAP_MIN_ROWS * self._map_table.verticalHeader().defaultSectionSize()
+            + 2 * self._map_table.frameWidth())
+        map_l.addWidget(self._map_table, 1)
 
         # Schnell-Mapping-Vorlagen
         tmpl_box = QGroupBox("Schnell-Vorlagen")
@@ -234,6 +283,8 @@ class MidiView(QWidget):
         btn_tmpl_notes.clicked.connect(self._template_notes_go)
         tmpl_l.addWidget(btn_tmpl_faders)
         tmpl_l.addWidget(btn_tmpl_notes)
+        self._btn_tmpl_faders = btn_tmpl_faders
+        self._btn_tmpl_notes = btn_tmpl_notes
         map_l.addWidget(tmpl_box)
 
         splitter.addWidget(map_box)
@@ -679,12 +730,12 @@ class MidiView(QWidget):
         default_off = mapping.midi_out.state_off
         default_on = mapping.midi_out.state_on
         off_val, ok = QInputDialog.getInt(
-            self, "Feedback OFF", "Velocity OFF (0-127):", default_off, 0, 127, 1
+            self, "Feedback Aus", "Velocity für Aus (0–127):", default_off, 0, 127, 1
         )
         if not ok:
             return
         on_val, ok = QInputDialog.getInt(
-            self, "Feedback ON", "Velocity ON (0-127):", default_on, 0, 127, 1
+            self, "Feedback An", "Velocity für An (0–127):", default_on, 0, 127, 1
         )
         if not ok:
             return

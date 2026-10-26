@@ -17,8 +17,10 @@
 - **Für USB:** einen ENTTEC DMX USB Pro. Den Treiber bringt Windows mit, Hinweise
   stehen in [INSTALL.md](../../INSTALL.md#enttec-dmx-usb-pro).
 - **Für USB ohne COM-Port:** einen uDMX-Adapter, siehe
-  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` und
-  einmalig ein Zugriffsrecht bzw. einen Treiber.
+  [uDMX-Adapter (USB)](#udmx-adapter-usb). Er braucht das Zusatzpaket `pyusb` (im
+  Windows-Installationspaket enthalten) und unter Linux einmalig ein Zugriffsrecht.
+  **Unter Windows braucht er einen Treiber, den weder Windows noch LightOS mitbringt** –
+  du weist ihn einmalig von Hand zu; danach läuft der Adapter.
 - **Für Netzwerk:** einen Art-Net- oder sACN-Node (oder ein Gerät mit eingebautem
   Netzwerkeingang) und einen Rechner **im selben Netz**, siehe
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
@@ -41,7 +43,7 @@ entstehen auf einem Rechner ohne angeschlossenen ENTTEC, deshalb steht dort „E
    (`Enttec: …`). Sie öffnet denselben Dialog.
 
 Der Dialog **Ausgabe konfigurieren** hat sechs Reiter: **Enttec Pro USB**, **uDMX (USB)**, **Art-Net**,
-**sACN (E1.31)**, **DMX Input** und **Universen**. Es gibt zwei Wege:
+**sACN (E1.31)**, **DMX-Eingang** und **Universen**. Es gibt zwei Wege:
 
 - **Einzel-Reiter** (Schritte 2–4): ein Universum auf einen Ausgang legen und sofort
   verbinden.
@@ -53,9 +55,10 @@ Beide schreiben in dieselbe Datei `universes.json` im LightOS-Datenordner
 automatisch wieder ein. **Schließen** beendet den Dialog; danach aktualisiert LightOS
 die Statusleiste.
 
-Der Reiter **DMX Input** gehört nicht zur Ausgabe: dort empfängt LightOS DMX von
+Der Reiter **DMX-Eingang** gehört nicht zur Ausgabe: dort empfängt LightOS DMX von
 außen (Art-Net auf Port 6454, sACN auf Port 5568) und mischt es in ein eigenes
-Universum.
+Universum. Empfangen löst unter Windows einmal eine Firewall-Abfrage aus — siehe
+[DMX empfangen: die Firewall-Abfrage](#dmx-empfangen-die-firewall-abfrage).
 
 ## 2. ENTTEC DMX USB Pro
 
@@ -63,23 +66,40 @@ Reiter **Enttec Pro USB**:
 
 ![Reiter Enttec Pro USB](img/02_enttec.png)
 
-1. **COM-Port:** — alle seriellen Anschlüsse des Rechners. Ein erkannter ENTTEC trägt
-   den Zusatz `[Enttec Pro]`. Ist der gespeicherte Port gerade nicht da, steht er mit
-   `— derzeit nicht gefunden` in der Liste, statt still auf einen anderen Port
-   umzuspringen. Ohne jeden Port steht dort `Kein Port gefunden`.
+1. **COM-Port:** — die seriellen Anschlüsse, an denen ein **USB-Gerät** hängt. Ein
+   erkannter ENTTEC trägt den Zusatz `[Enttec Pro]`, steht **oben** und ist auf einem
+   frischen Rechner **vorgewählt**. Anschlüsse ohne USB-Gerät (die eingebaute
+   Schnittstelle `COM1`, Bluetooth, leere `/dev/ttyS…`) sind ausgeblendet; der Haken
+   **Alle Anschlüsse zeigen** darunter holt sie in die Liste. Wird kein ENTTEC
+   erkannt, bleibt die Auswahl leer — LightOS wählt dann keinen Anschluss von selbst.
+   Ist der gespeicherte Port gerade nicht da, steht er mit `— derzeit nicht gefunden`
+   in der Liste, statt still auf einen anderen Port umzuspringen; hängt an ihm kein
+   Gerät, steht `(kein USB-Gerät erkannt)` dabei. In beiden Fällen nennt die Zeile
+   unter der Liste den erkannten Adapter. Ohne jeden Port steht dort
+   `Kein Port gefunden`.
 2. **Ports aktualisieren** — nach dem Einstecken die Liste neu einlesen. Die Auswahl
-   bleibt dabei erhalten.
-3. **Universe:** — welches LightOS-Universum über diesen Adapter hinausgeht. Das Feld
+   bleibt dabei erhalten; war noch nichts gewählt, wird der eben eingesteckte ENTTEC
+   vorgewählt.
+3. **Universum:** — welches LightOS-Universum über diesen Adapter hinausgeht. Das Feld
    ist mit dem gespeicherten Wert vorbelegt; stell es **vor** dem Klick auf
    **Verbinden** bewusst ein.
 4. **Verbinden** — entfernt einen anderen Ausgang dieses Universums, öffnet den Adapter
-   und speichert die Zuordnung. Danach meldet der Status erst
+   und speichert die Zuordnung. **Ein Adapter trägt genau ein Universum:** lag derselbe
+   Adapter bisher auf einem anderen Universum, verliert jene Zeile ihn (sie bleibt als
+   `Aus` stehen), und der Status sagt es dazu, zum Beispiel
+   `… · war Universe 2 — jetzt Universe 1`. Danach meldet der Status erst
    `Eingerichtet: … (gespeichert), verbinde …` und wenig später das Ergebnis:
    `Verbunden: … (gespeichert)`, oder `Port lässt sich nicht öffnen — gespeichert, aber
    es geht kein DMX raus`, oder `antwortet nicht — Port/Kabel prüfen`.
 5. **Status:** — beim Öffnen steht hier, was **gespeichert** ist
    (`Gespeichert: /dev/ttyUSB0 → Universe 1`). Ob der Adapter wirklich sendet, zeigt
    erst die Statusleiste (Schritt 8).
+
+**Rückfrage vor dem Ersetzen.** Läuft auf dem gewählten Universum schon eine **andere**
+Ausgabe (anderer Weg, anderer Port, andere Ziel-IP), fragt LightOS vor dem Einrichten
+**Laufende Ausgabe ersetzen?** – mit **Nein** bleibt alles, wie es ist. Das gilt für
+**Verbinden** hier und im Reiter uDMX (USB) und für **Übernehmen** in den Reitern
+Art-Net und sACN. Dieselbe Ausgabe noch einmal einzurichten löst keine Frage aus.
 
 ## uDMX-Adapter (USB)
 
@@ -92,16 +112,44 @@ Reiter hat noch kein Bild.
   Anschluss. Gesucht wird beim ersten Öffnen des Reiters und mit **Adapter suchen**.
   Der gespeicherte Adapter bleibt in der Liste, auch wenn er gerade fehlt
   (`— derzeit nicht gefunden`).
-- **Universe:** und **Verbinden** — wie beim ENTTEC. Der Status meldet erst
+- **Universum:** und **Verbinden** — wie beim ENTTEC. Der Status meldet erst
   `Eingerichtet: … (gespeichert), verbinde …` und danach `Verbunden: …` oder
   `sendet nicht — gespeichert, aber es geht kein DMX raus`.
 - Unter dem Status steht dann der **Grund** und was zu tun ist. Die häufigsten:
   - *Kein Zugriffsrecht* (Linux): einmalig eine udev-Regel einrichten.
-  - *Lässt sich nicht öffnen* (Windows): dem Adapter den WinUSB-Treiber zuweisen.
-  - *pyusb fehlt*: das Zusatzpaket nachinstallieren.
+  - *Treiber fehlt* (Windows): dem Adapter den WinUSB-Treiber zuweisen, siehe unten.
+  - *pyusb fehlt*: läuft LightOS aus dem Quelltext, das Zusatzpaket nachinstallieren;
+    ein älteres Installationspaket aktualisieren (neuere bringen es mit).
 
   Alle drei Wege stehen in [INSTALL.md](../../INSTALL.md#udmx-adapter-usb). LightOS
   installiert selbst keine Treiber und ändert keine Systemeinstellungen.
+
+**Unter Windows: „Treiber fehlt“.** Windows bringt für uDMX-Adapter keinen Treiber mit,
+und LightOS liefert und installiert keinen. Steckt ein Adapter ohne Treiber, sagt der
+Reiter das schon nach **Adapter suchen**: in der Liste steht hinter dem Adapter
+`— Treiber fehlt (WinUSB zuweisen)`, und darunter stehen die Schritte mit anklickbaren
+Links. LightOS öffnet dabei kein Gerät und ändert nichts – es fragt nur Windows.
+
+1. Das Programm Zadig laden: https://zadig.akeo.ie – ein freies Programm eines anderen
+   Anbieters.
+2. Den Adapter einstecken und Zadig starten (Windows fragt nach Administratorrechten).
+3. In Zadig im Menü *Options* den Punkt *List All Devices* einschalten und in der
+   Liste den Adapter wählen – zu erkennen an der USB ID `2008 1066` (CYL-6602) oder
+   `16C0 05DC` (Anyma uDMX).
+4. Als Treiber *WinUSB* einstellen und auf *Install Driver* (oder *Replace Driver*)
+   klicken.
+5. Zurück in LightOS: **Adapter suchen**, dann **Verbinden**.
+
+> **Achtung:** Wähle in Zadig genau den Adapter. Zadig ersetzt den Treiber des
+> gewählten Geräts – eine Maus oder Tastatur funktioniert danach nicht mehr, bis du
+> sie im Geräte-Manager von Windows deinstallierst (mit „Treiber löschen“) und neu
+> einsteckst.
+
+Das **Windows-Installationspaket** (x64) bringt die nötigen Programmteile mit (`pyusb`
+und die Bibliothek libusb – Bibliotheken, keine Treiber): nach der Installation läuft
+uDMX, sobald der Treiber wie oben zugewiesen ist. Ein Installationspaket von vor dem
+12.10.2026 enthält sie noch nicht; der Reiter sagt das dann und rät zum Aktualisieren.
+Auf Windows-ARM64 ist uDMX nicht enthalten.
 
 Haben zwei gleiche Adapter keine Seriennummer, unterscheidet LightOS sie am
 USB-Anschluss. Steckst du einen davon um, wähle ihn im Reiter neu aus.
@@ -133,7 +181,7 @@ Reiter **Art-Net**:
    Art-Net an deren Broadcast statt an `255.255.255.255` — den reichen Router nicht
    weiter. Die Wahl gilt für **diesen Rechner**, nicht für die Show; neue Verbindungen
    nutzen sie sofort, bestehende ab dem nächsten Start.
-3. **Universe:** — das LightOS-Universum, auf das **Übernehmen** wirkt. Nur dieses eine;
+3. **Universum:** — das LightOS-Universum, auf das **Übernehmen** wirkt. Nur dieses eine;
    andere Universen bleiben unverändert.
 4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.168.1.50`) oder
    `255.255.255.255` für alle im Netz. Leer bedeutet ebenfalls `255.255.255.255`.
@@ -152,7 +200,7 @@ Reiter **sACN (E1.31)**:
 
 1. **sACN (E1.31) aktivieren** — Haken setzen (ohne Haken entfernt **Übernehmen** den
    sACN-Ausgang wieder).
-2. **Universe:** — das LightOS-Universum. Es sendet auf die sACN-Universumsnummer
+2. **Universum:** — das LightOS-Universum. Es sendet auf die sACN-Universumsnummer
    mit derselben Zahl.
 3. **Multicast (239.255.0.x)** — Standard. Jeder sACN-Empfänger im Netz, der dieses
    Universum hört, bekommt die Daten.
@@ -169,26 +217,45 @@ Reiter **Universen** — hier siehst und bearbeitest du alle Ausgänge in einer 
 
 Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
 
-1. **Output** — `Disabled`, `Enttec`, `uDMX`, `sACN` oder `ArtNet`.
-2. **Patch (Port/IP)** — je nach Output: bei `Enttec` der Port (`COM3`,
+1. **Ausgang** — `Aus`, `Enttec`, `uDMX`, `sACN` oder `ArtNet`.
+2. **Patch (Port/IP)** — je nach Ausgang: bei `Enttec` der Port (`COM3`,
    `/dev/ttyUSB0`), bei `ArtNet` die Ziel-IP (leer = `255.255.255.255`), bei `sACN` eine
    Unicast-IP (leer = Multicast), bei `uDMX` der Adapter-Schlüssel (zum Beispiel
    `2008:1066@1-2`; am einfachsten über den Reiter **uDMX (USB)** eintragen lassen).
-3. **Ext-Universe** — optional die Universumsnummer im Netzwerk. Leer gilt der Standard:
+3. **Ext. Universum** — optional die Universumsnummer im Netzwerk. Leer gilt der Standard:
    Art-Net `#` minus 1, sACN `#`.
-4. **+ Universe hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
+   **Dongle** (nur lesbar) — bei `Enttec` die Seriennummer des Adapters, den das
+   Universum sucht, gekürzt (`Seriennr. …5123`). LightOS merkt sie sich, sobald der
+   Adapter einmal gesendet hat, und findet ihn darüber auch nach einem Neustart an einem
+   anderen Port wieder — zwei ENTTEC tauschen ihre Universen also nicht, wenn Linux die
+   Portnummern vertauscht. Wählen Sie für die Zeile **ausdrücklich einen anderen Port**
+   (hier oder mit **Verbinden** im Reiter Enttec), gilt die alte Nummer nicht mehr: das
+   Universum lernt den Adapter am neuen Port. Soll das Universum einen **anderen**
+   Adapter nehmen: Zeile markieren, **Dongle neu zuordnen** (oder Rechtsklick auf die
+   Zeile) und **Speichern** — danach lernt es den Adapter, der an seinem Port steckt.
+   **Nach dem Update einmal prüfen:** eine ältere Konfiguration merkt sich beim ersten
+   Start den Adapter, der gerade an ihrem Port steckt. Waren die Ports genau dann
+   vertauscht, steht in der Spalte **Dongle** die Nummer des anderen Adapters — dann
+   **Dongle neu zuordnen** und **Speichern**.
+4. **+ Universum hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
    markierten Zeilen aus der Tabelle; wirksam wird das erst mit **Speichern**.
 5. **Speichern** — schreibt `universes.json` (im LightOS-Datenordner) und wendet die Konfiguration
    **sofort** an, ohne Neustart. Zur Bestätigung zeigt LightOS den Pfad der Datei.
 
 Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
 
-- eine **#** außerhalb von 1–32 liegt (*Universe-Nummer angepasst*),
-- eine **Ext-Universe** nicht zum Ausgabetyp passt (*Externe Universe-Nummer angepasst*),
+- eine **#** außerhalb von 1–32 liegt (*Universumsnummer angepasst*),
+- eine Zahl unter **Ext. Universum** nicht zum Ausgabetyp passt (*Externe Universumsnummer angepasst*),
 - **zwei Zeilen am selben Ziel** landen (*Zwei Universen auf demselben Ziel*). Das führt
   am Empfänger zu Flackern; gespeichert wird trotzdem. Was dabei als „dasselbe Ziel"
   zählt, erklärt
   [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md#hinweis-zwei-universen-auf-demselben-ziel).
+- **derselbe Adapter in mehreren Zeilen** steht (*Ein Adapter auf mehreren Universen*) —
+  also zweimal `Enttec` mit demselben Port oder zweimal `uDMX` mit demselben Adapter. Ein
+  Adapter sendet nur ein Universum.
+  Gespeichert wird trotzdem, eingerichtet wird der Adapter so aber für **keines** davon,
+  bis nur noch eine Zeile ihn nennt. Am schnellsten behebt es der Reiter
+  **Enttec Pro USB**: Universum wählen und **Verbinden** (Schritt 2).
 
 ## 6. Kontrolle: der Output-Monitor
 
@@ -213,9 +280,21 @@ Reiter **DMX Monitor** daneben — dieselben Werte, aber mit Gerätenamen:
 1. **Universe:** — Auswahl `Universe 1` bis `Universe 32`.
 2. **Hervorgehobene Kanäle:** — zum Beispiel `1,5,10-20`; diese Kanäle bekommen einen
    gelben Rahmen.
-3. Die Ausgangs-Anzeige: `Universe 1 geht raus` heißt, dieses Universum hat einen
-   Ausgang und wird gesendet. Andernfalls steht dort `⚠ Universe <n> hat keinen
-   Ausgang — nur gerechnet` oder `⚠ Universe <n>: <Weg> sendet NICHT`.
+3. Die Ausgangs-Anzeige sagt dasselbe wie Statusleiste und Banner (Schritt 8):
+
+   | Anzeige | Bedeutung |
+   |---|---|
+   | `Universe 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
+   | `⚠ Universe <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
+   | `Universe <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
+   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
+   | `Universe <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
+
+   Hat ein Universum **mehrere Ausgänge** (zum Beispiel ENTTEC und Art-Net), erscheint
+   daneben die Auswahl **Ausgang:** – der Monitor zeigt, was an den gewählten Ausgang
+   geht. Die Ausgänge senden nur dann Verschiedenes, wenn der Laser-NOT-AUS einen von
+   ihnen sperrt; die Anzeige ergänzt dann
+   `· NOT-AUS-Sperre auf diesem Ausgang: <n> Adressen`.
 4. Die Legende: blauer Rahmen = gepatcht, gelber Rahmen = hervorgehoben. Jede
    gepatchte Kachel trägt ein Kürzel aus Gerät und Kanal, zum Beispiel `PAR 1 R`.
 
@@ -235,7 +314,12 @@ Kopfleiste gedrückt:
    Heads. Sie behalten ihre Werte (200 und 60), nur deren Dimmer geht auf 0. Die Köpfe
    bleiben also stehen und fahren beim Lösen nicht erst zurück.
 
-Geräte ohne Dimmerkanal, Laser und Nebel gehen beim Blackout ganz aus.
+Geräte ohne Dimmerkanal und Nebelmaschinen gehen beim Blackout ganz auf 0.
+**Laser** bekommen den **Aus-Wert aus ihrem Geräteprofil** (z. B. Betriebsart
+„Laser aus“), alle übrigen Laser-Kanäle gehen auf 0. Der Aus-Wert ist nicht immer 0 —
+im DMX-Monitor steht bei einem Laser nach dem Blackout also nicht unbedingt überall
+0. Kennt das Profil keinen Aus-Wert, strahlt ein Laser womöglich weiter (Einzelheiten,
+auch zum **Laser-NOT-AUS**: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 ## 8. Warnungen in der Statusleiste lesen
 
@@ -254,7 +338,7 @@ der Ausgang genommen, während dort Geräte gepatcht sind:
    | `Enttec: <Port> verbindet …` (orange) | Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter nicht erreichbar. |
    | `Enttec: <Port> aktiv (1 Universe)` (grün) | Eingerichtet, und der Adapter sendet. |
    | `Enttec: <Port> sendet NICHT (Universe <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
-   | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux). Der Tooltip nennt den Grund. |
+   | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux), oder derselbe Adapter steht auf mehreren Universen und ist deshalb für keines eingerichtet. Der Tooltip nennt den Grund. |
 
 3. **Ausgabe-Anzeige** unten rechts: normal eine Liste wie `Ausgabe: U1 Art-Net`
    (höchstens drei Einträge, der Rest als `+n`). Mit `⚠` und orange:
@@ -268,9 +352,101 @@ Ein Klick auf die Enttec-Anzeige öffnet direkt den Dialog aus Schritt 1.
 Netzwerk weg), erscheint zusätzlich oben im Hauptfenster ein roter Balken
 `Ausgabe gestört: U<n> <Weg> — <Grund>` — auch im Kiosk-Modus, in dem die Statusleiste
 ausgeblendet ist. Er verschwindet von selbst, sobald der Ausgang einige Sekunden wieder
-sendet; ein Klick öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist **gar kein**
-Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX gesendet`; ein
-Klick blendet diesen Hinweis bis zum nächsten Programmstart aus.
+sendet; ein Klick auf den Text öffnet den Dialog aus Schritt 1 (nicht im Kiosk-Modus). Ist
+**gar kein** Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX
+gesendet`.
+
+Der Balken liegt **über** dem oberen Rand der gerade gezeigten Ansicht, direkt unter der
+Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit
+Grand Master, STOP ALL, BLACKOUT und Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
+Tasten der Virtual Console und alle anderen Bedienelemente an ihrem Platz. Dafür verdeckt
+er eine schmale Zeile am oberen Rand der Ansicht. Ein Klick auf den Balken löst nichts aus,
+was darunter liegt. Der Balken ist immer nur eine Zeile hoch; ein zu langer Text wird mit
+„…“ gekürzt, der volle Text steht im Tooltip. Die Störungsmeldung lässt sich
+einklappen (nächster Absatz), aber nicht wegklicken, solange die Störung anliegt. Im
+ausgelagerten Fenster der Virtual Console
+(Popout) und im 3D-Fenster gibt es den Balken nicht.
+
+**Balken einklappen.** Der Balken verdeckt die oberste Zeile der Ansicht. Damit du während
+einer Störung weiterarbeiten kannst, lässt er sich verkleinern – ganz entfernen lässt sich
+die Störungsmeldung nicht, solange die Störung anliegt:
+
+- Klicke rechts im Balken auf `▴ einklappen`. Im Kiosk-Modus und beim Probenhinweis genügt
+  ein Klick irgendwo auf den Balken. Per Tastatur: mit der Tabulatortaste auf den Balken
+  gehen und die Eingabetaste drücken.
+- Statt des Balkens steht dann ein kleines Schild: rot `⚠ Ausgabe gestört ▾`, beim
+  Probenhinweis gedeckt `Probenmodus ▾`. In der Virtual Console sitzt es rechts in der Zeile
+  „Aktiver Effekt“ zwischen Werkzeugleiste und Tasten und verdeckt dort weder einen Knopf
+  noch eine Taste; in den übrigen Ansichten liegt es in der oberen rechten Ecke. Der Tooltip
+  nennt den vollen Text der Störung.
+- Ein Klick auf das Schild (oder die Eingabetaste) klappt den Balken wieder auf.
+- Bei einer **neuen** Störung klappt der Balken von selbst wieder auf: wenn ein anderer oder
+  ein weiterer Ausgang ausfällt, wenn sich der Grund ändert oder wenn dieselbe Störung länger
+  als 10 Sekunden weg war und wiederkommt. Ein Wackelkontakt, der innerhalb von 10 Sekunden
+  wiederkehrt, gilt als dieselbe Störung – das Schild bleibt dann klein, damit der Balken
+  nicht ständig über die Tasten springt.
+- Endet die Störung, verschwinden Balken und Schild von selbst.
+- Der eingeklappte Zustand wird nicht gespeichert: Nach einem Neustart steht wieder der volle
+  Balken. Statusleiste und DMX-Monitor zeigen die Störung unverändert an.
+
+Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
+mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
+LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
+sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
+**Enttec Pro USB** das richtige Universum wählen und **Verbinden**.
+
+## 9. Was beim Beenden und beim Entfernen einer Ausgabe hinausgeht
+
+Viele Adapter halten das zuletzt empfangene Bild, auch wenn kein Programm mehr
+sendet – ein ENTTEC DMX USB Pro oder ein uDMX-Adapter ebenso wie die meisten
+Art-Net- und sACN-Nodes.
+Damit nach dem Schließen von LightOS nichts weiterleuchtet, sendet LightOS
+vorher **ein letztes Bild**:
+
+- **Beim Beenden:** jede Ausgabe bekommt ein Bild wie bei einem Blackout – alle
+  Lichtkanäle auf 0, Laser auf ihre **Aus-Werte** (nicht einfach 0, siehe
+  Laser-Anleitung). Pan/Tilt, Gobo und Optik von Moving Heads mit Dimmer bleiben
+  stehen; die Köpfe fahren also nicht in die Grundstellung.
+- **Beim Entfernen einer Ausgabe** (Universum gelöscht, Ausgabe auf „Aus“
+  gestellt, Art-Net oder sACN abgewählt): dasselbe Bild an genau diese Ausgabe.
+- **Beim Wechsel auf einen anderen Adapter:** stellst du ein Universum von
+  ENTTEC auf Art-Net um, auf einen anderen Port, einen anderen uDMX-Adapter,
+  eine andere Ziel-IP oder eine andere Universumsnummer im Netzwerk, bekommt der
+  **bisherige** Adapter bzw. Node dasselbe letzte Bild – er hielte sonst, was er
+  zuletzt bekam.
+- **Nicht beim „Übernehmen“ ohne Änderung:** dort folgt sofort dieselbe Ausgabe,
+  ein dunkles Bild wäre ein Blitzer auf der Bühne.
+
+Reagiert ein Adapter nicht (abgezogen, Treiber hängt), wartet LightOS höchstens
+rund eine Sekunde und beendet sich dann trotzdem. Dieser eine Adapter bekommt
+dann kein letztes Bild – alle anderen schon.
+
+**Laser, die aus dem Patch genommen werden.** Entfernst du einen Laser aus dem
+Patch, gibst ihm eine andere Adresse oder lädst eine Show ohne ihn, hört das
+Gerät weiter auf seine bisherige Adresse. Fiele sie auf 0, schaltete das manchen
+Laser **ein** (bei vielen heißt DMX 0 „Auto run“) – und LightOS könnte ihn nicht
+mehr steuern. Deshalb bleibt der **Aus-Wert** des Lasers auf seiner bisherigen
+Adresse stehen, auch im Blackout und im letzten Bild beim Beenden, bis
+
+- die Adresse wieder gepatcht ist (dann bestimmt das neue Gerät), oder
+- LightOS beendet wird.
+
+Das gilt nur für Adressen, deren Aus-Wert nicht 0 ist. Solange so ein Wert
+gehalten wird, kommt auf dieser Adresse nichts anderes hinaus – auch kein Wert
+aus einem Skript oder vom Simple Desk. Der DMX Monitor zeigt den gehaltenen
+Wert.
+
+**So bekommst du die Adresse wieder frei:** Patche ein Gerät auf diese Adresse –
+ab dann bestimmt es, was dort hinausgeht (nimmst du es wieder aus dem Patch,
+ist die Adresse frei und steht auf 0). Oder beende LightOS und starte es neu:
+nach dem Neustart wird nichts mehr gehalten. Einen eigenen Knopf zum Freigeben
+gibt es mit Absicht nicht. Schalte den Laser vorher am Gerät aus oder gib ihm
+dort eine andere Adresse – er hört sonst weiter auf die alte.
+
+> **Wichtig:** Das letzte Bild ersetzt keinen Hauptschalter. Stürzt der Rechner
+> ab oder fällt der Strom aus, sendet niemand mehr etwas, und ein Adapter hält,
+> was er zuletzt bekam. Laser gehören deshalb an einen eigenen, erreichbaren
+> Schalter am Gerät.
 
 ## Netzwerk-Falle bei Art-Net und sACN
 
@@ -284,6 +460,40 @@ in Schritt 3 die richtige **Netzwerkkarte:**.
 
 Mehr zu Art-Net (Port 6454, Universumsnummern): [ARTNET.md](../ARTNET.md). Grundlagen zu
 DMX und Universen: [DMX_PROTOCOL.md](../DMX_PROTOCOL.md).
+
+## DMX empfangen: die Firewall-Abfrage
+
+Senden braucht keine Freigabe, **Empfangen** schon. Sobald du im Reiter **DMX-Eingang**
+den Art-Net- oder sACN-Eingang (oder die **Fernsteuerung**) einschaltest, lauscht LightOS
+auf UDP 6454 (Art-Net) bzw. 5568 (sACN).
+
+- **Windows** fragt dann beim ersten Mal mit „Windows-Sicherheitswarnung“, ob
+  `LightOS.exe` Daten aus dem Netzwerk empfangen darf. LightOS sagt das vorher an: oben
+  im Reiter steht ein Hinweis, und beim ersten Haken erscheint einmal ein kurzes
+  Fenster. Für ein Pult im selben Netz: **Zulassen** (privates Netzwerk). Ohne
+  Freigabe kommt nur an, was auf diesem Rechner selbst gesendet wird. Jede Antwort legt
+  in Windows eine Regel an — ändern lässt sie sich unter Windows-Sicherheit →
+  Firewall- & Netzwerkschutz → „Zugriff von App durch Firewall zulassen“.
+- **Linux** fragt nicht. Ist eine Firewall aktiv (z. B. `ufw`), blockiert sie still;
+  `sudo ufw status` zeigt, ob sie läuft.
+- **macOS** fragt beim ersten Empfang, sofern die Firewall eingeschaltet ist.
+
+LightOS ändert selbst nichts an der Firewall.
+
+**Empfangen auf:** (oben im Reiter **DMX-Eingang**) legt fest, worauf LightOS lauscht. Die
+Wahl gilt für Art-Net- und sACN-Eingang und die Fernsteuerung gemeinsam, wird sofort
+wirksam und bleibt auf diesem Rechner gespeichert:
+
+| Wahl | Was ankommt | Windows-Abfrage |
+|---|---|---|
+| **Alle Netzwerkkarten (Vorgabe)** | alles, wie bisher | ja |
+| eine Netzwerkkarte, z. B. `eth1 — 192.0.2.10` | nur, was über diese Karte kommt; sACN tritt dort den Multicast-Gruppen bei | ja |
+| **Nur dieser Rechner (127.0.0.1)** | nur ein zweites Programm auf demselben Rechner; sACN nur als Unicast an `127.0.0.1` | nein |
+
+Kommt nach dem Einschalten **5 Sekunden lang gar nichts** an, ergänzt die Statuszeile des
+Eingangs (und der Mitschnitt-Assistent) die Firewall als mögliche Ursache und sagt, wo du
+die Freigabe nachsiehst. Kam vorher schon etwas an, ist es nicht die Firewall.
+Ausführlich für Windows: [Netzwerk vorbereiten (Windows)](../anleitung_netzwerk_windows/ANLEITUNG.md).
 
 ## Weiterlesen
 

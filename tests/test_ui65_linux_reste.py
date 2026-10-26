@@ -20,6 +20,7 @@ from PySide6.QtCore import Qt  # noqa: E402
 from PySide6.QtGui import QAction, QKeySequence  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
+from _qt_lifecycle import flush_deferred_deletes  # noqa: E402
 
 from src.core.midi import midi_manager as mm  # noqa: E402
 
@@ -39,8 +40,11 @@ def main_window():
     QTest.qWaitForWindowExposed(w)
     yield w
     w.close()
+    # QA-97: wirklich abbauen (processEvents stellt DeferredDelete nicht zu).
     w.deleteLater()
+    flush_deferred_deletes()
     _app().processEvents()
+    flush_deferred_deletes()
 
 
 _DIGIT_KEYS = [getattr(Qt.Key, f"Key_{n}") for n in range(1, 10)]

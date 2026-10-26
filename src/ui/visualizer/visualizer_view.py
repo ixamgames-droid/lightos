@@ -34,6 +34,7 @@ from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
     install_scene_start_guard, max_beam_range_pref, create_dmx_push,
+    strobe_mode_pref,
     apply_push_tier, quality_tier_pref,
 )
 from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
@@ -358,6 +359,8 @@ class Visualizer3DView(QWidget):
             # in den beiden Ansichten unterschiedlich lange Kegel, und der
             # Regler im Vollfenster waere hier wirkungslos.
             "maxBeamRange":   max_beam_range_pref(),
+            # VIZ-104: dieselbe Strobe-Einstellung wie im Vollfenster.
+            "strobeMode":     strobe_mode_pref(),
             # VIZ-LABELS: aus der zentralen Quelle lesen (nicht aus dem Button),
             # damit der gepushte Wert immer dem AppState entspricht — der Button
             # ist nur ein Controller, der AppState VOR dem Push schreibt.

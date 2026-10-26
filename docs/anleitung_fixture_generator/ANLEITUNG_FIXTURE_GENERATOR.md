@@ -95,6 +95,15 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
 
 ![Patchen: Gerät erstellen](img/01_patch_geraet_erstellen.png)
 
+> **Nicht verwechseln:** Der Generator liegt **nur** hier, unter **Patchen →
+> Patch → Gerät erstellen…**. Das Menü **Datenbank → Neues Fixture-Profil…**
+> (und **Fixture-Profil bearbeiten…**) öffnet den einfacheren **Fixture
+> Editor** — Kanalliste ohne Bereiche, Prüfung und Live-Test.
+>
+> Der Dialog öffnet so groß, wie sein Inhalt es braucht, höchstens so groß wie
+> der Bildschirm. Auf einem kleinen Bildschirm (z. B. 1366 × 768) erscheint
+> rechts ein Rollbalken; **Speichern** und **Abbrechen** bleiben immer sichtbar.
+
 ## 3. Kopf: Hersteller, Modell, Typ
 
 ![Fixture Generator: Kopf](img/02_generator_kopf.png)
@@ -106,7 +115,9 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    ihn aus, der Blackout schaltet ihn ganz ab, die 3D-Ansicht zeichnet Strahlen.
 3. **Leistung** vom Typenschild (30 W).
 4. Gibt es für dein Gerät eine QLC+-Datei (`.qxf`), kannst du sie hier als
-   Startpunkt laden und danach gegen das Handbuch prüfen.
+   Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
+   Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn
+   du es umbaust. Die Hinweisliste unten zeigt sie an.
 
 ## 4. Modus und Kanäle
 
@@ -275,7 +286,10 @@ bzw. Wirkung ist am Gerät noch nicht bestätigt.
 **Ein vorhandenes Profil nachtragen:** im Fixture-Editor **Als LightOS-Profil
 exportieren…**, im Generator oben **LightOS-Profil (.json) laden…**, die
 Laser-Seiten ausfüllen und speichern. Der Generator legt immer ein **neues**
-eigenes Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage.
+Profil an — gib ihm deshalb einen anderen Modellnamen als der Vorlage. Es
+übernimmt die Herkunft und Lizenz der geladenen Datei; nur ein frei gebautes
+Profil gilt als „eigenes Profil“. Nennt die Vorlage keine belegbare Herkunft,
+speichert der Generator nicht und zeigt den Hinweis „Herkunft nicht belegbar“.
 Beim Export und Import eines Profils und beim Bearbeiten im Fixture-Editor
 bleiben die Laser-Angaben erhalten.
 
@@ -291,6 +305,25 @@ startet der Laser mit seinem Default eingeschaltet, kommt ein Hinweis.
 Der **Live-Test** (3) schreibt Werte direkt an das echte Gerät — beim Laser
 nur unter den Sicherheitsregeln aus Abschnitt 9. **Speichern** (4) legt das
 Profil in deiner Bibliothek an und bestätigt das mit einer kurzen Meldung.
+
+**Live-Test mit einem Laser.** **Test starten** sendet sofort die Default-Werte
+aller Kanäle. Bei einem Laser-Profil fragt LightOS deshalb vorher nach
+(**Live-Test mit einem Laser starten?**) und sagt dabei, an welche Adressen
+gesendet wird und ob der Laser mit den Default-Werten **sofort strahlt**. Mit
+**Abbrechen** – das ist die Vorgabe – wird nichts gesendet.
+
+- **Blackout** im Test stellt den Laser auf seinen **Aus-Wert**, nicht einfach
+  auf 0 (bei manchen Lasern heißt 0 „Auto run“). Dasselbe gilt für **Test
+  stoppen** und für das Schließen des Fensters, wenn auf der Adresse vorher 0
+  stand – der Kanal bleibt dann auf dem Aus-Wert stehen.
+- Der **Laser-NOT-AUS** beendet einen laufenden Laser-Test und lässt den Laser
+  auf „aus“. Solange der NOT-AUS aktiv ist, startet kein Live-Test mit einem
+  Laser – auch dann nicht, wenn er ausgelöst wird, während die Rückfrage noch
+  offen ist.
+- Kennt das Profil noch **keinen Aus-Wert**, sagt die Rückfrage das: LightOS
+  weiß dann nicht, ob der Laser mit den gesendeten Werten strahlt. Beendet der
+  NOT-AUS so einen Test, stehen alle Kanäle auf 0, und die Infozeile sagt rot,
+  dass das nicht sicher „aus“ heißt – dann den Laser am Gerät ausschalten.
 
 ## 8. Patchen und bedienen
 
@@ -322,10 +355,12 @@ Den Laser in der Geräteliste wählen; der Reiter **Laser** erscheint.
 ![Laser-NOT-AUS gedrückt](img/08_laser_not_aus.png)
 
 Nach dem NOT-AUS (1) zeigt die Laser-Seite rot an, dass er greift (2), die
-Statuszeile bestätigt ihn. Position, Farbe oder Größe zu verändern schaltet
-den Laser **nicht** wieder ein — erst ein neuer Klick auf eine Betriebsart oder
-ein neues Muster. Den NOT-AUS gibt es auch als VC-Taste (Aktion
-„Laser NOT-AUS“).
+Statuszeile bestätigt ihn. Kein Wert schaltet den Laser wieder ein — auch
+keine Betriebsart und kein Muster: Werte werden gemerkt, der Laser bleibt
+dunkel. Gelöst wird der NOT-AUS nur mit dem Knopf **LASER NOT-AUS** oben
+rechts im Hauptfenster (klicken, Rückfrage bestätigen); danach gibt der Laser
+sofort wieder aus, was eingestellt ist. Den NOT-AUS gibt es auch als VC-Taste
+(Aktion „Laser NOT-AUS“) — sie löst nur aus.
 
 ### Bewegung mit EFX
 

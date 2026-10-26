@@ -1,6 +1,8 @@
 """Chaser function — steps through a list of functions in sequence."""
 from __future__ import annotations
 import random
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, RunOrder, Direction
@@ -9,6 +11,28 @@ from . import fade_curve as fc
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
     from src.core.database.models import PatchedFixture
+
+
+# BPM-32: Die Auto-Show startet ihre Funktionen bei gewaehlter BPM-Quelle
+# „Aus"/„OS2L" in diesem Rahmen. Beat-Chaser setzen dann keinen stillen
+# 120-BPM-Default (sonst liefe ein Takt gegen die Nutzerwahl bzw. das DJ-
+# Programm). Thread-lokal: ein anderer Thread startet unveraendert.
+_sperre = threading.local()
+
+
+@contextmanager
+def ohne_default_takt():
+    """Rahmen, in dem ``Chaser._on_start`` keinen 120-BPM-Default setzt."""
+    tiefe = getattr(_sperre, "tiefe", 0)
+    _sperre.tiefe = tiefe + 1
+    try:
+        yield
+    finally:
+        _sperre.tiefe = tiefe
+
+
+def default_takt_gesperrt() -> bool:
+    return getattr(_sperre, "tiefe", 0) > 0
 
 
 @dataclass
@@ -75,7 +99,9 @@ class Chaser(Function):
             try:
                 from .bpm_manager import get_bpm_manager
                 bm = get_bpm_manager()
-                if bm.bpm <= 0:
+                if bm.bpm <= 0 and not default_takt_gesperrt():
+                    # BPM-32: in der Auto-Show bei Quelle Aus/OS2L gesperrt
+                    # (s. ``ohne_default_takt``) — dort zeigt sie den Hinweis.
                     # CDX-14b: Quelle MITGEBEN. Ohne source liesse set_bpm() aus dem
                     # Off-Zustand _source=='off' stehen (leitet 'off' nur aus bpm<=0
                     # ab) -> _bpm>0 bei Quelle 'off' (Timer laeuft trotz Anzeige
@@ -341,6 +367,14 @@ class Chaser(Function):
         from src.core.dmx.universe import Universe
         if child is None:
             return {}
+        # ENG-37: Ein Modify-Effekt als Chaser-Schritt ist GESPERRT — der
+        # Schritt gibt nichts aus. Der Chaser rendert Schritte mit angehaltener
+        # Zeit und ueberblendet ABSOLUTE Werte; ein Modify-Effekt wuerde hier
+        # setzen statt verrechnen und alle Lampen ausserhalb des Laeufers
+        # ueberschreiben. Lieber nichts als das Falsche.
+        from .modify import ModifySammler, ist_modify, setze_sammler
+        if ist_modify(child):
+            return {}
 
         def _render(bg: int) -> dict[int, bytes]:
             temp = {}
@@ -366,8 +400,16 @@ class Chaser(Function):
                     child.fade_in = saved_fade_in
             return {u: tu.get_all() for u, tu in temp.items()}
 
-        a = _render(0x00)
-        b = _render(0xFF)
+        # ENG-37: dieselbe Sperre fuer Modify-Effekte TIEFER im Schritt (Schritt
+        # ist eine Sammlung/Show mit Modify-Kind): waehrend der zwei Probe-
+        # Renderings sammelt ein Wegwerf-Sammler deren Posten ein — sie wuerden
+        # sonst doppelt und an der Ueberblendung vorbei im Bild landen.
+        sammler_alt = setze_sammler(ModifySammler())
+        try:
+            a = _render(0x00)
+            b = _render(0xFF)
+        finally:
+            setze_sammler(sammler_alt)
         target: dict[tuple[int, int], int] = {}
         for u, av in a.items():
             bv = b.get(u, av)

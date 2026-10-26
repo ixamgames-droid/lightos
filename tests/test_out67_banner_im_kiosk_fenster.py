@@ -2,7 +2,8 @@
 
 Im Kiosk-Modus sind Menue, Sektionsleiste und Statusleiste ausgeblendet — also
 genau die Stellen, an denen ein Ausfall bisher stand. Das Banner haengt deshalb
-im Wurzel-Layout und muss dort sichtbar bleiben.
+am Hauptfenster selbst (seit VCB-47 als Ueberlagerung ueber dem Inhaltsbereich,
+nicht mehr im Wurzel-Layout) und muss dort sichtbar bleiben.
 
 Eigene Datei, weil hier ein ganzes ``MainWindow`` gebaut wird (ein Prozess je
 Testdatei); die Regeln selbst prueft ``test_out67_ausgabe_ausfall_banner.py``
@@ -77,9 +78,23 @@ class BannerImKioskFensterTest(unittest.TestCase):
         self.assertTrue(banner.isVisibleTo(win),
                         "das Banner muss im Kiosk-Fenster sichtbar sein")
         self.assertIn("Ausgabe gestört: U1 Enttec (COM9)", banner.text())
-        # Ueber dem Inhalt, nicht darunter.
-        lay = win.centralWidget().layout()
-        self.assertLess(lay.indexOf(banner), lay.indexOf(win._stack))
+        # Ueber dem Inhalt, nicht darunter. Seit VCB-47 liegt das Banner nicht
+        # mehr im Layout (es verschob sonst die Konsole), sondern ueberlagert
+        # den oberen Rand des Inhaltsbereichs — als oberstes Kind.
+        from PySide6.QtCore import QPoint
+        from PySide6.QtWidgets import QWidget
+        zentral = win.centralWidget()
+        self.assertEqual(zentral.layout().indexOf(banner), -1)
+        # UI-103: im Kiosk (Virtual Console) rechts in der Zeile „Aktiver
+        # Effekt“ — nie ueber Bank-Knoepfen oder der VC-Werkzeugleiste.
+        from PySide6.QtCore import QRect
+        self.assertEqual(banner.geometry(), banner.ziel_rechteck())
+        zeile = win._vc_view.ausgabe_chip_platz()
+        self.assertTrue(QRect(zeile.mapTo(win, QPoint(0, 0)), zeile.size())
+                        .contains(QRect(banner.mapTo(win, QPoint(0, 0)),
+                                        banner.size())))
+        kinder = [k for k in zentral.children() if isinstance(k, QWidget)]
+        self.assertIs(kinder[-1], banner)
 
         om.wege[0]["verbunden"] = True
         with redirect_stdout(io.StringIO()):

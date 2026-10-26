@@ -17,9 +17,10 @@ in ``main_window.py`` stehen (dort waechst sonst alles zusammen):
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView, QDialog, QDialogButtonBox, QHeaderView, QLabel, QLineEdit,
@@ -37,21 +38,87 @@ DOKU_URL = GITHUB_DOCS + ANLEITUNGEN
 
 # ── Doku ─────────────────────────────────────────────────────────────────────
 
+def _windows_zuordnung(endung: str) -> bool | None:
+    """Fragt Windows, ob fuer ``endung`` (``".md"``) ein Programm zugeordnet ist.
+
+    ``AssocQueryStringW`` mit ``ASSOCF_INIT_IGNOREUNKNOWN``: ohne dieses Flag
+    antwortet Windows fuer JEDE Endung mit „OpenWith.exe“ — dem Dialog „App
+    auswaehlen“. ``None``, wenn die Frage selbst nicht ging."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+        frage = ctypes.windll.shlwapi.AssocQueryStringW
+        frage.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.LPCWSTR,
+                          wintypes.LPCWSTR, wintypes.LPWSTR,
+                          ctypes.POINTER(wintypes.DWORD)]
+        frage.restype = ctypes.c_long                       # HRESULT
+        # Programmdatei (2) — und, weil eine Zuordnung zu einer Store-App keine
+        # EXE nennen muss, ersatzweise der Anzeigename der App (4).
+        for was in (2, 4):
+            puffer = ctypes.create_unicode_buffer(1024)
+            laenge = wintypes.DWORD(1024)
+            if frage(0x400, was, endung, None, puffer, ctypes.byref(laenge)) == 0 \
+                    and puffer.value.strip():
+                return True
+        return False
+    except Exception:
+        return None
+
+
+def hat_zugeordnetes_programm(pfad: str, frage=None) -> bool:
+    """Oeffnet das Betriebssystem ``pfad`` mit einem Programm — oder mit dem
+    Dialog „Wie soll diese Datei geoeffnet werden?“ (UI-87).
+
+    Nur unter Windows eine echte Frage; ueberall sonst und im Zweifel ``True``
+    (dann bleibt es beim bisherigen Verhalten). ``frage`` ist austauschbar,
+    damit der Fall auf jedem Betriebssystem pruefbar ist."""
+    if frage is None:
+        if sys.platform != "win32":
+            return True
+        frage = _windows_zuordnung
+    endung = os.path.splitext(pfad)[1]
+    if not endung:
+        return True
+    return frage(endung) is not False
+
+
 def doku_ziel(rel: str) -> QUrl:
-    """Ziel fuer eine Doku-Datei (``rel`` relativ zu ``docs/``, mit ``/``)."""
+    """Ziel fuer eine Doku-Datei (``rel`` relativ zu ``docs/``, mit ``/``).
+
+    UI-87: die lokale Datei nur, wenn das Betriebssystem sie auch oeffnen kann.
+    Ein frisches Windows hat fuer ``.md`` kein Programm — „Erste Schritte“
+    zeigte dort im Quellbetrieb den Dialog „Oeffnen mit“ statt der Anleitung
+    (und ``openUrl`` meldete Erfolg). Dann der Link auf die Projektseite."""
     lokal = os.path.join(programm_dir(), "docs", *rel.split("/"))
-    if os.path.isfile(lokal):
+    if os.path.isfile(lokal) and hat_zugeordnetes_programm(lokal):
         return QUrl.fromLocalFile(lokal)
     return QUrl(GITHUB_DOCS + rel)
 
 
-def oeffne(url: QUrl) -> bool:
-    """Reicht ``url`` an das Betriebssystem (Browser, Dateimanager, Editor)."""
+def _jetzt_oeffnen(url: QUrl) -> None:
     try:
-        return bool(QDesktopServices.openUrl(url))
+        if not QDesktopServices.openUrl(url):
+            print(f"[hilfe] liess sich nicht oeffnen: {url.toString()}")
     except Exception as e:
         print(f"[hilfe] openUrl fehlgeschlagen ({url.toString()}): {e}")
-        return False
+
+
+def oeffne(url: QUrl) -> bool:
+    """Reicht ``url`` an das Betriebssystem (Browser, Dateimanager, Editor) —
+    nicht sofort, sondern ueber die Ereignisschleife. ``True`` = angenommen.
+
+    UI-87: ein Menue-Eintrag kann auch ueber die Bedienhilfen ausgeloest werden
+    (UI-Automation „Invoke“ — so arbeiten Screenreader und Sprachsteuerung).
+    Der Aufruf laeuft dann in einem eingabe-synchronen Fensteraufruf, und aus
+    dem laesst Windows nichts nach aussen starten: am Testrechner oeffnete
+    „Datenordner öffnen“ so KEINEN Explorer, im ``crash.log`` stand
+    ``0x8001010d``. Ein Zeitgeber mit 0 ms laesst den Aufruf erst zurueckkehren.
+    """
+    try:
+        QTimer.singleShot(0, lambda: _jetzt_oeffnen(url))
+    except Exception:
+        _jetzt_oeffnen(url)             # keine Ereignisschleife: wie bisher sofort
+    return True
 
 
 def oeffne_doku(rel: str) -> bool:
@@ -109,20 +176,66 @@ def build_art() -> str:
     return "Setup-Build" if ist_gefroren() else "Quellbetrieb (kein Setup-Build)"
 
 
+def lizenz_zeile() -> str:
+    """LIZ-1: Lizenzstatus fuer „Über LightOS“ — bei jedem Oeffnen frisch
+    gelesen (ein Ablauf waehrend der Sitzung zeigt sich NUR hier; die laufende
+    App bleibt davon unberuehrt)."""
+    try:
+        from src.core import lizenz
+        return lizenz.pruefe().text()
+    except Exception:
+        return "unbekannt"
+
+
+def fremd_hinweis() -> str:
+    """LIZ-3: Hinweis auf die Bestandteile unter der LGPL fuer „Über LightOS“.
+
+    Ein Programm, das waehrend des Laufs Urhebervermerke zeigt, muss dort auch
+    den Vermerk der LGPL-Bibliothek und einen Verweis auf die Lizenztexte
+    zeigen (LGPL-3.0 Abschnitt 4 c, LGPL-2.1 Abschnitt 6). Welche Teile unter
+    der LGPL stehen, fuehrt ``packaging/windows/fremdkomponenten.py``; der Test
+    gleicht beide ab. Der Verweis zeigt auf den Ordner ``licenses`` neben den
+    Programmdateien (im Setup-Build ``_internal``, im Quellbetrieb das Repo) —
+    auf den Ordner, nicht auf die .md-Datei: die oeffnet Windows ohne
+    zugeordnetes Programm nur mit „App auswaehlen“ (s. ``_windows_zuordnung``)."""
+    from html import escape
+    from pathlib import Path
+    ordner = os.path.join(programm_dir(), "licenses")
+    if os.path.isdir(ordner):
+        verweis = (f"<a href='{escape(Path(ordner).as_uri(), quote=True)}'>"
+                   "Ordner „licenses“</a>")
+    else:
+        verweis = "Ordner „licenses“ im Programmordner"
+    return (
+        "LightOS enthält Bestandteile anderer Urheber unter eigenen Lizenzen, "
+        "darunter Qt&nbsp;6 und Qt for Python (PySide6, Shiboken6), "
+        "© The Qt Company Ltd. und andere, unter der GNU LGPL 3.0, sowie "
+        "FFmpeg (© die FFmpeg-Entwickler) und libusb unter der GNU LGPL 2.1. "
+        "Sie liegen als eigene, austauschbare Bibliotheken bei. "
+        "Aufstellung: THIRD_PARTY_NOTICES.md; Lizenztexte (GNU LGPL, GNU GPL "
+        f"und weitere): {verweis}."
+    )
+
+
 def ueber_text() -> str:
     """HTML fuer „Über LightOS“."""
     from html import escape
+    from src.core.lizenz import COPYRIGHT, QUELLE
     daten = datenordner()
     return (
         f"<b>LightOS {escape(app_version())}</b><br>"
-        "Professionelle DMX-Lichtsteuerung<br><br>"
+        "Professionelle DMX-Lichtsteuerung<br>"
+        f"{escape(COPYRIGHT)}<br>"
+        f"<a href='{QUELLE}'>{QUELLE}</a><br><br>"
         "<table cellspacing='4'>"
+        f"<tr><td>Lizenz:</td><td>{escape(lizenz_zeile())}</td></tr>"
         f"<tr><td>Version:</td><td>{escape(app_version())}</td></tr>"
         f"<tr><td>Build:</td><td>{escape(build_art())}</td></tr>"
         f"<tr><td>Datenordner:</td><td>{escape(daten)}</td></tr>"
         f"<tr><td>Anleitungen:</td><td><a href='{DOKU_URL}'>{DOKU_URL}</a></td></tr>"
         "</table><br>"
-        "Enttec Pro USB &middot; Art-Net 4 &middot; sACN &middot; MIDI"
+        "Enttec Pro USB &middot; Art-Net 4 &middot; sACN &middot; MIDI<br><br>"
+        f"<small>{fremd_hinweis()}</small>"
     )
 
 
@@ -151,6 +264,14 @@ _TASTEN_DE = {
 _STANDARD_AKTION = {
     "Ctrl+Z": "Rückgängig", "Ctrl+Y": "Wiederholen",
     "Ctrl+Shift+Z": "Wiederholen", "Del": "Löschen",
+}
+
+#: UI-92: Kuerzel, die als ``QShortcut`` OHNE Beschreibung angelegt sind und
+#: deren Quelltext gerade nicht angefasst werden soll (der Laser-NOT-AUS wird
+#: in LAS-36 umgebaut). Sobald das steht, gehoert die Beschreibung per
+#: ``setWhatsThis`` an das Kuerzel selbst — dann wird dieser Eintrag ueberfluessig.
+_BEKANNTE_KUERZEL = {
+    "Ctrl+Shift+L": "Laser NOT-AUS auslösen",
 }
 
 #: Aktionstexte, die fuer sich allein zu knapp sind.
@@ -241,11 +362,15 @@ def sammle_tastenkuerzel(wurzeln, bereiche=None) -> list[Kuerzel]:
             for seq in act.shortcuts():
                 _dazu(tasten_text(seq), aktion, bereich)
         for sc in wurzel.findChildren(QShortcut):
-            portabel = sc.key().toString(QKeySequence.SequenceFormat.PortableText)
-            aktion = (sc.whatsThis() or sc.objectName()
-                      or _STANDARD_AKTION.get(portabel, "(ohne Beschreibung)"))
-            _dazu(tasten_text(sc.key()), _sauber(aktion),
-                  _fenster_bereich(sc.parent(), bereiche))
+            # UI-93: ein QShortcut kann mehrere Folgen tragen (Wiederholen:
+            # Strg+Y und Strg+Umschalt+Z) — alle auffuehren, nicht nur die erste.
+            for folge in (sc.keys() or [sc.key()]):
+                portabel = folge.toString(QKeySequence.SequenceFormat.PortableText)
+                aktion = (sc.whatsThis() or sc.objectName()
+                          or _BEKANNTE_KUERZEL.get(portabel)
+                          or _STANDARD_AKTION.get(portabel, "(ohne Beschreibung)"))
+                _dazu(tasten_text(folge), _sauber(aktion),
+                      _fenster_bereich(sc.parent(), bereiche))
 
     aus.sort(key=lambda e: (e.bereich != ALLGEMEIN, e.bereich.lower(),
                             e.aktion.lower(), e.tasten))

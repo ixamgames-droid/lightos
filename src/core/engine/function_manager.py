@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType, _alloc_id, bump_next_id
+from .patch_index import PatchListe
 from .scene import Scene
 from .chaser import Chaser
 from .collection import Collection
@@ -11,8 +12,12 @@ from .sequence import Sequence
 from .audio_func import AudioFunction
 from .effect_func import LayeredEffect
 from .carousel import Carousel
-from .efx import EfxInstance
+from .efx import EfxInstance, MODIFY_BEWEGUNG_ARTEN
 from .rgb_matrix import RgbMatrixInstance
+from .modify import (ModifySammler, ist_modify, modify_posten,
+                     normalize_channels, normalize_mode, normalize_strength,
+                     posten_anwenden, setze_sammler)
+from . import wer_gewinnt
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -40,6 +45,13 @@ class FunctionManager:
         # An die Identitaet des patch_cache gebunden (Re-Patch => Neuaufbau).
         self._dim_map_cache: dict[int, frozenset[int]] | None = None
         self._dim_map_key: int = -1
+        # ENG-30: die Patch-Liste mit fid-Tabelle, die ``write`` bekommt.
+        self._patch_liste: PatchListe | None = None
+        # ENG-35 Schritt 4: „wer gewinnt“ — Protokoll nur, solange eine Anzeige
+        # es angefordert hat (Zaehler). 0 = aus, der Takt bleibt wie bisher.
+        self._wg_zaehler = 0
+        self._wg_protokoll: wer_gewinnt.SchreibProtokoll | None = None
+        self._wg_oben: dict | None = None
 
     # ── CRUD ──────────────────────────────────────────────────────────────────
 
@@ -425,18 +437,95 @@ class FunctionManager:
         self._dim_map_key = key
         return result
 
+    def _patch_mit_tabelle(self, patch_cache):
+        """ENG-30: ``patch_cache`` als :class:`PatchListe` — neu gebaut nur,
+        wenn sich die Liste geaendert hat (andere Liste oder andere Geraete).
+        Alles, was keine gewoehnliche Liste ist, geht unveraendert durch."""
+        if type(patch_cache) is not list:
+            return patch_cache
+        liste = getattr(self, "_patch_liste", None)
+        if liste is None or not liste.passt_zu(patch_cache):
+            liste = self._patch_liste = PatchListe(patch_cache)
+        return liste
+
+    # ── ENG-35 Schritt 4: wer gewinnt ─────────────────────────────────────────
+
+    def wer_gewinnt_anfordern(self) -> None:
+        """Eine Anzeige will das Protokoll „Adresse -> letzter Schreiber“.
+        Jede Anforderung braucht genau ein ``wer_gewinnt_freigeben``."""
+        with self._lock:
+            self._wg_zaehler += 1
+
+    def wer_gewinnt_freigeben(self) -> None:
+        with self._lock:
+            self._wg_zaehler = max(0, self._wg_zaehler - 1)
+            if self._wg_zaehler == 0:
+                self._wg_protokoll = None
+                self._wg_oben = None
+
+    @property
+    def wer_gewinnt_aktiv(self) -> bool:
+        return getattr(self, "_wg_zaehler", 0) > 0
+
+    def wer_gewinnt_oben(self, oben: dict | None) -> None:
+        """Der Renderer meldet die Schicht ueber den Funktionen dieses Frames:
+        ``{universum: {adresse: "Cueliste"|"Programmer"|"Snap"}}``. Wird
+        als Ganzes getauscht (der Leser bekommt nie einen halben Stand)."""
+        if self.wer_gewinnt_aktiv:
+            self._wg_oben = oben
+
+    def wer_gewinnt(self, patch) -> dict[int, "wer_gewinnt.Ergebnis"]:
+        """Je Funktion des letzten Frames: gewinnt auf n / verdeckt auf m
+        Geraeten von X. Leer, solange niemand das Protokoll angefordert hat
+        oder noch kein Frame gelaufen ist."""
+        protokoll = getattr(self, "_wg_protokoll", None)
+        oben = getattr(self, "_wg_oben", None)
+
+        def name_von(fid):
+            f = self._functions.get(fid)
+            return getattr(f, "name", None) if f is not None else None
+
+        return wer_gewinnt.auswerten(protokoll, oben, patch, name_von)
+
+    def modify_aufschieben(self, an: bool = True) -> None:
+        """ENG-37: den NAECHSTEN ``tick`` anweisen, die Modify-Posten nur zu
+        sammeln (``True``) — der Aufrufer verrechnet sie dann selbst ueber
+        ``modify_anwenden``. Der Renderer meldet das vor jedem ``tick`` an und
+        nimmt es danach wieder zurueck (``False``); so bleibt die Signatur von
+        ``tick`` fuer alle Aufrufer und Ersatz-Manager unveraendert."""
+        self._modify_aufschieben = bool(an)
+
+    def modify_anwenden(self, universes: dict[int, "Universe"]) -> bool:
+        """ENG-37: die im letzten ``tick`` gesammelten Modify-Posten auf
+        ``universes`` verrechnen (und verbrauchen). Der Renderer ruft das NACH
+        Cuelisten, Programmer/Snaps und Grundhelligkeit und VOR den Mastern.
+        ``True``, wenn es etwas zu verrechnen gab."""
+        posten = getattr(self, "_modify_posten", None)
+        if not posten:
+            return False
+        self._modify_posten = []
+        posten_anwenden(posten, universes)
+        return True
+
     def tick(self, universes: dict[int, "Universe"],
              patch_cache: list["PatchedFixture"],
-             dt: float):
+             dt: float, modify_spaeter: bool = False):
         """Called every frame (44 Hz). Drives all running functions.
+
+        ENG-37: Modify-Effekte schreiben hier NICHT. Ihre Betraege werden
+        gesammelt und entweder am Ende dieses Aufrufs verrechnet (Vorgabe) oder
+        — ``modify_spaeter=True`` bzw. vorher ``modify_aufschieben()``, so macht
+        es der Renderer — erst durch ``modify_anwenden`` auf das fertige Bild
+        vor den Mastern.
 
         Per-Effekt-Intensitaet (Block B): Funktionen mit intensity < 1.0 werden
         in ein privates Universum gerendert und ihre geaenderten Kanaele skaliert
         ins gemeinsame Scratch gemerged (Dim-/Farbadressen * intensity). Bei
         intensity == 1.0 wird direkt geschrieben (Fast-Path, kein Kopieraufwand)."""
-        from src.core.dmx.universe import Universe
-        dim_map = None  # lazy — nur bei Bedarf aufbauen
         finished = set()
+        # ENG-30: Funktionen bekommen die Liste mit fid-Tabelle. ``patch_cache``
+        # selbst bleibt fuer _dim_addr_map (an dessen Identitaet gebunden).
+        patch_fn = self._patch_mit_tabelle(patch_cache)
         # LTP-Reihenfolge: in Start-Reihenfolge ticken — die zuletzt gestartete
         # Funktion schreibt zuletzt und gewinnt damit bei Kanal-Ueberschneidung
         # (z. B. zwei Effekte auf denselben Dimmer-/Farbkanal). Frueher wurde
@@ -457,11 +546,87 @@ class FunctionManager:
             # laesst die Reihenfolge unveraendert (kein Regressionsrisiko).
             ordered.sort(key=lambda fid: getattr(
                 self._functions.get(fid), "priority", 0))
+        # ENG-37: Sammler fuer die Modify-Posten dieses Frames. Modify-Effekte
+        # (auch als Kind einer Sammlung/Show) legen ihre Betraege hier ab statt
+        # zu schreiben; die Reihenfolge der Posten ist die Tick-Reihenfolge
+        # (Layer-Prioritaet, darin Start-Reihenfolge).
+        sammler = ModifySammler()
+        sammler_alt = setze_sammler(sammler)
+        # ENG-35 Schritt 4: Protokoll nur, wenn angefordert — sonst None und
+        # der Takt laeuft exakt wie bisher.
+        protokoll = (wer_gewinnt.SchreibProtokoll()
+                     if getattr(self, "_wg_zaehler", 0) > 0 else None)
+        try:
+            if protokoll is None:
+                self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                      finished, sammler, patch_fn)
+            else:
+                self._tick_mitgeschnitten(ordered, universes, patch_cache, dt,
+                                          finished, sammler, patch_fn,
+                                          protokoll)
+        finally:
+            setze_sammler(sammler_alt)
+        if protokoll is not None and self._wg_zaehler > 0:
+            # (zwischendurch freigegeben -> nichts Veraltetes liegen lassen)
+            self._wg_protokoll = protokoll
+        self._modify_posten = sammler.posten
+        if not (modify_spaeter or getattr(self, "_modify_aufschieben", False)):
+            self.modify_anwenden(universes)
+        if finished:
+            with self._lock:
+                self._running_ids -= finished
+                # _start_order mit _running_ids synchron halten: selbst-beendete
+                # Funktionen (die nicht ueber stop() liefen) hier entfernen, damit
+                # die Liste nicht mit stale-IDs volllaeuft.
+                self._start_order = [fid for fid in self._start_order
+                                     if fid in self._running_ids]
+
+    def _tick_mitgeschnitten(self, ordered, universes, patch_cache, dt,
+                             finished, sammler, patch_fn, protokoll) -> None:
+        """ENG-35 Schritt 4: der Funktions-Durchlauf mit Protokoll.
+
+        Je Universum wird EINMAL je Takt ein :class:`wer_gewinnt.Mitschnitt`
+        an Stelle des Schreib-Protokolls eingehaengt (ein evtl. laufendes
+        Protokoll des Renderers bekommt jede Adresse unveraendert
+        weitergereicht). Je Funktion wird nur ``takt.fid`` umgesetzt — der
+        Mehraufwand waechst mit den geschriebenen Adressen, nicht mit
+        (laufende Funktionen x Universen)."""
+        takt = wer_gewinnt.Takt()
+        mitschnitte = {}
+        for u, su in universes.items():
+            tauschen = getattr(su, "write_log_tauschen", None)
+            if tauschen is None:
+                continue
+            m = wer_gewinnt.Mitschnitt(None, takt)
+            m.aussen = tauschen(m)
+            mitschnitte[u] = (su, m)
+        try:
+            self._tick_funktionen(ordered, universes, patch_cache, dt,
+                                  finished, sammler, patch_fn, takt=takt)
+        finally:
+            for u, (su, m) in mitschnitte.items():
+                su.write_log_tauschen(m.aussen)
+                for fid, adressen in m.je_fid.items():
+                    protokoll.eintragen(fid, u, adressen)
+
+    def _tick_funktionen(self, ordered, universes, patch_cache, dt,
+                         finished, sammler, patch_fn=None, takt=None):
+        """Schleife ueber die laufenden Funktionen (Rumpf von ``tick``).
+
+        ENG-30: ``patch_fn`` ist ``patch_cache`` mit fid-Tabelle (siehe
+        ``_patch_mit_tabelle``) — die Funktionen bekommen diese Liste,
+        ``_dim_addr_map`` bleibt an ``patch_cache`` gebunden."""
+        if patch_fn is None:
+            patch_fn = patch_cache
+        from src.core.dmx.universe import Universe
+        dim_map = None  # lazy — nur bei Bedarf aufbauen
         for fid in ordered:
             f = self._functions.get(fid)
             if f is None or not f.is_running:
                 finished.add(fid)
                 continue
+            if takt is not None:
+                takt.fid = fid          # ENG-35 Schritt 4: wer schreibt jetzt
             try:
                 inten = f.intensity
                 try:
@@ -475,8 +640,21 @@ class FunctionManager:
                     env = f.env_factor(dt)
                 except AttributeError:
                     env = 1.0
-                if inten >= 0.999 and env >= 0.999:
-                    f.write(universes, patch_cache, dt, self._functions)
+                # ENG-37: Helligkeit x Huellkurve dieser Funktion — Staerke-
+                # Faktor fuer sie selbst (Modify) bzw. fuer ihre Modify-Kinder
+                # (Sammlung/Show). Skaliert NIE das Darunterliegende.
+                try:
+                    sammler.faktor = inten * max(0.0, min(1.0, float(env)))
+                except (TypeError, ValueError):
+                    sammler.faktor = inten
+                if ist_modify(f):
+                    # Verrechnen statt setzen: nur den Posten merken.
+                    p = modify_posten(f, universes, patch_fn, dt,
+                                      self._functions, sammler.faktor)
+                    if p is not None:
+                        sammler.posten.append(p)
+                elif inten >= 0.999 and env >= 0.999:
+                    f.write(universes, patch_fn, dt, self._functions)
                 else:
                     if dim_map is None:
                         dim_map = self._dim_addr_map(patch_cache)
@@ -494,7 +672,7 @@ class FunctionManager:
                         pu.set_range(1, su.get_all())   # Seed — NICHT geloggt
                         pu.begin_write_log()            # ab hier nur Funktions-Writes
                         priv[u] = pu
-                    f.write(priv, patch_cache, dt, self._functions)
+                    f.write(priv, patch_fn, dt, self._functions)
                     for u, pu in priv.items():
                         shared = universes.get(u)
                         if shared is None:
@@ -518,14 +696,6 @@ class FunctionManager:
                 print(f"[FunctionManager] tick error in function {fid}: {exc}")
             if not f.is_running:
                 finished.add(fid)
-        if finished:
-            with self._lock:
-                self._running_ids -= finished
-                # _start_order mit _running_ids synchron halten: selbst-beendete
-                # Funktionen (die nicht ueber stop() liefen) hier entfernen, damit
-                # die Liste nicht mit stale-IDs volllaeuft.
-                self._start_order = [fid for fid in self._start_order
-                                     if fid in self._running_ids]
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
@@ -640,6 +810,19 @@ class FunctionManager:
             # gemeinsamen Beat-Raster (Free-Run-Effekte mit leerer tempo_bus_id
             # bleiben davon unberuehrt).
             f.align_on_start = bool(fd.get("align_on_start", True))
+            # ENG-37: Modify-Kennzeichnung generisch laden. Fehlende Schluessel
+            # (jede Alt-Show) -> Vorgaben = normaler Effekt.
+            f.modify = bool(fd.get("modify", False))
+            f.modify_mode = normalize_mode(fd.get("modify_mode", "add"))
+            # ENG-43: Eine Bewegung kennt nur Addieren/Abziehen. normalize_mode
+            # liesse „dim" durch — dann behielten Show und Konsole einen Wert,
+            # den die Auswahl nicht anbietet. Auf die EFX-Arten begrenzen.
+            if (isinstance(f, EfxInstance)
+                    and f.modify_mode not in MODIFY_BEWEGUNG_ARTEN):
+                f.modify_mode = "add"
+            f.modify_strength = normalize_strength(fd.get("modify_strength", 100))
+            # ENG-40: Kanalwahl; fehlt der Schluessel, gilt die Vorgabe.
+            f.modify_channels = normalize_channels(fd.get("modify_channels"))
             self._functions[f.id] = f
         # ID-Zaehler hinter die hoechste geladene ID setzen, sonst kollidieren
         # neu erstellte Funktionen mit geladenen und ueberschreiben sie.

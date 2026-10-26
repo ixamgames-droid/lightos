@@ -776,6 +776,64 @@ def _datenumzug_melden(erg) -> bool:
     return True
 
 
+def _lizenz_beim_start():
+    """LIZ-1: Urheberzeile ins Log und — ohne gueltige Testlizenz — die Abfrage
+    nach einer Lizenzdatei. Rueckgabe: der Status, mit dem gestartet wird, oder
+    ``None`` = nicht starten.
+
+    Laeuft genau EINMAL, hier, vor dem Hauptfenster. Danach prueft nichts mehr:
+    eine laufende Show wird durch einen Ablauf nie beruehrt. ``--selbsttest`` und
+    ``--diagnose`` kommen gar nicht bis hierher, die Testsuite stellt die Abfrage
+    ueber ``LIGHTOS_LIZENZ_TESTLAUF`` ab (wirkt nur unter pytest).
+    """
+    from src.core import lizenz as _lz
+    try:
+        status = _lz.pruefe()
+    except Exception as e:      # pruefe() wirft nicht; doppeltes Netz
+        status = _lz.Lizenzstatus(_lz.UNGUELTIG, grund=f"nicht pruefbar ({e})")
+    print(_lz.start_zeile(status))
+    if not _lz.abfrage_noetig(status):
+        return status
+    try:
+        from src.ui.lizenz_dialog import frage_nach_lizenz
+        neu = frage_nach_lizenz(status)
+    except Exception as e:
+        # Der Dialog selbst ist kaputt: ehrlich sagen, nicht ohne Lizenz starten.
+        print(f"[lizenz] ERROR: Lizenzabfrage fehlgeschlagen: {e}")
+        try:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.critical(
+                None, "LightOS — Testlizenz erforderlich",
+                "LightOS ist in der Testphase und startet nur mit einer "
+                "gültigen Lizenzdatei.\n\n" + status.text() + "\n\n"
+                f"Lege die Lizenzdatei hier ab und starte LightOS neu:\n"
+                f"{_lz.standard_pfad()}\n\nTestzugang auf Anfrage: {_lz.QUELLE}")
+        except Exception:
+            pass
+        return None
+    if neu is None:
+        print("[lizenz] keine gueltige Lizenz — LightOS wird beendet")
+        return None
+    print(_lz.start_zeile(neu))
+    return neu
+
+
+def _lizenz_ablauf_hinweis(window, status) -> None:
+    """LIZ-1: ab 14 Tagen vor dem Ablauf ein Hinweis in Log und Statuszeile —
+    haelt den Start nicht auf und verlangt keine Bestaetigung."""
+    try:
+        from src.core import lizenz as _lz
+        text = _lz.ablauf_hinweis(status)
+        if not text:
+            return
+        print(f"[lizenz] {text}")
+        leiste = window.statusBar()
+        if leiste is not None and leiste.isVisibleTo(window):
+            leiste.showMessage(text, 20000)
+    except Exception as e:
+        print(f"[lizenz] Ablaufhinweis nicht angezeigt: {e}")
+
+
 def main():
     # argparse ZUERST: es hat keine Nebenwirkungen auf native Ressourcen.
     # Frueher lag die Einzelinstanz-Sperre davor — dann beantwortete ein
@@ -886,6 +944,11 @@ def main():
     # STAB-01: Qt-Warnungen/-Fehler ebenfalls ins crash.log (Vorboten nativer Crashes).
     _install_qt_message_handler()
 
+    # LIZ-1: Testlizenz — nur hier, beim echten GUI-Start (auch --kiosk/--touch).
+    _lizenz = _lizenz_beim_start()
+    if _lizenz is None:
+        return
+
     # XPLAT-44: Ergebnis der Datenuebernahme sichtbar machen — VOR MainWindow
     # (dort oeffnet get_state() die Show-DB).
     if _umzug is not None and not _datenumzug_melden(_umzug):
@@ -915,6 +978,8 @@ def main():
         QTimer.singleShot(4000, _dl.melde_laufzeit_umgebung)
     except Exception as _e:
         print(f"[main] Diagnose-Nachtrag nicht geplant: {_e}")
+
+    _lizenz_ablauf_hinweis(window, _lizenz)
 
     if args.show:
         _open_show_at_startup(window, args.show)

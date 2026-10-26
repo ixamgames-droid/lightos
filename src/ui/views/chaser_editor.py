@@ -8,11 +8,21 @@ from PySide6.QtWidgets import (
     QScrollArea, QGroupBox, QFormLayout, QCheckBox,
 )
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor
 from src.core.engine.chaser import Chaser, ChaserStep
 from src.core.engine.function import RunOrder, Direction
 from src.core.engine.function_manager import get_function_manager
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 from src.ui.weak_slots import weak_slot
+from src.ui.widgets.stufe_auswahl import StufeAuswahl
+from src.core.engine.stufen import modify_unter
+
+# ENG-37-A: Die Engine sperrt Modify-Effekte als Chaser-Schritt (gibt nichts
+# aus, auch tief in einer Sammlung/Show — chaser._render_child_target). Der
+# Editor sagt das, statt den Schritt still dunkel zu lassen.
+MODIFY_SCHRITT_HINWEIS = ("Modify-Effekte geben als Chaser-Schritt nichts aus – "
+                          "direkt, in einer Sammlung oder der Show-Zeitleiste starten")
+_HINWEIS_GELB = "#e3b341"
 
 
 class FunctionSelectorDialog(QDialog):
@@ -68,6 +78,7 @@ class ChaserEditor(QWidget):
 
     def set_chaser(self, chaser: Chaser):
         self._chaser = chaser
+        self._stufe_combo.binde(chaser)
         self._load_chaser()
 
     # ── UI ────────────────────────────────────────────────────────────────────
@@ -101,6 +112,9 @@ class ChaserEditor(QWidget):
         self._name_edit = QLineEdit()
         self._name_edit.textChanged.connect(self._on_name_changed)
         basic_form.addRow("Name:", self._name_edit)
+        # ENG-35: Stufe (welcher Effekt gewinnt) — festes Feld in jedem Editor.
+        self._stufe_combo = StufeAuswahl(self._chaser)
+        basic_form.addRow("Stufe:", self._stufe_combo)
         root.addWidget(grp_basic)
 
         # Wiedergabe & Tempo — vorher eine schmale prop_row (clippte horizontal)
@@ -208,6 +222,20 @@ class ChaserEditor(QWidget):
         # Notiz-Spalte (6) zurueckschreiben — sonst geht die Eingabe verloren.
         self._table.itemChanged.connect(self._on_note_changed)
         steps_layout.addWidget(self._table, 1)
+
+        # ENG-37-A: gelbe Hinweiszeile, sobald ein Schritt Modify ist.
+        self._modify_hinweis = QLabel()
+        self._modify_hinweis.setWordWrap(True)
+        self._modify_hinweis.setStyleSheet(
+            f"color:{_HINWEIS_GELB}; background:#2a2414; border:1px solid #5a4a1a;"
+            " border-radius:4px; padding:4px 6px;")
+        self._modify_hinweis.setToolTip(
+            "Ein Chaser überblendet feste Werte von Schritt zu Schritt. Ein "
+            "Modify-Effekt verrechnet sich dagegen mit dem laufenden Bild — als "
+            "Schritt würde er alles außerhalb seines Läufers überschreiben. Darum "
+            "bleibt so ein Schritt dunkel.")
+        self._modify_hinweis.setVisible(False)
+        steps_layout.addWidget(self._modify_hinweis)
 
         # Action buttons
         btn_row = QHBoxLayout()
@@ -347,6 +375,7 @@ class ChaserEditor(QWidget):
         self._table.blockSignals(True)
         self._table.setRowCount(len(self._chaser.steps))
         fm = get_function_manager()
+        modify_zeilen: list[int] = []
 
         for row, step in enumerate(self._chaser.steps):
             # Step number
@@ -360,6 +389,16 @@ class ChaserEditor(QWidget):
             fn_name = f"{fn.function_type.value}: {fn.name}" if fn else f"[ID {step.function_id}]"
             fn_item = QTableWidgetItem(fn_name)
             fn_item.setFlags(fn_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            mod = self._modify_im_schritt(fn, fm)
+            if mod:
+                modify_zeilen.append(row + 1)
+                fn_item.setText("⚠ " + fn_name)
+                fn_item.setForeground(QColor(_HINWEIS_GELB))
+                wer = "" if mod == [fn] else (
+                    "\nBetroffen: " + ", ".join(
+                        str(getattr(m, "name", "?")) for m in mod[:5])
+                    + (" …" if len(mod) > 5 else ""))
+                fn_item.setToolTip(MODIFY_SCHRITT_HINWEIS + "." + wer)
             self._table.setItem(row, 1, fn_item)
 
             # Timing spinboxes: Fade In(2), Hold(4), Fade Out(5)
@@ -387,6 +426,21 @@ class ChaserEditor(QWidget):
             self._table.setItem(row, 6, note_item)
 
         self._table.blockSignals(False)
+        self._modify_zeilen = modify_zeilen
+        if modify_zeilen:
+            wo = ", ".join(str(n) for n in modify_zeilen)
+            self._modify_hinweis.setText(
+                f"⚠ Schritt {wo}: {MODIFY_SCHRITT_HINWEIS}.")
+        self._modify_hinweis.setVisible(bool(modify_zeilen))
+
+    @staticmethod
+    def _modify_im_schritt(fn, fm) -> list:
+        """ENG-37-A: Modify-Effekte, die dieser Schritt stummschaltet (die
+        Funktion selbst oder ein Kind einer Sammlung/Show darin)."""
+        try:
+            return modify_unter(fn, fm.get)
+        except Exception:
+            return []
 
     # ── Slots ─────────────────────────────────────────────────────────────────
 

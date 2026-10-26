@@ -87,6 +87,38 @@ def _prune_ghost_placeholder_nodes(scene) -> None:
 # angefasst; hier reicht ein Ort. `load_show` leert die Liste am Anfang.
 _ladeprobleme: list[str] = []
 
+# ★ STAB-37: Hinweise zum Laden, bei denen von der Show NICHTS verworfen wurde.
+#
+# Der Sammler oben ist der fuer Verluste — die Oberflaeche haengt daran die
+# Warnung „Speichern schreibt den Verlust fest“. Ein Satz, der dort nicht
+# hingehoert, macht aus einer vollstaendig geladenen Show einen Schadensfall:
+# die Demo „Große Bühnen-Show“ meldete auf einem Rechner mit gewachsener
+# Geraete-Bibliothek „40 Teile konnten nicht gelesen werden“, vierzigmal
+# „… steht 2× in der Geraetebibliothek“ (einmal je PAR). Gelesen war alles, und
+# gewaehlt das richtige Profil.
+#
+# ``{Text: Anzahl}`` in Einfuegereihenfolge: derselbe Satz fuer vierzig Geraete
+# ist EIN Hinweis. ``load_show`` leert auch diesen Sammler am Anfang.
+_ladehinweise: dict[str, int] = {}
+
+
+def _ladehinweis(text: str) -> None:
+    """Einen Hinweis vormerken (STAB-37) — gleiche Texte zaehlen hoch."""
+    if text not in _ladehinweise:
+        print(f"[show_file] Hinweis: {text}")
+    _ladehinweise[text] = _ladehinweise.get(text, 0) + 1
+
+
+def letzte_ladehinweise() -> list[str]:
+    """Hinweise des letzten :func:`load_show`, bei denen nichts verloren ging
+    (STAB-37) — heute: ein Profil steht mehrfach in der Geraete-Bibliothek.
+
+    Einmal je Text; betrifft er mehrere Geraete, steht die Zahl dahinter. Die
+    Oberflaeche zeigt sie in der Statuszeile bzw. getrennt unter den echten
+    Ladeproblemen, nie als Verlust."""
+    return [text if anzahl == 1 else f"{text} (betrifft {anzahl} Geräte)"
+            for text, anzahl in _ladehinweise.items()]
+
 
 #: STAB-24 (c): Was ``save_show`` beim Einsammeln NICHT in die Datei bekam.
 #: Die Speichern-Aktion der Oberflaeche haengt es an ihre Lueckenliste
@@ -343,12 +375,16 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
     universe = max(1, _to_int(d.get("universe", 1), 1))
     address = min(512, max(1, _to_int(d.get("address", 1), 1)))
     channel_count = min(512, max(1, _to_int(d.get("channel_count", 1), 1)))
+    # Kanalzahl fuer den Modusabgleich nur, wenn die Show eine gueltige traegt:
+    # die Klemmung oben (>= 1) gilt nur fuers PatchedFixture. Gegenpruefung
+    # FM-65: eine gespeicherte 0 (Browser-Patch eines Profils ohne Kanaele)
+    # waere sonst „1 Kanal“ und loeste einen Fehlalarm aus.
+    _cc_roh = _to_int(d.get("channel_count", 0), 0)
     fixture_profile_id = _resolve_fixture_profile_id(
         fixture_profile_id,
         str(d.get("manufacturer_name", "") or ""),
         str(d.get("fixture_name", "") or ""),
-        # Kanalzahl nur, wenn die Show sie traegt (sonst klemmt sie oben auf 1).
-        mode_name=mode_name, channel_count=channel_count if "channel_count" in d else 0,
+        mode_name=mode_name, channel_count=_cc_roh if 0 < _cc_roh <= 512 else 0,
     )
     return PatchedFixture(
         fid=fid,
@@ -386,6 +422,152 @@ def _patched_fixture_from_data(d: dict, fallback_fid: int):
     )
 
 
+def _dublette_ohne_folgen(session, gewaehlt: int, rivalen: list,
+                          mode_name: str, channel_count: int) -> bool:
+    """STAB-37: ist es fuer DIESE Show gleich, welches der gleichnamigen
+    Profile genommen wurde?
+
+    ``rivalen`` sind die uebrigen Treffer, die den Modus der Show ebenfalls
+    tragen — alle anderen kommen fuer die Show ohnehin nicht in Frage. Gleich
+    heisst: dieselbe Geraeteart und im Modus der Show dieselbe Folge von
+    Kanal-Attributen. Dann faehrt in jedem Fall dasselbe Geraet, und die
+    Dublette ist eine Sache der Bibliothek. Laesst sich das nicht nachsehen,
+    gilt ``False`` — im Zweifel wird gewarnt.
+
+    Codex-Review #1072: zur Folge gehoert alles, was Render-Plan, Shutter-
+    und Laser-Aus-Logik und das 3D-Bild am Kanal lesen — Default-, Highlight-
+    und Invert-Wert, Aufloesung, Segment, Laser-Angaben und die Bereiche
+    (Grenzen und Art; ihr Name nur, soweit er gedeutet wird, s. u.) — und
+    das 3D-Modell des Profils. Unterschieden sich zwei Dubletten nur dort, wurde die Warnung
+    sonst zum blossen Statusleisten-Hinweis heruntergestuft.
+
+    ★ Namen sind nicht nur Beschriftung, wo die Ausgabe sie deutet: ein
+    Kanalname mit „Laser“ macht den Kanal zum Laserkanal (NOT-AUS, Laser-Aus-
+    Logik, LAS-38 ueber ALLE Modi des Profils), „Strobe“/„Flash“ im Namen
+    einen Kanal ohne Bereiche zum Strobe-Kanal, ein Bereich ohne Art namens
+    „Open“ zum Offen-Bereich, „1-25 Hz“ im Bereichsnamen gibt die Frequenz.
+    Verglichen wird deshalb diese DEUTUNG — ein bloss anders geschriebener
+    Name bleibt gleich, ein anders gedeuteter nicht.
+    """
+    if not rivalen:
+        return True
+    try:
+        from sqlalchemy import select
+        from src.core.database.models import (ChannelRange, FixtureChannel,
+                                              FixtureMode, FixtureProfile)
+        from types import SimpleNamespace
+        from src.core.app_state import (ist_strobe_kanal_ohne_bereiche,
+                                        shutter_bereich_art)
+        from src.core.database.modus_wahl import ist_zwilling
+        from src.core.laser.erkennung import ist_laserkanal
+        from src.core.strobe import (hz_spanne_aus_name,
+                                     ist_ausdruecklicher_strobe_kanal)
+
+        def _bereich(a, b, k, n) -> tuple:
+            r = SimpleNamespace(kind=k or "", name=n or "")
+            return (int(a or 0), int(b or 0), shutter_bereich_art(r),
+                    hz_spanne_aus_name(n))
+
+        def _kanal(zeile) -> tuple:
+            (cid, name, attr, default, highlight, invert, aufl, segment,
+             laser) = zeile
+            bereiche = tuple(sorted(
+                (_bereich(a, b, k, n) for a, b, k, n in session.execute(
+                    select(ChannelRange.range_from, ChannelRange.range_to,
+                           ChannelRange.kind, ChannelRange.name)
+                    .where(ChannelRange.channel_id == cid)).all()),
+                key=repr))
+            k = SimpleNamespace(name=name or "", attribute=attr or "",
+                                ranges=bereiche)
+            # Was die Ausgabe aus dem NAMEN liest (s. Docstring).
+            gedeutet = (ist_laserkanal(k), ist_ausdruecklicher_strobe_kanal(k),
+                        ist_strobe_kanal_ohne_bereiche(k))
+            return (attr, int(default or 0), int(highlight or 0), bool(invert),
+                    str(aufl or ""), segment, str(laser or ""), bereiche,
+                    gedeutet)
+
+        def _profil_mit_laser(pid: int) -> bool:
+            """LAS-38: hat IRGENDEIN Modus des Profils einen Laserkanal?"""
+            return any(ist_laserkanal(SimpleNamespace(name=n or "", attribute=a or ""))
+                       for n, a in session.execute(
+                           select(FixtureChannel.name, FixtureChannel.attribute)
+                           .join(FixtureMode, FixtureChannel.mode_id == FixtureMode.id)
+                           .where(FixtureMode.fixture_id == pid)).all())
+
+        def _bild(pid: int):
+            kopf = session.execute(
+                select(FixtureProfile.fixture_type, FixtureProfile.viz_model)
+                .where(FixtureProfile.id == pid)).one_or_none()
+            typ = kopf[0] if kopf is not None else None
+            modell = (kopf[1] or "") if kopf is not None else ""
+            modi = session.execute(
+                select(FixtureMode.id, FixtureMode.name, FixtureMode.channel_count)
+                .where(FixtureMode.fixture_id == pid)
+                .order_by(FixtureMode.id)).all()
+            # Dieselbe Regel wie ``_exakt`` im Aufrufer: Name + Kanalzahl,
+            # sonst der umbenannte Zwilling (FM-73).
+            passt = [m for m in modi if m[1] == mode_name
+                     and (not channel_count or int(m[2] or 0) == channel_count)]
+            if not passt and channel_count:
+                passt = [m for m in modi if int(m[2] or 0) == channel_count
+                         and ist_zwilling(m[1], mode_name)]
+            if not passt:
+                return None
+            kanaele = tuple(_kanal(z) for z in session.execute(
+                select(FixtureChannel.id, FixtureChannel.name,
+                       FixtureChannel.attribute, FixtureChannel.default_value,
+                       FixtureChannel.highlight_value,
+                       FixtureChannel.invert, FixtureChannel.resolution,
+                       FixtureChannel.segment, FixtureChannel.laser_angaben)
+                .where(FixtureChannel.mode_id == passt[0][0])
+                .order_by(FixtureChannel.channel_number)).all())
+            return (typ or "", modell, _profil_mit_laser(pid), kanaele)
+
+        eigen = _bild(int(gewaehlt))
+        return eigen is not None and all(_bild(int(r)) == eigen for r in rivalen)
+    except Exception as e:
+        print(f"[show_file] Dubletten-Vergleich: {e}")
+        return False
+
+
+def _modus_exakt(paare, mode_name: str, channel_count: int) -> bool:
+    """FM-63/FM-73: traegt ein Profil (``paare`` = seine (Name, Kanalzahl))
+    den Modus der Show — Name und, soweit bekannt, Kanalzahl, oder den
+    umbenannten Zwilling mit gleicher Kanalzahl?"""
+    if any(n == mode_name and (not channel_count or c == channel_count)
+           for n, c in paare):
+        return True
+    # FM-73: der Import hat den zweiten gleichnamigen Modus in
+    # „Name (n)“ umbenannt — fuer die Show ist das derselbe
+    # Modus (Alias-Regel in ``modus_wahl``), kein fehlender.
+    from src.core.database.modus_wahl import ist_zwilling
+    return bool(channel_count) and any(
+        c == channel_count and ist_zwilling(n, mode_name) for n, c in paare)
+
+
+def _modus_der_show_da(paare, mode_name: str, channel_count: int) -> bool:
+    """FM-65: Modusregel des Schnellwegs. Mit Modusname wie ``_modus_exakt``,
+    nur mit Kanalzahl: ein Modus dieser Kanalzahl; ohne beides immer wahr.
+
+    Gegenpruefung FM-65: mit Modusname UND Kanalzahl zaehlt auch ein Modus
+    gleicher Kanalzahl, dessen Name laut UXT-08 (``sync._ist_umbenennung``)
+    nur eine Kurzform/Umbenennung ist — dieselbe Regel wie die Show-Pruefung.
+    Der Geraetebrowser speichert „5 Channel (alte Version)“ als „5 Channel“
+    (``split(" (")[0]``), und Reifegrad-Zusaetze („(ungeprueft)“) fallen weg;
+    beides ist kein fehlender Modus und darf weder laut melden noch die Show
+    auf ein anderes gleichnamiges Profil umhaengen."""
+    if mode_name:
+        if _modus_exakt(paare, mode_name, channel_count):
+            return True
+        from src.core.sync import _ist_umbenennung
+        return bool(channel_count) and any(
+            c == channel_count and _ist_umbenennung(n, mode_name)
+            for n, c in paare)
+    if channel_count:
+        return any(c == channel_count for _n, c in paare)
+    return True
+
+
 def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                                 fixture_name: str, *, mode_name: str = "",
                                 channel_count: int = 0) -> int:
@@ -414,6 +596,16 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     den die UI beim Oeffnen ohnehin als Warnung zeigt. Bewusst KEIN neuer
     Meldeweg: der Fall gehoert in denselben Dialog wie ein nicht lesbarer
     Show-Block, und ein zweiter Kanal waere ein zweiter, der uebersehen wird.
+
+    ★ **STAB-37: eine Dublette OHNE FOLGEN ist ein Hinweis, kein Ladeproblem.**
+    Steht der Modus der Show im gewaehlten Profil und bietet kein anderer
+    Treffer denselben Modus mit anderer Kanalbelegung oder Geraeteart an
+    (``_dublette_ohne_folgen``), ist von der Show nichts verworfen — die
+    Meldung „steht 2× in der Geraetebibliothek“ geht dann in
+    ``_ladehinweise`` (dieselbe Stelle der Oberflaeche, aber nicht unter
+    „Speichern schreibt den Verlust fest“). Traegt die Show keinen Modus oder
+    unterscheiden sich die Treffer wirklich, bleibt sie ein Ladeproblem wie
+    die drei Ausgaenge oben.
 
     ★★ **Und die Mehrdeutigkeit wird nicht mehr von der Einfuegereihenfolge
     entschieden.** Bisher gewann ``order_by(FixtureProfile.id).first()`` —
@@ -446,6 +638,16 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
     Die FM-43-Regel „builtin vor Import“ gilt damit nur noch innerhalb einer
     Stufe: hat ein Import den Modus der Show und das builtin nicht, gewinnt
     der Import (die Dubletten-Meldung bleibt).
+
+    ★★ **FM-65: auch der Schnellweg „ID passt, Name passt“ prueft den Modus.**
+    Profil-IDs kollidieren ueber Geraete-DBs: eine Show von Rechner X kann mit
+    ihrer ID hier auf ein GLEICHNAMIGES Profil mit anderen Modi zeigen — bisher
+    still angenommen, falsche Kanalbelegung. Traegt die Show Modusname und/oder
+    Kanalzahl und hat das Profil der ID diesen Modus nicht
+    (``_modus_der_show_da``), laeuft der normale Abgleich oben; die ID der Show
+    steht dabei in jeder Stufe vorn, findet er nichts Besseres, bleibt sie —
+    mit Meldung in ``_ladeprobleme``. Legacy-Shows ohne Modus/Kanalzahl: wie
+    bisher.
     """
     if not fixture_name:
         return profile_id
@@ -462,11 +664,23 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                 .options(joinedload(FixtureProfile.manufacturer))
                 .where(FixtureProfile.id == profile_id)
             ).scalar_one_or_none()
+            # FM-65: ID + Name passen — aber traegt das Profil der ID auch den
+            # Modus der Show? Sonst zeigt die ID in DIESER Bibliothek womoeglich
+            # auf ein gleichnamiges Profil mit anderen Modi (andere Geraete-DB).
+            id_ohne_modus = False
             if current is not None:
                 current_mfr = getattr(current.manufacturer, "name", "") or ""
                 if (current.name == fixture_name and
                         (not manufacturer_name or current_mfr.casefold() == manufacturer_name.casefold())):
-                    return profile_id
+                    if not (mode_name or channel_count):
+                        return profile_id          # Legacy: wie bisher
+                    from src.core.database.models import FixtureMode
+                    paare = [(n, int(c or 0)) for n, c in session.execute(
+                        select(FixtureMode.name, FixtureMode.channel_count)
+                        .where(FixtureMode.fixture_id == profile_id))]
+                    if _modus_der_show_da(paare, mode_name, channel_count):
+                        return profile_id
+                    id_ohne_modus = True
 
             query = (
                 select(FixtureProfile.id, FixtureProfile.source)
@@ -502,34 +716,60 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     modi.setdefault(int(fid_), []).append((mname, int(mcount or 0)))
 
                 def _exakt(t) -> bool:
-                    paare = modi.get(int(t[0]), [])
-                    if any(n == mode_name and (not channel_count or c == channel_count)
-                           for n, c in paare):
-                        return True
-                    # FM-73: der Import hat den zweiten gleichnamigen Modus in
-                    # „Name (n)“ umbenannt — fuer die Show ist das derselbe
-                    # Modus (Alias-Regel in ``modus_wahl``), kein fehlender.
-                    from src.core.database.modus_wahl import ist_zwilling
-                    return bool(channel_count) and any(
-                        c == channel_count and ist_zwilling(n, mode_name)
-                        for n, c in paare)
+                    return _modus_exakt(modi.get(int(t[0]), []), mode_name,
+                                        channel_count)
 
                 def _kanalzahl(t) -> bool:
                     return bool(channel_count) and any(
                         c == channel_count for _n, c in modi.get(int(t[0]), []))
 
+                if id_ohne_modus:
+                    # FM-65: findet der Abgleich nichts Besseres, bleibt es bei
+                    # der ID der Show (innerhalb jeder Stufe zuerst) — nicht bei
+                    # irgendeinem anderen gleichnamigen Profil.
+                    treffer = sorted(treffer, key=lambda t: int(t[0]) != profile_id)
                 gewaehlt = treffer[0]
                 if mode_name or channel_count:
                     gewaehlt = (next((t for t in treffer if mode_name and _exakt(t)), None)
                                 or next((t for t in treffer if _kanalzahl(t)), None)
                                 or treffer[0])
                 resolved = int(gewaehlt[0])
-                print(
-                    f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
-                    f"({_geraet})"
-                )
+                if resolved != profile_id:
+                    print(
+                        f"[show_file] Fixture-Profil remapped: {profile_id} -> {resolved} "
+                        f"({_geraet})"
+                    )
                 modus_passt = not mode_name or _exakt(gewaehlt)
-                if not modus_passt:
+                if id_ohne_modus:
+                    modus_passt = _modus_der_show_da(
+                        modi.get(resolved, []), mode_name, channel_count)
+                if not modus_passt and resolved == profile_id:
+                    # FM-65: kein besseres Profil — die ID bleibt, aber laut.
+                    _modus = (f"„{mode_name}“ ({channel_count} Kanaele)"
+                              if mode_name and channel_count else
+                              f"„{mode_name}“" if mode_name else
+                              f"mit {channel_count} Kanaelen")
+                    _ladeprobleme.append(
+                        f"„{_geraet}“: Profil {profile_id} hat in dieser "
+                        f"Geraetebibliothek den Modus {_modus} der Show NICHT "
+                        f"(die ID gehoert hier wohl zu einem gleichnamigen Profil "
+                        f"mit anderen Modi), ein passenderes Profil gibt es nicht. "
+                        f"Kanalbelegung am Geraet pruefen.")
+                elif id_ohne_modus and resolved != profile_id:
+                    # Gegenpruefung FM-65: Wechsel weg von einer ID, deren Name
+                    # und Hersteller passen — nie still. Es kann die ID-Kollision
+                    # einer anderen Geraete-DB sein (dann ist der Wechsel richtig)
+                    # oder ein hier bearbeitetes Profil (dann nicht).
+                    _ladeprobleme.append(
+                        f"„{_geraet}“: Profil {profile_id} ist hier ein "
+                        f"gleichnamiges Profil OHNE den Modus „{mode_name or '?'}“ "
+                        f"({channel_count or '?'} Kanaele) der Show — genommen "
+                        f"wurde Profil {resolved} "
+                        f"({gewaehlt[1] or 'ohne Herkunft'}), das ihn hat. Stammt "
+                        f"die Show von einem anderen Rechner, ist das richtig; "
+                        f"wurde das Profil hier bearbeitet, das Geraet neu "
+                        f"patchen. Kanalbelegung am Geraet pruefen.")
+                elif not modus_passt:
                     _ladeprobleme.append(
                         f"„{_geraet}“: Profil {profile_id} passt nicht zur Show "
                         f"(fehlt oder traegt einen anderen Namen), "
@@ -550,11 +790,29 @@ def _resolve_fixture_profile_id(profile_id: int, manufacturer_name: str,
                     # Mehrdeutig: gemeldet, nicht verschwiegen. Der Mensch sieht
                     # sonst ein Geraet, das *fast* stimmt, und sucht den Fehler
                     # ueberall — nur nicht in der Bibliothek.
-                    _ladeprobleme.append(
+                    # STAB-37: nur ein HINWEIS, wenn die Wahl fuer diese Show
+                    # feststeht — der Modus der Show steht im gewaehlten Profil,
+                    # und kein anderer Treffer bietet denselben Modus mit einer
+                    # ANDEREN Kanalbelegung oder Geraeteart an. Dann ist von der
+                    # Show nichts verworfen; im Verlust-Sammler machte der Satz
+                    # aus jeder Show mit einem doppelt vorhandenen Profil einen
+                    # Schadensfall. Laesst sich das nicht pruefen (Show ohne
+                    # Modus) oder unterscheiden sich die Treffer wirklich, bleibt
+                    # es eine Warnung: dann kann das falsche Geraet fahren, und
+                    # Speichern schriebe die Wahl fest.
+                    text = (
                         f"„{_geraet}“ steht {len(andere) + 1}× in der Geraetebibliothek — "
                         f"genommen wurde Profil {resolved} "
                         f"({gewaehlt[1] or 'ohne Herkunft'}). Wenn das Geraet falsch "
                         f"aussieht, liegt es an der Dublette, nicht an der Show.")
+                    if (mode_name and _exakt(gewaehlt)
+                            and _dublette_ohne_folgen(
+                                session, resolved,
+                                [int(t[0]) for t in andere if _exakt(t)],
+                                mode_name, channel_count)):
+                        _ladehinweis(text)
+                    else:
+                        _ladeprobleme.append(text)
                 return resolved
             # FM-43: ab hier ist das Geraet NICHT aufloesbar. Bis 2026-09-03
             # endete die Funktion hier stumm mit der alten ID — und was diese
@@ -874,6 +1132,10 @@ def _collect_fixture_groups(state, probleme: list | None = None) -> list:
                         # meint (Blackout-Ziel einer VC-Taste), zeigte nach
                         # Speichern/Laden auf eine andere oder keine.
                         "id": int(g.id),
+                        # VCB-42: die Kennung auch. Die ID sagt nur „welche
+                        # Nummer“, die Kennung „welche Gruppe“ — ohne sie waere
+                        # nach dem Laden jede Gruppe fuer eine Taste eine neue.
+                        "uid": g.uid or "",
                         "name": g.name, "cols": int(g.cols), "rows": int(g.rows),
                         "positions_json": g.positions_json or "{}",
                         "folder": g.folder or "",
@@ -917,6 +1179,11 @@ def _fixture_group_aus_daten(g):
     if (isinstance(gid, int) and not isinstance(gid, bool)
             and 0 < gid <= _GRUPPEN_ID_MAX):
         fg.id = gid
+    # VCB-42: gespeicherte Kennung uebernehmen. Fehlt sie (Alt-Show) oder ist
+    # sie unlesbar, bleibt sie offen — ``_gruppen_ids_vergeben`` gibt dann eine
+    # neue. Auch hier kostet ein kaputter Wert nur sich selbst, nicht die Gruppe.
+    from ..group_ref import uid_lesbar
+    fg.uid = uid_lesbar(g.get("uid")) or None
     return fg
 
 
@@ -928,7 +1195,21 @@ def _gruppen_ids_vergeben(gebaut: list) -> None:
     die treffen, die ein spaeterer Eintrag mitbringt — die Transaktion
     scheiterte, und ALLE Gruppen waeren weg (der Fall, den STAB-24 beendet
     hat). Steht dieselbe ID zweimal in der Datei, behaelt sie der erste
-    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge."""
+    Eintrag. Alt-Shows ohne IDs bekommen wie bisher 1..n in Datei-Reihenfolge.
+
+    VCB-42: dasselbe fuer die Kennung — jede Gruppe genau eine, keine doppelt
+    (der erste Eintrag behaelt sie). Zwei Gruppen mit derselben Kennung waeren
+    fuer eine Taste „dieselbe“."""
+    from ..group_ref import neue_uid
+    kennungen: set[str] = set()
+    for fg in gebaut:
+        if not fg.uid or fg.uid in kennungen:
+            if fg.uid:
+                _lenient(f"Fixture-Gruppe '{fg.name}': Kennung steht doppelt in "
+                         f"der Datei — neue Kennung vergeben",
+                         ValueError("doppelte Kennung"))
+            fg.uid = neue_uid()
+        kennungen.add(fg.uid)
     vergeben: set[int] = set()
     for fg in gebaut:
         if fg.id is None:
@@ -1142,9 +1423,39 @@ def _show_daten(state, probleme: list) -> dict:
         "music_autoshow": getattr(state, "music_autoshow", None)
         or {"enabled": False, "function_ids": [], "bank": 0},
     }
+    # LAS-32 (S1): Sperrzonen als EIGENER Abschnitt mit eigener Versionsnummer
+    # — bewusst kein Knoten im Szenengraph (ein aelterer Programmstand macht aus
+    # einer unbekannten Knotenart ein Geraet). Nur geschrieben, wenn es etwas
+    # gibt: eine Show ohne Zonen bleibt Byte fuer Byte wie bisher.
+    sperrzonen = getattr(state, "sperrzonen", None)
+    if sperrzonen is not None and not sperrzonen.ist_leer():
+        show["sperrzonen"] = sperrzonen.to_dict()
     if scene_graph_data is not None:
         show["scene_graph"] = scene_graph_data
     return show
+
+
+def _mit_herkunft(show: dict) -> dict:
+    """LIZ-1: Vermerk ``erstellt_mit`` in den Kopf der show.json (direkt hinter
+    ``version``/``name``).
+
+    Nur beim SCHREIBEN der Datei, bewusst NICHT in :func:`_show_daten`: der
+    Vermerk ist kein Show-Inhalt — er darf weder den Aenderungs-Vergleich
+    (:func:`show_hat_aenderungen`) noch einen Block-Fingerabdruck beruehren. Der
+    Wert ist fest (haengt nur an der Programmversion), wiederholtes Speichern
+    schreibt also weiter dieselben Bytes. Beim Laden wird er nicht gelesen:
+    Shows ohne das Feld laden unveraendert.
+    """
+    try:
+        from src.core.lizenz import erstellt_mit
+        vermerk = erstellt_mit()
+    except Exception as e:
+        print(f"[show_file] Herkunftsvermerk nicht geschrieben: {e}")
+        return show
+    kopf = {k: show[k] for k in ("version", "name") if k in show}
+    kopf["erstellt_mit"] = vermerk
+    kopf.update((k, v) for k, v in show.items() if k not in kopf)
+    return kopf
 
 
 def save_show(path: str | os.PathLike, layout: dict | None = None):
@@ -1168,7 +1479,7 @@ def save_show(path: str | os.PathLike, layout: dict | None = None):
         # echten state._scene (keine Kopie) -- konsistent mit load_show, wo
         # dieselbe Aufraeumfunktion nach dem Graph-Aufbau laeuft.
         _prune_ghost_placeholder_nodes(scene)
-    show = _show_daten(state, _speicherprobleme)
+    show = _mit_herkunft(_show_daten(state, _speicherprobleme))
     # Reihenfolge der Bloecke wie bisher: Fensterlayout VOR dem Szenegraphen.
     scene_graph_data = show.pop("scene_graph", None)
     if layout:
@@ -1332,7 +1643,15 @@ def _vc_ohne_live_werte(knoten):
     if isinstance(knoten, list):
         return [_vc_ohne_live_werte(k) for k in knoten]
     if isinstance(knoten, dict):
-        felder = _LIVE_FELDER_VC.get(knoten.get("type"), ())
+        typ = knoten.get("type")
+        felder = _LIVE_FELDER_VC.get(typ, ())
+        # WEB-08: die Kennung eines VC-Widgets ist keine Aenderung am Inhalt.
+        # Eine Show von vor WEB-08 bekommt beim Laden Kennungen — zaehlten sie
+        # mit, gaelte jede alte Show sofort als "ungespeichert geaendert".
+        # Nur am Widget selbst (Typ "VC…"): ein gleichnamiges Feld tiefer in
+        # den Widget-Daten ist Inhalt.
+        if isinstance(typ, str) and typ.startswith("VC"):
+            felder = tuple(felder) + ("id",)
         return {k: _vc_ohne_live_werte(v) for k, v in knoten.items() if k not in felder}
     return knoten
 
@@ -1715,6 +2034,13 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     except Exception as e:
         print(f"[show_file] reset laser patterns error: {e}")
 
+    # LAS-32: Sperrzonen und Laser-Felder leeren.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten
+        state.sperrzonen = SperrzonenDaten()
+    except Exception as e:
+        print(f"[show_file] reset sperrzonen error: {e}")
+
     pe = getattr(state, "playback_engine", None)
     if pe is not None:
         try:
@@ -1914,6 +2240,7 @@ def _load_show_impl(path: str | os.PathLike):
     from src.core.engine.cue_stack import CueStack
 
     _ladeprobleme.clear()   # QA-50: Sammler gehoert diesem Ladevorgang
+    _ladehinweise.clear()   # STAB-37: der fuer Hinweise ebenso
 
     try:
         with zipfile.ZipFile(path, "r") as zf:
@@ -1999,6 +2326,12 @@ def _load_show_impl(path: str | os.PathLike):
     # sonst nullt der Zwischenschritt mit dem leeren Patch alle alten Adressen im
     # Live-Universe und der Output-Thread sendet den Blackout-Puls, bis der neue
     # Patch gerendert ist.
+    # LAS-32 (G10): hatte die Show, die gleich ersetzt wird, Sperrzonen?
+    try:
+        _sz_hatte_zonen = bool(getattr(getattr(state, "sperrzonen", None), "zonen", None))
+    except Exception:
+        _sz_hatte_zonen = False
+    state.sperrzonen_wechsel_hinweis = False
     with _deferred_addr_release(state):
         _prev_suppress = getattr(state, "_suppress_emits", False)
         state._suppress_emits = True
@@ -2167,6 +2500,19 @@ def _load_show_impl(path: str | os.PathLike):
             PatternSlot.from_dict, "Laser-Muster", "name", "label")
     except Exception as e:
         _lenient("load laser patterns error", e)
+
+    # LAS-32 (S1): Sperrzonen (eigener Abschnitt). Alt-Show ohne Abschnitt ->
+    # leerer Bestand; die Anzeige meldet dann „keine Sperrzonen", nie einen
+    # Zustand, der nach Schutz aussieht.
+    try:
+        from src.core.laser.sperrzonen import SperrzonenDaten, daten_aus_abschnitt
+        state.sperrzonen, _sz_probleme = daten_aus_abschnitt(data.get("sperrzonen"))
+        for _p in _sz_probleme:
+            print(f"[show_file] {_p}")
+            _ladeprobleme.append(_p)
+    except Exception as e:
+        state.sperrzonen = SperrzonenDaten()
+        _lenient("load sperrzonen error", e)
 
     try:
         from src.core.engine.efx_path import get_efx_path_library
@@ -2564,6 +2910,22 @@ def _load_show_impl(path: str | os.PathLike):
     except Exception as e:
         _lenient("music_autoshow load error", e)
         state.music_autoshow = {"enabled": False, "function_ids": [], "bank": 0, "slots": {}}
+
+    # LAS-32 (G10): von einer Show MIT Sperrzonen auf eine OHNE gewechselt,
+    # waehrend DMX-Laser gepatcht sind -> das Hauptfenster meldet es einmal
+    # (es liest und loescht dieses Flag im show_loaded-Handler). Eine Show mit
+    # Zonen merkt ausserdem, dass die Funktion auf diesem Rechner benutzt wird.
+    try:
+        from src.core.laser import sperrzonen as _sz
+        from src.core.laser.sperrzonen_merker import merke_benutzt as _sz_merke
+        _sz_daten = state.sperrzonen
+        if _sz_daten.zonen:
+            _sz_merke()
+        state.sperrzonen_wechsel_hinweis = bool(
+            _sz_hatte_zonen and not _sz_daten.zonen and _sz_daten.fremd is None
+            and _sz.dmx_laser(state))
+    except Exception as e:
+        _lenient("sperrzonen wechsel-hinweis error", e)
 
     # Notify listeners after full replacement
     try:

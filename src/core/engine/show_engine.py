@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 from .function import Function, FunctionType
+from .modify import write_child
 
 if TYPE_CHECKING:
     from src.core.dmx.universe import Universe
@@ -132,7 +133,9 @@ class Show(Function):
                 if sf._started and not sf._stopped:
                     child = function_registry.get(sf.function_id)
                     if child is not None:
-                        child.write(universes, patch_cache, dt, function_registry)
+                        # ENG-37: Modify-Kinder werden verrechnet statt gesetzt.
+                        write_child(child, universes, patch_cache, dt,
+                                    function_registry)
 
                 # Trigger stop
                 if (sf._started and not sf._stopped and

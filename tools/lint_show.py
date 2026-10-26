@@ -12,6 +12,7 @@ ausgegeben und zaehlen auch unter --strict nicht.
 """
 from __future__ import annotations
 
+import _werkzeug_sandbox  # noqa: F401  (TOOL-27: eigene Sandbox, vor jedem src-Import)
 import glob
 import os
 import sys

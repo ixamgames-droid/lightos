@@ -414,13 +414,21 @@ class LaserDrawDialog(QDialog):
         self._install_shortcuts()
 
     def _install_shortcuts(self):
-        from PySide6.QtGui import QShortcut, QKeySequence
-        self._sc_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
-        self._sc_undo.activated.connect(self._do_undo)
-        self._sc_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
-        self._sc_redo.activated.connect(self._do_redo)
-        self._sc_redo2 = QShortcut(QKeySequence("Ctrl+Y"), self)   # Windows-Redo
-        self._sc_redo2.activated.connect(self._do_redo)
+        # UI-93: feste Belegung aus einer Stelle. Vorher stand Strg+Y hier
+        # zusaetzlich zu StandardKey.Redo — unter Windows steckt Strg+Y dort
+        # schon drin, die Folge war doppelt belegt und loeste nichts aus.
+        from src.ui import undo_kuerzel
+        self._sc_undo, self._sc_redo = undo_kuerzel.kuerzel_anlegen(
+            self, self._do_undo, self._do_redo)
+
+    def event(self, ev):  # noqa: N802 (Qt-API)
+        # UI-93: in einem Textfeld gehoeren Strg+Y/Strg+Umschalt+Z dem Feld.
+        from PySide6.QtCore import QEvent
+        if ev.type() == QEvent.Type.ShortcutOverride:
+            from src.ui import undo_kuerzel
+            if undo_kuerzel.vorrang(self, ev):
+                return True
+        return super().event(ev)
 
     def showEvent(self, ev):  # noqa: N802 (Qt-API)
         super().showEvent(ev)
@@ -526,6 +534,7 @@ class LaserDrawDialog(QDialog):
             bar.addWidget(b)
         self._tool_buttons[TOOL_EDIT].setChecked(True)
         bar.addSpacing(10)
+        from src.ui import undo_kuerzel
         self._btn_undo = QPushButton("↶")
         self._btn_undo.setToolTip("Rückgängig (Strg+Z)")
         self._btn_undo.setStyleSheet(_TOOLBTN)
@@ -533,7 +542,7 @@ class LaserDrawDialog(QDialog):
         self._btn_undo.clicked.connect(self._do_undo)
         bar.addWidget(self._btn_undo)
         self._btn_redo = QPushButton("↷")
-        self._btn_redo.setToolTip("Wiederholen (Strg+Y)")
+        self._btn_redo.setToolTip(f"Wiederholen ({undo_kuerzel.redo_text()})")
         self._btn_redo.setStyleSheet(_TOOLBTN)
         self._btn_redo.setEnabled(False)
         self._btn_redo.clicked.connect(self._do_redo)

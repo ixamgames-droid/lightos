@@ -235,5 +235,133 @@ class KeineGeraeteSeriennummerTest(unittest.TestCase):
         self.assertFalse(rx.search("EN••••••"))
 
 
+def _backlog_dateien(repo: str) -> list[str]:
+    """PRIV-06: die drei Backlog-Gruppen, wie sie auf der Platte liegen.
+
+    Bewusst ``glob`` statt ``git ls-files``: ein neues Fragment in
+    ``backlog.d/`` ist vor dem ersten ``git add`` noch nicht getrackt, landet
+    aber mit genau diesem PR oeffentlich — der Waechter soll es VORHER sehen.
+    """
+    import glob
+    dateien = [os.path.join(repo, n) for n in ("BACKLOG.md", "BACKLOG_ARCHIVE.md")]
+    dateien += sorted(glob.glob(os.path.join(repo, "backlog.d", "*.md")))
+    return [d for d in dateien if os.path.isfile(d)]
+
+
+def _backlog_funde(repo: str, nur_klarnamen: bool) -> list[str]:
+    """``datei:zeile: befund`` fuer jede Zeile, die ``pruefe_oeffentlich()``
+    beanstandet.
+
+    ``nur_klarnamen`` trennt die zwei Teile des Gates: der Namensteil braucht
+    die LOKALE Liste (in der CI fehlt sie), der Pfad-Teil nicht.
+
+    Die E-Mail-Regel bleibt hier aussen vor: Backlog-Zeilen notieren
+    Absturz-Signaturen als ``UI-FREEZE@main.py:367`` — fuer die Regel sieht
+    das wie eine Adresse aus (2 Fehlalarme am 25.10.2026, 0 echte Funde).
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_session_claim_priv06", os.path.join(repo, "tools", "session_claim.py"))
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    funde = []
+    for pfad in _backlog_dateien(repo):
+        rel = os.path.relpath(pfad, repo).replace(os.sep, "/")
+        with open(pfad, encoding="utf-8") as f:
+            for nr, zeile in enumerate(f, 1):
+                for befund in sc.pruefe_oeffentlich(zeile):
+                    ist_name = befund.startswith("Klarname")
+                    if befund == "E-Mail-Adresse" or ist_name != nur_klarnamen:
+                        continue
+                    # Der Befund nennt nur den Anfangsbuchstaben — die
+                    # Fehlermeldung des Gates traegt den Namen also nicht weiter.
+                    funde.append(f"{rel}:{nr}: {befund}")
+    return funde
+
+
+def _lokale_klarnamen(repo: str) -> list[str]:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_session_claim_priv06_namen", os.path.join(repo, "tools", "session_claim.py"))
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    return sc._klarnamen()
+
+
+class KeinKlarnameImBacklogTest(unittest.TestCase):
+    """PRIV-06: BACKLOG.md, BACKLOG_ARCHIVE.md und backlog.d/ sind pseudonym.
+
+    Der Bestand ist am 25.10.2026 umgestellt worden (204 Stellen, der
+    Betreiber heisst dort „Robin“). Ohne Waechter traegt der naechste
+    Eintrag den Namen wieder hinein — genau dieselbe Lage wie vor PRIV-05
+    auf der Tafel. Die Pruefung ist DIESELBE wie dort: ``pruefe_oeffentlich()``
+    aus ``tools/session_claim.py`` gegen die lokale Namensliste.
+    """
+
+    def test_kein_klarname_in_den_backlog_dateien(self):
+        if not _lokale_klarnamen(_REPO):
+            self.skipTest("keine lokale Namensliste (klarnamen.txt) — der Namensteil "
+                          "braucht sie und laeuft deshalb nur auf den Entwicklungs"
+                          "rechnern, nicht in der CI; der Pfad-Teil laeuft weiter")
+        funde = _backlog_funde(_REPO, nur_klarnamen=True)
+        self.assertEqual(
+            funde, [],
+            "Klarname in den Backlog-Dateien — im Repo heisst der Betreiber "
+            "„Robin“. Ersetzen mit:  tools/pseudonymisieren.py --anwenden "
+            "--nur <datei>")
+
+    def test_keine_privaten_pfade_oder_links_in_den_backlog_dateien(self):
+        """Pfad-Teil: braucht keine lokale Liste und laeuft deshalb ueberall."""
+        alt = os.environ.get("LIGHTOS_KLARNAMEN")
+        os.environ["LIGHTOS_KLARNAMEN"] = os.path.join(_REPO, "gibt-es-nicht", "x.txt")
+        try:
+            funde = _backlog_funde(_REPO, nur_klarnamen=False)
+        finally:
+            if alt is None:
+                os.environ.pop("LIGHTOS_KLARNAMEN", None)
+            else:
+                os.environ["LIGHTOS_KLARNAMEN"] = alt
+        self.assertEqual(funde, [], "Privater Pfad oder Sitzungs-Link in den "
+                                    "Backlog-Dateien (Platzhalter: /home/user/…, "
+                                    "C:\\Users\\X\\…)")
+
+    def test_der_waechter_wuerde_einen_neuen_namen_finden(self):
+        """Gegenprobe mit einer KUENSTLICHEN Liste in einer tmp-Kopie — sonst
+        ist „keine Funde“ nicht von „schaut nicht hin“ zu unterscheiden."""
+        import shutil
+        import tempfile
+        name = "Kasi" + "mirus"          # zusammengesetzt: kein Fund in dieser Datei
+        alt = os.environ.get("LIGHTOS_KLARNAMEN")
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "tools"))
+            os.makedirs(os.path.join(tmp, "backlog.d"))
+            shutil.copy(os.path.join(_REPO, "tools", "session_claim.py"),
+                        os.path.join(tmp, "tools"))
+            liste = os.path.join(tmp, "klarnamen.txt")
+            with open(liste, "w", encoding="utf-8") as f:
+                f.write(f"# Probe\n{name}\n")
+            with open(os.path.join(tmp, "BACKLOG.md"), "w", encoding="utf-8") as f:
+                f.write("| X-1 | P2 | todo | Robin will es so |\n")
+            with open(os.path.join(tmp, "BACKLOG_ARCHIVE.md"), "w", encoding="utf-8") as f:
+                f.write(f"| X-2 | done | Wunsch von {name.upper()} |\n")
+            with open(os.path.join(tmp, "backlog.d", "X-3.md"), "w", encoding="utf-8") as f:
+                f.write(f"ID: X-3\nStatus: todo\n\n_{name}s Auftrag: …_\n"
+                        f"/home/{'konto' + 'name'}/x\n")
+            os.environ["LIGHTOS_KLARNAMEN"] = liste
+            try:
+                namen = _backlog_funde(tmp, nur_klarnamen=True)
+                pfade = _backlog_funde(tmp, nur_klarnamen=False)
+            finally:
+                if alt is None:
+                    os.environ.pop("LIGHTOS_KLARNAMEN", None)
+                else:
+                    os.environ["LIGHTOS_KLARNAMEN"] = alt
+        self.assertEqual([f.split(":")[0] for f in namen],
+                         ["BACKLOG_ARCHIVE.md", "backlog.d/X-3.md"])
+        self.assertTrue(all(name not in f for f in namen),
+                        "die Fehlermeldung darf den Namen nicht ausschreiben")
+        self.assertEqual([f.split(":")[:2] for f in pfade], [["backlog.d/X-3.md", "5"]])
+
+
 if __name__ == "__main__":
     unittest.main()
