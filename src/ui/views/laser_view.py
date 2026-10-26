@@ -34,8 +34,9 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QSlider,
     QSpinBox, QComboBox, QPushButton, QRadioButton, QButtonGroup,
     QScrollArea, QGroupBox, QInputDialog, QFrame, QMenu, QToolButton,
+    QSizePolicy,
 )
-from PySide6.QtCore import Qt, QRect, QTimer
+from PySide6.QtCore import Qt, QRect, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 
 from src.core.app_state import get_state, get_channels_for_patched
@@ -46,8 +47,8 @@ from src.core.laser.profilangaben import FARBEN, laser_profilangaben
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.laser_tab_bausteine import (
     TOUCH, BetriebsartUmschalter, FarbFelder, LageAnzeige, LageFeld,
-    MusterGalerie, SprechRegler, farbe_als_qt, lage_text, nebentext,
-    ueberschrift)
+    MusterGalerie, SprechRegler, bedien_hoehe, farbe_als_qt, lage_text,
+    nebentext, trefferflaechen_anheben, ueberschrift)
 
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
 # gehören (Musterauswahl = gobo_wheel, Rotation = gobo_rotation usw.).
@@ -200,6 +201,37 @@ def _modul_oder_none(name: str):
         return importlib.import_module(name)
     except Exception:
         return None
+
+
+class _SperrzonenAbzeichen(QLabel):
+    """LAS-44 (QA96-22): das gelbe Sperrzonen-Abzeichen der Sicherheitsleiste
+    sah aus wie ein Knopf und reagierte nicht. Jetzt ist es einer: Klick
+    (bzw. Leertaste/Eingabe mit Fokus) meldet ``geklickt`` — der Laser-Tab
+    oeffnet damit den Planer. Nur Anzeige: es schaltet keinen Laser."""
+
+    geklickt = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__("", parent)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.setAccessibleName("Sperrzonen planen")
+
+    def mouseReleaseEvent(self, event):  # noqa: N802 (Qt-API)
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self.rect().contains(event.position().toPoint())):
+            self.geklickt.emit()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+    def keyPressEvent(self, event):  # noqa: N802 (Qt-API)
+        if event.key() in (Qt.Key.Key_Space, Qt.Key.Key_Return,
+                           Qt.Key.Key_Enter):
+            self.geklickt.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 def sperrzonen_hinweis(state, fids) -> tuple[str, str] | None:
@@ -541,7 +573,8 @@ class LaserView(QWidget):
         self._dmx_safety_box.setStyleSheet(
             "#laserSicherheitsleiste{background:#1c1c1c;border:1px solid "
             "#3a3a3a;border-radius:4px;}")
-        self._dmx_safety_box.setFixedHeight(44)
+        # LAS-44: Hoehe folgt der Bedienhoehe (36 px, Touch 46 px) + Rand.
+        self._dmx_safety_box.setFixedHeight(bedien_hoehe() + 8)
         dsb = QHBoxLayout(self._dmx_safety_box)
         dsb.setContentsMargins(12, 0, 4, 0)
         dsb.setSpacing(8)
@@ -552,10 +585,20 @@ class LaserView(QWidget):
         dsb.addWidget(self._lbl_dmx_estop)
         self._lbl_modell = QLabel("")
         self._lbl_modell.setStyleSheet("color:#8b949e;background:transparent;")
+        # LAS-44: wird es eng (Touch-Schrift, langer Zustand „… durch BLACKOUT
+        # dunkel gehalten“), gibt zuerst Modell/Anzahl nach — nie der Zustand
+        # und nie der LASER NOT-AUS.
+        self._lbl_modell.setSizePolicy(QSizePolicy.Policy.Ignored,
+                                       QSizePolicy.Policy.Preferred)
         dsb.addWidget(self._lbl_modell)
         dsb.addStretch(1)
-        self._sperrzonen_abzeichen = QLabel("")
+        self._sperrzonen_abzeichen = _SperrzonenAbzeichen()
+        self._sperrzonen_abzeichen.setObjectName("laserSperrzonenAbzeichen")
         self._sperrzonen_abzeichen.setTextFormat(Qt.TextFormat.RichText)
+        # LAS-44 (QA96-22): Klick oeffnet den Planer (gibt es ihn auf diesem
+        # Stand nicht, klappt er die Meldung je Laser auf).
+        self._sperrzonen_abzeichen.geklickt.connect(
+            weak_slot(self._sperrzonen_abzeichen_geklickt))
         self._sperrzonen_abzeichen.setFixedHeight(TOUCH)
         self._sperrzonen_abzeichen.setStyleSheet(
             "QLabel{background:#2e2600;border:1px solid #f0c000;color:#f0c000;"
@@ -888,7 +931,8 @@ class LaserView(QWidget):
                 sync.subscribe_widget(SyncEvent.SELECTION_CHANGED, self,
                                       lambda *_: self._on_selection_changed())
             sync.subscribe_widget(SyncEvent.PALETTE_CHANGED, self,
-                                  lambda *_: self._rebuild_palettes())
+                                  lambda *_: (self._rebuild_palettes(),
+                                              self._trefferflaechen()))
             sync.subscribe_widget(SyncEvent.SHOW_LOADED, self,
                                   lambda *_: self._on_show_loaded())
             # LAS-10: Scharf/Unscharf-Änderung von VC/MIDI sofort spiegeln —
@@ -965,6 +1009,7 @@ class LaserView(QWidget):
         super().showEvent(event)
         if getattr(self, "_stale", True):
             self.refresh_from_selection()
+        self._trefferflaechen()
         takt = getattr(self, "_zustand_takt", None)
         if takt is not None:
             takt.start()
@@ -1040,6 +1085,7 @@ class LaserView(QWidget):
         self._load_values()
         self._rebuild_palettes()
         self._rebuild_patterns(template)
+        self._trefferflaechen()
 
     # ── Safety / Framequelle (LAS-07) ─────────────────────────────────────
     def _laser_output(self):
@@ -1077,6 +1123,14 @@ class LaserView(QWidget):
                 else:
                     text, farbe, punkt = (f"Laser AN ({n_an} von {n})",
                                           "#ffffff", "#30ff50")
+                if n_an:
+                    # LAS-44 (QA96-23): „Laser AN“ allein taeuscht, wenn
+                    # Blackout oder Grand Master 0 den Laser dunkel halten.
+                    zusatz = self._dunkel_zusatz(
+                        [f for f, a in zip(self._fixtures, an) if a])
+                    if zusatz is not None:
+                        rest, farbe, punkt = zusatz
+                        text = f"{text} · {rest}"
                 neben = "· " + " · ".join(
                     t for t in (self._modell_text(), zahl) if t)
             self._lbl_dmx_estop.setText(text)
@@ -1084,13 +1138,52 @@ class LaserView(QWidget):
                 f"color:{farbe};font-weight:bold;background:transparent;")
             self._lbl_dmx_estop.setToolTip(
                 "Laut Betriebsart — im Programmer oder in der laufenden "
-                "Ausgabe. Blackout, Grand Master 0 und NOT-AUS schalten den "
-                "Laser über den Aus-Wert der Betriebsart dunkel.")
+                "Ausgabe. Blackout und Grand Master 0 schalten einen Laser "
+                "nur über den Aus-Wert seines Profils dunkel; kennt das "
+                "Profil keinen, strahlt er weiter. Verlässlich aus: NOT-AUS.")
             self._zustand_punkt.setStyleSheet(
                 f"background:{punkt};border-radius:5px;")
             self._lbl_modell.setText(neben)
         except RuntimeError:
             pass
+
+    def _dunkel_zusatz(self, an_fixtures) -> tuple[str, str, str] | None:
+        """LAS-44 (QA96-23): Zusatz zur Sicherheitsleiste, wenn BLACKOUT oder
+        Grand Master 0 % wirken — ``(Text, Schriftfarbe, Punktfarbe)`` oder
+        ``None`` (beides aus).
+
+        „durch … dunkel gehalten“ steht NUR, wenn die laufende Ausgabe es
+        belegt: der zuletzt gesendete Betriebsart-Wert JEDES eingeschalteten
+        Lasers ist laut Profil „aus“. Zeigt die Ausgabe ihn noch an, steht
+        „… schaltet ihn nicht ab“ (Warnfarbe); ist sie unbekannt (kein Frame),
+        nur der Grund. Nur gelesen — schreibt nichts."""
+        try:
+            om = getattr(get_state(), "output_manager", None)
+            if om is None:
+                return None
+            blackout = bool(getattr(om, "blackout", False))
+            gm = float(getattr(om, "grand_master", 1.0))
+            schwelle = float(getattr(om, "GM_LASER_AUS_SCHWELLE", 0.01))
+        except Exception:
+            return None
+        if blackout:
+            grund = "BLACKOUT"
+        elif gm < schwelle:
+            grund = "Grand Master 0 %"
+        else:
+            return None
+        ba = self._plan.betriebsart
+        attr = ba.attribut if ba is not None else "shutter"
+        dunkel: list[bool | None] = []
+        for f in an_fixtures:
+            wert = self._ausgabe_wert(f, attr)
+            dunkel.append(None if wert is None else (
+                None if self._an_bei(wert) is None else not self._an_bei(wert)))
+        if dunkel and all(d is True for d in dunkel):
+            return f"durch {grund} dunkel gehalten", "#c8c8c8", "#d8a200"
+        if any(d is False for d in dunkel):
+            return f"{grund} schaltet ihn nicht ab", "#ff7b72", "#30ff50"
+        return grund, "#ffffff", "#d8a200"
 
     def _modell_text(self) -> str:
         """Modellname(n) der gewählten Laser für die Sicherheitsleiste."""
@@ -1121,8 +1214,11 @@ class LaserView(QWidget):
                 f"<b>{html.escape(str(kurz))}</b> &nbsp;"
                 "<span style='color:#d8b84a'>"
                 f"{NUR_ANZEIGE}</span>")
+            klick = ("Klick: Sperrzonen planen…" if _modul_oder_none(
+                SPERRZONEN_PLANER_MODUL) is not None
+                else "Klick: Meldung je Laser ein-/ausblenden")
             self._sperrzonen_abzeichen.setToolTip(
-                f"{lang}\n\n{NUR_ANZEIGE}. Kein Laserschutz.")
+                f"{lang}\n\n{klick}\n{NUR_ANZEIGE}. Kein Laserschutz.")
             self._sperrzonen_abzeichen.setVisible(True)
         except RuntimeError:
             pass
@@ -1137,6 +1233,37 @@ class LaserView(QWidget):
             self._sperrzonen_details.setVisible(zeigen)
             if zeigen:
                 self._sperrzonen_hinweis.aktualisieren()
+        except RuntimeError:
+            pass
+
+    def _sperrzonen_abzeichen_geklickt(self):
+        """LAS-44 (QA96-22): Abzeichen geklickt — Planer oeffnen; fehlt er
+        auf diesem Stand, die Meldung je Laser auf-/zuklappen."""
+        if _modul_oder_none(SPERRZONEN_PLANER_MODUL) is not None:
+            return self._sperrzonen_planer_oeffnen()
+        try:
+            if self._btn_sperrzonen_details.isVisibleTo(self):
+                self._btn_sperrzonen_details.toggle()
+        except RuntimeError:
+            pass
+        return None
+
+    def _trefferflaechen(self):
+        """LAS-44 (QA96-46): alle Bedienflaechen des Reiters mindestens 36 px
+        hoch, im Touch-Modus 46 px — auch die dynamisch gebauten Zeilen."""
+        try:
+            h = bedien_hoehe()
+            trefferflaechen_anheben(self, h)
+            self._dmx_safety_box.setFixedHeight(h + 8)
+            # Das klickbare Abzeichen ist ein QLabel — eigens mitnehmen.
+            self._sperrzonen_abzeichen.setFixedHeight(h)
+            # „Mitte“ hat eine feste Breite; mit der Touch-Schrift muss sie
+            # mitwachsen, sonst wird das Wort abgeschnitten.
+            self._btn_mitte.setFixedWidth(
+                max(60, self._btn_mitte.sizeHint().width()))
+            # LASER NOT-AUS wird nie abgeschnitten (Touch-Schrift ist breiter).
+            self._btn_dmx_estop.setMinimumWidth(
+                max(138, self._btn_dmx_estop.sizeHint().width()))
         except RuntimeError:
             pass
 
@@ -1496,12 +1623,14 @@ class LaserView(QWidget):
         row = _ChannelRow(channel, self._write_value, kompakt=True)
         self._rows[channel.attribute] = row
         lay.addWidget(row)
+        trefferflaechen_anheben(row)
 
     def _muster_alle_umschalten(self, an: bool):
         self._btn_muster_alle.setText("alle 0–255 ▾" if an else "alle 0–255 ▸")
         self._muster_alle_host.setVisible(bool(an))
         # Die Werksmuster (eigene Slots mit Foto) gehören zum Regler.
         self._rebuild_patterns()
+        self._trefferflaechen()
 
     def _farbe_alle_umschalten(self, an: bool):
         self._btn_farbe_alle.setText("alle 0–255 ▾" if an else "alle 0–255 ▸")

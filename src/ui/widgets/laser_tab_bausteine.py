@@ -31,8 +31,48 @@ from PySide6.QtWidgets import (QAbstractButton, QFrame, QGridLayout,
 from src.core.laser.profilangaben import ENDEN, MEHRFARBIG
 from src.ui.widgets.laser_musterbild import STANDARD_FARBE, male_muster
 
-#: Mindesthoehe einer Bedienflaeche (Finger).
+#: Mindesthoehe einer Bedienflaeche (Maus/Finger, LAS-44 / QA96-46).
 TOUCH = 36
+#: Mindesthoehe im Touch-Modus (``--touch`` bzw. erkannter Touchscreen).
+TOUCH_GROSS = 46
+
+
+def bedien_hoehe() -> int:
+    """LAS-44: Mindesthoehe einer Bedienflaeche — 36 px, im Touch-Modus
+    46 px."""
+    try:
+        from src.ui.touch_keyboard import is_touch_mode
+        return TOUCH_GROSS if is_touch_mode() else TOUCH
+    except Exception:
+        return TOUCH
+
+
+def trefferflaechen_anheben(wurzel: QWidget, hoehe: int | None = None) -> int:
+    """LAS-44 (QA96-46): Jede Bedienflaeche unter ``wurzel`` (Knoepfe,
+    Kacheln, Schalter, Regler, Auswahllisten, Zahlenfelder) mindestens
+    ``hoehe`` hoch (Vorgabe :func:`bedien_hoehe`). Nur nach oben — was schon
+    groesser ist, bleibt. Ein festes Quadrat (Farbfeld) bleibt quadratisch.
+    Rollbalken zaehlen nicht. Gibt die Anzahl angehobener Elemente zurueck."""
+    from PySide6.QtWidgets import QAbstractSpinBox, QComboBox, QScrollBar
+    h = int(hoehe or bedien_hoehe())
+    n = 0
+    for w in wurzel.findChildren(QWidget):
+        if isinstance(w, QScrollBar) or not isinstance(
+                w, (QAbstractButton, QSlider, QComboBox, QAbstractSpinBox)):
+            continue
+        if isinstance(w, QSlider) and w.orientation() != Qt.Orientation.Horizontal:
+            continue
+        alt_min, alt_max = w.minimumHeight(), w.maximumHeight()
+        quadrat = (w.minimumWidth() == w.maximumWidth() == alt_max
+                   and alt_min == alt_max)
+        if alt_max < h:
+            w.setMaximumHeight(h)
+        if alt_min < h:
+            w.setMinimumHeight(h)
+            n += 1
+        if quadrat and alt_max < h:
+            w.setFixedWidth(h)
+    return n
 
 BLAU = "#1a82ff"
 GRAU = "#8b949e"
@@ -574,10 +614,13 @@ class FarbFelder(QWidget):
                 w.setParent(None)
                 w.deleteLater()
         self.felder = []
+        # LAS-44: im Touch-Modus sind die Felder 46 px gross — dann sechs je
+        # Zeile, sonst passen sie nicht in die Spalte.
+        spalten = self.SPALTEN if bedien_hoehe() <= TOUCH else 6
         for i, f in enumerate(farben or ()):
             feld = FarbFeld(f, self._rueckruf)
             self.felder.append(feld)
-            self._gitter.addWidget(feld, i // self.SPALTEN, i % self.SPALTEN)
+            self._gitter.addWidget(feld, i // spalten, i % spalten)
 
     def set_gewaehlt(self, farbe) -> None:
         for feld in self.felder:
@@ -596,7 +639,7 @@ class _FingerRegler(QSlider):
 
     def __init__(self, parent=None):
         super().__init__(Qt.Orientation.Horizontal, parent)
-        self.setFixedHeight(28)
+        self.setFixedHeight(TOUCH)          # LAS-44: war 28 px
         self.setStyleSheet(
             "QSlider::groove:horizontal{height:6px;border-radius:3px;"
             "background:#161616;border:1px solid #454545;}"
@@ -672,16 +715,19 @@ class SprechRegler(QWidget):
         self.schieber = _FingerRegler()
         self.schieber.setRange(self._lo, self._hi)
         self.schieber.valueChanged.connect(self._bewegt)
-        lay.addWidget(self.schieber)
 
+        # LAS-44: die Enden stehen links und rechts NEBEN dem Schieber (statt
+        # in einer eigenen Zeile darunter) — der hoehere Schieber (36 px,
+        # QA96-46) kostet so keine Hoehe, der Reiter passt weiter ohne Rollen.
         links, rechts = self.enden()
-        fuss = QHBoxLayout()
+        zeile = QHBoxLayout()
+        zeile.setSpacing(6)
         self.ende_links = nebentext(links)
         self.ende_rechts = nebentext(rechts)
-        fuss.addWidget(self.ende_links)
-        fuss.addStretch(1)
-        fuss.addWidget(self.ende_rechts)
-        lay.addLayout(fuss)
+        zeile.addWidget(self.ende_links)
+        zeile.addWidget(self.schieber, stretch=1)
+        zeile.addWidget(self.ende_rechts)
+        lay.addLayout(zeile)
         self._anzeigen()
 
     # ── Richtung ─────────────────────────────────────────────────────────

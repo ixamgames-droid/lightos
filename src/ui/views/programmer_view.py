@@ -744,6 +744,18 @@ class ProgrammerView(QWidget):
         row.addWidget(b_stop)
         row.addStretch(1)
         v.addLayout(row)
+        # LAS-44 (QA96-46): die Assistent-Knoepfe waren 32 px hoch — jetzt
+        # mindestens 36 px, im Touch-Modus 46 px (wie der Laser-Reiter).
+        try:
+            from src.ui.widgets.laser_tab_bausteine import bedien_hoehe
+            h = bedien_hoehe()
+            for b in (btn, b_scene, b_chaser, b_capture, b_mitschnitt,
+                      b_start, b_stop):
+                b.setMinimumHeight(max(b.minimumHeight(), h))
+        except Exception as e:                           # noqa: BLE001
+            print(f"[programmer_view] Assistent-Knopfhoehe: {e}")
+        self._assistent_knoepfe = (btn, b_scene, b_chaser, b_capture,
+                                   b_mitschnitt, b_start, b_stop)
         self._refresh_effects_list()
         return w
 

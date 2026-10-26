@@ -48,12 +48,22 @@ nur noch **Assistent**, **EFX** und **Paletten**:
 
 Ganz oben steht die **Sicherheitsleiste** — eine Zeile: links der Zustand
 (**Laser AN** / **Laser AUS** laut Betriebsart, bzw. **NOT-AUS aktiv**), Modell
-und Anzahl der gewählten Laser, rechts der Knopf **LASER NOT-AUS**. Davor
+und Anzahl der gewählten Laser, rechts der Knopf **LASER NOT-AUS** (er löst nur
+aus). Hält BLACKOUT oder der Grand Master auf 0 % einen eingeschalteten Laser
+dunkel, steht das dabei: **„Laser AN · durch BLACKOUT dunkel gehalten“** bzw.
+**„Laser AN · durch Grand Master 0 % dunkel gehalten“** — aber nur, wenn die
+laufende Ausgabe die Betriebsart wirklich auf „aus“ gesetzt hat. Kennt das
+Profil keinen Aus-Wert, steht stattdessen **„… Grand Master 0 % schaltet ihn
+nicht ab“** (siehe Abschnitt Grand Master und Laser). Davor
 stehen die Sperrzonen: ein gelbes Abzeichen, wenn es zu den gewählten Lasern
-etwas zu melden gibt, der Schalter **„Meldung ▾“** (klappt die Meldung je Laser
+etwas zu melden gibt — ein Klick darauf öffnet den Planer wie der Knopf —, der
+Schalter **„Meldung ▾“** (klappt die Meldung je Laser
 unter der Leiste auf und wieder zu) und der Knopf **„Sperrzonen planen…“**
 (öffnet den Planer). Sperrzonen sind **nur Anzeige**: Sie schalten den Laser
 nicht ab und ersetzen keinen Laserschutz — siehe Abschnitt Sperrzonen.
+
+Alle Knöpfe, Felder und Regler des Tabs sind mindestens 36 px hoch, im
+Touch-Modus (`--touch`) 46 px.
 
 Was darunter steht, hängt vom Geräteprofil ab.
 
