@@ -174,9 +174,14 @@ def _arm_runtime(installer, monkeypatch, capsys, venv, ausfuehrend, **kw):
 
 
 def test_arm_warnung_nennt_vorhandenes_x64_venv(installer, monkeypatch, capsys):
+    # XPLAT-56: mit ARM64-Python wird das x64-venv nicht neu angelegt - keine
+    # Rueckfrage, der Lauf geht weiter (nur mit --arm64-trotzdem wird gefragt).
     warn = _arm_runtime(installer, monkeypatch, capsys, "x64", "arm64")
     zusatz = [z for z in warn if "vorhandene venv ist x64-Python" in z]
-    assert zusatz and "Rueckfrage folgt" in zusatz[0]
+    assert zusatz and "nicht neu angelegt" in zusatz[0]
+    assert "Rueckfrage folgt" not in zusatz[0]
+    warn = _arm_runtime(installer, monkeypatch, capsys, "x64", "arm64", trotzdem=True)
+    assert any("Rueckfrage folgt" in z for z in warn)
 
 
 def test_x64_installer_warnt_vor_vorhandenem_arm64_venv(installer, monkeypatch, capsys):
