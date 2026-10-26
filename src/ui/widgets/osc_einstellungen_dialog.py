@@ -6,7 +6,7 @@ an ein Ziel (IP:Port). Logik, Datenformat und Thread-Übergabe stehen in
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QEvent, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDialog, QFormLayout, QHBoxLayout,
     QHeaderView, QLabel, QLineEdit, QPushButton, QSpinBox, QTableWidget,
@@ -18,6 +18,7 @@ from src.core.osc.osc_zuordnung import (
     BEREICH_1, BEREICH_100, BEREICH_255, EXECUTOR_MAX, Konfig, RueckmeldeKonfig,
     Zuordnung,
 )
+from src.ui.widgets.tabellen_spalten import combo_breite, lineedit_breite, spalte_fest
 
 ZIELE_TEXT = [
     (oz.ZIEL_FADER, "Executor-Fader"),
@@ -34,6 +35,7 @@ ZIELE_TEXT = [
 BEREICHE_TEXT = [(BEREICH_1, "0–1"), (BEREICH_100, "0–100"), (BEREICH_255, "0–255")]
 SPALTEN = ["Adresse", "Ziel", "Nummer", "Versatz", "Nr. aus Arg.", "Funktion", "Bereich"]
 SP_ADR, SP_ZIEL, SP_NR, SP_VERSATZ, SP_ARG, SP_FKT, SP_BEREICH = range(7)
+FKT_PLATZHALTER = "Name oder Id"
 
 RM_TEXT = [
     (oz.RM_FADER, "Fader ({n}):"),
@@ -109,7 +111,14 @@ class OscEinstellungenDialog(QDialog):
         kopf = self.tabelle.horizontalHeader()
         kopf.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         kopf.setSectionResizeMode(SP_ADR, QHeaderView.ResizeMode.Stretch)
+        # OSC-07: ResizeToContents misst vor ``setCellWidget`` nur den Kopftext —
+        # „Ziel" zeigte nur „E"/„Ex", der Platzhalter in „Funktion" war gekuerzt.
+        # Wie NET-15 (#1138): Ziel/Bereich fest aus dem sizeHint einer Mess-Combo
+        # mit allen Eintraegen, Funktion aus der Platzhalter-Breite. Wird es zu
+        # eng, rollt die Tabelle waagerecht statt abzuschneiden.
+        self.tabelle.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.tabelle.setMinimumHeight(180)
+        self._spalten_anpassen()
         lay.addWidget(self.tabelle, 1)
 
         knoepfe = QHBoxLayout()
@@ -149,7 +158,7 @@ class OscEinstellungenDialog(QDialog):
         arg.setChecked(bool(z.nummer_aus_argument))
         arg.setToolTip("Erstes Argument = Zielnummer, zweites = Wert")
         fkt = QLineEdit(z.funktion)
-        fkt.setPlaceholderText("Name oder Id")
+        fkt.setPlaceholderText(FKT_PLATZHALTER)
         bereich = QComboBox()
         for key, text in BEREICHE_TEXT:
             bereich.addItem(text, key)
@@ -160,7 +169,21 @@ class OscEinstellungenDialog(QDialog):
             self.tabelle.setCellWidget(r, sp, w)
         ziel.currentIndexChanged.connect(lambda _i, w=ziel: self._ziel_geaendert(w))
         self._felder_schalten(r)
+        self._spalten_anpassen()
         return r
+
+    def _spalten_anpassen(self):
+        """Ziel/Bereich so breit wie der laengste Eintrag (mit Pfeil), Funktion
+        so breit wie ihr Platzhalter (OSC-07)."""
+        spalte_fest(self.tabelle, SP_ZIEL, combo_breite(self.tabelle, ZIELE_TEXT))
+        spalte_fest(self.tabelle, SP_BEREICH, combo_breite(self.tabelle, BEREICHE_TEXT))
+        spalte_fest(self.tabelle, SP_FKT, lineedit_breite(self.tabelle, FKT_PLATZHALTER))
+
+    def changeEvent(self, ev):
+        super().changeEvent(ev)
+        if (ev.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange)
+                and getattr(self, "tabelle", None) is not None):
+            self._spalten_anpassen()
 
     def _zeile_von(self, widget, spalte) -> int:
         for r in range(self.tabelle.rowCount()):
