@@ -1541,7 +1541,7 @@ class MainWindow(QMainWindow):
         elif offene:
             benutzt = sorted({getattr(d, "port", "?") for d in offene.values()})
             ziele = ", ".join(benutzt)
-            anzahl = f"{len(offene)} Universe{'n' if len(offene) != 1 else ''}"
+            anzahl = f"{len(offene)} Universum" if len(offene) == 1 else f"{len(offene)} Universen"
             # ★ OUT-51: Bis hierhin faerbte dieser Zweig gruen, sobald ein
             # Adapter REGISTRIERT war — nicht, wenn er sendet. `is_connected()`
             # (SERIAL-01) beantwortet genau diese Frage und stand seit Monaten
@@ -1562,7 +1562,7 @@ class MainWindow(QMainWindow):
                 liste = ", ".join(str(u) for u in tot)
                 self._lbl_enttec.setText(
                     f"Enttec: {ziele} sendet NICHT "
-                    f"(Universe {liste})")
+                    f"(Universum {liste})")
                 self._lbl_enttec.setStyleSheet("color: #ff4444;")
                 self._lbl_enttec.setToolTip(
                     "Der Adapter ist eingerichtet, aber der Port ist nicht "
@@ -1578,21 +1578,22 @@ class MainWindow(QMainWindow):
                 self._lbl_enttec.setStyleSheet("color: #9DFF52;")
                 self._lbl_enttec.setToolTip("")
         elif (port := self._enttec_port_gesucht()):
-            # Adapter steckt, aber kein Universe ist ihm zugewiesen.
+            # Adapter steckt, aber kein Universum ist ihm zugewiesen.
             # OUT-70: 0403:6001 ist der FTDI-Chip — nur „Enttec“ sagen, wenn
             # sich das Geraet so ausweist (oder die Art unbekannt bleibt).
             if getattr(self, "_portsuche_art", "") == "unklar":
                 self._lbl_enttec.setText(
-                    f"FTDI-Adapter {port} erkannt (Typ unklar), kein Universe")
+                    f"FTDI-Adapter {port} erkannt (Typ unklar), kein Universum")
                 self._lbl_enttec.setToolTip(
-                    "Ein FTDI-Adapter ist da, aber kein Universe gibt darüber "
+                    "Ein FTDI-Adapter ist da, aber kein Universum gibt darüber "
                     "aus. Enttec Pro oder Open DMX? Menü Ausgabe → "
                     "„Interface einrichten…“ zeigt, was zu tun ist.")
             else:
-                self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
+                self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universum")
                 self._lbl_enttec.setToolTip(
-                    "Der Adapter ist da, aber kein Universe gibt darueber aus. "
-                    "Im Universe-Manager einem Universe den Ausgang 'Enttec' geben.")
+                    "Der Adapter ist da, aber kein Universum gibt darueber aus. "
+                    "Unter Ausgabe → Konfigurieren… im Reiter „Universen“ einem "
+                    "Universum den Ausgang „Enttec“ geben.")
             self._lbl_enttec.setStyleSheet("color: #ffb454;")
         else:
             self._lbl_enttec.setText("Enttec: nicht gefunden")

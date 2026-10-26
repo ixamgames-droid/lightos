@@ -26,8 +26,8 @@
   Netzwerkeingang) und einen Rechner **im selben Netz**, siehe
   [Netzwerk-Falle](#netzwerk-falle-bei-art-net-und-sacn).
 
-Die Bilder zeigen eine **Beispiel-Konfiguration**: Universe 1 über einen ENTTEC an
-`/dev/ttyUSB0`, Universe 2 über Art-Net an einen Node mit der Adresse `192.168.1.50`.
+Die Bilder zeigen eine **Beispiel-Konfiguration**: Universum 1 über einen ENTTEC an
+`/dev/ttyUSB0`, Universum 2 über Art-Net an einen Node mit der Adresse `192.0.2.50`.
 Port und Adressen sind Beispiele — bei dir stehen dort deine eigenen. Unter Windows
 heißt der Port zum Beispiel `COM3`, unter Linux meist `/dev/ttyUSB0`.
 Die **Statusleiste** unten in den Bildern gehört nicht zu dieser Beispiel-Konfiguration: Die Bilder
@@ -145,12 +145,12 @@ Reiter **Enttec Pro USB**:
    und speichert die Zuordnung. **Ein Adapter trägt genau ein Universum:** lag derselbe
    Adapter bisher auf einem anderen Universum, verliert jene Zeile ihn (sie bleibt als
    `Aus` stehen), und der Status sagt es dazu, zum Beispiel
-   `… · war Universe 2 — jetzt Universe 1`. Danach meldet der Status erst
+   `… · war Universum 2 — jetzt Universum 1`. Danach meldet der Status erst
    `Eingerichtet: … (gespeichert), verbinde …` und wenig später das Ergebnis:
    `Verbunden: … (gespeichert)`, oder `Port lässt sich nicht öffnen — gespeichert, aber
    es geht kein DMX raus`, oder `antwortet nicht — Port/Kabel prüfen`.
 5. **Status:** — beim Öffnen steht hier, was **gespeichert** ist
-   (`Gespeichert: /dev/ttyUSB0 → Universe 1`). Ob der Adapter wirklich sendet, zeigt
+   (`Gespeichert: /dev/ttyUSB0 → Universum 1`). Ob der Adapter wirklich sendet, zeigt
    erst die Statusleiste (Schritt 8).
 
 **Rückfrage vor dem Ersetzen.** Läuft auf dem gewählten Universum schon eine **andere**
@@ -237,20 +237,20 @@ Reiter **Art-Net**:
 2. **Netzwerkkarte:** — über welche Karte Art-Net **und** sACN hinausgehen.
    `Automatisch (Betriebssystem entscheidet)` nimmt die Standardroute. Die übrigen
    Einträge zeigen je Karte Name, Adresse und Broadcast, zum Beispiel
-   `eth0 — 192.168.1.10  (Broadcast 192.168.1.255)`. Mit einer gewählten Karte geht
+   `eth0 — 192.0.2.10  (Broadcast 192.0.2.255)`. Mit einer gewählten Karte geht
    Art-Net an deren Broadcast statt an `255.255.255.255` — den reichen Router nicht
    weiter. Die Wahl gilt für **diesen Rechner**, nicht für die Show; neue Verbindungen
    nutzen sie sofort, bestehende ab dem nächsten Start.
 3. **Universum:** — das LightOS-Universum, auf das **Übernehmen** wirkt. Nur dieses eine;
    andere Universen bleiben unverändert.
-4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.168.1.50`) oder
+4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.0.2.50`) oder
    `255.255.255.255` für alle im Netz. Leer bedeutet ebenfalls `255.255.255.255`.
 5. **Art-Net Startuniversum:** — die Art-Net-Universumsnummer, die der Node erwartet.
-   Vorbelegt ist LightOS-Universum minus 1: Universe 2 sendet also auf Art-Net-Universum
-   `1`, Universe 1 auf `0`.
+   Vorbelegt ist LightOS-Universum minus 1: Universum 2 sendet also auf Art-Net-Universum
+   `1`, Universum 1 auf `0`.
 6. **Übernehmen** — richtet den Ausgang ein und speichert ihn. Der Status zeigt dann
-   `Aktiv → <Adresse> · Universe <n> (gespeichert)`; beim Öffnen des Dialogs steht dort
-   der gespeicherte Stand (`Gespeichert: 192.168.1.50 · Universe 2`).
+   `Aktiv → <Adresse> · Universum <n> (gespeichert)`; beim Öffnen des Dialogs steht dort
+   der gespeicherte Stand (`Gespeichert: 192.0.2.50 · Universum 2`).
 
 ## 4. sACN (E1.31)
 
@@ -267,7 +267,7 @@ Reiter **sACN (E1.31)**:
 4. **Unicast Ziel-IP:** — nur wenn der Haken bei Multicast **aus** ist: die Adresse eines
    einzelnen Empfängers. Leer bleibt es Multicast.
 5. **Übernehmen** — richtet den Ausgang ein und speichert ihn; Status zum Beispiel
-   `Aktiv · Multicast (239.255.0.x) · Universe 1 (gespeichert)`.
+   `Aktiv · Multicast (239.255.0.x) · Universum 1 (gespeichert)`.
 
 ## 5. Alle Universen auf einmal: Reiter Universen
 
@@ -324,7 +324,7 @@ und PAR 5–8 auf Blau, jeweils mit vollem Dimmer:
 
 ![Output-Monitor](img/06_output_monitor.png)
 
-1. **Universe:** — welches Universum angezeigt wird (1–32).
+1. **Universum:** — welches Universum angezeigt wird (1–32).
 2. Je Kanal eine Kachel: oben der Wert (0–255), unten klein die Kanalnummer. Kanäle über
    0 sind blau hinterlegt. PAR 1 belegt hier die Kanäle 1–4 (Dimmer, Rot, Grün, Blau):
    `255 255 0 0`.
@@ -337,18 +337,18 @@ Reiter **DMX Monitor** daneben — dieselben Werte, aber mit Gerätenamen:
 
 ![DMX Monitor](img/07_dmx_monitor.png)
 
-1. **Universe:** — Auswahl `Universe 1` bis `Universe 32`.
+1. **Universum:** — Auswahl `Universum 1` bis `Universum 32`.
 2. **Hervorgehobene Kanäle:** — zum Beispiel `1,5,10-20`; diese Kanäle bekommen einen
    gelben Rahmen.
 3. Die Ausgangs-Anzeige sagt dasselbe wie Statusleiste und Banner (Schritt 8):
 
    | Anzeige | Bedeutung |
    |---|---|
-   | `Universe 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
-   | `⚠ Universe <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
-   | `Universe <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
-   | `⚠ Universe <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
-   | `Universe <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
+   | `Universum 1 geht raus` (grün) | Das Universum hat einen Ausgang, und er sendet. |
+   | `⚠ Universum <n>: <Weg> sendet NICHT` (rot) | Der Ausgang ist eingerichtet, sendet aber nicht – zum Beispiel ein ENTTEC, dessen Port sich nicht öffnen lässt. Der Tooltip nennt den Grund. |
+   | `Universum <n>: <Weg> verbindet …` (orange) | Der Port wird gerade geöffnet. |
+   | `⚠ Universum <n> hat keinen Ausgang — nur gerechnet` (orange) | Die Werte werden berechnet, aber kein Adapter gibt sie aus. |
+   | `Universum <n> ist nicht angelegt — keine Werte` (grau) | In diesem Universum ist nichts gepatcht und kein Ausgang eingerichtet. Das Raster ist dann abgedunkelt und leer. |
 
    Hat ein Universum **mehrere Ausgänge** (zum Beispiel ENTTEC und Art-Net), erscheint
    daneben die Auswahl **Ausgang:** – der Monitor zeigt, was an den gewählten Ausgang
@@ -383,22 +383,22 @@ auch zum **Laser-NOT-AUS**: [Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER
 
 ## 8. Warnungen in der Statusleiste lesen
 
-Die Statusleiste meldet dauerhaft, ob etwas nicht hinausgeht. Im Bild wurde Universe 1
+Die Statusleiste meldet dauerhaft, ob etwas nicht hinausgeht. Im Bild wurde Universum 1
 der Ausgang genommen, während dort Geräte gepatcht sind:
 
-![Warnungen: Universe ohne Ausgang](img/08_warnungen.png)
+![Warnungen: Universum ohne Ausgang](img/08_warnungen.png)
 
-1. Der DMX Monitor meldet `⚠ Universe 1 hat keinen Ausgang — nur gerechnet`.
+1. Der DMX Monitor meldet `⚠ Universum 1 hat keinen Ausgang — nur gerechnet`.
 2. **Enttec-Anzeige** unten links:
 
    | Anzeige | Bedeutung |
    |---|---|
    | `Enttec: nicht gefunden` (rot) | Kein ENTTEC eingerichtet und keiner angesteckt. Ohne ENTTEC (reines Art-Net/sACN) ist das normal. |
-   | `Enttec: <Port> erkannt, kein Universe` (orange) | Der Adapter steckt, aber kein Universum gibt über ihn aus → in Schritt 2 oder 5 zuweisen. |
-   | `FTDI-Adapter <Port> erkannt (Typ unklar), kein Universe` (orange) | Ein Adapter mit FTDI-Chip steckt, der sich nicht als ENTTEC ausweist, und kein Universum gibt über ihn aus. Ist er Pro-kompatibel, wie einen ENTTEC einrichten (Schritt 2) und mit dem Testsignal prüfen; reine „Open DMX“-Kabel werden noch nicht unterstützt. |
+   | `Enttec: <Port> erkannt, kein Universum` (orange) | Der Adapter steckt, aber kein Universum gibt über ihn aus → in Schritt 2 oder 5 zuweisen. |
+   | `FTDI-Adapter <Port> erkannt (Typ unklar), kein Universum` (orange) | Ein Adapter mit FTDI-Chip steckt, der sich nicht als ENTTEC ausweist, und kein Universum gibt über ihn aus. Ist er Pro-kompatibel, wie einen ENTTEC einrichten (Schritt 2) und mit dem Testsignal prüfen; reine „Open DMX“-Kabel werden noch nicht unterstützt. |
    | `Enttec: <Port> verbindet …` (orange) | Der Port wird gerade geöffnet. Bleibt es dabei, ist der Adapter nicht erreichbar. |
-   | `Enttec: <Port> aktiv (1 Universe)` (grün) | Eingerichtet, und der Adapter sendet. |
-   | `Enttec: <Port> sendet NICHT (Universe <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
+   | `Enttec: <Port> aktiv (1 Universum)` (grün) | Eingerichtet, und der Adapter sendet. |
+   | `Enttec: <Port> sendet NICHT (Universum <n>)` (rot) | Eingerichtet, aber der Port ist nicht offen — es geht kein DMX raus. USB-Kabel und Port prüfen. |
    | `Enttec: falsch konfiguriert` (orange) | Der eingetragene Port kann auf diesem Rechner nicht stimmen (z. B. ein Windows-`COM`-Port unter Linux), oder derselbe Adapter steht auf mehreren Universen und ist deshalb für keines eingerichtet. Der Tooltip nennt den Grund. |
 
 3. **Ausgabe-Anzeige** unten rechts: normal eine Liste wie `Ausgabe: U1 Art-Net`
@@ -451,7 +451,7 @@ die Störungsmeldung nicht, solange die Störung anliegt:
   Balken. Statusleiste und DMX-Monitor zeigen die Störung unverändert an.
 
 Derselbe rote Balken erscheint, wenn in der gespeicherten Konfiguration **ein Adapter auf
-mehreren Universen** steht (`… — steht auf Universe 1 und 2, für keines eingerichtet`).
+mehreren Universen** steht (`… — steht auf Universum 1 und 2, für keines eingerichtet`).
 LightOS rät dann nicht, welches gemeint war, und richtet den Adapter für keines ein —
 sonst bekäme ein Rig womöglich die Werte eines anderen Universums. Beheben: im Reiter
 **Enttec Pro USB** das richtige Universum wählen und **Verbinden**.
@@ -511,12 +511,12 @@ dort eine andere Adresse – er hört sonst weiter auf die alte.
 
 ## Netzwerk-Falle bei Art-Net und sACN
 
-Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.168.1.50`,
-braucht die Netzwerkkarte des Rechners eine Adresse `192.168.1.x` (Maske
+Der Rechner muss **im selben Netz** wie der Node liegen. Hat der Node `192.0.2.50`,
+braucht die Netzwerkkarte des Rechners eine Adresse `192.0.2.x` (Maske
 `255.255.255.0`). Häufiger Fehler: ein USB-Netzwerkadapter ohne DHCP bekommt nur eine
 Adresse `169.254.x.x` — dann erreicht Art-Net den Node nicht, obwohl der Dialog
 „Aktiv" meldet. Abhilfe: dem Adapter eine feste Adresse im Netz des Nodes geben und mit
-`ping 192.168.1.50` prüfen. Hat der Rechner mehrere Karten (WLAN und Lichtnetz), wähle
+`ping 192.0.2.50` prüfen. Hat der Rechner mehrere Karten (WLAN und Lichtnetz), wähle
 in Schritt 3 die richtige **Netzwerkkarte:**.
 
 Mehr zu Art-Net (Port 6454, Universumsnummern): [ARTNET.md](../ARTNET.md). Grundlagen zu
@@ -561,7 +561,7 @@ Ausführlich für Windows: [Netzwerk vorbereiten (Windows)](../anleitung_netzwer
 - [Unterstützte DMX-Interfaces](INTERFACES.md) — Kompatibilitätsliste, Treiber-Links und
   „Ethernet→DMX per LAN-Kabel direkt am PC“ Schritt für Schritt.
 - [Zwei Universen über zwei Adapter](../anleitung_zwei_universen/ANLEITUNG.md) — ENTTEC
-  auf Universe 1 und Art-Net auf Universe 2 Schritt für Schritt, mit den Regeln für
+  auf Universum 1 und Art-Net auf Universum 2 Schritt für Schritt, mit den Regeln für
   doppelte Ziele.
 - [Enttec und Art-Net gleichzeitig](../anleitung_enttec_artnet/ANLEITUNG_ENTTEC_ARTNET.md)
   — dasselbe Prinzip an einem zweiten Beispiel.

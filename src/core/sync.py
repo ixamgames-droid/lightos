@@ -481,7 +481,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                     if universe < 1 or universe > 32:
                         issues.append(ValidationIssue(
                             'error', location,
-                            f"Ungültige Universe-Nummer: {universe}",
+                            f"Ungültige Universumsnummer: {universe}",
                         ))
 
                     # 4. Adresse + Channels <= 512?
@@ -534,7 +534,7 @@ def validate_and_repair(state, fix: bool = True) -> list[ValidationIssue]:
                             # Meldung nennt beide fids + volle Adressbereiche +
                             # Universe, damit sie manuell aufloesbar ist.
                             issues.append(ValidationIssue(
-                                'error', f"Universe {univ}",
+                                'error', f"Universum {univ}",
                                 f"Adresskonflikt (U{univ}): "
                                 f"{getattr(a, 'label', '?')}[fid {getattr(a, 'fid', '?')}] "
                                 f"@ {getattr(a, 'address', '?')}-{a_end} überlappt "

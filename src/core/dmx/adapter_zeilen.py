@@ -85,9 +85,9 @@ class Doppelt:
     def text(self) -> str:
         """Der Satz fuer Statusleiste, Dialog und Log."""
         liste = aufzaehlung(self.universen)
-        return (f"{self.name} steht auf Universe {liste} — ein Adapter sendet "
+        return (f"{self.name} steht auf Universum {liste} — ein Adapter sendet "
                 f"nur ein Universum. Er ist für keines davon eingerichtet. "
-                f"Ausgabe → Konfigurieren…: beim Adapter das richtige Universe "
+                f"Ausgabe → Konfigurieren…: beim Adapter das richtige Universum "
                 f"wählen und „Verbinden“.")
 
 
@@ -137,7 +137,7 @@ def stoerungen(doppelt) -> list[dict]:
     """
     return [{"universum": d.universen[0], "weg": d.typ, "ziel": d.patch,
              "verbunden": False,
-             "problem": (f"steht auf Universe {aufzaehlung(d.universen)}, "
+             "problem": (f"steht auf Universum {aufzaehlung(d.universen)}, "
                          f"für keines eingerichtet")}
             for d in doppelt or [] if d.universen]
 
@@ -169,7 +169,7 @@ def andere_abraeumen(rows, typ, patch, bleibt: int) -> list[int]:
 
 
 def umzug_text(geraeumt, jetzt: int) -> str:
-    """„war Universe 2 — jetzt Universe 1" (leer, wenn nichts umgezogen ist)."""
+    """„war Universum 2 — jetzt Universum 1" (leer, wenn nichts umgezogen ist)."""
     if not geraeumt:
         return ""
-    return f"war Universe {aufzaehlung(geraeumt)} — jetzt Universe {int(jetzt)}"
+    return f"war Universum {aufzaehlung(geraeumt)} — jetzt Universum {int(jetzt)}"

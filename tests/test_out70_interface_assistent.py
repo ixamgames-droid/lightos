@@ -384,10 +384,10 @@ def _statusbalken(art):
 
 def test_statusleiste_unterscheidet_unklaren_ftdi_nur_ohne_universe():
     lbl = _statusbalken("unklar")
-    assert lbl.text == "FTDI-Adapter /dev/ttyUSB0 erkannt (Typ unklar), kein Universe"
+    assert lbl.text == "FTDI-Adapter /dev/ttyUSB0 erkannt (Typ unklar), kein Universum"
     assert "Interface einrichten" in lbl.tip
-    assert _statusbalken("pro").text == "Enttec: /dev/ttyUSB0 erkannt, kein Universe"
-    assert _statusbalken("").text == "Enttec: /dev/ttyUSB0 erkannt, kein Universe"
+    assert _statusbalken("pro").text == "Enttec: /dev/ttyUSB0 erkannt, kein Universum"
+    assert _statusbalken("").text == "Enttec: /dev/ttyUSB0 erkannt, kein Universum"
 
 
 # ── Einsteck-Hinweis ─────────────────────────────────────────────────────────

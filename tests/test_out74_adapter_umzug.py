@@ -9,7 +9,7 @@ moeglicherweise das falsche Universum, ohne Meldung.
 Drei Dinge werden hier gemessen, jeweils am echten Weg:
 
 * **„Verbinden"** raeumt die anderen Zeilen desselben Adapters ab und sagt es
-  („war Universe 2 — jetzt Universe 1") — gemessen an ``universes.json``.
+  („war Universum 2 — jetzt Universum 1") — gemessen an ``universes.json``.
 * **Laden** einer Datei, in der ein Adapter doppelt steht: er wird fuer KEINE
   der Zeilen eingerichtet (die erste oder letzte zu nehmen waere geraten), und
   es steht in Statusleiste und Dialog.
@@ -217,15 +217,15 @@ class UmzugTest(_MitKonfig):
 
     def test_der_status_sagt_woher_der_adapter_kam(self):
         self._umziehen()
-        self.assertIn("war Universe 2 — jetzt Universe 1",
+        self.assertIn("war Universum 2 — jetzt Universum 1",
                       self.dlg._lbl_enttec_status.text())
 
     def test_der_satz_ueberlebt_die_spaetere_statusmeldung(self):
         self._umziehen()
         self.dlg._enttec_status_nachtragen()
         text = self.dlg._lbl_enttec_status.text()
-        self.assertIn("Universe 1", text)
-        self.assertIn("war Universe 2", text)
+        self.assertIn("Universum 1", text)
+        self.assertIn("war Universum 2", text)
 
     def test_nach_dem_neustart_liegt_der_adapter_auf_universum_1(self):
         self._umziehen()
@@ -242,19 +242,19 @@ class UmzugTest(_MitKonfig):
         self._verbinde(USB0, 1)
         self._verbinde(USB0, 2)
         self.assertEqual(self._enttec_zeilen(), [(2, USB0)])
-        self.assertIn("war Universe 1 — jetzt Universe 2",
+        self.assertIn("war Universum 1 — jetzt Universum 2",
                       self.dlg._lbl_enttec_status.text())
         self.assertEqual(self._neustart().output_manager.enttec_ports(), {2: USB0})
 
     def test_noch_einmal_verbinden_meldet_keinen_umzug(self):
         self._verbinde(USB0, 1)
         self._verbinde(USB0, 1)
-        self.assertNotIn("war Universe", self.dlg._lbl_enttec_status.text())
+        self.assertNotIn("war Universum", self.dlg._lbl_enttec_status.text())
 
     def test_nach_einem_umzug_meldet_das_naechste_verbinden_ihn_nicht_wieder(self):
         self._umziehen()
         self._verbinde(USB0, 1)
-        self.assertNotIn("war Universe", self.dlg._lbl_enttec_status.text())
+        self.assertNotIn("war Universum", self.dlg._lbl_enttec_status.text())
 
 
 class ZweiAdapterBleibenZweiTest(_MitKonfig):
@@ -265,7 +265,7 @@ class ZweiAdapterBleibenZweiTest(_MitKonfig):
     def test_der_zweite_adapter_laesst_den_ersten_stehen(self):
         self._verbinde(USB1, 2)
         self.assertEqual(self._enttec_zeilen(), [(1, USB0), (2, USB1)])
-        self.assertNotIn("war Universe", self.dlg._lbl_enttec_status.text())
+        self.assertNotIn("war Universum", self.dlg._lbl_enttec_status.text())
 
 
 class NetzZeilenBleibenTest(_MitKonfig):
@@ -338,7 +338,7 @@ class DoppelterAdapterBeimLadenTest(_MitKonfig):
     def test_beide_universen_tragen_den_hinweis_fuer_die_statusleiste(self):
         notes = self._neustart().enttec_port_notes
         for num in (1, 2):
-            self.assertIn("Universe 1 und 2", notes.get(num) or "")
+            self.assertIn("Universum 1 und 2", notes.get(num) or "")
             self.assertIn(USB0, notes.get(num) or "")
             self.assertIn("für keines", notes.get(num) or "")
         self.assertNotIn(3, {n for n, t in notes.items() if t})
@@ -405,12 +405,12 @@ class DreiZeilenTest(_MitKonfig):
     def test_alle_drei_werden_genannt_und_keine_eingerichtet(self):
         state = self._neustart()
         self.assertEqual(state.output_manager.eingerichtet, [])
-        self.assertIn("Universe 2, 4 und 7", state.enttec_port_notes.get(4) or "")
+        self.assertIn("Universum 2, 4 und 7", state.enttec_port_notes.get(4) or "")
 
     def test_verbinden_raeumt_beide_anderen_ab(self):
         self._verbinde(USB0, 7)
         self.assertEqual(self._enttec_zeilen(), [(7, USB0)])
-        self.assertIn("war Universe 2 und 4 — jetzt Universe 7",
+        self.assertIn("war Universum 2 und 4 — jetzt Universum 7",
                       self.dlg._lbl_enttec_status.text())
 
 
@@ -445,9 +445,9 @@ class UdmxUmzugTest(_MitKonfig):
     def test_der_status_sagt_woher_der_adapter_kam(self):
         self._verbinde_udmx(UDMX, 2)
         self._verbinde_udmx(UDMX, 1)
-        self.assertIn("war Universe 2 — jetzt Universe 1",
+        self.assertIn("war Universum 2 — jetzt Universum 1",
                       self.dlg._lbl_udmx_status.text())
-        self.assertNotIn("war Universe", self.dlg._lbl_enttec_status.text())
+        self.assertNotIn("war Universum", self.dlg._lbl_enttec_status.text())
 
     def test_nach_dem_neustart_liegt_er_auf_universum_1(self):
         self._verbinde_udmx(UDMX, 2)
@@ -469,7 +469,7 @@ class UdmxDoppeltBeimLadenTest(_MitKonfig):
     def test_fuer_keine_der_zeilen_eingerichtet_und_gemeldet(self):
         state = self._neustart()
         self.assertEqual(state.output_manager.eingerichtet_udmx, [])
-        self.assertIn("Universe 1 und 2", state.enttec_port_notes.get(1) or "")
+        self.assertIn("Universum 1 und 2", state.enttec_port_notes.get(1) or "")
         self.assertIn("uDMX", state.enttec_port_notes.get(2) or "")
         self.assertEqual([(d.typ, d.universen) for d in state.adapter_konflikte],
                          [("uDMX", (1, 2))])
@@ -544,7 +544,7 @@ class HinweisVeraltetNichtTest(_MitKonfig):
         stub = types.SimpleNamespace(output_manager=_FakeOutputManager(), universes={})
         AppState.apply_output_config(stub, path=self._pfad)
         self.assertEqual(stub.output_manager.eingerichtet, [])
-        self.assertIn("Universe 1 und 2", stub.enttec_port_notes.get(1) or "")
+        self.assertIn("Universum 1 und 2", stub.enttec_port_notes.get(1) or "")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -655,7 +655,7 @@ class BannerTest(_MitKonfig):
         zustand = ausgabe_banner(self._banner_wege(state))
         self.assertEqual(zustand.art, ART_STOERUNG)
         self.assertIn(USB0, zustand.text)
-        self.assertIn("Universe 1 und 2", zustand.text)
+        self.assertIn("Universum 1 und 2", zustand.text)
         self.assertIn("für keines eingerichtet", zustand.text)
 
     def test_ein_adapter_ein_eintrag(self):
@@ -743,9 +743,9 @@ class RegelnTest(unittest.TestCase):
     def test_umzug_text(self):
         az = self.az
         self.assertEqual(az.umzug_text([], 1), "")
-        self.assertEqual(az.umzug_text([2], 1), "war Universe 2 — jetzt Universe 1")
+        self.assertEqual(az.umzug_text([2], 1), "war Universum 2 — jetzt Universum 1")
         self.assertEqual(az.umzug_text([2, 5, 9], 1),
-                         "war Universe 2, 5 und 9 — jetzt Universe 1")
+                         "war Universum 2, 5 und 9 — jetzt Universum 1")
 
 
 class PersistOutputTest(_MitKonfig):

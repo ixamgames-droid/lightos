@@ -282,8 +282,14 @@ wertlos. Deshalb wird **ersetzt, nicht geloescht**, und zwar **konsistent**:
 * Der Betreiber des Rigs heisst im Repo durchgaengig **„Robin"**. Wer im
   Klartext arbeitet (lokale Notizen, Second Brain), behaelt dort den echten
   Namen — die Zuordnung steht **nur lokal**.
-* Beispiel-Adressen sind Beispiel-Adressen (`192.168.1.99`, `2.0.0.1`), nie die
-  echten des Aufbaus.
+* Beispiel-Adressen sind Beispiel-Adressen, nie die echten des Aufbaus: in Doku
+  aus den Dokumentationsbereichen `192.0.2.0/24` bzw. `198.51.100.0/24`
+  (RFC 5737, z. B. `192.0.2.50`, Broadcast `192.0.2.255`) oder der
+  Art-Net-Bereich `2.x.x.x`. Keine Heimnetz-Adressen (`192.168.x.y`,
+  `10.x.y.z`, `172.16–31.x.y`) in `docs/` und den Anleitungen — Waechter
+  `tests/test_priv07_doku_beispieladressen.py` (PRIV-07). Tests duerfen private
+  Bereiche nutzen, wo die Adresse selbst Gegenstand ist (LAN-IP-Ermittlung,
+  Erkennung privater Bereiche, Netzlogik).
 * Pfade in Code und Tests: `/home/user/…`, `C:\Users\X\…`.
 
 Zwei Waechter halten das:

@@ -692,7 +692,7 @@ def _nachfolger_ansagen(om, universe: int, name: str, ziel: str = "",
 
 
 def _mit_umzug(dialog, text: str, feld: str = "_enttec_umzug") -> str:
-    """OUT-74: haengt „war Universe 2 — jetzt Universe 1" an eine Statusmeldung.
+    """OUT-74: haengt „war Universum 2 — jetzt Universum 1" an eine Statusmeldung.
 
     Der Satz muss auch die spaeteren Meldungen ueberleben
     (`_enttec_status_nachtragen` ersetzt den Text nach knapp einer Sekunde) —
@@ -952,7 +952,7 @@ class OutputConfigDialog(QDialog):
             "Ueber welche Netzwerkkarte Art-Net und sACN hinausgehen.\n"
             "Automatisch = wie bisher ueber die Standardroute des Systems.\n"
             "Mit gewaehlter Karte geht Art-Net an deren gerichteten\n"
-            "Broadcast (z. B. 192.168.1.255) statt an 255.255.255.255 —\n"
+            "Broadcast (z. B. 192.0.2.255) statt an 255.255.255.255 —\n"
             "der wird von Routern nicht weitergereicht.\n"
             "Gilt fuer diesen Rechner, nicht fuer die Show. Neue Verbindungen\n"
             "nutzen die Karte sofort, bestehende ab dem naechsten Start.")
@@ -1240,7 +1240,7 @@ class OutputConfigDialog(QDialog):
             if port:
                 self._enttec_port_waehlen(port)
                 self._lbl_enttec_status.setText(
-                    f"Gespeichert: {port} → Universe {num}")
+                    f"Gespeichert: {port} → Universum {num}")
         # ★ OUT-74: derselbe Adapter in mehr als einer Zeile. Der Reiter kann
         # nur EINE Zeile zeigen (die mit der kleinsten Nummer) — still eine
         # davon als „Gespeichert" auszugeben hiesse, den Fehler zu verstecken:
@@ -1264,7 +1264,7 @@ class OutputConfigDialog(QDialog):
             self._spin_udmx_univ.setValue(num)
             self._udmx_adapter_waehlen(schluessel, "gespeichert")
             self._lbl_udmx_status.setText(
-                f"Gespeichert: {schluessel or 'einziger Adapter'} → Universe {num}")
+                f"Gespeichert: {schluessel or 'einziger Adapter'} → Universum {num}")
         # OUT-74: derselbe uDMX-Adapter in mehr als einer Zeile (s. Enttec oben).
         for d in adapter_zeilen.doppelte(_load_universe_config()):
             if d.typ == "uDMX":
@@ -1290,7 +1290,7 @@ class OutputConfigDialog(QDialog):
             # waere zwar erstmals ehrlich gesetzt, aber wirkungslos abwaehlbar.
             self._artnet_active_univ = num
             self._lbl_artnet_status.setText(
-                f"Gespeichert: {ip or 'Broadcast'} · Universe {num}")
+                f"Gespeichert: {ip or 'Broadcast'} · Universum {num}")
         # Erst NACH dem Setzen des Universums: die externe Art-Net-Universe
         # (A3D-15) haengt am gewaehlten internen Universum. Explizit gerufen,
         # weil `setValue` bei unveraendertem Wert kein `valueChanged` sendet.
@@ -1311,7 +1311,7 @@ class OutputConfigDialog(QDialog):
             self._sacn_active_univ = num
             self._lbl_sacn_status.setText(
                 f"Gespeichert: {('Unicast → ' + ip) if ip else 'Multicast'}"
-                f" · Universe {num}")
+                f" · Universum {num}")
 
     def _apply_iface_choice(self):
         """NET-04: Auswahl geraetegebunden sichern.
@@ -1484,7 +1484,7 @@ class OutputConfigDialog(QDialog):
             # gespeichert"; ob DMX rausgeht, sagt erst der Adapter selbst,
             # gleich, und dann traegt es `_enttec_status_nachtragen` nach.
             self._lbl_enttec_status.setText(_mit_umzug(self,
-                f"Eingerichtet: {port} → Universe {univ} "
+                f"Eingerichtet: {port} → Universum {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
                 f"verbinde …"))
             self._enttec_pruef_univ = univ
@@ -1605,20 +1605,20 @@ class OutputConfigDialog(QDialog):
             # Nach der Anlaufzeit immer noch „verbindet": das ist keine
             # Erfolgsmeldung mehr, aber auch kein bewiesener Ausfall.
             self._lbl_enttec_status.setText(_mit_umzug(self,
-                f"{port} → Universe {univ}: antwortet nicht — Port/Kabel prüfen"))
+                f"{port} → Universum {univ}: antwortet nicht — Port/Kabel prüfen"))
             return
         if zustand == ZUSTAND_SENDET:
             self._lbl_enttec_status.setText(_mit_umzug(self,
-                f"Verbunden: {port} → Universe {univ} (gespeichert)"))
+                f"Verbunden: {port} → Universum {univ} (gespeichert)"))
         elif zustand == ZUSTAND_TOT:
             self._lbl_enttec_status.setText(_mit_umzug(self,
-                f"{port} → Universe {univ}: Port lässt sich nicht öffnen — "
+                f"{port} → Universum {univ}: Port lässt sich nicht öffnen — "
                 f"gespeichert, aber es geht kein DMX raus"))
         else:
             # Der Adapter kann keine Auskunft geben (In-Prozess-Fallback ohne
             # Statusfeld). Dann bleibt die ehrliche Teilaussage stehen.
             self._lbl_enttec_status.setText(_mit_umzug(self,
-                f"Eingerichtet: {port} → Universe {univ} (gespeichert)"))
+                f"Eingerichtet: {port} → Universum {univ} (gespeichert)"))
 
     # ── OUT-68: uDMX-Adapter ─────────────────────────────────────────────────
 
@@ -1760,7 +1760,7 @@ class OutputConfigDialog(QDialog):
             self._univ_tabelle_nachladen()
             self._lbl_udmx_status.setText(_mit_umzug(
                 self,
-                f"Eingerichtet: {schluessel} → Universe {univ} "
+                f"Eingerichtet: {schluessel} → Universum {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}, "
                 f"verbinde …", "_udmx_umzug"))
             self._udmx_pruef_univ = univ
@@ -1801,12 +1801,12 @@ class OutputConfigDialog(QDialog):
                 return
             self._lbl_udmx_status.setText(_mit_umzug(
                 self,
-                f"{wer} → Universe {univ}: antwortet nicht — Adapter/Kabel prüfen",
+                f"{wer} → Universum {univ}: antwortet nicht — Adapter/Kabel prüfen",
                 "_udmx_umzug"))
             return
         if zustand == ZUSTAND_SENDET:
             self._lbl_udmx_status.setText(_mit_umzug(
-                self, f"Verbunden: {wer} → Universe {univ} (gespeichert)",
+                self, f"Verbunden: {wer} → Universum {univ} (gespeichert)",
                 "_udmx_umzug"))
             self._lbl_udmx_hinweis.setText("")
             return
@@ -1819,7 +1819,7 @@ class OutputConfigDialog(QDialog):
                 grund = ""
         self._lbl_udmx_status.setText(_mit_umzug(
             self,
-            f"{wer} → Universe {univ}: sendet nicht — gespeichert, aber es "
+            f"{wer} → Universum {univ}: sendet nicht — gespeichert, aber es "
             f"geht kein DMX raus", "_udmx_umzug"))
         self._lbl_udmx_hinweis.setText(grund or "Adapter prüfen und neu einstecken.")
         self._udmx_treiber_schritte_zeigen(dev, grund)
@@ -1942,10 +1942,10 @@ class OutputConfigDialog(QDialog):
         # ueberschreiben. Tabelle neu laden, damit die Ext-Zelle den aktuellen Stand
         # zeigt und Tab und Datei konsistent bleiben.
         self._univ_tabelle_nachladen()
-        _ext_txt = f" → Art-Net-Universe {start}" if out_u is not None else ""
+        _ext_txt = f" → Art-Net-Universum {start}" if out_u is not None else ""
         # QA-50: „(gespeichert)" nur, wenn die Datei wirklich geschrieben wurde.
         self._lbl_artnet_status.setText(
-            f"Aktiv → {ip} · Universe {univ}{_ext_txt} "
+            f"Aktiv → {ip} · Universum {univ}{_ext_txt} "
             f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}")
 
     # ── Universe Manager ─────────────────────────────────────────────────────
@@ -2310,7 +2310,7 @@ class OutputConfigDialog(QDialog):
             # wenn das Schreiben scheiterte, und die Ausgabe war nach dem
             # naechsten Start wieder weg.
             self._lbl_sacn_status.setText(
-                f"Aktiv · {mode} · Universe {univ} "
+                f"Aktiv · {mode} · Universum {univ} "
                 f"{'(gespeichert)' if gespeichert else '(NICHT gespeichert!)'}")
         except Exception as e:
             self._lbl_sacn_status.setText(f"Fehler: {e}")

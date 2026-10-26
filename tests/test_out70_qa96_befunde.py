@@ -418,7 +418,7 @@ def test_d09_ausgabe_anleitung_ohne_reste_vor_udmx_und_assistent():
     for text in (de, en):
         assert "[Enttec DMX USB Pro]" in text
         assert "[FTDI-Adapter, Typ unklar]" in text
-        assert "(Typ unklar), kein Universe" in text   # Statusleisten-Zustand
+        assert "(Typ unklar), kein Universum" in text   # Statusleisten-Zustand
     # uDMX nicht mehr ohne Nummer zwischen „2.“ und „3.“
     assert "## 2b. uDMX-Adapter (USB)" in de and "## 2b. uDMX adapters (USB)" in en
     assert "(#2b-udmx-adapter-usb)" in de and "(#2b-udmx-adapters-usb)" in en

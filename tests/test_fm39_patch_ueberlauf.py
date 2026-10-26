@@ -82,7 +82,7 @@ class DialogTest(unittest.TestCase):
             view._state = self.st
             pv.PatchView._add_fixture(view)
         self.assertEqual(info.call_count, 1)
-        self.assertIn("Universe 2", info.call_args[0][2])
+        self.assertIn("Universum 2", info.call_args[0][2])
         self.assertEqual([(f.universe, f.address) for f in self.st.get_patched_fixtures()],
                          [(2, 1)])
 

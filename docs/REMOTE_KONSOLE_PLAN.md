@@ -180,8 +180,8 @@ Damit du das Prinzip in 5 Minuten siehst (nutzt die *bestehende* `index.html`):
 
 1. PC und Handy ins **gleiche WLAN** (Hausnetz reicht zum Testen; für Show später Mini-Router).
 2. In LightOS: Menü → **„Web-Interface (Port 5000)"** einschalten.
-3. PC-IP herausfinden: PowerShell → `ipconfig` → „IPv4-Adresse" des WLAN-Adapters (z. B. `192.168.0.42`).
-4. Am Handy im Browser öffnen: `http://192.168.0.42:5000`
+3. PC-IP herausfinden: PowerShell → `ipconfig` → „IPv4-Adresse" des WLAN-Adapters (z. B. `192.0.2.42`).
+4. Am Handy im Browser öffnen: `http://192.0.2.42:5000`
 5. Du solltest GO/BACK/STOP, Blackout und die Executor-Fader sehen — und live steuern können.
 6. (Optional) Windows-Firewall fragt evtl. beim ersten Start nach Freigabe für Port 5000 → erlauben (privates Netz).
 

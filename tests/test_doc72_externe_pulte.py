@@ -403,9 +403,10 @@ class Doc72ExternePulteTest(unittest.TestCase):
                 self.assertTrue(os.path.isfile(os.path.normpath(os.path.join(basis, b))))
 
     def test_nur_beispieladressen(self):
-        """Erlaubt: 2.x / 10.x / 192.168.1.x als Beispiele und die festen
-        Sonderadressen (Loopback, alle Schnittstellen, Broadcast, Maske)."""
-        erlaubt = re.compile(r"^(2\.0\.0\.\d+|10\.0\.0\.\d+|192\.168\.1\.\d+|"
+        """Erlaubt: 2.x / 10.x (Werks-Bereiche) / 192.0.2.x (RFC 5737, PRIV-07)
+        als Beispiele und die festen Sonderadressen (Loopback, alle
+        Schnittstellen, Broadcast, Maske)."""
+        erlaubt = re.compile(r"^(2\.0\.0\.\d+|10\.0\.0\.\d+|192\.0\.2\.\d+|"
                              r"127\.0\.0\.1|0\.0\.0\.0|255\.(255|0)\.(255|0)\.(255|0))$")
         for adresse in set(re.findall(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", self.text)):
             with self.subTest(adresse):

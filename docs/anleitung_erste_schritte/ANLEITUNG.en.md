@@ -163,7 +163,7 @@ The dialog **Gerät hinzufügen** opens:
 3. **Modus:** (mode) — the channel layout. This profile only knows
    `4-Kanal Dimmer+RGB (4ch)`. For other fixtures the mode must match the setting on the
    fixture itself.
-4. **Universe:** — which DMX universe the fixture is on. `1` to begin with.
+4. **Universum:** (universe) — which DMX universe the fixture is on. `1` to begin with.
 5. **DMX-Adresse:** (DMX address) — the start address. LightOS suggests the next free
    range below it (`Vorschlag: Adresse 1 …` = suggestion: address 1) and fills it in
    right away. Set the same address on the real fixture.

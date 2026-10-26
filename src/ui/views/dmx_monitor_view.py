@@ -212,14 +212,14 @@ class DmxMonitorView(QWidget):
 
         # Top toolbar
         top = QHBoxLayout()
-        top.addWidget(QLabel("Universe:"))
+        top.addWidget(QLabel("Universum:"))
         self._combo_univ = QComboBox()
         # OUT-52: 1–32 wie Patch und Ausgabe-Konfiguration. Das 1–16-Limit
         # machte gepatchte Geraete auf U17–U32 im Monitor unsichtbar — im
         # Output-Tab war genau das schon korrigiert (`output_view.py:73`),
         # hier nicht.
         for u in range(1, 33):
-            self._combo_univ.addItem(f"Universe {u}", u)
+            self._combo_univ.addItem(f"Universum {u}", u)
         self._combo_univ.currentIndexChanged.connect(self._refresh_patched)
         top.addWidget(self._combo_univ)
 
@@ -351,7 +351,7 @@ class DmxMonitorView(QWidget):
             # zeigte dann die Werte des VORHER gewaehlten Universums weiter,
             # unter der Ueberschrift des neuen. Leeren und sagen, warum.
             self._grid.set_values([0] * 512)
-            self._grid.set_leer(f"Universe {univ} ist nicht angelegt")
+            self._grid.set_leer(f"Universum {univ} ist nicht angelegt")
             self._wege_zeigen([])
             self._update_ausgang_label(om, univ, False, angelegt=False)
             return

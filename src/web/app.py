@@ -106,7 +106,7 @@ def get_lan_ip() -> str:
 
 
 def remote_url(port: int = 5000) -> str:
-    """Vollstaendige LAN-URL fuer das Web-Remote, z.B. ``http://192.168.1.5:5000``."""
+    """Vollstaendige LAN-URL fuer das Web-Remote, z.B. ``http://192.0.2.5:5000``."""
     return f"http://{get_lan_ip()}:{port}"
 
 
