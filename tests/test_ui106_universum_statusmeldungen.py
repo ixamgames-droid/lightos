@@ -5,7 +5,8 @@ Befund: UI-100 hatte den Ausgabe-Dialog eingedeutscht, die Statuszeilen aber
 bewusst ausgeklammert. Danach sagte die Oberflaeche noch „Universe:“ im
 Patch-Dialog, im Output-Monitor und im DMX-Monitor, die Statuszeilen meldeten
 „Verbunden: COM3 → Universe 1“, „war Universe 2 — jetzt Universe 1“,
-„⚠ Universe 1 hat keinen Ausgang“, „Enttec: … erkannt, kein Universe“.
+„⚠ Universe 1 hat keinen Ausgang“, „Enttec: … erkannt, kein Universe“; der
+Dialog „Show prüfen“ meldete „Ungültige Universe-Nummer“ und „Universe N“.
 
 Festgehalten wird:
   * die neuen Begriffe stehen in den Dialogen und Meldungen (am Widget bzw. am
@@ -58,6 +59,8 @@ MODULE = (
     "src/core/dmx/enttec_pro.py",
     "src/ui/widgets/output_config.py",
     "src/ui/main_window.py",
+    "src/core/app_state.py",
+    "src/core/sync.py",
 )
 
 #: Gespeicherte Namen neuer Zeilen (``universes.json``, Feld ``name``) — bleiben.
