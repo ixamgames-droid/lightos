@@ -58,6 +58,45 @@ Feedback-Ausgangs. `subscribe_state()` liefert UI/VC denselben Zustand als
 **Persistenz:** `save(path)`/`load(path)` als JSON; modernes Schema
 (`from_config_dict`) und Legacy-Flachfelder werden beide gelesen.
 
+**Motorfader (MIDI-14):** ein Pitchbend-Mapping mit `midi_out.message_type ==
+"pitchbend"` (`ist_motorfader`, gebaut von `motor_rueckmeldung`) wird nachgeführt: die
+Schleife sendet die Stellung mit 14 Bit auf dem Kanal des Faders zurück
+(`MidiManager.send_pitchbend[_to]`). Drei Regeln:
+
+- **Hand vor Motor.** Kommen vom Fader Werte, geht `MOTOR_HAND_RUHE_S` (0,35 s) lang nichts
+  an seinen Motor; der Auftrag wird gemerkt und danach einmal nachgetragen
+  (`_motor_nachtrag`) – Mackie-Pulte fahren nach dem Loslassen auf den zuletzt gesendeten
+  Wert.
+- **Echo ist keine Eingabe.** Was binnen `MOTOR_ECHO_FENSTER_S` (0,25 s) nach einer eigenen
+  Sendung vom selben Fader kommt, ist der Bericht der Motorfahrt und wird nicht ausgeführt
+  (`_motor_eingang`). **Nachlauf:** bis `MOTOR_NACHLAUF_S` (1 s) nach der Sendung gilt ein
+  später Bericht weiter als Echo, wenn er höchstens `MOTOR_ECHO_TOLERANZ` (3 %) neben dem
+  gesendeten Ziel liegt und die Hand seither nichts gemeldet hat – bei einem Fader, dessen
+  Berührungssensor sich schon gemeldet hat (MIDI-15), jeder Bericht ohne Berührung. Sonst
+  überschriebe ein langsamer Motor einen per OSC/NET-15/WEB-12 gesetzten Wert, und zwei
+  Motorfader auf demselben Executor schaukelten sich auf. Danach ist alles wieder die Hand.
+- **Nichts raten.** Nachgeführt wird aus dem echten Stand (`_motor_stellung`,
+  zurückgerechnet durch `continuous_min/max`) – nur bei Executor-Fader und Grand Master
+  (`_MOTOR_LESBAR`). Andere stufenlose Ziele bekommen nur ihre eigene Stellung zurück.
+
+Schwelle `MOTOR_SCHRITT` = 0,2 % (statt 1 % der LED-Rückmeldung). VC-Fader haben keinen
+MIDI-Rückweg und werden nicht nachgeführt.
+
+**Touch-Sperre (MIDI-15):** `MidiOutFeedback.touch_note` nennt die Note des
+Berührungssensors (Mackie: Fader 1..9 = Note 104..112 auf Kanal 1,
+`mackie_touch_note`; `motor_rueckmeldung` trägt sie ein, gespeichert wird das Feld nur,
+wenn es gesetzt ist). `_motor_beruehrung` wertet sie vor allem anderen aus – auch während
+des Lernens –, die Note läuft danach normal weiter durch die Mappings. Berührt: nichts
+geht an den Motor, und was vom Fader kommt, ist nie ein Echo (so kommt die Hand auch durch
+eine laufende Überblendung). Losgelassen: die Stellung wird sofort nachgetragen, ohne die
+Wartezeit – bei Zielen ohne lesbaren Stand nur, was der Fader selbst gemeldet hat. Ohne
+`touch_note` (Kanal 10..16, anderes Pult) gelten allein die Regeln aus MIDI-14; dort
+gewinnt bei einer laufenden Fahrt der Motor. Kommt das Loslassen nie an (Kabel gezogen),
+löst sich die Sperre nach `MOTOR_BERUEHRT_MAX_S` (10 s) ohne Berührungs-Note und ohne Wert
+vom Fader wie ein Loslassen (`_motor_sperre_abgelaufen`). Mappings ohne `midi_in.device`
+nehmen die Note nur vom Port, von dem ihr Fader zuletzt kam, sonst vom Pult ihres
+Motor-Ausgangs (`_beruehrung_gilt`) – ein Extender mit derselben Note sperrt nicht mit.
+
 ## Gekoppelte VC-/Engine-Teile
 
 - **`app_state.playback_engine`** — Executoren (`get_executor(slot)`, `press_btn`,
