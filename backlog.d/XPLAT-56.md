@@ -1,0 +1,11 @@
+ID: XPLAT-56
+Prioritaet: P2
+Status: review
+Status-Notiz: Zweig fix/xplat56-installer-arm64-abbruch; install.py bricht bei nativem ARM64-Python ab (Exit-Code 3), Schalter --arm64-trotzdem nur für Tests/Entwicklung; Startskripte warnen weiter nur
+Nach: XPLAT-51
+Titel: install.py bricht bei nativem ARM64-Python ab statt nur zu warnen
+
+**Herkunft:** Entscheidung E-2 vom 25.10.2026 im Auftrag des Projektinhabers, Folge von XPLAT-51 (dort offen: „Entscheidung Abbruch ja/nein“). Mischfälle aus XPLAT-52.
+**Befund:** Seit XPLAT-51 heißt natives ARM64-Python „nicht unterstützt (instabil, kein 3D)“ — 6 von 12 Starts stürzten mit Access Violation ab. `install.py` warnte trotzdem nur („Die Installation läuft trotzdem weiter“) und richtete ein ARM64-venv ein.
+**Fertig, wenn:** `install.py` auf Windows-ARM mit Exit-Code ≠ 0 abbricht, sobald LightOS danach mit nativem ARM64-Python liefe — mit winget-Befehl und Aufruf mit `--neu-venv`; ein Ausnahme-Schalter nur für Tests/Entwickler (in der Hilfe so beschrieben); `start.bat`/`start.ps1` warnen weiter nur; Mischfälle aus XPLAT-52 richtig; Wortlaut-Wächter und INSTALL.md/README/CONTRIBUTING sagen „bricht ab“.
+**Ergebnis (25.10.2026):** Maßgeblich ist das **Ziel** (das Python, mit dem LightOS danach läuft), nicht das ausführende. `pruefe_arm64_vorab` (vor dem ersten Schritt): ARM64-Installer und Ziel ARM64 — kein venv, `--neu-venv`, `--no-venv`, vorhandenes ARM64- oder nicht startbares venv — Abbruch, Exit-Code 3 (`ARM64_EXIT_CODE`). Vorhandenes x64-venv + ARM64-Installer: läuft durch, `create_venv` fragt nicht mehr und baut nicht neu (ein „j“ machte daraus ein ARM64-venv). `pruefe_arm64_ziel` (nach `create_venv`): x64-Installer, vorhandenes ARM64-venv, Rückfrage mit Nein bzw. ohne Terminal — Abbruch, bevor Pakete hineinkommen, Weg nennt dieses x64-Python mit `--neu-venv`. `create_venv` baut mit ARM64-Python auf Windows-ARM nie ein venv und löscht kein vorhandenes (Absicherung). `--arm64-trotzdem` macht aus jedem Abbruch eine Warnung (alte Rückfrage beim x64-venv inklusive). Linux (auch aarch64), Windows x64 und x64-Python auf ARM: kein Abbruch. Tests: `tests/test_xplat56_installer_arm64_abbruch.py`; nachgezogen `test_xplat51_…`, `test_xplat52_…`, `test_xplat46_venv_architektur.py`. Offen: Lauf auf echtem Windows-ARM-Gerät (hier nur Monkeypatch).

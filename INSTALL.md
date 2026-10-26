@@ -83,7 +83,14 @@ nehmen.** Instabil: mit einem venv aus nativem ARM64-Python stuerzte LightOS in
 (XPLAT-51); mit x64-Python und derselben PySide6-Version nie. Kein 3D: die
 ARM64-Pakete von PySide6-Addons enthalten kein QtWebEngine (gemessen an 6.11,
 XPLAT-45); das Menue "3D-Visualizer" meldet dann "Visualizer nicht verfuegbar".
-Installer und Startskripte warnen in diesem Fall deutlich, brechen aber nicht ab.
+Der Installer bricht in diesem Fall ab (Exit-Code 3, XPLAT-56) und nennt den
+winget-Befehl und den Aufruf mit `--neu-venv`; die Startskripte warnen nur und
+starten trotzdem. Massgeblich ist das Python, mit dem LightOS danach laeuft:
+bleibt ein vorhandenes x64-`venv` stehen, laeuft install.py auch mit
+ARM64-Python durch (das `venv` wird dann nicht neu angelegt); ein x64-Installer
+bricht ab, wenn ein vorhandenes ARM64-`venv` nicht neu angelegt werden darf
+(Rueckfrage mit Nein). `--no-venv` mit ARM64-Python bricht ab (ausser mit dem
+Test-Schalter `--arm64-trotzdem`, s. u.).
 `python-rtmidi` baut dort nur mit den MSVC Build Tools
 (https://visualstudio.microsoft.com/visual-cpp-build-tools/, "Desktop
 Development with C++") - ohne sie laeuft MIDI ueber den eingebauten WinMM-Weg.
@@ -97,7 +104,12 @@ python install.py                # Standard (venv + shortcut)
 python install.py --no-venv      # In aktuelles Python installieren
 python install.py --no-shortcut  # Keine Desktop-Verknuepfung
 python install.py --dev          # Mit pyinstaller fuer Builds (KEINE Test-Pakete)
+python install.py --neu-venv     # Vorhandenes venv mit diesem Python neu anlegen
 ```
+
+`--arm64-trotzdem` ist nur fuer Tests und Entwicklung: damit installiert
+install.py auf Windows-ARM auch mit nativem ARM64-Python weiter, statt
+abzubrechen - das Ergebnis bleibt nicht unterstuetzt (instabil, kein 3D).
 
 Statt `python` geht ueberall auch `py -3.12` (bzw. die gewuenschte Version), s. o.
 
