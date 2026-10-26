@@ -92,14 +92,14 @@ aneinander. WLAN funktioniert, für den Live-Betrieb ist Kabel die sichere Wahl.
 **Adressen.** Beide Geräte brauchen eine Adresse im **selben Bereich**. Viele Pulte und
 Art-Net-Geräte arbeiten ab Werk im Bereich `2.x.x.x` oder `10.x.x.x` mit der Maske
 `255.0.0.0`: Dann zählt nur die erste Zahl als Netz, alle Geräte mit derselben ersten Zahl
-erreichen sich. In einem üblichen Hausnetz (`192.168.1.x`, Maske `255.255.255.0`) müssen
-die ersten drei Zahlen gleich sein.
+erreichen sich. In einem üblichen Hausnetz mit der Maske `255.255.255.0` (im Beispiel unten `192.0.2.x`)
+müssen die ersten drei Zahlen gleich sein.
 
 | Beispiel | Pult | LightOS-Rechner | Maske |
 |---|---|---|---|
 | Art-Net-Bereich | `2.0.0.10` | `2.0.0.20` | `255.0.0.0` |
 | Art-Net-Bereich | `10.0.0.10` | `10.0.0.20` | `255.0.0.0` |
-| Hausnetz | `192.168.1.10` | `192.168.1.20` | `255.255.255.0` |
+| Hausnetz | `192.0.2.10` | `192.0.2.20` | `255.255.255.0` |
 
 Die Adressen sind Beispiele. Jede Adresse darf im Netz nur einmal vorkommen. Wie du dem
 Rechner eine feste Adresse gibst, zeigt für Windows
@@ -160,7 +160,7 @@ die roten Zahlen gehören zum Text dort.*
    Karte.
 5. **Art-Net Startuniversum:** die Art-Net-Universumsnummer, auf der das Pult hört.
    Vorbelegt ist LightOS-Universum minus 1 — Universum 1 sendet auf Art-Net-Universum `0`.
-6. **Übernehmen**. Der Status zeigt `Aktiv → <Adresse> · Universe <n> (gespeichert)`.
+6. **Übernehmen**. Der Status zeigt `Aktiv → <Adresse> · Universum <n> (gespeichert)`.
 
 **Mit sACN** (Reiter **sACN (E1.31)**):
 
@@ -346,7 +346,7 @@ eine Rückmeldung an das Pult einrichten — siehe
 | Aufbau | Wo nachsehen | Was du sehen solltest |
 |---|---|---|
 | A | Statusleiste unten rechts | `Ausgabe: U<n> Art-Net` bzw. `sACN`. Orange oder rot mit `⚠` heißt: Dieses Universum geht nicht hinaus; der Tooltip nennt den Grund. |
-| A | Sektion **E/A** → **DMX Monitor** | `Universe <n> geht raus` und die Werte, die LightOS sendet. Ob sie beim Pult ankommen, zeigt nur das Pult. |
+| A | Sektion **E/A** → **DMX Monitor** | `Universum <n> geht raus` und die Werte, die LightOS sendet. Ob sie beim Pult ankommen, zeigt nur das Pult. |
 | B | Dialog **Ausgabe konfigurieren** → **DMX-Eingang** → **Status:** | `Aktiv: U<ein> -> U<ziel> (<Modus>)`. Das heißt: Der Eingang ist eingeschaltet — nicht, dass schon etwas ankommt. Die Zeile gilt nur, solange der Dialog offen bleibt. |
 | B | Sektion **E/A** → **Output** oder **DMX Monitor**, Ziel-Universum wählen | Einen Fader am Pult bewegen: Der Kanal muss sich im Monitor mitbewegen. |
 | C | Sektion **E/A** → **MIDI** → **MIDI Monitor (Eingehende Nachrichten)**, **Monitor aktiv** angehakt | Je Befehl eine Zeile wie `MSC   [<Quelle>] GO Cue=1 Liste=2`. Die Quelle ist der MIDI-Port oder `MSC/UDP` für den Netzwerkweg. |

@@ -1,7 +1,7 @@
 {
   "anleitung": "geraete_bibliothek",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "26ec5bba",
+  "stand": "000e51c2",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py geraete_bibliothek'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "67297352f18ddea9b457eca8fc9c787e"
+      "md5": "a2606cb1d56013590caebf74ec63fbd0"
     },
     {
       "datei": "02_menue_datenbank.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "778a986bf986727d3817327fa4329eaf"
+      "md5": "64a67167c9772f8a31bd97e2f485c510"
     },
     {
       "datei": "04_fixture_editor.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "0f5ede28ec4920e31c5066c465dad9a2"
+      "md5": "e65559d16a86f38fcf9333497f6044f4"
     },
     {
       "datei": "05_lightos_profil.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "9914c582524602ce40c46551cb8c819e"
+      "md5": "61f22efe2fba1f8fedc9b479ac46986e"
     },
     {
       "datei": "06_weiss_segment_hinweis.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "022e14875d8daf52ef5bce44e05b3a36"
+      "md5": "75f3739b61d7b53c681b7cf1360b35bf"
     },
     {
       "datei": "07_weiss_segment_gesetzt.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "bd4d8650831ef375f7c6616163875b1f"
+      "md5": "cb30a0d0e3f3d2c66b67f1d4439cf4de"
     },
     {
       "datei": "08_matrix_hinweis.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "ea466cd7f6ec6f447cff13b823d3f21b"
+      "md5": "f2a550c48888582cf50463d263603be6"
     },
     {
       "datei": "09_3d_modelle.png",

@@ -85,6 +85,7 @@ test_qa64_status_drift.py
 
 # ── Privatsphaere, Lizenz, Repo-Hygiene (laufen ueber ALLE Dateien) ─────────
 test_keine_privaten_dateien.py
+test_priv07_doku_beispieladressen.py # PRIV-07: keine Heimnetz-Adressen (192.168.x/10.x/172.16-31.x) in docs/ und den Wurzel-Anleitungen
 test_keine_konfliktmarker.py
 test_tool2_keine_binaerdateien.py
 test_proc18_fremd_lizenzhinweise.py

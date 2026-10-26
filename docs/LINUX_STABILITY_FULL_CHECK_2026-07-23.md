@@ -84,8 +84,8 @@ Befunde, Aenderungen, Verifikation und verbleibende Hardwaregrenzen.
 21. Der Onboard-Adapter Intel I219-V (`e1000e`, `eno1`) wurde als dauerhaftes
     NetworkManager-Profil `Internes Ethernet` eingerichtet. Wegen eines
     fehlerhaften Router-DHCP-Leases (angebotene Adresse bereits im LAN belegt)
-    verwendet er konfliktgeprueft `192.168.178.250/24`, Gateway
-    `192.168.178.1`, DNS `192.168.178.1` und `1.1.1.1`, EEE aus.
+    verwendet er konfliktgeprueft `192.0.2.250/24`, Gateway
+    `192.0.2.1`, DNS `192.0.2.1` und `1.1.1.1`, EEE aus.
 22. Fuer den ENTTEC DMX USB Pro wurde `maxi` dauerhaft der Gruppe `dialout`
     hinzugefuegt. Fuer die laufende Sitzung wurde zusaetzlich eine ACL auf
     `/dev/ttyUSB0` gesetzt.

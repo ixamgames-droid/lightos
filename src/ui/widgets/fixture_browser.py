@@ -261,7 +261,7 @@ class FixtureBrowserDialog(QDialog):
         self._spin_universe = QSpinBox()
         self._spin_universe.setRange(_UNIVERSE_MIN, _UNIVERSE_MAX)
         self._spin_universe.setValue(self._universum_vorbelegung())
-        form.addRow("Universe:", self._spin_universe)
+        form.addRow("Universum:", self._spin_universe)
 
         self._spin_address = QSpinBox()
         self._spin_address.setRange(1, 512)
@@ -446,7 +446,7 @@ class FixtureBrowserDialog(QDialog):
         if suggestion is None:
             self._lbl_addr_hint.setText(
                 f"⚠ Kein freier zusammenhängender Bereich für {ch_count} "
-                f"Kanäle in Universe {self._spin_universe.value()} — bitte "
+                f"Kanäle in Universum {self._spin_universe.value()} — bitte "
                 f"anderes Universum wählen oder Patch aufräumen.")
             self._lbl_addr_hint.setStyleSheet("color: #f85149;")
         else:

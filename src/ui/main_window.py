@@ -1518,7 +1518,7 @@ class MainWindow(QMainWindow):
         elif offene:
             benutzt = sorted({getattr(d, "port", "?") for d in offene.values()})
             ziele = ", ".join(benutzt)
-            anzahl = f"{len(offene)} Universe{'n' if len(offene) != 1 else ''}"
+            anzahl = f"{len(offene)} Universum" if len(offene) == 1 else f"{len(offene)} Universen"
             # ★ OUT-51: Bis hierhin faerbte dieser Zweig gruen, sobald ein
             # Adapter REGISTRIERT war — nicht, wenn er sendet. `is_connected()`
             # (SERIAL-01) beantwortet genau diese Frage und stand seit Monaten
@@ -1539,7 +1539,7 @@ class MainWindow(QMainWindow):
                 liste = ", ".join(str(u) for u in tot)
                 self._lbl_enttec.setText(
                     f"Enttec: {ziele} sendet NICHT "
-                    f"(Universe {liste})")
+                    f"(Universum {liste})")
                 self._lbl_enttec.setStyleSheet("color: #ff4444;")
                 self._lbl_enttec.setToolTip(
                     "Der Adapter ist eingerichtet, aber der Port ist nicht "
@@ -1556,11 +1556,12 @@ class MainWindow(QMainWindow):
                 self._lbl_enttec.setToolTip("")
         elif (port := self._enttec_port_gesucht()):
             # Adapter steckt, aber kein Universe ist ihm zugewiesen.
-            self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universe")
+            self._lbl_enttec.setText(f"Enttec: {port} erkannt, kein Universum")
             self._lbl_enttec.setStyleSheet("color: #ffb454;")
             self._lbl_enttec.setToolTip(
-                "Der Adapter ist da, aber kein Universe gibt darueber aus. "
-                "Im Universe-Manager einem Universe den Ausgang 'Enttec' geben.")
+                "Der Adapter ist da, aber kein Universum gibt darueber aus. "
+                "Unter Ausgabe → Konfigurieren… im Reiter „Universen“ einem "
+                "Universum den Ausgang „Enttec“ geben.")
         else:
             self._lbl_enttec.setText("Enttec: nicht gefunden")
             self._lbl_enttec.setStyleSheet("color: #ff4444;")
