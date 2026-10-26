@@ -343,11 +343,24 @@ class Doc72ExternePulteTest(unittest.TestCase):
         # NET-15: die Fernsteuerung startet sie (beim Start nur, wenn sie aktiv
         # gespeichert ist) — richtet aber keinen Merge ein; der Merge-Eingang
         # bleibt also ungespeichert, wie die Anleitung sagt.
+        # OUT-79: die Empfangsadresse bindet LAUFENDE Empfaenger neu
+        # (``neu_binden``) und der Kopf des Reiters liest ihren Zustand fuer
+        # die Statuszeilen — beide starten nichts Neues und richten keinen
+        # Merge ein (unten geprueft).
         self.assertEqual(sorted(nutzer), ["src/core/dmx/artnet_input.py",
+                                          "src/core/dmx/empfangsadresse.py",
                                           "src/core/dmx/fernsteuerung.py",
                                           "src/core/dmx/sacn_input.py",
                                           "src/core/mitschnitt.py",
+                                          "src/ui/widgets/dmx_empfang_box.py",
                                           "src/ui/widgets/output_config.py"])
+        for teile in (("src", "core", "dmx", "empfangsadresse.py"),
+                      ("src", "ui", "widgets", "dmx_empfang_box.py")):
+            # der eigene Pruef-Takt (QTimer) ist kein Empfaenger-Start
+            quelle = _lies(*teile).replace("self._timer.start()", "")
+            for eingriff in (".start(", ".stop(", ".set_merge(", ".add_merge(",
+                             ".remove_merge(", ".clear_merges("):
+                self.assertNotIn(eingriff, quelle, (teile, eingriff))
         mitschnitt = _lies("src", "core", "mitschnitt.py")
         for eingriff in (".start(", ".stop(", ".set_merge(", ".add_merge(",
                          ".remove_merge(", ".clear_merges("):

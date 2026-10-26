@@ -102,6 +102,16 @@ def dmx_fernsteuerung_path() -> str:
     return os.path.join(app_data_dir(), "dmx_fernsteuerung.json")
 
 
+def osc_zuordnungen_path() -> str:
+    """OSC-06: freie OSC-Zuordnungen und Rueckmeldung. Bauart wie
+    :func:`dmx_fernsteuerung_path`: ``LIGHTOS_OSC_ZUORDNUNGEN`` hat Vorrang,
+    sonst der Datenordner. ``tests/conftest.py`` setzt den Override hart."""
+    override = os.environ.get("LIGHTOS_OSC_ZUORDNUNGEN")
+    if override:
+        return override
+    return os.path.join(app_data_dir(), "osc_zuordnungen.json")
+
+
 # ── XPLAT-44: Nutzerdaten, die frueher CWD-relativ unter ``data/`` lagen ──────
 #
 # Entscheidung des Projektinhabers (2026-10-05): ALLE Nutzerdaten liegen im

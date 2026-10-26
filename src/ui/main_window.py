@@ -602,6 +602,14 @@ class MainWindow(QMainWindow):
             fernsteuerung.beim_start()
         except Exception as e:
             print(f"[main_window] DMX-Fernsteuerung: {e}")
+        # OSC-06: gespeicherte freie OSC-Zuordnungen + Rueckmeldung laden und
+        # die Uebergabe OSC-Thread -> GUI-Thread einrichten. Startet keinen
+        # Server (der OSC-Eingang bleibt opt-in ueber das Menue).
+        try:
+            from src.core.osc import osc_zuordnung
+            osc_zuordnung.beim_start()
+        except Exception as e:
+            print(f"[main_window] OSC-Zuordnungen: {e}")
 
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
@@ -891,6 +899,9 @@ class MainWindow(QMainWindow):
         self._act_osc = om.addAction("OSC-Server (Port 7770)")
         self._act_osc.setCheckable(True)
         self._act_osc.triggered.connect(self._toggle_osc_server)
+        # OSC-06: freie Adressen, OSC-Learn und Rueckmeldung.
+        om.addAction("OSC-Zuordnungen && Rückmeldung…").triggered.connect(
+            self._open_osc_einstellungen)
         self._act_os2l = om.addAction("OS2L-Server (Port 1234)")
         self._act_os2l.setCheckable(True)
         self._act_os2l.triggered.connect(self._toggle_os2l_server)
@@ -2848,6 +2859,13 @@ class MainWindow(QMainWindow):
                 pass
             self._lbl_web.setText("Web: aus")
             self._lbl_web.setStyleSheet("")
+
+    def _open_osc_einstellungen(self):
+        """OSC-06: Dialog „OSC-Zuordnungen & Rückmeldung“."""
+        from src.ui.widgets.osc_einstellungen_dialog import OscEinstellungenDialog
+        dlg = OscEinstellungenDialog(self)
+        dlg.exec()
+        dlg.deleteLater()
 
     def _toggle_osc_server(self, checked: bool):
         if checked:
