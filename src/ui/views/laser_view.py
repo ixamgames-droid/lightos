@@ -39,7 +39,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QRect, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 
-from src.core.app_state import get_state, get_channels_for_patched
+from src.core.app_state import (get_state, get_channels_for_patched,
+                                fixture_uses_dmx)
 from src.core.attr_groups import attr_label
 from src.core.laser.capability import (laser_capability, LaserClass,
                                        is_laser_fixture)
@@ -943,7 +944,8 @@ class LaserView(QWidget):
             # LAS-26: NOT-AUS von einer VC-Taste -> Anzeige sofort mitziehen;
             # LAS-36: dasselbe Ereignis kommt beim Loesen oben rechts.
             sync.subscribe_widget(SyncEvent.LASER_ESTOP, self,
-                                  lambda *_: self._update_dmx_estop_label())
+                                  lambda *_: (self._update_dmx_estop_label(),
+                                              self._update_arm_button()))
             # LAS-34: Die Bausteine zeigen einen ZUSTAND (Laser AN/AUS,
             # gewähltes Muster, Lage). Ändert ihn jemand anderes (Clear,
             # Palette, VC, Befehlszeile), ziehen sie nach — gebündelt, damit
@@ -1175,7 +1177,16 @@ class LaserView(QWidget):
         ba = self._plan.betriebsart
         attr = ba.attribut if ba is not None else "shutter"
         dunkel: list[bool | None] = []
+        lo = getattr(get_state(), "_laser_output", None)
         for f in an_fixtures:
+            if not fixture_uses_dmx(f):
+                # Netzwerk-Laser (LAS-04) haben keinen DMX-Frame — ihr Platz-
+                # halter waere bedeutungslos. Der Streamer dunkelt nur bei
+                # BLACKOUT, NOT-AUS oder unscharf; Grand Master wirkt dort
+                # NICHT (laser_output._tick). Im Zweifel „nicht dunkel“.
+                scharf = bool(getattr(lo, "armed", True)) if lo else True
+                dunkel.append(blackout or not scharf)
+                continue
             wert = self._ausgabe_wert(f, attr)
             dunkel.append(None if wert is None else (
                 None if self._an_bei(wert) is None else not self._an_bei(wert)))
@@ -1281,6 +1292,20 @@ class LaserView(QWidget):
 
     def _update_arm_button(self):
         armed = self._btn_arm.isChecked()
+        # LAS-44: der Hinweis „NOT-AUS aktiv …“ steht nur, solange der NOT-AUS
+        # wirklich steht — danach nicht mehr (sonst taeuscht der Sicherheits-
+        # knopf noch, wenn der Laser laengst wieder scharf ist).
+        try:
+            gesperrt = getattr(get_state(), "laser_estop_active",
+                               False) is True
+        except Exception:
+            gesperrt = False
+        try:
+            self._btn_arm.setToolTip(
+                "NOT-AUS aktiv — erst oben rechts lösen (Rückfrage), "
+                "dann scharf schalten." if gesperrt and not armed else "")
+        except RuntimeError:
+            return
         if armed:
             self._btn_arm.setText("🔓 SCHARF — Laser gibt Licht aus")
             self._btn_arm.setStyleSheet(
@@ -1321,14 +1346,14 @@ class LaserView(QWidget):
                 self._btn_arm.blockSignals(True)
                 self._btn_arm.setChecked(False)
                 self._btn_arm.blockSignals(False)
-                self._btn_arm.setToolTip(
-                    "NOT-AUS aktiv — erst oben rechts lösen (Rückfrage), "
-                    "dann scharf schalten.")
                 self._update_arm_button()
                 return
         lo = self._laser_output()
         if lo is not None:
             lo.set_armed(bool(checked))
+            # Der Kern kann „scharf“ verweigern (LAS-44) — Knopf zeigt dann
+            # den echten Zustand des Managers, nie einen Wunsch.
+            self._sync_arm_from_manager()
         self._update_arm_button()
 
     def _on_estop(self):
@@ -1697,7 +1722,9 @@ class LaserView(QWidget):
     def _ausgabe_wert(self, fixture, attr: str) -> int | None:
         """Was die Ausgabe für diesen Kanal zuletzt gerechnet hat (nach
         Blackout, Grand Master, laufenden Szenen) — ``None`` = unbekannt.
-        Nur gelesen."""
+        Nur gelesen. Netzwerk-Laser (kein DMX-Adressraum, LAS-04): ``None``."""
+        if not fixture_uses_dmx(fixture):
+            return None
         try:
             om = getattr(get_state(), "output_manager", None)
             if om is None:

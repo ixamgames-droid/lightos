@@ -402,3 +402,83 @@ def test_sperrzonen_bleiben_nur_anzeige_beschriftet(monkeypatch):
               v._btn_sperrzonen_details):
         assert "Kein Laserschutz" in w.toolTip(), w.objectName()
     assert "schaltet nicht ab" in v._sperrzonen_abzeichen.text()
+
+
+# ── Nachtrag Sicherheits-Gegenpruefung (LAS-44) ─────────────────────────────
+
+def test_grand_master_0_haelt_netzwerk_laser_nicht_dunkel(monkeypatch):
+    """Gemischte Auswahl DMX + scharfer Ether-Dream-Laser: GM 0 dunkelt den
+    Streamer NICHT (nur BLACKOUT/NOT-AUS/unscharf) — die Leiste darf also
+    nicht „dunkel gehalten“ melden. Der Platzhalter-Kanal des Netzwerk-
+    Lasers (LAS-04) im DMX-Frame zaehlt nicht."""
+    el = T._el400()
+    v, st = T._view(monkeypatch, [T._FX(1, el),
+                                  T._FX(2, el, protocol="etherdream")])
+    st.output_manager = _Ausgabe()
+    st._laser_output = st.lo
+    T._betriebsart(v, "statisch")
+    st.lo.armed = True
+    st.output_manager.grand_master = 0.0
+    v._update_dmx_estop_label()
+    text = v._lbl_dmx_estop.text()
+    assert "dunkel gehalten" not in text
+    assert text == "Laser AN · Grand Master 0 % schaltet ihn nicht ab"
+    # BLACKOUT dunkelt auch den Streamer -> hier stimmt „dunkel gehalten“.
+    st.output_manager.grand_master = 1.0
+    st.output_manager.blackout = True
+    v._update_dmx_estop_label()
+    assert v._lbl_dmx_estop.text() == "Laser AN · durch BLACKOUT dunkel gehalten"
+
+
+def test_zwei_dmx_laser_einer_strahlt_weiter(monkeypatch):
+    """Ein Laser laut Ausgabe aus, der andere weiter an: nie „dunkel
+    gehalten“ — weder bei GM 0 noch bei BLACKOUT."""
+    el = T._el400()
+    f1, f2 = T._FX(1, el), T._FX(2, el)
+    v, st = T._view(monkeypatch, [f1, f2])
+    st.output_manager = _Ausgabe()
+    T._betriebsart(v, "statisch")
+    st.output_manager.frame[f2.address - 1] = 174       # f2 strahlt weiter
+    for grund, setzen in (("Grand Master 0 %", ("grand_master", 0.0)),
+                          ("BLACKOUT", ("blackout", True))):
+        st.output_manager.grand_master = 1.0
+        st.output_manager.blackout = False
+        setattr(st.output_manager, *setzen)
+        v._update_dmx_estop_label()
+        text = v._lbl_dmx_estop.text()
+        assert "dunkel gehalten" not in text, text
+        assert text == f"Laser AN · {grund} schaltet ihn nicht ab"
+
+
+def test_scharf_tooltip_verschwindet_nach_dem_loesen(monkeypatch):
+    v, st = T._view(monkeypatch, [T._FX(1, T._el400(), protocol="etherdream")])
+    vorher = v._btn_arm.toolTip()
+    v._on_estop()
+    v._btn_arm.setChecked(True)                       # verweigert
+    assert v._btn_arm.toolTip().startswith("NOT-AUS aktiv")
+    st.laser_estop_active = False                     # oben rechts geloest
+    v._btn_arm.setChecked(True)
+    assert st.lo.armed is True
+    assert v._btn_arm.toolTip() == vorher
+    assert "NOT-AUS" not in v._btn_arm.toolTip()
+
+
+def test_kern_verweigert_scharf_bei_not_aus():
+    """Der Riegel sitzt im LaserOutputManager — gilt fuer Reiter, VC-/MIDI-
+    Taste LASER_ARM und Fernbedienung gleich; der Tick dunkelt zusaetzlich,
+    solange der NOT-AUS-Latch steht."""
+    import test_laser_etherdream as E
+    m, state = E._manager([E._Fx(1)])
+    state.programmer[1] = {"shutter": 255}
+    state.laser_estop_active = True
+    m.set_armed(not m.armed)                          # wie die VC-Taste LASER_ARM
+    assert m.armed is False
+    m._armed = True                                   # am Riegel vorbei
+    m._tick()
+    frame = list(m._connections.values())[0].frames[0]
+    assert all(p.blanked for p in frame.points)
+    state.laser_estop_active = False                  # oben rechts geloest
+    assert m.set_armed(True) is True
+    m._tick()
+    frame = list(m._connections.values())[0].frames[-1]
+    assert any(not p.blanked for p in frame.points)
