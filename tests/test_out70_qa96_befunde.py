@@ -452,3 +452,58 @@ def test_sichtkontrolle_eine_testzeile_je_universum_auch_bei_zwei_ausgaengen(app
     finally:
         dlg.reject()
         dlg.deleteLater()
+
+
+# ── Sicherheits-Gegenpruefung: Wettlauf Stopp/Takt, Sichtbarkeit je Adresse 1 ──
+
+def test_stopp_zwischen_pruefung_und_schreiben_laesst_keinen_wert_haengen():
+    """Stopp (UI-Thread) genau zwischen der Sperr-Pruefung und dem Schreiben im
+    Takt (Ausgabe-Thread): Kanal 1 muss danach auf dem alten Wert stehen."""
+    om, _ = _om(1)
+    om.universes[1].set_channel(1, 0)
+    zeit = [0.0]
+    lauf = testsignal.Testsignal(om, 1, uhr=lambda: zeit[0])
+    assert lauf.start() == ""
+    zeit[0] = 1.25                                  # Spitze: Wert 255
+    echt = testsignal.sperre_grund
+    import threading
+    fertig = threading.Event()
+
+    def ui_thread_stopp():
+        lauf.stopp()
+        fertig.set()
+
+    def mit_stopp(*a, **k):
+        grund = echt(*a, **k)
+        t = threading.Thread(target=ui_thread_stopp, daemon=True)
+        t.start()
+        t.join(0.3)                                 # Stopp darf hier warten
+        return grund
+
+    with mock.patch.object(testsignal, "sperre_grund", mit_stopp):
+        lauf._tick(0.02)
+    assert fertig.wait(2.0)
+    assert not lauf.laeuft
+    assert om.universes[1].get_channel(1) == 0
+
+
+def test_rueckfrage_verharmlost_nicht_wenn_adresse_1_ungedaempft_bleibt():
+    om, _ = _om(1)
+    # Grand Master 0 %, aber Adresse 1 nicht in der GM-Maske -> geht voll raus
+    om.set_gm_address_mask({1: frozenset({10})})
+    om.set_grand_master(0.0)
+    frage = testsignal.frage_text(om, 1, [])
+    assert "nicht zu sehen" not in frage
+    assert "Adresse 1 kann trotzdem reagieren" in frage
+    # GM-Maske enthaelt Adresse 1 -> wirklich gedaempft
+    om.set_gm_address_mask({1: frozenset({1})})
+    assert "nicht zu sehen" in testsignal.frage_text(om, 1, [])
+    om.set_grand_master(1.0)
+    # Blackout, Adresse 1 in der Erhalten-Maske -> geht raus
+    om.set_blackout_keep_mask({1: frozenset({1})})
+    om.set_blackout(True)
+    frage = testsignal.frage_text(om, 1, [])
+    assert "nicht zu sehen" not in frage and "BLACKOUT" in frage
+    om.set_blackout_keep_mask({1: frozenset({5})})
+    assert "nicht zu sehen" in testsignal.frage_text(om, 1, [])
+    om.set_blackout(False)

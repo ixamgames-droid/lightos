@@ -35,6 +35,7 @@ Kein Qt.
 """
 from __future__ import annotations
 
+import threading
 import time
 
 DAUER_S = 5.0
@@ -224,32 +225,63 @@ def adresse_1_text(om, universum: int, fixtures, kanaele_von=None) -> str:
     return f"Auf Adresse 1 liegt laut Patch: {namen}."
 
 
-def sichtbarkeit_text(om) -> str:
+def _adresse_1_gedaempft(maske, univ: int, *, blackout: bool) -> bool:
+    """Gilt die Daempfung fuer Adresse 1? Spiegelt ``OutputManager._send_all``:
+    Blackout nullt alles ausser der Erhalten-Maske, der Grand Master dimmt ohne
+    Maske global, mit Maske nur die Adressen darin."""
+    try:
+        m = (maske or {}).get(int(univ))
+    except Exception:                                    # noqa: BLE001
+        return False
+    if m is None:
+        return True
+    return (KANAL not in m) if blackout else (KANAL in m)
+
+
+def sichtbarkeit_text(om, universum: int | None = None) -> str:
     """V-03: warum das Signal gerade nicht zu sehen waere — leer, wenn nichts
-    dagegen spricht. Sperrt nicht: Blackout und Grand Master gelten weiter."""
+    dagegen spricht. Sperrt nicht: Blackout und Grand Master gelten weiter.
+
+    Die Aussage „nicht zu sehen“ nur, wenn Blackout/GM Adresse 1 dieses
+    Universums wirklich daempfen (Masken!). Sonst ein Warnsatz: ein Geraet auf
+    Adresse 1 reagiert trotzdem — die Rueckfrage darf nicht verharmlosen."""
+    try:
+        blackout = bool(om._blackout_wirksam())
+    except Exception:                                    # noqa: BLE001
+        blackout = bool(getattr(om, "_blackout", False))
+    try:
+        gm_null = float(getattr(om, "grand_master", 1.0)) <= 0.0
+    except Exception:                                    # noqa: BLE001
+        gm_null = False
     teile = []
-    try:
-        if om._blackout_wirksam():
-            teile.append("BLACKOUT ist aktiv")
-    except Exception:                                    # noqa: BLE001
-        if getattr(om, "_blackout", False):
-            teile.append("BLACKOUT ist aktiv")
-    try:
-        if float(getattr(om, "grand_master", 1.0)) <= 0.0:
-            teile.append("der Grand Master steht auf 0 %")
-    except Exception:                                    # noqa: BLE001
-        pass
+    if blackout:
+        teile.append("BLACKOUT ist aktiv")
+    if gm_null:
+        teile.append("der Grand Master steht auf 0 %")
     if not teile:
         return ""
     satz = " und ".join(teile)
-    return satz[:1].upper() + satz[1:] + " — das Signal wäre nicht zu sehen."
+    satz = satz[:1].upper() + satz[1:]
+    if universum is None:
+        gedaempft = False                     # ohne Universum: nichts versprechen
+    elif blackout:
+        # Blackout gewinnt in _send_all; der GM laeuft dann nicht mehr.
+        gedaempft = _adresse_1_gedaempft(
+            getattr(om, "_blackout_keep_mask", None), universum, blackout=True)
+    else:
+        gedaempft = _adresse_1_gedaempft(
+            getattr(om, "_gm_address_mask", None), universum, blackout=False)
+    if gedaempft:
+        return satz + " — das Signal wäre nicht zu sehen."
+    return (satz + " — beide dämpfen nur gepatchte Lichtkanäle. Ein Gerät "
+            "auf Adresse 1 kann trotzdem reagieren.")
 
 
 def frage_text(om, universum: int, fixtures, kanaele_von=None) -> str:
     """Die ganze Rueckfrage vor dem Start."""
     teile = [f"Testsignal auf Universum {int(universum)} senden?",
              adresse_1_text(om, universum, fixtures, kanaele_von)]
-    sicht = sichtbarkeit_text(om)
+    sicht = sichtbarkeit_text(om, universum)
     if sicht:
         teile.append(sicht)
     teile.append(FRAGE)
@@ -275,6 +307,11 @@ class Testsignal:
         self._vorher = None
         self.laeuft = False
         self.abbruch_grund = ""
+        # Takt (Ausgabe-Thread) und Stopp (UI-Thread) teilen EINE Sperre:
+        # sonst schreibt ein Takt, der vor dem Stopp geprueft hat, nach dem
+        # Zuruecksetzen noch einmal ``wert(t)`` — und Kanal 1 bliebe haengen.
+        # RLock: der Takt ruft bei Sperre/Ende selbst ``stopp()``.
+        self._sperre = threading.RLock()
         # EIN Objekt fuer An- und Abmelden: ``remove_tick_callback`` vergleicht
         # per Identitaet, und ``self._tick`` waere bei jedem Zugriff ein neues.
         self._cb = self._tick
@@ -301,27 +338,36 @@ class Testsignal:
         return ""
 
     def _tick(self, _dt=None):
-        if not self.laeuft:
-            return
-        t = self._uhr() - self._t0
-        # Im Takt nur, was der OutputManager weiss (kein Qt, keine Datenbank).
-        grund = sperre_grund(self._om, self.universum)
-        if grund or t >= DAUER_S:
-            self.abbruch_grund = grund
-            self.stopp()
-            return
-        self._om.universes[self.universum].set_channel(KANAL, wert(t))
+        with self._sperre:
+            if not self.laeuft:
+                return
+            t = self._uhr() - self._t0
+            # Im Takt nur, was der OutputManager weiss (kein Qt, keine Datenbank).
+            grund = sperre_grund(self._om, self.universum)
+            if not self.laeuft:              # Stopp kam waehrend der Pruefung
+                return
+            if grund or t >= DAUER_S:
+                self.abbruch_grund = grund
+                self.stopp()
+                return
+            self._om.universes[self.universum].set_channel(KANAL, wert(t))
 
     def stopp(self):
         """Signal beenden — Kanal 1 zurueck auf den Wert von vorher.
         Mehrfach aufrufbar."""
-        war = self.laeuft
+        # Erst abmelden (ohne Sperre: der OutputManager haelt beim Aufruf der
+        # Rueckrufe keine eigene), dann unter der Sperre zuruecksetzen — ein
+        # laufender Takt ist danach fertig und schreibt nichts mehr.
         self.laeuft = False
         try:
             self._om.remove_tick_callback(self._cb)
         except Exception:                                # noqa: BLE001
             pass
-        if war:
-            u = (getattr(self._om, "universes", None) or {}).get(self.universum)
-            if u is not None:
-                u.set_channel(KANAL, int(self._vorher or 0))
+        with self._sperre:
+            war = self._vorher is not None
+            vorher, self._vorher = self._vorher, None
+            if war:
+                u = (getattr(self._om, "universes", None) or {}).get(
+                    self.universum)
+                if u is not None:
+                    u.set_channel(KANAL, int(vorher or 0))
