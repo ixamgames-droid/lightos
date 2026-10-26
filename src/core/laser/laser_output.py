@@ -146,11 +146,25 @@ class LaserOutputManager:
         """Scharf/unscharf schalten. Unscharf blankt die Ausgabe ab dem
         NÄCHSTEN Tick — ein bereits laufender Tick kann noch mit dem alten
         Wert fertig senden, d. h. garantiert dunkel spätestens nach einer
-        Tick-Periode (~1/TARGET_FPS ≈ 33 ms). Für sofortiges Dunkel: estop_all."""
+        Tick-Periode (~1/TARGET_FPS ≈ 33 ms). Für sofortiges Dunkel: estop_all.
+
+        LAS-44 (Sicherheit): solange der Laser-NOT-AUS steht
+        (``state.laser_estop_active``), wird „scharf“ verweigert — für JEDEN
+        Aufrufer gleich (Laser-Reiter, VC-/MIDI-Taste, Fernbedienung). Gelöst
+        wird der NOT-AUS nur oben rechts mit Rückfrage (LAS-36). Rückgabe:
+        der tatsächliche Zustand danach."""
+        if value and self._notaus_verriegelt():
+            value = False
         changed = self._armed != bool(value)
         self._armed = bool(value)
         if changed:
             self._notify_armed_changed()
+        return self._armed
+
+    def _notaus_verriegelt(self) -> bool:
+        """LAS-44: steht der Laser-NOT-AUS (DMX-Latch der App)? Nur ein echtes
+        ``True`` zählt (Mocks/Alt-Zustände ohne Feld: nicht verriegelt)."""
+        return getattr(self._state, "laser_estop_active", False) is True
 
     def _notify_armed_changed(self):
         """Anzeige-Sync (LAS-10): Laser-Steuerseite + VC-Buttons erfahren eine
@@ -339,7 +353,11 @@ class LaserOutputManager:
             return
         # Nicht scharf geschaltet ⇒ Ausgabe geblankt (LAS-07-Safety), ebenso
         # bei BLACKOUT oder aktivem Not-Aus.
-        dark = self._blackout_active() or self._estopped or not self._armed
+        # LAS-44: zusaetzlich, solange der NOT-AUS-Latch der App steht — auch
+        # wenn ``_estopped`` nach dem Ausloesen wieder geloest wurde und
+        # jemand am Riegel vorbei ``_armed`` gesetzt haette.
+        dark = (self._blackout_active() or self._estopped or not self._armed
+                or self._notaus_verriegelt())
         for fx in fixtures:
             conn = self._conn_for(fx)
             if conn is None:
