@@ -67,7 +67,7 @@ class OutputView(QWidget):
 
         # Controls
         ctrl = QHBoxLayout()
-        ctrl.addWidget(QLabel("Universe:"))
+        ctrl.addWidget(QLabel("Universum:"))
         self._spin_univ = QSpinBox()
         # Der Patch und die Output-Konfiguration unterstützen Universen 1–32.
         # Ein 1–16-Limit machte gepatchte Geräte auf U17–U32 im Monitor unsichtbar.

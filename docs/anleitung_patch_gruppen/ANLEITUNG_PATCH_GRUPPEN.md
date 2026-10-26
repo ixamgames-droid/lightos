@@ -10,25 +10,25 @@
 
 Sektion **Patchen** → Tab **Patch**. Mit **+ Gerät hinzufügen** öffnet sich der Dialog
 *Gerät hinzufügen*: links das Profil im Baum wählen, rechts unter *Patch-Optionen* den
-**Modus** (= Kanal-Layout), **Universe:** und die **DMX-Adresse:** setzen (unter dem Feld
+**Modus** (= Kanal-Layout), **Universum:** und die **DMX-Adresse:** setzen (unter dem Feld
 schlägt LightOS automatisch den nächsten freien Bereich vor), dann **Hinzufügen**.
 
 Mehrere gleiche Geräte auf einmal: Feld **Anzahl:** hochzählen und mit **Adress-Offset:**
 den Abstand von Startadresse zu Startadresse festlegen (0 = Kanalzahl des Modus, also dicht
 hintereinander). Ein Wert **kleiner** als die Kanalzahl lässt die Geräte überlappen — der
-Dialog warnt nicht, die Zeilen werden danach rot. Reicht das Universe nicht aus, rollt
+Dialog warnt nicht, die Zeilen werden danach rot. Reicht das Universum nicht aus, rollt
 LightOS automatisch ins nächste.
 
 ![Patch-Tabelle der Hardstyle-Show](img/01_patch.png)
 
-Das Rig dieser Show (Universe 1):
+Das Rig dieser Show (Universum 1):
 - **PAR 1–8** — `Stage Light ZQ01424`, **8-Kanal RGBW**, Adressen **1 · 9 · 17 · 25 · 33 · 41 · 49 · 57**
 - **MH Links / Rechts** — `ZQ02001 Mini Moving Head`, **11-Kanal**, Adressen **65 / 76**
 - **Spider Links / Rechts** — `Spider 14ch`, **14-Kanal**, Adressen **87 / 101**
 
 Hilfen:
-- **Auto-Patch** legt **alle** Geräte neu ab Universe 1, Adresse 1 lückenlos in FID-Reihenfolge
-  an (ins nächste Universe erst, wenn 512 überschritten würden). Universe und Adresse **aller**
+- **Auto-Patch** legt **alle** Geräte neu ab Universum 1, Adresse 1 lückenlos in FID-Reihenfolge
+  an (ins nächste Universum erst, wenn 512 überschritten würden). Universum und Adresse **aller**
   Geräte werden überschrieben — eine gewollte Aufteilung auf mehrere Universen geht dabei
   verloren. Es fragt vorher nach; **Strg+Z** macht es rückgängig.
 - **Mit Offset kopieren…** patcht die markierten Geräte mehrfach mit festem Abstand
@@ -36,10 +36,10 @@ Hilfen:
 - **Gerät erstellen…** baut ein eigenes Profil (Kanäle/Attribute), falls dein Gerät nicht in der
   Datenbank ist.
 - **Löschen** entfernt die markierten Zeilen (mit Rückfrage). Doppelklick auf eine Zeile öffnet
-  *Gerät bearbeiten* (Label, Modus, Universe, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
+  *Gerät bearbeiten* (Label, Modus, Universum, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
   bei Lasern die Laser-Ausrichtung — siehe unten).
-- Die Leiste **„Belegte DMX-Kanäle — Universe:"** unten (mit der Universe-Auswahl direkt daneben)
-  zeigt pro Universe als farbige Blöcke, welche Kanäle belegt sind. **Adresskonflikte** erkennst du
+- Die Leiste **„Belegte DMX-Kanäle — Universum:"** unten (mit der Universum-Auswahl direkt daneben)
+  zeigt pro Universum als farbige Blöcke, welche Kanäle belegt sind. **Adresskonflikte** erkennst du
   direkt in der **Tabelle**: betroffene Zeilen werden rot eingefärbt und die FID mit **⚠** markiert.
   Oben rechts erscheint dann der Knopf **„⚠ N Adresskonflikt(e) — auflösen…"**: ein Klick öffnet
   *Adresskonflikte auflösen*, dort legst du die betroffenen Geräte mit **Auf Vorschlag
@@ -213,6 +213,6 @@ Reihenfolge/Position**: Ein Chase läuft genau in der Raster-Reihenfolge über d
 
 ---
 
-**Kurz:** Patchen → **+ Gerät hinzufügen** (Profil + Universe + DMX-Adresse) bzw. **Auto-Patch** →
+**Kurz:** Patchen → **+ Gerät hinzufügen** (Profil + Universum + DMX-Adresse) bzw. **Auto-Patch** →
 Tab **Fixture-Gruppen** → **+ Neu** → Geräte aufs **Raster** ziehen (Spalten×Zeilen = Reihenfolge)
 → **Speichern**. Matrix/EFX folgen dann dieser Gruppe.

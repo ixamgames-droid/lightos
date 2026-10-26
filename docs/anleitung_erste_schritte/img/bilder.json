@@ -1,8 +1,8 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "e3d80129",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "fb133f82",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
   "bilder": [
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "8674b71874c5ff268e3a16da56bd4fe7"
+      "md5": "f73d5b01b9b1c84e9919d85dbe6e0309"
     },
     {
       "datei": "02_sektionen.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "2d35cfdad2d0f3053c07ce4ca5bd88e9"
+      "md5": "0d910576d6421e072ffcc8a27f3b9257"
     },
     {
       "datei": "03_datei_neu.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "2785f6b463b6283ec81b5102cbcdf83a"
+      "md5": "c9467d1c668687e8d64e237184ffe98f"
     },
     {
       "datei": "04_rueckfrage.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "133b0c3b28c1fe11fc3533edbab9ccc8"
+      "md5": "e426fbe3ddca3010d709423941be417c"
     },
     {
       "datei": "05_patch_leer.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "fbe6b09db4c06f444a7c4c9211850a1c"
+      "md5": "0866fd24f6c6a10ce115eeaf288d4861"
     },
     {
       "datei": "06_geraet_waehlen.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "4777f44c98d5963790a4d5b1a2779f3a"
+      "md5": "0e77a217c471de37d416ef514468b22e"
     },
     {
       "datei": "07_patch_ein_geraet.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "a3451044017b1c2bd92388d234239d34"
+      "md5": "e54832f646e04c683d318f9da43b32a5"
     },
     {
       "datei": "08_programmer.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "0a1cc7330cd307348791a7df070a98d0"
+      "md5": "39ad090b7454b3d80d02d4df5ecff3b5"
     },
     {
       "datei": "09_programmer_farbe.png",
@@ -103,7 +103,7 @@
         900
       ],
       "marken": [],
-      "md5": "f2e222bd47a7630a487af28acf050788"
+      "md5": "38d7ba9af49eddbb889955df96a3dcc9"
     },
     {
       "datei": "10_datei_speichern.png",
@@ -114,7 +114,7 @@
         900
       ],
       "marken": [],
-      "md5": "7a674f299296796139cc267832595e3f"
+      "md5": "20a75416d8aa939a8c5025ad2dfbc27d"
     },
     {
       "datei": "11_beenden.png",
@@ -125,7 +125,7 @@
         900
       ],
       "marken": [],
-      "md5": "0a4027222de8a2df81196aa7e6b72c6e"
+      "md5": "5a2e4bc3b062d4632267ee811ddd2286"
     }
   ]
 }

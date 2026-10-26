@@ -103,14 +103,14 @@ erreichbar. Hängt alles an einem Router mit DHCP, kannst du diesen Schritt ausl
 
    | Feld | Wert | Hinweis |
    |---|---|---|
-   | **IP-Adresse** | `192.168.1.10` | dasselbe Netz wie der Node, aber eine **andere** letzte Zahl |
+   | **IP-Adresse** | `192.0.2.10` | dasselbe Netz wie der Node, aber eine **andere** letzte Zahl |
    | **Subnetzmaske** | `255.255.255.0` | |
    | **Gateway** | leer | ein reines Lichtnetz hat keinen Router |
    | **Bevorzugter DNS** | leer | |
 
 5. **Speichern**.
 
-Die Adresse richtet sich nach dem Node. Hat er `192.168.1.50`, passt `192.168.1.10`.
+Die Adresse richtet sich nach dem Node. Hat er `192.0.2.50`, passt `192.0.2.10`.
 Viele Art-Net-Geräte kommen ab Werk mit einer Adresse `2.x.x.x` oder `10.x.x.x` und der
 Maske `255.0.0.0` — dann bekommt der Rechner zum Beispiel `2.0.0.10` mit Maske
 `255.0.0.0`. Keine Adresse darf im Netz doppelt vorkommen.
@@ -125,14 +125,14 @@ geht alles andere weiter über das WLAN.
 Dasselbe in der PowerShell (als Administrator), hier für die Karte `Ethernet`:
 
 ```powershell
-New-NetIPAddress -InterfaceAlias 'Ethernet' -IPAddress 192.168.1.10 -PrefixLength 24
+New-NetIPAddress -InterfaceAlias 'Ethernet' -IPAddress 192.0.2.10 -PrefixLength 24
 ```
 
 **Prüfen:**
 
 ```powershell
 ipconfig
-ping 192.168.1.50
+ping 192.0.2.50
 ```
 
 Bei der Karte muss unter **IPv4-Adresse** deine Adresse stehen und unter
@@ -255,7 +255,7 @@ zu ist.
   aus:
 
   ```powershell
-  Test-NetConnection 192.168.1.10 -Port 5000
+  Test-NetConnection 192.0.2.10 -Port 5000
   ```
 
   `TcpTestSucceeded : True` heißt: Der Port ist offen.

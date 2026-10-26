@@ -149,7 +149,7 @@ Es öffnet sich der Dialog **Gerät hinzufügen**:
    und Gerät, und **Hinzufügen** wird anklickbar.
 3. **Modus:** — das Kanal-Layout. Dieses Profil kennt nur `4-Kanal Dimmer+RGB (4ch)`.
    Bei anderen Geräten muss der Modus zu der Einstellung am Gerät passen.
-4. **Universe:** — auf welchem DMX-Universum das Gerät liegt. Für den Anfang `1`.
+4. **Universum:** — auf welchem DMX-Universum das Gerät liegt. Für den Anfang `1`.
 5. **DMX-Adresse:** — die Startadresse. LightOS schlägt darunter den nächsten freien
    Bereich vor (`Vorschlag: Adresse 1 …`) und trägt ihn gleich ein. Stelle am echten
    Gerät dieselbe Adresse ein.
@@ -163,7 +163,7 @@ Danach steht das Gerät in der Tabelle:
 
 ![Ein Gerät im Patch](img/07_patch_ein_geraet.png)
 
-1. Die neue Zeile: FID `1`, Label `PARD`, Hersteller `Generic`, Modus, Universe (`Univ.`)
+1. Die neue Zeile: FID `1`, Label `PARD`, Hersteller `Generic`, Modus, Universum (`Univ.`)
    `1`, Adresse `1`, `4` Kanäle. Die Zeilenfarbe steht für den Gerätetyp. Eine **rote**
    Zeile mit **⚠** vor der FID würde einen Adresskonflikt anzeigen.
 2. Die Statusleiste zählt jetzt `1 Gerät(e)`.

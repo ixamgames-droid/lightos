@@ -26,7 +26,7 @@ Die Anzeige konnte es also nicht verschweigen — sie konnte es nicht wissen.
 
 ⚠️ **Was der Backlog-Eintrag OUT-56 daneben behauptete, stimmt nicht (mehr).**
 „Wird in der laufenden App nirgends gemeldet" ist seit OUT-52 falsch: der
-DMX-Monitor sagt woertlich ``⚠ Universe {n} hat keinen Ausgang — nur
+DMX-Monitor sagt woertlich ``⚠ Universum {n} hat keinen Ausgang — nur
 gerechnet``. Nur sieht man das erst, wenn man den Monitor oeffnet **und** dort
 genau dieses Universum waehlt (Vorgabe ist U1). Ebenso schon erledigt: ein
 konfigurierter-aber-toter Enttec-Port steht ueber ``enttec_port_notes`` in
