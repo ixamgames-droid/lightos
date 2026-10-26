@@ -381,6 +381,20 @@ def test_muster_und_vorschau_schalten_bei_not_aus_nicht_ein(echter_reiter):
     assert v._an_bei(ausgabe()) is False
 
 
+def test_scharf_schalten_umgeht_den_not_aus_nicht(monkeypatch):
+    """Netzwerk-Laser: „Scharf“ im Reiter wirkt nicht, solange der NOT-AUS
+    aktiv ist — er wird nur oben rechts geloest (LAS-36)."""
+    v, st = T._view(monkeypatch, [T._FX(1, T._el400(), protocol="etherdream")])
+    v._on_estop()
+    assert st.laser_estop_active is True and st.lo.armed is False
+    v._btn_arm.setChecked(True)
+    assert st.lo.armed is False
+    assert not v._btn_arm.isChecked()
+    st.laser_estop_active = False                     # oben rechts geloest
+    v._btn_arm.setChecked(True)
+    assert st.lo.armed is True
+
+
 def test_sperrzonen_bleiben_nur_anzeige_beschriftet(monkeypatch):
     _abzeichen_an(monkeypatch)
     v, _st = T._view(monkeypatch, [T._FX(1, T._el400())])

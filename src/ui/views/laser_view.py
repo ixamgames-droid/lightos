@@ -1308,6 +1308,24 @@ class LaserView(QWidget):
             pass
 
     def _on_arm_toggled(self, checked: bool):
+        # LAS-44 (Sicherheit): solange der Laser-NOT-AUS aktiv ist, schaltet
+        # der Reiter keinen Netzwerk-Laser scharf — sonst umginge „Scharf“ den
+        # NOT-AUS (er wird nur oben rechts mit Rueckfrage geloest, LAS-36).
+        if checked:
+            try:
+                gesperrt = bool(getattr(get_state(), "laser_estop_active",
+                                        False))
+            except Exception:
+                gesperrt = True                     # im Zweifel: nicht scharf
+            if gesperrt:
+                self._btn_arm.blockSignals(True)
+                self._btn_arm.setChecked(False)
+                self._btn_arm.blockSignals(False)
+                self._btn_arm.setToolTip(
+                    "NOT-AUS aktiv — erst oben rechts lösen (Rückfrage), "
+                    "dann scharf schalten.")
+                self._update_arm_button()
+                return
         lo = self._laser_output()
         if lo is not None:
             lo.set_armed(bool(checked))
