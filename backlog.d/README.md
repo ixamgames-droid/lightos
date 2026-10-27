@@ -27,8 +27,11 @@ Zeile bleiben; Kurzes gehoert in `Status-Notiz`). Steht im Fragment Freitext
 (z. B. der Liefertext), teilt der Sammel-Lauf ihn an `**Wort:**`-Marken und
 Leerzeilen in Absaetze und haengt jeden Absatz, der noch nicht in der Zeile
 steht, als einen `**Nachtrag aus Fragment (eingesammelt <Datum>):** …` an die
-letzte Zelle (TOOL-28). Schon Vorhandenes wird nicht doppelt angehaengt;
-`--dry-run` zeigt den Nachtrag vorher:
+letzte Zelle (TOOL-28). Schon Vorhandenes wird nicht doppelt angehaengt.
+Marken zaehlen nur am Zeilenanfang oder hinter einem Satzende. Steht die Marke
+eines abweichenden Absatzes (z. B. `**Offen:**`) schon in der Zeile, wird er
+nicht angehaengt, sondern als `Hinweis <ID>: … von Hand pruefen` gemeldet.
+`--dry-run` zeigt Nachtrag und Hinweise vorher:
 
 ```
 ID: FM-62

@@ -331,6 +331,10 @@ def _status_zelle(f: Fragment, pr: tuple[int | None, str | None]) -> str:
 
 # Absatz-Marke im Freitext: ``**Ergebnis:**``, ``**Nicht Teil (Folgefrage):**``.
 _ABSATZ_MARKE = re.compile(r"\*\*[^*\n]{1,80}?:\*\*")
+# Eine Marke beginnt nur dann einen Absatz, wenn sie am Zeilenanfang oder
+# hinter einem Satzende steht — fett Zitiertes mitten im Satz („**Herkunft:**
+# eigen“) bleibt im Satz (Gegenpruefung TOOL-28).
+_SATZENDE = re.compile(r"(?:^|\n|[.!?;][)\"'“”»]*)[ \t]*\Z")
 NACHTRAG = "**Nachtrag aus Fragment (eingesammelt {datum}):**"
 
 
@@ -341,11 +345,13 @@ def _norm(text: str) -> str:
 
 def absaetze(freitext: str) -> list[str]:
     """Freitext -> Absaetze (normalisiert), geteilt an Leerzeilen und vor
-    jeder ``**Wort:**``-Marke. Leere Stuecke fallen weg."""
+    jeder ``**Wort:**``-Marke am Zeilenanfang bzw. hinter einem Satzende.
+    Leere Stuecke fallen weg."""
     teile: list[str] = []
     for block in re.split(r"\n\s*\n", freitext):
-        start = [m.start() for m in _ABSATZ_MARKE.finditer(block)]
-        grenzen = [0] + [s for s in start if s > 0] + [len(block)]
+        start = [m.start() for m in _ABSATZ_MARKE.finditer(block)
+                 if m.start() > 0 and _SATZENDE.search(block[:m.start()])]
+        grenzen = [0] + start + [len(block)]
         for a, b in zip(grenzen, grenzen[1:]):
             stueck = _norm(block[a:b])
             if stueck:
@@ -353,10 +359,35 @@ def absaetze(freitext: str) -> list[str]:
     return teile
 
 
-def fehlende_absaetze(zeile: str, freitext: str) -> list[str]:
-    """Absaetze des Freitexts, die (normalisiert) nicht in ``zeile`` stehen."""
+def _marke(absatz: str) -> str | None:
+    m = _ABSATZ_MARKE.match(absatz)
+    return m.group(0) if m else None
+
+
+def fehlende_absaetze(zeile: str, freitext: str) -> tuple[list[str], list[str]]:
+    """``(anzuhaengen, zurueckgehalten)``: Absaetze des Freitexts, die
+    (normalisiert) nicht in ``zeile`` stehen.
+
+    Traegt ein fehlender Absatz eine Marke (``**Offen:**``), die schon in der
+    Zeile steht, ist es meist eine aeltere oder leicht andere Fassung eines
+    von Hand nachgefuehrten Absatzes. Den still anzuhaengen ergaebe eine
+    Zeile, die sich selbst widerspricht — er wird zurueckgehalten und nur
+    gemeldet (Gegenpruefung TOOL-28)."""
     da = " ".join(zeile.split())
-    return [a for a in absaetze(freitext) if a not in da]
+    anhaengen: list[str] = []
+    zurueck: list[str] = []
+    for a in absaetze(freitext):
+        if a in da:
+            continue
+        marke = _marke(a)
+        (zurueck if marke and marke in da else anhaengen).append(a)
+    return anhaengen, zurueck
+
+
+def _strich_escaped(rumpf: str) -> bool:
+    """Ist der letzte ``|`` escaped? Nur bei ungerader Zahl ``\\`` davor."""
+    vor = rumpf[:-1]
+    return (len(vor) - len(vor.rstrip("\\"))) % 2 == 1
 
 
 def mit_nachtrag(zeile: str, fehlend: list[str], datum: str) -> str:
@@ -366,7 +397,7 @@ def mit_nachtrag(zeile: str, fehlend: list[str], datum: str) -> str:
         return zeile
     zusatz = f"{NACHTRAG.format(datum=datum)} {' '.join(fehlend)}"
     rumpf = zeile.rstrip()
-    if rumpf.endswith("|") and not rumpf.endswith("\\|"):
+    if rumpf.endswith("|") and not _strich_escaped(rumpf):
         return f"{rumpf[:-1].rstrip()} {zusatz} |"
     return f"{rumpf} {zusatz}"
 
@@ -433,14 +464,19 @@ def baue_backlog(text: str, frags: list[Fragment],
             # TOOL-28: der Liefertext fiel frueher mit dem Fragment weg. Jetzt
             # kommt jeder Absatz, der noch nicht in der Zeile steht, als ein
             # Nachtrag an die letzte Zelle — schon Vorhandenes nicht doppelt.
-            fehlend = fehlende_absaetze(neu, f.freitext)
+            fehlend, zurueck = fehlende_absaetze(neu, f.freitext)
+            for a in zurueck:
+                protokoll.append(
+                    f"Hinweis {f.id}: Marke {_marke(a)} steht schon in der Zeile — "
+                    f"abweichender Fragment-Absatz NICHT angehaengt, von Hand "
+                    f"pruefen: {a[:160]}")
             if fehlend:
                 neu = mit_nachtrag(neu, fehlend, heute)
                 protokoll.append(
                     f"Nachtrag {f.id}: {len(fehlend)} Absatz/Absaetze aus dem "
                     f"Fragment fehlen in der Zeile -> angehaengt: "
                     f"{' '.join(fehlend)[:120]}")
-            elif f.freitext.strip():
+            elif f.freitext.strip() and not zurueck:
                 protokoll.append(f"Freitext {f.id}: steht schon vollstaendig in der Zeile")
             zeilen[i] = neu
             fertig.append(f)

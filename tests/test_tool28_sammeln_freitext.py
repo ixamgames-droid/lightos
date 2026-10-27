@@ -158,6 +158,77 @@ def test_neue_zeile_unveraendert_ohne_nachtrag(tmp_path):
 
 
 def test_absaetze_teilt_an_marken_und_leerzeilen():
-    assert bs.absaetze("**A:** eins **B (x):** zwei\n\ndrei\nvier") == [
-        "**A:** eins", "**B (x):** zwei", "drei vier"]
+    assert bs.absaetze("**A:** eins. **B (x):** zwei\n**C:** drei\n\nvier\nfuenf") == [
+        "**A:** eins.", "**B (x):** zwei", "**C:** drei", "vier fuenf"]
     assert bs.absaetze("") == []
+
+
+# ------------------------------------------------- Gegenpruefung TOOL-28
+
+def test_fett_zitierte_marke_mitten_im_satz_teilt_nicht():
+    """„**Herkunft:** eigen“ mitten im Satz ist Zitat, kein neuer Absatz:
+    sonst haengt nur ein abgerissenes Satzstueck an (FM-77)."""
+    assert bs.absaetze("**A:** Die Zeile „**Herkunft:** eigen“ steht.") == [
+        "**A:** Die Zeile „**Herkunft:** eigen“ steht."]
+    zeile = "| FM-2 | P3 | todo | **Anders** | Die Zeile „**Herkunft:** eigen“ steht. |"
+    fehlend, zurueck = bs.fehlende_absaetze(
+        zeile, "**A:** Die Zeile „**Herkunft:** eigen“ steht.")
+    assert fehlend == ["**A:** Die Zeile „**Herkunft:** eigen“ steht."]
+    assert zurueck == []
+
+
+def test_abgewandelter_absatz_mit_vorhandener_marke_wird_nur_gemeldet(tmp_path):
+    """Steht die Marke (``**Test:**``) schon in der Zeile, ist ein abweichender
+    Fragment-Absatz meist eine alte Fassung: nicht still anhaengen, melden."""
+    backlog = TABELLE.replace("| z |", "| z **Test:** `t1.py`. |")
+    repo = _repo(tmp_path, {"FM-2": "ID: FM-2\nStatus: done\n\n"
+                                       "**Test:** `t1.py`, `t2.py`.\n**Neu:** x.\n"},
+                 backlog=backlog)
+    aus = _sammeln(repo, dry_run=True)
+    hinweis = [z for z in aus if "Hinweis FM-2" in z]
+    assert len(hinweis) == 1 and "**Test:**" in hinweis[0] and "t2.py" in hinweis[0], aus
+    aus = _sammeln(repo)
+    z = _zeile(repo, "FM-2")
+    assert z.count("**Test:**") == 1, z
+    assert z.endswith(f"**Test:** `t1.py`. {NACHTRAG} **Neu:** x. |"), z
+    assert [x for x in aus if "Hinweis FM-2" in x], aus
+    assert not [x for x in aus if "steht schon vollstaendig" in x], aus
+
+
+def test_nur_zurueckgehaltenes_gilt_nicht_als_vollstaendig(tmp_path):
+    backlog = TABELLE.replace("| z |", "| z **Offen:** nichts mehr. |")
+    repo = _repo(tmp_path, {"FM-2": "ID: FM-2\nStatus: done\n\n**Offen:** Schritt 3.\n"},
+                 backlog=backlog)
+    aus = _sammeln(repo)
+    assert _zeile(repo, "FM-2").endswith("| z **Offen:** nichts mehr. |")
+    assert [x for x in aus if "Hinweis FM-2" in x], aus
+    assert not [x for x in aus if "steht schon vollstaendig" in x], aus
+
+
+def test_leerzeilen_absaetze_ueber_den_echten_lesepfad(tmp_path):
+    """Ohne Marken trennt nur die Leerzeile — das muss auch ueber
+    ``lies_fragment``/``sammeln`` ankommen, nicht nur in ``absaetze()``."""
+    repo = _repo(tmp_path, {"FM-2": "ID: FM-2\nStatus: done\n\nz\n\nzweiter\nTeil.\n"})
+    _sammeln(repo)
+    assert _zeile(repo, "FM-2") == f"| FM-2 | P3 | done | **Anders** | z {NACHTRAG} zweiter Teil. |"
+
+
+def test_doppelter_leerraum_in_der_zeile_gilt_als_vorhanden(tmp_path):
+    backlog = TABELLE.replace("| z |", "| z  und   mehr. |")
+    repo = _repo(tmp_path, {"FM-2": "ID: FM-2\nStatus: done\n\nz und mehr.\n"},
+                 backlog=backlog)
+    _sammeln(repo)
+    assert _zeile(repo, "FM-2") == "| FM-2 | P3 | done | **Anders** | z  und   mehr. |"
+
+
+def test_zeile_endet_auf_escaptem_strich_ohne_abschluss():
+    z = "| X-1 | P2 | todo | **T** | a \\|"
+    assert bs.mit_nachtrag(z, ["**Neu:** y"], HEUTE) == f"{z} {NACHTRAG} **Neu:** y"
+
+
+def test_escapter_backslash_vor_dem_schlussstrich():
+    """``C:\\\\|``: der Backslash ist escaped, der Strich schliesst die Zelle —
+    der Nachtrag gehoert davor, sonst entsteht eine Spalte mehr."""
+    z = "| X-1 | P2 | todo | **T** | Pfad C:\\\\|"
+    neu = bs.mit_nachtrag(z, ["**Neu:** y"], HEUTE)
+    assert neu == f"| X-1 | P2 | todo | **T** | Pfad C:\\\\ {NACHTRAG} **Neu:** y |"
