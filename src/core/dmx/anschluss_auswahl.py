@@ -54,6 +54,9 @@ class Anschluss:
     device: str
     beschreibung: str
     klasse: str
+    #: OUT-70: Zusatz in eckigen Klammern — was sich am Geraet ablesen laesst
+    #: („Enttec DMX USB Pro“ oder „FTDI-Adapter, Typ unklar“). Leer = wie bisher.
+    zusatz: str = ""
 
     @property
     def text(self) -> str:
@@ -62,19 +65,52 @@ class Anschluss:
         if self.beschreibung:
             text += f"  —  {self.beschreibung}"
         if self.klasse == ADAPTER:
-            text += "  [Enttec Pro]"
+            text += f"  [{self.zusatz or 'Enttec Pro'}]"
         elif self.klasse == OHNE_GERAET:
             text += "  (kein USB-Gerät erkannt)"
         return text
 
 
+def _pro_art(port) -> int:
+    """OUT-70: 2 = weist sich als Pro aus, 1 = FTDI mit unklarem Typ, 0 = weist
+    sich als etwas ANDERES aus (z. B. ein Arduino mit FTDI-Chip)."""
+    try:
+        from src.core.dmx.interfaces import ist_pro_kandidat
+        return ist_pro_kandidat(port.vid, port.pid,
+                                str(getattr(port, "manufacturer", "") or ""),
+                                str(getattr(port, "product", "") or ""))
+    except Exception:                                    # noqa: BLE001
+        return 1
+
+
+def kennzeichnung(port) -> str:
+    """OUT-70: Text in der eckigen Klammer hinter einem ``0403:6001``-Anschluss —
+    nur, was sich ablesen laesst. Leer bei anderen Kennungen."""
+    if (getattr(port, "vid", None) != ENTTEC_VID
+            or getattr(port, "pid", None) != ENTTEC_PID):
+        return ""
+    try:
+        from src.core.dmx.interfaces import FAMILIEN, ordne_ein
+        e = ordne_ein(port.vid, port.pid,
+                      str(getattr(port, "manufacturer", "") or ""),
+                      str(getattr(port, "product", "") or ""))
+    except Exception:                                    # noqa: BLE001
+        return ""
+    if e is None:
+        return ""
+    return "FTDI-Adapter, Typ unklar" if FAMILIEN[e.familie].typ_unklar else e.name
+
+
 def klasse_von(port) -> str:
-    """Klasse eines Eintrags von ``comports()`` — allein aus der USB-Kennung."""
+    """Klasse eines Eintrags von ``comports()`` — allein aus der USB-Kennung.
+
+    OUT-70: ein ``0403:6001``, das sich als etwas anderes ausweist, ist kein
+    Adapter (wird nie vorgewaehlt) — dieselbe Regel wie ``find_enttec_port``."""
     vid = getattr(port, "vid", None)
     if vid is None:
         return OHNE_GERAET
     if vid == ENTTEC_VID and getattr(port, "pid", None) == ENTTEC_PID:
-        return ADAPTER
+        return ADAPTER if _pro_art(port) else USB
     return USB
 
 
@@ -94,7 +130,9 @@ def ordnen(ports: Iterable) -> list[Anschluss]:
         beschreibung = str(getattr(port, "description", "") or "").strip()
         if beschreibung.lower() in _LEERE_BESCHREIBUNG:
             beschreibung = ""
-        liste.append(Anschluss(device, beschreibung, klasse_von(port)))
+        klasse = klasse_von(port)
+        zusatz = kennzeichnung(port) if klasse == ADAPTER else ""
+        liste.append(Anschluss(device, beschreibung, klasse, zusatz))
     liste.sort(key=lambda a: (_RANG[a.klasse], _natuerlich(a.device)))
     return liste
 

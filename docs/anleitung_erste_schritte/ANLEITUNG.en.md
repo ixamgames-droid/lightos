@@ -17,7 +17,7 @@
   `venv/bin/python main.py`.
 - **No hardware.** Your computer is enough for this guide. Whether DMX really comes out is
   set up afterwards:
-  [Ausgabe einrichten (ENTTEC, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
+  [Ausgabe einrichten (ENTTEC, uDMX, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
   (setting up output, German).
 - The example fixture is a built-in profile that every installation ships with:
   **Generic — LED PAR Dimmer+RGB 4ch** (4 channels: dimmer, red, green, blue). If you have
@@ -300,7 +300,7 @@ saved), and so does a show restored from the auto-save.
 
 All further guides are in German so far:
 
-- **Really output light:** [Ausgabe einrichten (ENTTEC, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
+- **Really output light:** [Ausgabe einrichten (ENTTEC, uDMX, Art-Net, sACN)](../anleitung_ausgabe_einrichten/ANLEITUNG.md)
 - **More fixtures and groups:** [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md)
 - **Your own control surface:** [Virtuelle Konsole bauen](../anleitung_vc/ANLEITUNG_VC.md)
 - **All guides:** [Übersicht](../ANLEITUNGEN.md)
