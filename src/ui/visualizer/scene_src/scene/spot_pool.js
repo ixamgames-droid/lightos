@@ -68,6 +68,7 @@ import { requestRender } from './render_loop.js';
 // VIZ-96: Gobo-Projektion — reine Rechnung/Shader-Patch in gobo_projektion.js,
 // Motive und Kegelrand aus gobo_textures.js.
 import { goboTexture, GOBO_STILE, GOBO_RAND, GROESSE as GOBO_KACHEL_PX, syncGoboUnterScheiben } from '../fixtures/gobo_textures.js';
+import { ausbrennNachfuehren } from '../fixtures/ausbrennen.js';   // VIZ-91
 import {
   installGoboProjektion, baueGoboAtlas, goboProjektionAktiv, goboKachel, goboLichtWinkel,
   goboDrehung, setzeGoboLicht, loescheGoboLicht, GOBO_HALBSCHATTEN, GOBO_MAX_LICHTER,
@@ -189,6 +190,7 @@ function _bodenmuster(f, flach) {
   if (typeof f._fleckBasis === 'number' && disc.material) {
     disc.material.opacity = goboFlachDeckkraft(f._fleckBasis, flach);
   }
+  ausbrennNachfuehren(f, true);   // VIZ-91: Fleck-Last zwischen zwei DMX-Updates nachziehen
 }
 
 function _projektionAbgleichen() {
