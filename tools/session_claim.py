@@ -658,7 +658,9 @@ def _remote_url(repo: str) -> str | None:
 def _url_kern(url: str) -> str:
     """``git@github.com:org/x.git``, ``https://…/org/x/`` und ``/tmp/x.git``
     auf einen Vergleichskern bringen (ohne Schema/Host-Trenner, ohne ``.git``)."""
-    u = url.strip().rstrip("/")
+    # Windows-Pfade (``C:\\Users\\x\\lightos-intern.git``) kommen mit Backslashes —
+    # ohne Umwandlung erkannte der Vergleich den Repo-Namen nie (ARM-CI, 26.10.).
+    u = url.strip().replace("\\", "/").rstrip("/")
     if u.endswith(".git"):
         u = u[:-4]
     u = re.sub(r"^[a-z+]+://", "", u)

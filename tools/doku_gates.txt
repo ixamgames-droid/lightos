@@ -85,6 +85,7 @@ test_backlog_*.py
 test_changelog_fragmente.py
 test_qa55_doku_und_backlog_gates.py
 test_qa64_status_drift.py
+test_tool28_sammeln_freitext.py    # TOOL-28: Sammel-Lauf haengt fehlenden Freitext an vorhandene BACKLOG-Zeilen an
 
 # ── Privatsphaere, Lizenz, Repo-Hygiene (laufen ueber ALLE Dateien) ─────────
 test_keine_privaten_dateien.py
