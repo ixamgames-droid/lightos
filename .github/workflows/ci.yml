@@ -24,7 +24,9 @@ jobs:
   linux:
     name: Linux — volle Suite (segmentiert)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # PROC-26: 45 -> 60 min. Die Suite brauchte im Oktober 26-45 min; am 27.10.
+    # wurde ein komplett gruener Lauf (1124/1124 Segmente) nach 45 min abgebrochen.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
