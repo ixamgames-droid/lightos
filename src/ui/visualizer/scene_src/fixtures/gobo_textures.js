@@ -53,6 +53,7 @@ import * as THREE from '../three/three.js';
 // Zirkulaer mit floor_pool.js (das GOBO_RAND holt) — unbedenklich, beide
 // Konstanten werden nur in Funktionsruempfen gelesen, nie beim Modul-Laden.
 import { POOL_MAX_RADIUS, poolFalloffTexture } from './floor_pool.js';
+import { fleckDaempfen } from './ausbrennen.js';   // VIZ-91
 import { isLowSpec, renderer } from '../scene/renderer.js';   // VIZ-92
 import { schattenRechteck, schattenPyramide } from '../scene/gobo_projektion.js';   // VIZ-102
 
@@ -573,6 +574,7 @@ function _unterScheibe(f) {
     map: main.material.map || null,
     clippingPlanes: neueKantenEbenen(), clipIntersection: true,
   });
+  fleckDaempfen(mat);               // VIZ-91: wie der Haupt-Fleck gedaempft
   const disc = new THREE.Mesh(main.geometry, mat);
   disc.matrixAutoUpdate = false;
   disc.visible = false;

@@ -20,6 +20,7 @@ import { requestRender } from '../scene/render_loop.js';                 // VIZ-
 import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
+import { ausbrennNachfuehren } from './ausbrennen.js';         // VIZ-91
 
 // EIN gehaltener Raycaster statt einer Neuanlage pro Fixture und Frame —
 // derselbe Haushalt wie beim Andocken (stage/docking.js).
@@ -400,6 +401,9 @@ export function resyncBeamVisibility(f) {
   // beamsOff). Sonst bliebe ein im 2D eingetroffener Bewegungs-Befehl nach dem
   // Wechsel nach 3D stehen, bis das naechste DMX kommt.
   noteLaserAnimation(f);
+  // VIZ-91: unsichtbare Kegel tragen keine Licht-Last (beamsOff, Kegel aus,
+  // 2D) — der Wechsel kommt hier ohne DMX-Update an.
+  ausbrennNachfuehren(f);
 }
 
 // ── Builders ─────────────────────────────────────────────────────────────────
@@ -2063,6 +2067,7 @@ function fleckFolgtTreffer(f, trifft) {
   const hell = (typeof f._fleckHell === 'number')
     ? f._fleckHell : f.floorSpot.material.opacity;
   f.floorSpot.visible = fleckSichtbar(f, hell);
+  ausbrennNachfuehren(f);   // VIZ-91: Fleck ohne Auftreffpunkt zaehlt nicht (auch je Bild)
 }
 
 function applyFloorAim(f, dmx) {

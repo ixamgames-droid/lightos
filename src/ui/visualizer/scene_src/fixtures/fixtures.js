@@ -33,6 +33,7 @@ import {
   FPS_VORGABE, fpsNachfuehren, strobeBilder, strobeFaktor, strobeModus, taktFps,
 } from './strobe.js';   // VIZ-104
 import { hellMerken, hellSchnell, hellSetzen } from './strobe_hell.js';   // VIZ-104
+import { kegelDaempfen, fleckDaempfen, ausbrennMelden, ausbrennAbmelden } from './ausbrennen.js';   // VIZ-91
 
 initSpotPool(fixtures);
 
@@ -293,6 +294,7 @@ export function createBeamCone(color, intensity, angle, length) {
     // Oberseite nicht gezeichnet (gobo_textures.js#kegelSchnittAbgleichen).
     clippingPlanes: neueKegelEbenen(), clipIntersection: true,
   });
+  kegelDaempfen(mat);              // VIZ-91: gemeinsamer Ausbrenn-Faktor (ausbrennen.js)
   const cone = new THREE.Mesh(geo, mat);
   applyBeamFalloff(cone);          // VIZ-15: Laengs-Falloff (s. o.)
   // VIZ-83: offene Gobo-Maske (weiss) ab dem Bau — ein Gobo tauscht spaeter
@@ -321,6 +323,7 @@ export function createFloorSpot(color, intensity, radius) {
     // beschnitten, ohne dass sich das Programm je aendert.
     clippingPlanes: neueKantenEbenen(),
   });
+  fleckDaempfen(mat);              // VIZ-91: gemeinsamer Ausbrenn-Faktor (ausbrennen.js)
   const disc = new THREE.Mesh(geo, mat);
   disc.rotation.x = -Math.PI / 2;
   disc.position.y = 0.01;
@@ -593,6 +596,7 @@ export function removeFixture(fid) {
   scene.remove(f.group);
   if (f.spotTarget) scene.remove(f.spotTarget);
   entferneGoboUnterScheibe(f);      // VIZ-102 (vor der ersten: geteilte Geometrie)
+  ausbrennAbmelden(f);              // VIZ-91: Licht-Last dieses Geraets heraus
   if (f.floorSpot) { scene.remove(f.floorSpot); disposeObj(f.floorSpot); }
   if (f.icon) { scene.remove(f.icon); f.icon.traverse(disposeObj); }
   // VIZ-14: Label-Sprite explizit freigeben (Textur-Map; disposeObj disposed nur
@@ -702,6 +706,9 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   // legt `_strobeZeigen` danach nur die Helligkeit des laufenden Bildes
   // darueber (fixtures/strobe_hell.js) — der Takt selbst wendet nie wieder an.
   updateFixtureDmx(f, dmx);
+  // VIZ-91: Licht-Last melden — Stand OHNE Strobe (vor _strobeZeigen), sonst
+  // pumpte jede Blitzflanke die Helligkeit aller anderen Kegel.
+  ausbrennMelden(f, settings.beamOpacity);
   f._hellOk = false;      // gemerkte Helligkeiten gelten fuer den alten Stand
   f._gezeigt = 1;
   _strobeEinordnen(f);

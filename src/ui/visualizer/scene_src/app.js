@@ -76,6 +76,7 @@ import { syncMountPoses } from './fixtures/mount_pose.js';            // VIZ-100
 import { tickBewegungGlaettung, bewegungGlaettungAktiv, setGlattUhr } from './fixtures/builders.js';   // VIZ-92
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
+import { ausbrennInfo, ausbrennDaempfung, ausbrennSchutz, patchAusbrennShader } from './fixtures/ausbrennen.js';  // VIZ-91
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -292,6 +293,9 @@ window.__lightos = {
   // ein 'weiss mit fallendem Alpha' waere im Gruenkanal konstant und der
   // Rand bliebe hart, ohne dass man es dem Code ansieht.
   floorPoolScale, poolFalloffTexture,
+  // VIZ-91: Ausbrennschutz — Lasten/Faktoren, reine Kurve, Shader-Patch.
+  ausbrennInfo, ausbrennDaempfung, __ausbrennSchutz: ausbrennSchutz,
+  __patchAusbrennShader: patchAusbrennShader,
   // VIZ-15 Laengs-Falloff im Kegel: derselbe Gruenkanal-Fallstrick, und
   // zusaetzlich haengt die RICHTUNG an der UV-Orientierung von ConeGeometry
   // (Spitze = v 1) und an CanvasTexture.flipY. Beides gemessen, beides im
