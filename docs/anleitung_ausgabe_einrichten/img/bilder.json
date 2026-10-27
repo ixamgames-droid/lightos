@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "000e51c2",
+  "stand": "d1a1e4bb",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "a3b9f2073ce32b444a3c851b2dc19126"
+      "md5": "4f4e0d864f46d790b6d80305798781e8"
     },
     {
       "datei": "02_enttec.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "41bf0756c318650e0ce6632227643bea"
+      "md5": "3a6b680f03b9baf9c4e2ce78f62c7c11"
     },
     {
       "datei": "03_artnet.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "f95be89b933d950a087d3431752ba912"
+      "md5": "e9f7dfc4e64048126c86f8a0ee8b5a6c"
     },
     {
       "datei": "04_sacn.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "cedee8cdd56e82bbe400003bbf93922f"
+      "md5": "ff9fca3f6a538675df34514955272d00"
     },
     {
       "datei": "05_universen.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "349221520d104208a1c4b2231e6fb91c"
+      "md5": "079605699bf6f373c11395e555a587b4"
     },
     {
       "datei": "06_output_monitor.png",
@@ -104,6 +104,28 @@
       ],
       "marken": [],
       "md5": "2db48f98d2e0afb99d6dfb970d9c60f7"
+    },
+    {
+      "datei": "10_assistent.png",
+      "szene": "10_assistent",
+      "titel": "Assistent „Interface einrichten…“: Reiter USB-Geräte",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "5e7cdbc70582d466264eff745db10004"
+    },
+    {
+      "datei": "11_testsignal.png",
+      "szene": "11_testsignal",
+      "titel": "Assistent: Testsignal läuft (Stopp), Laser-Ausgang gesperrt",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "8b35c628ba011cc193466a2ef166c172"
     }
   ]
 }
