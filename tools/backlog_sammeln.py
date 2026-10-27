@@ -51,9 +51,15 @@ Was der Sammel-Lauf tut
 -----------------------
 * **ID steht noch nicht in BACKLOG.md** -> neue Tabellenzeile, mit so vielen
   Spalten wie die Tabelle an der Einfuegestelle hat.
-* **ID steht schon dort** -> NUR die Statusspalte wird ersetzt. Titel,
-  Prioritaet und Details der Zeile bleiben, wie sie sind. Freitext im Fragment
-  wird dann NICHT uebernommen; der Lauf meldet das als Hinweis.
+* **ID steht schon dort** -> die Statusspalte wird ersetzt; Titel,
+  Prioritaet und Details der Zeile bleiben, wie sie sind. Der Freitext des
+  Fragments (der Liefertext) wird in Absaetze geteilt — an Marken wie
+  ``**Ergebnis:**`` und an Leerzeilen. Jeder Absatz, der noch NICHT in der
+  Zeile steht, kommt als EIN ``**Nachtrag aus Fragment (eingesammelt
+  <Datum>):** …`` ans Ende der letzten Zelle (TOOL-28; frueher fiel der
+  Freitext still weg). Was schon dasteht, wird nicht doppelt angehaengt — ein
+  zweiter Lauf haengt nichts an. ``--pruefen``/``--dry-run`` zeigen den
+  Nachtrag, ohne zu schreiben.
 * **``review``** wird zu ``done (<Datum>, [PR #N](…))``. Die Nummer kommt aus
   dem Betreff des letzten Commits, der das Fragment angefasst hat
   (Squash-Merge: ``… (#N)``), oder aus ``--pr N``. **Ohne Nummer bleibt das
@@ -117,9 +123,12 @@ class Fragment:
 
     def __init__(self, id: str, status: str, prio: str = "", titel: str = "",
                  notiz: str = "", nach: str = "", details: str = "",
-                 datei: str = ""):
+                 datei: str = "", freitext: str | None = None):
         self.id, self.status, self.prio, self.titel = id, status, prio, titel
         self.notiz, self.nach, self.details, self.datei = notiz, nach, details, datei
+        # Freitext mit Zeilenumbruechen (fuer die Absatz-Teilung, TOOL-28);
+        # ``details`` ist derselbe Text zu einer Zeile zusammengezogen.
+        self.freitext = details if freitext is None else freitext
 
 
 # --------------------------------------------------------------------------- git
@@ -212,7 +221,8 @@ def lies_fragment(name: str, text: str) -> tuple[Fragment | None, list[str]]:
                     prio=kopf.get("Prioritaet", ""),
                     titel=kopf.get("Titel", "").strip("* ").strip(),
                     notiz=kopf.get("Status-Notiz", ""), nach=kopf.get("Nach", ""),
-                    details=details, datei=name), []
+                    details=details, datei=name,
+                    freitext="\n".join(zeilen[i:]).strip()), []
 
 
 def fragmente(repo: Path = REPO) -> list[Path]:
@@ -319,12 +329,88 @@ def _status_zelle(f: Fragment, pr: tuple[int | None, str | None]) -> str:
     return f"{kern} — {f.notiz}" if f.notiz else kern
 
 
+# Absatz-Marke im Freitext: ``**Ergebnis:**``, ``**Nicht Teil (Folgefrage):**``.
+_ABSATZ_MARKE = re.compile(r"\*\*[^*\n]{1,80}?:\*\*")
+# Eine Marke beginnt nur dann einen Absatz, wenn sie am Zeilenanfang oder
+# hinter einem Satzende steht — fett Zitiertes mitten im Satz („**Herkunft:**
+# eigen“) bleibt im Satz (Gegenpruefung TOOL-28).
+_SATZENDE = re.compile(r"(?:^|\n|[.!?;][)\"'“”»]*)[ \t]*\Z")
+NACHTRAG = "**Nachtrag aus Fragment (eingesammelt {datum}):**"
+
+
+def _norm(text: str) -> str:
+    """Whitespace zusammenziehen, ``|`` wie in der Tabelle escapen."""
+    return re.sub(r"(?<!\\)\|", r"\\|", " ".join(text.split()))
+
+
+def absaetze(freitext: str) -> list[str]:
+    """Freitext -> Absaetze (normalisiert), geteilt an Leerzeilen und vor
+    jeder ``**Wort:**``-Marke am Zeilenanfang bzw. hinter einem Satzende.
+    Leere Stuecke fallen weg."""
+    teile: list[str] = []
+    for block in re.split(r"\n\s*\n", freitext):
+        start = [m.start() for m in _ABSATZ_MARKE.finditer(block)
+                 if m.start() > 0 and _SATZENDE.search(block[:m.start()])]
+        grenzen = [0] + start + [len(block)]
+        for a, b in zip(grenzen, grenzen[1:]):
+            stueck = _norm(block[a:b])
+            if stueck:
+                teile.append(stueck)
+    return teile
+
+
+def _marke(absatz: str) -> str | None:
+    m = _ABSATZ_MARKE.match(absatz)
+    return m.group(0) if m else None
+
+
+def fehlende_absaetze(zeile: str, freitext: str) -> tuple[list[str], list[str]]:
+    """``(anzuhaengen, zurueckgehalten)``: Absaetze des Freitexts, die
+    (normalisiert) nicht in ``zeile`` stehen.
+
+    Traegt ein fehlender Absatz eine Marke (``**Offen:**``), die schon in der
+    Zeile steht, ist es meist eine aeltere oder leicht andere Fassung eines
+    von Hand nachgefuehrten Absatzes. Den still anzuhaengen ergaebe eine
+    Zeile, die sich selbst widerspricht — er wird zurueckgehalten und nur
+    gemeldet (Gegenpruefung TOOL-28)."""
+    da = " ".join(zeile.split())
+    anhaengen: list[str] = []
+    zurueck: list[str] = []
+    for a in absaetze(freitext):
+        if a in da:
+            continue
+        marke = _marke(a)
+        (zurueck if marke and marke in da else anhaengen).append(a)
+    return anhaengen, zurueck
+
+
+def _strich_escaped(rumpf: str) -> bool:
+    """Ist der letzte ``|`` escaped? Nur bei ungerader Zahl ``\\`` davor."""
+    vor = rumpf[:-1]
+    return (len(vor) - len(vor.rstrip("\\"))) % 2 == 1
+
+
+def mit_nachtrag(zeile: str, fehlend: list[str], datum: str) -> str:
+    """``zeile`` mit EINEM Nachtrag am Ende der letzten Zelle; die Spaltenzahl
+    bleibt (kein neuer ``|`` ausser escapten)."""
+    if not fehlend:
+        return zeile
+    zusatz = f"{NACHTRAG.format(datum=datum)} {' '.join(fehlend)}"
+    rumpf = zeile.rstrip()
+    if rumpf.endswith("|") and not _strich_escaped(rumpf):
+        return f"{rumpf[:-1].rstrip()} {zusatz} |"
+    return f"{rumpf} {zusatz}"
+
+
 def baue_backlog(text: str, frags: list[Fragment],
-                 pr_je_id: dict[str, tuple[int | None, str | None]]
+                 pr_je_id: dict[str, tuple[int | None, str | None]],
+                 heute: str | None = None,
                  ) -> tuple[str, list[str], list[Fragment], list[str]]:
     """``(neuer Text, Protokoll, uebernommene Fragmente, Fehler)``.
 
-    Rein: kein Dateizugriff, kein Git. Bei Fehlern ist der Text unveraendert."""
+    Rein: kein Dateizugriff, kein Git. Bei Fehlern ist der Text unveraendert.
+    ``heute`` ist das Datum im Freitext-Nachtrag (TOOL-28)."""
+    heute = heute or datetime.date.today().isoformat()
     zeilen = text.split("\n")
     protokoll: list[str] = []
     fehler: list[str] = []
@@ -375,14 +461,23 @@ def baue_backlog(text: str, frags: list[Fragment],
             neu = (zeilen[i][:m.start(3)] + f" {zelle} " + zeilen[i][m.end(3):])
             protokoll.append(f"Status {f.id}: {m.group(3).strip()[:60]} -> {zelle}"
                              if neu != zeilen[i] else f"unveraendert: {f.id}")
-            if f.details:
-                # Review-Fund: der Freitext faellt mit dem Fragment weg. Das
-                # ist gewollt (nur die Statusspalte), darf aber nicht still
-                # passieren — --dry-run zeigt es, bevor geloescht wird.
+            # TOOL-28: der Liefertext fiel frueher mit dem Fragment weg. Jetzt
+            # kommt jeder Absatz, der noch nicht in der Zeile steht, als ein
+            # Nachtrag an die letzte Zelle — schon Vorhandenes nicht doppelt.
+            fehlend, zurueck = fehlende_absaetze(neu, f.freitext)
+            for a in zurueck:
                 protokoll.append(
-                    f"Hinweis {f.id}: die Zeile gibt es schon — der Freitext des "
-                    "Fragments wird NICHT uebernommen (nur der Status; Kurzes "
-                    "gehoert in 'Status-Notiz')")
+                    f"Hinweis {f.id}: Marke {_marke(a)} steht schon in der Zeile — "
+                    f"abweichender Fragment-Absatz NICHT angehaengt, von Hand "
+                    f"pruefen: {a[:160]}")
+            if fehlend:
+                neu = mit_nachtrag(neu, fehlend, heute)
+                protokoll.append(
+                    f"Nachtrag {f.id}: {len(fehlend)} Absatz/Absaetze aus dem "
+                    f"Fragment fehlen in der Zeile -> angehaengt: "
+                    f"{' '.join(fehlend)[:120]}")
+            elif f.freitext.strip() and not zurueck:
+                protokoll.append(f"Freitext {f.id}: steht schon vollstaendig in der Zeile")
             zeilen[i] = neu
             fertig.append(f)
             continue
@@ -418,7 +513,7 @@ def sammeln(repo: Path = REPO, *, pruefen: bool = False, dry_run: bool = False,
         roh = pfad.read_bytes().decode("utf-8")
         crlf = "\r\n" in roh
         alt = roh.replace("\r\n", "\n")
-        neu, protokoll, fertig, fehler = baue_backlog(alt, frags, pr_je_id)
+        neu, protokoll, fertig, fehler = baue_backlog(alt, frags, pr_je_id, heute)
     if fehler:
         for f in fehler:
             ausgabe(f"[backlog] FEHLER: {f}")
