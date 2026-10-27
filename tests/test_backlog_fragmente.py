@@ -203,22 +203,25 @@ class SammelnTest(_Tmp):
             "teils — Teil 1 geliefert", "todo"), BACKLOG)
 
     def test_freitext_zu_vorhandener_zeile_faellt_nicht_still_weg(self):
-        """Review-Fund: bei einer vorhandenen Zeile zaehlt nur der Status. Der
-        Freitext des Fragments verschwindet mit der Datei — das muss der Lauf
-        (auch --dry-run) sagen, sonst geht er unbemerkt verloren."""
+        """Review-Fund, seit TOOL-28 behoben: bei einer vorhandenen Zeile fiel
+        der Freitext mit der Datei weg. Jetzt zeigt --dry-run den Nachtrag,
+        der echte Lauf haengt ihn an die letzte Zelle."""
         self.frag("FM-2.md", "ID: FM-2\nStatus: teils\n\nGeliefert: Teil 1.\n")
-        for dry in (True, False):
-            aus: list[str] = []
-            self.assertEqual(bs.sammeln(self.repo, dry_run=dry, ausgabe=aus.append), 0)
-            hinweise = [z for z in aus if "Hinweis FM-2" in z]
-            self.assertEqual(len(hinweise), 1, aus)
-            self.assertIn("NICHT uebernommen", hinweise[0])
+        aus: list[str] = []
+        self.assertEqual(bs.sammeln(self.repo, dry_run=True, heute="2026-10-27",
+                                    ausgabe=aus.append), 0)
+        self.assertEqual(len([z for z in aus if "Nachtrag FM-2" in z]), 1, aus)
         self.assertNotIn("Geliefert: Teil 1.", self.backlog())
-        # Ohne Freitext kein Hinweis.
+        self.assertEqual(bs.sammeln(self.repo, heute="2026-10-27", ausgabe=_still), 0)
+        self.assertEqual(
+            self.zeile("FM-2"),
+            "| FM-2 | P3 | teils | **Offen** | z **Nachtrag aus Fragment "
+            "(eingesammelt 2026-10-27):** Geliefert: Teil 1. |")
+        # Ohne Freitext kein Nachtrag.
         self.frag("FM-2.md", "ID: FM-2\nStatus: todo\n")
         aus = []
         self.assertEqual(bs.sammeln(self.repo, ausgabe=aus.append), 0)
-        self.assertFalse([z for z in aus if "Hinweis" in z], aus)
+        self.assertFalse([z for z in aus if "Nachtrag" in z], aus)
 
     def test_review_wird_mit_pr_nummer_zu_done(self):
         self.frag("QA-7.md", "ID: QA-7\nStatus: review\n")
