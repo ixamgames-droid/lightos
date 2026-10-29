@@ -310,3 +310,42 @@ def test_bekannter_fehler_geht_vor_firewall_hinweis(tmp_path, prefs):
     # Gegenprobe: ohne Fehler nach der Frist -> Firewall (ufw)
     rx["artnet"].letzter_fehler = ""
     assert "ufw" in box.meldung(("artnet",))
+
+
+# ── QA-106: ohne Bildschirm haelt die Vorwarnung niemanden an ────────────────
+
+def test_vorwarnung_ohne_bildschirm_oeffnet_kein_fenster(monkeypatch):
+    """Unter Windows hing jeder Test, der „…-Eingang aktivieren“ anhakt, im
+    modalen Fenster bis in den Timeout. Ohne Bildschirm erreicht es niemanden:
+    kein ``QMessageBox`` — mit Bildschirm (sichtbare App) bleibt es."""
+    from src.core import qt_plattform
+    gezeigt = []
+    monkeypatch.setattr(EB.QMessageBox, "information",
+                        lambda *a, **k: gezeigt.append(a))
+    monkeypatch.setattr(qt_plattform, "ohne_bildschirm", lambda: True)
+    EB._zeige_vorwarnung(None, "x")
+    assert gezeigt == []
+    monkeypatch.setattr(qt_plattform, "ohne_bildschirm", lambda: False)
+    EB._zeige_vorwarnung(None, "x")
+    assert len(gezeigt) == 1                             # Gegenprobe
+
+
+def test_haken_unter_windows_haengt_nicht(tmp_path, monkeypatch, prefs):
+    """Der Weg aus tests/test_input_reconfigure_cleanup.py unter nachgestelltem
+    Windows, OHNE ersetztes Fenster: Haken setzen kehrt zurueck, die Vorwarnung
+    gilt als gezeigt (einmal), ein ``QMessageBox`` wird nie gebaut."""
+    from src.ui.widgets import output_config as oc
+    monkeypatch.setattr(oc, "_UNIV_CONFIG_PATH", str(tmp_path / "u.json"))
+    monkeypatch.setattr(EB.nh, "plattform", lambda p=None: EB.nh.WINDOWS)
+    # Aufzeichnen statt pytest.fail: eine Ausnahme im toggled-Slot schluckt Qt.
+    fenster = []
+    monkeypatch.setattr(EB.QMessageBox, "information",
+                        lambda *a, **k: fenster.append(a))
+    dlg = oc.OutputConfigDialog()
+    try:
+        dlg._check_artnet_in.setChecked(True)
+        assert prefs.get(EB.PREF_GEZEIGT) is True        # Weg wirklich gegangen
+        assert fenster == [], "modales Fenster im Test"
+    finally:
+        dlg.close()
+        dlg.deleteLater()
