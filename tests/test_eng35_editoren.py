@@ -408,8 +408,11 @@ def test_arbeiter():
     stufen_melder().geaendert.emit(frozenset({1, 2, 3}))
     app.processEvents()
     print(_MARKE, flush=True)
-    sys.stdout.flush()
-    os._exit(0)
+    # Hart beenden, unter Windows ohne DLL-Abbau (QA-101): die nicht
+    # zugestellten deleteLater() oben liessen os._exit dort in jedem Lauf in
+    # eine Zugriffsverletzung laufen, mitunter mit Rueckgabe 0xC0000005.
+    from _kind_ausstieg import harter_ausstieg
+    harter_ausstieg(0)
 
 
 def _kind_umgebung(tmp_path, runden: int) -> dict:

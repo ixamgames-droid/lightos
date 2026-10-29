@@ -476,6 +476,25 @@ let _letzteZeit = -1;
 let _warteTimer = 0;
 const WARTE_MS = 100;
 
+/**
+ * VIZ-90: ein Geraet verlaesst die Szene (fixtures.js#removeFixture — auch
+ * beim Neuaufbau mit derselben fid, Showwechsel). Sein Bewertungs-Zustand
+ * gehoert zum alten Geraet: ohne dieses Vergessen erbte ein neues Geraet mit
+ * derselben fid Spitzenwert, Vorbild-Helligkeit und Slot des alten, und die
+ * Lichtvergabe hinge bis zu einer Spitzen-Halbwertszeit am alten Wert.
+ */
+export function vergissSpotPoolGeraet(fid) {
+  const n = Number(fid);
+  _spitze.delete(n);
+  _vorher.delete(n);
+  _dunkelSeit.delete(n);
+  for (let i = 0; i < _pool.length; i++) {
+    const p = _pool[i];
+    if (p.fid === n) { p.fid = null; if (i < _seit.length) _seit[i] = null; }
+    if (p.traeger === n) p.traeger = null;
+  }
+}
+
 function _lage(fid) {
   const f = _fixtures && _fixtures[fid];
   if (!f || !f.group) return null;

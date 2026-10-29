@@ -389,8 +389,11 @@ export function resyncBeamVisibility(f) {
   // diese Funktion ueberhaupt erst noetig gemacht hat).
   syncPrismToBeam(f);
   // VIZ-79: vom Muster nicht benutzte Laserstrahlen bleiben aus.
+  // VIZ-89: Laser an der zuletzt gemessenen Leuchtdichte (applyGenericColor),
+  // nicht an der Deckkraft — offener Dimmer + Farbe schwarz bleibt dunkel.
   if (f.laserBeams) for (const bm of f.laserBeams) {
-    set(bm);
+    if (typeof f._laserHell === 'number') bm.visible = beamsSichtbar(f, f._laserHell);
+    else set(bm);
     if (bm.userData.aktiv === false) bm.visible = false;
   }
   if (f.parHeads) for (const ph of f.parHeads) set(ph.beam);
@@ -1919,6 +1922,10 @@ function applyGenericColor(f, dmx) {
   }
   // Laser-Faecher: jede Linie folgt DMX-Farbe + Intensitaet (statt fix gruen/an)
   if (f.laserBeams) {
+    // VIZ-89: Resync misst dieselbe Leuchtdichte (nicht die Deckkraft, die nur
+    // am Dimmer haengt) — sonst zaehlte ein schwarzer bewegter Laser danach
+    // wieder als sichtbar und hielte den Render-Loop wach.
+    f._laserHell = lum;
     const laserVis = beamsSichtbar(f, lum);
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;

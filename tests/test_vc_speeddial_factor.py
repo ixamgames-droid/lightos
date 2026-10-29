@@ -52,11 +52,14 @@ def test_tempo_bus_mult_freerun_also_scales_speed():
     d.target_mode = SpeedTarget.TEMPO_BUS_MULT
     d.function_ids = [e.id]
     d.factor_buttons = [0.25, 0.5, 1.0, 2.0, 4.0]
+    # ENG-32: speed wird im selben Verhaeltnis wie tempo_multiplier skaliert
+    # (Start: speed 0.5 Hz bei ×1), nicht mit dem Rohfaktor ueberschrieben.
+    speed0 = effect_live.get_param("speed", e.id)
     d._set_factor(0.5)
-    assert abs(effect_live.get_param("speed", e.id) - 0.5) < 1e-6, "Free-Run-Speed nicht gesetzt"
+    assert abs(effect_live.get_param("speed", e.id) - speed0 * 0.5) < 1e-6, "Free-Run-Speed nicht skaliert"
     assert abs(e.tempo_multiplier - 0.5) < 1e-6, "Bus-Multiplikator ebenfalls gesetzt"
     d._set_factor(2.0)
-    assert abs(effect_live.get_param("speed", e.id) - 2.0) < 1e-6
+    assert abs(effect_live.get_param("speed", e.id) - speed0 * 2.0) < 1e-6
 
 
 def test_tempo_bus_mult_custom_param_keeps_speed():
