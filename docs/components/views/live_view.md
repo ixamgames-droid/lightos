@@ -23,6 +23,22 @@ nur die Vorschau — DMX-Ausgabe und Playback haben ihren eigenen Takt.
 | Welt-Größe/Raster | Bühnenmaße setzen; Koordinaten snappen ans Raster |
 | Gruppen-Highlight | Fremd gesetzte Auswahl als cyan Ring hervorheben |
 
+## Was die 2D-Bühne zeigt
+
+- **Ausgabebild (WYSIWYG, VIZ-78/DOC-63):** Die Farben/Helligkeiten kommen aus
+  `OutputManager.get_display_frame(u)` — dem zuletzt gesendeten Frame **nach**
+  Grand Master, Blackout und NOT-AUS-Masken (`_display_frame`, `_wert_leser`).
+  Solange noch kein Frame gesendet wurde (Ausgabe aus), fällt die Ansicht auf den
+  Rohpuffer des Universums zurück.
+- **Beschriftung (DEMO-9):** Unter dem Symbol steht der Gerätename aus dem Patch
+  (`buehnen_beschriftung`), über 16 Zeichen gekürzt (`BUEHNEN_NAME_MAX`); eine
+  Endnummer („… 3") bleibt dabei erhalten. Kommt ein (gekürzter) Name mehrfach vor
+  (`buehnen_beschriftungen`) oder hat das Gerät keinen Namen, steht Typ-Kürzel +
+  Gerätenummer da („MH 9"). Bei LOD 0 erscheint der Name nur, wenn er in den Abstand
+  zum Nachbarn passt (`buehnen_label_waehlen`), sonst Kürzel + Nummer; LOD 1 zeigt die
+  Nummer, LOD 2 keine Beschriftung. Ausgewählte und hervorgehobene Geräte werden immer
+  mit LOD 0 und ohne Platzprüfung beschriftet (Name, sofern eindeutig).
+
 ## Verknüpfungen
 
 - **Bus:** abonniert Auswahl-/Gruppen-Events (`bus.subscribe`) für Highlight und
@@ -41,7 +57,9 @@ nur die Vorschau — DMX-Ausgabe und Playback haben ihren eigenen Takt.
 
 ## Quelle (file:line)
 
-- `src/ui/views/live_view.py:521` — `StageCanvas`
-- `src/ui/views/live_view.py:65` — `FixtureRenderer` (typ-abhängiges Zeichnen)
-- `src/ui/views/live_view.py:535` — `RENDER_INTERVAL_MS` (10 FPS, sichtbarkeitsgekoppelt)
-- `src/ui/views/live_view.py:55` — DMX→Grad-Umrechnung
+- `src/ui/views/live_view.py:1042` — `StageCanvas`
+- `src/ui/views/live_view.py:420` — `FixtureRenderer` (typ-abhängiges Zeichnen)
+- `src/ui/views/live_view.py:1056` — `RENDER_INTERVAL_MS` (10 FPS, sichtbarkeitsgekoppelt)
+- `src/ui/views/live_view.py:2261` — `_display_frame` (Ausgabebild nach GM/Blackout/NOT-AUS)
+- `src/ui/views/live_view.py` — `buehnen_beschriftung` / `buehnen_beschriftungen` / `buehnen_label_waehlen` (DEMO-9)
+- `src/ui/views/live_view.py:68` — `dmx_to_angle_deg` (DMX→Grad-Umrechnung)

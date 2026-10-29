@@ -96,7 +96,11 @@ Clicking a name switches the work area. With the keyboard use **Strg+1** to **St
 
 1. **Bühne** (stage) — 2D top view of your fixtures. On the left the list **Fixtures** /
    **Gruppen** (groups); drag fixtures onto the area. Top right switches between **2D**
-   and **3D**.
+   and **3D**. The 2D stage shows what really goes out — already including Grand
+   Master, blackout and NOT-AUS (emergency stop). Below each fixture you see its name
+   from the patch (long names shortened, a number at the end is kept). If several
+   fixtures share a name or there is too little room, it shows short type + number
+   instead (e.g. "MH 9"); selected fixtures show their name even when space is tight.
 2. **Patchen** (patch) — create fixtures, put them on DMX addresses and combine them into
    groups (step 5). In detail:
    [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md) (German).

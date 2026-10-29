@@ -62,7 +62,7 @@ Without any click, the **Erkennung** sub-tab shows exactly **six controls**; eve
 1. **Manuell** (also reached via TAP from the third tap in time, or via Nudge) and **🔒 Tempo einfrieren** override everything: as long as either of them applies, no source changes the tempo.
 2. **PC-Audio / Eingang:** if LightOS is listening live, the detection alone leads. The song analysis and the player's nominal BPM don't get through then.
 3. **Lied-Analyse (Player):** in **Auto**, a song playing in the player that has been **analyzed** in the generator leads with its BPM curve. A song without analysis sets its nominal BPM when it starts — this requires the **BPM koppeln** (couple BPM) checkbox in the **Musik** (music) tab.
-4. **Aus** and **OS2L:** the song does **not** lead. With **OS2L** the tempo comes solely from the DJ program; with **Aus** no source changes the BPM at all.
+4. **Aus** and **OS2L:** the song does **not** lead. With **OS2L** the tempo comes solely from the DJ program; with **Aus** no source changes the BPM afterwards. Switching to **Aus** sets the tempo to 0 (beat effects stand still); a tempo set by hand in mode **Manuell** (typed in, TAP, nudge) stays.
 
 So the **Quelle** list decides **who is allowed to lead** — not just whether LightOS listens. The generator button switches exactly like a selection in the list.
 
