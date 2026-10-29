@@ -511,11 +511,13 @@ def rote_dateien(ergebnis: Ergebnis, dateien) -> list | None:
       Teil der Vorgabe-Zusammenfassung, also nicht nachzaehlbar);
     * jeder andere Rueckgabewert (Absturz, Sammelfehler, Zeitlimit): ``None``.
 
-    Warum das die Pruefung nicht schwaecher macht: eine Zeitbombe ist eine
-    Datei, die MIT Sprung rot und OHNE Sprung gruen ist — und zwar zweimal mit
-    Sprung (s. ``pruefe``). Eine Datei, die im Sammellauf gruen war, konnte
-    nach dieser Regel nie gemeldet werden; sie einzeln nachzufahren kostete nur
-    Zeit (unter Windows ~6 s je Datei und Lauf, gemessen 2026-10-18: die ganze
+    Was das kostet: eine Zeitbombe ist eine Datei, die MIT Sprung rot und
+    OHNE Sprung gruen ist — und zwar zweimal mit Sprung (s. ``pruefe``). Eine
+    Bombe, die NUR im Einzellauf rot wird (im Sammellauf z. B. durch ein schon
+    geladenes Modul verdeckt), wird nicht mehr gefunden. Die alte Fassung fand
+    sie nur zufaellig — wenn irgendeine ANDERE Datei den Sammellauf rot machte;
+    bei gruenem Sammellauf nie. Diesen Zufallsfang gibt die neue Regel bewusst
+    auf; alle Dateien einzeln nachzufahren kostete sonst viel Zeit (unter Windows ~6 s je Datei und Lauf, gemessen 2026-10-18: die ganze
     Testdatei 486 s statt ~200 s, im Gate damit ueber dem 300-s-Limit).
     """
     dateien = list(dateien)
