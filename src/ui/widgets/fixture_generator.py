@@ -2466,8 +2466,20 @@ def model_from_qxf(path: str) -> GeneratorModel:
                     chans.append(_build_channel(el, nm))
             # FM-46 (Etappe 3): Dimmer -> Weiss-Segment aus <Head> — dieselbe
             # Regel wie der Bibliotheks-Import (`segmente_aus_mode`).
-            for p, seg in segmente_aus_mode(mode_el, nummern, chans).items():
-                chans[p].segment = seg
+            # FM-62 (4): abgeleitet wird nur auf den ANGENOMMENEN Kanaelen —
+            # die Bibliothek legt verworfene (Kollision/ungueltig, -1) gar
+            # nicht an; zaehlten sie hier mit, saehen `weiss_eigen` und der
+            # Weiss-Rang einen anderen Kanalsatz als dort.
+            # Das Segment ist ein Rang unter den `color_w` der GESPEICHERTEN
+            # Liste (hier alle `chans`) — darum zurueckgerechnet.
+            gueltig = [p for p, n in enumerate(nummern) if n >= 0]
+            w_alle = [p for p, c in enumerate(chans)
+                      if c.attribute == "color_w"]
+            w_gueltig = [p for p in gueltig if chans[p].attribute == "color_w"]
+            for q, seg in segmente_aus_mode(
+                    mode_el, [nummern[p] for p in gueltig],
+                    [chans[p] for p in gueltig]).items():
+                chans[gueltig[q]].segment = w_alle.index(w_gueltig[seg])
             # Die eigene Angabe des Modus schlaegt die fixture-weite.
             # `(0, 0)` ist ein wahres Tupel — deshalb explizit vergleichen.
             mode_grid = _physical_layout(mode_el)
