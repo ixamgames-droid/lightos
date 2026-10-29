@@ -4,8 +4,23 @@
 Set-Location -Path $PSScriptRoot
 
 # Architektur erkennen (zuverlaessig, auch unter ARM64-Emulation)
-$osArch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
-$procArch = [System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture
+# XPLAT-57: In einer interaktiven Windows PowerShell 5.1 ist PSReadLine 2.0
+# geladen. Dessen DLL bringt einen eigenen Typ gleichen Namens OHNE
+# OSArchitecture mit, und der Kurzname loest dann auf ihn auf: beide Werte waren
+# leer, und die ARM64-Warnung unten fiel aus. Deshalb unter Windows PowerShell
+# den Typ ausdruecklich aus mscorlib holen (dort ab .NET Framework 4.7.1).
+$ri = $null
+if ($PSVersionTable.PSEdition -ne "Core") {
+    $ri = [Type]::GetType("System.Runtime.InteropServices.RuntimeInformation, mscorlib")
+}
+if (-not $ri) { $ri = [System.Runtime.InteropServices.RuntimeInformation] }
+$osArch = $ri::OSArchitecture
+$procArch = $ri::ProcessArchitecture
+# Rueckfall wie in start.bat: PROCESSOR_IDENTIFIER zeigt auf ARM-Hardware stets
+# "ARMv8", auch unter Emulation.
+if (-not $osArch -and $env:OS -eq "Windows_NT" -and "$env:PROCESSOR_IDENTIFIER" -match "ARMv8") {
+    $osArch = "Arm64"
+}
 Write-Host "[start] OS-Arch: $osArch | Prozess-Arch: $procArch"
 
 # venv-Python suchen (Windows-Pfad ODER Unix-Pfad)
