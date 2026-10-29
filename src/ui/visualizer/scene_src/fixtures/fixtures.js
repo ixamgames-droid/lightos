@@ -27,7 +27,7 @@ import { updateEmptyState } from '../empty_state.js';
 import { cachedDmx } from './dmx_cache.js';   // VIZ-71
 import { syncMountPose } from './mount_pose.js';   // VIZ-100
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
-import { initSpotPool, resizeSpotPool } from '../scene/spot_pool.js';
+import { initSpotPool, resizeSpotPool, vergissSpotPoolGeraet } from '../scene/spot_pool.js';
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
 import {
   FPS_VORGABE, fpsNachfuehren, strobeBilder, strobeFaktor, strobeModus, taktFps,
@@ -609,6 +609,7 @@ export function removeFixture(fid) {
   f.group.traverse(disposeObj);
   delete fixtures[fid];
   delete topDownIcons[fid];
+  vergissSpotPoolGeraet(fid);       // VIZ-90: kein Erbe fuer ein neues Geraet gleicher fid
   // Frei gewordenes Shadow-Budget an verbleibende Spots weiterreichen.
   syncSpotShadowBudget();
   // Clean selection

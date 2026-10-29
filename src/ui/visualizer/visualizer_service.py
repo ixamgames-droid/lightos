@@ -351,7 +351,10 @@ def _laser_payload(fixture, attrs: dict, channels) -> dict | None:
             out["dr"] = True
             bewegt_selbst = True
     bank = int(attrs.get("laser_bank") or 0)
-    muster = int(attrs.get("gobo_wheel") or 0) if "laser_bank" in attrs else 0
+    # Musterauswahl: Gobo-Rad (``gobo_wheel``) — mit UND ohne Musterbank. Laser,
+    # die ihr Muster nur ueber ein Gobo-Rad waehlen, blieben sonst immer beim
+    # Standard-Faecher (VIZ-88). ``ist_laser`` ist oben schon geprueft.
+    muster = int(attrs.get("gobo_wheel") or 0)
     out["form"] = (bank // 16 + muster) % _LASER_FORMEN
     motor = None
     if not echte_achse and "pan" in attrs and "laser_x" not in attrs:
