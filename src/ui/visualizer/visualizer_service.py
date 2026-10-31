@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import re
+import zlib
 from typing import Any, Callable, Optional
 
 
@@ -305,9 +306,10 @@ def _laser_payload(fixture, attrs: dict, channels) -> dict | None:
     Ein Geraet zaehlt als Laser, wenn es als ``laser`` gepatcht ist oder
     ``laser_*``-Kanaele hat. Position kommt aus ``laser_x``/``laser_y``, sonst
     aus Pan/Tilt; Groesse aus ``laser_zoom_x``/``laser_zoom_y``, sonst ``zoom``;
-    der Winkel aus ``gobo_rotation``. Das Muster wird nur GROB abgebildet (vier
-    Formen aus Musterbank und Musterauswahl): die echten Muster sind
-    Vektorgrafiken im Geraet, die der Viewer nicht kennt."""
+    der Winkel aus ``gobo_rotation``. Ohne Profilangaben wird das Muster nur
+    GROB abgebildet (vier Formen aus Musterbank und Musterauswahl); MIT
+    Laser-Angaben im Profil (LAS-33) gelten Muster, Farbe, Groesse und Lage
+    daraus (VIZ-95, :func:`_laser_aus_profil`)."""
     ist_laser = (getattr(fixture, "fixture_type", "") == "laser"
                  or any(k.startswith("laser_") for k in attrs))
     if not ist_laser:
@@ -373,7 +375,164 @@ def _laser_payload(fixture, attrs: dict, channels) -> dict | None:
         # schwenkt der Faecher langsam.
         if not bewegt_selbst and "x" not in out and tempo > 0:
             out["dx"] = True
+    angaben = _laser_angaben_gemerkt(channels)
+    if angaben is not None:
+        _laser_aus_profil(out, attrs, channels, angaben)
     return out
+
+
+# ── VIZ-95: echte Muster, Farbe, Groesse und Lage aus den Profilangaben ─────
+# Traegt das Profil Laser-Angaben (LAS-33, ``channels.laser_angaben``), gelten
+# DIESE statt der Grobformen: das Muster unter dem DMX-Wert der Musterauswahl
+# wird als normierte Linienzuege (``musterformen.form_polylinien``, dieselbe
+# Schemazeichnung wie im Programmer) mitgeschickt, der Viewer zeichnet daraus
+# einen Strahlenkegel. Ein Wert ohne Muster-Eintrag ergibt ``muster.unbekannt``
+# (neutraler Einzelstrahl). Groesse und X/Y laufen ueber die Richtung des
+# Profils (EL-400: Groesse 0 = gross, X/Y 0-10 = Mitte). Die Farbe kommt aus
+# den Farb-Bereichen — sie aendert NUR den Farbton, nie die Helligkeit.
+LASER_MUSTER_MAX_PUNKTE = 32     # = Strahlen-Pool in scene_src/fixtures/laser.js
+LASER_MUSTER_MAX_KONTUR = 192    # Segmente des Kegelmantels (ebenda)
+
+
+def _laser_angaben_gemerkt(channels):
+    from src.core.laser.profilangaben import laser_profilangaben
+    if not channels:
+        return None
+    memo = _kanal_memo(channels)
+    if memo is None:
+        return laser_profilangaben(channels)
+    try:
+        return memo[("laser_angaben",)]
+    except KeyError:
+        try:
+            v = laser_profilangaben(list(channels))
+        except Exception:               # Attrappen ohne Kanal-Felder
+            v = None
+        memo[("laser_angaben",)] = v
+        return v
+
+
+def _muster_geometrie(muster) -> dict:
+    """Payload eines Musters: ``kontur`` = Linienzuege (flach u,v,u,v …;
+    geschlossene enden mit ihrem ersten Punkt), ``punkte`` = Einzelpunkte."""
+    from src.core.laser.musterformen import form_polylinien
+    kontur: list[list[float]] = []
+    punkte: list[tuple[float, float]] = []
+    segmente = 0
+    for l in form_polylinien(muster):
+        p = list(l.punkte)
+        if l.art == "punkte" or len(p) < 2:
+            punkte.extend(p)
+            continue
+        if l.geschlossen or l.art == "flaeche":
+            p.append(p[0])
+        if segmente + len(p) - 1 > LASER_MUSTER_MAX_KONTUR:
+            continue
+        segmente += len(p) - 1
+        kontur.append([round(c, 3) for pt in p for c in pt])
+    if len(punkte) > LASER_MUSTER_MAX_PUNKTE:
+        schritt = len(punkte) / LASER_MUSTER_MAX_PUNKTE
+        punkte = [punkte[int(i * schritt)] for i in range(LASER_MUSTER_MAX_PUNKTE)]
+    flach = [round(c, 3) for pt in punkte for c in pt]
+    # Die Kennung entscheidet im Viewer, ob der Kegel neu beschrieben wird
+    # (setzeMuster). Sie traegt darum die ZEICHNUNG mit (crc32) — sonst bliebe
+    # nach einer Profil-Aenderung einer eigenen Form (gleiche Bereichsgrenzen,
+    # andere ``linien``) die alte Kontur stehen.
+    zeichnung = zlib.crc32(json.dumps([kontur, flach]).encode("ascii"))
+    out: dict = {"name": muster.name,
+                 "id": f"{muster.von}-{muster.bis}|{muster.form}|"
+                       f"{muster.anzahl}|{muster.stil}|{zeichnung:08x}",
+                 "kontur": kontur,
+                 "punkte": flach}
+    if not kontur and not punkte:
+        out["unbekannt"] = True         # Form ohne Zeichnung (leere eigene Form)
+    return out
+
+
+_MUSTER_UNBEKANNT = {"name": "", "id": "unbekannt", "kontur": [], "punkte": [],
+                     "unbekannt": True}
+
+
+def _richtung_wert(richtung, dmx: int, plus_ende: str, minus_ende: str):
+    """Regler eines Richtungs-Kanals -> -1..1 mit +1 = ``plus_ende``; 0 im
+    Mittelbereich. Der Regler laeuft laut :class:`Richtung` IMMER von klein/
+    links/unten (0.0) nach gross/rechts/oben (1.0) — ohne Enden-Angabe gilt
+    dieses natuerliche Paar (sonst stuende ein Y-Kanal ohne Enden kopfueber,
+    weil ``plus_ende`` dort „unten" ist)."""
+    from src.core.laser.profilangaben import ENDEN_PAARE
+    r = richtung.dmx_zu_regler(dmx)
+    if r is None:
+        return 0.0
+    links, rechts = richtung.enden
+    if not rechts:
+        rechts = next((b for a, b in ENDEN_PAARE
+                       if {a, b} == {plus_ende, minus_ende}), plus_ende)
+    if rechts == minus_ende or links == plus_ende:
+        r = 1.0 - r
+    return r * 2.0 - 1.0
+
+
+def _laser_aus_profil(out: dict, attrs: dict, channels, angaben) -> None:
+    def wert(kanal):
+        if kanal is None or kanal.attribut not in attrs:
+            return None
+        try:
+            return max(0, min(255, int(attrs.get(kanal.attribut) or 0)))
+        except (TypeError, ValueError):
+            return None
+
+    # Lage: +x = vom Betrachter aus rechts (Gieren nach +X), +y = NACH UNTEN
+    # (positive Neigung im Viewer, siehe laser.js poseLaser).
+    for achse, attr, plus, minus in (("x", "laser_x", "rechts", "links"),
+                                     ("y", "laser_y", "unten", "oben")):
+        k = angaben.fuer_attribut(attr)
+        v = wert(k)
+        if v is not None and k.richtung is not None:
+            out[achse] = round(_richtung_wert(k.richtung, v, plus, minus), 4)
+            out.pop("d" + achse, None)
+    # Groesse je Achse: eigener Kanal (laser_zoom_x/_y), sonst ``zoom`` fuer
+    # beide — wie die Grobform oben (ein Geraet mit getrennten X/Y-Groessen
+    # bekam sonst fuer Y den X-Wert).
+    for achse, quellen in (("sx", ("laser_zoom_x", "zoom")),
+                           ("sy", ("laser_zoom_y", "zoom"))):
+        for attr in quellen:
+            k = angaben.fuer_attribut(attr)
+            v = wert(k)
+            if v is not None and k.richtung is not None:
+                out[achse] = round(
+                    (_richtung_wert(k.richtung, v, "gross", "klein") + 1) / 2, 4)
+                break
+
+    farbe = angaben.farb_kanal
+    v = wert(farbe)
+    if v is not None:
+        f = farbe.farbe_fuer(v)
+        if f is not None and f.rgb is not None:
+            out["farbe"] = list(f.rgb)
+        elif f is not None:
+            out["bunt"] = True
+
+    ba = angaben.betriebsart_kanal
+    b = ba.betriebsart_fuer(wert(ba)) if wert(ba) is not None else None
+    if b is not None and not b.steuert:
+        return      # Musik/Auto/Aus: das Geraet faehrt sein eigenes Programm
+    mk = angaben.muster_kanal
+    v = wert(mk)
+    if v is None:
+        return
+    m = mk.muster_fuer(v)
+    memo = _kanal_memo(channels)
+    key = ("lasermuster", v)
+    geo = memo.get(key) if memo is not None else None
+    if geo is None:
+        # Gemerkt je DMX-Wert: die Zeichnung (bis ~200 Punkte) entsteht EINMAL,
+        # nicht in jedem Takt.
+        geo = _MUSTER_UNBEKANNT if m is None else _muster_geometrie(m)
+        if memo is not None:
+            memo[key] = geo
+    out["muster"] = geo
+    if (m is not None and m.bewegt) or (b is not None and b.art == "dynamisch"):
+        out["dz"] = True        # pulsierend bzw. dynamisch: der Kreis waechst
 
 
 def _mit_fein(pt: dict, achse: str, default: int = 128, sfx: str = ""):
