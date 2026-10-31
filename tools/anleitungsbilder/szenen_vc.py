@@ -361,6 +361,85 @@ def _ende(ui):
     bank(ui, 0)
 
 
+# ── 10: Kiosk-Streifen mit NOT-AUS-Bestaetigung (DOC-75) ──────────────────
+#
+# Der Streifen existiert nur in einem Fenster, das mit ``kiosk=True`` gebaut
+# wurde. Die Szene baut dafuer ein ZWEITES Hauptfenster im Kiosk-Modus (wie
+# ``tests/test_las41_kiosk_notaus_bestaetigung.py``) auf demselben Zustand,
+# loest den LASER NOT-AUS ueber dessen echten Knopf aus (Sandbox, kein
+# Ausgabe-Thread — nichts wird gesendet), nimmt den oberen Rand auf, loest
+# den NOT-AUS in der Sandbox wieder und baut das Fenster ab.
+
+_KIOSK_H = 110          # Hoehe aus dem Fenster: Streifen, roter Balken, Rand
+_KIOSK_X0 = 400         # links abgeschnitten (dort steht nur leere Konsole)
+_KIOSK_RAND = 44        # Rand oben fuer die Nummernkreise
+
+
+def _bild_kiosk(ui):
+    from PySide6.QtCore import QPoint, QRect
+    from PySide6.QtGui import QColor, QPainter, QPixmap
+    from PySide6.QtWidgets import QLabel, QWidget
+    from anleitungsbilder import marker
+    from anleitungsbilder.szenen_erste_schritte import kreise_malen
+    from anleitungsbilder.szenen_laser import notaus_aufraeumen
+    from src.ui.main_window import MainWindow
+    if getattr(ui.state, "laser_estop_active", False):
+        raise SzenenFehler("NOT-AUS steht schon vor dem Kiosk-Bild")
+    kw = MainWindow(kiosk=True, touch=False)
+    try:
+        kw._hw_timer.stop()
+        kw.resize(1600, 900)
+        kw.show()
+        ui.pump(1.0)
+        leiste = getattr(kw, "_notaus_leiste", None)
+        if leiste is None or not leiste.isVisible():
+            raise SzenenFehler("Kiosk-Streifen fehlt")
+        kw._btn_laser_notaus.click()
+        ui.pump(0.6)
+        meldung = getattr(kw, "_kiosk_notaus_meldung", None)
+        if meldung is None or not meldung.isVisible():
+            raise SzenenFehler("Roter NOT-AUS-Balken im Kiosk erscheint nicht")
+        if "NOT-AUS ausgelöst" not in meldung.text():
+            raise SzenenFehler(f"Balkentext: {meldung.text()!r}")
+        gm = leiste.findChild(QWidget, "kioskGmGruppe")
+        teile = [gm, kw._btn_stop_all_kiosk, kw._btn_blackout_kiosk,
+                 kw._btn_laser_notaus]
+        if any(t is None or not t.isVisible() for t in teile):
+            raise SzenenFehler("GM, STOP ALL, BLACKOUT oder LASER NOT-AUS fehlt im Streifen")
+        # Ausschnitt rechts (Streifen + Balkentext); oben ein Rand fuer die
+        # Nummernkreise — der Streifen ist zu schmal, Kreise saessen sonst
+        # auf den Knopftexten.
+        x0 = _KIOSK_X0
+        roh = kw.grab(QRect(x0, 0, kw.width() - x0, _KIOSK_H))
+        pix = QPixmap(roh.width(), roh.height() + _KIOSK_RAND)
+        pix.fill(QColor("#202020"))
+        p = QPainter(pix)
+        p.drawPixmap(0, _KIOSK_RAND, roh)
+        p.end()
+        versatz = QPoint(-x0, _KIOSK_RAND)
+
+        def r(widget):
+            return rechteck(kw, widget).translated(versatz)
+        frei = [q.translated(versatz) for q in marker.hindernisse(kw)
+                if q.top() < _KIOSK_H]
+        kreise_malen(pix, [
+            (r(gm), 1, "oben"),
+            (r(kw._btn_stop_all_kiosk), 2, "oben"),
+            (r(kw._btn_blackout_kiosk), 3, "oben"),
+            (r(kw._btn_laser_notaus), 4, "oben"),
+            (r(meldung), 5, "unten"),
+        ], frei)
+    finally:
+        notaus_aufraeumen(ui)
+        kw.hide()
+        kw.deleteLater()
+        ui.pump(0.3)
+    flaeche = QLabel()
+    flaeche.setFixedSize(pix.width(), pix.height())
+    flaeche.setPixmap(pix)
+    return flaeche
+
+
 SZENEN = [
     Szene("01_vc_ueberblick", sektion="Virtual Console", vorher=_start,
           dialog=_bild_ueberblick,
@@ -385,4 +464,8 @@ SZENEN = [
     Szene("09_midi_teach", sektion="Virtual Console", dialog=_bild_midi_teach,
           nachher=_ende,
           titel="MIDI Teach mit APC-mini-Abbild"),
+    Szene("10_kiosk_streifen", sektion="Virtual Console", dialog=_bild_kiosk,
+          groesse=(1600 - _KIOSK_X0, _KIOSK_H + _KIOSK_RAND),
+          titel="Kiosk: Streifen GM, STOP ALL, BLACKOUT, LASER NOT-AUS und "
+                "roter NOT-AUS-Balken"),
 ]
