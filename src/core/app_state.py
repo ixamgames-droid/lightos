@@ -681,7 +681,7 @@ class AppState:
         self._all_white_map: dict[int, dict[str, int]] | None = None
         # BUG-FBW Slice 3: Zeitpunkt des globalen Freeze (None = laeuft normal).
         # Der Renderer steigt dann sofort aus; die Dauer wird beim Auftauen
-        # gebraucht, um die monotonic-Anker nachzuziehen.
+        # gebraucht, um die Show-Zeit-Anker nachzuziehen (ENG-33).
         self._freeze_since: float | None = None
         # F-26: Feature-Dimmer-Master pro Slot (stabile Slider-ID -> FeatureDimmer).
         # Effekt-unabhaengiger Helligkeits-/Feature-Master, s. Render-Schritt 4b².
@@ -4722,7 +4722,7 @@ class AppState:
 
         **Warum auf der Render-Stufe und nicht ueber ``dt``:** gemessen, nicht
         angenommen — ``rgb_matrix``, ``efx`` und die Cue-Fades ziehen ihren
-        Fortschritt aus ``time.monotonic()``, nicht aus dem uebergebenen ``dt``.
+        Fortschritt aus der Show-Zeit (ENG-33), nicht aus dem uebergebenen ``dt``.
         Ein „dt=0"-Freeze haette sie gar nicht angehalten. ``_render_frame``
         rechnet deshalb im Freeze GAR NICHT — die Universen behalten ihren
         letzten Stand, und der 44-Hz-Sende-Thread schickt genau den weiter.
@@ -4744,7 +4744,10 @@ class AppState:
         if aktiv == self.is_frozen():
             return aktiv
         if aktiv:
-            self._freeze_since = time.monotonic()
+            # ENG-33: auf der Show-Zeit messen — dieselbe Uhr wie die Anker, die
+            # beim Auftauen verschoben werden (bei manueller Uhr: Show-Sekunden).
+            from src.core.engine import show_zeit
+            self._freeze_since = show_zeit.jetzt()
             # Der Renderer steigt jetzt aus — den zuletzt GESENDETEN Stand
             # festhalten, damit die direkten Schreibwege (Programmer-Flush,
             # Input-Merge, Web/OSC-Roh) nicht am Freeze vorbei durchschlagen.
@@ -4754,30 +4757,43 @@ class AppState:
                 print(f"[AppState] freeze output error: {e}")
         else:
             seit = getattr(self, "_freeze_since", None)
-            self._freeze_since = None
-            try:
-                self.output_manager.set_freeze(False)
-            except Exception as e:
-                print(f"[AppState] unfreeze output error: {e}")
+            # ENG-33: ERST die Anker schieben, DANN den Renderer freigeben —
+            # sonst kann ein Tick dazwischen einen im Freeze faellig
+            # gewordenen Follow schalten, bevor seine Faelligkeit wandert.
             if seit is not None:
-                # Zeitanker der monotonic-basierten Verbraucher um die
+                # Zeitanker der Show-Zeit-Verbraucher (ENG-33) um die
                 # eingefrorene Dauer nachziehen — sonst rechnen sie sie beim
                 # ersten Tick danach in EINEM Schritt ab und springen.
-                dauer = max(0.0, time.monotonic() - seit)
+                from src.core.engine import show_zeit
+                dauer = max(0.0, show_zeit.jetzt() - seit)
                 try:
                     self.function_manager.shift_clocks(dauer)
                 except Exception as e:
                     print(f"[AppState] freeze shift_clocks error: {e}")
                 pe = getattr(self, "playback_engine", None)
                 if pe is not None:
-                    for ex in getattr(pe, "executors", ()) or ():
-                        stack = getattr(ex, "stack", None)
-                        if stack is None:
-                            continue
-                        try:
-                            stack.shift_clock(dauer)
-                        except Exception as e:
-                            print(f"[AppState] freeze shift cue error: {e}")
+                    # ENG-33: ALLE Pages — ``compute_merged`` tickt die Listen
+                    # aller Pages, also laufen auch dort Fades und Follows.
+                    # ``gesehen``: jede Liste genau einmal (dieselbe Liste auf
+                    # zwei Executoren / zugleich Unter-Cueliste).
+                    pages = getattr(pe, "pages", None)
+                    if pages is None:
+                        pages = [getattr(pe, "executors", ()) or ()]
+                    gesehen: set = set()
+                    for page in pages:
+                        for ex in page or ():
+                            stack = getattr(ex, "stack", None)
+                            if stack is None:
+                                continue
+                            try:
+                                stack.shift_clock(dauer, gesehen)
+                            except Exception as e:
+                                print(f"[AppState] freeze shift cue error: {e}")
+            self._freeze_since = None
+            try:
+                self.output_manager.set_freeze(False)
+            except Exception as e:
+                print(f"[AppState] unfreeze output error: {e}")
         try:
             tb = get_tempo_bus_manager()
             if tb.is_frozen() != aktiv:

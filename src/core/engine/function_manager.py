@@ -207,7 +207,7 @@ class FunctionManager:
         """Alle LAUFENDEN Funktionen um ``seconds`` weiterschieben.
 
         BUG-FBW Slice 3 (Freeze-Auftauen): waehrend des Freeze wird gar nicht
-        getickt. Funktionen, die ihren Fortschritt aus ``time.monotonic()``
+        getickt. Funktionen, die ihren Fortschritt aus der Show-Zeit (ENG-33)
         ziehen, rechneten die eingefrorene Dauer sonst beim ersten Tick danach in
         EINEM Schritt ab (s. ``Function.shift_clock``). Nur laufende: eine
         gestoppte Funktion setzt ihren Anker beim Start ohnehin neu.
