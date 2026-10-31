@@ -113,7 +113,16 @@ bleibt sie, wie du sie eingestellt hast.
 
 ## 3. Betriebsart wählen
 
-Die Kacheln unter **„Betriebsart"** entsprechen den Grund-Betriebsarten des
+**Profil mit Laser-Angaben** (Umschalter, Abschnitt 2): Klick im Umschalter
+**„Betriebsart"** auf **Statische Muster** (feste Figuren) oder **Dynamische Muster**
+(bewegte Figuren). Unter dem Namen steht dann **„LightOS steuert alles"** bzw.
+**„LightOS steuert, Muster bewegt sich"** — nur in diesen beiden wirken Muster, Lage
+und Farbe. Bei **Musik** und **Auto** steht **„Gerät läuft selbst"**, und rechts neben
+der Überschrift **„Betriebsart"** erscheint in Gelb der Hinweis **„Gerät läuft selbst — Muster, Lage und Farbe wirken in dieser
+Betriebsart nicht."** **Aus** („Laser dunkel") schaltet den Laser über die Betriebsart
+ab. Welche dieser Segmente erscheinen, legt das Geräteprofil fest.
+
+**Profil ohne Laser-Angaben** (bisherige Bedienung): Die Kacheln unter **„Betriebsart"** entsprechen den Grund-Betriebsarten des
 Geräts (**Aus · Auto-Programm · Sound-Modus · Muster-Modus**). Für die manuelle
 Steuerung die Kachel **„Muster-Modus (DMX-Steuerung)"** wählen — nur dann wirken
 Bank/Muster/Farbe-Regler.
@@ -121,6 +130,17 @@ Bank/Muster/Farbe-Regler.
 ---
 
 ## 4. Ein Muster einstellen
+
+**Profil mit Laser-Angaben:**
+
+1. Betriebsart **Statische Muster** oder **Dynamische Muster** wählen (Abschnitt 3).
+2. Unter **„Muster"** die **Kachel** des gewünschten Musters anklicken. Fehlt ein
+   Wert, weil das Profil ihn nicht kennt: **„alle 0–255 ▸"** klappt den Regler auf.
+3. Unter **„Farbe"** ein Farbfeld anklicken.
+4. In **„Vorschau & Position"** das Muster an seinen Platz ziehen; **Mitte** stellt
+   die Lage zurück. Größe und Tempo stellst du mit den Reglern darunter ein.
+
+**Profil ohne Laser-Angaben** (bisherige Bedienung):
 
 1. **Mustergruppe** (Bank) wählen — grobe Vorauswahl der Animations-Bank.
 2. **Muster** (Musterauswahl) — das konkrete Werksmuster in der Bank

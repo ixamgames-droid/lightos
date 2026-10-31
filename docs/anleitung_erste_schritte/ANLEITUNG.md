@@ -84,7 +84,11 @@ Ein Klick auf einen Namen wechselt den Arbeitsbereich. Mit der Tastatur geht es 
 
 1. **Bühne** — 2D-Draufsicht auf deine Geräte. Links die Liste **Fixtures** /
    **Gruppen**; Geräte ziehst du auf die Fläche. Oben rechts wechselst du zwischen
-   **2D** und **3D**.
+   **2D** und **3D**. Die 2D-Bühne zeigt, was wirklich hinausgeht — also schon mit
+   Grand Master, Blackout und NOT-AUS verrechnet. Unter jedem Gerät steht sein Name
+   aus dem Patch (lange Namen gekürzt, die Nummer am Ende bleibt stehen). Heißen
+   mehrere Geräte gleich oder ist zu wenig Platz, steht dort Kürzel + Nummer
+   (z. B. „MH 9"); ausgewählte Geräte zeigen ihren Namen auch bei wenig Platz.
 2. **Patchen** — Geräte anlegen, auf DMX-Adressen legen und zu Gruppen zusammenfassen
    (Schritt 5). Ausführlich:
    [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md).

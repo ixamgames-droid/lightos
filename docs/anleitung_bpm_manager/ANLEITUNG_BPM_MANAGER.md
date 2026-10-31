@@ -77,7 +77,7 @@ wieder eingeschaltet.
 | **Eingang: <Gerät>** | die Musik **von außen** kommt: Mischpult, Fremd-DJ, Band — über Line-In, Mikrofon oder Audio-Interface. | Je Eingang ein Eintrag. Pegel am Mischpult/Interface einstellen, bis der Balken grün ist. |
 | **OS2L (DJ-Software)** | ein DJ mit **VirtualDJ** (oder einem anderen OS2L-fähigen Programm) auflegt. | Tempo und Beats kommen direkt aus dem DJ-Programm; LightOS hört dann nicht selbst zu. Im DJ-Programm OS2L einschalten. Der Menüpunkt *Ausgabe → OS2L-Server (Port 1234)* ist dieselbe Umschaltung: Haken an = Quelle OS2L, Haken aus = zurück zur Quelle davor. |
 | **Lied-Analyse (Player)** | du ein **vorher im Generator analysiertes Lied** im Player abspielst und das Licht taktgenau sitzen soll. | Nimmt den Titel, der gerade im Player geladen ist (Abschnitt 7.2). Der Generator-Knopf **Im Player laden & als BPM-Quelle nutzen** stellt diesen Eintrag selbst ein. |
-| **Aus** | du keine Erkennung willst — z. B. nur Manuell mit TAP. | Die Statuszeile sagt dann „Erkennung aus — keine Beat-Quelle gewählt". |
+| **Aus** | du keine Erkennung willst — z. B. nur Manuell mit TAP. | Die Statuszeile sagt dann „Erkennung aus — keine Beat-Quelle gewählt". „Aus" setzt den Takt sofort auf 0 — Beat-Effekte stehen still. Hast du den Takt im Modus **Manuell** von Hand gesetzt (Eingabe, TAP oder Nudge), bleibt er stehen. |
 
 Ein gespeichertes Gerät, das gerade nicht angesteckt ist, steht als **„… (nicht gefunden)"**
 in der Liste.

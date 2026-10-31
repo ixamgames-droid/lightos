@@ -216,6 +216,9 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 - Funktionstypen: Scene, Chaser, Collection, Show (Timeline), EFX, RGB-Matrix, Sequence, Audio,
   Script, LayeredEffect, Carousel.
 - **Playback:** 10 Pages mit je 20 Executoren, Cue-Listen mit Fades, Grand Master, Blackout.
+- **Wer gewinnt?** Fünf Stufen legen fest, welcher Effekt sich auf einem Kanal durchsetzt;
+  der Reiter **Prioritäten** zeigt es live
+  ([Anleitung](docs/anleitung_prioritaeten/ANLEITUNG.md)).
 - **Virtual Console:** Taste, Fader, Encoder, Stepper, XY-Pad, Farbe, Farbliste, Cue-Liste,
   Speed-Dial, Tempo-Bus-Auswahl, Tempo-Controller, BPM-Anzeige, Musik-Info, Effekt-Anzeige,
   Effekt-Editor, Effekt-Farben, Live-Editor, Label und Frame (mehrseitig oder Solo).
@@ -293,7 +296,15 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 - Die Statusleiste meldet ein Universum ohne Ausgang; der DMX-Monitor zeigt, ob das Bild
   wirklich rausgeht.
 - **MIDI** mit Profil-Editor (APC mini und APC mini mk2 dabei), LED-Feedback, mehrere Ausgänge
-  gleichzeitig; **OSC** (Port 7770); Tastatur-Belegung.
+  gleichzeitig, Motorfader (Mackie Control/X-Touch) mit Nachführen
+  ([Fader-Referenz](docs/anleitung_vc_widgets/02_fader.md)); Tastatur-Belegung.
+- **OSC** (Port 7770) mit freien Adressen, Lernen und Rückmeldung an Pult oder Tablet
+  ([Anleitung OSC](docs/anleitung_osc/ANLEITUNG.md)).
+- **Fernsteuerung per Art-Net/sACN:** einzelne Kanäle eines Pults bedienen Executor-Fader,
+  Grand Master und GO/Zurück/Stop
+  ([Anleitung](docs/anleitung_externe_pulte/ANLEITUNG_EXTERNE_PULTE.md#fernsteuerung--das-pult-bedient-lightos-über-art-netsacn)).
+- [Unterstützte DMX-Interfaces](docs/anleitung_ausgabe_einrichten/INTERFACES.md):
+  Kompatibilitätsliste und Assistent **Interface einrichten…**.
 - **Web-Remote** im Browser von Handy oder Tablet — standardmäßig nur auf `127.0.0.1`, LAN als
   sichtbares Opt-in mit Token ([Anleitung](docs/anleitung_web_remote/ANLEITUNG.md)).
 

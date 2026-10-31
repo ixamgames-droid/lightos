@@ -63,7 +63,7 @@ Wechsle in **Patchen → Patch** und klicke auf **+ Gerät hinzufügen**.
 4. **Modus:** — das Kanal-Layout. Dieses Gerät kennt 4, 6 und 8 Kanäle. Der Modus muss
    zu der Einstellung am Gerät passen (im Gerätemenü meist „4CH“, „6CH“ …).
 
-Danach geht es weiter wie bei jedem Gerät: Universe, DMX-Adresse, **Hinzufügen**.
+Danach geht es weiter wie bei jedem Gerät: Universum, DMX-Adresse, **Hinzufügen**.
 
 **Ältere QLC+-Importe.** Hast du früher die QLC+-Bibliothek geladen und gibt es dasselbe
 Gerät (gleicher Hersteller, gleiches Modell) inzwischen als LightOS-Profil, bietet die

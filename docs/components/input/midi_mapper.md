@@ -40,8 +40,16 @@ Effekt) oder `"<key>@<function_id>"` (fester Effekt).
 
 **Button-Modi** (aus der Aktion abgeleitet oder explizit): `continuous`
 (Fader/Wert 0..1, skaliert über `continuous_min`/`continuous_max`), `flash`
-(Press/Release feuert, z. B. Effekt-Aktion einmal pro Druck) und `toggle`
-(Umschalten bei Press). Press/Release wird für Notes über `data2>0` bzw. für CC
+(Press/Release feuert, z. B. Effekt-Aktion einmal pro Druck), `toggle`
+(Umschalten bei Press) und `press` (MIDI-2: jeder Druck löst genau einmal aus,
+Loslassen tut nichts). `press` gilt **nur** für `executor_go` und `executor_back`
+und ist dort der einzige Modus: `normalize_button_mode` macht aus jedem
+gespeicherten Modus eines GO/BACK-Eintrags (Altbestand mit `toggle`/`flash`)
+beim Laden `press`. Steht `press` an einem anderen Ziel (z. B. ein GO-Mapping auf
+Flash umgestellt), fällt der Modus auf die Vorgabe des Ziels zurück
+(`_infer_button_mode`). Früher war `toggle` die GO-Vorgabe — jeder zweite Druck
+löste dann BACK aus. In der MIDI-Ansicht nennt der Spalten-Tooltip
+„Tastenverhalten: press, toggle, flash oder continuous". Press/Release wird für Notes über `data2>0` bzw. für CC
 über die 64er-Schwelle erkannt.
 
 **Learn-Modus:** `start_learn(callback)` setzt ein Flag; die nächste
