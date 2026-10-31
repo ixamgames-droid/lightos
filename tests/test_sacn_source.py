@@ -97,15 +97,17 @@ def test_env_override_bestimmt_den_ort(cid_datei):
     assert src_mod.cid_file_path() == str(cid_datei)
 
 
-def test_ohne_override_liegt_sie_im_app_datenordner(monkeypatch):
+def test_ohne_override_liegt_sie_im_app_datenordner(monkeypatch, tmp_path):
     """Der Default-Ort ist der App-Datenordner — ohne Env-Variable geprueft, aber
-    OHNE zu schreiben (sonst faende der Test in Davids echtem Ordner statt)."""
+    OHNE zu schreiben (sonst faende der Test in dem echten Ordner des Rig-Rechners statt).
+    STAB-39: der Ordner liegt im Temp-Bereich, sonst gaelte der Sandkasten der
+    Suite nicht und ``app_data_dir()`` gaebe einen Wegwerf-Ordner."""
     from src.core import paths
+    xdg = str(tmp_path / "xdg")
     monkeypatch.delenv("LIGHTOS_SACN_CID", raising=False)
     monkeypatch.setattr(paths.sys, "platform", "linux")
-    monkeypatch.setenv("XDG_DATA_HOME", "/wegwerf/xdg")
-    assert src_mod.cid_file_path() == os.path.join(
-        "/wegwerf/xdg", "LightOS", "sacn_cid")
+    monkeypatch.setenv("XDG_DATA_HOME", xdg)
+    assert src_mod.cid_file_path() == os.path.join(xdg, "LightOS", "sacn_cid")
 
 
 # ── Die zwei Kernaussagen ────────────────────────────────────────────────────

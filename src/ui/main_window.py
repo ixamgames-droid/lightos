@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import json
 import time
-from src.core.paths import app_data_dir
+from src.core.paths import app_data_dir, probelauf_titelzusatz
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QPushButton, QButtonGroup, QStackedWidget, QStatusBar,
@@ -546,6 +546,13 @@ class MainWindow(QMainWindow):
     # gequeued, Emits aus dem UI-Thread laufen direkt.
     _emit_marshal_sig = Signal(object)
 
+    def setWindowTitle(self, title: str) -> None:  # noqa: N802 (Qt-Name)
+        """STAB-39: haengt den Probelauf-Hinweis an (leer in der echten App)."""
+        zusatz = getattr(self, "_probelauf_zusatz", "")
+        if zusatz and not title.endswith(zusatz):
+            title = title + zusatz
+        super().setWindowTitle(title)
+
     def __init__(self, kiosk: bool = False, touch: bool = False):
         super().__init__()
         self._state = get_state()
@@ -572,6 +579,9 @@ class MainWindow(QMainWindow):
         self._kiosk_mode = kiosk
         self._touch_mode = touch
 
+        # STAB-39: ohne echte Daten (Wegwerf-Ordner) traegt JEDER Titel den
+        # Probelauf-Hinweis — einmal festgestellt, ``setWindowTitle`` haengt an.
+        self._probelauf_zusatz = probelauf_titelzusatz()
         self.setWindowTitle("LightOS")
         self.resize(1400, 900)
         self.setMinimumSize(900, 600)
