@@ -22,6 +22,7 @@ Optische Hinweise auf der Kachel:
 - **Blaues Quadrat** oben rechts = eine MIDI-Note/CC ist zugewiesen.
 - **`⌨`-Text** oben links = ein Tastatur-Hotkey ist zugewiesen.
 - **Lila `+N`-Badge** oben links = N Zusatz-Aktionen sind hinterlegt.
+- **Zeichen `+` / `−` / `◐` unten links** = die Taste schaltet einen **Modify-Effekt**; das Zeichen nennt seine Betriebsart: `+` Addieren (Bernstein), `−` Abziehen (Blau), `◐` Abdunkeln (Grau). Schaltet die Taste mehrere Modify-Effekte verschiedener Art, stehen mehrere Zeichen nebeneinander. Mit der Maus darüber erklärt ein Tooltip die Betriebsart. Mehr dazu: [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
 
 Zustands-Rückmeldung beim Drücken/Laufen:
 

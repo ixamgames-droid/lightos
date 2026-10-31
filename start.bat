@@ -27,7 +27,13 @@ echo %PROCESSOR_IDENTIFIER% | find /I "ARMv8" >nul
 if errorlevel 1 goto :arch_fertig
 "%PYTHON%" -c "import sys, sysconfig; sys.exit(3 if sysconfig.get_platform() == 'win-arm64' else 0)" >nul 2>&1
 if errorlevel 4 goto :arch_fertig
-if errorlevel 3 echo [start] WARNUNG: natives ARM64-Python ist nicht unterstuetzt - instabil, kein 3D. x64-Python nehmen: winget install Python.Python.3.12 --architecture x64 - Details in INSTALL.md.
+if not errorlevel 3 goto :arch_fertig
+REM XPLAT-59: Schwarz auf Gelb per ANSI-Folge, sonst geht die Warnung im Windows
+REM Terminal unter. Sicher, weil dieser Zweig nur auf Windows-ARM laeuft - also
+REM Windows 10 1709 oder neuer, deren Konsole ANSI-Folgen kann. ESC entsteht zur
+REM Laufzeit, die Datei bleibt reines ASCII.
+for /F %%e in ('echo prompt $E^| cmd') do set "ESC=%%e"
+echo %ESC%[30;43m[start] WARNUNG: natives ARM64-Python ist nicht unterstuetzt - instabil, kein 3D. x64-Python nehmen: winget install Python.Python.3.12 --architecture x64 - Details in INSTALL.md.%ESC%[0m
 :arch_fertig
 
 REM Main starten
