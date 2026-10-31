@@ -79,7 +79,7 @@ the next start.
 | **Eingang: <Gerät>** (input: <device>) | the music comes **from outside**: mixing desk, guest DJ, band — via line-in, microphone or audio interface. | One entry per input. Adjust the level on the mixing desk/interface until the bar is green. |
 | **OS2L (DJ-Software)** | a DJ is playing with **VirtualDJ** (or another OS2L-capable program). | Tempo and beats come directly from the DJ program; LightOS then does not listen itself. Switch on OS2L in the DJ program. The menu item *Ausgabe → OS2L-Server (Port 1234)* (Output → OS2L server) is the same switch: checked = source OS2L, unchecked = back to the source before. |
 | **Lied-Analyse (Player)** (song analysis, player) | you are playing a **song analysed beforehand in the Generator** in the player and want the light to sit exactly in time. | Takes the track that is currently loaded in the player (section 7.2). The Generator button **Im Player laden & als BPM-Quelle nutzen** (load in player & use as BPM source) selects this entry itself. |
-| **Aus** (off) | you don't want any detection — e.g. only Manuell with TAP. | The status line then says „Erkennung aus — keine Beat-Quelle gewählt" (detection off — no beat source selected). |
+| **Aus** (off) | you don't want any detection — e.g. only Manuell with TAP. | The status line then says „Erkennung aus — keine Beat-Quelle gewählt" (detection off — no beat source selected). „Aus" sets the tempo to 0 at once — beat effects stand still. If you set the tempo by hand in mode **Manuell** (typed in, TAP or nudge), it stays. |
 
 A saved device that is not plugged in at the moment appears in the list as
 **„… (nicht gefunden)"** (not found).

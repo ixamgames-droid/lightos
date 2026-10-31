@@ -48,6 +48,10 @@ Wer die Datei woanders liegen lassen will, setzt die Umgebungsvariable `LIGHTOS_
 ihren Pfad.
 
 Den Stand zeigt **Hilfe → Über LightOS** in der Zeile „Lizenz“ (für wen, gültig bis wann).
+Außerdem nennt dasselbe Fenster die Bestandteile anderer Urheber, die unter der LGPL stehen,
+und verweist auf die Aufstellung `THIRD_PARTY_NOTICES.md` und den **Ordner „licenses“** im
+Programmordner (als Link, wenn der Ordner vorhanden ist) — dort liegen die vollständigen
+Lizenztexte.
 
 ## Was beim Ablauf passiert
 

@@ -41,7 +41,7 @@ laufen mittig zwischen Reihe 2 und 3 durch.
 ## 1. Patchen — die Kopf-Gruppe entsteht von selbst
 
 Gepatcht wird wie immer: Sektion **Patchen** → Tab **Patch** → **+ Gerät hinzufügen**
-(Profil, Universe, DMX-Adresse). Der ausführliche Weg steht in
+(Profil, Universum, DMX-Adresse). Der ausführliche Weg steht in
 [Patchen & Fixture-Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md).
 
 Sobald du ein Gerät mit **mehreren** färbbaren Köpfen patchst, legt LightOS automatisch
@@ -266,8 +266,13 @@ Nach „als Block…" mit 12 Spalten (K1 = Kopf 1):
 
 Dabei gilt:
 
-* Das **Raster wächst selbst** auf die nötige Größe — es wird nie kleiner gemacht
-  (höchstens 64 Spalten bzw. Zeilen).
+* Das **Raster wächst selbst** auf die nötige Größe — es wird nie kleiner gemacht.
+  Es wächst auch über 64 Spalten bzw. Zeilen hinaus, die Felder **„Spalten:"** und
+  **„Zeilen:"** reichen aber nur bis 64 und zeigen dann 64.
+  **Achtung:** Änderst du danach eines der beiden Felder von Hand, wird das Raster auf
+  höchstens 64 × 64 zurückgesetzt, und Zellen außerhalb fallen weg. Auch
+  **„Speichern"** merkt sich die Größe aus den beiden Feldern. Bleib darum bei
+  Blöcken bis 64 Spalten bzw. Zeilen.
 * Beim Rechteck — „als Block…" oder „wie im Gerät hinterlegt", per Rechtsklick wie per
   Knopf — wirken **„Pixel-Reihenfolge:"** und **„Montage-Drehung:"** aus Abschnitt 1: ein
   Panel, das ab Werk in Schlangenlinien zählt oder hochkant hängt, landet ohne Handarbeit
