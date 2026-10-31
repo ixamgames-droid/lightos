@@ -24,6 +24,7 @@ Visual indicators on the tile:
 - **Blue square** at the top right = a MIDI note/CC is assigned.
 - **`⌨` text** at the top left = a keyboard hotkey is assigned.
 - **Purple `+N` badge** at the top left = N additional actions are stored.
+- **Sign `+` / `−` / `◐` at the bottom left** = the button switches a **Modify effect**; the sign names its mode: `+` add (amber), `−` subtract (blue), `◐` dim (grey). If the button switches several Modify effects of different modes, several signs stand side by side. Hovering over it shows a tooltip explaining the mode. More: [Dimmer matrix, section 5 (German)](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
 
 State feedback while pressed/running:
 

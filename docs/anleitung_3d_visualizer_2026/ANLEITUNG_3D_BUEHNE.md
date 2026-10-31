@@ -391,6 +391,13 @@ einem Zug. Sichtbar ändert sich nichts. Sobald du auf **Bauen** wechselst, ein
 Element auswählst oder in die 2D-Draufsicht gehst, sind es wieder einzelne,
 bearbeitbare Elemente; Andocken und Anklicken funktionieren in beiden Modi gleich.
 
+**Viele Lichtkegel werden gedämpft:** Leuchten viele Kegel und Bodenflecken
+zugleich, würde das Bild weiß ausbrennen. Leuchten die sichtbaren Kegel zusammen
+heller als 8 voll aufgezogene Kegel (Bodenflecken: 10), macht die Ansicht darum alle
+Kegel bzw. Flecken gemeinsam etwas durchsichtiger — je mehr leuchten, desto stärker;
+ein einzelner Kegel bleibt dabei immer sichtbar. Darunter sieht alles aus wie bisher.
+Laser sind davon ausgenommen. Die DMX-Ausgabe ändert sich nicht.
+
 Wie lange die Ansicht je Bild braucht, lässt sich messen:
 `./venv/bin/python tools/viz_render_benchmark.py 12 32 48` (echtes Fenster
 nötig, misst auf der echten Grafikkarte).

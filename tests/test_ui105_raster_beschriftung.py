@@ -92,7 +92,16 @@ class ZellTextLageTest(unittest.TestCase):
             cell = QRect(0, 0, 60, hb + hs - 1)
             b, s = FixtureGridWidget.zell_text_rechtecke(cell, big, small)
             self.assertIsNone(s, f"Skala {f}: Name muss entfallen")
-            self.assertEqual(b.center().y(), cell.center().y())
+            # Mittig = Rand oben und unten gleich, bis auf 1 px. QA-106: Ist
+            # der Restplatz (Zelle - Zeile) ungerade, liegt die wahre Mitte auf
+            # einem halben Pixel; das Produkt gibt das Pixel nach unten.
+            # ``QRect.center()`` rundet ZUSAETZLICH ab — unter Windows (Segoe
+            # UI, gerade Zeilenhoehen) lag die Nummer deshalb scheinbar 1 px
+            # daneben (12 != 13), unter Linux (ungerade Hoehen) nie.
+            oben = b.top() - cell.top()
+            unten = cell.bottom() - b.bottom()
+            self.assertIn(unten - oben, (0, 1), f"Skala {f}: {b} in {cell}")
+            self.assertTrue(cell.contains(b), f"Skala {f}: {b} ausserhalb {cell}")
             # genau passend: beide da
             cell = QRect(0, 0, 60, hb + hs)
             self.assertIsNotNone(FixtureGridWidget.zell_text_rechtecke(cell, big, small)[1])

@@ -26,6 +26,7 @@ Kleine Status-Marker im Element:
 
 - **Gelbes `⇅` oder `▯` oben links** – `⇅` = Fader ist invertiert, `▯` = ein Teilbereich (Min/Max) ist gesetzt. Der Prozentwert oben spiegelt das bereits wider.
 - **Cyan-Punkt oben rechts** – eine MIDI-Bindung (CC oder Pitchbend) ist aktiv.
+- **Zeichen `+` / `−` / `◐` unten links** neben der Spur – der Fader ist fest an einen **Modify-Effekt** gebunden; das Zeichen nennt dessen Betriebsart: `+` Addieren (Bernstein), `−` Abziehen (Blau), `◐` Abdunkeln (Grau). Mit der Maus darüber erklärt ein Tooltip die Betriebsart. Mehr dazu: [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
 - **Gelbe Strich-Linie + `⊘▲`/`⊘▼` (Soft-Takeover)** – nur wenn „Pickup" aktiv ist und der Fader nach einem Bank-/Seitenwechsel auf das Durchfahren des physischen Reglers wartet (siehe [MIDI & Tastatur](#midi--tastatur)). Die gestrichelte Linie markiert den Ziel-(VC-)Wert, der zweite gelbe Strich die aktuelle physische Reglerposition, der Pfeil die Richtung, in die der physische Regler bewegt werden muss.
 
 Ist „Touch-Lock" für die VC aktiv, ignoriert der Fader Maus/Touch (reine Anzeige); MIDI/APC regelt weiter (siehe [README.md](README.md)).
@@ -55,8 +56,8 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | **Invertieren** | Dreht die Wirkrichtung um: ganz oben = Min, ganz unten = Max. Gilt für **alle** Modi. | Checkbox „Fader invertieren (oben = klein)" |
 | **Wert min** | Unterer Ausgabewert (Leitplanke). Der Fader regelt nie darunter (z. B. Dimmer, der nie ganz aus geht). Gilt für alle Modi. | 0–255 |
 | **Wert max** | Oberer Ausgabewert (Leitplanke). Der Fader regelt nie darüber (z. B. Speed-Fader, der bei 70 % deckelt). Gilt für alle Modi. | 0–255 |
-| **DMX-Universe (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Universe. Wird bei Bedarf angelegt. | Ganzzahl (1-basiert) |
-| **DMX-Kanal (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Kanal im Universe. | Ganzzahl |
+| **DMX-Universe (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Universum. Wird bei Bedarf angelegt. | Ganzzahl (1-basiert) |
+| **DMX-Kanal (Level-Modus)** | Nur Modus *DMX-Kanal (Level)*: Ziel-Kanal im Universum. | Ganzzahl |
 | **Playback Executor-Slot** | Nur Modus *Playback (Executor)*: der Executor-Slot-Index (0-basiert), dessen Fader dieser Regler steuert. Eigenes Feld – „nicht gesetzt" = kein Slot (der Fader wirkt dann nicht). | Ganzzahl ≥ 0 oder „nicht gesetzt" |
 | **Slot/Funktions-ID (Playback/Effekt)** | Nur in den **Effekt-Modi** sichtbar (unter „Erweitert"): Effekt-Funktions-ID(s). Mehrere IDs mit Komma = Gruppe. Leer = aktiver Effekt. Die „Steuert"-Liste überschreibt dieses Feld. Setzt **nicht** den Playback-Slot – dafür dient das eigene Feld *Playback Executor-Slot*; in Playback-Mode wird dieses Feld gar nicht angezeigt. | Ganzzahl(en), kommagetrennt |
 | **Art** | Art der MIDI-Bindung: **CC** (Fader mit Controller-Nummer, z. B. APC mini) oder **Pitchbend (Motorfader, 14 Bit)** für Mackie-Control- und X-Touch-Pulte. Bei Pitchbend gibt es keine Nummer – der Fader ist sein MIDI-Kanal. | CC / Pitchbend |
@@ -67,7 +68,7 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 
 | Modus | Wirkung |
 |---|---|
-| **DMX-Kanal (Level)** | Schreibt den Wert direkt auf einen festen DMX-Kanal im gewählten Universe (0–255). Das Universe wird bei Bedarf automatisch angelegt. |
+| **DMX-Kanal (Level)** | Schreibt den Wert direkt auf einen festen DMX-Kanal im gewählten Universum (0–255). Das Universum wird bei Bedarf automatisch angelegt. |
 | **Playback (Executor)** | Setzt den Fader-Wert (0–100 %) eines Playback-Executors. Die Slot-Nummer ist der Executor-Index. |
 | **Submaster** | Setzt einen Output-Submaster (0–100 %) – multiplikativ, kombiniert sich sauber mit Grand Master und Gruppen-Dimmer. Jeder Fader hat seinen **eigenen** Submaster-Slot; zwei Submaster-Fader auf denselben Geräten multiplizieren sich also, statt sich zu überschreiben. Auf welche Geräte (oder Köpfe) er wirkt, legt die *Reichweite* fest. |
 | **Grand Master** | Steuert die globale Gesamthelligkeit der gesamten Ausgabe (0–100 %). |
