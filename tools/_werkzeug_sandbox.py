@@ -160,7 +160,9 @@ def _stamm() -> str:
 #: Was VOR der Umlenkung in der Umgebung stand (``None`` = nicht gesetzt).
 VORGABEN: dict[str, str | None] = {k: os.environ.get(k) or None for k in _GEMERKT}
 #: Der Datenordner, den die App OHNE dieses Modul benutzen wuerde — nur LESEN.
-ECHTER_DATENORDNER: str = _pfade().app_data_dir()
+#: STAB-39: die regulaere Aufloesung, nicht ``app_data_dir()`` (das liefert
+#: ausserhalb der App einen Wegwerf-Ordner).
+ECHTER_DATENORDNER: str = _pfade().regulaerer_app_data_dir()
 #: Variable -> Wert, den dieses Modul gesetzt hat (leer, wenn alles vorgegeben war).
 UMGELENKT: dict[str, str] = {}
 #: Der Wegwerf-Ordner dieses Laufs (``None``, solange keiner gebraucht wurde).
@@ -312,8 +314,22 @@ def _einrichten() -> None:
     _vorgabe("LIGHTOS_UNIVERSES_JSON", "universes.json")     # wird nie angelegt
     _vorgabe("LIGHTOS_CRASH_LOG", "crash.log")
 
+    # STAB-39: ein Werkzeug ist nie die echte App — auch nicht, wenn es aus ihr
+    # heraus gestartet wurde.
+    os.environ.pop("LIGHTOS_ECHTE_APP", None)
+    # Gegenpruefung 31.10.: auch eine GEERBTE Ausgabe-Freigabe faellt weg
+    # (Shell, in der fuer hw5_longrun freigegeben wurde; pytest-Kind, das die
+    # harte Freigabe aus conftest erbt) — sonst hinge das Werkzeug nur noch an
+    # den _AN-Schaltern. Nicht im pytest-Prozess selbst: dort importieren Tests
+    # Werkzeuge in-process, und die Suite prueft den Hardware-Code mit
+    # Attrappen (conftest gibt die Ausgabe dafuer frei).
+    if "pytest" not in sys.modules:
+        os.environ.pop("LIGHTOS_ECHTE_AUSGABE", None)
     ECHTE_DATEN = _echte_daten_verlangt()
     if ECHTE_DATEN:
+        # STAB-39: die bewusste Freigabe des echten Datenordners (die Ausgabe
+        # bleibt gesperrt — ``LIGHTOS_ECHTE_AUSGABE`` ist oben entfernt).
+        _setze("LIGHTOS_ECHTE_DATEN", "1")
         print(
             "\n".join((
                 "!" * 78,
@@ -333,6 +349,9 @@ def _einrichten() -> None:
 
     _bibliothek_kopieren()          # liest ECHTER_DATENORDNER — vor der Umlenkung berechnet
     _datenordner_umlenken()
+    # STAB-39: der Datenordner ist umgelenkt — ab hier die regulaere Aufloesung
+    # (in die Sandbox) statt eines zweiten Wegwerf-Ordners.
+    _setze("LIGHTOS_SANDKASTEN", "1")
     _vorgabe("LIGHTOS_SHOW_DB", "current_show.db")
 
 

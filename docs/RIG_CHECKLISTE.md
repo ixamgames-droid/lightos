@@ -185,8 +185,11 @@ eine bekannte Adresse gepatcht werden.
 **Handgriff**
 
 ```
-venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel <N>
+LIGHTOS_ECHTE_AUSGABE=1 venv/bin/python tools/hw5_longrun.py --probe --heartbeat-channel <N>
 ```
+
+`LIGHTOS_ECHTE_AUSGABE=1` gibt den echten Port frei: ausserhalb der App
+oeffnet LightOS seit STAB-39 kein DMX-Interface von selbst.
 
 `<N>` ist der Kanal, auf dem das Gerät reagiert (z. B. sein Dimmer).
 

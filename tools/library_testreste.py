@@ -41,6 +41,10 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# STAB-39: Bestands-Werkzeug (Geraete-Bibliothek) — bewusst am echten Datenordner (nur als
+# Skript; beim Import aus Tests bleibt es bei deren Sandkasten).
+if __name__ == "__main__":
+    os.environ.setdefault("LIGHTOS_ECHTE_DATEN", "1")
 
 # Bewusst eng: nur was die Tests nachweislich anlegen. Alles Weitere waere
 # Raten auf fremden Daten.

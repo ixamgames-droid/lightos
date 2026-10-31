@@ -384,6 +384,12 @@ class IDNConnection:
 
     def connect(self):
         if self._sock is None:
+            # STAB-39: ohne echte App (oder LIGHTOS_ECHTE_AUSGABE=1) kein
+            # Socket, also auch kein ``_send`` — der Fehler laeuft in die
+            # Retry-Logik des LaserOutputManager (_CONN_ERRORS).
+            from src.core.paths import echte_ausgabe_pruefen
+            if not echte_ausgabe_pruefen("Laser/IDN"):
+                raise IDNError("STAB-39: echte Laser-Ausgabe gesperrt")
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(self.timeout)
             self._sock = sock

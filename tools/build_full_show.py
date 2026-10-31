@@ -42,7 +42,7 @@ SNAP_FILE = os.path.join(APPDIR, "snapshots.json")
 # woanders, sobald das Skript nicht aus dem Repo-Root gestartet wurde.
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # XPLAT-44: die globalen MIDI-Zuordnungen liegen im App-Datenordner.
-from src.core.paths import user_data_file  # noqa: E402
+from src.core.paths import user_data_file, ziel_hinweis  # noqa: E402
 MIDIMAP = user_data_file("midi_mappings.json")
 SHOW_OUT = os.path.join(_ROOT, "shows", "APC_Demo_Show.lshow")
 
@@ -278,7 +278,8 @@ try:
         if mi.get("message_type") == "cc" and tid in targets:
             m["target"] = targets[tid]; m["name"] = names[tid]; n += 1
     json.dump(base, open(MIDIMAP, "w", encoding="utf-8"), indent=2, ensure_ascii=False)
-    print(f"midi_mappings: {n} Fader (R/G/B/W + Dimmer); Master=Grand Master")
+    print(f"midi_mappings: {n} Fader (R/G/B/W + Dimmer); Master=Grand Master"
+          f" -> {ziel_hinweis(MIDIMAP)}")  # STAB-39: echter Zielort
 except Exception as e:
     print(f"midi remap uebersprungen: {e}")
 
@@ -298,3 +299,4 @@ print(f"VC: Func={cnt('VCButton','FunctionToggle')} Snap={cnt('VCButton','Snapsh
       f"Clear={cnt('VCButton','Clear')} Tap={cnt('VCButton','Tap')} Color={cnt('VCColor')} "
       f"Slider={cnt('VCSlider')} Label={cnt('VCLabel')}")
 print("FERTIG ->", SHOW_OUT)
+print("Snapshots ->", ziel_hinweis(SNAP_FILE))  # STAB-39

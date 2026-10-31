@@ -126,3 +126,4 @@ test_stab37_bibliotheks_hinweis_kein_verlust.py # Erste Schritte nennt die Meldu
 test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen
 test_bpm32_takt_hinweis.py         # Musik-Anleitung erklaert den Hinweis „Takt aus Titel übernehmen“ (Quelle Aus/OS2L)
 test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen
+test_stab39_echte_daten_nur_app.py # COORDINATION.md nennt die STAB-39-Freigaben (echte Daten/Ausgabe nur in der App)

@@ -44,11 +44,14 @@ _SCHALTER = (
     "LIGHTOS_SERIAL_INPROC",        # kein multiprocessing-spawn fuer Enttec
     "LIGHTOS_NO_RECOVERY_PROMPT",   # keine Autosave-Wiederherstellungsfrage
     "LIGHTOS_NO_DATENUMZUG",        # XPLAT-44: kein Kopieren echter data/-Dateien
+    "LIGHTOS_SANDKASTEN",           # STAB-39: Datenordner ist umgelenkt -> regulaer aufloesen
 )
 
 # Variablen, die Ausgabe/Netz in eine bestimmte Richtung lenken wuerden —
 # in der Sandbox ungesetzt.
 _ENTFERNEN = (
+    "LIGHTOS_ECHTE_APP",            # STAB-39: das Bild-Werkzeug ist nie die echte App
+    "LIGHTOS_DATEN_ORDNER",
     "LIGHTOS_OUTPUT_IFACE",
     "LIGHTOS_REMOTE_TOKEN",
     "LIGHTOS_WEBENGINE_FLAGS",

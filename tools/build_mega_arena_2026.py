@@ -72,6 +72,7 @@ from src.core.show.show_file import reset_show, save_show, load_show
 from src.core.show import vc_gallery
 from src.core.audio.media_player import clean_title, guess_genre_bpm
 from src.core.stage.stage_definition import StageDefinition, save_stage
+from src.core.paths import ziel_hinweis  # STAB-39: echter Zielort statt %APPDATA%-Behauptung
 from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
 from src.ui.virtualconsole.vc_button import VCButton, ButtonAction
 from src.ui.virtualconsole.vc_color import VCColor, ColorTarget
@@ -999,7 +1000,7 @@ for sx in (-8, 8):
     for sz in (2.6, -2.6):
         sd.add("truss_v", x=sx, y=2.75, z=sz, w=0.3, h=5.5, d=0.3, name=f"Stuetze {sx},{sz}")
 sd.add("platform", x=0, y=0.3, z=-0.5, w=18, h=0.6, d=6, name="Buehne")
-save_stage(sd)
+print(f"[ok] Stage '{STAGE_NAME}' -> {ziel_hinweis(save_stage(sd))}")
 state.active_stage_name = STAGE_NAME
 
 scene = state._scene

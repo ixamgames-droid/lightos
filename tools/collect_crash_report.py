@@ -34,6 +34,10 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
+# STAB-39: Bestands-Werkzeug (wertet das Absturzprotokoll aus) — bewusst am echten Datenordner (nur als
+# Skript; beim Import aus Tests bleibt es bei deren Sandkasten).
+if __name__ == "__main__":
+    os.environ.setdefault("LIGHTOS_ECHTE_DATEN", "1")
 from src.core import crash_logging as _cl          # noqa: E402
 from src.core.paths import app_data_dir            # noqa: E402
 
