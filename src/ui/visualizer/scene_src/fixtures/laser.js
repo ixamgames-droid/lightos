@@ -215,6 +215,15 @@ export function noteLaserAnimation(f) {
   else _bewegt.delete(f.fid);
 }
 
+// VIZ-110: removeFixture meldet das Geraet hier ab. Ohne das bliebe der
+// Eintrag bis zum naechsten Bild stehen (tickLaserAnimation raeumt ihn dort
+// auch ab) — so lange meldete die Live-Probe einen Laser, den es nicht mehr
+// gibt. Ein Neubau mit gleicher fid setzt den Eintrag ueber
+// noteLaserAnimation ohnehin neu nach seinem eigenen Stand.
+export function vergissLaserAnimation(fid) {
+  _bewegt.delete(Number(fid));
+}
+
 // Pro-Geraet-Veto (beamsOff, VIZ-15) gilt auch hier: ein ausgeblendeter Laser
 // haelt den Render-Loop nicht wach und wird nicht weitergedreht.
 export function laserAnimationAktiv() {

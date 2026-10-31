@@ -29,6 +29,7 @@ import { syncMountPose } from './mount_pose.js';   // VIZ-100
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool, vergissSpotPoolGeraet } from '../scene/spot_pool.js';
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
+import { vergissLaserAnimation } from './laser.js';   // VIZ-110
 import {
   FPS_VORGABE, fpsNachfuehren, strobeBilder, strobeFaktor, strobeModus, taktFps,
 } from './strobe.js';   // VIZ-104
@@ -610,6 +611,7 @@ export function removeFixture(fid) {
   delete fixtures[fid];
   delete topDownIcons[fid];
   vergissSpotPoolGeraet(fid);       // VIZ-90: kein Erbe fuer ein neues Geraet gleicher fid
+  vergissLaserAnimation(fid);       // VIZ-110: bewegter Laser haelt den Loop nicht wach
   // Frei gewordenes Shadow-Budget an verbleibende Spots weiterreichen.
   syncSpotShadowBudget();
   // Clean selection
