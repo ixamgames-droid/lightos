@@ -81,6 +81,13 @@ the next start.
 | **Lied-Analyse (Player)** (song analysis, player) | you are playing a **song analysed beforehand in the Generator** in the player and want the light to sit exactly in time. | Takes the track that is currently loaded in the player (section 7.2). The Generator button **Im Player laden & als BPM-Quelle nutzen** (load in player & use as BPM source) selects this entry itself. |
 | **Aus** (off) | you don't want any detection — e.g. only Manuell with TAP. | The status line then says „Erkennung aus — keine Beat-Quelle gewählt" (detection off — no beat source selected). „Aus" sets the tempo to 0 at once — beat effects stand still. If you set the tempo by hand in mode **Manuell** (typed in, TAP or nudge), it stays. |
 
+Switching to **Aus**: a moment ago the tempo was 128 (source „Lied-Analyse“), afterwards the
+big BPM number and the header show „--“ — the tempo is 0:
+
+![Animated GIF: source (1) „Lied-Analyse (Player)“ with 128.0 BPM in the big display (2), status line (3) „128 BPM aus dem Player-Titel“ (from the player title) and header „BPM: 128,0“ (4); then source „Aus“ — the display jumps to „--“, the status line reads „Erkennung aus — keine Beat-Quelle gewählt“ (detection off), the header „BPM: --“](img/02_quelle_aus_ablauf.gif)
+
+![Source „Aus“ (1): big BPM display „--“ (2), status line „Erkennung aus — keine Beat-Quelle gewählt“ with the link „Quelle wählen“ (3), header „BPM: --“ (4)](img/01_quelle_aus.png)
+
 A saved device that is not plugged in at the moment appears in the list as
 **„… (nicht gefunden)"** (not found).
 
