@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 import types
 from unittest import mock
 
@@ -262,6 +263,19 @@ def _sysfs(tmp_path, name, vid, pid, produkt="", hersteller="", serie="",
         os.symlink(ziel, s / "driver")
 
 
+# QA-106: Der Nachbau braucht Ordner wie „1-2:1.0“ (Schnittstellen) und einen
+# ``driver``-Symlink — unter Windows ist ':' im Namen verboten (WinError 267),
+# Symlinks brauchen dort Sonderrechte. Unter Windows liest die Erkennung sysfs
+# nie (siehe ``test_sysfs_nur_unter_linux`` unten, der auf jedem System
+# laeuft). Uebersprungen wird nur dort, wo der Nachbau nicht geht (Windows) —
+# ueberall sonst bleibt die Abdeckung unveraendert.
+NICHT_UNTER_WINDOWS = pytest.mark.skipif(
+    sys.platform.startswith("win"),
+    reason="sysfs-Nachbau braucht ':' im Ordnernamen + Symlink (unter "
+           "Windows verboten; dort liest die Erkennung sysfs auch nie)")
+
+
+@NICHT_UNTER_WINDOWS
 def test_sysfs_wird_gelesen_hubs_bleiben_draussen(tmp_path):
     _sysfs(tmp_path, "1-2", "0403", "6001", "FT232R USB UART", "FTDI",
            "A50285BI", tty="ttyUSB0", treiber="ftdi_sio")
@@ -275,6 +289,25 @@ def test_sysfs_wird_gelesen_hubs_bleiben_draussen(tmp_path):
     assert ft.dev_pfad == "/dev/bus/usb/001/007"
     assert geraete[1].port == "" and geraete[1].produkt == "USBDMX512"
     assert ifc.lies_sysfs(str(tmp_path / "gibt-es-nicht")) == []
+
+
+def test_sysfs_nur_unter_linux(monkeypatch):
+    """QA-106: Nur unter Linux fasst die Erkennung ``/sys`` an; unter Windows
+    kommen die USB-Geraete aus pyusb. Laeuft auf jedem System (keine Ordner)."""
+    monkeypatch.delenv("LIGHTOS_KEIN_USB", raising=False)
+    aufrufe = []
+    monkeypatch.setattr(ifc, "lies_sysfs", lambda *a: aufrufe.append("sysfs") or [])
+    monkeypatch.setattr(ifc, "lies_pyusb", lambda *a: aufrufe.append("pyusb") or [])
+    monkeypatch.setattr(ifc, "lies_seriell", lambda *a: [])
+    assert ifc.erkenne(**_frei(system="windows")) == []
+    assert aufrufe == ["pyusb"]
+    aufrufe.clear()
+    assert ifc.erkenne(schnell=True, **_frei(system="windows")) == []
+    assert aufrufe == []
+    assert ifc.erkenne(**_frei()) == []
+    assert aufrufe == ["sysfs"]
+    monkeypatch.setattr(ifc.sys, "platform", "win32")
+    assert ifc._system() == "windows"
 
 
 def test_kein_zugriff_auf_unbekannte_geraete():

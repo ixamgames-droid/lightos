@@ -973,8 +973,17 @@ class VCSpeedDial(VCWidget):
                     facs.append(f)
             if facs:
                 self.factor_buttons = facs
-                if self._active_factor not in self.factor_buttons:
-                    self._active_factor = 1.0 if 1.0 in self.factor_buttons else self.factor_buttons[0]
+                # ENG-44: relative Toleranz — das Faktor-Feld gibt Werte wie 1/3 nur
+                # gerundet zurueck (_fmt_factor, 6 Stellen); ein unveraendertes OK darf
+                # den aktiven Faktor nicht verlieren. Treffer rastet auf die Stufe ein.
+                _hit = [f for f in self.factor_buttons
+                        if abs(self._active_factor - f) <= 1e-5 * max(abs(f), 1e-12)]
+                if _hit:
+                    self._active_factor = float(_hit[0])
+                else:
+                    # ENG-44: wie der Reset-„X" (ENG-32) auf die Gitterstufe naechst 1×
+                    # springen, nicht auf factors[0].
+                    self._active_factor = self._reset_target()
             self.show_dial = show_dial_cb.isChecked()
             self.show_tap = show_tap_cb.isChecked()
             self.show_factors = show_fac_cb.isChecked()
@@ -1001,7 +1010,13 @@ class VCSpeedDial(VCWidget):
                     self.function_id = None
                 self.function_ids = []
             self._bpm = max(self._min_bpm, min(self._max_bpm, bpm_sb.value()))
-            self._mult = max(self._min_mult, min(self._max_mult, mult_sb.value()))
+            if self.target_mode == SpeedTarget.TEMPO_BUS_MULT:
+                # ENG-44: im Faktor-Gitter ist der aktive Faktor die einzige Quelle
+                # fuer _mult (wie _set_factor) — das Multiplikator-Feld wuerde sonst
+                # einen anderen Wert anwenden, als das Gitter markiert.
+                self._mult = float(self._active_factor)
+            else:
+                self._mult = max(self._min_mult, min(self._max_mult, mult_sb.value()))
             if self.target_mode == SpeedTarget.SPEED_NODE:
                 self._ensure_node_config()
             self._apply()

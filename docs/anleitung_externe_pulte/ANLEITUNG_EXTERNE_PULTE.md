@@ -191,9 +191,10 @@ Vorher: Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk)
    **DMX-Eingang** öffnen. Für das Mischen gibt es zwei Kästen: **Art-Net-Eingang** und
    **sACN-Eingang**. Beide sind gleich aufgebaut.
 
-   > Darunter liegt der Kasten **Fernsteuerung**: Damit *bedient* das Pult LightOS über
-   > einzelne Kanäle (Executor-Fader, Grand Master, GO/Zurück/Stop), statt nur DMX
-   > durchzumischen. Beschrieben in [Art-Net → Fernsteuerung](../ARTNET.md#fernsteuerung-pult-bedient-lightos).
+   > Darunter liegt der Kasten **Fernsteuerung (Pult steuert LightOS)**: Damit *bedient*
+   > das Pult LightOS über einzelne Kanäle (Executor-Fader, Grand Master,
+   > GO/Zurück/Stop), statt nur DMX durchzumischen. Schritte: siehe
+   > [Fernsteuerung](#fernsteuerung--das-pult-bedient-lightos-über-art-netsacn) weiter unten.
 3. **Art-Net-Eingang aktivieren** bzw. **sACN-Eingang aktivieren** anhaken.
 4. **Eingehendes Universum:** die Nummer, auf der das Pult sendet. Bei Art-Net zählt LightOS
    hier ab 1: Sendet das Pult auf Art-Net-Universum `0`, trägst du `1` ein. Bei sACN gilt
@@ -241,6 +242,40 @@ Gut zu wissen:
 - Nach einem **Neustart von LightOS** ist der Eingang aus: Schritte 2 bis 7 wiederholen.
 - Bei sACN wertet der Eingang die **Priorität** des Absenders nicht aus. Was auf dem
   eingestellten Universum ankommt, wird eingemischt.
+
+### Fernsteuerung — das Pult bedient LightOS über Art-Net/sACN
+
+Statt DMX durchzumischen, kann ein Pult über **einzelne Kanäle** Executor-Fader,
+Grand Master und die Tasten GO, Zurück und Stop in LightOS bedienen. Vorher:
+Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk).
+
+1. Dialog **Ausgabe konfigurieren** (Menü **Ausgabe** → **Konfigurieren...**), Reiter
+   **DMX-Eingang** öffnen. Ganz unten steht der Kasten
+   **„Fernsteuerung (Pult steuert LightOS)"**.
+2. **„+ Zuordnung"** klicken. Es erscheint eine neue Zeile mit den Spalten
+   **Quelle**, **Universum**, **Kanal**, **Ziel**, **Executor** und **Schwelle %**.
+3. **Quelle:** `Art-Net` oder `sACN`. **Universum** und **Kanal:** wo das Pult den
+   Steuerkanal sendet. Wie beim Misch-Eingang zählt Art-Net hier ab 1: Sendet das
+   Pult auf Art-Net-Universum `0`, trägst du `1` ein. Bei sACN gilt die Nummer
+   unverändert.
+4. **Ziel:** `Executor-Fader`, `Grand Master`, `GO (Weiter)`, `Zurück` oder `Stop`.
+   - **Executor:** die Nummer des Executors (bei `Grand Master` ausgegraut).
+   - **Schwelle %:** nur bei den Tasten. Steigt der Kanal über die Schwelle
+     (Vorgabe 50 %), löst die Taste genau einmal aus.
+5. Für jeden weiteren Kanal Schritt 2 bis 4 wiederholen. Eine falsche Zeile anklicken
+   und **„Entfernen"** löscht sie.
+6. **„Fernsteuerung aktiv"** anhaken und im Kasten **Übernehmen** klicken. Die
+   Statuszeile zeigt dann `Aktiv · <n> Zuordnung(en) · Empfang: …` und
+   `(gespeichert)`. Anders als der Misch-Eingang oben bleibt die Fernsteuerung
+   gespeichert und läuft nach einem Neustart von selbst wieder.
+
+Gut zu wissen:
+
+- Ein Fader folgt dem Pult erst, **wenn sich der Kanal bewegt**. Der erste Wert nach
+  **Übernehmen** oder nach dem Start ist nur die Ausgangslage.
+- Zugeordnete Kanäle werden **nicht** in die Ausgabe gemischt.
+- Alle Einzelheiten (Hysterese, mehrere Sender auf einem Universum) stehen in
+  [Art-Net → Fernsteuerung](../ARTNET.md#fernsteuerung-pult-bedient-lightos).
 
 ### Aufbau C — das Pult löst Cues aus (MIDI Show Control)
 

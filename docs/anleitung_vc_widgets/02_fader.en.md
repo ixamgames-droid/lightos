@@ -28,6 +28,7 @@ Small status markers in the element:
 
 - **Yellow `⇅` or `▯` at the top left** – `⇅` = the fader is inverted, `▯` = a partial range (min/max) is set. The percentage at the top already reflects this.
 - **Cyan dot at the top right** – a MIDI binding (CC or pitch bend) is active.
+- **Sign `+` / `−` / `◐` at the bottom left** next to the track – the fader is bound to a fixed **Modify effect**; the sign names its mode: `+` add (amber), `−` subtract (blue), `◐` dim (grey). Hovering over it shows a tooltip explaining the mode. More: [Dimmer matrix, section 5 (German)](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
 - **Yellow dashed line + `⊘▲`/`⊘▼` (soft takeover)** – only when „Pickup" is active and the fader, after a bank/page change, is waiting for the physical fader to pass through (see [MIDI & keyboard](#midi--keyboard)). The dashed line marks the target (VC) value, the second yellow line the current physical fader position, the arrow the direction in which you have to move the physical fader.
 
 If „Touch-Lock" is active for the VC, the fader ignores mouse/touch (display only); MIDI/APC keeps controlling it (see [README.en.md](README.en.md)).
