@@ -18,8 +18,8 @@ Drei Dinge muss dieser Test belegen, und alle drei am DMX statt am Zustand:
 2. **Blackout und Laser-NOT-AUS greifen im eingefrorenen Zustand weiter durch** —
    ein Freeze darf den Notaus nicht aushebeln (sie liegen in
    ``OutputManager._send_all``, also NACH dem Renderer);
-3. beim Auftauen springt nichts: die monotonic-Anker werden um die eingefrorene
-   Dauer nachgezogen.
+3. beim Auftauen springt nichts: die Zeitanker (Show-Zeit, ENG-33) werden um
+   die eingefrorene Dauer nachgezogen.
 """
 from __future__ import annotations
 
@@ -193,13 +193,13 @@ class AuftauenTest(_Basis):
     def test_matrix_anker_wird_um_die_eingefrorene_dauer_nachgezogen(self):
         """Ohne das Nachziehen rechnete die Matrix die ganze eingefrorene Dauer
         beim ersten Tick danach in EINEM Schritt ab — ein sichtbarer Sprung."""
-        import src.core.app_state as A
         from src.core.engine.rgb_matrix import RgbMatrixInstance
 
         uhr = _Uhr()
-        echt = A.time.monotonic
-        A.time.monotonic = uhr
-        self.addCleanup(lambda: setattr(A.time, "monotonic", echt))
+        # ENG-33: der Freeze misst auf der Show-Zeit (dieselbe Uhr wie die Anker)
+        from src.core.engine import show_zeit
+        echt = show_zeit.setze_uhr(uhr)
+        self.addCleanup(lambda: show_zeit.setze_uhr(echt))
 
         m = RgbMatrixInstance("M")
         m._last_tick = uhr() - 0.02          # so, als haette er gerade getickt
@@ -220,13 +220,13 @@ class AuftauenTest(_Basis):
     def test_cue_fade_wird_mitgezogen(self):
         """Ein 3-Sekunden-Fade waere nach einem 10-Sekunden-Freeze sonst beim
         Auftauen sofort fertig, statt dort weiterzumachen, wo er stand."""
-        import src.core.app_state as A
         from src.core.engine.cue_stack import CueStack, FadeState
 
         uhr = _Uhr()
-        echt = A.time.monotonic
-        A.time.monotonic = uhr
-        self.addCleanup(lambda: setattr(A.time, "monotonic", echt))
+        # ENG-33: der Freeze misst auf der Show-Zeit (dieselbe Uhr wie die Anker)
+        from src.core.engine import show_zeit
+        echt = show_zeit.setze_uhr(uhr)
+        self.addCleanup(lambda: show_zeit.setze_uhr(echt))
 
         stack = CueStack("S")
         stack._fade = FadeState({}, {}, duration=3.0, delay=0.0)
@@ -250,16 +250,58 @@ class AuftauenTest(_Basis):
 
         self.assertAlmostEqual(stack._fade.start_time, vorher + 10.0, places=3)
 
+    def test_listen_aller_pages_werden_genau_einmal_mitgezogen(self):
+        """ENG-33: ``compute_merged`` tickt die Listen ALLER Pages — deren
+        Fades und Follow-Faelligkeiten muessen mitwandern (sonst schalten
+        Follows nach dem Auftauen sofort). Dieselbe Liste auf zwei Executoren
+        wird nur einmal geschoben."""
+        from src.core.engine import show_zeit
+        from src.core.engine.cue import Cue
+        from src.core.engine.cue_stack import CueStack
+
+        uhr = _Uhr()
+        echt = show_zeit.setze_uhr(uhr)
+        self.addCleanup(lambda: show_zeit.setze_uhr(echt))
+
+        def _liste(name):
+            st = CueStack(name)
+            c = Cue(1.0, "A", values={}, fade_in=0.0)
+            c.follow = 1.0
+            st.cues = [c, Cue(2.0, "B", values={}, fade_in=0.0)]
+            st.go()
+            return st
+        a, b = _liste("A"), _liste("B")
+        va, vb = a._follow_faellig, b._follow_faellig
+
+        class _Ex:
+            def __init__(self, stack):
+                self.stack = stack
+
+        class _PE:
+            pages = [[_Ex(a)], [_Ex(b), _Ex(a)]]
+            executors = pages[0]
+        alt = self.state.playback_engine
+        self.state.playback_engine = _PE()
+        self.addCleanup(lambda: setattr(self.state, "playback_engine", alt))
+
+        self.state.set_freeze(True)
+        uhr.weiter(10.0)
+        self.state.set_freeze(False)
+
+        self.assertAlmostEqual(a._follow_faellig, va + 10.0, places=3)
+        self.assertAlmostEqual(b._follow_faellig, vb + 10.0, places=3,
+                               msg="Liste auf einer anderen Page nicht verschoben")
+
     def test_von_hand_gescrubbter_fade_bleibt_unangetastet(self):
         """Ein manueller Crossfade haengt an der Faderposition, nicht an der
         Zeit — ihn zu verschieben waere falsch."""
-        import src.core.app_state as A
         from src.core.engine.cue_stack import CueStack, FadeState
 
         uhr = _Uhr()
-        echt = A.time.monotonic
-        A.time.monotonic = uhr
-        self.addCleanup(lambda: setattr(A.time, "monotonic", echt))
+        # ENG-33: der Freeze misst auf der Show-Zeit (dieselbe Uhr wie die Anker)
+        from src.core.engine import show_zeit
+        echt = show_zeit.setze_uhr(uhr)
+        self.addCleanup(lambda: show_zeit.setze_uhr(echt))
 
         stack = CueStack("S")
         stack._fade = FadeState({}, {}, duration=3.0, delay=0.0)

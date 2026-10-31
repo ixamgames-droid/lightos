@@ -9,11 +9,11 @@ erscheint in der Bibliothek und ist auf VC/MIDI legbar.
 from __future__ import annotations
 import math
 import random
-import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from . import show_zeit  # ENG-33: Vorschau-Zeit = Show-Zeit
 from .function import Function, FunctionType
 from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 from .patch_index import PatchListe
@@ -256,7 +256,7 @@ class EfxInstance(Function):
     _RANDOM_PREVIEW = 8
 
     def _on_start(self):
-        self._last_tick = time.monotonic()
+        self._last_tick = show_zeit.jetzt()
         self._rand_progress = 0.0
         if not self.loop:
             # One-Shot: deterministisch am Anfang (bzw. Ende bei backward)
@@ -613,10 +613,10 @@ class EfxInstance(Function):
         return (x0 + (x1 - x0) * s, y0 + (y1 - y0) * s)
 
     def tick(self) -> dict[int, dict[str, int]]:
-        """Nur fuer die Vorschau (zeitbasiert via monotonic)."""
+        """Nur fuer die Vorschau (zeitbasiert via Show-Zeit, ENG-33)."""
         if not self._running:
             return {}
-        now = time.monotonic()
+        now = show_zeit.jetzt()
         dt = now - self._last_tick
         self._last_tick = now
         self._advance(dt)
@@ -1256,7 +1256,7 @@ class EfxInstance(Function):
         ] + self.FREEZE_ACTIONS
 
     def shift_clock(self, seconds: float) -> None:
-        """Freeze-Auftauen: eigener monotonic-Anker mit (s. Function.shift_clock)."""
+        """Freeze-Auftauen: eigener Show-Zeit-Anker mit (s. Function.shift_clock)."""
         self._last_tick += float(seconds)
 
     def to_dict(self) -> dict:

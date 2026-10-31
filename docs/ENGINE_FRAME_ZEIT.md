@@ -102,3 +102,16 @@ Vorher wuchs die Zeit schneller als das Rig (Faktor 7 bei vierfacher Größe) un
 - Ohne Fenster und ohne echte Ausgabe-Hardware. In der laufenden App teilt sich der Render-Thread den Interpreter mit der Oberfläche; die Zeiten dort sind höher (bei der 2D-Ansicht gemessen: Faktor 1,6, siehe UI-88). Die **Verhältnisse** gelten, die Absolutwerte nicht.
 - Ein Rechner, nebenher benutzt. Zwei Läufe desselben Stands lagen bis zu 10 % auseinander; deshalb der kleinste Mittelwert und abwechselnde Läufe.
 - Die Verteilung misst mit Hüllen um `write`; die Summe liegt wenige Prozent über der ungestörten Messung.
+
+## Show-Zeit
+
+Seit ENG-33 laufen Cue-Fades, Follow-Cues und die Effekt-Vorschau (EFX, Matrix) auf **einer** Uhr: `src/core/engine/show_zeit.py`.
+
+- **In der App** ist das `time.perf_counter` — dieselbe Uhr wie die Fades seit QA-89 (unter Windows 100 ns statt des 15,6-ms-Rasters von `monotonic`). Am Verhalten ändert sich nichts.
+- **Follow-Cues** sind kein Timer-Thread mehr. Die Cueliste merkt sich eine Fälligkeit und prüft sie bei jedem Bild in `CueStack.tick()`. Der Folge-Fade beginnt rückdatiert auf die Fälligkeit; das Raster von 22,7 ms je Bild geht also nicht in den Fade ein, und Follow-Ketten driften nicht. Während eines Freeze wird nicht getickt, der Follow wartet also mit. Beim Auftauen schiebt `shift_clock` die Fälligkeit um die eingefrorene Dauer weiter — für die Listen **aller** Pages und jede Liste genau einmal; die Dauer misst der Freeze selbst auf der Show-Zeit.
+- **Nachholen:** Hing der Ausgabe-Thread länger als Follow + Fade (blockierender Serial-Write, GC), holt der nächste Tick alle inzwischen fälligen Schritte in einem Zug nach. Die Liste steht dann direkt auf der richtigen Cue, statt die Kette Bild für Bild durchzuflackern. Follow + Fade von praktisch 0 schaltet höchstens einmal je Bild.
+- **Sprünge:** Jeder neue Fade, auch `go_to`, verwirft den wartenden Follow der alten Cue.
+- **Effekte im Render-Pfad** bekommen ihren Schritt weiterhin als `dt` des Ausgabe-Takts.
+- **Bild für Bild rendern** (Aufnahme, Headless-Prüfung, die Showcase-Anleitungsbilder über `sim_einbauen`): `with show_zeit.manuelle_uhr() as uhr:` und je Bild `uhr.vorruecken(1/44)` vor `_render_frame(1/44)`. Dann sehen Fades, Follows und Effekte dieselbe Zeit. Die Uhr nur wechseln, solange nichts läuft, denn ältere Zeitanker stammen von der alten Uhr.
+- **Nicht an der Show-Zeit** hängen Tap-Tempo und BPM-Takt (sie messen echte Musik und echte Tasten), Audio-Funktionen (sie spielen in Echtzeit) und Zeitlimits der Ausgabe.
+- Eine Cueliste, die auf keinem Executor liegt, wird nicht getickt. Sie macht kein Licht, und ihr Follow schaltet erst weiter, wenn sie auf einem Executor liegt.

@@ -484,7 +484,7 @@ class Function:
         BUG-FBW Slice 3: Der globale Freeze haelt den Output an, indem der
         Renderer den Frame nicht mehr neu berechnet — die Funktionen werden also
         gar nicht getickt. Wer seinen Fortschritt aus ``dt`` zieht, haelt damit
-        von selbst. Wer ihn aus ``time.monotonic()`` zieht (Matrix, EFX,
+        von selbst. Wer ihn aus der Show-Zeit zieht (ENG-33; Matrix, EFX,
         Cue-Fades), rechnet beim ersten Tick nach dem Auftauen die GANZE
         eingefrorene Dauer auf einmal ab und springt nach vorn.
 

@@ -17,10 +17,10 @@ Das Fixture-Grid sind einfach die fids der gewaehlten Geraete (1×N), siehe
 from __future__ import annotations
 import math
 import random
-import time
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from . import show_zeit  # ENG-33: Vorschau-Zeit = Show-Zeit
 from .function import Function, FunctionType
 from .patch_index import PatchListe
 
@@ -603,7 +603,7 @@ class RgbMatrixInstance(Function):
     def _on_start(self):
         self._step = 0.0
         self._last_bus_pos = None
-        self._last_tick = time.monotonic()
+        self._last_tick = show_zeit.jetzt()
         # WP-Tempo: bei Bus-Sync ankern. „Taktgleich" (align_on_start, Default) klinkt
         # den Effekt auf das gemeinsame Beat-Raster seines Bus ein (note_groove_start
         # legt bei frischer Groove den Downbeat auf jetzt); bewusst frei (False) ankert
@@ -638,7 +638,7 @@ class RgbMatrixInstance(Function):
                 bus = get_tempo_bus_manager().bus_for_effect(bus_id)
                 if bus is not None:
                     self._beat_anchor = bus.take_anchor()
-                    self._last_tick = time.monotonic()
+                    self._last_tick = show_zeit.jetzt()
                     self._step = 0.0
                     # ENG-10: Stall-Cache loeschen. Hatte die Matrix vorher gegen
                     # einen STEHENDEN Bus gerendert, gilt ``_last_bus_pos == pos``;
@@ -651,7 +651,7 @@ class RgbMatrixInstance(Function):
             except Exception:
                 pass
         self._step = 0.0
-        self._last_tick = time.monotonic()
+        self._last_tick = show_zeit.jetzt()
 
     # ── Farb-Kompatibilitaet: color1/2/3 zeigen auf die ColorSequence ──────────
     # So funktioniert aller bestehender Code (View, Show-Builder, Tests, _render),
@@ -736,7 +736,7 @@ class RgbMatrixInstance(Function):
         return grid
 
     def tick(self) -> dict[int, dict[str, int]]:
-        """Nur fuer die Vorschau (zeitbasiert via monotonic). Treibt _step voran
+        """Nur fuer die Vorschau (zeitbasiert via Show-Zeit, ENG-33). Treibt _step voran
         und liefert {fid: {color_r/g/b}}. Der echte Output laeuft ueber write().
 
         Achtung: liefert IMMER rohe color_r/g/b — die Style-Kanalmaske (write()
@@ -745,7 +745,7 @@ class RgbMatrixInstance(Function):
         (style-gemappte Graustufen)."""
         if not self._running or not self.fixture_grid:
             return {}
-        now = time.monotonic()
+        now = show_zeit.jetzt()
         dt = now - self._last_tick
         self._last_tick = now
         # WP-Tempo: self._step bus-synchron oder frei fortschreiben (Vorschau).
@@ -2348,7 +2348,7 @@ class RgbMatrixInstance(Function):
         effect_live.commit_live_override(self.id)
 
     def shift_clock(self, seconds: float) -> None:
-        """Freeze-Auftauen: eigener monotonic-Anker mit (s. Function.shift_clock)."""
+        """Freeze-Auftauen: eigener Show-Zeit-Anker mit (s. Function.shift_clock)."""
         self._last_tick += float(seconds)
 
     def modify_wirksam(self) -> bool:
