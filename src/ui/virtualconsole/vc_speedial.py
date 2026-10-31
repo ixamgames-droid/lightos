@@ -229,7 +229,6 @@ class VCSpeedDial(VCWidget):
                 f = self._effective_mult()
                 for fid in self._targets():
                     key = self._key_for(fid, "tempo_multiplier")
-                    effect_live.set_param(key, f, fid)
                     # Free-Run-Fallback: ein frei laufender Effekt (kein laufender
                     # Tempo-Bus, bpm 0) liest tempo_multiplier NICHT -> der Dial waere
                     # sonst ein stiller No-op. Beim Default-Parameter den Faktor
@@ -239,7 +238,25 @@ class VCSpeedDial(VCWidget):
                     # konfliktfrei. Einen eigenen per-Effekt-Parameter (Phase E) NICHT
                     # anfassen (bewusste Wahl des Nutzers).
                     if key == "tempo_multiplier":
-                        effect_live.set_param("speed", f, fid)
+                        # ENG-32: nicht den Rohfaktor als speed schreiben (das
+                        # verwirft die gebaute Free-Run-Geschwindigkeit, z. B.
+                        # 150/60 × ¼ aus ENG-31), sondern speed im selben
+                        # Verhaeltnis wie tempo_multiplier skalieren.
+                        old_mult = effect_live.get_param("tempo_multiplier", fid)
+                        old_speed = effect_live.get_param("speed", fid)
+                        try:
+                            old_mult = float(old_mult)
+                            old_speed = float(old_speed)
+                        except (TypeError, ValueError):
+                            old_mult = old_speed = 0.0
+                        effect_live.set_param(key, f, fid)
+                        if old_mult > 0.0 and old_speed > 0.0:
+                            new_mult = float(effect_live.get_param(key, fid) or f)
+                            effect_live.set_param("speed", old_speed * new_mult / old_mult, fid)
+                        else:
+                            effect_live.set_param("speed", f, fid)
+                        continue
+                    effect_live.set_param(key, f, fid)
             except Exception:
                 pass
             return
@@ -484,8 +501,20 @@ class VCSpeedDial(VCWidget):
         idx = max(0, min(len(facs) - 1, idx + int(direction)))
         self._set_factor(facs[idx])
 
+    def _reset_target(self) -> float:
+        """ENG-32: Ziel des Reset-„X": 1× nur, wenn das Gitter 1× anbietet; sonst
+        der Gitterwert, der 1× am naechsten liegt (logarithmisch) — bei einem
+        Gitter 1/8·1/4 also der Baufaktor 1/4 statt eines Werts ausserhalb."""
+        import math
+        facs = [f for f in (self.factor_buttons or DEFAULT_FACTORS) if f > 0]
+        if not facs:
+            return 1.0
+        if any(abs(f - 1.0) < 1e-9 for f in facs):
+            return 1.0
+        return min(facs, key=lambda f: abs(math.log(f)))
+
     def _reset_factor(self):
-        self._set_factor(1.0)
+        self._set_factor(self._reset_target())
 
     def _node_sync(self):
         """Downbeat des Ziel-Bus neu auf 'jetzt' setzen (Sub-Sync)."""
