@@ -388,6 +388,12 @@ class EnttecPro:
 
         Gibt ``(ser, exklusiv)`` zurueck; ``exklusiv`` ist False nur im
         geteilten Notfall-Pfad (ein anderer haelt den Port)."""
+        # STAB-39: ohne echte App (oder ausdrueckliche Freigabe) wird kein
+        # serieller Port geoeffnet — das Geraet bleibt "nicht verbunden".
+        from src.core.paths import echte_ausgabe_pruefen
+        if not echte_ausgabe_pruefen("Enttec"):
+            raise serial.SerialException(
+                f"{port}: STAB-39 - echte Ausgabe nur aus der App (main.py)")
         kw = dict(timeout=1, write_timeout=0.5)
         if os.name == "posix":
             try:

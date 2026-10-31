@@ -1,0 +1,64 @@
+{
+  "anleitung": "osc",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "b0cc8008",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py osc'.",
+  "bilder": [
+    {
+      "datei": "01_menue_osc.png",
+      "szene": "01_menue_osc",
+      "titel": "Menü Ausgabe → OSC-Server und OSC-Zuordnungen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "4fa1717ac85db166cefbb626a984c010"
+    },
+    {
+      "datei": "02_eingang.png",
+      "szene": "02_eingang",
+      "titel": "Reiter Eingang mit Beispiel-Zuordnungen (Muster, Funktion, Lernen)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "502d79f45818c0a254d6a4bb9aaf479f"
+    },
+    {
+      "datei": "03_rueckmeldung.png",
+      "szene": "03_rueckmeldung",
+      "titel": "Reiter Rückmeldung: Ziel 192.0.2.20:9000, Vorlage LightOS",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "0becc6dbb8ba54f13409967e2b0dbeef"
+    },
+    {
+      "datei": "04_lernen.gif",
+      "szene": "04_lernen",
+      "titel": "Lernen: Knopf → wartet → Adresse /Page1/Fader{n} eingetragen",
+      "groesse": [
+        943,
+        555
+      ],
+      "marken": [
+        [],
+        [],
+        []
+      ],
+      "md5": "471a72a1c1166b1166c1ca6dca663797",
+      "frames": 3,
+      "dauern_ms": [
+        1600,
+        1800,
+        3200
+      ]
+    }
+  ]
+}

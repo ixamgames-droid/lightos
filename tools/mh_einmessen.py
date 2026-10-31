@@ -58,9 +58,13 @@ WAS DIESES WERKZEUG AUS EINEM ABEND AM RIG GELERNT HAT (26.08.2026)
 
 Aufruf::
 
-    venv/bin/python tools/mh_einmessen.py --port /dev/ttyUSB0 --adressen 1,17
+    LIGHTOS_ECHTE_AUSGABE=1 venv/bin/python tools/mh_einmessen.py --port /dev/ttyUSB0 --adressen 1,17
     (Windows: venv/Scripts/python.exe, Linux/macOS: ./venv/bin/python)
+    set LIGHTOS_ECHTE_AUSGABE=1
     venv\\Scripts\\python.exe tools\\mh_einmessen.py --port COM3 --adressen 1,17
+
+``LIGHTOS_ECHTE_AUSGABE=1`` gibt den echten Port frei: ausserhalb der App
+oeffnet LightOS seit STAB-39 kein DMX-Interface von selbst.
 
 ``--port`` darf entfallen: die Vorgabe ist ``/dev/ttyUSB0`` bzw. auf Windows der
 erste tatsaechlich vorhandene COM-Port (s. ``standard_port``).
@@ -358,6 +362,9 @@ def main(argv=None) -> int:
         dev = EnttecPro(args.port)
     except Exception as e:                                   # noqa: BLE001
         print(f"ABBRUCH: {args.port} nicht zu oeffnen ({e})")
+        if os.environ.get("LIGHTOS_ECHTE_AUSGABE") != "1":
+            print("STAB-39: ausserhalb der App braucht der echte Port "
+                  "LIGHTOS_ECHTE_AUSGABE=1.")
         return 2
 
     adr = [int(x) for x in args.adressen.split(",")]

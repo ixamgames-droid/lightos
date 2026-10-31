@@ -398,6 +398,35 @@ die wuerden bei drei CI-Plattformen die Warteschlange fluten. Erkannt werden
   Segments: `pgrep -fa "python main.py"`. Und `app.sh restart` waehrend die
   andere Sitzung am Rig misst, ist ein Eingriff in fremde Arbeit — erst in
   `SESSIONS.md` nachsehen.
+* **Echte Daten und echte DMX-Ausgabe gibt es nur in der echten App**
+  (STAB-39, seit 31.10.2026). `main.py` setzt beim Start `LIGHTOS_ECHTE_APP=1`
+  (der DMX-Sendeprozess erbt es). Jedes andere Python, das `src` importiert —
+  Probeskript, `python -c`, Werkzeug ohne Sandbox — bekommt automatisch einen
+  **Wegwerf-Datenordner** und eine **stumme Ausgabe** (kein Enttec/uDMX, kein
+  Art-Net/sACN ins Netz), mit je einer Warnzeile `STAB-39` auf stderr. Bewusst
+  echt geht nur ausdruecklich und nur auf Ansage des Menschen:
+  `LIGHTOS_ECHTE_DATEN=1` (echter Datenordner) bzw. `LIGHTOS_ECHTE_AUSGABE=1`
+  (echte Ausgabe, z. B. `tools/hw5_longrun.py`, `tools/mh_einmessen.py` am
+  Rig). `LIGHTOS_DATEN_ORDNER=<pfad>` gibt den Wegwerf-Ordner vor. Installer
+  und Bestands-Werkzeuge (`install.py`, `uninstall.py`,
+  `tools/collect_crash_report.py`, die Bibliotheks-Werkzeuge) geben sich die
+  Datenfreigabe selbst, aber nur als Skript gestartet. Sandkaesten, die den
+  Datenordner selbst umlenken (`tests/conftest.py`, `tools/_werkzeug_sandbox.py`,
+  `tools/anleitungsbilder/sandbox.py`), setzen `LIGHTOS_SANDKASTEN=1`; das
+  gilt nur, wenn der Ordner dann wirklich im Temp-Bereich liegt. Wer ein
+  Verhalten „ausserhalb von pytest" zeigen will, schreibt einen Test mit
+  Kindprozess und tmp-`HOME` — nie ein Skript gegen das echte Home.
+  **`LIGHTOS_ECHTE_APP` nie von Hand setzen oder exportieren:** es ist die
+  Generalfreigabe fuer Daten und Ausgabe zugleich und gehoert allein `main.py`.
+  In einer Claude-Code-Shell (`CLAUDECODE=1`) setzt auch `main.py` sie nicht —
+  eine von einem Agenten gestartete App laeuft mit Wegwerf-Daten und stummer
+  Ausgabe. Auch eine in der Shell exportierte `LIGHTOS_ECHTE_AUSGABE=1` gilt
+  fuer alles, was danach startet: nur vor den einzelnen Befehl schreiben.
+  Das gilt auch fuer `bin/app.sh` bzw. `tools/app.sh` aus einer Claude-Sitzung:
+  die gestartete App ist ein **Probelauf** (Wegwerf-Daten, beim Beenden
+  geloescht, keine DMX-Ausgabe; der Fenstertitel sagt „PROBELAUF"), `app.sh`
+  gibt ihr nur die vorhandene Lizenzdatei des Rechners lesend mit — fuer eine
+  UI-Verifikation reicht das, fuer Arbeit am echten Bestand oder am Rig nicht.
 * **`BACKLOG.md` fasst im normalen PR niemand mehr an** (PROC-20): Neues und
   Statusaenderungen als Fragment `backlog.d/<ID>.md`, eingesammelt von `A`. Wer
   die Datei doch direkt aendert (Uebergang, bewusste Korrektur), haelt die

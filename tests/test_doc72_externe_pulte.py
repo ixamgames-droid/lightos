@@ -396,7 +396,8 @@ class Doc72ExternePulteTest(unittest.TestCase):
 
     def test_eingebundene_bilder_existieren(self):
         bilder = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", self.text)
-        self.assertEqual(len(bilder), 2, bilder)
+        # DOC-76: + 01_fernsteuerung.png (Kasten Fernsteuerung im DMX-Eingang)
+        self.assertEqual(len(bilder), 3, bilder)
         basis = os.path.join(REPO, *REL[:-1])
         for b in bilder:
             with self.subTest(b):

@@ -74,7 +74,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Callable, Iterable
 
-from .paths import USER_DATA_FILES, app_data_dir, programm_dir
+from .paths import USER_DATA_FILES, app_data_dir, echte_daten_erlaubt, programm_dir
 
 MARKER_NAME = "datenumzug_xplat44.json"
 #: Sperrdatei im App-Ordner (zwischen Prozessen, s. ``_sperre``).
@@ -581,6 +581,13 @@ def uebernehme_alte_daten(
     erg = Ergebnis()
     if os.environ.get(ENV_AUS):
         erg.uebersprungen = f"{ENV_AUS} gesetzt"
+        return erg
+    if ziel_dir is None and not echte_daten_erlaubt():
+        # STAB-39 (Gegenpruefung 31.10.): ohne echte App/Freigabe ist das Ziel
+        # ein Wegwerf-Ordner — dorthin alte ECHTE data/-Dateien aus Programm-
+        # ordner und Arbeitsverzeichnis zu kopieren, zeigte einem Probeskript
+        # eine echte Show (etwa in Bildern fuer das oeffentliche Repo).
+        erg.uebersprungen = "STAB-39: kein App-Start (Wegwerf-Datenordner)"
         return erg
     ziel_dir = ziel_dir or app_data_dir()
     namen = list(dateien) if dateien is not None else list(USER_DATA_FILES)

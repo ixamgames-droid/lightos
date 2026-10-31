@@ -28,6 +28,38 @@ _ANLEGE_SERIENNR: contextvars.ContextVar = contextvars.ContextVar(
 ENTTEC_FREMDE_NACHFUEHREN_S = 1.0
 
 
+def _ausgabe_erlaubt(was: str) -> bool:
+    """STAB-39: echte Ausgabe nur fuer die echte App (``src/core/paths.py``)."""
+    from src.core.paths import echte_ausgabe_pruefen
+    return echte_ausgabe_pruefen(was)
+
+
+class GesperrteAusgabe:
+    """STAB-39: Platzhalter fuer einen Hardware-Ausgang (Enttec/uDMX) in einem
+    Prozess, der nicht die echte App ist. Oeffnet nichts, startet keinen
+    Sendeprozess, verwirft jedes Bild und meldet sich als nicht verbunden —
+    der Manager behandelt ihn wie einen abgezogenen Adapter."""
+
+    gesperrt = True
+    seriennr = None
+
+    def __init__(self, port: str):
+        self.port = port
+        self.konfig_port = port
+
+    def send_dmx(self, *_a, **_k) -> None:
+        return None
+
+    def is_connected(self) -> bool:
+        return False
+
+    def grund_kurz(self) -> str:
+        return "STAB-39: echte Ausgabe nur aus der App (main.py)"
+
+    def close(self) -> None:
+        return None
+
+
 def _make_enttec_device(port: str):
     """Erzeugt das Enttec-Ausgabegeraet.
 
@@ -57,6 +89,8 @@ def _make_enttec_device(port: str):
     seriennr = _ANLEGE_SERIENNR.get()
     if seriennr:
         kw["seriennr"] = seriennr
+    if not _ausgabe_erlaubt("Enttec"):
+        return GesperrteAusgabe(port)        # STAB-39: kein Prozess, kein Port
     if os.environ.get("LIGHTOS_SERIAL_INPROC"):
         return EnttecPro(port, **kw)
     try:
@@ -84,6 +118,8 @@ def _make_udmx_device(schluessel: str, streng: bool = False):
 
     ``streng``: es gibt schon einen anderen uDMX-Ausgang — der Sender nimmt
     dann von Anfang an nur genau seinen Adapter (``udmx.waehle``)."""
+    if not _ausgabe_erlaubt("uDMX"):
+        return GesperrteAusgabe(schluessel)  # STAB-39: kein Prozess, kein USB
     from .udmx_process import UdmxProcessProxy, UdmxThreadProxy
     if os.environ.get("LIGHTOS_SERIAL_INPROC"):
         return UdmxThreadProxy(schluessel, streng=streng)

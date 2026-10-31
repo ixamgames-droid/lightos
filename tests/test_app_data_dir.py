@@ -12,7 +12,15 @@ import pytest
 from src.core import paths
 
 
+def _freigeben(monkeypatch):
+    # STAB-39: hier wird nur die Pfad-AUFLOESUNG geprueft (nichts angelegt).
+    # Die Fantasiepfade liegen nicht im Temp-Bereich, also gilt
+    # LIGHTOS_SANDKASTEN dafuer nicht -> ausdruecklich freigeben.
+    monkeypatch.setenv("LIGHTOS_ECHTE_DATEN", "1")
+
+
 def _call(monkeypatch, plat, env):
+    _freigeben(monkeypatch)
     monkeypatch.setattr(paths.sys, "platform", plat)
     for k in ("APPDATA", "XDG_DATA_HOME"):
         monkeypatch.delenv(k, raising=False)
@@ -30,6 +38,7 @@ def test_windows_uses_appdata(monkeypatch):
 
 def test_windows_byte_identical_to_old_pattern(monkeypatch):
     # Das alte Muster war ueberall os.path.join(os.environ.get("APPDATA", ~), "LightOS").
+    _freigeben(monkeypatch)
     monkeypatch.setattr(paths.sys, "platform", "win32")
     monkeypatch.setenv("APPDATA", r"C:\Users\X\AppData\Roaming")
     old = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "LightOS")

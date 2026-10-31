@@ -1,7 +1,7 @@
 {
   "anleitung": "vc",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "161a0039",
+  "stand": "b0cc8008",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc'.",
@@ -104,6 +104,17 @@
       ],
       "marken": [],
       "md5": "9af4baeb3347feb00c67cd217c1ab2c3"
+    },
+    {
+      "datei": "10_kiosk_streifen.png",
+      "szene": "10_kiosk_streifen",
+      "titel": "Kiosk: Streifen GM, STOP ALL, BLACKOUT, LASER NOT-AUS und roter NOT-AUS-Balken",
+      "groesse": [
+        1200,
+        154
+      ],
+      "marken": [],
+      "md5": "6af060815d3dd664ed3d62aed7ba315b"
     }
   ]
 }

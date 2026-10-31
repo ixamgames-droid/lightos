@@ -30,7 +30,7 @@ import json
 import os
 from contextlib import contextmanager
 
-from anleitungsbilder.runner import Szene, SzenenFehler
+from anleitungsbilder.runner import Frame, Szene, SzenenFehler
 from anleitungsbilder.szenen_erste_schritte import (
     bild, feld, knopf, menue_eintraege, menue_oeffnen, platz_oben, rechteck,
     reiter_rechteck,
@@ -529,6 +529,148 @@ def _bild_testsignal(ui):
     ], titel=dlg.windowTitle())
 
 
+# ── DOC-76: Assistent ohne Geraet, Testsignal als Ablauf ────────────────────
+
+def schmal(bezug, w):
+    from anleitungsbilder.szenen_osc import schmal as _schmal
+    return _schmal(bezug, w)
+
+
+def _bild_assistent_leer(ui):
+    """Assistent mit leerem Suchergebnis (``befunde=[]``: es wird NICHT
+    gesucht, kein USB-Geraet und kein Port wird angefasst)."""
+    from src.ui.widgets.interface_assistent import InterfaceAssistent
+    dlg = InterfaceAssistent(ui.win, befunde=[], state=ui.state,
+                             netzkarten=[dict(n) for n in BEISPIEL_NICS])
+    dlg.resize(820, 640)
+    dlg.tabs.setCurrentIndex(0)
+    dlg.show()
+    ui.pump(0.3)
+    if dlg.lbl_usb_stand.text() != "Nichts gefunden":
+        raise SzenenFehler(f"Assistent meldet {dlg.lbl_usb_stand.text()!r}")
+    leer = dlg._lbl_leer
+    if leer is None or not leer.text().startswith("Kein DMX-Interface"):
+        raise SzenenFehler("Erklärung für „Nichts gefunden“ fehlt")
+    return bild(ui, dlg, [
+        (schmal(dlg, dlg.lbl_usb_stand), 1, "rechts"),
+        (rechteck(dlg, leer), 2, "unten"),
+        (rechteck(dlg, dlg.btn_suchen), 3, "links"),
+    ], titel=dlg.windowTitle())
+
+
+def _ohne_sendethread(ui):
+    """Sicherheitsnetz fuers Testsignal: der Ausgabe-Thread muss in der Sandbox
+    aus sein — das Testsignal schreibt dann nur in den Universums-Puffer, es
+    geht kein Paket hinaus."""
+    if getattr(ui.state.output_manager, "_running", False):
+        raise SzenenFehler("Ausgabe-Thread laeuft in der Sandbox — Testsignal-Szene abgebrochen")
+
+
+def _zeilen(dlg):
+    zeilen = {z["universum"]: z for z in dlg.test_zeilen}
+    if sorted(zeilen) != [1, 2]:
+        raise SzenenFehler(f"unerwartete Ausgaenge im Testsignal-Reiter: {sorted(zeilen)}")
+    return zeilen
+
+
+def _mit_rueckfrage(ui, dlg):
+    """„Testsignal senden" fuer Universum 1 klicken; die Rueckfrage im modalen
+    Loop aufnehmen und mit **Abbrechen** schliessen (es startet nichts).
+    Liefert ein Bild-Widget: Assistent mit der Rueckfrage darueber."""
+    from PySide6.QtCore import QPoint, QRect, QTimer
+    from PySide6.QtGui import QPainter, QPixmap
+    from PySide6.QtWidgets import QApplication, QLabel, QMessageBox
+    from anleitungsbilder.szenen_erste_schritte import _titelleiste_malen
+    ergebnis = {}
+
+    def _aufnehmen():
+        box = QApplication.activeModalWidget()
+        if not isinstance(box, QMessageBox):
+            ergebnis["fehler"] = "Rückfrage zum Testsignal ging nicht auf"
+            return
+        try:
+            box.adjustSize()
+            ui.pump(0.3)
+            nein = knopf(box, "Abbrechen")
+            if box.defaultButton() is not nein:
+                ergebnis["fehler"] = "Vorgabe der Rückfrage ist nicht „Abbrechen“"
+                return
+            ergebnis["box"] = box.grab()
+            ergebnis["titel"] = box.windowTitle()
+            ergebnis["nein"] = rechteck(box, nein)
+            ergebnis["ja"] = rechteck(box, knopf(box, "Testsignal senden"))
+        finally:
+            knopf(box, "Abbrechen").click()     # nichts wird gesendet
+
+    QTimer.singleShot(400, _aufnehmen)
+    antwort = dlg.testsignal_senden(1)
+    if "fehler" in ergebnis:
+        raise SzenenFehler(ergebnis["fehler"])
+    if antwort != "abgebrochen" or dlg._laeufe:
+        raise SzenenFehler(f"Rückfrage nicht abgebrochen ({antwort!r})")
+    ui.pump(0.2)
+    grund = dlg.grab()
+    kasten = ergebnis["box"]
+    kopf = 28
+    x = (grund.width() - kasten.width()) // 2
+    y = max(kopf + 4, (grund.height() - kasten.height() - kopf) // 2 + kopf)
+    pix = QPixmap(grund)
+    p = QPainter(pix)
+    _titelleiste_malen(p, x, y - kopf, kasten.width(), ergebnis["titel"])
+    p.drawPixmap(x, y, kasten)
+    from PySide6.QtGui import QColor
+    p.setPen(QColor("#59636e"))
+    p.drawRect(QRect(x - 1, y - kopf - 1, kasten.width() + 1, kasten.height() + kopf + 1))
+    p.end()
+    flaeche = QLabel()
+    flaeche.setFixedSize(pix.size())
+    flaeche.setPixmap(pix)
+    versatz = QPoint(x, y)
+    return flaeche, [ergebnis["nein"].translated(versatz),
+                     ergebnis["ja"].translated(versatz)], dlg.windowTitle()
+
+
+def _test_frame(schritt: int):
+    """0: Reiter Testsignal · 1: Rueckfrage (Vorgabe Abbrechen) · 2: laeuft,
+    Knopf heisst Stopp · 3: gestoppt."""
+    def _f(ui):
+        from unittest import mock
+        _ohne_sendethread(ui)
+        dlg = _assistent(ui, 2)
+        z = _zeilen(dlg)
+        laeuft, gesperrt = z[1], z[2]
+        if not gesperrt["gesperrt"]:
+            raise SzenenFehler("Laser-Ausgang ist nicht gesperrt")
+        if schritt == 0:
+            return bild(ui, dlg, [
+                (rechteck(dlg, laeuft["knopf"]), 1, "links"),
+                (rechteck(dlg, gesperrt["stand"]), 2, "unten"),
+            ], titel=dlg.windowTitle())
+        if schritt == 1:
+            flaeche, (nein, ja), titel = _mit_rueckfrage(ui, dlg)
+            return bild(ui, flaeche, [(nein, 3, "unten"), (ja, 4, "unten")],
+                        titel=titel)
+        with mock.patch.object(dlg, "_frage", lambda text, ja: True):
+            if dlg.testsignal_senden(1):
+                raise SzenenFehler("Testsignal startet nicht")
+        ui.pump(0.3)
+        if schritt == 2:
+            if laeuft["knopf"].text() != "Stopp":
+                raise SzenenFehler("Knopf heisst waehrend des Laufs nicht „Stopp“")
+            return bild(ui, dlg, [
+                (rechteck(dlg, laeuft["knopf"]), 5, "links"),
+                (schmal(dlg, laeuft["stand"]), 6, "rechts"),
+            ], titel=dlg.windowTitle())
+        dlg.testsignal_stoppen(1)
+        ui.pump(0.2)
+        if dlg._laeufe or not laeuft["stand"].text().startswith("Gestoppt"):
+            raise SzenenFehler("Testsignal nicht gestoppt")
+        return bild(ui, dlg, [
+            (schmal(dlg, laeuft["stand"]), 7, "rechts"),
+        ], titel=dlg.windowTitle())
+    return _f
+
+
 SZENEN = [
     Szene("01_menue_ausgabe", sektion="Programmer", unterreiter="Attribute",
           dialog=_bild_menue, titel="Menü Ausgabe → Konfigurieren…"),
@@ -557,4 +699,16 @@ SZENEN = [
     Szene("11_testsignal", sektion="Programmer", vorher=_test_vorher,
           dialog=_bild_testsignal, nachher=_test_nachher,
           titel="Assistent: Testsignal läuft (Stopp), Laser-Ausgang gesperrt"),
+    Szene("12_assistent_nichts_gefunden", sektion="Programmer",
+          dialog=_bild_assistent_leer,
+          titel="Assistent ohne angeschlossenes Interface: „Nichts gefunden“ + Erklärung"),
+    Szene("13_testsignal_ablauf", sektion="Programmer", vorher=_test_vorher,
+          nachher=_test_nachher,
+          titel="Testsignal: senden → Rückfrage (Vorgabe Abbrechen) → läuft (Stopp) → "
+                "gestoppt; Laser-Ausgang gesperrt",
+          frames=[Frame(dauer_s=2.0, dialog=_test_frame(0)),
+                  Frame(dauer_s=3.0, dialog=_test_frame(1)),
+                  Frame(dauer_s=2.0, dialog=_test_frame(2)),
+                  Frame(dauer_s=2.2, dialog=_test_frame(3))],
+          gif_zuschnitt=(388, 98, 824, 690)),
 ]

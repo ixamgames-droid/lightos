@@ -200,3 +200,100 @@ class AppShStopTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipUnless(_LAEUFT_HIER, _GRUND)
+class AppShProbelaufLizenzTest(unittest.TestCase):
+    """STAB-39: ``app.sh start`` aus einer Claude-Code-Shell (``CLAUDECODE=1``)
+    startet einen Probelauf mit Wegwerf-Datenordner. Ohne Lizenz haengt die App
+    im Dialog „LightOS — Testlizenz erforderlich“, und ``wait``/``shot`` bekamen
+    den Dialog. ``app.sh`` gibt darum die vorhandene Lizenzdatei des Rechners
+    NUR LESEND per ``LIGHTOS_LIZENZ`` mit (wie ``tools/app_messung.py``).
+
+    Attrappe statt App: ``start.sh`` schreibt die geerbte ``LIGHTOS_LIZENZ``
+    in eine Datei und startet ein schlafendes ``venv/bin/python main.py``; die
+    Fundlogik kommt aus der ECHTEN ``src/core/paths.py`` (kopiert)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="lightos-appliz-"))
+        self.repo = self.tmp / "repo"
+        (self.repo / "tools").mkdir(parents=True)
+        (self.repo / "venv" / "bin").mkdir(parents=True)
+        (self.repo / "src" / "core").mkdir(parents=True)
+        (self.tmp / "logs").mkdir()
+        shutil.copy(APP_SH, self.repo / "tools" / "app.sh")
+        shutil.copy(ROOT / "src" / "core" / "paths.py",
+                    self.repo / "src" / "core" / "paths.py")
+        for init in ("src/__init__.py", "src/core/__init__.py"):
+            (self.repo / init).write_text("", encoding="utf-8")
+        os.symlink(sys.executable, self.repo / "venv" / "bin" / "python")
+        (self.repo / "main.py").write_text("import time\ntime.sleep(300)\n",
+                                           encoding="utf-8")
+        start = self.repo / "start.sh"
+        start.write_text(
+            "#!/usr/bin/env bash\ncd \"$(dirname \"$0\")\"\n"
+            "printf '%s' \"${LIGHTOS_LIZENZ:-}\" > lizenz_env.txt\n"
+            "exec venv/bin/python main.py\n", encoding="utf-8")
+        os.chmod(start, 0o755)
+        self.run_dir = self.tmp / "run"
+        self.run_dir.mkdir()
+        self.daten = self.tmp / "xdg" / "LightOS"
+        self.daten.mkdir(parents=True)
+
+    def tearDown(self):
+        self._app("stop")
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _app(self, befehl: str, **zusatz):
+        umg = {k: v for k, v in os.environ.items()
+               if k not in ("CLAUDECODE", "LIGHTOS_LIZENZ")}
+        umg.update(XDG_RUNTIME_DIR=str(self.run_dir), HOME=str(self.tmp / "home"),
+                   XDG_DATA_HOME=str(self.tmp / "xdg"))
+        umg.update(zusatz)
+        # Ausgabe in eine DATEI, nicht in eine Pipe: der Hintergrund-Zweig von
+        # ``cmd_start`` erbt stdout/stderr des Skripts und haelt eine Pipe offen,
+        # solange die App laeuft — ``capture_output`` wartete bis zum Timeout.
+        aus = self.tmp / f"ausgabe_{befehl}.txt"
+        with open(aus, "w", encoding="utf-8") as fh:
+            r = subprocess.run(["bash", str(self.repo / "tools" / "app.sh"), befehl],
+                               stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT,
+                               env=umg, timeout=90)
+        r.stdout, r.stderr = aus.read_text(encoding="utf-8", errors="replace"), ""
+        return r
+
+    def _geerbte_lizenz(self, **zusatz) -> tuple[str, str]:
+        e = self._app("start", **zusatz)
+        self.assertEqual(e.returncode, 0, e.stdout + e.stderr)
+        datei = self.repo / "lizenz_env.txt"
+        for _ in range(100):
+            if datei.exists():
+                break
+            time.sleep(0.05)
+        return datei.read_text(encoding="utf-8"), e.stdout + e.stderr
+
+    def test_claude_shell_bekommt_die_vorhandene_lizenz_nur_lesend(self):
+        lizenz = self.daten / "lightos-lizenz.lic"
+        lizenz.write_text("LIZENZ", encoding="utf-8")
+        vorher = lizenz.stat().st_mtime_ns
+        wert, ausgabe = self._geerbte_lizenz(CLAUDECODE="1")
+        self.assertEqual(wert, str(lizenz))
+        self.assertIn("Probelauf", ausgabe)
+        self.assertIn("keine Ausgabe", ausgabe)
+        self.assertEqual(lizenz.read_text(encoding="utf-8"), "LIZENZ")
+        self.assertEqual(lizenz.stat().st_mtime_ns, vorher)
+
+    def test_ohne_claude_shell_bleibt_alles_wie_es_war(self):
+        (self.daten / "lightos-lizenz.lic").write_text("LIZENZ", encoding="utf-8")
+        wert, ausgabe = self._geerbte_lizenz()
+        self.assertEqual(wert, "")
+        self.assertNotIn("Probelauf", ausgabe)
+
+    def test_ohne_lizenzdatei_kein_erfundener_pfad_aber_ein_hinweis(self):
+        wert, ausgabe = self._geerbte_lizenz(CLAUDECODE="1")
+        self.assertEqual(wert, "")
+        self.assertIn("keine Lizenzdatei", ausgabe)
+
+    def test_gesetzte_lizenz_gewinnt(self):
+        (self.daten / "lightos-lizenz.lic").write_text("LIZENZ", encoding="utf-8")
+        wert, _ = self._geerbte_lizenz(CLAUDECODE="1", LIGHTOS_LIZENZ="/vorgabe.lic")
+        self.assertEqual(wert, "/vorgabe.lic")
