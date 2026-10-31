@@ -17,10 +17,9 @@ VC- und Playback-Bilder entstehen offscreen::
 
 ★ Zeit laeuft hier SIMULIERT (wie bei den Buehnen-Show-Bildern): Jeder
 Schritt rechnet feste DMX-Frames mit dem echten ``OutputManager._send_all``.
-Cue-Listen messen ihre Fades aber mit der Wanduhr (``time.monotonic``) und
-stellen Follow-Cues mit ``threading.Timer`` — beides ersetzt :class:`SimUhr`
-in ``cue_stack`` durch die simulierte Show-Zeit, und die Beats der globalen
-BPM kommen ebenfalls aus ihr. Ein GIF-Frame mit 0,2 s zeigt so genau 0,2 s
+Cue-Fades, Follow-Cues und die Effekt-Vorschau lesen die gemeinsame Show-Zeit
+(``src.core.engine.show_zeit``, ENG-33) — :func:`sim_einbauen` setzt dort
+:class:`SimUhr` ein, und die Beats der globalen BPM kommen ebenfalls aus ihr. Ein GIF-Frame mit 0,2 s zeigt so genau 0,2 s
 Show, egal wie lange die Aufnahme dauert.
 
 Darstellung wie in den Demo-Videos: Modus „Ansehen", Seitenleiste zu,
@@ -31,8 +30,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import threading
-import time as _time
 
 from anleitungsbilder.runner import Frame, Szene, SzenenFehler
 
@@ -55,55 +52,27 @@ class SimUhr:
 
     def __init__(self):
         self.t = 1000.0
-        self.timer: list = []
         self._beat_pos = None
         self.beat = None            # Original-``_emit_beat`` der BPM-Instanz
 
-    def monotonic(self):
+    def __call__(self):
         return self.t
-
-    def __getattr__(self, name):    # alles andere wie das echte ``time``
-        return getattr(_time, name)
-
-    def faellige(self):
-        for eintrag in sorted([e for e in self.timer if e[0] <= self.t], key=lambda e: e[0]):
-            if eintrag in self.timer:
-                self.timer.remove(eintrag)
-                if not eintrag[2].abgebrochen:
-                    eintrag[1]()
 
 
 _UHR = SimUhr()
 
 
-class _SimTimer:
-    """Ersatz fuer ``threading.Timer`` in ``cue_stack`` (Follow-Cues)."""
-
-    def __init__(self, intervall, fn, *a, **kw):
-        self.intervall, self.fn, self.abgebrochen, self.daemon = float(intervall), fn, False, True
-
-    def start(self):
-        _UHR.timer.append([_UHR.t + self.intervall, self.fn, self])
-
-    def cancel(self):
-        self.abgebrochen = True
-
-
-class _SimThreading:
-    Timer = _SimTimer
-
-    def __getattr__(self, name):
-        return getattr(threading, name)
-
-
 def sim_einbauen():
-    """Cue-Listen und Beats auf die simulierte Zeit umstellen (einmal je Prozess)."""
-    from src.core.engine import cue_stack
+    """Show-Zeit und Beats auf die simulierte Zeit umstellen (einmal je Prozess).
+
+    ENG-33: Fades und Follows haengen an ``show_zeit.jetzt()`` — die Follows
+    werden im Render-Takt (``CueStack.tick``) faellig, ein Timer-Ersatz ist
+    nicht mehr noetig."""
+    from src.core.engine import show_zeit
     from src.core.engine.bpm_manager import get_bpm_manager
-    if cue_stack.time is _UHR:
+    if show_zeit.aktuelle_uhr() is _UHR:
         return
-    cue_stack.time = _UHR
-    cue_stack.threading = _SimThreading()
+    show_zeit.setze_uhr(_UHR)
     bm = get_bpm_manager()
     _UHR.beat = type(bm)._emit_beat.__get__(bm)
     bm._emit_beat = lambda: None        # der Wanduhr-Takt-Thread schweigt
@@ -137,7 +106,6 @@ def ticks(ui, n: int):
             t.clear()
         for _ in range(max(1, int(n))):
             _UHR.t += _TAKT
-            _UHR.faellige()
             om._send_all()
             _beats_pruefen()
     finally:
@@ -252,7 +220,7 @@ def cue_springen(ui, titel, nummer):
     stack = w._executor().stack
     stack.go_to(float(nummer))
     if stack._fade is not None:
-        stack._fade.start_time -= 1000.0
+        stack._fade.start_time -= 1000.0   # simulierte Show-Zeit (SimUhr)
     stack._cancel_follow()
     w._refresh()
 
@@ -270,7 +238,6 @@ def alles_aus(ui):
     if getattr(om, "_blackout", False):
         taste(ui, "BLACKOUT")._trigger(False)
     om.set_grand_master(1.0)
-    _UHR.timer.clear()
     ticks(ui, 3)
 
 

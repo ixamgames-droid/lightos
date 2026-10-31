@@ -2,13 +2,15 @@
 from __future__ import annotations
 import math
 import threading
-import time
 from typing import Callable, Optional
 from .cue import Cue
 from .fade_curve import eval_named
+from . import show_zeit
 from ..debug_log import debug_swallow
 
 TICK = 0.02  # 50 Hz Fade-Update
+#: ENG-33: so viele faellige Follow-Schritte holt ein Tick hoechstens nach.
+FOLLOW_NACHHOLEN_MAX = 256
 
 
 def fade_uhr() -> float:
@@ -28,8 +30,12 @@ def fade_uhr() -> float:
     verschiedene Nullpunkte). Von aussen kommen nur Dauern hinein
     (``shift_clock``), und die sind uhrunabhaengig. Tests ersetzen diese
     Funktion gezielt, statt ``time.monotonic`` prozessweit zu verbiegen.
+
+    ENG-33: liest die gemeinsame Show-Zeit (``show_zeit.jetzt``). Deren
+    Standard ist weiter ``perf_counter`` — in der App unveraendert; Aufnahmen
+    und Tests setzen eine manuelle Uhr ein und sehen Fades Bild fuer Bild.
     """
-    return time.perf_counter()
+    return show_zeit.jetzt()
 
 
 class FadeState:
@@ -37,7 +43,8 @@ class FadeState:
 
     def __init__(self, from_vals: dict, to_vals: dict,
                  duration: float, delay: float, curve: str = "scurve",
-                 attr_delays: dict | None = None):
+                 attr_delays: dict | None = None,
+                 start_time: float | None = None):
         self.from_vals = from_vals    # {fid: {attr: int}}
         self.to_vals = to_vals
         self.duration = max(duration, 0.001)
@@ -46,7 +53,10 @@ class FadeState:
         # F-6: optionale Pro-Attribut-Verzögerung {fid: {attr: extra_delay_s}};
         # leer = ein gemeinsamer Fortschritt für die ganze Cue (bisheriges Verhalten).
         self.attr_delays = attr_delays or {}
-        self.start_time = fade_uhr()      # QA-89: nicht monotonic (Windows-Raster)
+        # QA-89: nicht monotonic (Windows-Raster). ENG-33: ein Follow-GO gibt
+        # seinen Faelligkeitszeitpunkt mit, damit der Folge-Fade nicht um das
+        # Frame-Raster spaeter beginnt (Follow-Ketten driften sonst).
+        self.start_time = fade_uhr() if start_time is None else float(start_time)
         self.done = False
         # Manueller Crossfade: wenn aktiv, treibt manual_pos (0..1) den Uebergang
         # statt der verstrichenen Zeit (Fader scrubbt von Hand).
@@ -191,7 +201,17 @@ class CueStack:
         self._manual_target_cue: "Cue | None" = None
         self._manual_dir: int = 1
         self._lock = threading.Lock()
-        self._follow_timer: threading.Timer | None = None
+        # ENG-33: Follow-Cue = Faelligkeit auf der Show-Uhr (``fade_uhr``), im
+        # Render-Takt (``tick``) geprueft — statt eines Timer-Threads. Grund:
+        # (1) Bild-fuer-Bild-Render und Tests mit manueller Uhr sehen Follows;
+        # (2) Licht macht ohnehin nur eine getickte Liste (Executor, s.
+        #     cueliste_ziel.py) — der Follow laeuft jetzt im selben Takt wie
+        #     ihr Fade, statt in einem fremden Thread;
+        # (3) Freeze haelt den Follow mit an (kein Tick), ``shift_clock``
+        #     schiebt die Faelligkeit — vorher feuerte der Timer mitten im Freeze.
+        # Genauigkeit: der Folge-Fade startet rueckdatiert auf die Faelligkeit,
+        # das Frame-Raster (22,7 ms) geht also nicht in den Fade ein.
+        self._follow_faellig: float | None = None
         self._on_cue_change: list = []        # callbacks(idx, cue)
         self._on_output_change: list = []     # callbacks(output_dict)
         # F-16: Sequence-in-Sequence. _resolve_sub(idx)->CueStack|None wird von
@@ -220,30 +240,34 @@ class CueStack:
 
     def go(self):
         with self._lock:
-            self._cancel_follow()
-            if not self.cues:
-                return
-            n = len(self.cues)
-            if self._current_idx < 0:
+            self._go_locked()
+
+    def _go_locked(self, start_time: float | None = None):
+        """GO-Logik; Aufrufer haelt ``_lock``. ``start_time``: Follow-GO (ENG-33)."""
+        self._cancel_follow()
+        if not self.cues:
+            return
+        n = len(self.cues)
+        if self._current_idx < 0:
+            self._dir = 1
+            self._fade_to(0, start_time=start_time)            # erster GO -> Cue 1
+            return
+        if self.mode in ("bounce", "pingpong") and n >= 2:
+            next_idx = self._current_idx + self._dir
+            if next_idx >= n:           # am Ende umkehren (ohne Endpunkt-Wiederholung)
+                self._dir = -1
+                next_idx = self._current_idx - 1
+            elif next_idx < 0:          # am Anfang umkehren
                 self._dir = 1
-                self._fade_to(0)            # erster GO -> Cue 1
-                return
-            if self.mode in ("bounce", "pingpong") and n >= 2:
-                next_idx = self._current_idx + self._dir
-                if next_idx >= n:           # am Ende umkehren (ohne Endpunkt-Wiederholung)
-                    self._dir = -1
-                    next_idx = self._current_idx - 1
-                elif next_idx < 0:          # am Anfang umkehren
-                    self._dir = 1
-                    next_idx = self._current_idx + 1
-            else:                            # single / loop
                 next_idx = self._current_idx + 1
-                if next_idx >= n:
-                    if self.mode == "loop":
-                        next_idx = 0
-                    else:
-                        return               # single: am Ende stehen bleiben
-            self._fade_to(next_idx)
+        else:                            # single / loop
+            next_idx = self._current_idx + 1
+            if next_idx >= n:
+                if self.mode == "loop":
+                    next_idx = 0
+                else:
+                    return               # single: am Ende stehen bleiben
+        self._fade_to(next_idx, start_time=start_time)
 
     def back(self):
         with self._lock:
@@ -370,7 +394,7 @@ class CueStack:
                     debug_swallow("cue_stack.cue_cb", e)
         return committed
 
-    def shift_clock(self, seconds: float) -> None:
+    def shift_clock(self, seconds: float, _gesehen: set | None = None) -> None:
         """Laufenden Cue-Fade um ``seconds`` weiterschieben (Freeze-Auftauen).
 
         ``FadeState`` misst seinen Fortschritt gegen ``fade_uhr()`` (QA-89;
@@ -380,13 +404,28 @@ class CueStack:
         Ein von Hand gescrubbter Fade (``manual``) haengt an der Faderposition,
         nicht an der Zeit — der bleibt unangetastet. Verschachtelte Stacks
         (``_active_sub``) werden mitgenommen.
+
+        ENG-33: ``_gesehen`` (Menge von ``id``) sorgt dafuer, dass jede Liste
+        nur EINMAL geschoben wird — auch wenn sie auf zwei Executoren liegt
+        oder zugleich Unter-Cueliste ist (und bricht Sub-Zyklen ab). Fade und
+        Follow-Faelligkeit werden unter dem Lock geschoben: der Ausgabe-Thread
+        kann die Faelligkeit im ``tick`` gleichzeitig verbrauchen.
         """
-        fade = getattr(self, "_fade", None)
-        if fade is not None and not getattr(fade, "manual", False):
-            fade.start_time += float(seconds)
-        sub = getattr(self, "_active_sub", None)
+        if _gesehen is None:
+            _gesehen = set()
+        if id(self) in _gesehen:
+            return
+        _gesehen.add(id(self))
+        with self._lock:
+            fade = getattr(self, "_fade", None)
+            if fade is not None and not getattr(fade, "manual", False):
+                fade.start_time += float(seconds)
+            # ENG-33: die Follow-Faelligkeit laeuft auf derselben Uhr mit.
+            if self._follow_faellig is not None:
+                self._follow_faellig += float(seconds)
+            sub = getattr(self, "_active_sub", None)
         if sub is not None:
-            sub.shift_clock(seconds)
+            sub.shift_clock(seconds, _gesehen)
 
     def stop(self):
         sub = None
@@ -527,6 +566,10 @@ class CueStack:
         try:
             old_sub = None
             with self._lock:
+                # ENG-33: faelliger Follow — VOR dem Fade-Schritt, damit derselbe
+                # Tick schon den (rueckdatierten) Folge-Fade ausgibt.
+                if self._follow_faellig is not None:
+                    self._follow_nachholen(fade_uhr())
                 # WICHTIG: VOR dem Abräumen merken — sonst unterbleibt auf dem
                 # Abschluss-Tick eines Fades der finale Emit/Return (alter Kontrakt:
                 # der Tick, der den Fade beendet, liefert noch die Zielwerte).
@@ -581,7 +624,11 @@ class CueStack:
 
     # ── Internes ──────────────────────────────────────────────────────────────
 
-    def _fade_to(self, idx: int, use_fade_out: bool = False):
+    def _fade_to(self, idx: int, use_fade_out: bool = False,
+                 start_time: float | None = None):
+        # ENG-33: jeder neue Fade (auch ``go_to``) verwirft einen wartenden
+        # Follow der alten Cue; die neue Cue armiert unten ihren eigenen.
+        self._cancel_follow()
         cue = self.cues[idx]
         # Fade startet vom EIGENEN Stand (ohne Sub-Cueliste), damit Sub-Kanäle beim
         # Cue-Wechsel nicht nachhängen; ohne Sub ist _own_output == _output.
@@ -602,6 +649,7 @@ class CueStack:
             from_vals, cue.values, fade_time, base_delay,
             getattr(cue, "fade_curve", "scurve"),
             attr_delays,
+            start_time=start_time,
         )
         self._current_idx = idx
         # A3D-16: ein programmatischer GO/BACK bricht einen evtl. armierten
@@ -615,18 +663,48 @@ class CueStack:
             except Exception as e:
                 debug_swallow("cue_stack.cue_cb", e)
         # Bei Beat-Sync treibt der BPM-Manager (on_beat) das Weiterschalten —
-        # dann keinen Zeit-Follow-Timer armieren.
+        # dann keinen Zeit-Follow armieren. ENG-33: Faelligkeit ab Fade-Start
+        # (wie vorher der Timer ab GO), geprueft in ``tick``.
         if not self.beat_sync and cue.follow is not None and cue.follow >= 0:
-            self._follow_timer = threading.Timer(
-                cue.follow + fade_time, self.go
-            )
-            self._follow_timer.daemon = True
-            self._follow_timer.start()
+            self._follow_faellig = (self._fade.start_time
+                                    + cue.follow + fade_time)
 
     def _cancel_follow(self):
-        if self._follow_timer:
-            self._follow_timer.cancel()
-            self._follow_timer = None
+        self._follow_faellig = None
+
+    def _follow_nachholen(self, jetzt: float) -> None:
+        """Faellige Follows schalten (Aufrufer haelt ``_lock``; ENG-33).
+
+        Jeder Folge-Fade startet rueckdatiert auf seine Faelligkeit (kein
+        Drift durch das Frame-Raster). Lag der Ausgabe-Thread laenger still
+        (Freeze einer anderen Liste, blockierender Serial-Write, GC), werden
+        alle inzwischen faelligen Schritte HIER in einem Zug nachgeholt — die
+        Liste steht danach direkt auf der richtigen Cue, statt die Kette Bild
+        fuer Bild (je Cue ein Bild auf vollem Wert) durchzuflackern. Was so
+        nicht aufholbar ist (Follow+Fade ~0 oder mehr als
+        ``FOLLOW_NACHHOLEN_MAX`` Schritte), setzt ab ``jetzt`` neu an.
+        """
+        faellig = self._follow_faellig
+        schritte = 0
+        while faellig is not None and jetzt >= faellig:
+            self._follow_faellig = None
+            # Der Folge-Fade startet vom aktuellen Stand des alten — auch wenn
+            # seit dem letzten Tick kein Bild gerechnet wurde.
+            if self._fade is not None:
+                self._own_output = self._fade.current_values()
+            self._go_locked(start_time=faellig)
+            schritte += 1
+            neu = self._follow_faellig
+            if neu is None:
+                return
+            if neu <= faellig or schritte >= FOLLOW_NACHHOLEN_MAX:
+                if jetzt >= neu and self._fade is not None:
+                    # nicht weiter aufholbar: ab jetzt neu ansetzen
+                    abstand = neu - self._fade.start_time
+                    self._fade.start_time = jetzt
+                    self._follow_faellig = jetzt + abstand
+                return
+            faellig = neu
 
     def _emit_output(self):
         for cb in self._on_output_change:

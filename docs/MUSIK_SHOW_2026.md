@@ -45,7 +45,7 @@ hinterlegt sein, ob und welche Auto-Show beim Play startet.
 - **Chaser** mit `audio_triggered=True`: der `BPMManager` ruft pro Beat `trigger_next_step()`;
   der Chaser schaltet nach `beats_per_step` Beats eine Stufe weiter. (Die Auto-Show-Sektionen.)
 - **Cuelisten** mit `beat_sync=True` (neu): der `BPMManager._emit_beat()` ruft `CueStack.on_beat()`;
-  die aktive Liste schaltet nach `beats_per_cue` Beats eine Cue weiter. Der Zeit-`follow`-Timer
+  die aktive Liste schaltet nach `beats_per_cue` Beats eine Cue weiter. Der Zeit-`follow` (seit ENG-33 eine Fälligkeit auf der Show-Zeit)
   ist dann deaktiviert (der Beat treibt). Default aus → Alt-Shows verhalten sich unverändert.
 - **Layer-getrennt schalten:** Bank-Pads nutzen `edit_slot` (`par_show` / `mh_show`), damit ein
   neuer PAR-Effekt nur den vorigen **PAR**-Effekt ablöst und den MH-Layer weiterlaufen lässt

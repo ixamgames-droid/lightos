@@ -53,12 +53,12 @@ erg = {"kw": {f: aim_kw(fx[f]) for f in spots},
                for f in spots}}
 stack = st.playback_engine.get_executor(1, page=0).stack
 stack.go_to(4.0)
-stack._fade.start_time -= 100.0          # Fade ueberspringen (Wanduhr)
+stack._fade.start_time -= 100.0          # Fade ueberspringen (Show-Zeit)
 for _ in range(4):
     st._render_frame(1 / 44.0)
 erg["rede_spots"] = [dmx(f, "intensity") for f in spots]
 stack.go_to(2.0)
-erg["follow_gestellt"] = stack._follow_timer is not None
+erg["follow_gestellt"] = stack._follow_faellig is not None
 stack._cancel_follow()
 print("ERG=" + json.dumps(erg))
 '''

@@ -47,13 +47,13 @@ class CueStackBeatSyncTest(unittest.TestCase):
     def test_beat_sync_suppresses_follow_timer(self):
         s = _stack(per=2, follow=0.01)
         s.go()
-        self.assertIsNone(s._follow_timer)       # Beat treibt, kein Zeit-Follow
+        self.assertIsNone(s._follow_faellig)       # Beat treibt, kein Zeit-Follow
         s.stop()
 
     def test_time_follow_still_armed_without_beat_sync(self):
         s = _stack(beat_sync=False, follow=0.0)
         s.go()
-        self.assertIsNotNone(s._follow_timer)    # Zeit-Follow weiterhin aktiv
+        self.assertIsNotNone(s._follow_faellig)    # Zeit-Follow weiterhin aktiv (ENG-33: Faelligkeit statt Timer)
         s._cancel_follow()
         s.stop()
 
