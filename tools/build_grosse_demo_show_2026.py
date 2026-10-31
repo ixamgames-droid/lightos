@@ -29,6 +29,7 @@ from _builder import (ShowBuilder, RunOrder, ButtonAction, build_and_verify)
 from sqlalchemy.orm import Session
 from src.core.database.models import FixtureGroup
 from src.core.stage.stage_definition import StageDefinition, save_stage
+from src.core.paths import ziel_hinweis  # STAB-39: echter Zielort statt %APPDATA%-Behauptung
 from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
 from src.core.app_state import get_channels_for_patched
 from src.core.engine.chaser import ChaserStep
@@ -262,7 +263,7 @@ def main():
         sd.add("truss_v", x=sx, y=2.75, z=-4.6, w=0.3, h=5.5, d=0.3,
                name=f"Stuetze {sx},-4.6")
     sd.add("platform", x=0, y=0.3, z=0.4, w=16, h=0.6, d=8, name="Buehne")
-    save_stage(sd)
+    stage_pfad = save_stage(sd)
     b.state.active_stage_name = STAGE_NAME
 
     scene = b.state._scene
@@ -304,7 +305,7 @@ def main():
     # ---- 7) SPEICHERN + VALIDIEREN ---------------------------------------------
     build_and_verify(b, OUT, name="Grosse Demo Show 2026")
     print(f"[ok] geschrieben: {OUT}")
-    print(f"[ok] Stage '{STAGE_NAME}' -> %APPDATA%/LightOS/stages/{STAGE_NAME}.json")
+    print(f"[ok] Stage '{STAGE_NAME}' -> {ziel_hinweis(stage_pfad)}")
 
 
 if __name__ == "__main__":

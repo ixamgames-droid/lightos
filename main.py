@@ -11,6 +11,36 @@ multiprocessing.freeze_support()
 
 import sys
 import os
+
+# STAB-39: DIES ist die echte App. Nur hier (als ``__main__``: start.sh/.bat/.ps1,
+# tools/app.sh, PyInstaller-Build) gibt es den echten Datenordner und echte
+# DMX-Ausgabe; jedes andere Python, das ``src`` importiert, bekommt einen
+# Wegwerf-Ordner und eine stumme Ausgabe (``src/core/paths.py``). Als
+# UMGEBUNGSvariable, damit der DMX-Sendeprozess (spawn) sie erbt, und VOR dem
+# ersten ``src``-Import, weil Module ihre Pfade beim Import einfrieren. Ein Test,
+# der ``main`` nur importiert, bleibt bewusst ohne Markierung.
+#
+# Ausnahme: in einer Shell von Claude Code (``CLAUDECODE=1``) startet ein Agent
+# die App — genau der Vorfall vom 31.10., nur einen Schritt weiter. Dort gibt es
+# KEINE Markierung: Wegwerf-Datenordner, gesperrte Ausgabe. Wer das bewusst will,
+# gibt einzeln frei (``LIGHTOS_ECHTE_DATEN=1`` / ``LIGHTOS_ECHTE_AUSGABE=1``).
+def _echte_app_markieren(env=os.environ) -> bool:
+    """Setzt ``LIGHTOS_ECHTE_APP=1`` in ``env`` — ausser in einer Agent-Shell."""
+    if (env.get("CLAUDECODE") or "").strip() == "1":
+        try:    # nur ASCII (cp1252-Konsole)
+            print("[LightOS] !! STAB-39: Start aus einer Claude-Code-Shell "
+                  "(CLAUDECODE=1) - KEINE echte App: Wegwerf-Datenordner, "
+                  "Ausgabe gesperrt. Bewusst echt: LIGHTOS_ECHTE_DATEN=1 / "
+                  "LIGHTOS_ECHTE_AUSGABE=1.", file=sys.stderr, flush=True)
+        except Exception:                                # noqa: BLE001
+            pass
+        return False
+    env["LIGHTOS_ECHTE_APP"] = "1"
+    return True
+
+
+if __name__ == "__main__":
+    _echte_app_markieren()
 import argparse
 import faulthandler
 import datetime

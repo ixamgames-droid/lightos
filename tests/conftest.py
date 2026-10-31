@@ -176,8 +176,22 @@ os.environ.setdefault(
 # XPLAT-04: fixture_db.DB_PATH folgt app_data_dir() (also APPDATA). Der Pfad wird
 # hier aufgeloest, SOLANGE APPDATA noch echt ist (app_data_dir importiert nur
 # os/sys, kein App-State -> sicher vor dem ersten App-Import).
-from src.core.paths import app_data_dir as _app_data_dir  # noqa: E402
+# STAB-39: ``regulaerer_app_data_dir`` statt ``app_data_dir`` — ohne echte App
+# lieferte ``app_data_dir()`` hier schon einen Wegwerf-Ordner, die Kopie waere
+# leer und der QA-58-Waechter vergliche gegen den falschen Pfad.
+from src.core.paths import regulaerer_app_data_dir as _app_data_dir  # noqa: E402
 _ECHTE_FIXTURE_DB = os.path.join(_app_data_dir(), "fixtures.db")
+# STAB-39: die Suite ist ein Sandkasten — sie lenkt APPDATA/XDG_DATA_HOME gleich
+# selbst um, danach gilt die regulaere Aufloesung (in den Testordner; die Tests
+# von ``app_data_dir()`` pruefen genau sie). Und die Ausgabe-Schicht bleibt
+# scharf: Tests pruefen Enttec/uDMX/Art-Net/sACN mit Attrappen. Echte Geraete
+# halten LIGHTOS_KEIN_USB / LIGHTOS_NO_OUTPUT_THREAD / die Wegwerf-
+# Ausgabe-Konfiguration (unten) fern. Hart gesetzt; eine geerbte Markierung der
+# echten App gehoert nicht in die Suite.
+os.environ["LIGHTOS_SANDKASTEN"] = "1"
+os.environ["LIGHTOS_ECHTE_AUSGABE"] = "1"
+os.environ.pop("LIGHTOS_ECHTE_APP", None)
+os.environ.pop("LIGHTOS_DATEN_ORDNER", None)
 _FIXTURE_DB_VORGABE = os.environ.get("LIGHTOS_FIXTURE_DB")
 
 

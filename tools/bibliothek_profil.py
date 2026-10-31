@@ -34,6 +34,11 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO not in sys.path:
     sys.path.insert(0, REPO)
 
+# STAB-39: Bestands-Werkzeug (Geraete-Bibliothek) — bewusst am echten Datenordner (nur als
+# Skript; beim Import aus Tests bleibt es bei deren Sandkasten).
+if __name__ == "__main__":
+    os.environ.setdefault("LIGHTOS_ECHTE_DATEN", "1")
+
 from src.core.database import bibliothek_format as BF  # noqa: E402
 
 

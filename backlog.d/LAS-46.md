@@ -1,6 +1,10 @@
 ID: LAS-46
 Prioritaet: P3
-Status: todo
-Titel: Laser-Reiter: Spaltenkopf links abgeschnitten ("VORSCHAU & POSITIO", "zeigt den ersten von 2 Laser")
+Status: review
+Titel: Laser-Reiter: Kopf der Spalte „Vorschau & Position“ links abgeschnitten
+Status-Notiz: Hinweis steht jetzt unter der Ueberschrift und darf umbrechen; Test prueft Textbreite gegen Label-Breite bei Schrift x1/x1.25/x1.5
 
-**Herkunft:** Sichtprobe von Sitzung D (Windows 11 x64, echte App, 100/125/150 %, 29.10.2026, main 674fa9c6). Bei zwei gewaehlten Lasern (Programmer -> Laser-Reiter) sind im Spaltenkopf links die letzten Buchstaben abgeschnitten: "VORSCHAU & POSITIO…" und "zeigt den ersten von 2 Laser…" — das Label ist 138 px breit, braucht 143–149 px; bei allen drei Skalierungen. Sonst war der Laser-Reiter in Ordnung (NOT-AUS, Scharf-Sperre ueber Reiter/VC/MIDI, Blackout). **Fertig, wenn:** beide Texte bei 100/125/150 % ganz lesbar sind (Spalte breiter, Umbruch oder kuerzerer Text); Test, der die benoetigte Breite gegen die verfuegbare prueft.
+**Herkunft:** Sichtprobe Sitzung D, Windows 11 x64, 100/125/150 %, 29.10.2026: „VORSCHAU & POSITIO…“ und „zeigt den ersten von 2 Laser…“ abgeschnitten, Label 138 px breit, braucht 143–149 px.
+**Ursache:** Ueberschrift und Hinweis teilten sich in der fest 280 px breiten Spalte eine Zeile; offscreen gemessen bekamen beide 138 px, brauchten 148 bzw. 152 px.
+**Behoben:** `src/ui/views/laser_view.py` — Hinweis eigene Zeile unter der Ueberschrift, `setWordWrap(True)`. Spaltenbreite unveraendert.
+**Tests:** neu `tests/test_las46_laser_spaltenkopf.py` (9 Faelle: drei Hinweistexte x Schrift 11/14/17 px); ohne Fix 8 von 9 rot.

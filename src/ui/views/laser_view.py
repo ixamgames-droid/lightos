@@ -799,12 +799,13 @@ class LaserView(QWidget):
         l1 = QVBoxLayout(self._lage_box)
         l1.setContentsMargins(0, 0, 0, 0)
         l1.setSpacing(5)
-        kopf = QHBoxLayout()
-        kopf.addWidget(ueberschrift("Vorschau & Position"))
-        kopf.addStretch(1)
+        # LAS-46: Ueberschrift und Hinweis teilten sich eine Zeile und wurden
+        # in der festen Spalte beide abgeschnitten. Hinweis jetzt darunter,
+        # mit Umbruch — bei jeder Schriftgroesse ganz lesbar.
+        l1.addWidget(ueberschrift("Vorschau & Position"))
         self._lbl_lage_hinweis = nebentext("ziehen zum Verschieben")
-        kopf.addWidget(self._lbl_lage_hinweis)
-        l1.addLayout(kopf)
+        self._lbl_lage_hinweis.setWordWrap(True)
+        l1.addWidget(self._lbl_lage_hinweis)
         self._lage_feld = LageFeld(self._lage_gezogen)
         l1.addWidget(self._lage_feld)
         fuss = QHBoxLayout()

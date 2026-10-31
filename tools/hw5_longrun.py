@@ -323,6 +323,9 @@ def main(argv: list[str] | None = None) -> int:
         dev = EnttecPro(port)
     except Exception as e:
         print(f"Port {port} liess sich nicht oeffnen: {e}")
+        if os.environ.get("LIGHTOS_ECHTE_AUSGABE") != "1":
+            print("STAB-39: ausserhalb der App braucht der echte Port "
+                  "LIGHTOS_ECHTE_AUSGABE=1.")
         return 2
 
     run = Run(dev, log_path, status_path)

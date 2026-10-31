@@ -52,6 +52,10 @@ MANIFEST_PATH = ROOT / "install_manifest.json"
 # legt der Installer auf Linux ~/LightOS/{stages,input_profiles,snaps} an, waehrend
 # die App ihre Daten nach ~/.local/share/LightOS schreibt. src/core/paths importiert
 # nur os+sys, laeuft also auch hier vor dem venv mit dem System-Python.
+# STAB-39: Installer legt die Ordner der App an — bewusst am echten Datenordner (nur als
+# Skript; beim Import aus Tests bleibt es bei deren Sandkasten).
+if __name__ == "__main__":
+    os.environ.setdefault("LIGHTOS_ECHTE_DATEN", "1")
 sys.path.insert(0, str(ROOT))
 from src.core.paths import app_data_dir            # noqa: E402
 

@@ -313,6 +313,35 @@ class BauPruefungenTest(unittest.TestCase):
             self.assertEqual(env[name], "1")
         self.assertTrue(self.bau.app_datenordner(env).startswith(basis + os.sep))
 
+    def test_stab39_buehne_des_generators_landet_im_gepruefen_ordner(self):
+        """STAB-39: ohne ``LIGHTOS_SANDKASTEN`` speicherte ein Generator seine
+        Buehne in einen Wegwerf-Ordner, ``buehnen_befund`` suchte in
+        ``app_datenordner(env)/stages``, fand nichts und meldete immer ok."""
+        # Vorlage OHNE die Sandkasten-Markierung der Suite (conftest) — wie der
+        # Windows-Build (``python packaging/demo_shows.py`` in der CI).
+        vorlage = {k: v for k, v in os.environ.items()
+                   if not k.startswith("LIGHTOS_") and k != "PYTHONPATH"}
+        vorlage["LIGHTOS_ECHTE_APP"] = "1"          # geerbt: muss raus
+        vorlage["LIGHTOS_DATEN_ORDNER"] = os.path.join(self.tmp, "fremd")
+        env = self.bau.sandbox_umgebung(os.path.join(self.tmp, "sb"), vorlage=vorlage)
+        self.assertNotIn("LIGHTOS_ECHTE_APP", env)
+        self.assertNotIn("LIGHTOS_DATEN_ORDNER", env)
+        treiber = (
+            "import sys; sys.path.insert(0, sys.argv[1])\n"
+            "from src.core.stage.stage_definition import StageDefinition, save_stage\n"
+            "st = StageDefinition(name='Probe-Bühne'); st.add('truss')\n"
+            "print('GESPEICHERT=' + str(save_stage(st)))\n")
+        r = subprocess.run([sys.executable, "-c", treiber, _REPO], env=env,
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=120)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        stages = os.path.join(self.bau.app_datenordner(env), "stages")
+        show = {"visualizer": {"active_stage": "Probe-Bühne"},
+                "scene_graph": {"nodes": []}}
+        maengel = self.bau.buehnen_befund(show, stages)
+        self.assertEqual(len(maengel), 1, (stages, r.stdout, r.stderr))
+        self.assertIn("1 von 1", maengel[0])
+
     def test_gescheiterter_bau_hinterlaesst_kein_verzeichnis(self):
         ziel = os.path.join(self.tmp, "ziel")
         os.makedirs(ziel)

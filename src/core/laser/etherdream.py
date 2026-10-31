@@ -158,6 +158,12 @@ class EtherDreamConnection:
     def connect(self):
         if self._sock is not None:
             return
+        # STAB-39: ohne echte App (oder LIGHTOS_ECHTE_AUSGABE=1) keine
+        # Verbindung zum DAC. Der Fehler laeuft in die normale Retry-Logik
+        # des LaserOutputManager (_CONN_ERRORS).
+        from src.core.paths import echte_ausgabe_pruefen
+        if not echte_ausgabe_pruefen("Laser/Ether Dream"):
+            raise EtherDreamError("STAB-39: echte Laser-Ausgabe gesperrt")
         sock = socket.create_connection((self.host, self.port), self.timeout)
         sock.settimeout(self.timeout)
         self._sock = sock

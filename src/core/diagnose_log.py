@@ -1386,7 +1386,15 @@ def _liesmich_absturzhinweise(befunde: list[tuple[str, dict[str, int], int]]) ->
 
 
 def standard_ziel() -> str:
-    """Desktop (falls vorhanden), sonst Home — dort findet ein Tester die Datei."""
+    """Desktop (falls vorhanden), sonst Home — dort findet ein Tester die Datei.
+
+    STAB-39 (Gegenpruefung 31.10.): ohne echte App/Freigabe in den
+    Wegwerf-Datenordner statt auf den echten Desktop."""
+    from .paths import app_data_dir, echte_daten_erlaubt
+    if not echte_daten_erlaubt():
+        ordner = app_data_dir()
+        stempel = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        return os.path.join(ordner, f"LightOS-Diagnose-{stempel}.zip")
     home = os.path.expanduser("~")
     ordner = home
     for kandidat in ("Desktop", "Schreibtisch"):

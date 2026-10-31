@@ -23,8 +23,10 @@ Exit 0 = identisch (Abnahme bestanden), 1 = Abweichung, 2/3 = Lauf kaputt.
   1. ``XDG_DATA_HOME`` -> Wegwerf (Snaps, Buehnen, ``crash.log``).
   2. ``LIGHTOS_SHOW_DB`` -> Wegwerf. Der Default ist RELATIV zum Arbeits-
      verzeichnis; aus ``repo/`` gestartet schriebe der Lauf in die echte Show-DB.
-  3. ``LIGHTOS_FIXTURE_DB`` -> die echte Library, nur lesend. Mit leerer Library
-     laedt die Show 0 Fixtures und der Test misst nichts.
+  3. ``LIGHTOS_FIXTURE_DB`` -> eine KOPIE der echten Library im Sandkasten
+     (STAB-39/QA-58: eine Schema-Migration beim Oeffnen schriebe sonst in die
+     echte Datei). Mit leerer Library laedt die Show 0 Fixtures und der Test
+     misst nichts.
   4. ``LIGHTOS_NO_OUTPUT_THREAD`` -> kein Sendethread. Auf ``/dev/ttyUSB0`` kann
      der HW-5-Langzeitlauf liegen; ein zweiter Oeffner wuerde ihn stoeren.
   5. ``LIGHTOS_NO_DATENUMZUG`` -> keine Uebernahme alter ``data/``-Dateien
@@ -70,13 +72,25 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
     """Pins 1-5 setzen (s. Modul-Doku) und die Buehnen in den Sandkasten
     kopieren. Gibt den Wegwerf-Ordner zurueck."""
     global _SANDBOX
+    # STAB-39: der echte Datenordner (nur als QUELLE fuer Kopien) — VOR jeder
+    # Umlenkung und plattformgerecht, statt fest ``~/.local/share``.
+    from src.core.paths import regulaerer_app_data_dir
+    echter_ordner = regulaerer_app_data_dir()
     tmp = tmp or tempfile.mkdtemp(prefix="vizverify_")
     _SANDBOX = tmp
     os.environ["XDG_DATA_HOME"] = os.path.join(tmp, "xdg")
     os.environ["LIGHTOS_SHOW_DB"] = os.path.join(tmp, "show.db")
-    os.environ["LIGHTOS_FIXTURE_DB"] = fixture_db or os.path.expanduser(
-        "~/.local/share/LightOS/fixtures.db")
+    # Gegenpruefung 31.10.: die Bibliothek als KOPIE — vorher zeigte der Pin
+    # direkt auf die echte Datei und ging so an der STAB-39-Sperre vorbei.
+    quelle = fixture_db or os.path.join(echter_ordner, "fixtures.db")
+    kopie = os.path.join(tmp, "fixtures.db")
+    if os.path.isfile(quelle) and not os.path.exists(kopie):
+        os.makedirs(tmp, exist_ok=True)
+        shutil.copy2(quelle, kopie)
+    os.environ["LIGHTOS_FIXTURE_DB"] = kopie
     os.environ["LIGHTOS_NO_OUTPUT_THREAD"] = "1"
+    # STAB-39: Datenordner umgelenkt -> regulaer aufloesen (in den Sandkasten).
+    os.environ["LIGHTOS_SANDKASTEN"] = "1"
     # TOOL-27 (Gegenpruefung): das Hauptfenster laeuft hier mit Ereignisschleife.
     # Ohne diese Schalter oeffnete es nach 800 ms die MIDI-Eingaenge des
     # Rechners und zaehlte USB-Geraete auf; unter Windows leitet sich der
@@ -95,7 +109,7 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
     # Codex #959: hart setzen (nicht setdefault) — ein vom Bediener gesetzter
     # Wert zeigte auf die echte Ausgabe-Konfiguration.
     os.environ["LIGHTOS_UNIVERSES_JSON"] = os.path.join(tmp, "universes.json")
-    echte_stages = stages_quelle or os.path.expanduser("~/.local/share/LightOS/stages")
+    echte_stages = stages_quelle or os.path.join(echter_ordner, "stages")
     sandkasten_stages = os.path.join(tmp, "xdg", "LightOS", "stages")
     if os.path.isdir(echte_stages) and not os.path.exists(sandkasten_stages):
         os.makedirs(os.path.dirname(sandkasten_stages), exist_ok=True)
@@ -105,7 +119,7 @@ def sandbox_einrichten(tmp: str | None = None, *, fixture_db: str | None = None,
 
 def schutz_aktiv() -> bool:
     """Stehen alle Schutzschalter auf DIESEM Sandkasten? (Pins 1, 2, 4, 5 —
-    die Fixture-Library darf echt sein, sie wird nur gelesen.)"""
+    die Fixture-Library ist eine Kopie im Sandkasten.)"""
     if not _SANDBOX:
         return False
     env = os.environ

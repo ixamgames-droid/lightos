@@ -117,6 +117,10 @@ def sandbox_umgebung(wurzel: str) -> dict[str, str]:
         "LIGHTOS_SERIAL_INPROC": "1",
         "LIGHTOS_NO_RECOVERY_PROMPT": "1",
         "LIGHTOS_NO_DATENUMZUG": "1",
+        # STAB-39: der Datenordner ist oben umgelenkt — regulaer aufloesen (in die
+        # Sandbox) statt eines Wegwerf-Ordners ausserhalb, den pruefe_sandbox
+        # zu Recht ablehnte. Gibt KEINE Ausgabe frei.
+        "LIGHTOS_SANDKASTEN": "1",
     }
     if sys.platform == "darwin":
         env["HOME"] = os.path.join(w, "home")
@@ -863,7 +867,9 @@ def main(argv=None) -> int:
     if not os.environ.get("LIGHTOS_LIZENZ"):
         if repo not in sys.path:
             sys.path.insert(0, repo)
-        from src.core.paths import app_data_dir as _echter_datenordner
+        # STAB-39: die regulaere Aufloesung — app_data_dir() waere hier schon
+        # ein Wegwerf-Ordner (dieses Werkzeug ist nicht die App).
+        from src.core.paths import regulaerer_app_data_dir as _echter_datenordner
         os.environ["LIGHTOS_LIZENZ"] = os.path.join(
             _echter_datenordner(), "lightos-lizenz.lic")
     env = sandbox_umgebung(wurzel)
