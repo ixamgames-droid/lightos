@@ -1,0 +1,21 @@
+{
+  "anleitung": "externe_pulte",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "b0cc8008",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py externe_pulte'.",
+  "bilder": [
+    {
+      "datei": "01_fernsteuerung.png",
+      "szene": "01_fernsteuerung",
+      "titel": "Ausgabe-Dialog, Reiter DMX-Eingang: Kasten Fernsteuerung mit drei Beispiel-Zuordnungen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "0d357926e8ecff19e0068dc6381d9699"
+    }
+  ]
+}

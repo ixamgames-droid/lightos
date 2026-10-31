@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "d1a1e4bb",
+  "stand": "b0cc8008",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -126,6 +126,40 @@
       ],
       "marken": [],
       "md5": "8b35c628ba011cc193466a2ef166c172"
+    },
+    {
+      "datei": "12_assistent_nichts_gefunden.png",
+      "szene": "12_assistent_nichts_gefunden",
+      "titel": "Assistent ohne angeschlossenes Interface: „Nichts gefunden“ + Erklärung",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "1ad221d385f1068f3b56ee20b51d4632"
+    },
+    {
+      "datei": "13_testsignal_ablauf.gif",
+      "szene": "13_testsignal_ablauf",
+      "titel": "Testsignal: senden → Rückfrage (Vorgabe Abbrechen) → läuft (Stopp) → gestoppt; Laser-Ausgang gesperrt",
+      "groesse": [
+        824,
+        690
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "77eee24bd61e1da142a5f31a7b96c3c1",
+      "frames": 4,
+      "dauern_ms": [
+        2000,
+        3000,
+        2000,
+        2200
+      ]
     }
   ]
 }
