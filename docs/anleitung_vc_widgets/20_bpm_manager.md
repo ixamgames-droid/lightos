@@ -60,7 +60,7 @@ Der Sub-Tab **Erkennung** zeigt ohne Klick genau **sechs Bedienelemente**; alles
 1. **Manuell** (auch durch TAP ab dem dritten Tipp im Takt oder durch Nudge) und **🔒 Tempo einfrieren** stehen über allem: solange eins davon gilt, ändert keine Quelle das Tempo.
 2. **PC-Audio / Eingang:** hört LightOS live mit, führt allein die Erkennung. Die Lied-Analyse und die Nominal-BPM des Players kommen dann nicht durch.
 3. **Lied-Analyse (Player):** in **Auto** führt ein im Player laufendes, im Generator **analysiertes** Lied mit seiner BPM-Kurve. Ein Lied ohne Analyse setzt beim Start seine Nominal-BPM — Voraussetzung ist der Haken **BPM koppeln** im **Musik**-Tab.
-4. **Aus** und **OS2L:** das Lied führt **nicht**. Bei **OS2L** kommt das Tempo allein vom DJ-Programm, bei **Aus** ändert gar keine Quelle die BPM.
+4. **Aus** und **OS2L:** das Lied führt **nicht**. Bei **OS2L** kommt das Tempo allein vom DJ-Programm, bei **Aus** ändert danach gar keine Quelle die BPM. Beim Umschalten auf **Aus** geht der Takt auf 0 (Beat-Effekte stehen); ein im Modus **Manuell** von Hand gesetzter Takt (Eingabe, TAP, Nudge) bleibt stehen.
 
 Die **Quelle**-Liste entscheidet also, **wer führen darf** — nicht nur, ob mitgehört wird. Der Generator-Knopf schaltet genauso um wie eine Auswahl in der Liste.
 

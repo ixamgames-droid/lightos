@@ -20,7 +20,7 @@
 - Die **6 Bänke** liegen auf der **Virtual Console** (`Strg+4`). Blättern: **`Strg+Bild↓` / `Strg+Bild↑`**.
   Mit **APC mini**: **SCENE-Tasten = Bank 1–6**.
 
-## Das Rig (14 Fixtures, 137 DMX-Kanäle, Universe 1)
+## Das Rig (14 Fixtures, 137 DMX-Kanäle, Universum 1)
 
 | # | Fixture | Mode | Adresse | Gruppe |
 |---|---|---|---|---|

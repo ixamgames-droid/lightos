@@ -167,6 +167,18 @@ ganz (kein Ziehen auf Tasten, kein „➡ Auf VC-Taste legen"), und **Bearbeiten
 nicht. Die Tasten, Fader, Bänke, Touch-Lock und Pickup bleiben bedienbar — beim Tempo-Bus-Controller
 auch Quelle, Faktor, SYNC und die Bus-Wahl.
 
+Oben rechts bleibt im Kiosk ein **Streifen** mit den Not-Bedienungen, von links nach rechts:
+**GM** (Grand-Master-Regler mit Prozentwert), **STOP ALL**, **BLACKOUT** und **LASER NOT-AUS**.
+Sind Laser gepatcht, hat die Show aber keine Sperrzonen (obwohl auf diesem Rechner schon
+mit Sperrzonen gearbeitet wurde), steht links davor zusätzlich eine
+kleine gelbe Hinweiszeile (siehe [Laser → Sperrzonen](../anleitung_laser/ANLEITUNG_LASER.md#9-sperrzonen-vorschau)).
+Sie wirken wie ihre Gegenstücke im normalen Fenster und zeigen denselben Zustand
+(Einzelheiten: [Erste Schritte](../anleitung_erste_schritte/ANLEITUNG.md)). Löst du den
+LASER NOT-AUS aus, erscheint unter dem Streifen für einige Sekunden ein **roter Balken** mit
+der Bestätigung „⏹ LASER NOT-AUS ausgelöst — alle Laser dunkel …" — im Kiosk gibt es keine
+Statusleiste, die das sonst anzeigt. Gelöst wird der NOT-AUS auch hier nur mit dem Knopf
+samt Rückfrage ([Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
+
 ### Konsole auf einen zweiten Bildschirm legen (Popout)
 
 **⧉ Popout** in der Werkzeugleiste holt die ganze Konsole in ein eigenes Fenster, zum Beispiel

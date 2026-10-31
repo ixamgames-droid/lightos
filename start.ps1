@@ -21,6 +21,12 @@ $procArch = $ri::ProcessArchitecture
 if (-not $osArch -and $env:OS -eq "Windows_NT" -and "$env:PROCESSOR_IDENTIFIER" -match "ARMv8") {
     $osArch = "Arm64"
 }
+# XPLAT-59: Im Rueckfall bliebe die Prozess-Arch in der Kopfzeile leer.
+# PROCESSOR_ARCHITECTURE nennt die Architektur dieses Prozesses (unter
+# Emulation also AMD64, nicht ARM64).
+if (-not $procArch -and $env:PROCESSOR_ARCHITECTURE) {
+    $procArch = $env:PROCESSOR_ARCHITECTURE
+}
 Write-Host "[start] OS-Arch: $osArch | Prozess-Arch: $procArch"
 
 # venv-Python suchen (Windows-Pfad ODER Unix-Pfad)
@@ -55,7 +61,9 @@ if ($osArch -eq "Arm64" -and $env:OS -eq "Windows_NT") {
     $pyPlattform = ""
     try { $pyPlattform = (& $python -c "import sysconfig; print(sysconfig.get_platform())" 2>$null) } catch { }
     if ("$pyPlattform".Trim() -eq "win-arm64") {
-        Write-Host "[start] WARNUNG: natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen: winget install Python.Python.3.12 --architecture x64, Details in INSTALL.md." -ForegroundColor Yellow
+        # XPLAT-59: Schwarz auf Gelb - reines Gelb ist im Windows Terminal kaum
+        # von normalem Text zu unterscheiden.
+        Write-Host "[start] WARNUNG: natives ARM64-Python ist nicht unterstuetzt (instabil, kein 3D) - x64-Python nehmen: winget install Python.Python.3.12 --architecture x64, Details in INSTALL.md." -ForegroundColor Black -BackgroundColor Yellow
     }
 }
 
