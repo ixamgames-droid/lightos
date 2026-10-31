@@ -1,4 +1,0 @@
-ID: VIZ-91
-Prioritaet: P2
-Status: review
-Status-Notiz: Ausbrennschutz im 3D (fixtures/ausbrennen.js): Kegel- und Bodenfleck-Deckkraft aller Geraete teilen sich einen Daempfungsfaktor aus der Licht-Last der Szene (bis 8 Kegel bzw. 10 Flecken unveraendert, darueber Kegel Schwelle/Last, Flecken (Schwelle/Last)^0,75, Untergrenze 0,08/0,25), als Shader-Uniform ohne Arbeit je Bild; gezaehlt wird nur Sichtbares (beamsOff, Fleck-Schalter, Kopf ohne Auftreffpunkt zaehlen nicht, Prisma-Nebenstrahlen je als Kegel); gemessen 60 weisse Kegel von vorn: Weiss-Anteil 58 % -> 35 %, 3 Kegel unveraendert (tests/test_viz91_ausbrennen_scene.py). Offen: Laser und Pool-Lichter ungedaempft, Pumpen bei Chasern ueber 8 Kegeln, echter Deckel der Summe (HDR-Zwischenpuffer), bessere Standardwerte in Demo-Shows, Sichtpruefung am Bildschirm
