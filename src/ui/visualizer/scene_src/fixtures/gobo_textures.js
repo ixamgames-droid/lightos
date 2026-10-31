@@ -548,6 +548,35 @@ export function kegelSchnittAbgleichen(f, kante) {
   return true;
 }
 
+/** VIZ-101: Kegel an der Ebene einer getroffenen Wand enden lassen —
+ *  alle fuenf Ebenen auf dieselbe Wandebene (Normale n zum Licht hin, Punkt p
+ *  auf der Wand); hinter der Wand ist jede Ebene negativ, dort wird nicht
+ *  gezeichnet. Dieselben Ebenen wie oben: kein Programmwechsel (VIZ-69). */
+export function kegelWandAbgleichen(f, n, p) {
+  const beam = f && f.beam;
+  const ebenen = beam && beam.material && beam.material.clippingPlanes;
+  if (!ebenen || ebenen.length !== KEGEL_EBENEN || !n || !p) return false;
+  const c = -(n[0] * p[0] + n[1] * p[1] + n[2] * p[2]);
+  for (const e of ebenen) { e.normal.set(n[0], n[1], n[2]); e.constant = c; }
+  f._kegelSchnitt = true;
+  return true;
+}
+
+/** VIZ-101 (Review): Bodenfleck an einer Wand in seinem Fussabdruck enden
+ *  lassen — eine der vier Kanten-Ebenen auf die Wandebene (n zur Fleckmitte
+ *  hin, Punkt p), die uebrigen frei. Die Ebenen des Flecks wirken einzeln
+ *  (ohne clipIntersection): hinter der Wand wird nicht gezeichnet. Die naechste
+ *  goboKanteAbgleichen-Runde gibt sie wieder frei. */
+export function fleckWandAbgleichen(f, n, p) {
+  const main = f && f.floorSpot;
+  const ebenen = main && main.material && main.material.clippingPlanes;
+  if (!ebenen || ebenen.length !== KANTE_ANZAHL || !n || !p) return false;
+  _ebenenFrei(ebenen);
+  ebenen[0].normal.set(n[0], n[1], n[2]);
+  ebenen[0].constant = -(n[0] * p[0] + n[1] * p[1] + n[2] * p[2]);
+  return true;
+}
+
 function _ebenenFrei(ebenen) {
   if (!ebenen) return;
   for (const e of ebenen) { e.normal.set(0, 1, 0); e.constant = KANTE_FREI; }

@@ -11,9 +11,9 @@ import { isLowSpec } from '../scene/renderer.js';
 import { placeElement, panelGrid, rotatePoint, ringSegmente, wabenPlatz } from './pixel_order.js';
 import { applyOptics } from './optics.js';   // VIZ-MH-OPTICS
 import { applyPrism, syncPrismToBeam } from './prism.js';   // VIZ-PRISMA-3D
-import { syncPoolSize } from './floor_pool.js';               // VIZ-15
+import { syncPoolSize, fleckAufFlaeche } from './floor_pool.js';               // VIZ-15
 import { beamsOff } from '../state.js';                       // VIZ-15
-import { applyGobo, alignGoboFloor, goboKanteAbgleichen, kegelSchnittAbgleichen, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
+import { applyGobo, alignGoboFloor, goboKanteAbgleichen, kegelSchnittAbgleichen, kegelWandAbgleichen, fleckWandAbgleichen, goboWinkel, GOBO_LICHT, GOBO_STRAHL, GOBO_FLECK } from './gobo_textures.js';   // VIZ-GOBO-3D, VIZ-83
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
 import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge, goboInnenGerichtet, kantenAbstand } from '../scene/gobo_projektion.js';      // VIZ-96, VIZ-107
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
@@ -95,6 +95,95 @@ function koerperTreffer(f, origin, dir) {
 function _goboSchmalMass(f) {
   if (!f.goboAktiv || !goboProjektionAktiv()) return 0;
   return _kegelDurchmesser(f);
+}
+
+// VIZ-101: ist der getroffene Koerper SEITLICH schmaler als der Kegel (eine
+// Box, an der das Licht links und rechts vorbeigeht)? Massgeblich ist die
+// groessere waagerechte Kante — die Hoehe prueft _wandDeckt. (Die mittlere
+// Kante wie bei goboSchmal hielt eine 10 m breite, 3-5 m hohe Rueckwand fuer
+// „schmal“: der Kegel eines weiten Spots schoss dann ungeschnitten hindurch.)
+function _schmalerAlsKegel(groesse, durchmesser) {
+  if (!groesse || !(durchmesser > 0)) return false;
+  const x = Math.abs(groesse.x), z = Math.abs(groesse.z);
+  if (!isFinite(x) || !isFinite(z)) return false;
+  return Math.max(x, z) < durchmesser;
+}
+
+// VIZ-101 (Review): deckt eine Wand (Ebene n·x + c = 0, n zum Licht hin, Punkt
+// p darauf, Oberkante `oben`) ALLES ab, was der Kegel hinter ihrer Ebene
+// zeichnen wuerde? Nur dann darf die (unendliche) Ebene ihn beschneiden — bei
+// einer niedrigen Wand geht ein flacher Randstrahl ueber sie hinweg. Geprueft
+// wird die Durchstosshoehe von 16 Randstrahlen des Kegels (o, d: Linse und
+// Achse, tanA: Tangens des halben Kegelwinkels).
+const _RAND_DECKT = 16;
+function _wandDeckt(o, d, tanA, n, p, oben) {
+  if (!(typeof oben === 'number' && isFinite(oben)) || !(tanA >= 0)) return false;
+  const abst = n[0] * (o.x - p[0]) + n[1] * (o.y - p[1]) + n[2] * (o.z - p[2]);
+  if (!(abst > 0)) return false;               // Linse nicht vor der Wand
+  // Zwei Achsen senkrecht zur Strahlachse
+  let ax = -d.z, ay = 0, az = d.x;
+  let al = Math.hypot(ax, ay, az);
+  if (al < 1e-6) { ax = 1; ay = 0; az = 0; al = 1; }
+  ax /= al; ay /= al; az /= al;
+  const bx = d.y * az - d.z * ay, by = d.z * ax - d.x * az, bz = d.x * ay - d.y * ax;
+  for (let i = 0; i < _RAND_DECKT; i++) {
+    const th = 2 * Math.PI * i / _RAND_DECKT;
+    const c = Math.cos(th) * tanA, s = Math.sin(th) * tanA;
+    const rx = d.x + c * ax + s * bx, ry = d.y + c * ay + s * by, rz = d.z + c * az + s * bz;
+    const rn = rx * n[0] + ry * n[1] + rz * n[2];
+    if (!(rn < -1e-6)) continue;               // erreicht die Wandebene nicht
+    if (o.y + ry * (abst / -rn) > oben + 0.01) return false;   // geht darueber
+  }
+  return true;
+}
+
+// VIZ-101 (Review): die Strahlmitte trifft den BODEN, im Fussabdruck des
+// Flecks steht aber eine Wand (Spot vor die Rueckwand gerichtet). Der Fleck
+// ragte dann hinter die Wand und der Kegel durch sie hindurch — dieselbe
+// Erscheinung wie bei einem Treffer auf der Wand. Gesucht wird mit flachen
+// Strahlen knapp ueber dem Boden in den acht Richtungen des Fussabdrucks;
+// zaehlt nur eine senkrechte Flaeche, die breiter ist als der Kegel und hoch
+// genug, ihn ganz abzudecken. Liefert {n, p} (Normale zur Fleckmitte hin,
+// Punkt) oder null.
+const _wandStrahl = new THREE.Raycaster();
+const _wandO = new THREE.Vector3();
+const _wandD = new THREE.Vector3();
+const _wandBox = new THREE.Box3();
+function _wandImFleck(origin, dir, hitX, hitZ, abstand, tanA, durchmesser) {
+  const fuss = strahlFussabdruck(dir.x, dir.y, dir.z, abstand, tanA);
+  if (!fuss.length) return null;
+  const meshes = [];
+  for (const id in stageObjects) {
+    const m = stageObjects[id] && stageObjects[id].mesh;
+    if (!m) continue;
+    m.updateMatrixWorld();
+    meshes.push(m);
+  }
+  if (!meshes.length) return null;
+  let best = null;
+  for (const r of fuss) {
+    if (!(r.weit > 0.01) || !isFinite(r.weit)) continue;
+    _wandO.set(hitX, 0.02, hitZ);
+    _wandD.set(r.dx, 0, r.dz);
+    _wandStrahl.set(_wandO, _wandD);
+    _wandStrahl.near = 0;
+    _wandStrahl.far = Math.min(r.weit, KEIN_TREFFER_FERN);
+    for (const h of _wandStrahl.intersectObjects(meshes, true)) {
+      if (best && h.distance >= best.weg) break;
+      if (!h.face || !h.object) continue;
+      _normale.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+      if (Math.abs(_normale.y) >= 0.7) continue;
+      if (_normale.dot(_wandD) > 0) _normale.negate();   // zur Fleckmitte hin
+      if (_schmalerAlsKegel(_koerperGroesse(h.object), durchmesser)) continue;
+      const n = [_normale.x, _normale.y, _normale.z];
+      const p = [h.point.x, h.point.y, h.point.z];
+      _wandBox.setFromObject(h.object);
+      if (!_wandDeckt(origin, dir, tanA, n, p, _wandBox.max.y)) continue;
+      best = { n, p, weg: h.distance };
+      break;
+    }
+  }
+  return best;
 }
 
 // Durchmesser (m) des Kegels am AUFTREFFPUNKT (dort liegt der Rand des
@@ -292,9 +381,14 @@ function _koerperTrefferRechnen(origin, dir, schmal = 0) {
     // dann ist die Trefferhoehe eine Flaeche, an der die Projektion enden
     // kann (VIZ-102: Kante der Oberseite, s. u.).
     let oben = false;
+    let normale = null;
     if (h.face && h.object) {
       _normale.copy(h.face.normal).transformDirection(h.object.matrixWorld);
       oben = _normale.y > 0.7;
+      // VIZ-101: Normale der getroffenen Flaeche, zum Licht hin (eine
+      // DoubleSide-Wand liefert von hinten getroffen die abgewandte).
+      if (_normale.dot(dir) > 0) _normale.negate();
+      normale = [_normale.x, _normale.y, _normale.z];
     }
     // VIZ-102: Kante der Oberseite und die naechste Flaeche DAHINTER (ein
     // anderer Koerper; den Boden rechnet applyFloorAim dazu) — fuer Muster und
@@ -309,7 +403,9 @@ function _koerperTrefferRechnen(origin, dir, schmal = 0) {
         break;
       }
     }
-    return { abstand: h.distance, y: h.point.y, oben, kante, unten, untenY };
+    _wandBox.setFromObject(h.object);
+    return { abstand: h.distance, y: h.point.y, oben, kante, unten, untenY,
+             normale, groesse: _koerperGroesse(h.object), oberkante: _wandBox.max.y };
   }
   return null;
 }
@@ -2166,6 +2262,14 @@ function applyFloorAim(f, dmx) {
   // deren Vorderseite): kein Boden, keine Oberseite.
   const seitlich = amKoerper && !kt.oben;
   const radius = _kegelDurchmesser(f) / 2;
+  // VIZ-101: die Strahlmitte trifft eine WAND (senkrechte Flaeche, z. B. die
+  // Rueckwand). Der Fleck lag bisher waagerecht in Trefferhoehe und ragte zur
+  // Haelfte hinter die Wand; ein verlaengerter Gobo-Kegel schoss durch sie
+  // hindurch. Jetzt liegt der Fleck auf der Wand, und der Kegel endet an
+  // ihrer Ebene — aber nur, wenn die Flaeche breiter ist als der Kegel:
+  // an einer schmalen Box geht das Licht daneben weiter.
+  const wandN = (seitlich && kt.normale && Math.abs(kt.normale[1]) < 0.7)
+    ? kt.normale : null;
   // Tangens des halben Kegelwinkels (der Kegel endet am Auftreffpunkt mit
   // festem Radius). Das Gobo-Motiv liegt seit VIZ-102 ganz IM Kegel.
   const tanBis = (abstand) => {
@@ -2173,6 +2277,30 @@ function applyFloorAim(f, dmx) {
       ? Math.max(0.15, Math.min(f.baseBeamLength || abstand, abstand)) : 0;
     return bis > 0 ? radius / bis : 0;
   };
+  // Review: die unendliche Wandebene schneidet nur, wenn die Wand den Kegel
+  // auch in der Hoehe ganz abdeckt (eine niedrige Wand: Licht geht darueber).
+  const wandKappt = !!(wandN && !_schmalerAlsKegel(kt.groesse, 2 * radius)
+    && ursprung && richtung
+    && _wandDeckt(ursprung, richtung, tanBis(auftreffAbstand), wandN,
+                  [ursprung.x + richtung.x * auftreffAbstand,
+                   ursprung.y + richtung.y * auftreffAbstand,
+                   ursprung.z + richtung.z * auftreffAbstand], kt.oberkante));
+  // VIZ-101 (Review): die Mitte trifft den BODEN vor einer Wand — Fleck und
+  // Kegel an der Wandebene beschneiden (s. _wandImFleck). Gerechnet nur, wenn
+  // sich Strahl, Buehne oder Kegelweite geaendert haben (Kostenbremse wie
+  // koerperTreffer).
+  let wandVorn = null;
+  if (!amKoerper && goboTreffer && ursprung && richtung && isFinite(auftreffAbstand)
+      && f._koerperSchluessel) {
+    const tanV = tanBis(auftreffAbstand);
+    const schl = f._koerperSchluessel + tanV * 31 + auftreffAbstand * 37;
+    if (f._wandVornSchluessel !== schl) {
+      f._wandVornSchluessel = schl;
+      f._wandVorn = _wandImFleck(ursprung, richtung, goboTreffer[0], goboTreffer[2],
+                                 auftreffAbstand, tanV, 2 * radius);
+    }
+    wandVorn = f._wandVorn;
+  }
   // VIZ-107: der spiegelbildliche Fall. Die Strahlmitte liegt schon NEBEN
   // einer Oberseite — auf dem Hallenboden, auf einer tieferen Flaeche oder an
   // der Stirnseite —, der Kegel trifft die Oberseite aber noch. Bisher galt von
@@ -2205,6 +2333,11 @@ function applyFloorAim(f, dmx) {
   // `mit` nicht legen laesst — der Aufrufer legt sie dann ohne.
   const ausrichten = (mit) => {
     const kante = mit ? null : kanteMitte;
+    const aufWand = !mit && wandN;
+    // VIZ-101: Richtung gegen die Wandnormale (negativ: auf die Wand zu) —
+    // spielt fuer die Wand die Rolle, die richtung.y fuer den Boden spielt.
+    const wandDy = (aufWand && richtung)
+      ? richtung.x * wandN[0] + richtung.y * wandN[1] + richtung.z * wandN[2] : 0;
     let kegelAbstand = auftreffAbstand, ueber = 0, untenY = 0, fernUnten = 0;
     // Abstand, auf den sich der Kegelwinkel bezieht (der Kegel endet dort mit
     // festem Radius): am Kantenwechsel die Oberseite wie kurz davor, dann mit
@@ -2240,6 +2373,17 @@ function applyFloorAim(f, dmx) {
         ? fernTreffer + (fernUnten - fernTreffer) * ueber : fernTreffer;
       ueberBasis = KEGEL_UEBER_BASIS;
     }
+    // VIZ-101: an einer Wand reicht der Kegel (mit und ohne Gobo) bis zu ihrer
+    // Ebene — sein Ende steht senkrecht zur Achse, bei schraegem Einfall blieb
+    // der obere Rand als runder Bogen VOR der Wand stehen, der untere ragte
+    // hindurch. Laenger bis zum fernen Rand, hinter der Wandebene beschnitten
+    // (kegelWandAbgleichen). Ohne Gobo nur, wenn der Kegel die Wand ueberhaupt
+    // erreicht.
+    if (aufWand && wandKappt && tanA > 0 && isFinite(auftreffAbstand)
+        && (f.goboAktiv || auftreffAbstand <= (f.baseBeamLength || 0))) {
+      kegelAbstand = _fernLaenge(wandDy, tanA, auftreffAbstand);
+      ueberBasis = KEGEL_UEBER_BASIS;
+    }
     setBeamLength(f, kegelAbstand, ueberBasis);
     _kegelWeite(f, bezug);
     // VIZ-102: Reichweite der Projektion = Reichweite des Kegels
@@ -2248,7 +2392,7 @@ function applyFloorAim(f, dmx) {
     // VIZ-107: mit `bezug` — sonst wechselte die Projektion am Hallenboden im
     // Schritt ueber die Kante von „hinter der Buehne, gedaempft“ auf voll.
     if (richtung && tanA > 0 && f.beam && f.baseBeamLength) {
-      f._goboFernQ = kegelFernLaenge(richtung.y, tanA, bezug);
+      f._goboFernQ = kegelFernLaenge(aufWand ? wandDy : richtung.y, tanA, bezug);
       // Kein Muster ohne Kegel: die Projektion reicht genau so weit wie der
       // gezeichnete Kegel (und blendet dahinter aus, gobo_projektion.js).
       f._goboReich = f.baseBeamLength * f.beam.scale.y;
@@ -2266,10 +2410,25 @@ function applyFloorAim(f, dmx) {
       // der Achse — dieselbe Rechnung wie kurz vor dem Kantenwechsel.
       goboRand = alignGoboFloor(f, mit.x, mit.kante.y + 0.01, mit.z);
       if (goboRand === null) return false;
+    } else if (wandN) {
+      // VIZ-101: auf der Wand — die Boden-Rechnung (Randstrahlen bis zur
+      // waagerechten Ebene in Trefferhoehe) gilt hier nicht; die Scheibe
+      // liegt unverzerrt in der Wandebene.
+      goboRand = alignGoboFloor(f);
     } else {
       goboRand = goboTreffer
         ? alignGoboFloor(f, goboTreffer[0], goboTreffer[1], goboTreffer[2])
         : alignGoboFloor(f);        // kein Treffer: Scheibe zurueck auf TRS
+    }
+    if (f.floorSpot) {
+      fleckAufFlaeche(f.floorSpot, aufWand ? wandN : null);
+      if (aufWand) {
+        const t = auftreffAbstand;
+        f.floorSpot.position.set(
+          ursprung.x + richtung.x * t + wandN[0] * 0.01,
+          ursprung.y + richtung.y * t + wandN[1] * 0.01,
+          ursprung.z + richtung.z * t + wandN[2] * 0.01);
+      }
     }
     // VIZ-15: derselbe Abstand macht den Boden-Pool gross. Er hatte bisher
     // einen FESTEN Radius — ein Scheinwerfer 10 m ueber der Buehne warf
@@ -2281,6 +2440,12 @@ function applyFloorAim(f, dmx) {
     // (gobo_textures.js#goboKanteAbgleichen). Nichts haengt mehr in der Luft.
     const kanteWirkt = kante || (mit ? mit.kante : null);
     kegelSchnittAbgleichen(f, (kanteWirkt && f.goboAktiv) ? kanteWirkt : null);
+    if (aufWand && wandKappt) {
+      kegelWandAbgleichen(f, wandN, [ursprung.x + richtung.x * auftreffAbstand,
+                                     ursprung.y + richtung.y * auftreffAbstand,
+                                     ursprung.z + richtung.z * auftreffAbstand]);
+    }
+    if (!mit && wandVorn) kegelWandAbgleichen(f, wandVorn.n, wandVorn.p);
     if (!f.floorSpot) return true;
     if (mit) {
       // VIZ-107: die zweite Scheibe liegt unter dem Auftreffpunkt der
@@ -2292,6 +2457,9 @@ function applyFloorAim(f, dmx) {
     }
     goboKanteAbgleichen(f, kante, ueber > 0, untenY,
                         goboTreffer ? goboTreffer[0] : 0, goboTreffer ? goboTreffer[2] : 0, ueber);
+    // VIZ-101 (Review): NACH goboKanteAbgleichen, das die Ebenen ohne Kante
+    // freigibt — der Fleck am Boden endet an der Wand davor.
+    if (wandVorn && !kante) fleckWandAbgleichen(f, wandVorn.n, wandVorn.p);
     return true;
   };
   // Laesst sich die zweite Scheibe nicht legen (sehr flacher Strahl: ihr
