@@ -880,8 +880,35 @@ class BpmManagerView(QWidget):
     def _on_bpm(self, bpm: float):
         self._lbl_bpm.setText(rules.zahl(bpm, ".1f") if bpm and bpm > 0 else "--")
         self._lbl_bpm.setStyleSheet(_BPM_STYLE.format(col=self._bpm_color(bpm)))
+        if not bpm or bpm <= 0:
+            self._clear_beat_display()
+
+    def _clear_beat_display(self):
+        """BPM-34: Takt 0 (Quelle „Aus" -> ``reset()``/``turn_off()``) -> keine Taktzelle
+        und kein Beat-Punkt bleibt auf dem letzten Schlag erleuchtet. Laeuft ueber das
+        BPM-Signal (``_on_bpm``), kein Polling."""
+        self._beat_phase = 0
+        self._dot_timer.stop()
+        self._dot.setStyleSheet(_DOT_IDLE)
+        for i, pl in enumerate(self._phase_lbls):
+            pl.setStyleSheet(self._phase_style(False, i == 0))
+        self._phase_pos.setText("")
+
+    def _beat_gilt(self) -> bool:
+        """BPM-34: Ein Beat bei Takt 0 kommt nur von einem externen Taktgeber
+        (Audio-Detektor vor der ersten Erkennung, Beatgrid) in AUTO. Sonst ist es ein
+        verspaeteter Queued-Beat aus dem Faden VOR ``reset()`` — verwerfen, damit er
+        die eben geloeschte Taktzelle nicht wieder erleuchtet."""
+        mgr = self._mgr
+        if (getattr(mgr, "bpm", 0.0) or 0.0) > 0:
+            return True
+        return (getattr(mgr, "mode", None) == BpmMode.AUTO
+                and bool(getattr(mgr, "audio_active", False)
+                         or getattr(mgr, "grid_active", False)))
 
     def _on_beat(self, idx: int):
+        if not self._beat_gilt():
+            return
         bpb = max(1, int(self._mgr.beats_per_bar))
         self._beat_phase = idx % bpb
         accent = (self._beat_phase == 0)
