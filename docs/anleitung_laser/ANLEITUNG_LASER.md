@@ -89,6 +89,11 @@ Laserworld EL-400RGB MK2; anlegen im Fixture Generator):
   für einen Regler keine Richtung, läuft er von 0 bis 255 und sagt das dazu.
 - **Gemerkte Muster:** siehe Abschnitt 5.
 
+![Laser-Reiter im Programmer mit gewähltem Laserworld EL-400RGB MK2: (1) Sicherheitsleiste mit Zustand „Laser AN“, Sperrzonen-Abzeichen und LASER NOT-AUS, (2) Betriebsart-Umschalter mit Unterzeilen, (3) Vorschau & Position, (4) Knopf „Mitte“, (5) Musterkacheln, (6) Farbfelder](img/01_laser_reiter.png)
+
+**1** Sicherheitsleiste · **2** Betriebsart · **3** Vorschau & Position ·
+**4** Mitte · **5** Muster · **6** Farbe
+
 Sind mehrere Laser gewählt, wirkt jede Bedienung auf alle; die Vorschau zeigt
 den ersten. Macht ein Profil zu einem Teil keine Angaben — oder unterscheiden
 sich die gewählten Laser darin —, steht dort die bisherige Bedienung.
@@ -122,6 +127,8 @@ der Überschrift **„Betriebsart"** erscheint in Gelb der Hinweis **„Gerät l
 Betriebsart nicht."** **Aus** („Laser dunkel") schaltet den Laser über die Betriebsart
 ab. Welche dieser Segmente erscheinen, legt das Geräteprofil fest.
 
+![Betriebsart „Musik“ gewählt: (1) Segment „Musik — Gerät läuft selbst“, (2) gelber Hinweis neben „Betriebsart“, (3) Musterkacheln und Farbfelder ausgegraut, auch die Vorschau ist abgedunkelt](img/03_musik_hinweis.png)
+
 **Profil ohne Laser-Angaben** (bisherige Bedienung): Die Kacheln unter **„Betriebsart"** entsprechen den Grund-Betriebsarten des
 Geräts (**Aus · Auto-Programm · Sound-Modus · Muster-Modus**). Für die manuelle
 Steuerung die Kachel **„Muster-Modus (DMX-Steuerung)"** wählen — nur dann wirken
@@ -139,6 +146,8 @@ Bank/Muster/Farbe-Regler.
 3. Unter **„Farbe"** ein Farbfeld anklicken.
 4. In **„Vorschau & Position"** das Muster an seinen Platz ziehen; **Mitte** stellt
    die Lage zurück. Größe und Tempo stellst du mit den Reglern darunter ein.
+
+![Statische Muster: (1) Betriebsart „Statische Muster“, (2) angeklickte Kachel „Stern“ mit blauem Rahmen, (3) die Vorschau zeigt den Stern in der gewählten Farbe Rot](img/02_statische_muster.png)
 
 **Profil ohne Laser-Angaben** (bisherige Bedienung):
 
@@ -292,6 +301,8 @@ hier — ein Laser bekommt also nicht einfach überall 0:
   ist, werden Werte gemerkt, der Laser bleibt dunkel: Betriebsart, Muster,
   Regler, Snaps und MIDI lösen ihn nicht. Nach dem Lösen gibt der Laser sofort
   wieder aus, was eingestellt ist.
+
+![Ablauf als GIF: (1) Klick auf LASER NOT-AUS oben rechts, der Knopf zeigt „LASER NOT-AUS AKTIV“, (2) die Sicherheitsleiste meldet „NOT-AUS aktiv“, (3) ein Klick auf den Scharf/Unscharf-Umschalter des Netzwerk-Lasers („UNSCHARF — Ausgabe geblockt“) wird verweigert, der Tooltip sagt „NOT-AUS aktiv — erst oben rechts lösen (Rückfrage), dann scharf schalten.“, (4) erneuter Klick oben rechts öffnet die Rückfrage „Laser-NOT-AUS lösen?“ mit „NOT-AUS lösen“ und „Abbrechen“; danach steht wieder „Laser AN“](img/04_notaus_ablauf.gif)
 
 ### Was als Laser gilt (für NOT-AUS, Blackout und „Alles Weiß“)
 
