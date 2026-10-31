@@ -68,6 +68,12 @@
 # Exit 0. Beides ruft nach einem Anteils-Schutz, nicht nach einer Aenderung
 # dieser Einzelregel.
 #
+# ★ XPLAT-55: Dateien, die `pytest.mark.timeout` auf das Segmentlimit oder
+# darueber heben (oder mit 0 abschalten), stehen AUSSERHALB der 60-s-Begruendung
+# - erreichen sie die Grenze, liefen ihre Tests nicht zu Ende. Fuer sie zaehlt
+# ein Zeitlimit ROT (Test-ZeitToleranzGedeckt). Anlass: der Zeitbomben-Waechter
+# (`timeout(600)`) lief unter Windows ins Limit und das Gate blieb gruen.
+#
 # Zeitreserve, auf BEIDEN Plattformen gemessen (echter Voll-Lauf):
 #
 #                      Linux (647 Seg.)   Windows (646 Seg., -j 6)
@@ -430,6 +436,41 @@ function Test-NativerAbbau([string]$log) {
         -Pattern 'Windows fatal exception', 'Fatal Python error')
 }
 
+function Test-ZeitToleranzGedeckt([string]$rel) {
+    <#
+      XPLAT-55: traegt die Begruendung der Zeit-Toleranz (Kopf, XPLAT-28) fuer
+      DIESE Datei?
+
+      Die Toleranz ruht auf der 60-s-Klammer aus `pytest.ini`: ein Haenger IM
+      Test stirbt nach 60 s rot, also kann nur ein Abbau-Haenger NACH den
+      Tests die Segmentgrenze erreichen. Eine Datei, die `pytest.mark.timeout`
+      auf das Segmentlimit oder darueber hebt (oder mit 0 abschaltet), steht
+      ausserhalb dieser Begruendung: erreicht SIE die Grenze, sind ihre Tests
+      schlicht nicht zu Ende gelaufen.
+
+      Gemessen ist genau dieser Fall: `tests/test_zeitbomben_gate.py`
+      (`pytestmark = pytest.mark.timeout(600)`) lief am 11.10. und 18.10.2026
+      unter Windows ins 300-s-Limit, wurde als ZEIT gezaehlt und das Gate
+      meldete trotzdem Exit 0 - der Zeitbomben-Waechter war damit still nicht
+      ausgewertet. Solche Dateien zaehlen bei einem Zeitlimit jetzt ROT.
+
+      Nicht lesbar oder nicht gefunden: wie bisher toleriert (die Einzelregel
+      aus XPLAT-28 bleibt fuer alle anderen Dateien unangetastet).
+    #>
+    try {
+        $pfad = if ([System.IO.Path]::IsPathRooted($rel)) { $rel } else { Join-Path $repo $rel }
+        if (-not (Test-Path -LiteralPath $pfad)) { return $true }
+        $text = Get-Content -LiteralPath $pfad -Raw -ErrorAction SilentlyContinue
+        if (-not $text) { return $true }
+        foreach ($m in [regex]::Matches($text, 'pytest\.mark\.timeout\(\s*(?:timeout\s*=\s*)?(\d+)')) {
+            $sek = [int]$m.Groups[1].Value
+            if ($sek -eq 0 -or $sek -ge $TimeoutSec) { return $false }
+        }
+        return $true
+    }
+    catch { return $true }
+}
+
 function Complete-Segment($rec, [int]$rc, [string]$art) {
     # XPLAT-23/QA-53: die Ergebniszeile darf den Lauf nicht mitreissen.
     # Gemessen: `Add-Content` auf eine exklusiv gehaltene Datei wirft eine
@@ -451,6 +492,9 @@ function Complete-Segment($rec, [int]$rc, [string]$art) {
     switch ($art) {
         "ok"      { $script:okCount++; Write-Host ("   ok   " + $rec.Rel) -ForegroundColor Green }
         "zeit"    { $script:timeout += $rec.Rel; Write-Host ("  ZEIT  {0} (>{1}s abgebrochen)" -f $rec.Rel, $TimeoutSec) -ForegroundColor Magenta }
+        # XPLAT-55: Zeitlimit einer Datei mit gehobenem pytest-timeout -> ROT
+        # (s. Test-ZeitToleranzGedeckt). Zaehlt in $fail, nicht in $timeout.
+        "zeit-rot" { $script:fail += $rec.Rel; Write-Host ("  ROT   {0} (>{1}s abgebrochen; Datei hebt pytest-timeout ueber das Segmentlimit - Tests NICHT ausgewertet, XPLAT-55)" -f $rec.Rel, $TimeoutSec) -ForegroundColor Red }
         "crash"   { $script:crash += $rec.Rel; Write-Host ("  CRASH {0} (rc={1}, nativer Abbau)" -f $rec.Rel, $rc) -ForegroundColor Magenta }
         default   { $script:fail += $rec.Rel; Write-Host ("  ROT   {0} (exit {1})" -f $rec.Rel, $rc) -ForegroundColor Red }
     }
@@ -537,7 +581,8 @@ while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
             finally { $ErrorActionPreference = $prevEAP }
             Start-Sleep -Milliseconds 300     # taskkill nachlaufen lassen, dann Log lesbar
             Merge-SegmentLog $rec
-            Complete-Segment $rec 124 "zeit"
+            if (Test-ZeitToleranzGedeckt $rec.Rel) { Complete-Segment $rec 124 "zeit" }
+            else { Complete-Segment $rec 124 "zeit-rot" }
             $laufend.Remove($rec)
         }
     }
@@ -649,7 +694,7 @@ if ($last.Count) {
     $last | ForEach-Object { Write-Host ("    " + $_) -ForegroundColor DarkYellow }
     Write-Host "[seg]   Gegenprobe: .\tools\verify_loop.ps1 <datei> - bleibt sie isoliert" -ForegroundColor DarkYellow
     Write-Host "[seg]   gruen, war es die Last. Ein FAILURE bleibt trotzdem rot;" -ForegroundColor DarkYellow
-    Write-Host "[seg]   ein ZEITLIMIT faerbt nicht rot (Exit-Vertrag, s. Skriptkopf)." -ForegroundColor DarkYellow
+    Write-Host "[seg]   ein ZEITLIMIT faerbt nur rot, wenn die Datei pytest-timeout hebt (XPLAT-55)." -ForegroundColor DarkYellow
     Write-Host "[seg]   Dauerhaft? LIGHTOS_VERIFY_JOBS kleiner setzen (Default 4)." -ForegroundColor DarkYellow
     Write-Host "[seg]   Die Gegenprobe darf INSGESAMT laenger dauern als das Segment im Gate:" -ForegroundColor DarkYellow
     Write-Host "[seg]   auf einem ruhigen Rechner bleibt die CPU im Spartakt (XPLAT-36)." -ForegroundColor DarkYellow
@@ -729,7 +774,8 @@ function Write-GateSummary {
 Write-GateSummary
 
 # Exit-Vertrag wie run_tests.ps1 -Isolate: NUR echte Test-Failures faerben rot.
-# Crashes/Timeouts sind Umgebungs-Flakiness (s. Kopf). Bewusst 1 statt der
+# Crashes/Timeouts sind Umgebungs-Flakiness (s. Kopf). Ausnahme XPLAT-55: das
+# Zeitlimit einer Datei mit gehobenem pytest-timeout steht in $fail. Bewusst 1 statt der
 # Segmentanzahl wie auf Linux - verify_loop.ps1 deutet 97/98/99 als
 # Lock-Runner-Codes, eine Zaehlung koennte dort kollidieren.
 if ($fail.Count) { exit 1 }
