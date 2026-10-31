@@ -27,6 +27,9 @@ Kleine Status-Marker im Element:
 - **Gelbes `⇅` oder `▯` oben links** – `⇅` = Fader ist invertiert, `▯` = ein Teilbereich (Min/Max) ist gesetzt. Der Prozentwert oben spiegelt das bereits wider.
 - **Cyan-Punkt oben rechts** – eine MIDI-Bindung (CC oder Pitchbend) ist aktiv.
 - **Zeichen `+` / `−` / `◐` unten links** neben der Spur – der Fader ist fest an einen **Modify-Effekt** gebunden; das Zeichen nennt dessen Betriebsart: `+` Addieren (Bernstein), `−` Abziehen (Blau), `◐` Abdunkeln (Grau). Mit der Maus darüber erklärt ein Tooltip die Betriebsart. Mehr dazu: [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
+
+  ![Nahaufnahme zweier Effekt-Fader: „Welle“ mit bernsteinfarbenem + (1) und „Abdunkeln“ mit grauem ◐ (2), jeweils unten links neben dem Spurende über der Beschriftung](img/07_modify_zeichen_fader.png)
+
 - **Gelbe Strich-Linie + `⊘▲`/`⊘▼` (Soft-Takeover)** – nur wenn „Pickup" aktiv ist und der Fader nach einem Bank-/Seitenwechsel auf das Durchfahren des physischen Reglers wartet (siehe [MIDI & Tastatur](#midi--tastatur)). Die gestrichelte Linie markiert den Ziel-(VC-)Wert, der zweite gelbe Strich die aktuelle physische Reglerposition, der Pfeil die Richtung, in die der physische Regler bewegt werden muss.
 
 Ist „Touch-Lock" für die VC aktiv, ignoriert der Fader Maus/Touch (reine Anzeige); MIDI/APC regelt weiter (siehe [README.md](README.md)).

@@ -1,7 +1,7 @@
 {
   "anleitung": "vc_widgets",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "000e51c2",
+  "stand": "b0cc8008",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc_widgets'.",
@@ -80,6 +80,28 @@
         1800,
         1400
       ]
+    },
+    {
+      "datei": "06_modify_zeichen_tasten.png",
+      "szene": "06_modify_zeichen_tasten",
+      "titel": "Modify-Zeichen unten links: + Addieren, − Abziehen, ◐ Abdunkeln",
+      "groesse": [
+        908,
+        196
+      ],
+      "marken": [],
+      "md5": "738b60785f29cfcbc0ac2006d5ae4654"
+    },
+    {
+      "datei": "07_modify_zeichen_fader.png",
+      "szene": "07_modify_zeichen_fader",
+      "titel": "Modify-Zeichen am Effekt-Fader",
+      "groesse": [
+        460,
+        516
+      ],
+      "marken": [],
+      "md5": "88612fa121a20add9f414a7e88a7804d"
     }
   ]
 }

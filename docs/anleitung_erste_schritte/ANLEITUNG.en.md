@@ -101,6 +101,18 @@ Clicking a name switches the work area. With the keyboard use **Strg+1** to **St
    from the patch (long names shortened, a number at the end is kept). If several
    fixtures share a name or there is too little room, it shows short type + number
    instead (e.g. "MH 9"); selected fixtures show their name even when space is tight.
+
+   ![2D stage of the demo show: eight PARs with a colour gradient from red to blue, two washes and two spots behind them, the LED bar in front; below each symbol the fixture name, marked "PAR 1" (1), "Spot 1" (2) and "LED-Leiste" (3)](img/12_buehne_namen.png)
+
+   Selected fixtures get a yellow ring; they are highlighted in the list on the left
+   as well, and the bottom line reads "Selektion: 3 Fixtures" (selection).
+
+   ![2D stage with a selection: PAR 3 and PAR 4 (1) and Spot 1 (2) with a yellow ring, highlighted blue in the fixture list on the left](img/13_buehne_auswahl.png)
+
+   Pull the **GM** down or press **BLACKOUT** and the 2D stage gets darker or goes
+   dark too — it shows the output image:
+
+   ![Animated GIF: GM slider (1) from 100 % to 50 % and 15 %, the fixtures on the 2D stage get darker and show 50 % and 14 %; GM back to 100 %, then BLACKOUT (2) on — all symbols dark — and off again](img/14_buehne_gm_blackout.gif)
 2. **Patchen** (patch) — create fixtures, put them on DMX addresses and combine them into
    groups (step 5). In detail:
    [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md) (German).

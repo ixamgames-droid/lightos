@@ -439,6 +439,153 @@ def _viz_bild(*, taste: bool):
     return bauen
 
 
+# ── 6/7 (DOC-77): Modify-Zeichen auf Taste und Fader ────────────────────────
+#
+# Drei Dimmer-Matrizen mit Haken „Modify“ (Addieren, Abziehen, Abdunkeln),
+# dazu drei Tasten und zwei Fader auf Bank 1 der Doku-Demo. Die Taste
+# „Lücke + Dunkel“ schaltet ZWEI Modify-Effekte verschiedener Art — sie zeigt
+# beide Zeichen nebeneinander. Nichts wird gestartet; die Zeichen haengen nur
+# an der Bindung. Die letzte der beiden Szenen raeumt Widgets und Matrizen ab.
+
+_MODIFY_MATRIZEN = (("doku_mod_add", "Welle (Addieren)", "add"),
+                    ("doku_mod_sub", "Lücke (Abziehen)", "sub"),
+                    ("doku_mod_dim", "Abdunkeln", "dim"))
+_MODIFY_TASTEN = (("doku_mod_taste_add", "Welle", ("add",), (680, 300)),
+                  ("doku_mod_taste_subdim", "Lücke + Dunkel", ("sub", "dim"), (830, 300)),
+                  ("doku_mod_taste_dim", "Abdunkeln", ("dim",), (980, 300)))
+_MODIFY_FADER = (("doku_mod_fader_add", "Welle", "add", (1140, 260)),
+                 ("doku_mod_fader_dim", "Abdunkeln", "dim", (1250, 260)))
+_TASTE_GROESSE = (130, 70)
+_FADER_GROESSE = (90, 230)      # wie die Fader der Doku-Demo
+_NAH = 2            # Nahaufnahme: Ausschnitt doppelt so gross
+
+
+def _modify_matrizen(ui) -> dict:
+    """Die drei Modify-Matrizen (einmal angelegt, danach wiederverwendet)."""
+    from src.core.engine.function_manager import get_function_manager
+    from src.core.engine.rgb_matrix import MatrixStyle
+    fm = get_function_manager()
+    ids = ui.info.setdefault("doku_modify", {})
+    for _schluessel, name, art in _MODIFY_MATRIZEN:
+        if art in ids and fm.get(ids[art]) is not None:
+            continue
+        m = fm.new_rgb_matrix(name)
+        m.style = MatrixStyle.DIMMER
+        m.modify = True
+        m.modify_mode = art
+        ids[art] = m.id
+    return ids
+
+
+def _modify_anlegen(ui):
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QWidget
+    from src.ui.virtualconsole.vc_button import ButtonAction
+    from src.ui.virtualconsole.vc_slider import SliderMode
+    ids = _modify_matrizen(ui)
+    canvas = _canvas(ui)
+    for name, text, arten, (x, y) in _MODIFY_TASTEN:
+        w = canvas.findChild(QWidget, name)
+        if w is None:
+            w = canvas._add_widget("VCButton", QPoint(x, y))
+            w.setObjectName(name)
+        w.caption = text
+        w.resize(*_TASTE_GROESSE)
+        w.action = ButtonAction.FUNCTION_TOGGLE
+        w.function_id = ids[arten[0]]
+        w.function_ids = [ids[a] for a in arten[1:]]
+        w.show()
+        w.update()
+    for name, text, art, (x, y) in _MODIFY_FADER:
+        w = canvas.findChild(QWidget, name)
+        if w is None:
+            w = canvas._add_widget("VCSlider", QPoint(x, y))
+            w.setObjectName(name)
+        w.caption = text
+        w.resize(*_FADER_GROESSE)
+        w.mode = SliderMode.EFFECT_INTENSITY
+        w.function_id = ids[art]
+        w.show()
+        w.update()
+    ui.pump(0.4)
+    for name, _t, arten, _p in _MODIFY_TASTEN:
+        ist = canvas.findChild(QWidget, name)._modify_arten()
+        if ist != list(arten):
+            raise SzenenFehler(f"Taste {name}: Zeichen {ist}, erwartet {list(arten)}")
+    for name, _t, art, _p in _MODIFY_FADER:
+        ist = canvas.findChild(QWidget, name)._modify_arten()
+        if ist != [art]:
+            raise SzenenFehler(f"Fader {name}: Zeichen {ist}, erwartet {[art]}")
+
+
+def _modify_weg(ui):
+    from PySide6.QtWidgets import QWidget
+    from src.core.engine.function_manager import get_function_manager
+    canvas = _canvas(ui)
+    for name, *_rest in _MODIFY_TASTEN + _MODIFY_FADER:
+        w = canvas.findChild(QWidget, name)
+        if w is not None:
+            canvas._remove_widget(w)
+    fm = get_function_manager()
+    for fid in (ui.info.pop("doku_modify", None) or {}).values():
+        try:
+            fm.remove(fid)
+        except Exception:
+            pass
+    ui.pump(0.2)
+
+
+def _nahaufnahme(ui, namen, *, rand=14, lage="unten"):
+    """Ausschnitt um die Widgets ``namen`` doppelt so gross, Zeichen markiert.
+
+    Rueckgabe: QLabel in der Bildgroesse (die Szene muss diese ``groesse``
+    tragen; der Runner setzt das Bild-Widget darauf)."""
+    from PySide6.QtCore import QPoint, QRect, Qt
+    from PySide6.QtWidgets import QLabel, QWidget
+    from anleitungsbilder.szenen_erste_schritte import kreise_malen
+    canvas = _canvas(ui)
+    win = ui.win
+    widgets = [canvas.findChild(QWidget, n) for n in namen]
+    for w in widgets:
+        w.update()
+    ui.pump(0.4)
+    ganz = None
+    for w in widgets:
+        r = rechteck(win, w)
+        ganz = r if ganz is None else ganz.united(r)
+    ganz = ganz.adjusted(-rand, -rand, rand, rand)
+    pix = win.grab(ganz)
+    pix = pix.scaled(pix.width() * _NAH, pix.height() * _NAH,
+                     Qt.AspectRatioMode.IgnoreAspectRatio,
+                     Qt.TransformationMode.SmoothTransformation)
+    kreise = []
+    for nr, w in enumerate(widgets, 1):
+        z = getattr(w, "_modify_zeichen_rect", None)
+        if z is None:
+            raise SzenenFehler(f"{w.objectName()}: kein Modify-Zeichen gemalt")
+        oben = w.mapTo(win, z.topLeft()) - ganz.topLeft()
+        kreise.append((QRect(QPoint(oben.x() * _NAH - 3, oben.y() * _NAH - 3),
+                             QRect(0, 0, z.width() * _NAH + 6,
+                                   z.height() * _NAH + 6).size()), nr, lage))
+    # Keine weiteren Hindernisse: neben dem Zeichen ist auf Taste und Fader
+    # freie Flaeche; der Kern haelt die Kreise nur von Rahmen und Kreisen fern.
+    kreise_malen(pix, kreise)
+    flaeche = QLabel()
+    flaeche.setFixedSize(pix.size())
+    flaeche.setPixmap(pix)
+    return flaeche
+
+
+def _bild_modify_tasten(ui):
+    _modify_anlegen(ui)
+    return _nahaufnahme(ui, [n for n, *_r in _MODIFY_TASTEN])
+
+
+def _bild_modify_fader(ui):
+    _modify_anlegen(ui)
+    return _nahaufnahme(ui, [n for n, *_r in _MODIFY_FADER], lage="oben")
+
+
 SZENEN = [
     Szene("01_blackout_ziel_dialog", sektion="Virtual Console",
           dialog=_bild_dialog,
@@ -472,4 +619,12 @@ SZENEN = [
                     dialog=_viz_bild(taste=False)),
           ],
           titel="GIF: „Blackout Links“ im 3D-Visualizer (am echten Bildschirm)"),
+    # DOC-77: Nahaufnahmen der Modify-Zeichen (Bildgroesse = Ausschnitt x 2,
+    # das Bild-Widget hat feste Groesse — ``groesse`` der Szene wirkt nicht)
+    Szene("06_modify_zeichen_tasten", sektion="Virtual Console",
+          dialog=_bild_modify_tasten,
+          titel="Modify-Zeichen unten links: + Addieren, − Abziehen, ◐ Abdunkeln"),
+    Szene("07_modify_zeichen_fader", sektion="Virtual Console",
+          dialog=_bild_modify_fader, nachher=_modify_weg,
+          titel="Modify-Zeichen am Effekt-Fader"),
 ]
