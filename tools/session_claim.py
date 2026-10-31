@@ -475,6 +475,21 @@ def _git_klarnamen_datei() -> str | None:
     darf (Windows-Sitzung B, 01.10.2026)."""
     if os.environ.get("LIGHTOS_KLARNAMEN"):
         return None                              # Tests: nur die ausdrueckliche Datei
+    # TOOL-29: Der Ort haengt nur an der Lage dieser Datei — einmal je Prozess
+    # fragen. Sonst startet jede gepruefte Backlog-Zeile ein git (rund 2450 auf
+    # Windows-ARM, 182 s). Gemerkt wird nur der Pfad, die Liste selbst wird
+    # weiter jedes Mal frisch gelesen.
+    global _GIT_KLARNAMEN_ORT
+    if _GIT_KLARNAMEN_ORT is _UNBEKANNT:
+        _GIT_KLARNAMEN_ORT = _git_klarnamen_ort_ermitteln()
+    return _GIT_KLARNAMEN_ORT
+
+
+_UNBEKANNT = object()
+_GIT_KLARNAMEN_ORT: object = _UNBEKANNT
+
+
+def _git_klarnamen_ort_ermitteln() -> str | None:
     try:
         r = subprocess.run(["git", "rev-parse", "--git-common-dir"], capture_output=True,
                            text=True, encoding="utf-8", errors="replace",
