@@ -32,7 +32,12 @@ def _build_artdmx(universe: int, data: bytes, sequence: int) -> bytes:
 
 
 class ArtNetSender:
+    #: STAB-39: True = ohne echte App, es geht nichts ins Netz.
+    _stumm = False
+
     def __init__(self, target_ip: str = "255.255.255.255"):
+        from src.core.paths import echte_ausgabe_pruefen
+        self._stumm = not echte_ausgabe_pruefen("Art-Net")
         # NET-04: Steht als Ziel der LIMITED Broadcast (255.255.255.255) UND ist
         # eine Ausgangs-NIC gewaehlt, geht es an deren GERICHTETEN Broadcast
         # (z. B. 192.0.2.255). Limited Broadcast wird von Routern nicht
@@ -55,6 +60,8 @@ class ArtNetSender:
 
     def send_dmx(self, universe: int, data: bytes):
         """Sendet ein ArtDmx Paket. universe = 0-32767, data = 2-512 Bytes."""
+        if self._stumm:
+            return
         self._sequence = (self._sequence % 255) + 1
         packet = _build_artdmx(universe, data, self._sequence)
         if self._quellport is None:

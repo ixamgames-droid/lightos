@@ -88,7 +88,12 @@ def _pack_framing(data: bytes, universe: int, seq: int, source: str, cid: bytes,
 class SACNSender:
     """Sends sACN (E1.31) DMX data over UDP multicast or unicast."""
 
+    #: STAB-39: True = ohne echte App, es geht nichts ins Netz.
+    _stumm = False
+
     def __init__(self, target_ip: str | None = None, source_name: str = "LightOS"):
+        from src.core.paths import echte_ausgabe_pruefen
+        self._stumm = not echte_ausgabe_pruefen("sACN")
         self._target_ip = target_ip   # None = multicast
         self._source_name = source_name
         # OUT-06: CID, Sequenzzaehler und Universums-Besitz liegen in der EINEN Quelle
@@ -118,7 +123,7 @@ class SACNSender:
 
     def send_dmx(self, universe: int, data: bytes):
         """Send 512 bytes of DMX data for the given universe (1-based)."""
-        if self._sock is None:
+        if self._sock is None or self._stumm:
             return
         # Pad or trim to exactly 512 bytes
         dmx = (data + bytes(512))[:512]
@@ -178,7 +183,7 @@ class SACNSender:
         # `None`, wenn das Universum weitergereicht wurde.
         for universe in sorted(self._universes):
             seq = self._source.release(universe, self._token)
-            if seq is None:
+            if seq is None or self._stumm:
                 continue          # Nachfolger sendet hier bereits — nicht stoeren
             try:
                 pkt = _pack_framing(bytes(512), universe, seq, self._source_name,

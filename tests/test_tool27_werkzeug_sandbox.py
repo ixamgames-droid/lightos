@@ -513,6 +513,21 @@ class SandboxModulTest(unittest.TestCase):
             self.assertIn("fixtures.db", erg["wurzel_inhalt"])
             self.assertEqual(sorted(os.listdir(daten)), ["eigene_fixtures.db"])
 
+    def test_stab39_geerbte_freigaben_fallen_weg(self):
+        """Gegenpruefung 31.10.: eine geerbte ``LIGHTOS_ECHTE_AUSGABE=1`` (Shell
+        nach hw5_longrun, pytest-Kind) oder ``LIGHTOS_ECHTE_APP=1`` darf im
+        Werkzeug nicht stehen bleiben — auch nicht mit ``--echte-daten``."""
+        for args in (("audit_tooltip_coverage.py",),
+                     ("patch_quarantaene.py", "--echte-daten")):
+            with self.subTest(args=args), \
+                    tempfile.TemporaryDirectory(prefix="lightos_tool27_") as tmp:
+                env, _, _ = _bediener_umgebung(tmp)
+                env.update({"LIGHTOS_ECHTE_AUSGABE": "1", "LIGHTOS_ECHTE_APP": "1"})
+                lauf, erg = _kind(_NUR_SANDBOX, tmp, env, *args)
+                self.assertIsNotNone(erg, (lauf.returncode, lauf.stderr[-1500:]))
+                self.assertNotIn("LIGHTOS_ECHTE_AUSGABE", erg["umgebung"])
+                self.assertNotIn("LIGHTOS_ECHTE_APP", erg["umgebung"])
+
     def test_echte_daten_nur_fuer_die_erlaubten_werkzeuge(self):
         sys.path.insert(0, str(TOOLS))
         try:
@@ -733,7 +748,8 @@ def _stand(daten: str) -> dict:
     return aus
 
 
-def _werkzeug_lauf(name: str, modus: str, *, schreibend: bool = True):
+def _werkzeug_lauf(name: str, modus: str, *, schreibend: bool = True,
+                   freigabe: bool = True):
     with tempfile.TemporaryDirectory(prefix="lightos_tool27_") as tmp:
         env, daten, temp = _bediener_umgebung(tmp)
         vorher = _echte_dateien_anlegen(daten)
@@ -744,6 +760,12 @@ def _werkzeug_lauf(name: str, modus: str, *, schreibend: bool = True):
             env.update({"LIGHTOS_SERIAL_INPROC": "1", "LIGHTOS_NO_OUTPUT_THREAD": "1",
                         "LIGHTOS_KEIN_USB": "1", "LIGHTOS_NO_AUDIO_AUTOSTART": "1",
                         "LIGHTOS_NO_DATENUMZUG": "1"})
+            if freigabe:
+                # STAB-39: ohne Freigabe faengt schon die zweite Schicht das
+                # Werkzeug ab (Wegwerf-Ordner, stumme Ausgabe). Die Gegenprobe
+                # soll aber zeigen, dass die SANDBOX wirkt — also die Lage,
+                # in der jemand die echten Daten/Ausgaenge freigegeben hat.
+                env.update({"LIGHTOS_ECHTE_DATEN": "1", "LIGHTOS_ECHTE_AUSGABE": "1"})
         ziel = os.path.join(tmp, "bericht.txt")
         argumente = ["--ausgabe", ziel] if schreibend else ["--check"]
         lauf, erg = _nackt(name, tmp, env, modus, *argumente)
@@ -825,6 +847,17 @@ class WerkzeugeAmEchtenWegTest(unittest.TestCase):
                             "die echte Show-Datenbank wurde nicht angefasst")
         self.assertIn(["serial", ["COM_TOOL27"]],
                       [[a, b[:1]] for a, b in erg["geoeffnet"]], erg["geoeffnet"])
+
+    @pytest.mark.timeout(300)
+    def test_stab39_ohne_sandbox_und_ohne_freigabe_bleibt_alles_echte_zu(self):
+        """STAB-39, zweite Schicht: dasselbe Werkzeug OHNE Sandbox und OHNE
+        Freigabe bekommt einen Wegwerf-Datenordner und oeffnet keinen Port."""
+        r = _werkzeug_lauf("audit_tooltip_coverage.py", "ohne", freigabe=False)
+        erg = r["erg"]
+        self.assertFalse(_innerhalb(erg["show_db"], r["daten"]), erg["show_db"])
+        self.assertEqual(r["nachher"], r["vorher"], "der echte Datenordner wurde angefasst")
+        self.assertNotIn("serial", [a for a, _ in erg["geoeffnet"]], erg["geoeffnet"])
+        self.assertIn("STAB-39", r["stderr"])
 
 
 class MidiAutoconnectSchalterTest(unittest.TestCase):

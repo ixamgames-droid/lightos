@@ -66,10 +66,11 @@ def buehne_speichern(state, name: str, elemente: list) -> dict:
 
     Liefert ``{element_name: element_id}`` (fuers Andocken der Geraete)."""
     from src.core.stage.stage_definition import StageDefinition, save_stage
+    from src.core.paths import ziel_hinweis  # STAB-39
     from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
     sd = StageDefinition(name=name)
     sd.elements.extend(elemente)
-    save_stage(sd)
+    print(f"[ok] Stage '{name}' -> {ziel_hinweis(save_stage(sd))}")
     state.active_stage_name = name
     scene = state._scene
     for e in sd.elements:

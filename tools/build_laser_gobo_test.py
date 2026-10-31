@@ -28,6 +28,7 @@ from _builder import (ShowBuilder, RgbAlgorithm, EfxAlgorithm, RunOrder,
 from sqlalchemy.orm import Session
 from src.core.database.models import FixtureGroup
 from src.core.stage.stage_definition import StageDefinition, save_stage
+from src.core.paths import ziel_hinweis  # STAB-39: echter Zielort statt %APPDATA%-Behauptung
 from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
 from src.core.app_state import get_channels_for_patched
 from src.core.engine.chaser import ChaserStep
@@ -175,7 +176,7 @@ def main(argv=None):
         for sz in (2.6, -2.6):
             sd.add("truss_v", x=sx, y=2.75, z=sz, w=0.3, h=5.5, d=0.3, name=f"Stuetze {sx},{sz}")
     sd.add("platform", x=0, y=0.3, z=0.4, w=14, h=0.6, d=8, name="Buehne")
-    save_stage(sd)
+    stage_pfad = save_stage(sd)
     b.state.active_stage_name = STAGE_NAME
 
     scene = b.state._scene
@@ -217,7 +218,7 @@ def main(argv=None):
     # ---- 7) SPEICHERN + VALIDIEREN ----
     build_and_verify(b, out, name="Laser Gobo Test 2026")
     print(f"[ok] geschrieben: {out}")
-    print(f"[ok] Stage '{STAGE_NAME}' -> %APPDATA%/LightOS/stages/{STAGE_NAME}.json")
+    print(f"[ok] Stage '{STAGE_NAME}' -> {ziel_hinweis(stage_pfad)}")
 
 
 if __name__ == "__main__":

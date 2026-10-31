@@ -118,6 +118,11 @@ _SCHALTER = (
     "LIGHTOS_NO_RECOVERY_PROMPT",
     "LIGHTOS_NO_DATENUMZUG",
     "LIGHTOS_NO_SESSION_LOG",
+    # STAB-39: der Datenordner ist unten umgelenkt (im Temp-Bereich) — regulaer
+    # aufloesen statt eines Wegwerf-Ordners. Sonst speicherten die Generatoren
+    # ihre Buehne (``save_stage``) in einen Ordner, den ``buehnen_befund`` nie
+    # sieht, und die DEMO-8-Pruefung meldete immer ok. Gibt KEINE Ausgabe frei.
+    "LIGHTOS_SANDKASTEN",
 )
 
 #: Was eine geerbte Umgebung in eine echte Richtung lenken koennte — raus.
@@ -130,6 +135,11 @@ _ENTFERNEN = (
     "LIGHTOS_VC_ASSETS_DIR",
     "LIGHTOS_SESSION_LOG",
     "LIGHTOS_LOG_DIR",
+    # STAB-39: eine geerbte Markierung der echten App / Ausgabe-Freigabe /
+    # ein geerbter Wegwerf-Ordner gehoeren nicht in den Generator-Kindprozess.
+    "LIGHTOS_ECHTE_APP",
+    "LIGHTOS_ECHTE_AUSGABE",
+    "LIGHTOS_DATEN_ORDNER",
     # Kein echter Bildschirm: die Generatoren zeichnen offscreen.
     "DISPLAY",
     "WAYLAND_DISPLAY",

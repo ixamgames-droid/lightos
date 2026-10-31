@@ -126,6 +126,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
     from src.core.engine.efx import EfxFixture
     from src.core.database.models import FixtureGroup
     from src.core.stage.stage_definition import StageDefinition, StageElement, save_stage
+    from src.core.paths import ziel_hinweis  # STAB-39
     from src.core.stage.scene_graph import NodeKind, SceneNode, Transform
     from src.ui.virtualconsole.vc_slider import SliderMode
     from _shutter import shutter_offen
@@ -594,7 +595,7 @@ def bauen(out: str, *, reset: bool = True) -> dict:
         # PAR-Tuerme neben der Buehne.
         for i, z in enumerate(TURM_Z, 1):
             _e("truss_v", sx * TURM_X, 3.75, z, 0.4, 7.5, 0.4, grau, f"Turm {seite} {i}")
-    save_stage(sd)
+    print(f"[ok] Stage '{STAGE_NAME}' -> {ziel_hinweis(save_stage(sd))}")
     st.active_stage_name = STAGE_NAME
     scene = st._scene
     for e in sd.elements:

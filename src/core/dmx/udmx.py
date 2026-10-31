@@ -322,6 +322,11 @@ def _usb_laden():
     if os.environ.get("LIGHTOS_KEIN_USB"):
         raise UdmxFehler(G_PYUSB_FEHLT, "Rohes USB ist per LIGHTOS_KEIN_USB "
                                         "abgeschaltet — uDMX-Adapter ruhen.")
+    # STAB-39: rohes USB nur fuer die echte App (oder mit ausdruecklicher Freigabe).
+    from src.core.paths import echte_ausgabe_pruefen
+    if not echte_ausgabe_pruefen("uDMX"):
+        raise UdmxFehler(G_PYUSB_FEHLT, "STAB-39: echte Ausgabe nur aus der App "
+                                        "(main.py) — uDMX-Adapter ruhen.")
     try:
         import usb.core
         import usb.util

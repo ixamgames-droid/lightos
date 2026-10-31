@@ -108,10 +108,34 @@ _win_id() {
                                         if (t == want) { print $1; exit } }'
 }
 
+# ★ STAB-39: aus einer Claude-Code-Shell (CLAUDECODE=1) ist der Start KEINE
+# echte App — main.py setzt dort keine Markierung: PROBELAUF mit Wegwerf-
+# Datenordner (beim Beenden geloescht) und gesperrter DMX-Ausgabe. Im leeren
+# Wegwerf-Ordner fehlt aber die Testlizenz, und der Dialog
+# "LightOS — Testlizenz erforderlich" passte auf WIN_PATTERN — wait/shot
+# bekamen den Dialog statt des Hauptfensters. Darum hier, wie
+# tools/app_messung.py (LIZ-1), den Ort der Lizenz DIESES Rechners mitgeben —
+# NUR LESEND, und mit derselben Fundlogik (paths.regulaerer_app_data_dir statt
+# einer bash-Nachbildung). Eine gesetzte LIGHTOS_LIZENZ gewinnt.
+_probelauf_lizenz() {
+    [ "${CLAUDECODE:-}" = "1" ] || return 0
+    [ -n "${LIGHTOS_LIZENZ:-}" ] && return 0
+    local py="$REPO/venv/bin/python" pfad
+    [ -x "$py" ] || py="python3"
+    pfad=$("$py" -c 'import os, sys; sys.path.insert(0, sys.argv[1]); from src.core.paths import regulaerer_app_data_dir as d; print(os.path.join(d(), "lightos-lizenz.lic"))' "$REPO" 2>/dev/null) || pfad=""
+    if [ -n "$pfad" ] && [ -f "$pfad" ]; then
+        export LIGHTOS_LIZENZ="$pfad"
+        echo "[app] Probelauf (CLAUDECODE=1): Wegwerf-Daten, keine Ausgabe; Lizenz nur lesend aus dem echten Datenordner"
+    else
+        echo "[app] Probelauf (CLAUDECODE=1): Wegwerf-Daten, keine Ausgabe; keine Lizenzdatei gefunden — Lizenzdialog moeglich" >&2
+    fi
+}
+
 cmd_start() {
     if pid=$(_running_pid); then echo "[app] laeuft bereits (PID $pid)"; return 0; fi
     [ -x "$REPO/start.sh" ] || die "start.sh nicht gefunden unter $REPO"
     mkdir -p "$(dirname "$LOGFILE")"
+    _probelauf_lizenz
     ( cd "$REPO" && nohup ./start.sh >>"$LOGFILE" 2>&1 & echo $! >"$PIDFILE" )
     sleep 1
     if pid=$(_running_pid); then echo "[app] gestartet (PID $pid), Log: $LOGFILE"; else
