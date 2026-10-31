@@ -56,7 +56,7 @@ def _fx(protocol):
 
 
 class SchreiberTest(unittest.TestCase):
-    """Die sechs Schreiber, je mit eingebauter Positivkontrolle."""
+    """Die acht Schreiber, je mit eingebauter Positivkontrolle."""
 
     def setUp(self):
         alt = AS.get_channels_for_patched
@@ -149,6 +149,55 @@ class SchreiberTest(unittest.TestCase):
         dmx, laser = self._beide(bauen)
         self.assertEqual([], laser, f"der Platzhalter schreibt auf {dmx}")
 
+    def test_rgb_matrix_write(self):
+        """Die Farbschleife der Matrix (die vorher OFFEN gefuehrte Stelle 7)."""
+        from src.core.engine.rgb_matrix import (RgbAlgorithm, RgbMatrixInstance,
+                                                MatrixStyle)
+
+        def bauen(f):
+            m = RgbMatrixInstance(name="m", cols=1, rows=1, fixture_grid=[1],
+                                  algorithm=RgbAlgorithm.PLAIN,
+                                  color1=(255, 255, 255), drive_intensity=True)
+            m.style = MatrixStyle.RGB
+            m._running = True
+            u = _U()
+            m.write({1: u}, [f], 0.05)
+            return u.ch
+        dmx, laser = self._beide(bauen)
+        self.assertEqual([], laser, f"der Platzhalter schreibt auf {dmx}")
+
+    def test_rgb_matrix_weiss_achse(self):
+        """Die eigene Weiss-Achse der Matrix (die vorher OFFEN gefuehrte Stelle 8).
+
+        Die Achsen-Helfer werden gestellt: hier geht es allein darum, ob die
+        Schleife vor der Adressrechnung fragt — nicht um die Achsenregeln
+        (die pruefen test_fm41_*/test_fm46*/test_fm54_*)."""
+        from src.core.engine.rgb_matrix import (RgbAlgorithm, RgbMatrixInstance,
+                                                MatrixStyle)
+        w = _Ch("color_w", 6)
+        for name, wert in (("weiss_ist_eigene_achse_for_channels",
+                            lambda chans, fx=None: True),
+                           ("channels_for_axis",
+                            lambda chans, achse, index: {"color_w": w}),
+                           ("weiss_rueckfall_dimmer",
+                            lambda chans, index, proj=None: [])):
+            alt = getattr(AS, name)
+            setattr(AS, name, wert)
+            self.addCleanup(setattr, AS, name, alt)
+
+        def bauen(f):
+            m = RgbMatrixInstance(name="m", cols=1, rows=1, fixture_grid=[None],
+                                  weiss_grid=[(1, 0)],
+                                  algorithm=RgbAlgorithm.PLAIN,
+                                  color1=(255, 255, 255))
+            m.style = MatrixStyle.RGB
+            m._running = True
+            u = _U()
+            m._weiss_achse_schreiben({1: u}, [f], m._render(0.0))
+            return u.ch
+        dmx, laser = self._beide(bauen)
+        self.assertEqual([], laser, f"der Platzhalter schreibt auf {dmx}")
+
 
 class HuelleTest(unittest.TestCase):
     """``gibt_ueber_dmx_aus`` — und ihre bewusst gewaehlte sichere Richtung."""
@@ -188,7 +237,7 @@ class WaechterTest(unittest.TestCase):
     Sucht per **AST** die Funktionen, die eine Geraete-Adresse rechnen UND ins
     Universum schreiben, und haelt fest, dass jede die Regel konsultiert.
 
-    ⚠️ Die zwei Ausnahmen unten sind **benannt und selbstraeumend**: der Test
+    ⚠️ Ausnahmen unten sind **benannt und selbstraeumend**: der Test
     prueft, dass die Liste EXAKT stimmt. Wird eine davon behoben, faellt er und
     zwingt zum Streichen — eine Ausschlussliste, die still verrotten kann, waere
     genau der Waechter, vor dem Sitzung A gewarnt hat.
@@ -202,11 +251,12 @@ class WaechterTest(unittest.TestCase):
             "span-begrenzt (gemessen 2026-09-06)",
     }
 
-    #: Gemessen ERREICHBAR, noch offen — Sitzung A zieht sie selbst nach (QA-78).
-    OFFEN = {
-        "core/engine/rgb_matrix.py::write",
-        "core/engine/rgb_matrix.py::_weiss_achse_schreiben",
-    }
+    #: Gemessen ERREICHBAR, noch offen. Leer seit QA-78 (Rest): die beiden
+    #: Matrix-Stellen (``rgb_matrix.write`` und ``_weiss_achse_schreiben``)
+    #: fragen jetzt selbst — Nachweis ``SchreiberTest.test_rgb_matrix_*``.
+    #: Die Liste bleibt als Mechanismus stehen, falls eine neue Stelle
+    #: bewusst und befristet offen gefuehrt werden muss.
+    OFFEN: set = set()
 
     def _schreiber(self) -> dict:
         """``{"pfad::funktion": fragt_die_regel}`` fuer alle Adress-Schreiber."""
@@ -265,7 +315,7 @@ class WaechterTest(unittest.TestCase):
     def test_die_offene_liste_raeumt_sich_selbst(self):
         """★★ Die Ausnahmeliste darf nicht still verrotten.
 
-        Sobald A ihre beiden Stellen nachzieht, faellt dieser Test und zwingt
+        Sobald eine offen gefuehrte Stelle nachgezogen ist, faellt dieser Test und zwingt
         zum Streichen. Eine Liste, die auch dann gruen bleibt, wenn ihr Grund
         entfallen ist, ist genau der Waechter, der zu viel schluckt.
         """
