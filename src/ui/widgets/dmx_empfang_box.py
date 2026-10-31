@@ -60,7 +60,20 @@ def _prefs_merken(updates: dict) -> None:
 
 
 def _zeige_vorwarnung(parent, text: str) -> None:
-    """Das eine Fenster vor der Windows-Abfrage (Tests ersetzen das)."""
+    """Das eine Fenster vor der Windows-Abfrage (Tests ersetzen das).
+
+    QA-106: Ohne Bildschirm (Testlauf, Werkzeug, CI — ``qt_plattform.
+    ohne_bildschirm``, also die Plattform, auf der Qt WIRKLICH läuft) erreicht
+    ein modales Fenster niemanden; es hielt unter Windows jeden Test an, der
+    „…-Eingang aktivieren“ anhakt, bis in den Timeout (unter Linux fragt
+    nichts nach, dort fiel es nie auf). Dann nur ins Protokoll — dieselbe
+    Regel wie beim Wiederherstellungsdialog (QA-23/STAB-34). In der sichtbaren
+    App unverändert."""
+    from src.core.qt_plattform import ohne_bildschirm
+    if ohne_bildschirm():
+        print(f"[dmx_empfang] {TITEL_VORWARNUNG} (ohne Bildschirm, "
+              "kein Fenster)")
+        return
     QMessageBox.information(parent, TITEL_VORWARNUNG, text)
 
 
