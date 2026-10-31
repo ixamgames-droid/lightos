@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING
 
 from . import show_zeit  # ENG-33: Vorschau-Zeit = Show-Zeit
 from .function import Function, FunctionType
+from .function import gibt_ueber_dmx_aus as _gibt_ueber_dmx_aus
 from .patch_index import PatchListe
 
 if TYPE_CHECKING:
@@ -895,6 +896,10 @@ class RgbMatrixInstance(Function):
             fx = _find_fixture(patch_cache, fid)
             if fx is None:
                 continue
+            # QA-78: gemessen erreichbar — ein Netzwerk-Laser in der Matrix-
+            # Gruppe schrieb ueber seine Platzhalter-Adresse 1 auf CH1-4.
+            if not _gibt_ueber_dmx_aus(fx):
+                continue
             universe = universes.get(fx.universe)
             if universe is None:
                 continue
@@ -1197,6 +1202,11 @@ class RgbMatrixInstance(Function):
             fid, segment = eintrag
             fx = _find_fixture(patch_cache, fid)
             if fx is None:
+                continue
+            # QA-78: gemessen erreichbar — die Weiss-Zelle eines Netzwerk-
+            # Lasers schrieb ueber die Platzhalter-Adresse in fremde Kanaele
+            # (Segment-Kanal CH6 bei Adresse 1).
+            if not _gibt_ueber_dmx_aus(fx):
                 continue
             universe = universes.get(fx.universe)
             if universe is None:
