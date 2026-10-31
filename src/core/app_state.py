@@ -3832,13 +3832,46 @@ class AppState:
 
     def dimmer_key_setzen(self, fid, key, value) -> None:
         """Setzt einen Dimmer-Schluessel aus ``weiss_dimmer_key`` und verankert
-        vorher die Vorkommen, auf die er sonst gespiegelt wuerde (FM-46)."""
+        vorher die Vorkommen, auf die er sonst gespiegelt wuerde (FM-46).
+
+        FM-62 (1): verankert wird auf dem WIRKSAMEN Vorwert, nicht auf 0 —
+        steht der Basis-Schluessel schon im Programmer (z. B. ``intensity``
+        = 128), erbten die anderen Vorkommen genau diesen Wert ueber den
+        Spiegel; sonst ihr eigener Standardwert. Mit 0 gingen die anderen
+        Segmente beim Regeln eines Segments ungefragt dunkel."""
         prog = self.programmer.get(fid, {})
-        for anker in self.weiss_dimmer_anker_keys(fid, key):
-            if anker not in prog:
-                self.set_programmer_value(fid, anker, 0)
-                prog = self.programmer.get(fid, {})
+        anker_keys = self.weiss_dimmer_anker_keys(fid, key)
+        if anker_keys:
+            vorwert = self._dimmer_anker_vorwerte(fid, key, anker_keys, prog)
+            for anker in anker_keys:
+                if anker not in prog:
+                    self.set_programmer_value(fid, anker, vorwert.get(anker, 0))
+                    prog = self.programmer.get(fid, {})
         self.set_programmer_value(fid, key, int(value))
+
+    def _dimmer_anker_vorwerte(self, fid, key, anker_keys, prog) -> dict:
+        """FM-62 (1): ``{anker: wert}`` — was das Vorkommen VOR dem Setzen
+        wirksam zeigte: der gespiegelte Basiswert, sonst ``default_value``."""
+        if key in prog:
+            try:
+                basis = int(prog.get(key) or 0)
+            except (TypeError, ValueError):
+                basis = 0
+            return {a: basis for a in anker_keys}
+        fx = next((f for f in self._patch_cache
+                   if getattr(f, "fid", None) == fid), None)
+        try:
+            chans = get_channels_for_patched(fx) if fx is not None else []
+            out = {}
+            for c, k in channel_occurrence_keys(chans):
+                if k in anker_keys:
+                    try:
+                        out[k] = max(0, min(255, int(getattr(c, "default_value", 0) or 0)))
+                    except (TypeError, ValueError):
+                        out[k] = 0
+            return out
+        except Exception:
+            return {}
 
     def weiss_programmer_key(self, fid, segment) -> str | None:
         """FM-41: Programmer-Schluessel des Weiss-Segments ``segment`` von

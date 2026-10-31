@@ -130,6 +130,9 @@ class Ergebnis(NamedTuple):
     rc: int
     ausgabe: str
     sprung_wirksam: bool
+    #: QA-102: die Einzel-Ergebnisse der Kinder eines verteilten Laufs
+    #: (``lauf_verteilt``); leer bei einem einzelnen ``lauf``.
+    teile: tuple = ()
 
 
 class Bericht(NamedTuple):
@@ -138,6 +141,12 @@ class Bericht(NamedTuple):
     schon_rot: list           # [(relpfad, ausgabe)]  — heute schon rot
     tage: int
     ausgabe: str
+    #: QA-102: Rueckgabewert des Sammellaufs mit Sprung (0 = jede gefahrene
+    #: Datei war mit vorgerueckter Uhr gruen); ``None`` = nichts gefahren.
+    sammel_rc: int | None = None
+    #: QA-102: die Dateien, die nach einem roten Sammellauf einzeln
+    #: nachgefahren wurden (leer, wenn der Sammellauf gruen war).
+    nachgefahren: tuple = ()
 
     @property
     def gruen(self) -> bool:
@@ -408,6 +417,11 @@ def lauf(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
 #: Mehr als drei lohnt nicht: das Gate faehrt selbst schon parallel, und jedes
 #: Kind bezahlt Prozessstart, conftest und das Sammeln aller Kandidaten einzeln
 #: (Windows ~6,5 s je Prozess).
+#: QA-102 nachgemessen (2026-10-29, Windows 11, i7-7700 4C/8T, 38 Kandidaten mit
+#: 954 Tests; das Sammeln allein kostet jedes Kind ~25 s): allein 3 Kinder 161 s,
+#: 4 Kinder 143 s, 6 Kinder 138 s — unter gate-aehnlicher Last (vier
+#: Rechenschleifen nebenher) 3 Kinder 231 s, 6 Kinder 247 s. Mehr Kinder machen
+#: es im Gate also LANGSAMER; es bleibt bei drei.
 KINDER = 3
 
 #: pytest: "keine Tests gelaufen" — fuer eine Scheibe ohne Tests kein Fehler.
@@ -440,14 +454,120 @@ def lauf_verteilt(dateien, tage: int, shim: str = SHIM, zeitlimit: int = 480,
         laeufe = [pool.submit(lauf, dateien, tage, shim=shim, zeitlimit=zeitlimit,
                               uhr=uhr, scheibe=(i, n)) for i in range(n)]
     teile = [f.result() for f in laeufe]       # wirft z. B. TimeoutExpired weiter
-    rcs = [t.rc for t in teile]
-    if all(r == _KEINE_TESTS for r in rcs):
-        rc = _KEINE_TESTS
-    else:
-        rc = next((r for r in rcs if r not in (0, _KEINE_TESTS)), 0)
     ausgabe = "\n".join(f"── Kind {i + 1}/{n} (jeder {n}. Test ab {i + 1}) ──\n{t.ausgabe}"
                         for i, t in enumerate(teile))
-    return Ergebnis(rc, ausgabe, all(t.sprung_wirksam for t in teile))
+    return Ergebnis(rc_zusammen([t.rc for t in teile]), ausgabe,
+                    all(t.sprung_wirksam for t in teile), tuple(teile))
+
+
+def rc_zusammen(rcs) -> int:
+    """Der Rueckgabewert eines verteilten Laufs aus denen seiner Kinder.
+
+    ★ QA-102: ein ABGEBROCHENES Kind (Absturz, negativer Code, pytest 2–4)
+    zaehlt VOR einem bloss roten (1). Vorher galt das erste Kind, das nicht 0
+    war — Kind 1 rot und Kind 2 abgestuerzt ergab 1. Seit ``pruefe`` nach einem
+    roten Sammellauf nur noch die dort roten Dateien nachfaehrt
+    (``rote_dateien``), haette das die Tests, die das abgestuerzte Kind nie mehr
+    erreicht hat, stillschweigend fuer gruen gehalten.
+    """
+    rcs = list(rcs)
+    if rcs and all(r == _KEINE_TESTS for r in rcs):
+        return _KEINE_TESTS
+    abgebrochen = [r for r in rcs if r not in (0, 1, _KEINE_TESTS)]
+    if abgebrochen:
+        return abgebrochen[0]
+    return 1 if 1 in rcs else 0
+
+
+#: QA-102: die Schlusszeile von ``pytest -q`` („4 failed, 313 passed, 1 skipped,
+#: 636 deselected, 1 error, 189 subtests passed in 138.52s (0:02:18)“). Nur ein
+#: Kind, das sie geschrieben hat, ist bis zum Ende gelaufen: ``pytest-timeout``
+#: (``timeout_method = thread``) beendet ein haengendes Kind mit ``os._exit(1)``
+#: — Rueckgabewert 1 wie „rot“, aber ohne Schlusszeile und ohne die Tests danach.
+_SCHLUSSZEILE = re.compile(
+    r"^(?:\d+ [a-z]+(?: [a-z]+)?, )*\d+ [a-z]+(?: [a-z]+)? in \d+(?:\.\d+)?s\b")
+#: Die Zeilen der Kurz-Zusammenfassung (pytest-Vorgabe ``-r fE``):
+#: ``FAILED tests/test_x.py::A::b - …`` und ``ERROR tests/test_x.py::…``.
+_ROTE_ZEILE = re.compile(r"^(FAILED|ERROR) (\S+?)(?:::|\s|$)")
+
+
+def _anzahl(schluss: str, wort: str) -> int:
+    m = re.search(rf"(?<!\d)(\d+) {wort}\b", schluss)
+    return int(m.group(1)) if m else 0
+
+
+def rote_dateien(ergebnis: Ergebnis, dateien) -> list | None:
+    """QA-102: welche von ``dateien`` waren im (verteilten) Lauf rot?
+
+    ``None`` heisst „nicht sicher“ — dann faehrt ``pruefe`` wie bisher JEDE
+    Datei einzeln nach. Eine Liste gibt es nur, wenn jedes Kind nachweislich
+    bis zum Ende gelaufen ist und jeder rote Test einer Datei zugeordnet ist:
+
+    * Kind gruen (0) oder ohne Tests (5): nichts zu tun;
+    * Kind rot (1) MIT Schlusszeile: jede ``FAILED``/``ERROR``-Zeile muss auf
+      eine der ``dateien`` zeigen, und ihre Zahl muss zu „N failed“ / „N
+      error(s)“ der Schlusszeile passen — fehlt auch nur eine, ``None``;
+    * Unter-Tests rot („N subtests failed“): ``None`` (deren Zeilen sind nicht
+      Teil der Vorgabe-Zusammenfassung, also nicht nachzaehlbar);
+    * jeder andere Rueckgabewert (Absturz, Sammelfehler, Zeitlimit): ``None``.
+
+    Was das kostet: eine Zeitbombe ist eine Datei, die MIT Sprung rot und
+    OHNE Sprung gruen ist — und zwar zweimal mit Sprung (s. ``pruefe``). Eine
+    Bombe, die NUR im Einzellauf rot wird (im Sammellauf z. B. durch ein schon
+    geladenes Modul verdeckt), wird nicht mehr gefunden. Die alte Fassung fand
+    sie nur zufaellig — wenn irgendeine ANDERE Datei den Sammellauf rot machte;
+    bei gruenem Sammellauf nie. Diesen Zufallsfang gibt die neue Regel bewusst
+    auf; alle Dateien einzeln nachzufahren kostete sonst viel Zeit (unter Windows ~6 s je Datei und Lauf, gemessen 2026-10-18: die ganze
+    Testdatei 486 s statt ~200 s, im Gate damit ueber dem 300-s-Limit).
+    """
+    dateien = list(dateien)
+    wurzel = _wurzel_fuer(dateien) or REPO
+
+    def _schluessel(pfad):
+        return os.path.normcase(os.path.normpath(os.path.abspath(pfad)))
+
+    bekannt = {_schluessel(d): d for d in dateien}
+
+    def _datei(angabe):
+        # pytest nennt die Datei relativ zum AUFRUF-Ordner (``cwd=REPO``) —
+        # bei Zielen ausserhalb also ``..\..\Users\…`` mit Backslashes — und
+        # nur sonst relativ zum ``--rootdir``. Beides aufloesen.
+        for basis in (REPO, wurzel):
+            ziel = angabe if os.path.isabs(angabe) else os.path.join(basis, angabe)
+            treffer = bekannt.get(_schluessel(ziel))
+            if treffer is not None:
+                return treffer
+        return None
+
+    rot = set()
+    for teil in ergebnis.teile or (ergebnis,):
+        if teil.rc in (0, _KEINE_TESTS):
+            continue
+        if teil.rc != 1:
+            return None
+        zeilen = teil.ausgabe.splitlines()
+        schluss = next((z.strip() for z in reversed(zeilen)
+                        if _SCHLUSSZEILE.match(z.strip())), None)
+        if schluss is None or _anzahl(schluss, "subtests failed"):
+            return None
+        failed = error = 0
+        for z in zeilen:
+            m = _ROTE_ZEILE.match(z)
+            if not m:
+                continue
+            datei = _datei(m.group(2))
+            if datei is None:
+                return None
+            rot.add(datei)
+            if m.group(1) == "FAILED":
+                failed += 1
+            else:
+                error += 1
+        if (failed, error) != (_anzahl(schluss, "failed"), _anzahl(schluss, "errors?")):
+            return None
+        if not failed and not error:
+            return None
+    return [d for d in dateien if d in rot]
 
 
 class SprungUnwirksam(RuntimeError):
@@ -470,12 +590,20 @@ def pruefe(wurzel: str, tage: int = SPRUNG_TAGE, shim: str = SHIM,
             f"hat nicht gegriffen. Ein gruener Lauf beweist hier NICHTS.\n"
             f"{gesamt.ausgabe[-3000:]}")
     if gesamt.rc == 0:
-        return Bericht(kand, [], [], tage, gesamt.ausgabe)
+        return Bericht(kand, [], [], tage, gesamt.ausgabe, sammel_rc=0)
 
     # Erst wenn etwas rot ist, kostet es Zeit: Datei fuer Datei, und jede rote
     # noch einmal OHNE Sprung. Nur was mit Sprung rot und ohne Sprung gruen ist,
     # ist eine Zeitbombe — alles andere ist ein gewoehnlicher Fehlschlag und
     # gehoert nicht diesem Gate.
+    # ★ QA-102: nachgefahren werden nur die Dateien, die im Sammellauf rot
+    # waren (``rote_dateien``); ist das nicht sicher feststellbar (Absturz,
+    # Zeitlimit, nicht zuzuordnende Zeile), wie bisher alle. Vorher lief hier
+    # JEDE Kandidatendatei einzeln — unter Windows ~6 s je Prozess; mit einigen
+    # roten Kandidaten (18.10.2026: fehlende Schriften im Offscreen-Lauf, QA-99)
+    # brauchte die Testdatei so 486 s und brach im Gate am 300-s-Limit ab.
+    rot = rote_dateien(gesamt, fahren)
+    nachfahren = list(fahren) if rot is None else rot
     # ★ Hier steht bewusst KEINE zweite Kanarienvogel-Pruefung, obwohl eine
     # naheliegt. Sie waere nicht pruefbar: der Sammellauf oben hat den Beleg
     # schon erbracht, und die Einzellaeufe erben Umgebung und Vorspann
@@ -490,7 +618,7 @@ def pruefe(wurzel: str, tage: int = SPRUNG_TAGE, shim: str = SHIM,
     # Qt/Threading-Test steht (`test_grand_master_thread_marshal`) und ein
     # Fehlalarm dieses Gate abschalten wuerde.
     bomben, schon_rot = [], []
-    for pfad in fahren:
+    for pfad in nachfahren:
         mit = lauf([pfad], tage, shim=shim, uhr=uhr)
         if mit.rc == 0:
             continue
@@ -499,7 +627,8 @@ def pruefe(wurzel: str, tage: int = SPRUNG_TAGE, shim: str = SHIM,
             bomben.append((pfad, mit.ausgabe))
         else:
             schon_rot.append((pfad, ohne.ausgabe))
-    return Bericht(kand, bomben, schon_rot, tage, gesamt.ausgabe)
+    return Bericht(kand, bomben, schon_rot, tage, gesamt.ausgabe,
+                   sammel_rc=gesamt.rc, nachgefahren=tuple(nachfahren))
 
 
 # ─────────────────────────── 3. Proben (Selbsttest) ─────────────────────────
@@ -612,6 +741,11 @@ def bericht_text(bericht: Bericht) -> str:
     ohne einen ganzen Waechter-Lauf zu fahren."""
     zeilen = [f"Uhr um {bericht.tage} Tage vorgerueckt "
               f"({echt_heute() + datetime.timedelta(days=bericht.tage)})."]
+    if bericht.sammel_rc not in (None, 0):
+        # QA-102: sichtbar machen, ob gezielt oder (unsicher) alles nachgefahren wurde.
+        zeilen.append(f"  Sammellauf rot (Rueckgabe {bericht.sammel_rc}) — einzeln "
+                      f"nachgefahren: {len(bericht.nachgefahren)} von "
+                      f"{len(zu_fahren(bericht.kandidaten))} Datei(en)")
     for pfad, _ in bericht.schon_rot:
         zeilen.append(f"  … {_anzeigepfad(pfad)} ist schon HEUTE rot "
                       f"— nicht Sache dieses Gates")

@@ -535,6 +535,31 @@ class Viz79ReviewSceneTest(Viz79LaserStrahlenSceneTest):
         self.assertTrue(i["bewegt"] and i["animationAktiv"],
                         "nach Kegel aus/an steht der bewegte Laser still")
 
+    def test_schwarzer_bewegter_laser_bleibt_nach_resync_dunkel(self):
+        """VIZ-89: offener Dimmer, Farbe 0/0/0, laufende Bewegung. Der DMX-Weg
+        misst an der Leuchtdichte (dunkel); der Resync (2D<->3D, Kegel-Schalter)
+        las bisher die Deckkraft (Dimmer allein) und schaltete Strahlen wie
+        Animation wieder ein — die Szene renderte ohne sichtbare Aenderung."""
+        self._load_and_wait()
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        self._bauen(_laser())
+        schwarz = dict(_gruen(laser={"dx": True, "tempo": 0.2}), g=0)
+        self._apply([schwarz], 1)
+        self.assertFalse(self._info()["animationAktiv"],
+                         "schwarzer Laser schon nach DMX als animiert gemeldet")
+        self._eval("window.__lightos.setViewMode('2D'); true")
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        i = self._info()
+        self.assertFalse(i["bewegt"] or i["animationAktiv"],
+                         "schwarzer bewegter Laser haelt nach 2D->3D den Render-Loop wach")
+        self.assertFalse(any(bm["visible"] for bm in self._miss()["beams"]),
+                         "schwarzer Laser zeigt nach dem Resync Strahlen")
+        # Gegenprobe: mit Farbe laeuft er nach dem Resync weiter.
+        self._apply([_gruen(laser={"dx": True, "tempo": 0.2})], 2)
+        self._eval("window.__lightos.setViewMode('2D'); true")
+        self._eval("window.__lightos.setViewMode('3D'); true")
+        self.assertTrue(self._info()["animationAktiv"])
+
 
 if __name__ == "__main__":
     unittest.main()

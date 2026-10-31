@@ -57,6 +57,24 @@ def _kandidaten():
     return list(_KANDIDATEN_CACHE)
 
 
+_REPO_BERICHT = []
+
+
+def _repo_bericht():
+    """QA-102: der Waechter ueber das echte Repo — EINMAL je Prozess.
+
+    Ihn brauchen zwei Tests (``RepoTest``). Vorher fuhr jeder seinen eigenen
+    Lauf, und die sechs QA-62-Dateien liefen ein zweites Mal mit Sprung, obwohl
+    sie im Repo-Lauf schon dabei sind (gemessen 2026-10-29 unter Windows: 42 s
+    von 250 s der ganzen Datei). Die Kandidaten kommen aus demselben Scan wie
+    ``_kandidaten`` — ``pruefe(dateien=...)`` liest sie nur noch einmal ein,
+    statt alle 1100 Testdateien erneut zu durchsuchen (~6 s).
+    """
+    if not _REPO_BERICHT:
+        _REPO_BERICHT.append(zg.pruefe(TESTS, dateien=[p for p, _ in _kandidaten()]))
+    return _REPO_BERICHT[0]
+
+
 #: Die sechs Dateien, die QA-62 am 22.08.2026 als „feste Daten, aber gesund"
 #: gemessen hat. Sie sind hier der Massstab fuer Fehlalarme.
 QA62_GESUND = [
@@ -558,6 +576,29 @@ class ProbenTest(unittest.TestCase):
         ergebnis = zg.lauf([kind], zg.SPRUNG_TAGE)
         self.assertEqual(ergebnis.rc, 0, _kind_ausgabe(ergebnis))
 
+    def test_im_verteilten_lauf_wird_die_bombe_gefunden_und_nur_rotes_nachgefahren(self):
+        """★★ QA-102: der absichtlich eingebaute Verstoss bleibt rot — auch im
+        VERTEILTEN Sammellauf ueber mehrere Dateien (drei Kinder, jedes faehrt
+        einen Test), den die Proben oben mit je einer Datei nie erreichen.
+
+        Und nachgefahren wird nur, was dort rot war: die harmlose Probe nicht.
+        Vorher lief nach einem roten Sammellauf JEDE Datei einzeln mit und ohne
+        Sprung — mit 38 Kandidaten unter Windows der Weg ins 300-s-Limit.
+        """
+        ordner = tempfile.mkdtemp(dir=self.tmp)
+        harmlos = zg.probe_schreiben(ordner, "harmlos")
+        bombe = zg.probe_schreiben(ordner, "bombe")
+        schon_rot = zg.probe_schreiben(ordner, "schon_rot")
+        bericht = zg.pruefe(ordner, dateien=[harmlos, bombe, schon_rot])
+        self.assertEqual([p for p, _ in bericht.bomben], [bombe],
+                         "die eingebaute Zeitbombe muss gefunden werden"
+                         + chr(10) + bericht.ausgabe[-3000:])
+        self.assertEqual([p for p, _ in bericht.schon_rot], [schon_rot])
+        self.assertEqual(bericht.sammel_rc, 1)
+        self.assertEqual(list(bericht.nachgefahren), [bombe, schon_rot],
+                         "nur die im Sammellauf roten Dateien werden nachgefahren")
+        self.assertIn("nachgefahren: 2 von 3", zg.bericht_text(bericht))
+
     def test_die_probe_traegt_ein_frisch_gepraegtes_datum(self):
         """Eine EINGECHECKTE Zeitbombe waere selbst eine: ein paar Wochen nach
         dem Merge waere sie auch ohne Sprung rot, und dieser Test kippte ohne
@@ -579,7 +620,7 @@ class RepoTest(unittest.TestCase):
         ``tests/test_crash_intake.py`` seit QA-62), damit der Test die REGEL
         misst statt eines Kalenderstands.
         """
-        bericht = zg.pruefe(TESTS)
+        bericht = _repo_bericht()
         self.assertTrue(bericht.kandidaten, "keine Kandidaten gefunden — dann "
                                             "hat dieser Lauf nichts gemessen")
         namen = [os.path.relpath(p, REPO) for p, _ in bericht.bomben]
@@ -595,12 +636,96 @@ class RepoTest(unittest.TestCase):
         dateien = [os.path.join(TESTS, n) for n in QA62_GESUND]
         for pfad in dateien:
             self.assertTrue(os.path.isfile(pfad), pfad)
+        # QA-102: war der Repo-Lauf gruen, sind die sechs darin schon mit
+        # wirksamem Sprung gruen gelaufen (``pruefe`` bricht ohne die Marke
+        # jedes Kindes ab) — ein zweiter Lauf beweist nichts Neues. Nur wenn er
+        # rot war, wird wie bisher eigens gefahren.
+        bericht = _repo_bericht()
+        if bericht.sammel_rc == 0:
+            gefahren = zg.zu_fahren(bericht.kandidaten)
+            self.assertEqual([d for d in dateien if d not in gefahren], [],
+                             "die sechs muessen im Repo-Lauf mitgefahren sein — "
+                             "sonst beweist sein Gruen fuer sie nichts")
+            return
         ergebnis = zg.lauf_verteilt(dateien, zg.SPRUNG_TAGE)   # XPLAT-34
         self.assertTrue(ergebnis.sprung_wirksam,
                         "ohne wirksamen Sprung beweist gruen hier nichts")
         self.assertEqual(ergebnis.rc, 0,
                          "eine der sechs als gesund gemessenen Dateien wurde "
                          "rot:" + chr(10) + _kind_ausgabe(ergebnis))
+
+
+class NachfahrenTest(unittest.TestCase):
+    """QA-102: wann ``pruefe`` nach einem roten Sammellauf nur die roten Dateien
+    nachfaehrt — und wann es (zur Sicherheit) wie bisher alle faehrt.
+
+    Ohne Kindprozesse: die Ausgaben sind so gebaut, wie ``pytest -q`` sie
+    schreibt. Der echte Lauf steht in ``ProbenTest``.
+    """
+
+    A = os.path.join(TESTS, "test_qa102_a.py")
+    B = os.path.join(TESTS, "test_qa102_b.py")
+    C = os.path.join(TESTS, "test_qa102_c.py")
+
+    def _teil(self, rc, *zeilen):
+        return zg.Ergebnis(rc, chr(10).join(zeilen), True)
+
+    def _verteilt(self, *teile):
+        return zg.Ergebnis(zg.rc_zusammen([t.rc for t in teile]), "", True, tuple(teile))
+
+    def _rot(self, ergebnis):
+        return zg.rote_dateien(ergebnis, [self.A, self.B, self.C])
+
+    def test_nur_die_roten_dateien_eines_sauber_beendeten_laufs(self):
+        e = self._verteilt(
+            self._teil(0, "....", "12 passed, 20 deselected in 3.10s"),
+            self._teil(1, "..F.", "FAILED tests/test_qa102_b.py::T::test_x - AssertionError: 1 != 2",
+                       "1 failed, 11 passed, 20 deselected in 2.95s"),
+            self._teil(1, "E...", "ERROR tests/test_qa102_c.py::test_y - RuntimeError",
+                       "11 passed, 20 deselected, 1 error, 4 subtests passed in 3.40s (0:00:03)"))
+        self.assertEqual(self._rot(e), [self.B, self.C])
+
+    def test_ein_einzelner_lauf_ohne_kinder(self):
+        e = self._teil(1, "FAILED tests/test_qa102_a.py::test_z", "1 failed, 3 passed in 1.00s")
+        self.assertEqual(self._rot(e), [self.A])
+
+    def test_ohne_schlusszeile_werden_alle_nachgefahren(self):
+        """pytest-timeout beendet ein haengendes Kind mit ``os._exit(1)`` —
+        Rueckgabe 1, aber die Tests danach liefen nie."""
+        e = self._verteilt(self._teil(0, "3 passed in 1.00s"),
+                           self._teil(1, "..", "+++++ Timeout +++++", "Thread 0x1 ..."))
+        self.assertIsNone(self._rot(e))
+
+    def test_ein_abgestuerztes_kind_zaehlt_vor_einem_roten(self):
+        absturz = -1073741819                            # 0xC0000005
+        e = self._verteilt(
+            self._teil(1, "FAILED tests/test_qa102_a.py::test_z", "1 failed in 1.00s"),
+            self._teil(absturz, "..Windows fatal exception: access violation"))
+        self.assertEqual(e.rc, absturz, _kind_ausgabe(e.teile[1]))
+        self.assertIsNone(self._rot(e))
+
+    def test_eine_fremde_datei_in_der_zusammenfassung(self):
+        e = self._teil(1, "FAILED tests/test_woanders.py::test_z", "1 failed in 1.00s")
+        self.assertIsNone(self._rot(e))
+
+    def test_die_zahl_der_roten_zeilen_muss_stimmen(self):
+        e = self._teil(1, "FAILED tests/test_qa102_a.py::test_z", "2 failed, 1 passed in 1.00s")
+        self.assertIsNone(self._rot(e))
+
+    def test_rote_untertests_werden_nicht_geraten(self):
+        e = self._teil(1, "FAILED tests/test_qa102_a.py::test_z",
+                       "1 failed, 2 subtests failed, 3 passed in 1.00s")
+        self.assertIsNone(self._rot(e))
+
+    def test_rot_ohne_eine_einzige_rote_zeile(self):
+        e = self._teil(1, "Interrupted: 1 error during collection", "0 passed in 1.00s")
+        self.assertIsNone(self._rot(e))
+
+    def test_rueckgabewerte_zusammenfassen(self):
+        for rcs, soll in (([0, 0, 0], 0), ([0, 5, 0], 0), ([5, 5, 5], 5),
+                          ([1, 0, 5], 1), ([0, 1, 3221225477], 3221225477),
+                          ([1, 2], 2), ([-1073741819, 1], -1073741819)):
+            self.assertEqual(zg.rc_zusammen(rcs), soll, rcs)
 
 
 class ProzessHygieneTest(unittest.TestCase):
