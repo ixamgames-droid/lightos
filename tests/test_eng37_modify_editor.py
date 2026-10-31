@@ -322,9 +322,10 @@ def test_arbeiter():
 
     print(_MARKE, flush=True)
     # Bewusst hart beenden: geprueft wird die Schleife, nicht der Abbau am
-    # Prozessende (eigenes Thema, eigene Tests).
-    sys.stdout.flush()
-    os._exit(0)
+    # Prozessende (eigenes Thema, eigene Tests). Unter Windows ohne DLL-Abbau
+    # (QA-101), sonst stirbt das Kind mitunter erst NACH der Marke.
+    from _kind_ausstieg import harter_ausstieg
+    harter_ausstieg(0)
 
 
 def _kind_umgebung(tmp_path, rolle: str, runden: int) -> dict:

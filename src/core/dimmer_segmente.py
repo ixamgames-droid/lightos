@@ -172,7 +172,8 @@ def segmente_aus_heads(channels, heads) -> dict[int, int]:
       unter allen ``color_w`` des Modus;
     * mehrdeutig -> fuer die betroffenen Dimmer nichts: mehrere Dimmer oder
       mehrere Weiss in einem Kopf, ein Dimmer in mehreren Weiss-Koepfen, ein
-      Weiss-Segment, das mehrere Dimmer bekaemen;
+      Weiss-Segment, das mehrere Dimmer bekaemen — auch dann, wenn einer
+      davon nur ueber einen mehrdeutigen Kopf hinzukommt (FM-62);
     * eine VORHANDENE Zuordnung bleibt: weder wird ein Dimmer mit Segment
       ueberschrieben noch ein schon vergebenes Segment ein zweites Mal
       vergeben (Re-Import, Nachtragen in einer bestehenden Bibliothek).
@@ -188,6 +189,7 @@ def segmente_aus_heads(channels, heads) -> dict[int, int]:
 
     kandidat: dict[int, int] = {}
     in_koepfen: dict[int, int] = {}
+    strittig: set[int] = set()
     for head in heads or ():
         idx = {i for i in head
                if isinstance(i, int) and not isinstance(i, bool)
@@ -200,8 +202,15 @@ def segmente_aus_heads(channels, heads) -> dict[int, int]:
             in_koepfen[d] = in_koepfen.get(d, 0) + 1
         if len(ws) == 1 and len(ds) == 1 and ds[0] in zuordbar:
             kandidat[ds[0]] = w_rang[ws[0]]
+        elif any(d in zuordbar for d in ds):
+            # FM-62 (3): ein MEHRDEUTIGER Kopf (mehrere Dimmer oder mehrere
+            # Weiss) nennt seine Weiss-Segmente zusammen mit weiteren Dimmern
+            # — dann ist auch ein eindeutiger Kopf fuer dasselbe Segment nicht
+            # mehr eindeutig ([d0,w0] + [d1,d2,w0] -> nichts fuer w0).
+            strittig.update(w_rang[w] for w in ws)
 
-    out = {d: s for d, s in kandidat.items() if in_koepfen.get(d) == 1}
+    out = {d: s for d, s in kandidat.items()
+           if in_koepfen.get(d) == 1 and s not in strittig}
     anzahl: dict[int, int] = {}
     for s in out.values():
         anzahl[s] = anzahl.get(s, 0) + 1
@@ -256,6 +265,7 @@ def zuordnung_probleme(channels) -> list[str]:
     * ein Segment, das es im Modus nicht gibt — wirkt nie;
     * ein mehrfacher Dimmer ohne Segment, waehrend andere eins haben —
       vielleicht gewollt (ein Dimmer, der kein Weiss dimmt), oft vergessen.
+      Das gilt ueber ALLE mehrfachen Dimmer-Attribute hinweg (FM-62).
 
     Kanalnummern 1-basiert wie in der Tabelle."""
     chans = list(channels or ())
@@ -264,10 +274,16 @@ def zuordnung_probleme(channels) -> list[str]:
     if not mehrfach or not weiss_eigen(chans):
         return []
     n_weiss = attrs.count("color_w")
+    # FM-62 (2): jede mehrfache Dimmer-Gruppe einzeln pruefen. Ist irgendeine
+    # Gruppe zugeordnet, meldet eine GANZ freie andere Gruppe (z. B.
+    # ``intensity`` zugeordnet, ``master`` nicht) ihre Dimmer ebenfalls —
+    # ``zuordnung_fehlt`` ist dann schon falsch und wuerde schweigen.
+    irgendeine = any(segment_von(chans[i]) is not None
+                     for pos in mehrfach.values() for i in pos)
     out: list[str] = []
     for positionen in mehrfach.values():
         segs = {i: segment_von(chans[i]) for i in positionen}
-        if all(v is None for v in segs.values()):
+        if all(v is None for v in segs.values()) and not irgendeine:
             continue
         vergeben: dict[int, list[int]] = {}
         for i, seg in segs.items():
