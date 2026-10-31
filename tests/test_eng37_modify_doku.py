@@ -114,12 +114,15 @@ def test_schrittweite_tabelle_stimmt_mit_der_engine(monkeypatch):
     assert folge[4] == t["Schritt 1"]
 
 
-def test_abschnitt_listet_fehlende_bilder_und_bindet_keine_ein():
+def test_abschnitt_bindet_seine_bilder_ein_und_alle_gibt_es():
+    """DOC-73: die Bilder zu Abschnitt 5 sind aufgenommen — die frühere Liste
+    „Noch aufzunehmende Bilder“ ist weg, jedes eingebundene Bild existiert."""
     a = _abschnitt()
-    assert "### Noch aufzunehmende Bilder" in a
-    assert "![" not in a, "Abschnitt bindet ein Bild ein, das es noch nicht gibt"
-    liste = a.split("### Noch aufzunehmende Bilder", 1)[1]
-    assert len(re.findall(r"^\d+\. ", liste, flags=re.M)) >= 5
+    assert "### Noch aufzunehmende Bilder" not in a
+    bilder = re.findall(r"!\[[^\]]+\]\(([^)]+)\)", a)
+    assert len(bilder) >= 12, bilder
+    for pfad in bilder:
+        assert (ANLEITUNG.parent / pfad).is_file(), pfad
 
 
 def test_tabelle_hat_alle_zeilen():
