@@ -39,6 +39,14 @@ nur die Vorschau — DMX-Ausgabe und Playback haben ihren eigenen Takt.
   Nummer, LOD 2 keine Beschriftung. Ausgewählte und hervorgehobene Geräte werden immer
   mit LOD 0 und ohne Platzprüfung beschriftet (Name, sofern eindeutig).
 
+![2D-Bühne der Doku-Demo mit Gerätenamen unter den Symbolen (DEMO-9)](../../anleitung_erste_schritte/img/12_buehne_namen.png)
+
+![Ausgewählte Geräte: gelber Ring, Name auch bei wenig Platz](../../anleitung_erste_schritte/img/13_buehne_auswahl.png)
+
+![GIF: Grand Master runter und Blackout — die 2D-Bühne zeigt das Ausgabebild (VIZ-78/DOC-63)](../../anleitung_erste_schritte/img/14_buehne_gm_blackout.gif)
+
+Bilder: `tools/anleitungsbilder.py erste_schritte` (Szenen `12_`–`14_`, DOC-77).
+
 ## Verknüpfungen
 
 - **Bus:** abonniert Auswahl-/Gruppen-Events (`bus.subscribe`) für Highlight und

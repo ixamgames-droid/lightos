@@ -1,0 +1,40 @@
+{
+  "anleitung": "bpm_manager",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "b0cc8008",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py bpm_manager'.",
+  "bilder": [
+    {
+      "datei": "01_quelle_aus.png",
+      "szene": "01_quelle_aus",
+      "titel": "Quelle „Aus“: Takt 0 — BPM-Anzeige „--“, Statuszeile „Erkennung aus“",
+      "groesse": [
+        1600,
+        364
+      ],
+      "marken": [],
+      "md5": "3d661ff11ca6799dc7c0a4579e5939fc"
+    },
+    {
+      "datei": "02_quelle_aus_ablauf.gif",
+      "szene": "02_quelle_aus_ablauf",
+      "titel": "GIF: Quelle von „Lied-Analyse“ auf „Aus“ — der Takt fällt von 128 auf 0",
+      "groesse": [
+        1600,
+        296
+      ],
+      "marken": [
+        [],
+        []
+      ],
+      "md5": "e32fe193854cb7db4a198553f08d1e85",
+      "frames": 2,
+      "dauern_ms": [
+        1800,
+        2200
+      ]
+    }
+  ]
+}

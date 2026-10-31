@@ -31,7 +31,7 @@ from __future__ import annotations
 import os
 from contextlib import contextmanager
 
-from anleitungsbilder.runner import BREITE, HOEHE, Szene, SzenenFehler
+from anleitungsbilder.runner import BREITE, HOEHE, Frame, Szene, SzenenFehler
 
 ZIEL = "docs/anleitung_erste_schritte/img"
 
@@ -591,6 +591,148 @@ def _beenden_aufraeumen(ui):
     ui.pump(0.1)
 
 
+# ── DOC-77: 2D-Buehne mit Geraetenamen, Auswahl, GM/Blackout ───────────────
+#
+# Die Szenen laufen auf der Doku-Demo (13 Geraete mit Namen „PAR 1“ … „LED-
+# Leiste“). Das Werkzeug hat keinen Ausgabe-Thread: die 2D-Buehne zeigt sonst
+# den Rohpuffer, Grand Master und Blackout waeren nicht zu sehen. Fuer das GIF
+# rechnet ``szenen_buehnen_show.ticks`` deshalb Frames mit dem ECHTEN
+# ``OutputManager._send_all`` — mit leeren Sender-Tabellen, es wird also nichts
+# gesendet. Danach wird der Anzeige-Snapshot wieder geleert, damit spaetere
+# Szenen wie vorher den Rohpuffer sehen.
+
+def _buehne(ui):
+    return ui.win._live_view._canvas
+
+
+def _buehne_licht(ui):
+    """PARs mit Farbverlauf Rot -> Blau, Mover und Leiste weiss, nichts gewaehlt."""
+    info = ui.info
+    pars = info["pars"]
+    alle = pars + info["mover"] + info["leiste"]
+    ui.wert(alle, "intensity", 255)
+    for i, fid in enumerate(pars):
+        anteil = i / (len(pars) - 1)
+        ui.wert([fid], "color_r", round(255 * (1 - anteil)))
+        ui.wert([fid], "color_g", round(80 * (1 - abs(0.5 - anteil) * 2)))
+        ui.wert([fid], "color_b", round(255 * anteil))
+    for fid in info["mover"] + info["leiste"]:
+        for attr in ("color_r", "color_g", "color_b"):
+            ui.wert([fid], attr, 255)
+    ui.waehle([])
+    _buehne(ui).update()
+
+
+def _buehne_aufraeumen(ui):
+    """Programmer leer, Auswahl leer, GM voll, Blackout aus, Anzeige-Snapshot
+    weg (spaetere Szenen sehen wieder den Rohpuffer)."""
+    om = ui.state.output_manager
+    win = ui.win
+    if win._btn_blackout.isChecked():
+        win._btn_blackout.click()
+    win._slider_gm.setValue(100)
+    ui.state.clear_programmer()
+    ui.waehle([])
+    om._display_frame.clear()
+    ui.pump(0.3)
+
+
+def _namen_rechteck(ui, fid):
+    """Rechteck der Beschriftung unter dem Geraet ``fid`` (Fensterkoordinaten).
+    Die Beschriftung ist gemalt, kein Widget — ihre Lage folgt aus der
+    Buehnenposition (Welt * Zoom) und der Symbolgroesse."""
+    from PySide6.QtCore import QPoint, QRect
+    c = _buehne(ui)
+    if fid not in c._positions:
+        raise SzenenFehler(f"Gerät {fid} steht nicht auf der 2D-Bühne")
+    x, y = c._positions[fid]
+    z = c.zoom
+    halb = c._fixture_size / 2.0
+    oben = c.mapTo(ui.win, QPoint(int((x - 34) * z), int((y + halb + 8) * z)))
+    return QRect(oben, QRect(0, 0, int(68 * z), int(20 * z)).size())
+
+
+def _bild_buehne_namen(ui):
+    _buehne_licht(ui)
+    ui.pump(0.6)
+    info = ui.info
+    return bild(ui, kreise=[
+        (_namen_rechteck(ui, info["pars"][0]), 1, "unten"),
+        (_namen_rechteck(ui, info["spots"][0]), 2, "links"),
+        (_namen_rechteck(ui, info["leiste"][0]), 3, "unten"),
+    ])
+
+
+def _bild_buehne_auswahl(ui):
+    _buehne_licht(ui)
+    info = ui.info
+    gewaehlt = [info["pars"][2], info["pars"][3], info["spots"][0]]
+    ui.waehle(gewaehlt)
+    _buehne(ui).update()
+    ui.pump(0.6)
+    from PySide6.QtCore import QPoint, QRect
+    c = _buehne(ui)
+    rechtecke = []
+    for fid in gewaehlt:
+        x, y = c._positions[fid]
+        r = c._fixture_size * c.zoom
+        mitte = c.mapTo(ui.win, QPoint(int(x * c.zoom), int(y * c.zoom)))
+        # Symbol samt Prozent-/FX-Zeile darueber und Namen darunter
+        rechtecke.append(QRect(int(mitte.x() - 1.4 * r), int(mitte.y() - 1.8 * r),
+                               int(2.9 * r), int(3.6 * r)))
+    return bild(ui, kreise=[
+        (vereinigung(rechtecke[:2]), 1, "unten"),
+        (rechtecke[2], 2, "links"),
+    ])
+
+
+def _gm_schritt(prozent):
+    def _schritt(ui):
+        from anleitungsbilder.szenen_buehnen_show import ticks
+        ui.win._slider_gm.setValue(int(prozent))     # wie Ziehen am GM-Regler
+        ticks(ui, 3)
+        _buehne(ui).update()
+    return _schritt
+
+
+def _blackout_schritt(an):
+    def _schritt(ui):
+        from anleitungsbilder.szenen_buehnen_show import ticks
+        if ui.win._btn_blackout.isChecked() != bool(an):
+            ui.win._btn_blackout.click()               # wie ein Klick auf BLACKOUT
+        ticks(ui, 3)
+        _buehne(ui).update()
+    return _schritt
+
+
+def _gm_vorher(ui):
+    from anleitungsbilder.szenen_buehnen_show import ticks
+    _buehne_licht(ui)
+    ticks(ui, 3)
+    ui.pump(0.3)
+
+
+def _gm_bild(ui):
+    """Kopfzeile (GM, BLACKOUT) und Buehne in EINEM Bild, GM und BLACKOUT
+    markiert."""
+    w = ui.win
+    gm = vereinigung([rechteck(w, w._slider_gm), rechteck(w, w._lbl_gm_val)])
+    flaeche = bild(ui, kreise=[(gm, 1, "unten")])
+    # BLACKOUT: rechts daneben LASER NOT-AUS, links STOP ALL — der Kreis gehoert
+    # eindeutig UNTER die Taste. Dort steht nur die kleine Typ-Filterzeile der
+    # Buehne; sie darf fuer diesen einen Kreis verdeckt werden.
+    pix = flaeche.pixmap()
+    kreise_malen(pix, [(rechteck(w, w._btn_blackout), 2, "unten")])
+    flaeche.setPixmap(pix)
+    return flaeche
+
+
+# Ausschnitt fuers GIF: ab „Simple Desk“ in der Sektionsleiste (GM und
+# BLACKOUT bleiben drin) bis unter die LED-Leiste, ohne die Fixture-Liste
+# links — die Buehne bleibt gross und lesbar.
+_GM_ZUSCHNITT = (336, 0, 1264, 800)
+
+
 SZENEN = [
     Szene("01_hauptfenster", sektion="Bühne", vorher=_neue_show,
           dialog=_bild_hauptfenster, titel="Hauptfenster nach „Neue Show“ — leer"),
@@ -622,4 +764,22 @@ SZENEN = [
           vorher=_show_geaendert, dialog=_bild_beenden,
           nachher=_beenden_aufraeumen,
           titel="Beenden mit ungespeicherten Änderungen: Rückfrage"),
+    # DOC-77: 2D-Buehne (Doku-Demo, nach ``_beenden_aufraeumen`` wieder geladen)
+    Szene("12_buehne_namen", sektion="Bühne", dialog=_bild_buehne_namen,
+          nachher=_buehne_aufraeumen,
+          titel="2D-Bühne: Gerätenamen unter den Symbolen"),
+    Szene("13_buehne_auswahl", sektion="Bühne", dialog=_bild_buehne_auswahl,
+          nachher=_buehne_aufraeumen,
+          titel="2D-Bühne: ausgewählte Geräte"),
+    Szene("14_buehne_gm_blackout", sektion="Bühne", vorher=_gm_vorher,
+          nachher=_buehne_aufraeumen, gif_zuschnitt=_GM_ZUSCHNITT, gif_breite=1000,
+          frames=[
+              Frame(dauer_s=1.6, dialog=_gm_bild),
+              Frame(dauer_s=1.2, schritt=_gm_schritt(50), dialog=_gm_bild),
+              Frame(dauer_s=1.2, schritt=_gm_schritt(15), dialog=_gm_bild),
+              Frame(dauer_s=1.2, schritt=_gm_schritt(100), dialog=_gm_bild),
+              Frame(dauer_s=1.8, schritt=_blackout_schritt(True), dialog=_gm_bild),
+              Frame(dauer_s=1.4, schritt=_blackout_schritt(False), dialog=_gm_bild),
+          ],
+          titel="GIF: Grand Master runter und Blackout — die 2D-Bühne wird dunkel"),
 ]
