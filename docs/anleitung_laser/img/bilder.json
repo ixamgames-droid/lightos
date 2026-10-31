@@ -1,0 +1,68 @@
+{
+  "anleitung": "laser",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "b0cc8008",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py laser'.",
+  "bilder": [
+    {
+      "datei": "01_laser_reiter.png",
+      "szene": "01_laser_reiter",
+      "titel": "Laser-Reiter: Sicherheitsleiste, Betriebsart, Vorschau, Muster, Farbe",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "ee2004c362a15d6a0c501980e19e9880"
+    },
+    {
+      "datei": "02_statische_muster.png",
+      "szene": "02_statische_muster",
+      "titel": "Statische Muster: Musterkachel angeklickt, Vorschau folgt",
+      "groesse": [
+        1048,
+        413
+      ],
+      "marken": [],
+      "md5": "cb878e2094a70dda7c8120b76c0a0e1b"
+    },
+    {
+      "datei": "03_musik_hinweis.png",
+      "szene": "03_musik_hinweis",
+      "titel": "Betriebsart Musik: gelber Hinweis, Muster/Lage/Farbe ausgegraut",
+      "groesse": [
+        1048,
+        289
+      ],
+      "marken": [],
+      "md5": "0ab30fcc7c1ff3a5396e01e41ae88788"
+    },
+    {
+      "datei": "04_notaus_ablauf.gif",
+      "szene": "04_notaus_ablauf",
+      "titel": "GIF: LASER NOT-AUS auslösen, „Scharf“ verweigert, lösen mit Rückfrage",
+      "groesse": [
+        1280,
+        365
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "188b797ec4dac3565b1be05332824c2d",
+      "frames": 5,
+      "dauern_ms": [
+        1600,
+        2200,
+        2600,
+        3000,
+        2000
+      ]
+    }
+  ]
+}

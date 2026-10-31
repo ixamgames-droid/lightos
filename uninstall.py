@@ -52,6 +52,10 @@ MANIFEST_PATH = ROOT / "install_manifest.json"
 # XPLAT-10: dieselbe Aufloesung wie App und Installer — sonst raeumt uninstall.py
 # auf Linux ~/LightOS weg (vom alten Installer angelegt, meist leer) und LAESST die
 # echten Nutzerdaten in ~/.local/share/LightOS stehen.
+# STAB-39: Deinstallation raeumt die Ordner der App auf — bewusst am echten Datenordner (nur als
+# Skript; beim Import aus Tests bleibt es bei deren Sandkasten).
+if __name__ == "__main__":
+    os.environ.setdefault("LIGHTOS_ECHTE_DATEN", "1")
 sys.path.insert(0, str(ROOT))
 from src.core.paths import app_data_dir, USER_DATA_FILES   # noqa: E402
 # Nur Standardbibliothek + paths: laeuft auch mit dem System-Python ohne venv.

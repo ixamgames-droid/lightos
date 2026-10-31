@@ -3771,9 +3771,9 @@ class AppState:
         ★ Das erste Segment traegt den BASIS-Schluessel (``color_w``). Den
         spiegelt der DMX-Flush auf jedes Vorkommen, das keinen eigenen Wert hat
         — „Weiss 1" fuhr so gemessen ALLE acht Segmente mit. Darum werden vor dem
-        Schreiben die uebrigen Segmente auf ihrem aktuellen Wert verankert (0,
-        solange nie gesetzt) — dieselbe Antwort wie beim Getrennt-Modus der
-        Farbkoepfe (``_seed_separate_head``)."""
+        Schreiben die uebrigen Segmente auf ihrem WIRKSAMEN Vorwert verankert
+        (FM-78: gespiegelter Basiswert, sonst ihr ``default_value``) — dieselbe
+        Antwort wie ``dimmer_key_setzen`` seit FM-62."""
         key = self.weiss_programmer_key(fid, segment)
         if not key:
             return False
@@ -3782,15 +3782,23 @@ class AppState:
         # Hervorheben, Einfuegen) bzw. im Ruhe-Zeitfenster. Ein eigener Schritt
         # je Aufruf machte aus EINEM Regler-Tick ueber n Geraete n Schritte.
         prog = self.programmer.get(fid, {})
+        anker_keys = []
         k = 0
         while True:
             other = self.weiss_programmer_key(fid, k)
             if other is None:
                 break
             if other != key and other not in prog:
-                self.set_programmer_value(fid, other, int(prog.get(other, 0) or 0))
-                prog = self.programmer.get(fid, {})
+                anker_keys.append(other)
             k += 1
+        if anker_keys:
+            # FM-78: auf dem WIRKSAMEN Vorwert verankern (gespiegeltes
+            # ``color_w`` bzw. ``default_value``) — wie ``dimmer_key_setzen``
+            # seit FM-62. Mit 0 gingen die uebrigen Segmente ungefragt dunkel.
+            basis = self.weiss_programmer_key(fid, 0) or key.split("#", 1)[0]
+            vorwert = self._dimmer_anker_vorwerte(fid, basis, anker_keys, prog)
+            for anker in anker_keys:
+                self.set_programmer_value(fid, anker, vorwert.get(anker, 0))
         self.set_programmer_value(fid, key, int(value))
         return True
 
