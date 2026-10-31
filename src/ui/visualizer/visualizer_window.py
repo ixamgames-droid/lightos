@@ -2656,6 +2656,67 @@ def _any_focused(*widgets) -> bool:
     return False
 
 
+_POS_TITEL = "Position && Ausrichtung"
+
+
+def _pos_felder_nachziehen(win) -> None:
+    """VIZ-76: „Position & Ausrichtung" folgt der Auswahl der Geraeteliste.
+
+    Ohne gewaehltes Geraet ist der Bereich gesperrt — sonst standen dort der
+    Startwert (Y 6.50) oder die Werte des zuletzt gewaehlten Geraets in aktiven
+    Feldern und sahen aus wie die Lage eines Geraets. Bei einem noch nicht
+    platzierten Geraet sagt der Titel, dass es Platzierungswerte sind (die nimmt
+    „Im Raum platzieren"). Stub-tolerant: ohne Box/Liste passiert nichts."""
+    box = getattr(win, "_pos_box", None)
+    lst = getattr(win, "_patch_list", None)
+    if box is None or lst is None:
+        return
+    it = lst.currentItem()
+    gewaehlt = it is not None and it.isSelected()
+    box.setEnabled(gewaehlt)
+    if not gewaehlt:
+        win._pos_felder_fid = None
+        box.setTitle(_POS_TITEL + " — kein Gerät gewählt")
+        box.setToolTip("Erst ein Gerät in der Liste wählen.")
+        return
+    fid = it.data(Qt.ItemDataRole.UserRole)
+    state = getattr(win, "_state", None)
+    platziert = state is not None and fid in getattr(state, "visualizer_positions", {})
+    if platziert:
+        # Review-Befund: `_mark_patch_list` (Auswahl von aussen, Listen-Neuaufbau)
+        # verschiebt das currentItem OHNE Signal — `_on_patch_list_selected`
+        # fuellt dann nicht. Stehen in den Feldern noch die Werte eines anderen
+        # (oder eines vor dem Neuaufbau geladenen) Geraets, hier nachladen;
+        # sonst verschoebe die naechste Eingabe das neue Geraet an fremde Werte.
+        # Gleiche fid -> nicht anfassen (stoert sonst laufende Eingaben).
+        if getattr(win, "_pos_felder_fid", None) != fid:
+            _pos_felder_laden(win, fid)
+        box.setTitle(_POS_TITEL)
+        box.setToolTip("")
+    else:
+        win._pos_felder_fid = None     # nach dem Platzieren einmal nachladen
+        box.setTitle(_POS_TITEL + " — Platzierungswerte")
+        box.setToolTip("Gerät ist noch nicht im Raum: „Im Raum platzieren“ "
+                       "setzt es an diese Werte.")
+
+
+def _pos_felder_laden(win, fid) -> None:
+    """VIZ-76: Lage/Drehung von ``fid`` aus dem AppState in die Felder (ohne
+    Eigenschafts-Commit) und merken, wessen Werte dort stehen."""
+    st = win._state
+    x, y, z = st.visualizer_positions[fid]
+    rx, ry, rz = normalize_rotation(st.visualizer_rotations.get(fid))
+    win._suppress_property_signals = True
+    try:
+        for sp, v in ((win._spin_x, x), (win._spin_y, y), (win._spin_z, z),
+                      (win._spin_rot_x, rx), (win._spin_rot_y, ry),
+                      (win._spin_rot_z, rz)):
+            sp.setValue(v)
+    finally:
+        win._suppress_property_signals = False
+    win._pos_felder_fid = fid
+
+
 def _should_pass_key_to_text(focus_widget, key, modifiers) -> bool:
     """True, wenn ein Einzeltasten-Shortcut stattdessen als Texteingabe an das
     fokussierte Feld gehen soll (Eingabefeld/Spinbox + reine Buchstabentaste,
@@ -3326,7 +3387,8 @@ class VisualizerWindow(QMainWindow):
         row.addWidget(btn_remove)
         layout.addLayout(row)
 
-        box = QGroupBox("Position && Ausrichtung")
+        box = QGroupBox(_POS_TITEL)
+        self._pos_box = box            # VIZ-76: ohne Auswahl gesperrt
         form = QFormLayout(box)
         self._pos_form = form          # T-VIZ-06 (B-7): Y-Row im 2D-Modus ausblenden
         self._spin_x = LocaleTolerantDoubleSpinBox(); self._spin_x.setRange(-200, 200); self._spin_x.setSingleStep(0.5)
@@ -3354,6 +3416,7 @@ class VisualizerWindow(QMainWindow):
         form.addRow("Kippen (auf/ab X):",    self._spin_rot_x)
         form.addRow("Roll (seitlich Z):",    self._spin_rot_z)
         layout.addWidget(box)
+        _pos_felder_nachziehen(self)
         layout.addWidget(self._build_einmessen_box())
 
         return w
@@ -4216,6 +4279,10 @@ class VisualizerWindow(QMainWindow):
             self._mark_patch_list(self._state.get_selected_fids())
         except Exception:
             pass
+        # VIZ-76: Neuaufbau ohne Signal. Nach Show-Wechsel/Resync kann dieselbe
+        # fid eine andere Lage haben -> Felder einmal neu laden lassen.
+        self._pos_felder_fid = None
+        _pos_felder_nachziehen(self)
         self._update_status_counts()
 
     def _update_status_counts(self):
@@ -4290,6 +4357,7 @@ class VisualizerWindow(QMainWindow):
             pass
 
     def _on_patch_list_selected(self):
+        _pos_felder_nachziehen(self)   # VIZ-76: auch (gerade) ohne Auswahl
         item = self._patch_list.currentItem()
         if not item:
             return
@@ -4310,18 +4378,7 @@ class VisualizerWindow(QMainWindow):
             if fids:
                 self._state.set_selected_fids(fids)
         if fid in self._state.visualizer_positions:
-            x, y, z = self._state.visualizer_positions[fid]
-            self._suppress_property_signals = True
-            try:
-                self._spin_x.setValue(x)
-                self._spin_y.setValue(y)
-                self._spin_z.setValue(z)
-                rx, ry, rz = normalize_rotation(self._state.visualizer_rotations.get(fid))
-                self._spin_rot_x.setValue(rx)
-                self._spin_rot_y.setValue(ry)
-                self._spin_rot_z.setValue(rz)
-            finally:
-                self._suppress_property_signals = False
+            _pos_felder_laden(self, fid)
 
     def _place_selected(self):
         item = self._patch_list.currentItem()
@@ -4654,6 +4711,8 @@ class VisualizerWindow(QMainWindow):
             print(f"[Visualizer] Listen-Markierung fehlgeschlagen: {e}")
         finally:
             lst.blockSignals(False)
+        # VIZ-76: die Markierung lief ohne Signal — Sperre trotzdem nachziehen.
+        _pos_felder_nachziehen(self)
 
     def _on_fixture_deleted_from_js(self, fid: int):
         # Konsistent mit remove_fixture_from_scene / fixtureDeleted (idempotent,
