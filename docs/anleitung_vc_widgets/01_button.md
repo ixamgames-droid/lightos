@@ -24,6 +24,8 @@ Optische Hinweise auf der Kachel:
 - **Lila `+N`-Badge** oben links = N Zusatz-Aktionen sind hinterlegt.
 - **Zeichen `+` / `−` / `◐` unten links** = die Taste schaltet einen **Modify-Effekt**; das Zeichen nennt seine Betriebsart: `+` Addieren (Bernstein), `−` Abziehen (Blau), `◐` Abdunkeln (Grau). Schaltet die Taste mehrere Modify-Effekte verschiedener Art, stehen mehrere Zeichen nebeneinander. Mit der Maus darüber erklärt ein Tooltip die Betriebsart. Mehr dazu: [Dimmer-Matrix, Abschnitt 5](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
 
+  ![Nahaufnahme dreier VC-Tasten: „Welle“ mit bernsteinfarbenem + (1), „Lücke + Dunkel“ mit blauem − und grauem ◐ nebeneinander (2), „Abdunkeln“ mit ◐ (3), jeweils unten links über dem grünen Aktions-Streifen](img/06_modify_zeichen_tasten.png)
+
 Zustands-Rückmeldung beim Drücken/Laufen:
 
 - **Gedrückt** (Maus oder MIDI/Taste): Kachel wird heller, dazu ein heller gelber Rahmen.

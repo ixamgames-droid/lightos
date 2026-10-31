@@ -1,7 +1,7 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "fb133f82",
+  "stand": "b0cc8008",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
@@ -126,6 +126,55 @@
       ],
       "marken": [],
       "md5": "5a2e4bc3b062d4632267ee811ddd2286"
+    },
+    {
+      "datei": "12_buehne_namen.png",
+      "szene": "12_buehne_namen",
+      "titel": "2D-Bühne: Gerätenamen unter den Symbolen",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "bc05c9c781042f49ca416c1da0892826"
+    },
+    {
+      "datei": "13_buehne_auswahl.png",
+      "szene": "13_buehne_auswahl",
+      "titel": "2D-Bühne: ausgewählte Geräte",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "44a805bc1e3d585c7b0f0378b4d5f929"
+    },
+    {
+      "datei": "14_buehne_gm_blackout.gif",
+      "szene": "14_buehne_gm_blackout",
+      "titel": "GIF: Grand Master runter und Blackout — die 2D-Bühne wird dunkel",
+      "groesse": [
+        1000,
+        633
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "a472f3514c6f40f5ae5d6a788a06ac26",
+      "frames": 6,
+      "dauern_ms": [
+        1600,
+        1200,
+        1200,
+        1200,
+        1800,
+        1400
+      ]
     }
   ]
 }

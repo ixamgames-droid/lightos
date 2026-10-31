@@ -26,6 +26,8 @@ Visual indicators on the tile:
 - **Purple `+N` badge** at the top left = N additional actions are stored.
 - **Sign `+` / `−` / `◐` at the bottom left** = the button switches a **Modify effect**; the sign names its mode: `+` add (amber), `−` subtract (blue), `◐` dim (grey). If the button switches several Modify effects of different modes, several signs stand side by side. Hovering over it shows a tooltip explaining the mode. More: [Dimmer matrix, section 5 (German)](../anleitung_dimmermatrix/ANLEITUNG_DIMMERMATRIX.md#5-modify-effekt-auf-laufende-effekte-addieren-abziehen-abdunkeln).
 
+  ![Close-up of three VC buttons: "Welle" with an amber + (1), "Lücke + Dunkel" with a blue − and a grey ◐ side by side (2), "Abdunkeln" with ◐ (3), each at the bottom left above the green action bar](img/06_modify_zeichen_tasten.png)
+
 State feedback while pressed/running:
 
 - **Pressed** (mouse or MIDI/key): the tile gets brighter, plus a light yellow border.
