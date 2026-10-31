@@ -1,8 +1,8 @@
 {
   "anleitung": "buehnen_effekte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "8148ec3f",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "b51fdd5a",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_effekte'.",
   "bilder": [
@@ -99,7 +99,7 @@
         900
       ],
       "marken": [],
-      "md5": "beb4136ee0265b696197a49b19202c7a"
+      "md5": "09881939ed90fc4b1642718dd1f235a2"
     },
     {
       "datei": "06_efx_form.png",
@@ -110,7 +110,7 @@
         900
       ],
       "marken": [],
-      "md5": "8673c4a52acd504230a76cbfb4030b1d"
+      "md5": "59e15f606ea4136a3b8bc5f0ce4a6b55"
     },
     {
       "datei": "07_efx_tempo.png",
@@ -121,7 +121,7 @@
         900
       ],
       "marken": [],
-      "md5": "6f917fefefc9ee99e9c4543174ddd43f"
+      "md5": "dc39a2c9ff68f1188beedc302db8c6c2"
     },
     {
       "datei": "08_efx_verhaeltnis.png",
@@ -132,7 +132,7 @@
         900
       ],
       "marken": [],
-      "md5": "70604dc46f92ad162b9adeb1e94a82dc"
+      "md5": "18df84bbbcd369d91a1bcf2f38730767"
     },
     {
       "datei": "09_welle_3d.gif",
