@@ -19,7 +19,7 @@ from src.core.midi.midi_mapper import (
     normalize_button_mode, ist_motorfader, motor_rueckmeldung,
     ACTION_EXECUTOR_GO, ACTION_EXECUTOR_BACK, ACTION_EXECUTOR_FLASH,
     ACTION_EXECUTOR_FADER, ACTION_PROGRAMMER_VAL, ACTION_GRAND_MASTER, ACTION_NONE,
-    _binding_type_from_msg_type,
+    _binding_type_from_msg_type, typ_text, typ_aus_text,
 )
 from src.core.app_state import get_state
 try:
@@ -44,9 +44,13 @@ MAP_COLS = ["Name", "Ziel", "Typ", "Kanal", "Daten 1", "Modus", "An", "Aus", "Po
 MAP_COL_TIPS = [
     "Frei wählbarer Name des Mappings",
     "Was gesteuert wird, z. B. executor_go:1 oder grand_master",
-    "MIDI-Nachrichtentyp: note_on, cc oder pitchbend",
+    "MIDI-Nachrichtentyp: note_on, cc, pitchbend, pc (Program Change),\n"
+    "nrpn (Daten 1 = Parameternummer), cc14 (CC 0–31 + LSB auf CC 32–63)\n"
+    "oder Endlos-Encoder cc_rel_zk / cc_rel_bo / cc_rel_vz\n"
+    "(Zweierkomplement / Binär-Offset / Vorzeichenbit)",
     "MIDI-Kanal 1–16",
-    "Daten 1 = Noten- bzw. Controller-Nummer (0–127)",
+    "Daten 1 = Noten-, Controller- bzw. Programmnummer (0–127),\n"
+    "bei nrpn die Parameternummer (0–16383)",
     "Tastenverhalten: press, toggle, flash oder continuous",
     "LED-Feedback: Velocity-Wert für „an“ (0–127)",
     "LED-Feedback: Velocity-Wert für „aus“ (0–127)",
@@ -453,7 +457,7 @@ class MidiView(QWidget):
         # CC-Strom (Fader) auf ~60 Hz drosseln, damit die Qt-Event-Loop nicht überflutet
         # wird. Betrifft nur die Monitor-Anzeige; die Fader-Steuerung im MidiMapper
         # bleibt ungedrosselt.
-        if msg.msg_type in ("cc", "pitchbend"):     # MIDI-10: Motorfader ebenso
+        if msg.msg_type in ("cc", "pitchbend", "nrpn"):  # MIDI-10/13 ebenso
             now = time.monotonic()
             if now - self._last_monitor_emit < 0.015:
                 return
@@ -473,6 +477,11 @@ class MidiView(QWidget):
         }
         if msg.msg_type == "msc" and msg.msc is not None:
             self._console.appendPlainText(self._msc_zeile(msg))
+            return
+        if msg.msg_type == "nrpn":                  # MIDI-13
+            self._console.appendPlainText(
+                f"NRPN  [{msg.port_name[:20]}] CH{msg.channel:2d} "
+                f"Param={msg.data1:5d} Wert={wert14(msg):5d}")
             return
         prefix = prefixes.get(msg.msg_type, msg.msg_type.upper()[:5])
         line = (f"{prefix} [{msg.port_name[:20]}] "
@@ -543,7 +552,7 @@ class MidiView(QWidget):
             vals = [
                 m.name,
                 m.target_id,
-                m.msg_type,
+                typ_text(m),                # MIDI-9/11/12/13
                 str(m.channel),
                 str(m.data1),
                 m.button_mode,
@@ -574,7 +583,9 @@ class MidiView(QWidget):
                     m.action = m.target_id
                     m.param = ""
             elif col == 2:
-                m.msg_type = txt.strip() or "note_on"
+                # MIDI-11/12: cc14 / cc_rel_* sind ein CC mit eigener Auswertung.
+                m.msg_type, modus = typ_aus_text(txt)
+                m.midi_in.cc_modus = modus if m.msg_type == "cc" else ""
             elif col == 3:
                 m.channel = int(txt or "1")
             elif col == 4:
@@ -614,8 +625,9 @@ class MidiView(QWidget):
             m.midi_in.message_type = _binding_type_from_msg_type(m.msg_type)
             if ist_motorfader(m):
                 m.midi_out.channel = m.channel      # MIDI-14: derselbe Fader
-            if m.midi_out and m.msg_type != "pitchbend":
-                # (MIDI-10: ein Pitchbend-Fader hat keine LED mit seiner Nummer)
+            if m.midi_out and m.msg_type not in ("pitchbend", "nrpn"):
+                # (MIDI-10: ein Pitchbend-Fader hat keine LED mit seiner Nummer;
+                # MIDI-13: eine NRPN-Parameternummer ist keine Note)
                 if m.midi_out.trigger_id < 0:
                     m.midi_out.trigger_id = m.data1
                 m.midi_out.channel = m.channel
@@ -654,6 +666,12 @@ class MidiView(QWidget):
             self._append_log(
                 f"✓ Learn: Pitchbend-Fader CH{msg.channel} (14 Bit) — "
                 f"Motorfader nachführen: Zeile wählen und „Feedback...“")
+            return
+        if msg.msg_type == "nrpn":
+            # MIDI-13: Parameternummer bis 16383 — keine LED dahinter.
+            self._refresh_map_table()
+            self._append_log(
+                f"✓ Learn: NRPN {msg.data1} CH{msg.channel} (14 Bit)")
             return
         self._prompt_feedback_values(m)
         self._refresh_map_table()
