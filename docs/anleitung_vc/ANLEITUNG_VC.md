@@ -179,6 +179,8 @@ der Bestätigung „⏹ LASER NOT-AUS ausgelöst — alle Laser dunkel …" — 
 Statusleiste, die das sonst anzeigt. Gelöst wird der NOT-AUS auch hier nur mit dem Knopf
 samt Rückfrage ([Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
+![Kiosk-Streifen oben rechts: (1) GM-Regler mit Prozentwert, (2) STOP ALL, (3) BLACKOUT, (4) LASER NOT-AUS (ausgelöst: „LASER NOT-AUS AKTIV“), darunter (5) der rote Balken „LASER NOT-AUS ausgelöst — alle Laser dunkel …“](img/10_kiosk_streifen.png)
+
 ### Konsole auf einen zweiten Bildschirm legen (Popout)
 
 **⧉ Popout** in der Werkzeugleiste holt die ganze Konsole in ein eigenes Fenster, zum Beispiel

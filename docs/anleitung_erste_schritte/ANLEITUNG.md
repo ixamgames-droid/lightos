@@ -89,6 +89,18 @@ Ein Klick auf einen Namen wechselt den Arbeitsbereich. Mit der Tastatur geht es 
    aus dem Patch (lange Namen gekürzt, die Nummer am Ende bleibt stehen). Heißen
    mehrere Geräte gleich oder ist zu wenig Platz, steht dort Kürzel + Nummer
    (z. B. „MH 9"); ausgewählte Geräte zeigen ihren Namen auch bei wenig Platz.
+
+   ![2D-Bühne der Demo-Show: acht PARs mit Farbverlauf von Rot nach Blau, darüber zwei Washes und zwei Spots, vorne die LED-Leiste; unter jedem Symbol der Gerätename, markiert „PAR 1" (1), „Spot 1" (2) und „LED-Leiste" (3)](img/12_buehne_namen.png)
+
+   Ausgewählte Geräte bekommen einen gelben Ring; links in der Liste sind sie
+   ebenfalls markiert, unten steht „Selektion: 3 Fixtures".
+
+   ![2D-Bühne mit Auswahl: PAR 3 und PAR 4 (1) sowie Spot 1 (2) mit gelbem Ring, in der Fixture-Liste links blau hinterlegt](img/13_buehne_auswahl.png)
+
+   Ziehst du den **GM** herunter oder drückst **BLACKOUT**, wird auch die 2D-Bühne
+   dunkler bzw. dunkel — sie zeigt das Ausgabebild:
+
+   ![Ablauf als GIF: GM-Regler (1) von 100 % auf 50 % und 15 %, die Geräte auf der 2D-Bühne werden dunkler und zeigen 50 % bzw. 14 %; GM zurück auf 100 %, dann BLACKOUT (2) an — alle Symbole dunkel — und wieder aus](img/14_buehne_gm_blackout.gif)
 2. **Patchen** — Geräte anlegen, auf DMX-Adressen legen und zu Gruppen zusammenfassen
    (Schritt 5). Ausführlich:
    [Patchen & Gruppen](../anleitung_patch_gruppen/ANLEITUNG_PATCH_GRUPPEN.md).

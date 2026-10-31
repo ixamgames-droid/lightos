@@ -79,6 +79,13 @@ wieder eingeschaltet.
 | **Lied-Analyse (Player)** | du ein **vorher im Generator analysiertes Lied** im Player abspielst und das Licht taktgenau sitzen soll. | Nimmt den Titel, der gerade im Player geladen ist (Abschnitt 7.2). Der Generator-Knopf **Im Player laden & als BPM-Quelle nutzen** stellt diesen Eintrag selbst ein. |
 | **Aus** | du keine Erkennung willst — z. B. nur Manuell mit TAP. | Die Statuszeile sagt dann „Erkennung aus — keine Beat-Quelle gewählt". „Aus" setzt den Takt sofort auf 0 — Beat-Effekte stehen still. Hast du den Takt im Modus **Manuell** von Hand gesetzt (Eingabe, TAP oder Nudge), bleibt er stehen. |
 
+Wechsel auf **Aus**: Eben stand der Takt noch auf 128 (Quelle „Lied-Analyse“), danach zeigen
+die große BPM-Zahl und die Kopfzeile „--“ — der Takt ist 0:
+
+![Ablauf als GIF: Quelle (1) „Lied-Analyse (Player)“ mit 128,0 BPM in der großen Anzeige (2), Statuszeile (3) „128 BPM aus dem Player-Titel“ und Kopfzeile „BPM: 128,0“ (4); dann Quelle „Aus“ — die Anzeige springt auf „--“, die Statuszeile meldet „Erkennung aus — keine Beat-Quelle gewählt“, die Kopfzeile „BPM: --“](img/02_quelle_aus_ablauf.gif)
+
+![Quelle „Aus“ (1): große BPM-Anzeige „--“ (2), Statuszeile „Erkennung aus — keine Beat-Quelle gewählt“ mit Link „Quelle wählen“ (3), Kopfzeile „BPM: --“ (4)](img/01_quelle_aus.png)
+
 Ein gespeichertes Gerät, das gerade nicht angesteckt ist, steht als **„… (nicht gefunden)"**
 in der Liste.
 

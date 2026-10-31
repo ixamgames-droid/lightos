@@ -96,6 +96,16 @@ which driver each needs is listed in [Supported DMX interfaces](INTERFACES.md) (
 The **Netzwerk (Art-Net / sACN)** tab shows the addresses of this computer (display
 only) and leads to the Art-Net tab.
 
+If no (recognised) interface is plugged in, the list stays empty:
+
+![Assistant without a device: the USB devices tab reports "Nichts gefunden" (nothing found) and explains possible causes](img/12_assistent_nichts_gefunden.png)
+
+1. **Nichts gefunden** (nothing found) — the operating system reports no known DMX
+   adapter.
+2. The **explanation** below: check the cable or try another USB port — or it is a
+   network adapter (Art-Net/sACN node), then continue in the **Netzwerk** tab.
+3. **Neu suchen** (search again) — look again after plugging it in.
+
 ![Assistant: test signal running, laser output locked](img/11_testsignal.png)
 
 **Testsignal** tab — one row per universe that has an output:
@@ -118,6 +128,13 @@ only) and leads to the Art-Net tab.
    If a laser is added or the emergency stop is triggered while it runs, the signal ends
    immediately. A device LightOS does not know (not patched) can still react — that is
    why it asks.
+
+The whole sequence as an animation — **Testsignal senden** (1), the confirmation with
+**Abbrechen** (cancel) as the default (3; only **Testsignal senden** in the question (4)
+starts it), the running test with **Stopp** (5, 6) and then **Gestoppt** (stopped, 7).
+The output with a laser stays **gesperrt** (locked) the whole time (2):
+
+![Animation: Testsignal tab, confirmation with Abbrechen as default, test signal running with the Stopp button, then stopped; universe 2 with a laser stays locked](img/13_testsignal_ablauf.gif)
 
 ## 2. ENTTEC DMX USB Pro
 

@@ -90,6 +90,15 @@ Treiber jedes Interface braucht, steht in [Unterstützte DMX-Interfaces](INTERFA
 Der Reiter **Netzwerk (Art-Net / sACN)** zeigt die Adressen dieses Rechners (nur
 Anzeige) und führt in den Reiter Art-Net.
 
+Steckt kein (erkanntes) Interface, bleibt die Liste leer:
+
+![Assistent ohne Gerät: Reiter USB-Geräte meldet „Nichts gefunden“ und erklärt, woran es liegen kann](img/12_assistent_nichts_gefunden.png)
+
+1. **Nichts gefunden** — das Betriebssystem meldet keinen bekannten DMX-Adapter.
+2. Die **Erklärung** darunter: Kabel oder anderen USB-Anschluss prüfen — oder es ist ein
+   Netzwerk-Adapter (Art-Net/sACN-Node), dann weiter im Reiter **Netzwerk**.
+3. **Neu suchen** — nach dem Einstecken noch einmal nachsehen.
+
 ![Assistent: Testsignal läuft, Laser-Ausgang gesperrt](img/11_testsignal.png)
 
 Reiter **Testsignal** — eine Zeile je Universum mit Ausgang:
@@ -113,6 +122,13 @@ Reiter **Testsignal** — eine Zeile je Universum mit Ausgang:
    Kommt während des Laufs ein Laser dazu oder wird der NOT-AUS ausgelöst, endet das
    Signal sofort. Ein Gerät, das LightOS nicht kennt (nicht gepatcht), kann trotzdem
    reagieren — darum die Rückfrage.
+
+Der ganze Ablauf als Animation — **Testsignal senden** (1), die Rückfrage mit
+**Abbrechen** als Vorgabe (3; erst **Testsignal senden** in der Rückfrage (4) startet),
+der laufende Test mit **Stopp** (5, 6) und danach **Gestoppt** (7). Der Ausgang mit
+Laser bleibt die ganze Zeit **gesperrt** (2):
+
+![Animation: Reiter Testsignal, Rückfrage mit Vorgabe Abbrechen, Testsignal läuft mit Knopf Stopp, danach gestoppt; Universum 2 mit Laser bleibt gesperrt](img/13_testsignal_ablauf.gif)
 
 ## 2. ENTTEC DMX USB Pro
 
