@@ -249,6 +249,12 @@ Statt DMX durchzumischen, kann ein Pult über **einzelne Kanäle** Executor-Fade
 Grand Master und die Tasten GO, Zurück und Stop in LightOS bedienen. Vorher:
 Netzwerk und Firewall wie in [Abschnitt 3](#3-vorbereitung-das-netzwerk).
 
+![Ausgabe-Dialog, Reiter DMX-Eingang: Kasten „Fernsteuerung (Pult steuert LightOS)“ mit drei Beispiel-Zuordnungen — Art-Net Kanal 1 auf Executor-Fader 1, Art-Net Kanal 2 auf GO, sACN Kanal 10 auf Grand Master](img/01_fernsteuerung.png)
+
+Im Bild: (1) der Kasten, (2) Spalte **Executor**, (3) Spalte **Schwelle %** (wirkt nur
+bei den Tasten GO, Zurück und Stop), (4) **„+ Zuordnung"**, (5) **„Entfernen"**,
+(6) **„Fernsteuerung aktiv"**, (7) **Übernehmen** des Kastens.
+
 1. Dialog **Ausgabe konfigurieren** (Menü **Ausgabe** → **Konfigurieren...**), Reiter
    **DMX-Eingang** öffnen. Ganz unten steht der Kasten
    **„Fernsteuerung (Pult steuert LightOS)"**.

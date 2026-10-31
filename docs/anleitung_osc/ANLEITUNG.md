@@ -9,9 +9,18 @@ LightOS auf Wunsch Fader, Cue-Stand, Grand Master und Blackout an ein OSC-Ziel z
 Ort: Menü **Ausgabe** → **OSC-Zuordnungen & Rückmeldung…**. Der OSC-Eingang selbst
 bleibt wie bisher ein eigener Schalter: Menü **Ausgabe** → **OSC-Server (Port 7770)**.
 
+![Menü Ausgabe mit den Einträgen OSC-Server (Port 7770) und OSC-Zuordnungen & Rückmeldung…](img/01_menue_osc.png)
+
+(1) schaltet den OSC-Eingang ein, (2) öffnet den Dialog dieser Anleitung.
+
 ## 1. Eine Adresse zuordnen
 
 Reiter **Eingang**, **+ Zuordnung**, dann je Zeile:
+
+![Dialog OSC-Zuordnungen & Rückmeldung, Reiter Eingang mit vier Beispiel-Zuordnungen: /1/fader{n} auf Executor-Fader, /1/push{n} auf GO, /szene/{an,start} startet die Funktion Lauflicht, /tempo/tap auf Tap-Tempo](img/02_eingang.png)
+
+Im Bild: (1) **Zuordnungen aktiv**, (2) eine Adresse mit Muster `{n}`, (3) **Funktion**
+bei einem Funktions-Ziel, (4) **+ Zuordnung**, (5) **Lernen**, (6) **Übernehmen**.
 
 | Spalte | Bedeutung |
 |---|---|
@@ -63,6 +72,13 @@ wirkt auf beiden Wegen. Deshalb feste Adressen nicht zusätzlich frei zuordnen.
 2. Im Dialog eine Zeile wählen (ohne Auswahl entsteht eine neue) und **Lernen** drücken.
 3. Am Pult bzw. in TouchOSC das Bedienelement einmal bewegen oder drücken.
 
+![Animation: Lernen drücken, der Knopf wartet auf die nächste OSC-Nachricht, dann steht die neue Zeile /Page1/Fader{n} mit Ziel Executor-Fader, Versatz -200 und Bereich 0–100 in der Tabelle und die Statuszeile nennt die gelernte Adresse](img/04_lernen.gif)
+
+Im Bild: (1) **Lernen**, (2) die Statuszeile wartet, (3) die neue Zeile — aus
+`/Page1/Fader203` wurde `/Page1/Fader{n}` mit Versatz `-200` und Bereich `0–100`,
+(4) die Statuszeile nennt Adresse, `n` und Absender. (Für das Bild kam die Nachricht
+nicht übers Netz, sondern wurde dem Lernen direkt übergeben.)
+
 LightOS trägt die Adresse ein und macht aus der **letzten Zahl** `{n}`, schlägt ein Ziel
 vor (Fader, GO, Zurück …) und bei Nummern wie 201 den Versatz `-200`; der Bereich wird
 aus dem Wert geraten. Die Statuszeile zeigt Adresse, `n` und den Absender. Vorschläge
@@ -79,6 +95,11 @@ kann das zuerst gelernt werden: dann einfach noch einmal lernen.
 
 Reiter **Rückmeldung**: Haken **Rückmeldung senden**, Ziel-IP und Port des Empfängers
 (z. B. `192.0.2.20`, Port 9000), dann eine **Vorlage** oder eigene Adressen.
+
+![Reiter Rückmeldung: Rückmeldung senden an 192.0.2.20 Port 9000, Vorlage LightOS, Executoren 1-10, darunter die fünf Adressen der Vorlage](img/03_rueckmeldung.png)
+
+Im Bild: (1) Reiter **Rückmeldung**, (2) **Rückmeldung senden**, (3) Ziel-IP und Port,
+(4) **Vorlage**, (5) **Executoren**, (6) **Alles neu senden**.
 
 | Zustand | Adresse (LightOS-Vorlage) | Wert |
 |---|---|---|
