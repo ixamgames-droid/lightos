@@ -278,7 +278,11 @@ export const STAGE_BLUEPRINTS = {
     defaultColor: '#222230',
     build: (size, color) => new THREE.Mesh(
       new THREE.BoxGeometry(size.x, size.y, size.z),
-      new THREE.MeshStandardMaterial({ color: color, roughness: 1.0, side: THREE.DoubleSide })
+      // VIZ-101: Schatten mit der RUECKseite. Bei DoubleSide zeichnete three
+      // auch die beleuchtete Vorderseite in die Shadow-Map — sie verschattete
+      // sich selbst (Shadow-Acne: Moire-Streifen im Lichtfleck).
+      new THREE.MeshStandardMaterial({ color: color, roughness: 1.0, side: THREE.DoubleSide,
+                                       shadowSide: THREE.BackSide })
     ),
   },
   led_wall: {

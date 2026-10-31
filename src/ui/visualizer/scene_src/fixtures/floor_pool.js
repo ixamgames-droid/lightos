@@ -114,3 +114,17 @@ export function syncPoolSize(f, dist, goboRand) {
   // also nach oben — skaliert wird in X und Y, nicht in X und Z.
   disc.scale.set(k, k, 1);
 }
+
+/** VIZ-101: Scheibe flach auf den Boden (n = null) oder in eine senkrechte
+ *  Flaeche mit der Normalen n = [x, y, z] legen. Die Drehung um die eigene
+ *  Achse (rotation.z, Gobo-Drehung) bleibt in beiden Lagen erhalten. */
+export function fleckAufFlaeche(disc, n) {
+  if (!disc) return;
+  if (n) {
+    disc.rotation.x = 0;
+    disc.rotation.y = Math.atan2(n[0], n[2]);
+  } else {
+    disc.rotation.x = -Math.PI / 2;
+    disc.rotation.y = 0;
+  }
+}
