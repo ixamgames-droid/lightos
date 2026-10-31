@@ -51,7 +51,12 @@ def _merkmale(app, w):
     app.processEvents()
     img = w.grab().toImage()
     h = img.height()
-    grund = img.pixelColor(2, h // 2).getRgb()[:3]
+    # Grund = haeufigste Farbe im Innern, nicht ein fester Pixel: je nach
+    # Schrift des Rechners (CI) traf (2, h/2) sonst einen Buchstaben.
+    from collections import Counter
+    grund = Counter(img.pixelColor(x, y).getRgb()[:3]
+                    for x in range(3, img.width() - 3)
+                    for y in range(3, h - 3)).most_common(1)[0][0]
     rahmen = img.pixelColor(0, h // 2).getRgb()[:3]
     hellste = max(img.pixelColor(x, y).lightness()
                   for x in range(3, img.width() // 2)
