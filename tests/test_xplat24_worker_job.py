@@ -78,6 +78,15 @@ def _lebt(pid: int) -> bool:
     try:   # Zombie zaehlt als tot
         with open(f"/proc/{pid}/stat") as f:
             return f.read().split(")")[-1].split()[0] != "Z"
+    except ProcessLookupError:
+        # QA-108: Datei war offen, der Zombie wurde vor dem Lesen abgeraeumt -
+        # Linux meldet beim read() ESRCH. Der Prozess ist weg, also tot.
+        return False
+    except FileNotFoundError:
+        # QA-108: Zwischen kill(0) und dem Lesen wurde der Zombie abgeraeumt -
+        # der Prozess ist weg, also tot. Nur ohne /proc (macOS) fehlt die
+        # Zombie-Pruefung; dann zaehlt das erfolgreiche kill(0).
+        return not os.path.isdir("/proc")
     except OSError:
         return True
 
@@ -85,6 +94,18 @@ def _lebt(pid: int) -> bool:
 def _hart_beenden(pid: int):
     # Windows: os.kill ruft TerminateProcess - wie Task-Manager „Task beenden“.
     os.kill(pid, getattr(signal, "SIGKILL", signal.SIGTERM))
+
+
+def _worker_abraeumen(pid: int):
+    """Aufraeumen nach dem Test: ein schon toter Worker ist das gewuenschte
+    Ergebnis. Stirbt er zwischen Pruefung und Kill (unter Last, QA-108), ist
+    ``ProcessLookupError`` „schon tot“ - nur hier, nicht beim Kill der App."""
+    if not _lebt(pid):
+        return
+    try:
+        _hart_beenden(pid)
+    except ProcessLookupError:
+        pass
 
 
 class WorkerStirbtMitDerApp(unittest.TestCase):
@@ -109,7 +130,7 @@ class WorkerStirbtMitDerApp(unittest.TestCase):
         with open(pids, encoding="utf-8") as f:
             app_pid, worker_pid = map(int, f.read().split())
         # Aufraeumen auch im Fehlerfall: keine Waise aus dem Test selbst.
-        self.addCleanup(lambda: _lebt(worker_pid) and _hart_beenden(worker_pid))
+        self.addCleanup(_worker_abraeumen, worker_pid)
         self.assertTrue(_lebt(worker_pid), "Worker lief vor dem Kill nicht")
 
         _hart_beenden(app_pid)
@@ -134,6 +155,50 @@ class WorkerStirbtMitDerApp(unittest.TestCase):
         self.assertIsNotNone(
             dauer, "Ein haengender Worker ueberlebt die App - er haelt den COM-Port, "
                    "die naechste App bekommt keine Ausgabe")
+
+
+@unittest.skipIf(os.name == "nt", "Wettlauf mit /proc gibt es nur unter POSIX")
+class AbraeumenImWettlauf(unittest.TestCase):
+    """QA-108: Unter Last verschwand der Worker zwischen ``kill(pid, 0)`` und
+    dem Lesen von ``/proc/<pid>/stat`` (Zombie wird gerade abgeraeumt). Das
+    galt als „lebt“, der Aufraeum-Kill traf ins Leere -> ProcessLookupError.
+    Nachgestellt mit Attrappen: ``os.kill`` wird vollstaendig ersetzt, es
+    erreicht kein Signal einen echten Prozess."""
+
+    PID = 999_999_999   # liegt ueber jedem pid_max
+
+    @staticmethod
+    def _kill_attrappe(pid, sig):
+        if sig == 0:
+            return None                 # noch als Zombie sichtbar ...
+        raise ProcessLookupError(3, "No such process")   # ... dann weg
+
+    def test_verschwundener_zombie_gilt_als_tot(self):
+        from unittest import mock
+        with mock.patch.object(os, "kill", side_effect=self._kill_attrappe), \
+                mock.patch("builtins.open", side_effect=FileNotFoundError):
+            self.assertFalse(_lebt(self.PID))
+
+    def test_beim_lesen_abgeraeumter_zombie_gilt_als_tot(self):
+        """Zweiter Weg: ``open`` gelingt noch, ``read()`` liefert ESRCH."""
+        from unittest import mock
+        datei = mock.mock_open()
+        datei.return_value.read.side_effect = ProcessLookupError(3, "No such process")
+        with mock.patch.object(os, "kill", side_effect=self._kill_attrappe), \
+                mock.patch("builtins.open", datei):
+            self.assertFalse(_lebt(self.PID))
+
+    def test_aufraeumen_wertet_schon_toten_worker_nicht_als_fehler(self):
+        from unittest import mock
+        with mock.patch.object(os, "kill", side_effect=self._kill_attrappe), \
+                mock.patch("builtins.open", side_effect=FileNotFoundError):
+            _worker_abraeumen(self.PID)   # darf nicht werfen
+
+    def test_kill_der_app_bleibt_streng(self):
+        from unittest import mock
+        with mock.patch.object(os, "kill", side_effect=self._kill_attrappe):
+            with self.assertRaises(ProcessLookupError):
+                _hart_beenden(self.PID)
 
 
 class JobObjekt(unittest.TestCase):
