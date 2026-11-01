@@ -110,13 +110,20 @@ function _schmalerAlsKegel(groesse, durchmesser) {
 }
 
 // VIZ-101 (Review): deckt eine Wand (Ebene n·x + c = 0, n zum Licht hin, Punkt
-// p darauf, Oberkante `oben`) ALLES ab, was der Kegel hinter ihrer Ebene
-// zeichnen wuerde? Nur dann darf die (unendliche) Ebene ihn beschneiden — bei
-// einer niedrigen Wand geht ein flacher Randstrahl ueber sie hinweg. Geprueft
-// wird die Durchstosshoehe von 16 Randstrahlen des Kegels (o, d: Linse und
-// Achse, tanA: Tangens des halben Kegelwinkels).
+// p darauf, Welt-Kasten `kasten` = {min, max}) ALLES ab, was der Kegel hinter
+// ihrer Ebene zeichnen wuerde? Nur dann darf die (unendliche) Ebene ihn
+// beschneiden — bei einer niedrigen Wand geht ein flacher Randstrahl ueber sie
+// hinweg. Geprueft wird der Durchstosspunkt von 16 Randstrahlen des Kegels
+// (o, d: Linse und Achse, tanA: Tangens des halben Kegelwinkels).
+// CDX-63: auch SEITLICH — trifft die Mitte nahe dem Wandende, gehen die
+// aeusseren Randstrahlen neben der Wand vorbei (eine 10 m breite Wand reicht
+// nicht, wenn die Mitte 0,1 m vor ihrem Ende auftrifft). Randstrahlen, die die
+// Ebene erst unter dem Boden kreuzen, enden vorher am Boden und zaehlen nicht.
 const _RAND_DECKT = 16;
-function _wandDeckt(o, d, tanA, n, p, oben) {
+const _DECKT_TOL = 0.02;
+function _wandDeckt(o, d, tanA, n, p, kasten) {
+  const lo = kasten && kasten.min, hi = kasten && kasten.max;
+  const oben = hi && hi.y;
   if (!(typeof oben === 'number' && isFinite(oben)) || !(tanA >= 0)) return false;
   const abst = n[0] * (o.x - p[0]) + n[1] * (o.y - p[1]) + n[2] * (o.z - p[2]);
   if (!(abst > 0)) return false;               // Linse nicht vor der Wand
@@ -132,7 +139,13 @@ function _wandDeckt(o, d, tanA, n, p, oben) {
     const rx = d.x + c * ax + s * bx, ry = d.y + c * ay + s * by, rz = d.z + c * az + s * bz;
     const rn = rx * n[0] + ry * n[1] + rz * n[2];
     if (!(rn < -1e-6)) continue;               // erreicht die Wandebene nicht
-    if (o.y + ry * (abst / -rn) > oben + 0.01) return false;   // geht darueber
+    const t = abst / -rn;
+    const py = o.y + ry * t;
+    if (py > oben + 0.01) return false;        // geht darueber
+    if (py < 0) continue;                      // endet vorher am Boden
+    const px = o.x + rx * t, pz = o.z + rz * t;
+    if (px < lo.x - _DECKT_TOL || px > hi.x + _DECKT_TOL
+        || pz < lo.z - _DECKT_TOL || pz > hi.z + _DECKT_TOL) return false;   // daneben
   }
   return true;
 }
@@ -178,7 +191,7 @@ function _wandImFleck(origin, dir, hitX, hitZ, abstand, tanA, durchmesser) {
       const n = [_normale.x, _normale.y, _normale.z];
       const p = [h.point.x, h.point.y, h.point.z];
       _wandBox.setFromObject(h.object);
-      if (!_wandDeckt(origin, dir, tanA, n, p, _wandBox.max.y)) continue;
+      if (!_wandDeckt(origin, dir, tanA, n, p, _wandBox)) continue;
       best = { n, p, weg: h.distance };
       break;
     }
@@ -405,7 +418,8 @@ function _koerperTrefferRechnen(origin, dir, schmal = 0) {
     }
     _wandBox.setFromObject(h.object);
     return { abstand: h.distance, y: h.point.y, oben, kante, unten, untenY,
-             normale, groesse: _koerperGroesse(h.object), oberkante: _wandBox.max.y };
+             normale, groesse: _koerperGroesse(h.object),
+             kasten: { min: _wandBox.min.clone(), max: _wandBox.max.clone() } };
   }
   return null;
 }
@@ -2288,7 +2302,7 @@ function applyFloorAim(f, dmx) {
     && _wandDeckt(ursprung, richtung, tanBis(auftreffAbstand), wandN,
                   [ursprung.x + richtung.x * auftreffAbstand,
                    ursprung.y + richtung.y * auftreffAbstand,
-                   ursprung.z + richtung.z * auftreffAbstand], kt.oberkante));
+                   ursprung.z + richtung.z * auftreffAbstand], kt.kasten));
   // VIZ-101 (Review): die Mitte trifft den BODEN vor einer Wand — Fleck und
   // Kegel an der Wandebene beschneiden (s. _wandImFleck). Gerechnet nur, wenn
   // sich Strahl, Buehne oder Kegelweite geaendert haben (Kostenbremse wie
