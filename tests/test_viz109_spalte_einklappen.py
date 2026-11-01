@@ -498,7 +498,9 @@ def test_fokus_in_der_eingeklappten_spalte_schluckt_s_und_f_nicht(prefs, monkeyp
     monkeypatch.setattr(fenster, "_on_fit_selected", lambda: None)
 
     for taste, reiter in ((Qt.Key.Key_S, 1), (Qt.Key.Key_F, 0)):
-        fenster._tabs.setCurrentIndex(2 if reiter == 0 else 0)
+        # Ausgangsreiter immer „Einstellungen“: auf „Geräte“ sind die Felder
+        # ohne gewaehltes Geraet seit VIZ-76 gesperrt (kein Fokusziel mehr).
+        fenster._tabs.setCurrentIndex(2)
         _app.processEvents()
         felder = [w for w in fenster._tabs.currentWidget().findChildren(QWidget)
                   if isinstance(w, (QLineEdit, QAbstractSpinBox))
