@@ -2495,12 +2495,6 @@ class VCButton(VCWidget):
                 if func_combo.itemData(i) == self.function_id:
                     func_combo.setCurrentIndex(i)
                     break
-        func_combo.currentIndexChanged.connect(
-            lambda _i: slot.setText(str(func_combo.currentData()))
-            if func_combo.currentData() is not None and func_combo.currentData() >= 0
-            else None
-        )
-
         extra_ids = QLineEdit(",".join(str(i) for i in self.function_ids))
         extra_ids.setToolTip("Weitere Funktions-IDs (Komma-getrennt) — Toggle/Flash "
                              "wirkt zusaetzlich auf diese Funktionen (als Gruppe).")
@@ -2511,6 +2505,43 @@ class VCButton(VCWidget):
         target_editor.set_targets(_t0)
         target_editor.setToolTip("Funktionen/Effekte, die dieser Button schaltet — "
                                  "per Dropdown auswählen, mit ✕ entfernen, „+\" hinzufügen.")
+
+        _namen_sync = {"aktiv": False}
+
+        def _namenswahl(_i=None):
+            # VCB-35 (b): die Namenswahl unter „Erweitert" traegt sich sichtbar in
+            # „Ziele" ein (eine Quelle der Wahrheit). Sonst setzte sie nur das
+            # Roh-ID-Feld, und apply() band Umschalten/Flash/Effekt-Aktion/„Alle
+            # Weiss" an die LEERE Ziel-Liste -> Knopf ungebunden, ohne Meldung.
+            fid = func_combo.currentData()
+            if fid is None or fid < 0:
+                return
+            fid = int(fid)
+            ids = target_editor.ids()
+            if not ids or ids[0] != fid:
+                # gewaehlte Funktion wird Haupt-Ziel (wie function_id): ersetzt das
+                # bisherige erste Ziel, weitere bleiben (ohne Doppel).
+                _namen_sync["aktiv"] = True
+                try:
+                    target_editor.set_targets([fid] + [i for i in ids[1:] if i != fid])
+                finally:
+                    _namen_sync["aktiv"] = False
+            slot.setText(str(fid))
+
+        def _ziele_zur_namenswahl():
+            # VCB-35: Rueckrichtung — die Namens-Combo zeigt immer das Haupt-Ziel
+            # (sonst stand nach Leeren/Aendern von „Ziele" ein veralteter Name da,
+            # und dieselbe Wahl erneut loeste kein Signal aus).
+            if _namen_sync["aktiv"]:
+                return
+            ids = target_editor.ids()
+            idx = func_combo.findData(ids[0]) if ids else 0
+            func_combo.blockSignals(True)
+            func_combo.setCurrentIndex(idx if idx >= 0 else 0)
+            func_combo.blockSignals(False)
+
+        func_combo.currentIndexChanged.connect(_namenswahl)
+        target_editor.changed.connect(_ziele_zur_namenswahl)
 
         snap_combo = QComboBox()
         snap_combo.addItem("(keiner)", -1)
@@ -2796,7 +2827,8 @@ class VCButton(VCWidget):
                 except ValueError:
                     pass
             self.function_ids = _eids
-            # „Schaltet mit"-Liste hat Vorrang, wenn befuellt (nur Funktions-Aktionen).
+            # „Schaltet mit"-Liste ist die Quelle (nur Funktions-Aktionen); leer = ungebunden.
+            # Die Namenswahl unter „Erweitert" traegt sich dort ein (VCB-35).
             if self.action in (FT, FF, EA, AW):
                 _tids = target_editor.ids()
                 self.function_id = _tids[0] if _tids else None
