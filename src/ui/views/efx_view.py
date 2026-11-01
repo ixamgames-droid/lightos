@@ -95,6 +95,22 @@ def _head_beschriftung():
         return None
 
 
+def _geraete_namen():
+    """LAS-29: ``{fid: Label}`` der gepatchten Geraete fuer die Zielliste —
+    oder ``None``, wenn ``app_state`` nicht erreichbar ist. Ein Geraet ohne
+    Label fehlt in der Karte und heisst weiter „Fixture #N“."""
+    try:
+        from src.core.app_state import get_state
+        out = {}
+        for f in get_state().get_patched_fixtures():
+            lbl = str(getattr(f, "label", "") or "").strip()
+            if lbl:
+                out[int(f.fid)] = lbl
+        return out
+    except Exception:
+        return None
+
+
 def _nur_weiss_auswahl() -> bool:
     """FM-51: besteht die Auswahl NUR aus Weiss-Segmenten (``["1:w3"]``)?
     Dann sind ``selected_fids`` leer, es ist aber etwas gewaehlt — die
@@ -138,6 +154,22 @@ def laser_achsen_attrs(attrs) -> tuple[str, str] | None:
     if basis & set(LASER_ACHSEN):
         return LASER_ACHSEN
     return None
+
+
+# LAS-29: Beschriftung der Geometrie-Felder — Moving Head (Bestand) vs. reine
+# Laser-Ziele, deren Bild ueber laser_x/laser_y wandert.
+_PAN_TILT_TEXTE = {
+    "_width_spin": "Breite (Pan-Hub):",
+    "_height_spin": "Höhe (Tilt-Hub):",
+    "_xoff_spin": "Zentrum Pan:",
+    "_yoff_spin": "Zentrum Tilt:",
+}
+_LASER_TEXTE = {
+    "_width_spin": "Breite (X-Hub):",
+    "_height_spin": "Höhe (Y-Hub):",
+    "_xoff_spin": "Zentrum X:",
+    "_yoff_spin": "Zentrum Y:",
+}
 
 
 def _laser_achsen_fuer_fid(fid) -> tuple[str, str] | None:
@@ -817,7 +849,7 @@ class EfxView(QWidget):
         return out
 
     @staticmethod
-    def _target_label(target, beschriften=None) -> str:
+    def _target_label(target, beschriften=None, namen=None) -> str:
         """Listen-Beschriftung eines EFX-Ziels — Kopf-Ziele ausdruecklich benennen,
         sonst stehen bei einem 4-Kopf-Geraet vier gleiche Zeilen untereinander.
 
@@ -825,14 +857,19 @@ class EfxView(QWidget):
         ``app_state.head_labeller`` und holt den Kopf-Namen aus DERSELBEN Quelle
         wie Programmer und Gruppen-Raster. Ohne Angabe bleibt es bei ``K{N+1}``
         — die Liste haelt nur fids, die Geraete muessen von aussen kommen.
+
+        LAS-29: ``namen`` (``{fid: Label}``, aus ``_geraete_namen``) nennt das
+        Geraet beim Label wie Programmer-Kopfzeile und Fan-Werkzeug („G2 · K4“)
+        statt „Fixture #2“. Ohne Label (oder ohne Karte) bleibt „Fixture #N“.
         """
         from src.core.app_state import head_label_short
+        geraet = (namen or {}).get(int(target.fid)) or f"Fixture #{target.fid}"
         head = getattr(target, "head", None)
         if head is None:
-            return f"Fixture #{target.fid}"
+            return geraet
         if beschriften is None:
-            return f"Fixture #{target.fid} · {head_label_short('', int(head))}"
-        return (f"Fixture #{target.fid} · "
+            return f"{geraet} · {head_label_short('', int(head))}"
+        return (f"{geraet} · "
                 f"{beschriften(int(target.fid), int(head), kurz=True)}")
 
     def _active_group_fids(self) -> set[int]:
@@ -1948,8 +1985,9 @@ class EfxView(QWidget):
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
             _kopf = _head_beschriftung()
+            _namen = _geraete_namen()
             for _t in self._current.fixtures:
-                self._fx_list.addItem(self._target_label(_t, _kopf))
+                self._fx_list.addItem(self._target_label(_t, _kopf, _namen))
             if not movers:
                 title = "Geräte: keine beweglichen Geräte in der Auswahl"
             elif spiders == len(movers):
@@ -2036,8 +2074,9 @@ class EfxView(QWidget):
             # Text wie bisher.
             self._fx_list.clear()
             _kopf = _head_beschriftung()
+            _namen = _geraete_namen()
             for fx in efx.fixtures:
-                self._fx_list.addItem(f"{self._target_label(fx, _kopf)}"
+                self._fx_list.addItem(f"{self._target_label(fx, _kopf, _namen)}"
                                       f"  offset={fx.start_offset:.2f}")
         finally:
             self._loading = False
@@ -2138,8 +2177,59 @@ class EfxView(QWidget):
         except Exception:
             return False
 
+    def _current_is_laser(self) -> bool:
+        """LAS-29: True, wenn ALLE Ziele der aktuellen EFX Laser-Ziele sind
+        (``pan_attr``/``tilt_attr`` = ``laser_x``/``laser_y``, gesetzt von
+        ``_targets_for`` nach LAS-22).
+
+        Bewusst die Achsen des ZIELS und nicht ``laser.erkennung.ist_laser``
+        (LAS-37): die weite Sicherheitsregel zaehlt auch einen Moving Head mit
+        Laserdiode als Laser — der wird aber ueber Pan/Tilt bewegt und muss
+        auch so beschriftet bleiben. Was der Editor hier beschriftet, ist genau
+        die Achse, die der Effekt schreibt."""
+        cur = self._current
+        fixtures = getattr(cur, "fixtures", None) if cur is not None else None
+        if not fixtures:
+            return False
+        return all(getattr(f, "pan_attr", "pan") == LASER_ACHSEN[0]
+                   for f in fixtures)
+
+    def _apply_laser_beschriftung(self, laser: bool) -> None:
+        """LAS-29: Geometrie-Felder fuer reine Laser-Ziele X/Y statt Pan/Tilt
+        nennen und die 16-bit-Option (pan_fine/tilt_fine — Laser haben keine)
+        ausblenden. Gemischte Ziele (Laser + Moving Head) behalten die
+        Pan/Tilt-Beschriftung und die Option: die 16-bit-Ausgabe wirkt dort auf
+        die Moving Heads weiter, und Breite/Zentrum bedeuten fuer sie Pan/Tilt
+        (fuer die Laser dieselbe Groesse auf X/Y). Mutiert das Modell NICHT."""
+        if not hasattr(self, "_bit16_chk"):
+            return
+        laser = bool(laser)
+        self._laser_mode = laser
+        texte = _LASER_TEXTE if laser else _PAN_TILT_TEXTE
+        try:
+            for name, text in texte.items():
+                feld = getattr(self, name)
+                lbl = self._form_box.layout().labelForField(feld)
+                if lbl is not None:
+                    lbl.setText(text)
+            self._relative_chk.setText(
+                "um aktuelle X/Y-Position" if laser
+                else "um aktuelle Pan/Tilt-Position")
+            self._relative_chk.setToolTip(
+                "Bewegung relativ um die beim Start geschnappte Position jedes "
+                "Geräts (z. B. „fahr zur Bühne, dann dort die Acht“) statt um "
+                + ("Zentrum X/Y." if laser else "Zentrum Pan/Tilt."))
+            self._bit16_chk.setVisible(not laser)
+            lbl16 = self._bit16_chk.parentWidget().layout().labelForField(
+                self._bit16_chk)
+            if lbl16 is not None:
+                lbl16.setVisible(not laser)
+        except RuntimeError:
+            return
+
     def _update_spider_mode(self):
         self._apply_spider_mode(self._current_is_spider())
+        self._apply_laser_beschriftung(self._current_is_laser())
 
     def _apply_spider_mode(self, on: bool):
         """Schaltet den Editor zwischen Moving-Head (Pan/Tilt-Geometrie + 2D-Pad)
@@ -2518,8 +2608,9 @@ class EfxView(QWidget):
             self._current.fixtures = self._targets_for(movers)
             self._fx_list.clear()
             _kopf = _head_beschriftung()
+            _namen = _geraete_namen()
             for _t in self._current.fixtures:
-                self._fx_list.addItem(self._target_label(_t, _kopf))
+                self._fx_list.addItem(self._target_label(_t, _kopf, _namen))
             if not self._follow:
                 self._fx_box.setTitle(f"Geräte: {len(movers)} automatisch zugewiesen")
             else:
@@ -2587,12 +2678,13 @@ class EfxView(QWidget):
             existing = {(f.fid, getattr(f, "head", None))
                         for f in self._current.fixtures}
             _kopf = _head_beschriftung()
+            _namen = _geraete_namen()
             for _t in self._targets_for(fids):
                 key = (_t.fid, getattr(_t, "head", None))
                 if key in existing:
                     continue
                 self._current.fixtures.append(_t)
-                self._fx_list.addItem(self._target_label(_t, _kopf))
+                self._fx_list.addItem(self._target_label(_t, _kopf, _namen))
                 existing.add(key)
             self._update_spider_mode()
         except Exception:

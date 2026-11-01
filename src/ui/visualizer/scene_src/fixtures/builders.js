@@ -17,7 +17,7 @@ import { applyGobo, alignGoboFloor, goboKanteAbgleichen, kegelSchnittAbgleichen,
 import { glattKanal, glattZiel, glattWert, glattDeckel } from './bewegung_glatt.js';   // VIZ-92
 import { goboProjektionAktiv, goboFlachDeckkraft, goboSchmal, strahlFussabdruck, goboUeberhangGerichtet, kegelFernLaenge, goboInnenGerichtet, kantenAbstand } from '../scene/gobo_projektion.js';      // VIZ-96, VIZ-107
 import { requestRender } from '../scene/render_loop.js';                 // VIZ-92
-import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY } from './laser.js';   // VIZ-79
+import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY, laserFarbe } from './laser.js';   // VIZ-79, VIZ-95
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
 import { ausbrennNachfuehren } from './ausbrennen.js';         // VIZ-91
@@ -2023,9 +2023,13 @@ function applyGenericColor(f, dmx) {
     // wieder als sichtbar und hielte den Render-Loop wach.
     f._laserHell = lum;
     const laserVis = beamsSichtbar(f, lum);
+    // VIZ-95: Farbton aus den Farb-Bereichen des Profils (falls da) — die
+    // Helligkeit (Deckkraft, Sichtbarkeit) bleibt an intNorm/lum oben.
+    const laserCol = laserFarbe(f, color);
+    if (laserCol !== color && f.lamp && f.lamp.material) f.lamp.material.emissive = laserCol;
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
-      bm.material.color = color;
+      bm.material.color = laserCol;
       // VIZ-79: eigene Deckkraft (Strahl bzw. Flaeche), NICHT Beam Opacity.
       const deck = (bm.userData.deckkraft !== undefined) ? bm.userData.deckkraft : LASER_BEAM_OPACITY;
       bm.material.opacity = Math.max(0.0, intNorm * deck);
