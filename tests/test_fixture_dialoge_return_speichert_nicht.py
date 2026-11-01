@@ -279,7 +279,12 @@ class GeneratorReturnTest(_DialogBasis):
     """Der Generator — hier wurde der Befund gemessen."""
 
     def _dialog(self):
-        return self._dialog_zeigen(generator_module.FixtureGeneratorDialog())
+        # FM-71: der Generator startet leer; diese Tests messen am frueheren Start
+        # mit dem RGB-Beispiel (sonst faengt der Modus-Check vor ihnen ab).
+        beispiel = generator_module.GeneratorModel(modes=[generator_module.GenMode(
+            "Default", generator_module.beispiel_kanaele())])
+        return self._dialog_zeigen(
+            generator_module.FixtureGeneratorDialog(model=beispiel))
 
     def test_return_im_rasterfeld_speichert_nicht(self):
         dlg = self._dialog()

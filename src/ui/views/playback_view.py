@@ -15,7 +15,7 @@ from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
 from src.ui.weak_slots import weak_slot
 
-CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve"]
+CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
 
 class PlaybackView(QWidget):
@@ -445,6 +445,13 @@ class PlaybackView(QWidget):
                 self._table.setItem(row, col, item)
             # F-5: Fade-Verlauf als Combo (eigene Zelle, kein itemChanged)
             self._table.setCellWidget(row, 6, self._make_curve_combo(cue))
+            # MTC-04: Ausloese-Timecode HH:MM:SS:FF ("—" = aus)
+            tc_item = QTableWidgetItem(getattr(cue, "timecode", None) or "—")
+            tc_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            tc_item.setToolTip("MIDI-Timecode HH:MM:SS:FF — erreicht der empfangene "
+                               "MTC diesen Wert, springt die Cueliste auf diese Cue. "
+                               "„—“ = aus.")
+            self._table.setItem(row, 7, tc_item)
         self._table.blockSignals(False)
         # Zeilen wurden neu aufgebaut -> Highlight im naechsten Tick neu zeichnen.
         self._last_hl_idx = None
@@ -677,6 +684,14 @@ class PlaybackView(QWidget):
         if row >= len(self._current_stack.cues):
             return
         cue = self._current_stack.cues[row]
+        if col == 7:
+            # MTC-04: ungueltig/leer -> aus; normalisiert zurueckschreiben.
+            from src.core.engine.cue import normalisiere_timecode
+            cue.timecode = normalisiere_timecode(item.text())
+            self._table.blockSignals(True)
+            item.setText(cue.timecode or "—")
+            self._table.blockSignals(False)
+            return
         try:
             val = item.text().replace("s", "").strip()
             if col == 0:
@@ -810,10 +825,32 @@ class ExecutorWidget(QWidget):
         self._setup_ui()
         # UI-98: statt fester 110 px eine aus fontMetrics gemessene
         # Mindestbreite (drei Tasten + Rand), höchstens wie bisher 110 px.
-        self.setMinimumWidth(self.mindestbreite())
-        self.setMaximumWidth(max(110, self.mindestbreite()))
+        self._breite_setzen()
         self.setSizePolicy(QSizePolicy.Policy.Preferred,
                            QSizePolicy.Policy.Preferred)
+
+    def _breite_setzen(self) -> None:
+        m = self.mindestbreite()
+        if self.minimumWidth() != m:
+            self.setMinimumWidth(m)
+        if self.maximumWidth() != max(110, m):
+            self.setMaximumWidth(max(110, m))
+
+    # QA-109: Beim Bau hat die Taste noch die Schrift OHNE Stylesheet; die
+    # Schrift aus dark.qss bekommt sie erst beim Polieren (spaetestens beim
+    # ersten Anzeigen). Fallen die beiden Schriften verschieden breit aus,
+    # stimmte die Mindestbreite nicht mehr — gemessen unter Windows: ohne Stil
+    # „Sans Serif“, mit Stil „Roboto Condensed“ -> Arial, „— Leer —“ 43 -> 48 px,
+    # Mindestbreite 89 statt 92. Deshalb nach dem Polieren neu messen.
+    def showEvent(self, event):  # noqa: N802 (Qt-Name)
+        super().showEvent(event)
+        self._breite_setzen()
+
+    def changeEvent(self, event):  # noqa: N802 (Qt-Name)
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.StyleChange, QEvent.Type.FontChange):
+            # erst im naechsten Durchlauf: dann sind auch die Tasten neu poliert
+            QTimer.singleShot(0, self, self._breite_setzen)
 
     #: Rand je Taste (2 × 3 px Innenabstand + 2 × 1 px Rahmen + Luft).
     TASTEN_RAND = 10

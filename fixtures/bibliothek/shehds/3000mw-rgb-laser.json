@@ -15,7 +15,7 @@
     "lizenz": "Apache-2.0",
     "urheber": "QLC+-Beitragende (Heikki Junnila, Massimo Callegari u. a.); Datei: Q Light Controller Plus 4.14.2 GIT · Bram Janssen",
     "original": "resources/fixtures/Shehds/Shehds-3000mW-RGB-Laser.qxf",
-    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 214 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Betriebsart-Kanal als shutter (0-41 Laser aus = closed, 42-83 manuell = open, Default 0 = Laser aus, Highlight 60); Laser-Attribute statt Moving-Head-Attributen: Gruppe -> laser_bank, Muster -> gobo_wheel (art gobo), Rotation -> gobo_rotation, Flip -> laser_twist, Bewegung -> laser_x/laser_y (Default 64 = Mitte des Positionsbereichs), Groesse -> zoom, Zeichnen -> laser_draw, Scan -> laser_scan_rate; kurzname SH-LASER3W; typ laser statt moving_head; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); zweites Goborad als gobo_wheel2"
+    "geaendert": "ins LightOS-Format umgebaut (JSON statt QXF); Kanal-Attribute auf LightOS-Namen abgebildet; Default-/Highlight-Werte von LightOS gesetzt; 214 Wertebereiche mit Art (kind) versehen; LightOS-Nachbearbeitung (FM-57): Betriebsart-Kanal als shutter (0-41 Laser aus = closed, 42-83 manuell = open, Default 0 = Laser aus, Highlight 60); Laser-Attribute statt Moving-Head-Attributen: Gruppe -> laser_bank, Muster -> gobo_wheel (art gobo), Rotation -> gobo_rotation, Flip -> laser_twist, Bewegung -> laser_x/laser_y (Default 64 = Mitte des Positionsbereichs), Groesse -> zoom, Zeichnen -> laser_draw, Scan -> laser_scan_rate; kurzname SH-LASER3W; typ laser statt moving_head; Bereichs-Arten korrigiert (u. a. „Preset“ nicht als Reset, Farben/Offen auf Farbrad, Open/Shake/Rotation auf Goborad, Prisma/Frost, keine Farb-/Dreh-Kacheln auf Makro-/Speed-Kanaelen, Sound-Bereiche); zweites Goborad als gobo_wheel2; LAS-28: vertikaler Flip je Mustergruppe als laser_twist_y (horizontaler bleibt laser_twist), damit Mustergruppe A/B beim Flip die Gruppe meint"
   },
   "autor": "LightOS (QXF-Konverter)",
   "geprueft": {
@@ -104,7 +104,7 @@
         },
         {
           "name": "Pattern A Vertical Flip",
-          "attribut": "laser_twist",
+          "attribut": "laser_twist_y",
           "default": 0,
           "highlight": 0,
           "bereiche": [
@@ -243,7 +243,7 @@
         },
         {
           "name": "Pattern B Vertical Flip",
-          "attribut": "laser_twist",
+          "attribut": "laser_twist_y",
           "default": 0,
           "highlight": 0,
           "bereiche": [
@@ -402,7 +402,7 @@
         },
         {
           "name": "Pattern A Vertical Flip",
-          "attribut": "laser_twist",
+          "attribut": "laser_twist_y",
           "default": 0,
           "highlight": 0,
           "bereiche": [
@@ -541,7 +541,7 @@
         },
         {
           "name": "Pattern B Vertical Flip",
-          "attribut": "laser_twist",
+          "attribut": "laser_twist_y",
           "default": 0,
           "highlight": 0,
           "bereiche": [
