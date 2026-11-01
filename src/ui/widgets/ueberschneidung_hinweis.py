@@ -243,12 +243,35 @@ def start_regeln(widget) -> StartRegeln | None:
     return None
 
 
-def stoppt_beim_start(regeln, eigene_ids, ihre_regeln, ihre_ids, fid) -> bool:
+def _laufzeit_geraete():
+    """``fid -> Geraete-IDs`` genau so, wie „Andere Effekte auf denselben
+    Geräten stoppen“ sie zur Laufzeit sieht
+    (``FunctionManager.stop_others_sharing_fixture_group``)."""
+    from src.core.engine.function_manager import get_function_manager
+    fm = get_function_manager()
+    cache: dict[int, frozenset] = {}
+
+    def geraete(fid: int) -> frozenset:
+        if fid not in cache:
+            try:
+                cache[fid] = frozenset(int(i) for i in fm.affected_fids(int(fid)) or ())
+            except Exception:
+                cache[fid] = frozenset()
+        return cache[fid]
+    return geraete
+
+
+def stoppt_beim_start(regeln, eigene_ids, ihre_regeln, ihre_ids, fid,
+                      geraete_von=None) -> bool:
     """Stoppt ein Element mit ``regeln`` (startet ``eigene_ids``) beim Start
     sicher die Funktion ``fid`` eines Elements mit ``ihre_regeln`` /
-    ``ihre_ids``? Gefragt wird nur fuer Funktionen, die mit den eigenen
-    Geraete teilen (sonst gaebe es keine Ueberschneidung) — darum genuegt
-    „Andere Effekte auf denselben Geräten stoppen“."""
+    ``ihre_ids``?
+
+    „Andere Effekte auf denselben Geräten stoppen“ zaehlt nur, wenn die
+    Laufzeit die geteilten Geraete AUCH sieht (CDX-62): die Hinweis-Rechnung
+    folgt Behaeltern wie einer Show ueber ihre Spuren, ``affected_fids`` (und
+    damit der Stopp) nicht. ``geraete_von``: ``fid -> Geraete-IDs`` (Default:
+    ``FunctionManager.affected_fids``)."""
     if regeln is None:
         return False
     try:
@@ -261,8 +284,18 @@ def stoppt_beim_start(regeln, eigene_ids, ihre_regeln, ihre_ids, fid) -> bool:
     # eigenen Ziele, und der Slot stoppt nur ein Ziel ausserhalb der Gruppe.
     if fid in eigene:
         return False
-    if regeln.alles or regeln.gleiche_geraete:
+    if regeln.alles:
         return True
+    if regeln.gleiche_geraete:
+        geraete = geraete_von or _laufzeit_geraete()
+        try:
+            eigene_geraete = set()
+            for i in eigene:
+                eigene_geraete |= set(geraete(i) or ())
+            if eigene_geraete & set(geraete(fid) or ()):
+                return True
+        except Exception:
+            pass
     if (regeln.edit_slot and ihre_regeln is not None
             and ihre_regeln.edit_slot == regeln.edit_slot and ihre_ids):
         try:
@@ -285,12 +318,14 @@ def gegenueber_elemente(wurzel, ausser=None) -> list[tuple]:
     return aus
 
 
-def stopp_regeln_anwenden(treffer, eigene_ids, eigene_regeln, elemente) -> list:
+def stopp_regeln_anwenden(treffer, eigene_ids, eigene_regeln, elemente,
+                          geraete_von=None) -> list:
     """ENG-41: Treffer gegen Tasten, die sich beim Start GEGENSEITIG stoppen,
     fallen weg (die beiden laufen nie zusammen). Stoppt nur eine Seite die
     andere, bleibt der Treffer und traegt ``stoppt``. Liegt die andere
     Funktion auf mehreren Bedienelementen, muss es fuer JEDES gelten."""
     eigene = [int(i) for i in eigene_ids or ()]
+    geraete = geraete_von or _laufzeit_geraete()
     aus = []
     for t in treffer:
         try:
@@ -303,9 +338,11 @@ def stopp_regeln_anwenden(treffer, eigene_ids, eigene_regeln, elemente) -> list:
         if not traeger:
             aus.append(t)
             continue
-        diese = all(stoppt_beim_start(eigene_regeln, eigene, r, ids, aid)
+        diese = all(stoppt_beim_start(eigene_regeln, eigene, r, ids, aid,
+                                      geraete)
                     for ids, r in traeger)
-        andere = all(stoppt_beim_start(r, ids, eigene_regeln, eigene, eid)
+        andere = all(stoppt_beim_start(r, ids, eigene_regeln, eigene, eid,
+                                       geraete)
                      for ids, r in traeger)
         if diese and andere:
             continue

@@ -63,22 +63,27 @@ class FadeState:
         self.manual = False
         self.manual_pos = 0.0
 
-    def _progress(self) -> float:
-        """Roher Fortschritt 0..1 (oder -1 = noch in der Delay-Phase)."""
+    def _progress(self, zeit: float | None = None) -> float:
+        """Roher Fortschritt 0..1 (oder -1 = noch in der Delay-Phase).
+
+        ``zeit``: Zeitpunkt auf der Fade-Uhr (Default: jetzt)."""
         if self.manual:
             return max(0.0, min(1.0, self.manual_pos))
-        elapsed = fade_uhr() - self.start_time - self.delay
+        jetzt = fade_uhr() if zeit is None else float(zeit)
+        elapsed = jetzt - self.start_time - self.delay
         if elapsed < 0:
             return -1.0
         return min(1.0, elapsed / self.duration)
 
-    def current_values(self) -> dict[int, dict[str, int]]:
+    def current_values(self, zeit: float | None = None) -> dict[int, dict[str, int]]:
+        # ``zeit``: Stand zu diesem Zeitpunkt der Fade-Uhr statt jetzt — der
+        # Follow-Nachholer (ENG-33/CDX-62) fragt den Stand zur Faelligkeit ab.
         # F-6: Mit Pro-Attribut-Verzögerungen bekommt jedes Attribut seinen eigenen
         # Fortschritt. Ohne (Normalfall) ODER beim manuellen Scrub gilt der bisherige
         # gemeinsame Fortschritt 1:1 (manueller Crossfade ignoriert Attr-Delays).
         if self.attr_delays and not self.manual:
-            return self._blend_per_attr()
-        raw = self._progress()
+            return self._blend_per_attr(zeit)
+        raw = self._progress(zeit)
         if raw < 0:                       # Delay laeuft noch
             return self.from_vals
         if raw >= 1.0:                    # fertig -> exakt Zielwerte (kurvenunabhaengig)
@@ -118,11 +123,12 @@ class FadeState:
         t = eval_named(self.curve, raw)
         return self._blend(t)
 
-    def _blend_per_attr(self) -> dict[int, dict[str, int]]:
+    def _blend_per_attr(self, zeit: float | None = None) -> dict[int, dict[str, int]]:
         """F-6: Blend mit eigener, um ``attr_delays`` verschobener Zeitachse je
         Attribut. ``done`` erst, wenn auch das am längsten verzögerte Attribut fertig
         ist. Attribute ohne Eintrag verhalten sich exakt wie im Normalpfad."""
-        base = fade_uhr() - self.start_time - self.delay
+        jetzt = fade_uhr() if zeit is None else float(zeit)
+        base = jetzt - self.start_time - self.delay
         max_extra = 0.0
         result: dict[int, dict[str, int]] = {}
         all_fids = set(self.from_vals) | set(self.to_vals)
@@ -688,10 +694,14 @@ class CueStack:
         schritte = 0
         while faellig is not None and jetzt >= faellig:
             self._follow_faellig = None
-            # Der Folge-Fade startet vom aktuellen Stand des alten — auch wenn
-            # seit dem letzten Tick kein Bild gerechnet wurde.
+            # Der Folge-Fade startet vom Stand des alten ZUR FAELLIGKEIT — auch
+            # wenn seit dem letzten Tick kein Bild gerechnet wurde. CDX-62: nicht
+            # zum jetzigen Zeitpunkt abfragen; mit Eingangs-/Attribut-Delay laeuft
+            # der alte Fade bei der Faelligkeit noch, und der rueckdatierte
+            # Folge-Fade begaenne sonst von einem Wert, der damals noch gar nicht
+            # erreicht war (Ausgabe hinge an ausgelassenen Bildern).
             if self._fade is not None:
-                self._own_output = self._fade.current_values()
+                self._own_output = self._fade.current_values(faellig)
             self._go_locked(start_time=faellig)
             schritte += 1
             neu = self._follow_faellig
