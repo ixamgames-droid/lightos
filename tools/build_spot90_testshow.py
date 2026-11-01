@@ -155,7 +155,7 @@ for fid, name in ((1, "MH Links"), (2, "MH Rechts")):
         manufacturer_name=HERSTELLER, fixture_name=MODELL,
         fixture_type="moving_head",
         pan_range_deg=int(PAN_RANGE), tilt_range_deg=int(TILT_RANGE),
-        pan_zero_dmx=int(PAN_ZERO), tilt_zero_dmx=int(TILT_ZERO),
+        pan_zero_dmx=PAN_ZERO, tilt_zero_dmx=TILT_ZERO,   # UI-77: Kommazahl
         invert_pan=INVERT_PAN, invert_tilt=INVERT_TILT,
     ), undoable=False)
     adr += N_KANAELE

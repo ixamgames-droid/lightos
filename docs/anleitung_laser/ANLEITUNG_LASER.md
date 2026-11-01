@@ -498,8 +498,9 @@ worauf es ankommt:
   hoch, dass das Feld erst dahinter aufsetzt, noch 5 m ab dort) und blendet zum
   Ende hin aus — das Feld hört dort nicht auf, nur das Bild.
 - **Rote Schraffur:** der Teil einer Sperrzone, den das Feld erreicht. Das
-  Schild über der Zone bekommt eine zweite Zeile *„⚠ Laser 1 erreicht diese
-  Zone“* (bei mehreren: *„Laser 1, 3 erreichen diese Zone“*). Zonen, die kein
+  Schild über der Zone bekommt eine zweite Zeile *„⚠ Laser 1 kann diese Zone
+  erreichen · nur Anzeige“* (bei mehreren: *„Laser 1, 3 können diese Zone
+  erreichen · nur Anzeige“*) — es schaltet den Laser nicht ab. Zonen, die kein
   Laser erreicht, sind etwas blasser — aber nur, solange **alle** Laser
   prüfbar sind. Fehlen einem Laser Randwinkel oder der Platz im 3D, bleibt
   jede Zone kräftig: für ihn weiß LightOS es nicht.
