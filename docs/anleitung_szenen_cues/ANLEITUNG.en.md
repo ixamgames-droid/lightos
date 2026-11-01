@@ -185,9 +185,11 @@ cue lands in the **first** cue list of the show.
 ![Three cues, cue list on executor 1](img/08_executor.png)
 
 1. **The cue table**: **Nr.** (no.), **Label**, **Fade In** (default 2.0 s),
-   **Fade Out**, **Delay**, **Follow** and **Kurve** (curve). A double-click on a cell
+   **Fade Out**, **Delay**, **Follow**, **Kurve** (curve) and **Timecode**. A double-click on a cell
    changes the value. Enter a time under **Follow** and the next cue follows by itself.
-   **Kurve** chooses the shape of the fade.
+   **Kurve** chooses the shape of the fade. Under **Timecode** you enter a MIDI timecode
+   as `HH:MM:SS:FF` (e.g. `00:01:30:00`); when the incoming timecode of a DAW or desk
+   reaches this value, the cue list jumps to this cue. „—“ or an empty cell turns it off.
 2. **Executor 1** in the **executor bar**: in the selection box „— Leer —“ (empty) choose
    the cue list „Meine Show“. The executor is then named like the cue list.
 

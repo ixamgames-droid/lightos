@@ -15,7 +15,7 @@ from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
 from src.ui.weak_slots import weak_slot
 
-CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve"]
+CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
 
 class PlaybackView(QWidget):
@@ -432,6 +432,13 @@ class PlaybackView(QWidget):
                 self._table.setItem(row, col, item)
             # F-5: Fade-Verlauf als Combo (eigene Zelle, kein itemChanged)
             self._table.setCellWidget(row, 6, self._make_curve_combo(cue))
+            # MTC-04: Ausloese-Timecode HH:MM:SS:FF ("—" = aus)
+            tc_item = QTableWidgetItem(getattr(cue, "timecode", None) or "—")
+            tc_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            tc_item.setToolTip("MIDI-Timecode HH:MM:SS:FF — erreicht der empfangene "
+                               "MTC diesen Wert, springt die Cueliste auf diese Cue. "
+                               "„—“ = aus.")
+            self._table.setItem(row, 7, tc_item)
         self._table.blockSignals(False)
         # Zeilen wurden neu aufgebaut -> Highlight im naechsten Tick neu zeichnen.
         self._last_hl_idx = None
@@ -642,6 +649,14 @@ class PlaybackView(QWidget):
         if row >= len(self._current_stack.cues):
             return
         cue = self._current_stack.cues[row]
+        if col == 7:
+            # MTC-04: ungueltig/leer -> aus; normalisiert zurueckschreiben.
+            from src.core.engine.cue import normalisiere_timecode
+            cue.timecode = normalisiere_timecode(item.text())
+            self._table.blockSignals(True)
+            item.setText(cue.timecode or "—")
+            self._table.blockSignals(False)
+            return
         try:
             val = item.text().replace("s", "").strip()
             if col == 0:

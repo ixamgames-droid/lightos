@@ -77,6 +77,7 @@ wieder eingeschaltet.
 | **Eingang: <Gerät>** | die Musik **von außen** kommt: Mischpult, Fremd-DJ, Band — über Line-In, Mikrofon oder Audio-Interface. | Je Eingang ein Eintrag. Pegel am Mischpult/Interface einstellen, bis der Balken grün ist. |
 | **OS2L (DJ-Software)** | ein DJ mit **VirtualDJ** (oder einem anderen OS2L-fähigen Programm) auflegt. | Tempo und Beats kommen direkt aus dem DJ-Programm; LightOS hört dann nicht selbst zu. Im DJ-Programm OS2L einschalten. Der Menüpunkt *Ausgabe → OS2L-Server (Port 1234)* ist dieselbe Umschaltung: Haken an = Quelle OS2L, Haken aus = zurück zur Quelle davor. |
 | **Lied-Analyse (Player)** | du ein **vorher im Generator analysiertes Lied** im Player abspielst und das Licht taktgenau sitzen soll. | Nimmt den Titel, der gerade im Player geladen ist (Abschnitt 7.2). Der Generator-Knopf **Im Player laden & als BPM-Quelle nutzen** stellt diesen Eintrag selbst ein. |
+| **MIDI-Clock (Pult/DAW)** | ein Pult, ein Sequencer oder eine DAW den Takt über **MIDI-Clock** vorgibt. | LightOS misst das Tempo aus den 24 Clock-Ticks je Viertel, gemittelt über zwei Viertel, und übernimmt es etwa einmal je Schlag (auf 0,1 BPM gerundet). Das Gerät muss an einem geöffneten MIDI-Eingang hängen und MIDI-Clock senden. Start/Continue des Geräts beginnen die Messung neu, Stop hält den zuletzt gemessenen Takt. Senden mehrere Geräte Clock, zählt nur das zuerst gehörte. Im Modus **Manuell** wird der Takt nicht überschrieben. |
 | **Aus** | du keine Erkennung willst — z. B. nur Manuell mit TAP. | Die Statuszeile sagt dann „Erkennung aus — keine Beat-Quelle gewählt". „Aus" setzt den Takt sofort auf 0 — Beat-Effekte stehen still. Hast du den Takt im Modus **Manuell** von Hand gesetzt (Eingabe, TAP oder Nudge), bleibt er stehen. |
 
 Wechsel auf **Aus**: Eben stand der Takt noch auf 128 (Quelle „Lied-Analyse“), danach zeigen
@@ -116,7 +117,7 @@ Analysefenster von rund sechs Sekunden Musik, bevor sie Beats meldet. Solange st
 | **PAUSE · hält 128** (grün) | Die Musik ist still, das letzte Tempo wird **gehalten**; die Beats pausieren, bis die Musik zurückkommt. |
 | **MANUELL** | Du gibst das Tempo vor (TAP, Nudge, Manuell-Knopf). |
 | **OS2L** / **OS2L · wartet auf DJ-Software** | Quelle OS2L — verbunden bzw. noch kein DJ-Programm verbunden. |
-| **LIED-ANALYSE** / **AUS** | Die entsprechende Quelle ist gewählt. |
+| **LIED-ANALYSE** / **MIDI-CLOCK** / **AUS** | Die entsprechende Quelle ist gewählt. |
 
 Hinter dem Zustandswort kann ein kurzer Zusatz stehen, z. B. **„· Tap"** (Tempo kam zuletzt
 vom TAP) oder **„· 🔒"** (Tempo eingefroren).
