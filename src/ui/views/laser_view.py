@@ -90,7 +90,7 @@ _ROW_GROUPS: list[tuple[str, tuple[str, ...]]] = [
       "zoom", "laser_zoom_x", "laser_zoom_y")),
     ("Zeichnen", ("laser_draw_mode", "laser_draw")),
 ]
-# Alles Übrige (laser_boundary, laser_twist, laser_grating, laser_dots, macro,
+# Alles Übrige (laser_boundary, laser_twist(_y), laser_grating, laser_dots, macro,
 # raw, …) landet in der einklappbaren „Weitere Kanäle"-Gruppe.
 _ADVANCED_GROUP = "Weitere Kanäle"
 _GROUPED_ATTRS = frozenset(a for _n, attrs in _ROW_GROUPS for a in attrs)
