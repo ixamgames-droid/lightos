@@ -465,6 +465,42 @@ class _SectionBar(QWidget):
             self._reflowing = False
 
 
+class _AbzeichenFesteBreite(QLabel):
+    """UI-108: Abzeichen (BPM-Modus AUTO/MAN/🔒 LOCK), dessen Breite fuer ALLE
+    seine moeglichen Texte reicht.
+
+    Vorher war es so breit wie der aktuelle Text. Wechselte er zur Laufzeit
+    (z. B. Freeze -> LOCK), stand bis zum naechsten Layout-Durchlauf der lange
+    Text in der alten Breite („🔒 LO“), und STOP ALL/BLACKOUT daneben sprangen
+    bei jedem Wechsel um gut 20 px. Gemessen wird erst, wenn das Layout fragt —
+    also mit der Schrift, die das Stylesheet dann wirklich gesetzt hat."""
+
+    def __init__(self, texte, text: str = "", parent=None):
+        super().__init__(text, parent)
+        self._texte = tuple(texte)
+
+    def _breite(self) -> int:
+        # fm.size wie QLabel selbst (nicht horizontalAdvance): beim Emoji 🔒
+        # liegen die beiden unter Windows um mehrere Pixel auseinander.
+        fm = self.fontMetrics()
+        zeile = Qt.TextFlag.TextSingleLine
+
+        def breit(t):
+            return fm.size(zeile, t).width()
+        rand = super().sizeHint().width() - breit(self.text())
+        return max(breit(t) for t in self._texte) + max(rand, 0)
+
+    def sizeHint(self):  # noqa: N802 (Qt-Name)
+        s = super().sizeHint()
+        s.setWidth(max(s.width(), self._breite()))
+        return s
+
+    def minimumSizeHint(self):  # noqa: N802 (Qt-Name)
+        s = super().minimumSizeHint()
+        s.setWidth(max(s.width(), self._breite()))
+        return s
+
+
 class _GmReglerOhneRad(QSlider):
     """UI-95: Grand-Master-Regler im Kiosk-Streifen.
 
@@ -1161,6 +1197,9 @@ class MainWindow(QMainWindow):
         # Page-Anzeige + Pfeile (T0.1 Multi-Page)
         page_prev = QPushButton("<")
         page_prev.setFixedSize(22, 22)
+        # UI-108: dark.qss gibt jeder Taste 10 px Innenabstand links/rechts —
+        # bei 22 px Breite blieb fuer das Zeichen nichts, die Pfeile waren leer.
+        page_prev.setStyleSheet("padding:0px;")
         page_prev.setToolTip("Vorherige Page (Ctrl+Page Up)")
         page_prev.clicked.connect(self._page_prev)
         bar_layout.addWidget(page_prev)
@@ -1174,6 +1213,7 @@ class MainWindow(QMainWindow):
 
         page_next = QPushButton(">")
         page_next.setFixedSize(22, 22)
+        page_next.setStyleSheet("padding:0px;")      # UI-108, s. page_prev
         page_next.setToolTip("Nächste Page (Ctrl+Page Down)")
         page_next.clicked.connect(self._page_next)
         bar_layout.addWidget(page_next)
@@ -1195,7 +1235,8 @@ class MainWindow(QMainWindow):
 
         # AUTO/MANUAL/Lock-Badge — zeigt, welcher Modus/welche Quelle den Leader
         # treibt. Klick togglet AUTO/MANUAL.
-        self._lbl_bpm_mode = QLabel("AUTO")
+        self._lbl_bpm_mode = _AbzeichenFesteBreite(("AUTO", "MAN", "🔒 LOCK"), "AUTO")
+        self._lbl_bpm_mode.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_bpm_mode.setFixedHeight(22)
         self._lbl_bpm_mode.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lbl_bpm_mode.setToolTip("BPM-Modus (Klick: AUTO/MANUAL umschalten)")
@@ -1203,8 +1244,11 @@ class MainWindow(QMainWindow):
         bar_layout.addWidget(self._lbl_bpm_mode)
 
         # BPM-Pulse Indikator — groesserer runder Beat-Punkt (deutlich sichtbar)
+        # UI-108: 26 px − 2×2 px Rand = 22 px, Radius 11 = Kreis. Vorher Rand
+        # 4 px seitlich (18×22) mit Radius 13 — passte nicht, Qt zeichnete ein
+        # dunkles Viereck.
         self._BPM_DOT_IDLE = ("background:#1c1c1c; border:1px solid #333;"
-                              " border-radius:13px; margin:2px 4px;")
+                              " border-radius:11px; margin:2px;")
         self._bpm_indicator = QLabel(" ")
         self._bpm_indicator.setFixedSize(26, 26)
         self._bpm_indicator.setToolTip("Beat-Indikator (Takt 1 gelb, sonst grün)")
@@ -1986,7 +2030,7 @@ class MainWindow(QMainWindow):
         bpb = max(1, int(getattr(self._bpm_mgr, "beats_per_bar", 4) or 4)) if self._bpm_mgr else 4
         col = "#FFD700" if (idx % bpb == 0) else "#9DFF52"
         self._bpm_indicator.setStyleSheet(
-            f"background:{col}; border:1px solid {col}; border-radius:13px; margin:2px 4px;")
+            f"background:{col}; border:1px solid {col}; border-radius:11px; margin:2px;")
         self._bpm_indicator_timer.start()
         # BPM-Label synchron halten — auch wenn das Tempo extern (APC-TAP / Audio)
         # geaendert wurde und nicht ueber den Tap-Button im Hauptfenster.
