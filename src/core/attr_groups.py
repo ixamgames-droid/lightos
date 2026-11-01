@@ -60,7 +60,8 @@ ATTR_GROUPS: dict[str, set[str]] = {
                   "laser_boundary", "laser_bank", "laser_x", "laser_y",
                   "laser_zoom_x", "laser_zoom_y", "laser_color",
                   "laser_color_change", "laser_dots", "laser_draw",
-                  "laser_draw_mode", "laser_twist", "laser_grating",
+                  "laser_draw_mode", "laser_twist", "laser_twist_y",
+                  "laser_grating",
                   "laser_scan_rate"},
 }
 
@@ -113,6 +114,7 @@ ATTR_LABELS: dict[str, str] = {
     "laser_color": "Punktfarbe", "laser_color_change": "Muster-Farbwechsel",
     "laser_dots": "Punkte", "laser_draw": "Zeichnen-Anteil",
     "laser_draw_mode": "Zeichenmodus", "laser_twist": "Verdrehung",
+    "laser_twist_y": "Verdrehung vertikal",
     "laser_grating": "Raster", "laser_scan_rate": "Scan-Rate",
 }
 

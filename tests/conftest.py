@@ -982,6 +982,20 @@ def pytest_unconfigure(config):
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _by_id_ordner_leer(tmp_path_factory):
+    """OUT-81: der Reiter „Enttec Pro USB“ bietet die stabilen Namen aus
+    ``/dev/serial/by-id`` an. Ein am Testrechner gesteckter echter Adapter darf
+    keinen Dialog-Test veraendern — der Ordner zeigt in der ganzen Suite auf
+    einen leeren Wegwerf-Ordner (Tests, die by-id pruefen, geben ``ordner``
+    ausdruecklich mit oder setzen ihn selbst um)."""
+    from src.core.dmx import anschluss_auswahl as _aa
+    alt = _aa.BY_ID_ORDNER
+    _aa.BY_ID_ORDNER = str(tmp_path_factory.mktemp("by_id_leer"))
+    yield
+    _aa.BY_ID_ORDNER = alt
+
+
+@pytest.fixture(scope="session", autouse=True)
 def _stop_background_threads_at_end():
     """Sicherheitsnetz: am Suite-Ende einen ggf. doch laufenden Output-Thread
     stoppen (z. B. wenn ein Test ihn explizit gestartet hat), damit der

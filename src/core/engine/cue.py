@@ -43,6 +43,26 @@ def _coerce_attr_delays(raw) -> dict[int, dict[str, float]]:
     return out
 
 
+def normalisiere_timecode(raw) -> str | None:
+    """MTC-04: "H:M:S:F" (auch "." / ";" als Frame-Trenner) -> "HH:MM:SS:FF";
+    leer, "—" oder ungueltig -> None (eine kaputte Angabe loest nie aus)."""
+    if raw is None:
+        return None
+    text = str(raw).strip().replace(";", ":").replace(".", ":")
+    if not text or text in ("—", "-"):
+        return None
+    teile = text.split(":")
+    if len(teile) != 4:
+        return None
+    try:
+        h, m, s, f = (int(t) for t in teile)
+    except ValueError:
+        return None
+    if not (0 <= h < 24 and 0 <= m < 60 and 0 <= s < 60 and 0 <= f < 30):
+        return None
+    return f"{h:02d}:{m:02d}:{s:02d}:{f:02d}"
+
+
 @dataclass
 class Cue:
     number: float                          # 1.0, 2.0, 2.5 ...
@@ -72,9 +92,14 @@ class Cue:
     #   GO (Basis delay_in), ``attr_delays_out`` beim BACK (Basis delay_out).
     #   Leer = wie bisher (BACK nutzt dann nur die Cue-Delay-Basis).
     attr_delays_out: dict[int, dict[str, float]] = field(default_factory=dict)
+    # MTC-04: Ausloese-Timecode "HH:MM:SS:FF" (MIDI Time Code) oder None = aus.
+    #   Erreicht/ueberschreitet der empfangene MTC diesen Wert, springt die
+    #   Cueliste auf diese Cue (src/core/timecode/mtc_cues.py).
+    timecode: str | None = None
 
     def __post_init__(self):
         self.number = round(float(self.number), 3)
+        self.timecode = normalisiere_timecode(self.timecode)
 
     def to_dict(self) -> dict:
         return {
@@ -97,6 +122,7 @@ class Cue:
                 str(k): {a: float(d) for a, d in v.items()}
                 for k, v in self.attr_delays_out.items()
             },
+            "timecode": self.timecode,
         }
 
     @classmethod
@@ -121,6 +147,7 @@ class Cue:
             fade_curve=d.get("fade_curve", "scurve"),
             sub_stack_ref=ref,
             sub_stack_mode=mode,
+            timecode=d.get("timecode"),
         )
         c.values = _coerce_values(d.get("values"))
         c.attr_delays = _coerce_attr_delays(d.get("attr_delays"))

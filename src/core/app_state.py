@@ -4924,7 +4924,12 @@ class AppState:
         # advance_frame aufruft). Rein additiv: schreibt KEINE Universen.
         try:
             from src.core.engine.tempo_bus import get_tempo_bus_manager
-            get_tempo_bus_manager().advance_frame(dt)
+            _tbm = get_tempo_bus_manager()
+            _tbm.advance_frame(dt)
+            # BPM-29: taktgebundene Cuelisten, die an einen Tempo-Bus
+            # gekoppelt sind, nach derselben eingefrorenen Bus-Position schalten.
+            from src.core.engine.cue_stack import treibe_bus_cuelisten
+            treibe_bus_cuelisten(getattr(self, "cue_stacks", None), _tbm)
         except Exception as exc:
             print(f"[AppState] tempo advance error: {exc}")
         for su in scratch.values():
