@@ -1,0 +1,119 @@
+{
+  "anleitung": "prioritaeten",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "b51fdd5a",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py prioritaeten'.",
+  "bilder": [
+    {
+      "datei": "02_ansicht.png",
+      "szene": "02_ansicht",
+      "titel": "Reiter Prioritäten mit laufender Show: Snap-Zeile, Stufen, Fasst an, ● läuft",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "7fee30f6c7e47c4a5960559676defc72"
+    },
+    {
+      "datei": "03_stufe_aendern.gif",
+      "szene": "03_stufe_aendern",
+      "titel": "GIF: „Blinder“ mit ▲ Stufe höher von Effekte nach Strobe & Blinder",
+      "groesse": [
+        1200,
+        405
+      ],
+      "marken": [
+        [],
+        [],
+        []
+      ],
+      "md5": "4a02692b6f73c00aea56fc01984ccc51",
+      "frames": 3,
+      "dauern_ms": [
+        1600,
+        1200,
+        2000
+      ]
+    },
+    {
+      "datei": "04_stufe_matrix.png",
+      "szene": "04_stufe_matrix",
+      "titel": "Feld Stufe im Matrix-Editor (Tempo & Blende)",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "d9b220813ad5f35582fcfdec746e9afd"
+    },
+    {
+      "datei": "05_stufe_szene.png",
+      "szene": "05_stufe_szene",
+      "titel": "Feld Stufe im Szenen-Editor",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "dda708cf07154bc8c4e2c917375ee608"
+    },
+    {
+      "datei": "06_eigene_zahl.png",
+      "szene": "06_eigene_zahl",
+      "titel": "Effekt aus einer älteren Show: Gruppe „eigene Zahl (5)“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "34a14dc04d665af7e8e695e53a6ece43"
+    },
+    {
+      "datei": "07_snap_haken.png",
+      "szene": "07_snap_haken",
+      "titel": "Snap-Taste: Haken „übersteuert laufende Dimmer-Effekte“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "5bad021b557b3aa3d744c7e60a52bcee"
+    },
+    {
+      "datei": "08_blinder_gegen_lauflicht.png",
+      "szene": "08_blinder_gegen_lauflicht",
+      "titel": "Blinder-Snap gegen ein Dimmer-Lauflicht: ohne und mit Haken",
+      "groesse": [
+        1017,
+        369
+      ],
+      "marken": [],
+      "md5": "4423fac56471ac0c0a23e8f46dfacf19"
+    },
+    {
+      "datei": "09_ueberschneidung.png",
+      "szene": "09_ueberschneidung",
+      "titel": "Eigenschaften einer Taste mit dem gelben Hinweis bei Überschneidung",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "6297e29851c97c64be51be508ac21f16"
+    },
+    {
+      "datei": "10_verdeckt.png",
+      "szene": "10_verdeckt",
+      "titel": "Spalte Verdeckt: „verdeckt von Blinder auf 4 Geräten“",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "47d4801f7735d799ed991022bf6caca9"
+    }
+  ]
+}
