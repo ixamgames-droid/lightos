@@ -55,6 +55,20 @@ def normiere_versatz(value) -> float:
     return max(-64.0, min(64.0, v))
 
 
+def normiere_dmx_mitte(value, default: float = 128.0) -> float:
+    """Pan-/Tilt-Mitte (DMX, Kommazahl — UI-77: am Rig gemessen z. B. 167,5)
+    als endliche Zahl im DMX-Bereich 0..255; Unlesbares -> ``default``. Die EINE
+    Normalisierung fuer Show-Datei und ``update_fixture``. Alte Ganzzahl-Werte
+    bleiben zahlengleich (120 -> 120.0)."""
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if v != v or v in (float("inf"), float("-inf")):
+        return float(default)
+    return max(0.0, min(255.0, v))
+
+
 def effektive_nullpunkte(f) -> tuple[float, float]:
     """Pan/Tilt-Nullpunkt (DMX, Kommazahl) inkl. gemerktem Einmess-Versatz.
 

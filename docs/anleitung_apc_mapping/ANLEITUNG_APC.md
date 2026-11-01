@@ -17,6 +17,8 @@ Die Bindung wird **mit der Show** gespeichert.
 
 > **Anderes Pult mit Motorfadern (Mackie Control, X-Touch)?** Deren Fader senden Pitchbend statt CC. „MIDI Teach“ am VC-Fader lernt sie genauso – siehe [Fader, Abschnitt MIDI](../anleitung_vc_widgets/02_fader.md#midi--tastatur). In der Mapping-Tabelle der MIDI-Ansicht lassen sich solche Fader an Executor-Fader und Grand Master binden und über **Feedback...** nachführen (der Motor fährt mit, wenn sich der Wert anderswo ändert).
 
+> **Andere Pulte mit Program Change, Endlos-Encodern, 14-Bit-Reglern oder NRPN?** In der Mapping-Tabelle der MIDI-Ansicht (**E/A → MIDI**) trägt die Spalte **Typ** auch: `pc` (Program Change — z. B. eine Szene oder ein GO je Programmnummer, Daten 1 = Programmnummer), `nrpn` (Daten 1 = Parameternummer, Wert mit 14 Bit), `cc14` (Regler mit 14 Bit: CC 0–31 plus Feinwert auf CC 32–63) und für Endlos-Encoder `cc_rel_zk`, `cc_rel_bo` oder `cc_rel_vz` (Zweierkomplement, Binär-Offset, Vorzeichenbit — welche Art das Pult sendet, steht in seinem Handbuch). Ein Encoder bewegt das Ziel dann schrittweise ab der aktuellen Stellung. **MIDI Learn** in dieser Tabelle erkennt Program Change und NRPN von selbst (das „MIDI Lernen“ der VC-Tasten nicht); `cc14` oder einen Encoder-Typ nach dem Lernen in der Spalte Typ eintragen.
+
 ## 2. Weg A — schnell per „MIDI Lernen" (nur Tasten/Pads)
 
 > **Wichtig:** „MIDI Lernen" bindet **ausschließlich VCButtons** (Pads/Tasten). Ein angeklickter

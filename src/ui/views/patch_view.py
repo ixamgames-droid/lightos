@@ -3,10 +3,11 @@ from __future__ import annotations
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView,
-    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDialogButtonBox,
+    QDialog, QFormLayout, QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox,
+    QDialogButtonBox,
     QCheckBox
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QLocale
 from PySide6.QtGui import QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
@@ -137,6 +138,34 @@ class CopyWithOffsetDialog(QDialog):
 
     def offset(self) -> int:
         return self._spin_offset.value()
+
+
+class _DmxMitteSpin(QDoubleSpinBox):
+    """UI-77 (Review): Punkt wird wie Komma gelesen. Ohne dies verwarf das
+    deutsche Feld den getippten Punkt still — „167.5“ wurde 167,00, genau die
+    stille Abrundung, die UI-77 beheben soll."""
+
+    def _komma(self, text: str) -> str:
+        return text.replace(".", self.locale().decimalPoint())
+
+    def validate(self, text, pos):
+        return super().validate(self._komma(text), pos)
+
+    def valueFromText(self, text):
+        return super().valueFromText(self._komma(text))
+
+
+def _dmx_mitte_spin() -> QDoubleSpinBox:
+    """UI-77: Eingabefeld fuer Pan-/Tilt-Mitte (DMX 0..255, zwei Nachkommastellen,
+    deutsches Komma unabhaengig von der System-Sprache; Punkt geht auch)."""
+    sp = _DmxMitteSpin()
+    loc = QLocale(QLocale.Language.German, QLocale.Country.Germany)
+    loc.setNumberOptions(QLocale.NumberOption.OmitGroupSeparator)
+    sp.setLocale(loc)
+    sp.setDecimals(2)
+    sp.setRange(0.0, 255.0)
+    sp.setSingleStep(0.5)
+    return sp
 
 
 class PatchFixtureEditDialog(QDialog):
@@ -294,15 +323,17 @@ class PatchFixtureEditDialog(QDialog):
             self._spin_tilt_range.setSuffix(" °")
             self._spin_tilt_range.setValue(int(getattr(self._fixture, "tilt_range_deg", 270) or 270))
             self._spin_tilt_range.setToolTip("Physischer Tilt-Bereich des Geräts (z.B. 270°).")
-            self._spin_pan_zero = QSpinBox(); self._spin_pan_zero.setRange(0, 255)
+            # UI-77: DMX-Mitte mit Kommastelle (am Rig gemessen z. B. 167,5) —
+            # die Rechnung (aim/einmessen/3D) war schon immer Kommazahl.
+            self._spin_pan_zero = _dmx_mitte_spin()
             # VIZ-55 (Review B7): nur ein FEHLENDER Wert ist 128 — eine echte 0 blieb
             # sonst beim Oeffnen+OK still als 128 zurueckgeschrieben.
             _pz = getattr(self._fixture, "pan_zero_dmx", 128)
             _tz = getattr(self._fixture, "tilt_zero_dmx", 128)
-            self._spin_pan_zero.setValue(int(128 if _pz is None else _pz))
+            self._spin_pan_zero.setValue(float(128 if _pz is None else _pz))
             self._spin_pan_zero.setToolTip("DMX-Wert, bei dem der Pan in der Mitte steht (meist 128).")
-            self._spin_tilt_zero = QSpinBox(); self._spin_tilt_zero.setRange(0, 255)
-            self._spin_tilt_zero.setValue(int(128 if _tz is None else _tz))
+            self._spin_tilt_zero = _dmx_mitte_spin()
+            self._spin_tilt_zero.setValue(float(128 if _tz is None else _tz))
             self._spin_tilt_zero.setToolTip("DMX-Wert, bei dem der Tilt in der Mitte steht (meist 128).")
             form.addRow("Pan-Bereich:", self._spin_pan_range)
             form.addRow("Tilt-Bereich:", self._spin_tilt_range)

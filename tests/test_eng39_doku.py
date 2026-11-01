@@ -50,7 +50,9 @@ def test_anleitung_hat_den_abschnitt_und_die_nummern_stimmen():
     assert "## 8. Was die Stufen nicht regeln" in text
     assert text.index("## 6. ") < text.index("## 7. ") < text.index("## 8. ")
     assert "nur eine Auskunft" in text
-    assert "9. Eigenschaften einer Taste mit dem gelben Hinweis" in text
+    # DOC-73: Bild 9 (Eigenschaften einer Taste mit dem gelben Hinweis) ist da.
+    assert "(img/09_ueberschneidung.png)" in text
+    assert (ANLEITUNG.parent / "img" / "09_ueberschneidung.png").is_file()
 
 
 def test_anleitung_nennt_die_bedienelemente_wie_im_code():

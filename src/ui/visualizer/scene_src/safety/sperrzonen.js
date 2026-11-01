@@ -119,9 +119,25 @@ function schildAnpassen(_renderer, _scene, camera) {
   }
 }
 
+const ZEILE2_MAX = 72;   // LAS-45: Zeile 2 samt „· nur Anzeige“ (vorher 48)
+
+/** Zweite Schildzeile einer erreichten Zone (LAS-45): „kann … erreichen ·
+ *  nur Anzeige" — eine Rechnung, keine Sperre. Wird sie zu lang, kuerzt sie
+ *  die Laser-Liste („Laser 1, 2 +3"), nie den Hinweis „nur Anzeige". */
+export function trefferZeile(laser) {
+  if (!laser || !laser.length) return '';
+  const wort = laser.length === 1 ? 'kann' : 'können';
+  let n = laser.length;
+  const bau = () => '⚠ Laser ' + laser.slice(0, n).join(', ')
+    + (n < laser.length ? ' +' + (laser.length - n) : '')
+    + ' ' + wort + ' diese Zone erreichen · nur Anzeige';
+  while (n > 1 && bau().length > ZEILE2_MAX) n--;
+  return bau();
+}
+
 function schild(text, zusatz) {
   const beschriftung = String(text).slice(0, 24);
-  const zeile2 = zusatz ? String(zusatz).slice(0, 48) : '';
+  const zeile2 = zusatz ? String(zusatz).slice(0, ZEILE2_MAX) : '';
   const c = document.createElement('canvas');
   const ZEILE2 = 54;
   c.height = 96 + (zeile2 ? ZEILE2 : 0);
@@ -162,6 +178,7 @@ function schild(text, zusatz) {
   s.userData.hoehenFaktor = c.height / 96;      // die Namenszeile bleibt gleich gross
   s.userData.text = beschriftung;
   s.userData.zusatz = zeile2;
+  s.userData.zusatzRoh = zusatz ? String(zusatz) : '';   // Vergleich ohne Kuerzung
   s.scale.set(SCHILD_MIN_M * c.width / 96, SCHILD_MIN_M * c.height / 96, 1);
   s.center.set(0.5, 0);               // waechst von der Unterkante nach oben
   s.renderOrder = 20;                 // ueber Zonen und Feld
@@ -329,7 +346,8 @@ function auswahlFolgen() {
 //                Reichweite und zum Rand hin ausgeblendet.
 //   SCHRAFFUR    der Teil einer Sperrzone, den das Feld erreicht, kraeftig rot
 //                schraffiert. Ihr Schild sitzt UEBER der Zone, neben der
-//                Schraffur, und traegt „⚠ Laser N erreicht diese Zone".
+//                Schraffur, und traegt „⚠ Laser N kann diese Zone erreichen ·
+//                nur Anzeige" (LAS-45).
 //                Nicht erreichte Zonen sind etwas blasser — aber nur, wenn
 //                ALLE DMX-Laser pruefbar sind: fehlen einem die Randwinkel
 //                oder der Platz im 3D, weiss niemand, ob er die Zone
@@ -711,9 +729,11 @@ function zonenZustand(z, laser, aktiv, mitte, unsicher) {
   const blass = z.zustand === 'frei';
   u.koerper.material.opacity = blass ? ZONE_BLASS_DECKKRAFT : ZONEN_DECKKRAFT;
   u.kanten.material.opacity = blass ? 0.5 : 0.9;
-  const wort = laser.length === 1 ? 'erreicht' : 'erreichen';
-  const zusatz = laser.length ? '⚠ Laser ' + laser.join(', ') + ' ' + wort + ' diese Zone' : '';
-  if (u.schild.userData.zusatz !== zusatz) {
+  // „kann … erreichen · nur Anzeige" (LAS-45): das Schild ist eine Rechnung,
+  // keine Sperre — wie Laser-Tab und Dialog („Nur Anzeige — schaltet den
+  // Laser NICHT ab", LAS-32).
+  const zusatz = trefferZeile(laser);
+  if ((u.schild.userData.zusatzRoh || '') !== zusatz) {
     entsorge(u.schild);
     u.schild = schild(z.daten.name || 'Sperrzone', zusatz);
     z.gruppe.add(u.schild);
@@ -879,6 +899,7 @@ export function sperrzonenDarstellungInfo() {
                  deckkraft: u.koerper.material.opacity,
                  farbe: u.koerper.material.color.getHex(),
                  zusatz: u.schild.userData.zusatz || '',
+                 schildPx: u.schild.material.map.image.width,
                  schildOrt: [u.schild.position.x, u.schild.position.y, u.schild.position.z],
                  schildUeberZone: u.schild.position.y >= par.height / 2
                                   && u.schild.center.y === 0 });
@@ -947,5 +968,5 @@ export function sperrzonenInfo() {
 // Zugang fuer Tests und Diagnose, ohne app.js anzufassen.
 window.__lightosSperrzonen = {
   setzen: setSperrzonen, abgleich: sperrzonenAbgleich, info: sperrzonenInfo, feldEcken,
-  schildHoehe, darstellung: sperrzonenDarstellungInfo, lasersicht,
+  schildHoehe, darstellung: sperrzonenDarstellungInfo, lasersicht, trefferZeile,
 };
