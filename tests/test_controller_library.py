@@ -166,9 +166,10 @@ class TestMidiOnlyFilter:
         assert "akai_apc_mini" in ids
         assert "korg_nanokontrol2" in ids
         assert "enttec_dmx_usb_pro" not in ids
+        # MIDI-8: Pult-Vorlagen beschreiben MIDI, das ein Pult sendet -> drin.
         assert all(p.device_type in
                    ("midi_grid_controller", "midi_fader_controller",
-                    "midi_keyboard") for p in out)
+                    "midi_keyboard", "console_template") for p in out)
 
 
 class TestQxiDecode:

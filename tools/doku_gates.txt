@@ -20,6 +20,7 @@ test_doc_*.py                      # doc_links, doc_images, doc_removed_ui
 test_viz96_gobo_projektion.py      # 3D-Anleitung nennt die Gobo-Projektion
 test_doc[0-9]*.py                  # test_doc13_..., test_doc62_installdoku ...
 test_doc72_externe_pulte.py        # Anleitung Externe Pulte: Ports/Beschriftungen gegen den Code (vom Muster darueber schon erfasst)
+test_midi8_konsolen_vorlagen.py    # Anleitung Externe Pulte nennt Pult-Vorlagen + Wing-Grenze (MIDI-8)
 test_ui85_hilfe_menue.py           # Hilfe-Menue oeffnet docs/ANLEITUNGEN.md + Erste Schritte (Pfade muessen existieren)
 test_ui87_hilfe_oeffnen.py         # doku_ziel bleibt nur lokal, wenn docs/ANLEITUNGEN.md existiert
 test_qa100_anleitung_ueberschriften_einmalig.py # jede ##-Ueberschrift (und Abschnittsnummer) einer Anleitung nur einmal
