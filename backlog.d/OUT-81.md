@@ -1,4 +1,0 @@
-ID: OUT-81
-Prioritaet: P3
-Status: review
-Status-Notiz: NOT-AUS-Weg war schon normalisiert (OUT-80, beide Richtungen, Symlink aufgeloest); nachgezogen: adapter_zeilen.schluessel (OUT-74), _enttec_belegt_port/close_enttec_on_port (Verdraengen beim Anlegen), output_config._gleicher_port (Portwechsel/Seriennummer bei „Verbinden“); Gegenpruefung: enttec_pro.diagnose_port (by-id-Name galt als „existiert nicht“ -> Statusleiste „falsch konfiguriert“) und OutputManager._enttec_nachweislich_eigen (Ersatz-Sperre) loesen ebenfalls auf. Port-Feld bietet /dev/serial/by-id an (anschluss_auswahl.mit_stabilen_namen, direkt unter dem Anschluss, Klasse geerbt, Vorwahl bleibt der Anschluss; Windows unveraendert). Suite lenkt den by-id-Ordner auf einen leeren Wegwerf-Ordner (conftest). Sicherheitstest Laser an by-id / anderes Universum an tty -> 0 in tests/test_out81_byid_portfeld.py. Offen: Gegenprobe am Rig mit echtem by-id-Namen.
