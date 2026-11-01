@@ -40,15 +40,15 @@ import sys
 import glob
 import json
 import math
-import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-# ISO: eigene Show-Cache-DB — NICHT Davids laufende data/current_show.db anfassen
-# (sonst Race/Desync mit der Live-App). Muss VOR dem app_state-Import gesetzt sein
-# (SHOW_DB_PATH liest die Env beim Import). Siehe Audit-Fund 2026-07-17.
-os.environ.setdefault("LIGHTOS_SHOW_DB",
-                      os.path.join(tempfile.gettempdir(), "lightos_mega_arena_build.db"))
+# ISO: eigene Show-Cache-DB — NICHT die laufende current_show.db anfassen (sonst
+# Race/Desync mit der Live-App). Das erledigt ``_gen_env`` (ueber die Werkzeug-
+# Sandbox) VOR dem app_state-Import: ``<eigener Wegwerf-Ordner>/current_show.db``,
+# je Lauf neu (mkdtemp) und am Ende weggeraeumt. QA-84: hier stand frueher eine
+# FESTE Datei ``<tmp>/lightos_mega_arena_build.db`` — zwei gleichzeitige Laeufe
+# teilten sie sich ("database is locked"), und sie blieb liegen.
 
 import _gen_env  # noqa: F401  # DEMO-02: spawn-sichere Env-Schalter vor src.core
 from PySide6.QtWidgets import QApplication
