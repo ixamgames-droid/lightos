@@ -129,7 +129,8 @@ def _g(snap, name, default):
 
 def _quelle(m: MgrState) -> str:
     base = {"loopback": "PC-Audio", "input": "Eingang", "os2l": "OS2L",
-            "song": "Lied-Analyse", "off": "Aus"}.get(m.kind or "", "—")
+            "song": "Lied-Analyse", "midi_clock": "MIDI-Clock",
+            "off": "Aus"}.get(m.kind or "", "—")
     if m.kind in AUDIO_KINDS and m.device_label:
         return f"{base} »{m.device_label}«"
     return base

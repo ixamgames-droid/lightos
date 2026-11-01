@@ -26,6 +26,7 @@ Das Modul kennt weder Qt noch den OutputManager; es rechnet auf den Zeilen.
 """
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass
 
@@ -45,8 +46,9 @@ def _text(wert) -> str:
 def schluessel(typ, patch) -> tuple[str, str] | None:
     """Woran man denselben Adapter erkennt — oder ``None``, wenn es keiner ist.
 
-    Windows unterscheidet bei ``COM3``/``com3`` nicht; Geraetepfade unter Linux
-    und macOS bleiben wie geschrieben. Ein Enttec ohne Anschluss wird nie
+    Windows unterscheidet bei ``COM3``/``com3`` nicht. OUT-81: ein absoluter
+    Geraetepfad unter Linux/macOS wird aufgeloest — ``/dev/serial/by-id/…`` und
+    das ``ttyUSB…``, auf das er zeigt, sind EIN Adapter. Ein Enttec ohne Anschluss wird nie
     eingerichtet und kollidiert deshalb mit nichts. Bei uDMX heisst ein leerer
     ``patch`` „der einzige Adapter" — zwei solche Zeilen meinen dasselbe Geraet.
     """
@@ -59,6 +61,11 @@ def schluessel(typ, patch) -> tuple[str, str] | None:
             return None
         if _COM.match(patch):
             patch = patch.upper()
+        elif os.name != "nt" and patch.startswith("/"):
+            try:
+                patch = os.path.realpath(patch)
+            except (OSError, ValueError):
+                pass
     return typ, patch
 
 

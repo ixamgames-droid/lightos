@@ -26,6 +26,7 @@ _SRC_SHORT = {
     "audio": "AUTO",
     "file":  "AUTO",
     "os2l":  "OS2L",
+    "midi_clock": "CLOCK",
     "tap":   "Tap",
     "nudge": "Nudge",
     "manual": "MANUAL",
