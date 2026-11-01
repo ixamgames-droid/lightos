@@ -277,6 +277,19 @@ class PlaybackView(QWidget):
         self._combo_mode.currentIndexChanged.connect(self._on_mode_changed)
         mode_row.addWidget(self._combo_mode, 1)
         bo.addLayout(mode_row)
+        # BPM-29: Taktquelle der Beat-Sync — globale BPM oder ein Tempo-Bus A–D.
+        takt_row = QHBoxLayout()
+        takt_row.addWidget(QLabel("Takt:"))
+        self._combo_takt = _QCombo()
+        self._combo_takt.addItem("global", "")
+        for _b in ("A", "B", "C", "D"):
+            self._combo_takt.addItem(f"Bus {_b}", _b)
+        self._combo_takt.setToolTip(
+            "Woher eine taktgebundene Cueliste ihre Beats nimmt: globale BPM "
+            "oder ein Tempo-Bus (A–D). Wirkt nur bei aktiver Beat-Sync.")
+        self._combo_takt.currentIndexChanged.connect(self._on_takt_changed)
+        takt_row.addWidget(self._combo_takt, 1)
+        bo.addLayout(takt_row)
         rv.addWidget(box_opts)
 
         rv.addStretch()
@@ -571,6 +584,27 @@ class PlaybackView(QWidget):
         self._btn_loop.setText(f"Loop: {'AN' if mode != 'single' else 'AUS'}")
         self._btn_loop.blockSignals(False)
 
+    def _on_takt_changed(self, _idx: int):
+        """BPM-29: Taktquelle (global / Bus A–D) der aktuellen Cueliste setzen."""
+        if self._current_stack is None:
+            return
+        self._current_stack.tempo_bus = self._current_stack.normalisiere_tempo_bus(
+            self._combo_takt.currentData() or "")
+
+    def _sync_takt_combo(self):
+        """BPM-29: Takt-Auswahl an die Cueliste angleichen (unbekannter Bus →
+        als eigener Eintrag ergaenzt, damit nichts still auf global faellt)."""
+        if self._current_stack is None or not hasattr(self, "_combo_takt"):
+            return
+        bid = getattr(self._current_stack, "tempo_bus", "") or ""
+        self._combo_takt.blockSignals(True)
+        i = self._combo_takt.findData(bid)
+        if i < 0:
+            self._combo_takt.addItem(f"Bus {bid}", bid)
+            i = self._combo_takt.count() - 1
+        self._combo_takt.setCurrentIndex(i)
+        self._combo_takt.blockSignals(False)
+
     def _sync_mode_combo(self):
         """Combo + Loop-Button an den Modus des aktuellen Stacks angleichen."""
         if self._current_stack is None or not hasattr(self, "_combo_mode"):
@@ -582,6 +616,7 @@ class PlaybackView(QWidget):
                 self._combo_mode.setCurrentIndex(i)
                 break
         self._combo_mode.blockSignals(False)
+        self._sync_takt_combo()
 
     # ── Cue Record / Delete ───────────────────────────────────────────────────
 
