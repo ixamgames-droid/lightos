@@ -35,6 +35,7 @@ from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
 from src.ui.weak_slots import weak_slot
 from src.ui import undo_kuerzel
+from src.ui import leertaste_fokus
 
 
 # Recent files storage
@@ -1775,6 +1776,9 @@ class MainWindow(QMainWindow):
         # VC-QShortcut); Qt wertet das als mehrdeutig und loest dann KEINE aus.
         if (ev.type() == QEvent.Type.ShortcutOverride
                 and undo_kuerzel.vorrang(self, ev, self._lokales_undo)):
+            return True
+        # UI-94: Leertaste an einen per Tabulator fokussierten Knopf statt GO.
+        if leertaste_fokus.hat_vorrang(self, ev):
             return True
         return super().event(ev)
 
