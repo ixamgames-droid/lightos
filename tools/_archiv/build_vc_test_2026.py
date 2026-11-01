@@ -9,8 +9,8 @@ Davids Layout-Wunsch (Live-View 2D, 1550x800; oben=Buehne, unten=Publikum):
 
 Effekte leuchten standalone (drive_intensity=True) -> kein Dimmer-Gefummel noetig.
 
-Aufruf (headless, eigene Test-DB, ruehrt current_show.db NICHT an):
-  set LIGHTOS_SHOW_DB=%TEMP%\lightos_vctest.db
+Aufruf (headless, eigene Test-DB je Lauf ueber die Werkzeug-Sandbox,
+ruehrt current_show.db NICHT an):
   venv\Scripts\python.exe tools\_archiv\build_vc_test_2026.py
 Erzeugt: shows/VC_Test_2026.lshow
 """
@@ -19,9 +19,9 @@ import os
 
 import _bootstrap  # noqa: F401  # Repo-Root + tools/ auf sys.path (siehe _bootstrap.py)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-# Eigene Test-DB, damit der Build die laufende App / current_show.db nicht stoert.
-os.environ.setdefault("LIGHTOS_SHOW_DB",
-                      os.path.join(os.environ.get("TEMP", "."), "lightos_vctest.db"))
+# Eigene Test-DB: setzt ``_gen_env`` (Werkzeug-Sandbox, je Lauf ein eigener
+# Wegwerf-Ordner). QA-84: hier stand frueher die FESTE Datei
+# ``%TEMP%/lightos_vctest.db`` — zwei gleichzeitige Laeufe teilten sie sich.
 os.environ.setdefault("LIGHTOS_NO_OUTPUT_THREAD", "1")
 os.environ.setdefault("LIGHTOS_NO_AUDIO_AUTOSTART", "1")
 
