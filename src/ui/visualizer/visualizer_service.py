@@ -1233,8 +1233,9 @@ class VisualizerService:
                 continue
             try:
                 cb()
-            except Exception:
-                pass
+            except Exception as e:
+                from src.core.diagnose_log import melde_still
+                melde_still("viz.reload_callback", e)   # STAB-31
         self.force_full_resync(target)
 
     # ── State-Subscribe (aus der Bridge gehobene Prune-Logik, dict-only) ────
