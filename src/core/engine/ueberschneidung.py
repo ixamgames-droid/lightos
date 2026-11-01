@@ -45,6 +45,13 @@ GLEICH, DIESE_HOEHER, DIESE_TIEFER, MODIFY = "gleich", "diese_hoeher", "diese_ti
 # Modify-Saetze.
 _RANG = {DIESE_TIEFER: 0, GLEICH: 1, DIESE_HOEHER: 2, MODIFY: 3}
 
+# ENG-41: stoppt nur EINE Seite die andere beim Start (Tasten-Haken „Andere
+# Funktionen stoppen“ / „Andere Effekte auf denselben Geräten stoppen“, gleicher
+# Live-Edit-Slot), laufen beide trotzdem, sobald die andere danach startet —
+# der Hinweis bleibt und sagt das dazu. Stoppen sich beide gegenseitig, gibt
+# es gar keinen Hinweis (das entscheidet der Aufrufer).
+DIESE_STOPPT, ANDERE_STOPPT = "diese_stoppt", "andere_stoppt"
+
 _AKKUSATIV = {stufen.DIMMER: "den Dimmer", stufen.FARBE: "die Farbe",
               stufen.BEWEGUNG: "die Bewegung", stufen.GOBO: "das Gobo"}
 _ZAHLWORT = {1: "eine Stufe", 2: "zwei Stufen", 3: "drei Stufen", 4: "vier Stufen"}
@@ -202,6 +209,8 @@ class Treffer:
     # laeuft er bei 0 weiter und belegt die Geraete.
     eigene_haelt: bool = False
     andere_haelt: bool = False
+    # ENG-41: DIESE_STOPPT / ANDERE_STOPPT oder "" (siehe oben).
+    stoppt: str = ""
 
     @property
     def gewinner(self):
@@ -225,9 +234,23 @@ class Treffer:
         steht das als zweiter Satz dahinter; fuer den eigenen Effekt sagt es
         :func:`halte_zeilen` einmal fuer den ganzen Hinweis."""
         text = self._satz(subjekt, nenne_eigene)
+        if self.stoppt:
+            text += " " + self._stopp_satz(subjekt)
         if self.andere_haelt:
             text += " " + _halte_satz(f"„{getattr(self.andere, 'name', '') or '?'}“")
         return text
+
+    def _stopp_satz(self, subjekt: str) -> str:
+        """ENG-41: der Zusatz, wenn nur eine Seite die andere beim Start
+        stoppt — beide laufen trotzdem, wenn die andere danach startet."""
+        klein = _SUBJEKT.get(subjekt, _SUBJEKT["Taste"])[1]
+        name = f"„{getattr(self.andere, 'name', '') or '?'}“"
+        if self.stoppt == DIESE_STOPPT:
+            return (f"Beim Start stoppt {klein} {name} — erst wenn {name} "
+                    "danach startet, laufen beide.")
+        eigene = f"„{getattr(self.eigene, 'name', '') or '?'}“"
+        return (f"Die Taste mit {name} stoppt beim Start {eigene} — erst wenn "
+                f"{eigene} danach startet, laufen beide.")
 
     def _satz(self, subjekt: str, nenne_eigene: bool) -> str:
         gross, klein = _SUBJEKT.get(subjekt, _SUBJEKT["Taste"])
