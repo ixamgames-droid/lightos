@@ -40,6 +40,7 @@ test_las40_notaus_rueckfrage_knoepfe.py # Laser-Anleitung nennt die Knopftexte d
 test_viz109_spalte_einklappen.py   # 3D-Anleitung nennt Klapp-Knopf und F9
 test_vcb45_popout_lage.py          # VC-Anleitung nennt das gemerkte Popout
 test_tool14_gen_tools_index_cli.py # tools/README.md
+test_tool12_mh_einmessen_beschreibung.py  # TOOL-12: Einmess-Werkzeug verweist auf docs/anleitung_einmessen
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
 test_eng36_klonen_anleitung.py     # Anleitung Klonen: Wortlaut wie im Dialog, Eintrag in ANLEITUNGEN.md

@@ -495,7 +495,11 @@ class BPMManager:
             st = vorhandener_state()
             if st is not None:
                 for stack in list(getattr(st, "cue_stacks", []) or []):
-                    if getattr(stack, "beat_sync", False):
+                    # BPM-29: an einen Tempo-Bus gekoppelte Listen treibt
+                    # der Bus (cue_stack.treibe_bus_cuelisten), nicht die
+                    # globale BPM.
+                    if (getattr(stack, "beat_sync", False)
+                            and not getattr(stack, "tempo_bus", "")):
                         stack.on_beat()
         except Exception:
             pass

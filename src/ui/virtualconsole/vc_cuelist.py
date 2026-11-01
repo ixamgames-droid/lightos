@@ -3,7 +3,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QSpinBox,
                                 QDialogButtonBox, QVBoxLayout, QHBoxLayout,
                                 QPushButton, QListWidget, QListWidgetItem, QLabel,
-                                QSizePolicy)
+                                QSizePolicy, QComboBox)
 from PySide6.QtCore import Qt, QRect, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont
 from .vc_widget import VCWidget
@@ -14,10 +14,15 @@ class VCCueList(VCWidget):
 
     # UI-64i: so viele Executoren zeigt die Executor-Leiste im Playback.
     SICHTBARE_EXECUTOREN = 10
+    # VCB-40: so viele Executor-Seiten kennt die Engine (PlaybackEngine.MAX_PAGES).
+    SEITEN = 10
 
     def __init__(self, caption: str = "Cueliste", parent=None):
         super().__init__(caption, parent)
         self.stack_slot: int = 0
+        # VCB-40: feste Executor-Seite (0-basiert) oder None = folgt der
+        # gerade gewaehlten Seite (bisheriges Verhalten, Standard).
+        self.fixed_page: int | None = None
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#e6edf3")
         self.resize(280, 320)
@@ -37,6 +42,13 @@ class VCCueList(VCWidget):
         self._title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._title_label.setStyleSheet("color: #58a6ff; font-weight: bold; font-size: 10px;")
         layout.addWidget(self._title_label)
+
+        # VCB-40: Zielanzeige — welcher Executor auf welcher Seite gesteuert wird.
+        self._target_label = QLabel("")
+        self._target_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._target_label.setStyleSheet("color: #8b949e; font-size: 8px;")
+        layout.addWidget(self._target_label)
+        self._update_target_label()
 
         self._cue_list = QListWidget()
         self._cue_list.setStyleSheet("""
@@ -69,16 +81,62 @@ class VCCueList(VCWidget):
 
     # ── Transport ─────────────────────────────────────────────────────────────
 
-    def _executor(self):
+    def _engine(self):
         try:
             from src.core.app_state import get_state
-            state = get_state()
-            executors = state.playback_engine.executors
+            return get_state().playback_engine
+        except Exception:
+            return None
+
+    def target_page(self) -> int | None:
+        """VCB-40: 0-basierte Seite, deren Executor gesteuert wird — die
+        feste Seite, sonst die gerade gewaehlte (None, wenn keine Engine)."""
+        if self.fixed_page is not None:
+            return self.fixed_page
+        pe = self._engine()
+        try:
+            return int(pe.current_page) if pe is not None else None
+        except Exception:
+            return None
+
+    def _executor(self):
+        try:
+            pe = self._engine()
+            if pe is None:
+                return None
+            if self.fixed_page is not None:
+                pages = pe.pages
+                if not (0 <= self.fixed_page < len(pages)):
+                    return None
+                executors = pages[self.fixed_page]
+            else:
+                executors = pe.executors
             if self.stack_slot < len(executors):
                 return executors[self.stack_slot]
         except Exception:
             pass
         return None
+
+    def target_text(self) -> str:
+        """VCB-40: Anzeigetext der Zielseite, z. B. ``Ex 3 · Seite 2 (fest)``."""
+        page = self.target_page()
+        seite = f"Seite {page + 1}" if page is not None else "Seite ?"
+        art = "fest" if self.fixed_page is not None else "folgt"
+        # Kaputter stack_slot aus handbearbeiteter Show darf Laden/Abgleich
+        # nicht abbrechen — die Anzeige zeigt dann „Ex ?".
+        try:
+            ex = str(int(self.stack_slot) + 1)
+        except (TypeError, ValueError):
+            ex = "?"
+        return f"Ex {ex} · {seite} ({art})"
+
+    def _update_target_label(self):
+        lbl = getattr(self, "_target_label", None)
+        if lbl is None:
+            return
+        text = self.target_text()
+        if lbl.text() != text:
+            lbl.setText(text)
 
     def _do_go(self):
         ex = self._executor()
@@ -96,6 +154,7 @@ class VCCueList(VCWidget):
             ex.press_btn("stop")
 
     def _refresh(self):
+        self._update_target_label()
         ex = self._executor()
         if ex is None or ex.stack is None:
             return
@@ -140,6 +199,15 @@ class VCCueList(VCWidget):
         slot.setValue(self.stack_slot + 1)
         slot.setToolTip("Executor aus der Executor-Leiste im Playback (Ex 1–10)")
         form.addRow("Executor-Slot:", slot)
+        # VCB-40: optional feste Executor-Seite; Standard folgt der aktuellen.
+        seite = QComboBox()
+        seite.addItem("folgt der aktuellen Seite", None)
+        for i in range(max(self.SEITEN, (self.fixed_page or 0) + 1)):
+            seite.addItem(f"feste Seite {i + 1}", i)
+        seite.setCurrentIndex(0 if self.fixed_page is None else self.fixed_page + 1)
+        seite.setToolTip("Folgt der gerade gewaehlten Executor-Seite oder "
+                         "steuert immer dieselbe Seite")
+        form.addRow("Seite:", seite)
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
@@ -147,7 +215,9 @@ class VCCueList(VCWidget):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.caption = cap.text() or self.caption
             self.stack_slot = slot.value() - 1
+            self.fixed_page = seite.currentData()
             self._title_label.setText(self.caption)
+            self._update_target_label()
             self.update()
 
     # ── Serialization ─────────────────────────────────────────────────────────
@@ -155,10 +225,17 @@ class VCCueList(VCWidget):
     def to_dict(self) -> dict:
         d = super().to_dict()
         d["stack_slot"] = self.stack_slot
+        # VCB-40: nur bei fester Seite gespeichert — alte Shows bleiben gleich.
+        if self.fixed_page is not None:
+            d["fixed_page"] = self.fixed_page
         return d
 
     def apply_dict(self, d: dict):
         super().apply_dict(d)
         self.stack_slot = d.get("stack_slot", 0)
+        fp = d.get("fixed_page")
+        self.fixed_page = (fp if isinstance(fp, int) and not isinstance(fp, bool)
+                           and fp >= 0 else None)
         if hasattr(self, "_title_label"):
             self._title_label.setText(self.caption)
+        self._update_target_label()
