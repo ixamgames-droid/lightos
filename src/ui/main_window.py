@@ -720,6 +720,13 @@ class MainWindow(QMainWindow):
             mm = get_midi_manager()
             before = set(getattr(mm, "_inputs", {}).keys())
             mm.open_all_inputs()
+            # MTC-04: Timecode aus der gemeinsamen Empfangsschleife (rtmidi und
+            # WinMM) lesen und Timecode-Cues ausloesen. Idempotent.
+            try:
+                from src.core.timecode.mtc_cues import verdrahten
+                verdrahten(mm)
+            except Exception as e:
+                print(f"[main_window] MTC-Cues: {e}")
             new = set(getattr(mm, "_inputs", {}).keys()) - before
             if new:
                 print(f"[main_window] MIDI auto-connect: {sorted(new)}")
