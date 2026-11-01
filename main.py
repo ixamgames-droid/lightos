@@ -922,6 +922,15 @@ def main():
 
     _setup_crash_logging()
 
+    # STAB-40: im Probelauf (Wegwerf-Datenordner) die liegengebliebenen
+    # Wegwerf-Ordner frueherer Laeufe wegraeumen — nach Sperre und Sitzungs-Log,
+    # damit die Meldung dort steht. In der echten App tut es nichts.
+    try:
+        from src.core.paths import probelauf_aufraeumen
+        probelauf_aufraeumen()
+    except Exception as _e:                              # noqa: BLE001
+        print(f"[LightOS] STAB-40 aufraeumen: {_e}")
+
     # XPLAT-44: Nutzerdaten liegen im App-Datenordner. Was ein aelterer Stand
     # noch unter ``data/`` (Programmordner bzw. Arbeitsverzeichnis) abgelegt
     # hat, wird hier EINMALIG kopiert — nach der Einzelinstanz-Sperre (kein

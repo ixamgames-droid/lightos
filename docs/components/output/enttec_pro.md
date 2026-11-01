@@ -102,7 +102,7 @@ Worker-Loop).
   im Dialog (Reiter Universen oder „Verbinden“ im Reiter Enttec) schreibt `""`: der
   Bediener meint den Dongle am neuen Port, die Ausgabe sendet nicht still weiter auf dem
   alten (Gegenprüfung). Nur die Windows-Schreibweise (`com3`/`COM3`) gilt nicht als
-  Wechsel (`_gleicher_port`; Symlinks werden bewusst nicht aufgelöst). Zieht der Adapter im Reiter Enttec auf ein anderes
+  Wechsel (`_gleicher_port`; unter Linux/macOS wird ein Symlink wie `/dev/serial/by-id/…` auf sein `ttyUSB…` aufgelöst, OUT-81). Zieht der Adapter im Reiter Enttec auf ein anderes
   Universum um, ersetzt seine Nummer die der Zielzeile.
 - **Ein Dongle, eine Zeile (Gegenprüfung):** `seriennr_eintragen` entfernt die gelernte
   Nummer aus jeder anderen Zeile; der Dialog gibt einer neuen Zeile keine Nummer aus der
@@ -112,13 +112,13 @@ Worker-Loop).
   sich wie alte Zeilen und lernen neu; der Hinweis „Enttec-Seriennummer steht auch bei
   Universe …“ steht in der Statusleiste. Die Nummer des laufenden Geräts ergänzt eine Zeile
   ohne Feld nur, wenn keine andere Zeile sie ausdrücklich trägt.
-- **Keine stabilen Linux-Namen im Port-Feld (Gegenprüfung 2):** `/dev/serial/by-id`-Namen
-  bietet der Reiter Enttec bewusst nicht an — sie galten in den NOT-AUS-Weg-Schlüsseln
-  (OUT-64) als anderer Anschluss als `ttyUSB1`. Von Hand eingetippt ging ein solcher Name
-  schon immer; darum nimmt `_wege_enttec` zu jedem Portnamen zusätzlich (nie statt) den
-  normalisierten Schlüssel `enttec_pro._port_key` (POSIX: Symlink aufgelöst, Windows:
-  Großschreibung) — by-id und tty desselben Anschlusses treffen dieselbe Sperre. Das
-  Anbieten im Port-Feld ist als OUT-81 vorgemerkt.
+- **Stabile Linux-Namen im Port-Feld (OUT-81):** Der Reiter Enttec bietet unter Linux zusätzlich
+  die Namen aus `/dev/serial/by-id` an, je direkt unter ihrem Anschluss. Sie bleiben gleich,
+  wenn sich die Nummer von `ttyUSB…` nach einem Neustart oder Umstecken ändert. `_wege_enttec`
+  nimmt zu jedem Portnamen zusätzlich (nie statt) den normalisierten Schlüssel
+  `enttec_pro._port_key` (POSIX: Symlink aufgelöst, Windows: Großschreibung) — by-id und tty
+  desselben Anschlusses treffen dieselbe NOT-AUS-Sperre (OUT-64). Auch die Port-Diagnose und der
+  Eigentums-Nachweis für Ersatz-Dongles vergleichen den aufgelösten Port.
 - **Schreiben (Gegenprüfung 2):** `_persist_output` liest und schreibt `universes.json` unter
   `DATEI_LOCK`. `atomar_schreiben` ersetzt bei einem Symlink dessen Ziel und scheitert
   sichtbar (`False`), wenn die vorhandene Datei schreibgeschützt ist — `os.replace` hätte
@@ -132,9 +132,9 @@ Worker-Loop).
   dem Update einmal prüfen, ob die Spalte **Dongle** stimmt, sonst **Dongle neu
   zuordnen** bzw. den Port korrigieren. Die „früher eigenen“ Nummern (OUT-66, Runde 3) werden bewusst nicht
   gespeichert; sie gelten weiter nur bis zum Neustart.
-- **Grenze — zwei Namen für einen Anschluss:** ein von Hand eingetippter by-id-Name und
-  `ttyUSB0` in zwei Zeilen erkennt die Doppel-Prüfung (OUT-74) nicht als denselben
-  Adapter; die NOT-AUS-Sperre greift trotzdem (normalisierter Weg-Schlüssel, s. oben).
+- **Zwei Namen für einen Anschluss (OUT-81):** ein by-id-Name und `ttyUSB0` in zwei Zeilen
+  erkennt die Doppel-Prüfung (OUT-74, `adapter_zeilen.schluessel` löst den Pfad auf) als
+  denselben Adapter; die NOT-AUS-Sperre greift ohnehin (normalisierter Weg-Schlüssel, s. oben).
 - `close()` bricht/leert vorher den Output-Puffer, damit `CloseHandle()` nicht mit einem
   ausstehenden `WriteFile` kollidiert. Idempotent, fehlertolerant.
 

@@ -208,6 +208,11 @@ _STIL = {
 }
 _STIL_KLEIN = ("background:#1c1b17; color:#8f8458; font-size:9px;",
                0, 8, 8, "#8f8458")
+#: QA-109: so hoch wird die schmale Kiosk-Zeile mindestens (wie der Waechter
+#: in test_vcb47_banner_einklappen_haerte). Ohne Polster ist sie genau eine
+#: Schriftzeile hoch — unter Windows (Roboto Condensed fehlt -> Arial, 9 px)
+#: nur 10 px, unter Linux mit der dortigen Ersatzschrift hoeher.
+KLEIN_MIN_HOEHE = 12
 
 _STIL_CHIP = {
     ART_STOERUNG: ("QLabel#ausgabeChip { background:#c81e1e; color:#ffffff;"
@@ -447,10 +452,27 @@ class AusgabeBanner(_FolgtAnsicht, QLabel):
             return
         self._voll = z.text
         self._tip = z.tooltip
-        self._stil(_STIL_KLEIN if z.klein else _STIL[z.art], rahmen=not z.klein)
+        stil = self._mit_mindesthoehe(_STIL_KLEIN) if z.klein else _STIL[z.art]
+        self._stil(stil, rahmen=not z.klein)
         self._kuerze()
         self.show()
         self.lege_an()
+
+    def _mit_mindesthoehe(self, stil):
+        """QA-109: Polster oben/unten so, dass die Zeile mit der WIRKLICHEN
+        Schrift mindestens ``KLEIN_MIN_HOEHE`` hoch ist. Reicht die Schrift
+        schon (Linux), bleibt das Polster wie in ``stil``. Ein neues Tupel
+        statt eines Nachstellens danach: ``_hoehe_hoechstens`` (UI-103) nimmt
+        ``stil[1]`` als volles Polster und setzte es sonst wieder zurueck."""
+        rumpf, oben, links, knopf_px, farbe = stil
+        m = re.search(r"font-size:\s*(\d+)px", rumpf)
+        if not m:
+            return stil
+        self.ensurePolished()               # Schriftfamilie aus dem Stylesheet
+        f = QFont(self.font())
+        f.setPixelSize(int(m.group(1)))
+        noetig = max(oben, (KLEIN_MIN_HOEHE - QFontMetrics(f).height() + 1) // 2)
+        return stil if noetig == oben else (rumpf, noetig, links, knopf_px, farbe)
 
     def _stil(self, stil, rahmen: bool) -> None:
         _rumpf, oben, _links, knopf_px, farbe = stil
