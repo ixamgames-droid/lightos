@@ -9,6 +9,20 @@ from .enttec_pro import EnttecPro, _port_key
 from .artnet import ArtNetSender
 from .sacn import SACNSender
 
+
+def _gleicher_enttec_port(a, b) -> bool:
+    """OUT-81: derselbe Anschluss — exakt gleich oder gleicher ``_port_key``
+    (Symlink ``/dev/serial/by-id/…`` aufgeloest, Windows ``com3``/``COM3``)."""
+    if not isinstance(a, str) or not isinstance(b, str) or not a or not b:
+        return False
+    if a == b:
+        return True
+    try:
+        return _port_key(a) == _port_key(b)
+    except Exception:
+        return False
+
+
 TARGET_HZ = 44
 FRAME_INTERVAL = 1.0 / TARGET_HZ
 
@@ -572,7 +586,8 @@ class OutputManager:
         ist, nur solange er dort verbunden ist (``port_aktuell``). Ein toter
         Ausgang wird so nicht verdraengt, wenn ein anderes Universum auf die
         laengst wieder freie Nummer gelegt wird."""
-        if cls._weg_enttec(dev)[1] == port:
+        # OUT-81: by-id-Name und tty-Name desselben Anschlusses sind EIN Port.
+        if _gleicher_enttec_port(cls._weg_enttec(dev)[1], port):
             return True
         try:
             akt = getattr(dev, "port_aktuell", None)
@@ -580,7 +595,7 @@ class OutputManager:
             akt = None
         if not isinstance(akt, str) or not akt:
             akt = getattr(dev, "port", None)        # Attrappen ohne Rueckmeldung
-        return akt == port
+        return _gleicher_enttec_port(akt, port)
 
     # ── OUT-80: Seriennummer dauerhaft in der Konfiguration ─────────────────
 
@@ -755,7 +770,9 @@ class OutputManager:
             akt = None
         if not isinstance(akt, str) or not akt:
             akt = getattr(dev, "port", None)
-        return bool(konfig) and akt == konfig
+        # OUT-81: konfiguriert als by-id-Name, zurueckgemeldet als ttyUSB…
+        # (oder umgekehrt) ist derselbe Anschluss.
+        return bool(konfig) and _gleicher_enttec_port(akt, konfig)
 
     def _fremde_fuer(self, universe: int, merken: bool = True) -> frozenset:
         """Seriennummern der Enttec-Ausgaben ausser ``universe`` — gelernte
@@ -1673,7 +1690,8 @@ class OutputManager:
         def _trifft(d) -> bool:
             if not self._enttec_belegt_port(d, port):
                 return False
-            if not fuer_seriennr or self._weg_enttec(d)[1] == port:
+            if not fuer_seriennr or _gleicher_enttec_port(
+                    self._weg_enttec(d)[1], port):
                 return True
             andere = self._enttec_sn(d)
             return not (andere and andere != fuer_seriennr)

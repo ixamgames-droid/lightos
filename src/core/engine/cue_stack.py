@@ -183,6 +183,13 @@ class CueStack:
         # Alt-Shows verhalten sich unverändert (rein zeitbasiert).
         self.beat_sync: bool = False
         self.beats_per_cue: int = 4
+        # BPM-29: Taktquelle der Beat-Sync. "" = globale BPM (BPMManager treibt
+        # on_beat, bisheriges Verhalten); "A".."D" bzw. ein anderer Bus-Name =
+        # dieser Tempo-Bus treibt on_beat ueber on_bus_position() (Render-Thread,
+        # nach advance_frame). Der BPMManager laesst bus-gekoppelte Listen aus.
+        self.tempo_bus: str = ""
+        self._bus_letzter_beat: int | None = None
+        self._bus_anker_id: str = ""     # Bus, auf dem _bus_letzter_beat gilt
         self._beat_count: int = 0
         self._dir: int = 1                # Laufrichtung für bounce/pingpong
         self._current_idx = -1
@@ -298,6 +305,47 @@ class CueStack:
                 return
             self._beat_count = 0
         self.go()   # eigener Lock — daher außerhalb des with aufrufen
+
+    @staticmethod
+    def normalisiere_tempo_bus(bus_id) -> str:
+        """BPM-29: ``""``/``None``/``"global"``/``"default"`` → ``""`` (globale
+        BPM), sonst der getrimmte Bus-Name (z. B. ``"A"``)."""
+        if not isinstance(bus_id, str):
+            return ""
+        bid = bus_id.strip()
+        if bid.lower() in ("", "global", "default"):
+            return ""
+        return bid
+
+    #: Mehr ganze Beats pro Frame gelten als Sprung (Bus neu gesetzt), nicht
+    #: als verpasste Beats — sonst schaltete die Liste mehrere Cues auf einmal.
+    MAX_BUS_BEATS_PRO_FRAME = 4
+
+    def on_bus_position(self, position: float) -> int:
+        """BPM-29: vom Render-Thread pro Frame mit der Position des gekoppelten
+        Tempo-Busses aufgerufen. Jeder ueberschrittene ganze Beat → ein
+        :meth:`on_beat`. Rueckwaertssprung (Bus-Reset) oder grosser Sprung
+        setzt nur den Anker neu. Liefert die Zahl der ausgeloesten Beats."""
+        try:
+            ganz = int(position // 1)
+        except (TypeError, ValueError):
+            return 0
+        # Anker gilt nur fuer den Bus, auf dem er gesetzt wurde: nach einem
+        # Wechsel (A -> B, global -> A) zaehlt die Differenz zweier fremder
+        # Positionen nicht als Beats — erst neu ankern.
+        if self._bus_anker_id != self.tempo_bus:
+            self._bus_anker_id = self.tempo_bus
+            self._bus_letzter_beat = None
+        letzter = self._bus_letzter_beat
+        self._bus_letzter_beat = ganz
+        if letzter is None or not self.beat_sync or not self.tempo_bus:
+            return 0
+        delta = ganz - letzter
+        if delta <= 0 or delta > self.MAX_BUS_BEATS_PRO_FRAME:
+            return 0
+        for _ in range(delta):
+            self.on_beat()
+        return delta
 
     def _peek_next(self) -> tuple[int | None, int]:
         """Liefert (naechster_index, neue_richtung) wie ein GO ihn waehlen wuerde,
@@ -727,7 +775,7 @@ class CueStack:
     # ── Serialisierung ────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "name": self.name,
             "mode": self.mode,
             "loop": self.loop,          # Rückwärtskompatibel für alte Leser
@@ -735,6 +783,9 @@ class CueStack:
             "beats_per_cue": self.beats_per_cue,
             "cues": [c.to_dict() for c in self.cues],
         }
+        if self.tempo_bus:              # BPM-29: global = Feld fehlt (Alt-Format)
+            d["tempo_bus"] = self.tempo_bus
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "CueStack":
@@ -749,6 +800,28 @@ class CueStack:
             stack.beats_per_cue = max(1, int(d.get("beats_per_cue", 4)))
         except (TypeError, ValueError):
             stack.beats_per_cue = 4
+        stack.tempo_bus = cls.normalisiere_tempo_bus(d.get("tempo_bus", ""))
         for cd in d.get("cues", []):
             stack.add_cue(Cue.from_dict(cd))
         return stack
+
+
+def treibe_bus_cuelisten(stacks, tempo_bus_manager) -> None:
+    """BPM-29: bus-gekoppelte, taktgebundene Cuelisten aus ihrem Tempo-Bus
+    weiterschalten. Einmal pro Frame vom Render-Thread NACH
+    ``TempoBusManager.advance_frame`` (alle Listen sehen dieselbe Position).
+    Listen mit ``tempo_bus == ""`` treibt weiter der BPMManager."""
+    for stack in list(stacks or []):
+        bid = getattr(stack, "tempo_bus", "")
+        if not bid:
+            # Global: alten Bus-Anker verwerfen, damit ein spaeteres Zurueck-
+            # koppeln nicht gegen eine veraltete Position zaehlt.
+            if getattr(stack, "_bus_letzter_beat", None) is not None:
+                stack._bus_letzter_beat = None
+            continue
+        try:
+            bus = tempo_bus_manager.bus_for_effect(bid)
+            if bus is not None:
+                stack.on_bus_position(bus.position())
+        except Exception as exc:
+            print(f"[CueStack] tempo-bus beat error: {exc}")
