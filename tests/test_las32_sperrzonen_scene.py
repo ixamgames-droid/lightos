@@ -409,7 +409,25 @@ class SperrzonenSceneTest(unittest.TestCase):
         z = {e["id"]: e for e in i["zonen"]}
         self.assertEqual(z["p"]["zustand"], "erreicht")
         self.assertEqual(z["p"]["laser"], [_FID])
-        self.assertEqual(z["p"]["zusatz"], "⚠ Laser %d erreicht diese Zone" % _FID)
+        # LAS-45: das Schild ist eine Rechnung, keine Sperre — „nur Anzeige"
+        # steht dabei, ganz (nicht gekuerzt) und ungestaucht lesbar.
+        soll_zusatz = "⚠ Laser %d kann diese Zone erreichen · nur Anzeige" % _FID
+        self.assertEqual(z["p"]["zusatz"], soll_zusatz)
+        self.assertNotIn("erreicht diese Zone", z["p"]["zusatz"])
+        text_px = self._eval(
+            "(function(){const g=document.createElement('canvas').getContext('2d');"
+            " g.font='bold 30px sans-serif'; return g.measureText(%s).width;})()"
+            % json.dumps(soll_zusatz))
+        self.assertLessEqual(text_px + 24, z["p"]["schildPx"])
+        # Viele Laser: die Liste wird gekuerzt, nie der Hinweis „nur Anzeige".
+        viele = self._eval(
+            "JSON.stringify(window.__lightosSperrzonen.trefferZeile(%s))"
+            % json.dumps([_FID + k for k in range(8)]))
+        viele = json.loads(viele)
+        self.assertTrue(viele.endswith(" können diese Zone erreichen · nur Anzeige"), viele)
+        self.assertLessEqual(len(viele), 72)
+        self.assertIn(" +", viele)
+        self.assertEqual(self._eval("window.__lightosSperrzonen.trefferZeile([])"), "")
         self.assertTrue(z["p"]["schildUeberZone"])
         self.assertLess(z["p"]["schildOrt"][2], -1.0)      # Schraffur liegt hinten (+z)
         self.assertEqual(z["t"]["zustand"], "frei")
@@ -534,10 +552,12 @@ class SperrzonenSceneTest(unittest.TestCase):
         self.assertEqual(je, {_FID: ["Publikum"], fid2: sorted(soll2.zonen)})
         z = {e["id"]: e for e in i["zonen"]}
         self.assertEqual(z["t"]["laser"], [fid2])
-        self.assertIn("Laser %d erreicht diese Zone" % fid2, z["t"]["zusatz"])
+        self.assertEqual(z["t"]["zusatz"],
+                         "⚠ Laser %d kann diese Zone erreichen · nur Anzeige" % fid2)
         if "Publikum" in soll2.zonen:
             self.assertEqual(z["p"]["zusatz"],
-                             "⚠ Laser %d, %d erreichen diese Zone" % (_FID, fid2))
+                             "⚠ Laser %d, %d können diese Zone erreichen · nur Anzeige"
+                             % (_FID, fid2))
         ls = i["lasersicht"]
         self.assertEqual(ls["laser"], [_FID, fid2])
         self.assertEqual(ls["schalter"], [_FID, fid2])     # Umschalter „Laser 1 | Laser 2"

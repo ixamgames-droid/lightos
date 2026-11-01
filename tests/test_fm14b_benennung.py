@@ -542,7 +542,9 @@ class OhneRingeUnveraendertTest(_RigFall):
             # offset). Das fruehere „  offset=0.00" kam nur zustande, weil der
             # UNSICHTBARE Programmer-EFX-Editor die neue EFX beim Listen-Refresh
             # aus der Auswahl befuellte — genau der behobene Fehler.
-            "EFX-Zielliste": "Fixture #2 · K4",
+            # LAS-29: die Zielliste nennt das Geraet beim Label (wie
+            # Kopfzeile und Fan-Werkzeug) statt „Fixture #2".
+            "EFX-Zielliste": "G2 · K4",
             "Fan-Werkzeug": "G2 · K4",
             "Command-Line-Statuszeile": "Selektiert: 1 (2·K4)",
             "Snap-Speichern-Dialog": "Rot (Kopf 4)  (1)",
@@ -763,7 +765,8 @@ class NutzlastTest(_RigFall):
         neu geschrieben. Jede Stelle braucht die Modellkarte — eine, die sie
         vergisst, faellt sonst nicht auf, weil eine andere kurz darauf
         drueberschreibt."""
-        erwartet = f"Fixture #1 · {head_label_short(_PIXEL_MODELL, 3)}"
+        # LAS-29: Label „G1" statt „Fixture #1".
+        erwartet = f"G1 · {head_label_short(_PIXEL_MODELL, 3)}"
 
         # (a) Auswahl folgen. ``_sync_follow_selection`` steigt in einer
         # unsichtbaren View bewusst sofort aus (Wurzel-Fix 2026-06-24), gefahren

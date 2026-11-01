@@ -3640,7 +3640,37 @@ class VisualizerWindow(QMainWindow):
         layout = QVBoxLayout(w)
 
         layout.addWidget(QLabel("Bühnen-Elemente:"))
-        self._stage_tree = QTreeWidget()
+        from PySide6.QtCore import QSize
+        from PySide6.QtWidgets import QStyle, QStyleOptionViewItem
+
+        class _BuehnenListe(QTreeWidget):
+            """VIZ-75: der Reiter liegt im Scrollbereich und ist mit den
+            Gruppen darunter hoeher als die Spalte — dann bekommt die Liste
+            trotz Streckfaktor nur ihre Mindesthoehe (gut eine Zeile). Sie
+            haelt deshalb mindestens fuenf ECHTE Zeilen frei: gemessen ueber
+            den Stil, also mit Theme, Touch-Modus und Schrift zur Laufzeit."""
+
+            _ZEILEN = 5
+
+            def _zeilenhoehe(self) -> int:
+                opt = QStyleOptionViewItem()
+                self.initViewItemOption(opt)
+                opt.text = "Xg"
+                opt.features |= QStyleOptionViewItem.ViewItemFeature.HasDisplay
+                h = self.style().sizeFromContents(
+                    QStyle.ContentsType.CT_ItemViewItem, opt, QSize(), self).height()
+                if self.topLevelItemCount():
+                    h = max(h, self.sizeHintForRow(0))
+                return max(h, self.fontMetrics().height())
+
+            def minimumSizeHint(self) -> QSize:
+                s = super().minimumSizeHint()
+                h = (self._ZEILEN * self._zeilenhoehe()
+                     + self.header().sizeHint().height()
+                     + 2 * self.frameWidth())
+                return QSize(s.width(), max(s.height(), h))
+
+        self._stage_tree = _BuehnenListe()
         self._stage_tree.setHeaderLabels(["Typ", "Name"])
         self._stage_tree.itemSelectionChanged.connect(self._on_stage_tree_selected)
         # Touch-freundliche groessere Zeilen + ruhigeres Painting

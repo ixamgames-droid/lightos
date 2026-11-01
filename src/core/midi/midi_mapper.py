@@ -12,6 +12,8 @@ from uuid import uuid4
 
 from .midi_manager import (MidiMessage, geraet_passt, get_midi_manager,
                            port_basisname,
+                           NRPN_PARAM_MSB, NRPN_PARAM_LSB,
+                           NRPN_WERT_MSB, NRPN_WERT_LSB,
                            stabiler_portname, fader_wert)
 
 # Action types (legacy-compatible)
@@ -70,6 +72,68 @@ TOUCH_NOTE_FADER_1 = 104
 #: Geht das Loslassen verloren (Kabel gezogen, Pult neu gestartet), loest sich
 #: die Sperre nach dieser Zeit ohne Beruehrungs-Note und ohne Wert vom Fader.
 MOTOR_BERUEHRT_MAX_S = 10.0
+
+
+# ── MIDI-11/MIDI-12: Auswertung eines CC ─────────────────────────────────────
+#: ``MidiInBinding.cc_modus``: leer = absoluter 7-Bit-Wert (Bestand).
+CC_ABSOLUT = ""
+#: MIDI-12: CC 0..31 (MSB) + CC 32..63 (LSB) = ein 14-Bit-Wert.
+CC_14BIT = "14bit"
+#: MIDI-11: Endlos-Encoder, die Schritte statt Stellungen senden.
+CC_REL_ZWEIERKOMPLEMENT = "rel_zk"    # 1..63 = +1..+63, 127..65 = -1..-63
+CC_REL_BINAER_OFFSET = "rel_bo"       # 65 = +1, 63 = -1 (64 = Ruhe)
+CC_REL_VORZEICHENBIT = "rel_vz"       # Bit 6 = Minus, Bits 0..5 = Betrag
+CC_MODI = (CC_ABSOLUT, CC_14BIT, CC_REL_ZWEIERKOMPLEMENT,
+           CC_REL_BINAER_OFFSET, CC_REL_VORZEICHENBIT)
+_CC_RELATIV = (CC_REL_ZWEIERKOMPLEMENT, CC_REL_BINAER_OFFSET,
+               CC_REL_VORZEICHENBIT)
+#: MIDI-11: ein Encoder-Schritt bewegt ein stufenloses Ziel um 1/127 — so fein
+#: wie eine Stufe eines absoluten CC.
+RELATIV_SCHRITT = 1.0 / 127.0
+
+#: MIDI-9/11/12/13: Text der Spalte „Typ" in der MIDI-Ansicht <-> (msg_type,
+#: cc_modus). Bestandstexte (note_on, cc, pitchbend) bleiben, wie sie waren.
+TYP_TEXTE = {
+    "note_on": ("note_on", CC_ABSOLUT),
+    "cc": ("cc", CC_ABSOLUT),
+    "cc14": ("cc", CC_14BIT),
+    "cc_rel_zk": ("cc", CC_REL_ZWEIERKOMPLEMENT),
+    "cc_rel_bo": ("cc", CC_REL_BINAER_OFFSET),
+    "cc_rel_vz": ("cc", CC_REL_VORZEICHENBIT),
+    "pc": ("pc", CC_ABSOLUT),
+    "nrpn": ("nrpn", CC_ABSOLUT),
+    "pitchbend": ("pitchbend", CC_ABSOLUT),
+}
+
+
+def relativ_schritt(modus: str, wert: int) -> int:
+    """MIDI-11: der Schritt (+/-), den ein Relativ-Encoder mit ``wert`` meldet."""
+    w = int(wert) & 0x7F
+    if modus == CC_REL_ZWEIERKOMPLEMENT:
+        return w - 128 if w >= 64 else w
+    if modus == CC_REL_BINAER_OFFSET:
+        return w - 64
+    if modus == CC_REL_VORZEICHENBIT:
+        return -(w & 0x3F) if w & 0x40 else (w & 0x3F)
+    return 0
+
+
+def typ_text(mapping) -> str:
+    """Spalte „Typ": ``msg_type`` plus Auswertung eines CC."""
+    msg_type = str(getattr(mapping, "msg_type", "") or "note_on")
+    modus = getattr(getattr(mapping, "midi_in", None), "cc_modus", CC_ABSOLUT)
+    if msg_type == "cc" and modus:
+        for text, (typ, m) in TYP_TEXTE.items():
+            if typ == "cc" and m == modus:
+                return text
+    return msg_type
+
+
+def typ_aus_text(text: str) -> tuple[str, str]:
+    """Umkehrung von :func:`typ_text`. Unbekanntes bleibt als ``msg_type``
+    stehen (Bestand: die Spalte nahm schon immer freien Text)."""
+    t = str(text or "").strip().lower() or "note_on"
+    return TYP_TEXTE.get(t, (t, CC_ABSOLUT))
 
 
 def mackie_touch_note(fader_kanal: int) -> int | None:
@@ -152,18 +216,26 @@ def _action_from_target(target: str) -> tuple[str, str]:
     return action.strip(), param.strip()
 
 
+#: MIDI-13: die CCs, aus denen ein NRPN entsteht (Wahl + Wert).
+_NRPN_CCS = (NRPN_PARAM_MSB, NRPN_PARAM_LSB, NRPN_WERT_MSB, NRPN_WERT_LSB)
+
+#: Typen, die als Bindung und als ``msg_type`` gleich heissen.
+_EIGENE_TYPEN = ("pitchbend", "pc", "nrpn")    # MIDI-10, MIDI-9, MIDI-13
+
+
 def _msg_type_from_binding(binding_type: str) -> str:
-    if binding_type == "pitchbend":             # MIDI-10
-        return "pitchbend"
+    if binding_type in _EIGENE_TYPEN:
+        return binding_type
     return "cc" if binding_type == "cc" else "note_on"
 
 
 def _binding_type_from_msg_type(msg_type: str) -> str:
     """Flaches Feld ``msg_type`` (note_on/cc/pitchbend) -> Typ der Bindung.
     EINE Stelle statt dreier ``"cc" if … else "note"``, die Pitchbend zu einer
-    Note gemacht haetten (MIDI-10)."""
-    if msg_type == "pitchbend":
-        return "pitchbend"
+    Note gemacht haetten (MIDI-10). Program Change (MIDI-9) und NRPN
+    (MIDI-13) behalten ebenso ihren Namen."""
+    if msg_type in _EIGENE_TYPEN:
+        return msg_type
     return "cc" if msg_type == "cc" else "note"
 
 
@@ -207,8 +279,8 @@ def _binding_family(msg_type: str) -> str:
     """note_on/note_off/note -> 'note', cc -> 'cc', pitchbend -> 'pitchbend'
     (Match-Familie)."""
     t = str(msg_type)
-    if t == "pitchbend":
-        return "pitchbend"
+    if t in _EIGENE_TYPEN:
+        return t
     return "cc" if t == "cc" else "note"
 
 
@@ -246,6 +318,12 @@ def _offene_eingaenge() -> list[str]:
         return []
 
 
+def _cc_modus(wert) -> str:
+    """Gespeicherten Modus pruefen; Unbekanntes = absolut (Bestand)."""
+    w = str(wert or "")
+    return w if w in CC_MODI else CC_ABSOLUT
+
+
 @dataclass
 class MidiInBinding:
     """Incoming MIDI trigger definition."""
@@ -253,7 +331,9 @@ class MidiInBinding:
     device: str = ""
     channel: int = 1
     trigger_id: int = 0
-    message_type: str = "note"  # note, cc oder pitchbend (MIDI-10)
+    message_type: str = "note"  # note, cc, pitchbend (MIDI-10), pc, nrpn
+    # MIDI-11/12: Auswertung eines CC (CC_MODI); leer = absolut wie bisher.
+    cc_modus: str = CC_ABSOLUT
 
     def matches(self, msg: MidiMessage, geschwister=None) -> bool:
         # MIDI-3: ueber den Geraetenamen, nicht ueber die ALSA-Nummer.
@@ -268,6 +348,12 @@ class MidiInBinding:
             # MIDI-10: je Fader ein Kanal; ``data1`` sind die unteren 7 Bit des
             # Werts und aendern sich mit jeder Bewegung.
             return msg.msg_type == "pitchbend"
+        if (self.message_type == "cc" and self.cc_modus == CC_14BIT
+                and 0 <= self.trigger_id <= 31):
+            # MIDI-12: MSB auf ``trigger_id`` (0..31), LSB 32 darueber. Ab
+            # CC 32 gibt es keinen LSB — dort wie ein absoluter CC.
+            return (msg.msg_type == "cc"
+                    and msg.data1 in (self.trigger_id, self.trigger_id + 32))
         if self.trigger_id != msg.data1:
             return False
         if self.message_type == "cc":
@@ -285,6 +371,7 @@ class MidiInBinding:
             channel=int(data.get("channel", 1)),
             trigger_id=int(data.get("trigger_id", 0)),
             message_type=str(data.get("message_type", "note")),
+            cc_modus=_cc_modus(data.get("cc_modus", CC_ABSOLUT)),
         )
 
     @classmethod
@@ -299,12 +386,16 @@ class MidiInBinding:
         )
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "device": self.device,
             "channel": int(self.channel),
             "trigger_id": int(self.trigger_id),
             "message_type": self.message_type,
         }
+        # MIDI-11/12: nur wenn gesetzt — Bestandsmappings speichern wie bisher.
+        if self.cc_modus:
+            d["cc_modus"] = self.cc_modus
+        return d
 
 
 @dataclass
@@ -419,17 +510,23 @@ class MidiMapping:
 
         # Legacy -> structured sync (kept for editor compatibility).
         legacy_binding_type = _binding_type_from_msg_type(self.msg_type)
+        # MIDI-11/12: der CC-Modus hat kein Legacy-Flachfeld — aus der
+        # uebergebenen Bindung uebernehmen, sonst ginge er hier verloren.
+        modus = (getattr(self.midi_in, "cc_modus", CC_ABSOLUT)
+                 if legacy_binding_type == "cc" else CC_ABSOLUT)
         self.midi_in = MidiInBinding(
             device=self.port_filter,
             channel=int(self.channel),
             trigger_id=int(self.data1),
             message_type=legacy_binding_type,
+            cc_modus=_cc_modus(modus),
         )
 
         # MIDI-10: ein Pitchbend-Fader hat keine Nummer. ``data1`` (0) als
         # Rueckmelde-Note zu nehmen, schaltete am Mackie-Pult die LED von Note 0.
+        # MIDI-13: eine NRPN-Parameternummer (bis 16383) ist ebenso keine Note.
         if (self.midi_out and self.midi_out.trigger_id < 0
-                and self.msg_type != "pitchbend"):
+                and self.msg_type not in ("pitchbend", "nrpn")):
             self.midi_out.trigger_id = int(self.data1)
 
     @classmethod
@@ -474,10 +571,14 @@ class MidiMapping:
         self.channel = int(msg.channel)
         # MIDI-10: Pitchbend hat keine Nummer (data1 = untere Bits des Werts).
         self.data1 = 0 if msg.msg_type == "pitchbend" else int(msg.data1)
+        modus = getattr(self.midi_in, "cc_modus", CC_ABSOLUT)
         self.midi_in = MidiInBinding.from_message(msg)
+        if msg.msg_type == "cc":
+            # MIDI-11/12: neu gelernt bleibt der gewaehlte CC-Modus stehen.
+            self.midi_in.cc_modus = _cc_modus(modus)
         self.port_filter = self.midi_in.device
         if (self.midi_out and self.midi_out.trigger_id < 0
-                and self.msg_type != "pitchbend"):
+                and self.msg_type not in ("pitchbend", "nrpn")):
             self.midi_out.trigger_id = self.data1
 
 
@@ -488,8 +589,14 @@ class MidiMapper:
     # gebautes Objekt (Tests) sie hat. Siehe start_learn.
     _learn_pitchbend = False
     _learn_note: MidiMessage | None = None
+    _learn_nrpn_wahl: MidiMessage | None = None     # MIDI-13
     # MIDI-14: ebenfalls als Klassen-Vorgabe (Objekte ohne __init__ in Tests).
     _uhr = staticmethod(time.monotonic)
+    # MIDI-11/12: Zustand je Mapping (mapping_id). Nur der MIDI-Empfangsthread
+    # schreibt; replace/remove setzen ihn zurueck. Leere Klassen-Vorgaben
+    # werden in __init__ je Objekt ersetzt.
+    _cc14: dict = {}
+    _relativ_stand: dict = {}
 
     def __init__(self, app_state):
         self._state = app_state
@@ -504,6 +611,9 @@ class MidiMapper:
         # und das Feedback-Polling in anderen Threads.
         self._toggle_lock = threading.Lock()
         self._feedback_state_cache: dict[str, float] = {}
+        # MIDI-12: {mapping_id: [msb, lsb, lsb_gesehen]}; MIDI-11: {id: 0..1}
+        self._cc14: dict[str, list] = {}
+        self._relativ_stand: dict[str, float] = {}
         self._feedback_output_cache: dict[str, int] = {}
         self._feedback_last_send_ts: dict[str, float] = {}
         # MIDI-14: je Motorfader (mapping_id) — wann zuletzt die Hand einen
@@ -554,6 +664,8 @@ class MidiMapper:
             with self._toggle_lock:
                 self._toggle_states.pop(mapping.mapping_id, None)
             self._feedback_state_cache.pop(mapping.mapping_id, None)
+            self._cc14.pop(mapping.mapping_id, None)
+            self._relativ_stand.pop(mapping.mapping_id, None)
             self._motor_vergessen(mapping.mapping_id)
 
     def get_mappings(self) -> list[MidiMapping]:
@@ -566,6 +678,8 @@ class MidiMapper:
                 m.mapping_id: False for m in self._mappings
                 if m.button_mode == BUTTON_TOGGLE}
         self._feedback_state_cache = {}
+        self._cc14 = {}
+        self._relativ_stand = {}
         self._motor_vergessen()
         for mapping in self._mappings:
             self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
@@ -583,6 +697,7 @@ class MidiMapper:
         bisher: Pitchbend wird uebergangen, die erste Note zaehlt sofort
         (so wollen es die Aufrufer, die nur Tasten binden)."""
         self._learn_note = None
+        self._learn_nrpn_wahl = None
         self._learn_pitchbend = bool(pitchbend)
         self._learn_mode = True
         self._learn_callback = callback
@@ -591,13 +706,30 @@ class MidiMapper:
         self._learn_mode = False
         self._learn_callback = None
         self._learn_note = None
+        self._learn_nrpn_wahl = None
 
     def _lern_auswahl(self, msg: MidiMessage):
         """Die Nachricht, die das Lernen beendet — oder ``None`` (weiter warten)."""
         art = msg.msg_type
         if not self._learn_pitchbend:
             return msg if art in ("note_on", "note_off", "cc") else None
-        if art in ("pitchbend", "cc"):
+        # MIDI-13: CC 99/98 waehlen einen NRPN-Parameter, CC 6/38 tragen den
+        # Wert — abwarten, ob ein NRPN folgt (der Dekoder meldet ihn direkt
+        # NACH dem CC). Auch CC 6/38 allein: viele Geraete waehlen den
+        # Parameter nur einmal und schicken danach nur noch Werte. Kommt
+        # dieselbe Nummer erneut (ein Regler auf CC 99/98/6/38), gilt der CC.
+        wahl = self._learn_nrpn_wahl
+        if art == "nrpn":
+            return msg
+        if art == "cc" and msg.data1 in _NRPN_CCS:
+            if wahl is not None and wahl.data1 == msg.data1:
+                return wahl
+            if wahl is None or (msg.data1 in (NRPN_PARAM_MSB, NRPN_PARAM_LSB)
+                                and wahl.data1 in (NRPN_WERT_MSB,
+                                                   NRPN_WERT_LSB)):
+                self._learn_nrpn_wahl = msg
+            return None
+        if art in ("pitchbend", "cc", "pc"):        # MIDI-9: Program Change
             return msg
         if art not in ("note_on", "note_off"):
             return None
@@ -701,6 +833,7 @@ class MidiMapper:
                 self._learn_mode = False
                 self._learn_callback = None
                 self._learn_note = None
+                self._learn_nrpn_wahl = None
                 # Konflikt-Check VOR dem Anwenden der Bindung: so zaehlt die
                 # gerade gelernte Zeile sich nicht selbst mit (Option B).
                 try:
@@ -900,20 +1033,46 @@ class MidiMapper:
         mode = _normalize_button_mode(
             mapping.action,
             (mapping.button_mode or _infer_button_mode(mapping.action)).lower())
+        cc_modus = (getattr(mapping.midi_in, "cc_modus", CC_ABSOLUT)
+                    if msg.msg_type == "cc" else CC_ABSOLUT)
         if mode == BUTTON_CONTINUOUS:
             if self._motor_eingang(mapping, msg):
                 return                      # MIDI-14: Bericht der Motorfahrt
-            value = fader_wert(msg)         # MIDI-10: Pitchbend mit 14 Bit
+            if cc_modus == CC_14BIT:
+                value = self._cc14_wert(mapping, msg)        # MIDI-12
+            elif cc_modus in _CC_RELATIV:
+                value = self._relativ_wert(mapping, msg, cc_modus)  # MIDI-11
+            else:
+                value = fader_wert(msg)     # MIDI-10/13: Pitchbend, NRPN 14 Bit
+            if value is None:
+                return
             self._execute_continuous(mapping, value)
             self._emit_mapping_state(mapping, value)
             return
 
-        # Ein Fader (CC oder Pitchbend) an einer Tasten-Aktion: obere Haelfte
-        # = gedrueckt. data2 ist bei Pitchbend das obere Byte, die Schwelle 64
-        # liegt also auch dort in der Mitte.
-        als_fader = msg.msg_type in ("cc", "pitchbend")
+        if cc_modus == CC_14BIT and msg.data1 != mapping.midi_in.trigger_id:
+            return      # MIDI-12: an einer Taste zaehlt nur der MSB
+
+        if msg.msg_type == "pc":
+            # MIDI-9: Program Change kennt kein Loslassen — jede Nachricht ist
+            # ein Druck. Flash blitzt deshalb nur kurz (an und gleich wieder aus).
+            if mode == BUTTON_FLASH:
+                self._execute_binary(mapping, True)
+                self._execute_binary(mapping, False)
+                self._emit_mapping_state(mapping, 0.0)
+                return
+            if mode == BUTTON_PRESS:
+                self._execute_binary(mapping, True)
+                self._emit_mapping_state(mapping, self._read_mapping_state(mapping))
+                return
+
+        # Ein Fader (CC, Pitchbend, NRPN) an einer Tasten-Aktion: obere Haelfte
+        # = gedrueckt. data2 ist bei Pitchbend/NRPN das obere Byte, die
+        # Schwelle 64 liegt also auch dort in der Mitte.
+        als_fader = msg.msg_type in ("cc", "pitchbend", "nrpn")
         is_pressed = (
             (msg.msg_type == "note_on" and msg.data2 > 0)
+            or msg.msg_type == "pc"
             or (als_fader and msg.data2 >= 64)
         )
         is_released = (
@@ -947,6 +1106,43 @@ class MidiMapper:
             self._toggle_states[mapping.mapping_id] = new_state
         self._execute_binary(mapping, new_state)
         self._emit_mapping_state(mapping, 1.0 if new_state else 0.0)
+
+    def _cc14_wert(self, mapping: MidiMapping, msg: MidiMessage):
+        """MIDI-12: MSB (CC n) + LSB (CC n+32) -> 0..1, oder ``None``.
+
+        Solange vom Regler noch nie ein LSB kam, zaehlt der MSB allein (als
+        7-Bit-Wert) — ein Regler, der nur MSB sendet, bleibt bedienbar. Danach
+        meldet erst der LSB: der MSB allein darf den Wert nicht auf ``MSB·128``
+        springen lassen (die Geraete senden MSB vor LSB)."""
+        z = self._cc14.setdefault(mapping.mapping_id, [0, 0, False])
+        wert = int(msg.data2) & 0x7F
+        if msg.data1 == mapping.midi_in.trigger_id:
+            z[0] = wert
+            if z[2]:
+                return None
+            return wert / 127.0
+        z[1], z[2] = wert, True
+        return ((z[0] << 7) | z[1]) / 16383.0
+
+    def _relativ_wert(self, mapping: MidiMapping, msg: MidiMessage,
+                      modus: str):
+        """MIDI-11: Encoder-Schritt -> neue Stellung 0..1, oder ``None``.
+
+        Ausgang ist die echte Stellung des Ziels, wo sie sich lesen laesst
+        (Executor-Fader, Grand Master — anderswo verschoben, setzt der Encoder
+        dort an), sonst die zuletzt vom Encoder gesetzte (Start 0)."""
+        schritt = relativ_schritt(modus, msg.data2)
+        if schritt == 0:
+            return None
+        basis = self._relativ_stand.get(mapping.mapping_id, 0.0)
+        if mapping.action in _MOTOR_LESBAR:
+            span = mapping.continuous_max - mapping.continuous_min
+            if abs(span) > 1e-9:
+                basis = (self._read_mapping_state(mapping)
+                         - mapping.continuous_min) / span
+        wert = max(0.0, min(1.0, basis + schritt * RELATIV_SCHRITT))
+        self._relativ_stand[mapping.mapping_id] = wert
+        return wert
 
     def _execute_binary(self, mapping: MidiMapping, state_on: bool):
         pe = self._state.playback_engine
@@ -1165,7 +1361,8 @@ class MidiMapper:
             if ist_motorfader(mapping):
                 self._motor_melden(midi, mapping, value)    # MIDI-14
                 continue
-            if mapping.msg_type == "pitchbend" and fb.trigger_id < 0:
+            if (mapping.msg_type in ("pitchbend", "nrpn")
+                    and fb.trigger_id < 0):
                 # MIDI-10: keine Rueckmeldung ohne ausdruecklich gesetztes Ziel
                 # — der Rueckfall auf ``data1`` waere hier Note/CC 0.
                 continue

@@ -119,18 +119,31 @@ Cuelisten, Snap-Tasten, Programmer und die automatische Grundhelligkeit zusammen
 1. Matrix wie in Abschnitt 2 anlegen: **Stil Dimmer**, Algorithmus z. B. *Chase*, Lampen zuweisen.
    (Für Farbe statt Helligkeit: **Stil RGB** oder **RGBW** — siehe „Modify im Stil Farbe“ weiter
    unten.)
+
+   ![Matrix-Editor im Programmer: Matrix „Modify-Lauflicht“ der Gruppe „Alle PAR“, Stil Dimmer (1), darunter der noch leere Haken „Modify-Effekt“ (2)](img/03_modify_aus.png)
+
 2. Unter **Stil** den Haken **Modify-Effekt** setzen. Darunter erscheint die Gruppe **Modify** mit
    **Betriebsart** (Addieren / Abziehen / Abdunkeln) und **Stärke** (0–100 %, Vorgabe 100 %).
    Haken raus = wieder ein ganz normaler Effekt; Betriebsart und Stärke bleiben gemerkt.
+
+   ![Gruppe „Modify“ nach dem Setzen des Hakens: Betriebsart Addieren (1), Stärke 100 % (2) und der graue Hinweis „Wirkt auf das, was die Lampe gerade tut …“ (3)](img/04_modify_an.png)
+
 3. **💾 Speichern** und den Effekt auf eine normale Taste der Virtuellen Konsole legen:
    Taste an = der Modify-Effekt wirkt, Taste aus = alles läuft wie vorher weiter.
    Die Taste zeigt **unten links das Zeichen der Betriebsart**: **+** (Addieren, Bernstein),
    **−** (Abziehen, Blau), **◐** (Abdunkeln, Grau) — dieselben Farben wie die Vorschau im Editor.
    Ein Effekt-Fader mit festem Ziel trägt das Zeichen links unten neben der Spur. Wer Haken oder
    Betriebsart umstellt, sieht das Zeichen auf der Konsole sofort mitwechseln.
+
+   ![Nahaufnahme dreier VC-Tasten mit den Zeichen unten links: + Addieren (bernstein), − Abziehen (blau) und ◐ Abdunkeln (grau)](../anleitung_vc_widgets/img/06_modify_zeichen_tasten.png)
+
 4. Wer mag, legt einen Regler auf den Effekt-Parameter **Modify-Stärke**. Der Regler
    **Helligkeit** des Modify-Effekts und seine Ein-/Ausblendzeit wirken ebenfalls nur auf die
    Stärke — das Darunterliegende wird davon nie mitgedimmt.
+
+![Virtuelle Konsole: Taste „Modify-Lauflicht“ mit dem bernsteinfarbenen + unten links (1) und ein Fader „Modify-Stärke“ (Effekt-Parameter) auf 100 % (2)](img/07_vc_taste_fader.png)
+
+![GIF: Unter acht PARs funkelt es mit rund 15–50 %. Die Taste „Modify-Lauflicht“ (1) wird eingeschaltet — zwei Lampen springen auf 100 % und wandern weiter, die übrigen funkeln unverändert; nach dem Ausschalten funkelt wieder die ganze Reihe](img/08_taste_an_aus.gif)
 
 ### Nur per Fader bedienen
 
@@ -201,6 +214,13 @@ Lampen, im Moment auf Lampe 3 und 7:
 (40 + 100 = 140 → gekappt auf 100. 40 − 50 = −10 → gekappt auf 0.) Im nächsten Schritt stehen die
 Läufer auf Lampe 4 und 8 — Lampe 3 und 7 sind dann wieder exakt bei den 40 % des Effekts darunter.
 
+Auf der 2D-Bühne (Sektion **Bühne**) sieht das so aus — der Untergrund von 40 % kommt hier aus
+dem Programmer, das Modify-Lauflicht rechnet darauf genauso wie auf einen Effekt:
+
+![Drei Lampenreihen auf der 2D-Bühne: darunter alle acht PARs auf 40 %; das Modify-Lauflicht allein mit PAR 3 und PAR 7 auf 100 %; das Ergebnis mit Addieren — PAR 3 und 7 auf 100 %, alle anderen bei 40 %](img/05_lampen_addieren.png)
+
+![Dieselbe Reihe mit Stärke 50 %: darunter 40 % überall; Abziehen setzt PAR 3 und 7 auf 0 %, Abdunkeln auf 20 % — die übrigen Lampen bleiben bei 40 %](img/06_lampen_abziehen_abdunkeln.png)
+
 ### Zwei Lampen, dann die nächsten zwei: Schrittweite
 
 Beim Lauflicht (*Chase*) gibt es drei Stellschrauben, die leicht verwechselt werden:
@@ -223,7 +243,13 @@ Schrittweite „wie Breite“** (oder 2), **Schweif 0 %**. Als Modify-Effekt *Ad
 | Schritt 3 | 40 | 40 | 40 | 40 | 100 | 100 | 40 | 40 |
 | Schritt 4 | 40 | 40 | 40 | 40 | 40 | 40 | 100 | 100 |
 
-Danach beginnt es wieder bei Lampe 1 + 2. Die Schrittweite gibt es bei **jedem** Lauflicht, nicht
+Danach beginnt es wieder bei Lampe 1 + 2.
+
+![Bewegung & Parameter: Schrittweite „wie Breite“ (1), Läufer-Anzahl 1 und Läufer-Breite 2 (2), Schweif 0 % (3)](img/09_schrittweite.png)
+
+![GIF: Modify-Lauflicht (Addieren) über 40 % — Schritt 1 PAR 1 + 2 auf 100 %, Schritt 2 PAR 3 + 4, Schritt 3 PAR 5 + 6, Schritt 4 PAR 7 + 8; die übrigen Lampen stehen jeweils bei 40 %](img/10_zweierbloecke.gif)
+
+Die Schrittweite gibt es bei **jedem** Lauflicht, nicht
 nur bei Modify-Effekten; das Feld steht unter **Bewegung & Parameter**, an der Virtuellen Konsole
 heißt der Parameter **Schrittweite**. So spielt sie mit den anderen Einstellungen zusammen:
 
@@ -251,6 +277,10 @@ Lampe ausrechnet.
 Einrichten wie oben, nur mit **Stil RGB** (oder RGBW) und einer Farbe: z. B. ein rotes Lauflicht
 als *Addieren* über einem blauen Hintergrund — unter dem Läufer wird es Magenta, dahinter wieder
 Blau.
+
+![Matrix-Editor, Stil RGB (1) mit gesetztem Haken „Modify-Effekt“ (2); in der Gruppe Modify die Betriebsart (3) und der Hinweis „… Der Dimmer wird nie angefasst: eine dunkle Lampe bleibt dunkel …“ (4)](img/11_modify_rgb.png)
+
+![Drei Lampenreihen in Farbe: darunter alle PARs blau; das rote Modify-Lauflicht allein (PAR 3 und 7 rot, der Rest ohne Farbe dunkel); das Ergebnis mit Addieren — PAR 3 und 7 magenta, die übrigen blau](img/12_farbe_lampen.png)
 
 Durchgerechnet für eine Lampe, die gerade **Rot 200, Grün 100, Blau 50** zeigt (Werte 0–255);
 der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
@@ -336,6 +366,9 @@ Dimmer steht auf 77 (Werte 0–255). Der Modify-Effekt ist an dieser Lampe voll 
   schreibt die Matrix sie nicht.
 - Die Vorschau im Editor malt die Lampen in der Mischfarbe der angekreuzten Kanäle; neben dem
   Zeichen der Betriebsart steht z. B. „− nur Weiß“.
+
+  ![Links die Vorschau mit „− nur Weiß“ oben links (3), rechts die Gruppe Modify im Stil RGBW: Betriebsart Abziehen (1), bei „Wirkt auf“ nur Weiß angekreuzt (2), „Kanäle der Modify-Farbe“ ist dadurch abgewählt](img/13_wirkt_auf.png)
+
 - An der Virtuellen Konsole gibt es für die Kanalwahl keinen eigenen Regler; sie wird im Editor
   eingestellt. **Modify-Stärke** und **Modify-Art** wirken wie gewohnt.
 
@@ -385,6 +418,9 @@ Dimmer steht auf 77 (Werte 0–255). Der Modify-Effekt ist an dieser Lampe voll 
   der Modify-Effekt in einer Sammlung oder Show *in* dem Schritt steckt), darunter die gelbe
   Zeile „Modify-Effekte geben als Chaser-Schritt nichts aus – direkt, in einer Sammlung oder der
   Show-Zeitleiste starten“.
+
+  ![Chaser-Editor im Dialog „Bearbeiten: Chaser mit Modify“: Schritt 2 „RGBMatrix: Modify-Lauflicht“ steht gelb mit ⚠ (1), unter der Liste die gelbe Zeile „⚠ Schritt 2: Modify-Effekte geben als Chaser-Schritt nichts aus …“ (2)](img/14_chaser_modify.png)
+
 - Steht **Dimmer-Bereich Min** im Modify-Effekt über 0, bekommt **jede** Lampe diesen Grundbetrag
   ab (der Editor weist darauf hin).
 - **Der Schweif gehört zum Effekt und wird mit verrechnet.** Der Haken **Modify-Effekt** stellt
@@ -405,24 +441,6 @@ nimm einen **normalen** Dimmer-Effekt (kein Modify) in einer höheren Stufe und 
 Effekt nur Lampen mit einem Wert über 0 — Schweif-Lampen zählen als hell —, die dunklen bleiben
 beim Effekt darunter, bei Snap/Programmer oder Grundhelligkeit. Einblendzeit und Helligkeit wirken
 wie bei jedem Effekt, aber nur auf die hellen Lampen. Steht **Min** über 0, ist keine Lampe dunkel.
-
-### Noch aufzunehmende Bilder
-
-Für diesen Abschnitt gibt es noch keine Bilder. Aufzunehmen sind:
-
-1. Matrix-Editor, Stil Dimmer, Haken **Modify-Effekt** aus.
-2. Matrix-Editor mit gesetztem Haken und der Gruppe **Modify**.
-3. Lampenreihe: Effekt darunter allein / Modify-Lauflicht allein / Ergebnis mit Addieren.
-4. Dieselbe Reihe mit Abziehen und Abdunkeln nebeneinander.
-5. Virtuelle Konsole: Taste für den Modify-Effekt und Regler **Modify-Stärke**.
-6. Kurzes GIF: Taste an/aus über einem laufenden Funkeln.
-7. Matrix-Editor, **Bewegung & Parameter** mit dem Feld **Schrittweite** auf „wie Breite“.
-8. Lampenreihe: Farb-Taste und Dimmer-Taste auf 40 %, darüber das Modify-Lauflicht in Zweierblöcken.
-9. Matrix-Editor, Stil RGB, Haken **Modify-Effekt** gesetzt, Gruppe **Modify** mit dem Hinweis zum Dimmer.
-10. Lampenreihe in Farbe: blauer Hintergrund / rotes Modify-Lauflicht allein / Ergebnis mit Addieren.
-11. Gruppe **Modify** mit der Zeile **Wirkt auf**, „Weiß“ angekreuzt, Vorschau mit „− nur Weiß“.
-12. Drei Tasten mit den Zeichen **+**, **−** und **◐** unten links.
-13. Chaser-Editor mit einem gelb markierten Modify-Schritt und der Hinweiszeile.
 
 ---
 
