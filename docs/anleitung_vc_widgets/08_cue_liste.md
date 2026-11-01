@@ -15,6 +15,7 @@ Das Element spiegelt den Zustand des Slots laufend: Es fragt den Executor etwa *
 Das Element besteht von oben nach unten aus drei Teilen:
 
 1. **Titelzeile** (blau, fett, zentriert) — zeigt die Beschriftung des Widgets (im Bild „Cueliste"). Sie wird über die Einstellungen gesetzt.
+   Darunter steht klein und grau das **Ziel**, z. B. `Ex 3 · Seite 2 (folgt)` oder `Ex 3 · Seite 2 (fest)` — welcher Executor auf welcher Executor-Seite gerade gesteuert wird.
 2. **Cue-Liste** (dunkler Kasten) — eine Zeile pro Cue im Format `Nummer  Beschriftung`, z. B. `1.0  Rot`, `2.0  Gruen`, `3.0  Blau`. Hat ein Cue keine Beschriftung, steht dort `---`. Der **aktuell laufende Cue** ist farbig hinterlegt markiert.
 3. **Transport-Knopfreihe** (drei Knöpfe nebeneinander):
 
@@ -36,11 +37,12 @@ Das Element besteht von oben nach unten aus drei Teilen:
 |---|---|---|
 | **Beschriftung** | Text in der blauen Titelzeile über der Liste. Reine Anzeige. | Freitext. Bleibt leer das Feld, wird die bisherige Beschriftung beibehalten. |
 | **Executor-Slot** | Welchen Executor das Widget fernsteuert und anzeigt. **Ex N** ist der Executor N in der Executor-Leiste der **gerade aktiven Playback-Page** – nicht die Playback-Seite N. | **Ex 1 bis Ex 10** (Standard: Ex 1). In der Show-Datei steht der 0-basierte Index (`stack_slot`: 0 = Ex 1, 9 = Ex 10). |
+| **Seite** | Auf welcher Executor-Seite der Executor-Slot liegt. **folgt der aktuellen Seite** steuert immer den Slot der gerade gewählten Seite (ein Seitenwechsel wechselt das Ziel mit). **feste Seite N** steuert immer den Slot auf Seite N, egal welche Seite gerade gewählt ist. | **folgt der aktuellen Seite** (Standard, bisheriges Verhalten) oder **feste Seite 1 bis 10**. In der Show-Datei steht nur bei fester Seite `fixed_page` (0-basiert: 0 = Seite 1); ohne den Eintrag folgt die Liste der aktuellen Seite — ältere Shows bleiben also unverändert. |
 
 ## Tipps & Fallen
 
 - **Slot muss belegt sein:** Zeigt die Liste nichts an, ist auf dem eingestellten Executor-Slot kein Cuestack geladen. Lege erst einen Cuestack auf den passenden Slot, oder stelle den **Executor-Slot** auf die richtige Nummer.
-- **Executor, nicht Seite:** „Ex 3" heißt „dritter Executor der Executor-Leiste", nicht „Playback-Seite 3". Die Cue-Liste folgt immer der **aktuell aktiven Page**: Wechselst du die Page (z. B. per Bank-Taste am APC), steuert dasselbe Widget den Ex 3 der neuen Page. Erscheint ein anderer Cuestack als erwartet, stimmt entweder die Ex-Nummer oder die aktive Page nicht.
+- **Executor, nicht Seite:** „Ex 3" heißt „dritter Executor der Executor-Leiste", nicht „Playback-Seite 3". Im Standard (**Seite: folgt der aktuellen Seite**) folgt die Cue-Liste der **aktuell aktiven Page**: Wechselst du die Page (z. B. per Bank-Taste am APC), steuert dasselbe Widget den Ex 3 der neuen Page. Soll das Widget immer denselben Cuestack steuern, stelle **Seite** auf eine **feste Seite**. Erscheint ein anderer Cuestack als erwartet, zeigt die Zielzeile unter dem Titel, welche Ex-Nummer und Seite gerade gelten.
 - **Liste ist nur Anzeige:** Ein Klick in die Cue-Liste springt nicht zu diesem Cue. Zum Schalten immer GO / BACK / STOP benutzen.
 - **Automatische Aktualisierung:** Die Anzeige folgt dem echten Playback-Stand (ca. alle 200 ms). Was du in der Liste markiert siehst, ist der real laufende Cue — auch wenn er von woanders (Hardware, anderes Widget) ausgelöst wurde.
 - **GO ► springt weiter:** GO ist nicht nur „Start", sondern jeder Druck rückt einen Cue vor. Mehrfaches Drücken läuft die Liste Schritt für Schritt durch; BACK geht entsprechend zurück.

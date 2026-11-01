@@ -1728,9 +1728,13 @@ class AppState:
 
         # Normalize common numeric fields to stable types for DB + compare.
         for key in ("fixture_profile_id", "universe", "address", "channel_count",
-                    "pan_range_deg", "tilt_range_deg", "pan_zero_dmx", "tilt_zero_dmx"):
+                    "pan_range_deg", "tilt_range_deg"):
             if key in values:
                 values[key] = int(values[key])
+        for key in ("pan_zero_dmx", "tilt_zero_dmx"):          # UI-77: Kommazahl
+            if key in values:
+                from src.core.stage.einmessen import normiere_dmx_mitte
+                values[key] = normiere_dmx_mitte(values[key])
         for key in ("aim_offset_pan", "aim_offset_tilt"):      # VIZ-55: Kommazahl
             if key in values:
                 from src.core.stage.einmessen import normiere_versatz

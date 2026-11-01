@@ -25,6 +25,27 @@ Eingehend: `note_on`/`note_off`/`cc` (Note- und CC-Trigger). Ein
 | `trigger_id` | exakt (`msg.data1`: Note-/CC-Nummer) |
 | `message_type` | `note` (note_on+note_off) oder `cc` |
 
+**Weitere Auslöser (MIDI-9, MIDI-11, MIDI-12, MIDI-13):**
+
+| Typ (Spalte „Typ") | Bindung | Auswertung |
+|---|---|---|
+| `pc` | `message_type="pc"`, `trigger_id` = Programmnummer | Program Change ist immer ein Druck (kein Loslassen): `press`/`toggle` wie eine Taste, `flash` blitzt an und gleich wieder aus |
+| `nrpn` | `message_type="nrpn"`, `trigger_id` = Parameternummer (0..16383) | Wert mit 14 Bit (`MidiMessage.wert14bit`, `fader_wert`) |
+| `cc14` | `message_type="cc"`, `cc_modus="14bit"`, `trigger_id` = MSB-CC 0..31 (ab CC 32 gibt es keinen LSB: dort wie ein absoluter CC) | MSB + LSB (CC +32) = 14 Bit (`_cc14_wert`). Bis zum ersten LSB zählt der MSB allein (7-Bit-Regler bleiben bedienbar); danach meldet erst der LSB — der MSB allein springt nicht. An Tasten-Zielen zählt nur der MSB |
+| `cc_rel_zk` / `cc_rel_bo` / `cc_rel_vz` | `message_type="cc"`, `cc_modus` = `rel_zk`/`rel_bo`/`rel_vz` | Endlos-Encoder (Zweierkomplement / Binär-Offset 64 / Vorzeichenbit): jeder Schritt bewegt ein stufenloses Ziel um 1/127 (`relativ_schritt`, `_relativ_wert`). Ausgang ist die echte Stellung bei Executor-Fader und Grand Master, sonst die zuletzt vom Encoder gesetzte. An Tasten-Zielen wirkt der Modus nicht (bisheriges CC-Verhalten) |
+
+**NRPN-Dekodierung** sitzt in `NrpnDekoder` (`midi_manager.py`) hinter `_decode` in der
+gemeinsamen Empfangsschleife `_rx_loop` — gilt also für python-rtmidi und den
+WinMM-ctypes-Pfad gleich. Je Eingang und Kanal: CC 99/98 wählen den Parameter, CC 6/38
+tragen den Wert; die einzelnen CCs werden weiter zugestellt (wer CC 6 gebunden hat,
+behält ihn). Gemeldet wird beim CC 6, solange das Gerät noch nie einen CC 38 schickte
+(7-Bit-Wert auf 14 Bit gestreckt), danach erst beim CC 38. Eine RPN-Wahl (CC 101/100)
+und der Null-Parameter 127/127 beenden die NRPN-Wahl. Data Increment/Decrement
+(CC 96/97) wird nicht ausgewertet.
+
+**Gespeichert** wird `cc_modus` nur, wenn gesetzt (`midi_in.cc_modus`); alte Mappings
+laden und speichern damit byte-gleich, ein unbekannter Modus wird `absolut`.
+
 Ausgehend (`MidiOutFeedback`): Note oder CC mit `state_off`/`state_on`,
 optionalem `brightness`-Cap und `aux_channel`.
 
@@ -54,7 +75,12 @@ löste dann BACK aus. In der MIDI-Ansicht nennt der Spalten-Tooltip
 
 **Learn-Modus:** `start_learn(callback)` setzt ein Flag; die nächste
 note/cc-Nachricht wird direkt an den Callback gereicht (kein Mapping-Durchlauf),
-danach ist Learn wieder aus. `MidiMapping.set_from_learn_message(msg)` /
+danach ist Learn wieder aus. Mit `pitchbend=True` (Mapping-Tabelle der MIDI-Ansicht)
+lernt er zusätzlich Pitchbend, Program Change und NRPN; auf CC 99/98 und 6/38 wartet er
+ab, ob ein NRPN folgt (auch Geräte, die den Parameter nur einmal wählen und danach nur
+noch CC 6/38 senden, werden so als NRPN gelernt; kommt dieselbe CC-Nummer erneut, gilt
+der CC). Neu lernen behält einen
+gewählten CC-Modus. `MidiMapping.set_from_learn_message(msg)` /
 `MidiInBinding.from_message(msg)` bauen das Binding aus der gelernten Nachricht.
 
 **Feedback-Engine:** eigener Daemon-Thread `MidiFeedbackEngine` pollt alle 100 ms
@@ -120,6 +146,7 @@ Motor-Ausgangs (`_beruehrung_gilt`) – ein Extender mit derselben Note sperrt n
 ## Tests
 
 - `tests/test_midi_mapper.py` — Bindings, Button-Modi, Aktionsausführung, Feedback.
+- `tests/test_midi9_11_12_13_ausloeser.py` — Program Change, Relativ-Encoder, 14-Bit-CC, NRPN (beide Eingangswege), Altbestand.
 - `tests/test_midi_learn_thread_marshal.py` — Learn-Callback thread-korrekt.
 - `tests/test_midi_view.py`, `tests/test_vc_xypad_midi.py`, `tests/test_vc_encoder.py`.
 

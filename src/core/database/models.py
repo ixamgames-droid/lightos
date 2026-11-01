@@ -290,8 +290,11 @@ class PatchedFixture(Base):
     # Default: typische Moving-Head-Werte 540/270, Mitte bei DMX 128.
     pan_range_deg: Mapped[int] = mapped_column(Integer, default=540)
     tilt_range_deg: Mapped[int] = mapped_column(Integer, default=270)
-    pan_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
-    tilt_zero_dmx: Mapped[int] = mapped_column(Integer, default=128)
+    # UI-77: DMX-Mitte als Kommazahl (am Rig gemessen z. B. 167,5). Alt-DBs mit
+    # INTEGER-Spalte brauchen keine Migration — SQLite speichert 167.5 dort
+    # verlustfrei als REAL (Typ-Affinitaet), alte Ganzzahlen lesen zahlengleich.
+    pan_zero_dmx: Mapped[float] = mapped_column(Float, default=128.0)
+    tilt_zero_dmx: Mapped[float] = mapped_column(Float, default=128.0)
     # VIZ-55 Stufe A: Einmess-Versatz (DMX, Kommazahl = 16-Bit-genau), wirkt als
     # Verschiebung des Nullpunkts — gelesen NUR ueber einmessen.effektive_nullpunkte.
     aim_offset_pan: Mapped[float] = mapped_column(Float, default=0.0)
@@ -413,11 +416,13 @@ def migrate_show_db(engine) -> None:
                     "ALTER TABLE patched_fixtures ADD COLUMN head_mode "
                     "VARCHAR(16) DEFAULT 'auto'"))
             # Pan/Tilt physische Bereiche + Nullpunkt (Moving-Head-Aim/Visualizer).
-            for _col, _def in (("pan_range_deg", 540), ("tilt_range_deg", 270),
-                               ("pan_zero_dmx", 128), ("tilt_zero_dmx", 128)):
+            for _col, _typ, _def in (("pan_range_deg", "INTEGER", 540),
+                                     ("tilt_range_deg", "INTEGER", 270),
+                                     ("pan_zero_dmx", "REAL", 128),     # UI-77: Komma
+                                     ("tilt_zero_dmx", "REAL", 128)):
                 if pcols and _col not in pcols:
                     conn.execute(text(
-                        f"ALTER TABLE patched_fixtures ADD COLUMN {_col} INTEGER DEFAULT {_def}"))
+                        f"ALTER TABLE patched_fixtures ADD COLUMN {_col} {_typ} DEFAULT {_def}"))
             # VIZ-55 Stufe A: Einmess-Versatz (Kommazahl, Default 0 = nie eingemessen).
             for _col in ("aim_offset_pan", "aim_offset_tilt"):
                 if pcols and _col not in pcols:

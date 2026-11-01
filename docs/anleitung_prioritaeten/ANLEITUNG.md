@@ -50,6 +50,8 @@ Eine höhere Zahl gewinnt weiterhin; die Stufen entsprechen den Zahlen −20, 0,
 Auch eine **Kanal-Kopplung** steht als „eigene Zahl (10)“ in der Liste: sie liest die Bewegung
 der Effekte darunter und rechnet deshalb absichtlich direkt nach der Stufe „Effekte“.
 
+![Ein Effekt aus einer älteren Show mit der Zahl 5: zwischen „Akzente“ und „Effekte“ steht die Gruppe „eigene Zahl (5)“ mit einem Effekt, der Bewegung „Kreis“ (1)](img/06_eigene_zahl.png)
+
 ## 3. Stufe vergeben — in der Ansicht „Prioritäten“
 
 1. Öffne die Sektion **Programmer** und dort den Reiter **Prioritäten**.
@@ -60,6 +62,9 @@ der Effekte darunter und rechnet deshalb absichtlich direkt nach der Stufe „Ef
    Gobo oder Sonstiges. Steht dort **unbekannt**, lässt sich das nicht aus der Show ablesen
    (zum Beispiel bei einem Skript oder einer Szene mit Geräten, die nicht mehr gepatcht sind).
 4. Ein laufender Effekt ist fett und trägt **● läuft**.
+
+   ![Reiter Prioritäten mit der Doku-Demo-Show: oben ausgegraut die feste Zeile „Snaps / Programmer — liegt immer darüber“ (1), darunter die Stufen, hier aufgeklappt „Effekte (8)“ (2), die Spalte „Fasst an“ (3) und „● läuft“ am fett geschriebenen Lauflicht HG (4)](img/02_ansicht.png)
+
 5. Die Spalte **Verdeckt** zeigt live, ob ein laufender Effekt wirklich ankommt. Liegt
    jemand darüber, steht dort zum Beispiel **verdeckt von Blinder auf 4 Geräten** — oder
    **verdeckt von Programmer auf 2 Geräten**, **verdeckt von Snap auf 1 Gerät**,
@@ -75,11 +80,17 @@ der Effekte darunter und rechnet deshalb absichtlich direkt nach der Stufe „Ef
      steht dann an der Zeile der Sammlung bzw. Show, an der des Mitglieds bleibt sie leer.
    - Die Spalte zieht etwa dreimal je Sekunde nach, nur solange der Reiter zu sehen ist.
      Ausgeblendet kostet sie nichts.
+
+   ![Spalte „Verdeckt“ (1): „Lauflicht HG“ läuft in der Stufe Effekte und ist „verdeckt von Blinder auf 4 Geräten“ (2), weil „Blinder“ (3) in „Strobe & Blinder“ auf PAR 1–4 den Dimmer schreibt; der Regenbogen darunter ist „verdeckt von Programmer auf 8 Geräten“ (dort steht eine Farbe im Programmer)](img/10_verdeckt.png)
+
 6. Stufe ändern — vier Wege, alle auch für mehrere Zeilen (Strg oder Umschalt beim Klicken):
    - die Zeile in eine andere Stufe **ziehen**,
    - **▲ Stufe höher** / **▼ Stufe tiefer**,
    - im Feld **Auswahl in Stufe** die Stufe wählen,
    - Rechtsklick → **In Stufe „…“**.
+
+   ![GIF: „Blinder“ ist in der Stufe Effekte ausgewählt (1); zweimal „▲ Stufe höher“ (2) schiebt ihn über Akzente nach „Strobe & Blinder“](img/03_stufe_aendern.gif)
+
 7. Jede Änderung ist **ein** Schritt für **Bearbeiten → Rückgängig**, auch wenn sie mehrere
    Effekte betrifft.
 
@@ -91,6 +102,10 @@ Entwürfe aus dem Bewegungs-Editor.
 Jeder Editor hat das feste Feld **Stufe**: Szene, Chaser, Sequenz, Sammlung, Skript,
 Ebenen-Effekt, Carousel, Matrix und Bewegung (EFX). Im Matrix- und im Bewegungs-Editor steht
 es in der Gruppe *Tempo & Blende* bzw. *Tempo & Richtung*, dort wo früher das Zahlenfeld war.
+
+![Matrix-Editor des „Blinder“, Gruppe Tempo & Blende: Feld „Stufe“ auf „Strobe & Blinder“ (1)](img/04_stufe_matrix.png)
+
+![Szenen-Editor (Bibliothek → Bearbeiten: Alle PAR Blau): Feld „Stufe“ direkt unter dem Namen (1)](img/05_stufe_szene.png)
 
 Die Auswahl im Editor und die Ansicht **Prioritäten** zeigen dasselbe — ändert man es an der
 einen Stelle, zieht die andere nach.
@@ -111,11 +126,16 @@ Dafür gibt es je Snap-Taste einen Haken:
 1. In der Virtual Console **Bearbeiten** einschalten und die Snap-Taste doppelt anklicken.
 2. Unter **Ziel und Verhalten**, direkt unter **Tasten-Modus (Snap)**, den Haken
    **übersteuert laufende Dimmer-Effekte** setzen (Zeile **Dimmer (Snap)**).
+
+   ![Button Einstellungen einer Snap-Taste „Blinder (Snap)“: Tasten-Modus (Snap) „Halten (nur gedrückt)“ (1), darunter der gesetzte Haken „übersteuert laufende Dimmer-Effekte“ in der Zeile Dimmer (Snap) (2)](img/07_snap_haken.png)
+
 3. Solange die Taste aktiv ist — gehalten, umgeschaltet oder gesetzt —, gewinnt der
    **Dimmer-Wert des Snaps** an genau den Lampen, für die der Snap einen Dimmer-Wert enthält.
    Lampen, die der Snap nicht nennt, laufen im Effekt weiter.
 4. Nach dem Loslassen bzw. Ausschalten läuft der Effekt an diesen Lampen weiter, als wäre
    nichts gewesen.
+
+![Drei Lampenreihen auf der 2D-Bühne: das Dimmer-Lauflicht steht gerade auf PAR 6; die Snap-Taste „Blinder (Snap)“ (Dimmer 100 % für PAR 1–4) gehalten ohne Haken — nichts ändert sich, der Effekt behält den Dimmer; mit Haken — PAR 1–4 auf 100 %, PAR 6 läuft weiter](img/08_blinder_gegen_lauflicht.png)
 
 Was der Haken **nicht** tut:
 
@@ -148,6 +168,8 @@ Beim Bauen der Virtual Console sagt dir LightOS, wenn zwei Tasten dasselbe anfas
 
    > Diese Taste und „Blinder“ steuern beide den Dimmer der Gruppe „Hintergrund“ —
    > „Blinder“ liegt eine Stufe höher und gewinnt.
+
+   ![Button Einstellungen der Taste „Lauflicht HG“ (Aktion „Funktion an/aus“, 1): gleich darunter der gelbe Hinweis (2) — „Diese Taste und „Blinder“ steuern beide den Dimmer der Gruppe „PAR links“ — „Blinder“ liegt zwei Stufen höher und gewinnt.“, danach zwei Überschneidungen gleicher Stufe und „… und 2 weitere Überschneidungen“](img/09_ueberschneidung.png)
 
 3. Der Text nennt die Gruppe, wenn die gemeinsamen Geräte genau eine Gruppe sind, bei einem
    einzelnen Gerät dessen Namen, sonst die Zahl der Geräte.
@@ -240,17 +262,7 @@ alle Geräte der Mitglieder und die Stufe des Behälters.
 - **Master und Blackout:** Grand Master, Gruppen-Fader, Blackout und Laser-NOT-AUS wirken
   nach allen Effekten, egal auf welcher Stufe.
 
-## Bilder, die noch aufzunehmen sind
+## Noch fehlendes Bild
 
-Diese Anleitung ist bewusst noch ohne Bilder; aufzunehmen sind:
-
-1. Schichten-Schaubild von den Grundwerten bis zum NOT-AUS.
-2. Ansicht **Prioritäten** mit einer laufenden Party-Show.
-3. Ziehen eines Effekts in „Strobe & Blinder“, vorher und nachher.
-4. Feld **Stufe** im Matrix-Editor.
-5. Feld **Stufe** im Szenen-Editor.
-6. Eine alte Show mit „eigene Zahl (n)“ in der Liste.
-7. Eigenschaften einer Snap-Taste mit dem Haken „übersteuert laufende Dimmer-Effekte“.
-8. Blinder-Taste gegen ein Dimmer-Lauflicht, ohne und mit Haken (zwei Bilder).
-9. Eigenschaften einer Taste mit dem gelben Hinweis bei einer Überschneidung.
-10. Ansicht **Prioritäten** mit der Spalte **Verdeckt** („verdeckt von … auf n Geräten“).
+Das **Schichten-Schaubild** (Grundwerte bis NOT-AUS) aus Abschnitt 1 ist noch nicht gezeichnet;
+bis dahin gilt die Tabelle dort.

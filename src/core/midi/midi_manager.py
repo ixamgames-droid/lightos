@@ -262,6 +262,9 @@ def wert14(msg) -> int:
     d2 = int(getattr(msg, "data2", 0) or 0) & 0x7F
     if getattr(msg, "msg_type", "") == "pitchbend":
         return (d2 << 7) | (int(getattr(msg, "data1", 0) or 0) & 0x7F)
+    voll = getattr(msg, "wert14bit", None)      # MIDI-13: NRPN-Wert
+    if voll is not None:
+        return max(0, min(16383, int(voll)))
     return d2 << 7
 
 
@@ -279,7 +282,8 @@ def fader_wert(msg) -> float:
     16384 Stufen; CC und alles andere wie bisher ``data2 / 127``. EINE Stelle
     fuer Mapper und VC-Fader — wer ``data2`` allein nimmt, verschenkt bei
     Pitchbend die unteren 7 Bit."""
-    if getattr(msg, "msg_type", "") == "pitchbend":
+    if (getattr(msg, "msg_type", "") == "pitchbend"
+            or getattr(msg, "wert14bit", None) is not None):     # MIDI-13
         return wert14(msg) / 16383.0
     return (int(getattr(msg, "data2", 0) or 0) & 0x7F) / 127.0
 
@@ -288,11 +292,13 @@ def fader_wert(msg) -> float:
 class MidiMessage:
     port_name: str
     channel: int       # 1-16
-    msg_type: str      # "note_on", "note_off", "cc", "pc", "pitchbend"
-    data1: int         # Note / CC-Nummer / PC-Nummer
-    data2: int         # Velocity / CC-Wert / 0
+    msg_type: str      # "note_on", "note_off", "cc", "pc", "pitchbend", "nrpn"
+    data1: int         # Note / CC-Nummer / PC-Nummer / NRPN-Parameter (14 Bit)
+    data2: int         # Velocity / CC-Wert / 0 / NRPN: obere 7 Bit des Werts
     # MIDI-5: bei msg_type "msc" das zerlegte MscCommand (sonst None).
     msc: object = None
+    # MIDI-13: bei msg_type "nrpn" der volle Wert (0..16383), sonst None.
+    wert14bit: int | None = None
 
 
 # MIDI-16: Mindestlaenge je Statustyp (Status + Datenbytes). Kuerzere
@@ -337,6 +343,67 @@ def _decode(raw: list[int], port_name: str) -> MidiMessage | None:
     return MidiMessage(port_name, channel, msg_type, d1, d2)
 
 
+# ── MIDI-13: NRPN ────────────────────────────────────────────────────────────
+#: Parameterwahl (NRPN MSB/LSB), Wert (Data Entry MSB/LSB) und die RPN-Wahl,
+#: die eine laufende NRPN-Wahl abloest.
+NRPN_PARAM_MSB, NRPN_PARAM_LSB = 99, 98
+NRPN_WERT_MSB, NRPN_WERT_LSB = 6, 38
+_RPN_PARAM = (101, 100)
+
+
+class NrpnDekoder:
+    """MIDI-13: setzt CC 99/98 (Parameter) + 6/38 (Wert) zu einer Nachricht
+    ``nrpn`` zusammen — je Eingang und Kanal ein eigener Zustand.
+
+    Sitzt hinter ``_decode`` in der gemeinsamen Empfangsschleife und gilt damit
+    fuer python-rtmidi UND den WinMM-Pfad. Die einzelnen CCs werden weiter
+    zugestellt (Bestand: wer CC 6 gebunden hat, behaelt ihn).
+
+    Gemeldet wird beim Wert: CC 6 (MSB) allein, solange das Geraet noch nie
+    einen LSB (CC 38) geschickt hat — dann als 7-Bit-Wert auf 14 Bit gestreckt.
+    Hat es einmal einen LSB gesendet, meldet erst der LSB, damit der Wert beim
+    MSB nicht auf ``MSB·128`` springt. Eine RPN-Wahl (CC 101/100) beendet die
+    NRPN-Wahl: deren Werte gehoeren dann nicht zum NRPN."""
+
+    def __init__(self):
+        self._zustand: dict[tuple[str, int], dict] = {}
+
+    def einspeisen(self, msg: MidiMessage) -> MidiMessage | None:
+        if msg is None or msg.msg_type != "cc":
+            return None
+        z = self._zustand.setdefault((msg.port_name, msg.channel), {
+            "p_msb": None, "p_lsb": None, "w_msb": None, "lsb_gesehen": False})
+        nummer, wert = int(msg.data1), int(msg.data2) & 0x7F
+        if nummer == NRPN_PARAM_MSB:
+            z["p_msb"], z["w_msb"] = wert, None
+            return None
+        if nummer == NRPN_PARAM_LSB:
+            z["p_lsb"], z["w_msb"] = wert, None
+            return None
+        if nummer in _RPN_PARAM:
+            z["p_msb"] = z["p_lsb"] = z["w_msb"] = None
+            return None
+        if nummer not in (NRPN_WERT_MSB, NRPN_WERT_LSB):
+            return None
+        if z["p_msb"] is None or z["p_lsb"] is None:
+            return None
+        if z["p_msb"] == 127 and z["p_lsb"] == 127:
+            return None                     # „Null-Parameter" = abgewaehlt
+        param = (z["p_msb"] << 7) | z["p_lsb"]
+        if nummer == NRPN_WERT_MSB:
+            z["w_msb"] = wert
+            if z["lsb_gesehen"]:
+                return None                 # auf den LSB warten
+            voll = round(wert * 16383 / 127)
+        else:
+            z["lsb_gesehen"] = True
+            if z["w_msb"] is None:
+                return None                 # LSB ohne MSB: kein Wert
+            voll = (z["w_msb"] << 7) | wert
+        return MidiMessage(msg.port_name, msg.channel, "nrpn", param,
+                           (voll >> 7) & 0x7F, wert14bit=voll)
+
+
 class MidiManager:
     def __init__(self):
         self._inputs: dict[str, object] = {}
@@ -373,6 +440,8 @@ class MidiManager:
         # verloren gingen. Der Consumer (_rx_loop) nimmt diesen Lock NIE -> kein Deadlock.
         self._producer_lock = threading.Lock()
         self._rx_dropped = 0  # Zaehler fuer bei Overflow verworfene Nachrichten (F2)
+        # MIDI-13: nur die Empfangsschleife fasst ihn an (ein Thread).
+        self._nrpn = NrpnDekoder()
         self._rx_running = True
         self._rx_thread = threading.Thread(target=self._rx_loop, daemon=True, name="MidiDispatch")
         self._rx_thread.start()
@@ -1065,18 +1134,25 @@ class MidiManager:
                 continue
             msg = _decode(raw, port_name)
             if msg:
-                # Kopie: subscribe/unsubscribe aus dem UI-Thread darf die Liste
-                # waehrend der Iteration veraendern (sonst RuntimeError/Skips).
-                for cb in list(self._callbacks):
-                    try:
-                        cb(msg)
-                    except Exception as e:
-                        # STAB-30: kaputte MIDI-Aktion sichtbar (je Art einmal).
-                        from src.core.diagnose_log import melde_still
-                        melde_still("midi.aktion", e, text=getattr(cb, "__qualname__", ""))
+                self._verteilen(msg)
+                # MIDI-13: aus CC 99/98/6/38 zusammengesetzter NRPN, nach dem CC.
+                nrpn = self._nrpn.einspeisen(msg)
+                if nrpn is not None:
+                    self._verteilen(nrpn)
                 # Kein Per-Nachricht-Log hier: die MIDI-View zeigt eingehende Nachrichten
                 # thread-sicher und gedrosselt im Monitor an. Ein zusätzliches Log pro
                 # Event würde die Anzeige duplizieren und die Qt-Event-Loop fluten.
+
+    def _verteilen(self, msg: MidiMessage) -> None:
+        # Kopie: subscribe/unsubscribe aus dem UI-Thread darf die Liste
+        # waehrend der Iteration veraendern (sonst RuntimeError/Skips).
+        for cb in list(self._callbacks):
+            try:
+                cb(msg)
+            except Exception as e:
+                # STAB-30: kaputte MIDI-Aktion sichtbar (je Art einmal).
+                from src.core.diagnose_log import melde_still
+                melde_still("midi.aktion", e, text=getattr(cb, "__qualname__", ""))
 
     def _log(self, text: str):
         # STAB-30: Fehlermeldungen gingen NUR an die MIDI-Ansicht (Abonnent) —

@@ -68,7 +68,7 @@ Rechts in der Sektions-Leiste liegen die globalen Live-Bedienelemente:
 | Kürzel | Funktion |
 |--------|----------|
 | `Strg+1`…`8` | Sektion wechseln |
-| `Leertaste` | GO (nächste Cue der GO-Zielliste, s. Abschnitt 6) |
+| `Leertaste` | GO (nächste Cue der GO-Zielliste, s. Abschnitt 6). Ausnahme: Bist du mit dem Tabulator auf einen Knopf, Haken oder eine Auswahlliste gegangen, drückt die Leertaste dieses Element. Ein nur angeklickter Knopf bekommt die Leertaste nicht, dann bleibt sie GO. Die Eingabetaste löst einen fokussierten Knopf immer aus |
 | `Shift+Leertaste` | BACK (Cue zurück, GO-Zielliste) |
 | `Esc` | Programmer leeren |
 | `H` / `Shift+H` | Hervorheben / Abdunkeln |
