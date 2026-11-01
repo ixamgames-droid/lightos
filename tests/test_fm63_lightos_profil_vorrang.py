@@ -462,6 +462,21 @@ class E_ShowbuilderStrict(_Basis):
         with self.assertRaises(BuildError):
             self._builder(strict=True)._lookup_profile("Bar 9")
 
+    def test_abgeloester_import_ohne_abloesung_unter_treffern_bleibt(self):
+        """TOOL-17: der Import ist abgeloest, aber das abloesende LightOS-Profil
+        traegt einen ANDEREN short_name und ist kein Treffer. Dann darf der
+        Import nicht still wegfallen — sonst gewinnt ohne Warnung ein fremdes
+        Profil gleichen short_names (hier: anderer Hersteller)."""
+        from src.core.show.showbuilder import BuildError
+        alt = self._profil("Testwerk", "Par 7", "qlcplus")      # short_name "Par 7"
+        self._profil("Fremdwerk", "Par 7", "qlcplus")           # short_name "Par 7"
+        self._spielen(_datei())                                  # LightOS: "PAR7LOS"
+        self.assertEqual(FDB.abgeloeste_profil_ids(), {alt})
+        with self.assertRaises(BuildError):
+            self._builder(strict=True)._lookup_profile("Par 7")
+        pid, *_ = self._builder(strict=False)._lookup_profile("Par 7")
+        self.assertEqual(pid, alt)
+
 
 if __name__ == "__main__":
     unittest.main()

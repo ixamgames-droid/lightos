@@ -67,13 +67,40 @@ def is_own_port(port_name: str) -> bool:
 
 def _sysex_freigeben(midi_in) -> None:
     """MIDI-5: RtMidi verwirft SysEx standardmaessig — fuer MSC freigeben.
-    Timing-Clock und Active Sensing bleiben gefiltert."""
+
+    MIDI-7/MTC-04: auch die Zeit-Nachrichten freigeben. RtMidi fasst unter
+    ``timing`` (``midiTime``) MIDI-Clock (0xF8) UND MTC-Quarter-Frames (0xF1)
+    zusammen; mit ``timing=True`` kam keines davon je an (Konsolen-Check: 48
+    Ticks gesendet, 0 angekommen). Active Sensing bleibt gefiltert."""
     setter = getattr(midi_in, "ignore_types", None)
     if callable(setter):
         try:
-            setter(sysex=False, timing=True, active_sense=True)
+            setter(sysex=False, timing=False, active_sense=True)
         except Exception:
             pass
+
+
+# MIDI-7/MTC-04: Echtzeit-/Zeit-Nachrichten. Sie gehen NICHT an die
+# Mapping-Abonnenten (``subscribe``): Learn, Monitor und Mapper sollen keine
+# 48 Clock-Ticks je Sekunde sehen. Abnehmer (MIDI-Clock -> BPM, MTC-Leser)
+# haengen sich mit ``subscribe_echtzeit`` an. Gilt fuer python-rtmidi UND den
+# WinMM-Pfad — beide liefern ueber ``_on_message`` in dieselbe Empfangsschleife
+# (WinMM als kurze Nachricht ``[status, d1, d2]``).
+MTC_QUARTER_FRAME = 0xF1
+CLOCK_TICK, CLOCK_START, CLOCK_CONTINUE, CLOCK_STOP = 0xF8, 0xFA, 0xFB, 0xFC
+ECHTZEIT_STATUS = frozenset(
+    (MTC_QUARTER_FRAME, CLOCK_TICK, CLOCK_START, CLOCK_CONTINUE, CLOCK_STOP))
+
+
+def ist_mtc_vollbild(raw) -> bool:
+    """MTC-Full-Frame als SysEx: ``F0 7F <dev> 01 01 hh mm ss ff F7``."""
+    return (len(raw) >= 10 and raw[0] == 0xF0 and raw[1] == 0x7F
+            and raw[3] == 0x01 and raw[4] == 0x01)
+
+
+def ist_echtzeit(raw) -> bool:
+    """MIDI-7/MTC-04: Clock/Start/Continue/Stop, MTC-Quarter-Frame, MTC-Vollbild."""
+    return bool(raw) and (raw[0] in ECHTZEIT_STATUS or ist_mtc_vollbild(raw))
 
 
 # ── MIDI-3: Portnamen stabil ueber Neustecken ──────────────────────────────
@@ -432,7 +459,10 @@ class MidiManager:
         self._rtmidi_error = ""
         self._callbacks: list[Callable[[MidiMessage], None]] = []
         self._log_callbacks: list[Callable[[str], None]] = []
-        self._rx_queue: queue.Queue[tuple[list[int], str]] = queue.Queue(maxsize=_RX_QUEUE_MAX)
+        # MIDI-7/MTC-04: cb(raw, port_name, zeit) fuer Clock/MTC (s. ist_echtzeit).
+        self._echtzeit_callbacks: list[Callable[[list, str, float], None]] = []
+        self._rx_queue: queue.Queue[tuple] = queue.Queue(maxsize=_RX_QUEUE_MAX)
+        # Eintrag: (raw, port_name); Clock/MTC zusaetzlich mit Empfangszeit (MIDI-7).
         # Producer-Lock (Review): serialisiert ALLE Producer-Enqueues untereinander.
         # Jeder offene MIDI-Input hat einen eigenen Callback-Thread; ohne Serialisierung
         # konnte ein zweiter Producer die in _make_room_for_release freigeraeumten Slots
@@ -1042,6 +1072,30 @@ class MidiManager:
         except ValueError:
             pass
 
+    def subscribe_echtzeit(self, cb: Callable[[list, str, float], None]):
+        """MIDI-7/MTC-04: ``cb(raw, port_name, zeit)`` fuer jede Clock-/MTC-
+        Nachricht (``ist_echtzeit``); ``zeit`` = ``time.perf_counter()`` beim
+        Empfang (``_on_message``, Treiber-Callback). Gerufen im MIDI-Dispatch-Thread."""
+        if cb not in self._echtzeit_callbacks:
+            self._echtzeit_callbacks.append(cb)
+
+    def unsubscribe_echtzeit(self, cb):
+        try:
+            self._echtzeit_callbacks.remove(cb)
+        except ValueError:
+            pass
+
+    def _echtzeit_verteilen(self, raw: list, port_name: str,
+                            zeit: float | None = None) -> None:
+        if zeit is None:
+            zeit = time.perf_counter()
+        for cb in list(self._echtzeit_callbacks):
+            try:
+                cb(raw, port_name, zeit)
+            except Exception as e:
+                from src.core.diagnose_log import melde_still
+                melde_still("midi.echtzeit", e, text=getattr(cb, "__qualname__", ""))
+
     def subscribe_log(self, cb: Callable[[str], None]):
         self._log_callbacks.append(cb)
 
@@ -1096,6 +1150,11 @@ class MidiManager:
 
     def _on_message(self, raw: list[int], port_name: str):
         item = (list(raw), port_name)
+        if ist_echtzeit(raw):
+            # MIDI-7 (Review): Clock/MTC beim EMPFANG stempeln, nicht beim
+            # Verteilen — haengt die Verteilschleife kurz (langsamer Abnehmer),
+            # kaemen gestaute Ticks sonst im selben Augenblick an (Tempo-Spitze).
+            item = (item[0], port_name, time.perf_counter())
         # Der gesamte Enqueue-/Rescue-Pfad laeuft unter dem Producer-Lock, damit
         # _make_room_for_release nicht von einem parallelen Input-Callback-Thread
         # unterlaufen wird (Review-Fix). +Nebeneffekt: _rx_dropped ist so RMW-sicher.
@@ -1125,12 +1184,18 @@ class MidiManager:
     def _rx_loop(self):
         while self._rx_running:
             try:
-                raw, port_name = self._rx_queue.get(timeout=0.25)
+                item = self._rx_queue.get(timeout=0.25)
             except queue.Empty:
                 continue
             if not self._rx_running:
                 break
+            raw, port_name = item[0], item[1]
             if not raw and not port_name:
+                continue
+            if ist_echtzeit(raw):
+                # MIDI-7/MTC-04: an die Zeit-Abnehmer, nicht an die Mappings.
+                self._echtzeit_verteilen(raw, port_name,
+                                         item[2] if len(item) > 2 else None)
                 continue
             msg = _decode(raw, port_name)
             if msg:

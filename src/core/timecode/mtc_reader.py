@@ -6,8 +6,17 @@ Frame, daher ist die effektive Update-Rate halb so schnell wie die fps.
 MTC FPS Codes:
     0 = 24 fps     1 = 25 fps     2 = 29.97 (drop)    3 = 30 fps
 
-Verwendet python-rtmidi.
-Wenn es nicht vorhanden ist -> Reader laeuft trotzdem (no-op via subscribe).
+Zwei Empfangswege:
+
+* **Gemeinsamer Pfad (MTC-04):** ``an_manager_haengen`` haengt den Reader an die
+  Empfangsschleife des ``MidiManager`` (``subscribe_echtzeit``). Darueber kommt
+  MTC von JEDEM geoeffneten Eingang an — mit python-rtmidi (Linux) ebenso wie
+  ueber das WinMM-ctypes-Backend (Windows-ARM, ohne rtmidi): WinMM liefert
+  Quarter-Frames als kurze Nachricht (MIM_DATA) und das Vollbild als SysEx
+  (MIM_LONGDATA, MIDI-5) in denselben Pfad.
+* **Eigener Port (Bestand):** ``attach_midi_input`` oeffnet einen eigenen
+  rtmidi-Eingang (nur mit python-rtmidi). Solange er offen ist, ignoriert der
+  Reader den gemeinsamen Pfad — sonst kaemen die Pakete desselben Ports doppelt.
 """
 from __future__ import annotations
 import threading
@@ -49,6 +58,7 @@ class MTCReader:
         self._callbacks: list[Callable[[int, int, int, int], None]] = []
         self._midi_input = None
         self._port_name: str | None = None
+        self._manager = None            # MTC-04: gemeinsamer Pfad (MidiManager)
 
     # ── MIDI attach ──────────────────────────────────────────────────────────
 
@@ -92,6 +102,23 @@ class MTCReader:
         except Exception as e:
             print(f"[MTCReader] attach error: {e}")
             return False
+
+    def an_manager_haengen(self, midi_manager=None) -> None:
+        """MTC-04: MTC ueber die gemeinsame MIDI-Empfangsschleife lesen
+        (rtmidi und WinMM). Idempotent."""
+        if getattr(self, "_manager", None) is not None:
+            return
+        if midi_manager is None:
+            from src.core.midi.midi_manager import get_midi_manager
+            midi_manager = get_midi_manager()
+        midi_manager.subscribe_echtzeit(self._on_manager)
+        self._manager = midi_manager
+
+    def _on_manager(self, raw, _port_name=None, _zeit=None):
+        if self._midi_input is not None:
+            return                      # eigener Port offen -> der liefert schon
+        if raw and raw[0] in (0xF1, 0xF0):
+            self._on_raw((list(raw), 0.0))
 
     def detach(self):
         if self._midi_input:

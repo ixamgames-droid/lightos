@@ -185,9 +185,11 @@ cue lands in the **first** cue list of the show.
 ![Three cues, cue list on executor 1](img/08_executor.png)
 
 1. **The cue table**: **Nr.** (no.), **Label**, **Fade In** (default 2.0 s),
-   **Fade Out**, **Delay**, **Follow** and **Kurve** (curve). A double-click on a cell
+   **Fade Out**, **Delay**, **Follow**, **Kurve** (curve) and **Timecode**. A double-click on a cell
    changes the value. Enter a time under **Follow** and the next cue follows by itself.
-   **Kurve** chooses the shape of the fade.
+   **Kurve** chooses the shape of the fade. Under **Timecode** you enter a MIDI timecode
+   as `HH:MM:SS:FF` (e.g. `00:01:30:00`); when the incoming timecode of a DAW or desk
+   reaches this value, the cue list jumps to this cue. „—“ or an empty cell turns it off.
 2. **Executor 1** in the **executor bar**: in the selection box „— Leer —“ (empty) choose
    the cue list „Meine Show“. The executor is then named like the cue list.
 
@@ -253,6 +255,10 @@ Also: **▶ Hierhin springen** (jump here) fades directly into the marked cue.
 **Crossfade (manuell)** (manual crossfade) fades to the next cue by hand. **Optionen**
 (options) sets **Loop: AUS**/**AN** (off/on) and the **Modus:** (mode):
 **Einzel (am Ende stop)** (single, stop at the end), **Loop**, **Bounce**, **Ping-Pong**.
+**Takt:** (beat) picks where a beat-synced cue list takes its beats from: **global**
+(the global BPM, default) or **Bus A** to **Bus D** — then the list steps on in the
+tempo of that tempo bus, independent of the global BPM. The choice is saved with the
+show; older shows stay on **global**.
 
 ## 10. Trigger cues from the Virtual Console
 

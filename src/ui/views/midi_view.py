@@ -964,6 +964,13 @@ class MidiView(QWidget):
     def _build_mtc_box(self, parent_layout):
         """Append a MTC Reader groupbox to parent_layout."""
         box = QGroupBox("MTC - MIDI Time Code Reader")
+        # MTC-04: Timecode kommt ohnehin von allen geoeffneten MIDI-Eingaengen
+        # (rtmidi und WinMM); ein eigener Port ist nur noch eine Einschraenkung.
+        box.setToolTip(
+            "MTC wird automatisch von allen geöffneten MIDI-Eingängen gelesen "
+            "(auch unter Windows ohne rtmidi). „Verbinden“ liest nur noch von "
+            "diesem einen Port. Cues mit Timecode (Spalte „Timecode“ der "
+            "Cueliste) werden beim Erreichen ausgelöst.")
         bl = QHBoxLayout(box)
 
         # Port-Auswahl
