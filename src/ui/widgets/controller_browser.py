@@ -11,9 +11,13 @@ ausgeblendet. ``midi_only=False`` zeigt die komplette Bibliothek.
 - „QLC+ .qxi importieren…" — konvertiert QLC+-Inputprofile in unsere
   Bibliothek (Kern: src/core/controllers/qxi_import.py, Apache-2.0-Quelle
   bleibt im Profil vermerkt)
-- „MIDI-Mapping-Profil erzeugen" — legt für Profile mit Mapping-Vorlage
-  (z. B. APC mini) ein fertiges Input-Profil unter
-  %APPDATA%/LightOS/input_profiles/ an (MIDI-Konsole → Profile)
+- „MIDI-Mapping-Profil erzeugen" — legt ein Input-Profil unter
+  <Datenordner>/input_profiles/ an (Ausgabe → Input-Profile verwalten…): APC mini mit
+  fester Vorlage, jedes andere Profil mit Noten/CCs über den allgemeinen
+  Generator (MIDI-8, src/core/controllers/mapping_generator.py)
+- Pult-Vorlagen (MIDI-8): was ein Lichtpult per Makro/MSC senden muss, damit
+  LightOS es versteht — mit Hinweis, dass Hersteller-Wings nicht anschließbar
+  sind
 
 Aufgerufen aus der MIDI-Konsole („Controller-Profile…").
 """
@@ -35,6 +39,7 @@ _TYPE_LABELS = {
     "network_node": "Netzwerk-Node (Art-Net/sACN)",
     "console": "Lichtpult",
     "keyboard_macro": "Tastatur/Makro-Board",
+    "console_template": "Pult-Vorlage (MIDI-Noten/MSC)",
     "other": "Sonstiges",
 }
 
@@ -47,9 +52,19 @@ MIDI_DEVICE_TYPES = (
     "midi_keyboard",
 )
 
+# MIDI-8: Pult-Vorlagen sind kein Eingabegerät, beschreiben aber MIDI, das
+# ein Pult an LightOS sendet — sie gehören deshalb in die MIDI-Liste (zuletzt).
+_MIDI_LIST_TYPES = MIDI_DEVICE_TYPES + ("console_template",)
+
 # Gruppen-Reihenfolge für die "schön sortierte" MIDI-Liste:
-# Grid-Controller → Fader/Encoder → Keyboards (innerhalb je alphabetisch).
-_MIDI_TYPE_ORDER = {t: i for i, t in enumerate(MIDI_DEVICE_TYPES)}
+# Grid-Controller → Fader/Encoder → Keyboards → Pult-Vorlagen (je alphabetisch).
+_MIDI_TYPE_ORDER = {t: i for i, t in enumerate(_MIDI_LIST_TYPES)}
+
+# MIDI-8: Hersteller-Wings/Faderbänke sprechen nur mit ihrem eigenen Pult.
+WING_HINWEIS = ("Hersteller-Wings und Faderbänke (z. B. von MA, ChamSys, "
+                "Avolites Titan, Hog, ETC) sind proprietär und grundsätzlich "
+                "nicht anschließbar. Ein Pult erreicht LightOS nur über MIDI, "
+                "MSC, OSC oder DMX, das es selbst sendet.")
 
 
 def _sorted_midi_profiles(profiles, midi_only: bool = True):
@@ -61,7 +76,7 @@ def _sorted_midi_profiles(profiles, midi_only: bool = True):
     (device_type, label) sortiert.
     """
     if midi_only:
-        midi = [p for p in profiles if p.device_type in MIDI_DEVICE_TYPES]
+        midi = [p for p in profiles if p.device_type in _MIDI_LIST_TYPES]
         return sorted(midi, key=lambda p: (_MIDI_TYPE_ORDER.get(p.device_type, 99),
                                            p.label.lower()))
     return sorted(profiles, key=lambda p: (p.device_type, p.label.lower()))
@@ -105,6 +120,10 @@ class ControllerBrowserDialog(QDialog):
             "QListWidget::item:selected { background:#1f6feb; }")
         self._list.currentItemChanged.connect(lambda *_: self._show_details())
         left.addWidget(self._list, stretch=1)
+        self._wing_hinweis = QLabel(WING_HINWEIS)
+        self._wing_hinweis.setWordWrap(True)
+        self._wing_hinweis.setMaximumWidth(300)
+        left.addWidget(self._wing_hinweis)
         cols.addLayout(left, stretch=1)
 
         # Rechts: Details
@@ -165,7 +184,8 @@ class ControllerBrowserDialog(QDialog):
             self._details.setHtml("")
             self._btn_mapping.setEnabled(False)
             return
-        self._btn_mapping.setEnabled(bool(p.mapping_template))
+        from src.core.controllers.mapping_generator import kann_mapping_erzeugen
+        self._btn_mapping.setEnabled(kann_mapping_erzeugen(p))
 
         def esc(s):
             return (str(s).replace("&", "&amp;").replace("<", "&lt;")
@@ -199,6 +219,26 @@ class ControllerBrowserDialog(QDialog):
             rows.append("</table>")
         if p.led_feedback:
             rows.append(f"<br><b>LED-Feedback:</b> {esc(p.led_feedback.get('notes', p.led_feedback))}<br>")
+        if p.pult_vorlagen:
+            rows.append("<br><b>Was das Pult senden muss:</b>"
+                        "<table border='0' cellspacing='0' cellpadding='3' "
+                        "style='font-size:10px'>")
+            rows.append("<tr style='color:#79c0ff'><td>Zweck</td><td>Am Pult</td>"
+                        "<td>In LightOS</td></tr>")
+            for z in p.pult_vorlagen:
+                am_pult = esc(z.get("am_pult", ""))
+                if z.get("msc"):
+                    am_pult += f"<br><code>{esc(z['msc'])}</code>"
+                if z.get("beispiel"):
+                    am_pult = ("<i style='color:#d29922'>Beispiel — Schreibweise "
+                               "im Pult-Handbuch prüfen:</i><br>" + am_pult)
+                rows.append(f"<tr><td>{esc(z.get('zweck', ''))}</td>"
+                            f"<td>{am_pult}</td>"
+                            f"<td>{esc(z.get('in_lightos', ''))}</td></tr>")
+            rows.append("</table>")
+        if p.device_type == "console_template":
+            rows.append(f"<p style='color:#d29922'><b>Hinweis:</b> "
+                        f"{esc(WING_HINWEIS)}</p>")
         if p.features:
             rows.append("<br><b>Besonderheiten:</b><ul>")
             for f in p.features:
@@ -245,21 +285,17 @@ class ControllerBrowserDialog(QDialog):
 
     def _create_mapping_profile(self):
         p = self._current()
-        if p is None or not p.mapping_template:
+        from src.core.controllers.mapping_generator import (
+            erzeuge_mapping_profil, kann_mapping_erzeugen)
+        if not kann_mapping_erzeugen(p):
             return
-        if p.mapping_template == "apc_mini_default":
-            try:
-                from src.core.input.profile import create_default_apc_mini_profile
-                prof = create_default_apc_mini_profile()
-                path = prof.save()
-                QMessageBox.information(
-                    self, "Mapping-Profil",
-                    f"Profil „{prof.name}“ gespeichert:\n{path}\n\n"
-                    "Laden über MIDI-Konsole → Profile.")
-            except Exception as e:
-                QMessageBox.warning(self, "Mapping-Profil", str(e))
-        else:
+        try:
+            prof = erzeuge_mapping_profil(p)
+            path = prof.save()
             QMessageBox.information(
                 self, "Mapping-Profil",
-                f"Für die Vorlage „{p.mapping_template}“ ist noch kein "
-                "Generator hinterlegt.")
+                f"Profil „{prof.name}“ mit {len(prof.mappings)} Zuordnungen "
+                f"gespeichert:\n{path}\n\n"
+                "Laden über Ausgabe → Input-Profile verwalten...")
+        except Exception as e:
+            QMessageBox.warning(self, "Mapping-Profil", str(e))
