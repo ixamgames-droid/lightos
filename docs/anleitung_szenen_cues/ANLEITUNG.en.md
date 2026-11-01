@@ -253,6 +253,10 @@ Also: **▶ Hierhin springen** (jump here) fades directly into the marked cue.
 **Crossfade (manuell)** (manual crossfade) fades to the next cue by hand. **Optionen**
 (options) sets **Loop: AUS**/**AN** (off/on) and the **Modus:** (mode):
 **Einzel (am Ende stop)** (single, stop at the end), **Loop**, **Bounce**, **Ping-Pong**.
+**Takt:** (beat) picks where a beat-synced cue list takes its beats from: **global**
+(the global BPM, default) or **Bus A** to **Bus D** — then the list steps on in the
+tempo of that tempo bus, independent of the global BPM. The choice is saved with the
+show; older shows stay on **global**.
 
 ## 10. Trigger cues from the Virtual Console
 

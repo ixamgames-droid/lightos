@@ -35,7 +35,6 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 import serial                                                    # noqa: E402
 import serial.tools.list_ports                                   # noqa: E402
 from src.core.app_state import AppState                          # noqa: E402
-from src.core.dmx import anschluss_auswahl                       # noqa: E402
 from src.core.dmx import enttec_konfig                           # noqa: E402
 from src.core.dmx import enttec_pro                              # noqa: E402
 from src.core.dmx import output_manager as om_mod                # noqa: E402
@@ -799,17 +798,16 @@ class DialogTest(_DialogBasis):
         self.assertNotIn(FELD, z[1])
 
 
-# ── Gegenpruefung 2: keine zwei Namen fuer einen Anschluss ───────────────────
+# ── Gegenpruefung 2: zwei Namen fuer einen Anschluss (seit OUT-81 angeboten) ─
 
 class KeineStabilenNamen(unittest.TestCase):
-    """Entscheidung: by-id-Namen bietet OUT-80 NICHT an (sie galten in den
-    NOT-AUS-Weg-Schluesseln als anderer Anschluss)."""
+    """Entscheidung OUT-80: by-id-Namen NICHT anbieten (sie galten in den
+    NOT-AUS-Weg-Schluesseln als anderer Anschluss). OUT-81 hat alle
+    Portvergleiche normalisiert und bietet sie jetzt an — die Pruefungen dazu
+    stehen in ``test_out81_byid_portfeld.py``; hier bleibt die
+    Windows-Schreibweise."""
 
-    def test_port_auswahl_ohne_by_id(self):
-        self.assertFalse(hasattr(anschluss_auswahl, "mit_stabilen_namen"))
-        self.assertFalse(hasattr(anschluss_auswahl, "BY_ID_ORDNER"))
-
-    def test_gleicher_port_nur_windows_schreibweise(self):
+    def test_gleicher_port_windows_schreibweise(self):
         import src.ui.widgets.output_config as oc
         self.assertTrue(oc._gleicher_port("COM3", "com3"))
         self.assertTrue(oc._gleicher_port(" COM3", "COM3 "))
@@ -817,16 +815,6 @@ class KeineStabilenNamen(unittest.TestCase):
         self.assertFalse(oc._gleicher_port("", ""))
         self.assertTrue(oc._gleicher_port(P0, P0))
         self.assertFalse(oc._gleicher_port(P0, P1))
-
-    @unittest.skipUnless(os.name == "posix", "Symlinks als Portnamen: POSIX")
-    def test_gleicher_port_loest_keine_symlinks_auf(self):
-        import src.ui.widgets.output_config as oc
-        with tempfile.TemporaryDirectory() as d:
-            ziel = os.path.join(d, "ttyFAKE_OUT80")
-            open(ziel, "w").close()
-            link = os.path.join(d, "usb-ENTTEC_DMX_USB_PRO_EN123456-if00-port0")
-            os.symlink(ziel, link)
-            self.assertFalse(oc._gleicher_port(link, ziel))
 
 
 class _Sender:

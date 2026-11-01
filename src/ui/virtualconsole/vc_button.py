@@ -2726,7 +2726,8 @@ class VCButton(VCWidget):
         # denselben Geraeten denselben Baustein steuert. Reine Auskunft. Sie
         # liest die Ziele aus den FELDERN (im Dialog ist noch nichts
         # uebernommen) und rechnet nur beim Oeffnen und bei Aenderungen.
-        from src.ui.widgets.ueberschneidung_hinweis import UeberschneidungsHinweis
+        from src.ui.widgets.ueberschneidung_hinweis import (
+            StartRegeln, UeberschneidungsHinweis)
 
         def _hinweis_ziele():
             if act.currentData() not in (ButtonAction.FUNCTION_TOGGLE.value,
@@ -2734,13 +2735,23 @@ class VCButton(VCWidget):
                 return []
             return target_editor.ids()
 
-        ueberschn_hinweis = UeberschneidungsHinweis(self, _hinweis_ziele)
+        # ENG-41: die eigenen Tasten-Haken und der Live-Edit-Slot aus den Feldern.
+        def _hinweis_regeln():
+            return StartRegeln.aus(exclusive_cb.isChecked(),
+                                   solo_fix_cb.isChecked(),
+                                   edit_slot_edit.text())
+
+        ueberschn_hinweis = UeberschneidungsHinweis(
+            self, _hinweis_ziele, regeln_selbst=_hinweis_regeln)
         _hinweis_setzer = {"f": None}
         ueberschn_hinweis.sichtbar_setzen = (
             lambda an: _hinweis_setzer["f"](ueberschn_hinweis, an)
             if _hinweis_setzer["f"] is not None else None)
         target_editor.changed.connect(ueberschn_hinweis.veraltet)
         act.currentIndexChanged.connect(ueberschn_hinweis.veraltet)
+        exclusive_cb.toggled.connect(ueberschn_hinweis.veraltet)
+        solo_fix_cb.toggled.connect(ueberschn_hinweis.veraltet)
+        edit_slot_edit.textChanged.connect(ueberschn_hinweis.veraltet)
 
         # ── Aktions-Konstanten (Sichtbarkeit) ──
         FT, FF = ButtonAction.FUNCTION_TOGGLE, ButtonAction.FUNCTION_FLASH
@@ -2848,6 +2859,9 @@ class VCButton(VCWidget):
             self.long_press_editor = long_press_cb.isChecked()
             self.actions = _edited["list"]
             self.update()
+            # ENG-41: offene Hinweiszeilen ANDERER Bedienelemente ziehen nach.
+            from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert
+            belegung_geaendert()
 
         def _live():
             if live:
