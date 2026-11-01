@@ -1307,7 +1307,16 @@ class StageCanvas(QWidget):
 
     @classmethod
     def _patch_fingerabdruck(cls, f) -> tuple:
-        return (f.fid,) + tuple(getattr(f, k, None) for k in cls._PATCH_FELDER)
+        # UI-90: die Felder sind ORM-Spalten (``PatchedFixture``). ``getattr``
+        # geht je Feld durch den SQLAlchemy-Deskriptor — 17 Felder × 80 Geraete
+        # in jedem Takt kosteten so ~2 ms je Bild (gemessen bei 250 %). Geladene
+        # Spaltenwerte stehen im ``__dict__`` der Instanz; dasselbe Ergebnis
+        # ohne Deskriptor. Objekte ohne ``__dict__`` (Attrappen mit ``__slots__``)
+        # gehen den alten Weg.
+        d = getattr(f, "__dict__", None)
+        if d is None or "_sa_instance_state" not in d:
+            return (f.fid,) + tuple(getattr(f, k, None) for k in cls._PATCH_FELDER)
+        return (d.get("fid"),) + tuple(d.get(k) for k in cls._PATCH_FELDER)
 
     def _patch_geaendert(self, *_a) -> None:
         self._paint_sig = None
