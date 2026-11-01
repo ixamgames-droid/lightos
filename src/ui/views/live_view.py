@@ -257,8 +257,14 @@ def _form_durchgang(painter: QPainter, kx, art: str, geo: tuple, pen, brush,
     m11, m22, dx, dy, rdx, rdy, wt, hints = kx
     # Verlaeufe rechnet Qt je Pixel ueber die INVERSE Matrix zurueck; nur ohne
     # Skalierung (Zoom 1) ist das in der Kachel bitgleich (reine, exakte
-    # Verschiebung um ganze Pixel). Sonst direkt.
-    if schluessel[1][0] == "g" and (m11 != 1.0 or m22 != 1.0):
+    # Verschiebung um ganze Pixel). UI-90: skaliert kommen sie trotzdem aus der
+    # Kachel — die Rundung der Rueckrechnung verschiebt dort einzelne Kanten-
+    # pixel um hoechstens 2 Stufen (Grenze von A: <= 2 Stufen je Kanal, <= 2 %
+    # der Pixel; getestet in test_ui90_2d_kachelwege). Gemessen bei 250 %:
+    # ~40 Glow-Verlaeufe je Bild, die vorher jedes Mal neu gerastert wurden.
+    # Deckende Verlaeufe (``"gd"``, s. ``_verlauf``) ungeskaliert weiter direkt.
+    if (m11 == 1.0 and m22 == 1.0 and any(
+            isinstance(t, tuple) and t and t[0] == "gd" for t in schluessel[1:])):
         _KACHEL_STATS["direkt"] += 1
         _form_direkt(painter, art, geo, pen, brush)
         return
@@ -335,6 +341,19 @@ def _form(painter: QPainter, kx, art: str, geo: tuple, pen=None, brush=None,
     abgerundet; ``geo`` = (x, y, w, h[, rx, ry]) in lokalen Koordinaten;
     ``kx`` = :func:`_kachel_kontext` des Painters in genau diesem Zustand.
     ``*_key`` beschreibt Stift/Pinsel vollstaendig (``None`` = nicht cachen)."""
+    # UI-90: skaliert (Zoom/Pixeldichte != 1) Fuellung UND Kontur in EINER
+    # Kachel — ein Aufblenden statt zwei (bei 250 % ~150 solcher Formen je
+    # Bild). Die Kachel mischt Kontur und Fuellung vor dem Aufblenden; an
+    # Kantenpixeln weicht das um hoechstens 2 Stufen ab (Grenze von A, wie bei
+    # den Verlaeufen oben). Ungeskaliert bleibt es bei zwei Durchgaengen —
+    # bitgleich wie seit VIZ-78. Duenne Stifte gehen weiter einzeln (direkt).
+    if (brush is not None and pen is not None and brush_key is not None
+            and pen_key is not None and kx is not None and art != "r"
+            and (kx[0] != 1.0 or kx[1] != 1.0)
+            and pen.widthF() * max(abs(kx[0]), abs(kx[1])) > 1.0):
+        _form_durchgang(painter, kx, art, geo, pen, brush,
+                        ("bp", brush_key, pen_key))
+        return
     if brush is not None:
         _form_durchgang(painter, kx, art, geo, None, brush,
                         None if brush_key is None else ("b", brush_key))
@@ -364,9 +383,13 @@ def _pinsel(color: QColor):
 def _verlauf(cx: float, cy: float, r: float, stops):
     """Radialer Verlauf wie ``QRadialGradient(cx, cy, r)`` + ``setColorAt``.
 
-    Ein durchgehend DECKENDER Verlauf bekommt keinen Schluessel: Qt mischt ihn
-    als „Source" mit Abdeckung (eine Rundung: s·c + d·(1−c)), die Kachel
+    Ein durchgehend DECKENDER Verlauf ist nicht bitgleich kachelbar: Qt mischt
+    ihn als „Source" mit Abdeckung (eine Rundung: s·c + d·(1−c)), die Kachel
     rechnet zweimal gerundet — bis zu 2 Stufen Unterschied an den Kanten.
+    UI-90: er bekommt deshalb die eigene Art ``"gd"``; ungeskaliert zeichnet
+    ``_form_durchgang`` ihn weiter direkt (bitgleich), skaliert kommt er aus
+    der Kachel (Toleranz von A, <= 2 Stufen). Gemessen bei 250 %: 20 solche
+    Gehaeuse-Verlaeufe je Bild kosteten direkt 3,8 ms.
     Sobald ein Stop durchscheint (Glow), mischt Qt „Source Over" wie die
     Kachel."""
     g = QRadialGradient(cx, cy, r)
@@ -375,7 +398,7 @@ def _verlauf(cx: float, cy: float, r: float, stops):
         g.setColorAt(pos, c)
         keys.append((pos, _ck(c)))
     if all(k[1][3] == 0xFFFF for k in keys):
-        return QBrush(g), None
+        return QBrush(g), ("gd", cx, cy, r, tuple(keys))
     return QBrush(g), ("g", cx, cy, r, tuple(keys))
 
 

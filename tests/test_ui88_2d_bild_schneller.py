@@ -173,7 +173,11 @@ class KachelnImZwischenbildTest(_Fall):
         self.assertGreater(LV._KACHEL_STATS["gebaut"], 0)
 
     def test_bild_mit_und_ohne_cache_gleich(self):
-        """Bitgleich: Kacheln im Zwischenbild == direkt ins Zwischenbild."""
+        """Kacheln im Zwischenbild == direkt ins Zwischenbild. UI-90: bei
+        Pixeldichte != 1 ist immer skaliert — Glow-Verlaeufe, deckende Verlaeufe
+        und Fuellung+Kontur kommen dann aus der Kachel; verglichen wird mit der
+        Toleranz von A (``_bild_toleranz``: <= 2 Stufen, <= 2 % der Pixel)."""
+        from _bild_toleranz import innerhalb
         rnd = random.Random(88)
         self._szene()
         self.c.set_selection([4])
@@ -196,13 +200,19 @@ class KachelnImZwischenbildTest(_Fall):
                 bild = self._bild()
                 with self.subTest(dpr=dpr, zoom=zoom):
                     self.assertGreater(LV._KACHEL_STATS["treffer"], vor)
-                    self.assertTrue(ref == bild)
+                    ok, info = innerhalb(ref, bild)
+                    self.assertTrue(ok, info)
 
     def test_symbole_rasten_auf_ganze_geraetepixel(self):
         """Lage 100,0 und 100,1 (250,0 / 250,25 Geraetepixel) ergeben dasselbe
         Bild; 100,3 (250,75) liegt genau einen Geraetepixel weiter rechts."""
         self._dichte(2.5)
         self.c.grid_visible = False           # Raster verschiebt sich nicht mit
+        # UI-90: nur das Einrasten pruefen — ohne Kachel-Cache (skaliert kaeme
+        # das dritte Bild sonst aus der Kachel, mit Toleranz statt bitgleich).
+        alt_ab = LV.KACHEL_AB
+        LV.KACHEL_AB = 10 ** 9
+        self.addCleanup(setattr, LV, "KACHEL_AB", alt_ab)
 
         def bild(x):
             self._szene(typen=("par",), lage={1: (x, 60.0)},
@@ -224,6 +234,11 @@ class KachelnImZwischenbildTest(_Fall):
         self.assertEqual({(x + 1, y): p for (x, y), p in sa.items()}, sc)
 
     def test_hintergrund_als_kopie_gleich_dem_alten_weg(self):
+        # UI-90: nur den Hintergrund-Weg vergleichen — Symbole ohne Kachel-Cache
+        # (sonst kaeme das zweite Bild skaliert aus der Kachel, mit Toleranz).
+        alt_ab = LV.KACHEL_AB
+        LV.KACHEL_AB = 10 ** 9
+        self.addCleanup(setattr, LV, "KACHEL_AB", alt_ab)
         self._szene()
         for dpr in (1.25, 1.5, 2.0, 2.5):
             self._dichte(dpr)

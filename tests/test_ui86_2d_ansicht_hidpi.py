@@ -302,6 +302,12 @@ class AusschnittCacheTest(_Fall):
     def test_ausschnitt_ist_pixelgleich(self):
         """Das Bild mit Ausschnitt-Cache gleicht dem direkt gezeichneten — an
         mehreren Scroll-Stellen, auch mit ungeradem Zoom."""
+        # UI-90: nur den Ausschnitt-Cache vergleichen — Symbole ohne Kachel-
+        # Cache (skaliert kaemen sie sonst mal aus der Kachel, mit Toleranz).
+        import src.ui.views.live_view as _lv
+        alt_ab = _lv.KACHEL_AB
+        _lv.KACHEL_AB = 10 ** 9
+        self.addCleanup(setattr, _lv, "KACHEL_AB", alt_ab)
         for zoom in (2.0, 1.37, 3.0):
             sa, c = self._im_scrollbereich(zoom)
             c.BG_CACHE_MAX_PIXEL = 700_000       # ganze Flaeche passt nicht

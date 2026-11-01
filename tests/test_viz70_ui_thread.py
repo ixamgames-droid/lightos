@@ -307,6 +307,12 @@ class CanvasHintergrundTest(_CanvasCase):
         return c.grab().toImage()
 
     def test_hintergrund_pixmap_ist_pixelgleich(self):
+        # UI-90: nur den Hintergrund-Cache vergleichen — Symbole ohne Kachel-
+        # Cache (skaliert kaemen sie sonst mal aus der Kachel, mit Toleranz).
+        import src.ui.views.live_view as _lv
+        alt_ab = _lv.KACHEL_AB
+        _lv.KACHEL_AB = 10 ** 9
+        self.addCleanup(setattr, _lv, "KACHEL_AB", alt_ab)
         for zoom in (1.0, 1.37, 0.6):
             c = self._canvas(zoom)
             mit = self._bild(c)
