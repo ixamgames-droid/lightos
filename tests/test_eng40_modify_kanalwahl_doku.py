@@ -60,12 +60,13 @@ def test_anleitung_behauptet_nicht_mehr_amber_und_uv_gingen_nie():
     assert "Amber und UV lassen sich über **Wirkt auf**" in text
 
 
-def test_bilderliste_ist_fortlaufend_nummeriert():
+def test_wirkt_auf_hat_sein_bild():
+    """DOC-73: das Bild zur Zeile „Wirkt auf“ (nur Weiß, Vorschau „− nur Weiß“)
+    ist eingebunden und liegt im Repo."""
     text = ANLEITUNG.read_text(encoding="utf-8")
-    liste = text.split("### Noch aufzunehmende Bilder", 1)[1].split("---", 1)[0]
-    nummern = [int(n) for n in re.findall(r"^(\d+)\. ", liste, flags=re.M)]
-    assert nummern == list(range(1, len(nummern) + 1)), nummern
-    assert "**Wirkt auf**" in liste
+    assert "### Noch aufzunehmende Bilder" not in text
+    assert "(img/13_wirkt_auf.png)" in text
+    assert (ANLEITUNG.parent / "img" / "13_wirkt_auf.png").is_file()
 
 
 def test_tabelle_stimmt_mit_der_engine(monkeypatch):

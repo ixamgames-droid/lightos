@@ -1,0 +1,170 @@
+{
+  "anleitung": "dimmermatrix",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "b51fdd5a",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py dimmermatrix'.",
+  "bilder": [
+    {
+      "datei": "03_modify_aus.png",
+      "szene": "03_modify_aus",
+      "titel": "Matrix-Editor, Stil Dimmer, Haken „Modify-Effekt“ noch aus",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "e8ebd044b528efdb2c7519224e8e7e6d"
+    },
+    {
+      "datei": "04_modify_an.png",
+      "szene": "04_modify_an",
+      "titel": "Haken „Modify-Effekt“ gesetzt: Gruppe Modify mit Betriebsart und Stärke",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "8d7f8dacde3f0279cd1cc631685e4aa6"
+    },
+    {
+      "datei": "05_lampen_addieren.png",
+      "szene": "05_lampen_addieren",
+      "titel": "Lampenreihe: Untergrund 40 % / Modify-Lauflicht allein / Ergebnis Addieren",
+      "groesse": [
+        1017,
+        369
+      ],
+      "marken": [],
+      "md5": "9bbb6ec9ac4be58b3014698a33bc6025"
+    },
+    {
+      "datei": "06_lampen_abziehen_abdunkeln.png",
+      "szene": "06_lampen_abziehen_abdunkeln",
+      "titel": "Lampenreihe: Abziehen und Abdunkeln mit Stärke 50 %",
+      "groesse": [
+        1017,
+        369
+      ],
+      "marken": [],
+      "md5": "f07e7e7645ab273dc5a859c2db2d77f2"
+    },
+    {
+      "datei": "07_vc_taste_fader.png",
+      "szene": "07_vc_taste_fader",
+      "titel": "Virtuelle Konsole: Taste für das Modify-Lauflicht (Zeichen +) und Fader Modify-Stärke",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "128360d15e9d9bb56f8a57ee32431f7e"
+    },
+    {
+      "datei": "08_taste_an_aus.gif",
+      "szene": "08_taste_an_aus",
+      "titel": "GIF: Modify-Taste an und aus über einem laufenden Funkeln",
+      "groesse": [
+        1017,
+        405
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "fb66bebbd3e3ced19a0f5cc75d953266",
+      "frames": 6,
+      "dauern_ms": [
+        1000,
+        1000,
+        1000,
+        1000,
+        1000,
+        1000
+      ]
+    },
+    {
+      "datei": "09_schrittweite.png",
+      "szene": "09_schrittweite",
+      "titel": "Bewegung & Parameter: Schrittweite „wie Breite“, Läufer-Breite 2, Schweif 0 %",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "c6b675f9b7fc1540413d15d4880719bc"
+    },
+    {
+      "datei": "10_zweierbloecke.gif",
+      "szene": "10_zweierbloecke",
+      "titel": "GIF: Modify-Lauflicht in Zweierblöcken über 40 %",
+      "groesse": [
+        1017,
+        135
+      ],
+      "marken": [
+        [],
+        [],
+        [],
+        []
+      ],
+      "md5": "69832a7a4c4a557d0e0262c58c3c7ade",
+      "frames": 4,
+      "dauern_ms": [
+        900,
+        900,
+        900,
+        900
+      ]
+    },
+    {
+      "datei": "11_modify_rgb.png",
+      "szene": "11_modify_rgb",
+      "titel": "Stil RGB mit Haken Modify-Effekt: Gruppe Modify mit dem Hinweis zum Dimmer",
+      "groesse": [
+        858,
+        754
+      ],
+      "marken": [],
+      "md5": "9cfb5cd738f6e2ad924e4003ee615bbd"
+    },
+    {
+      "datei": "12_farbe_lampen.png",
+      "szene": "12_farbe_lampen",
+      "titel": "Lampenreihe in Farbe: Blau / Modify Rot allein / Ergebnis Addieren",
+      "groesse": [
+        1017,
+        369
+      ],
+      "marken": [],
+      "md5": "851c75b00e137551e3dd152e6c8a7d9a"
+    },
+    {
+      "datei": "13_wirkt_auf.png",
+      "szene": "13_wirkt_auf",
+      "titel": "Gruppe Modify: Wirkt auf nur Weiß, Abziehen; Vorschau „− nur Weiß“",
+      "groesse": [
+        1150,
+        243
+      ],
+      "marken": [],
+      "md5": "2f117d532d5d7ad3a2657fa00904b895"
+    },
+    {
+      "datei": "14_chaser_modify.png",
+      "szene": "14_chaser_modify",
+      "titel": "Chaser-Editor: Modify-Schritt gelb mit ⚠ und Hinweiszeile",
+      "groesse": [
+        1600,
+        900
+      ],
+      "marken": [],
+      "md5": "8f71df03e427f68574276a66ff803e48"
+    }
+  ]
+}

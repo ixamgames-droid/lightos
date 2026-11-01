@@ -46,10 +46,17 @@ def test_anleitung_sagt_was_die_stufen_nicht_regeln():
     assert "Kein „Untergrund“" in text
 
 
-def test_anleitung_hat_die_liste_der_fehlenden_bilder():
-    text = _text(ANLEITUNG)
-    assert "## Bilder, die noch aufzunehmen sind" in text
-    assert "![" not in text, "noch keine Bilder — sonst die Liste kuerzen"
+def test_anleitung_bindet_ihre_bilder_ein():
+    """DOC-73: die Bilder zur Ansicht „Prioritäten“ (auch Spalte „Verdeckt“)
+    sind eingebunden und liegen im Repo; offen ist nur das Schaubild."""
+    import re
+    text = ANLEITUNG.read_text(encoding="utf-8")
+    assert "## Bilder, die noch aufzunehmen sind" not in text
+    bilder = re.findall(r"!\[[^\]]+\]\(([^)]+)\)", text)
+    assert "img/10_verdeckt.png" in bilder
+    assert len(bilder) >= 9, bilder
+    for pfad in bilder:
+        assert (ANLEITUNG.parent / pfad).is_file(), pfad
 
 
 def test_anleitung_steht_im_verzeichnis():
