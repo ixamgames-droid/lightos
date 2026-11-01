@@ -17,6 +17,7 @@ The element continuously mirrors the slot's state: it polls the executor about *
 From top to bottom, the element consists of three parts:
 
 1. **Title bar** (blue, bold, centered) — shows the widget's label („Cueliste" (cue list) in the picture). It is set in the settings.
+   Below it, small and grey, is the **target**, e.g. `Ex 3 · Seite 2 (folgt)` (follows) or `Ex 3 · Seite 2 (fest)` (fixed) — which executor on which executor page is currently controlled.
 2. **Cue list** (dark box) — one line per cue in the format `Nummer  Beschriftung` (number  label), e.g. `1.0  Rot`, `2.0  Gruen`, `3.0  Blau` (red, green, blue). If a cue has no label, `---` is shown there. The **currently running cue** is marked with a colored background.
 3. **Row of transport buttons** (three buttons side by side):
 
@@ -38,11 +39,12 @@ From top to bottom, the element consists of three parts:
 |---|---|---|
 | **Beschriftung** (label) | Text in the blue title bar above the list. Display only. | Free text. If the field is left empty, the previous label is kept. |
 | **Executor-Slot** | Which executor the widget remote-controls and displays. **Ex N** is executor N in the executor bar of the **currently active playback page** – not playback page N. | **Ex 1 to Ex 10** (default: Ex 1). The show file stores the 0-based index (`stack_slot`: 0 = Ex 1, 9 = Ex 10). |
+| **Seite** (page) | Which executor page the executor slot is on. **folgt der aktuellen Seite** (follows the current page) always controls the slot of the currently selected page (changing the page changes the target too). **feste Seite N** (fixed page N) always controls the slot on page N, no matter which page is selected. | **folgt der aktuellen Seite** (default, previous behaviour) or **feste Seite 1 to 10**. The show file only stores `fixed_page` (0-based: 0 = page 1) for a fixed page; without that entry the list follows the current page — so older shows stay unchanged. |
 
 ## Tips & pitfalls
 
 - **The slot must be occupied:** if the list shows nothing, no cuestack is loaded on the configured executor slot. First put a cuestack on the matching slot, or set **Executor-Slot** to the right number.
-- **Executor, not page:** „Ex 3" means “third executor of the executor bar”, not “playback page 3”. The cue list always follows the **currently active page**: if you change the page (e.g. with a bank button on the APC), the same widget controls Ex 3 of the new page. If a different cuestack appears than expected, either the Ex number or the active page is wrong.
+- **Executor, not page:** „Ex 3" means “third executor of the executor bar”, not “playback page 3”. By default (**Seite: folgt der aktuellen Seite**) the cue list follows the **currently active page**: if you change the page (e.g. with a bank button on the APC), the same widget controls Ex 3 of the new page. If the widget should always control the same cuestack, set **Seite** to a **feste Seite** (fixed page). If a different cuestack appears than expected, the target line below the title shows which Ex number and page currently apply.
 - **The list is display only:** clicking in the cue list does not jump to that cue. Always use GO / BACK / STOP to switch.
 - **Automatic update:** the display follows the real playback state (about every 200 ms). What you see marked in the list is the cue that is really running — even if it was triggered from elsewhere (hardware, another widget).
 - **GO ► moves on:** GO is not just “start” — every press advances one cue. Pressing repeatedly runs through the list step by step; BACK goes back accordingly.

@@ -96,6 +96,8 @@ class TempoTracker:
     RASTER_BASS_AUS = 0.3   # ... greift nur, wenn sich der Bass mit dem Sieger-Lag NICHT wiederholt
     RASTER_BASS_EIN = 0.5   # ... aber mit 2/3 davon deutlich (ac_bass/ac_bass[0]; Fehlfaelle 0,95..0,98)
     RASTER_SC_MIN = 0.5     # ... und der Kamm beim 2/3-Lag mind. diesen Anteil des Siegers traegt
+    RASTER_HI = True        # BPM-27: ... und das Hochband dem 2/3-Lag nicht widerspricht (Schalter)
+    RASTER_HI_EIN = 0.3     # ... ac_hi/ac_hi[0] beim 2/3-Lag: wahre Faelle 0,87..0,99, 3:2-Bass -0,13..0,00
     EST_SMOOTH = True       # Huellkurve vor der ACF gaussisch glaetten (SMOOTH_SIGMA Frames)
     SMOOTH_SIGMA = 1.0      # Frames (~12 ms); Spitzen zwischen zwei Lags verlieren sonst ACF-Hoehe
     HARM_WIDE = True        # Max-Filter +-2 an den Oberwellen 3 und 4
@@ -331,7 +333,7 @@ class TempoTracker:
         if sc[k] <= 0:
             return 0.0, 0.0, 0.0, 0.0, 0
         if self.RASTER_BASS and not self.tempo_hint:
-            k = self._bass_raster(L, sc, k, self._bass_acf(M))
+            k = self._bass_raster(L, sc, k, self._bass_acf(M), hi_M=M)
         a = int(L[k])
         bpm = 60.0 * self.fps / self._feinlage(ac, a, M)
         # Konfidenz: Periodizitaet x Onset-Kontrast
@@ -367,7 +369,11 @@ class TempoTracker:
     def _bass_acf(self, M: int):
         """(ac_bass[0], ac_bass mit Max-Filter +-1) ueber das Schaetzfenster, gleiche Kette wie die
         Gesamt-ACF (Glaettung, unbiased) — oder None, wenn das Fenster keinen Bass hat."""
-        b = self.env_bass[-M:].astype(np.float64)
+        return self._band_acf(self.env_bass, M)
+
+    def _band_acf(self, env: np.ndarray, M: int):
+        """Wie ``_bass_acf`` fuer eine beliebige Band-Huellkurve (Bass / Hochband)."""
+        b = env[-M:].astype(np.float64)
         if self.EST_SMOOTH:
             b = np.convolve(b, self._smooth_k, mode="same")
         b -= b.mean()
@@ -382,7 +388,7 @@ class TempoTracker:
         np.maximum(acbm[1:-1], acb[2:], out=acbm[1:-1])
         return float(acb[0]), acbm
 
-    def _bass_raster(self, L: np.ndarray, sc: np.ndarray, k: int, bacf) -> int:
+    def _bass_raster(self, L: np.ndarray, sc: np.ndarray, k: int, bacf, hi_M: int = 0) -> int:
         """Bass-Raster-Waechter: Index des Kamm-Kandidaten, der gewinnt (``k`` oder der 2/3-Lag).
 
         Ist die Hihat im geweissten Flux so stark wie die Kick, ist die Huellkurve ein gleichmaessiger
@@ -391,7 +397,14 @@ class TempoTracker:
         Kicks wiederholen sich dann aber NICHT mit dem Sieger-Lag (ac_bass/ac_bass[0] gemessen
         -0,10..-0,15), wohl aber mit 2/3 davon (0,95..0,98); bei allen richtigen Faellen der Messbank
         ist es umgekehrt (Sieger 0,75..1,00, 2/3 hoechstens -0,06). Dann gilt das Kick-Raster —
-        sofern der Kamm dort mind. RASTER_SC_MIN des Siegers traegt. Tempo-Hinweis: kein Eingriff."""
+        sofern der Kamm dort mind. RASTER_SC_MIN des Siegers traegt. Tempo-Hinweis: kein Eingriff.
+
+        BPM-27 (Codex-Review #831): die Bass-Huellkurve kann eine Kick nicht von einer Bassnote
+        unterscheiden. Gerader Beat (Snare/Hats auf jedem Viertel) + Bassfigur im 2/3-Abstand
+        (Viertel-Triolen, 3:2) erfuellte alle Bedingungen und rastete auf 1,5 x Tempo ein (120 -> 180).
+        Unterscheidung: im echten Fehlfall (BPM-26, Offbeat-Schlag) wiederholt sich auch das Hochband
+        mit dem 2/3-Lag (ac_hi/ac_hi[0] 0,87..0,99), beim 3:2-Bass nicht (-0,13..0,00) — dort traegt
+        das Hochband den Hauptpuls des Siegers. Ohne Hochband (``hi_M`` 0 / leere Huellkurve): wie vorher."""
         if bacf is None:
             return k
         r0, acbm = bacf
@@ -406,6 +419,10 @@ class TempoTracker:
         j = j0 + int(np.argmax(sc[j0:j1]))
         if sc[j] < self.RASTER_SC_MIN * sc[k] or acbm[int(L[j])] < self.RASTER_BASS_EIN * r0:
             return k
+        if self.RASTER_HI and hi_M > 0:
+            hacf = self._band_acf(self.env_hi, hi_M)
+            if hacf is not None and hacf[1][int(L[j])] < self.RASTER_HI_EIN * hacf[0]:
+                return k                                # Hochband widerspricht: Bassfigur, kein Kick-Raster
         return j
 
     # ------------------------------------------------------------ Feinlage (BPM-20)

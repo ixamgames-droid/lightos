@@ -7,6 +7,7 @@ from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
 from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
 from .vc_widget import VCWidget
+from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert   # ENG-41
 from src.core import undo as _verlauf      # UI-93: gemeinsame Schrittnummern
 
 
@@ -622,6 +623,7 @@ class VCCanvas(QWidget):
                         self._assign_snapshot_index = None
                         self._awaiting_button_click_for = None
                         self.setCursor(Qt.CursorShape.ArrowCursor)
+                        belegung_geaendert()      # ENG-41
                         self.snapshot_assign_done.emit()
                         return
                     elif mode == "function":
@@ -640,6 +642,7 @@ class VCCanvas(QWidget):
                         self._assign_function_id = None
                         self._awaiting_button_click_for = None
                         self.setCursor(Qt.CursorShape.ArrowCursor)
+                        belegung_geaendert()      # ENG-41
                         self.function_assign_done.emit()
                         return
                     elif mode == "library_snap":
@@ -647,6 +650,7 @@ class VCCanvas(QWidget):
                         self._assign_snap_id = None
                         self._awaiting_button_click_for = None
                         self.setCursor(Qt.CursorShape.ArrowCursor)
+                        belegung_geaendert()      # ENG-41
                         self.snap_assign_done.emit()
                         return
 
@@ -949,8 +953,16 @@ class VCCanvas(QWidget):
 
     # ── apply_drop (testbar ohne echten Drag) ────────────────────────────────
 
-    def apply_drop(self, *, function_id=None, snapshot_index=None, snap_id=None,
-                   pos=None, target=None, interactive: bool = False):
+    def apply_drop(self, **kwargs):
+        """Wie :meth:`_apply_drop` — danach ziehen offene Ueberschneidungs-
+        Hinweise anderer Bedienelemente nach (ENG-41), auch nach Abbruch."""
+        try:
+            return self._apply_drop(**kwargs)
+        finally:
+            belegung_geaendert()
+
+    def _apply_drop(self, *, function_id=None, snapshot_index=None, snap_id=None,
+                    pos=None, target=None, interactive: bool = False):
         """Fuehrt den Drop aus: Funktion, Snapshot oder Bibliothek-Snap (Farbe/Look)
         auf ein Ziel-Widget oder das leere Canvas anwenden.
 
@@ -1899,6 +1911,7 @@ class VCCanvas(QWidget):
             # Beim Laden einer ganzen Konsole prueft ``from_dict`` einmal am Ende.
             if not self._laedt_layout:
                 self._kennungen_reparieren()
+                belegung_geaendert()      # ENG-41: eingefuegt/kopiert
         else:
             snapped = QPoint(
                 round(pos.x() / self.GRID) * self.GRID,
@@ -2008,6 +2021,7 @@ class VCCanvas(QWidget):
                     x += w.width() + gap
         finally:
             self._restoring = _prev_restoring
+            belegung_geaendert()      # ENG-41: neue Effekt-Fader mit festem Ziel
         return created
 
     def handle_drag_drop(self, widget):
@@ -2092,6 +2106,8 @@ class VCCanvas(QWidget):
             self._reattach_highlight(widget, had_hl)
             widget.show()
             widget.update()
+        # ENG-41: in einen/aus einem Solo-Frame gezogen -> andere Exklusiv-Gruppe.
+        belegung_geaendert()
         self.popups_nach_oben()
 
     @staticmethod
@@ -2175,6 +2191,7 @@ class VCCanvas(QWidget):
         widget.setParent(None)
         widget.deleteLater()
         self._update_content_extent()
+        belegung_geaendert()              # ENG-41
         try:
             if _handy_vorher is not None and self.handy_seiten() != _handy_vorher:
                 self.handy_seiten_changed.emit()
