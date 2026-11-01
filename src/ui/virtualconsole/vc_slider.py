@@ -1330,6 +1330,9 @@ class VCSlider(VCWidget):
                 midi_cc_spin.value(), midi_ch_spin.value())
             self.update()
             self._post_dialog_mode_sync(_old_mode, _old_group)
+            # ENG-41: offene Hinweiszeilen ANDERER Bedienelemente ziehen nach.
+            from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert
+            belegung_geaendert()
 
     def _reset_group_dimmer(self, group_name: str):
         """Setzt die Fixture-Dimmer einer (alten) Gruppe auf 1.0 zurueck — sonst

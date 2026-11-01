@@ -1,15 +1,33 @@
 #!/usr/bin/env python3
-"""VIZ-60 — Moving Heads am echten Rig einmessen, ohne KI und ohne Rechnerei.
+"""VIZ-60 (VERALTET — nimm das Einmessen in der App) — zwei Moving Heads am Rig vergleichen.
 
-WOFUER
-------
-Damit LightOS zwei Moving Heads auf denselben PUNKT IM RAUM zielen kann, muss
-es wissen, wie sie wirklich stehen: Abstand, Hoehe, Montagerichtung, und wo die
-DMX-Nullpunkte der beiden Achsen liegen. Diese Werte stehen in KEINEM
-Datenblatt — sie haengen am Aufbau. Wer sie raet, zielt daneben.
+VERALTET
+--------
+Das Einmessen gehoert inzwischen in die Oberflaeche (VIZ-55): Visualizer ->
+Modus Bauen -> Reiter Fixtures -> Gruppe "Einmessen (Moving Heads)". Das
+funktioniert fuer beliebig viele Geraete und jede Aufstellung und speichert das
+Ergebnis in der Show. Anleitung: docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md.
+Dieses Kommandozeilen-Werkzeug bleibt nur als Notbehelf und wird nicht
+weiterentwickelt.
 
-Dieses Werkzeug ermittelt sie am Geraet: Du richtest beide Koepfe auf denselben
-Punkt, das Programm rechnet daraus zurueck.
+WAS ES KANN — UND WAS NICHT
+---------------------------
+Du richtest ZWEI Koepfe auf denselben Punkt und gibst dessen Entfernung ein; das
+Werkzeug rechnet aus der Pan-/Tilt-Differenz einen Geraeteabstand und einen
+Hoehenversatz der beiden Koepfe aus und zeigt sie als Klartext.
+
+Grenzen:
+
+* nur genau zwei Koepfe, nur ein Enttec DMX USB Pro;
+* feste Kanalbelegung (Hero Spot 90, 16 Bit, s. ``KANAL``) — andere Geraete
+  bekommen falsche Werte;
+* der Pan-Bereich wird NICHT ermittelt: mit zwei verschiedenen Entfernungen
+  meldet das Werkzeug nur, dass er bestimmbar waere; Pan-/Tilt-Bereich kommen
+  aus ``--pan-range``/``--tilt-range``;
+* die abgefragte Hoehe des Ziels wird nur gemerkt und in der Zusammenfassung
+  angezeigt, sie fliesst in keine Rechnung ein;
+* keine Erkennung vertauschter Koepfe, keine DMX-Nullpunkte, keine
+  Montagerichtung.
 
 WIE ES BEDIENT WIRD
 -------------------
@@ -22,8 +40,7 @@ Pfeiltasten bewegen, Leertaste schaltet um, was bewegt wird:
     Pfeile      bewegen (fein)
     Leertaste   Auswahl umschalten
     +/-         Dimmer
-    Enter       Punkt uebernehmen
-    m           Zielpunkt vermessen (Hoehe/Seite/Abstand eingeben)
+    Enter       Punkt uebernehmen (fragt Entfernung und Hoehe des Ziels ab)
     q           beenden
 
     Grob (8x):  Linux/macOS  Shift+Pfeile
@@ -51,10 +68,10 @@ WAS DIESES WERKZEUG AUS EINEM ABEND AM RIG GELERNT HAT (26.08.2026)
   Pan sind Geraeteabstand und Pan-BEREICH nicht zu trennen, solange alle Ziele
   gleich weit weg sind: 540 Grad mit 103 cm Abstand und 310 Grad mit 59 cm
   sagen dasselbe voraus. Erst ein Ziel in ANDERER ENTFERNUNG trennt sie —
-  darum fragt das Werkzeug danach.
+  darum fragt das Werkzeug danach (die Auswertung selbst macht es nicht).
 * **Links und rechts koennen vertauscht sein.** Das faellt nicht auf, solange
-  man nur geradeaus zielt. Die Rueckrechnung erkennt es (die vertauschte
-  Variante passt dann messbar besser) und sagt es.
+  man nur geradeaus zielt. Dieses Werkzeug erkennt es NICHT — pruef die
+  Adressen von Kopf A und B von Hand.
 
 Aufruf::
 
@@ -69,8 +86,11 @@ oeffnet LightOS seit STAB-39 kein DMX-Interface von selbst.
 ``--port`` darf entfallen: die Vorgabe ist ``/dev/ttyUSB0`` bzw. auf Windows der
 erste tatsaechlich vorhandene COM-Port (s. ``standard_port``).
 
-Ausgabe: die Kalibrierwerte als Klartext und als fertiger Python-Schnipsel.
-Das Werkzeug SCHREIBT NICHTS — weder in die Show-DB noch in eine Show-Datei.
+Ohne ``LIGHTOS_ECHTE_AUSGABE=1`` bricht das Werkzeug beim Oeffnen des Ports ab.
+
+Ausgabe: Geraeteabstand und Hoehenversatz je Punkt als Klartext auf der
+Konsole. Das Werkzeug SCHREIBT NICHTS — weder in die Show-DB noch in eine
+Show-Datei; die Werte musst du selbst uebertragen.
 """
 from __future__ import annotations
 
@@ -101,6 +121,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # ein Lookup in ``sys.modules`` und damit auch in der 44-fps-Schleife gratis.
 _PLAT = sys.platform
 IST_WINDOWS = _PLAT == "win32"
+
+VERALTET_HINWEIS = (
+    "VERALTET — nimm das Einmessen in der App (Visualizer -> Bauen -> Fixtures "
+    "-> Einmessen, VIZ-55; docs/anleitung_einmessen/ANLEITUNG_EINMESSEN.md).")
 
 DMX_BYTES = 512
 KANAL = {"pan": 1, "pan_fine": 2, "tilt": 3, "tilt_fine": 4,
@@ -313,11 +337,13 @@ def zeige_zweideutigkeit(pan_diff: float, entfernung: float) -> None:
         a = 2 * entfernung * math.tan(math.radians(pan_diff / 255.0 * r / 2))
         print(f"     Pan-Bereich {r:3d} Grad  ->  Geraeteabstand {a * 100:5.0f} cm")
     print("  Miss den Abstand der Linsen nach, oder mess einen Punkt in ANDERER")
-    print("  Entfernung ein — dann entscheidet die Rechnung selbst.")
+    print("  Entfernung ein und rechne den Pan-Bereich selbst nach — dieses")
+    print("  Werkzeug wertet das nicht aus.")
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0],
+                                 epilog=VERALTET_HINWEIS)
     ap.add_argument("--port", default=standard_port())
     ap.add_argument("--adressen", default="1,17",
                     help="DMX-Startadressen der beiden Koepfe, z. B. 1,17")
@@ -325,6 +351,7 @@ def main(argv=None) -> int:
     ap.add_argument("--tilt-range", type=float, default=270.0)
     ap.add_argument("--fps", type=float, default=44.0)
     args = ap.parse_args(argv)
+    print(VERALTET_HINWEIS)
 
     belegt, halter, sicher = port_halter(args.port)
     if belegt:
@@ -436,8 +463,8 @@ def main(argv=None) -> int:
                     if len(punkte) == 1:
                         zeige_zweideutigkeit(abs(pd), ent_f)
                     if len({round(p["entfernung"], 1) for p in punkte}) >= 2:
-                        print("\n  Zwei verschiedene Entfernungen — jetzt ist der Pan-Bereich")
-                        print("  bestimmbar. (Auswertung: siehe Zusammenfassung mit 'q'.)")
+                        print("\n  Zwei verschiedene Entfernungen — jetzt waere der Pan-Bereich")
+                        print("  bestimmbar. Dieses Werkzeug rechnet ihn NICHT aus.")
                     print()
                 elif t == "q":
                     break
@@ -468,7 +495,8 @@ def main(argv=None) -> int:
         print("Pan-Bereich bleiben dadurch gekoppelt — miss die Linsen nach oder")
         print("nimm einen Punkt in anderer Entfernung dazu.")
     else:
-        print("Zwei Entfernungen vorhanden — der Pan-Bereich ist damit bestimmbar.")
+        print("Zwei Entfernungen vorhanden — der Pan-Bereich waere damit bestimmbar;")
+        print("dieses Werkzeug rechnet ihn nicht aus.")
     return 0
 
 
