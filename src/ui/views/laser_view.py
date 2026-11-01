@@ -26,6 +26,7 @@ Nutzeraktion; es gibt keinen Auto-Start.
 """
 from __future__ import annotations
 
+import functools
 import html
 import importlib
 from dataclasses import dataclass
@@ -90,7 +91,7 @@ _ROW_GROUPS: list[tuple[str, tuple[str, ...]]] = [
       "zoom", "laser_zoom_x", "laser_zoom_y")),
     ("Zeichnen", ("laser_draw_mode", "laser_draw")),
 ]
-# Alles Übrige (laser_boundary, laser_twist, laser_grating, laser_dots, macro,
+# Alles Übrige (laser_boundary, laser_twist(_y), laser_grating, laser_dots, macro,
 # raw, …) landet in der einklappbaren „Weitere Kanäle"-Gruppe.
 _ADVANCED_GROUP = "Weitere Kanäle"
 _GROUPED_ATTRS = frozenset(a for _n, attrs in _ROW_GROUPS for a in attrs)
@@ -150,6 +151,21 @@ def row_label(channel) -> str:
     if not name or name == attr:
         return attr_label(attr)
     return name
+
+
+def zwei_mustergruppen(channels) -> bool:
+    """LAS-43: Hat das Geraet eine echte zweite Mustergruppe (L2600: Gruppe A
+    und B doppeln MEHRERE Laser-Attribute, jedes gleich oft)? Nur dann gilt
+    das 2. Vorkommen als Gruppe B. Doppelt sich nur EIN Attribut (EL-230 aus
+    einem aelteren Import: „Mode“ und „Pattern“ beide ``macro``) oder
+    verschieden oft, sind es einfach verschiedene Kanaele."""
+    counts: dict[str, int] = {}
+    for ch in channels or ():
+        attr = getattr(ch, "attribute", "") or ""
+        if im_laser_reiter(attr):
+            counts[attr] = counts.get(attr, 0) + 1
+    doppelt = [n for n in counts.values() if n > 1]
+    return len(doppelt) >= 2 and len(set(doppelt)) == 1
 
 
 def _range_value(rng) -> int:
@@ -333,7 +349,8 @@ class _ChannelRow(QWidget):
     ``kompakt`` (LAS-34): nur Schieber und Zahlenfeld — die Zeile hinter
     „alle 0–255“ unter der Muster-Galerie bzw. den Farbfeldern."""
 
-    def __init__(self, channel, on_change, parent=None, kompakt: bool = False):
+    def __init__(self, channel, on_change, parent=None, kompakt: bool = False,
+                 titel: str | None = None):
         super().__init__(parent)
         self.attribute = channel.attribute
         self._on_change = on_change
@@ -343,7 +360,7 @@ class _ChannelRow(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
 
-        lbl = QLabel(row_label(channel))
+        lbl = QLabel(titel if titel else row_label(channel))
         # LAS-26: feste Spaltenbreiten — vorher sass jeder Regler je nach
         # Namens- und Bereichslaenge woanders, die Zeilen fluchteten nicht.
         lbl.setFixedWidth(LABEL_BREITE)
@@ -495,6 +512,10 @@ class LaserView(QWidget):
         self._collapsible_groups: dict[str, list[str]] = {}
         self._template_sig: tuple = ()
         self._head_mode: str = "A"          # "A" | "B" | "AB"
+        # LAS-43: Attribute, deren Kanaele einzeln Regler bekommen (doppeltes
+        # Attribut ohne echte zweite Mustergruppe), und der Kopf je Zeile.
+        self._getrennt: set[str] = set()
+        self._row_kopf: dict[str, int] = {}
         # LAS-34: aktive Bausteine und ihre Regler.
         self._plan = _Plan()
         self._sprech: dict[str, SprechRegler] = {}
@@ -1051,7 +1072,7 @@ class LaserView(QWidget):
             self._info.setText(
                 f"{len(self._fixtures)} Laser: {names}"
                 + (f" … (+{more})" if more > 0 else ""))
-            self._head_box.setVisible(self._max_head_count() > 1)
+            self._head_box.setVisible(self._mustergruppen())
 
         # Safety-Box nur für Netzwerk-Streaming-Laser (Klasse B) in der Auswahl
         # — über den Fähigkeits-Klassifikator (LAS-12), eine Wahrheitsquelle.
@@ -1071,12 +1092,21 @@ class LaserView(QWidget):
         self._sync_arm_from_manager()   # VC-/MIDI-Änderungen widerspiegeln
         self._apply_figure_to_selection()
 
+        self._getrennt = self._getrennte_attribute()
+        if not self._mustergruppen() and self._head_mode != "A":
+            # Ohne Gruppe B (Umschalter verborgen) gilt immer Gruppe A.
+            for rb in self._head_group.buttons():
+                if rb.text() == "Gruppe A":
+                    rb.setChecked(True)
+            self._head_mode = "A"
+
         template = self._template_channels()
         self._kanal_je_attr = {getattr(ch, "attribute", ""): ch
                                for ch in template}
         plan = self._plan_bilden(template)
         sig = (tuple((ch.attribute, int(getattr(ch, "channel_number", 0) or 0))
-                     for ch in template), plan.kennung())
+                     for ch in template), plan.kennung(),
+               tuple(sorted(self._getrennt)))
         if sig != self._template_sig:
             self._template_sig = sig
             self._plan = plan
@@ -1523,6 +1553,92 @@ class LaserView(QWidget):
                 best = max(best, max(counts.values()))
         return best
 
+    def _kanaele(self, fx) -> list:
+        try:
+            return list(get_channels_for_patched(fx) or ())
+        except Exception:
+            return []
+
+    def _mustergruppen(self) -> bool:
+        """LAS-43: Umschalter „Mustergruppe“ nur, wenn ein gewaehlter Laser
+        wirklich zwei Gruppen hat (``zwei_mustergruppen``)."""
+        return any(zwei_mustergruppen(self._kanaele(f))
+                   for f in self._fixtures)
+
+    def _getrennte_attribute(self) -> set[str]:
+        """LAS-43: doppelte Laser-Attribute ohne echte zweite Mustergruppe —
+        jeder ihrer Kanaele bekommt einen eigenen Regler. Mit Mustergruppe
+        in der Auswahl bleibt es bei der A/B-Bedienung."""
+        if self._mustergruppen():
+            return set()
+        out: set[str] = set()
+        for f in self._fixtures:
+            counts: dict[str, int] = {}
+            for ch in self._kanaele(f):
+                attr = getattr(ch, "attribute", "") or ""
+                if im_laser_reiter(attr):
+                    counts[attr] = counts.get(attr, 0) + 1
+            out |= {a for a, n in counts.items() if n > 1}
+        return out
+
+    def _vorkommen(self, fx, attr: str) -> list:
+        return [ch for ch in self._kanaele(fx)
+                if (getattr(ch, "attribute", "") or "") == attr]
+
+    def _kanal_wert(self, fx, attr: str, kopf: int) -> int:
+        """LAS-43: was der ``kopf``-te Kanal dieses Attributs gerade bekommt —
+        eigener Programmer-Wert, sonst (ab dem 2. Kanal) der gespiegelte des
+        ersten, sonst sein Grundwert. Dieselbe Regel wie die Ausgabe."""
+        state = get_state()
+        fid = getattr(fx, "fid", None)
+        val = None
+        for h in ((kopf, 0) if kopf > 0 else (0,)):
+            try:
+                val = state.get_programmer_value(fid, attr, head=h)
+            except Exception:
+                val = None
+            if val is not None:
+                break
+        if val is None:
+            occ = self._vorkommen(fx, attr)
+            ch = occ[kopf] if kopf < len(occ) else None
+            val = getattr(ch, "default_value", 0) if ch is not None else 0
+        try:
+            return max(0, min(255, int(val or 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    def _weitere_kanaele_festhalten(self, attr: str):
+        """LAS-43: Bevor der erste Kanal eines getrennten Attributs geschrieben
+        wird, bekommen die weiteren Kanaele ohne eigenen Wert ihren
+        BISHERIGEN Wert fest — sonst spiegelt die Ausgabe den neuen Wert auf
+        sie (Kopf>0 folgt Kopf 0). Es aendert sich dabei kein Ausgabewert."""
+        state = get_state()
+        for f in self._fixtures:
+            fid = getattr(f, "fid", None)
+            if fid is None:
+                continue
+            for kopf in range(1, len(self._vorkommen(f, attr))):
+                try:
+                    eigen = state.get_programmer_value(fid, attr, head=kopf)
+                except Exception:
+                    eigen = None
+                if eigen is None:
+                    state.set_programmer_value(
+                        fid, attr, self._kanal_wert(f, attr, kopf), head=kopf)
+
+    def _write_kanal(self, kopf: int, attr: str, value: int):
+        """LAS-43: Regler eines einzelnen Kanals (``kopf``-tes Vorkommen)."""
+        if kopf == 0:
+            self._write_value(attr, value)
+            return
+        state = get_state()
+        for f in self._fixtures:
+            fid = getattr(f, "fid", None)
+            if fid is not None and len(self._vorkommen(f, attr)) > kopf:
+                state.set_programmer_value(fid, attr, int(value), head=kopf)
+        self._bausteine_laden()
+
     # ── LAS-34: Bausteine ─────────────────────────────────────────────────
     def _plan_bilden(self, template: list) -> _Plan:
         """Welche Bausteine die Auswahl bekommt. Ein Baustein entsteht nur,
@@ -1888,7 +2004,9 @@ class LaserView(QWidget):
         """Alle Attribute, die dieser Reiter gerade bedient: Regler-Zeilen,
         Bausteine und die Betriebsart-Kacheln. Für die Zusage „kein Kanal
         geht verloren“ (UI-89, LAS-34)."""
-        out = set(self._rows) | set(self._sprech)
+        # LAS-43: getrennte Kanalzeilen heissen „attr#1“ — gezaehlt wird das
+        # Attribut.
+        out = {k.split("#", 1)[0] for k in self._rows} | set(self._sprech)
         plan = self._plan
         if plan.betriebsart is not None and not self._seg_box.isHidden():
             out.add(plan.betriebsart.attribut)
@@ -1910,11 +2028,25 @@ class LaserView(QWidget):
             if w is not None:
                 w.deleteLater()
         self._rows = {}
+        self._row_kopf = {}
         self._collapsible_groups = {}
         # LAS-34: was ein Baustein bedient, bekommt hier keine Zeile.
         ohne = self._plan.abgedeckt()
+        # LAS-43: doppelte Attribute ohne zweite Mustergruppe — je Kanal ein
+        # Regler, ganz oben und nie eingeklappt (dort steht z. B. „Mode“).
+        # Bedient ein Baustein das Attribut, fehlt nur die Zeile des ERSTEN
+        # Kanals (die schreibt der Baustein); die weiteren Kanaele behalten
+        # ihren Regler — sonst blieben sie nach dem Festhalten unbedienbar.
+        getrennt = [ch for ch in template
+                    if getattr(ch, "attribute", "") in self._getrennt]
+        if getrennt:
+            box = self._make_kanal_gruppe(getrennt, ohne)
+            if box is not None:
+                self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
         template = [ch for ch in template
                     if getattr(ch, "attribute", "") not in ohne]
+        template = [ch for ch in template
+                    if getattr(ch, "attribute", "") not in self._getrennt]
         by_attr = {getattr(ch, "attribute", ""): ch for ch in template}
 
         # Kern-Achsen als benannte Gruppen (Muster / Farbe / Bewegung … /
@@ -1938,6 +2070,41 @@ class LaserView(QWidget):
             box = self._make_row_group(_ADVANCED_GROUP, rest, collapsed=True)
             self._rows_lay.insertWidget(self._rows_lay.count() - 1, box)
         self._rows_host.setVisible(bool(self._rows))
+
+    def _make_kanal_gruppe(self, vertreter: list,
+                           ohne: set | frozenset = frozenset()) -> QGroupBox | None:
+        """LAS-43: eine Zeile je KANAL fuer die getrennten Attribute,
+        beschriftet mit Kanalnummer und Kanalname. Die Kanaele kommen vom
+        gewaehlten Laser mit den meisten Vorkommen."""
+        box = QGroupBox("Einzelne Kanäle")
+        box.setToolTip("Diese Kanäle tragen im Profil dasselbe Attribut — "
+                       "jeder hat hier seinen eigenen Regler.")
+        lay = QVBoxLayout(box)
+        lay.setSpacing(3)
+        lay.setContentsMargins(8, 4, 8, 6)
+        for ch0 in vertreter:
+            attr = ch0.attribute
+            occ: list = []
+            for f in self._fixtures:
+                o = self._vorkommen(f, attr)
+                if len(o) > len(occ):
+                    occ = o
+            for kopf, ch in enumerate(occ):
+                if kopf == 0 and attr in ohne:
+                    continue        # Kanal 1 bedient der Baustein
+                nr = int(getattr(ch, "channel_number", 0) or 0)
+                titel = f"Kanal {nr} · {row_label(ch)}"
+                row = _ChannelRow(ch, functools.partial(self._write_kanal,
+                                                        kopf),
+                                  titel=titel)
+                key = attr if kopf == 0 else f"{attr}#{kopf}"
+                self._rows[key] = row
+                self._row_kopf[key] = kopf
+                lay.addWidget(row)
+        if lay.count() == 0:
+            box.deleteLater()
+            return None
+        return box
 
     def _make_row_group(self, title: str, channels: list,
                         collapsed: bool) -> QGroupBox:
@@ -2209,6 +2376,8 @@ class LaserView(QWidget):
         return [h for h in heads if h == 0 or count > h]
 
     def _write_value(self, attr: str, value: int):
+        if attr in self._getrennt:
+            self._weitere_kanaele_festhalten(attr)
         state = get_state()
         for f in self._fixtures:
             fid = getattr(f, "fid", None)
@@ -2229,6 +2398,11 @@ class LaserView(QWidget):
         fid = getattr(first, "fid", None)
         read_head = 1 if self._head_mode == "B" else 0
         for attr, row in self._rows.items():
+            kopf = self._row_kopf.get(attr)
+            if kopf is not None:
+                row.set_value(self._kanal_wert(first, attr.split("#", 1)[0],
+                                               kopf))
+                continue
             try:
                 val = state.get_programmer_value(fid, attr, head=read_head)
             except TypeError:

@@ -384,16 +384,23 @@ def _kurz(seriennr) -> str:
 
 
 def _gleicher_port(a, b) -> bool:
-    """OUT-80: derselbe Portname — gleichgesetzt wird nur die Gross-/
-    Kleinschreibung eines Windows-Namens (``com3``/``COM3``). Bewusst KEIN
-    Aufloesen von Symlinks (``/dev/serial/by-id``): zwei Namen fuer einen
-    Anschluss bietet der Dialog nicht an (Gegenpruefung 2)."""
+    """OUT-80: derselbe Anschluss — Gross-/Kleinschreibung eines Windows-Namens
+    (``com3``/``COM3``) gleichgesetzt. OUT-81: unter Linux/macOS auch ein
+    Symlink (``/dev/serial/by-id/…``) und das ``ttyUSB…``, auf das er zeigt —
+    der Dialog bietet beide Namen an."""
     a, b = str(a or "").strip(), str(b or "").strip()
-    if not a:
+    if not a or not b:
         return False
     if a.upper().startswith("COM") and b.upper().startswith("COM"):
         return a.upper() == b.upper()
-    return a == b
+    if a == b:
+        return True
+    if os.name != "nt" and a.startswith("/") and b.startswith("/"):
+        try:
+            return os.path.realpath(a) == os.path.realpath(b)
+        except (OSError, ValueError):
+            return False
+    return False
 
 
 def _laufende_seriennr(om, univ) -> str | None:
@@ -1354,8 +1361,10 @@ class OutputConfigDialog(QDialog):
         aktuell = (bevorzugt or self._combo_port.currentData()
                    or _gespeicherter_enttec_port())
         alle_zeigen = self._check_alle_ports.isChecked()
-        anschluesse = anschluss_auswahl.ordnen(
-            serial.tools.list_ports.comports())
+        # OUT-81: unter Linux zusaetzlich die stabilen Namen aus
+        # /dev/serial/by-id, je direkt unter ihrem Anschluss.
+        anschluesse = anschluss_auswahl.mit_stabilen_namen(
+            anschluss_auswahl.ordnen(serial.tools.list_ports.comports()))
         self._anschluesse = anschluesse
         # Der Neuaufbau meldet jede Zwischenauswahl — die Hinweiszeile wird
         # einmal am Ende gesetzt, nicht je Eintrag.

@@ -204,6 +204,16 @@ def diagnose_port(configured: str) -> str | None:
         vorhanden = []
     if want and want in vorhanden:
         return None
+    # OUT-81: ein stabiler Name (``/dev/serial/by-id/…``) steht nicht in
+    # ``comports()`` — dort steht das ``ttyUSB…``, auf das er zeigt. Derselbe
+    # Anschluss, also unauffaellig. Nur POSIX: unter Windows bleibt es beim
+    # woertlichen Vergleich.
+    if want and os.name != "nt" and want.startswith("/"):
+        try:
+            if any(_port_key(v) == _port_key(want) for v in vorhanden):
+                return None
+        except Exception:
+            pass
 
     try:
         gefunden = find_enttec_port()

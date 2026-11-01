@@ -231,6 +231,7 @@ Renderer hängen daran). Gibt es kein passendes, `raw`.
 | `laser_draw` | Laser: Zeichnen |
 | `laser_draw_mode` | Laser: Zeichenmodus |
 | `laser_twist` | Laser: Verdrehung |
+| `laser_twist_y` | Laser: Verdrehung vertikal (zweiter Flip-Kanal) |
 | `laser_grating` | Laser: Gitter |
 | `laser_scan_rate` | Laser: Scanrate |
 

@@ -278,6 +278,7 @@ class FreiGebautTest(_Fall):
 
     def test_frisches_profil_bleibt_eigen(self):
         dlg = self._dialog()
+        dlg._tabs.currentWidget().beispiel_einfuegen()   # FM-71: startet leer
         dlg._edit_mfr.setText("Eigenbau")
         dlg._edit_model.setText("FM76 frei")
         dlg._edit_short.setText("FREI")

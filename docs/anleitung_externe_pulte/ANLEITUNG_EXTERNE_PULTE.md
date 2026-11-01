@@ -76,9 +76,19 @@ Die Aufbauten lassen sich kombinieren, zum Beispiel B und C.
   Pult-Sitzung bei, tauscht keine Showdaten aus und ist kein Backup-Pult. Es antwortet
   auch nicht auf die Art-Net-Gerätesuche (ArtPoll): In der Geräteliste des Pults taucht
   LightOS nicht von selbst auf — Adresse und Universum trägst du von Hand ein.
-- **Kein Auslösen über Timecode.** LightOS zeigt eingehenden MIDI-Timecode an
-  (Sektion **E/A** → Reiter **MIDI** → **MTC - MIDI Time Code Reader**: Zeit und Bildrate),
-  löst damit aber nichts aus.
+- **Timecode löst nur Sprünge in Cuelisten aus.** LightOS liest eingehenden
+  MIDI-Timecode (MTC) von allen geöffneten MIDI-Eingängen — auch unter Windows ohne
+  rtmidi — und zeigt ihn an (Sektion **E/A** → Reiter **MIDI** →
+  **MTC - MIDI Time Code Reader**: Zeit und Bildrate). Eine Cue mit einem Eintrag in der Spalte
+  **Timecode** der Cueliste wird ausgelöst, sobald der Timecode diesen Wert erreicht
+  oder überschreitet; die Cueliste muss dazu auf einem Executor liegen. Springt der
+  Timecode zurück (DAW auf Anfang), löst das nichts aus — die Cues danach lösen beim
+  erneuten Erreichen wieder aus. Überspringt der Timecode mehrere Cues auf einmal,
+  springt LightOS nur auf die letzte davon. Timecode über Art-Net (ArtTimeCode) oder
+  LTC als Audiosignal kann LightOS nicht.
+- **MIDI-Clock nur als Tempo.** Ein Pult oder eine DAW kann über MIDI-Clock den Takt
+  vorgeben (BPM-Manager, Quelle **MIDI-Clock (Pult/DAW)**). Start/Stop des Pults
+  startet und stoppt keine Cueliste.
 - **Der DMX-Eingang nimmt je Protokoll ein Universum an:** eines über Art-Net und eines
   über sACN. Stellst du ein anderes eingehendes Universum ein, ersetzt es das vorherige.
 - **Der DMX-Eingang wird nicht gespeichert.** Nach jedem Programmstart schaltest du ihn

@@ -341,7 +341,10 @@ class _GeneratorFall(unittest.TestCase):
     #    Waechter fuer sie blind ODER rot; beides faellt sofort auf.
 
     def _generator(self):
-        dlg = gen_module.FixtureGeneratorDialog()
+        # FM-71: der Generator startet leer; diese Tests messen am frueheren Start
+        # mit dem RGB-Beispiel (sonst faengt der Modus-Check vor ihnen ab).
+        dlg = gen_module.FixtureGeneratorDialog(model=gen_module.GeneratorModel(
+            modes=[gen_module.GenMode("Default", gen_module.beispiel_kanaele())]))
         self.addCleanup(dlg.deleteLater)
         # Gemessen: headless (`QT_QPA_PLATFORM=offscreen`) bekommt der Dialog
         # ohne ausdrueckliche Groesse eine Zeile mit HOEHE 0 — der Import-Knopf
