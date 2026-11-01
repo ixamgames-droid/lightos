@@ -1106,7 +1106,7 @@ class LaserView(QWidget):
         plan = self._plan_bilden(template)
         sig = (tuple((ch.attribute, int(getattr(ch, "channel_number", 0) or 0))
                      for ch in template), plan.kennung(),
-               tuple(sorted(self._getrennt)))
+               tuple(sorted(self._getrennt)), self._kanal_gruppe_sig())
         if sig != self._template_sig:
             self._template_sig = sig
             self._plan = plan
@@ -1580,6 +1580,33 @@ class LaserView(QWidget):
                     counts[attr] = counts.get(attr, 0) + 1
             out |= {a for a, n in counts.items() if n > 1}
         return out
+
+    def _getrennt_vorkommen(self, attr: str) -> list:
+        """LAS-43: die Kanaele eines getrennten Attributs vom gewaehlten
+        Laser mit den meisten Vorkommen (Quelle der „Einzelne Kanäle“)."""
+        occ: list = []
+        for f in self._fixtures:
+            o = self._vorkommen(f, attr)
+            if len(o) > len(occ):
+                occ = o
+        return occ
+
+    def _kanal_gruppe_sig(self) -> tuple:
+        """CDX-63: was „Einzelne Kanäle“ aufbaut, gehoert in die Rebuild-
+        Signatur — Anzahl, Nummer, Name und Bereiche JEDES Vorkommens. Sonst
+        bleibt beim Wechsel auf einen Laser mit gleichem ersten Kanal, aber
+        mehr/anderen Vorkommen die alte Reglerliste stehen."""
+        out = []
+        for attr in sorted(self._getrennt):
+            out.append((attr, tuple(
+                (int(getattr(ch, "channel_number", 0) or 0),
+                 str(getattr(ch, "name", "") or ""),
+                 tuple((getattr(r, "range_from", None),
+                        getattr(r, "range_to", None),
+                        str(getattr(r, "name", "") or ""))
+                       for r in (getattr(ch, "ranges", None) or ())))
+                for ch in self._getrennt_vorkommen(attr))))
+        return tuple(out)
 
     def _vorkommen(self, fx, attr: str) -> list:
         return [ch for ch in self._kanaele(fx)
@@ -2084,11 +2111,7 @@ class LaserView(QWidget):
         lay.setContentsMargins(8, 4, 8, 6)
         for ch0 in vertreter:
             attr = ch0.attribute
-            occ: list = []
-            for f in self._fixtures:
-                o = self._vorkommen(f, attr)
-                if len(o) > len(occ):
-                    occ = o
+            occ = self._getrennt_vorkommen(attr)
             for kopf, ch in enumerate(occ):
                 if kopf == 0 and attr in ohne:
                     continue        # Kanal 1 bedient der Baustein
