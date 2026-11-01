@@ -177,7 +177,10 @@ class _FM35Fall(unittest.TestCase):
 
     def _generator(self):
         """Ein echter, sichtbarer Generator-Dialog — kein Nachbau."""
-        dlg = gen_mod.FixtureGeneratorDialog()
+        # FM-71: der Generator startet leer; diese Tests messen am frueheren Start
+        # mit dem RGB-Beispiel (sonst faengt der Modus-Check vor ihnen ab).
+        dlg = gen_mod.FixtureGeneratorDialog(model=gen_mod.GeneratorModel(
+            modes=[gen_mod.GenMode("Default", gen_mod.beispiel_kanaele())]))
         self.addCleanup(dlg.deleteLater)
         dlg.show()
         _app.processEvents()

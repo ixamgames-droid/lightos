@@ -872,6 +872,45 @@ RANGE_COLS = ["Von", "Bis", "Name", "Art"]
 #: FM-70: Mindesthoehe der Kanal-/Bereichstabelle (Kopfzeile + ~5 Zeilen).
 KANAL_TABELLE_MIN_H = 190
 
+#: FM-71: so lange nach der letzten Eingabe wartet die Hinweisliste, bevor sie
+#: neu rechnet (entprellt — nicht bei jedem Tastendruck).
+HINWEIS_VERZOEGERUNG_MS = 400
+
+#: FM-71: Aufschrift des Knopfs, der die frueheren Startkanaele einfuegt.
+BEISPIEL_KNOPF = "Beispiel einfügen"
+
+
+def beispiel_kanaele() -> list[GenChannel]:
+    """FM-71: das RGB-Beispiel (Dimmer, Rot, Gruen, Blau), mit dem der
+    Generator bis FM-71 jeden neuen Modus vorbelegte. Heute startet er leer;
+    der Knopf „Beispiel einfügen“ haengt diese vier Kanaele an."""
+    return [GenChannel("Dimmer", "intensity", 0, 255),
+            GenChannel("Rot", "color_r", 0, 255),
+            GenChannel("Grün", "color_g", 0, 255),
+            GenChannel("Blau", "color_b", 0, 255)]
+
+
+def eigene_profile(eng=None) -> list[tuple[int, str]]:
+    """FM-71: ``[(id, "Hersteller — Modell"), ...]`` der EIGENEN Profile
+    (``source='user'``), die „Eigenes Profil öffnen…“ anbietet.
+
+    Bewusst nur eigene: mitgelieferte (``builtin``/``lightos``) und
+    QLC+-Importe haben ihre eigenen Wege (Fixture-Editor, UI-74); ihre
+    Herkunft trueg der Generator zwar mit (FM-76), aber ein Profil, das
+    nicht dem Nutzer gehoert, soll hier nicht als „sein“ Profil erscheinen."""
+    from src.ui.widgets.profil_auswahl_dialog import profile_suchen
+    eigene = [(pid, f"{hersteller} — {modell}")
+              for pid, hersteller, modell, source in profile_suchen("", eng)
+              if (source or "").lower() == "user"]
+    # Gleichnamige eigene Profile (z. B. nach „öffnen → speichern“, das ein
+    # NEUES Profil anlegt) muessen unterscheidbar bleiben — die Auswahlliste
+    # liefert nur den Text zurueck; sonst waere das zweite nie erreichbar.
+    zaehler: dict[str, int] = {}
+    for _pid, text in eigene:
+        zaehler[text] = zaehler.get(text, 0) + 1
+    return [(pid, f"{text} (Nr. {pid})" if zaehler[text] > 1 else text)
+            for pid, text in eigene]
+
 
 class _RangeEditor(QWidget):
     """Bereichs-Tabelle eines Kanals + kompakte Schnellwahl-Vorschau."""
@@ -879,6 +918,8 @@ class _RangeEditor(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.ranges: list[GenRange] = []
+        #: FM-71: Rueckruf nach jeder Aenderung (Hinweisliste entprellt neu).
+        self.geaendert = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         self._title = QLabel("Bereiche (Kanal wählen)")
@@ -892,6 +933,7 @@ class _RangeEditor(QWidget):
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked |
                                   QAbstractItemView.EditTrigger.SelectedClicked)
         self._tbl.setMinimumHeight(KANAL_TABELLE_MIN_H)
+        self._tbl.itemChanged.connect(lambda *_: self._melden())
         lay.addWidget(self._tbl)
 
         row = QHBoxLayout()
@@ -912,6 +954,10 @@ class _RangeEditor(QWidget):
         self._preview.setStyleSheet("color:#7d8590; font-size:11px;")
         lay.addWidget(self._preview)
 
+    def _melden(self):
+        if self.geaendert is not None:
+            self.geaendert()
+
     def set_ranges(self, ranges: list[GenRange], title: str):
         self.sync_from_table()
         self.ranges = ranges
@@ -922,6 +968,7 @@ class _RangeEditor(QWidget):
         self.sync_from_table()
         self.ranges.append(GenRange(0, 255, "Bereich", ""))
         self._refresh()
+        self._melden()
 
     def _del(self):
         self.sync_from_table()
@@ -930,6 +977,7 @@ class _RangeEditor(QWidget):
             if 0 <= r < len(self.ranges):
                 del self.ranges[r]
         self._refresh()
+        self._melden()
 
     def _infer_kinds(self):
         self.sync_from_table()
@@ -937,6 +985,7 @@ class _RangeEditor(QWidget):
         for r in self.ranges:
             r.kind = _infer_range_kind(r.name)
         self._refresh()
+        self._melden()
 
     def _refresh(self):
         self._tbl.blockSignals(True)
@@ -958,6 +1007,7 @@ class _RangeEditor(QWidget):
         if 0 <= row < len(self.ranges):
             self.ranges[row].kind = value
             self._update_preview()
+            self._melden()
 
     def sync_from_table(self):
         for i in range(min(self._tbl.rowCount(), len(self.ranges))):
@@ -1087,8 +1137,19 @@ class _ModeTab(QWidget):
         ll.setContentsMargins(0, 0, 0, 0)
         self._tbl = QTableWidget(0, len(CHANNEL_COLS))
         self._tbl.setHorizontalHeaderLabels(CHANNEL_COLS)
-        self._tbl.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.Stretch)
+        # FM-71: „Name“ und „Attribut“ so breit wie ihr Inhalt. Vorher war
+        # „Name“ die Dehnspalte (bekam nur den Rest: „Position X (0-1…“) und
+        # „Attribut“ hatte die Standardbreite — das eintippbare Auswahlfeld
+        # zeigte das ENDE des Worts („fect_speed“, „lor_change“). Reicht die
+        # Breite nicht, rollt die Tabelle waagrecht; die letzte Spalte dehnt.
+        kopf = self._tbl.horizontalHeader()
+        kopf.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        kopf.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        kopf.setStretchLastSection(True)
+        self._tbl.setTextElideMode(Qt.TextElideMode.ElideRight)
+        #: FM-71: Rueckruf nach jeder Aenderung (Hinweisliste entprellt neu).
+        self.geaendert = None
+        self._tbl.itemChanged.connect(self._item_geaendert)
         self._tbl.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked |
                                   QAbstractItemView.EditTrigger.SelectedClicked)
         self._tbl.setSelectionBehavior(
@@ -1105,6 +1166,14 @@ class _ModeTab(QWidget):
             b = QPushButton(label)
             b.clicked.connect(slot)
             row.addWidget(b)
+        # FM-71: ein neuer Modus startet leer — das RGB-Beispiel gibt es auf
+        # Wunsch (vorher waren vier Beispielkanaele erst zu loeschen).
+        self._btn_beispiel = QPushButton(BEISPIEL_KNOPF)
+        self._btn_beispiel.setToolTip(
+            "Hängt vier Beispielkanäle an (Dimmer, Rot, Grün, Blau) — als "
+            "Vorlage für ein einfaches RGB-Gerät.")
+        self._btn_beispiel.clicked.connect(self.beispiel_einfuegen)
+        row.addWidget(self._btn_beispiel)
         # FM-46: Vorschlag fuer die Spalte „Weiß-Segment“.
         self._btn_vorschlag = QPushButton("Vorschlag aus Reihenfolge")
         self._btn_vorschlag.setToolTip(
@@ -1127,6 +1196,7 @@ class _ModeTab(QWidget):
         split.addWidget(left)
 
         self._range_editor = _RangeEditor()
+        self._range_editor.geaendert = self._melden
         split.addWidget(self._range_editor)
         split.setSizes([420, 320])
 
@@ -1223,12 +1293,32 @@ class _ModeTab(QWidget):
         if self.laser_geaendert is not None:
             self.laser_geaendert()
 
+    # ── FM-71: Aenderungen melden (Hinweisliste live) ────────────────────
+    def _melden(self) -> None:
+        if self.geaendert is not None:
+            self.geaendert()
+
+    def _item_geaendert(self, item) -> None:
+        # Der Tooltip der Namenszelle traegt den vollen Namen.
+        if item is not None and item.column() == 1:
+            item.setToolTip(item.text())
+        self._melden()
+
+    def beispiel_einfuegen(self) -> None:
+        """FM-71: das RGB-Beispiel (:func:`beispiel_kanaele`) anhaengen."""
+        self.sync_from_widgets()
+        self.mode.channels.extend(beispiel_kanaele())
+        self._ziele.nachziehen(self.mode.channels)
+        self._refresh()
+        self._melden()
+
     def _add(self):
         self.sync_from_widgets()
         n = len(self.mode.channels) + 1
         self.mode.channels.append(GenChannel(name=f"Kanal {n}"))
         self._refresh()
         self._tbl.selectRow(n - 1)
+        self._melden()
 
     def _del(self):
         self.sync_from_widgets()
@@ -1238,6 +1328,7 @@ class _ModeTab(QWidget):
                 del self.mode.channels[r]
         self._ziele.nachziehen(self.mode.channels)
         self._refresh()
+        self._melden()
 
     def _move(self, direction: int):
         self.sync_from_widgets()
@@ -1252,6 +1343,7 @@ class _ModeTab(QWidget):
             self._ziele.nachziehen(ch)
             self._refresh()
             self._tbl.selectRow(nr)
+            self._melden()
 
     def _refresh(self):
         self._tbl.blockSignals(True)
@@ -1260,12 +1352,20 @@ class _ModeTab(QWidget):
             it_num = QTableWidgetItem(str(i + 1))
             it_num.setFlags(it_num.flags() & ~Qt.ItemFlag.ItemIsEditable)
             self._tbl.setItem(i, 0, it_num)
-            self._tbl.setItem(i, 1, QTableWidgetItem(ch.name))
+            it_name = QTableWidgetItem(ch.name)
+            it_name.setToolTip(ch.name)            # FM-71: voller Name
+            self._tbl.setItem(i, 1, it_name)
 
             cb_attr = QComboBox()
             cb_attr.setEditable(True)   # Freitext fuer Sonderfaelle erlaubt
+            # FM-71: so breit wie das laengste Attribut der Liste.
+            cb_attr.setSizeAdjustPolicy(
+                QComboBox.SizeAdjustPolicy.AdjustToContents)
             cb_attr.addItems(CHANNEL_ATTRS)
             cb_attr.setCurrentText(ch.attribute)
+            cb_attr.setToolTip(ch.attribute)
+            # Beginn des Worts zeigen, nicht sein Ende (eintippbares Feld).
+            cb_attr.lineEdit().setCursorPosition(0)
             cb_attr.currentTextChanged.connect(
                 lambda txt, row=i: self._set_attr(row, txt))
             self._tbl.setCellWidget(i, 2, cb_attr)
@@ -1308,6 +1408,10 @@ class _ModeTab(QWidget):
             self._refresh_segment_cells()
             # LAS-33: ein Laser-Attribut blendet die Laser-Seiten ein.
             self._laser_sichtbarkeit()
+            cb = self._tbl.cellWidget(row, 2)
+            if cb is not None:
+                cb.setToolTip(value)
+            self._melden()
 
     # ── FM-46: Spalte „Weiß-Segment“ ─────────────────────────────────────
     # Dieselbe Spalte wie im einfachen Editor (Begruendung dort, an
@@ -1350,6 +1454,7 @@ class _ModeTab(QWidget):
                                                if combo_index > 0 else None)
             self._ziele.setzen(self.mode.channels, self.mode.channels[row])
             self._update_segment_hinweis()
+            self._melden()
 
     def _update_segment_hinweis(self):
         text = hinweis_fuer(self.mode.channels)
@@ -1399,11 +1504,13 @@ class _ModeTab(QWidget):
     def _set_invert(self, row: int, value: bool):
         if 0 <= row < len(self.mode.channels):
             self.mode.channels[row].invert = bool(value)
+            self._melden()
 
     def _set_res(self, row: int, value: str):
         if 0 <= row < len(self.mode.channels):
             self.mode.channels[row].resolution = value
             self._sync_fine_combo()
+            self._melden()
 
     def _on_row_changed(self, cur_row, _c, _pr, _pc):
         self.sync_from_widgets()
@@ -1416,6 +1523,7 @@ class _ModeTab(QWidget):
         r = self._active_row()
         if 0 <= r < len(self.mode.channels):
             self.mode.channels[r].fine_channel = value
+            self._melden()
 
     def _sync_fine_combo(self):
         r = self._active_row()
@@ -1800,6 +1908,14 @@ class FixtureGeneratorDialog(QDialog):
         # Rollbereich; die Startgroesse setzt `showEvent`.
         self.setMinimumSize(640, 420)
         self.saved_id: int | None = None
+        #: FM-71: Meldung nach dem Speichern — der Aufrufer zeigt sie in
+        #: seiner Statuszeile (statt einer modalen Box hier).
+        self.gespeichert_meldung: str = ""
+        #: FM-71: Hinweisliste entprellt neu rechnen (beim Eintippen).
+        self._hinweis_timer = QTimer(self)
+        self._hinweis_timer.setSingleShot(True)
+        self._hinweis_timer.setInterval(HINWEIS_VERZOEGERUNG_MS)
+        self._hinweis_timer.timeout.connect(self._revalidate)
         self._model = model or _default_model()
         self._setup_ui()
         self._reload_modes()
@@ -1857,6 +1973,11 @@ class FixtureGeneratorDialog(QDialog):
         self._spin_power.setSuffix(" W")
         self._spin_power.setValue(self._model.power_w)
         self._edit_notes = QLineEdit(self._model.notes)
+        # FM-71: Kopf-Eingaben rechnen die Hinweise live (entprellt) neu.
+        for feld in (self._edit_mfr, self._edit_model, self._edit_short,
+                     self._edit_notes):
+            feld.textEdited.connect(lambda *_: self._hinweise_planen())
+        self._spin_power.valueChanged.connect(lambda *_: self._hinweise_planen())
         b_import = QPushButton("QLC+ (.qxf) importieren…")
         b_import.setToolTip(
             "Vorhandene QLC+-Definition als Startpunkt laden. Die Herkunft "
@@ -1879,7 +2000,15 @@ class FixtureGeneratorDialog(QDialog):
             "neues Profil; die Herkunft und Lizenz der Vorlage werden "
             "übernommen.")
         b_profil.clicked.connect(self._import_profil)
+        # FM-71: ein gespeichertes EIGENES Profil wieder in den Generator laden.
+        b_eigen = QPushButton("Eigenes Profil öffnen…")
+        b_eigen.setToolTip(
+            "Ein im Generator oder Fixture-Editor angelegtes eigenes Profil "
+            "zum Weiterbearbeiten laden. Speichern legt ein NEUES Profil an "
+            "— das geöffnete bleibt unverändert.")
+        b_eigen.clicked.connect(self._eigenes_profil_oeffnen)
         laden = QHBoxLayout()
+        laden.addWidget(b_eigen)
         laden.addWidget(b_profil)
         laden.addWidget(b_import)
         grid.addWidget(QLabel("Notizen:"), 3, 0)
@@ -2019,6 +2148,7 @@ class FixtureGeneratorDialog(QDialog):
         # LAS-33: Laser-Seiten — sichtbar je nach Typ, Aenderungen pruefen.
         tab.set_typ_laser(self._cb_type.currentText() == "laser")
         tab.laser_geaendert = self._laser_hinweise
+        tab.geaendert = self._hinweise_planen          # FM-71
         return tab
 
     def _reiter_benennen(self, tab: "_ModeTab"):
@@ -2100,7 +2230,14 @@ class FixtureGeneratorDialog(QDialog):
         Seiten schreiben direkt ins Modell)."""
         self._zeige_hinweise()
 
+    def _hinweise_planen(self):
+        """FM-71: nach einer Eingabe die Hinweisliste neu rechnen — entprellt
+        (``HINWEIS_VERZOEGERUNG_MS`` nach der letzten Aenderung). Vorher kam
+        z. B. die Zeile „Laser-Sicherheit“ erst nach einem Klick auf „Prüfen“."""
+        self._hinweis_timer.start()
+
     def _revalidate(self):
+        self._hinweis_timer.stop()
         self._sync_all()
         self._update_viz_suggestion()
         # LAS-33: Typ „laser“ blendet die Laser-Seiten der Modi ein.
@@ -2162,6 +2299,37 @@ class FixtureGeneratorDialog(QDialog):
             model = model_from_daten(BF.lade_datei(path))
         except Exception as e:
             QMessageBox.warning(self, "Laden", f"Laden fehlgeschlagen:\n{e}")
+            return
+        self.set_model(model)
+
+    def _eigenes_profil_oeffnen(self):
+        """FM-71: ein eigenes Profil (``source='user'``) aus der Fixture-DB
+        laden (:func:`model_from_profile` — die Herkunft reist mit, FM-76).
+        Gespeichert wird danach wie immer ein NEUES Profil."""
+        try:
+            profile = eigene_profile()
+        except Exception as e:
+            QMessageBox.warning(self, "Eigenes Profil öffnen",
+                                f"Profilliste nicht lesbar:\n{e}")
+            return
+        if not profile:
+            QMessageBox.information(
+                self, "Eigenes Profil öffnen",
+                "Es gibt noch kein eigenes Profil. Mitgelieferte Profile und "
+                "QLC+-Importe öffnest du über „LightOS-Profil (.json) laden…“ "
+                "bzw. im Menü „Datenbank → Fixture-Profil bearbeiten…“.")
+            return
+        namen = [text for _pid, text in profile]
+        wahl, ok = QInputDialog.getItem(self, "Eigenes Profil öffnen",
+                                        "Profil:", namen, 0, False)
+        if not ok or wahl not in namen:
+            return
+        pid = profile[namen.index(wahl)][0]
+        try:
+            model = model_from_profile(pid)
+        except Exception as e:
+            QMessageBox.warning(self, "Eigenes Profil öffnen",
+                                f"Laden fehlgeschlagen:\n{e}")
             return
         self.set_model(model)
 
@@ -2257,9 +2425,10 @@ class FixtureGeneratorDialog(QDialog):
             get_sync().emit(SyncEvent.REFRESH_ALL, None)
         except Exception:
             pass
-        QMessageBox.information(
-            self, "Gespeichert",
-            f"Fixture-Profil '{self._model.manufacturer} {self._model.model}' "
+        # FM-71: keine modale Erfolgsmeldung mehr (ein Klick mehr) — der
+        # Aufrufer zeigt den Text in seiner Statuszeile (Patch-Ansicht).
+        self.gespeichert_meldung = (
+            f"Fixture-Profil „{self._model.manufacturer} {self._model.model}“ "
             f"gespeichert.")
         self.accept()
 
@@ -2282,13 +2451,9 @@ def _wrap(layout) -> QWidget:
 
 
 def _default_model() -> GeneratorModel:
-    return GeneratorModel(
-        modes=[GenMode("Default", [
-            GenChannel("Dimmer", "intensity", 0, 255),
-            GenChannel("Rot", "color_r", 0, 255),
-            GenChannel("Grün", "color_g", 0, 255),
-            GenChannel("Blau", "color_b", 0, 255),
-        ])])
+    # FM-71: leer starten. Das RGB-Beispiel (`beispiel_kanaele`) gibt es auf
+    # Knopfdruck („Beispiel einfügen“) — vorher war es erst zu loeschen.
+    return GeneratorModel(modes=[GenMode("Default", [])])
 
 
 def model_from_daten(daten: dict) -> GeneratorModel:

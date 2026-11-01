@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "id": "pult_grandma3",
+  "manufacturer": "MA Lighting",
+  "model": "grandMA3 (Pult-Vorlage)",
+  "device_type": "console_template",
+  "connections": [
+    "MIDI-Ausgang des Pults",
+    "MSC"
+  ],
+  "buttons": 0,
+  "faders": 0,
+  "encoders": 0,
+  "pad_matrix": null,
+  "banks": "",
+  "controls": [
+    {
+      "name": "GO Executor 1-20",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        1,
+        20
+      ],
+      "layout": "Note-On auf MIDI-Kanal 1, Note n (Velocity > 0) = GO von Executor n - nach „MIDI-Mapping-Profil erzeugen“"
+    }
+  ],
+  "led_feedback": {},
+  "features": [
+    "MSC per MIDI; über Netzwerk nur, wenn das Pult das GMA-MSC-Paketformat sendet (Beispiel aus der Recherche – im Pult-Handbuch prüfen)",
+    "Keine Fernsteuerung des Pults: LightOS sendet kein MIDI/MSC zurück.",
+    "Wings/Faderbänke dieses Herstellers sind proprietär und an LightOS nicht anschließbar."
+  ],
+  "source": "MSC-Zeilen: MIDI Show Control 1.0 (MMA, öffentlicher Standard), gegen den LightOS-Parser geprüft (src/core/midi/msc.py, Test test_midi8_konsolen_vorlagen.py). Herstellerbefehle: aus dem Konsolen-Check 2026-10-05 (Recherche, ohne echte Hardware) - als Beispiel gekennzeichnet, Schreibweise im Handbuch des Pults prüfen.",
+  "license": "Faktendaten (MIDI-/MSC-Befehlsformen sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-11-01",
+  "vc_template": "",
+  "mapping_template": "",
+  "pult_vorlagen": [
+    {
+      "zweck": "Executor-GO per MIDI-Note",
+      "am_pult": "Befehl SendMIDI in einem Makro oder Cue-Befehl, Kanal 1, Note n, Wert 127 - z. B. SendMIDI \"Note\" 1/5 127 (Note 5)",
+      "beispiel": true,
+      "in_lightos": "Nach „MIDI-Mapping-Profil erzeugen“: Note n auf Kanal 1 = GO von Executor n (1-20)."
+    },
+    {
+      "zweck": "MSC über Netzwerk",
+      "am_pult": "MSC-Ausgabe über Netzwerk an die Adresse des LightOS-Rechners, Port 6004",
+      "beispiel": true,
+      "in_lightos": "„GMA-MSC über Netzwerk“ anhaken, passende Schnittstelle, Port 6004; SET-Belegung „grandMA (Executor, Seite)“."
+    },
+    {
+      "zweck": "Cue auslösen (MSC GO)",
+      "am_pult": "MSC-Ausgabe einschalten; das Pult sendet GO für Cue 5 in Cue-Liste 1 an Device-ID 127 (alle):",
+      "msc": "F0 7F 7F 02 01 01 35 00 31 F7",
+      "msc_befehl": "go",
+      "beispiel": false,
+      "in_lightos": "Executor 1 der aktuellen Seite springt in seiner Cueliste zu Cue 5 (MSC an, Device-ID 127 oder passend)."
+    },
+    {
+      "zweck": "Funktion starten (MSC FIRE)",
+      "am_pult": "Makro-Nummer 3 als MSC FIRE senden:",
+      "msc": "F0 7F 7F 02 01 07 03 F7",
+      "msc_befehl": "fire",
+      "beispiel": false,
+      "in_lightos": "Startet die LightOS-Funktion mit der Nummer (ID) 3."
+    },
+    {
+      "zweck": "Alles aus (MSC ALL_OFF)",
+      "am_pult": "MSC ALL_OFF senden:",
+      "msc": "F0 7F 7F 02 01 08 F7",
+      "msc_befehl": "all_off",
+      "beispiel": false,
+      "in_lightos": "Stoppt alle laufenden Executoren."
+    }
+  ]
+}
