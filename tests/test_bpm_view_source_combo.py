@@ -188,6 +188,7 @@ def test_combo_eintraege(fakes, _isolated_prefs, monkeypatch):
             ("Eingang: Scarlett 2i2", "input:Scarlett 2i2"),
             ("OS2L (DJ-Software)", "os2l"),
             ("Lied-Analyse (Player)", "song"),
+            ("MIDI-Clock (Pult/DAW)", "midi_clock"),   # MIDI-7
             ("Aus", "off"),
         ]
         assert v._cmb_source.currentData() == "loopback"     # Default-Quelle der Prefs

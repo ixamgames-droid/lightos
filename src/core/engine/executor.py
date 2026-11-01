@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from .cue_stack import CueStack, TICK
+from src.core.timecode import mtc_cues as _mtc_cues   # MTC-04
 
 
 class Executor:
@@ -184,6 +185,15 @@ class PlaybackEngine:
         Output aller Executoren ALLER Pages als {fid: {attr: val}}.
         Schreibt NICHT direkt ins Universe — das macht der zentrale Renderer."""
         merged: dict[int, dict[str, int]] = {}
+        # MTC-04: faellige Timecode-Cues im Render-Takt ausloesen (ENG-33) —
+        # VOR dem Ticken, damit der Fade schon in diesem Bild beginnt.
+        ausloeser = _mtc_cues.vorhandener_ausloeser()
+        if ausloeser is not None:
+            try:
+                ausloeser.anwenden(ex.stack for page in self.pages for ex in page)
+            except Exception as e:
+                from src.core.diagnose_log import melde_still
+                melde_still("mtc.cue", e)
         for page in self.pages:
             for ex in page:
                 if ex.stack:

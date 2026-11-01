@@ -53,7 +53,7 @@ VERSION = 3
 # Reihenfolge = Schreibreihenfolge in der Datei (Migrationstabelle plan.md 3.).
 DEFAULTS: dict = {
     "version": VERSION,
-    "source": "loopback",        # loopback (PC-Audio) | input (Mikro/Line-In) | os2l | song | off
+    "source": "loopback",        # loopback (PC-Audio) | input (Mikro/Line-In) | os2l | song | off | midi_clock (MIDI-7)
     "device": None,              # input: Eingangsname; loopback: sink_id (S5); sonst None
     "mode": "auto",              # Manager-Modus: auto | manual
     "min_bpm": 60,               # untere AUTO-Grenze („Tiefen")
@@ -63,7 +63,7 @@ DEFAULTS: dict = {
     "beat_latency_ms": 0,        # v3: Beat-Callback frueher (+) / spaeter (−), ms
 }
 
-SOURCES = ("loopback", "input", "os2l", "song", "off")
+SOURCES = ("loopback", "input", "os2l", "song", "off", "midi_clock")
 MODES = ("auto", "manual")
 # Bereiche folgen den UI-Reglern (Spinboxen 20..400 bzw. 1..32), damit kein Wert,
 # den der Tab schreiben kann, beim naechsten Laden auf den Default zurueckfaellt.
@@ -355,7 +355,7 @@ def start_auto_if_configured(settings: dict) -> bool:
         return False
     s = _normalize(settings)
     source, device, mode = s["source"], s["device"], s["mode"]
-    if source not in ("loopback", "input", "os2l"):
+    if source not in ("loopback", "input", "os2l", "midi_clock"):
         return False
     try:
         from src.core.engine.bpm_manager import get_bpm_manager

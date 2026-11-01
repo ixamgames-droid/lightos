@@ -10,6 +10,12 @@ Je Eintrag (``kind``, ``device``):
 | ``os2l``    | stop                                 | start  | ``use_audio_source(False)``                |
 | ``song``    | stop                                 | stop   | ``use_audio_source(False)`` + aktueller Player-Track (``request_bpm``, nur in AUTO) |
 | ``off``     | stop                                 | stop   | ``use_audio_source(False)`` + ``reset()`` (Takt 0 ausser von Hand gesetzt, BPM-33) |
+| ``midi_clock``| stop                               | stop   | ``use_audio_source(False)``; MIDI-Clock-Messung an (MIDI-7, ``request_bpm(…, "midi_clock")``) |
+
+**MIDI-Clock (MIDI-7):** nur bei ``midi_clock`` haengt ``MidiClock`` an der
+gemeinsamen MIDI-Empfangsschleife (``aktivieren``); jeder andere Eintrag meldet
+sie ab (``deaktivieren``), damit ein Pult mit laufender Clock nicht gegen
+PC-Audio/OS2L in den Takt schreibt.
 
 ``sink`` (S5) ist die ``sink_id`` eines Ausgabegeraets aus
 ``AudioCapture.list_loopback_sinks()``; alles andere (z. B. ein Mikrofonname aus
@@ -94,7 +100,7 @@ def _known_sink(device: str | None) -> str | None:
     except Exception:
         return None
     return device if device in ids else None
-KINDS = ("loopback", "input", "os2l", "song", "off")
+KINDS = ("loopback", "input", "os2l", "song", "off", "midi_clock")
 # BPM-33: Takt-Herkuenfte, die „Aus" nicht nullt (von Hand gesetzt).
 HANDQUELLEN = ("manual", "tap", "nudge")
 
@@ -122,8 +128,9 @@ def _is_auto(mgr) -> bool:
 class SourceController:
     """Schaltet Capture / OS2L / Manager je Quelle — genau eine Stelle, idempotent."""
 
-    def __init__(self, mgr=None, cap=None, os2l=None, det=None, player=None):
+    def __init__(self, mgr=None, cap=None, os2l=None, det=None, player=None, clock=None):
         self._mgr, self._cap, self._os2l, self._det, self._player = mgr, cap, os2l, det, player
+        self._clock = clock             # MIDI-7: MidiClock (Tests reichen eine Attrappe)
         self._current: tuple[str, str | None] | None = None
         self._wanted: tuple[str, str | None] | None = None
         self.missing_sink: str | None = None
@@ -171,6 +178,15 @@ class SourceController:
             except Exception:
                 self._det = None
         return self._det
+
+    def _midi_clock(self):
+        if self._clock is None:
+            try:
+                from src.core.midi.midi_clock import get_midi_clock
+                self._clock = get_midi_clock()
+            except Exception as e:
+                _log(f"keine MIDI-Clock: {e}")
+        return self._clock
 
     def _media(self):
         if self._player is None:
@@ -264,6 +280,13 @@ class SourceController:
             return False
         self._current = key
         mgr = self._manager()
+        clock = self._midi_clock()
+        if clock is not None:
+            # MIDI-7: nur die Quelle „MIDI-Clock" hoert auf die Clock-Ticks.
+            if kind == "midi_clock":
+                self._safe("midi_clock an", clock.aktivieren)
+            else:
+                self._safe("midi_clock aus", clock.deaktivieren)
         det = self._detector()
         if det is not None:
             self._safe("tempo_hint", lambda: det.set_tempo_hint(None))
@@ -556,7 +579,7 @@ def song_may_lead() -> bool:
 
 
 # BPM-32: Quellen, bei denen die Auto-Show keinen Titel-Takt setzen darf.
-FALLBACK_GESPERRT = ("off", "os2l")
+FALLBACK_GESPERRT = ("off", "os2l", "midi_clock")
 
 
 def nominal_fallback_blocked() -> bool:
