@@ -31,8 +31,9 @@ jede Rechner-Lage (Linux, Windows, nichts gesteckt) als Liste nachstellen.
 """
 from __future__ import annotations
 
+import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Iterable
 
 from src.core.dmx.enttec_pro import ENTTEC_PID, ENTTEC_VID
@@ -45,6 +46,9 @@ _RANG = {ADAPTER: 0, USB: 1, OHNE_GERAET: 2}
 
 # pyserial schreibt "n/a", wenn das System zu einem Anschluss nichts weiss.
 _LEERE_BESCHREIBUNG = {"", "n/a"}
+
+#: OUT-81: stabile Linux-Namen (udev). Tests lenken das auf einen Wegwerf-Ordner.
+BY_ID_ORDNER = "/dev/serial/by-id"
 
 
 @dataclass(frozen=True)
@@ -135,6 +139,53 @@ def ordnen(ports: Iterable) -> list[Anschluss]:
         liste.append(Anschluss(device, beschreibung, klasse, zusatz))
     liste.sort(key=lambda a: (_RANG[a.klasse], _natuerlich(a.device)))
     return liste
+
+
+def mit_stabilen_namen(anschluesse: Iterable[Anschluss],
+                       ordner: str | None = None) -> list[Anschluss]:
+    """OUT-81: zu jedem Anschluss die stabilen Namen aus ``/dev/serial/by-id``.
+
+    Ein by-id-Name ist ein Symlink auf ``/dev/ttyUSB…`` und bleibt gleich, wenn
+    Linux beim Booten die Nummern vertauscht. Er steht direkt UNTER seinem
+    Anschluss und erbt dessen Klasse; vorgewaehlt (:func:`vorschlag`) bleibt
+    der Anschluss selbst. Sicher erst, seit jede Stelle, die zwei Portnamen
+    vergleicht (NOT-AUS je Ausgabeweg OUT-64, Doppel-Pruefung OUT-74,
+    Verdraengen beim „Verbinden“, Portwechsel OUT-80), beide Namen als EINEN
+    Anschluss erkennt. Windows kennt keine by-id-Namen: Liste unveraendert.
+    Ein Link ohne passenden Anschluss in der Liste wird nicht angeboten.
+    """
+    liste = list(anschluesse)
+    if os.name == "nt":
+        return liste
+    ordner = BY_ID_ORDNER if ordner is None else ordner
+    try:
+        namen = sorted(os.listdir(ordner), key=_natuerlich)
+    except OSError:
+        return liste
+    links: dict[str, list[str]] = {}
+    for name in namen:
+        pfad = os.path.join(ordner, name)
+        try:
+            if not os.path.islink(pfad):
+                continue
+            ziel = os.path.realpath(pfad)
+        except (OSError, ValueError):
+            continue
+        links.setdefault(ziel, []).append(pfad)
+    if not links:
+        return liste
+    raus: list[Anschluss] = []
+    for a in liste:
+        raus.append(a)
+        try:
+            ziel = os.path.realpath(a.device)
+        except (OSError, ValueError):
+            continue
+        for pfad in links.get(ziel, ()):
+            if pfad != a.device:
+                raus.append(replace(a, device=pfad,
+                                    beschreibung=f"stabiler Name für {a.device}"))
+    return raus
 
 
 def sichtbare(anschluesse: Iterable[Anschluss], alle: bool = False,
