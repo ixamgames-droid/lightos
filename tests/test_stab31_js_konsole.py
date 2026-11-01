@@ -65,9 +65,10 @@ def _warte(app, bedingung, sek=15.0):
 
 
 def _weg(obj):
-    from PySide6.QtCore import QCoreApplication, QEvent
-    obj.deleteLater()
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    # Abbau ueber den XPLAT-09-Helfer (auch fuer eine nackte Page: der
+    # page()-Zugriff schlaegt dort still fehl, deleteLater greift trotzdem).
+    from tests._qt_lifecycle import destroy_webengine_view
+    destroy_webengine_view(obj)
 
 
 def _seite_mit(weiterleitung):
