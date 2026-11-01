@@ -1052,6 +1052,8 @@ class MidiMapper:
 
         if cc_modus == CC_14BIT and msg.data1 != mapping.midi_in.trigger_id:
             return      # MIDI-12: an einer Taste zaehlt nur der MSB
+        if getattr(msg, "nrpn_praezisiert", False):
+            return      # CDX-60: derselbe NRPN-Wert, schon beim MSB gedrueckt
 
         if msg.msg_type == "pc":
             # MIDI-9: Program Change kennt kein Loslassen — jede Nachricht ist

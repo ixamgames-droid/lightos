@@ -118,15 +118,25 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
    Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn
    du es umbaust. Die Hinweisliste unten zeigt sie an.
+5. Ein schon gespeichertes **eigenes** Profil holst du mit **Eigenes Profil
+   öffnen…** zurück in den Generator (Liste nur eigener Profile; mitgelieferte
+   und QLC+-Importe öffnest du über die Datei bzw. den Fixture Editor). Die
+   Herkunft des Profils reist mit. **Speichern** legt danach ein **neues**
+   Profil an — das geöffnete bleibt unverändert; wer es ersetzen will, löscht
+   das alte danach im Fixture Editor.
 
 ## 4. Modus und Kanäle
 
 ![Fixture Generator: Kanäle](img/03_generator_kanaele.png)
 
-Ein neuer Generator startet mit einem Beispielmodus „Default“ (Dimmer, Rot,
-Grün, Blau). Ins Feld **Modus-Name** „9-Kanal“ tippen (der Reiter übernimmt den
-Namen mit Enter), mit **+ Kanal** (4) auf neun Kanäle aufstocken und die Zeilen
-in der Reihenfolge des Handbuchs überschreiben (1) — Kanal 1 zuerst. Name,
+Ein neuer Generator startet mit einem **leeren** Modus „Default“. Wer ein
+einfaches RGB-Gerät baut, kann mit **Beispiel einfügen** vier Vorlagekanäle
+(Dimmer, Rot, Grün, Blau) anhängen. Ins Feld **Modus-Name** „9-Kanal“ tippen
+(der Reiter übernimmt den Namen mit Enter), mit **+ Kanal** (4) neun Kanäle
+anlegen und die Zeilen in der Reihenfolge des Handbuchs ausfüllen (1) — Kanal
+1 zuerst. Die Spalten **Name** und **Attribut** sind so breit wie ihr Inhalt
+(reicht der Platz nicht, rollt die Tabelle waagrecht); der volle Text steht
+auch im Tooltip. Name,
 Default und Highlight per Doppelklick in die Zelle, das Attribut im Auswahlfeld
 der Zeile (man kann es auch eintippen). Für jeden Kanal einen
 **Namen** und ein **Attribut** wählen. Das Attribut entscheidet, was LightOS
@@ -297,14 +307,17 @@ bleiben die Laser-Angaben erhalten.
 
 ![Fixture Generator: Prüfen und Speichern](img/05_generator_pruefen.png)
 
-**Prüfen** (1) meldet Lücken, Überlappungen und vertauschte Kanäle (2). Bei
+Die Hinweisliste (2) rechnet schon **beim Eintippen** neu — kurz nach der
+letzten Eingabe, nicht bei jedem Tastendruck. **Prüfen** (1) erzwingt das
+sofort. Sie meldet Lücken, Überlappungen und vertauschte Kanäle. Bei
 einem Laser steht dort zusätzlich, über welchen Kanal und Wert LightOS ihn
 dunkel schaltet — hier „Kanal 1 (Betriebsart) = 0“. Fehlt der Aus-Wert oder
 startet der Laser mit seinem Default eingeschaltet, kommt ein Hinweis.
 
 Der **Live-Test** (3) schreibt Werte direkt an das echte Gerät — beim Laser
 nur unter den Sicherheitsregeln aus Abschnitt 9. **Speichern** (4) legt das
-Profil in deiner Bibliothek an und bestätigt das mit einer kurzen Meldung.
+Profil in deiner Bibliothek an, schließt den Generator und bestätigt das in der
+Statuszeile unten im Hauptfenster (ohne Meldungsfenster zum Wegklicken).
 
 **Live-Test mit einem Laser.** **Test starten** sendet sofort die Default-Werte
 aller Kanäle. Bei einem Laser-Profil fragt LightOS deshalb vorher nach

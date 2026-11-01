@@ -92,6 +92,7 @@ _SRC_LABELS = {
     "manual": "Eingabe",
     "file": "Datei/Player",
     "timeline": "Lied-Analyse",
+    "midi_clock": "MIDI-Clock",
     "off": "—",
 }
 _COL_GOLD, _COL_GREEN, _COL_GREY, _COL_AMBER = "#FFD700", "#9DFF52", "#888888", "#f0b429"
@@ -159,12 +160,14 @@ def state_word(mode_manual: bool, kind: str | None, snap, os2l_waiting: bool = F
         return ("OS2L · wartet auf DJ-Software" if os2l_waiting else "OS2L"), _COL_AMBER if os2l_waiting else _COL_GREEN
     if kind == "song":
         return "LIED-ANALYSE", _COL_GREEN
+    if kind == "midi_clock":
+        return "MIDI-CLOCK", _COL_GREEN
     return "AUS", _COL_GREY
 
 
 # Quelle des Manager-Tempos, die die gewaehlte Quelle ohnehin nahelegt -> kein Zusatz
 _SRC_SELBSTVERSTAENDLICH = {"loopback": ("audio",), "input": ("audio",), "os2l": ("os2l",),
-                            "song": ("timeline", "file")}
+                            "song": ("timeline", "file"), "midi_clock": ("midi_clock",)}
 
 
 def source_suffix(current_source: str | None, kind: str | None, locked: bool) -> str:
@@ -747,6 +750,7 @@ class BpmManagerView(QWidget):
                 self._cmb_source.addItem(f"Eingang: {cur[6:]} (nicht gefunden)", cur)
             self._cmb_source.addItem("OS2L (DJ-Software)", "os2l")
             self._cmb_source.addItem("Lied-Analyse (Player)", "song")
+            self._cmb_source.addItem("MIDI-Clock (Pult/DAW)", "midi_clock")   # MIDI-7
             self._cmb_source.addItem("Aus", "off")
             idx = self._cmb_source.findData(cur) if cur else -1
             self._cmb_source.setCurrentIndex(idx if idx >= 0 else 0)

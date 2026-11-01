@@ -174,9 +174,12 @@ gewählt, landet die Cue in der **ersten** Cueliste der Show.
 ![Drei Cues, Cueliste auf Executor 1](img/08_executor.png)
 
 1. **Die Cue-Tabelle**: **Nr.**, **Label**, **Fade In** (Standard 2,0 s),
-   **Fade Out**, **Delay**, **Follow** und **Kurve**. Ein Doppelklick auf eine Zelle
+   **Fade Out**, **Delay**, **Follow**, **Kurve** und **Timecode**. Ein Doppelklick auf eine Zelle
    ändert den Wert. Bei **Follow** eine Zeit eintragen, dann folgt die nächste Cue
-   von selbst. **Kurve** wählt den Verlauf der Überblendung.
+   von selbst. **Kurve** wählt den Verlauf der Überblendung. In **Timecode** trägst du
+   einen MIDI-Timecode als `HH:MM:SS:FF` ein (z. B. `00:01:30:00`); erreicht der
+   eingehende Timecode einer DAW oder eines Pults diesen Wert, springt die Cueliste
+   auf diese Cue. „—“ oder ein leeres Feld schaltet das aus.
 2. **Executor 1** in der **Executor-Leiste**: Im Auswahlfeld „— Leer —“ die
    Cueliste „Meine Show“ wählen. Der Executor heißt dann wie die Cueliste.
 
