@@ -22,12 +22,23 @@ Das folgt genau dem, was ``VCFrame.on_child_activated`` tut: er schaltet nur
 seine direkten Kinder aus und nur solche mit ``deactivate_for_solo`` (Tasten).
 Ein Fader im Solo-Frame, eine Taste in einem Unter-Rahmen und Tasten zweier
 verschiedener Solo-Frames gehoeren deshalb NICHT zur selben Gruppe.
+
+ENG-41 — Tasten-Haken und Live-Edit-Slot: „Andere Funktionen stoppen (nur
+diese aktiv)“, „Andere Effekte auf denselben Geräten stoppen“ und ein
+gemeinsamer Live-Edit-Slot stoppen beim Start einer Taste andere Funktionen
+(``VCButton._start_function_group``). Stoppen sich zwei Seiten GEGENSEITIG,
+laufen sie nie zusammen — dann gibt es keinen Hinweis, wie in einer
+Exklusiv-Gruppe. Stoppt nur eine Seite die andere, laufen beide, sobald die
+andere danach startet: der Hinweis bleibt und benennt das Stoppen. Die
+Zeile zieht nach, wenn ein ANDERES Bedienelement umbelegt wird
+(:func:`belegung_geaendert`).
 """
 from __future__ import annotations
 
+import dataclasses
 import weakref
 
-from PySide6.QtCore import QEvent, QPoint, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QAbstractScrollArea, QLabel, QSizePolicy
 
 from src.core.engine import ueberschneidung
@@ -45,7 +56,10 @@ HINWEIS_TOOLTIP = (
     "läuft der Effekt dort weiter und belegt die Geräte — der Hinweis sagt "
     "das dazu.\n"
     "Tasten im selben Solo-Frame schalten sich gegenseitig aus; zwischen "
-    "ihnen gibt es keinen Hinweis.\n"
+    "ihnen gibt es keinen Hinweis. Ebenso nicht, wenn sich zwei Tasten beim "
+    "Start gegenseitig stoppen („Andere Funktionen stoppen“, „Andere Effekte "
+    "auf denselben Geräten stoppen“ oder derselbe Live-Edit-Slot); stoppt nur "
+    "eine die andere, sagt der Hinweis das dazu.\n"
     "Die höhere Stufe gewinnt; bei gleicher Stufe gewinnt, wer zuletzt "
     "gestartet wurde. Die Stufe stellst du im Editor des Effekts oder im "
     "Reiter „Prioritäten“ ein.")
@@ -163,6 +177,144 @@ def haltende_ids(wurzel, ausser=None) -> set[int]:
     liegen (ohne ``ausser`` selbst)."""
     return {int(fid) for w, ids, _g, haelt in _bedienelemente(wurzel)
             if haelt and w is not ausser for fid in ids}
+
+
+# ── ENG-41: Tasten, die beim Start andere stoppen ───────────────────────────
+
+class _BelegungsMelder(QObject):
+    """Sagt offenen Hinweiszeilen Bescheid, wenn ein Bedienelement der
+    Virtual Console umbelegt, angelegt oder entfernt wurde. Dafuer gibt es
+    kein Sync-Ereignis; ohne das bliebe die Zeile stehen, bis der Dialog neu
+    geoeffnet wird."""
+    geaendert = Signal()
+
+
+_belegung: _BelegungsMelder | None = None
+
+
+def belegung_melder() -> _BelegungsMelder:
+    global _belegung
+    if _belegung is None:
+        _belegung = _BelegungsMelder()
+    return _belegung
+
+
+def belegung_geaendert() -> None:
+    """Ein Bedienelement wurde umbelegt — offene Hinweiszeilen rechnen beim
+    naechsten Umlauf neu (mehrere Meldungen ergeben EINE Rechnung)."""
+    try:
+        belegung_melder().geaendert.emit()
+    except Exception as e:
+        print(f"[ueberschneidung_hinweis] belegung_geaendert: {e}")
+
+
+@dataclasses.dataclass(frozen=True)
+class StartRegeln:
+    """Was eine Taste beim Start stoppt (``VCButton._start_function_group``).
+
+    ``alles``: „Andere Funktionen stoppen (nur diese aktiv)“ — greift nur OHNE
+    Live-Edit-Slot (sonst gilt der Slot). ``gleiche_geraete``: „Andere Effekte
+    auf denselben Geräten stoppen“. ``edit_slot``: stoppt das Bearbeitungsziel
+    desselben Slots, also die erste Funktion einer anderen Taste mit diesem
+    Slot."""
+    alles: bool = False
+    gleiche_geraete: bool = False
+    edit_slot: str = ""
+
+    @classmethod
+    def aus(cls, exklusiv, gleiche_geraete, edit_slot) -> "StartRegeln":
+        slot = str(edit_slot or "").strip()
+        return cls(alles=bool(exklusiv) and not slot,
+                   gleiche_geraete=bool(gleiche_geraete), edit_slot=slot)
+
+
+def start_regeln(widget) -> StartRegeln | None:
+    """Die Start-Regeln einer Funktions-Taste — None fuer alles andere (ein
+    Fader stoppt beim Start nichts)."""
+    from src.ui.virtualconsole.vc_button import ButtonAction, VCButton
+    try:
+        if (isinstance(widget, VCButton)
+                and widget.action in (ButtonAction.FUNCTION_TOGGLE,
+                                      ButtonAction.FUNCTION_FLASH)):
+            return StartRegeln.aus(widget.exclusive, widget.solo_fixtures,
+                                   widget.edit_slot)
+    except Exception:
+        return None
+    return None
+
+
+def stoppt_beim_start(regeln, eigene_ids, ihre_regeln, ihre_ids, fid) -> bool:
+    """Stoppt ein Element mit ``regeln`` (startet ``eigene_ids``) beim Start
+    sicher die Funktion ``fid`` eines Elements mit ``ihre_regeln`` /
+    ``ihre_ids``? Gefragt wird nur fuer Funktionen, die mit den eigenen
+    Geraete teilen (sonst gaebe es keine Ueberschneidung) — darum genuegt
+    „Andere Effekte auf denselben Geräten stoppen“."""
+    if regeln is None:
+        return False
+    try:
+        fid = int(fid)
+        eigene = {int(i) for i in eigene_ids or ()}
+    except (TypeError, ValueError):
+        return False
+    # Startet das Element ``fid`` selbst mit, stoppt es sie nicht: ``stop_all``
+    # laeuft VOR dem Start, ``stop_others_sharing_fixture_group`` schuetzt die
+    # eigenen Ziele, und der Slot stoppt nur ein Ziel ausserhalb der Gruppe.
+    if fid in eigene:
+        return False
+    if regeln.alles or regeln.gleiche_geraete:
+        return True
+    if (regeln.edit_slot and ihre_regeln is not None
+            and ihre_regeln.edit_slot == regeln.edit_slot and ihre_ids):
+        try:
+            return int(ihre_ids[0]) == fid
+        except (TypeError, ValueError):
+            return False
+    return False
+
+
+def gegenueber_elemente(wurzel, ausser=None) -> list[tuple]:
+    """``(Funktions-IDs, Start-Regeln)`` jedes Bedienelements, gegen das der
+    Hinweis an ``ausser`` rechnet — ohne ``ausser`` selbst und ohne seine
+    Exklusiv-Gruppe (wie :func:`konsolen_funktions_ids`)."""
+    gruppe = exklusiv_gruppe(ausser) if ausser is not None else None
+    aus = []
+    for w, ids, ihre_gruppe, _haelt in _bedienelemente(wurzel):
+        if w is ausser or (gruppe is not None and ihre_gruppe is gruppe):
+            continue
+        aus.append((tuple(int(i) for i in ids), start_regeln(w)))
+    return aus
+
+
+def stopp_regeln_anwenden(treffer, eigene_ids, eigene_regeln, elemente) -> list:
+    """ENG-41: Treffer gegen Tasten, die sich beim Start GEGENSEITIG stoppen,
+    fallen weg (die beiden laufen nie zusammen). Stoppt nur eine Seite die
+    andere, bleibt der Treffer und traegt ``stoppt``. Liegt die andere
+    Funktion auf mehreren Bedienelementen, muss es fuer JEDES gelten."""
+    eigene = [int(i) for i in eigene_ids or ()]
+    aus = []
+    for t in treffer:
+        try:
+            aid = int(getattr(t.andere, "id"))
+            eid = int(getattr(t.eigene, "id"))
+        except (TypeError, ValueError, AttributeError):
+            aus.append(t)
+            continue
+        traeger = [(ids, r) for ids, r in elemente if aid in ids]
+        if not traeger:
+            aus.append(t)
+            continue
+        diese = all(stoppt_beim_start(eigene_regeln, eigene, r, ids, aid)
+                    for ids, r in traeger)
+        andere = all(stoppt_beim_start(r, ids, eigene_regeln, eigene, eid)
+                     for ids, r in traeger)
+        if diese and andere:
+            continue
+        if diese:
+            t = dataclasses.replace(t, stoppt=ueberschneidung.DIESE_STOPPT)
+        elif andere:
+            t = dataclasses.replace(t, stoppt=ueberschneidung.ANDERE_STOPPT)
+        aus.append(t)
+    return aus
 
 
 def konsolen_beziehungen(flaechen) -> tuple[list[int], dict[int, set[int]], set[int]]:
@@ -334,12 +486,15 @@ class UeberschneidungsHinweis(QLabel):
     KLEINSTE_BREITE = 120
 
     def __init__(self, taste, quelle, parent=None, subjekt: str = "Taste",
-                 haelt_selbst=None):
+                 haelt_selbst=None, regeln_selbst=None):
         super().__init__(parent)
         self._taste = taste
         self._quelle = quelle
         self._subjekt = subjekt
         self._haelt_selbst = haelt_selbst
+        # ENG-41: die eigenen Start-Regeln aus den FELDERN des Dialogs
+        # (``StartRegeln`` oder None) — im Dialog ist noch nichts uebernommen.
+        self._regeln_selbst = regeln_selbst
         self.sichtbar_setzen = None
         self._stillgelegt = False
         self.treffer: list = []
@@ -364,6 +519,8 @@ class UeberschneidungsHinweis(QLabel):
             stufen_melder().geaendert.connect(self.veraltet)
         except Exception as e:
             print(f"[ueberschneidung_hinweis] stufen_melder error: {e}")
+        # ENG-41: ein ANDERES Bedienelement wurde umbelegt.
+        belegung_melder().geaendert.connect(self.veraltet)
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
@@ -454,6 +611,14 @@ class UeberschneidungsHinweis(QLabel):
         except RuntimeError:
             pass                        # Zeile schon abgebaut
 
+    def _eigene_regeln(self):
+        if callable(self._regeln_selbst):
+            try:
+                return self._regeln_selbst()
+            except Exception:
+                return None
+        return start_regeln(self._taste)
+
     def neu_berechnen(self, *_a) -> None:
         try:
             eigene = list(self._quelle() or ())
@@ -474,6 +639,10 @@ class UeberschneidungsHinweis(QLabel):
                         if selbst_haelt:
                             haltend |= {int(i) for i in eigene}
                     treffer = treffer_fuer(eigene, andere, haltend=haltend)
+                    if treffer:
+                        treffer = stopp_regeln_anwenden(
+                            treffer, eigene, self._eigene_regeln(),
+                            gegenueber_elemente(wurzel, ausser=self._taste))
             except Exception as e:
                 print(f"[ueberschneidung_hinweis] Rechnung: {e}")
                 treffer = []

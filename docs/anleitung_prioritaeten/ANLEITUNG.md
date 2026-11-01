@@ -227,6 +227,16 @@ Wann **kein** Hinweis kommt:
   - Startet eine Taste im Solo-Rahmen eine **Sammlung** oder einen **Chaser** und die
     Nachbartaste eines der Mitglieder, gibt es zwischen den beiden ebenfalls keinen Hinweis.
 - Mehrere Funktionen **derselben** Taste: die startest du absichtlich gemeinsam.
+- Zwei Tasten **stoppen sich beim Start gegenseitig** — über den Haken **Andere Funktionen
+  stoppen (nur diese aktiv)**, den Haken **Andere Effekte auf denselben Geräten stoppen**
+  (auch gemischt: an der einen der eine, an der anderen der andere Haken) oder denselben
+  **Live-Edit-Slot** an beiden. Dann läuft immer nur eine. Mit Live-Edit-Slot zählt der
+  Haken „nur diese aktiv“ nicht — die Taste stoppt dann nur das Ziel ihres Slots. Hat nur
+  **eine** der beiden Tasten so eine Regel, laufen beide, sobald die andere danach startet:
+  der Hinweis bleibt und sagt das dazu („Beim Start stoppt diese Taste „…“ — erst wenn „…“
+  danach startet, laufen beide.“). Startet die andere Taste deine Funktion selbst mit,
+  stoppt sie sie nicht — dann bleibt der Hinweis ebenfalls. Das gilt für die gelbe Zeile an der Taste und am Fader;
+  der Tooltip im Reiter **Prioritäten** kennt diese Regeln noch nicht.
 - Es lässt sich nicht sicher ablesen, was ein Effekt anfasst (Skript, **unbekannt** in der
   Spalte **Fasst an**), oder es ist nur **Sonstiges** wie Shutter oder Zoom.
 

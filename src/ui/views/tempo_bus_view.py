@@ -508,6 +508,7 @@ class TempoBusView(QWidget):
             return
         bus = mgr.ensure_bus(name)
         bus.set_role("master")
+        self._eingerichtet(bus)
         self._new_master_name.clear()
         self._refresh_speeds()
 
@@ -516,6 +517,11 @@ class TempoBusView(QWidget):
         if not bid or bid == self._tbm().DEFAULT_BUS:
             return
         self._tbm().remove_bus(bid)
+        try:                         # VCB-39: eingerichteten Stand verwerfen
+            from src.core.show.show_file import tempo_bus_entfernt
+            tempo_bus_entfernt(bid)
+        except Exception as e:
+            print(f"[TempoBusView] entfernt: {e}")
         self._refresh_speeds()
 
     def _on_bus_selected(self):
@@ -551,7 +557,18 @@ class TempoBusView(QWidget):
                 bus.set_bus_multiplier(float(self._edit_factor.currentData() or 1.0))
             except (TypeError, ValueError):
                 pass
+        self._eingerichtet(bus)
         self._refresh_speeds()
+
+    @staticmethod
+    def _eingerichtet(bus):
+        """VCB-39: Editor-Aenderung als Einrichtung melden — auch bei einem
+        Bus, den ein VC-Element steuert, fragt Beenden dann nach dem Speichern."""
+        try:
+            from src.core.show.show_file import tempo_bus_eingerichtet
+            tempo_bus_eingerichtet(bus)
+        except Exception as e:
+            print(f"[TempoBusView] eingerichtet: {e}")
 
     def _on_auto_sync_toggled(self, checked: bool):
         """Auto-Sync an/aus (global, alle Tempo-Buses) — spiegelt die VC-Aktion."""

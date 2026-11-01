@@ -247,6 +247,10 @@ Außerdem: **▶ Hierhin springen** blendet direkt in die markierte Cue.
 **Crossfade (manuell)** blendet von Hand zur nächsten Cue. **Optionen** legt
 **Loop: AUS**/**AN** und den **Modus:** fest: **Einzel (am Ende stop)**, **Loop**,
 **Bounce**, **Ping-Pong**.
+**Takt:** wählt, woher eine taktgebundene Cueliste (Beat-Sync) ihre Schläge
+nimmt: **global** (die globale BPM, Standard) oder **Bus A** bis **Bus D** — dann
+schaltet die Liste im Tempo dieses Tempo-Busses weiter, unabhängig von der globalen
+BPM. Die Auswahl wird mit der Show gespeichert; ältere Shows bleiben auf **global**.
 
 ## 10. Cues aus der Virtual Console auslösen
 
