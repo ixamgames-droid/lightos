@@ -35,7 +35,9 @@ class SpeedDialResetTest(unittest.TestCase):
         self.assertIn("def _reset_target(self)", src)
         self.assertIn("self._active_factor = self._reset_target()", src)
         self.assertIn("self._mult = float(self._active_factor)", src)
-        self.assertIn("old_speed * new_mult / old_mult", src)
+        # CDX-62: Grundwert gemerkt (_FREE_RUN_BASIS), Verhaeltnis bleibt gleich
+        self.assertIn("basis = old_speed / old_mult", src)
+        self.assertIn('effect_live.set_param("speed", basis * new_mult, fid)', src)
 
     def test_speed_anleitung(self):
         doc = _flach(_lies("docs", "anleitung_speed", "ANLEITUNG_SPEED.md"))
