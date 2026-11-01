@@ -299,6 +299,9 @@ class MidiMessage:
     msc: object = None
     # MIDI-13: bei msg_type "nrpn" der volle Wert (0..16383), sonst None.
     wert14bit: int | None = None
+    # CDX-60: True = praezisiert per LSB einen schon gemeldeten NRPN-Wert
+    # (erste Folge eines Parameters). Ein Fader nimmt ihn, eine Taste nicht.
+    nrpn_praezisiert: bool = False
 
 
 # MIDI-16: Mindestlaenge je Statustyp (Status + Datenbytes). Kuerzere
@@ -359,8 +362,8 @@ class NrpnDekoder:
     fuer python-rtmidi UND den WinMM-Pfad. Die einzelnen CCs werden weiter
     zugestellt (Bestand: wer CC 6 gebunden hat, behaelt ihn).
 
-    Gemeldet wird beim Wert: CC 6 (MSB) allein, solange das Geraet noch nie
-    einen LSB (CC 38) geschickt hat — dann als 7-Bit-Wert auf 14 Bit gestreckt.
+    Gemeldet wird beim Wert: CC 6 (MSB) allein, solange fuer diesen Parameter
+    noch nie ein LSB (CC 38) kam (CDX-60: je Parameter, nicht je Kanal) — dann als 7-Bit-Wert auf 14 Bit gestreckt.
     Hat es einmal einen LSB gesendet, meldet erst der LSB, damit der Wert beim
     MSB nicht auf ``MSB·128`` springt. Eine RPN-Wahl (CC 101/100) beendet die
     NRPN-Wahl: deren Werte gehoeren dann nicht zum NRPN."""
@@ -372,7 +375,8 @@ class NrpnDekoder:
         if msg is None or msg.msg_type != "cc":
             return None
         z = self._zustand.setdefault((msg.port_name, msg.channel), {
-            "p_msb": None, "p_lsb": None, "w_msb": None, "lsb_gesehen": False})
+            "p_msb": None, "p_lsb": None, "w_msb": None,
+            "lsb_params": set()})
         nummer, wert = int(msg.data1), int(msg.data2) & 0x7F
         if nummer == NRPN_PARAM_MSB:
             z["p_msb"], z["w_msb"] = wert, None
@@ -392,16 +396,20 @@ class NrpnDekoder:
         param = (z["p_msb"] << 7) | z["p_lsb"]
         if nummer == NRPN_WERT_MSB:
             z["w_msb"] = wert
-            if z["lsb_gesehen"]:
+            if param in z["lsb_params"]:
                 return None                 # auf den LSB warten
             voll = round(wert * 16383 / 127)
+            praezisiert = False
         else:
-            z["lsb_gesehen"] = True
+            # Erster LSB dieses Parameters: der MSB hat schon gemeldet.
+            praezisiert = param not in z["lsb_params"]
+            z["lsb_params"].add(param)
             if z["w_msb"] is None:
                 return None                 # LSB ohne MSB: kein Wert
             voll = (z["w_msb"] << 7) | wert
         return MidiMessage(msg.port_name, msg.channel, "nrpn", param,
-                           (voll >> 7) & 0x7F, wert14bit=voll)
+                           (voll >> 7) & 0x7F, wert14bit=voll,
+                           nrpn_praezisiert=praezisiert)
 
 
 class MidiManager:
