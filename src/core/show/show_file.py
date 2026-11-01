@@ -1605,7 +1605,8 @@ _LIVE_FELDER_TEMPO_BUS = ("bpm", "source")
 #: Hierarchie-Felder eines Tempo-Bus, die ein VC-Tempo-Bedienelement beim
 #: BEDIENEN umstellt (Tempo-Bus-Regler: Quelle Sound -> Sub/Faktor 1, Tap/Fix ->
 #: Master; Speed-Knoten: Faktor-Gitter -> bus_multiplier). Nur fuer Busse, die
-#: ein solches Element steuert — eingerichtet im Tempo-Bus-Tab zaehlen sie.
+#: ein solches Element steuert. Statt des Laufzeitwerts zaehlt bei ihnen der
+#: EINGERICHTETE Stand (VCB-39, s. ``_eingerichtete_hierarchie``).
 _LIVE_FELDER_TEMPO_BUS_GESTEUERT = ("role", "parent_id", "bus_multiplier")
 _LIVE_FELDER_GRANDMASTER = ("bpm", "armed")      # auto_sync bleibt Einstellung
 _LIVE_FELDER_EXECUTOR = ("fader_value",)         # Executor-Fader
@@ -1639,6 +1640,49 @@ ABGELEITETE_3D_BLOECKE = ("visualizer", "scene_graph")
 #: (None = keiner). Blockweise, damit eine abgeleitete Aenderung einzelne Bloecke
 #: nachfuehren kann, ohne echte Aenderungen anderswo zu verdecken.
 _gemerkter_stand: dict | None = None
+
+#: VCB-39: eingerichtete Hierarchie (``role``/``parent_id``/``bus_multiplier``)
+#: je Tempo-Bus. Bei VC-gesteuerten Bussen fliesst sie STATT der Laufzeitwerte
+#: in den Fingerabdruck: die VC stellt die Laufzeitwerte beim Bedienen um (keine
+#: Show-Arbeit), der Tempo-Bus-Editor meldet seine Aenderungen ueber
+#: :func:`tempo_bus_eingerichtet` (Show-Arbeit). Gesetzt wird der Stand beim
+#: Merken (Laden/Speichern/Neue Show) aus den aktuellen Bussen.
+_eingerichtete_hierarchie: dict = {}
+
+
+def _hierarchie(b: dict) -> dict:
+    """Hierarchie-Felder eines Bus-Dicts (``TempoBus.to_dict``) mit Defaults."""
+    return {"role": b.get("role", "master"),
+            "parent_id": b.get("parent_id", "") or "",
+            "bus_multiplier": b.get("bus_multiplier", 1.0)}
+
+
+def tempo_bus_eingerichtet(bus) -> None:
+    """Der Tempo-Bus-Editor hat Rolle/Eltern/Faktor von ``bus`` eingerichtet
+    (VCB-39) — zaehlt auch bei einem VC-gesteuerten Bus als Show-Aenderung."""
+    try:
+        _eingerichtete_hierarchie[str(bus.bus_id)] = _hierarchie(bus.to_dict())
+    except Exception as e:
+        print(f"[show_file] tempo_bus_eingerichtet error: {e}")
+
+
+def tempo_bus_entfernt(bus_id) -> None:
+    """Der Tempo-Bus-Editor hat ``bus_id`` geloescht (VCB-39): sein eingerichteter
+    Stand gilt nicht mehr. Legt die VC den Bus beim Bedienen neu an (Master,
+    Faktor 1), zaehlt das so als Aenderung statt den alten Stand vorzutaeuschen."""
+    _eingerichtete_hierarchie.pop(str(bus_id), None)
+
+
+def _hierarchie_merken() -> None:
+    """Eingerichteten Stand aller Tempo-Busse aus der Laufzeit uebernehmen."""
+    _eingerichtete_hierarchie.clear()
+    try:
+        from src.core.engine.tempo_bus import get_tempo_bus_manager
+        for b in get_tempo_bus_manager().to_dict():
+            if isinstance(b, dict):
+                _eingerichtete_hierarchie[str(b.get("bus_id", ""))] = _hierarchie(b)
+    except Exception as e:
+        print(f"[show_file] hierarchie merken error: {e}")
 
 
 def _ohne(d, felder) -> dict:
@@ -1704,10 +1748,15 @@ def _ohne_live_werte(show: dict) -> dict:
         gesteuert = _vc_gesteuerte_busse(d.get("virtual_console"), set())
 
         def _bus_ohne(b):
-            felder = _LIVE_FELDER_TEMPO_BUS
-            if isinstance(b, dict) and str(b.get("bus_id", "")) in gesteuert:
-                felder = felder + _LIVE_FELDER_TEMPO_BUS_GESTEUERT
-            return _ohne(b, felder)
+            bid = str(b.get("bus_id", "")) if isinstance(b, dict) else None
+            if bid is None or bid not in gesteuert:
+                return _ohne(b, _LIVE_FELDER_TEMPO_BUS)
+            # VCB-39: Laufzeitwerte raus, eingerichteter Stand rein
+            ohne = _ohne(b, _LIVE_FELDER_TEMPO_BUS + _LIVE_FELDER_TEMPO_BUS_GESTEUERT)
+            eingerichtet = _eingerichtete_hierarchie.get(bid)
+            if eingerichtet is not None:
+                ohne["eingerichtet"] = dict(eingerichtet)
+            return ohne
         d["tempo_buses"] = [_bus_ohne(b) for b in d["tempo_buses"]]
     d["tempo_grandmaster"] = _ohne(d.get("tempo_grandmaster"), _LIVE_FELDER_GRANDMASTER)
     ex = d.get("executors")
@@ -1775,6 +1824,7 @@ def merke_show_stand(state=None, views: dict | None = None) -> None:
     Neue Show. NICHT nach dem Auto-Save: der sichert nur gegen Abstuerze, die
     Show-Datei des Nutzers ist danach weiterhin alt."""
     global _gemerkter_stand
+    _hierarchie_merken()             # VCB-39: vor dem Abdruck, der ihn liest
     _gemerkter_stand = _block_abdruecke(state, views)
 
 

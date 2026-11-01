@@ -44,12 +44,26 @@ def _app():
     return QApplication.instance() or QApplication([])
 
 
+#: QA-107: so viele Takte (je 20 ms, also ~2 s) wartet ``_mit_dialog`` nach dem
+#: Erscheinen der Rueckfrage darauf, dass ihr Fenster aktiv ist.
+_AKTIV_WARTEN_TAKTE = 100
+
+
 def _mit_dialog(aufruf, bedienen):
-    """Ruft ``aufruf()``; sobald die Rueckfrage sichtbar ist, wird ihr Bild
-    festgehalten und ``bedienen(box)`` ausgefuehrt. Gibt (Ergebnis, Bild)
-    zurueck; Bild ist None, wenn keine Rueckfrage kam."""
+    """Ruft ``aufruf()``; sobald die Rueckfrage sichtbar UND aktiv ist, wird
+    ihr Bild festgehalten und ``bedienen(box)`` ausgefuehrt. Gibt (Ergebnis,
+    Bild) zurueck; Bild ist None, wenn keine Rueckfrage kam.
+
+    QA-107: ``exec()`` zeigt den Dialog sofort, die Aktivierung des Fensters
+    (erst dann ist ``QApplication.focusWidget()`` gesetzt) kommt aber als
+    eigenes Ereignis hinterher. Unter Last lief der Takt dazwischen und las
+    den Fokus als None. Darum wird bis zur Aktivierung gewartet (mit
+    Zeitlimit — danach wird trotzdem festgehalten, die Pruefung schlaegt dann
+    ehrlich fehl). ``fokus_im_fenster`` ist der Fokus-Knopf des Dialogs selbst,
+    unabhaengig von der Aktivierung."""
     gesehen = []
     versuche = [0]
+    sichtbar_seit = [None]
     takt = QTimer()
     takt.setInterval(20)
 
@@ -64,8 +78,14 @@ def _mit_dialog(aufruf, bedienen):
                 takt.stop()
             return
         if not gesehen:
+            if sichtbar_seit[0] is None:
+                sichtbar_seit[0] = versuche[0]
+            if (not box.isActiveWindow()
+                    and versuche[0] - sichtbar_seit[0] < _AKTIV_WARTEN_TAKTE):
+                return                      # Aktivierung noch unterwegs
             knoepfe = {box.standardButton(b): b.text() for b in box.buttons()}
             fokus = QApplication.focusWidget()
+            eigen = box.focusWidget()
             gesehen.append({
                 "titel": box.windowTitle(),
                 "knoepfe": knoepfe,
@@ -75,9 +95,11 @@ def _mit_dialog(aufruf, bedienen):
                 if box.escapeButton() is not None else None,
                 "fokus": box.standardButton(fokus)
                 if fokus in box.buttons() else None,
+                "fokus_im_fenster": box.standardButton(eigen)
+                if eigen in box.buttons() else None,
             })
             bedienen(box)
-        elif versuche[0] > 150:             # Notbremse: nie haengen bleiben
+        elif versuche[0] - sichtbar_seit[0] > 150:  # Notbremse: nie haengen bleiben
             box.reject()
 
     takt.timeout.connect(tick)
@@ -137,6 +159,37 @@ class RueckfrageKnoepfeTest(unittest.TestCase):
         self.assertEqual(bild["vorgabe"], _ABBRECHEN)
         self.assertEqual(bild["escape"], _ABBRECHEN)
         self.assertEqual(bild["fokus"], _ABBRECHEN)
+        self.assertEqual(bild["fokus_im_fenster"], _ABBRECHEN)
+
+    def test_fokus_auch_bei_spaeter_aktivierung_abbrechen(self):
+        """QA-107: kommt die Aktivierung des Dialogfensters spaet (wie unter
+        Last), liest das Bild den Fokus erst danach — und er ist „Abbrechen“.
+        Nachgestellt wird der Zustand aus dem Gate: Dialog sichtbar, Fenster
+        noch nicht aktiv, ``QApplication.focusWidget()`` None — fuer 300 ms.
+        Ohne das Warten war ``fokus`` hier None."""
+        echt = laser_notaus._QtMessageBox
+        aktiv = [False]
+        echter_fokus = QApplication.focusWidget
+
+        class _SpaetAktiv(echt):
+            def __init__(self, *a, **k):
+                super().__init__(*a, **k)
+                QTimer.singleShot(300, lambda: aktiv.__setitem__(0, True))
+
+            def isActiveWindow(self):
+                return aktiv[0] and super().isActiveWindow()
+
+        def fokus():
+            return echter_fokus() if aktiv[0] else None
+
+        with mock.patch.object(laser_notaus, "_QtMessageBox", _SpaetAktiv), \
+                mock.patch.object(QApplication, "focusWidget", staticmethod(fokus)):
+            _, zustand, bild = self._fragen(lambda box: box.reject())
+        self.assertEqual(bild["fokus"], _ABBRECHEN)
+        self.assertTrue(aktiv[0], "Bild vor der Aktivierung festgehalten")
+        self.assertEqual(bild["fokus_im_fenster"], _ABBRECHEN)
+        self.assertEqual(bild["vorgabe"], _ABBRECHEN)
+        self.assertEqual(zustand.geloest, 0)
 
     def test_escape_loest_nicht(self):
         self._loest_nicht(lambda box: QTest.keyClick(box, Qt.Key.Key_Escape), "Escape")
