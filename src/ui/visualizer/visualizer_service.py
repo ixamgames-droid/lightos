@@ -412,20 +412,51 @@ def _laser_angaben_gemerkt(channels):
         return v
 
 
+def _ausduennen(p: list, segmente: int) -> list:
+    """Linienzug ``p`` auf ``segmente`` Segmente: gleichmaessig verteilte
+    Punkte, erster und letzter bleiben (ein geschlossener Zug endet weiter mit
+    seinem ersten Punkt)."""
+    n = len(p) - 1
+    if segmente >= n or segmente < 1:
+        return p
+    return [p[round(i * n / segmente)] for i in range(segmente + 1)]
+
+
 def _muster_geometrie(muster) -> dict:
     """Payload eines Musters: ``kontur`` = Linienzuege (flach u,v,u,v …;
     geschlossene enden mit ihrem ersten Punkt), ``punkte`` = Einzelpunkte."""
     from src.core.laser.musterformen import form_polylinien
     kontur: list[list[float]] = []
     punkte: list[tuple[float, float]] = []
-    segmente = 0
+    zuege: list[tuple[list, int]] = []
     for l in form_polylinien(muster):
         p = list(l.punkte)
         if l.art == "punkte" or len(p) < 2:
             punkte.extend(p)
             continue
-        if l.geschlossen or l.art == "flaeche":
+        zu = l.geschlossen or l.art == "flaeche"
+        if zu:
             p.append(p[0])
+        zuege.append((p, min(len(p) - 1, 3 if zu else 1)))
+    # CDX-63: ueber dem Segment-Budget des Kegelmantels werden die Linienzuege
+    # gleichmaessig AUSGEDUENNT (jeder behaelt Anfang und Ende, geschlossene
+    # bleiben geschlossen) — vorher fielen ganze Zuege weg: eine Spirale mit
+    # 7 Windungen oder eine Welle mit 9 Perioden kam leer („unbekannt“) an.
+    # Review: kurze Zuege (bis zum fairen Anteil) behalten ALLE Punkte —
+    # sonst wurde neben einem langen Zug ein Quadrat zum Dreieck. Gekuerzt
+    # werden nur die langen, anteilig am verbleibenden Budget.
+    if sum(len(p) - 1 for p, _ in zuege) > LASER_MUSTER_MAX_KONTUR:
+        rest = LASER_MUSTER_MAX_KONTUR
+        lang = sorted(range(len(zuege)), key=lambda i: len(zuege[i][0]))
+        while lang and len(zuege[lang[0]][0]) - 1 <= rest / len(lang):
+            rest -= len(zuege[lang.pop(0)][0]) - 1
+        summe = sum(len(zuege[i][0]) - 1 for i in lang)
+        for i in lang:
+            p, mind = zuege[i]
+            zuege[i] = (_ausduennen(p, max(mind, int((len(p) - 1) * rest / summe))),
+                        mind)
+    segmente = 0
+    for p, _mind in zuege:
         if segmente + len(p) - 1 > LASER_MUSTER_MAX_KONTUR:
             continue
         segmente += len(p) - 1
