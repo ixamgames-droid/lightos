@@ -24,6 +24,7 @@ test_ui85_hilfe_menue.py           # Hilfe-Menue oeffnet docs/ANLEITUNGEN.md + E
 test_ui87_hilfe_oeffnen.py         # doku_ziel bleibt nur lokal, wenn docs/ANLEITUNGEN.md existiert
 test_qa100_anleitung_ueberschriften_einmalig.py # jede ##-Ueberschrift (und Abschnittsnummer) einer Anleitung nur einmal
 test_cdx58_codex_nachlese.py       # liest docs/ (Solo-Ausnahme, Lint-Meldungen)
+test_cdx61_doku_nachzuege.py       # Speed-Dial/Einmessen/EFX/3D/Laser-Anleitungen: Marken gegen den Quelltext (Codex-Doku-Nachzug)
 test_web06_socketio_lokal.py       # liest THIRD_PARTY_NOTICES.md (Lizenzhinweis Socket.IO)
 test_web11_qr_startbildschirm.py   # Web-Remote-Anleitung: Abschnitt „Handy verbinden" (QR-Code, Startbildschirm)
 test_web12_anleitung.py            # Web-Remote-Anleitung + LASER_VOM_HANDY.md Satz fuer Satz gegen Dialog, Rechte-Tabelle, Handy-Seite

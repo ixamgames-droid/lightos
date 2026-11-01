@@ -97,6 +97,9 @@ schätzen); wenn du später dort zielen willst, nimm dort einen Punkt dazu.
   die Köpfe sitzen an verschiedenen Stellen, eine Position für „das Gerät" wäre falsch.
 - Die Rechnung setzt voraus, dass **Pan/Tilt-Bereich** und **Nullpunkt** im Patch zum
   Gerät passen (Datenblatt). Einmessen gleicht den **Standort** aus, nicht ein falsch
-  eingetragenes Gerät.
+  eingetragenes Gerät. Beides steht in **Patch → Gerät bearbeiten**: **Pan-Bereich** /
+  **Tilt-Bereich** in Grad, **Pan-Mitte (DMX)** / **Tilt-Mitte (DMX)** als DMX-Wert
+  0–255 mit bis zu zwei Nachkommastellen (meist 128). Eine am Gerät gemessene Mitte
+  wie `167,5` trägst du mit Komma oder Punkt ein; die Pfeile ändern in 0,5er-Schritten.
 - Feinkanäle (Pan fein/Tilt fein) machen das Schieben feiner. Ohne sie ist ein Schritt
   ein ganzer DMX-Schritt — bei 540° Pan gut 2°, auf 5 m rund 18 cm.
