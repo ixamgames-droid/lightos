@@ -67,9 +67,10 @@ Die Aufbauten lassen sich kombinieren, zum Beispiel B und C.
   Betriebssystem als MIDI-Port meldet, und was als Art-Net, sACN oder OSC über das
   Netzwerk kommt. Ein Pult, das per USB am Rechner hängt, ist damit nicht verbunden.
 - **Tasten und Fader eines Pults sind kein MIDI-Controller für LightOS.** Das gilt auch
-  für herstellereigene Erweiterungen (Wings, Faderbänke): Sie sprechen mit ihrem Pult,
-  nicht mit LightOS. Ein Fader erreicht LightOS nur, wenn das Pult selbst daraus MIDI,
-  MSC, OSC oder DMX macht und sendet.
+  für herstellereigene Erweiterungen (Wings, Faderbänke): Sie sind proprietär, sprechen
+  nur mit ihrem Pult und sind an LightOS grundsätzlich nicht anschließbar. Ein Fader
+  erreicht LightOS nur, wenn das Pult selbst daraus MIDI, MSC, OSC oder DMX macht und
+  sendet.
 - **LightOS steuert kein fremdes Pult fern.** Nach außen gehen DMX-Daten per Art-Net und
   sACN. LightOS sendet kein MSC und drückt auf dem Pult keine Tasten.
 - **Herstellereigene Sitzungsprotokolle werden nicht gesprochen.** LightOS tritt keiner
@@ -355,6 +356,17 @@ Seite (ab 1) und Wert in Prozent und setzt den Fader auf der genannten Executor-
 der aktuellen Seite, Wert 0–16383. Gibt es den Executor oder die Seite nicht, schreibt
 LightOS einen Hinweis ins Programm-Log (`lightos.log`; es steckt im Diagnosepaket aus
 dem Hilfe-Menü).
+
+**Pult-Vorlagen in der Controller-Bibliothek.** Sektion **E/A** → Reiter **MIDI** →
+**Controller-Profile…** listet nach den MIDI-Controllern die Pult-Vorlagen: je Pult eine
+Tabelle, was es senden muss, damit LightOS es versteht — MSC-Befehle als Bytefolge
+(geprüft gegen den MSC-Empfang von LightOS) und MIDI-Noten aus einem Makro des Pults.
+Herstellereigene Befehlsformen sind als **Beispiel** gekennzeichnet: Sie stammen aus einer
+Recherche ohne echtes Pult, die genaue Schreibweise steht im Handbuch des Pults. Mit
+**MIDI-Mapping-Profil erzeugen** legt LightOS dazu ein Mapping-Profil an: Note *n* auf
+MIDI-Kanal 1 löst GO von Executor *n* aus (1–20). Dasselbe geht für jeden MIDI-Controller
+der Bibliothek, der Noten oder CCs beschreibt (Noten → GO, CCs → Fader). Geladen und
+angepasst wird das Profil über das Menü **Ausgabe** → **Input-Profile verwalten...**.
 
 ### Nebenweg: OSC
 
