@@ -50,7 +50,7 @@ Im Sub-Betrieb (Speed-Knoten/Sub) und im Multiplier-Betrieb (Effekt ×½/×2) ze
 
 - **Kopfzeile**: links die Beschriftung, rechts ein gelbes Badge — `× Master` (Multiplier) bzw. `Sub→<Master>` (Sub, z. B. `Sub→Sound`).
 - **Faktor-Buttons** (Reihe oben, z. B. `¼ ½ 1× 2× 4×`): der aktive Faktor ist blau hervorgehoben. Klick wählt diesen Faktor.
-- **Schritt-Leiste** darunter: `-` (einen Faktor langsamer), Faktor-Anzeige in der Mitte, `+` (einen Faktor schneller), `X` (Reset auf `1×`).
+- **Schritt-Leiste** darunter: `-` (einen Faktor langsamer), Faktor-Anzeige in der Mitte, `+` (einen Faktor schneller), `X` (Reset auf `1×`; fehlt `1×` im Faktor-Set, auf die Stufe, die `1×` am nächsten liegt).
 - **„SYNC"** (grüner Balken): setzt den Downbeat des Ziel-Bus neu.
 - **BPM-Anzeige** ganz unten: links das effektive Tempo (`… BPM` oder `— BPM`, wenn keines anliegt), rechts der Bezug, z. B. `folgt Sound-BPM · 1×` bzw. `Master · 2×`.
 
@@ -60,7 +60,7 @@ Welche dieser Teile sichtbar sind, steuern die *Anzeigen*-Schalter im Dialog (Au
 |---|---|
 | Klick auf einen **Faktor-Button** | Setzt diesen Faktor (Sub → Bus-Multiplikator des Ziel-Bus; Multiplier → `tempo_multiplier` je Ziel-Effekt). |
 | **`-` / `+`** | Einen Schritt im Faktor-Set langsamer / schneller. |
-| **`X`** | Faktor zurück auf `1×`. |
+| **`X`** | Faktor zurück auf `1×`. Bietet das Faktor-Set kein `1×` an, auf die Stufe, die `1×` am nächsten liegt (bei `⅛, ¼` also `¼`). |
 | **SYNC** | Downbeat des Ziel-Bus neu auf „jetzt". |
 
 ### Tap-Tempo erklärt
@@ -78,7 +78,7 @@ Doppelklick auf das Element (im Bearbeiten-Modus) öffnet „Speed Dial Einstell
 | Beschriftung | Text oben am Element. | Freitext |
 | BPM | Startwert/aktueller Wert im BPM-Betrieb. | 20–600 |
 | Multiplikator-Modus | Wenn an, wirkt der Dial als Faktor auf die Geschwindigkeit statt als absolute BPM. | Aus / An |
-| Multiplikator | Faktor-Wert im Multiplikator-Betrieb. | 0,1–8,0 (× ) |
+| Multiplikator | Faktor-Wert im Multiplikator-Betrieb. Beim Ziel *Effekt ×½/×2 (Multiplier)* zählt dieses Feld nicht: dort gilt beim OK der im Faktor-Gitter markierte Faktor. | 0,1–8,0 (× ) |
 | Invertieren | Höherer Dial-Wert = langsamer (Wert wird am Bereich gespiegelt). Zeigt „INV" im Rad. | Aus / An |
 | Ziel | Worauf der Dial wirkt (siehe Liste unten). | 5 Modi |
 | Executor-Slot / Function-ID | Haupt-Ziel-ID: Executor-Index (Modus *Executor*) bzw. Function-ID (Effekt-Modi). | Ganzzahl oder leer |
@@ -87,7 +87,7 @@ Doppelklick auf das Element (im Bearbeiten-Modus) öffnet „Speed Dial Einstell
 | Tempo-Bus | Ziel-Bus für die Modi *Tempo-Bus* und *Speed-Knoten*. | (aktiver/Default-Bus) · Bus A · Bus B · Bus C · Bus D |
 | Speed-Rolle | Bei *Speed-Knoten*: ist der Dial Master oder Sub. | Master (eigene BPM) · Sub (folgt Master × Faktor) |
 | Folgt Master | Bei Rolle *Sub*: welchem Master/Bus der Sub folgt. | (Sound-BPM / Default) · Bus A · Bus B · Bus C · Bus D |
-| Faktor-Set (Sub) | Die Faktor-Buttons des Gitters, Komma-getrennt. | z. B. `¼, ½, 1, 2, 4` — auch `0.25, 0.5, 1, 2, 4` oder `1/4, 1/2, 1, 2, 4` |
+| Faktor-Set (Sub) | Die Faktor-Buttons des Gitters, Komma-getrennt. Steht der aktive Faktor nach dem OK nicht mehr im Set, springt er auf die Stufe, die `1×` am nächsten liegt (wie `X`). | z. B. `¼, ½, 1, 2, 4` — auch `0.25, 0.5, 1, 2, 4` oder `1/4, 1/2, 1, 2, 4` |
 | Anzeigen: Rad (Master) | Rad sichtbar (nur Master sinnvoll). | An / Aus |
 | Anzeigen: Tap (Master) | Tap-Button sichtbar. | An / Aus |
 | Anzeigen: Faktor-Gitter (Sub) | Faktor-Gitter sichtbar (nur Sub). | An / Aus |
@@ -102,7 +102,7 @@ Doppelklick auf das Element (im Bearbeiten-Modus) öffnet „Speed Dial Einstell
 | **Executor (Playback)** | Der Dial setzt die Cue-Fade-Zeiten des Executors am angegebenen Slot. Im BPM-Betrieb: `fade_in = 60 / BPM` (ein Beat pro Cue). Im Multiplikator-Betrieb: `fade_in = 1 / Faktor`. |
 | **Funktion / Effekt** | Der Dial setzt die Geschwindigkeit der Funktion/des Effekts. Effekte (Matrix/EFX) über `set_param('speed', …)`, klassische Funktionen über ihr `speed`-Attribut. Der Faktor leitet sich aus dem Dial-Wert ab (BPM/120 bzw. der Multiplikator), geklemmt auf 0,05–20. |
 | **Tempo-Bus (BPM setzen)** | Der Dial setzt die **BPM eines benannten Tempo-Bus**. Alle Effekte, die diesem Bus folgen, übernehmen das Tempo. TAP tappt den Bus, SYNC setzt dessen Downbeat neu. |
-| **Effekt ×½/×2 (Multiplier)** | Der Dial setzt den **`tempo_multiplier` der Ziel-Effekte** (Half/Double). Zeigt das Faktor-Gitter; jeder Ziel-Effekt kann einen eigenen, unabhängigen Multiplikator am selben Master haben. |
+| **Effekt ×½/×2 (Multiplier)** | Der Dial setzt den **`tempo_multiplier` der Ziel-Effekte** (Half/Double). Zeigt das Faktor-Gitter; jeder Ziel-Effekt kann einen eigenen, unabhängigen Multiplikator am selben Master haben. Läuft ein Ziel-Effekt frei (ohne Tempo-Bus), ändert der Dial seine eigene Geschwindigkeit im selben Verhältnis (von `1×` auf `2×` = doppelt so schnell wie vorher), statt sie durch den Faktor zu ersetzen. |
 | **Speed-Knoten (Master/Sub)** | Der Dial **ist selbst ein Tempo-Bus** (QLC+-Parität). Als **Master** liefert er eine eigene BPM (per Tap/Rad). Als **Sub** folgt er einem Master-Bus und multipliziert dessen Tempo mit dem gewählten **Faktor** aus dem Gitter (`¼ … 4×`). Der reservierte Default-Bus wird nie zum Sub gemacht. |
 
 #### Rolle Master vs. Sub, Faktor-Set und Tempo-Bus (im Speed-Knoten-Modus)
