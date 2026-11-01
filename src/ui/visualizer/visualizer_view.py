@@ -30,6 +30,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QGuiApplication
 
 from src.core.app_state import get_state
+from src.core.diagnose_log import melde_still as _melde_still   # STAB-31
 from src.core.stage.stage_definition import resolve_active_stage
 from src.ui.visualizer.visualizer_window import (
     VisualizerBridge, load_stage_html, install_render_crash_guard,
@@ -145,6 +146,9 @@ class Visualizer3DView(QWidget):
         root.addLayout(bar)
 
         self._view = QWebEngineView()
+        # STAB-31 (2): JS-Konsole ins Diagnose-Log (vor Profil/Settings/Signalen).
+        from src.ui.visualizer.js_konsole import installiere_js_konsole
+        installiere_js_konsole(self._view, "eingebettet")
         try:
             profile = self._view.page().profile()
             profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.NoCache)
@@ -377,8 +381,8 @@ class Visualizer3DView(QWidget):
         ``self._target.emit_batch``."""
         try:
             self._bridge._activate()        # idempotent re-arm nach on_hidden()
-        except Exception:
-            pass
+        except Exception as e:
+            _melde_still("viz.view_activate", e)   # STAB-31
         svc = getattr(self, "_service", None)
         target = getattr(self, "_target", None)
         if svc is not None and target is not None:
@@ -421,8 +425,8 @@ class Visualizer3DView(QWidget):
         if getattr(self, "_loaded", False):
             try:
                 self._bridge.push_settings(self._collect_settings())
-            except Exception:
-                pass
+            except Exception as e:
+                _melde_still("viz.view_push_settings", e)   # STAB-31
             try:
                 self._bridge.requestFixtures()
             except Exception:
@@ -462,8 +466,8 @@ class Visualizer3DView(QWidget):
             pass
         try:
             self._bridge.push_settings(self._collect_settings())
-        except Exception:
-            pass
+        except Exception as e:
+            _melde_still("viz.view_push_settings", e)   # STAB-31
 
     def _reset_camera(self):
         try:

@@ -2390,9 +2390,11 @@ def _load_show_impl(path: str | os.PathLike):
         for fid_raw, attrs in programmer.items():
             try:
                 fid = int(fid_raw)
-            except Exception:
+            except Exception as _e:
+                _melde_still("show.programmer", _e, text=f"Geraet {fid_raw!r}")   # STAB-31
                 continue
             if not isinstance(attrs, dict):
+                _melde_still("show.programmer", text=f"Geraet {fid_raw}: kein Objekt")   # STAB-31
                 continue
             # STAB-18: int(v) PRO Wert kapseln — ein einzelner kaputter Wert
             # (None/Liste/nicht-numerisch) darf nur diesen Eintrag ueberspringen,
@@ -2405,7 +2407,8 @@ def _load_show_impl(path: str | os.PathLike):
             for a, v in attrs.items():
                 try:
                     vals[str(a)] = int(v)
-                except (TypeError, ValueError, OverflowError):
+                except (TypeError, ValueError, OverflowError) as _e:
+                    _melde_still("show.programmer", _e, text=f"Geraet {fid} {a}")   # STAB-31
                     continue
             # CDX-18: fan<-dimmer VOR dem gleich folgenden _flush_all_to_dmx(),
             # sonst zeigte der Luefter unmittelbar nach dem Laden weiter 0.
@@ -2424,10 +2427,12 @@ def _load_show_impl(path: str | os.PathLike):
         parsed = {}
         for k, vals in bl.items():
             if not isinstance(vals, dict):
+                _melde_still("show.base_levels", text=f"Geraet {k}: kein Objekt")   # STAB-31
                 continue
             try:
                 fid = int(k)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError) as _e:
+                _melde_still("show.base_levels", _e, text=f"Geraet {k!r}")   # STAB-31
                 continue
             # STAB-18: int(v) pro Wert kapseln (ein kaputter Wert -> nur dieser
             # faellt, nicht alle Basis-Level). A3D-19: OverflowError mitfangen
@@ -2436,7 +2441,8 @@ def _load_show_impl(path: str | os.PathLike):
             for a, v in vals.items():
                 try:
                     clean[str(a)] = int(v)
-                except (TypeError, ValueError, OverflowError):
+                except (TypeError, ValueError, OverflowError) as _e:
+                    _melde_still("show.base_levels", _e, text=f"Geraet {fid} {a}")   # STAB-31
                     continue
             # CDX-18: fan<-dimmer VOR dem gleich folgenden _rebuild_render_plan(),
             # sonst faehrt der Default-Frame den Luefter dauerhaft auf 0.
@@ -2718,7 +2724,8 @@ def _load_show_impl(path: str | os.PathLike):
             try:
                 if sid:
                     docks[int(fid_raw)] = str(sid)
-            except Exception:
+            except Exception as _e:
+                _melde_still("show.viz_dock", _e, text=f"Geraet {fid_raw}")   # STAB-31
                 continue
         valid_ids = _resolve_stage_element_ids(active_stage_name)
         if valid_ids is not None:
@@ -2765,7 +2772,8 @@ def _load_show_impl(path: str | os.PathLike):
         for fid_raw, p in (lv.get("positions", {}) or {}).items():
             try:
                 lv_pos[int(fid_raw)] = (float(p[0]), float(p[1]))
-            except Exception:
+            except Exception as _e:
+                _melde_still("show.live_position", _e, text=f"Geraet {fid_raw}")   # STAB-31
                 continue
         # P4: Show-spezifische View-Einstellungen (Zoom/Grid/Snap/Weltgroesse).
         # Alte Shows ohne "meta" -> leeres Dict; die Live View faellt dann auf

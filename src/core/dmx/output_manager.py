@@ -423,8 +423,9 @@ class OutputManager:
         for cb in list(self._gm_callbacks):
             try:
                 cb(self.grand_master)
-            except Exception:
-                pass
+            except Exception as e:
+                from src.core.diagnose_log import melde_still   # STAB-31
+                melde_still("dmx.gm_callback", e)
 
     def subscribe_grand_master(self, cb):
         if cb not in self._gm_callbacks:
@@ -1282,8 +1283,9 @@ class OutputManager:
         for cb in list(self._blackout_callbacks):
             try:
                 cb(jetzt)
-            except Exception:
-                pass
+            except Exception as e:
+                from src.core.diagnose_log import melde_still   # STAB-31
+                melde_still("dmx.blackout_callback", e)
 
     def set_blackout(self, enabled: bool):
         """Der Blackout-SCHALTER an/aus (Kopfzeile, Web, OSC, Kommandozeile,
