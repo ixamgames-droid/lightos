@@ -40,7 +40,9 @@ def output_interface_ip() -> "str | None":
     try:
         from src.ui.views.programmer_view import _load_prefs
         gespeichert = (_load_prefs().get("output_iface_ip") or "").strip()
-    except Exception:
+    except Exception as e:
+        from src.core.diagnose_log import melde_still   # STAB-31
+        melde_still("dmx.iface_prefs", e, text="Einstellungen unlesbar")
         gespeichert = ""
     return gespeichert or None
 

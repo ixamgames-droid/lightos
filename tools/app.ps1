@@ -22,6 +22,7 @@
     stop           Laufende App(s) beenden (pythonw/python mit main.py in der Cmdline).
     restart        stop + start.
     wait           Auf das LightOS-Fenster warten (Bereitschaft). Timeout via -TimeoutSec.
+    lizenz         Zeigt, welche Lizenz 'start' im Probelauf mitgibt (TOOL-30), startet nichts.
     shot <Path>    Screenshot des gesamten virtuellen Bildschirms als PNG nach <Path>.
                    Optional -Width skaliert die Breite; -X -Y -W -H schneidet einen Bereich zu.
     fg             LightOS in den Vordergrund + TOPMOST zwingen (vor jeder Aufnahme).
@@ -70,7 +71,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true, Position = 0)]
-  [ValidateSet('start', 'stop', 'restart', 'wait', 'shot', 'fg', 'untop')]
+  [ValidateSet('start', 'stop', 'restart', 'wait', 'shot', 'fg', 'untop', 'lizenz')]
   [string]$Command,
 
   [Parameter(Position = 1)]
@@ -147,11 +148,37 @@ function Get-AppProcesses {
     Where-Object { $_.CommandLine -and $_.CommandLine -match 'main\.py' }
 }
 
+# TOOL-30 (wie _probelauf_lizenz in tools/app.sh, STAB-39): aus einer Claude-Code-Shell
+# (CLAUDECODE=1) ist der Start KEINE echte App, sondern ein PROBELAUF mit leerem
+# Wegwerf-Datenordner. Darin fehlt die Lizenz, und statt des Hauptfensters kaeme der
+# Dialog "Testlizenz erforderlich" (wait/shot griffen ihn). Darum den Ort der Lizenz
+# DIESES Rechners mitgeben - NUR LESEND, mit derselben Fundlogik wie die App
+# (paths.regulaerer_app_data_dir). Eine gesetzte LIGHTOS_LIZENZ gewinnt.
+function Set-ProbelaufLizenz {
+  if ($env:CLAUDECODE -ne '1') { return }
+  if ($env:LIGHTOS_LIZENZ) { return }
+  $pyc = Join-Path $RepoRoot 'venv\Scripts\python.exe'
+  if (-not (Test-Path $pyc)) { $pyc = 'python' }
+  # ohne Anfuehrungszeichen im Code: PowerShell 5.1 reicht eingebettete " nicht an
+  # native Programme weiter - der Dateiname kommt deshalb als Argument
+  $code = 'import os, sys; sys.path.insert(0, sys.argv[1]); from src.core.paths import regulaerer_app_data_dir as d; print(os.path.join(d(), sys.argv[2]))'
+  $pfad = ''
+  try { $pfad = (& $pyc -c $code $RepoRoot 'lightos-lizenz.lic' 2>$null | Select-Object -Last 1) } catch { $pfad = '' }
+  if ($pfad) { $pfad = $pfad.Trim() }
+  if ($pfad -and (Test-Path -LiteralPath $pfad -PathType Leaf)) {
+    $env:LIGHTOS_LIZENZ = $pfad
+    Write-Output '[app] Probelauf (CLAUDECODE=1): Wegwerf-Daten, keine Ausgabe; Lizenz nur lesend aus dem echten Datenordner'
+  } else {
+    Write-Output '[app] Probelauf (CLAUDECODE=1): Wegwerf-Daten, keine Ausgabe; keine Lizenzdatei gefunden - Lizenzdialog moeglich'
+  }
+}
+
 function Start-App {
   $py = Join-Path $RepoRoot 'venv\Scripts\pythonw.exe'
   $mainPy = Join-Path $RepoRoot 'main.py'
   if (-not (Test-Path $py)) { Write-Output "FEHLER: venv-pythonw nicht gefunden: $py"; return }
   if (-not (Test-Path $mainPy)) { Write-Output "FEHLER: main.py nicht gefunden: $mainPy"; return }
+  Set-ProbelaufLizenz
   Start-Process -FilePath $py -ArgumentList 'main.py', '--touch' -WorkingDirectory $RepoRoot | Out-Null
   Write-Output "gestartet: $py main.py --touch (cwd=$RepoRoot)"
 }
@@ -198,6 +225,7 @@ function Save-Shot([int]$sx, [int]$sy, [int]$sw, [int]$sh, [string]$outPath, [in
 switch ($Command) {
   'start'   { Start-App; if ($Wait) { [void](Wait-App $TimeoutSec) } }
   'stop'    { Stop-App }
+  'lizenz'  { Set-ProbelaufLizenz; Write-Output "LIGHTOS_LIZENZ=$env:LIGHTOS_LIZENZ" }
   'restart' { Stop-App; Start-Sleep -Milliseconds 600; Start-App; if ($Wait) { [void](Wait-App $TimeoutSec) } }
   'wait'    { [void](Wait-App $TimeoutSec) }
   'fg'      {

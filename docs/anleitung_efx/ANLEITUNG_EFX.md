@@ -38,6 +38,11 @@ In der Gruppe **Form & Geometrie** stellst du ein:
   *Diamond* (Raute), *Square* (Quadrat), *Trapez*, *Lissajous*, *Random* (Zufall), *Triangle*
   (Dreieck) sowie *Custom Path* für eigene, aufgezeichnete Bahnen.
 - **Breite (Pan-Hub)** / **Höhe (Tilt-Hub):** wie weit die Bewegung ausschlägt (0–255, DMX-Wert).
+  Sind **nur Laser** Ziel des EFX, heißen die Felder **Breite (X-Hub)** / **Höhe (Y-Hub)** und
+  **Zentrum X** / **Zentrum Y**, der Schalter **um aktuelle X/Y-Position**; die Zeile **16-bit**
+  (**Pan/Tilt über pan_fine/tilt_fine**) ist ausgeblendet — Laser haben keine Feinkanäle. Bei
+  gemischten Zielen (Laser und Moving Heads) bleibt die Pan/Tilt-Beschriftung samt 16-bit-Zeile;
+  für die Laser wirken dieselben Werte auf X/Y.
 - **Geschwindigkeit (Hz)** (Tempo, siehe Abschnitt 4) und **Richtung** (in der Gruppe *Tempo &
   Richtung*).
 
