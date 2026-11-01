@@ -1048,6 +1048,13 @@ class PatchView(QWidget):
         dlg = FixtureGeneratorDialog(self)
         if dlg.exec() and dlg.saved_id is not None:
             self._refresh_table()
+            # FM-71: Erfolg nicht-modal in der Statuszeile (statt Meldungsbox).
+            meldung = getattr(dlg, "gespeichert_meldung", "")
+            if meldung:
+                try:
+                    self.window().statusBar().showMessage(meldung, 6000)
+                except Exception:
+                    pass
 
     def _fid_at_row(self, row: int) -> int | None:
         """FID der angezeigten Zeile (aus den Item-Daten, nicht positionsbasiert)."""
