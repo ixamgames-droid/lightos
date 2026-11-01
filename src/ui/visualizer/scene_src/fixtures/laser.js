@@ -11,12 +11,21 @@
 //   form     0 Faecher · 1 Einzelstrahl · 2 Strahlenkranz · 3 Flaeche
 //            (grob aus Musterbank/Musterauswahl — die echten Muster der
 //            Geraete sind Vektorgrafiken, die der Viewer nicht nachzeichnet)
+//   muster   VIZ-95: echtes Muster aus den Profilangaben (LAS-33) —
+//            {id, name, kontur: [[u,v,u,v…]…], punkte: [u,v…], unbekannt?}
+//            in normierten Koordinaten (-1..1, x rechts, y oben). Ist es da,
+//            gilt es statt `form`: Linienzuege werden ein Strahlenkegel
+//            (Mantel vom Austrittsfenster bis zur Kontur), Einzelpunkte je ein
+//            Strahl; `unbekannt` = neutraler Einzelstrahl.
+//   farbe    VIZ-95: [r,g,b] aus den Farb-Bereichen des Profils — NUR der
+//            Farbton der Strahlen, die Helligkeit bleibt beim Dimmer.
 //   dx, dy, dz, dr   Bewegung laeuft im Geraet selbst (dynamische Bereiche
 //            der Kanaele bzw. Auto-Programm mit Geschwindigkeit > 0)
 //   tempo    0..1 (speed) — Tempo dieser Eigenbewegung
 //
-// Leistung: das Rig wird EINMAL je Geraet gebaut (8 Strahlen + 1 Flaeche, eine
-// geteilte Zylinder-Geometrie). Ein DMX-Update setzt nur Drehung, Skalierung
+// Leistung: das Rig wird EINMAL je Geraet gebaut (32 Strahlen + 1 Flaeche, eine
+// geteilte Zylinder-Geometrie, dazu ein Kegelmantel mit fester Kapazitaet —
+// ein Musterwechsel schreibt dessen Punkte nur um, VIZ-95). Ein DMX-Update setzt nur Drehung, Skalierung
 // und Sichtbarkeit — keine neuen Geometrien, keine neuen Materialien, keine
 // Vektor-Allokationen (Modul-Temporaere).
 import * as THREE from '../three/three.js';
@@ -32,7 +41,14 @@ export const LASER_BEAM_RADIUS = 0.015;
 export const LASER_BEAM_OPACITY = 0.9;
 // Eine Flaeche deckt viel mehr Pixel als ein Strahl — sonst ueberstrahlt sie.
 export const LASER_SHEET_OPACITY = 0.3;
-export const LASER_MAX_BEAMS = 8;
+export const LASER_MAX_BEAMS = 32;      // VIZ-95: Pool fuer gepunktete Muster
+const KRANZ_STRAHLEN = 8;               // Grobform „Strahlenkranz" (VIZ-79)
+// VIZ-95: Kegelmantel eines Musters. Kapazitaet = visualizer_service.
+// LASER_MUSTER_MAX_KONTUR; deckt weniger als eine Flaeche (ein Kreis-Kegel
+// ueberlagert sich vorn und hinten).
+export const LASER_MUSTER_MAX_KONTUR = 192;
+export const LASER_KEGEL_OPACITY = 0.22;
+const MUSTER_TAN = Math.tan(0.3);      // halber Oeffnungswinkel bei voller Groesse
 
 const LASER_PITCH = 0.06;        // rad (~3,5°) nach unten — ueber den Koepfen
 const FAN_HALF = 0.35;           // halbe Faecherbreite bei voller Groesse (rad)
@@ -45,6 +61,7 @@ export const LASER_FORMEN = ['faecher', 'einzel', 'kranz', 'flaeche'];
 
 const _AUF = new THREE.Vector3(0, 1, 0);
 const _dir = new THREE.Vector3();
+const _UNBEKANNT = { id: 'unbekannt', name: '', kontur: [], punkte: [], unbekannt: true };
 
 // Geteilt von allen Lasern (VIZ-66-Cache): die Geometrie ist bei allen gleich,
 // disposeObj gibt sie beim Entfernen eines Geraets nicht frei.
@@ -66,6 +83,21 @@ function sheetGeo() {
       [0, 0, 0, -L, 0, L, L, 0, L], 3));
     return g;
   });
+}
+
+// VIZ-95: Kegelmantel JE GERAET (die Kontur ist je Laser verschieden) mit
+// fester Kapazitaet; ein Musterwechsel schreibt nur das Positions-Attribut um
+// und setzt den Zeichenbereich. Die Kontur steht in Einheiten je Meter Laenge
+// (u, v, 1) * L — die Groesse setzt scale.x/scale.y.
+function kegelGeo() {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(
+    new Float32Array(LASER_MUSTER_MAX_KONTUR * 9), 3));
+  g.setDrawRange(0, 0);
+  // Feste Huelle statt computeBoundingSphere je Musterwechsel.
+  g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, LASER_BEAM_LENGTH / 2),
+                                      LASER_BEAM_LENGTH);
+  return g;
 }
 
 // Strahlen und Flaeche sind reines Licht, kein Koerper:
@@ -114,15 +146,26 @@ export function buildLaserRig(group, fensterZ) {
   nurLicht(sheet);
   pivot.add(sheet);
   laserBeams.push(sheet);
-  const rig = { pivot, beams: laserBeams.slice(0, LASER_MAX_BEAMS), sheet,
-                state: defaultState(), key: '' };
+  const kegelMat = sheetMat.clone();
+  const kegel = new THREE.Mesh(kegelGeo(), kegelMat);
+  kegel.userData.deckkraft = LASER_KEGEL_OPACITY;
+  kegel.userData.kegel = true;
+  nurLicht(kegel);
+  pivot.add(kegel);
+  laserBeams.push(kegel);
+  const rig = { pivot, beams: laserBeams.slice(0, LASER_MAX_BEAMS), sheet, kegel,
+                state: defaultState(), key: '',
+                muster: null, musterId: '', kegelSegmente: 0,
+                punkte: new Float32Array(LASER_MAX_BEAMS * 2), punktN: 0,
+                farbe: null, farbeObj: new THREE.Color() };
   poseLaser(rig, 0);
   return { rig, laserBeams };
 }
 
 function defaultState() {
   return { x: 0, y: 0, sx: 1, sy: 1, rot: 0, form: 0,
-           dx: false, dy: false, dz: false, dr: false, tempo: 0 };
+           dx: false, dy: false, dz: false, dr: false, tempo: 0,
+           farbe: '' };
 }
 
 function zahl(v, lo, hi, def) {
@@ -143,6 +186,8 @@ function poseLaser(rig, t) {
   const gy = Math.max(MIN_SIZE, s.sy) * puls;
   rig.pivot.rotation.set(pitch, yaw, roll);
 
+  if (rig.muster) { poseMuster(rig, gx, gy); return; }
+  rig.kegel.userData.aktiv = false;
   const form = LASER_FORMEN[s.form] || 'faecher';
   let n = 0;
   for (let i = 0; i < rig.beams.length; i++) {
@@ -152,8 +197,8 @@ function poseLaser(rig, t) {
       _dir.set(Math.sin(a), 0, Math.cos(a));
     } else if (form === 'einzel' && i === 0) {
       _dir.set(0, 0, 1);
-    } else if (form === 'kranz') {
-      const phi = (i / rig.beams.length) * 2 * Math.PI;
+    } else if (form === 'kranz' && i < KRANZ_STRAHLEN) {
+      const phi = (i / KRANZ_STRAHLEN) * 2 * Math.PI;
       _dir.set(Math.sin(RING_HALF * gx) * Math.cos(phi),
                Math.sin(RING_HALF * gy) * Math.sin(phi), 1).normalize();
     } else {
@@ -167,6 +212,83 @@ function poseLaser(rig, t) {
   rig.sheet.userData.aktiv = (form === 'flaeche');
   rig.sheet.scale.set(Math.tan(FAN_HALF * gx), 1, 1);
   rig.aktiveStrahlen = n;
+}
+
+// VIZ-95: echtes Muster — Kegelmantel (Groesse ueber die Skalierung) plus je
+// Einzelpunkt ein Strahl; ein unbekanntes Muster ist ein Strahl geradeaus.
+function poseMuster(rig, gx, gy) {
+  const kx = MUSTER_TAN * gx, ky = MUSTER_TAN * gy;
+  rig.kegel.scale.set(kx, ky, 1);
+  rig.kegel.userData.aktiv = rig.kegelSegmente > 0;
+  rig.sheet.userData.aktiv = false;
+  const unbekannt = !!rig.muster.unbekannt;
+  let n = 0;
+  for (let i = 0; i < rig.beams.length; i++) {
+    const bm = rig.beams[i];
+    if (unbekannt && i === 0) {
+      _dir.set(0, 0, 1);
+    } else if (!unbekannt && i < rig.punktN) {
+      _dir.set(rig.punkte[2 * i] * kx, rig.punkte[2 * i + 1] * ky, 1).normalize();
+    } else {
+      bm.userData.aktiv = false;
+      continue;
+    }
+    bm.quaternion.setFromUnitVectors(_AUF, _dir);
+    bm.userData.aktiv = true;
+    n += 1;
+  }
+  rig.aktiveStrahlen = n;
+}
+
+// Muster in das Rig schreiben — nur wenn es ein ANDERES ist (id). Keine neuen
+// Geometrien: das Positions-Attribut des Kegels wird ueberschrieben.
+function setzeMuster(rig, m) {
+  if (!m) {
+    rig.muster = null; rig.musterId = ''; rig.kegelSegmente = 0; rig.punktN = 0;
+    rig.kegel.geometry.setDrawRange(0, 0);
+    return;
+  }
+  const id = String(m.id || m.name || '');
+  if (rig.muster && id === rig.musterId) return;
+  rig.muster = m.unbekannt ? _UNBEKANNT : m;
+  rig.musterId = id;
+  const L = LASER_BEAM_LENGTH;
+  const attr = rig.kegel.geometry.getAttribute('position');
+  const a = attr.array;
+  let seg = 0;
+  for (const linie of (m.unbekannt ? [] : (m.kontur || []))) {
+    for (let j = 0; j + 3 < linie.length && seg < LASER_MUSTER_MAX_KONTUR; j += 2) {
+      const o = seg * 9;
+      a[o] = 0; a[o + 1] = 0; a[o + 2] = 0;
+      a[o + 3] = linie[j] * L; a[o + 4] = linie[j + 1] * L; a[o + 5] = L;
+      a[o + 6] = linie[j + 2] * L; a[o + 7] = linie[j + 3] * L; a[o + 8] = L;
+      seg += 1;
+    }
+  }
+  rig.kegelSegmente = seg;
+  rig.kegel.geometry.setDrawRange(0, seg * 3);
+  attr.needsUpdate = true;
+  const p = m.unbekannt ? [] : (m.punkte || []);
+  const n = Math.min(LASER_MAX_BEAMS, Math.floor(p.length / 2));
+  for (let i = 0; i < 2 * n; i++) rig.punkte[i] = zahl(p[i], -1, 1, 0);
+  rig.punktN = n;
+}
+
+function setzeFarbe(rig, farbe) {
+  const ok = Array.isArray(farbe) && farbe.length === 3;
+  if (!ok) { rig.farbe = null; rig.state.farbe = ''; return; }
+  const r = zahl(farbe[0], 0, 255, 255), g = zahl(farbe[1], 0, 255, 255),
+        b = zahl(farbe[2], 0, 255, 255);
+  rig.farbeObj.setRGB(r / 255, g / 255, b / 255);
+  rig.farbe = rig.farbeObj;
+  rig.state.farbe = `${r},${g},${b}`;
+}
+
+// VIZ-95: Farbe der Laserstrahlen fuer applyGenericColor — die Profilfarbe,
+// sonst die allgemeine Geraetefarbe. Nur der Farbton: Deckkraft und
+// Sichtbarkeit rechnet der Aufrufer weiter aus der Helligkeit.
+export function laserFarbe(f, allgemein) {
+  return (f && f.laserRig && f.laserRig.farbe) || allgemein;
 }
 
 // DMX-Teil des Lasers: Zustand aus payload.laser uebernehmen und Strahlen
@@ -186,12 +308,16 @@ export function applyLaser(f, dmx) {
     s.form = Math.round(zahl(L.form, 0, LASER_FORMEN.length - 1, 0));
     s.dx = !!L.dx; s.dy = !!L.dy; s.dz = !!L.dz; s.dr = !!L.dr;
     s.tempo = zahl(L.tempo, 0, 1, 0);
+    setzeMuster(rig, (L.muster && typeof L.muster === 'object') ? L.muster : null);
+    setzeFarbe(rig, L.farbe);
   } else {
     Object.assign(s, defaultState());
+    setzeMuster(rig, null);
+    setzeFarbe(rig, null);
   }
   // Nur neu setzen, wenn sich etwas geaendert hat (DMX kommt im Takt, auch
   // wenn der Laser steht); bewegte Laser setzt der Frame-Takt.
-  const key = `${s.x}|${s.y}|${s.sx}|${s.sy}|${s.rot}|${s.form}`;
+  const key = `${s.x}|${s.y}|${s.sx}|${s.sy}|${s.rot}|${s.form}|${rig.musterId}`;
   if (key !== rig.key || bewegt(s)) {
     rig.key = key;
     poseLaser(rig, bewegt(s) ? jetzt() : 0);
@@ -254,6 +380,11 @@ export function laserInfo(fid, t) {
     form: LASER_FORMEN[rig.state.form],
     aktiv: rig.aktiveStrahlen,
     flaeche: !!rig.sheet.userData.aktiv,
+    muster: rig.muster ? (rig.muster.unbekannt ? 'unbekannt' : (rig.muster.name || rig.musterId)) : null,
+    kegel: rig.kegel.userData.aktiv ? rig.kegelSegmente : 0,
+    punkte: rig.muster && !rig.muster.unbekannt ? rig.punktN : 0,
+    kegelSkala: [rig.kegel.scale.x, rig.kegel.scale.y],
+    farbe: rig.state.farbe,
     yaw: rig.pivot.rotation.y, pitch: rig.pivot.rotation.x, roll: rig.pivot.rotation.z,
     bewegt: _bewegt.has(Number(fid)),
     animationAktiv: laserAnimationAktiv(),
