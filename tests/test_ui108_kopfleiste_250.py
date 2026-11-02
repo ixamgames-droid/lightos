@@ -109,6 +109,47 @@ class KopfleisteTest(unittest.TestCase):
             w._bpm_mgr = echt
             w._update_bpm_mode_badge()
 
+    def test_festes_abzeichen_kostet_keinen_platz_gegenueber_auto(self):
+        """Nachbesserung 02.11.2026: die feste Breite reservierte die Breite von
+        „🔒 LOCK“ (unter Windows 53 statt 34 px Text). Damit fehlten der
+        Kopfleiste schon im AUTO-Start rund 12–20 px, und bei 1440 px zeigte der
+        Bereichsknopf im Linux-Gate „Virtual Cons…“
+        (``test_ui_polish_audit::TestSectionButtonsFullTextAt1440``). Unter
+        Windows bleibt dort Luft, deshalb prueft dieser Test die Ursache selbst:
+        das Abzeichen ist im AUTO-Zustand hoechstens so breit wie ein schlichtes
+        QLabel „AUTO“ mit demselben Stil (2 px Spiel fuer Schriften, in denen
+        ein anderer Zustandstext ein Pixel breiter laeuft als „AUTO“)."""
+        from PySide6.QtWidgets import QLabel
+
+        from src.core.engine.bpm_manager import BpmMode
+
+        w = self.w
+        lbl = w._lbl_bpm_mode
+        echt = w._bpm_mgr
+        if echt is None:
+            self.skipTest("kein BPM-Manager")
+        modus_vorher = echt.mode
+        try:
+            w._bpm_mgr = _StubMgr(echt, False)
+            echt.set_mode(BpmMode.AUTO)
+            w._update_bpm_mode_badge()
+            self.assertEqual(lbl.text(), "AUTO")
+            schlicht = QLabel("AUTO")
+            schlicht.setStyleSheet(lbl.styleSheet())
+            # gleiche Ausrichtung: ein linksbuendiges Label bekaeme noch einen
+            # Einzug, der hier als verstecktes Spiel durchginge
+            schlicht.setAlignment(lbl.alignment())
+            schlicht.ensurePolished()
+            self.assertLessEqual(
+                lbl.sizeHint().width(), schlicht.sizeHint().width() + 2,
+                f"festes Abzeichen {lbl.sizeHint().width()} px, schlichtes AUTO "
+                f"{schlicht.sizeHint().width()} px — die feste Breite nimmt der "
+                "Kopfleiste Platz")
+        finally:
+            echt.set_mode(modus_vorher)
+            w._bpm_mgr = echt
+            w._update_bpm_mode_badge()
+
 
 if __name__ == "__main__":
     unittest.main()

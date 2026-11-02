@@ -466,22 +466,27 @@ class _SectionBar(QWidget):
 
 
 class _AbzeichenFesteBreite(QLabel):
-    """UI-108: Abzeichen (BPM-Modus AUTO/MAN/🔒 LOCK), dessen Breite fuer ALLE
+    """UI-108: Abzeichen (BPM-Modus AUTO/MAN/LOCK), dessen Breite fuer ALLE
     seine moeglichen Texte reicht.
 
     Vorher war es so breit wie der aktuelle Text. Wechselte er zur Laufzeit
     (z. B. Freeze -> LOCK), stand bis zum naechsten Layout-Durchlauf der lange
     Text in der alten Breite („🔒 LO“), und STOP ALL/BLACKOUT daneben sprangen
     bei jedem Wechsel um gut 20 px. Gemessen wird erst, wenn das Layout fragt —
-    also mit der Schrift, die das Stylesheet dann wirklich gesetzt hat."""
+    also mit der Schrift, die das Stylesheet dann wirklich gesetzt hat.
+
+    Die Zustandstexte muessen kurz bleiben: die feste Breite gilt auch im
+    AUTO-Start, und die Kopfleiste ist bei 1440 px knapp. Mit „🔒 LOCK“ fehlten
+    ihr 12–20 px, und ein Bereichsknopf wurde gekuerzt („Virtual Cons…“)."""
 
     def __init__(self, texte, text: str = "", parent=None):
         super().__init__(text, parent)
         self._texte = tuple(texte)
 
     def _breite(self) -> int:
-        # fm.size wie QLabel selbst (nicht horizontalAdvance): beim Emoji 🔒
-        # liegen die beiden unter Windows um mehrere Pixel auseinander.
+        # fm.size wie QLabel selbst (nicht horizontalAdvance): die beiden
+        # koennen auseinanderliegen (beim frueheren 🔒 unter Windows um mehrere
+        # Pixel).
         fm = self.fontMetrics()
         zeile = Qt.TextFlag.TextSingleLine
 
@@ -1235,7 +1240,9 @@ class MainWindow(QMainWindow):
 
         # AUTO/MANUAL/Lock-Badge — zeigt, welcher Modus/welche Quelle den Leader
         # treibt. Klick togglet AUTO/MANUAL.
-        self._lbl_bpm_mode = _AbzeichenFesteBreite(("AUTO", "MAN", "🔒 LOCK"), "AUTO")
+        # UI-108: „LOCK“ ohne Schloss-Zeichen — so breit wie „AUTO“, die feste
+        # Breite kostet die Kopfleiste dann keinen Platz.
+        self._lbl_bpm_mode = _AbzeichenFesteBreite(("AUTO", "MAN", "LOCK"), "AUTO")
         self._lbl_bpm_mode.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lbl_bpm_mode.setFixedHeight(22)
         self._lbl_bpm_mode.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -2079,7 +2086,7 @@ class MainWindow(QMainWindow):
             from src.core.engine.bpm_manager import BpmMode
             mgr = self._bpm_mgr
             if mgr.is_locked:
-                txt, bg, fg = "🔒 LOCK", "#3a2a00", "#ffb000"
+                txt, bg, fg = "LOCK", "#3a2a00", "#ffb000"   # UI-108: kurz, s. o.
             elif mgr.mode == BpmMode.AUTO:
                 txt, bg, fg = "AUTO", "#10331a", "#9DFF52"
             else:
