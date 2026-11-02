@@ -249,12 +249,15 @@ class BPMManager:
     def request_bpm(self, bpm: float, source: str = "audio"):
         """BPM-Anfrage einer NICHT-manuellen Quelle (OS2L/Datei) mit Praezedenz.
         MANUAL/Lock blocken; und im AUTO-Modus hat der laufende Audio-Detektor
-        Vorrang vor OS2L/Datei (zentrale Praezedenz statt konkurrierender Writer)."""
+        Vorrang vor OS2L/Datei (zentrale Praezedenz statt konkurrierender Writer).
+
+        Returns (CDX-64): True = uebernommen, False = abgelehnt — Quellen mit
+        Wert-Cache (MIDI-Clock) reichen dann spaeter erneut ein."""
         if self._locked or self._mode == BpmMode.MANUAL:
-            return
+            return False
         # Audio-Detektor ist im AUTO-Modus die fuehrende Quelle.
         if self._audio_active and source != "audio":
-            return
+            return False
         # CDX-14: _source atomar mit _bpm setzen (kein separates _source-Lock-Fenster
         # mehr, in das ein reset() schluepfen und _bpm>0 bei _source='off' hinterlassen
         # koennte).
@@ -262,8 +265,9 @@ class BPMManager:
         # wiederholt. Kippte der Leader dazwischen (turn_off aus dem UI-Thread),
         # faellt der Write weg — und ohne Write auch der State-Emit.
         if not self.set_bpm(bpm, source=source, only_if_auto=True):
-            return
+            return False
         self._emit_state_change()
+        return True
 
     def tap(self) -> float:
         """Tap-Tempo: BPM ueber die letzten 4 Taps. → MANUAL-Modus.
