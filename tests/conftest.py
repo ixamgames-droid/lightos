@@ -978,7 +978,39 @@ def pytest_unconfigure(config):
             sys.stderr.flush()
         except Exception:
             pass
-        os._exit(_HARDEN_EXIT_STATUS)
+        _harter_ausstieg(_HARDEN_EXIT_STATUS)
+
+
+def _harter_ausstieg(status: int) -> None:
+    """QA-110: den Prozess OHNE Abbau beenden — auch unter Windows.
+
+    Unter Linux ist ``os._exit`` ``_exit()``: keine Destruktoren der geladenen
+    Bibliotheken. Unter Windows ruft es aber ``ExitProcess``, und das entlaedt
+    noch alle DLLs. Qt raeumt dabei auf und fragt die noch lebenden, in Python
+    abgeleiteten Top-Level-Widgets nach ihrem ``metaObject()`` — PySide greift
+    dafuer in den schon abgebauten Interpreter: Access Violation in
+    ``pyside6.abi3.dll`` (``SignalManager::retrieveMetaObject``), gemessen am
+    01.11.2026 bei 100 von 136 Python-Abstuerzen des Tages.
+
+    Rate je 10 Einzellaeufe (las35_planer, viz75_buehnen_elemente_hoehe,
+    viz55_einmessen): mit ``os._exit`` 29/30 Absturz; nur die Python-Top-Level-
+    Widgets vorher loeschen 0/20 (nur die reinen Qt-Widgets: 19/20);
+    ``TerminateProcess`` 0/30. ``TerminateProcess`` entspricht dem Linux-
+    ``_exit``: kein DLL-Entladen, der Rueckgabewert bleibt ``status``.
+    Klappt der Aufruf nicht, bleibt es bei ``os._exit``.
+    """
+    if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            k32.GetCurrentProcess.restype = wintypes.HANDLE
+            k32.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+            k32.TerminateProcess.restype = wintypes.BOOL
+            k32.TerminateProcess(k32.GetCurrentProcess(), int(status) & 0xFFFFFFFF)
+        except Exception:
+            pass
+    os._exit(status)
 
 
 @pytest.fixture(scope="session", autouse=True)
