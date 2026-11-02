@@ -134,7 +134,11 @@ Tabelle „DMX-Kanäle“ oder „DMX chart“.
 1. **Kopf** — **Hersteller:** (wählen oder neu eintippen), **Modell:**, **Kurzname:**
    (wird beim Patchen das Label), **Typ:** (`par`, `led_bar`, `moving_head`, `strobe`,
    `smoke` …) und **Leistung:**. Der Typ entscheidet unter anderem, welches 3D-Modell
-   das Gerät bekommt (Schritt 5).
+   das Gerät bekommt (Schritt 5). **Abstrahlwinkel:** ist der volle Winkel des
+   Lichtkegels laut Datenblatt; bei Zoom links den engsten, bei **bis** den
+   weitesten Winkel. Die 3D-Ansicht zeichnet den Kegel damit (mit Zoom je nach
+   Zoomwert dazwischen). „keine Angabe“ lässt den Kegel wie bisher aus Typ und
+   Zoom entstehen.
 2. **Modus-Reiter** — je DMX-Modus ein Reiter. Den Namen änderst du im Feld
    **Modus-Name:** darüber oder mit **Modus umbenennen**.
 3. **Kanaltabelle** — eine Zeile je DMX-Kanal, in DMX-Reihenfolge. **Name** frei;

@@ -37,7 +37,8 @@ from PySide6.QtCore import (QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent,
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
-    AppState, get_state, get_channels_for_patched, is_spider_fixture,
+    AppState, abstrahlwinkel_for, get_state, get_channels_for_patched,
+    is_spider_fixture,
     panel_grid_for, pixel_ring_banks_for, viz_model_for, white_grid_for,
     weiss_segment_count_for_channels,
 )
@@ -2177,6 +2178,11 @@ class VisualizerBridge(QObject):
         wird beim Anlegen (``_fixture_to_dict``) gemerkt; ein Geraet ohne Eintrag
         (angelegt vor dieser Aenderung) gilt beim ersten Sehen als synchron."""
         gesendet = self.__dict__.setdefault("_gesendete_nullpunkte", {})
+        # FM-64: dasselbe fuer den Abstrahlwinkel des Profils. Editor/Generator
+        # melden ein geaendertes Profil ueber ``profil_geaendert`` ->
+        # ``patch_changed``; der Kegel wird nur beim Anlegen gebaut, ohne diesen
+        # Abgleich behielte ein platziertes Geraet den alten Winkel.
+        gesendet_w = self.__dict__.setdefault("_gesendete_abstrahlwinkel", {})
         placed = self._state.visualizer_positions    # VIZ-71: einmal lesen
         for f in self._state.get_patched_fixtures():
             if f.fid not in placed:
@@ -2184,7 +2190,16 @@ class VisualizerBridge(QObject):
             jetzt = effektive_nullpunkte(f)
             vorher = gesendet.get(f.fid)
             gesendet[f.fid] = jetzt
-            if vorher is not None and vorher != jetzt:
+            try:
+                w_jetzt = tuple(abstrahlwinkel_for(f))
+            except Exception:                            # noqa: BLE001
+                w_jetzt = None
+            w_vorher = gesendet_w.get(f.fid)
+            if w_jetzt is not None:
+                gesendet_w[f.fid] = w_jetzt
+            if ((vorher is not None and vorher != jetzt)
+                    or (w_vorher is not None and w_jetzt is not None
+                        and w_vorher != w_jetzt)):
                 self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(f)))
 
     def refresh_fixture(self, fid: int) -> None:
@@ -2515,6 +2530,15 @@ class VisualizerBridge(QObject):
         # ist ueber `visual_rgb` laengst in dessen Farbe eingerechnet).
         if not (white_rows or white_cols):
             n_whites = 0
+        # FM-64: Abstrahlwinkel aus dem Profil (voller Winkel, Grad). 0/0 =
+        # keine Angabe -> JS leitet den Kegel wie bisher aus Typ/Zoom ab.
+        try:
+            beam_min, beam_max = abstrahlwinkel_for(f)
+        except Exception:                                # noqa: BLE001
+            beam_min, beam_max = (0.0, 0.0)
+        # FM-64: gesendeten Winkel merken (s. ``_nullpunkte_nachziehen``).
+        self.__dict__.setdefault("_gesendete_abstrahlwinkel", {})[f.fid] = (
+            beam_min, beam_max)
         return {
             "fid": f.fid,
             "label": f.label,
@@ -2548,6 +2572,10 @@ class VisualizerBridge(QObject):
             # dann steht `nWhites` schon auf 0 und es gibt kein Band).
             "whiteRows": white_rows,
             "whiteCols": white_cols,
+            # FM-64: Abstrahlwinkel eng/weit (Grad, voller Winkel; 0 = keine
+            # Angabe). Gleich = fest; verschieden = Spanne fuer den Zoom-Kanal.
+            "beamAngleMin": beam_min,
+            "beamAngleMax": beam_max,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],
