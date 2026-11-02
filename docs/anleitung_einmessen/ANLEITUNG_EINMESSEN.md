@@ -42,8 +42,14 @@ Wiederhole Schritt 2 bis 4 an **weiteren Punkten**. Ab **vier** Punkten rechnet 
 aus, wo der Kopf **wirklich** hängt und wie er gedreht ist, und **prüft das gegen**:
 jeder Punkt wird einmal weggelassen und nachgesehen, ob die Rechnung ihn trotzdem
 trifft. Nur wenn das hält, erscheint in der Statuszeile *„Position gefunden …"* und
-**Position übernehmen** wird anklickbar — und zwar nur, solange **genau ein** Moving Head
-gewählt ist. Merken geht für mehrere Geräte auf einmal, übernehmen nur einzeln.
+**Position übernehmen** wird anklickbar. Sind **mehrere** Moving Heads gewählt, übernimmt
+der Knopf die Position für **alle** gewählten Köpfe, die schon eine Lösung haben (er zeigt
+z. B. *„Position übernehmen (2 von 3 Köpfen)"*) — in **einem** Rückgängig-Schritt. Köpfe
+ohne Lösung bleiben unverändert und werden danach in der Statuszeile genannt.
+
+> **Achtung beim Schieben mit mehreren Köpfen:** Pan/Tilt schieben bewegt **alle**
+> gewählten Köpfe um denselben Betrag — die Statuszeile sagt das auch. Um nur einen Kopf
+> nachzujustieren, nur diesen wählen.
 
 Nach dem Übernehmen stimmt das Zielen **im ganzen Bereich, den deine Punkte abdecken** —
 auch an Stellen, die du nie angetippt hast — und das 3D-Bild zeigt den Kopf dort, wo er

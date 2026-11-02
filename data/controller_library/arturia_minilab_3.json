@@ -56,7 +56,17 @@
         16,
         93
       ],
-      "layout": "8 Endlos-Drehencoder. Default-CCs (Werks-User-Template): K1=74, K2=71, K3=76, K4=77, K5=93, K6=18, K7=19, K8=16. MIDI-Kanal nicht hart belegt - als Default Keyboard Channel 1 (0-basiert 0) modelliert. CCs NICHT zusammenhaengend - range-Feld nur Min/Max, echte Liste hier im layout."
+      "layout": "8 Endlos-Drehencoder. Default-CCs (Werks-User-Template): K1=74, K2=71, K3=76, K4=77, K5=93, K6=18, K7=19, K8=16. MIDI-Kanal nicht hart belegt - als Default Keyboard Channel 1 (0-basiert 0) modelliert. CCs NICHT zusammenhaengend - range-Feld nur Min/Max, echte Liste hier im layout.",
+      "numbers": [
+        74,
+        71,
+        76,
+        77,
+        93,
+        18,
+        19,
+        16
+      ]
     },
     {
       "name": "Faders 1-4",
