@@ -1111,6 +1111,128 @@ def _fill_fan_from_dimmer(attrs, fid_key, euron10_fids: set) -> None:
             pass
 
 
+# CDX-65: LAS-28 (#1211) legte beim SH-LASER3W die vertikalen Flips auf das
+# eigene Attribut ``laser_twist_y``. Vorher trugen alle vier Flip-Kanaele
+# ``laser_twist`` — gespeicherte Schluessel zaehlten die Vorkommen in
+# Kanalreihenfolge: #0 = A horizontal, #1 = A vertikal, #2 = B horizontal,
+# #3 = B vertikal. Jetzt: laser_twist = A h., laser_twist#1 = B h.,
+# laser_twist_y = A v., laser_twist_y#1 = B v. Ohne Umschluesselung bedeutete
+# ``laser_twist#1`` einer Alt-Show still den horizontalen Flip von B, und #2/#3
+# loesten nicht mehr auf (Werte weg).
+_LAS28_MARKER = "LAS-28"
+_LAS28_ALT_NEU = (("laser_twist#1", "laser_twist_y"),
+                  ("laser_twist#2", "laser_twist#1"),
+                  ("laser_twist#3", "laser_twist_y#1"))
+_LAS28_FORM = ["laser_twist", "laser_twist_y", "laser_twist", "laser_twist_y"]
+
+
+def _sh_laser3w_fids(state) -> set[int]:
+    """CDX-65: fids gepatchter SH-LASER3W, deren Kanalform schon den neuen
+    Stand (LAS-28) traegt. Eine eigene Profilkopie im Altstand (vier
+    ``laser_twist``) faellt durch die Formpruefung und wird nie umgeschluesselt.
+    Best-effort wie ``_euron10_2ch_fids``: bei Fehlern wird nichts migriert."""
+    out: set[int] = set()
+    try:
+        fixtures = list(state.get_patched_fixtures())
+    except Exception:
+        return out
+    if not fixtures:
+        return out
+    try:
+        from sqlalchemy import select
+        from sqlalchemy.orm import Session
+        from src.core.database.fixture_db import engine as _fdb_engine
+        from src.core.database.models import FixtureProfile
+        from src.core.app_state import get_channels_for_patched
+        pids = {getattr(f, "fixture_profile_id", None) for f in fixtures}
+        pids.discard(None)
+        if not pids:
+            return out
+        with Session(_fdb_engine()) as s:
+            laser_pids = set(s.execute(
+                select(FixtureProfile.id).where(
+                    FixtureProfile.id.in_(pids),
+                    FixtureProfile.short_name == "SH-LASER3W",
+                )
+            ).scalars().all())
+        if not laser_pids:
+            return out
+        for f in fixtures:
+            if getattr(f, "fixture_profile_id", None) not in laser_pids:
+                continue
+            try:
+                form = [a for c in get_channels_for_patched(f)
+                        if (a := getattr(c, "attribute", None))
+                        in ("laser_twist", "laser_twist_y")]
+                fid_i = int(getattr(f, "fid"))
+            except Exception:
+                continue
+            if form == _LAS28_FORM:
+                out.add(fid_i)
+    except Exception as e:
+        print(f"[show_file] SH-LASER3W flip detection failed: {e}")
+    return out
+
+
+def _las28_umschluesseln(attrs) -> None:
+    """Alt-Schluessel (vier ``laser_twist``-Vorkommen) in die LAS-28-Schluessel
+    umsetzen — in place, gleichzeitig (``#2`` wird zu ``#1``, das alte ``#1``
+    zu ``laser_twist_y``). Traegt das Dict schon ein ``laser_twist_y*``, ist es
+    neu geschrieben und bleibt unberuehrt (idempotent)."""
+    if not isinstance(attrs, dict):
+        return
+    if any(str(k).split("#", 1)[0] == "laser_twist_y" for k in attrs):
+        return
+    umzug = {neu: attrs.pop(alt) for alt, neu in _LAS28_ALT_NEU if alt in attrs}
+    attrs.update(umzug)
+
+
+def _las28_twist_nachziehen(attrs, fid_key, laser_fids: set) -> None:
+    """CDX-65: ``_las28_umschluesseln`` NUR fuer erkannte SH-LASER3W-fids.
+    Nimmt int- ODER str-fid-Keys an (wie ``_fill_fan_from_dimmer``)."""
+    try:
+        fid_int = int(fid_key)
+    except (TypeError, ValueError):
+        return
+    if fid_int in laser_fids:
+        _las28_umschluesseln(attrs)
+
+
+def _andere_mit_mehrfach_twist(state, laser_fids: set) -> bool:
+    """CDX-65 (Review): hat ein ANDERES gepatchtes Geraet (nicht in
+    ``laser_fids``) mindestens zwei ``laser_twist``-Kanaele (L2600, eine
+    SH-LASER3W-Profilkopie im Altstand)? Dann ist ein generisches
+    ``laser_twist#1`` mehrdeutig. Im Zweifel (Fehler) gilt: ja."""
+    try:
+        from src.core.app_state import get_channels_for_patched
+        for f in state.get_patched_fixtures():
+            try:
+                if int(getattr(f, "fid")) in laser_fids:
+                    continue
+            except Exception:
+                pass
+            n = sum(1 for c in get_channels_for_patched(f)
+                    if getattr(c, "attribute", None) == "laser_twist")
+            if n >= 2:
+                return True
+        return False
+    except Exception:
+        return True
+
+
+def _las28_generisch_nachziehen(attrs, kopf1_eindeutig: bool = False) -> None:
+    """CDX-65: generische Palettenwerte haben keinen Geraetebezug. Ein
+    ``laser_twist#2``/``#3`` ist eindeutig der SH-LASER3W-Altstand (kein anderes
+    Profil hat mehr als zwei ``laser_twist``). Ein ``#1`` allein (z. B. eine
+    alte Palette „Flip A" = ``laser_twist`` + ``laser_twist#1``) kann auch von
+    einem Zweigruppen-Laser (L2600) stammen — es wird nur umgesetzt, wenn
+    ``kopf1_eindeutig`` (kein solches Geraet im Patch)."""
+    if isinstance(attrs, dict) and (
+            "laser_twist#2" in attrs or "laser_twist#3" in attrs
+            or (kopf1_eindeutig and "laser_twist#1" in attrs)):
+        _las28_umschluesseln(attrs)
+
+
 def _collect_fixture_groups(state, probleme: list | None = None) -> list:
     """Spatial-Gruppen (FixtureGroup) aus der Show-DB fuer die .lshow sammeln.
     Frueher gingen Gruppen beim Save/Load verloren (nur in current_show.db).
@@ -1429,6 +1551,9 @@ def _show_daten(state, probleme: list) -> dict:
         "playlist": getattr(state, "playlist", []) or [],
         "music_autoshow": getattr(state, "music_autoshow", None)
         or {"enabled": False, "function_ids": [], "bank": 0},
+        # CDX-65: Attribut-Umbauten, deren neue Schluessel diese Show schon
+        # traegt — der Loader migriert sie dann nicht noch einmal.
+        "attribut_migrationen": [_LAS28_MARKER],
     }
     # LAS-32 (S1): Sperrzonen als EIGENER Abschnitt mit eigener Versionsnummer
     # — bewusst kein Knoten im Szenengraph (ein aelterer Programmstand macht aus
@@ -2433,6 +2558,15 @@ def _load_show_impl(path: str | os.PathLike):
     # Profil verfuegbar) fuer die fan-Split-Kompat, die unten pro Playback-Container
     # inline laeuft — jeweils VOR dessen nachgelagertem Flush/Rebuild/Verbraucher.
     _euron10_fids = _euron10_2ch_fids(state)
+    # CDX-65: SH-LASER3W-Flip-Schluessel (LAS-28) nur fuer Shows OHNE Marker —
+    # eine seit CDX-65 gespeicherte Show traegt die neuen Schluessel schon.
+    _laser3w_fids: set[int] = set()
+    try:
+        _migr = data.get("attribut_migrationen") or []
+        if _LAS28_MARKER not in (_migr if isinstance(_migr, list) else []):
+            _laser3w_fids = _sh_laser3w_fids(state)
+    except Exception as e:
+        print(f"[show_file] SH-LASER3W flip marker check failed: {e}")
 
     try:
         programmer = data.get("programmer", {}) or {}
@@ -2463,6 +2597,7 @@ def _load_show_impl(path: str | os.PathLike):
             # CDX-18: fan<-dimmer VOR dem gleich folgenden _flush_all_to_dmx(),
             # sonst zeigte der Luefter unmittelbar nach dem Laden weiter 0.
             _fill_fan_from_dimmer(vals, fid, _euron10_fids)
+            _las28_twist_nachziehen(vals, fid, _laser3w_fids)
             cleaned[fid] = vals
         state.programmer = cleaned
         state._flush_all_to_dmx()
@@ -2497,6 +2632,7 @@ def _load_show_impl(path: str | os.PathLike):
             # CDX-18: fan<-dimmer VOR dem gleich folgenden _rebuild_render_plan(),
             # sonst faehrt der Default-Frame den Luefter dauerhaft auf 0.
             _fill_fan_from_dimmer(clean, fid, _euron10_fids)
+            _las28_twist_nachziehen(clean, fid, _laser3w_fids)
             parsed[fid] = clean
         state.base_levels = parsed
         state.implicit_brightness = bool(data.get("implicit_brightness", True))
@@ -2531,11 +2667,16 @@ def _load_show_impl(path: str | os.PathLike):
     # CDX-18: fan<-dimmer NUR in den per-Fixture-Overrides (Palette.fixture_values);
     # die generische Palette.values hat keinen Fixture-Bezug und darf NICHT (sonst
     # bekaeme jedes Gerät, das die Palette nutzt, faelschlich einen fan-Kanal).
-    if _euron10_fids:
+    if _euron10_fids or _laser3w_fids:
         try:
+            _kopf1 = bool(_laser3w_fids) and not _andere_mit_mehrfach_twist(
+                state, _laser3w_fids)
             for _p in pm.get_all():
+                if _laser3w_fids:
+                    _las28_generisch_nachziehen(getattr(_p, "values", None), _kopf1)
                 for _fid, _attrs in (getattr(_p, "fixture_values", {}) or {}).items():
                     _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+                    _las28_twist_nachziehen(_attrs, _fid, _laser3w_fids)
         except Exception as e:
             print(f"[show_file] EURON10 fan palette migration failed: {e}")
 
@@ -2606,12 +2747,13 @@ def _load_show_impl(path: str | os.PathLike):
         _lenient("load cue stacks error", e)
 
     # CDX-18: fan<-dimmer in allen Cue-Werten der gerade geladenen Cuelisten.
-    if _euron10_fids:
+    if _euron10_fids or _laser3w_fids:
         try:
             for _stk in state.cue_stacks:
                 for _cue in (getattr(_stk, "cues", []) or []):
                     for _fid, _attrs in (getattr(_cue, "values", {}) or {}).items():
                         _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+                        _las28_twist_nachziehen(_attrs, _fid, _laser3w_fids)
         except Exception as e:
             print(f"[show_file] EURON10 fan cue migration failed: {e}")
 
@@ -2637,7 +2779,7 @@ def _load_show_impl(path: str | os.PathLike):
 
     # CDX-18: fan<-dimmer in allen Sequence-Schritt-Werten (SequenceStep.values
     # nutzt STRING-fid-Keys — _fill_fan_from_dimmer normalisiert via int()).
-    if _euron10_fids:
+    if _euron10_fids or _laser3w_fids:
         try:
             from src.core.engine.function import FunctionType as _FT
             _fm = getattr(state, "function_manager", None)
@@ -2646,6 +2788,7 @@ def _load_show_impl(path: str | os.PathLike):
                     for _step in (getattr(_seq, "steps", []) or []):
                         for _fid, _attrs in (getattr(_step, "values", {}) or {}).items():
                             _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+                            _las28_twist_nachziehen(_attrs, _fid, _laser3w_fids)
         except Exception as e:
             print(f"[show_file] EURON10 fan sequence migration failed: {e}")
 
@@ -2662,12 +2805,13 @@ def _load_show_impl(path: str | os.PathLike):
         _lenient("load snap library error", e)
 
     # CDX-18: fan<-dimmer in allen Snap-Werten der Show-Snap-Bibliothek.
-    if _euron10_fids:
+    if _euron10_fids or _laser3w_fids:
         try:
             from src.core.engine.snap_library import get_snap_library as _gsl
             for _snap in _gsl().snaps():
                 for _fid, _attrs in (getattr(_snap, "values", {}) or {}).items():
                     _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+                    _las28_twist_nachziehen(_attrs, _fid, _laser3w_fids)
         except Exception as e:
             print(f"[show_file] EURON10 fan snap migration failed: {e}")
 
@@ -2709,13 +2853,14 @@ def _load_show_impl(path: str | os.PathLike):
     # CDX-18: fan<-dimmer direkt auf den ROHEN Snapshot-Dicts — zum load_show-
     # Zeitpunkt existieren noch KEINE Snapshot-Objekte (sie entstehen erst im
     # UI-Thread), daher hier auf entry["values"][fid_str][attr] (str-fid).
-    if _euron10_fids:
+    if _euron10_fids or _laser3w_fids:
         try:
             for _entry in _snaps_raw:
                 _vals = _entry.get("values") if isinstance(_entry, dict) else None
                 if isinstance(_vals, dict):
                     for _fid, _attrs in _vals.items():
                         _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
+                        _las28_twist_nachziehen(_attrs, _fid, _laser3w_fids)
         except Exception as e:
             print(f"[show_file] EURON10 fan snapshot migration failed: {e}")
     state._snapshots_data = _snaps_raw
