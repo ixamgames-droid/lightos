@@ -8,7 +8,8 @@ Ticks ergibt sich das Tempo: ``BPM = 60 / (24 * Tick-Abstand)``.
 Ein einzelner verspaeteter Tick verschiebt so nur die Enden des Fensters, nicht
 jede Messung (Zeitstempel kommen aus der gemeinsamen MIDI-Empfangsschleife,
 nicht vom Treiber). Gemeldet wird hoechstens einmal je Viertel (alle 24 Ticks)
-und nur, wenn sich der auf ``AUFLOESUNG`` gerundete Wert aendert.
+und nur, wenn sich der auf ``AUFLOESUNG`` gerundete Wert aendert oder der
+BPM-Manager gerade eine andere Quelle fuehrt (CDX-64: Hand-Override, Ablehnung).
 
 **Transport:** Start (0xFA) und Continue (0xFB) beginnen die Messung neu (das
 Pult setzt dort neu an), Stop (0xFC) verwirft das Fenster. Der zuletzt
@@ -38,6 +39,11 @@ import threading
 from collections import deque
 
 from .midi_manager import CLOCK_CONTINUE, CLOCK_START, CLOCK_STOP, CLOCK_TICK
+
+# CDX-64: nur diese Bytes duerfen den Clock-Port beanspruchen/halten. Die
+# Echtzeit-Abonnenten bekommen auch MTC (0xF1, Vollbild-SysEx) — ein MTC-only-
+# Eingang wuerde sonst Clock-Port und verdraengte den echten Clock-Eingang.
+_CLOCK_BYTES = frozenset((CLOCK_TICK, CLOCK_START, CLOCK_CONTINUE, CLOCK_STOP))
 
 PPQN = 24
 FENSTER = 48          # Ticks im Messfenster (2 Viertel)
@@ -87,7 +93,7 @@ class MidiClock:
 
     # ── Empfang ─────────────────────────────────────────────────────────────
     def _on_echtzeit(self, raw, port_name, zeit) -> None:
-        if not raw:
+        if not raw or raw[0] not in _CLOCK_BYTES:
             return
         if not self._port_passt(raw[0], port_name, zeit):
             return
@@ -134,11 +140,30 @@ class MidiClock:
                 return None
             bpm = 60.0 * abstaende / (PPQN * dauer)
             bpm = round(round(bpm / AUFLOESUNG) * AUFLOESUNG, 1)
-            if self._gemeldet is not None and abs(bpm - self._gemeldet) < AUFLOESUNG / 2:
-                return None
+            gleich = (self._gemeldet is not None
+                      and abs(bpm - self._gemeldet) < AUFLOESUNG / 2)
             self._gemeldet = bpm
+        # CDX-64: unveraendertes Tempo nur dann still uebergehen, wenn der
+        # Manager es noch von uns hat. Hat ein anderer Writer (Tap/Manuell)
+        # die BPM inzwischen ueberschrieben, reicht die Clock nach der Rueck-
+        # kehr zu AUTO sonst nie wieder ein (hoechstens einmal je Viertel).
+        if gleich and not self._fremd_gefuehrt():
+            return None
         self._melden(bpm)
         return bpm
+
+    def _fremd_gefuehrt(self) -> bool:
+        """True, wenn der BPM-Manager gerade NICHT unsere Quelle fuehrt."""
+        try:
+            mgr = self._mgr
+            if mgr is None:
+                from src.core.engine.bpm_manager import get_bpm_manager
+                mgr = get_bpm_manager()
+            quelle = getattr(mgr, "current_source", None)
+        except Exception:
+            return False
+        # Attrappen ohne echte Quelle (kein str) -> wie bisher nicht neu melden.
+        return isinstance(quelle, str) and quelle != QUELLE
 
     def bpm(self) -> float | None:
         """Zuletzt gemeldetes Tempo (None = noch keines)."""
@@ -152,15 +177,25 @@ class MidiClock:
             self._gemeldet = None
 
     def _melden(self, bpm: float) -> None:
+        angenommen = True
         try:
             mgr = self._mgr
             if mgr is None:
                 from src.core.engine.bpm_manager import get_bpm_manager
                 mgr = get_bpm_manager()
-            mgr.request_bpm(bpm, QUELLE)
+            # CDX-64: request_bpm meldet False, wenn MANUAL/Lock/Audio blockt.
+            # (None = Alt-/Attrappen-Manager ohne Rueckgabe -> angenommen.)
+            angenommen = mgr.request_bpm(bpm, QUELLE) is not False
         except Exception as e:
+            angenommen = False
             from src.core.diagnose_log import melde_still
             melde_still("midi.clock", e)
+        if not angenommen:
+            # Abgelehnt: nicht als gemeldet merken — sonst reicht eine gleich-
+            # bleibende Clock ihr Tempo nach AUTO/Unlock nie wieder ein.
+            with self._lock:
+                if self._gemeldet == bpm:
+                    self._gemeldet = None
 
 
 _clock: MidiClock | None = None
