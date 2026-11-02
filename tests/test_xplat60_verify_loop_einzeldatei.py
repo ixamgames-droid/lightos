@@ -40,6 +40,7 @@ nachgestellten Aufbau, unabhaengig vom Rechner.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -129,18 +130,34 @@ class ProbeOrdnerBegrenztTest(unittest.TestCase):
     rootdir-Regel ist dieselbe, nur der lstat-Wettlauf ist Windows-eigen)."""
 
     def test_rootdir_ist_der_probe_ordner(self):
-        with tempfile.TemporaryDirectory(prefix="xplat60_wurzel_") as d:
+        self._pruefe("xplat60_wurzel_")
+
+    def test_rootdir_bei_pfad_mit_nicht_ascii_zeichen(self):
+        """Codex-Hinweis zu #1233: Benutzer- oder Temp-Pfad mit „Jörg“ — das
+        Kind schreibt umgeleitete Ausgabe in der System-Codepage (unter Windows
+        cp1252; „Ł“/„ź“ gibt es dort gar nicht). Der gemeldete Pfad muss
+        trotzdem heil ankommen."""
+        self._pruefe("xplat60_wurzel_Jörg_Łódź_")
+
+    def _pruefe(self, praefix):
+        with tempfile.TemporaryDirectory(prefix=praefix) as d:
             basis = Path(d)
             aufruf = basis / "aufruf"
             aufruf.mkdir()
             ordner = _probe_ordner(basis / "probe")
             datei = ordner / "test_xplat60_wurzel.py"
+            # Pfad als ASCII-JSON (\uXXXX) melden — heil in jeder Codepage, wie
+            # der Lizenzpfad in tools/app.ps1
             datei.write_text(
+                "import json\n"
                 "def test_wurzel(request):\n"
-                "    print('XPLAT60-WURZEL=' + str(request.config.rootpath))\n",
+                "    print('XPLAT60-WURZEL=' + json.dumps(str(request.config.rootpath)))\n",
                 encoding="utf-8")
+            # Normalfall: keine Ausgabe-Kodierung vorgegeben (das Gate setzt
+            # PYTHONIOENCODING, ein Entwickler-Aufruf meist nicht)
             umgebung = {k: v for k, v in os.environ.items()
-                        if k not in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS")}
+                        if k not in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS",
+                                     "PYTHONIOENCODING", "PYTHONUTF8")}
             r = subprocess.run(
                 [sys.executable, "-m", "pytest", str(datei), "-q", "-s",
                  "--tb=short", "-p", "no:cacheprovider", "-o", "addopts="],
@@ -148,13 +165,14 @@ class ProbeOrdnerBegrenztTest(unittest.TestCase):
                 encoding="utf-8", errors="replace", timeout=120)
             aus = r.stdout + r.stderr
             self.assertEqual(r.returncode, 0, aus[-1500:])
-            m = re.search(r"XPLAT60-WURZEL=(.+)", aus)
+            m = re.search(r'XPLAT60-WURZEL=("[^"\r\n]*")', aus)
             self.assertIsNotNone(m, aus[-1500:])
+            wurzel = json.loads(m.group(1))
             self.assertEqual(
-                os.path.normcase(os.path.realpath(m.group(1).strip())),
+                os.path.normcase(os.path.realpath(wurzel)),
                 os.path.normcase(os.path.realpath(str(ordner))),
-                "pytest sammelt ueber den Probe-Ordner hinaus (rootdir = "
-                f"{m.group(1).strip()}) — im Repo-Aufruf waere das z. B. der Temp-Ordner")
+                f"pytest sammelt ueber den Probe-Ordner hinaus (rootdir = {wurzel}) "
+                "— im Repo-Aufruf waere das z. B. der Temp-Ordner")
 
 
 if __name__ == "__main__":
