@@ -55,10 +55,25 @@ class ControllerControl:
     channel: int = 0                  # 0-basiert; -1 = beliebig
     range: list = field(default_factory=lambda: [0, 0])  # [erste, letzte] Nummer
     layout: str = ""                  # Freitext ("8x8, Note 0 unten links")
+    # CDX-64: explizite MIDI-Nummern, wenn der Block NICHT lueckenlos ist
+    # (Raster mit Luecken, Schrittweite 3/10, verstreute Werks-CCs). ``range``
+    # ist dann nur die Min/Max-Huelle; leer = ``range`` ist lueckenlos.
+    numbers: list = field(default_factory=list)
+
+    def nummern(self) -> list[int]:
+        """Die MIDI-Nummern des Blocks (explizite Liste vor ``range``);
+        leer, wenn keine gueltigen Nummern belegt sind."""
+        if self.numbers:
+            return list(self.numbers)
+        a, b = int(self.range[0]), int(self.range[1])
+        return list(range(a, b + 1)) if 0 <= a <= b <= 127 else []
 
     def to_dict(self) -> dict:
-        return {"name": self.name, "type": self.type, "channel": self.channel,
-                "range": list(self.range), "layout": self.layout}
+        d = {"name": self.name, "type": self.type, "channel": self.channel,
+             "range": list(self.range), "layout": self.layout}
+        if self.numbers:
+            d["numbers"] = list(self.numbers)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "ControllerControl":
@@ -69,11 +84,28 @@ class ControllerControl:
                    type=str(d.get("type", "note")),
                    channel=int(d.get("channel", 0)),
                    range=[int(rng[0]), int(rng[1])],
-                   layout=str(d.get("layout", "")))
+                   layout=str(d.get("layout", "")),
+                   numbers=_nummern_liste(d.get("numbers")))
 
     @property
     def count(self) -> int:
+        if self.numbers:
+            return len(self.numbers)
         return max(0, int(self.range[1]) - int(self.range[0]) + 1)
+
+
+def _nummern_liste(roh) -> list[int]:
+    """CDX-64: ``numbers`` tolerant lesen — nur ganze Zahlen 0..127, ohne
+    Doppelte, Reihenfolge des Profils (= Belegungsreihenfolge)."""
+    if not isinstance(roh, (list, tuple)):
+        return []
+    aus: list[int] = []
+    for n in roh:
+        if isinstance(n, bool) or not isinstance(n, int):
+            continue
+        if 0 <= n <= 127 and n not in aus:
+            aus.append(n)
+    return aus
 
 
 @dataclass
