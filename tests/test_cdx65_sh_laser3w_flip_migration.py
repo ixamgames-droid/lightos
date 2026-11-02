@@ -18,6 +18,14 @@ Ohne Umsetzung stellte ``laser_twist#1`` einer Alt-Show still den
 horizontalen Flip von B, ``#2``/``#3`` gingen verloren. ``load_show`` setzt die
 Schluessel fuer erkannte SH-LASER3W einmal um — nicht fuer Shows mit dem
 Marker ``attribut_migrationen: ["LAS-28"]``, den jedes Speichern schreibt.
+
+Nachbesserung (Codex): Die show.json verraet nicht, ob sie vor oder nach
+LAS-28 gespeichert wurde; nur der ZIP-Zeitstempel des Eintrags belegt „vorher".
+Ein Dict nur mit ``laser_twist#1`` wird deshalb nur umgesetzt, wenn die Show
+nirgends ``laser_twist_y`` traegt und entweder anderswo eindeutig im Altstand
+ist (``#2``/``#3``) oder vor dem 01.11.2026 gestempelt wurde. Generische Palettenwerte bleiben neben einem
+anderen Mehrfach-twist-Geraet (L2600) unveraendert; die Umsetzung landet als
+Override je SH-LASER3W.
 """
 import json
 import os
@@ -57,10 +65,17 @@ def frische_library_engine():
     return FDB._engine
 
 
-def _laden(show: dict) -> None:
+def _laden(show: dict, zeit: tuple | None = None) -> None:
+    """``zeit``: Zeitstempel des ZIP-Eintrags show.json (Vorgabe: jetzt, wie
+    ``zipfile.writestr`` beim echten Speichern)."""
     path = os.path.join(tempfile.mkdtemp(), "cdx65.lshow")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("show.json", json.dumps(show))
+        if zeit is None:
+            z.writestr("show.json", json.dumps(show))
+        else:
+            info = zipfile.ZipInfo("show.json", date_time=zeit)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            z.writestr(info, json.dumps(show))
     ok, msg = load_show(path)
     assert ok, f"load_show fehlgeschlagen: {msg}"
 
@@ -165,16 +180,7 @@ class ShLaser3wFlipMigration(unittest.TestCase):
         _las28_umschluesseln(d)   # idempotent
         self.assertEqual(d, NEU)
 
-    def _generisch_laden(self, patch):
-        pm = PaletteManager()
-        pm._palettes = [Palette(name="Q", type=PaletteType.LASER,
-                                values={"laser_twist": 8, "laser_twist#1": 9})]
-        _laden({"version": "1.2", "patch": patch, "palettes": pm.to_dict()})
-        return next(p for p in get_palette_manager().get_all() if p.name == "Q")
-
-    def test_generische_palette_mit_nur_kopf_1_bleibt_neben_l2600(self):
-        """Ein einzelnes ``laser_twist#1`` in generischen Werten kann von einem
-        Zweigruppen-Laser stammen (L2600) — steht einer im Patch, bleibt es."""
+    def _l2600(self):
         with Session(frische_library_engine()) as s:
             l2600 = s.execute(
                 select(FixtureProfile)
@@ -182,21 +188,137 @@ class ShLaser3wFlipMigration(unittest.TestCase):
                          .selectinload(FixtureMode.channels))
                 .where(FixtureProfile.short_name == "L2600LASER")).scalar_one()
             modus = max(l2600.modes, key=lambda m: len(m.channels))
-            zweiter = {"fid": 2, "label": "L2600", "fixture_profile_id": l2600.id,
-                       "mode_name": modus.name, "universe": 1, "address": 101,
-                       "channel_count": len(modus.channels),
-                       "fixture_name": l2600.name, "fixture_type": "laser"}
             self.assertGreaterEqual(
                 sum(c.attribute == "laser_twist" for c in modus.channels), 2)
-        pal = self._generisch_laden(self._patch() + [zweiter])
+            return {"fid": 2, "label": "L2600", "fixture_profile_id": l2600.id,
+                    "mode_name": modus.name, "universe": 1, "address": 101,
+                    "channel_count": len(modus.channels),
+                    "fixture_name": l2600.name, "fixture_type": "laser"}
+
+    def _generisch_laden(self, patch, werte=None, fixture_values=None, **extra):
+        pm = PaletteManager()
+        pm._palettes = [Palette(
+            name="Q", type=PaletteType.LASER,
+            values=dict(werte or {"laser_twist": 8, "laser_twist#1": 9}),
+            fixture_values=dict(fixture_values or {}))]
+        show = {"version": "1.2", "patch": patch, "palettes": pm.to_dict()}
+        show.update(extra)
+        _laden(show)
+        return next(p for p in get_palette_manager().get_all() if p.name == "Q")
+
+    def test_generische_palette_mit_nur_kopf_1_bleibt_neben_l2600(self):
+        """Ein einzelnes ``laser_twist#1`` in generischen Werten kann von einem
+        Zweigruppen-Laser stammen (L2600) — steht einer im Patch, bleibt es."""
+        pal = self._generisch_laden(self._patch() + [self._l2600()])
         self.assertEqual(pal.values, {"laser_twist": 8, "laser_twist#1": 9})
 
-    def test_generische_palette_flip_a_nur_mit_sh_laser3w(self):
+    def test_generische_palette_flip_a_mit_altstands_merkmal(self):
         """Review CDX-65: eine alte generische Palette „Flip A" (``laser_twist``
         + ``laser_twist#1``) traf ohne Umsetzung den horizontalen Flip von B.
-        Ist kein anderes Mehrfach-twist-Geraet gepatcht, ist #1 eindeutig."""
-        pal = self._generisch_laden(self._patch())
+        Traegt die Show anderswo eindeutig den Altstand (#2/#3) und kein
+        ``laser_twist_y``, ist #1 eindeutig und wird umgesetzt."""
+        pal = self._generisch_laden(self._patch(),
+                                    programmer={"1": dict(ALT)})
         self.assertEqual(pal.values, {"laser_twist": 8, "laser_twist_y": 9})
+
+    # ── CDX-65 Nachbesserung (Codex) ─────────────────────────────────────
+
+    def test_generische_palette_neben_l2600_bleibt_fuer_l2600_gleich(self):
+        """Codex (A): generische ``#1``/``#2`` neben einem L2600. Umgesetzt
+        werden darf nur fuer den SH-LASER3W — als Override je Geraet. Der L2600
+        bekommt weiter dieselben generischen Werte (zweiter Twist = 20)."""
+        alt = {"laser_twist#1": 20, "laser_twist#2": 30}
+        pal = self._generisch_laden(self._patch() + [self._l2600()], werte=alt)
+        self.assertEqual(pal.values, alt)
+        self.assertEqual(pal.get_values_for_fixture(2)["laser_twist#1"], 20)
+        laser = pal.get_values_for_fixture(1)
+        self.assertEqual(laser["laser_twist_y"], 20)     # A vertikal
+        self.assertEqual(laser["laser_twist#1"], 30)     # B horizontal
+
+    def test_override_des_geraets_gewinnt_ueber_generisch(self):
+        alt = {"laser_twist#1": 20, "laser_twist#2": 30}
+        pal = self._generisch_laden(
+            self._patch() + [self._l2600()], werte=alt,
+            fixture_values={1: {"laser_twist#2": 77}})
+        self.assertEqual(pal.values, alt)
+        self.assertEqual(pal.fixture_values[1],
+                         {"laser_twist_y": 20, "laser_twist#1": 77})
+
+    def test_nur_kopf_1_ohne_altstands_merkmal_bleibt(self):
+        """Codex (B): eine nach LAS-28, aber vor dieser Migration gespeicherte
+        Show traegt keinen Marker. ``laser_twist#1`` heisst dort schon „B
+        horizontal" und darf nicht zu ``laser_twist_y`` werden."""
+        cs = CueStack("CS")
+        cs.cues.append(Cue.from_dict(
+            {"number": 1, "values": {"1": {"laser_twist#1": 30}}}))
+        _laden({"version": "1.2", "patch": self._patch(),
+                "programmer": {"1": {"laser_twist#1": 30}},
+                "cue_stacks": [cs.to_dict()]})
+        st = get_state()
+        self.assertEqual(st.programmer[1], {"laser_twist#1": 30})
+        self.assertEqual(st.cue_stacks[0].cues[0].values[1], {"laser_twist#1": 30})
+        self.assertEqual(st.universes[1].get_channel(
+            KANAL["Pattern B Horizontal Flip"]), 30)
+
+    def test_nur_kopf_1_neben_neuem_stand_bleibt(self):
+        """Mischstand: ein Dict traegt schon ``laser_twist_y`` -> die Show ist
+        nach LAS-28 gespeichert, ein ``#1`` allein bleibt; eindeutig alte
+        Dicts (#2/#3) werden trotzdem umgesetzt."""
+        cs = CueStack("CS")
+        cs.cues.append(Cue.from_dict({"number": 1, "values": {"1": dict(ALT)}}))
+        _laden({"version": "1.2", "patch": self._patch(),
+                "programmer": {"1": {"laser_twist#1": 30}},
+                "base_levels": {"1": {"laser_twist_y": 5}},
+                "cue_stacks": [cs.to_dict()]})
+        st = get_state()
+        self.assertEqual(st.programmer[1], {"laser_twist#1": 30})
+        self.assertEqual(st.cue_stacks[0].cues[0].values[1], NEU)
+
+    def test_nur_kopf_1_mit_altstands_merkmal_wird_umgesetzt(self):
+        cs = CueStack("CS")
+        cs.cues.append(Cue.from_dict({"number": 1, "values": {"1": dict(ALT)}}))
+        _laden({"version": "1.2", "patch": self._patch(),
+                "programmer": {"1": {"laser_twist#1": 20}},
+                "cue_stacks": [cs.to_dict()]})
+        self.assertEqual(get_state().programmer[1], {"laser_twist_y": 20})
+
+    # ── ZIP-Zeitstempel als Speicherstand-Hinweis ────────────────────────
+
+    def _nur_kopf_1_show(self):
+        cs = CueStack("CS")
+        cs.cues.append(Cue.from_dict(
+            {"number": 1, "values": {"1": {"laser_twist#1": 20}}}))
+        return {"version": "1.2", "patch": self._patch(),
+                "programmer": {"1": {"laser_twist#1": 20}},
+                "cue_stacks": [cs.to_dict()]}
+
+    def test_nur_kopf_1_vor_dem_stichtag_gespeichert_wird_umgesetzt(self):
+        """Eine Alt-Show, die nur den vertikalen Flip von A nutzt (nur
+        ``laser_twist#1``), traegt kein Inhaltsmerkmal — aber der ZIP-Eintrag
+        show.json ist vor LAS-28 gestempelt: eindeutig Altstand."""
+        _laden(self._nur_kopf_1_show(), zeit=(2026, 10, 20, 18, 30, 0))
+        st = get_state()
+        self.assertEqual(st.programmer[1], {"laser_twist_y": 20})
+        self.assertEqual(st.cue_stacks[0].cues[0].values[1], {"laser_twist_y": 20})
+        self.assertEqual(st.universes[1].get_channel(
+            KANAL["Pattern A Vertical Flip"]), 20)
+
+    def test_nur_kopf_1_nach_dem_stichtag_bleibt(self):
+        _laden(self._nur_kopf_1_show(), zeit=(2026, 11, 1, 14, 0, 0))
+        self.assertEqual(get_state().programmer[1], {"laser_twist#1": 20})
+
+    def test_unplausibler_zeitstempel_zaehlt_nicht(self):
+        """ZIP-Vorgabe 1980 (Uhr ohne Zeit) ist kein Beleg fuer „vorher"."""
+        _laden(self._nur_kopf_1_show(), zeit=(1980, 1, 1, 0, 0, 0))
+        self.assertEqual(get_state().programmer[1], {"laser_twist#1": 20})
+
+    def test_vor_dem_stichtag_aber_mit_neuem_stand_bleibt(self):
+        """``laser_twist_y`` im Inhalt widerlegt den Zeitstempel (falsche Uhr)."""
+        show = self._nur_kopf_1_show()
+        show["base_levels"] = {"1": {"laser_twist_y": 5}}
+        _laden(show, zeit=(2026, 10, 20, 18, 30, 0))
+        self.assertEqual(get_state().programmer[1], {"laser_twist#1": 20})
+
 
 if __name__ == "__main__":
     unittest.main()
