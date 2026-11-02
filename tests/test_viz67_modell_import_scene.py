@@ -22,7 +22,7 @@ from src.core.stage.stage_definition import StageDefinition, StageElement  # noq
 from test_viz96_gobo_projektion_scene import (         # noqa: E402
     _Basis, _MockBridge, _pump)
 
-DATEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daten")
+DATEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "viz67")
 
 
 @_pytest_xplat15.fixture(autouse=True)

@@ -9,7 +9,7 @@
 * Fenster-Weg: der Import legt ein Buehnenobjekt mit Undo an; eine kaputte
   Datei endet in einer Meldung statt in einer Ausnahme.
 
-Beispieldateien: ``tests/daten/viz67_*``.
+Beispieldateien: ``tests/fixtures/viz67/viz67_*``.
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from src.core.stage import modell_import as mi            # noqa: E402
 from src.core.stage import stage_definition as SD         # noqa: E402
 
-DATEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daten")
+DATEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "viz67")
 
 
 def _datei(name):
@@ -172,7 +172,7 @@ class ElementTest(unittest.TestCase):
     def test_typ_ist_ueberall_bekannt(self):
         from src.core.stage.scene_graph import NodeKind
         self.assertEqual(NodeKind("imported_model").value, "imported_model")
-        js = os.path.join(os.path.dirname(DATEN), "..", "src", "ui", "visualizer", "scene_src")
+        js = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "ui", "visualizer", "scene_src")
         with open(os.path.join(js, "stage", "stage_objects.js"), encoding="utf-8") as f:
             quelle = f.read()
         self.assertIn("imported_model: {", quelle)
