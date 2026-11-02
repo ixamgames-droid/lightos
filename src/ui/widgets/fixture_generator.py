@@ -167,6 +167,9 @@ class GeneratorModel:
     notes: str = ""
     # FM-12: expliziter 3D-Modell-Override ("" = Automatik/Vorschlag).
     viz_model: str = ""
+    # FM-64: Abstrahlwinkel (eng, weit) in Grad, voller Winkel; fest = beide
+    # gleich, (0, 0) = keine Angabe (3D wie bisher aus Typ/Zoom).
+    abstrahlwinkel: tuple = (0.0, 0.0)
     modes: list[GenMode] = field(default_factory=list)
     # FM-76: Herkunft der geladenen Vorlage — die vier Felder ``quelle``/
     # ``herkunft``/``geprueft``/``autor`` wie in der Bibliotheksdatei.
@@ -242,8 +245,17 @@ def build_profile_payload(model: GeneratorModel) -> dict:
         "notes": model.notes or "",
         "source": "user",
         "viz_model": (model.viz_model or "").strip(),
+        # FM-64: Abstrahlwinkel (0/0 = keine Angabe).
+        "beam_angle_min": _aw_paar(model)[0],
+        "beam_angle_max": _aw_paar(model)[1],
         "modes": modes_out,
     }
+
+
+def _aw_paar(model) -> tuple[float, float]:
+    """FM-64: bereinigter Abstrahlwinkel des Modells."""
+    from src.core import abstrahlwinkel as AW
+    return AW.normalisiere(*tuple(getattr(model, "abstrahlwinkel", None) or (0, 0)))
 
 
 def _clamp(v) -> int:
@@ -835,6 +847,9 @@ def model_to_markdown(model: GeneratorModel) -> str:
     meta = [f"Typ: {model.fixture_type}"]
     if model.power_w:
         meta.append(f"Leistung: {model.power_w} W")
+    from src.core import abstrahlwinkel as AW
+    if AW.text(*_aw_paar(model)):
+        meta.append(f"Abstrahlwinkel: {AW.text(*_aw_paar(model))}")
     lines.append(" · ".join(meta))
     if model.notes:
         lines.append("")
@@ -2014,6 +2029,15 @@ class FixtureGeneratorDialog(QDialog):
         grid.addWidget(QLabel("Notizen:"), 3, 0)
         grid.addWidget(self._edit_notes, 3, 1)
         grid.addLayout(laden, 3, 2, 1, 2)
+        # FM-64: Abstrahlwinkel (fest bzw. eng..weit bei Zoom) fuer den 3D-Kegel.
+        from src.ui.widgets.abstrahlwinkel_feld import AbstrahlwinkelFeld
+        self._abstrahlwinkel = AbstrahlwinkelFeld()
+        self._abstrahlwinkel.setze(*_aw_paar(self._model))
+        self._abstrahlwinkel.geaendert.connect(lambda *_: self._hinweise_planen())
+        lbl_aw = QLabel("Abstrahlwinkel:")
+        lbl_aw.setToolTip(self._abstrahlwinkel.toolTip())
+        grid.addWidget(lbl_aw, 4, 0)
+        grid.addWidget(self._abstrahlwinkel, 4, 1)
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         root.addWidget(head)
@@ -2200,6 +2224,7 @@ class FixtureGeneratorDialog(QDialog):
         self._model.fixture_type = self._cb_type.currentText()
         self._model.viz_model = self._cb_vizmodel.currentData() or ""
         self._model.power_w = self._spin_power.value()
+        self._model.abstrahlwinkel = self._abstrahlwinkel.werte()   # FM-64
         self._model.notes = self._edit_notes.text()
         for i in range(self._tabs.count()):
             self._tabs.widget(i).sync_from_widgets()
@@ -2348,6 +2373,7 @@ class FixtureGeneratorDialog(QDialog):
         vidx = self._cb_vizmodel.findData(model.viz_model or "")
         self._cb_vizmodel.setCurrentIndex(vidx if vidx >= 0 else 0)
         self._spin_power.setValue(model.power_w)
+        self._abstrahlwinkel.setze(*_aw_paar(model))   # FM-64
         self._edit_notes.setText(model.notes)
         self._reload_modes()
         self._revalidate()
@@ -2466,6 +2492,7 @@ def model_from_daten(daten: dict) -> GeneratorModel:
     (``GeneratorModel.herkunft``) — fehlt sie oder ist sie ungueltig, steht
     der Grund in ``herkunft_fehlt`` und gespeichert wird nicht."""
     import copy
+    from src.core import abstrahlwinkel as _AW
     from src.core.database import bibliothek_format as BF
     modes: list[GenMode] = []
     for m in daten.get("modi", ()):
@@ -2499,6 +2526,7 @@ def model_from_daten(daten: dict) -> GeneratorModel:
         power_w=int(daten.get("leistung_w", 0) or 0),
         notes=str(daten.get("notizen", "")),
         viz_model=str(daten.get("viz_model", "")),
+        abstrahlwinkel=_AW.aus_daten(daten.get("abstrahlwinkel")),   # FM-64
         modes=modes,
         herkunft=BF.herkunft_aus_daten(daten),
         herkunft_fehlt="" if BF.herkunft_aus_daten(daten) else (

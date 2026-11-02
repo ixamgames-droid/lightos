@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import ast
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -171,36 +172,128 @@ class SchreibpfadBleibtLfTest(unittest.TestCase):
                          "Tafel fuer die Linux-Sitzung unlesbar")
 
 
+def _wegwerf_tafel(wurzel: str, blocker: list[str]) -> str:
+    """QA-113: eine Tafel nur fuer diesen Test — Bare-Repo ``lightos-intern.git``
+    (Stellvertreter fuer GitHub, wie in ``test_session_claim``) plus Klon mit
+    ``SESSIONS.md`` auf ``main``. Liefert den Klon-Pfad fuer
+    ``LIGHTOS_TAFEL_REPO``. Nie die echte Tafel: deren Inhalt schreiben andere
+    Sitzungen, ein Test darf nicht davon abhaengen, was dort gerade steht."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_sc_tafel", WERKZEUGE / "session_claim.py")
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+
+    def git(*a, cwd=None):
+        subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)
+
+    bare = os.path.join(wurzel, "lightos-intern.git")
+    klon = os.path.join(wurzel, "lightos-intern")
+    git("init", "--quiet", "--bare", bare)
+    git("clone", "--quiet", bare, klon)
+    git("config", "user.email", "test@example.invalid", cwd=klon)
+    git("config", "user.name", "Test", cwd=klon)
+    git("checkout", "--quiet", "-b", "main", cwd=klon)
+    inhalt = sc.rendere({"claims": [], "blocker": blocker, "verlauf": []})
+    with open(os.path.join(klon, sc.DATEI), "w", encoding="utf-8", newline="\n") as f:
+        f.write(inhalt)
+    git("add", sc.DATEI, cwd=klon)
+    git("commit", "--quiet", "-m", "Tafel fuer den Test", cwd=klon)
+    git("push", "--quiet", "origin", "main", cwd=klon)
+    return klon
+
+
 class WerkzeugeUeberlebenCp1252Test(unittest.TestCase):
     """Der Endnachweis: ein echter Lauf ohne die UTF-8-Schalter."""
 
     # Nur Werkzeuge mit einem gefahrlosen Nur-Lese-Modus. `pr_bereit` fragt
     # GitHub und `zeitbomben_gate` startet pytest — beide gehoeren nicht in
     # einen Test, der bloss die Kodierung nachweisen will.
+    # QA-113: dazu die Rueckgaben, die ein fehlerfreier Lauf haben darf.
+    # ``backlog_ids`` fragt GitHub (``gh pr list``); ohne Anmeldung — etwa im
+    # Gate mit eigenem APPDATA — meldet es „Abdeckung unvollstaendig“ mit 2.
+    # Das ist eine Auskunft, kein Absturz (der endet mit 1 und Traceback).
     HARMLOSE_LAEUFE = (
-        ("backlog_ids.py", ["--kein-fetch", "--gruppe", "FM"]),
-        ("backlog_status_drift.py", ["--kein-fetch"]),
-        ("session_claim.py", ["list"]),
+        ("backlog_ids.py", ["--kein-fetch", "--gruppe", "FM"], (0, 2)),
+        ("backlog_status_drift.py", ["--kein-fetch"], (0,)),
+        ("session_claim.py", ["list"], (0,)),
     )
+
+    # QA-113: so sah der Eintrag aus, der den Fehlalarm ausloeste (die Tafel
+    # nannte den Fehlernamen woertlich) — dazu Zeichen, die cp1252 nicht kennt.
+    TAFEL_EINTRAG = ("2026-11-02T18:39Z (D) D AN A — Testfall mit Ordner "
+                     "„Jörg_Łódź“ ⏳ ★: ohne Fix "
+                     "UnicodeEncodeError, sonst UnicodeDecodeError")
 
     @unittest.skipUnless(sys.platform == "win32",
                          "cp1252 ist die Locale-Kodierung nur auf Windows; "
                          "auf Linux ist der Lauf ohne PYTHONUTF8 ohnehin UTF-8")
     def test_kein_werkzeug_stirbt_an_der_kodierung(self):
         env = _cp1252_umgebung()
-        for name, argumente in self.HARMLOSE_LAEUFE:
+        tmp = tempfile.TemporaryDirectory(prefix="xplat20_tafel_")
+        self.addCleanup(tmp.cleanup)
+        env["LIGHTOS_TAFEL_REPO"] = _wegwerf_tafel(tmp.name, [self.TAFEL_EINTRAG])
+        for name, argumente, erlaubt in self.HARMLOSE_LAEUFE:
             with self.subTest(werkzeug=name):
                 r = subprocess.run(
                     [sys.executable, "-X", "utf8=0", str(WERKZEUGE / name),
                      *argumente],
                     cwd=REPO, capture_output=True, env=env, timeout=180)
                 ausgabe = (r.stdout + r.stderr).decode("utf-8", "replace")
-                for schaden in ("UnicodeDecodeError", "UnicodeEncodeError"):
-                    self.assertNotIn(
-                        schaden, ausgabe,
-                        f"{name} stirbt ohne PYTHONUTF8 an {schaden} — genau "
-                        "so startet der Mensch es in seiner PowerShell.\n"
-                        f"{ausgabe[-600:]}")
+                schaden = _kodierschaden(r.stderr)
+                self.assertIsNone(
+                    schaden,
+                    f"{name} stirbt ohne PYTHONUTF8 an {schaden} — genau "
+                    "so startet der Mensch es in seiner PowerShell.\n"
+                    f"{ausgabe[-600:]}")
+                self.assertNotIn("Traceback (most recent call last)",
+                                 r.stderr.decode("utf-8", "replace"),
+                                 f"{name} stirbt mit einem Traceback\n{ausgabe[-600:]}")
+                self.assertIn(r.returncode, erlaubt,
+                              f"{name}: Rueckgabe {r.returncode}\n{ausgabe[-600:]}")
+
+
+def _kodierschaden(stderr: bytes) -> str | None:
+    """QA-113: Name des Kodierfehlers, an dem ein Werkzeug WIRKLICH gestorben
+    ist — sonst ``None``.
+
+    Gesucht wird nur auf stderr und nur als Traceback-Schluss (Zeilenanfang
+    ``UnicodeEncodeError:`` bzw. ``UnicodeDecodeError:``). Vorher stand hier
+    eine Textsuche ueber stdout UND stderr; ``session_claim.py list`` gibt aber
+    die letzten Tafel-Eintraege aus — und ein Eintrag, der den Fehlernamen
+    nannte, machte den Test auf jedem Windows-Zweig rot (02.11.2026), obwohl
+    das Werkzeug fehlerfrei lief."""
+    text = stderr.decode("utf-8", "replace")
+    if "Traceback (most recent call last)" not in text:
+        return None
+    for name in ("UnicodeEncodeError", "UnicodeDecodeError"):
+        if re.search(rf"^\s*{name}\b", text, re.MULTILINE):
+            return name
+    return None
+
+
+class KodierschadenErkennungTest(unittest.TestCase):
+    """QA-113 Gegenprobe: die engere Pruefung findet einen echten Absturz weiter
+    — und nur den."""
+
+    def test_freier_text_mit_dem_fehlernamen_ist_kein_absturz(self):
+        self.assertIsNone(_kodierschaden(
+            "Hinweis: UnicodeEncodeError war gestern\n".encode("utf-8")))
+
+    def test_traceback_auf_stderr_wird_erkannt(self):
+        tb = ("Traceback (most recent call last):\n"
+              '  File "x.py", line 1, in <module>\n'
+              "UnicodeEncodeError: 'charmap' codec can't encode character\n")
+        self.assertEqual(_kodierschaden(tb.encode("utf-8")), "UnicodeEncodeError")
+
+    @unittest.skipUnless(sys.platform == "win32", "cp1252 nur unter Windows")
+    def test_echter_kodier_absturz_wird_erkannt(self):
+        """Ein Kind, das wirklich an cp1252 stirbt (``print`` von „Ł“)."""
+        r = subprocess.run(
+            [sys.executable, "-X", "utf8=0", "-c", "print('\\u0141')"],
+            capture_output=True, env=_cp1252_umgebung(), timeout=60)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(_kodierschaden(r.stderr), "UnicodeEncodeError",
+                         r.stderr.decode("utf-8", "replace"))
 
 
 if __name__ == "__main__":
