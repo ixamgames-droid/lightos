@@ -29,6 +29,8 @@ from PySide6.QtGui import QColor, QImage, QPainter, QRegion
 from PySide6.QtWidgets import QApplication
 
 from _qt_lifecycle import destroy_all_top_level_widgets
+# UI-90: skalierte Kachelwege (Verlaeufe, Fuellung+Kontur) mit Toleranz von A
+from _bild_toleranz import innerhalb
 
 import src.ui.views.live_view as LV
 
@@ -129,10 +131,19 @@ class KachelExaktTest(unittest.TestCase):
                             kachel = _male(fn, zoom, pos, clip)  # bauen + aufblenden
                             kachel2 = _male(fn, zoom, pos, clip)  # Treffer
                             t1 = LV._KACHEL_STATS["gebaut"] + LV._KACHEL_STATS["treffer"]
-                            if not (name.startswith("verlauf") and zoom != 1.0):
-                                self.assertGreater(t1, t0, "Kachel-Cache nicht benutzt")
-                            self.assertTrue(direkt == kachel, "Kachel != direkt")
-                            self.assertTrue(direkt == kachel2, "Treffer != direkt")
+                            self.assertGreater(t1, t0, "Kachel-Cache nicht benutzt")
+                            # UI-90: skaliert kommen Verlaeufe und Fuellung+Kontur
+                            # aus der Kachel — dort gilt die Toleranz von A; alles
+                            # andere (und Zoom 1 ueberhaupt) bleibt bitgleich.
+                            if zoom != 1.0 and name in self._NEUE_WEGE:
+                                for img in (kachel, kachel2):
+                                    ok, info = innerhalb(direkt, img)
+                                    self.assertTrue(ok, info)
+                            else:
+                                self.assertTrue(direkt == kachel, "Kachel != direkt")
+                                self.assertTrue(direkt == kachel2, "Treffer != direkt")
+
+    _NEUE_WEGE = ("verlauf_mit_glow", "gehaeuse_beide")
 
     def test_kachel_an_anderer_ganzzahliger_lage_wiederverwendet(self):
         fn = lambda p, kx: LV._form(  # noqa: E731
@@ -154,29 +165,39 @@ class NichtKachelbarTest(unittest.TestCase):
     def setUp(self):
         LV._kacheln_leeren()
 
-    def test_deckender_verlauf_hat_keinen_schluessel(self):
+    def test_deckender_verlauf_ungeskaliert_nie_aus_der_kachel(self):
+        """Ein deckender Verlauf ist nicht bitgleich kachelbar. UI-90: er bekommt
+        die eigene Art ``gd`` — ungeskaliert bleibt er direkt (bitgleich),
+        skaliert kommt er aus der Kachel (Toleranz, s. test_ui90_2d_kachelwege)."""
         c = QColor(255, 48, 48)
-        _br, key = LV._verlauf(0, 0, 12, ((0, c.lighter(140)), (0.7, c),
-                                          (1, c.darker(120))))
-        self.assertIsNone(key)
-        _br, key = LV._verlauf(0, 0, 12, ((0, c), (1, QColor(255, 48, 48, 127))))
-        self.assertIsNotNone(key)
+        br, key = LV._verlauf(0, 0, 12, ((0, c.lighter(140)), (0.7, c),
+                                         (1, c.darker(120))))
+        self.assertEqual(key[0], "gd")
+        _br, key2 = LV._verlauf(0, 0, 12, ((0, c), (1, QColor(255, 48, 48, 127))))
+        self.assertEqual(key2[0], "g")
+        fn = lambda p, kx: LV._form(p, kx, "e", LV._ellipse(0, 0, 12, 12),  # noqa: E731
+                                    None, br, None, key)
+        for _ in range(LV.KACHEL_AB + 1):
+            img = _male(fn, 1.0, (60.3, 60.7))
+        self.assertFalse(LV._KACHELN)
+        self.assertTrue(img == _male(fn, 1.0, (60.3, 60.7), kachel=False))
 
-    def test_verlauf_nur_ohne_skalierung_und_rechteck_nie(self):
+    def test_rechteck_nie_verlauf_auch_skaliert(self):
+        """Rechtecke nie aus der Kachel; Verlaeufe seit UI-90 auch skaliert."""
         c = QColor(255, 48, 48)
         br, bk = LV._verlauf(0, 0, 12, ((0, c), (1, QColor(255, 48, 48, 127))))
         pen, pk = LV._pinsel(c)
         for zoom in (0.8, 1.37):
             for _ in range(3):
-                _male(lambda p, kx: LV._form(p, kx, "e", LV._ellipse(0, 0, 12, 12),
-                                             None, br, None, bk), zoom, (60, 60))
                 _male(lambda p, kx: LV._form(p, kx, "r", (-9.0, -3.0, 18.0, 6.0),
                                              None, pen, None, pk), zoom, (60, 60))
         self.assertFalse(LV._KACHELN)
-        for _ in range(3):
-            _male(lambda p, kx: LV._form(p, kx, "e", LV._ellipse(0, 0, 12, 12),
-                                         None, br, None, bk), 1.0, (60.3, 60.7))
-        self.assertTrue(LV._KACHELN)
+        for zoom in (0.8, 1.37, 1.0):
+            LV._kacheln_leeren()
+            for _ in range(3):
+                _male(lambda p, kx: LV._form(p, kx, "e", LV._ellipse(0, 0, 12, 12),
+                                             None, br, None, bk), zoom, (60.3, 60.7))
+            self.assertTrue(LV._KACHELN, f"Zoom {zoom}")
 
     def test_duenner_stift_bleibt_direkt(self):
         pen, pk = LV._stift(QColor("#222"), 1)
@@ -367,8 +388,13 @@ class FixtureRendererPixelgleichTest(unittest.TestCase):
                             self._zeichne(ft, zoom, False, **dict(kw))
                         a = self._zeichne(ft, zoom, False, **dict(kw))
                         b = self._zeichne(ft, zoom, False, **dict(kw))
-                        self.assertTrue(ref == a, "erste Kachel weicht ab")
-                        self.assertTrue(ref == b, "Treffer weicht ab")
+                        if zoom == 1.0:
+                            self.assertTrue(ref == a, "erste Kachel weicht ab")
+                            self.assertTrue(ref == b, "Treffer weicht ab")
+                        else:       # UI-90: skalierte Kachelwege, Toleranz von A
+                            for img, was in ((a, "erste Kachel"), (b, "Treffer")):
+                                ok, info = innerhalb(ref, img)
+                                self.assertTrue(ok, f"{was}: {info}")
         LV._kacheln_leeren()
         for _ in range(LV.KACHEL_AB + 1):
             self._zeichne("par", 1.0, False, effects=["X"], anim_phase=0.1)
@@ -600,7 +626,12 @@ class CanvasBildTest(unittest.TestCase):
                 finally:
                     LV._kachel_kontext = orig_kontext
                 c.grab()
-                self.assertTrue(ref == c.grab().toImage(), f"Zoom {z}")
+                bild = c.grab().toImage()
+                if z == 1.0:
+                    self.assertTrue(ref == bild, f"Zoom {z}")
+                else:       # UI-90: skalierte Kachelwege, Toleranz von A
+                    ok, info = innerhalb(ref, bild)
+                    self.assertTrue(ok, f"Zoom {z}: {info}")
 
 
 if __name__ == "__main__":
