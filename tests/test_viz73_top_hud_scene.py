@@ -25,6 +25,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+import _webgl_gate                      # QA-74
 
 _app = QApplication.instance() or QApplication([])
 
@@ -184,6 +185,19 @@ class TopHudUeberlappungTest(unittest.TestCase):
         self.assertTrue(self._loaded_ok, "loadFinished nie ausgeloest (Timeout)")
         self.assertTrue(self._loaded_ok[-1], "loadFinished(ok=False)")
 
+    def _warte_auf_szene(self, _zweiter_versuch=False):
+        # QA-74: EINE Quelle fuer "die Szene kam nicht hoch - was nun?" —
+        # einmal neu laden, beim wiederholten GL-Ausfall ueberspringen.
+        try:
+            self._poll_until_true("!!window.__lightosAppReady")
+        except AssertionError as e:
+            diagnose = _webgl_gate.szenen_diagnose(self._view, _pump, 3.0)
+            if _webgl_gate.nach_szenen_timeout(
+                    e, diagnose, zweiter_versuch=_zweiter_versuch):
+                _pump(1.0)
+                self._load_and_wait()
+                return self._warte_auf_szene(_zweiter_versuch=True)
+
     def _eval(self, js_expr):
         # ★ QA-VIZ-TESTS (2026-08-05): ein JS-Wurf kam hier als leerer String
         # zurueck — ununterscheidbar von einem echten Ergebnis. Und an rund 25
@@ -261,7 +275,7 @@ class TopHudUeberlappungTest(unittest.TestCase):
 
     def test_bauen_banner_und_leiste_ueberlappen_nicht(self):
         self._load_and_wait()
-        self._poll_until_true("!!window.__lightosAppReady")
+        self._warte_auf_szene()
         self._bridge_obj._poll_payload = '{"editMode": "edit"}'
         self._poll_until_true(
             "document.getElementById('mode-frame').dataset.mode === 'build'", timeout_s=8.0)
