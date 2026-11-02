@@ -209,7 +209,8 @@ class ControllerBrowserDialog(QDialog):
             rows.append("<tr style='color:#79c0ff'><td>Element</td><td>Typ</td>"
                         "<td>Kanal</td><td>Nummern</td><td>Layout</td></tr>")
             for c in p.controls[:40]:
-                rng = (f"{c.range[0]}–{c.range[1]}" if c.range[0] != c.range[1]
+                rng = (", ".join(map(str, c.numbers)) if c.numbers  # CDX-64
+                       else f"{c.range[0]}–{c.range[1]}" if c.range[0] != c.range[1]
                        else str(c.range[0]))
                 ch = "alle" if c.channel < 0 else str(c.channel + 1)
                 rows.append(f"<tr><td>{esc(c.name)}</td><td>{esc(c.type)}</td>"

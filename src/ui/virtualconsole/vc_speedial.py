@@ -1,6 +1,7 @@
 """VCSpeedDial — Rotary speed control with tap-tempo."""
 from __future__ import annotations
 import time
+import weakref
 from PySide6.QtWidgets import (
     QDialog, QFormLayout, QDoubleSpinBox, QLineEdit, QDialogButtonBox,
     QComboBox, QCheckBox, QWidget,
@@ -63,7 +64,30 @@ def _parse_factor_token(tok: str):
 # tempo_multiplier) samt zuletzt geschriebenem speed und Multiplikator. Gilt
 # nur, solange beide unveraendert sind (sonst fremder Effekt mit gleicher fid
 # oder von aussen umgestellt -> neu ableiten). Nur Laufzeit, nicht gespeichert.
-_FREE_RUN_BASIS: dict[int, tuple[float, float, float]] = {}
+# CDX-64: zusaetzlich an die Effekt-INSTANZ gebunden (weakref) — laedt eine
+# andere Show einen Effekt mit gleicher fid UND gleichem speed/Multiplikator,
+# erbt er sonst die Basis der alten Show.
+_FREE_RUN_BASIS: dict[int, tuple] = {}
+
+
+def _instanz_ref(fid):
+    """Schwache Referenz auf den aktuellen Ziel-Effekt (None = keine)."""
+    try:
+        from src.core.engine import effect_live
+        fn = effect_live.resolve_target(fid)
+        return weakref.ref(fn) if fn is not None else None
+    except Exception:
+        return None
+
+
+def _basis_gilt(gemerkt, fid) -> bool:
+    if gemerkt is None or gemerkt[3] is None:
+        return False
+    try:
+        from src.core.engine import effect_live
+        return gemerkt[3]() is effect_live.resolve_target(fid)
+    except Exception:
+        return False
 
 
 class VCSpeedDial(VCWidget):
@@ -269,7 +293,7 @@ class VCSpeedDial(VCWidget):
                             # aufgebautes Pult oder ein zweiter Dial auf
                             # denselben Effekt kennt die Basis sonst nicht.
                             gemerkt = _FREE_RUN_BASIS.get(fid)
-                            if (gemerkt is not None
+                            if (_basis_gilt(gemerkt, fid)
                                     and abs(gemerkt[1] - old_speed) < 1e-9
                                     and abs(gemerkt[2] - old_mult) < 1e-9):
                                 basis = gemerkt[0]
@@ -278,7 +302,8 @@ class VCSpeedDial(VCWidget):
                             effect_live.set_param("speed", basis * new_mult, fid)
                             try:
                                 geschrieben = float(effect_live.get_param("speed", fid))
-                                _FREE_RUN_BASIS[fid] = (basis, geschrieben, new_mult)
+                                _FREE_RUN_BASIS[fid] = (basis, geschrieben, new_mult,
+                                                        _instanz_ref(fid))
                             except (TypeError, ValueError):
                                 _FREE_RUN_BASIS.pop(fid, None)
                         else:
