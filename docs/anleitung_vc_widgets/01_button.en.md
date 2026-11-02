@@ -185,6 +185,18 @@ The same sequence in the 3D visualizer, looking at the stage from the front — 
 - In addition, the button remembers **which** group is meant — its identifier, its name and its folder. If that group no longer exists (deleted, or the VC layout was loaded into another show in which the same number belongs to a different group), the target is **lost**: the button blacks out nothing for it and does not turn into the global blackout. It then carries a red dashed frame with ⚠ (the tooltip names the group), pressing it puts a note in the status bar, and the **Blackout-Ziel** list shows „Gruppe: … — verloren (gelöscht oder aus einer anderen Show), bitte neu wählen“ (group: … — lost (deleted or from another show), please choose again). A newly created group **never** takes over the target — not even if it gets the same number, has the same name and lies in the same folder: deleted and created again is a different group. Only for targets from very old layouts that carry no identifier yet do name and folder decide. **Datei → Show prüfen & reparieren…** (File → check & repair show) lists buttons with a lost target.
 - The target is saved in the show (`blackout_fids`, `blackout_group_ids`, plus identifier, name and folder per group in `blackout_group_refs`); older layouts without these fields load as a global blackout. Layouts from earlier versions carried group **names** (`blackout_groups`) and keep working unchanged. When the settings are opened, such a name becomes the number if exactly one group has that name; if several do, the entry is marked „mehrdeutig — bitte neu wählen“.
 
+## Picture on the button (gallery and snapshot from 3D)
+
+In **edit mode**, right-click the button → **„Hintergrundbild wählen…"** (choose background picture). The dialog shows the built-in graphics in tabs; one click applies one. **„Eigene Datei…"** (own file) takes your own picture (PNG, JPG, GIF, WebP, BMP). **„Hintergrundbild entfernen"** in the same menu removes it again.
+
+**„Aus 3D-Ansicht aufnehmen"** (capture from 3D view, VCG-02) takes a picture of the light beams exactly as the 3D visualizer shows them right now — the button then shows what its function does on stage:
+
+1. Open the **3D visualizer** and **start the button's function** (press the button, recall the snap …) until the beams look the way the button should show them.
+2. In edit mode, on the button: **„Hintergrundbild wählen…" → „Aus 3D-Ansicht aufnehmen"**.
+3. A section in the button's aspect ratio is cut from the middle of the 3D picture, scaled down (at most 256 px) and set as the button picture.
+
+If no 3D window is open, a message says to open the 3D visualizer and start the button's function first. The picture is a **snapshot**: it does not change by itself when you later change the button's function or the rig — just capture it again. Like every gallery graphic it is stored in the show file (`.lshow`) and is back on another computer.
+
 ## Binding to an effect
 
 With the actions **Funktion an/aus**, **Funktion (nur gehalten)** and **Effekt-Aktion (Live)**, the button counts as effect-bound. You bind it via the **Executor-Slot / Function-ID** field, the **Funktion/Chase (Name)** dropdown or the **Steuert** list (which takes precedence when it is filled). Only the `function_id` is saved (plus optional further IDs); the actual live effect runs through the shared seam `src/core/engine/effect_live.py` (`do_action` for „Effekt-Aktion", `start`/`stop` for the toggle/flash actions). MIDI uses the same binding.

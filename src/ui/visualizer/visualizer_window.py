@@ -376,6 +376,10 @@ def load_stage_html(view) -> None:
         # ein Target spaeter feststellen, dass es veraltet rendert.
         try:
             view._lightos_loaded_tier = tier
+            # VCG-02: Kennzeichen „hier laeuft die 3D-Szene" — der Galerie-
+            # Dialog der VC-Taste sucht so die Ansicht fuer die Momentaufnahme,
+            # ohne QtWebEngine importieren zu muessen.
+            view._lightos_3d_szene = True
         except Exception:
             pass
         view.load(url)

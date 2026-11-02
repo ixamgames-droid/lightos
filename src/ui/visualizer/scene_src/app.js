@@ -203,6 +203,42 @@ startRenderLoop({
   perFrame: perFrameUpdate,
 });
 
+// VCG-02: Momentaufnahme fuer das Bild einer VC-Taste. Der Renderer laeuft
+// ohne preserveDrawingBuffer — nach dem Compositing ist der Puffer leer.
+// Deshalb hier EIN Frame direkt davor im selben JS-Durchlauf rendern und die
+// Pixel per readPixels holen, solange der Puffer garantiert gefuellt ist.
+// Bewusst NICHT renderer.domElement.toDataURL: das geht bei Chromium ueber den
+// Compositor und lieferte im Test (offscreen) ein leeres, transparentes Bild,
+// obwohl readPixels die Szene zeigte. Der Umweg ueber eine 2D-Leinwand
+// liefert dieselbe PNG-Data-URL. Aendert nichts an der Szene (keine neue
+// Mutationsquelle, also kein requestRender). '' = nicht moeglich.
+function momentaufnahme() {
+  try {
+    renderFrame();
+    renderer.setRenderTarget(null);
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    if (!w || !h) return '';
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const leinwand = document.createElement('canvas');
+    leinwand.width = w;
+    leinwand.height = h;
+    const ctx = leinwand.getContext('2d');
+    const bild = ctx.createImageData(w, h);
+    const zeile = w * 4;
+    // GL zaehlt Zeilen von unten, die 2D-Leinwand von oben.
+    for (let y = 0; y < h; y++) {
+      bild.data.set(px.subarray((h - 1 - y) * zeile, (h - y) * zeile), y * zeile);
+    }
+    ctx.putImageData(bild, 0, 0);
+    return leinwand.toDataURL('image/png');
+  } catch (e) {
+    console.error('VCG-02 Momentaufnahme fehlgeschlagen:', e);
+    return '';
+  }
+}
+
 // Initial Brightness anwenden (Default = dunkel fuer Beam-Wiedergabe)
 applyBrightness(settings.brightness);
 
@@ -392,6 +428,8 @@ window.__lightos = {
   // aufbauen (XPLAT-33), leeren den DMX-Cache, damit der Vortest nicht
   // nachwirkt — im Betrieb behaelt ein Neubau seinen Stand bewusst (VIZ-71).
   __dmxCacheLeeren: () => { resetDmxCache(); return true; },
+  // VCG-02: Bild der aktuellen Ansicht als PNG-Data-URL (VC-Tastenbild).
+  momentaufnahme,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett
