@@ -692,7 +692,8 @@ class FixtureEditorDialog(QDialog):
         self._lbl_nur_ansehen.setHidden(False)
         self.setStyleSheet(NUR_ANSEHEN_STIL)
         for w in (self._cb_manufacturer, self._edit_name, self._edit_short,
-                  self._cb_type, self._spin_power):
+                  self._cb_type, self._spin_power,
+                  self._abstrahlwinkel.spin_eng, self._abstrahlwinkel.spin_weit):
             nur_ansehen_markieren(w)
         self._btn_cancel.setText("Schließen")
         self._btn_save.setEnabled(False)
@@ -744,6 +745,12 @@ class FixtureEditorDialog(QDialog):
         self._spin_power.setRange(0, 5000)
         self._spin_power.setSuffix(" W")
         form.addRow("Leistung:", self._spin_power)
+
+        # FM-64: Abstrahlwinkel (fest bzw. eng..weit bei Zoom) — nutzt der
+        # 3D-Visualizer fuer die Kegelbreite.
+        from src.ui.widgets.abstrahlwinkel_feld import AbstrahlwinkelFeld
+        self._abstrahlwinkel = AbstrahlwinkelFeld()
+        form.addRow("Abstrahlwinkel:", self._abstrahlwinkel)
 
         root.addLayout(form)
 
@@ -887,7 +894,7 @@ class FixtureEditorDialog(QDialog):
             hersteller=hersteller,
             modell=self._edit_name.text(), kurzname=self._edit_short.text(),
             typ=self._cb_type.currentText(), leistung_w=self._spin_power.value(),
-            modi=modi, **extra)
+            modi=modi, abstrahlwinkel=self._abstrahlwinkel.werte(), **extra)
 
     def _hat_inhalt(self) -> bool:
         """Steht im Editor etwas, das ein Import verwerfen wuerde?"""
@@ -1037,6 +1044,9 @@ class FixtureEditorDialog(QDialog):
             self._edit_short.setText(profile.short_name)
             self._cb_type.setCurrentText(profile.fixture_type)
             self._spin_power.setValue(profile.power_w)
+            # FM-64
+            self._abstrahlwinkel.setze(profile.beam_angle_min or 0,
+                                       profile.beam_angle_max or 0)
             # Modes
             modes = s.execute(
                 select(FixtureMode).where(FixtureMode.fixture_id == profile.id)
@@ -1120,6 +1130,9 @@ class FixtureEditorDialog(QDialog):
             fixture_type=self._cb_type.currentText(),
             power_w=self._spin_power.value(), source="user",
         )
+        # FM-64: Abstrahlwinkel steht im Editor — kommt also aus dem Feld,
+        # auch bei einer Kopie.
+        profile.beam_angle_min, profile.beam_angle_max = self._abstrahlwinkel.werte()
         if self._kopie_von is not None:
             # UI-82: ohne belegbare Herkunft KEINE Kopie — ``_kopie_herkunft``
             # wirft ``ProfilFehler``; ``_save`` fragt vorher und schreibt dann
@@ -1148,7 +1161,8 @@ class FixtureEditorDialog(QDialog):
         return _json.dumps([
             self._cb_manufacturer.currentText().strip(),
             self._edit_name.text().strip(), self._edit_short.text().strip(),
-            self._cb_type.currentText(), self._spin_power.value(), modi,
+            self._cb_type.currentText(), self._spin_power.value(),
+            list(self._abstrahlwinkel.werte()), modi,
         ], sort_keys=True, default=str, ensure_ascii=False)
 
     def _save(self):
@@ -1286,6 +1300,9 @@ class FixtureEditorDialog(QDialog):
                     profile.short_name = self._edit_short.text().strip() or name[:8].upper()
                     profile.fixture_type = self._cb_type.currentText()
                     profile.power_w = self._spin_power.value()
+                    # FM-64
+                    (profile.beam_angle_min,
+                     profile.beam_angle_max) = self._abstrahlwinkel.werte()
                     # Alte Modes ueber die ORM-Session loeschen -> cascade=
                     # "all, delete-orphan" (FixtureMode.channels / FixtureChannel.ranges)
                     # raeumt Channels + Ranges mit ab. Ein Core-Bulk-delete(FixtureMode)
