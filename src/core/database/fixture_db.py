@@ -542,6 +542,10 @@ def create_user_profile(payload: dict, *, engine=None,
             herkunft=herkunft_text,
             provenance=provenance,
         )
+        # FM-64: Abstrahlwinkel (voller Winkel, Grad; fehlt = keine Angabe).
+        from src.core import abstrahlwinkel as _AW
+        prof.beam_angle_min, prof.beam_angle_max = _AW.normalisiere(
+            payload.get("beam_angle_min"), payload.get("beam_angle_max"))
         s.add(prof)
         s.flush()
         # FM-73: keine zwei Modi gleichen Namens speichern — ein gepatchtes

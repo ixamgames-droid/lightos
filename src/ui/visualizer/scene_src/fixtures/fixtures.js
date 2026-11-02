@@ -26,6 +26,7 @@ import { makeFixtureLabel, disposeFixtureLabel } from './labels.js';  // VIZ-14
 import { updateEmptyState } from '../empty_state.js';
 import { cachedDmx } from './dmx_cache.js';   // VIZ-71
 import { syncMountPose } from './mount_pose.js';   // VIZ-100
+import { profilKegel } from './optics.js';   // FM-64
 // VIZ-72: echte Lichter nur noch aus dem Spot-Pool (scene/spot_pool.js).
 import { initSpotPool, resizeSpotPool, vergissSpotPoolGeraet } from '../scene/spot_pool.js';
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
@@ -454,7 +455,11 @@ export function addFixture(data) {
   } else {
     const headHost = model.head || model.group;
     const beamLength = rtype === 'led_bar' ? 6.0 : 8.0;
-    const beamAngle = rtype === 'led_bar' ? Math.PI/14 : Math.PI/10;
+    // FM-64: ein Abstrahlwinkel im Profil bestimmt den Kegel (halber Winkel
+    // der Mitte, s. optics.js#profilKegel); ohne Angabe wie bisher aus dem Typ.
+    const _pk = profilKegel(data);
+    const beamAngle = _pk ? _pk.basisHalb
+      : (rtype === 'led_bar' ? Math.PI/14 : Math.PI/10);
     beam = createBeamCone(color, intensity, beamAngle, beamLength);
     headHost.add(beam);
 
@@ -558,6 +563,9 @@ export function addFixture(data) {
     // relativ dazu — ohne Referenz waere jede Zoom-Aenderung kumulativ und der
     // Kegel liefe nach ein paar Zuegen weg.
     baseSpotAngle: spot ? spot.angle : null,
+    // FM-64: Profil-Abstrahlwinkel (null = keine Angabe) — applyOptics fuehrt
+    // den Zoom dann zwischen eng und weit statt ueber die Typ-Faktoren.
+    profilKegel: beam ? profilKegel(data) : null,
     // VIZ-BEAM-OCCLUSION: Grundlaenge des Kegels merken. Die Laenge wird
     // relativ dazu skaliert — ohne Referenz waere jede Anpassung kumulativ.
     baseBeamLength: (beam && beam.geometry && beam.geometry.parameters)
