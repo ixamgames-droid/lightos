@@ -77,7 +77,9 @@ Siehe Docstrings in `src/core/controllers/controller_library.py`. Kurzform:
 `id`, `manufacturer`, `model`, `device_type`, `connections[]`, `buttons`,
 `faders`, `encoders`, `pad_matrix [cols, rows] | null`, `banks`, `controls[]`
 (`name`, `type` note/cc/fader/encoder/key, `channel` 0-basiert (-1 = beliebig),
-`range [von, bis]`, `layout`), `led_feedback {}`, `features[]`, `source`,
+`range [von, bis]`, `layout`, optional `numbers[]` = explizite MIDI-Nummern
+für Blöcke mit Lücken — `range` ist dann nur die Min/Max-Hülle; der
+Mapping-Generator nimmt `numbers` vor `range`), `led_feedback {}`, `features[]`, `source`,
 `license`, `imported_at`, `vc_template` (Schlüssel in
 `controller_templates.CONTROLLERS`), `mapping_template`
 (`apc_mini_default` = fertiges MIDI-Mapping-Profil aus `input/profile.py`;

@@ -81,7 +81,17 @@
         1,
         22
       ],
-      "layout": "Pro Strip 1 MUTE-Taste. Notes (Schrittweite 3): Strip1=1, Strip2=4, Strip3=7, Strip4=10, Strip5=13, Strip6=16, Strip7=19, Strip8=22. Werks-Default = Note-On Velocity 127. (Bestaetigt an zweiter Quelle.)"
+      "layout": "Pro Strip 1 MUTE-Taste. Notes (Schrittweite 3): Strip1=1, Strip2=4, Strip3=7, Strip4=10, Strip5=13, Strip6=16, Strip7=19, Strip8=22. Werks-Default = Note-On Velocity 127. (Bestaetigt an zweiter Quelle.)",
+      "numbers": [
+        1,
+        4,
+        7,
+        10,
+        13,
+        16,
+        19,
+        22
+      ]
     },
     {
       "name": "REC ARM-Tasten (8, je Channel-Strip)",
@@ -91,7 +101,17 @@
         3,
         24
       ],
-      "layout": "Pro Strip 1 REC-ARM-Taste. Notes (Schrittweite 3): Strip1=3, Strip2=6, Strip3=9, Strip4=12, Strip5=15, Strip6=18, Strip7=21, Strip8=24."
+      "layout": "Pro Strip 1 REC-ARM-Taste. Notes (Schrittweite 3): Strip1=3, Strip2=6, Strip3=9, Strip4=12, Strip5=15, Strip6=18, Strip7=21, Strip8=24.",
+      "numbers": [
+        3,
+        6,
+        9,
+        12,
+        15,
+        18,
+        21,
+        24
+      ]
     },
     {
       "name": "SOLO+MUTE (8 virtuelle Tasten, aktiv waehrend SOLO gehalten wird)",
@@ -101,7 +121,17 @@
         2,
         23
       ],
-      "layout": "Solange SOLO gedrueckt ist, senden die MUTE-Tasten diese IDs: Strip1=2, Strip2=5, Strip3=8, Strip4=11, Strip5=14, Strip6=17, Strip7=20, Strip8=23 (Schrittweite 3)."
+      "layout": "Solange SOLO gedrueckt ist, senden die MUTE-Tasten diese IDs: Strip1=2, Strip2=5, Strip3=8, Strip4=11, Strip5=14, Strip6=17, Strip7=20, Strip8=23 (Schrittweite 3).",
+      "numbers": [
+        2,
+        5,
+        8,
+        11,
+        14,
+        17,
+        20,
+        23
+      ]
     },
     {
       "name": "SOLO-Taste",
