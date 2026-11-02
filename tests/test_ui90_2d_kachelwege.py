@@ -201,6 +201,17 @@ class GegenprobeTest(unittest.TestCase):
         ok, info = innerhalb(_male(blau, 5.6, LAGEN[0], kachel=False), img)
         self.assertFalse(ok, f"veralteter Cache nicht erkannt ({info})")
 
+    def test_kleines_symbol_ganz_zwei_stufen_daneben_faellt_auf(self):
+        """UI-109 (Hinweis aus dem Gegenlesen von #1230): der Anteil zaehlt ueber
+        das ganze Testbild. Ein kleines Symbol, das KOMPLETT um 2 Stufen falsch
+        ist, blieb darunter (gemessen 0,76 % bei Zoom 1,37) und ging durch,
+        obwohl A nur Abweichungen an Kanten erlaubt hat. Jetzt muss jede
+        Abweichung an einer Kante der Referenz liegen."""
+        ref = _male(_ring_mit_fuellung(QColor(220, 60, 30)), 1.37, LAGEN[0], kachel=False)
+        img = _male(_ring_mit_fuellung(QColor(222, 62, 32)), 1.37, LAGEN[0], kachel=False)
+        ok, info = innerhalb(ref, img)
+        self.assertFalse(ok, f"ganzes Symbol 2 Stufen daneben nicht erkannt ({info})")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -50,12 +50,45 @@ const PENUMBRA_SCHARF = 0.12;
 const PENUMBRA_WEICH = 0.95;
 const FROST_AUFWEITUNG = 0.25;   // voller Frost weitet den Kegel um 25 %
 
+// ── FM-64: Abstrahlwinkel aus dem Profil ────────────────────────────────────
+//
+// Traegt das Profil einen Abstrahlwinkel (Python: `beamAngleMin`/`beamAngleMax`,
+// VOLLER Winkel in Grad, 0 = keine Angabe), bestimmt ER den Kegel statt der
+// Ableitung aus dem Geraetetyp: fest (beide gleich) -> der Zoom-Kanal aendert
+// die Weite nicht; Spanne -> der Zoom laeuft linear von eng (DMX 0) nach weit
+// (DMX 255), dieselbe Laufrichtung wie ZOOM_ENG/ZOOM_WEIT oben. Gebaut wird der
+// Kegel in der MITTE der Spanne (Grundstellung, solange kein Zoomwert da ist);
+// `opticsScale` liefert dann das Verhaeltnis Zielwinkel / Mitte.
+// Ohne Angabe gibt die Funktion `null` und ALLES bleibt wie vorher.
+
+/** Profil-Winkel aus den Fixture-Daten -> {min, max, basisHalb} oder null. */
+export function profilKegel(data) {
+  if (!data) return null;
+  const a = Number(data.beamAngleMin), b = Number(data.beamAngleMax);
+  const okA = isFinite(a) && a > 0, okB = isFinite(b) && b > 0;
+  if (!okA && !okB) return null;
+  let lo = okA ? a : b, hi = okB ? b : a;
+  if (lo > hi) { const t = lo; lo = hi; hi = t; }
+  lo = Math.max(1, Math.min(170, lo));
+  hi = Math.max(1, Math.min(170, hi));
+  const mitte = (lo + hi) / 2;
+  // basisHalb = HALBER Winkel in Radiant (createBeamCone rechnet mit dem
+  // halben Oeffnungswinkel: radius = tan(angle) * Laenge).
+  return { min: lo, max: hi, basisHalb: (mitte / 2) * Math.PI / 180 };
+}
+
 /** DMX 0..255 -> Skalierungsfaktor des Kegel-Radius. */
-export function opticsScale(zoom, iris) {
+export function opticsScale(zoom, iris, profil) {
   let k = 1.0;
   if (typeof zoom === 'number' && isFinite(zoom)) {
     const z = Math.max(0, Math.min(255, zoom)) / 255;
-    k *= ZOOM_ENG + (ZOOM_WEIT - ZOOM_ENG) * z;
+    if (profil && profil.max > 0) {
+      // FM-64: Zielwinkel zwischen eng und weit, relativ zur gebauten Mitte.
+      const mitte = (profil.min + profil.max) / 2;
+      k *= (profil.min + (profil.max - profil.min) * z) / mitte;
+    } else {
+      k *= ZOOM_ENG + (ZOOM_WEIT - ZOOM_ENG) * z;
+    }
   }
   if (typeof iris === 'number' && isFinite(iris)) {
     // Iris-Konvention wie beim Zoom: 0 = offen, 255 = zu.
@@ -104,7 +137,16 @@ export function applyOptics(f, dmx) {
   // am Frost-Wert, nicht an der gemeinsamen Weichheit.
   const frostAnteil = (typeof f.lastFrost === 'number' && isFinite(f.lastFrost))
     ? Math.max(0, Math.min(255, f.lastFrost)) / 255 : 0;
-  const k = opticsScale(f.lastZoom, f.lastIris) * (1 + FROST_AUFWEITUNG * frostAnteil);
+  const k = opticsScale(f.lastZoom, f.lastIris, f.profilKegel)
+    * (1 + FROST_AUFWEITUNG * frostAnteil);
+  // FM-64: mit Profilwinkel ist `k` ein WINKEL-Verhaeltnis; der Kegel-RADIUS
+  // waechst mit dem Tangens. Ohne Profilwinkel bleibt es exakt wie vorher
+  // (ein Faktor fuer Radius und SpotLight).
+  let kKegel = k;
+  if (f.profilKegel && f.profilKegel.basisHalb > 0) {
+    const h = f.profilKegel.basisHalb;
+    kKegel = Math.tan(Math.min(Math.PI / 2 - 0.01, h * k)) / Math.tan(h);
+  }
   // ★ Y bleibt STEHEN, statt auf 1 zurueckgesetzt zu werden. Die Y-Achse ist
   // die KEGELLAENGE und gehoert einem anderen Besitzer: setBeamLength in
   // builders.js (Bodenauftreffpunkt aus VIZ-BEAM-OCCLUSION, globale Obergrenze
@@ -117,8 +159,8 @@ export function applyOptics(f, dmx) {
   // VIZ-102: `_optikK` ist die Weite aus Zoom/Iris allein; ein ueber eine Kante
   // verlaengerter Kegel wird um `_kegelWeit` breiter gezeichnet, damit sein
   // WINKEL gleich bleibt (builders.js#applyFloorAim).
-  f._optikK = k;
-  if (f.beam) { const w = k * (f._kegelWeit || 1); f.beam.scale.set(w, f.beam.scale.y, w); }
+  f._optikK = kKegel;
+  if (f.beam) { const w = kKegel * (f._kegelWeit || 1); f.beam.scale.set(w, f.beam.scale.y, w); }
   if (f.spot && f.baseSpotAngle) {
     // Der SpotLight traegt die Ausleuchtung — ohne ihn wuerde nur der sichtbare
     // Kegel schmaler, der Bodenfleck aber gleich gross bleiben.
