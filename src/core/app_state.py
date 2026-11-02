@@ -4867,6 +4867,32 @@ class AppState:
                             ls.pop(univ, None)
             remote.clear()
 
+    # ── ENG-37: Grundbild fuer die gemischte Modify-Vorschau ─────────────────
+
+    def grundbild_anfordern(self, sekunden: float = 1.0) -> None:
+        """Eine Vorschau braucht das Grundbild: der Renderer merkt es sich die
+        naechsten ``sekunden`` lang in jedem Frame (Vorschau fordert im Takt
+        nach; schliesst sie, endet das Merken von selbst)."""
+        self._grundbild_bis = time.monotonic() + float(sekunden)
+
+    #: Hoechstalter (s) eines gemerkten Grundbilds. Steht der Renderer (Ausgabe
+    #: angehalten), wird das letzte Bild nicht ewig weiter als „was darunter
+    #: laeuft" gezeigt — die Vorschau faellt dann auf „nur Modify" zurueck.
+    GRUNDBILD_MAX_ALTER = 0.5
+
+    def grundbild(self) -> dict | None:
+        """Das zuletzt gemerkte Grundbild ``{universum: bytes}``: das fertige
+        Bild der Schichten unter den Modify-Effekten (Effekte, Cuelisten,
+        Programmer/Snaps, Grundhelligkeit) unmittelbar VOR dem Modify-Gang
+        4a²b — ohne Master. ``None``, solange keines vorliegt oder das letzte
+        aelter als ``GRUNDBILD_MAX_ALTER`` ist (Renderer steht)."""
+        gb = getattr(self, "_grundbild", None)
+        if gb is None:
+            return None
+        if time.monotonic() - getattr(self, "_grundbild_zeit", 0.0) > self.GRUNDBILD_MAX_ALTER:
+            return None
+        return gb
+
     def _render_frame(self, dt: float):
         """Berechnet jeden Output-Frame komplett neu (ein Thread):
         Default → Funktionen → Executoren → Programmer, dann atomarer Commit
@@ -5254,6 +5280,14 @@ class AppState:
         #      Master/Blackout im OutputManager: die behalten das letzte Wort,
         #      ein Modify kann Blackout und NOT-AUS nie aufhellen.
         #      Kosten ohne laufenden Modify-Effekt: ein leerer Listen-Test.
+        # ENG-37 (gemischte Vorschau): das Grundbild — genau das Bild, auf das
+        #      dieser Gang gleich rechnet — fuer die Effekt-Vorschau im Editor
+        #      merken. Nur solange eine Vorschau es anfordert
+        #      (``grundbild_anfordern``); sonst kostet es einen Zeitvergleich.
+        _jetzt_gb = time.monotonic()
+        if _jetzt_gb < getattr(self, "_grundbild_bis", 0.0):
+            self._grundbild = {u: su.get_all() for u, su in scratch.items()}
+            self._grundbild_zeit = _jetzt_gb
         if _modify_anwenden is not None:
             try:
                 _modify_anwenden(scratch)
