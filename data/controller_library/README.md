@@ -47,6 +47,7 @@ selbst stehen unter CC0.
 | `novation_launchkey_mini_mk3` | Novation „Launchkey Mini [MK3] Programmer's Reference Guide" (öffentlich) |
 | `m_audio_oxygen_pro_49` | M-Audio „Oxygen Pro" User Guide / Preset 1 Default (öffentlich; per Editor änderbar) |
 | `arturia_keylab_essential_mk3` | Arturia „KeyLab Essential mk3" User Manual + MIDI Control Center (öffentlich; Werks-Default, in MCC editierbar). Hinweis: Encoder/Fader/Transport-CC-Nummern sind herstellerseitig nicht dokumentiert und im Profil als nicht belegbar gekennzeichnet |
+| `pult_grandma2`, `pult_grandma3`, `pult_magicq`, `pult_titan`, `pult_allgemein_msc` | **Pult-Vorlagen** (MIDI-8, Typ `console_template`): was ein Lichtpult senden muss, damit LightOS es versteht. MSC-Zeilen nach MIDI Show Control 1.0 (offener Standard), gegen den LightOS-Parser getestet; herstellereigene Befehlsformen aus dem Konsolen-Check 2026-10-05 (ohne Hardware) und deshalb als **Beispiel** gekennzeichnet. Hersteller-Wings sind proprietär und nicht anschließbar |
 
 > Alle 2026-06-30 ergänzten MIDI-Controller-Profile sind **Werks-Defaults** aus
 > öffentlicher Herstellerdokumentation, jeweils gegen eine zweite Quelle
@@ -79,4 +80,8 @@ Siehe Docstrings in `src/core/controllers/controller_library.py`. Kurzform:
 `range [von, bis]`, `layout`), `led_feedback {}`, `features[]`, `source`,
 `license`, `imported_at`, `vc_template` (Schlüssel in
 `controller_templates.CONTROLLERS`), `mapping_template`
-(`apc_mini_default` = fertiges MIDI-Mapping-Profil aus `input/profile.py`).
+(`apc_mini_default` = fertiges MIDI-Mapping-Profil aus `input/profile.py`;
+ohne Vorlage baut `src/core/controllers/mapping_generator.py` aus den
+`note`-/`cc`-Blöcken eine Startbelegung: Noten → GO, CCs → Fader der
+Executoren 1–20), `pult_vorlagen[]` (nur Pult-Vorlagen: `zweck`, `am_pult`,
+`in_lightos`, `beispiel` true/false, optional `msc` als Hex-SysEx + `msc_befehl`).

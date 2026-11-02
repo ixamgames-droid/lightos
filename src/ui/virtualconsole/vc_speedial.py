@@ -59,6 +59,13 @@ def _parse_factor_token(tok: str):
         return None
 
 
+# CDX-62: je Ziel-Effekt (fid) die UNGEKLEMMTE Free-Run-Basis (speed je 1×
+# tempo_multiplier) samt zuletzt geschriebenem speed und Multiplikator. Gilt
+# nur, solange beide unveraendert sind (sonst fremder Effekt mit gleicher fid
+# oder von aussen umgestellt -> neu ableiten). Nur Laufzeit, nicht gespeichert.
+_FREE_RUN_BASIS: dict[int, tuple[float, float, float]] = {}
+
+
 class VCSpeedDial(VCWidget):
     """Rotary dial controlling a function's speed + tap-tempo button."""
 
@@ -252,9 +259,31 @@ class VCSpeedDial(VCWidget):
                         effect_live.set_param(key, f, fid)
                         if old_mult > 0.0 and old_speed > 0.0:
                             new_mult = float(effect_live.get_param(key, fid) or f)
-                            effect_live.set_param("speed", old_speed * new_mult / old_mult, fid)
+                            # CDX-62: Basis nicht aus dem (evtl. an der
+                            # speed-Grenze geklemmten) letzten Wert ableiten —
+                            # sonst verliert z. B. ×4 -> ×1 an einer 10-Hz-
+                            # Grenze dauerhaft Tempo. Die gemerkte Basis gilt,
+                            # solange speed seit unserem Schreiben unveraendert
+                            # ist; sonst (von aussen geaendert) neu ableiten.
+                            # Modulweit je Effekt (nicht je Dial): ein neu
+                            # aufgebautes Pult oder ein zweiter Dial auf
+                            # denselben Effekt kennt die Basis sonst nicht.
+                            gemerkt = _FREE_RUN_BASIS.get(fid)
+                            if (gemerkt is not None
+                                    and abs(gemerkt[1] - old_speed) < 1e-9
+                                    and abs(gemerkt[2] - old_mult) < 1e-9):
+                                basis = gemerkt[0]
+                            else:
+                                basis = old_speed / old_mult
+                            effect_live.set_param("speed", basis * new_mult, fid)
+                            try:
+                                geschrieben = float(effect_live.get_param("speed", fid))
+                                _FREE_RUN_BASIS[fid] = (basis, geschrieben, new_mult)
+                            except (TypeError, ValueError):
+                                _FREE_RUN_BASIS.pop(fid, None)
                         else:
                             effect_live.set_param("speed", f, fid)
+                            _FREE_RUN_BASIS.pop(fid, None)
                         continue
                     effect_live.set_param(key, f, fid)
             except Exception:

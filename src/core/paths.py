@@ -170,11 +170,189 @@ def wegwerf_datenordner() -> str:
     import atexit
     import shutil
     import tempfile
-    _WEGWERF_BASIS = tempfile.mkdtemp(prefix="lightos_wegwerf_")
+    _WEGWERF_BASIS = tempfile.mkdtemp(prefix=WEGWERF_PRAEFIX)
     atexit.register(shutil.rmtree, _WEGWERF_BASIS, True)
+    try:        # STAB-40: Besitzer vermerken (lebt er, raeumt niemand weg)
+        with open(os.path.join(_WEGWERF_BASIS, WEGWERF_BESITZER), "w",
+                  encoding="ascii") as f:
+            f.write(str(os.getpid()))
+    except OSError:
+        pass
     ziel = os.path.join(_WEGWERF_BASIS, _APP)
     os.environ[DATEN_ORDNER_VAR] = ziel
     return ziel
+
+
+def probelauf_aufraeumen() -> list[str]:
+    """STAB-40: beim Start eines PROBELAUFS (``main.py`` mit eigenem Wegwerf-
+    Ordner) alte Wegwerf-Ordner wegraeumen — auch die von Skripten/Werkzeugen,
+    sie tragen dasselbe Praefix. Bewusst NICHT in ``wegwerf_datenordner``: der
+    Temp-Ordner kann sehr voll sein (gemessen 14 647 Eintraege, ~60 ms je
+    Durchsicht), und jedes Probeskript, jeder Werkzeug-Kindprozess der Tests
+    zahlte das sonst. Ohne eigenen Wegwerf-Ordner (echte App, Vorgabe per
+    ``LIGHTOS_DATEN_ORDNER``) tut es nichts."""
+    if _WEGWERF_BASIS is None:
+        return []
+    try:
+        weg = alte_wegwerf_ordner_aufraeumen(eigener=_WEGWERF_BASIS)
+    except Exception:                                    # noqa: BLE001
+        return []   # Aufraeumen ist Komfort - ein Fehler darf keinen Start kosten
+    if weg:
+        _warne_einmal(
+            "aufraeumen",
+            f"[LightOS] STAB-40: {len(weg)} alte(r) Wegwerf-Datenordner aus "
+            f"{os.path.dirname(weg[0])} entfernt.")
+    return weg
+
+
+# ── STAB-40: liegengebliebene Wegwerf-Ordner wegraeumen ─────────────────────
+#
+# Das ``atexit``-rmtree oben kann unter Windows nicht alles loeschen: beim
+# Prozessende sind Show-DB, Sperrdatei und Logs noch offen, und offene Dateien
+# laesst Windows nicht loeschen (``ignore_errors`` verschweigt das). Gemessen am
+# 01.11.2026: jeder Probelauf liess ~2,2 MB in ``%TEMP%`` zurueck; ein
+# abgeschossener Prozess hinterlaesst den Ordner auf jedem System. Deshalb raeumt
+# jeder NEUE Wegwerf-Ordner die alten weg — aber nur, was sicher niemandem mehr
+# gehoert. Weggelassen wird ein Ordner, wenn
+# * er der eigene ist oder der echte Datenordner darin liegt (nie!),
+# * er ein Link/Junction ist (wird nie verfolgt),
+# * seine Sperrdatei noch gehalten wird (laufende LightOS-Instanz),
+# * sein Besitzer-Prozess noch lebt,
+# * darin in der letzten Stunde etwas geaendert wurde,
+# * er sich unter Windows nicht umbenennen laesst (eine Datei darin ist offen).
+
+WEGWERF_PRAEFIX = "lightos_wegwerf_"
+WEGWERF_BESITZER = "besitzer.pid"
+WEGWERF_MINDESTALTER_S = 3600.0
+
+
+def _norm(pfad: str) -> str:
+    return os.path.normcase(os.path.realpath(pfad))
+
+
+def _ist_link(eintrag) -> bool:
+    if eintrag.is_symlink():
+        return True
+    pruefe = getattr(os.path, "isjunction", None)        # ab Python 3.12
+    return bool(pruefe and pruefe(eintrag.path))
+
+
+def _prozess_lebt(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    if pid == os.getpid():
+        return True
+    if os.name == "nt":
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        k32.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        k32.CloseHandle.argtypes = [wintypes.HANDLE]
+        h = k32.OpenProcess(0x1000, False, pid)          # QUERY_LIMITED_INFORMATION
+        if not h:
+            # 87 = kein solcher Prozess; alles andere (z. B. Zugriff verweigert)
+            # heisst: es gibt ihn -> lieber stehen lassen
+            return ctypes.get_last_error() != 87
+        try:
+            code = wintypes.DWORD()
+            if not k32.GetExitCodeProcess(h, ctypes.byref(code)):
+                return True
+            return code.value == 259                     # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(h)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _besitzer_lebt(ordner: str) -> bool:
+    try:
+        with open(os.path.join(ordner, WEGWERF_BESITZER), encoding="ascii") as f:
+            return _prozess_lebt(int(f.read().strip() or "0"))
+    except (OSError, ValueError):
+        return False
+
+
+def _juengste_aenderung(ordner: str) -> float:
+    neu = os.lstat(ordner).st_mtime
+    for wurzel, dirs, dateien in os.walk(ordner, followlinks=False):
+        for name in dirs + dateien:
+            try:
+                neu = max(neu, os.lstat(os.path.join(wurzel, name)).st_mtime)
+            except OSError:
+                pass
+    return neu
+
+
+def _sperre_gehalten(ordner: str) -> bool:
+    sperre = os.path.join(ordner, _APP, "lightos.instance.lock")
+    if not os.path.exists(sperre):
+        return False
+    from src.core.single_instance import acquire_instance_lock
+    h = acquire_instance_lock(sperre)
+    if h is None:
+        return True
+    try:
+        h.close()
+    except Exception:                                    # noqa: BLE001
+        pass
+    return False
+
+
+def alte_wegwerf_ordner_aufraeumen(eigener: str | None = None,
+                                   jetzt: float | None = None,
+                                   mindestalter: float = WEGWERF_MINDESTALTER_S,
+                                   ) -> list[str]:
+    """STAB-40: alte ``lightos_wegwerf_*``-Ordner im Temp-Bereich entfernen.
+
+    Liefert die entfernten Ordner. Nur direkte Kinder von
+    ``tempfile.gettempdir()``; Regeln siehe Kopf dieses Abschnitts."""
+    import shutil
+    import tempfile
+    import time
+    tmp = tempfile.gettempdir()
+    jetzt = time.time() if jetzt is None else jetzt
+    eigen = _norm(eigener) if eigener else None
+    echt = _norm(regulaerer_app_data_dir())
+    weg: list[str] = []
+    try:
+        eintraege = list(os.scandir(tmp))
+    except OSError:
+        return weg
+    for e in eintraege:
+        if not e.name.startswith(WEGWERF_PRAEFIX):
+            continue
+        try:
+            if _ist_link(e) or not e.is_dir(follow_symlinks=False):
+                continue
+        except OSError:
+            continue
+        pfad = e.path
+        p = _norm(pfad)
+        if p == eigen:
+            continue
+        if echt == p or echt.startswith(p + os.sep) or p.startswith(echt + os.sep):
+            continue                    # echter Datenordner darin oder drumherum: nie
+        try:
+            if _besitzer_lebt(pfad) or _sperre_gehalten(pfad):
+                continue
+            if jetzt - _juengste_aenderung(pfad) < mindestalter:
+                continue
+            ziel = f"{pfad}.weg{os.getpid()}"
+            os.rename(pfad, ziel)       # Windows: scheitert, solange etwas offen ist
+        except OSError:
+            continue
+        shutil.rmtree(ziel, ignore_errors=True)
+        weg.append(pfad)
+    return weg
 
 
 def app_data_dir() -> str:

@@ -89,6 +89,7 @@ class MidiView(QWidget):
         self._learn_target_row = -1
         self._monitor_active = True       # Plain-Bool: thread-sicher aus MIDI-Thread lesbar
         self._last_monitor_emit = 0.0     # Drosselung des CC-Stroms im Monitor
+        self._last_monitor_emit_nrpn = 0.0  # CDX-60: NRPN getrennt vom CC
         self._log_callback = lambda t: self._log_signal.log_received.emit(t)
         self._midi_callback = self._on_midi_msg
         self._mtc_reader = None
@@ -458,10 +459,14 @@ class MidiView(QWidget):
         # wird. Betrifft nur die Monitor-Anzeige; die Fader-Steuerung im MidiMapper
         # bleibt ungedrosselt.
         if msg.msg_type in ("cc", "pitchbend", "nrpn"):  # MIDI-10/13 ebenso
+            # CDX-60: der NRPN kommt direkt nach seinem CC (Empfangsschleife)
+            # — mit gemeinsamer Drossel kaeme er nie an.
+            attr = ("_last_monitor_emit_nrpn" if msg.msg_type == "nrpn"
+                    else "_last_monitor_emit")
             now = time.monotonic()
-            if now - self._last_monitor_emit < 0.015:
+            if now - getattr(self, attr, 0.0) < 0.015:
                 return
-            self._last_monitor_emit = now
+            setattr(self, attr, now)
         self._log_signal.msg_received.emit(msg)
 
     def _on_midi_msg_ui(self, msg: MidiMessage):

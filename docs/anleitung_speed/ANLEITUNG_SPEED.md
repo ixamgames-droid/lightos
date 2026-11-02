@@ -38,6 +38,8 @@ Rad + **Tap** setzen die eigene BPM; unten die digitale BPM-Anzeige.
 
 Das **Faktor-Gitter** `¼ ½ 1× 2× 4×` wählt das Verhältnis (aktiver Faktor blau),
 `-` / `+` schrittweise, `X` zurück auf `1×`, **SYNC** setzt den Downbeat neu.
+Fehlt `1×` in einem eigenen Faktor-Set, springt `X` auf die Stufe, die `1×` am
+nächsten liegt (bei `⅛, ¼` also auf `¼`) — nie auf einen Wert außerhalb des Gitters.
 Die Anzeige zeigt die **abgeleitete** BPM („folgt Sound-BPM · ½").
 
 Im Dialog **„Speed Dial Einstellungen"** einstellbar: **Speed-Rolle (Master/Sub)**,

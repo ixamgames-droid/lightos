@@ -3108,6 +3108,10 @@ class VisualizerWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         self._view = QWebEngineView()
+        # STAB-31 (2): JS-Konsole ins Diagnose-Log — VOR Profil/Settings/Signalen,
+        # die sonst an der ersetzten Standard-Seite haengen.
+        from src.ui.visualizer.js_konsole import installiere_js_konsole
+        installiere_js_konsole(self._view, "fenster")
         # ── CACHE FIX: HTTP-Cache komplett deaktivieren ──────────────────────
         try:
             profile = self._view.page().profile()

@@ -162,7 +162,11 @@ Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Gr
    nachträglich dicker oder höher gemacht): bis 0,5 m unter der Unterkante rückt das
    Bild an die Kante, die gespeicherte Höhe bleibt, wie sie ist. Liegt das Gerät weiter
    weg, wird es bei seiner gespeicherten Position gezeichnet.
-4. **Position & Ausrichtung** — die Felder des gewählten Geräts:
+4. **Position & Ausrichtung** — die Felder des gewählten Geräts. Ist in der Liste kein
+   Gerät gewählt, ist der Bereich gesperrt und heißt **„Position & Ausrichtung — kein Gerät
+   gewählt“**. Ist das gewählte Gerät noch nicht im Raum, heißt er **„Position & Ausrichtung —
+   Platzierungswerte“**: die Felder zeigen dann nicht die Lage eines Geräts, sondern die Werte,
+   an die **Im Raum platzieren** es setzt.
    - **Unten an die Traverse:** `Y` = Unterkante der Traverse minus 0,25 m. Im Bild hängt
      Spot 1 an der Back-Traverse (`Y=6`, 0,3 m hoch): `Y=5.6`, `Z=-2.5`, `X` entlang
      der Traverse verteilen. Genau diese Höhe setzt auch das Andocken. Die Höhe allein

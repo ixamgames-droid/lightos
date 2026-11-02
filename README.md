@@ -91,7 +91,10 @@ Danach nach Thema weiter: **[alle Anleitungen](docs/ANLEITUNGEN.md)**.
 **Datei → Demo-Show öffnen** (Club-Nacht, Theater/Event, Große Bühnen-Show, Mega Arena,
 Laser- und Gobo-Test). Die Demo öffnet sich als neue, ungespeicherte Show — **Speichern**
 legt deine eigene Kopie an. Aus dem Quellcode erzeugt sie einmalig
-`python packaging/demo_shows.py`.
+`python packaging/demo_shows.py`. Beschreibungen: [Showcase „Club-Nacht“](docs/showcase/club_nacht.md),
+[Showcase „Theater/Event“](docs/showcase/theater_event.md),
+[Große Bühnen-Show](docs/anleitung_buehnen_show/ANLEITUNG_BUEHNEN_SHOW.md); alle Shows mit
+Generator unter [Shows & Beispiele](docs/ANLEITUNGEN.md#shows--beispiele).
 
 ---
 
@@ -175,8 +178,10 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   QLC+-Bibliotheken: Menü **Datenbank → Fixtures importieren (XML)...** liest einen Ordner mit
   `.qxf`-Dateien ein. Eigene Profile über **Datenbank → Neues Fixture-Profil...**.
 - **Fixture-Generator:** ein eigenes Geräteprofil grafisch anlegen (Modi, Kanäle, Wertebereiche,
-  Kopf-Form) — **Patchen → Patch → Gerät erstellen…**; LightOS-Profile lassen sich exportieren
-  und importieren ([Anleitung Geräte-Bibliothek](docs/anleitung_geraete_bibliothek/ANLEITUNG.md)).
+  Kopf-Form) — **Patchen → Patch → Gerät erstellen…**
+  ([Anleitung Fixture-Generator](docs/anleitung_fixture_generator/ANLEITUNG_FIXTURE_GENERATOR.md),
+  Schritt für Schritt am Beispiel eines Laserworld-Show-Lasers); LightOS-Profile lassen sich
+  exportieren und importieren ([Anleitung Geräte-Bibliothek](docs/anleitung_geraete_bibliothek/ANLEITUNG.md)).
 - Mitgelieferte Profile werden nach einem Update angeglichen; importierte Geräte bekommen die
   passenden Regler (Farbkanal statt „Dimmer“, Gobo-Rotation statt Geschwindigkeit).
 - Mehrkopf-Geräte (Moving-Bars, Spider, Hydrabeam) als echte Kopf-Ziele; Pan/Tilt invertieren
@@ -361,6 +366,27 @@ zweiter Lauf mit einem Gerät an der Leitung und sichtbarem Herzschlag lief 5,87
 Auf Linux braucht die BPM-Erkennung aus PC-Audio eine PulseAudio/PipeWire-Monitor-Quelle,
 der 3D-Visualizer startet mit `--no-sandbox` (abschaltbar über
 `LIGHTOS_WEBENGINE_NO_SANDBOX=0`). Details: [INSTALL.md](INSTALL.md#linux-x86_64).
+
+---
+
+## Hilfe bei Problemen
+
+Kein DMX, MIDI-Gerät stumm, 3D-Ansicht schwarz oder ein Absturz? Eine Datei reicht, damit man
+aus der Ferne sieht, was passiert ist:
+
+- **Hilfe → „Diagnosepaket speichern…“** speichert `LightOS-Diagnose-<Datum>.zip` (Vorschlag:
+  Desktop). Startet LightOS gar nicht mehr, geht es ohne Fenster: `python main.py --diagnose`
+  im Quellordner bzw. `LightOS.exe --diagnose` im Installationsordner, optional mit Zielpfad.
+- **Im Paket:** Sitzungs-Logs (aktuelle und vorige Sitzungen), `crash.log`, Systeminfo und die
+  Einstellungen ohne private Inhalte — keine Shows, keine Datenbanken.
+- **Logs selbst ansehen:** im Datenordner (Tabelle oben) unter `logs/lightos.log` (vorige
+  Sitzungen `lightos.log.1` …), daneben `crash.log`.
+- **Echte Daten nur über den normalen Start:** Nur `LightOS.exe` bzw. `python main.py` arbeitet
+  mit deinem Datenordner und sendet DMX. Ein direkt gestartetes Skript oder Werkzeug bekommt
+  einen Wegwerf-Ordner und sendet nichts; läuft so ein Fenster, steht im Titel
+  „PROBELAUF (Wegwerf-Daten, keine Ausgabe)“.
+
+Ausführlich: [INSTALL.md — Fehler melden / Diagnosepaket](INSTALL.md#fehler-melden--diagnosepaket).
 
 ---
 

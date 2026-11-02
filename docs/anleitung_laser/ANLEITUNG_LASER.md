@@ -105,6 +105,15 @@ sich die gewählten Laser darin —, steht dort die bisherige Bedienung.
 - **Farbe**, **Bewegung & Geschwindigkeit**, **Zeichnen**
 - einklappbare **„Weitere Kanäle"** für den Rest
 
+Tragen im Profil mehrere Kanäle dasselbe Attribut (z. B. „Mode“ und „Pattern“ beide als
+Makro aus einem älteren Import), steht über den Regler-Gruppen (**Muster**, **Farbe** …)
+die Gruppe **„Einzelne Kanäle“**, nie eingeklappt: je
+Kanal ein eigener Regler, beschriftet mit Kanalnummer und Kanalname (z. B.
+„Kanal 1 · Mode“). Das sind verschiedene Kanäle, keine Mustergruppen. Nur ein Gerät mit
+echter zweiter Mustergruppe — mehrere Attribute doppelt, jedes gleich oft, wie beim L2600
+im 34-Kanal-Modus — zeigt stattdessen den Umschalter **„Mustergruppe“** mit **Gruppe A**,
+**Gruppe B** und **A + B**.
+
 Neben jedem Regler steht der **Klartext des Wertebereichs** — z. B. zeigt das
 Muster-Farbfeld bei Wert 40 automatisch „40–47 Blau", die Musterbank
 „0–223 Animations-Bänke 1–14". So musst du keine DMX-Tabelle neben der Konsole

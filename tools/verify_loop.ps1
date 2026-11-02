@@ -294,7 +294,10 @@ try {
             $code = $LASTEXITCODE
         }
         else {
-            $target = if ($TestArgs) { $TestArgs } else { @("tests/") }
+            # XPLAT-60: @( ... ) um den if-Ausdruck - sonst entrollt PowerShell ein
+            # Array mit EINER Datei zur Zeichenkette, und @target reichte pytest nur
+            # deren erstes Zeichen weiter ("file or directory not found: t").
+            $target = @(if ($TestArgs) { $TestArgs } else { "tests/" })
             Write-Host "[verify] 2/2 pytest $($target -join ' ') ..."
             & $py -m pytest @target -q --tb=short -p no:cacheprovider -o addopts=""
             $code = $LASTEXITCODE

@@ -133,6 +133,22 @@ def test_nicht_zugestellte_loeschung_endet_ohne_zugriffsverletzung(tmp_path):
         aus[-3000:]
 
 
+_VERLETZUNG = "Windows fatal exception: access violation"
+
+
+def _gegenprobe_pruefen(rc: int, aus: str) -> None:
+    """CDX-63 (Codex zu #1162): die Verletzung ist nur auf der gemessenen
+    Installation belegt (Windows 11 ARM, emuliertes Python). Tritt sie hier
+    nicht auf, ist das kein Fehler der App oder der Hilfe — dann wird die
+    Gegenprobe uebersprungen statt rot (auch, wenn Qt den Fehler behebt). Die
+    Hilfe selbst prueft ``test_harter_ausstieg_ruft_unter_windows_terminate``
+    ohne echten Absturz."""
+    assert MARKE in aus, aus[-3000:]
+    if _VERLETZUNG not in aus:
+        pytest.skip("Qt-Abbaufehler auf dieser Installation nicht nachstellbar "
+                    f"(rc={rc}) — Gegenprobe entfaellt")
+
+
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows-Abbau (ExitProcess)")
 def test_gegenprobe_os_exit_laeuft_unter_windows_in_die_verletzung(tmp_path):
     """Ohne die Hilfe meldet faulthandler die Verletzung in os._exit — sonst
@@ -142,8 +158,55 @@ def test_gegenprobe_os_exit_laeuft_unter_windows_in_die_verletzung(tmp_path):
     import os
     os._exit(0)
     """, tmp_path)
-    assert MARKE in aus, aus[-3000:]
-    assert "Windows fatal exception: access violation" in aus, (rc, aus[-3000:])
+    _gegenprobe_pruefen(rc, aus)
+
+
+def test_gegenprobe_ohne_verletzung_wird_uebersprungen():
+    """CDX-63: kein Abbaufehler auf dieser Installation -> uebersprungen,
+    nicht rot; ein Absturz VOR der Marke bleibt rot."""
+    with pytest.raises(pytest.skip.Exception):
+        _gegenprobe_pruefen(0, f"{MARKE}\n")
+    _gegenprobe_pruefen(0, f"{MARKE}\n{_VERLETZUNG}\n")   # nachgestellt: ok
+    with pytest.raises(AssertionError):
+        _gegenprobe_pruefen(0xC0000005, _VERLETZUNG)
+
+
+def test_harter_ausstieg_ruft_unter_windows_terminate(monkeypatch):
+    """CDX-63: der Windows-Weg der Hilfe, ohne echten Absturz und auf jedem
+    System: TerminateProcess mit dem Exit-Code; os._exit nur als Rueckfall."""
+    import ctypes
+    import _kind_ausstieg as K
+
+    aufrufe = []
+
+    class _Fn:
+        def __init__(self, name, wert=None):
+            self.name, self.wert = name, wert
+
+        def __call__(self, *a):
+            aufrufe.append((self.name, a))
+            return self.wert
+
+    class _K32:
+        def __init__(self, *_a, **_k):
+            self.GetCurrentProcess = _Fn("GetCurrentProcess", 1234)
+            self.TerminateProcess = _Fn("TerminateProcess", 1)
+
+    class _Ende(BaseException):
+        pass
+
+    def _exit(rc):
+        aufrufe.append(("os._exit", (rc,)))
+        raise _Ende
+
+    monkeypatch.setattr(K.sys, "platform", "win32")
+    monkeypatch.setattr(ctypes, "WinDLL", _K32, raising=False)
+    monkeypatch.setattr(K.os, "_exit", _exit)
+    with pytest.raises(_Ende):
+        K.harter_ausstieg(3)
+    assert ("TerminateProcess", (1234, 3)) in aufrufe, aufrufe
+    assert aufrufe.index(("TerminateProcess", (1234, 3))) < aufrufe.index(
+        ("os._exit", (3,)))
 
 
 @pytest.mark.parametrize("datei", ARBEITER)

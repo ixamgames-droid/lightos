@@ -39,6 +39,9 @@ DEVICE_TYPES = (
     "network_node",           # Art-Net/sACN-Nodes
     "console",                # Hardware-Lichtpulte
     "keyboard_macro",         # Tastatur/Makro-Boards (Keyboard-Mapping)
+    # MIDI-8: was ein Lichtpult senden muss (MIDI-Noten aus Makros, MSC),
+    # damit LightOS es versteht — kein anschliessbares Geraet.
+    "console_template",
     "other",
 )
 
@@ -95,6 +98,10 @@ class ControllerProfile:
     vc_template: str = ""
     # "apc_mini_default" → fertiges MIDI-Mapping-Profil (input/profile.py)
     mapping_template: str = ""
+    # MIDI-8: Hilfetexte einer Pult-Vorlage, je Zeile {"zweck", "am_pult",
+    # "in_lightos", "beispiel": bool, optional "msc" (SysEx hex) +
+    # "msc_befehl"}. "beispiel" = Befehlsform nicht gegengeprueft.
+    pult_vorlagen: list = field(default_factory=list)
 
     @property
     def label(self) -> str:
@@ -121,6 +128,7 @@ class ControllerProfile:
             "imported_at": self.imported_at,
             "vc_template": self.vc_template,
             "mapping_template": self.mapping_template,
+            "pult_vorlagen": [dict(z) for z in self.pult_vorlagen],
         }
 
     @classmethod
@@ -148,6 +156,8 @@ class ControllerProfile:
             imported_at=str(d.get("imported_at", "")),
             vc_template=str(d.get("vc_template", "")),
             mapping_template=str(d.get("mapping_template", "")),
+            pult_vorlagen=[dict(z) for z in (d.get("pult_vorlagen") or [])
+                           if isinstance(z, dict)],
         )
 
 
