@@ -19,10 +19,30 @@ eine winzige Testdatei in einem eigenen Temp-Ordner (absoluter Pfad, beginnt
 also mit dem Laufwerksbuchstaben — ohne Fix kaeme bei pytest nur ``C`` an).
 Ist ``../run_tests.ps1`` vorhanden, nimmt das Skript den anderen Zweig; dann
 gibt es hier nichts zu pruefen und der Test wird uebersprungen.
+
+**Probe-Ordner begrenzt (CDX-66, Codex-Hinweis zu #1220).** Der Runner startet
+pytest im Repo (``Push-Location $repo``) mit dem absoluten Pfad der Probe.
+Findet pytest ueber der Probe keine ini-Datei, nimmt es als rootdir den
+gemeinsamen Vorfahren von Aufrufordner und Probe — liegt das Repo im
+Benutzerprofil, ist das z. B. ``C:/Users/<name>``. Beim Sammeln zaehlt pytest
+dann die Ordner auf diesem Weg auf, ``%TEMP%`` eingeschlossen, und vergleicht
+unter Windows jeden Eintrag per ``lstat`` (``samefile_nofollow``). Ein
+Nachbartest, der dort gerade einen Ordner loescht, beendet die Sammlung mit
+``FileNotFoundError`` — derselbe Wettlauf wie in XPLAT-38
+(``tools/zeitbomben_gate.py::_wurzel_fuer``) und
+``test_harden_exit_keeps_report.py::_run_pytest_in``. Den Aufruf selbst darf
+dieser Test nicht aendern (er prueft ja genau EIN Argument); darum bekommt der
+Probe-Ordner eine leere ``pytest.ini``: pytest nimmt ihn damit als rootdir,
+egal wo Repo und Temp-Ordner liegen. Auf diesem PC (Repo nicht im
+Benutzerprofil) war der gemeinsame Vorfahr das Laufwerk — dort griff der
+Wettlauf nicht, darum prueft ``ProbeOrdnerBegrenztTest`` die Wurzel in einem
+nachgestellten Aufbau, unabhaengig vom Rechner.
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -34,6 +54,18 @@ RUNNER = REPO / "tools" / "verify_loop.ps1"
 LOCK_RUNNER = REPO.parent / "run_tests.ps1"
 
 _IST_WINDOWS = sys.platform == "win32"
+
+
+def _probe_ordner(pfad: Path) -> Path:
+    """Ordner fuer Probe-Dateien eines Kind-pytest — die Sammlung bleibt darin.
+
+    Eine leere ``pytest.ini`` genuegt: pytest sucht die ini-Datei zuerst im
+    Ordner des Arguments, nimmt diesen Ordner dann als rootdir und zaehlt keine
+    Vorfahren mehr auf („pytest.ini files take precedence over other files,
+    even when empty“, pytest-Doku)."""
+    pfad.mkdir(parents=True, exist_ok=True)
+    (pfad / "pytest.ini").write_text("", encoding="utf-8")
+    return pfad
 
 
 def _lauf(*argumente, timeout=300):
@@ -57,7 +89,7 @@ class EinzeldateiOhneLockRunnerTest(unittest.TestCase):
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory(prefix="xplat60_")
-        self.ordner = Path(self._tmp.name)
+        self.ordner = _probe_ordner(Path(self._tmp.name))
 
     def tearDown(self):
         self._tmp.cleanup()
@@ -87,6 +119,60 @@ class EinzeldateiOhneLockRunnerTest(unittest.TestCase):
         rc, aus = _lauf(str(a), str(b))
         self.assertIn("2 passed", aus, aus[-1500:])
         self.assertEqual(rc, 0, aus[-1500:])
+
+
+class ProbeOrdnerBegrenztTest(unittest.TestCase):
+    """CDX-66: Aufrufordner (steht fuer das Repo) und Probe-Ordner haben einen
+    gemeinsamen Vorfahren, der nicht das Laufwerk ist — der Aufbau, in dem der
+    Runner auf einem Rechner mit Repo im Benutzerprofil ``%TEMP%`` aufzaehlte.
+    Gerechnet wird mit demselben Kind-Befehl wie im Runner; die Probe meldet,
+    welches rootdir pytest gewaehlt hat. Laeuft auch unter Linux (die
+    rootdir-Regel ist dieselbe, nur der lstat-Wettlauf ist Windows-eigen)."""
+
+    def test_rootdir_ist_der_probe_ordner(self):
+        self._pruefe("xplat60_wurzel_")
+
+    def test_rootdir_bei_pfad_mit_nicht_ascii_zeichen(self):
+        """Codex-Hinweis zu #1233: Benutzer- oder Temp-Pfad mit „Jörg“ — das
+        Kind schreibt umgeleitete Ausgabe in der System-Codepage (unter Windows
+        cp1252; „Ł“/„ź“ gibt es dort gar nicht). Der gemeldete Pfad muss
+        trotzdem heil ankommen."""
+        self._pruefe("xplat60_wurzel_Jörg_Łódź_")
+
+    def _pruefe(self, praefix):
+        with tempfile.TemporaryDirectory(prefix=praefix) as d:
+            basis = Path(d)
+            aufruf = basis / "aufruf"
+            aufruf.mkdir()
+            ordner = _probe_ordner(basis / "probe")
+            datei = ordner / "test_xplat60_wurzel.py"
+            # Pfad als ASCII-JSON (\uXXXX) melden — heil in jeder Codepage, wie
+            # der Lizenzpfad in tools/app.ps1
+            datei.write_text(
+                "import json\n"
+                "def test_wurzel(request):\n"
+                "    print('XPLAT60-WURZEL=' + json.dumps(str(request.config.rootpath)))\n",
+                encoding="utf-8")
+            # Normalfall: keine Ausgabe-Kodierung vorgegeben (das Gate setzt
+            # PYTHONIOENCODING, ein Entwickler-Aufruf meist nicht)
+            umgebung = {k: v for k, v in os.environ.items()
+                        if k not in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS",
+                                     "PYTHONIOENCODING", "PYTHONUTF8")}
+            r = subprocess.run(
+                [sys.executable, "-m", "pytest", str(datei), "-q", "-s",
+                 "--tb=short", "-p", "no:cacheprovider", "-o", "addopts="],
+                cwd=str(aufruf), env=umgebung, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=120)
+            aus = r.stdout + r.stderr
+            self.assertEqual(r.returncode, 0, aus[-1500:])
+            m = re.search(r'XPLAT60-WURZEL=("[^"\r\n]*")', aus)
+            self.assertIsNotNone(m, aus[-1500:])
+            wurzel = json.loads(m.group(1))
+            self.assertEqual(
+                os.path.normcase(os.path.realpath(wurzel)),
+                os.path.normcase(os.path.realpath(str(ordner))),
+                f"pytest sammelt ueber den Probe-Ordner hinaus (rootdir = {wurzel}) "
+                "— im Repo-Aufruf waere das z. B. der Temp-Ordner")
 
 
 if __name__ == "__main__":

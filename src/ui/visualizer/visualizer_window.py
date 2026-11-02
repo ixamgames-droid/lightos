@@ -3528,6 +3528,14 @@ class VisualizerWindow(QMainWindow):
                 if self._bridge.einmessen.schiebe(self._state, f.fid, k, achse, schritt))
         if not n:
             self._lbl_einmess.setText("Erst ein Gerät wählen und mit ⌖ Zielen ausrichten.")
+        elif n > 1 and self._einmess_mehrfach_hinweis(n) not in self._lbl_einmess.text():
+            # VIZ-81: Verhalten bleibt (alle gleich), aber es muss SICHTBAR sein.
+            self._einmess_status()
+
+    @staticmethod
+    def _einmess_mehrfach_hinweis(n: int) -> str:
+        return (f"⚠ Schieben bewegt alle {n} gewählten Köpfe um denselben Betrag — "
+                "für einen einzelnen Kopf nur diesen wählen.")
 
     def _einmess_merken(self) -> None:
         teile, ohne_ziel = [], 0
@@ -3571,7 +3579,13 @@ class VisualizerWindow(QMainWindow):
                     z += (f" ⚠ {grad:.0f}° — stimmen Standort, Montage (hängend/stehend) "
                           "und Pan/Tilt-Bereich im Patch?")
             L = self._einmess_loesung.get(f.fid)
-            if L is not None and n >= L.punkte:
+            if L is not None and n < L.punkte:
+                # VIZ-81: Punkte weg (Show-Wechsel, fid neu belegt, Versatz extern
+                # geaendert) -> Loesung veraltet; sonst gaebe sie den Knopf frei und
+                # „uebernehmen" fuer mehrere Koepfe naehme sie still mit.
+                self._einmess_loesung.pop(f.fid, None)
+                L = None
+            if L is not None:
                 z += (f" — Position gefunden ({L.punkte} Punkte, Gegenprobe "
                       f"{L.gegenprobe_cm:.1f} cm): {L.verschiebung_m * 100:.0f} cm und "
                       f"{L.drehung_grad:.1f}° neben dem eingetragenen Standort")
@@ -3594,9 +3608,15 @@ class VisualizerWindow(QMainWindow):
                 z += (" (ohne Feinkanal für " + "/".join(a.capitalize() for a in ohne_fein)
                       + ": ein Schritt ist grob, die Position ist dann selten sicher rechenbar)")
             zeilen.append(z)
+        if len(geraete) > 1:
+            zeilen.append(self._einmess_mehrfach_hinweis(len(geraete)))
         self._lbl_einmess.setText("\n".join(zeilen))
-        self._btn_einmess_uebernehmen.setEnabled(
-            len(geraete) == 1 and geraete[0][0].fid in self._einmess_loesung)
+        # VIZ-81: Uebernehmen fuer ALLE gewaehlten Koepfe mit Loesung.
+        mit_loesung = sum(1 for g in geraete if g[0].fid in self._einmess_loesung)
+        self._btn_einmess_uebernehmen.setEnabled(mit_loesung > 0)
+        self._btn_einmess_uebernehmen.setText(
+            "Position übernehmen" if len(geraete) == 1 or not mit_loesung
+            else f"Position übernehmen ({mit_loesung} von {len(geraete)} Köpfen)")
 
     def _einmess_uebernehmen(self) -> None:
         """Positions-Loesung uebernehmen — als EIN Undo-Schritt, der Standort,
@@ -3606,58 +3626,79 @@ class VisualizerWindow(QMainWindow):
         ein Strg+Z stellte nur den alten Versatz wieder her, die neue Position blieb
         — doppelt korrigiert, ~20 cm auf 5 m, ohne Meldung. Die Richtung liest der
         Rueckruf an der angewandten Position ab (neu -> Versatz 0, alt -> alter
-        Versatz); der Szenen-Command bleibt der normale (Dock, JS, Live-View)."""
+        Versatz); der Szenen-Command bleibt der normale (Dock, JS, Live-View).
+
+        VIZ-81: gilt fuer ALLE gewaehlten Koepfe mit Loesung — weiterhin EIN
+        Command (Plural-Weg in ``scene_commands``). Koepfe ohne Loesung bleiben
+        unveraendert und werden in der Statuszeile genannt."""
         geraete = self._einmess_geraete()
-        if len(geraete) != 1:
+        alt, neu_pos, neu_rot = {}, {}, {}
+        ohne = []
+        for f, _k, _p, _r in geraete:
+            L = self._einmess_loesung.get(f.fid)
+            if L is None:
+                ohne.append(getattr(f, "label", "") or str(f.fid))
+                continue
+            fid = f.fid
+            alt[fid] = dict(
+                pos=tuple(self._state.visualizer_positions.get(fid, (0.0, 0.0, 0.0))),
+                rot=tuple(self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0))),
+                dock=self._state.visualizer_docks.get(fid),
+                versatz=(float(getattr(f, "aim_offset_pan", 0.0) or 0.0),
+                         float(getattr(f, "aim_offset_tilt", 0.0) or 0.0)))
+            neu_pos[fid], neu_rot[fid] = tuple(L.pos), tuple(L.rot)
+        if not alt:
             return
-        f = geraete[0][0]
-        L = self._einmess_loesung.get(f.fid)
-        if L is None:
-            return
-        fid = f.fid
-        old_pos = tuple(self._state.visualizer_positions.get(fid, (0.0, 0.0, 0.0)))
-        old_rot = tuple(self._state.visualizer_rotations.get(fid, (0.0, 0.0, 0.0)))
-        old_dock = self._state.visualizer_docks.get(fid)
-        old_versatz = (float(getattr(f, "aim_offset_pan", 0.0) or 0.0),
-                       float(getattr(f, "aim_offset_tilt", 0.0) or 0.0))
-        new_pos, new_rot = tuple(L.pos), tuple(L.rot)
 
         def _anwenden(fid_, pos_, rot_):
-            neu = tuple(pos_) == new_pos
-            v = (0.0, 0.0) if neu else old_versatz
+            neu = tuple(pos_) == neu_pos[fid_]
+            v = (0.0, 0.0) if neu else alt[fid_]["versatz"]
             self._state.update_fixture(fid_, undoable=False,
                                        aim_offset_pan=v[0], aim_offset_tilt=v[1])
-            self._bridge.push_apply_fixture_transform(fid_, pos_[0], pos_[1], pos_[2], *rot_,
-                                                      dock=None if neu else old_dock)
+            self._bridge.push_apply_fixture_transform(
+                fid_, pos_[0], pos_[1], pos_[2], *rot_,
+                dock=None if neu else alt[fid_]["dock"])
             self._bridge.refresh_fixture(fid_)
 
         # Jetzt anwenden (der Command wird mit execute=False gepusht) …
-        self._state.visualizer_positions[fid] = new_pos
-        self._state.visualizer_rotations[fid] = new_rot
-        if old_dock is not None:
-            self._state.visualizer_docks.pop(fid, None)
-        _anwenden(fid, new_pos, new_rot)
-        # … und EIN Command fuer Undo/Redo.
-        _scmd.push_transform_and_dock_fixture(
-            self._state, fid,
-            old_pos=old_pos, new_pos=new_pos, old_rot=old_rot, new_rot=new_rot,
-            old_dock=old_dock, new_dock=None,
+        for fid in alt:
+            self._state.visualizer_positions[fid] = neu_pos[fid]
+            self._state.visualizer_rotations[fid] = neu_rot[fid]
+            if alt[fid]["dock"] is not None:
+                self._state.visualizer_docks.pop(fid, None)
+            _anwenden(fid, neu_pos[fid], neu_rot[fid])
+        # … und EIN Command fuer Undo/Redo — auch bei mehreren Koepfen.
+        _scmd.push_transform_and_dock_fixtures(
+            self._state,
+            [{"fid": fid, "old_pos": a["pos"], "new_pos": neu_pos[fid],
+              "old_rot": a["rot"], "new_rot": neu_rot[fid],
+              "old_dock": a["dock"], "new_dock": None} for fid, a in alt.items()],
             label="Einmessen: Position übernehmen",
             apply_push=_anwenden)
-        self._bridge.einmessen.punkte_verwerfen(fid)
-        self._einmess_loesung.pop(fid, None)
-        self._suppress_property_signals = True
-        try:
-            for sp, wert in zip((self._spin_x, self._spin_y, self._spin_z,
-                                 self._spin_rot_x, self._spin_rot_y, self._spin_rot_z),
-                                (*new_pos, *new_rot)):
-                sp.setValue(wert)
-        finally:
-            self._suppress_property_signals = False
+        for fid in alt:
+            self._bridge.einmessen.punkte_verwerfen(fid)
+            self._einmess_loesung.pop(fid, None)
+        # Felder zeigen das aktuelle Geraet der Liste (bei einem Kopf: diesen).
+        it = self._patch_list.currentItem()
+        cur = it.data(Qt.ItemDataRole.UserRole) if it is not None else None
+        feld_fid = cur if cur in alt else (next(iter(alt)) if len(geraete) == 1 else None)
+        if feld_fid is not None:
+            self._suppress_property_signals = True
+            try:
+                for sp, wert in zip((self._spin_x, self._spin_y, self._spin_z,
+                                     self._spin_rot_x, self._spin_rot_y, self._spin_rot_z),
+                                    (*neu_pos[feld_fid], *neu_rot[feld_fid])):
+                    sp.setValue(wert)
+            finally:
+                self._suppress_property_signals = False
         self._einmess_status()
-        self._lbl_einmess.setText(self._lbl_einmess.text()
-                                  + "\n✓ Position übernommen — gilt jetzt im ganzen Bereich "
-                                  "der Messpunkte. Rückgängig nimmt alles in einem Schritt zurück.")
+        wer = "" if len(alt) == 1 else f" für {len(alt)} Köpfe"
+        text = (self._lbl_einmess.text()
+                + f"\n✓ Position übernommen{wer} — gilt jetzt im ganzen Bereich "
+                "der Messpunkte. Rückgängig nimmt alles in einem Schritt zurück.")
+        if ohne:
+            text += "\nOhne Lösung, unverändert: " + ", ".join(ohne)
+        self._lbl_einmess.setText(text)
 
     def _einmess_zuruecksetzen(self) -> None:
         for f, _k, _p, _r in self._einmess_geraete():
