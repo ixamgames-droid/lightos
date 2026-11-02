@@ -1,7 +1,7 @@
 {
   "anleitung": "3d_buehne",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "c9e46cb0",
+  "stand": "3035562e",
   "schrift": "Roboto Condensed",
   "qt": "6.12.0",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py 3d_buehne'.",
@@ -94,6 +94,17 @@
         1300,
         1300
       ]
+    },
+    {
+      "datei": "08_strahl_falloff.png",
+      "szene": "08_strahl_falloff",
+      "titel": "Ein Spot von schräg vorn: Strahl an der Linse hell, zum Boden hin schwächer",
+      "groesse": [
+        1358,
+        830
+      ],
+      "marken": [],
+      "md5": "e6a9fdee23ebcec75eaae99bb2053045"
     }
   ]
 }
