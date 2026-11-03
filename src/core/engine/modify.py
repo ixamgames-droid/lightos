@@ -454,3 +454,39 @@ def write_child(child, universes, patch_cache, dt, function_registry=None) -> No
                      * _clamp01(getattr(child, "intensity", 1.0)))
     else:
         child.write(universes, patch_cache, dt, function_registry)
+
+
+def vorschau_mischen(f, grundbild, patch_cache, function_registry=None):
+    """ENG-37, gemischte Vorschau: Modify-Effekt ``f`` auf das ``grundbild``
+    verrechnen und das Ergebnis als Universen liefern (``None`` ohne Grundbild).
+
+    ``grundbild`` = ``{universum: bytes}``, das fertige Bild der Schichten
+    darunter, wie der Renderer es unmittelbar VOR seinem Modify-Gang (4a²b)
+    hatte (``AppState.grundbild``). Gerechnet wird mit DENSELBEN Bausteinen wie
+    im Renderer — ``modify_posten`` (Betrag aus ``f.write`` in ein leeres
+    privates Universum) und ``posten_anwenden`` —, also nach derselben Regel;
+    die Vorschau baut nichts nach.
+
+    ``f`` selbst bleibt unberuehrt: geschrieben wird eine flache Kopie mit
+    angehaltener Uhr (die Vorschau treibt die Phase selbst), damit auch ein
+    gerade live laufender Effekt in Zeit und Zustand nicht verstellt wird.
+    Die Staerke ist die des Effekts (Modify-Staerke x Effekt-Helligkeit);
+    Huellkurve und Helligkeit einer Sammlung, in der er laeuft, kennt die
+    Vorschau nicht."""
+    if not grundbild:
+        return None
+    import copy
+    from src.core.dmx.universe import Universe
+    ergebnis: dict[int, Universe] = {}
+    for u, werte in grundbild.items():
+        uni = Universe(u)
+        uni.set_range(1, bytes(werte)[:Universe.SIZE])
+        ergebnis[u] = uni
+    probe = copy.copy(f)
+    probe._running = True
+    probe._frozen = True
+    p = modify_posten(probe, ergebnis, patch_cache, 0.0, function_registry,
+                      _clamp01(getattr(f, "intensity", 1.0)))
+    if p is not None:
+        posten_anwenden((p,), ergebnis)
+    return ergebnis

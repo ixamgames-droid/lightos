@@ -909,20 +909,11 @@ class RgbMatrixInstance(Function):
             # w#h + die geteilten Dimmer/Shutter) statt aller Vorkommen uniform. Ohne
             # head_grid-Eintrag (None / Alt-Show) bleibt es das ganze Fixture
             # (byte-identisch). channels_for_head projiziert {attr: channel} des Kopfes.
-            _head = self.head_grid[idx] if (self.head_grid and idx < len(self.head_grid)) else None
-            if _head is None:
-                target_chans = chans
-            else:
-                _proj = channels_for_head(chans, _head)
-                target_chans = list(_proj.values())
-                # FM-17: Hat das Attribut eine Kopf-Karte, gehoert der geteilte
-                # Master KEINEM Kopf mehr — die Zelle wuerde ihren eigenen Dimmer
-                # hochziehen und bliebe hinter dem gemeinsamen Dimmer (Hydrabeam
-                # CH1, default 0) trotzdem dunkel. Darum bei Dimmer-Attributen
-                # ausdruecklich mitnehmen.
-                for _a in list(_proj):
-                    if _a in _DIM_INTENSITY_ATTRS:
-                        target_chans.extend(shared_master_channels(chans, _a))
+            # ENG-37: die Projektion steht in ``_ziel_kanaele`` — dieselbe, mit
+            # der die gemischte Vorschau (``zellen_ablesen``) die Zelle abliest.
+            target_chans = self._ziel_kanaele(
+                chans, idx, channels_for_head, shared_master_channels,
+                _DIM_INTENSITY_ATTRS)
             # M1: Per-Effekt-Master (intensity) auf die Farbkanaele anwenden — aber
             # NUR wenn der generische FunctionManager-Merge sie nicht ohnehin
             # skaliert. Der Merge skaliert pro Fixture entweder dessen Dimmer-Kanal
@@ -1142,6 +1133,79 @@ class RgbMatrixInstance(Function):
         if kanalwahl and "color_w" not in kanalwahl:
             return
         self._weiss_achse_schreiben(universes, patch_cache, grid, farb_modify)
+
+    def _ziel_kanaele(self, chans, idx, channels_for_head,
+                      shared_master_channels, dim_attrs) -> list:
+        """Kanaele, die Zelle ``idx`` an ihrem Geraet faerbt (FM-16).
+
+        Traegt die Zelle einen Kopf-Index (``head_grid``), nur die Kanaele
+        DIESES Kopfes plus die geteilten Dimmer; sonst das ganze Geraet.
+        Die Helfer kommen als Argumente herein (``write`` importiert sie einmal
+        je Frame, nicht je Zelle)."""
+        _head = self.head_grid[idx] if (self.head_grid and idx < len(self.head_grid)) else None
+        if _head is None:
+            return chans
+        _proj = channels_for_head(chans, _head)
+        target_chans = list(_proj.values())
+        # FM-17: Hat das Attribut eine Kopf-Karte, gehoert der geteilte
+        # Master KEINEM Kopf mehr — die Zelle wuerde ihren eigenen Dimmer
+        # hochziehen und bliebe hinter dem gemeinsamen Dimmer (Hydrabeam
+        # CH1, default 0) trotzdem dunkel. Darum bei Dimmer-Attributen
+        # ausdruecklich mitnehmen.
+        for _a in list(_proj):
+            if _a in dim_attrs:
+                target_chans.extend(shared_master_channels(chans, _a))
+        return target_chans
+
+    def zellen_ablesen(self, universes, patch_cache) -> list:
+        """ENG-37 (gemischte Vorschau): je Zelle ablesen, was die Lampe in
+        ``universes`` zeigt — im Stil Dimmer die Helligkeit als Grau, in den
+        Farb-Stilen die Farbe (Rot/Gruen/Blau, ein Weiss-Kanal kommt auf alle
+        drei). Liest dieselben Kanaele, die ``write`` fuer die Zelle schreibt
+        (``_ziel_kanaele``). ``None`` fuer Luecken und Zellen ohne Geraet bzw.
+        ohne passenden Kanal. Rechnet nichts — die Verrechnung macht
+        ``modify.vorschau_mischen`` mit derselben Regel wie der Renderer."""
+        try:
+            from src.core.app_state import (get_channels_for_patched,
+                                            channels_for_head,
+                                            shared_master_channels,
+                                            _DIM_INTENSITY_ATTRS)
+        except Exception:
+            return []
+        n = int(self.cols or 0) * int(self.rows or 0)
+        out: list = [None] * n
+        grid = list(self.fixture_grid or [])
+        for idx in range(min(n, len(grid))):
+            fid = grid[idx]
+            if is_gap(grid, idx):
+                continue
+            fx = _find_fixture(patch_cache, fid)
+            if fx is None:
+                continue
+            uni = universes.get(fx.universe)
+            if uni is None:
+                continue
+            roh = uni.get_all()
+            werte: dict[str, int] = {}
+            for ch in self._ziel_kanaele(get_channels_for_patched(fx), idx,
+                                         channels_for_head,
+                                         shared_master_channels,
+                                         _DIM_INTENSITY_ATTRS):
+                attr = (ch.attribute or "").lower()
+                addr = fx.address + ch.channel_number - 1
+                if attr in werte or not (1 <= addr <= 512):
+                    continue
+                werte[attr] = roh[addr - 1]
+            if self.style == MatrixStyle.DIMMER:
+                v = next((werte[a] for a in ("intensity", "dimmer", "master")
+                          if a in werte), None)
+                if v is not None:
+                    out[idx] = (v, v, v)
+            elif any(a in werte for a in ("color_r", "color_g", "color_b", "color_w")):
+                w = werte.get("color_w", 0)
+                out[idx] = tuple(min(255, werte.get(a, 0) + w)
+                                 for a in ("color_r", "color_g", "color_b"))
+        return out
 
     def _weiss_achse_schreiben(self, universes, patch_cache, grid,
                                farb_modify: bool = False) -> None:

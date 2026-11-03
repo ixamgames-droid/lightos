@@ -11,8 +11,9 @@ from src.core.engine.rgb_matrix import (RgbMatrixInstance, RgbAlgorithm, MatrixS
                                         Color, is_gap, _MODIFY_STILE)
 from src.core.engine.rgb_matrix_meta import ALGO_META
 from src.core.engine.modify import (MODIFY_LABELS, MODIFY_MODES, MODIFY_KANAELE,
-                                    MODIFY_KANAL_LABELS, normalize_channels,
-                                    normalize_mode)
+                                    MODIFY_KANAL_LABELS, ist_modify,
+                                    normalize_channels, normalize_mode,
+                                    vorschau_mischen)
 from src.ui.virtualconsole.vc_effect_meta import option_label
 from src.ui.widgets.select_all_spinbox import SelectAllSpinBox
 from src.ui.widgets.modify_zeichen import MODIFY_VORSCHAU_RGB, MODIFY_ZEICHEN
@@ -85,6 +86,25 @@ def _viz_modell(fixture) -> str:
         return ""
 
 
+def _grundbild_aus_state():
+    """ENG-37: ``(Grundbild, Geraeteliste)`` fuer die gemischte Vorschau aus
+    dem laufenden AppState — nur, wenn es ihn schon gibt (die Vorschau legt
+    keinen an). Fordert das Grundbild beim Renderer im Takt nach. ``None``,
+    solange keines vorliegt (z. B. Renderer laeuft nicht)."""
+    try:
+        import src.core.app_state as _A
+        st = getattr(_A, "_state", None)
+        if st is None:
+            return None
+        st.grundbild_anfordern()
+        gb = st.grundbild()
+        if not gb:
+            return None
+        return gb, (getattr(st, "_patch_cache", None) or [])
+    except Exception:
+        return None
+
+
 class MatrixPreview(QWidget):
     """Live LED grid preview.
 
@@ -121,6 +141,13 @@ class MatrixPreview(QWidget):
         self._show_assignment = False
         self._labels: dict = {}
         self._models: dict = {}          # FM-14b: fid -> Render-Modell
+        # ENG-37: gemischte Vorschau eines Modify-Effekts — Grundbild (was
+        # darunter laeuft) plus Modify, verrechnet nach der Regel des
+        # Renderers. Vorgabe an; ``None`` = nichts zu mischen (dann „nur
+        # Modify" wie bisher). Die Quelle ist austauschbar (Tests).
+        self._gemischt = True
+        self._misch: list | None = None
+        self._grundbild_quelle = _grundbild_aus_state
         self.setFixedSize(240, 160)
         self.setStyleSheet("background:#0d1117; border:1px solid #21262d; border-radius:4px;")
         self.setMouseTracking(True)          # Tooltip ohne Klick
@@ -132,6 +159,35 @@ class MatrixPreview(QWidget):
     def set_matrix(self, m: RgbMatrixInstance | None):
         self._matrix = m
         self._grid = []
+        self._misch = None
+
+    def set_gemischt(self, on: bool):
+        """Umschalter „gemischt" / „nur Modify" (ENG-37)."""
+        self._gemischt = bool(on)
+        self._misch = self.gemischte_zellen()
+        self.update()
+
+    def gemischte_zellen(self) -> list | None:
+        """ENG-37: je Zelle, was am Ende herauskommt — das Grundbild mit dem
+        Modify-Effekt verrechnet (``modify.vorschau_mischen``, dieselbe Regel
+        wie der Renderer), abgelesen an den Kanaelen der Zelle. ``None``, wenn
+        nicht gemischt wird: kein Modify-Effekt, Umschalter auf „nur Modify“
+        oder (noch) kein Grundbild vom Renderer."""
+        m = self._matrix
+        if not self._gemischt or m is None or not ist_modify(m):
+            return None
+        quelle = self._grundbild_quelle() if self._grundbild_quelle else None
+        if not quelle:
+            return None
+        grundbild, patch = quelle
+        try:
+            ergebnis = vorschau_mischen(m, grundbild, patch)
+            if ergebnis is None:
+                return None
+            zellen = m.zellen_ablesen(ergebnis, patch)
+        except Exception:
+            return None
+        return zellen if any(z is not None for z in zellen) else None
 
     # ── Zuordnung (FM-HEADLAYOUT: Geraet/Kopf je Zelle) ───────────────────────
 
@@ -271,6 +327,7 @@ class MatrixPreview(QWidget):
             + float(getattr(self._matrix, "matrix_speed", 1.0)) * 0.05
         )
         self._grid = self._matrix.preview_pixels()
+        self._misch = self.gemischte_zellen()
         self.update()
 
     def paintEvent(self, event):
@@ -319,6 +376,12 @@ class MatrixPreview(QWidget):
                     p.drawLine(x, y, x + w - 1, y + h - 1)
                     continue
                 r, g, b = self._grid[idx]
+                _mz = (self._misch[idx] if (modify_art is not None and self._misch
+                                            and idx < len(self._misch)) else None)
+                if _mz is not None:
+                    # ENG-37: gemischt — so sieht die Lampe am Ende aus.
+                    p.fillRect(x, y, w, h, QColor(*_mz))
+                    continue
                 if modify_kanaele:
                     _lvl = max(r, g, b) / 255.0
                     r, g, b = (int(kanal_farbe[0] * _lvl),
@@ -350,6 +413,8 @@ class MatrixPreview(QWidget):
         if modify_art is not None:
             p.setPen(QColor("#e6edf3"))
             p.drawText(8, 18, self.modify_eckentext())
+            if self._misch is not None:
+                p.drawText(8, self.height() - 8, "gemischt")
         # Zuordnungs-Overlay ZULETZT und nur als Rahmen: die Effektfarbe darunter
         # bleibt vollstaendig sichtbar (sie ist der Zweck der Vorschau).
         if self._show_assignment:
@@ -1320,6 +1385,20 @@ class RgbMatrixView(QWidget):
         self._modify_hint.setWordWrap(True)
         self._modify_hint.setStyleSheet("color:#8b949e; font-size:11px;")
         fm_.addRow(self._modify_hint)
+        # ENG-37: Umschalter der Vorschau — gemischt (Vorgabe) zeigt, was am
+        # Ende herauskommt; aus = nur der Betrag des Modify-Effekts.
+        self._cb_vorschau_gemischt = QCheckBox("Vorschau gemischt")
+        self._cb_vorschau_gemischt.setChecked(True)
+        self._cb_vorschau_gemischt.setToolTip(
+            "An: die Vorschau zeigt, was am Ende herauskommt — das, was "
+            "gerade darunter läuft, mit dem Modify-Effekt verrechnet (dieselbe "
+            "Rechnung wie am Ausgang, vor den Mastern).\n"
+            "Aus: nur der Modify-Effekt allein, eingefärbt nach Betriebsart.\n"
+            "Ohne laufende Ausgabe gibt es nichts zu mischen — dann zeigt die "
+            "Vorschau den Modify-Effekt allein.")
+        self._cb_vorschau_gemischt.toggled.connect(
+            weak_slot_fwd(self._preview.set_gemischt))
+        fm_.addRow(self._cb_vorschau_gemischt)
         self._grp_modify.setVisible(False)
         body.addWidget(self._grp_modify)
 

@@ -126,6 +126,17 @@ Cuelisten, Snap-Tasten, Programmer und die automatische Grundhelligkeit zusammen
    **Betriebsart** (Addieren / Abziehen / Abdunkeln) und **Stärke** (0–100 %, Vorgabe 100 %).
    Haken raus = wieder ein ganz normaler Effekt; Betriebsart und Stärke bleiben gemerkt.
 
+   **Vorschau gemischt:** In der Gruppe **Modify** steht der Haken **Vorschau gemischt**
+   (Vorgabe an). Dann zeigt die Vorschau links, **was am Ende herauskommt**: das, was gerade
+   darunter läuft (Effekte, Cuelisten, Programmer/Snaps, automatische Grundhelligkeit), mit dem
+   Modify-Effekt verrechnet — dieselbe Rechnung wie am Ausgang, also **vor** den Mastern. Im Stil
+   Dimmer erscheint jede Lampe als Grau in ihrer Helligkeit, in den Stilen RGB/RGBW in ihrer
+   Farbe; unten links steht „gemischt“. Haken raus = nur der Modify-Effekt allein, eingefärbt
+   nach Betriebsart (Bernstein, Blau, Grau). Läuft gerade keine Ausgabe, gibt es nichts zu
+   mischen — dann zeigt die Vorschau ebenfalls den Modify-Effekt allein. Was die Vorschau nicht
+   kennt: Helligkeit und Ein-/Ausblendzeit einer Sammlung oder Show, in der der Modify-Effekt
+   läuft, und weitere Modify-Effekte (gemischt wird mit dem Bild vor allen Modify-Effekten).
+
    ![Gruppe „Modify“ nach dem Setzen des Hakens: Betriebsart Addieren (1), Stärke 100 % (2) und der graue Hinweis „Wirkt auf das, was die Lampe gerade tut …“ (3)](img/04_modify_an.png)
 
 3. **💾 Speichern** und den Effekt auf eine normale Taste der Virtuellen Konsole legen:
@@ -320,8 +331,9 @@ der Modify-Effekt hat an dieser Lampe die Farbe **Rot 100, Grün 200, Blau 0**:
 - **Master haben das letzte Wort** — wie beim Dimmer-Modify. Bei Lampen ohne eigenen Dimmer (reine
   RGB-Geräte) dimmen Fader, Grand Master und Blackout die verrechnete Farbe.
 - Der Regler **Helligkeit** des Farb-Modify stellt wie beim Dimmer nur die Stärke ein.
-- Die Vorschau im Editor zeigt beim Farb-Modify die echten Farben; das Zeichen in der Ecke nennt
-  die Betriebsart (+ Addieren, − Abziehen, ◐ Abdunkeln, dann schraffiert).
+- Die Vorschau im Editor zeigt beim Farb-Modify mit **Vorschau gemischt** (Vorgabe) die Farbe,
+  die am Ende herauskommt; ohne den Haken die echten Farben des Modify-Effekts allein. Das Zeichen
+  in der Ecke nennt die Betriebsart (+ Addieren, − Abziehen, ◐ Abdunkeln, dann schraffiert).
 
 ### Nur bestimmte Kanäle verändern: „Wirkt auf“
 
