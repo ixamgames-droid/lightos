@@ -33,6 +33,8 @@ SUPPORTED_TYPES = (
     "bar_counter",    # Bar / Theke
     "riser_stairs",   # Podest mit Treppe
     "foh_desk",       # Mischpult-Tisch (FOH)
+    # VIZ-67: eigene 3D-Datei (STL/OBJ), Geometrie in ``StageElement.model``
+    "imported_model",
     "support",   # Alias fuer truss_v
     "truss",     # Alias fuer truss_h
 )
@@ -66,6 +68,11 @@ class StageElement:
     rotation: float = 0.0   # Y-Rotation in Radiant
     color: str = "#2a2a3a"
     name: str = ""
+    # VIZ-67: eingebettetes Dreiecksnetz eines importierten Modells
+    # (``modell_import.packen``: ``lsm1:`` + base64/zlib). Leer fuer alle
+    # eingebauten Typen. Steht IM Element — die Show braucht die
+    # Originaldatei nicht.
+    model: str = ""
 
     def __post_init__(self):
         if not self.id:
@@ -79,7 +86,7 @@ class StageElement:
     # --- JSON fuer die HTML/Three.js-Seite -----------------------------------
     def to_js_dict(self) -> dict:
         """Format wie es loadStageJson() in stage_scene.html erwartet."""
-        return {
+        out = {
             "id": self.id,
             "type": self.type,
             "position": {"x": float(self.x), "y": float(self.y), "z": float(self.z)},
@@ -88,6 +95,14 @@ class StageElement:
             "color": self.color,
             "name": self.name,
         }
+        if self.model:
+            # VIZ-67: entpackt fuer die Seite ({key, pos, idx}); ohne Modell
+            # bleibt die Payload byte-gleich zum Bestand.
+            from .modell_import import js_daten
+            daten = js_daten(self.model)
+            if daten is not None:
+                out["modell"] = daten
+        return out
 
     @classmethod
     def from_js_dict(cls, data: dict) -> "StageElement":
@@ -107,6 +122,7 @@ class StageElement:
             rotation=float(data.get("rotation", 0.0)),
             color=data.get("color", "#2a2a3a"),
             name=data.get("name", ""),
+            model=data.get("model", "") if isinstance(data.get("model"), str) else "",
         )
 
     # --- Geometrie-Helfer (Andocken) -----------------------------------------
@@ -177,6 +193,15 @@ class StageElement:
                    else self.top_y_at(px, pz))
             return None if top is None else top + DOCK_TOP_OFFSET
         return None
+
+
+def _element_dict(e: StageElement) -> dict:
+    """``asdict`` ohne leeres ``model`` — Buehnendateien ohne Import bleiben
+    unveraendert (VIZ-67)."""
+    d = asdict(e)
+    if not d.get("model"):
+        d.pop("model", None)
+    return d
 
 
 @dataclass
@@ -254,7 +279,7 @@ class StageDefinition:
     def to_dict(self) -> dict:
         return {
             "name": self.name,
-            "elements": [asdict(e) for e in self.elements],
+            "elements": [_element_dict(e) for e in self.elements],
         }
 
     def to_js_dict(self) -> dict:

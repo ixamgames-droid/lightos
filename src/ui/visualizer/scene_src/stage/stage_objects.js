@@ -237,6 +237,61 @@ function buildMischpultTisch(size, color) {
     });
 }
 
+// ── VIZ-67: importiertes 3D-Modell (STL/OBJ) ────────────────────────────────
+// Python liest die Datei (src/core/stage/modell_import.py) und schickt das
+// Netz als `modell = {key, pos, idx}` (base64, Float32 bzw. Uint32, Little
+// Endian, Meter, Mittelpunkt im Ursprung, Y oben). Die Geometrie wird je
+// `key` EINMAL gebaut (geteilteGeometrie) — Neuladen der Buehne und Kopien
+// kosten nichts. Die Groesse (`size`) streckt das Modell auf seine
+// Bounding-Box: so greifen Griffe und Groessenfelder wie bei allen Objekten.
+// Das Netz steht bewusst NICHT in `so.data` (das Echo an Python bliebe sonst
+// Megabyte gross), sondern in `so.modell`.
+function _b64Puffer(b64) {
+  const s = atob(b64);
+  const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  return u.buffer;
+}
+
+function importGeometrie(modell) {
+  return geteilteGeometrie('import|' + modell.key, () => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(_b64Puffer(modell.pos)), 3));
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(_b64Puffer(modell.idx)), 1));
+    g.computeVertexNormals();   // Normalen aus der Geometrie (Datei-Normalen ignoriert)
+    return g;
+  });
+}
+
+function buildImportModell(size, color, modell) {
+  const group = new THREE.Group();
+  let geo = null;
+  if (modell && modell.key && modell.pos && modell.idx) {
+    try { geo = importGeometrie(modell); } catch (e) { geo = null; }
+  }
+  const mesh = geo
+    ? new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+        color: color, roughness: 0.8, metalness: 0.05,
+        // STL-Dateien haben oft uneinheitlich gedrehte Dreiecke.
+        side: THREE.DoubleSide }))
+    // Ohne Netz (kaputte Show-Daten): sichtbarer Platzhalter statt nichts.
+    : new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({ color: color, wireframe: true }));
+  const bb = geo ? geo.boundingBox : null;
+  const nat = bb
+    ? { x: bb.max.x - bb.min.x, y: bb.max.y - bb.min.y, z: bb.max.z - bb.min.z }
+    : { x: 1, y: 1, z: 1 };
+  const k = (groesse, eigen) => (eigen > 1e-6 ? groesse / eigen : 1);
+  mesh.scale.set(k(size.x, nat.x), k(size.y, nat.y), k(size.z, nat.z));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  group.userData.color = color;
+  group.userData.size = { x: size.x, y: size.y, z: size.z };
+  group.userData.importModell = geo ? modell.key : null;
+  return group;
+}
+
 export const STAGE_BLUEPRINTS = {
   floor: {
     label: 'Boden / Floor',
@@ -343,6 +398,12 @@ export const STAGE_BLUEPRINTS = {
     defaultColor: '#222226',
     build: (size, color) => buildMischpultTisch(size, color),
   },
+  imported_model: {
+    label: '3D-Modell',
+    defaultSize: { x: 1, y: 1, z: 1 },
+    defaultColor: '#8c8c8c',
+    build: (size, color, modell) => buildImportModell(size, color, modell),
+  },
   dj_booth: {
     label: 'DJ Booth',
     defaultSize: { x: 2.4, y: 1.2, z: 1.0 },
@@ -354,12 +415,12 @@ export const STAGE_BLUEPRINTS = {
   },
 };
 
-export function createStageObject(type, position, size, color, rotation, providedId, name) {
+export function createStageObject(type, position, size, color, rotation, providedId, name, modell) {
   const bp = STAGE_BLUEPRINTS[type];
   if (!bp) return null;
   const sz = size || { ...bp.defaultSize };
   const cl = color || bp.defaultColor;
-  const mesh = bp.build(sz, cl);
+  const mesh = bp.build(sz, cl, modell);   // VIZ-67: nur imported_model nutzt `modell`
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   if (position) mesh.position.set(
@@ -380,6 +441,7 @@ export function createStageObject(type, position, size, color, rotation, provide
   scene.add(mesh);
   stageObjects[id] = {
     mesh,
+    modell: modell || null,   // VIZ-67: bewusst ausserhalb von `data`
     data: {
       id, type,
       position: { x: mesh.position.x, y: mesh.position.y, z: mesh.position.z },
@@ -426,7 +488,7 @@ export function updateStageObjectProps(id, props) {
       const type = data.type;
       const bp = STAGE_BLUEPRINTS[type];
       if (bp) {
-        const newGroup = bp.build({ x: data.size.x, y: data.size.y, z: data.size.z }, data.color);
+        const newGroup = bp.build({ x: data.size.x, y: data.size.y, z: data.size.z }, data.color, so.modell);
         newGroup.position.copy(so.mesh.position);
         newGroup.rotation.copy(so.mesh.rotation);
         newGroup.userData.stageId = data.id;
@@ -517,6 +579,7 @@ export const STAGE_2D_COLORS = {
   bar_counter:  { fill: 0x3a2a20, edge: 0xb07040, label: 'BAR' },
   riser_stairs: { fill: 0x6b4a3a, edge: 0xc7906a, label: 'PODEST' },
   foh_desk:     { fill: 0x26262c, edge: 0x9090a0, label: 'FOH' },
+  imported_model: { fill: 0x4a4a4a, edge: 0xb0b0b0, label: '3D-MODELL' },   // VIZ-67
 };
 
 export function updateStageObject2D(id) {
@@ -964,7 +1027,7 @@ export function loadStageJson(json) {
         // sonst bleibt von einer 15-Element-Buehne nur Element #0 uebrig
         // (Live-Befund 2026-07-11).
         try {
-          createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+          createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name, o.modell);
         } catch (e) {
           console.log('loadStageJson: Element uebersprungen', o && o.id, e);
         }
@@ -1018,7 +1081,7 @@ export function loadStageJson(json) {
       let repaired = 0;
       for (const o of missing) {
         try {
-          createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name);
+          createStageObject(o.type, o.position, o.size, o.color, o.rotation, o.id, o.name, o.modell);
           repaired += 1;
         } catch (e) {
           console.log('stage repair: Element uebersprungen', o && o.id, e);

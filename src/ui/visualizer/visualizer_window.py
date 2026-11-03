@@ -3806,6 +3806,15 @@ class VisualizerWindow(QMainWindow):
         abstand.addWidget(self._spin_abstand)
         abstand.addStretch(1)
         add_grid.addLayout(abstand)
+        # VIZ-67: eigene 3D-Datei (STL/OBJ) als Buehnenobjekt.
+        self._btn_modell_import = QPushButton("Datei importieren…")
+        self._btn_modell_import.setMinimumHeight(40)
+        self._btn_modell_import.setToolTip(
+            "Eigenes 3D-Modell (STL oder OBJ) als Bühnenobjekt einfügen.\n"
+            "Das Modell wird in die Show eingebettet — die Originaldatei "
+            "wird danach nicht mehr gebraucht.")
+        self._btn_modell_import.clicked.connect(weak_slot(self._on_import_model_clicked))
+        add_grid.addWidget(self._btn_modell_import)
         layout.addWidget(add_box)
 
         # Properties
@@ -3818,9 +3827,9 @@ class VisualizerWindow(QMainWindow):
         self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-200, 200); self._stage_spin_x.setSingleStep(0.5)
         self._stage_spin_y = LocaleTolerantDoubleSpinBox(); self._stage_spin_y.setRange(0, 30);   self._stage_spin_y.setSingleStep(0.25)
         self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-200, 200); self._stage_spin_z.setSingleStep(0.5)
-        self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.05, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
-        self._stage_spin_h = LocaleTolerantDoubleSpinBox(); self._stage_spin_h.setRange(0.05, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
-        self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.05, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
+        self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.01, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
+        self._stage_spin_h = LocaleTolerantDoubleSpinBox(); self._stage_spin_h.setRange(0.01, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
+        self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.01, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
         self._stage_spin_rot = LocaleTolerantDoubleSpinBox(); self._stage_spin_rot.setRange(-360, 360); self._stage_spin_rot.setSingleStep(15); self._stage_spin_rot.setSuffix(" °")
 
         for sp in (self._stage_spin_x, self._stage_spin_y, self._stage_spin_z,
@@ -4893,7 +4902,7 @@ class VisualizerWindow(QMainWindow):
             scene.add(SceneNode(
                 id=el.id, kind=kind, transform=transform, parent_id=None,
                 size_m=(float(el.w), float(el.h), float(el.d)),
-                color=el.color, name=el.name,
+                color=el.color, name=el.name, model=el.model or None,
             ))
         else:
             node.kind = kind
@@ -4901,6 +4910,7 @@ class VisualizerWindow(QMainWindow):
             node.size_m = (float(el.w), float(el.h), float(el.d))
             node.color = el.color
             node.name = el.name
+            node.model = el.model or None
         self._state._notify_scene_changed()
 
     def _remove_stage_node_from_scene(self, element_id: str) -> None:
@@ -5010,6 +5020,7 @@ class VisualizerWindow(QMainWindow):
                 "beer_table": "Biertisch", "high_table": "Stehtisch",
                 "bar_counter": "Bar",      "riser_stairs": "Podest+Treppe",
                 "foh_desk": "Mischpult-Tisch",
+                "imported_model": "3D-Modell",   # VIZ-67
             }
             for el in self._current_stage.elements:
                 label_name = el.name or el.id
@@ -5028,10 +5039,71 @@ class VisualizerWindow(QMainWindow):
             self._stage_tree.blockSignals(False)
             self._stage_tree.setUpdatesEnabled(True)
 
-    def _add_stage_element(self, type_: str):
+    def _on_import_model_clicked(self):
+        """VIZ-67: Datei waehlen, Einheit abfragen, als Buehnenobjekt anlegen."""
+        from PySide6.QtWidgets import QFileDialog
+        eltern = self if isinstance(self, QWidget) else None
+        pfad, _ = QFileDialog.getOpenFileName(
+            eltern, "3D-Modell importieren", "",
+            "3D-Modelle (*.stl *.STL *.obj *.OBJ);;STL (*.stl *.STL);;OBJ (*.obj *.OBJ)")
+        if not pfad:
+            return
+        ist_stl = pfad.lower().endswith(".stl")
+        einheiten = ["Millimeter (mm)", "Zentimeter (cm)", "Meter (m)"]
+        wahl, ok = QInputDialog.getItem(
+            eltern, "Einheit des Modells",
+            "In welcher Einheit ist das Modell gezeichnet?\n"
+            "(CAD-Programme und 3D-Druck-Dateien meist Millimeter)",
+            einheiten, 0 if ist_stl else 2, False)
+        if not ok:
+            return
+        einheit = {"Millimeter (mm)": "mm", "Zentimeter (cm)": "cm"}.get(wahl, "m")
+        # CAD/STL zeichnen meist mit Z nach oben, OBJ meist mit Y nach oben.
+        antwort = QMessageBox.question(
+            eltern, "Ausrichtung",
+            "Zeigt im Modell die Z-Achse nach oben?\n"
+            "(Üblich bei STL/CAD. Bei „Nein“ gilt Y als oben, üblich bei OBJ.)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Yes if ist_stl else QMessageBox.StandardButton.No)
+        # Review: Schliessen/Esc bricht ab, statt still „Y oben“ zu importieren.
+        if antwort not in (QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No):
+            return
+        self._import_model_file(pfad, einheit,
+                                antwort == QMessageBox.StandardButton.Yes)
+
+    def _import_model_file(self, pfad: str, einheit: str = "mm",
+                           z_oben: bool = False):
+        """VIZ-67: Datei lesen und als Buehnenobjekt ``imported_model`` anlegen
+        (gleicher Weg wie die Knoepfe: Undo, Auswahl, Szenengraph). Eine
+        unpassende Datei endet in einer Meldung, nie in einer Ausnahme.
+        Gibt das neue Element zurueck oder None."""
+        from src.core.stage import modell_import as mi
+        eltern = self if isinstance(self, QWidget) else None
+        try:
+            netz = mi.lies_datei(pfad, einheit, z_oben)
+            modell = mi.packen(netz)
+        except mi.ModellImportFehler as e:
+            QMessageBox.warning(eltern, "Import nicht möglich", str(e))
+            return None
+        except Exception as e:   # Fangnetz: kaputte Datei darf nichts abreissen
+            print(f"[Visualizer] Modell-Import error: {e}")
+            QMessageBox.warning(eltern, "Import nicht möglich",
+                                "Die Datei ließ sich nicht als 3D-Modell lesen.")
+            return None
+        w, h, d = mi.element_groesse(netz)
+        name = os.path.splitext(os.path.basename(pfad))[0] or "3D-Modell"
+        return self._add_stage_element("imported_model", vorgaben=dict(
+            x=0.0, y=round(h / 2.0, 4), z=0.0, w=w, h=h, d=d,
+            color="#8c8c8c", name=name, model=modell))
+
+    def _add_stage_element(self, type_: str, vorgaben: Optional[dict] = None):
         # Standardwerte je Typ (VIZ-68: Klassenkonstante STAGE_DEFAULTS)
         kwargs = dict(VisualizerWindow.STAGE_DEFAULTS.get(type_, {}))
-        type_label = dict(self.STAGE_TYPES).get(type_, type_)
+        if vorgaben:
+            kwargs.update(vorgaben)   # VIZ-67: importiertes Modell
+        type_label = {**dict(self.STAGE_TYPES),
+                      "imported_model": "3D-Modell"}.get(type_, type_)
         kwargs.setdefault("name", type_label)
         # VIZ-68: Reihe/Raster. Ohne die Felder (aeltere Tests bauen das
         # Fenster nicht) gilt 1 x 1.
@@ -5152,6 +5224,7 @@ class VisualizerWindow(QMainWindow):
             w = getattr(self, attr, None)
             if w is not None and hasattr(w, "setValue"):
                 w.setValue(1)
+        return el
 
     def _selected_stage_element(self) -> Optional[StageElement]:
         it = self._stage_tree.currentItem()

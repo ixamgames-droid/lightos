@@ -2475,7 +2475,9 @@ def _buehne_aus_szenengraph(stage_name: str, scene_graph_data):
                 x=float(pos[0]), y=float(pos[1]), z=float(pos[2]),
                 w=float(size[0]), h=float(size[1]), d=float(size[2]),
                 rotation=math.radians(float(rot[1])),
-                color=n.get("color") or "#2a2a3a", name=n.get("name") or ""))
+                color=n.get("color") or "#2a2a3a", name=n.get("name") or "",
+                # VIZ-67: importiertes Modell reist eingebettet mit
+                model=n.get("model") if isinstance(n.get("model"), str) else ""))
         except Exception as e:
             print(f"[show_file] Buehnen-Knoten {n.get('id')!r} uebersprungen: {e}")
     return StageDefinition(name=stage_name, elements=elemente) if elemente else None
