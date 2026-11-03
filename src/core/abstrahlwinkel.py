@@ -110,3 +110,31 @@ def text(wmin, wmax=None) -> str:
     def _f(x):
         return f"{x:g}"
     return f"{_f(a)}°" if a == b else f"{_f(a)}–{_f(b)}° (Zoom)"
+
+
+# ── VIZ-111: Laufrichtung des Zoom-Kanals ───────────────────────────────────
+#
+# DMX sagt nicht, in welche Richtung ein Zoom-Kanal laeuft. Der verbreitete
+# Fall (und die Annahme des 3D-Visualizers) ist „0 = eng, 255 = weit“. Ein
+# Profil kann die Umkehr angeben („0 = weit, 255 = eng“); gespeichert als
+# ``FixtureProfile.zoom_inverted``, in der Bibliotheksdatei als Feld
+# ``zoom_umgekehrt`` (nur ``true``; fehlt = normale Laufrichtung). Die Angabe
+# betrifft NUR das Bild im 3D — an der DMX-Ausgabe aendert sie nichts.
+
+#: Name des Felds in der Bibliotheksdatei.
+FELD_ZOOM_UMGEKEHRT = "zoom_umgekehrt"
+
+
+def zoom_umgekehrt_aus_profil(prof) -> bool:
+    """Laufrichtung eines ``FixtureProfile`` (fehlende Spalte = normal)."""
+    return bool(getattr(prof, "zoom_inverted", False) or False)
+
+
+def zoom_umgekehrt_aus_daten(wert) -> bool:
+    """Bibliotheksfeld -> bool; nur ein echtes ``true`` zaehlt."""
+    return wert is True
+
+
+def pruefe_zoom_umgekehrt(wert) -> bool:
+    """Ist ``wert`` ein gueltiges Feld ``zoom_umgekehrt``? (``true``/``false``)"""
+    return isinstance(wert, bool)

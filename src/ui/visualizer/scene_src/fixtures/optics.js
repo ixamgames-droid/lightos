@@ -15,8 +15,10 @@
 // eingebauten MH-Profile), und genau den nimmt diese Abbildung an. Bei einem
 // Geraet mit umgekehrter Kanal-Laufrichtung sieht der Kegel im 3D dann falsch
 // herum aus — sichtbar, aber folgenlos: an der DMX-AUSGABE aendert das nichts.
-// Eine Umkehr-Angabe pro Profil waere die saubere Loesung und ist als eigener
-// Punkt notiert, statt sie hier zu raten.
+// VIZ-111: deshalb kann das Profil die Umkehr angeben (`zoomInverted` in der
+// Nutzlast, `f.zoomUmgekehrt` am Fixture). Dann laeuft der Zoom hier
+// "0 = weit, 255 = eng" — fuer die Typ-Faktoren ZOOM_ENG/ZOOM_WEIT ebenso wie
+// fuer die FM-64-Spanne eng..weit. Ohne Angabe bleibt alles wie vorher.
 
 // ── Kantenschaerfe: Fokus + Frost ───────────────────────────────────────────
 //
@@ -56,7 +58,8 @@ const FROST_AUFWEITUNG = 0.25;   // voller Frost weitet den Kegel um 25 %
 // VOLLER Winkel in Grad, 0 = keine Angabe), bestimmt ER den Kegel statt der
 // Ableitung aus dem Geraetetyp: fest (beide gleich) -> der Zoom-Kanal aendert
 // die Weite nicht; Spanne -> der Zoom laeuft linear von eng (DMX 0) nach weit
-// (DMX 255), dieselbe Laufrichtung wie ZOOM_ENG/ZOOM_WEIT oben. Gebaut wird der
+// (DMX 255), dieselbe Laufrichtung wie ZOOM_ENG/ZOOM_WEIT oben (VIZ-111: bei
+// umgekehrtem Profil fuer beide gespiegelt). Gebaut wird der
 // Kegel in der MITTE der Spanne (Grundstellung, solange kein Zoomwert da ist);
 // `opticsScale` liefert dann das Verhaeltnis Zielwinkel / Mitte.
 // Ohne Angabe gibt die Funktion `null` und ALLES bleibt wie vorher.
@@ -77,11 +80,13 @@ export function profilKegel(data) {
   return { min: lo, max: hi, basisHalb: (mitte / 2) * Math.PI / 180 };
 }
 
-/** DMX 0..255 -> Skalierungsfaktor des Kegel-Radius. */
-export function opticsScale(zoom, iris, profil) {
+/** DMX 0..255 -> Skalierungsfaktor des Kegel-Radius.
+ *  `umgekehrt` (VIZ-111): Zoom-Kanal laeuft "0 = weit, 255 = eng". */
+export function opticsScale(zoom, iris, profil, umgekehrt) {
   let k = 1.0;
   if (typeof zoom === 'number' && isFinite(zoom)) {
-    const z = Math.max(0, Math.min(255, zoom)) / 255;
+    let z = Math.max(0, Math.min(255, zoom)) / 255;
+    if (umgekehrt === true) z = 1 - z;
     if (profil && profil.max > 0) {
       // FM-64: Zielwinkel zwischen eng und weit, relativ zur gebauten Mitte.
       const mitte = (profil.min + profil.max) / 2;
@@ -137,7 +142,7 @@ export function applyOptics(f, dmx) {
   // am Frost-Wert, nicht an der gemeinsamen Weichheit.
   const frostAnteil = (typeof f.lastFrost === 'number' && isFinite(f.lastFrost))
     ? Math.max(0, Math.min(255, f.lastFrost)) / 255 : 0;
-  const k = opticsScale(f.lastZoom, f.lastIris, f.profilKegel)
+  const k = opticsScale(f.lastZoom, f.lastIris, f.profilKegel, f.zoomUmgekehrt)
     * (1 + FROST_AUFWEITUNG * frostAnteil);
   // FM-64: mit Profilwinkel ist `k` ein WINKEL-Verhaeltnis; der Kegel-RADIUS
   // waechst mit dem Tangens. Ohne Profilwinkel bleibt es exakt wie vorher

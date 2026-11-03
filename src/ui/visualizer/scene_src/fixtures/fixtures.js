@@ -566,6 +566,9 @@ export function addFixture(data) {
     // FM-64: Profil-Abstrahlwinkel (null = keine Angabe) — applyOptics fuehrt
     // den Zoom dann zwischen eng und weit statt ueber die Typ-Faktoren.
     profilKegel: beam ? profilKegel(data) : null,
+    // VIZ-111: Zoom-Kanal laeuft laut Profil umgekehrt (0 = weit) —
+    // applyOptics dreht die Laufrichtung, mit und ohne Profilwinkel.
+    zoomUmgekehrt: !!(data && data.zoomInverted === true),
     // VIZ-BEAM-OCCLUSION: Grundlaenge des Kegels merken. Die Laenge wird
     // relativ dazu skaliert — ohne Referenz waere jede Anpassung kumulativ.
     baseBeamLength: (beam && beam.geometry && beam.geometry.parameters)

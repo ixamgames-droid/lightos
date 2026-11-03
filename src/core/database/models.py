@@ -78,6 +78,9 @@ class FixtureProfile(Base):
     # ``src/core/abstrahlwinkel.py``.
     beam_angle_min: Mapped[float] = mapped_column(Float, default=0.0)
     beam_angle_max: Mapped[float] = mapped_column(Float, default=0.0)
+    # VIZ-111: Zoom-Kanal laeuft umgekehrt („0 = weit, 255 = eng“). False =
+    # wie bisher angenommen (0 = eng). Betrifft nur das 3D-Bild.
+    zoom_inverted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     manufacturer: Mapped[Manufacturer] = relationship(back_populates="fixtures")
     modes: Mapped[list[FixtureMode]] = relationship(
@@ -510,6 +513,10 @@ def migrate_fixtures_db(engine) -> None:
                 if fcols and _wcol not in fcols:
                     conn.execute(text(
                         f"ALTER TABLE fixtures ADD COLUMN {_wcol} FLOAT DEFAULT 0"))
+            # VIZ-111: Laufrichtung des Zoom-Kanals (0 = normal). Dieselbe Falle.
+            if fcols and "zoom_inverted" not in fcols:
+                conn.execute(text(
+                    "ALTER TABLE fixtures ADD COLUMN zoom_inverted BOOLEAN DEFAULT 0"))
             # VIZ-50a: physische Rasterform eines Pixel-Panels (0 = nicht
             # hinterlegt -> der Renderer raet wie bisher). Dieselbe Falle wie bei
             # `pixel_order` (PR #514): ohne ALTER TABLE waere jede bestehende

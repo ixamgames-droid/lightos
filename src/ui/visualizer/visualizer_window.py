@@ -37,7 +37,7 @@ from PySide6.QtCore import (QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent,
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
-    AppState, abstrahlwinkel_for, get_state, get_channels_for_patched,
+    AppState, abstrahlwinkel_for, zoom_umgekehrt_for, get_state, get_channels_for_patched,
     is_spider_fixture,
     panel_grid_for, pixel_ring_banks_for, viz_model_for, white_grid_for,
     weiss_segment_count_for_channels,
@@ -2187,6 +2187,8 @@ class VisualizerBridge(QObject):
         # ``patch_changed``; der Kegel wird nur beim Anlegen gebaut, ohne diesen
         # Abgleich behielte ein platziertes Geraet den alten Winkel.
         gesendet_w = self.__dict__.setdefault("_gesendete_abstrahlwinkel", {})
+        # VIZ-111: ebenso die Laufrichtung des Zoom-Kanals.
+        gesendet_z = self.__dict__.setdefault("_gesendete_zoomrichtung", {})
         placed = self._state.visualizer_positions    # VIZ-71: einmal lesen
         for f in self._state.get_patched_fixtures():
             if f.fid not in placed:
@@ -2201,9 +2203,18 @@ class VisualizerBridge(QObject):
             w_vorher = gesendet_w.get(f.fid)
             if w_jetzt is not None:
                 gesendet_w[f.fid] = w_jetzt
+            try:
+                z_jetzt = bool(zoom_umgekehrt_for(f))
+            except Exception:                            # noqa: BLE001
+                z_jetzt = None
+            z_vorher = gesendet_z.get(f.fid)
+            if z_jetzt is not None:
+                gesendet_z[f.fid] = z_jetzt
             if ((vorher is not None and vorher != jetzt)
                     or (w_vorher is not None and w_jetzt is not None
-                        and w_vorher != w_jetzt)):
+                        and w_vorher != w_jetzt)
+                    or (z_vorher is not None and z_jetzt is not None
+                        and z_vorher != z_jetzt)):
                 self.fixtureAdded.emit(json.dumps(self._fixture_to_dict(f)))
 
     def refresh_fixture(self, fid: int) -> None:
@@ -2543,6 +2554,13 @@ class VisualizerBridge(QObject):
         # FM-64: gesendeten Winkel merken (s. ``_nullpunkte_nachziehen``).
         self.__dict__.setdefault("_gesendete_abstrahlwinkel", {})[f.fid] = (
             beam_min, beam_max)
+        # VIZ-111: Laufrichtung des Zoom-Kanals (False = 0 eng, 255 weit).
+        try:
+            zoom_umgekehrt = bool(zoom_umgekehrt_for(f))
+        except Exception:                                # noqa: BLE001
+            zoom_umgekehrt = False
+        self.__dict__.setdefault("_gesendete_zoomrichtung", {})[f.fid] = \
+            zoom_umgekehrt
         return {
             "fid": f.fid,
             "label": f.label,
@@ -2580,6 +2598,9 @@ class VisualizerBridge(QObject):
             # Angabe). Gleich = fest; verschieden = Spanne fuer den Zoom-Kanal.
             "beamAngleMin": beam_min,
             "beamAngleMax": beam_max,
+            # VIZ-111: Zoom-Kanal laeuft umgekehrt (0 = weit) -> optics.js
+            # dreht die Laufrichtung, mit und ohne Profilwinkel.
+            "zoomInverted": zoom_umgekehrt,
             # Spider: ist die 2. Farbreihe gespiegelt (W,B,G,R) statt parallel?
             "mirror": bool(getattr(f, "spider_mirrored", True)),
             "x": pos[0], "y": pos[1], "z": pos[2],

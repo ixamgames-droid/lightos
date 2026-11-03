@@ -157,6 +157,8 @@ _KOPF_FELDER = {
     # FM-64: Abstrahlwinkel des Lichtkegels (voller Winkel in Grad): Zahl
     # (fest) oder [eng, weit] (Zoom). Nutzt der 3D-Visualizer.
     "abstrahlwinkel",
+    # VIZ-111: Zoom-Kanal laeuft umgekehrt (true = „0 = weit, 255 = eng“).
+    "zoom_umgekehrt",
 }
 _KOPF_PFLICHT = ("format_version", "hersteller", "modell", "kurzname", "typ",
                  "quelle", "herkunft", "autor", "geprueft", "modi")
@@ -297,6 +299,10 @@ def pruefe(daten, datei: str = "") -> list[str]:
         if not AW.pruefe_wert(daten["abstrahlwinkel"]):
             out.append(f"{p}abstrahlwinkel: Zahl oder [eng, weit] in Grad "
                        f"({AW.WINKEL_MIN:g}..{AW.WINKEL_MAX:g}, eng <= weit) erwartet")
+    from src.core import abstrahlwinkel as _AW
+    if _AW.FELD_ZOOM_UMGEKEHRT in daten:                  # VIZ-111
+        if not _AW.pruefe_zoom_umgekehrt(daten[_AW.FELD_ZOOM_UMGEKEHRT]):
+            out.append(f"{p}{_AW.FELD_ZOOM_UMGEKEHRT}: true oder false erwartet")
     for f, n in (("notizen", None), ("viz_model", 40)):
         if f in daten and (not isinstance(daten[f], str)
                            or (n and len(daten[f]) > n)):
@@ -652,6 +658,8 @@ def profil_zu_daten(prof, *, quelle: dict | None = None,
     aw = AW.zu_daten(*AW.aus_profil(prof))
     if aw is not None:
         d["abstrahlwinkel"] = aw
+    if AW.zoom_umgekehrt_aus_profil(prof):          # VIZ-111
+        d[AW.FELD_ZOOM_UMGEKEHRT] = True
     d.update({
         "quelle": dict(quelle or basis["quelle"]),
         "herkunft": dict(herkunft or basis["herkunft"]),
@@ -671,7 +679,8 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
                       leistung_w: int, modi, hersteller_kurz: str = "",
                       notizen: str = "", viz_model: str = "",
                       herkunft: dict | None = None,
-                      abstrahlwinkel: tuple = (0, 0)) -> dict:
+                      abstrahlwinkel: tuple = (0, 0),
+                      zoom_umgekehrt: bool = False) -> dict:
     """LightOS-Profil aus dem, was der Fixture-Editor gerade zeigt (auch
     ungespeichert). ``modi`` = ``[(name, kanaele, beschreibung, raster, weiss)]``
     mit Kanaelen wie in ``_ModeTab.channels`` (``attribute``/``default``/
@@ -732,6 +741,9 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
     aw = AW.zu_daten(*tuple(abstrahlwinkel or (0, 0)))
     if aw is not None:
         d["abstrahlwinkel"] = aw
+    # VIZ-111: umgekehrte Zoom-Laufrichtung — weggelassen, wenn normal.
+    if zoom_umgekehrt:
+        d[AW.FELD_ZOOM_UMGEKEHRT] = True
     # ``herkunft`` = die vier Herkunftsfelder des GELADENEN Profils
     # (:func:`herkunft_fuer`). Ohne geladenes Profil ist der Editor-Inhalt ein
     # eigenes Profil. Eine fremde Vorlage bleibt fremd — nur mit dem Vermerk,
@@ -952,6 +964,8 @@ def _kopf_setzen(prof, daten: dict) -> None:
     prof.viz_model = daten.get("viz_model", "")
     from src.core import abstrahlwinkel as AW
     prof.beam_angle_min, prof.beam_angle_max = AW.aus_daten(daten.get("abstrahlwinkel"))
+    prof.zoom_inverted = AW.zoom_umgekehrt_aus_daten(        # VIZ-111
+        daten.get(AW.FELD_ZOOM_UMGEKEHRT))
     prof.provenance = _provenance(daten)
     prof.herkunft = _herkunft_json(daten)
 
@@ -1025,6 +1039,8 @@ def _vergleichsform(prof) -> tuple:
             # FM-64: ein geaenderter Abstrahlwinkel ist eine Aenderung.
             tuple(float(x or 0) for x in (getattr(prof, "beam_angle_min", 0),
                                           getattr(prof, "beam_angle_max", 0))),
+            # VIZ-111: ebenso die Laufrichtung des Zoom-Kanals.
+            bool(getattr(prof, "zoom_inverted", False) or False),
             tuple((m.name, m.description or "", m.grid_rows or 0, m.grid_cols or 0,
                    m.white_rows or 0, m.white_cols or 0, m.channel_count,
                    tuple((c.channel_number, c.name, c.attribute, c.default_value,

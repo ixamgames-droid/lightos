@@ -6601,6 +6601,7 @@ def clear_channel_cache():
     _viz_model_override_cache.clear()
     # FM-64: der Abstrahlwinkel haengt am Profil wie der viz_model-Override.
     _abstrahlwinkel_cache.clear()
+    _zoom_umgekehrt_cache.clear()
     # VIZ-50a: die Rasterform haengt am selben Modus wie die Kanaele — sie MUSS
     # ueber denselben Weg invalidiert werden, sonst zeigt das 3D-Panel nach einem
     # Modus-Wechsel die Form des alten Modus.
@@ -6726,6 +6727,32 @@ def abstrahlwinkel_for(fixture) -> tuple[float, float]:
         # Wie beim viz_model-Override: Fehlerfall nicht einfrieren.
         return (0.0, 0.0)
     _abstrahlwinkel_cache[pid] = val
+    return val
+
+
+_zoom_umgekehrt_cache: dict = {}
+
+
+def zoom_umgekehrt_for(fixture) -> bool:
+    """VIZ-111: laeuft der Zoom-Kanal im Profil des gepatchten Geraets
+    umgekehrt (0 = weit)? ``False`` = normal bzw. keine Angabe. Gecached pro
+    Profil-ID; ``clear_channel_cache`` leert mit (wie ``abstrahlwinkel_for``)."""
+    from . import abstrahlwinkel as AW
+    pid = getattr(fixture, "fixture_profile_id", None)
+    if pid is None:
+        return False
+    cached = _zoom_umgekehrt_cache.get(pid)
+    if cached is not None:
+        return cached
+    try:
+        from .database.fixture_db import engine
+        from .database.models import FixtureProfile
+        with Session(engine()) as s:
+            prof = s.get(FixtureProfile, pid)
+            val = AW.zoom_umgekehrt_aus_profil(prof) if prof else False
+    except Exception:
+        return False
+    _zoom_umgekehrt_cache[pid] = val
     return val
 
 
