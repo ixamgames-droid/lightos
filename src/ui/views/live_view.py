@@ -1327,6 +1327,7 @@ class StageCanvas(QWidget):
                      "invert_pan", "invert_tilt", "swap_pan_tilt",
                      # get_channels_for_patched schluesselt auch danach
                      "spider_dual_tilt")
+    _PATCH_FELDER_MENGE = frozenset(("fid",) + _PATCH_FELDER)
 
     @classmethod
     def _patch_fingerabdruck(cls, f) -> tuple:
@@ -1336,10 +1337,15 @@ class StageCanvas(QWidget):
         # Spaltenwerte stehen im ``__dict__`` der Instanz; dasselbe Ergebnis
         # ohne Deskriptor. Objekte ohne ``__dict__`` (Attrappen mit ``__slots__``)
         # gehen den alten Weg.
+        # UI-109: ebenso ein (auch nur teilweise) VERFALLENES Objekt (nach
+        # ``commit``/``expire``) — ihm fehlen Spalten im ``__dict__``, und
+        # ``dict.get`` lieferte still ``None``: ein geaenderter Patch fiel dem
+        # Abdruck nicht auf. Der Deskriptor laedt dann nach.
         d = getattr(f, "__dict__", None)
-        if d is None or "_sa_instance_state" not in d:
+        if (d is None or "_sa_instance_state" not in d
+                or not cls._PATCH_FELDER_MENGE <= d.keys()):
             return (f.fid,) + tuple(getattr(f, k, None) for k in cls._PATCH_FELDER)
-        return (d.get("fid"),) + tuple(d.get(k) for k in cls._PATCH_FELDER)
+        return (d["fid"],) + tuple(d[k] for k in cls._PATCH_FELDER)
 
     def _patch_geaendert(self, *_a) -> None:
         self._paint_sig = None

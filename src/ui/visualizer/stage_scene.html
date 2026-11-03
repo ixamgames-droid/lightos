@@ -13,12 +13,37 @@
     background: rgba(0,0,0,0.55); padding: 6px 10px; border-radius: 4px;
     z-index: 5;
   }
+  /* VIZ-73: Werkzeugleiste, Trace-Einstellungen, Modus-Banner und Selektions-Pille
+     sassen alle absolut oben mittig (top 8/10/42/66 px) und lagen im Bauen-Modus
+     uebereinander. Jetzt EIN Stapel: die Elemente fliessen untereinander, ein
+     ausgeblendetes (display:none) nimmt keinen Platz. Der Stapel selbst laesst
+     Klicks durch (pointer-events:none); Leiste und Trace-Panel stellen auf auto. */
+  #top-hud {
+    position: absolute; top: 8px; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    pointer-events: none; z-index: 40;
+  }
+  /* Seitenrand je 210 px: #overlay oben links ist bis ~200 px breit ("LightOS
+     Visualizer | 2D Top View"), der Modus-Chip/FPS oben rechts schmaler. */
+  #top-hud > * { max-width: calc(100% - 420px); box-sizing: border-box; }
+  /* Schmale 3D-Ansicht (die Ansicht ist nur ein Teil des Fensters — bei 1280 px
+     Fensterbreite oft unter 900 px): Stapel UNTER die Eckzeile (#overlay endet
+     bei ~35 px) setzen und die volle Breite nutzen, statt in die Ecken zu ragen
+     bzw. die Leiste dreizeilig umzubrechen. */
+  @media (max-width: 900px) {
+    #top-hud { top: 44px; }
+    #top-hud > * { max-width: calc(100% - 16px); }
+  }
   #mode-banner {
-    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
-    color: #ffcc00; font-size: 12px; font-weight: 600;
+    color: #ffcc00; font-size: 12px; font-weight: 600; text-align: center;
     background: rgba(40,30,0,0.85); padding: 5px 14px; border-radius: 4px;
-    pointer-events: none; display: none; z-index: 5;
+    pointer-events: none; display: none;
     border: 1px solid #886;
+  }
+  #selection-banner {
+    color: #ffd700; font-size: 14px; font-weight: bold;
+    background: rgba(0,0,0,0.6); padding: 5px 14px; border-radius: 4px;
+    border: 1px solid #ffd700; display: none; pointer-events: none;
   }
   #tooltip {
     position: absolute; background: rgba(20,20,20,0.92); color: #eee;
@@ -68,8 +93,7 @@
   #fab-place:hover   { background: #2ecc71; }
   /* Edit-Werkzeug-Leiste (oben, touch-tauglich) — Verschieben/Höhe/Drehen */
   #edit-toolbar {
-    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-    display: none; gap: 8px; z-index: 40;
+    display: none; gap: 8px; pointer-events: auto; flex-wrap: wrap; justify-content: center;
     background: rgba(10,14,20,0.82); padding: 6px; border-radius: 12px;
     border: 1px solid #2a4a6a; box-shadow: 0 4px 14px rgba(0,0,0,0.55);
   }
@@ -88,8 +112,8 @@
   }
   /* Zweite Reihe: Trace-Einstellungen (Form/Größe/Tempo/Speichern) */
   #trace-panel {
-    position: absolute; top: 66px; left: 50%; transform: translateX(-50%);
-    display: none; gap: 8px; align-items: center; z-index: 39;
+    display: none; gap: 8px; align-items: center; pointer-events: auto;
+    flex-wrap: wrap; justify-content: center;
     background: rgba(10,14,20,0.82); padding: 5px 8px; border-radius: 10px;
     border: 1px solid #2a4a6a; box-shadow: 0 4px 14px rgba(0,0,0,0.5);
     color: #9acbff; font-size: 13px;
@@ -177,7 +201,8 @@
   Traversen und Podeste baust du im Modus <b>Bauen</b> über <b>Bühne</b>.</span>
 </div>
 <div id="overlay">LightOS Visualizer | <span id="mode-text">3D View</span></div>
-<div id="mode-banner">EDIT MODE - Drag fixtures with mouse</div>
+<!-- VIZ-73: gemeinsamer Stapel oben mittig (Reihenfolge = Anzeige von oben). -->
+<div id="top-hud">
 <div id="edit-toolbar">
   <button class="edit-tool-btn active" id="tool-move-xz" onclick="setEditTool('move_xz')" title="Bewegen: Gerät antippen=auswählen · am Boden ziehen (X/Z) · Gizmo-Pfeile verschieben je Achse/Höhe, Ringe drehen (Strg = frei ohne Raster)">✥ Bewegen</button>
   <button class="edit-tool-btn" id="tool-aim" onclick="setEditTool('aim')" title="Zielen: erst Geräte antippen=auswählen, dann Boden/Wand antippen → Strahler richten sich automatisch dorthin (Moving Heads fahren Pan/Tilt)">⌖ Zielen</button>
@@ -196,12 +221,11 @@
   <span class="tp-val" id="trace-speed-val">60 ms</span>
   <button class="tp-save" onclick="saveTraceSeq()" title="Aktuelle Form + Auswahl als abspielbare Sequenz speichern">💾 Als Sequenz</button>
 </div>
-<div id="selection-banner" style="position:absolute; top:42px; left:50%; transform:translateX(-50%);
-     color:#ffd700; font-size:14px; font-weight:bold;
-     background:rgba(0,0,0,0.6); padding:5px 14px; border-radius:4px;
-     border:1px solid #ffd700; display:none; z-index:50; pointer-events:none;">
+<div id="mode-banner">EDIT MODE - Drag fixtures with mouse</div>
+<div id="selection-banner">
   Selektion: <span id="selection-banner-text">?</span>
 </div>
+</div><!-- /#top-hud -->
 <div id="tooltip"></div>
 <div id="marquee"></div>
 <div id="controls">

@@ -45,7 +45,25 @@
         96,
         119
       ],
-      "layout": "Im DAW-/Session-Modus melden die 16 Pads Note-Events (Status 90h) auf MIDI-Kanal 1. Notenraster 96-119 (0x60-0x77): obere Reihe 96-103 (links->rechts), untere Reihe 112-119. Klartext-belegt durch offizielle Programmer's Reference (Note 60h=96 oben-links, 70h=112 unten-links). Dieselben Notennummern dienen zum LED-Coloring."
+      "layout": "Im DAW-/Session-Modus melden die 16 Pads Note-Events (Status 90h) auf MIDI-Kanal 1. Notenraster 96-119 (0x60-0x77): obere Reihe 96-103 (links->rechts), untere Reihe 112-119. Klartext-belegt durch offizielle Programmer's Reference (Note 60h=96 oben-links, 70h=112 unten-links). Dieselben Notennummern dienen zum LED-Coloring.",
+      "numbers": [
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119
+      ]
     },
     {
       "name": "Rotary Knobs (8 Encoder)",

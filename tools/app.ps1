@@ -161,9 +161,17 @@ function Set-ProbelaufLizenz {
   if (-not (Test-Path $pyc)) { $pyc = 'python' }
   # ohne Anfuehrungszeichen im Code: PowerShell 5.1 reicht eingebettete " nicht an
   # native Programme weiter - der Dateiname kommt deshalb als Argument
-  $code = 'import os, sys; sys.path.insert(0, sys.argv[1]); from src.core.paths import regulaerer_app_data_dir as d; print(os.path.join(d(), sys.argv[2]))'
+  # CDX-66: der Pfad kommt als JSON, das json.dumps rein in ASCII schreibt (\uXXXX).
+  # Mit print(pfad) scheiterte Python an einem Datenordner mit Zeichen ausserhalb
+  # der System-Codepage (umgeleitete Ausgabe = cp1252) - stderr ist verworfen, die
+  # Lizenz galt als fehlend. UTF-8 waere keine Loesung: PowerShell liest die Ausgabe
+  # nativer Programme in [Console]::OutputEncoding.
+  $code = 'import os, sys, json; sys.path.insert(0, sys.argv[1]); from src.core.paths import regulaerer_app_data_dir as d; print(json.dumps(os.path.join(d(), sys.argv[2])))'
   $pfad = ''
-  try { $pfad = (& $pyc -c $code $RepoRoot 'lightos-lizenz.lic' 2>$null | Select-Object -Last 1) } catch { $pfad = '' }
+  try {
+    $roh = (& $pyc -c $code $RepoRoot 'lightos-lizenz.lic' 2>$null | Select-Object -Last 1)
+    if ($roh) { $pfad = [string]($roh | ConvertFrom-Json) }
+  } catch { $pfad = '' }
   if ($pfad) { $pfad = $pfad.Trim() }
   if ($pfad -and (Test-Path -LiteralPath $pfad -PathType Leaf)) {
     $env:LIGHTOS_LIZENZ = $pfad
