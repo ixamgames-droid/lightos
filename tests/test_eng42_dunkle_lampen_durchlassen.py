@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import statistics
 import sys
 import threading
 import time
@@ -477,9 +478,9 @@ def test_entwurf_und_preset():
 # ── Leistung im 44-Hz-Takt ───────────────────────────────────────────────────
 
 
-def _messen(monkeypatch, haken, frames=300):
-    """Zeit je write() einer 48-Lampen-Dimmer-Matrix (Mittel aus 3 Läufen,
-    bester Lauf)."""
+def _mess_matrix(monkeypatch, haken):
+    """48-Lampen-Dimmer-Matrix (Lauflicht, 4 Läufer, langer Schweif),
+    eingeschwungen; gibt eine Funktion zurück, die ``frames`` write() macht."""
     n = 48
     kanaele = [_Ch("intensity", 1)]
     monkeypatch.setattr(A, "get_channels_for_patched", lambda fx: kanaele)
@@ -493,27 +494,78 @@ def _messen(monkeypatch, haken, frames=300):
     m.dunkle_durchlassen = haken
     m.start()
     u = {1: Universe(1)}
-    for _ in range(30):
-        m.write(u, rig, 1 / 44, {})
-    beste = float("inf")
-    for _ in range(3):
-        t0 = time.perf_counter()
+
+    def laufen(frames):
         for _ in range(frames):
             m.write(u, rig, 1 / 44, {})
-        beste = min(beste, (time.perf_counter() - t0) / frames)
-    return beste
+    laufen(30)
+    return laufen
+
+
+def _zeit(laufen, frames):
+    t0 = time.perf_counter()
+    laufen(frames)
+    return (time.perf_counter() - t0) / frames
+
+
+# „Mit Haken nie deutlich teurer": der Haken-Pfad darf höchstens 1,5-mal so
+# lange brauchen wie der Pfad ohne Haken (gemessen ist er etwa gleich schnell).
+GRENZE_VERHAELTNIS = 1.5
+
+
+def _haken_verhaeltnis(monkeypatch, paare=60, frames=20):
+    """QA-111: gepaarte Messung. Beide Matrizen (Haken aus/an) laufen
+    abwechselnd in kurzen Blöcken (Reihenfolge je Paar wechselnd); je Paar das
+    Verhältnis an/aus, Ergebnis ist der MEDIAN der Verhältnisse. Eine
+    Lastspitze auf der CI trifft so nur einzelne Paare, statt wie beim
+    früheren Vergleich zweier Bestwerte (plus festem Polster) den ganzen Test
+    zu kippen. Gibt (Median, beste Zeit aus, beste Zeit an) je Frame zurück."""
+    aus_lauf = _mess_matrix(monkeypatch, False)
+    an_lauf = _mess_matrix(monkeypatch, True)
+    verh, aus_alle, an_alle = [], [], []
+    for i in range(paare):
+        if i % 2:
+            an = _zeit(an_lauf, frames)
+            aus = _zeit(aus_lauf, frames)
+        else:
+            aus = _zeit(aus_lauf, frames)
+            an = _zeit(an_lauf, frames)
+        verh.append(an / aus)
+        aus_alle.append(aus)
+        an_alle.append(an)
+    return statistics.median(verh), min(aus_alle), min(an_alle)
 
 
 def test_leistung_haken_aus_und_an(monkeypatch):
-    # Abwechselnd messen und je den besten Lauf nehmen: nacheinander gemessen
-    # kippte der Vergleich auf der CI, wenn die Maschine zwischen den beiden
-    # Bloecken langsamer wurde (25.10.2026: 874 us gegen 492 us).
-    aus = an = float("inf")
-    for _ in range(4):
-        aus = min(aus, _messen(monkeypatch, False, frames=150))
-        an = min(an, _messen(monkeypatch, True, frames=150))
+    # QA-111: früher Bestwert gegen Bestwert mit 1,5 x + 50 us — auf der CI
+    # rot (01.11.2026: 1,72 ms gegen 0,98 ms), unter Last oft. Jetzt Median
+    # der gepaarten Verhältnisse, die Grenze bleibt 1,5.
+    verh, aus, an = _haken_verhaeltnis(monkeypatch)
     print(f"\nENG-42 write() 48 Lampen: Haken aus {aus * 1e6:.1f} us, "
-          f"an {an * 1e6:.1f} us je Frame (44 Hz-Budget 22727 us)")
+          f"an {an * 1e6:.1f} us je Frame, Median an/aus {verh:.2f} "
+          f"(44 Hz-Budget 22727 us)")
     # Mit Haken werden dunkle Lampen übersprungen — nie deutlich teurer.
-    assert an < aus * 1.5 + 50e-6
+    assert verh < GRENZE_VERHAELTNIS
     assert aus < 0.01           # weit unter dem Frame-Budget
+
+
+def test_leistung_gegenprobe_teurer_haken_wird_erkannt(monkeypatch):
+    """QA-111: der robustere Vergleich muss eine echte Verlangsamung weiter
+    finden. Künstlich teurer Haken-Pfad: je Lampe und Dimmer-Abfrage wartet
+    er so lange, wie eine ganze Lampe ohne Haken kostet — damit ist er
+    mindestens doppelt so teuer, auf jedem Rechner."""
+    je_lampe = min(_zeit(_mess_matrix(monkeypatch, False), 20)
+                   for _ in range(3)) / 48
+    orig = RgbMatrixInstance._dimmer_output
+
+    def teuer(self, rgb):
+        if self.dunkle_durchlassen:
+            ende = time.perf_counter() + je_lampe
+            while time.perf_counter() < ende:
+                pass
+        return orig(self, rgb)
+
+    monkeypatch.setattr(RgbMatrixInstance, "_dimmer_output", teuer)
+    verh, aus, an = _haken_verhaeltnis(monkeypatch, paare=20)
+    print(f"\nENG-42 Gegenprobe: Median an/aus {verh:.2f}")
+    assert verh >= GRENZE_VERHAELTNIS
