@@ -154,6 +154,9 @@ _KOPF_FELDER = {
     # eintragen, wenn dort belegt. Wird aus der Datei gelesen
     # (laser/sperrzonen.winkel_aus_bibliothek), nicht in die Datenbank gespielt.
     "laser_abstrahlwinkel", "laser_randwinkel",
+    # FM-64: Abstrahlwinkel des Lichtkegels (voller Winkel in Grad): Zahl
+    # (fest) oder [eng, weit] (Zoom). Nutzt der 3D-Visualizer.
+    "abstrahlwinkel",
 }
 _KOPF_PFLICHT = ("format_version", "hersteller", "modell", "kurzname", "typ",
                  "quelle", "herkunft", "autor", "geprueft", "modi")
@@ -289,6 +292,11 @@ def pruefe(daten, datei: str = "") -> list[str]:
     if not _ist_int(lw) or lw < 0:
         out.append(f"{p}leistung_w: ganze Zahl >= 0 erwartet (ist {lw!r})")
     _laser_winkel_pruefen(daten, p, out)
+    if "abstrahlwinkel" in daten:
+        from src.core import abstrahlwinkel as AW
+        if not AW.pruefe_wert(daten["abstrahlwinkel"]):
+            out.append(f"{p}abstrahlwinkel: Zahl oder [eng, weit] in Grad "
+                       f"({AW.WINKEL_MIN:g}..{AW.WINKEL_MAX:g}, eng <= weit) erwartet")
     for f, n in (("notizen", None), ("viz_model", 40)):
         if f in daten and (not isinstance(daten[f], str)
                            or (n and len(daten[f]) > n)):
@@ -640,6 +648,10 @@ def profil_zu_daten(prof, *, quelle: dict | None = None,
         d["notizen"] = prof.notes
     if prof.viz_model:
         d["viz_model"] = prof.viz_model
+    from src.core import abstrahlwinkel as AW
+    aw = AW.zu_daten(*AW.aus_profil(prof))
+    if aw is not None:
+        d["abstrahlwinkel"] = aw
     d.update({
         "quelle": dict(quelle or basis["quelle"]),
         "herkunft": dict(herkunft or basis["herkunft"]),
@@ -658,7 +670,8 @@ def profil_zu_daten(prof, *, quelle: dict | None = None,
 def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
                       leistung_w: int, modi, hersteller_kurz: str = "",
                       notizen: str = "", viz_model: str = "",
-                      herkunft: dict | None = None) -> dict:
+                      herkunft: dict | None = None,
+                      abstrahlwinkel: tuple = (0, 0)) -> dict:
     """LightOS-Profil aus dem, was der Fixture-Editor gerade zeigt (auch
     ungespeichert). ``modi`` = ``[(name, kanaele, beschreibung, raster, weiss)]``
     mit Kanaelen wie in ``_ModeTab.channels`` (``attribute``/``default``/
@@ -714,6 +727,11 @@ def daten_aus_feldern(*, hersteller: str, modell: str, kurzname: str, typ: str,
         d["notizen"] = notizen
     if viz_model:
         d["viz_model"] = viz_model
+    # FM-64: Abstrahlwinkel (eng, weit) — weggelassen ohne Angabe.
+    from src.core import abstrahlwinkel as AW
+    aw = AW.zu_daten(*tuple(abstrahlwinkel or (0, 0)))
+    if aw is not None:
+        d["abstrahlwinkel"] = aw
     # ``herkunft`` = die vier Herkunftsfelder des GELADENEN Profils
     # (:func:`herkunft_fuer`). Ohne geladenes Profil ist der Editor-Inhalt ein
     # eigenes Profil. Eine fremde Vorlage bleibt fremd — nur mit dem Vermerk,
@@ -932,6 +950,8 @@ def _kopf_setzen(prof, daten: dict) -> None:
     prof.power_w = int(daten.get("leistung_w", 0))
     prof.notes = daten.get("notizen", "")
     prof.viz_model = daten.get("viz_model", "")
+    from src.core import abstrahlwinkel as AW
+    prof.beam_angle_min, prof.beam_angle_max = AW.aus_daten(daten.get("abstrahlwinkel"))
     prof.provenance = _provenance(daten)
     prof.herkunft = _herkunft_json(daten)
 
@@ -1002,6 +1022,9 @@ def _vergleichsform(prof) -> tuple:
     return (prof.name, prof.short_name, prof.fixture_type, int(prof.power_w or 0),
             prof.notes or "", prof.viz_model or "", prof.provenance or "",
             prof.herkunft or "",
+            # FM-64: ein geaenderter Abstrahlwinkel ist eine Aenderung.
+            tuple(float(x or 0) for x in (getattr(prof, "beam_angle_min", 0),
+                                          getattr(prof, "beam_angle_max", 0))),
             tuple((m.name, m.description or "", m.grid_rows or 0, m.grid_cols or 0,
                    m.white_rows or 0, m.white_cols or 0, m.channel_count,
                    tuple((c.channel_number, c.name, c.attribute, c.default_value,

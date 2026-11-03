@@ -979,6 +979,56 @@ def pytest_unconfigure(config):
         except Exception:
             pass
         _harter_ausstieg(_HARDEN_EXIT_STATUS)
+    elif os.name == "nt" and not armed:
+        _fenster_vor_dem_ende_loeschen()
+
+
+def _fenster_vor_dem_ende_loeschen() -> None:
+    """QA-112: unter Windows die noch lebenden Top-Level-Fenster loeschen, bevor
+    der Interpreter normal endet.
+
+    Dialoge mit in Python abgeleiteter Klasse halten sich oft ueber ein Lambda
+    am eigenen Knopf selbst fest (``clicked.connect(lambda: self._...)``). Die
+    Verbindung haelt Qt in C++ — fuer Pythons Speicherbereinigung unsichtbar,
+    ``gc.collect()`` gibt sie nicht frei. Ohne dieses Aufraeumen wurden sie erst
+    im Interpreter-Abbau zerstoert, waehrend PySide die ``QApplication``
+    abraeumt, und der Prozess endete trotz gruener Tests mit ``abort``
+    (0xC0000409, ``ucrtbase.dll``) oder einer Access Violation. Gemessen am
+    02.11.2026, je 5 Einzellaeufe von ``test_snapshot_ignore``,
+    ``test_group_edit_dialog`` und ``test_button_multi_action``: ohne
+    Aufraeumen 9/15 Absturz, nur ``gc.collect()`` 7/15, Fenster loeschen 0/15.
+
+    Nur der normale Weg und nur ohne WebEngine im Prozess: dort gilt der harte
+    Ausstieg (QA-110), und WebEngine-Fenster jetzt abzubauen waere ein eigenes
+    Risiko. Linux bleibt unveraendert (dort nicht gemessen). Laedt kein Qt nach,
+    wenn die Sitzung keine Widgets hatte; Fehler beim Aufraeumen bleiben stumm —
+    das Testergebnis steht zu diesem Zeitpunkt schon fest.
+    """
+    import sys
+    qtw = sys.modules.get("PySide6.QtWidgets")
+    if qtw is None:
+        return
+    try:
+        import shiboken6
+        from PySide6.QtCore import QCoreApplication, QEvent
+        app = qtw.QApplication.instance()
+        if app is None:
+            return
+        fenster = [w for w in qtw.QApplication.topLevelWidgets() if shiboken6.isValid(w)]
+        for w in fenster:
+            try:
+                w.hide()
+            except RuntimeError:
+                pass
+        for w in fenster:
+            # ein Fenster kann schon mit seinem Eltern-Fenster gegangen sein
+            if shiboken6.isValid(w):
+                shiboken6.delete(w)
+        for _ in range(3):
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            app.processEvents()
+    except Exception:
+        pass
 
 
 def _harter_ausstieg(status: int) -> None:

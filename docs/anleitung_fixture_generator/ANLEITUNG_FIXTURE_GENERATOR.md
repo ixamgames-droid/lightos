@@ -114,6 +114,12 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    Laser — Reiter **Laser** im Programmer, Laser-NOT-AUS, „Alles Weiß“ lässt
    ihn aus, der Blackout schaltet ihn ganz ab, die 3D-Ansicht zeichnet Strahlen.
 3. **Leistung** vom Typenschild (30 W).
+   Darunter steht **Abstrahlwinkel:** — der volle Winkel des Lichtkegels aus
+   dem Datenblatt. Hat das Gerät Zoom, links den engsten und bei **bis** den
+   weitesten Winkel eintragen; die 3D-Ansicht folgt dann dem Zoom-Kanal
+   zwischen beiden. Bleibt das Feld auf „keine Angabe“, leitet die 3D-Ansicht
+   den Kegel wie bisher aus Typ und Zoom ab. (Für einen Laser ohne Kegel
+   bleibt es leer.)
 4. Gibt es für dein Gerät eine QLC+-Datei (`.qxf`), kannst du sie hier als
    Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
    Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn

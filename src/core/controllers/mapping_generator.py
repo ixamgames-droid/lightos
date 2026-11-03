@@ -34,9 +34,12 @@ def _bloecke(profile, typ: str):
     for c in getattr(profile, "controls", None) or []:
         if c.type != typ:
             continue
-        a, b = int(c.range[0]), int(c.range[1])
-        if 0 <= a <= b <= 127:
-            yield c, a, b
+        # CDX-64: explizite Nummernliste vor ``range`` — bei Rastern mit
+        # Luecken ist ``range`` nur die Min/Max-Huelle; ausmultipliziert gaebe
+        # das Bindungen fuer nicht existierende Regler (und frass Slots).
+        nummern = c.nummern()
+        if nummern:
+            yield c, nummern
 
 
 def kann_mapping_erzeugen(profile) -> bool:
@@ -71,8 +74,8 @@ def erzeuge_mapping_profil(profile) -> InputProfile:
             ("note", "note_on", ACTION_EXECUTOR_GO, "GO"),
             ("cc", "cc", ACTION_EXECUTOR_FADER, "Fader")):
         slot = 0
-        for c, a, b in _bloecke(profile, typ):
-            for nummer in range(a, b + 1):
+        for c, nummern in _bloecke(profile, typ):
+            for nummer in nummern:
                 if slot >= _MAX_SLOTS:
                     break
                 slot += 1
