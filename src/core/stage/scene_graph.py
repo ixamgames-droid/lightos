@@ -50,6 +50,8 @@ class NodeKind(str, Enum):
     FOH_DESK = "foh_desk"
     DJ_BOOTH = "dj_booth"
     FLOOR = "floor"
+    # VIZ-67: importierte 3D-Datei (Geometrie in SceneNode.model)
+    IMPORTED_MODEL = "imported_model"
 
 
 class MountType(str, Enum):
@@ -82,6 +84,9 @@ class SceneNode:
     size_m: tuple[float, float, float] | None = None  # (w, h, d)
     color: str | None = None
     name: str | None = None
+    # VIZ-67: eingebettetes Netz eines importierten Modells (``lsm1:...``,
+    # s. modell_import). Reist so im ``scene_graph`` der .lshow mit.
+    model: str | None = None
     # Facetten-Flag (nur kind==FIXTURE, Review-Fix): True, sobald die Position
     # EXPLIZIT gesetzt wurde (set_world_pos/set_transform(pos_m=...)/from_legacy).
     # Ein Fixture-Node, der NUR wegen einer Rotations-Zuweisung entstanden ist
@@ -368,6 +373,7 @@ class SceneGraph:
                     size_m=(float(el.w), float(el.h), float(el.d)),
                     color=el.color,
                     name=el.name,
+                    model=el.model or None,
                 )
             )
 
@@ -471,6 +477,8 @@ class SceneGraph:
                 entry["color"] = n.color
             if n.name is not None:
                 entry["name"] = n.name
+            if n.model:
+                entry["model"] = n.model
             nodes.append(entry)
         return {"nodes": nodes, "stage_snapshot": dict(self.stage_snapshot)}
 
@@ -512,6 +520,7 @@ class SceneGraph:
                 size_m=tuple(map(float, size_m)) if size_m is not None else None,
                 color=entry.get("color"),
                 name=entry.get("name"),
+                model=entry.get("model") if isinstance(entry.get("model"), str) else None,
                 pos_set=pos_set,
             )
             graph.add(node)

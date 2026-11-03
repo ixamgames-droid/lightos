@@ -63,6 +63,7 @@ export function jsAddStageObjectData(json) {
     return createStageObject(
       d.type, d.position || null, d.size || null, d.color || null,
       d.rotation || 0, d.id || null, d.name || null,
+      d.modell || null,   // VIZ-67: Netz eines importierten Modells
     );
   } catch (e) {
     return null;
