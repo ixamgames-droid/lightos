@@ -87,7 +87,11 @@ class JsKonsolenWeiterleitung:
         # Zaehler zuruecksetzen, Unterdrueckt-Zaehler behalten (Nachtrag beim
         # naechsten Auftreten); ganz ruhige Eintraege verwerfen.
         self._je_meldung = {k: [0, v[1]] for k, v in self._je_meldung.items() if v[1]}
-        if len(self._je_meldung) > _MAX_SCHLUESSEL:
+        # CDX-65: ``>=`` — neue Eintraege entstehen nur noch unterhalb der
+        # Grenze; stuenden hier genau _MAX_SCHLUESSEL Reste, die nie wieder
+        # auftreten, bliebe die Tabelle fuer immer voll und keine neue Meldung
+        # kaeme mehr durch.
+        if len(self._je_meldung) >= _MAX_SCHLUESSEL:
             self._je_meldung.clear()
         return nachtrag
 
@@ -107,8 +111,20 @@ class JsKonsolenWeiterleitung:
             schluessel = (herkunft, stufe, ort, text)
             with self._lock:
                 aus = self._fenster_pruefen(self._uhr())
-                eintrag = self._je_meldung.setdefault(schluessel, [0, 0])
-                if eintrag[0] >= self._max_gleich or self._gesamt >= self._max_gesamt:
+                eintrag = self._je_meldung.get(schluessel)
+                if eintrag is None and (self._gesamt >= self._max_gesamt
+                                        or len(self._je_meldung) >= _MAX_SCHLUESSEL):
+                    # CDX-65: eine NEUE Meldung, die ohnehin nicht durchkommt,
+                    # bekommt keinen eigenen Eintrag — sonst wuchs die Tabelle bei
+                    # einer Flut wechselnder Texte bis zum naechsten Fenster
+                    # unbegrenzt. Sie zaehlt nur im Sammelzaehler.
+                    self._gesamt_weg += 1
+                    if self._gesamt_weg == 1:
+                        aus.append("[viz-js] zu viele JS-Meldungen — weitere in "
+                                   "diesem Fenster werden unterdrueckt")
+                    zeilen = aus
+                elif eintrag is not None and (eintrag[0] >= self._max_gleich
+                                              or self._gesamt >= self._max_gesamt):
                     eintrag[1] += 1
                     if self._gesamt >= self._max_gesamt:
                         self._gesamt_weg += 1
@@ -117,6 +133,8 @@ class JsKonsolenWeiterleitung:
                                        "diesem Fenster werden unterdrueckt")
                     zeilen = aus
                 else:
+                    if eintrag is None:
+                        eintrag = self._je_meldung[schluessel] = [0, 0]
                     eintrag[0] += 1
                     self._gesamt += 1
                     zusatz = f" (+{eintrag[1]} gleiche unterdrueckt)" if eintrag[1] else ""

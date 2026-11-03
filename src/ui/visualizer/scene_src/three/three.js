@@ -49,6 +49,7 @@ export const {
   Box3,
   BoxGeometry,
   BoxHelper,
+  BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   CircleGeometry,

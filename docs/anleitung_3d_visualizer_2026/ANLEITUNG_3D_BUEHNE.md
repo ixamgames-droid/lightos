@@ -134,6 +134,31 @@ Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Gr
 
 ![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
 
+### Eigene 3D-Datei importieren (STL, OBJ) (VIZ-67)
+
+Unter „Element hinzufügen" öffnet **„Datei importieren…"** eine eigene 3D-Datei —
+z. B. ein Möbel, eine Säule oder ein Hallen-Element aus einem CAD- oder 3D-Programm.
+
+1. Datei wählen: **STL** (binär oder Text) oder **OBJ**.
+2. **Einheit** angeben, in der das Modell gezeichnet ist: Millimeter, Zentimeter oder Meter.
+   CAD- und 3D-Druck-Dateien sind fast immer in Millimetern.
+3. **Ausrichtung:** „Zeigt die Z-Achse nach oben?" — bei STL/CAD meist **Ja**, bei OBJ meist **Nein**
+   (dann gilt Y als oben). Steht das Modell danach auf der Seite, einfach löschen und mit der
+   anderen Antwort neu importieren.
+
+Das Modell erscheint als **3D-Modell** in der Elementliste, steht auf dem Boden in der Mitte und
+ist neutral grau. Es lässt sich wie jedes Bühnenelement verschieben, drehen, in der Größe ändern
+(es wird dabei gestreckt), umbenennen und einfärben; `Strg+Z` nimmt den Import zurück.
+
+**Eingebettet:** Die Form wird in die Bühne und in die `.lshow` gespeichert, nicht nur ein Pfad.
+Die Show öffnet auch auf einem anderen Rechner vollständig, ohne die Originaldatei.
+
+**Grenzen:** höchstens **20 MB** Dateigröße und **200.000 Dreiecke**; das Modell darf höchstens
+60 m breit/tief und 30 m hoch werden. Ist eine Datei zu groß, kaputt oder ist die Einheit
+offensichtlich falsch, meldet LightOS das und legt nichts an. Materialien, Farben und Texturen
+aus der Datei werden nicht übernommen. Strahler docken an importierten Modellen nicht an.
+DXF folgt später (VIZ-67 Teil 2).
+
 ## Teil B — Geräte platzieren und hängen (Reiter „Fixtures")
 
 ![Modus Bauen, Reiter Fixtures: Spot 1 ist gewählt, Andocken ist an](img/03_geraet_platzieren.png)

@@ -174,10 +174,22 @@ class AbraeumenImWettlauf(unittest.TestCase):
         raise ProcessLookupError(3, "No such process")   # ... dann weg
 
     def test_verschwundener_zombie_gilt_als_tot(self):
+        # CDX-65: /proc ausdruecklich vorhanden - sonst ist der Test auf POSIX
+        # ohne procfs (macOS) immer rot, dort gilt der Fallback unten.
         from unittest import mock
         with mock.patch.object(os, "kill", side_effect=self._kill_attrappe), \
-                mock.patch("builtins.open", side_effect=FileNotFoundError):
+                mock.patch("builtins.open", side_effect=FileNotFoundError), \
+                mock.patch.object(os.path, "isdir", return_value=True):
             self.assertFalse(_lebt(self.PID))
+
+    def test_ohne_procfs_zaehlt_das_erfolgreiche_kill_null(self):
+        """CDX-65: POSIX ohne /proc (macOS): keine Zombie-Pruefung moeglich,
+        das erfolgreiche ``kill(pid, 0)`` entscheidet - der Prozess lebt."""
+        from unittest import mock
+        with mock.patch.object(os, "kill", side_effect=self._kill_attrappe), \
+                mock.patch("builtins.open", side_effect=FileNotFoundError), \
+                mock.patch.object(os.path, "isdir", return_value=False):
+            self.assertTrue(_lebt(self.PID))
 
     def test_beim_lesen_abgeraeumter_zombie_gilt_als_tot(self):
         """Zweiter Weg: ``open`` gelingt noch, ``read()`` liefert ESRCH."""

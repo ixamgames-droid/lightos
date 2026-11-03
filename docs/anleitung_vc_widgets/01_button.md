@@ -183,6 +183,18 @@ Derselbe Ablauf im 3D-Visualizer, von vorn auf die Bühne gesehen — PAR 1–4 
 - Die Taste merkt sich dazu, **welche** Gruppe gemeint ist — ihre Kennung, ihren Namen und ihren Ordner. Gibt es diese Gruppe nicht mehr (gelöscht, oder das VC-Layout wurde in eine andere Show geladen, in der dieselbe Nummer einer anderen Gruppe gehört), ist das Ziel **verloren**: die Taste schaltet dafür nichts dunkel und wird nicht zum globalen Blackout. Sie trägt dann einen rot gestrichelten Rahmen mit ⚠ (der Tooltip nennt die Gruppe), beim Drücken steht ein Hinweis in der Statusleiste, und in der Liste **Blackout-Ziel** steht „Gruppe: … — verloren (gelöscht oder aus einer anderen Show), bitte neu wählen“. Eine neu angelegte Gruppe übernimmt das Ziel **nie** — auch nicht, wenn sie dieselbe Nummer bekommt, genauso heißt und im selben Ordner liegt: gelöscht und neu angelegt ist eine andere Gruppe. Nur bei Zielen aus sehr alten Layouts, die noch keine Kennung tragen, entscheiden Name und Ordner. **Datei → Show prüfen & reparieren…** listet Tasten mit verlorenem Ziel auf.
 - Gespeichert wird das Ziel in der Show (`blackout_fids`, `blackout_group_ids`, je Gruppe dazu Kennung, Name und Ordner in `blackout_group_refs`); ältere Layouts ohne diese Felder laden als globaler Blackout. Layouts aus früheren Versionen trugen Gruppen-**Namen** (`blackout_groups`) und wirken unverändert weiter. Beim Öffnen der Einstellungen wird ein solcher Name zur Nummer, wenn genau eine Gruppe so heißt; heißen mehrere so, steht „mehrdeutig — bitte neu wählen“ dabei.
 
+## Bild auf der Taste (Galerie und Momentaufnahme aus 3D)
+
+Im **Bearbeiten-Modus** Rechtsklick auf die Taste → **„Hintergrundbild wählen…"**. Der Dialog zeigt die eingebauten Grafiken nach Reitern geordnet; ein Klick übernimmt sie. **„Eigene Datei…"** nimmt ein eigenes Bild (PNG, JPG, GIF, WebP, BMP). **„Hintergrundbild entfernen"** im selben Menü nimmt es wieder weg.
+
+**„Aus 3D-Ansicht aufnehmen"** (VCG-02) macht ein Bild der Lichtkegel, so wie sie gerade im 3D-Visualizer zu sehen sind — die Taste zeigt dann, was ihre Funktion auf der Bühne tut:
+
+1. Den **3D-Visualizer** öffnen und die **Funktion der Taste starten** (Taste drücken, Snap aufrufen …), bis die Kegel so stehen, wie die Taste es zeigen soll.
+2. Im Bearbeiten-Modus an der Taste **„Hintergrundbild wählen…" → „Aus 3D-Ansicht aufnehmen"**.
+3. Aus der Mitte des 3D-Bildes wird ein Ausschnitt im Format der Taste geschnitten, verkleinert (höchstens 256 px) und als Tastenbild gesetzt.
+
+Ist kein 3D-Fenster offen, kommt die Meldung „Erst den 3D-Visualizer öffnen und die Funktion der Taste starten". Das Bild ist eine **Momentaufnahme**: es ändert sich nicht von selbst, wenn du die Funktion der Taste oder das Rig später änderst — dann einfach neu aufnehmen. Es wird wie jede Galerie-Grafik in der Show-Datei (`.lshow`) mitgespeichert und ist auf einem anderen Rechner wieder da.
+
 ## Bindung an einen Effekt
 
 Bei den Aktionen **Funktion an/aus**, **Funktion (nur gehalten)** und **Effekt-Aktion (Live)** gilt der Button als effektgebunden. Gebunden wird über das Feld **Executor-Slot / Function-ID**, das Dropdown **Funktion/Chase (Name)** oder die **Steuert**-Liste (die bei Befüllung Vorrang hat). Gespeichert wird nur die `function_id` (plus optional weitere IDs); die eigentliche Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/effect_live.py` (`do_action` für „Effekt-Aktion", `start`/`stop` für die Toggle-/Flash-Aktionen). Dieselbe Bindung nutzt auch MIDI.

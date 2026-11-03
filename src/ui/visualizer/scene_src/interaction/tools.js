@@ -306,7 +306,8 @@ export function updateOutlines(notify = true) {
         wall: 'WAND', led_wall: 'LED-WAND', speaker: 'LAUTSPRECHER',
         audience: 'PUBLIKUM', dj_booth: 'DJ-BOOTH',
         beer_table: 'BIERTISCHGARNITUR', high_table: 'STEHTISCH',
-        bar_counter: 'BAR', riser_stairs: 'PODEST MIT TREPPE', foh_desk: 'MISCHPULT-TISCH'
+        bar_counter: 'BAR', riser_stairs: 'PODEST MIT TREPPE', foh_desk: 'MISCHPULT-TISCH',
+        imported_model: '3D-MODELL'
       };
       const nm = so.data.name || '';
       const tp = typeLabels[so.data.type] || String(so.data.type || '').toUpperCase();
