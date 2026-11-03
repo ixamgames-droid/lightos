@@ -138,7 +138,10 @@ Tabelle „DMX-Kanäle“ oder „DMX chart“.
    Lichtkegels laut Datenblatt; bei Zoom links den engsten, bei **bis** den
    weitesten Winkel. Die 3D-Ansicht zeichnet den Kegel damit (mit Zoom je nach
    Zoomwert dazwischen). „keine Angabe“ lässt den Kegel wie bisher aus Typ und
-   Zoom entstehen.
+   Zoom entstehen. Läuft der Zoom-Kanal laut Handbuch andersherum (DMX 0 = weit,
+   255 = eng), den Haken **Zoom-Kanal umgekehrt (0 = weit)** daneben setzen —
+   sonst zeigt die 3D-Ansicht den Kegel falsch herum. Die DMX-Ausgabe bleibt
+   davon unberührt.
 2. **Modus-Reiter** — je DMX-Modus ein Reiter. Den Namen änderst du im Feld
    **Modus-Name:** darüber oder mit **Modus umbenennen**.
 3. **Kanaltabelle** — eine Zeile je DMX-Kanal, in DMX-Reihenfolge. **Name** frei;

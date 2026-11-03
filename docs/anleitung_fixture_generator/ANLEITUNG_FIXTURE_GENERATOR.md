@@ -119,7 +119,10 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    weitesten Winkel eintragen; die 3D-Ansicht folgt dann dem Zoom-Kanal
    zwischen beiden. Bleibt das Feld auf „keine Angabe“, leitet die 3D-Ansicht
    den Kegel wie bisher aus Typ und Zoom ab. (Für einen Laser ohne Kegel
-   bleibt es leer.)
+   bleibt es leer.) Läuft der Zoom-Kanal laut Handbuch umgekehrt (DMX 0 = weit,
+   255 = eng), den Haken **Zoom-Kanal umgekehrt (0 = weit)** rechts daneben
+   setzen; dann zeigt die 3D-Ansicht den Kegel richtig herum. An der
+   DMX-Ausgabe ändert der Haken nichts.
 4. Gibt es für dein Gerät eine QLC+-Datei (`.qxf`), kannst du sie hier als
    Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
    Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn

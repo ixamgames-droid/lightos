@@ -9,7 +9,9 @@ ab. Die Regeln (Klemmen, Tauschen, fest/Spanne) stehen in
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QDoubleSpinBox, QHBoxLayout, QLabel, QWidget
+from PySide6.QtWidgets import (
+    QCheckBox, QDoubleSpinBox, QHBoxLayout, QLabel, QWidget,
+)
 
 from src.core import abstrahlwinkel as AW
 
@@ -19,6 +21,14 @@ TOOLTIP = (
     "Hat das Gerät Zoom: links den engsten, rechts („bis“) den weitesten "
     "Winkel eintragen — der Kegel folgt dann dem Zoom-Kanal zwischen beiden.\n"
     "„keine Angabe“ = wie bisher: der Kegel ergibt sich aus Gerätetyp und Zoom.")
+
+#: VIZ-111: Beschriftung + Erklaerung des Hakens fuer die Zoom-Laufrichtung.
+ZOOM_UMGEKEHRT_TEXT = "Zoom-Kanal umgekehrt (0 = weit)"
+ZOOM_UMGEKEHRT_TOOLTIP = (
+    "Üblich ist: Zoom-Kanal 0 = enger Strahl, 255 = weiter Strahl. Läuft der "
+    "Zoom dieses Geräts laut Handbuch andersherum (0 = weit, 255 = eng), hier "
+    "den Haken setzen — sonst zeigt der 3D-Visualizer den Kegel falsch herum.\n"
+    "Ändert nur das Bild im 3D, nicht die DMX-Ausgabe.")
 
 
 class AbstrahlwinkelFeld(QWidget):
@@ -49,6 +59,12 @@ class AbstrahlwinkelFeld(QWidget):
         lay.addWidget(self.spin_eng, 1)
         lay.addWidget(lbl)
         lay.addWidget(self.spin_weit, 1)
+        # VIZ-111: Laufrichtung des Zoom-Kanals (gilt auch ohne Winkelangabe).
+        self.cb_zoom_umgekehrt = QCheckBox(ZOOM_UMGEKEHRT_TEXT)
+        self.cb_zoom_umgekehrt.setToolTip(ZOOM_UMGEKEHRT_TOOLTIP)
+        self.cb_zoom_umgekehrt.setAccessibleName("Zoom-Kanal umgekehrt")
+        self.cb_zoom_umgekehrt.toggled.connect(lambda *_: self.geaendert.emit())
+        lay.addWidget(self.cb_zoom_umgekehrt)
         self.setToolTip(TOOLTIP)
 
     def werte(self) -> tuple[float, float]:
@@ -60,6 +76,14 @@ class AbstrahlwinkelFeld(QWidget):
         self.spin_eng.setValue(a)
         self.spin_weit.setValue(b if b != a else 0.0)
 
+    def zoom_umgekehrt(self) -> bool:
+        """VIZ-111: laeuft der Zoom-Kanal umgekehrt (0 = weit)?"""
+        return self.cb_zoom_umgekehrt.isChecked()
+
+    def setze_zoom_umgekehrt(self, an) -> None:
+        self.cb_zoom_umgekehrt.setChecked(bool(an))
+
     def nur_ansehen(self) -> None:
         for sp in (self.spin_eng, self.spin_weit):
             sp.setReadOnly(True)
+        self.cb_zoom_umgekehrt.setEnabled(False)

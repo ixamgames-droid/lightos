@@ -546,6 +546,8 @@ def create_user_profile(payload: dict, *, engine=None,
         from src.core import abstrahlwinkel as _AW
         prof.beam_angle_min, prof.beam_angle_max = _AW.normalisiere(
             payload.get("beam_angle_min"), payload.get("beam_angle_max"))
+        # VIZ-111: Laufrichtung des Zoom-Kanals (fehlt = normal, 0 = eng).
+        prof.zoom_inverted = bool(payload.get("zoom_inverted", False))
         s.add(prof)
         s.flush()
         # FM-73: keine zwei Modi gleichen Namens speichern — ein gepatchtes

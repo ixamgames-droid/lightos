@@ -63,6 +63,7 @@ Unbekannte Felder sind ein Fehler (Tippfehler fallen so auf).
 | `notizen` | nein | freier Text (Annahmen, Besonderheiten) |
 | `viz_model` | nein | 3D-Modell-Override (leer = Automatik) |
 | `abstrahlwinkel` | nein | Abstrahlwinkel des Lichtkegels laut Datenblatt, **voller** Winkel in Grad (1–170): eine Zahl (fest, z. B. `25`) oder bei Zoom `[eng, weit]` (z. B. `[8, 40]`). Der 3D-Visualizer zeichnet den Kegel damit; bei einer Spanne folgt er dem Zoom-Kanal (DMX 0 = eng, 255 = weit). Fehlt das Feld, leitet er den Kegel wie bisher aus Typ und Zoom ab (FM-64) |
+| `zoom_umgekehrt` | nein | `true`, wenn der Zoom-Kanal laut Handbuch umgekehrt läuft (DMX 0 = weit, 255 = eng). Der 3D-Visualizer dreht dann die Laufrichtung – für die Spanne aus `abstrahlwinkel` wie für die Ableitung aus dem Typ. Fehlt das Feld (oder `false`), gilt 0 = eng, 255 = weit. Ändert nur das 3D-Bild, nicht die DMX-Ausgabe (VIZ-111) |
 | `quelle` | ja | `{"titel", "version"?, "datum"?, "url"?}` — Handbuch-Titel, Version, Datum, URL des Herstellers. Nur Herkunftsangabe; `titel` ist Pflicht |
 | `herkunft` | ja | `{"art", "lizenz", "urheber"?, "original"?, "geaendert"?}` — siehe Kasten oben. `art`: `lightos` · `hersteller-handbuch` · `qlcplus` · `ofl`; `lizenz`: `eigen` (lightos/handbuch) · `Apache-2.0` (qlcplus) · `MIT` (ofl) |
 | `autor` | ja | wer die Datei geschrieben hat (`"LightOS"`) |

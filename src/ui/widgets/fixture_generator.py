@@ -170,6 +170,8 @@ class GeneratorModel:
     # FM-64: Abstrahlwinkel (eng, weit) in Grad, voller Winkel; fest = beide
     # gleich, (0, 0) = keine Angabe (3D wie bisher aus Typ/Zoom).
     abstrahlwinkel: tuple = (0.0, 0.0)
+    # VIZ-111: Zoom-Kanal laeuft umgekehrt (0 = weit). False = normal.
+    zoom_umgekehrt: bool = False
     modes: list[GenMode] = field(default_factory=list)
     # FM-76: Herkunft der geladenen Vorlage — die vier Felder ``quelle``/
     # ``herkunft``/``geprueft``/``autor`` wie in der Bibliotheksdatei.
@@ -248,6 +250,8 @@ def build_profile_payload(model: GeneratorModel) -> dict:
         # FM-64: Abstrahlwinkel (0/0 = keine Angabe).
         "beam_angle_min": _aw_paar(model)[0],
         "beam_angle_max": _aw_paar(model)[1],
+        # VIZ-111: Laufrichtung des Zoom-Kanals.
+        "zoom_inverted": bool(getattr(model, "zoom_umgekehrt", False)),
         "modes": modes_out,
     }
 
@@ -2033,6 +2037,7 @@ class FixtureGeneratorDialog(QDialog):
         from src.ui.widgets.abstrahlwinkel_feld import AbstrahlwinkelFeld
         self._abstrahlwinkel = AbstrahlwinkelFeld()
         self._abstrahlwinkel.setze(*_aw_paar(self._model))
+        self._abstrahlwinkel.setze_zoom_umgekehrt(self._model.zoom_umgekehrt)
         self._abstrahlwinkel.geaendert.connect(lambda *_: self._hinweise_planen())
         lbl_aw = QLabel("Abstrahlwinkel:")
         lbl_aw.setToolTip(self._abstrahlwinkel.toolTip())
@@ -2225,6 +2230,7 @@ class FixtureGeneratorDialog(QDialog):
         self._model.viz_model = self._cb_vizmodel.currentData() or ""
         self._model.power_w = self._spin_power.value()
         self._model.abstrahlwinkel = self._abstrahlwinkel.werte()   # FM-64
+        self._model.zoom_umgekehrt = self._abstrahlwinkel.zoom_umgekehrt()  # VIZ-111
         self._model.notes = self._edit_notes.text()
         for i in range(self._tabs.count()):
             self._tabs.widget(i).sync_from_widgets()
@@ -2374,6 +2380,8 @@ class FixtureGeneratorDialog(QDialog):
         self._cb_vizmodel.setCurrentIndex(vidx if vidx >= 0 else 0)
         self._spin_power.setValue(model.power_w)
         self._abstrahlwinkel.setze(*_aw_paar(model))   # FM-64
+        self._abstrahlwinkel.setze_zoom_umgekehrt(           # VIZ-111
+            getattr(model, "zoom_umgekehrt", False))
         self._edit_notes.setText(model.notes)
         self._reload_modes()
         self._revalidate()
@@ -2527,6 +2535,8 @@ def model_from_daten(daten: dict) -> GeneratorModel:
         notes=str(daten.get("notizen", "")),
         viz_model=str(daten.get("viz_model", "")),
         abstrahlwinkel=_AW.aus_daten(daten.get("abstrahlwinkel")),   # FM-64
+        zoom_umgekehrt=_AW.zoom_umgekehrt_aus_daten(                  # VIZ-111
+            daten.get(_AW.FELD_ZOOM_UMGEKEHRT)),
         modes=modes,
         herkunft=BF.herkunft_aus_daten(daten),
         herkunft_fehlt="" if BF.herkunft_aus_daten(daten) else (
