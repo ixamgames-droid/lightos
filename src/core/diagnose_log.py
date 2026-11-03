@@ -41,6 +41,7 @@ import os
 import platform
 import struct
 import sys
+import sysconfig
 import threading
 import zipfile
 
@@ -786,8 +787,19 @@ def _maschine_kurz(name) -> str:
     return _MASCHINEN_NAMEN.get(str(name or "").strip().upper(), "")
 
 
+def _interpreter_kurz(plattform) -> str:
+    """Architektur, fuer die der laufende Interpreter gebaut ist, aus
+    ``sysconfig.get_platform()`` (``win-amd64``, ``win-arm64``, ``win32``,
+    ``linux-x86_64``, ``macosx-11.0-arm64`` ...). Leer, wenn unbekannt."""
+    text = str(plattform or "").strip().lower()
+    if text == "win32":
+        return "x86"
+    return _maschine_kurz(text.rsplit("-", 1)[-1]) if "-" in text else ""
+
+
 def windows_architektur(wow_maschine: int | None, native_maschine: int | None,
-                        *, machine: str = "", env=None, bits: int = 64) -> str:
+                        *, machine: str = "", env=None, bits: int = 64,
+                        interpreter: str = "") -> str:
     """Text der Zeile ``Architektur:`` — reine Funktion, alle Werte kommen herein
     (damit unter Linux testbar).
 
@@ -796,7 +808,13 @@ def windows_architektur(wow_maschine: int | None, native_maschine: int | None,
     nicht ging. Achtung: fuer einen Prozess, der NICHT unter WOW64 laeuft, ist
     ``wow_maschine`` 0 — das gilt auch fuer ein x64-Python auf einem ARM64-Geraet
     (x64-Emulation ist kein WOW64). Die Prozess-Architektur kommt deshalb aus
-    ``machine`` (``platform.machine()``) bzw. ``PROCESSOR_ARCHITECTURE``.
+    ``interpreter`` (``sysconfig.get_platform()``), sonst aus ``machine``
+    (``platform.machine()``) bzw. ``PROCESSOR_ARCHITECTURE``.
+
+    XPLAT-61: ``platform.machine()`` meldet ab Python 3.12 unter Windows die
+    Architektur des RECHNERS (WMI), nicht die des Prozesses — ein emuliertes
+    x64-Python auf ARM64 sagt dort "ARM64", und die Zeile lautete faelschlich
+    "ARM64 nativ". Die Bauart des Interpreters (``win-amd64``) ist eindeutig.
 
     Rueckfall ohne Systemaufruf: ``PROCESSOR_ARCHITEW6432`` nennt bei einem
     32-Bit-Prozess die echte Maschine; ein emuliertes x64-Python auf ARM64
@@ -806,7 +824,7 @@ def windows_architektur(wow_maschine: int | None, native_maschine: int | None,
     prozess = ""
     if wow_maschine:
         prozess = _MASCHINEN.get(wow_maschine, "")
-    prozess = (prozess or _maschine_kurz(machine)
+    prozess = (prozess or _interpreter_kurz(interpreter) or _maschine_kurz(machine)
                or _maschine_kurz(env.get("PROCESSOR_ARCHITECTURE")))
     if not prozess and bits == 32:
         prozess = "x86"
@@ -866,9 +884,10 @@ def _iswow64process2() -> tuple[int, int] | None:
 
 
 def _windows_architektur() -> str:
-    """Prozess- und Maschinen-Architektur unter Windows. Ein x64-Python auf einem
-    ARM64-Geraet meldet ueber ``platform.machine()`` "AMD64" (emuliert) — erst
-    ``IsWow64Process2`` verraet die echte Maschine."""
+    """Prozess- und Maschinen-Architektur unter Windows. ``platform.machine()``
+    ist dafuer nicht verlaesslich (je nach Python-Version Prozess oder Rechner,
+    XPLAT-61) — der Prozess kommt aus ``sysconfig.get_platform()``, die echte
+    Maschine aus ``IsWow64Process2``."""
     bits = struct.calcsize("P") * 8
     try:
         machine = platform.machine()
@@ -879,8 +898,12 @@ def _windows_architektur() -> str:
     except Exception:
         paar = None
     wow, nativ = paar if paar else (None, None)
+    try:
+        interpreter = sysconfig.get_platform()
+    except Exception:
+        interpreter = ""
     return windows_architektur(wow, nativ, machine=machine, env=os.environ,
-                               bits=bits)
+                               bits=bits, interpreter=interpreter)
 
 
 #: Zeile ``Sitzungs-Log:``, wenn es die Datei nicht gibt (UI-87).
