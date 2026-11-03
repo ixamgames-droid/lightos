@@ -1,6 +1,0 @@
-ID: LAS-47
-Prioritaet: P3
-Status: todo
-Titel: SH-LASER3W: Effekt-Ziele, Kanal-Zuordnungen und VC-Bindungen auf laser_twist nach LAS-28 nachziehen (Rest aus CDX-65)
-
-CDX-65 migriert gespeicherte Programmer-, Paletten- und Cue-Werte alter SH-LASER3W-Shows (laser_twist#N -> laser_twist / laser_twist_y). Nicht umsetzbar per Umbenennen und deshalb offen: (1) Effekte (`target_attribute`) und `MappedChannelChange` mit Ziel `laser_twist` schrieben vor LAS-28 auf alle vier Flips, seitdem nur auf die beiden horizontalen; (2) VC-Bindungen an `laser_twist#N` werden nicht umgesetzt; (3) Shows ohne Altstands-Merkmal (nur `laser_twist#1`, kein `#2`/`#3`) setzt CDX-65 nur um, wenn der ZIP-Eintrag show.json vor dem 01.11.2026 gestempelt ist; spaeter gestempelte bleiben bewusst, weil sie auch zwischen #1211 und CDX-65 gespeichert sein koennen — eine alte Show, die erst nach dem Stichtag mit einem aelteren Programmstand (anderer Rechner) gespeichert wurde und nur den vertikalen Flip von A nutzt, stellt deshalb weiter B horizontal (Meldung `[still:show.las28]` im Sitzungs-Log); (4) eine generische Palette mit altem `#1`, aber ohne `#2`, gibt neben einem L2600 ihren `#1`-Wert am SH-LASER3W weiter auf B horizontal (der Override kann einen generischen Wert nicht loeschen). Klaeren, ob ein Effekt auf „alle Flips“ gewollt ist (Robin), dann gezielt nachziehen.
