@@ -250,6 +250,13 @@ und schwenkst/zoomst mit zwei.
    - **Max. Strahllänge** — deckelt die sichtbare Länge der Kegel (0 = aus). Hilft bei
      waagerecht oder nach oben zeigenden Köpfen, deren Strahl nie auf den Boden trifft.
      Ändert nichts an der DMX-Ausgabe.
+   - **Verlauf entlang des Strahls:** Jeder Lichtkegel ist an der Linse am hellsten und
+     wird zum Boden hin schwächer, wie Licht im Dunst. Ganz verschwindet er nicht: Am
+     Ende bleibt etwa ein Viertel, damit du siehst, wo der Strahl auftrifft. Das gilt auf
+     jeder Qualitätsstufe.
+
+     ![Ein einzelner Spot von schräg vorn: an der Linse hell, zum Boden hin schwächer, darunter der Lichtfleck](img/08_strahl_falloff.png)
+
    - **Laser** zeichnen keinen Kegel, sondern einen Fächer aus fünf dünnen Strahlen,
      die 25 m weit nach vorn über die Bühne ins Publikum reichen. Sie folgen Farbe und
      Helligkeit aus dem DMX, hängen aber bewusst **nicht** an Beam Opacity und Max.
