@@ -96,6 +96,8 @@ def test_architektur_zeile_unter_windows_nie_leer(monkeypatch):
     """Die Zeile im Kopfblock: auch wenn der Systemaufruf nichts liefert."""
     monkeypatch.setattr(d, "_iswow64process2", lambda: None)
     monkeypatch.setattr(d.platform, "machine", lambda: "AMD64")
+    # XPLAT-61: die Bauart des Interpreters zaehlt zuerst — fest vorgeben
+    monkeypatch.setattr(d.sysconfig, "get_platform", lambda: "win-amd64")
     monkeypatch.setenv("PROCESSOR_ARCHITECTURE", "AMD64")
     monkeypatch.delenv("PROCESSOR_ARCHITEW6432", raising=False)
     monkeypatch.delenv("PROCESSOR_IDENTIFIER", raising=False)
