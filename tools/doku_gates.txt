@@ -50,6 +50,7 @@ test_eng35_doku.py                 # Anleitung „Wer gewinnt?“ (Stufen, Snap-
 test_eng39_doku.py                 # Anleitung „Wer gewinnt?“, Abschnitt „Hinweis bei Überschneidungen“; Button-Anleitung; Fragmente
 test_eng37_modify_doku.py          # Dimmer-Matrix-Anleitung, Abschnitt Modify-Effekt: Tabelle gegen die Engine
 test_eng37_modify_sichtbar_doku.py  # Dimmer-Matrix §5 + Prioritaeten §8: Tasten-Zeichen, Chaser-Hinweis (Wortlaut aus dem Code), ENG-42/43
+test_eng37_gemischte_vorschau.py   # Dimmer-Matrix §5: Haken „Vorschau gemischt“ (Name aus dem Code)
 test_eng38_modify_farbe_doku.py    # Dimmer-Matrix-Anleitung, Modify im Stil Farbe: Tabelle gegen die Engine
 test_eng40_modify_kanalwahl_doku.py # Dimmer-Matrix-Anleitung, „Wirkt auf“: Tabelle gegen die Engine
 test_ui91_efx_reiter_geraeteliste.py # Anleitungen nennen „Auswahl übernehmen“ (EFX/Matrix)
