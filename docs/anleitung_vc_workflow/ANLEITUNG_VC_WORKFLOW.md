@@ -99,10 +99,11 @@ verdrahteten Knopfes führt LightOS dann durch den Aufbau:
 4. Im Abschnitt **„Ziel und Verhalten"** bei **„Ziele:"** (Liste „Schaltet mit") auf
    **„+ Funktion/Effekt hinzufügen"** klicken und in der neuen Zeile den Effekt wählen
    (hier *Effekt Feuer*).
-   > ⚠ Nicht über das Feld **„Funktion / Chase (Name):"** im zugeklappten Bereich
-   > **„Erweitert (Roh-ID / Executor-Slot)"**: Bei „Funktion an/aus" überschreibt die
-   > Liste „Ziele:" beim **OK** diese Wahl — bleibt sie leer, ist die Taste danach
-   > **ungebunden**.
+   > Alternativ geht auch das Feld **„Funktion / Chase (Name):"** im zugeklappten
+   > Bereich **„Erweitert (Roh-ID / Executor-Slot)"**: Die dort gewählte Funktion
+   > trägt sich sofort sichtbar in **„Ziele:"** ein (als erstes Ziel, weitere Ziele
+   > bleiben stehen), umgekehrt zeigt das Feld immer das erste Ziel. Beide Wege
+   > binden also dieselbe Taste; wer „Ziele:" leert, löst die Taste.
 
 ![Effekt gebunden](img/07_button_gebunden_feuer.png)
 
