@@ -560,6 +560,33 @@ def _b07(ui):
     return lbl
 
 
+# ── 8: Laengs-Falloff eines Strahls (VIZ-15, DOC-73) ────────────────────────
+# Ein einzelner Spot (Spot 1, hintere Traverse) mit offenem Farbrad vor dunkler
+# Szene, schraeg von vorn: der Kegel ist an der Linse voll und wird zum Boden
+# hin schwaecher (fixtures.js#beamFalloffTexture). Ein Spot statt eines Washs:
+# dessen breiter Kegel war bei hoher Deckkraft fast durchgehend weiss, der
+# Verlauf kaum zu sehen. Deckkraft wie in den anderen Bildern (35 %).
+
+# Spot 1 (x -1,5): die Sichtlinie von vorn rechts laeuft zwischen den Stuetzen
+# und unter den PARs der Front-Traverse durch (mit Spot 2 stand die rechte
+# vordere Stuetze mitten im Strahl).
+_KAM_FALLOFF = {"name": "Doku", "mode": "3D", "theta": 0.75, "phi": 1.45,
+                "radius": 11.0, "target": [-1.5, 3.2, -2.5]}
+
+
+def _v08(ui):
+    from anleitungsbilder.szenen_ausgabe_einrichten import frame_wie_ausgabe
+    _alles_grundstellung(ui)
+    _einstellung(ui, opacity=35, helligkeit=8, kegel=True, nebel=True, boden=True)
+    _farben(ui, intens=0, spot_intens=0, wash_intens=0)
+    s1, _s2 = ui.info["spots"]
+    ui.wert([s1], "intensity", 255)
+    ui.wert([s1], "color_wheel", 0)             # offen = weiss
+    frame_wie_ausgabe(ui)
+    _pan_tilt(ui, {s1: (128, 100)})
+    kamera(ui, _KAM_FALLOFF)
+
+
 _MAG, _AMB, _BLAU, _CYAN = (255, 0, 150), (255, 90, 0), (0, 60, 255), (0, 200, 255)
 _GIF_SCHRITTE = [
     # (Wash1, Wash2, Spot1, Spot2) je (pan, tilt), PAR-Farben, Wash-Farbe, Spot-Rad
@@ -593,4 +620,7 @@ SZENEN = [
           frames=[Frame(dauer_s=1.3, schritt=_gif_schritt(*s), dialog=_b07, warte_s=0.8)
                   for s in _GIF_SCHRITTE],
           titel="GIF: Moving Heads fahren, Farben wechseln"),
+    Szene("08_strahl_falloff", sektion="Bühne", vorher=_v08, dialog=_b07,
+          braucht_gpu=True, groesse=_GROESSE,
+          titel="Ein Spot von schräg vorn: Strahl an der Linse hell, zum Boden hin schwächer"),
 ]
