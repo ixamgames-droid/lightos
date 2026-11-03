@@ -72,6 +72,12 @@ class FixtureProfile(Base):
     # nach Apache-2.0 §4 bzw. MIT — nie verloren gehen oder zu „eigen“ werden.
     # Leer = keine Angabe (Builtins, Editor-/Generator-Profile, QLC+-Importe).
     herkunft: Mapped[str] = mapped_column(Text, default="")
+    # FM-64: Abstrahlwinkel laut Datenblatt, VOLLER Winkel in Grad. Fest =
+    # beide gleich; mit Zoom = Spanne eng..weit. 0/0 = keine Angabe -> der
+    # 3D-Kegel kommt wie bisher aus Geraetetyp/Zoom. Regeln:
+    # ``src/core/abstrahlwinkel.py``.
+    beam_angle_min: Mapped[float] = mapped_column(Float, default=0.0)
+    beam_angle_max: Mapped[float] = mapped_column(Float, default=0.0)
 
     manufacturer: Mapped[Manufacturer] = relationship(back_populates="fixtures")
     modes: Mapped[list[FixtureMode]] = relationship(
@@ -498,6 +504,12 @@ def migrate_fixtures_db(engine) -> None:
             if fcols and "herkunft" not in fcols:
                 conn.execute(text(
                     "ALTER TABLE fixtures ADD COLUMN herkunft TEXT DEFAULT ''"))
+            # FM-64: Abstrahlwinkel (0 = keine Angabe). Dieselbe Falle: das
+            # ORM fragt alle Modell-Spalten ab.
+            for _wcol in ("beam_angle_min", "beam_angle_max"):
+                if fcols and _wcol not in fcols:
+                    conn.execute(text(
+                        f"ALTER TABLE fixtures ADD COLUMN {_wcol} FLOAT DEFAULT 0"))
             # VIZ-50a: physische Rasterform eines Pixel-Panels (0 = nicht
             # hinterlegt -> der Renderer raet wie bisher). Dieselbe Falle wie bei
             # `pixel_order` (PR #514): ohne ALTER TABLE waere jede bestehende

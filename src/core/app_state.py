@@ -6599,6 +6599,8 @@ def clear_channel_cache():
     Programm neu startete. Wer hier etwas aendert, prueft beide Aufrufer."""
     _channel_cache.clear()
     _viz_model_override_cache.clear()
+    # FM-64: der Abstrahlwinkel haengt am Profil wie der viz_model-Override.
+    _abstrahlwinkel_cache.clear()
     # VIZ-50a: die Rasterform haengt am selben Modus wie die Kanaele — sie MUSS
     # ueber denselben Weg invalidiert werden, sonst zeigt das 3D-Panel nach einem
     # Modus-Wechsel die Form des alten Modus.
@@ -6694,6 +6696,36 @@ def viz_model_override_for(fixture) -> str:
         # als "kein Override" eingefroren. Naechster Aufruf versucht es neu.
         return ""
     _viz_model_override_cache[pid] = val
+    return val
+
+
+# FM-64: Cache profile_id -> (eng, weit) Abstrahlwinkel in Grad ((0, 0) =
+# keine Angabe). Gleiches Muster wie ``_viz_model_override_cache``.
+_abstrahlwinkel_cache: dict = {}
+
+
+def abstrahlwinkel_for(fixture) -> tuple[float, float]:
+    """FM-64: Abstrahlwinkel ``(eng, weit)`` aus dem Profil des gepatchten
+    Geraets — voller Winkel in Grad, ``(0.0, 0.0)`` = keine Angabe (dann
+    leitet der 3D-Visualizer den Kegel wie bisher aus Typ/Zoom ab).
+    Gecached pro Profil-ID; ``clear_channel_cache`` leert mit."""
+    from . import abstrahlwinkel as AW
+    pid = getattr(fixture, "fixture_profile_id", None)
+    if pid is None:
+        return (0.0, 0.0)
+    cached = _abstrahlwinkel_cache.get(pid)
+    if cached is not None:
+        return cached
+    try:
+        from .database.fixture_db import engine
+        from .database.models import FixtureProfile
+        with Session(engine()) as s:
+            prof = s.get(FixtureProfile, pid)
+            val = AW.aus_profil(prof) if prof else (0.0, 0.0)
+    except Exception:
+        # Wie beim viz_model-Override: Fehlerfall nicht einfrieren.
+        return (0.0, 0.0)
+    _abstrahlwinkel_cache[pid] = val
     return val
 
 

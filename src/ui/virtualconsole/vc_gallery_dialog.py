@@ -16,7 +16,7 @@ from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QMovie, QPixmap, QImageReader, QIcon
 from PySide6.QtWidgets import (
     QDialog, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QToolButton,
-    QLabel, QScrollArea, QWidget, QFileDialog, QTabWidget,
+    QLabel, QScrollArea, QWidget, QFileDialog, QTabWidget, QMessageBox,
 )
 
 from src.core.show import vc_assets, vc_gallery
@@ -40,10 +40,21 @@ _KAT_TITEL = {
 class VCGalleryDialog(QDialog):
     """Grafischer Auswaehler; nach Annahme steht der Key in ``selected_key``."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, seitenverhaeltnis: float | None = None):
         super().__init__(parent)
         self.setWindowTitle("Button-Grafik wählen")
         self.selected_key: str | None = None
+        # VCG-02: Seitenverhaeltnis der Taste fuer den Zuschnitt der
+        # Momentaufnahme — ohne Angabe aus der Groesse des Eltern-Widgets.
+        if seitenverhaeltnis is None:
+            try:
+                if parent is not None and parent.width() > 0 and parent.height() > 0:
+                    seitenverhaeltnis = parent.width() / parent.height()
+            except Exception:
+                seitenverhaeltnis = None
+        self._seitenverhaeltnis = seitenverhaeltnis or 1.0
+        self._aufnahme_laeuft = False
+        self._geschlossen = False
         self._movies: list[QMovie] = []      # am Leben halten (sonst GC -> keine Animation)
 
         root = QVBoxLayout(self)
@@ -72,12 +83,26 @@ class VCGalleryDialog(QDialog):
             tabs.addTab(leer, "—")
         root.addWidget(tabs, 1)
 
+        # VCG-02: Tastenbild als Momentaufnahme aus der 3D-Ansicht.
+        hinweis = QLabel(
+            "„Aus 3D-Ansicht aufnehmen“ macht ein Bild der offenen 3D-Ansicht "
+            "(Funktion der Taste vorher starten). Es ist eine Momentaufnahme — "
+            "sie wird nicht automatisch neu erzeugt.")
+        hinweis.setWordWrap(True)
+        root.addWidget(hinweis)
+
         row = QHBoxLayout()
         own = QPushButton("Eigene Datei…")
         own.clicked.connect(self._pick_own_file)
+        self._btn_aufnahme = QPushButton("Aus 3D-Ansicht aufnehmen")
+        self._btn_aufnahme.setToolTip(
+            "Nimmt das aktuelle Bild des 3D-Visualizers auf, schneidet es auf "
+            "das Format der Taste zu und setzt es als Tastenbild.")
+        self._btn_aufnahme.clicked.connect(self._aus_3d_aufnehmen)
         cancel = QPushButton("Abbrechen")
         cancel.clicked.connect(self.reject)
         row.addWidget(own)
+        row.addWidget(self._btn_aufnahme)
         row.addStretch(1)
         row.addWidget(cancel)
         root.addLayout(row)
@@ -155,6 +180,45 @@ class VCGalleryDialog(QDialog):
             return
         self.accept()
 
+    # ── VCG-02: Momentaufnahme aus der 3D-Ansicht ────────────────────────────
+    def _melden(self, text: str) -> None:
+        QMessageBox.information(self, "Aus 3D-Ansicht aufnehmen", text)
+
+    def _aus_3d_aufnehmen(self) -> None:
+        from src.ui.virtualconsole import vc_momentaufnahme as mom
+        if self._aufnahme_laeuft:
+            return
+        ansicht = mom.finde_3d_ansicht()
+        if ansicht is None:
+            self._melden(mom.MELDUNG_KEIN_3D)
+            return
+        self._aufnahme_laeuft = True
+        self._btn_aufnahme.setEnabled(False)
+        try:
+            mom.aufnehmen(ansicht, self._aufnahme_fertig)
+        except Exception as e:
+            print(f"[vc_gallery_dialog] 3D-Aufnahme fehlgeschlagen: {e}")
+            self._aufnahme_fertig("")
+
+    def _aufnahme_fertig(self, data_url) -> None:
+        # Asynchron: der Dialog kann inzwischen zu sein (Python-Attribute
+        # bleiben lesbar, auch wenn das Qt-Objekt schon weg ist).
+        if self._geschlossen:
+            return
+        from src.ui.virtualconsole import vc_momentaufnahme as mom
+        self._aufnahme_laeuft = False
+        self._btn_aufnahme.setEnabled(True)
+        try:
+            key = mom.als_tastenbild(data_url, self._seitenverhaeltnis)
+        except Exception as e:
+            print(f"[vc_gallery_dialog] Aufnahme speichern fehlgeschlagen: {e}")
+            key = None
+        if not key:
+            self._melden(mom.MELDUNG_FEHLGESCHLAGEN)
+            return
+        self.selected_key = key
+        self.accept()
+
     # ── Aufraeumen ────────────────────────────────────────────────────────────
     def _stop_movies(self) -> None:
         """Alle Vorschau-GIFs anhalten + Signale trennen (sonst laufen sie nach
@@ -171,6 +235,7 @@ class VCGalleryDialog(QDialog):
         # Wird von accept()/reject()/Esc/Fenster-Schliessen aufgerufen -> hier ist
         # der einzige garantierte Punkt, die Animationen zu stoppen.
         self._stop_movies()
+        self._geschlossen = True
         super().done(result)
 
 
