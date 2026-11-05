@@ -27,6 +27,26 @@ Im **Programmer → Tab Assistent** gibt es den Button
 Die folgenden Abschnitte erklären, wie du dasselbe von Hand und mit mehr
 Kontrolle baust.
 
+**Zoom-Vorlagen.** Für Geräte mit Zoom-Kanal bietet der Assistent drei
+fertige Zoom-Effekte an. Sie schreiben **nur den Zoom** – Dimmer und Farbe
+bleiben, wie sie sind:
+
+- **Zoom-Puls** – der Zoom atmet sanft zwischen eng und weit (Sinus).
+  „Halten" ist hier die Dauer eines ganzen Zyklus eng → weit → eng.
+- **Zoom-Welle** – dasselbe Atmen, aber über die gewählten Lampen
+  versetzt: jede Lampe ist ein Stück weiter im Zyklus, die Welle läuft durch
+  die Gruppe.
+- **Zoom im Takt** – der Zoom wechselt im Takt zwischen eng und weit
+  (Chaser an der Haupt-BPM, wie die anderen taktgleichen Vorlagen).
+
+Lampen ohne Zoom-Kanal sind bei diesen Vorlagen auf der Lampen-Seite
+**ausgegraut**; ist gar kein Gerät mit Zoom-Kanal gepatcht, stehen die drei
+Vorlagen ausgegraut mit dem Hinweis „kein Gerät mit Zoom-Kanal gepatcht" in
+der Liste. Puls und Welle entstehen als Effekt mit Ebenen (Ziel `zoom`) und
+lassen sich danach im Effekt-Ebenen-Editor weiter anpassen. Ist der Haken
+„Zoom-Kanal umgekehrt (0 = weit)" im Profil gesetzt, beachtet „Zoom im Takt"
+ihn: „Eng" bleibt eng.
+
 ---
 
 ## 1. Die drei „Geschwindigkeiten" in LightOS

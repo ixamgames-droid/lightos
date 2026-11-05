@@ -263,32 +263,73 @@ function importGeometrie(modell) {
   });
 }
 
+// VIZ-67 Teil 2 (DXF): `modell.lin` (Uint32-Paare) = Linien eines Grundrisses.
+// Sie teilen sich die Eckpunkte mit den Flaechen und werden als
+// THREE.LineSegments gebaut — ebenfalls je `key` einmal.
+function importLinien(modell) {
+  return geteilteGeometrie('importlin|' + modell.key, () => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(_b64Puffer(modell.pos)), 3));
+    g.setIndex(new THREE.BufferAttribute(new Uint32Array(_b64Puffer(modell.lin)), 1));
+    return g;
+  });
+}
+
 function buildImportModell(size, color, modell) {
   const group = new THREE.Group();
-  let geo = null;
-  if (modell && modell.key && modell.pos && modell.idx) {
+  let geo = null, linGeo = null;
+  const hatNetz = !!(modell && modell.key && modell.pos && typeof modell.idx === 'string');
+  if (hatNetz && modell.idx.length) {
     try { geo = importGeometrie(modell); } catch (e) { geo = null; }
   }
-  const mesh = geo
-    ? new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
-        color: color, roughness: 0.8, metalness: 0.05,
-        // STL-Dateien haben oft uneinheitlich gedrehte Dreiecke.
-        side: THREE.DoubleSide }))
-    // Ohne Netz (kaputte Show-Daten): sichtbarer Platzhalter statt nichts.
-    : new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
-        new THREE.MeshStandardMaterial({ color: color, wireframe: true }));
-  const bb = geo ? geo.boundingBox : null;
+  if (hatNetz && modell.lin) {
+    try { linGeo = importLinien(modell); } catch (e) { linGeo = null; }
+  }
+  const ok = !!(geo || linGeo);
+  // Natuerliche Groesse aus ALLEN Eckpunkten (Flaechen und Linien teilen sie).
+  const bb = geo ? geo.boundingBox : (linGeo ? linGeo.boundingBox : null);
   const nat = bb
     ? { x: bb.max.x - bb.min.x, y: bb.max.y - bb.min.y, z: bb.max.z - bb.min.z }
     : { x: 1, y: 1, z: 1 };
   const k = (groesse, eigen) => (eigen > 1e-6 ? groesse / eigen : 1);
-  mesh.scale.set(k(size.x, nat.x), k(size.y, nat.y), k(size.z, nat.z));
+  const skal = [k(size.x, nat.x), k(size.y, nat.y), k(size.z, nat.z)];
+  let mesh = null;
+  if (geo) {
+    mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: color, roughness: 0.8, metalness: 0.05,
+      // STL-Dateien haben oft uneinheitlich gedrehte Dreiecke.
+      side: THREE.DoubleSide }));
+  } else if (linGeo) {
+    // Nur Linien (flacher Hallenplan): unsichtbarer Quader zum Anklicken —
+    // der Raycaster von three r128 prueft `visible` nicht (s. umgebung_merge.js).
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshBasicMaterial({ color: color }));
+    mesh.visible = false;
+    mesh.userData.pickHilfe = true;
+    mesh.userData.eigeneFarbe = true;
+  } else {
+    // Ohne Netz (kaputte Show-Daten): sichtbarer Platzhalter statt nichts.
+    mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: color, wireframe: true }));
+  }
+  if (geo || !linGeo) mesh.scale.set(...skal);
+  else mesh.scale.set(Math.max(size.x, 1e-3), Math.max(size.y, 1e-3), Math.max(size.z, 1e-3));
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   group.add(mesh);
+  if (linGeo) {
+    const linien = new THREE.LineSegments(linGeo, new THREE.LineBasicMaterial({ color: color }));
+    linien.scale.set(...skal);
+    linien.userData.importLinien = true;
+    // Wie der 2D-Umriss (_outline2d): three raycastet Linien mit ~1 m Toleranz —
+    // Picking/Andocken/Zielen liefen sonst bis 1 m neben jeder Linie auf den
+    // Grundriss. Gepickt wird ueber die Flaechen bzw. die unsichtbare Hilfe.
+    linien.raycast = function () {};
+    group.add(linien);
+  }
   group.userData.color = color;
   group.userData.size = { x: size.x, y: size.y, z: size.z };
-  group.userData.importModell = geo ? modell.key : null;
+  group.userData.importModell = ok ? modell.key : null;
   return group;
 }
 
@@ -532,7 +573,8 @@ export function updateStageObjectProps(id, props) {
     } else if (so.mesh.isGroup) {
       so.mesh.traverse(c => {
         // VIZ-68: Gestell/Metall behaelt seine Farbe.
-        if (c.isMesh && c.material && c.material.color && !c.userData.eigeneFarbe) {
+        // VIZ-67 Teil 2: Linien eines DXF-Grundrisses faerben mit.
+        if ((c.isMesh || c.isLine) && c.material && c.material.color && !c.userData.eigeneFarbe) {
           c.material.color = col.clone();
         }
       });

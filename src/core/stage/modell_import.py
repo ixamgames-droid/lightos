@@ -1,4 +1,4 @@
-"""VIZ-67: eigene 3D-Dateien (STL, OBJ) als Buehnenobjekt importieren.
+"""VIZ-67: eigene 3D-Dateien (STL, OBJ, DXF) als Buehnenobjekt importieren.
 
 Reines Python-Modul ohne Qt und ohne neue Abhaengigkeit. Es liest eine
 STL- (binaer oder ASCII) oder OBJ-Datei, macht daraus ein indiziertes
@@ -16,7 +16,11 @@ Bewusst einfach gehalten:
   3D-Seite aus der Geometrie (``computeVertexNormals``).
 * STL: binaer oder ASCII. Die Normalen in der Datei werden ignoriert (viele
   Programme schreiben dort Nullen); gleiche Eckpunkte werden zusammengelegt.
-* Grenzen: ``MAX_DATEI_BYTES`` und ``MAX_DREIECKE``. Alles, was nicht passt
+* DXF (Teil 2): eigener Parser in :mod:`dxf_import`. Linien (z. B. ein
+  Hallenplan) reisen als Liniengeometrie mit (Format ``LSM2``) oder werden
+  auf Wunsch zu Wandstreifen hochgezogen. Ohne Linien bleibt das gepackte
+  Format byte-gleich ``LSM1`` — alte Shows laden unveraendert.
+* Grenzen: ``MAX_DATEI_BYTES``, ``MAX_DREIECKE`` und ``MAX_LINIEN``. Alles, was nicht passt
   oder kaputt ist, endet in :class:`ModellImportFehler` mit einer deutschen
   Meldung fuer den Nutzer — nie in einer rohen Ausnahme.
 """
@@ -31,11 +35,12 @@ import struct
 import sys
 import zlib
 from array import array
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 
 MAX_DATEI_BYTES = 20 * 1024 * 1024
 MAX_DREIECKE = 200_000
+MAX_LINIEN = 200_000      # Strecken (DXF-Linien)
 # Groesste Kante in Metern nach der Einheiten-Umrechnung. Groesser als das
 # Eingabefeld der Buehnenobjekte (60 m) heisst fast immer: falsche Einheit.
 MAX_KANTE_M = 60.0
@@ -43,10 +48,11 @@ MAX_HOEHE_M = 30.0   # Eingabefeld Hoehe
 # Kleinste gespeicherte Objektgroesse je Achse (flache Modelle, z. B. ein Schild).
 MIN_GROESSE_M = 0.01
 
-EINHEITEN = {"mm": 0.001, "cm": 0.01, "m": 1.0}
+EINHEITEN = {"mm": 0.001, "cm": 0.01, "m": 1.0, "in": 0.0254, "ft": 0.3048}
 
 _PRAEFIX = "lsm1:"
 _MAGIC = b"LSM1"
+_MAGIC_LINIEN = b"LSM2"   # wie LSM1, dazu Linien (Index-Paare)
 # Obergrenze fuer das Entpacken einer gespeicherten Zeichenkette (Schutz vor
 # einer manipulierten Show, die beim Laden Gigabytes aufblaeht).
 _MAX_ENTPACKT = 64 * 1024 * 1024
@@ -63,6 +69,10 @@ class Netz:
     positionen: array      # 'f', x,y,z je Eckpunkt
     indizes: array         # 'I', drei je Dreieck
     groesse: tuple[float, float, float]   # Bounding-Box (Breite, Hoehe, Tiefe)
+    # VIZ-67 Teil 2: Linien als Index-Paare in ``positionen`` (DXF-Grundriss)
+    linien: array = field(default_factory=lambda: array("I"))
+    # Hinweise fuer den Nutzer (z. B. nicht unterstuetzte DXF-Objekte)
+    hinweise: tuple = ()
 
     @property
     def eckpunkte(self) -> int:
@@ -71,6 +81,10 @@ class Netz:
     @property
     def dreiecke(self) -> int:
         return len(self.indizes) // 3
+
+    @property
+    def strecken(self) -> int:
+        return len(self.linien) // 2
 
 
 # ── Lesen ──────────────────────────────────────────────────────────────────
@@ -202,8 +216,7 @@ def _text(daten: bytes) -> str:
     return daten.decode("utf-8", errors="replace")
 
 
-def lies_datei(pfad: str, einheit: str = "mm", z_oben: bool = False) -> Netz:
-    """Datei lesen und als :class:`Netz` (Meter, zentriert, Y oben) liefern."""
+def _datei_bytes(pfad: str) -> bytes:
     try:
         groesse = os.path.getsize(pfad)
     except OSError:
@@ -217,22 +230,53 @@ def lies_datei(pfad: str, einheit: str = "mm", z_oben: bool = False) -> Netz:
             daten = f.read()
     except OSError:
         raise ModellImportFehler("Die Datei lässt sich nicht lesen.") from None
+    return daten
+
+
+def lies_datei(pfad: str, einheit: str = "mm", z_oben: bool = False,
+               wand_hoehe_m: float | None = None) -> Netz:
+    """Datei lesen und als :class:`Netz` (Meter, zentriert, Y oben) liefern.
+    ``wand_hoehe_m`` (nur DXF): Linien als Waende dieser Hoehe hochziehen."""
+    daten = _datei_bytes(pfad)
     endung = os.path.splitext(pfad)[1].lower()
-    return lies_bytes(daten, endung, einheit, z_oben)
+    return lies_bytes(daten, endung, einheit, z_oben, wand_hoehe_m)
 
 
-def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
-               z_oben: bool = False) -> Netz:
-    """Wie :func:`lies_datei`, aber aus Bytes (``endung`` = ``.stl``/``.obj``)."""
-    if einheit not in EINHEITEN:
-        raise ModellImportFehler(f"Unbekannte Einheit: {einheit}")
+@dataclass
+class DxfInfo:
+    """Was die Import-Abfrage vorab ueber eine DXF-Datei wissen muss."""
+
+    einheit: str | None    # aus $INSUNITS, None = nicht angegeben
+    dreiecke: int
+    linien: int
+
+
+def dxf_info(pfad: str) -> DxfInfo:
+    """DXF vorab lesen: Einheiten-Vorschlag und ob es Linien gibt."""
+    from .dxf_import import lies_dxf
+    roh = lies_dxf(_pruefe_bytes(_datei_bytes(pfad)))
+    return DxfInfo(einheit=roh.einheit, dreiecke=roh.dreiecke, linien=roh.linien)
+
+
+def _pruefe_bytes(daten: bytes) -> bytes:
     if len(daten) > MAX_DATEI_BYTES:
         raise ModellImportFehler(
             f"Die Datei ist {len(daten) / 1024 / 1024:.1f} MB groß — erlaubt sind höchstens "
             f"{MAX_DATEI_BYTES // 1024 // 1024} MB. Bitte das Modell vereinfachen.")
     if not daten:
         raise ModellImportFehler("Die Datei ist leer.")
+    return daten
+
+
+def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
+               z_oben: bool = False, wand_hoehe_m: float | None = None) -> Netz:
+    """Wie :func:`lies_datei`, aber aus Bytes (``endung`` = ``.stl``/``.obj``/``.dxf``)."""
+    if einheit not in EINHEITEN:
+        raise ModellImportFehler(f"Unbekannte Einheit: {einheit}")
+    _pruefe_bytes(daten)
     endung = (endung or "").lower()
+    if endung == ".dxf":
+        return _lies_dxf(daten, EINHEITEN[einheit], wand_hoehe_m)
     if endung == ".stl":
         if _ist_binaer_stl(daten):
             s = _lies_stl_binaer(daten)
@@ -244,13 +288,30 @@ def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
     elif endung == ".obj":
         s = _lies_obj(_text(daten))
     else:
-        raise ModellImportFehler("Nur STL- und OBJ-Dateien lassen sich importieren.")
+        raise ModellImportFehler("Nur STL-, OBJ- und DXF-Dateien lassen sich importieren.")
     return _normieren(s.pos, s.idx, EINHEITEN[einheit], z_oben)
 
 
-def _normieren(pos: array, idx: array, faktor: float, z_oben: bool) -> Netz:
+def _lies_dxf(daten: bytes, faktor: float, wand_hoehe_m: float | None) -> Netz:
+    from .dxf_import import lies_dxf, linien_zu_waenden
+    roh = lies_dxf(daten)
+    # DXF-Weltkoordinaten haben immer Z oben.
+    if wand_hoehe_m is not None and roh.linien:
+        if not (0.0 < wand_hoehe_m <= MAX_HOEHE_M):
+            raise ModellImportFehler(
+                f"Die Wandhöhe muss zwischen 0 und {MAX_HOEHE_M:.0f} m liegen.")
+        pos, idx = linien_zu_waenden(roh, wand_hoehe_m / faktor)
+        netz = _normieren(pos, idx, faktor, True)
+    else:
+        netz = _normieren(roh.pos, roh.idx, faktor, True, roh.lin)
+    netz.hinweise = roh.hinweise
+    return netz
+
+
+def _normieren(pos: array, idx: array, faktor: float, z_oben: bool,
+               linien: array | None = None) -> Netz:
     n = len(pos) // 3
-    if n == 0 or not idx:
+    if n == 0 or not (idx or linien):
         raise ModellImportFehler("Das Modell enthält keine Geometrie.")
     out = array("f", bytes(4 * 3 * n))
     for i in range(n):
@@ -273,7 +334,8 @@ def _normieren(pos: array, idx: array, faktor: float, z_oben: bool) -> Netz:
         for a in range(3):
             out[3 * i + a] -= mitte[a]
     return Netz(positionen=out, indizes=array("I", idx),
-                groesse=tuple(float(g) for g in groesse))
+                groesse=tuple(float(g) for g in groesse),
+                linien=array("I", linien or ()))
 
 
 # ── Einbetten (Zeichenkette in der Show) ────────────────────────────────────
@@ -286,9 +348,16 @@ def _le(a: array) -> bytes:
 
 
 def packen(netz: Netz) -> str:
-    """Netz -> ``lsm1:<base64(zlib(...))>`` (fuer ``StageElement.model``)."""
-    roh = (_MAGIC + struct.pack("<II", netz.eckpunkte, netz.dreiecke)
-           + _le(netz.positionen) + _le(netz.indizes))
+    """Netz -> ``lsm1:<base64(zlib(...))>`` (fuer ``StageElement.model``).
+
+    Ohne Linien: Binaerformat ``LSM1`` wie seit Teil 1. Mit Linien: ``LSM2``
+    (Kopf mit dritter Zahl, Linien-Indizes am Ende)."""
+    if netz.strecken:
+        roh = (_MAGIC_LINIEN + struct.pack("<III", netz.eckpunkte, netz.dreiecke, netz.strecken)
+               + _le(netz.positionen) + _le(netz.indizes) + _le(netz.linien))
+    else:
+        roh = (_MAGIC + struct.pack("<II", netz.eckpunkte, netz.dreiecke)
+               + _le(netz.positionen) + _le(netz.indizes))
     return _PRAEFIX + base64.b64encode(zlib.compress(roh, 6)).decode("ascii")
 
 
@@ -306,27 +375,43 @@ def entpacken(text: str) -> Netz:
         if isinstance(e, ModellImportFehler):
             raise
         raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.") from None
-    if len(roh) < 12 or roh[:4] != _MAGIC:
+    if len(roh) >= 16 and roh[:4] == _MAGIC_LINIEN:
+        nv, nt, nl = struct.unpack_from("<III", roh, 4)
+        kopf = 16
+        if nl == 0:
+            raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.")
+    elif len(roh) >= 12 and roh[:4] == _MAGIC:
+        nv, nt = struct.unpack_from("<II", roh, 4)
+        nl, kopf = 0, 12
+        if nt == 0:
+            raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.")
+    else:
         raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.")
-    nv, nt = struct.unpack_from("<II", roh, 4)
-    if nt > MAX_DREIECKE or len(roh) != 12 + 12 * nv + 12 * nt or nv == 0 or nt == 0:
+    if (nt > MAX_DREIECKE or nl > MAX_LINIEN or nv == 0
+            or len(roh) != kopf + 12 * nv + 12 * nt + 8 * nl):
         raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.")
+    a, b = kopf + 12 * nv, kopf + 12 * nv + 12 * nt
     pos = array("f")
-    pos.frombytes(roh[12:12 + 12 * nv])
+    pos.frombytes(roh[kopf:a])
     idx = array("I")
-    idx.frombytes(roh[12 + 12 * nv:])
+    idx.frombytes(roh[a:b])
+    lin = array("I")
+    lin.frombytes(roh[b:])
     if sys.byteorder != "little":
         pos.byteswap()
         idx.byteswap()
-    if max(idx) >= nv or not all(math.isfinite(v) for v in pos):
+        lin.byteswap()
+    if (max(idx, default=0) >= nv or max(lin, default=0) >= nv
+            or not all(math.isfinite(v) for v in pos)):
         raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.")
     groesse = tuple(float(max(pos[a::3]) - min(pos[a::3])) for a in range(3))
-    return Netz(positionen=pos, indizes=idx, groesse=groesse)
+    return Netz(positionen=pos, indizes=idx, groesse=groesse, linien=lin)
 
 
 @lru_cache(maxsize=16)
 def js_daten(text: str) -> dict | None:
-    """Payload fuer die 3D-Seite: ``{key, pos, idx}`` (base64, Little Endian),
+    """Payload fuer die 3D-Seite: ``{key, pos, idx}`` (base64, Little Endian;
+    mit Linien zusaetzlich ``lin``),
     oder None bei einer kaputten Zeichenkette. Gemerkt, weil jedes Neuladen
     der Buehne jedes Objekt erneut schickt."""
     try:
@@ -334,11 +419,14 @@ def js_daten(text: str) -> dict | None:
     except ModellImportFehler as e:
         print(f"[stage] Importiertes Modell nicht lesbar: {e}")
         return None
-    return {
+    out = {
         "key": hashlib.sha1(text.encode("ascii", "replace")).hexdigest()[:16],
         "pos": base64.b64encode(_le(netz.positionen)).decode("ascii"),
         "idx": base64.b64encode(_le(netz.indizes)).decode("ascii"),
     }
+    if netz.strecken:
+        out["lin"] = base64.b64encode(_le(netz.linien)).decode("ascii")
+    return out
 
 
 def element_groesse(netz: Netz) -> tuple[float, float, float]:

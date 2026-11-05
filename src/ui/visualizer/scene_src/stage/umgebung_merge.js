@@ -216,6 +216,9 @@ function _zusammenfassen() {
     const teile = [];
     let ok = true;
     w.traverse(o => {
+      // VIZ-67 Teil 2: Linien (DXF-Grundriss) kann der Sammelkoerper nicht
+      // zeichnen — das Objekt bleibt einzeln, sonst verschwaenden sie.
+      if (ok && (o.isLine || o.isPoints) && _sichtbarKette(o, w)) { ok = false; return; }
       if (!ok || !o.isMesh || !_sichtbarKette(o, w)) return;
       if (!_tauglich(o)) ok = false; else teile.push(o);
     });

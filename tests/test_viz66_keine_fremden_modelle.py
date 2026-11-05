@@ -22,7 +22,8 @@ VIS = ROOT / "src/ui/visualizer"
 
 #: Endungen fuer 3D-Modelle/Meshes. Test-Fixtures duerften sie unter
 #: ``tests/fixtures/`` tragen — derzeit gibt es keine.
-MODELL_ENDUNGEN = (".dae", ".obj", ".fbx", ".gltf", ".glb", ".3ds", ".stl", ".ply", ".mtl")
+MODELL_ENDUNGEN = (".dae", ".obj", ".fbx", ".gltf", ".glb", ".3ds", ".stl", ".ply", ".mtl",
+                   ".dxf")   # VIZ-67 Teil 2: DXF-Beispiele nur unter tests/fixtures/
 
 
 def _repo_dateien():

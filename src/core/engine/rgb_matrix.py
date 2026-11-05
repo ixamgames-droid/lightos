@@ -1160,9 +1160,9 @@ class RgbMatrixInstance(Function):
     def zellen_ablesen(self, universes, patch_cache) -> list:
         """ENG-37 (gemischte Vorschau): je Zelle ablesen, was die Lampe in
         ``universes`` zeigt — im Stil Dimmer die Helligkeit als Grau, in den
-        Farb-Stilen die Farbe (Rot/Gruen/Blau, ein Weiss-Kanal kommt auf alle
-        drei). Liest dieselben Kanaele, die ``write`` fuer die Zelle schreibt
-        (``_ziel_kanaele``). ``None`` fuer Luecken und Zellen ohne Geraet bzw.
+        Farb-Stilen die Farbe (``color_utils.visual_rgb``: Rot/Gruen/Blau,
+        Weiss auf alle drei, Amber/UV additiv — CDX-67). Liest dieselben
+        Kanaele, die ``write`` fuer die Zelle schreibt (``_ziel_kanaele``). ``None`` fuer Luecken und Zellen ohne Geraet bzw.
         ohne passenden Kanal. Rechnet nichts — die Verrechnung macht
         ``modify.vorschau_mischen`` mit derselben Regel wie der Renderer."""
         try:
@@ -1170,8 +1170,11 @@ class RgbMatrixInstance(Function):
                                             channels_for_head,
                                             shared_master_channels,
                                             _DIM_INTENSITY_ATTRS)
+            from src.core.color_utils import visual_rgb as _visual_rgb
         except Exception:
             return []
+        _ANZEIGE_FARB_ATTRS = ("color_r", "color_g", "color_b", "color_w",
+                               "color_a", "color_uv")
         n = int(self.cols or 0) * int(self.rows or 0)
         out: list = [None] * n
         grid = list(self.fixture_grid or [])
@@ -1201,10 +1204,12 @@ class RgbMatrixInstance(Function):
                           if a in werte), None)
                 if v is not None:
                     out[idx] = (v, v, v)
-            elif any(a in werte for a in ("color_r", "color_g", "color_b", "color_w")):
-                w = werte.get("color_w", 0)
-                out[idx] = tuple(min(255, werte.get(a, 0) + w)
-                                 for a in ("color_r", "color_g", "color_b"))
+            elif any(a in werte for a in _ANZEIGE_FARB_ATTRS):
+                # CDX-67: Anzeigefarbe nach DERSELBEN Regel wie 3D/2D-Plan
+                # (visual_rgb): Weiss auf alle drei, Amber/UV als eigene
+                # Emitter additiv — sonst malt ein Modify, der nur Amber
+                # oder UV faehrt, die aktive Lampe schwarz.
+                out[idx] = _visual_rgb(werte)
         return out
 
     def _weiss_achse_schreiben(self, universes, patch_cache, grid,

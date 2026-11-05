@@ -134,13 +134,13 @@ Gespeichert wird mit der Bühne ([Teil F](#teil-f--speichern)) — Typ, Lage, Gr
 
 ![Objekt-Bibliothek: 2 × 3 Biertischgarnituren, Bar, Podest mit Treppe, Stehtische](viz68_objekt_bibliothek.png)
 
-### Eigene 3D-Datei importieren (STL, OBJ) (VIZ-67)
+### Eigene 3D-Datei importieren (STL, OBJ, DXF) (VIZ-67)
 
 Unter „Element hinzufügen" öffnet **„Datei importieren…"** eine eigene 3D-Datei —
 z. B. ein Möbel, eine Säule oder ein Hallen-Element aus einem CAD- oder 3D-Programm.
 
-1. Datei wählen: **STL** (binär oder Text) oder **OBJ**.
-2. **Einheit** angeben, in der das Modell gezeichnet ist: Millimeter, Zentimeter oder Meter.
+1. Datei wählen: **STL** (binär oder Text), **OBJ** oder **DXF** (siehe unten).
+2. **Einheit** angeben, in der das Modell gezeichnet ist: Millimeter, Zentimeter, Meter, Zoll oder Fuß.
    CAD- und 3D-Druck-Dateien sind fast immer in Millimetern.
 3. **Ausrichtung:** „Zeigt die Z-Achse nach oben?" — bei STL/CAD meist **Ja**, bei OBJ meist **Nein**
    (dann gilt Y als oben). Steht das Modell danach auf der Seite, einfach löschen und mit der
@@ -157,7 +157,26 @@ Die Show öffnet auch auf einem anderen Rechner vollständig, ohne die Originald
 60 m breit/tief und 30 m hoch werden. Ist eine Datei zu groß, kaputt oder ist die Einheit
 offensichtlich falsch, meldet LightOS das und legt nichts an. Materialien, Farben und Texturen
 aus der Datei werden nicht übernommen. Strahler docken an importierten Modellen nicht an.
-DXF folgt später (VIZ-67 Teil 2).
+
+#### DXF-Zeichnungen (Hallenpläne aus dem CAD)
+
+DXF-Dateien müssen im **Textformat (ASCII-DXF)** gespeichert sein; eine binäre DXF lehnt LightOS
+mit einem Hinweis ab. Ablauf wie oben, mit drei Unterschieden:
+
+- **Einheit:** Steht in der Datei eine Einheit (`$INSUNITS`), ist sie in der Abfrage schon
+  vorgewählt („Die Datei gibt an: …"). Ohne Angabe ist Millimeter vorgewählt.
+- **Keine Ausrichtungs-Frage:** In DXF zeigt die Z-Achse immer nach oben.
+- **Linien als Wände?** Enthält die Zeichnung Linien (typisch für einen Hallenplan), fragt LightOS
+  „Sollen die Linien als Wände hochgezogen werden?". **Nein** zeigt sie als flache Linien auf dem
+  Boden — gut zum Ausrichten der Bühne auf dem Grundriss. **Ja** fragt die Wandhöhe in Metern ab und
+  macht aus jeder Linie einen dünnen Wandstreifen. **Abbrechen** importiert nichts.
+
+Übernommen werden Flächen (`3DFACE`, Polyface- und Polygon-Netze, `MESH`), Linien (`LINE`,
+`LWPOLYLINE`, `POLYLINE`, Kreise und Bögen als kurze Strecken) und Blöcke über `INSERT`.
+Texte, Bemaßungen, Schraffuren, Volumenkörper (`3DSOLID`) und Ähnliches werden weggelassen;
+LightOS sagt nach dem Import, was nicht übernommen wurde. Für Linien gilt zusätzlich eine
+Grenze von **200.000 Strecken**. Auch die Linien werden in die Show eingebettet.
+glTF-Import ist nicht vorgesehen.
 
 ## Teil B — Geräte platzieren und hängen (Reiter „Fixtures")
 
