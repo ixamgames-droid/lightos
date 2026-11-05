@@ -28,9 +28,72 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 # finden Schriften ueber fontconfig/CoreText — dort bleibt alles, wie es ist.
 # Ein vom Aufrufer gesetztes QT_QPA_FONTDIR gewinnt. Muss vor der ersten
 # QApplication stehen (die Plattform liest die Variable beim Start).
+#
+# QA-114: NICHT der ganze Windows-Schriftordner. Liegen dort weitere Schriften
+# (z. B. aus Office), nimmt Qt fuer die Standardschrift die alphabetisch erste
+# Familie („AGA Arabesque“: Text 279 statt 148 px breit), QtWebEngine erbt sie
+# als sans-serif — gemessen 02.11.2026 auf einem Windows-Rechner, 13 Testdateien
+# rot ohne Fehler im Code. Deshalb ein fester Ordner im Temp nur mit den
+# Schriften unten: jeder Windows-Rechner misst dann wie die CI.
+_TEST_SCHRIFTEN = ("arial.ttf", "arialbd.ttf", "segoeui.ttf", "segoeuib.ttf",
+                   "seguisym.ttf", "consola.ttf")
+
+
+def _schriftordner_passt(ordner, quellen):
+    """True, wenn ``ordner`` genau die Dateien aus ``quellen`` (Name, Groesse)
+    enthaelt — nichts fehlt, nichts Fremdes dazu."""
+    try:
+        if sorted(os.listdir(ordner)) != sorted(name for name, _, _ in quellen):
+            return False
+        return all(os.path.getsize(os.path.join(ordner, name)) == groesse
+                   for name, groesse, _ in quellen)
+    except OSError:
+        return False
+
+
+def _fester_schriftordner(quelle, basis):
+    """Kopiert die ``_TEST_SCHRIFTEN`` aus ``quelle`` in einen Ordner unter
+    ``basis`` und gibt ihn zurueck; None, wenn keine davon in ``quelle`` liegt.
+
+    Der Name haengt an Groesse und Zeitstempel der Quellen: alle Testprozesse
+    (auch parallele Segmente) teilen sich denselben Ordner, und eine per Update
+    getauschte Schrift ergibt einen neuen. Aufgebaut wird in einem eigenen
+    Ordner und erst fertig umbenannt — ein halb kopierter Ordner ist nie sichtbar."""
+    quellen = []
+    for name in _TEST_SCHRIFTEN:
+        try:
+            st = os.stat(os.path.join(quelle, name))
+        except OSError:
+            continue
+        quellen.append((name, st.st_size, st.st_mtime_ns))
+    if not quellen:
+        return None
+    kennung = hashlib.sha1(repr(quellen).encode("utf-8")).hexdigest()[:12]
+    ziel = os.path.join(basis, f"lightos_qt_schriften_{kennung}")
+    if _schriftordner_passt(ziel, quellen):
+        return ziel
+    if os.path.isdir(ziel):                 # beschaedigt (Datei fehlt/fremd) -> neu
+        shutil.rmtree(ziel, ignore_errors=True)
+    bau = tempfile.mkdtemp(prefix="lightos_qt_schriften_bau_", dir=basis)
+    try:
+        for name, _, _ in quellen:
+            shutil.copyfile(os.path.join(quelle, name), os.path.join(bau, name))
+        try:
+            os.rename(bau, ziel)
+        except OSError:
+            # Ein paralleler Prozess war schneller: dessen fertiger Ordner gilt.
+            if not _schriftordner_passt(ziel, quellen):
+                raise
+        return ziel
+    finally:
+        shutil.rmtree(bau, ignore_errors=True)
+
+
 def _offscreen_schriftordner(umgebung, plattform=sys.platform):
-    """Setzt in ``umgebung`` QT_QPA_FONTDIR auf den Windows-Schriftordner, wenn
-    die Plattform „offscreen“ ist und noch kein Schriftordner gesetzt ist.
+    """Setzt in ``umgebung`` QT_QPA_FONTDIR auf einen festen Schriftordner
+    (QA-114), wenn die Plattform „offscreen“ ist und noch kein Schriftordner
+    gesetzt ist. Fehlen alle festen Schriften, bleibt es beim ganzen
+    Windows-Ordner — besser als gar keine Schrift (QA-99).
     Gibt den gesetzten Ordner zurueck, sonst None."""
     if not plattform.startswith("win"):
         return None
@@ -42,6 +105,10 @@ def _offscreen_schriftordner(umgebung, plattform=sys.platform):
     ordner = os.path.join(windows, "Fonts")
     if not os.path.isdir(ordner):
         return None
+    try:
+        ordner = _fester_schriftordner(ordner, tempfile.gettempdir()) or ordner
+    except OSError:
+        pass                                # Temp nicht beschreibbar -> wie QA-99
     umgebung["QT_QPA_FONTDIR"] = ordner
     return ordner
 
