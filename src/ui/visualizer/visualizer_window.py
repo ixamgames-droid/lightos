@@ -3835,7 +3835,7 @@ class VisualizerWindow(QMainWindow):
         self._btn_modell_import = QPushButton("Datei importieren…")
         self._btn_modell_import.setMinimumHeight(40)
         self._btn_modell_import.setToolTip(
-            "Eigenes 3D-Modell (STL oder OBJ) als Bühnenobjekt einfügen.\n"
+            "Eigenes 3D-Modell (STL, OBJ oder DXF) als Bühnenobjekt einfügen.\n"
             "Das Modell wird in die Show eingebettet — die Originaldatei "
             "wird danach nicht mehr gebraucht.")
         self._btn_modell_import.clicked.connect(weak_slot(self._on_import_model_clicked))
@@ -5067,22 +5067,65 @@ class VisualizerWindow(QMainWindow):
     def _on_import_model_clicked(self):
         """VIZ-67: Datei waehlen, Einheit abfragen, als Buehnenobjekt anlegen."""
         from PySide6.QtWidgets import QFileDialog
+        from src.core.stage import modell_import as mi
         eltern = self if isinstance(self, QWidget) else None
         pfad, _ = QFileDialog.getOpenFileName(
             eltern, "3D-Modell importieren", "",
-            "3D-Modelle (*.stl *.STL *.obj *.OBJ);;STL (*.stl *.STL);;OBJ (*.obj *.OBJ)")
+            "3D-Modelle (*.stl *.STL *.obj *.OBJ *.dxf *.DXF);;STL (*.stl *.STL);;"
+            "OBJ (*.obj *.OBJ);;DXF (*.dxf *.DXF)")
         if not pfad:
             return
         ist_stl = pfad.lower().endswith(".stl")
-        einheiten = ["Millimeter (mm)", "Zentimeter (cm)", "Meter (m)"]
+        ist_dxf = pfad.lower().endswith(".dxf")
+        info = None
+        if ist_dxf:
+            # VIZ-67 Teil 2: vorab lesen — $INSUNITS als Vorschlag, Linien?
+            try:
+                info = mi.dxf_info(pfad)
+            except mi.ModellImportFehler as e:
+                QMessageBox.warning(eltern, "Import nicht möglich", str(e))
+                return
+            except Exception as e:   # Fangnetz wie _import_model_file
+                print(f"[Visualizer] DXF-Vorschau error: {e}")
+                QMessageBox.warning(eltern, "Import nicht möglich",
+                                    "Die Datei ließ sich nicht als DXF lesen.")
+                return
+        einheiten = {"Millimeter (mm)": "mm", "Zentimeter (cm)": "cm", "Meter (m)": "m",
+                     "Zoll (in)": "in", "Fuß (ft)": "ft"}
+        namen = list(einheiten)
+        vorschlag = 0 if (ist_stl or ist_dxf) else 2
+        frage = ("In welcher Einheit ist das Modell gezeichnet?\n"
+                 "(CAD-Programme und 3D-Druck-Dateien meist Millimeter)")
+        if info is not None and info.einheit in einheiten.values():
+            vorschlag = list(einheiten.values()).index(info.einheit)
+            frage += f"\nDie Datei gibt an: {namen[vorschlag]}."
         wahl, ok = QInputDialog.getItem(
-            eltern, "Einheit des Modells",
-            "In welcher Einheit ist das Modell gezeichnet?\n"
-            "(CAD-Programme und 3D-Druck-Dateien meist Millimeter)",
-            einheiten, 0 if ist_stl else 2, False)
+            eltern, "Einheit des Modells", frage, namen, vorschlag, False)
         if not ok:
             return
-        einheit = {"Millimeter (mm)": "mm", "Zentimeter (cm)": "cm"}.get(wahl, "m")
+        einheit = einheiten.get(wahl, "m")
+        if ist_dxf:
+            # DXF hat immer Z oben — keine Ausrichtungs-Frage.
+            wand_hoehe = None
+            if info.linien:
+                antwort = QMessageBox.question(
+                    eltern, "Linien als Wände?",
+                    f"Die Zeichnung enthält {info.linien} Linien (z. B. ein Hallenplan).\n"
+                    "Sollen die Linien als Wände hochgezogen werden?\n"
+                    "„Nein“ zeigt sie als flache Linien auf dem Boden.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                    | QMessageBox.StandardButton.Cancel,
+                    QMessageBox.StandardButton.No)
+                if antwort not in (QMessageBox.StandardButton.Yes, QMessageBox.StandardButton.No):
+                    return
+                if antwort == QMessageBox.StandardButton.Yes:
+                    wand_hoehe, ok = QInputDialog.getDouble(
+                        eltern, "Wandhöhe", "Linien als Wände mit Höhe (m) hochziehen:",
+                        3.0, 0.1, mi.MAX_HOEHE_M, 2)
+                    if not ok:
+                        return
+            self._import_model_file(pfad, einheit, True, wand_hoehe_m=wand_hoehe)
+            return
         # CAD/STL zeichnen meist mit Z nach oben, OBJ meist mit Y nach oben.
         antwort = QMessageBox.question(
             eltern, "Ausrichtung",
@@ -5098,7 +5141,7 @@ class VisualizerWindow(QMainWindow):
                                 antwort == QMessageBox.StandardButton.Yes)
 
     def _import_model_file(self, pfad: str, einheit: str = "mm",
-                           z_oben: bool = False):
+                           z_oben: bool = False, wand_hoehe_m: Optional[float] = None):
         """VIZ-67: Datei lesen und als Buehnenobjekt ``imported_model`` anlegen
         (gleicher Weg wie die Knoepfe: Undo, Auswahl, Szenengraph). Eine
         unpassende Datei endet in einer Meldung, nie in einer Ausnahme.
@@ -5106,7 +5149,7 @@ class VisualizerWindow(QMainWindow):
         from src.core.stage import modell_import as mi
         eltern = self if isinstance(self, QWidget) else None
         try:
-            netz = mi.lies_datei(pfad, einheit, z_oben)
+            netz = mi.lies_datei(pfad, einheit, z_oben, wand_hoehe_m)
             modell = mi.packen(netz)
         except mi.ModellImportFehler as e:
             QMessageBox.warning(eltern, "Import nicht möglich", str(e))
@@ -5118,9 +5161,14 @@ class VisualizerWindow(QMainWindow):
             return None
         w, h, d = mi.element_groesse(netz)
         name = os.path.splitext(os.path.basename(pfad))[0] or "3D-Modell"
-        return self._add_stage_element("imported_model", vorgaben=dict(
+        el = self._add_stage_element("imported_model", vorgaben=dict(
             x=0.0, y=round(h / 2.0, 4), z=0.0, w=w, h=h, d=d,
             color="#8c8c8c", name=name, model=modell))
+        if el is not None and netz.hinweise:
+            # VIZ-67 Teil 2: was aus der DXF nicht uebernommen wurde.
+            QMessageBox.information(eltern, "Import mit Hinweisen",
+                                    "\n".join(netz.hinweise))
+        return el
 
     def _add_stage_element(self, type_: str, vorgaben: Optional[dict] = None):
         # Standardwerte je Typ (VIZ-68: Klassenkonstante STAGE_DEFAULTS)
