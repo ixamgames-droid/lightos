@@ -7,7 +7,7 @@ Ablauf:
   4. Tempo / Beat / Name
   -> erzeugt automatisch die noetigen Szenen + einen Chaser im Function-Manager.
 
-Aufruf:  EffectWizard(parent).exec()  -> self.created_function (Chaser | None)
+Aufruf:  EffectWizard(parent).exec()  -> self.created_function (Chaser | LayeredEffect | None)
 """
 from __future__ import annotations
 from PySide6.QtCore import Qt
@@ -38,7 +38,29 @@ PRESETS = [
     ("comet", "Komet", "Heller Kopf mit nachziehendem Schweif", True, ["white"], True),
     ("random_strobe", "Random-Strobe", "Zufällige Lampen blitzen weiß", False, ["white"], False),
     ("vu", "VU-Meter", "Pegel-Balken grün→rot, auf und ab", False, [], True),
+    # VIZ-111 (4): Zoom-Vorlagen. Nur fuer Geraete mit Zoom-Kanal (s. ZOOM_PRESETS).
+    ("zoom_pulse", "Zoom-Puls", "Zoom atmet sanft zwischen eng und weit", False, [], False),
+    ("zoom_wave", "Zoom-Welle", "Zoom-Atmen läuft versetzt über die Lampen", False, [], False),
+    ("zoom_beat", "Zoom im Takt", "Zoom wechselt im Takt zwischen eng und weit", False, [], True),
 ]
+
+# VIZ-111 (4): Vorlagen, die NUR den Zoom-Kanal schreiben. Sie werden nur fuer
+# Geraete mit Kanal-Attribut ``zoom`` angeboten (sonst ausgegraut mit Hinweis).
+# Puls/Welle erzeugen einen LayeredEffect (Sinus auf ``zoom``); „im Takt" ist
+# wie die anderen taktgebundenen Vorlagen ein Chaser am Tempo-Bus „Global".
+ZOOM_PRESETS = frozenset({"zoom_pulse", "zoom_wave", "zoom_beat"})
+ZOOM_ATTR = "zoom"
+KEIN_ZOOM_HINWEIS = "kein Zoom-Kanal – für Zoom-Effekte nicht wählbar"
+
+
+def hat_zoom(fixture) -> bool:
+    """Hat das gepatchte Geraet mindestens einen Kanal mit Attribut ``zoom``?"""
+    try:
+        from src.core.app_state import get_channels_for_patched
+        return any(getattr(c, "attribute", None) == ZOOM_ATTR
+                   for c in get_channels_for_patched(fixture))
+    except Exception:
+        return False
 
 SWATCHES = [
     ("Rot", (255, 0, 0)), ("Amber", (255, 140, 0)), ("Gelb", (255, 255, 0)),
@@ -59,13 +81,31 @@ class _TypePage(QWizardPage):
         lay = QVBoxLayout(self)
         self.list = QListWidget()
         self.list.setSpacing(2)
+        # VIZ-111 (4): ohne ein einziges gepatchtes Geraet mit Zoom-Kanal stehen
+        # die Zoom-Vorlagen ausgegraut in der Liste (mit Hinweis), statt einen
+        # Effekt zu bauen, der nichts bewegt.
+        zoom_da = self._zoom_geraet_gepatcht()
         for key, label, desc, *_ in PRESETS:
-            it = QListWidgetItem(f"{label}   —   {desc}")
+            text = f"{label}   —   {desc}"
+            if key in ZOOM_PRESETS and not zoom_da:
+                text += "   (kein Gerät mit Zoom-Kanal gepatcht)"
+            it = QListWidgetItem(text)
             it.setData(Qt.ItemDataRole.UserRole, key)
+            if key in ZOOM_PRESETS and not zoom_da:
+                it.setFlags(it.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+                it.setToolTip("Nur für Geräte mit Zoom-Kanal – keines ist gepatcht.")
             self.list.addItem(it)
         self.list.setCurrentRow(0)
         self.list.itemDoubleClicked.connect(lambda *_: self.wizard().next())
         lay.addWidget(self.list)
+
+    @staticmethod
+    def _zoom_geraet_gepatcht() -> bool:
+        try:
+            from src.core.app_state import get_state
+            return any(hat_zoom(f) for f in get_state().get_patched_fixtures())
+        except Exception:
+            return False
 
     def selected_key(self):
         it = self.list.currentItem()
@@ -133,22 +173,52 @@ class _FixturePage(QWizardPage):
                 cb = QCheckBox(f"{getattr(f,'label','Fixture')}  (ID {f.fid}, U{f.universe} @{f.address})")
                 cb.setChecked(f.fid in sel if sel else leer)
                 cb.fid = f.fid
+                cb.hat_zoom = hat_zoom(f)          # VIZ-111 (4)
                 self.checks.append(cb)
                 lay.addWidget(cb)
         except Exception as e:
             lay.addWidget(QLabel(f"Fehler beim Laden der Lampen: {e}"))
+        self._zoom_hinweis = QLabel(
+            "Zoom-Effekt: Lampen ohne Zoom-Kanal sind ausgegraut.")
+        self._zoom_hinweis.setWordWrap(True)
+        self._zoom_hinweis.setStyleSheet("color:#888;")
+        self._zoom_hinweis.setVisible(False)
+        lay.addWidget(self._zoom_hinweis)
         lay.addStretch(1)
+
+    def initializePage(self):
+        """VIZ-111 (4): bei einer Zoom-Vorlage Lampen ohne Zoom-Kanal ausgrauen
+        und abhaken; bei allen anderen Vorlagen wieder freigeben."""
+        try:
+            key = self.wizard().page(0).selected_key()
+        except Exception:
+            key = ""
+        nur_zoom = key in ZOOM_PRESETS
+        for cb in self.checks:
+            waehlbar = (not nur_zoom) or getattr(cb, "hat_zoom", False)
+            if not waehlbar and cb.isEnabled():
+                # Haken merken: wer zurueck auf eine Nicht-Zoom-Vorlage geht,
+                # bekommt seine (Vor-)Auswahl wieder statt einer leeren.
+                cb.zoom_weggehakt = cb.isChecked()
+                cb.setChecked(False)
+            elif waehlbar and not cb.isEnabled():
+                cb.setChecked(bool(getattr(cb, "zoom_weggehakt", False)))
+                cb.zoom_weggehakt = False
+            cb.setEnabled(waehlbar)
+            cb.setToolTip("" if waehlbar else KEIN_ZOOM_HINWEIS)
+        self._zoom_hinweis.setVisible(nur_zoom)
 
     def _set_all(self, on):
         for cb in self.checks:
-            cb.setChecked(on)
+            if cb.isEnabled():
+                cb.setChecked(on)
 
     def _select_group(self, fids):
         """EA-01: Mitglieder einer Gruppe zusätzlich ankreuzen (Union — bestehende
         Haken bleiben). Nicht gepatchte fids haben keine Checkbox und entfallen."""
         want = set(fids)
         for cb in self.checks:
-            if cb.fid in want:
+            if cb.fid in want and cb.isEnabled():
                 cb.setChecked(True)
 
     def selected_fids(self):
@@ -267,10 +337,22 @@ class _OptionsPage(QWizardPage):
             defaults = {"strobe": (0.05, 0.0), "police": (0.13, 0.0), "rainbow": (0.3, 0.7),
                         "pulse": (0.5, 0.6), "fire": (0.1, 0.06), "twinkle": (0.12, 0.04),
                         "wipe": (0.15, 0.1), "comet": (0.1, 0.05),
-                        "random_strobe": (0.05, 0.0), "vu": (0.1, 0.05)}
+                        "random_strobe": (0.05, 0.0), "vu": (0.1, 0.05),
+                        "zoom_pulse": (4.0, 0.0), "zoom_wave": (4.0, 0.0),
+                        "zoom_beat": (0.5, 0.4)}
             h, f = defaults.get(key, (0.4, 0.2))
             self.hold.setValue(h); self.fade.setValue(f)
-            self._hint.setText("Tipp: Bei 'Im Beat' bestimmt das TAP-Tempo das Schalt-Tempo.")
+            # VIZ-111 (4): Zoom-Puls/-Welle laufen als Sinus — „Halten" ist dort
+            # die Dauer EINES Zyklus, Fade und Beat gibt es nicht.
+            schwingt = key in ("zoom_pulse", "zoom_wave")
+            self.fade.setEnabled(not schwingt)
+            self.beat.setEnabled(not schwingt)
+            if schwingt:
+                self.beat.setChecked(False)
+                self._hint.setText("Halten = Dauer eines Zyklus eng → weit → eng "
+                                   "(frei laufend; für den Takt „Zoom im Takt“ nehmen).")
+            else:
+                self._hint.setText("Tipp: Bei 'Im Beat' bestimmt das TAP-Tempo das Schalt-Tempo.")
 
 
 class EffectWizard(QWizard):
@@ -318,6 +400,8 @@ class EffectWizard(QWizard):
         fm = get_function_manager()
         if not fids:
             raise ValueError("Keine Lampe ausgewählt.")
+        if key in ZOOM_PRESETS:
+            return self._generate_zoom(key, fids, name, hold, fade, beat, st, fm)
         # Bugfix: Kanal-Zuordnung MUSS pro Fixture berechnet werden. Frueher kam
         # die Map aus dem ersten Geraet und galt fuer alle — bei gemischten Typen
         # (PAR + Moving Head) landete color_r=Ch1 dann auf dem Pan-Kanal des MH
@@ -456,11 +540,81 @@ class EffectWizard(QWizard):
         for sid in steps:
             ch.steps.append(ChaserStep(function_id=sid, fade_in=fade, hold=hold, fade_out=0.0))
         self.created_function = ch
+        self._melden(ch)
 
+    @staticmethod
+    def _melden(func):
         try:
             from src.core.sync import get_sync, SyncEvent
             sync = get_sync()
-            sync.emit(SyncEvent.FUNCTION_CHANGED, {"id": ch.id})
+            sync.emit(SyncEvent.FUNCTION_CHANGED, {"id": func.id})
             sync.emit(SyncEvent.REFRESH_ALL, None)
         except Exception:
             pass
+
+    def _generate_zoom(self, key, fids, name, hold, fade, beat, st, fm):
+        """VIZ-111 (4): Zoom-Vorlagen. Schreiben NUR den Zoom-Kanal — Dimmer und
+        Farbe bleiben unberuehrt (der Zoom-Effekt legt sich ueber jeden Look)."""
+        from src.core.app_state import get_channels_for_patched
+        fx_by_fid = {f.fid: f for f in st.get_patched_fixtures()}
+        zfids = [fid for fid in fids
+                 if fid in fx_by_fid and hat_zoom(fx_by_fid[fid])]
+        if not zfids:
+            raise ValueError("Keine der gewählten Lampen hat einen Zoom-Kanal.")
+
+        if key in ("zoom_pulse", "zoom_wave"):
+            import math
+            from src.core.engine.effect_layers import EffectLayer, LayerType
+            periode = max(0.02, float(hold))
+            le = fm.new_layered_effect(name)
+            le.fixture_ids = list(zfids)
+            le.target_attribute = ZOOM_ATTR
+            # 0.5 ± 0.5 -> der Sinus faehrt den ganzen Zoom-Weg 0..255 ab.
+            le.base_value = 0.5
+            schritt = (2 * math.pi / len(zfids)) if key == "zoom_wave" else 0.0
+            le.layers = [EffectLayer(type=LayerType.SIN, amplitude=0.5,
+                                     frequency=1.0 / periode,
+                                     fixture_phase_step=schritt)]
+            self.created_function = le
+            self._melden(le)
+            return
+
+        # zoom_beat: zwei Szenen (eng/weit) im Wechsel, taktgleich wie die
+        # anderen Beat-Vorlagen. Laeuft der Zoom eines Profils umgekehrt
+        # (VIZ-111 Teil 1, 0 = weit), bekommt „eng" dort den Wert 255.
+        from src.core.engine.function import RunOrder
+        from src.core.engine.chaser import ChaserStep
+        try:
+            from src.core.app_state import zoom_umgekehrt_for
+        except Exception:
+            zoom_umgekehrt_for = lambda fx: False   # noqa: E731
+
+        def zoom_szene(sname, eng):
+            s = fm.new_scene(sname)
+            for fid in zfids:
+                fx = fx_by_fid[fid]
+                try:
+                    umgekehrt = bool(zoom_umgekehrt_for(fx))
+                except Exception:
+                    umgekehrt = False
+                wert = 0 if eng != umgekehrt else 255
+                for c in get_channels_for_patched(fx):
+                    if c.attribute == ZOOM_ATTR:
+                        s.set_value(fid, c.channel_number, wert)
+            return s
+
+        steps = [zoom_szene(f"{name} · Eng", True).id,
+                 zoom_szene(f"{name} · Weit", False).id]
+        ch = fm.new_chaser(name)
+        ch.run_order = RunOrder.Loop
+        if beat:
+            ch.tempo_bus_id = "Global"
+            ch.align_on_start = True
+            ch.audio_triggered = False
+        else:
+            ch.tempo_bus_id = ""
+        ch.beats_per_step = 1
+        for sid in steps:
+            ch.steps.append(ChaserStep(function_id=sid, fade_in=fade, hold=hold, fade_out=0.0))
+        self.created_function = ch
+        self._melden(ch)
