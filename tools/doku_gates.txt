@@ -134,3 +134,4 @@ test_bpm32_takt_hinweis.py         # Musik-Anleitung erklaert den Hinweis „Tak
 test_bpm31_liedlook_ohne_global.py # Musik-Anleitung: Grenze „Lied-Look erst beim naechsten Trackwechsel“ bleibt gestrichen
 test_stab39_echte_daten_nur_app.py # COORDINATION.md nennt die STAB-39-Freigaben (echte Daten/Ausgabe nur in der App)
 test_cdx65_vc_anleitung_erweitert.py # VC-Workflow-Anleitung: Namenswahl unter „Erweitert" traegt sich in „Ziele" ein (VCB-35)
+test_viz111_zoom_vorlagen_doku.py # Effekt-Anleitung nennt die Zoom-Vorlagen (Puls/Welle/im Takt) und den Ausgegraut-Hinweis
