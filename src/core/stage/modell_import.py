@@ -62,6 +62,17 @@ class ModellImportFehler(ValueError):
     """Datei passt nicht — die Meldung ist fuer den Nutzer gedacht."""
 
 
+class ModellZuGross(ModellImportFehler):
+    """VIZ-113: das Modell waere groesser als die Buehne erlaubt. ``groesse``
+    (x, y, z in m) und ``passend`` (Massstab, mit dem es gerade hineinpasst)
+    erlauben dem Aufrufer, ein Verkleinern anzubieten."""
+
+    def __init__(self, text: str, groesse: tuple, passend: float):
+        super().__init__(text)
+        self.groesse = groesse
+        self.passend = passend
+
+
 @dataclass
 class Netz:
     """Indiziertes Dreiecksnetz in Metern, Mittelpunkt im Ursprung."""
@@ -234,12 +245,12 @@ def _datei_bytes(pfad: str) -> bytes:
 
 
 def lies_datei(pfad: str, einheit: str = "mm", z_oben: bool = False,
-               wand_hoehe_m: float | None = None) -> Netz:
+               wand_hoehe_m: float | None = None, massstab: float = 1.0) -> Netz:
     """Datei lesen und als :class:`Netz` (Meter, zentriert, Y oben) liefern.
     ``wand_hoehe_m`` (nur DXF): Linien als Waende dieser Hoehe hochziehen."""
     daten = _datei_bytes(pfad)
     endung = os.path.splitext(pfad)[1].lower()
-    return lies_bytes(daten, endung, einheit, z_oben, wand_hoehe_m)
+    return lies_bytes(daten, endung, einheit, z_oben, wand_hoehe_m, massstab)
 
 
 @dataclass
@@ -269,14 +280,18 @@ def _pruefe_bytes(daten: bytes) -> bytes:
 
 
 def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
-               z_oben: bool = False, wand_hoehe_m: float | None = None) -> Netz:
+               z_oben: bool = False, wand_hoehe_m: float | None = None,
+               massstab: float = 1.0) -> Netz:
     """Wie :func:`lies_datei`, aber aus Bytes (``endung`` = ``.stl``/``.obj``/``.dxf``)."""
     if einheit not in EINHEITEN:
         raise ModellImportFehler(f"Unbekannte Einheit: {einheit}")
+    if not (0.0 < massstab <= 1.0):
+        raise ModellImportFehler("Der Maßstab muss zwischen 0 und 1 liegen.")
     _pruefe_bytes(daten)
+    faktor = EINHEITEN[einheit] * massstab       # VIZ-113: auf Wunsch verkleinert
     endung = (endung or "").lower()
     if endung == ".dxf":
-        return _lies_dxf(daten, EINHEITEN[einheit], wand_hoehe_m)
+        return _lies_dxf(daten, faktor, wand_hoehe_m)
     if endung == ".stl":
         if _ist_binaer_stl(daten):
             s = _lies_stl_binaer(daten)
@@ -289,7 +304,7 @@ def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
         s = _lies_obj(_text(daten))
     else:
         raise ModellImportFehler("Nur STL-, OBJ- und DXF-Dateien lassen sich importieren.")
-    return _normieren(s.pos, s.idx, EINHEITEN[einheit], z_oben)
+    return _normieren(s.pos, s.idx, faktor, z_oben)
 
 
 def _lies_dxf(daten: bytes, faktor: float, wand_hoehe_m: float | None) -> Netz:
@@ -327,11 +342,15 @@ def _normieren(pos: array, idx: array, faktor: float, z_oben: bool,
     groesse = tuple(maxs[a] - mins[a] for a in range(3))
     if max(groesse) <= 0.0:
         raise ModellImportFehler("Das Modell hat keine Ausdehnung (alle Punkte liegen aufeinander).")
-    if max(groesse) > MAX_KANTE_M or groesse[1] > MAX_HOEHE_M:
-        raise ModellImportFehler(
+    if max(groesse[0], groesse[2]) > MAX_KANTE_M or groesse[1] > MAX_HOEHE_M:
+        grenzen = [MAX_KANTE_M / g for g in (groesse[0], groesse[2]) if g > 0]
+        if groesse[1] > 0:
+            grenzen.append(MAX_HOEHE_M / groesse[1])
+        raise ModellZuGross(
             f"Das Modell wäre {groesse[0]:.1f} × {groesse[1]:.1f} × {groesse[2]:.1f} m groß — das passt nicht auf die Bühne "
             f"(höchstens {MAX_KANTE_M:.0f} m breit/tief und {MAX_HOEHE_M:.0f} m hoch). Stimmt die Einheit? Für CAD- und "
-            "3D-Druck-Dateien meist Millimeter wählen.")
+            "3D-Druck-Dateien meist Millimeter wählen.",
+            tuple(float(g) for g in groesse), min(grenzen) * 0.999)
     mitte = [(mins[a] + maxs[a]) / 2.0 for a in range(3)]
     for i in range(n):
         for a in range(3):
