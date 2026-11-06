@@ -5141,7 +5141,8 @@ class VisualizerWindow(QMainWindow):
                                 antwort == QMessageBox.StandardButton.Yes)
 
     def _import_model_file(self, pfad: str, einheit: str = "mm",
-                           z_oben: bool = False, wand_hoehe_m: Optional[float] = None):
+                           z_oben: bool = False, wand_hoehe_m: Optional[float] = None,
+                           massstab: float = 1.0):
         """VIZ-67: Datei lesen und als Buehnenobjekt ``imported_model`` anlegen
         (gleicher Weg wie die Knoepfe: Undo, Auswahl, Szenengraph). Eine
         unpassende Datei endet in einer Meldung, nie in einer Ausnahme.
@@ -5149,8 +5150,24 @@ class VisualizerWindow(QMainWindow):
         from src.core.stage import modell_import as mi
         eltern = self if isinstance(self, QWidget) else None
         try:
-            netz = mi.lies_datei(pfad, einheit, z_oben, wand_hoehe_m)
+            netz = mi.lies_datei(pfad, einheit, z_oben, wand_hoehe_m, massstab)
             modell = mi.packen(netz)
+        except mi.ModellZuGross as e:
+            # VIZ-113: grosse Hallenplaene nicht einfach ablehnen, sondern ein
+            # passendes Verkleinern anbieten (die Einheit kann trotzdem falsch sein).
+            if massstab < 1.0 or not (0.0 < e.passend < 1.0):
+                QMessageBox.warning(eltern, "Import nicht möglich", str(e))
+                return None
+            prozent = e.passend * 100.0
+            antwort = QMessageBox.question(
+                eltern, "Modell zu groß",
+                f"{e}\n\nAuf {prozent:.1f} % verkleinern, damit es auf die Bühne passt?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return None
+            return VisualizerWindow._import_model_file(self, pfad, einheit, z_oben, wand_hoehe_m,
+                                           massstab=e.passend)
         except mi.ModellImportFehler as e:
             QMessageBox.warning(eltern, "Import nicht möglich", str(e))
             return None
