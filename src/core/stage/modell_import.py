@@ -121,7 +121,7 @@ class _Sammler:
     """Legt gleiche Eckpunkte zusammen (STL ist eine Dreiecks-Suppe)."""
 
     def __init__(self):
-        self.pos = array("f")
+        self.pos = array("d")  # CDX-70: volle Genauigkeit bis nach dem Zentrieren
         self.idx = array("I")
         self._index: dict = {}
 
@@ -182,7 +182,7 @@ def _lies_stl_ascii(text: str) -> _Sammler:
 
 
 def _lies_obj(text: str) -> _Sammler:
-    pos = array("f")
+    pos = array("d")  # CDX-70
     idx = array("I")
     n_ecken = 0
     for nr, zeile in enumerate(text.splitlines(), 1):
@@ -328,7 +328,10 @@ def _normieren(pos: array, idx: array, faktor: float, z_oben: bool,
     n = len(pos) // 3
     if n == 0 or not (idx or linien):
         raise ModellImportFehler("Das Modell enthält keine Geometrie.")
-    out = array("f", bytes(4 * 3 * n))
+    # CDX-70: in doppelter Genauigkeit rechnen und erst NACH dem Zentrieren auf
+    # float32 runden — sonst gehen bei grossen Absolutkoordinaten (CAD-Plaene
+    # im Landeskoordinatensystem) feine Details schon beim Einlesen verloren.
+    out = array("d", bytes(8 * 3 * n))
     for i in range(n):
         x, y, z = pos[3 * i], pos[3 * i + 1], pos[3 * i + 2]
         if z_oben:                       # CAD/STL: Z zeigt nach oben -> Y oben
@@ -352,7 +355,7 @@ def _normieren(pos: array, idx: array, faktor: float, z_oben: bool,
     for i in range(n):
         for a in range(3):
             out[3 * i + a] -= mitte[a]
-    return Netz(positionen=out, indizes=array("I", idx),
+    return Netz(positionen=array("f", out), indizes=array("I", idx),
                 groesse=tuple(float(g) for g in groesse),
                 linien=array("I", linien or ()))
 
@@ -390,6 +393,8 @@ def entpacken(text: str) -> Netz:
         roh = d.decompress(gepackt, _MAX_ENTPACKT)
         if d.unconsumed_tail:
             raise ModellImportFehler("Eingebettetes 3D-Modell ist zu groß.")
+        if not d.eof:                    # CDX-70: abgeschnitten (Pruefsumme fehlt)
+            raise ModellImportFehler("Eingebettetes 3D-Modell ist beschädigt.")
     except (binascii.Error, zlib.error, ValueError) as e:
         if isinstance(e, ModellImportFehler):
             raise
