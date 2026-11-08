@@ -39,6 +39,6 @@ Effekt um. (Tipp: läuft kein Effekt, passiert nichts — erst ein Muster starte
 
 ### Sofort weiterprobieren
 - **Pro Gruppe:** dieselben Muster gibt es für **Spider** (RGBW) und als **Farbrad** für den **Moving Head**.
-- **Auf den Beat:** „Farbwechsel“ läuft auf Bus A im Takt. **„Sync Bus A“** (Bank 4) setzt laufende
-  Bus-A-Effekte auf die Eins; „Sync jetzt“ schaltet nur Auto-Sync an/aus (danach gestartete Effekte
-  beginnen phasengleich).
+- **Auf den Beat:** „Farbwechsel“ läuft auf Bus A im Takt der Haupt-BPM. **„Sync jetzt“** (Bank 4)
+  setzt laufende Bus-A-Effekte auf die Eins; „Auto-Sync an/aus“ entscheidet, ob danach gestartete
+  Effekte von selbst phasengleich einsteigen.
