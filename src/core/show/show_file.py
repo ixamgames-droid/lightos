@@ -1859,6 +1859,7 @@ _LIVE_FELDER_LIVE_VIEW_META = ("zoom",)          # Ansicht, wie das Fensterlayou
 #:   VCSpeedDial         bpm, active_factor, mult Rad, Tap, Faktor-Gitter
 #:   VCXYPad             pan, tilt, area          Pad ziehen, Feld markieren, MIDI
 #:   VCTempoBusController source, factor, fixed_bpm  Quelle/Tap, Faktor, Fix-Rad
+#:   VCMultiLiveEditor   joint                    Dropdown „Alle gemeinsam" (VCB-49)
 #: Bewusst NICHT live: VCColor-Farbe (der Doppelklick-Waehler aendert, WAS die
 #: Kachel tut, und gilt in Edit- wie Run-Modus), VCTempoBusController
 #: tempo_bus_id/function_ids (koppeln Effekte um — das landet ohnehin im
@@ -1872,6 +1873,10 @@ _LIVE_FELDER_VC = {
     "VCSpeedDial": ("bpm", "active_factor", "mult"),
     "VCXYPad": ("pan", "tilt", "area"),
     "VCTempoBusController": ("source", "factor", "fixed_bpm"),
+    # VCB-49: Wahl „Alle gemeinsam" im Dropdown = Bedienung (wie die Einzel-
+    # Auswahl, die gar nicht gespeichert wird); der Haken-Satz joint_checked
+    # ist Einrichtung und zaehlt weiter.
+    "VCMultiLiveEditor": ("joint",),
 }
 
 #: Bloecke, die der 3D-Visualizer aus der Live View ABLEITET (Auto-Patch, s.

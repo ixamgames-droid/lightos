@@ -36,11 +36,37 @@ seine eigentliche Bedienidee:
 Wer im Betrieb einen Regler vermisst, hat ihn also nicht verloren — er ist im
 Bearbeiten-Modus nicht angehakt.
 
+## Alle gemeinsam
+
+Ab **zwei** zugewiesenen Effekten steht im Dropdown zusätzlich der Eintrag
+**„Alle gemeinsam (N)“**. Ist er gewählt, zeigt der Body **nur die Parameter, die
+alle Effekte haben** — gleicher Name und passender Wertebereich (z. B. Farben,
+Richtung, Helligkeit, Fade bei mehreren Matrizen; bei Matrix + EFX Helligkeit,
+Richtung und Tempo-Faktor). Eine Änderung wirkt auf **alle gleichzeitig**: Zahlenwerte werden
+überall auf **denselben** Wert gesetzt (kein Verschieben um einen Betrag), eine
+Farbliste wird für jeden Effekt übernommen (die gerade aktive Farbe behält jeder
+Effekt). Vorschau und Tempo-Bereich (Aus/BPM/Tap) bleiben dort aus — die gibt es
+weiter je Effekt; den **Tempo-Faktor** (¼ … 4×) gibt es aber als gemeinsamen Regler
+„Tempo ×“. Er wirkt bei Effekten, die einem Tempo-Bus folgen.
+
+- **„gemischt“:** Haben die Effekte unterschiedliche Ausgangswerte, steht am Regler
+  „gemischt“ (Schieber in Mittelstellung, keine Taste gedrückt), bis du ihn bewegst.
+- **Richtung:** Matrix (vorwärts/rückwärts), EFX (vorwärts/rückwärts/Ping-Pong) und
+  Chaser nennen „rückwärts“ intern verschieden; das Panel ordnet das fest zu und
+  zeigt nur die Richtungen, die alle können.
+- **„gilt für: …“** unter den Reglern nennt die Effekte, die die Änderung trifft.
+- Im **Bearbeiten-Modus** hakst du auch hier an, welche gemeinsamen Regler im
+  Betrieb erscheinen — ein eigener Satz, unabhängig von den Haken der einzelnen
+  Effekte.
+- `–` / `+` springen aus „Alle gemeinsam“ zurück zum ersten bzw. letzten Effekt.
+
 ## Was gespeichert wird
 
 Mit der Show wandern mit: Geometrie und Beschriftung, **welche Effekte** zugewiesen
-sind (`fids`) und **welche Regler angehakt** sind (`checked`). Die eingestellten
-Live-Werte selbst gehören dem jeweiligen Effekt, nicht dem Panel.
+sind (`fids`), **welche Regler angehakt** sind (`checked`, für „Alle gemeinsam“
+`joint_checked`) und ob „Alle gemeinsam“ gewählt war (`joint`). Das bloße Umschalten
+auf „Alle gemeinsam“ ist Bedienung und gilt nicht als ungespeicherte Änderung. Die
+eingestellten Live-Werte selbst gehören dem jeweiligen Effekt, nicht dem Panel.
 
 ## Verwandt
 

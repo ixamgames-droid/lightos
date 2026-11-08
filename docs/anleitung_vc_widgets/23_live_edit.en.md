@@ -32,9 +32,19 @@ The panel depends on the **VC edit mode** — and that is not a side issue but i
 
 So if you miss a control during operation, you haven't lost it — it just isn't ticked in edit mode.
 
+## All together („Alle gemeinsam“)
+
+With **two or more** assigned effects, the dropdown offers an extra entry **„Alle gemeinsam (N)“** (all together). When selected, the body shows **only the parameters that all effects have** — same name and matching value range (e.g. colors, direction, brightness, fade for several matrices; for matrix + EFX brightness, direction and tempo factor). A change applies to **all at once**: numeric values are set to the **same** value everywhere (no relative shift), a color list is copied to every effect (each effect keeps its currently active color). Preview and the tempo area (off/BPM/tap) stay hidden there — they remain per effect; the **tempo factor** (¼ … 4×) is offered as a shared control „Tempo ×“. It affects effects that follow a tempo bus.
+
+- **„gemischt“** (mixed): if the effects start with different values, the control shows „gemischt“ (slider centred, no button pressed) until you move it.
+- **Direction:** matrix (forward/reverse), EFX (forward/backward/ping-pong) and chaser name „backward“ differently internally; the panel maps them with a fixed table and only offers the directions all of them support.
+- **„gilt für: …“** (applies to) below the controls names the effects a change reaches.
+- In **edit mode** you tick which shared controls appear during operation — a separate set, independent of the ticks of the individual effects.
+- `–` / `+` leave „Alle gemeinsam“ and jump to the first or last effect.
+
 ## What is saved
 
-The show stores: geometry and caption, **which effects** are assigned (`fids`) and **which controls are ticked** (`checked`). The live values you set belong to the respective effect, not to the panel.
+The show stores: geometry and caption, **which effects** are assigned (`fids`) and **which controls are ticked** (`checked`, for „Alle gemeinsam“ `joint_checked`) and whether „Alle gemeinsam“ was selected (`joint`). Merely switching to „Alle gemeinsam“ is operation and does not count as an unsaved change. The live values you set belong to the respective effect, not to the panel.
 
 ## Related
 
