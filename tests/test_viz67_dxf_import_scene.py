@@ -68,6 +68,7 @@ _INFO_JS = """
     ok: !!so.mesh.userData.importModell,
     strecken: lin ? lin.geometry.index.count / 2 : -1,
     linGroesse: lin ? box(lin) : null,
+    linUnten: lin ? new window.THREE.Box3().setFromObject(lin).min.y : null,
     linFarbe: lin ? lin.material.color.getHexString() : null,
     linSichtbar: lin ? lin.visible : false,
     dreiecke: (m && m.geometry.index && !m.userData.pickHilfe) ? m.geometry.index.count / 3 : 0,
@@ -118,6 +119,8 @@ class DxfInDerSzeneTest(Viz72SzeneBasis):
         # Klicks/Andocken/Zielen bis ~1 m daneben ab. Gepickt wird ueber die
         # unsichtbare Hilfe bzw. die Flaechen.
         self.assertEqual(info["linTreffer"], 0, "Linie faengt Klicks daneben ab")
+        # VIZ-113: flacher Grundriss mit Abstand zum Boden (sonst Flimmern)
+        self.assertGreaterEqual(info["linUnten"], 0.015, "Grundriss liegt zu nah am Boden")
 
     def test_flaechen_und_linien_gleich_skaliert(self):
         netz = _gemischt()
