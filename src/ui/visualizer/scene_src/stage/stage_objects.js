@@ -9,6 +9,11 @@ import { raycaster, mouse } from '../interaction/picking.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
 import { updateEmptyState } from '../empty_state.js';
 
+// VIZ-113: Modelle bis zu dieser Hoehe gelten als flach (Grundriss); ihre
+// Linien liegen GRUNDRISS_ABSTAND_M ueber dem Boden statt 5 mm.
+const FLACH_M = 0.05;
+const GRUNDRISS_ABSTAND_M = 0.02;
+
 // stageObjIdCounter bleibt hier (kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" - nur von createStageObject genutzt).
 let stageObjIdCounter = 1;
@@ -312,6 +317,12 @@ function buildImportModell(size, color, modell) {
     mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({ color: color, wireframe: true }));
   }
+  if (geo && size.y <= FLACH_M) {
+    // VIZ-113: flache Flaechen (Bodenplatten, Grundriss) vor den Boden ziehen.
+    mesh.material.polygonOffset = true;
+    mesh.material.polygonOffsetFactor = -2;
+    mesh.material.polygonOffsetUnits = -2;
+  }
   if (geo || !linGeo) mesh.scale.set(...skal);
   else mesh.scale.set(Math.max(size.x, 1e-3), Math.max(size.y, 1e-3), Math.max(size.z, 1e-3));
   mesh.castShadow = true;
@@ -325,6 +336,9 @@ function buildImportModell(size, color, modell) {
     // Picking/Andocken/Zielen liefen sonst bis 1 m neben jeder Linie auf den
     // Grundriss. Gepickt wird ueber die Flaechen bzw. die unsichtbare Hilfe.
     linien.raycast = function () {};
+    // VIZ-113: ein flacher Grundriss liegt sonst 5 mm ueber dem Boden und
+    // flimmert aus der Ferne mit dem Bodenraster (Tiefenpuffer zu grob).
+    if (size.y <= FLACH_M) linien.position.y = GRUNDRISS_ABSTAND_M;
     group.add(linien);
   }
   group.userData.color = color;
