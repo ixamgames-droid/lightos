@@ -683,7 +683,11 @@ if _ziel:
                 "app_state_geladen": gebaut,
                 "show_db": show_db, "datenordner": datenordner,
                 "wurzel": getattr(sandbox, "WURZEL", None),
-                "hauptmodul": getattr(haupt, "__file__", None),
+                # QA-116: in der ARM-CI hatte __main__ beim atexit kein
+                # __file__ mehr ('' statt Werkzeugname) — dann zaehlt das
+                # Startskript aus sys.argv[0] (gleiche Aussage: eigenes Skript).
+                "hauptmodul": (getattr(haupt, "__file__", None)
+                               or (sys.argv[0] if sys.argv and sys.argv[0] not in ("", "-c") else None)),
                 "umgebung": {k: v for k, v in os.environ.items()
                              if k.startswith("LIGHTOS_")},
             }, f)
