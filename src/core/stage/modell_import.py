@@ -291,7 +291,7 @@ def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
     faktor = EINHEITEN[einheit] * massstab       # VIZ-113: auf Wunsch verkleinert
     endung = (endung or "").lower()
     if endung == ".dxf":
-        return _lies_dxf(daten, faktor, wand_hoehe_m)
+        return _lies_dxf(daten, faktor, wand_hoehe_m, massstab)
     if endung == ".stl":
         if _ist_binaer_stl(daten):
             s = _lies_stl_binaer(daten)
@@ -307,7 +307,8 @@ def lies_bytes(daten: bytes, endung: str, einheit: str = "mm",
     return _normieren(s.pos, s.idx, faktor, z_oben)
 
 
-def _lies_dxf(daten: bytes, faktor: float, wand_hoehe_m: float | None) -> Netz:
+def _lies_dxf(daten: bytes, faktor: float, wand_hoehe_m: float | None,
+              massstab: float = 1.0) -> Netz:
     from .dxf_import import lies_dxf, linien_zu_waenden
     roh = lies_dxf(daten)
     # DXF-Weltkoordinaten haben immer Z oben.
@@ -315,7 +316,10 @@ def _lies_dxf(daten: bytes, faktor: float, wand_hoehe_m: float | None) -> Netz:
         if not (0.0 < wand_hoehe_m <= MAX_HOEHE_M):
             raise ModellImportFehler(
                 f"Die Wandhöhe muss zwischen 0 und {MAX_HOEHE_M:.0f} m liegen.")
-        pos, idx = linien_zu_waenden(roh, wand_hoehe_m / faktor)
+        # CDX-71: die Wandhoehe gilt in der Einheit der Datei und wird beim
+        # Verkleinern (VIZ-113) mit dem ganzen Modell skaliert — sonst passt
+        # der vorgeschlagene Massstab nicht, weil die Waende hoch bleiben.
+        pos, idx = linien_zu_waenden(roh, wand_hoehe_m * massstab / faktor)
         netz = _normieren(pos, idx, faktor, True)
     else:
         netz = _normieren(roh.pos, roh.idx, faktor, True, roh.lin)
