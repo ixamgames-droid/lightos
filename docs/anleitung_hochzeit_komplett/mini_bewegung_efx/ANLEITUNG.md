@@ -35,11 +35,13 @@ laufen auf Moving Head + Spider, **Linie** nur auf den Spidern, die übrigen Fig
 ### Schritt-für-Schritt (Beispiel: fächernder Kreis)
 1. **Bank 3** → **„Kreis"** antippen. → MH + Spider fahren einen Kreis.
 2. **„Kreis“** läuft schon gegenläufig; **„Gegenläufig“** schaltet das aus und wieder ein (wirkt nur auf „Kreis“).
-3. Tempo: Fader **„Mover-Speed“** (oder Encoder „EFX-Tempo“) — wirkt nur, solange **keine BPM** läuft; die
-   Figuren hängen am Tempo-Bus „Global“. Größe: Fader **„Mover-Größe“**.
+3. Tempo: die Figuren hängen an **Bus A** (eine Figur je Takt, ×¼) und folgen damit der Haupt-BPM.
+   Fader **„Mover-Speed“** stellt den Faktor aller Figuren (×1/16 … ×1), Encoder **„EFX-Tempo“** den
+   des Kreises. Größe: Fader **„Mover-Größe“**. Vor dem ersten Tap bzw. ohne Musik-BPM laufen die
+   Figuren frei in ihrer Grundgeschwindigkeit; Fader und Encoder greifen erst mit Takt.
 4. Dazu Farbe: **„MH Grün"** (Bank 1) bzw. Spider-Farbe → bunte Bewegung.
 
 ### Sofort weiterprobieren
 - **Zielen:** XY-Pad „MH zielen" → den Kopf gezielt auf einen Punkt (z. B. Brautpaar) richten.
 - **Eigene Bahn:** „Custom-Pfad" zeigt, wie eine gezeichnete Bahn aussieht (im EFX-Editor zeichenbar).
-- **Auf den Beat:** Bewegungen lassen sich (wie Farbe/Dimmer) an den Tempo-Bus koppeln (Bank 4).
+- **Auf den Beat:** Bewegungen laufen wie Farbe/Dimmer an Bus A — „Sync jetzt“ (Bank 4) setzt sie mit auf die Eins.

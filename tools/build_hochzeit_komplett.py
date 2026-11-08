@@ -6,7 +6,8 @@ KOMPOSITIONS-MODELL (Davids Vorgabe):
     Beide Schichten layern disjunkt → feste grüne Farbe + Dimmer-Lauflicht = grünes Lauflicht.
   * PRO GRUPPE unabhängig: Paarlichter · Moving Heads · Spider — jede Gruppe eigener Farb-Effekt UND
     eigener Dimmer-Effekt gleichzeitig (edit_slot = Radio-Gruppe je (Gruppe, Schicht); killt die anderen nicht).
-  * TEMPO-SYNC: alle Effekte hängen an Tempo-Bus A mit gemeinsamer sync_group → phasen-gekoppelt auf den
+  * TEMPO-SYNC: alle Effekte hängen an Tempo-Bus A (folgt der Haupt-BPM: Tap/Musik-BPM) mit gemeinsamer
+    sync_group → phasen-gekoppelt auf den
     Beat, auch bei unterschiedlichen Tempi (Farbe ×1, Dimmer ×2 — beginnt auf demselben Taktschlag).
   * Farb-Kacheln (Ziel „Effekt") färben den AKTIVEN (zuletzt gestarteten) Effekt live um.
 
@@ -82,7 +83,9 @@ from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
 from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT = os.path.join(_ROOT, "shows", "Hochzeit_Komplett_2026.lshow")
+# TOOL-10: LIGHTOS_GEN_OUT lenkt die Show in einen Wegwerf-Ordner um (Test baut
+# die Show bis „FERTIG", ohne shows/ anzufassen; Muster aus build_demo_show_full.py).
+OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Hochzeit_Komplett_2026.lshow")
 MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
 
 BPM = 128.0
@@ -92,12 +95,24 @@ PHRASE = 8 * BEAT
 SYNC = "hochzeit"   # gemeinsame sync_group → alle Effekte phasen-gekoppelt
 
 
+# TOOL-10: Profile, die NICHT eingebaut sind, sondern als QLC+-Datei (.qxf) in die
+# lokale Geraete-Bibliothek importiert wurden. ensure_builtins legt sie nie an.
+LOKALE_PROFILE = {"Speider": "U-King Spider 14ch (QLC+-Profil)"}
+
+
 def profile_id(short: str) -> int:
     with Session(fdb_engine()) as s:
         pid = s.execute(select(FixtureProfile.id).where(
             FixtureProfile.short_name == short)).scalar_one_or_none()
     if pid is None:
-        raise SystemExit(f"Profil '{short}' fehlt — bitte App einmal starten (ensure_builtins).")
+        if short in LOKALE_PROFILE:
+            raise SystemExit(
+                f"Profil '{short}' fehlt in der Geräte-Bibliothek. Es ist kein eingebautes "
+                f"Profil, sondern ein lokal importiertes ({LOKALE_PROFILE[short]}) — der "
+                f"App-Start legt es NICHT an. Bitte die .qxf-Datei des Geräts in der "
+                f"Geräte-Bibliothek importieren und den Generator erneut starten.")
+        raise SystemExit(f"Profil '{short}' fehlt — eingebautes Profil: App einmal starten "
+                         f"(ensure_builtins legt es an).")
     return int(pid)
 
 
@@ -257,7 +272,10 @@ if missing:
 # ════════════════════════════════════════════════════════════════════════════════
 tbm = get_tempo_bus_manager()
 tbm.load_dict([])
-bus_a = tbm.ensure_bus("A"); bus_a.set_role("master"); bus_a.set_bpm(BPM)
+# TOOL-10: Bus A folgt der Haupt-BPM (Sub x1 des Default-Bus = Quelle „Sound" im
+# Tempo-Panel). Sonst liefen Tap/Musik-BPM/BPM +/-/„BPM global" am globalen Leiter
+# an allen Farb-/Dimmer-/Bewegungs-Effekten vorbei (Bus A stand fest auf 128).
+bus_a = tbm.ensure_bus("A"); bus_a.set_role("sub"); bus_a.set_parent(""); bus_a.set_bus_multiplier(1.0)
 bus_b = tbm.ensure_bus("B"); bus_b.set_role("sub"); bus_b.set_parent("A"); bus_b.set_bus_multiplier(0.5)
 bus_c = tbm.ensure_bus("C"); bus_c.set_role("sub"); bus_c.set_parent("A"); bus_c.set_bus_multiplier(2.0)
 bus_d = tbm.ensure_bus("D"); bus_d.set_role("master"); bus_d.set_bpm(140.0)
@@ -474,9 +492,13 @@ for fid in spider_fids:
 mh_strobe = mh_scene("MH Strobe", col=MHCOL["weiss"], strobe=True)
 
 # ── BEWEGUNG (EFX) — alle 10 Figuren ────────────────────────────────────────────────
+# TOOL-10: alle Figuren an Bus A mit ×¼ (eine Figur je Takt) — so treffen sie
+# „Sync jetzt", die Haupt-BPM und die Tempo-Regler (tempo_multiplier).
+EFX_MULT = 0.25
+
 def efx(name, algo, fids, phase_mode="fan", spread=1.0, counter=False, mirror=False,
         x=128.0, y=128.0, size=150.0, speed_hz=0.45, xf=3.0, yf=2.0, direction="forward",
-        bus="", mult=1.0, rotation=0.0):
+        bus="A", mult=EFX_MULT, rotation=0.0):
     e = fm.new_efx(name)
     e.algorithm = algo
     e.fixtures = [EfxFixture(fid=f) for f in fids]
@@ -517,6 +539,7 @@ efx_custom.fixtures = [EfxFixture(fid=f) for f in mover_fids]
 efx_custom.set_custom_path(zig)
 efx_custom.open_beam = True
 efx_custom.width = efx_custom.height = 180.0
+efx_custom.tempo_bus_id, efx_custom.tempo_multiplier, efx_custom.sync_group = "A", EFX_MULT, SYNC
 EFX_ALL = EFX_BASE + [efx_custom]   # alle 10 EfxAlgorithm-Werte
 
 # MH-Gobos
@@ -754,7 +777,7 @@ def color_tile(name, note, bank, r, g, b, w=0, target=ColorTarget.EFFECT, functi
 
 def fader(caption, col, bank, mode, function_ids=None, programmer_attr="intensity",
           programmer_scope="all", programmer_group="", param_key="speed", midi_cc=-1,
-          value=0, submaster_slot=None, function_id=None, tempo_bus_id=""):
+          value=0, submaster_slot=None, function_id=None, tempo_bus_id="", rng=None):
     s = VCSlider(caption)
     s.mode = mode
     s.function_id = function_id
@@ -766,10 +789,24 @@ def fader(caption, col, bank, mode, function_ids=None, programmer_attr="intensit
     s.programmer_group = programmer_group
     s.param_key = param_key
     s.tempo_bus_id = tempo_bus_id
+    if rng is not None:
+        s.range_min, s.range_max = rng
     s.midi_cc, s.midi_ch = midi_cc, 0
     s._value = value
     x = X0 + col * STEP + 2
     _add(s, x, Y_FAD, 56, FAD_H, bank)
+
+
+# TOOL-10: Tempo-Fader stellen tempo_multiplier (×1/16 … 16, linear über den
+# 0..255-Hub). Ein Effekt auf einem LAUFENDEN Tempo-Bus liest nur diesen Faktor —
+# speed/matrix_speed (Modus EFFECT_SPEED) gilt nur im Free-Run.
+# Hub-Bereich 0..64 -> ×1/16 … ×4 (Mitte ≈ ×2), 0..16 -> ×1/16 … ×1.
+TEMPO_X4, TEMPO_X1 = (0, 64), (0, 16)
+
+
+def tempo_fader(caption, col, bank, *, function_ids=None, rng=TEMPO_X4, value=124, midi_cc=-1):
+    fader(caption, col, bank, SliderMode.EFFECT_PARAM, function_ids=function_ids,
+          param_key="tempo_multiplier", midi_cc=midi_cc, value=value, rng=rng)
 
 
 def pb_fader(caption, col, bank, slot, midi_cc, value=255):
@@ -803,10 +840,13 @@ def bus_selector(x, y, bank, buses=("A", "B", "C", "D"), caption="Tempo-Bus", ww
 
 
 def speed_dial(caption, x, y, bank, target_mode=SpeedTarget.FUNCTION, function_id=None,
-               tempo_bus_id="", role="master", parent_bus_id="", ww=160, hh=150):
+               tempo_bus_id="", role="master", parent_bus_id="", ww=160, hh=150,
+               function_ids=None, factor=1.0):
     w = VCSpeedDial(caption)
     w.target_mode = target_mode
     w.function_id = function_id
+    w.function_ids = list(function_ids or [])
+    w._mult = w._active_factor = float(factor)
     w.tempo_bus_id = tempo_bus_id
     w.role = role
     w.parent_bus_id = parent_bus_id
@@ -961,7 +1001,7 @@ select_group_btn("Moving Head", "Moving Head", note_rc(4, 2), B_DIM)
 stepper("Dimmer-Lvl", 7, B_DIM, base_amber.id, "intensity_max", step=16)
 effect_display("Dimmer-Vorschau", RX, Y0, B_DIM, dm_chase.id)
 fader("Dimmer-Master", 0, B_DIM, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
-fader("Dimmer-Tempo", 1, B_DIM, SliderMode.EFFECT_SPEED, midi_cc=49, value=80)
+tempo_fader("Dimmer-Tempo", 1, B_DIM, function_ids=[m.id for m in DM_FRONT + DM_MOVER], midi_cc=49)
 fader("Front-Dim", 3, B_DIM, SliderMode.GROUP_DIMMER, programmer_group="Paarlichter", midi_cc=51, value=255)
 fader("Programmer", 4, B_DIM, SliderMode.PROGRAMMER, programmer_attr="intensity", midi_cc=52, value=255)
 label("BANK 2  DIMMEREFFEKTE (Bewegung über Dimmer)  —  R0: Grundfarbe. R1: Paarlichter-Dimmer (Lauflicht/"
@@ -983,8 +1023,8 @@ effect_action_btn("Neustart", note_rc(3, 3), B_MOVE, "#553010", "restart", efx_c
 select_group_btn("Mover", "Alle Mover", note_rc(3, 5), B_MOVE)
 xy_pad("MH zielen (Pan/Tilt)", RX, Y0, B_MOVE, mh_fids, mode="position")
 xy_pad("EFX-Feld aufziehen", RX + 210, Y0, B_MOVE, mover_fids, mode="area", efx_function_id=efx_circle.id)
-encoder("EFX-Tempo", 7, B_MOVE, efx_circle.id, "speed", step=0.05)
-fader("Mover-Speed", 0, B_MOVE, SliderMode.EFFECT_SPEED, function_ids=[e.id for e in EFX_ALL], midi_cc=48, value=80)
+encoder("EFX-Tempo", 7, B_MOVE, efx_circle.id, "tempo_multiplier", step=0.005)
+tempo_fader("Mover-Speed", 0, B_MOVE, function_ids=[e.id for e in EFX_ALL], rng=TEMPO_X1, value=48, midi_cc=48)
 fader("Mover-Größe", 1, B_MOVE, SliderMode.EFFECT_PARAM, function_ids=[e.id for e in EFX_ALL], param_key="size", midi_cc=49, value=150)
 fader("Mover-Dim", 3, B_MOVE, SliderMode.GROUP_DIMMER, programmer_group="Alle Mover", midi_cc=51, value=255)
 label("BANK 3  BEWEGUNGEN  —  R0-1: alle 10 EFX-Figuren (Kreis/Acht/Linie/Raute/Rechteck/Trapez/"
@@ -1003,23 +1043,28 @@ action_btn("Musik-BPM", ButtonAction.AUDIO_BPM, note_rc(1, 1), B_STROBE, "#103a4
 action_btn("BPM +", ButtonAction.BPM_NUDGE_UP, note_rc(1, 2), B_STROBE, "#1f5a3a")
 action_btn("BPM -", ButtonAction.BPM_NUDGE_DOWN, note_rc(1, 3), B_STROBE, "#5a1f1f")
 action_btn("BPM-Modus", ButtonAction.BPM_MODE_TOGGLE, note_rc(1, 4), B_STROBE, "#3a3a1f")
-action_btn("Sync jetzt", ButtonAction.AUTO_SYNC, note_rc(2, 0), B_STROBE, "#1f6a4a")        # alle auf die Eins
-action_btn("Tap Bus A", ButtonAction.TAP_BUS, note_rc(2, 1), B_STROBE, "#1f3a6a", tempo_bus_id="A")
+# TOOL-10: „Sync jetzt" = SYNC_BUS auf Bus A (dort haengen alle Farb-/Dimmer-/EFX-Effekte).
+action_btn("Sync jetzt", ButtonAction.SYNC_BUS, note_rc(2, 0), B_STROBE, "#1f6a4a", tempo_bus_id="A")
+# Bus A ist Sub der Haupt-BPM — ein eigener Tap auf A waere wirkungslos; Tap = „Tap Tempo".
+action_btn("Auto-Sync an/aus", ButtonAction.AUTO_SYNC, note_rc(2, 1), B_STROBE, "#1f3a6a")
 action_btn("Sync Bus A", ButtonAction.SYNC_BUS, note_rc(2, 2), B_STROBE, "#1f4a6a", tempo_bus_id="A")
 action_btn("Arm Bus", ButtonAction.ARM_BUS, note_rc(2, 3), B_STROBE, "#5a3a1f", tempo_bus_id="A")
 bpm_display(RX, Y0, B_STROBE, tempo_bus_id="", caption="GLOBAL BPM")
-bpm_display(RX + 196, Y0, B_STROBE, tempo_bus_id="A", caption="BUS A (Master)")
+bpm_display(RX + 196, Y0, B_STROBE, tempo_bus_id="A", caption="BUS A (= Haupt-BPM)")
 bus_selector(RX, Y0 + 106, B_STROBE)
 tempo_ctrl("Tempo-Bus-Panel A", RX, Y0 + 200, B_STROBE, tempo_bus_id="A")
-speed_dial("Master A (Farbe ×1)", RX + 390, Y0, B_STROBE, target_mode=SpeedTarget.SPEED_NODE, tempo_bus_id="A", role="master")
-speed_dial("Sub C (Dimmer ×2)", RX + 390, Y0 + 160, B_STROBE, target_mode=SpeedTarget.SPEED_NODE,
-           tempo_bus_id="C", role="sub", parent_bus_id="A")
-fader("Tempo Bus A", 0, B_STROBE, SliderMode.TEMPO_BUS, tempo_bus_id="A", midi_cc=48, value=100)
+# TOOL-10: Faktor-Raeder auf die Effekte selbst (tempo_multiplier, im Free-Run
+# zusaetzlich speed) — der alte „Sub C" stellte Bus C, an dem nichts hing; der alte
+# „Master A" (Speed-Knoten) haette Bus A von der Haupt-BPM abgekoppelt.
+speed_dial("Farb-Tempo ×", RX + 390, Y0, B_STROBE, target_mode=SpeedTarget.TEMPO_BUS_MULT,
+           function_ids=[m.id for m in CF_FRONT + CF_SPIDER + [cf_rgbw_white]], factor=1.0)
+speed_dial("Dimmer-Tempo ×", RX + 390, Y0 + 160, B_STROBE, target_mode=SpeedTarget.TEMPO_BUS_MULT,
+           function_ids=[m.id for m in DM_FRONT + DM_MOVER], factor=2.0)
 fader("Tempo Bus D", 1, B_STROBE, SliderMode.TEMPO_BUS, tempo_bus_id="D", midi_cc=49, value=85)
 fader("BPM global", 3, B_STROBE, SliderMode.BPM, midi_cc=51, value=100)
 label("BANK 4  STROBE & TEMPO  —  R0: Strobe (Shutter + Farb-Strobe + Spider/MH-Flash). R1: Tap/Musik-BPM/"
-      "+/-/Modus. R2: SYNC JETZT (alle Effekte auf die Eins) + Tap/Sync/Arm Bus. Rechts: BPM-Fenster + Bus-Wahl "
-      "+ Tempo-Panel + Speed-Knoten (Farbe ×1, Dimmer ×2 — selber Takt, doppeltes Tempo).", X0, 28, 1320, B_STROBE)
+      "+/-/Modus (Haupt-BPM, Bus A folgt). R2: SYNC JETZT (Bus A auf die Eins) + Auto-Sync + Sync/Arm Bus. "
+      "Rechts: BPM-Fenster + Bus-Wahl + Tempo-Panel + Faktor-Räder (Farbe ×1, Dimmer ×2).", X0, 28, 1320, B_STROBE)
 
 
 # ── BANK 5 — LIVE-EDITOR (Effekte im Nachhinein regeln) ─────────────────────────────
@@ -1035,10 +1080,10 @@ effect_display("Live-Vorschau", RX + 350, Y0, B_EDIT, dm_chase.id, ww=260, hh=13
 frame("Effekt-Container", RX, Y0 + 270, B_EDIT, ww=330, hh=110, show_header=True)
 multi_live_editor("Multi-Live-Edit", RX + 350, Y0 + 140, B_EDIT,
                   [dm_chase.id, efx_circle.id])
-encoder("Tempo", 0, B_EDIT, dm_chase.id, "speed", step=0.25)
+encoder("Tempo", 0, B_EDIT, dm_chase.id, "tempo_multiplier", step=0.01)
 stepper("Lauflichter", 1, B_EDIT, dm_chase.id, "runner_count", step=1)
 encoder("Dichte", 7, B_EDIT, dm_wave.id, "density", step=0.25)
-fader("Effekt-Tempo", 3, B_EDIT, SliderMode.EFFECT_SPEED, midi_cc=48, value=80)
+tempo_fader("Effekt-Tempo", 3, B_EDIT, midi_cc=48)
 fader("Effekt-Helligk.", 4, B_EDIT, SliderMode.EFFECT_INTENSITY, midi_cc=49, value=255)
 label("BANK 5  LIVE-EDITOR  —  R0: Farbe + Dimmer-Bewegung + EFX + Live-Chase starten. R1: Farbe +/-/Leeren. "
       "Rechts: großer Effekt-Editor + Vorschau + Multi-Live-Edit + Container. Encoder/Stepper/Fader regeln "
@@ -1161,7 +1206,8 @@ assert any({x.fid for x in e.fixtures} & set(mh_fids) for e in efxs), "keine MH-
 tbm2 = get_tempo_bus_manager()
 named = {b.bus_id: b for b in tbm2.named_buses()}
 assert {"A", "B", "C", "D"}.issubset(named), f"Buses: {list(named)}"
-assert named["A"].role == "master" and named["B"].role == "sub", "A/B Rollen falsch"
+assert named["A"].role == "sub" and named["A"].parent_id == "", "Bus A folgt der Haupt-BPM nicht"
+assert named["B"].role == "sub", "B-Rolle falsch"
 assert abs(named["C"].bus_multiplier - 2.0) < 1e-6, "Sub C falsch"
 
 mh_cw_ch = chan_of[12]["color_wheel"]
