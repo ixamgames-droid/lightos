@@ -47,6 +47,7 @@ test_vcb45_popout_lage.py          # VC-Anleitung nennt das gemerkte Popout
 test_tool14_gen_tools_index_cli.py # tools/README.md
 test_tool12_mh_einmessen_beschreibung.py  # TOOL-12: Einmess-Werkzeug verweist auf docs/anleitung_einmessen
 test_tool23_backlog_ids_tafel_fragmente.py  # BACKLOG / Tafel
+test_tool10_hochzeit_verdrahtung.py  # TOOL-10: Hochzeit-Anleitungen (mini_strobe_tempo/live_editor/bewegung/dimmer) zur Verdrahtung
 test_ui84_efx_laden_geraeteliste.py # Anleitung Matrix/EFX beim Laden
 test_eng36_klonen_anleitung.py     # Anleitung Klonen: Wortlaut wie im Dialog, Eintrag in ANLEITUNGEN.md
 test_eng35_doku.py                 # Anleitung „Wer gewinnt?“ (Stufen, Snap-Haken VCB-46), Merge-Vertrag, Feld „Stufe“ in den Editor-Anleitungen, Button-Anleitung
