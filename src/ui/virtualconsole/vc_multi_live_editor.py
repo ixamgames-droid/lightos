@@ -30,6 +30,15 @@ wuerden die Live-Werte speicherbar machen. Die Baseline wird beim Drop EINMAL ge
 ``set_param_normalized``. Ergebnis: Panel + welche Effekte drin haengen bleiben nach
 Reload erhalten, die konkret gedrehten Werte fallen auf das Preset zurueck.
 
+ALLE GEMEINSAM (VCB-49): Ab 2 Effekten steht im Dropdown zusaetzlich
+„Alle gemeinsam (N)". Der Body zeigt dann nur die Params, die ALLE Effekte haben
+(``_joint_specs``: gleicher Name + passender Typ/Wertebereich, Richtungs-Werte ueber
+``_JOINT_VALUE_ALIASES``); eine Aenderung schreibt ueber dieselben effect_live-
+Pfade in jeden Effekt (absolut, kein relatives Verschieben). Unterschiedliche
+Ausgangswerte zeigen „gemischt". Eigener Haken-Satz ``joint_checked`` und die Wahl
+selbst (``joint``) werden mitgespeichert. Vorschau und Tempo-Bereich bleiben
+dort aus; den Tempo-Faktor gibt es als gemeinsamen Regler „Tempo ×".
+
 Verschieben/Skalieren: Der Content-Container ist STETS bedienbar (damit man im
 Bearbeiten-Modus Haken setzen kann). Das Panel wird ueber den **Header** (oben)
 verschoben und ueber den ``HANDLE_SIZE``-breiten **Randring** skaliert — dort liegen
@@ -83,6 +92,47 @@ _DIR_ARROWS = {"forward": "→", "reverse": "←", "backward": "←", "bounce": 
                "left": "←", "right": "→", "up": "↑", "down": "↓",
                "in": "→←", "out": "←→", "center_out": "←‧→", "out_center": "→‧←",
                "cw": "↻", "ccw": "↺"}
+
+# VCB-49 „Alle gemeinsam": Schnittmenge der live-steuerbaren Params ALLER
+# zugewiesenen Effekte. Geklaert (08.11.): Matrix/EFX/Chaser benutzen fuer
+# dieselbe Sache bereits DENSELBEN Param-Namen (intensity, direction …); was
+# verschieden heisst, meint auch Verschiedenes (Chaser ``step_fade`` = Schritt-
+# Ueberblendung, Matrix ``env_fade`` = Huellkurve) und wird bewusst NICHT
+# gleichgesetzt. Abweichend sind nur die WERTE von ``direction``
+# (Matrix forward/reverse, EFX forward/backward/bounce, Chaser Forward/Backward)
+# -> diese kleine, explizite Werte-Zuordnung (kanonisch, klein geschrieben).
+# Nicht gelistete Werte bleiben, wie sie sind (kein Raten).
+_JOINT_VALUE_ALIASES = {
+    "direction": {"forward": "forward", "reverse": "backward",
+                  "backward": "backward"},
+}
+
+
+def _joint_canon(key, value):
+    """Effekt-eigenen select-Wert auf den kanonischen gemeinsamen Wert abbilden."""
+    table = _JOINT_VALUE_ALIASES.get(key)
+    if table is None or not isinstance(value, str):
+        return value
+    return table.get(value.lower(), value)
+
+
+def _option_value(o):
+    return o[0] if isinstance(o, (tuple, list)) and o else o
+
+
+class _JointSpec:
+    """Gemeinsamer Param (Schnittmenge) — Duck-Typ zu ParamSpec fuer die Builder.
+    ``options`` traegt KANONISCHE Werte; ``raw[fid]`` bildet kanonisch -> Effekt-
+    eigener Wert ab (nur bei select)."""
+
+    def __init__(self, key, kind, label, lo=0.0, hi=0.0, step=1.0,
+                 options=(), raw=None, labels=None):
+        self.key, self.kind, self.label = key, kind, label
+        self.min, self.max, self.step = lo, hi, step
+        self.options = tuple(options)
+        self.raw = raw or {}
+        self.labels = labels or {}         # optionale feste Options-Beschriftung
+
 
 class _EffectPreview(QWidget):
     """Kompakte Live-Vorschau des gewaehlten Effekts — EIGENER Renderer je Typ:
@@ -602,6 +652,11 @@ class VCMultiLiveEditor(VCWidget):
         self._drift_timer = QTimer(self)
         self._drift_timer.setInterval(500)
         self._drift_timer.timeout.connect(self._poll_external_drift)
+        # VCB-49: Eintrag „Alle gemeinsam (N)" (ab 2 Effekten). Eigener Haken-Satz
+        # (mit der Show gespeichert) + eigener Drift-Snapshot {(fid, key): wert}.
+        self._joint = False
+        self._joint_checked: set = set()
+        self._joint_rendered: dict = {}
 
         self._build()
         self._refresh_nav()
@@ -839,6 +894,12 @@ class VCMultiLiveEditor(VCWidget):
         # alles sichtbar -> kein Eintrag (Back-Compat, kleinere Show-Datei).
         d["hidden"] = {str(int(f)): sorted(vs)
                        for f, vs in self._hidden.items() if vs}
+        # VCB-49: Auswahl „Alle gemeinsam" + deren Haken-Satz. Nur geschrieben,
+        # wenn gesetzt (alte Shows ohne die Schluessel laden unveraendert).
+        if self._joint_checked:
+            d["joint_checked"] = sorted(self._joint_checked)
+        if self._joint_active():
+            d["joint"] = True
         return d
 
     def apply_dict(self, d: dict):
@@ -860,6 +921,11 @@ class VCMultiLiveEditor(VCWidget):
                 continue
             if fid in self._fids:          # gleicher Waisen-Guard wie bei "checked"
                 self._hidden[fid] = set(vals or ())
+        self._joint_checked = {str(k) for k in (d.get("joint_checked") or ())}
+        if d.get("joint") and len(self._fids) >= 2:
+            self._joint = True
+            self._refresh_nav()            # Combo auf „Alle gemeinsam" stellen
+            return
         self._refresh_body()               # gespeicherte Auswahl sichtbar machen
 
     # ── Drag & Drop ────────────────────────────────────────────────────────────
@@ -900,6 +966,7 @@ class VCMultiLiveEditor(VCWidget):
             return
         if fid in self._fids:
             self._current = self._fids.index(fid)
+            self._joint = False
             self._refresh_nav()
             return
         from src.core.engine import effect_live
@@ -907,6 +974,7 @@ class VCMultiLiveEditor(VCWidget):
             return
         self._fids.append(fid)
         self._current = len(self._fids) - 1
+        self._joint = False
         # Baseline EINMAL pinnen -> Live-Edits bleiben fluechtig (Save schreibt das
         # Preset). Bewusst kein commit/discard hier oder beim Schliessen.
         effect_live.begin_live_edit(fid)
@@ -915,13 +983,25 @@ class VCMultiLiveEditor(VCWidget):
     def _step(self, delta: int) -> None:
         if not self._fids:
             return
-        self._current = (self._current + delta) % len(self._fids)
+        if self._joint_active():
+            # Aus „Alle gemeinsam" heraus: + -> erster, – -> letzter Effekt.
+            self._joint = False
+            self._current = 0 if delta > 0 else len(self._fids) - 1
+        else:
+            self._current = (self._current + delta) % len(self._fids)
         self._refresh_nav()
 
     def _on_combo(self, idx: int) -> None:
         if 0 <= idx < len(self._fids):
+            self._joint = False
             self._current = idx
             self._refresh_body()
+        elif idx == len(self._fids) and len(self._fids) >= 2:
+            self._joint = True             # VCB-49: Eintrag „Alle gemeinsam (N)"
+            self._refresh_body()
+
+    def _joint_active(self) -> bool:
+        return bool(self._joint) and len(self._fids) >= 2
 
     def _refresh_nav(self) -> None:
         from .vc_effect_meta import effect_name
@@ -929,9 +1009,14 @@ class VCMultiLiveEditor(VCWidget):
         self._combo.clear()
         for i, fid in enumerate(self._fids):
             self._combo.addItem(f"{i + 1}.  {effect_name(fid)}")
+        if len(self._fids) >= 2:           # VCB-49: erst ab 2 Effekten sinnvoll
+            self._combo.addItem(f"Alle gemeinsam ({len(self._fids)})")
+        else:
+            self._joint = False
         if self._fids:
             self._current = max(0, min(self._current, len(self._fids) - 1))
-            self._combo.setCurrentIndex(self._current)
+            self._combo.setCurrentIndex(len(self._fids) if self._joint
+                                        else self._current)
         self._combo.blockSignals(False)
 
         multi = len(self._fids) > 1
@@ -942,7 +1027,11 @@ class VCMultiLiveEditor(VCWidget):
 
     # ── Parameter-Editor ─────────────────────────────────────────────────────────
     def _current_fid(self):
-        return self._fids[self._current] if self._fids else None
+        """Gerade gezeigter EINZEL-Effekt; ``None`` auch bei „Alle gemeinsam"
+        (Vorschau/Tempo/Einzel-Drift bleiben dort aus)."""
+        if not self._fids or self._joint_active():
+            return None
+        return self._fids[self._current]
 
     def _editable_specs(self, fid) -> list:
         """Live-steuerbare Params des Effekts (gefiltert), in list_params-Reihenfolge."""
@@ -1011,6 +1100,10 @@ class VCMultiLiveEditor(VCWidget):
         self._preview.set_fid(self._current_fid())
         self._tempo.set_fid(self._current_fid())
         self._apply_display_visibility(self._current_fid())
+        if self._joint_active():
+            self._refresh_joint_body()
+            return
+        self._joint_rendered = {}
         content = QWidget()
         v = QVBoxLayout(content)
         v.setContentsMargins(10, 10, 10, 10)
@@ -1399,6 +1492,417 @@ class VCMultiLiveEditor(VCWidget):
             self._rendered_values[key] = effect_live.get_param(key, fid)
         self._after_edit(fid)
 
+    # ── VCB-49: „Alle gemeinsam" (Schnittmenge, eine Aenderung -> alle Effekte) ──
+    def _joint_specs(self) -> list:
+        """Params, die ALLE zugewiesenen Effekte live steuern koennen — gleicher
+        Name UND passender Typ/Wertebereich (int/float: gleiches min/max; select:
+        Schnittmenge der kanonischen Optionen, mind. 2). Reihenfolge = erster
+        Effekt. Kein Raten ueber Namen hinweg (siehe ``_JOINT_VALUE_ALIASES``)."""
+        if len(self._fids) < 2:
+            return []
+        per_fid = {f: {s.key: s for s in self._editable_specs(f)} for f in self._fids}
+        first = self._fids[0]
+        out = []
+        for key, s0 in per_fid[first].items():
+            specs = [per_fid[f].get(key) for f in self._fids]
+            if any(s is None for s in specs):
+                continue
+            kind = getattr(s0, "kind", "")
+            if any(getattr(s, "kind", "") != kind for s in specs):
+                continue
+            label = getattr(s0, "label", key) or key
+            if kind in ("int", "float"):
+                lo, hi = float(getattr(s0, "min", 0)), float(getattr(s0, "max", 0))
+                if any(abs(float(getattr(s, "min", 0)) - lo) > 1e-9
+                       or abs(float(getattr(s, "max", 0)) - hi) > 1e-9 for s in specs):
+                    continue
+                step = min(float(getattr(s, "step", 1) or 1) for s in specs)
+                out.append(_JointSpec(key, kind, label, lo, hi, step))
+            elif kind == "select":
+                raw = {}
+                common = None
+                for f, s in zip(self._fids, specs):
+                    m = {}
+                    for o in (getattr(s, "options", ()) or ()):
+                        v = _option_value(o)
+                        m.setdefault(_joint_canon(key, v), v)
+                    raw[f] = m
+                    common = set(m) if common is None else common & set(m)
+                opts = [c for c in raw[first] if c in (common or ())]
+                if len(opts) < 2:
+                    continue
+                out.append(_JointSpec(key, kind, label, options=opts, raw=raw))
+            else:                          # bool / color_sequence / dimmer_sequence
+                out.append(_JointSpec(key, kind, label))
+        # Tempo-Faktor: im Einzel-Effekt steckt er im Tempo-Bereich (deshalb in
+        # _EXCLUDE_KEYS); der ist unter „Alle gemeinsam" aus -> hier als eigener
+        # gemeinsamer Regler mit demselben Raster wie das Tempo-×-Dropdown.
+        from src.core.engine import effect_live
+        if all("tempo_multiplier" in {getattr(s, "key", "") for s in
+                                      effect_live.list_params(f)} for f in self._fids):
+            vals = [v for _t, v in _MULT_CHOICES]
+            out.append(_JointSpec(
+                "tempo_multiplier", "select", "Tempo ×", options=vals,
+                raw={f: {v: v for v in vals} for f in self._fids},
+                labels={v: t for t, v in _MULT_CHOICES}))
+        return out
+
+    def _joint_values(self, spec) -> list:
+        """Aktuelle Werte aller Effekte (select kanonisch)."""
+        from src.core.engine import effect_live
+        vals = [effect_live.get_param(spec.key, f) for f in self._fids]
+        if spec.kind == "select":
+            vals = [_joint_canon(spec.key, v) for v in vals]
+        return vals
+
+    @staticmethod
+    def _values_mixed(spec, vals) -> bool:
+        if spec.kind in ("color_sequence", "dimmer_sequence"):
+            lists = [v.to_list() if hasattr(v, "to_list") else v for v in vals]
+            return any(x != lists[0] for x in lists[1:])
+        if spec.kind in ("int", "float"):
+            try:
+                fs = [float(v) for v in vals]
+            except (TypeError, ValueError):
+                return True
+            return max(fs) - min(fs) > 1e-9
+        return any(v != vals[0] for v in vals[1:])
+
+    def _snapshot_joint(self, specs) -> None:
+        from src.core.engine import effect_live
+        self._joint_rendered = {
+            (f, s.key): effect_live.get_param(s.key, f)
+            for s in specs if s.kind in ("int", "float", "bool", "select")
+            for f in self._fids}
+
+    def _refresh_joint_body(self) -> None:
+        from .vc_effect_meta import effect_name
+        content = QWidget()
+        v = QVBoxLayout(content)
+        v.setContentsMargins(10, 10, 10, 10)
+        v.setSpacing(7)
+        specs = self._joint_specs()
+        self._snapshot_joint(specs)
+        self._rendered_values = {}
+        edit = bool(getattr(self, "_edit_mode", False))
+        n = len(self._fids)
+        head = QLabel(f"Alle gemeinsam ({n})  — hak an, was du gemeinsam steuern willst:"
+                      if edit else f"Alle gemeinsam ({n})")
+        head.setProperty("muted", "true")
+        head.setWordWrap(True)
+        v.addWidget(head)
+        if not specs:
+            v.addWidget(self._hint(
+                "Diese Effekte haben keinen live steuerbaren Parameter gemeinsam."))
+        elif edit:
+            for spec in specs:
+                v.addWidget(self._build_joint_pick_row(spec))
+        else:
+            chosen = [s for s in specs if s.key in self._joint_checked]
+            if not chosen:
+                v.addWidget(self._hint(
+                    "Noch keine gemeinsamen Regler gewählt. Schalte die virtuelle "
+                    "Konsole auf „Bearbeiten“ und hak an, was du steuern willst."))
+            for spec in chosen:
+                v.addWidget(self._build_joint_operate_row(spec))
+        info = QLabel("gilt für: " + ", ".join(effect_name(f) for f in self._fids))
+        info.setProperty("muted", "true")
+        info.setProperty("joint_info", "true")
+        info.setWordWrap(True)
+        v.addWidget(info)
+        v.addStretch(1)
+        self._scroll.setWidget(content)
+        self._visible_keys = [s.key for s in specs]
+
+    def _build_joint_pick_row(self, spec) -> QWidget:
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+        cb = QCheckBox(spec.label)
+        cb.setMinimumWidth(140)
+        cb.setChecked(spec.key in self._joint_checked)
+        control = self._build_joint_control(spec)
+        control.setVisible(cb.isChecked())
+
+        def on_toggle(on, key=spec.key, ctl=control):
+            (self._joint_checked.add if on else self._joint_checked.discard)(key)
+            ctl.setVisible(bool(on))
+
+        cb.toggled.connect(on_toggle)
+        h.addWidget(cb)
+        h.addWidget(control, 1)
+        return row
+
+    def _build_joint_operate_row(self, spec) -> QWidget:
+        control = self._build_joint_control(spec)
+        if spec.kind in ("select", "color_sequence", "dimmer_sequence"):
+            box = QWidget()
+            v = QVBoxLayout(box)
+            v.setContentsMargins(0, 2, 0, 2)
+            v.setSpacing(4)
+            cap = QLabel(spec.label)
+            cap.setProperty("muted", "true")
+            v.addWidget(cap)
+            v.addWidget(control)
+            return box
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(10)
+        cap = QLabel(spec.label)
+        cap.setMinimumWidth(120)
+        h.addWidget(cap)
+        h.addWidget(control, 1)
+        return row
+
+    @staticmethod
+    def _mixed_label() -> QLabel:
+        lbl = QLabel("gemischt")
+        lbl.setProperty("muted", "true")
+        lbl.setProperty("mixed", "true")
+        lbl.setToolTip("Die Effekte haben hier unterschiedliche Werte. Eine "
+                       "Änderung setzt alle auf denselben Wert.")
+        return lbl
+
+    def _build_joint_control(self, spec) -> QWidget:
+        vals = self._joint_values(spec)
+        mixed = self._values_mixed(spec, vals)
+        if spec.kind == "select":
+            return self._build_joint_select(spec, vals, mixed)
+        if spec.kind == "bool":
+            return self._build_joint_toggle(spec, vals, mixed)
+        if spec.kind == "int":
+            return self._build_joint_stepper(spec, vals, mixed)
+        if spec.kind in ("color_sequence", "dimmer_sequence"):
+            return self._build_joint_sequence(spec, vals, mixed)
+        return self._build_joint_slider(spec, vals, mixed)
+
+    def _build_joint_select(self, spec, vals, mixed) -> QWidget:
+        pairs = [(c, spec.labels.get(c) or self._option_labeled(c, spec.key))
+                 for c in spec.options]
+        arrows = all(c in _DIR_ARROWS for c, _ in pairs)
+        cur = None if mixed else vals[0]
+        off_grid = (not mixed and spec.labels
+                    and not any(c == cur for c in spec.options))
+        if not arrows and len(pairs) > 5:
+            combo = QComboBox()
+            if mixed:
+                combo.addItem("gemischt", None)
+            for c, lbl in pairs:
+                combo.addItem(lbl, c)
+            if not mixed and cur in spec.options:
+                combo.setCurrentIndex(list(spec.options).index(cur))
+            combo._joint_key = spec.key
+            combo.currentIndexChanged.connect(self._on_joint_combo)
+            return combo
+        box = QWidget()
+        h = QHBoxLayout(box)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(5)
+        if mixed:
+            h.addWidget(self._mixed_label())
+        elif off_grid:                     # z. B. Tempo 3× (ausserhalb des Rasters)
+            lbl0 = QLabel(f"{self._fmt(cur)}×")
+            lbl0.setProperty("muted", "true")
+            h.addWidget(lbl0)
+        for c, lbl in pairs:
+            b = QPushButton(f"{_DIR_ARROWS.get(c, '')}\n{lbl}" if arrows else lbl)
+            b.setCheckable(True)
+            b.setChecked(c == cur)
+            b.setProperty("seg", "true")
+            if arrows:
+                b.setMinimumHeight(42)
+                b.setToolTip(lbl)
+            b.clicked.connect(lambda _c=False, val=c, key=spec.key:
+                              self._joint_choice(key, val))
+            h.addWidget(b, 1)
+        return box
+
+    def _on_joint_combo(self, i):
+        c = self.sender()
+        if c is not None and c.itemData(i) is not None:
+            self._joint_choice(c._joint_key, c.itemData(i))
+
+    def _build_joint_toggle(self, spec, vals, mixed) -> QWidget:
+        cur = bool(vals[0]) and not mixed
+        btn = QPushButton("gemischt" if mixed else ("An" if cur else "Aus"))
+        btn.setCheckable(True)
+        btn.setChecked(cur)
+        btn.setProperty("seg", "true")
+        btn.setFixedWidth(84)
+        btn.clicked.connect(lambda on, key=spec.key: self._joint_choice(key, bool(on)))
+        return btn
+
+    def _build_joint_stepper(self, spec, vals, mixed) -> QWidget:
+        lo, hi = int(spec.min), int(spec.max)
+        if hi <= lo:
+            hi = lo + 100
+        step = max(1, int(spec.step or 1))
+        try:
+            cur = int(vals[0])
+        except (TypeError, ValueError):
+            cur = lo
+        state = {"v": max(lo, min(hi, cur))}
+        box = QWidget()
+        h = QHBoxLayout(box)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(0)
+        h.addStretch(1)
+        minus = QPushButton("–")
+        minus.setProperty("step", "true")
+        minus.setFixedWidth(36)
+        val_lbl = self._mixed_label() if mixed else QLabel(str(state["v"]))
+        val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        val_lbl.setMinimumWidth(60)
+        plus = QPushButton("+")
+        plus.setProperty("step", "true")
+        plus.setFixedWidth(36)
+
+        def bump(delta, key=spec.key, ro=val_lbl):
+            # Absolut: alle auf DENSELBEN Wert (Ausgang = erster Effekt).
+            nv = max(lo, min(hi, state["v"] + delta * step))
+            state["v"] = nv
+            ro.setText(str(nv))
+            ro.setProperty("mixed", None)
+            self._joint_write(key, nv)
+
+        minus.clicked.connect(lambda: bump(-1))
+        plus.clicked.connect(lambda: bump(+1))
+        h.addWidget(minus)
+        h.addWidget(val_lbl)
+        h.addWidget(plus)
+        return box
+
+    def _build_joint_slider(self, spec, vals, mixed) -> QWidget:
+        from src.core.engine import effect_live
+        lo, hi = float(spec.min), float(spec.max)
+        step = float(spec.step or 0.1)
+        steps = max(1, int(round((hi - lo) / step))) if hi > lo else 100
+        container = QWidget()
+        hl = QHBoxLayout(container)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.setSpacing(8)
+        sl = QSlider(Qt.Orientation.Horizontal)
+        sl.setRange(0, steps)
+        try:
+            val = float(vals[0])
+        except (TypeError, ValueError):
+            val = lo
+        if mixed:
+            sl.setValue(steps // 2)        # neutral, bis der Nutzer ihn bewegt
+            readout = self._mixed_label()
+        else:
+            norm = 0.0 if hi <= lo else max(0.0, min(1.0, (val - lo) / (hi - lo)))
+            sl.setValue(int(round(norm * steps)))
+            readout = QLabel(self._fmt(val))
+            readout.setProperty("muted", "true")
+        readout.setMinimumWidth(60)
+
+        def on_slide(sv, key=spec.key, ro=readout, n=steps):
+            norm = (sv / n) if n else 0.0
+            for f in self._fids:          # gleiche Live-Semantik wie Einzel-Slider
+                effect_live.set_param_normalized(key, norm, f)
+                self._joint_rendered[(f, key)] = effect_live.get_param(key, f)
+            ro.setText(self._fmt(effect_live.get_param(key, self._fids[0])))
+            ro.setProperty("mixed", None)
+
+        sl.valueChanged.connect(on_slide)
+        hl.addWidget(sl, 1)
+        hl.addWidget(readout)
+        return container
+
+    def _build_joint_sequence(self, spec, vals, mixed) -> QWidget:
+        """Farb-/Dimmer-Liste gemeinsam: das Feld bearbeitet eine KOPIE (Ausgang =
+        erster Effekt); jede Aenderung schreibt je Effekt eine eigene Kopie per
+        ``effect_live.set_param`` (Baseline bleibt gepinnt, keine geteilte
+        Referenz zwischen den Effekten)."""
+        from src.core.engine import effect_live
+        from src.core.engine.rgb_matrix import ColorSequence, DimmerSequence
+        if spec.kind == "color_sequence":
+            from src.ui.widgets.color_sequence_editor import ColorSequenceField as F
+            cls = ColorSequence
+        else:
+            from src.ui.widgets.dimmer_sequence_editor import DimmerSequenceField as F
+            cls = DimmerSequence
+        src = vals[0]
+        seq = cls.from_list(src.to_list()) if hasattr(src, "to_list") else cls()
+        field = F(title=spec.label)
+        field.set_sequence(seq)
+        box = QWidget()
+        v = QVBoxLayout(box)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(3)
+        mixed_lbl = self._mixed_label() if mixed else None
+        if mixed_lbl is not None:
+            mixed_lbl.setText("gemischt — eine Änderung übernimmt diese Liste für alle")
+            v.addWidget(mixed_lbl)
+        v.addWidget(field)
+
+        def on_changed(key=spec.key, seq=seq, kind=spec.kind, ml=mixed_lbl):
+            for f in self._fids:
+                effect_live.begin_live_edit(f)
+                # Eigene Kopie je Effekt; dessen aktive Farbe/Stufe (Weiter/
+                # Zurueck der VC-Buttons) bleibt erhalten statt auf 0 zu springen.
+                old = effect_live.get_param(key, f)
+                fresh = cls.from_list(seq.to_list())
+                if fresh.entries:
+                    fresh.active_index = max(0, min(
+                        int(getattr(old, "active_index", 0) or 0),
+                        len(fresh.entries) - 1))
+                effect_live.set_param(key, fresh, f)
+                if kind == "color_sequence":
+                    self._notify_effect_colors_changed(f)
+            if ml is not None:
+                ml.setVisible(False)
+
+        field.changed.connect(on_changed)
+        return box
+
+    def _joint_write(self, key, value) -> None:
+        """int: alle Effekte auf denselben absoluten Wert (effect_live.set_param)."""
+        from src.core.engine import effect_live
+        for f in self._fids:
+            effect_live.set_param(key, value, f)
+            self._joint_rendered[(f, key)] = effect_live.get_param(key, f)
+        self._joint_after_edit()
+
+    def _joint_choice(self, key, canon) -> None:
+        """select/bool: kanonischen Wert je Effekt auf dessen eigenen Wert abbilden
+        und schreiben; danach (deferred) neu bauen, damit Markierung/„gemischt"
+        und ggf. per ``when`` geaenderte Schnittmengen stimmen."""
+        from src.core.engine import effect_live
+        spec = next((s for s in self._joint_specs() if s.key == key), None)
+        for f in self._fids:
+            val = canon
+            if spec is not None and spec.kind == "select":
+                val = spec.raw.get(f, {}).get(canon, canon)
+            effect_live.set_param(key, val, f)
+            self._joint_rendered[(f, key)] = effect_live.get_param(key, f)
+        self._schedule_rebuild()
+
+    def _joint_after_edit(self) -> None:
+        if [s.key for s in self._joint_specs()] != self._visible_keys:
+            self._schedule_rebuild()
+
+    def _poll_joint_drift(self) -> None:
+        """VCL-01 fuer „Alle gemeinsam": Fremd-Aenderung an irgendeinem der
+        Effekte -> Anzeige neu bauen (auch „gemischt" neu bewerten)."""
+        from src.core.engine import effect_live
+        for (f, key), snap in self._joint_rendered.items():
+            live = effect_live.get_param(key, f)
+            if isinstance(snap, float) or isinstance(live, float):
+                try:
+                    if abs(float(live) - float(snap)) <= 1e-9:
+                        continue
+                except (TypeError, ValueError):
+                    pass
+            elif live == snap:
+                continue
+            if self._drift_rebuild_allowed():
+                self._schedule_rebuild()
+            return
+
     # ── VCL-01: Drift-Sync-Poll (Fremd-Aenderungen von anderer Stelle) ───────────
     def _drift_rebuild_allowed(self) -> bool:
         """Kein Rebuild, waehrend eine Maustaste gedrueckt ist (kein Yank unterm
@@ -1412,6 +1916,9 @@ class VCMultiLiveEditor(VCWidget):
         Effekts vorgenommen hat, und synchronisiert die Anzeige. effect_live hat
         kein Change-Signal (Qt-frei) -> bewusst ein leichter Poll statt Signal-
         Umbau (kleinerer Blast-Radius)."""
+        if self._joint_active():
+            self._poll_joint_drift()
+            return
         fid = self._current_fid()
         if fid is None:
             return

@@ -19,27 +19,42 @@
 - **Musik-BPM** — übernimmt die BPM aus der laufenden Musik (PC-Audio).
 - **BPM +/-** — fein nachregeln. **BPM-Modus** — Auto/Manuell umschalten.
 
+Alles das stellt die **Haupt-BPM**. **Bus A folgt ihr** (Sub ×1 — im Tempo-Bus-Panel A steht die
+Quelle auf **Sound**); an Bus A hängen alle Farb-, Dimmer- und Bewegungs-Effekte. Ein Tap oder
+Musik-BPM erreicht damit die ganze Show.
+
 ### Auf den Beat bringen (Reihe 3)
-- **„Sync jetzt“** — schaltet **Auto-Sync** an/aus: neu gestartete Effekte beginnen phasengleich am
-  gemeinsamen Beat-Raster. Laufende Bus-A-Effekte setzt **„Sync Bus A“** auf die Eins.
-- **Tap/Sync/Arm Bus A** — den Tempo-Bus A tippen/synchronisieren/scharf schalten.
+- **„Sync jetzt“** — setzt Bus A auf die Eins: alle laufenden Farb-, Dimmer- und Bewegungs-Effekte
+  beginnen ihren Zyklus gemeinsam auf diesem Schlag. **„Sync Bus A“** daneben tut dasselbe.
+- **„Auto-Sync an/aus“** — schaltet um, ob **neu gestartete** Effekte von selbst phasengleich am
+  gemeinsamen Beat-Raster einsteigen (Vorgabe: an).
+- **Arm Bus** — schaltet Bus A „scharf“ (wie ein Klick auf A in der Bus-Auswahl rechts).
 
 ### Rechts: die Tempo-Fenster
-- **GLOBAL BPM** + **BUS A** — die aktuelle BPM groß ablesen (Beat-Blink).
+- **GLOBAL BPM** + **BUS A (= Haupt-BPM)** — die aktuelle BPM groß ablesen (Beat-Blink).
 - **Tempo-Bus** (Auswahl A/B/C/D) + **Tempo-Bus-Panel A** — der Bus, an dem die Effekte hängen.
-- **Master A (Farbe ×1)** — der Speed-Knoten von Bus A: die Farbe läuft im Grundtakt, der Dimmer
-  **doppelt so schnell** (die Dimmer-Effekte hängen selbst mit ×2 an Bus A) — beide **phasengleich**.
-  **Sub C (Dimmer ×2)** hängt an Bus C, den derzeit kein Effekt benutzt; er ändert nichts Sichtbares.
+  Im Panel auf **Tap** oder **Fix** umschalten koppelt Bus A bewusst von der Haupt-BPM ab
+  (eigenes Tempo); **Sound** hängt ihn wieder an.
+- **Farb-Tempo ×** — Faktor-Rad (¼ ½ 1 2 4) für alle Farb-Effekte, Vorgabe ×1.
+- **Dimmer-Tempo ×** — Faktor-Rad für alle Dimmer-Effekte, Vorgabe ×2 (doppelt so schnell wie die
+  Farbe, trotzdem **phasengleich**).
+- Fader **„Tempo Bus D“** stellt den eigenen Bus D; **„BPM global“** schiebt die Haupt-BPM (30–300).
 
 ---
 
 ### Warum „verschiedene Tempi, gleicher Takt"?
 Alle Farb- und Dimmer-Effekte hängen an **Bus A** und teilen eine **sync_group**. Der Bus gibt den
-Beat vor; jeder Effekt hat einen **Multiplikator** (Farbe ×1, Dimmer ×2). Dadurch starten sie zusammen
-auf der Eins und bleiben gekoppelt — der Dimmer macht nur doppelt so viele Schritte pro Takt.
+Beat vor; jeder Effekt hat einen **Multiplikator** (Farbe ×1, Dimmer ×2, Bewegung ×¼). Dadurch starten
+sie zusammen auf der Eins und bleiben gekoppelt — der Dimmer macht nur doppelt so viele Schritte pro Takt.
+Alle Tempo-Regler der Show (Faktor-Räder, „Dimmer-Tempo“, „Effekt-Tempo“, „Mover-Speed“, Encoder
+„Tempo“/„EFX-Tempo“) stellen genau diesen Multiplikator.
+
+> Solange noch **keine BPM** läuft (weder Tap noch Musik-BPM), laufen die Effekte frei in ihrer
+> Grundgeschwindigkeit; die Fader und Encoder wirken erst mit Takt. Die Faktor-Räder rechts wirken
+> in beiden Fällen.
 
 ### Sofort weiterprobieren
 1. **Musik-BPM** tippen (oder **Tap Tempo** im Takt) → die BPM oben rechts springt auf den Wert.
 2. Ein paar Effekte starten (Bank 1 Farbwechsel + Bank 2 Lauflicht).
-3. **„Sync Bus A“** → die laufenden Bus-A-Effekte schnappen auf die Eins. Der Dimmer läuft sichtbar doppelt so schnell wie der Farbwechsel.
+3. **„Sync jetzt“** → die laufenden Effekte schnappen auf die Eins. Der Dimmer läuft sichtbar doppelt so schnell wie der Farbwechsel.
 4. **Fader „BPM global"** schieben → das ganze Set wird schneller/langsamer, bleibt aber synchron.

@@ -35,9 +35,11 @@ Tippe eine an — sie läuft sofort über die gewählte Farbe:
 ### Schritt-für-Schritt (Beispiel: pulsierendes Warmweiß)
 1. **Bank 1** → **„Feste Farbe"** → eine Farb-Kachel (z. B. **Orange**). Alle Paarlichter orange.
 2. **Bank 2** → **„Puls"**. → Das Orange atmet jetzt.
-3. Tempo: die Dimmer-Bewegungen hängen an **Bus A** — in **Bank 4** Fader **„Tempo Bus A“** bzw. Dial
-   **„Master A“**. (Der Fader „Dimmer-Tempo“ links unten stellt nur die Eigengeschwindigkeit; bei
-   laufendem Bus A wirkt sie nicht.)
+3. Tempo: die Dimmer-Bewegungen hängen an **Bus A**, und Bus A folgt der **Haupt-BPM** (Tap Tempo,
+   Musik-BPM, Fader „BPM global“). Wie schnell der Dimmer **relativ zum Takt** läuft, stellt der Fader
+   **„Dimmer-Tempo“** links unten (Faktor ×1/16 … ×4, Mitte ≈ ×2) — oder in **Bank 4** das Rad
+   **„Dimmer-Tempo ×“** (¼ ½ 1 2 4). Beide wirken auf alle Dimmer-Effekte. Vor dem ersten Tap bzw. ohne
+   Musik-BPM läuft der Dimmer frei; dann wirkt nur das Rad, der Fader erst mit Takt.
 
 ### Warum das funktioniert
 Dimmer-Effekte schreiben **nur den Dimmerkanal** — die Farbkanäle (aus Bank 1) bleiben unberührt.
@@ -46,6 +48,6 @@ Beide Schichten kombinieren sich automatisch. Darum kannst du jede Farbe mit jed
 ### Sofort weiterprobieren
 - **Pro Gruppe verschieden:** Paarlichter „Lauflicht" + Spider „Puls" gleichzeitig (eigene Kacheln).
 - **Tempo koppeln:** der Dimmer läuft **doppelt so schnell** wie der Farbwechsel (die Dimmer-Effekte hängen mit
-  ×2 an Bus A), beide auf demselben Taktschlag; „Sync Bus A“ (Bank 4) setzt sie auf die Eins.
+  ×2 an Bus A), beide auf demselben Taktschlag; „Sync jetzt“ (Bank 4) setzt sie auf die Eins.
 - **Regler:** **„Dimmer-Master“** (Helligkeit des gerade aktiven Effekts), **„Dimmer-Lvl“** (Stepper,
   Höchsthelligkeit der Grundfarbe Amber).
