@@ -4024,10 +4024,12 @@ class VisualizerWindow(QMainWindow):
         # aufgeklappte Liste zeigt ihn ganz) — sonst macht „Gedämpft (weiches
         # Pulsieren)“ die Zeile breiter als die Spalte, und die Auswahl ist
         # rechts abgeschnitten (Sichtprobe 2026-10-12). Dasselbe Muster wie
-        # bei der Stufe (VIZ-108).
+        # bei der Stufe (VIZ-108). VIZ-112: wie schmal, misst die Schrift
+        # (feste 12 Zeichen waren unter Windows/Arial 2 px zu breit).
         self._combo_strobe.setSizeAdjustPolicy(
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self._combo_strobe.setMinimumContentsLength(12)
+        self._combo_strobe.setMinimumContentsLength(
+            strobe_prefs.auswahl_mindest_zeichen(self._combo_strobe.fontMetrics()))
         s_row.addWidget(self._combo_strobe, 1)
         q_layout.addLayout(s_row)
         self._lbl_strobe_warnung = QLabel(strobe_prefs.WARNHINWEIS)
