@@ -17,6 +17,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import _qt_schriftordner
 import conftest
 
 
@@ -50,6 +51,11 @@ class RegelTest(unittest.TestCase):
         with open(os.path.join(self.fonts, name), "wb") as f:
             f.write(inhalt)
 
+    def _inhalt_basis(self):
+        """Was im Temp liegt — ohne die Sperrdatei (CDX-69), die bewusst bleibt."""
+        return sorted(n for n in os.listdir(self.basis)
+                      if n != _qt_schriftordner.SPERRDATEI)
+
     def _regel(self):
         umgebung = {"QT_QPA_PLATFORM": "offscreen", "WINDIR": self.windows}
         ordner = conftest._offscreen_schriftordner(umgebung, plattform="win32")
@@ -76,7 +82,7 @@ class RegelTest(unittest.TestCase):
         erster = self._regel()
         zweiter = self._regel()
         self.assertEqual(erster, zweiter)
-        self.assertEqual(os.listdir(self.basis), [os.path.basename(erster)])
+        self.assertEqual(self._inhalt_basis(), [os.path.basename(erster)])
 
     def test_geaenderte_schrift_gibt_neuen_ordner(self):
         """Ein Windows-Update tauscht eine Schrift — der alte Ordner gilt nicht mehr."""
@@ -109,7 +115,7 @@ class RegelTest(unittest.TestCase):
             ordner = self._regel()
         self.assertEqual(sorted(os.listdir(ordner)),
                          ["arial.ttf", "consola.ttf", "segoeui.ttf"])
-        self.assertEqual(os.listdir(self.basis), [os.path.basename(ordner)])
+        self.assertEqual(self._inhalt_basis(), [os.path.basename(ordner)])
 
     def test_ohne_eine_der_festen_schriften_bleibt_es_beim_windows_ordner(self):
         """Fehlen alle festen Schriften, ist der ganze Ordner besser als gar
@@ -117,7 +123,7 @@ class RegelTest(unittest.TestCase):
         for name in ("arial.ttf", "segoeui.ttf", "consola.ttf"):
             os.remove(os.path.join(self.fonts, name))
         self.assertEqual(self._regel(), self.fonts)
-        self.assertEqual(os.listdir(self.basis), [])
+        self.assertEqual(self._inhalt_basis(), [])
 
 
 @unittest.skipUnless(sys.platform == "win32", "nur Windows: dort setzt conftest den Schriftordner")
