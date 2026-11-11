@@ -3,9 +3,10 @@ from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QDialogButtonBox, QSizePolicy, QSpinBox, QLabel,
                                 QCheckBox, QWidget, QVBoxLayout, QHBoxLayout)
-from PySide6.QtCore import Qt, QRect, QPoint, Signal
+from PySide6.QtCore import Qt, QRect, QPoint, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
-from src.core.midi.midi_manager import fader_wert          # MIDI-10
+from src.core.midi.midi_manager import fader_wert, wert14  # MIDI-10
+from src.core.midi.motor_fader import MotorFader            # MIDI-17
 from .vc_widget import VCWidget
 from .vc_style import paint_slider_handle   # VC3D-02: plastischer Fader-Griff
 
@@ -178,6 +179,13 @@ class VCSlider(VCWidget):
         # senden Pitchbend, je Fader ein Kanal, 14 Bit. Bei Pitchbend ist
         # ``midi_cc`` nur der Merker „gebunden" (0), die Kennung ist ``midi_ch``.
         self.midi_type: str = "cc"
+        # MIDI-17: Motor des Pult-Faders nachfuehren (nur Pitchbend mit festem
+        # Kanal). Gespeichert nur, wenn an — alte Layouts bleiben gleich.
+        self.midi_motor: bool = False
+        self._motor = MotorFader(self._motor_senden)
+        self._motor_timer = QTimer(self)
+        self._motor_timer.setInterval(60)
+        self._motor_timer.timeout.connect(self._motor_nachtrag)
         # Soft-Takeover-Laufzeitzustand (s. Klassen-Flag soft_takeover):
         #   _pickup_armed = True  -> wartet, bis der physische Fader den VC-Wert
         #                            durchfährt; bis dahin wird MIDI ignoriert.
@@ -219,6 +227,7 @@ class VCSlider(VCWidget):
         self._value = max(0, min(255, v))
         self._apply()
         self.update()
+        self._motor_folgen()            # MIDI-17
 
     # ── GDS-1: Grand-Master-Spiegelung ──────────────────────────────────────────
     def _ensure_grandmaster_sync(self):
@@ -282,6 +291,7 @@ class VCSlider(VCWidget):
             self.update()
         except Exception:
             pass
+        self._motor_folgen()            # MIDI-17: GM von woanders -> Motor folgt
 
     def _effective_value(self) -> int:
         """Tatsächlicher Ausgabewert: der Hub 0..255 wird auf [range_min, range_max]
@@ -720,18 +730,26 @@ class VCSlider(VCWidget):
         """Aktiviert Soft-Takeover für diesen Fader (falls global eingeschaltet):
         der nächste MIDI-Zugriff wirkt erst, wenn der physische Fader den aktuellen
         VC-Wert durchfährt. Wird bei jedem Bank-/Seitenwechsel aufgerufen."""
+        # MIDI-17: ein Motorfader faehrt nach dem Wechsel auf den Wert der
+        # neuen Seite (nur der Fader der aktiven Bank, s. _motor_folgen).
+        self._motor_folgen(erzwingen=True)
         if VCSlider.soft_takeover:
             self._pickup_armed = True
             self._last_cc = None
             self.update()
 
     def handle_midi(self, msg) -> bool:
+        if self._motor_aktiv() and self._motor_beruehrung(msg):
+            return False                # die Note laeuft normal weiter
         if self.midi_cc < 0 or msg.msg_type != self.midi_type:
             return False
         if self.midi_ch != 0 and self.midi_ch != msg.channel:
             return False
         if self.midi_type == "cc" and msg.data1 != self.midi_cc:
             return False
+        # MIDI-17: Bericht der eigenen Motorfahrt ist keine Eingabe.
+        if self._motor_aktiv() and self._motor.eingang(wert14(msg)):
+            return True
         # MIDI-10: Pitchbend mit 14 Bit — alle 256 Stufen erreichbar (CC: 128).
         iv = round(fader_wert(msg) * 255)
 
@@ -756,6 +774,71 @@ class VCSlider(VCWidget):
             self.update()              # nur den Pickup-Hinweis (Pfeil) auffrischen
         return True
 
+    # ── MIDI-17: Motorfader nachführen ─────────────────────────────────────────
+
+    def _motor_aktiv(self) -> bool:
+        """Nur ein Pitchbend-Fader mit festem Kanal hat einen Motor, den man
+        anfahren kann („Alle“ wüsste nicht, welchen)."""
+        if getattr(self, "_motor", None) is None:
+            return False                # noch im Aufbau (__init__)
+        return (bool(self.midi_motor) and self.midi_type == "pitchbend"
+                and self.midi_cc >= 0 and 1 <= int(self.midi_ch) <= 16)
+
+    def _motor_beruehrung(self, msg) -> bool:
+        """Beruehrungs-Note dieses Faders (Mackie: Fader n = Note 103+n auf
+        Kanal 1). ``True`` = war die Note dieses Faders."""
+        from src.core.midi.midi_mapper import TOUCH_KANAL, mackie_touch_note
+        if msg.msg_type not in ("note_on", "note_off") or msg.channel != TOUCH_KANAL:
+            return False
+        if msg.data1 != mackie_touch_note(self.midi_ch):
+            return False
+        self._motor.beruehrung(msg.msg_type == "note_on" and msg.data2 > 0)
+        self._motor_timer_planen()
+        return True
+
+    def _motor_auf_aktiver_bank(self) -> bool:
+        canvas = self._find_canvas()
+        fn = getattr(canvas, "on_active_bank", None)
+        if not callable(fn):
+            return True                 # ohne Canvas (Test, Vorschau) kein Bankbegriff
+        try:
+            return bool(fn(self))
+        except Exception:
+            return False
+
+    def _motor_folgen(self, erzwingen: bool = False) -> None:
+        """Den Motor auf die aktuelle Griff-Stellung fahren (oder den Auftrag
+        merken, solange die Hand am Fader ist)."""
+        if not self._motor_aktiv() or not self._motor_auf_aktiver_bank():
+            return
+        wert = int(round(self._value / 255.0 * 16383))
+        self._motor.melden(wert, erzwingen=erzwingen)
+        self._motor_timer_planen()
+
+    def _motor_timer_planen(self) -> None:
+        try:
+            if self._motor.wartet:
+                if not self._motor_timer.isActive():
+                    self._motor_timer.start()
+            elif self._motor_timer.isActive():
+                self._motor_timer.stop()
+        except RuntimeError:
+            pass                        # Widget wird gerade zerstoert
+
+    def _motor_nachtrag(self) -> None:
+        if not self._motor_aktiv() or not self._motor_auf_aktiver_bank():
+            self._motor.vergessen()
+        else:
+            self._motor.nachtrag()
+        self._motor_timer_planen()
+
+    def _motor_senden(self, wert: int) -> bool:
+        try:
+            from src.core.midi.midi_manager import get_midi_manager
+            return bool(get_midi_manager().send_pitchbend(int(self.midi_ch), wert))
+        except Exception:
+            return False
+
     # ── MIDI Teach (siehe VCWidget) — Fader bindet CC oder Pitchbend ───────────
 
     def supports_midi_teach(self) -> bool:
@@ -772,6 +855,7 @@ class VCSlider(VCWidget):
         return ("cc", self.midi_ch, self.midi_cc)
 
     def apply_midi_binding(self, msg_type, channel, data1):
+        self._motor.vergessen()         # MIDI-17: anderer Fader, neuer Zustand
         if data1 is None or data1 < 0:
             self.midi_cc = -1
             self.midi_type = "cc"
@@ -786,6 +870,7 @@ class VCSlider(VCWidget):
             self.midi_ch = channel or 0
 
     def _midi_bindung_aus_dialog(self, art: str, cc: int, kanal: int):
+        self._motor.vergessen()         # MIDI-17
         """MIDI-10: Eingaben des Eigenschaften-Dialogs uebernehmen. Pitchbend
         hat keine Nummer — gewaehlt heisst gebunden, die Kennung ist der Kanal."""
         if art == "pitchbend":
@@ -1257,6 +1342,23 @@ class VCSlider(VCWidget):
         midi_ch_spin.setSpecialValueText("Alle")
         form.addRow("MIDI-Kanal (0=alle):", midi_ch_spin)
 
+        # MIDI-17: Motor des Pult-Faders nachfuehren.
+        motor_cb = QCheckBox("Motorfader nachführen")
+        motor_cb.setChecked(bool(self.midi_motor))
+        motor_cb.setToolTip(
+            "Der Motor des Pult-Faders fährt mit, wenn sich der Wert in LightOS "
+            "ändert (Maus, Seitenwechsel, Grand Master von woanders). Nur bei "
+            "Art „Pitchbend“ mit festem Kanal. Solange du den Fader bewegst oder "
+            "berührst, wartet der Motor.")
+        form.addRow("", motor_cb)
+
+        def _motor_erlaubt(_x=0):
+            motor_cb.setEnabled(midi_type_combo.currentData() == "pitchbend"
+                                and midi_ch_spin.value() != 0)
+        midi_type_combo.currentIndexChanged.connect(_motor_erlaubt)
+        midi_ch_spin.valueChanged.connect(_motor_erlaubt)
+        _motor_erlaubt()
+
         angenommen = dlg.exec() == QDialog.DialogCode.Accepted
         # ENG-39: der Dialog bleibt als Kind des Faders bestehen — seine
         # Hinweiszeile soll danach nicht bei jeder Aenderung weiterrechnen.
@@ -1328,6 +1430,8 @@ class VCSlider(VCWidget):
             self._midi_bindung_aus_dialog(
                 midi_type_combo.currentData() or "cc",
                 midi_cc_spin.value(), midi_ch_spin.value())
+            self.midi_motor = bool(motor_cb.isChecked() and motor_cb.isEnabled())
+            self._motor_folgen(erzwingen=True)   # MIDI-17: gleich hinfahren
             self.update()
             self._post_dialog_mode_sync(_old_mode, _old_group)
             # ENG-41: offene Hinweiszeilen ANDERER Bedienelemente ziehen nach.
@@ -1418,6 +1522,8 @@ class VCSlider(VCWidget):
             # MIDI-10: nur schreiben, wenn es kein CC ist — ein CC-Fader bleibt
             # in der Datei Zeichen fuer Zeichen wie bisher.
             d["midi_type"] = self.midi_type
+        if self.midi_motor:
+            d["midi_motor"] = True      # MIDI-17: nur wenn an
         return d
 
     def apply_dict(self, d: dict):
@@ -1480,6 +1586,8 @@ class VCSlider(VCWidget):
         self.midi_ch = d.get("midi_ch", 0)
         _mt = d.get("midi_type", "cc")
         self.midi_type = "pitchbend" if _mt == "pitchbend" else "cc"   # MIDI-10
+        self.midi_motor = bool(d.get("midi_motor", False))              # MIDI-17
+        self._motor.vergessen()
         # VCB-32: Die Direktzuweisung an self._value (oben) umgeht den @value.setter,
         # der _apply() ruft. Modi mit persistentem App-State (GROUP_DIMMER schreibt
         # fixture_dimmers, SUBMASTER einen Output-Slot) muessen ihren geladenen Wert
