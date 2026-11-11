@@ -26,8 +26,19 @@ Regeln (``ziel_bereich``):
   markiert in der Liste wie bisher. Tippen klickt; ein Knopf, ueber den
   gewischt wird, loest kein ``clicked`` aus und bekommt ``released`` (wer
   wie die Executor-Tasten schon auf ``pressed`` reagiert, sieht den Druck
-  wie vor UI-110 beim Aufsetzen — ein FLASH geht beim Wischen wieder aus). Die Schwelle ist am Finger doppelt so gross.
-  Regler, Fader und Eingabefelder behalten den Zug auch am Finger.
+  wie vor UI-110 beim Aufsetzen — ein FLASH geht beim Wischen wieder aus).
+  Die Schwelle ist am Finger doppelt so gross.
+  Fader und Eingabefelder behalten den Zug auch am Finger.
+* **Regler am Finger** (UI-113, Touch-Audit A-02/C-03/D-09): bei einem
+  einfachen ``QSlider`` zaehlt am Finger NUR der Griff (Trefferzone Griff
+  +-``GRIFF_ZONE`` px). Tippen oder Halten auf der Rille aendert nichts (kein
+  Seitensprung, kein Weiterlaufen), Ziehen ab der Rille bewegt den Regler
+  nicht. Ziehen am Griff entlang bedient ihn; der Druck wird dafuer an die
+  Griffmitte nachgereicht und die weiteren Bewegungen um denselben Versatz
+  verschoben — der Griff springt nicht. Quer wischen scrollt die Seite (A-02,
+  UI-110); ohne scrollbare Seite drumherum (z. B. Grand Master in der
+  Kopfleiste) wird der Druck genauso zurueckgehalten. Die Maus bedient den
+  Regler unveraendert; eigene Regler-Klassen (VC-Fader) sind nicht betroffen.
 * **Schwung:** nach schnellem Wischen laeuft der Inhalt weiter und bremst
   aus (Maus und Finger); ein neuer Druck haelt ihn an.
 * Mit gedrueckter Umschalt-/Strg-/Alt-Taste wird nicht gescrollt — so laesst
@@ -40,12 +51,13 @@ from __future__ import annotations
 import math
 import time
 
-from PySide6.QtCore import QEvent, QObject, QPointF, Qt, QTimer
+from PySide6.QtCore import QEvent, QObject, QPointF, QRect, Qt, QTimer
 from PySide6.QtGui import QInputDevice, QMouseEvent
 from PySide6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QAbstractScrollArea, QApplication, QFrame, QGroupBox,
     QHeaderView, QLabel, QListView, QPlainTextEdit, QProgressBar, QScrollArea,
-    QSlider, QSplitter, QStackedWidget, QTabWidget, QTextEdit, QToolBox, QWidget,
+    QSlider, QSplitter, QStackedWidget, QStyle, QStyleOptionSlider, QTabWidget, QTextEdit,
+    QToolBox, QWidget,
 )
 
 try:
@@ -70,6 +82,8 @@ SPUR_S = 0.1
 SCHWUNG_MIN = 400.0         # px/s — langsamer losgelassen: kein Schwung
 SCHWUNG_ENDE = 20.0
 SCHWUNG_ZEIT_S = 0.325
+# UI-113: so viele Pixel um den Regler-Griff zaehlen am Finger noch als Griff.
+GRIFF_ZONE = 12
 
 _MAUS = ("mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent")
 _EIN_AUS = "ziehen_scrollen"       # Qt-Eigenschaft: False = hier nie
@@ -169,6 +183,35 @@ def _einfacher_regler(w) -> bool:
     return (_qt_klasse(w) is QSlider and not _eigene_maus(w) and not _abgeschaltet(w))
 
 
+def griff_rechteck(regler: QSlider) -> QRect:
+    """Wo steht der Griff des Reglers (lokale Koordinaten)?"""
+    opt = QStyleOptionSlider()
+    try:
+        regler.initStyleOption(opt)
+    except Exception:
+        # von C++ gebaute Regler: Option von Hand fuellen
+        opt.initFrom(regler)
+        opt.orientation = regler.orientation()
+        opt.minimum = regler.minimum()
+        opt.maximum = regler.maximum()
+        opt.sliderPosition = regler.sliderPosition()
+        opt.sliderValue = regler.value()
+        opt.singleStep = regler.singleStep()
+        opt.pageStep = regler.pageStep()
+        opt.upsideDown = (regler.invertedAppearance()
+                          != (regler.orientation() == Qt.Orientation.Vertical))
+        opt.subControls = QStyle.SubControl.SC_All
+    return regler.style().subControlRect(QStyle.ComplexControl.CC_Slider, opt,
+                                         QStyle.SubControl.SC_SliderHandle, regler)
+
+
+def am_griff(regler: QSlider, pos) -> bool:
+    """Trifft ``pos`` (lokal) den Griff samt ``GRIFF_ZONE``?"""
+    z = GRIFF_ZONE
+    p = pos.toPoint() if hasattr(pos, "toPoint") else pos
+    return griff_rechteck(regler).adjusted(-z, -z, z, z).contains(p)
+
+
 def _listen_flaeche(w) -> bool:
     """Ist ``w`` die Flaeche (viewport) einer Liste/eines Baums/einer Tabelle?"""
     eltern = w.parentWidget()
@@ -218,6 +261,7 @@ class ZiehenScrollen(QObject):
         self._schwung_bereich = None
         self._schwung_v = QPointF()
         self._schwung_ts = 0.0
+        self._versatz = None        # (Regler, Versatz) nach nachgereichtem Griff-Druck
         self._zuruecksetzen()
 
     def _zuruecksetzen(self) -> None:
@@ -236,6 +280,10 @@ class ZiehenScrollen(QObject):
         self._druck_widget = None
         self._zurueck = None      # am Finger zurueckgehaltener Druck (Liste, Regler)
         self._regler = None       # Ausrichtung des Reglers unter dem Finger
+        self._regler_w = None     # UI-113: Regler, dessen Druck am Finger zurueckliegt
+        self._am_griff = False    # ... und ob der Finger seinen Griff traf
+        self._schlucken = False   # Zug ohne Bereich (Rille/quer): nichts tun
+        self._versatz_neu = None  # Versatz, der mit dem Nachreichen gilt
 
     # ── Ereignisse ───────────────────────────────────────────────────────────
 
@@ -243,18 +291,30 @@ class ZiehenScrollen(QObject):
         if self._reicht:
             return False                # unser eigener, nachgereichter Druck
         t = ev.type()
+        if self._versatz is not None and t in (QEvent.Type.MouseMove,
+                                               QEvent.Type.MouseButtonRelease):
+            if self._verschoben(obj, ev):
+                return True
         if t == QEvent.Type.MouseButtonPress:
+            self._versatz = None
             return self._druck(obj, ev)
         if t == QEvent.Type.MouseButtonDblClick:
+            if isinstance(obj, QWidget) and _einfacher_regler(obj) and ist_touch(ev):
+                # UI-113: Doppeltippen auf einen Regler ist ein Druck wie jeder
+                # andere (QSlider wertet einen Doppelklick als Druck — Sprung).
+                if self._regler_w is obj:
+                    return True
+                self._versatz = None
+                return self._druck(obj, ev)
             # Zweiter Druck kurz nach dem ersten kommt beim Widget als
             # Doppelklick an (am Finger staendig) — zaehlt wie ein Druck,
             # wird aber nie zurueckgehalten (Doppeltippen bleibt Doppelklick).
             self._druck(obj, ev, zurueckhalten=False)
             return False
-        if self._bereich is None:
+        if self._bereich is None and self._regler_w is None:
             return False
         if t == QEvent.Type.MouseMove:
-            return self._zug(ev)
+            return self._zug(obj, ev)
         if t == QEvent.Type.MouseButtonRelease and ev.button() == Qt.MouseButton.LeftButton:
             if self._loest:
                 return False            # unser eigenes Loslassen (_druck_loesen)
@@ -286,14 +346,12 @@ class ZiehenScrollen(QObject):
         touch = ist_touch(ev)
         bereich = ziel_bereich(obj)
         halten = False
-        regler = None
         if bereich is None and touch and zurueckhalten and _einfacher_regler(obj):
-            # A-02: senkrecht ueber einen waagerechten Regler wischen scrollt
-            # die Seite; entlang ziehen bedient den Regler.
+            # A-02/UI-113: am Finger zaehlt nur der Griff; quer wischen scrollt
+            # die Seite (falls es eine gibt), entlang am Griff bedient ihn.
             eltern = obj.parentWidget()
             bereich = ziel_bereich(eltern, touch=True) if eltern is not None else None
-            if bereich is not None:
-                regler = obj.orientation()
+            return self._regler_druck(obj, ev, bereich)
         if bereich is None and touch:
             bereich = ziel_bereich(obj, touch=True)
             halten = bereich is not None
@@ -309,8 +367,7 @@ class ZiehenScrollen(QObject):
         self._start_h = bereich.horizontalScrollBar().value()
         self._start_v = bereich.verticalScrollBar().value()
         self._faktor = faktor(bereich)
-        self._regler = regler
-        if touch and zurueckhalten and (regler is not None or _listen_flaeche(obj)):
+        if touch and zurueckhalten and _listen_flaeche(obj):
             # Qt waehlt in Listen schon beim Aufsetzen aus — beim Wischen
             # waere die Auswahl (z. B. Programmer-Geraete) weg. Wie am
             # Telefon: Druck zurueckhalten; Tippen reicht ihn beim Loslassen
@@ -321,9 +378,76 @@ class ZiehenScrollen(QObject):
             return True
         return False
 
-    def _zug(self, ev) -> bool:
+    def _regler_druck(self, regler: QSlider, ev, bereich) -> bool:
+        """UI-113: Fingerdruck auf einen einfachen Regler — immer zurueckhalten.
+        Nur am Griff wird er (an die Griffmitte) nachgereicht."""
+        try:
+            griff = am_griff(regler, ev.position())
+            mitte = QPointF(griff_rechteck(regler).center())
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: Regler-Griff: {e}")
+            return False
+        self._bereich = bereich
+        self._regler_w = regler
+        self._regler = regler.orientation()
+        self._am_griff = griff
+        self._druck_widget = regler
+        self._touch = True
+        self._druck_zeit = self._uhr()
+        self._start = ev.globalPosition()
+        self._spur = [(self._druck_zeit, QPointF(self._start))]
+        if bereich is not None:
+            self._start_h = bereich.horizontalScrollBar().value()
+            self._start_v = bereich.verticalScrollBar().value()
+            self._faktor = faktor(bereich)
+        if griff:
+            # Druck an die Griffmitte legen: Qt greift sicher den Griff, die
+            # weiteren Bewegungen um denselben Versatz verschieben (_verschoben).
+            versatz = mitte - ev.position()
+            self._zurueck = (regler, mitte, ev.globalPosition() + versatz,
+                             ev.button(), ev.buttons(), ev.modifiers())
+            self._versatz_neu = (regler, versatz)
+            self._lang_timer.start(int(LANG_DRUCK_S * 1000))
+        return True
+
+    def _verschoben(self, obj, ev) -> bool:
+        """Nach dem Griff-Druck: Bewegung/Loslassen am Regler um den Versatz
+        zur Griffmitte verschoben weitergeben (der Griff springt nicht)."""
+        regler, versatz = self._versatz
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            self._versatz = None
+        if not _gueltig(regler):
+            self._versatz = None
+            return False
+        if obj is not regler:
+            return False
+        neu = QMouseEvent(ev.type(), ev.position() + versatz, ev.globalPosition() + versatz,
+                          ev.button(), ev.buttons(), ev.modifiers())
+        neu.setTimestamp(ev.timestamp())
+        self._reicht = True
+        try:
+            QApplication.sendEvent(regler, neu)
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: Regler-Zug: {e}")
+        finally:
+            self._reicht = False
+        return True
+
+    def _zug(self, obj, ev) -> bool:
         bereich = self._bereich
-        if not _gueltig(bereich) or not (ev.buttons() & Qt.MouseButton.LeftButton):
+        if self._regler_w is not None:
+            if not _gueltig(self._regler_w):
+                self._abbrechen()
+                return False
+            if not (ev.buttons() & Qt.MouseButton.LeftButton):
+                self._abbrechen()
+                return False
+            if self._schlucken:
+                return True
+            if bereich is not None and not _gueltig(bereich):
+                self._abbrechen()
+                return True
+        elif not _gueltig(bereich) or not (ev.buttons() & Qt.MouseButton.LeftButton):
             self._abbrechen()
             return False
         jetzt = self._uhr()
@@ -333,27 +457,29 @@ class ZiehenScrollen(QObject):
             if ((self._halten_gibt_frei or self._zurueck is not None)
                     and jetzt - self._druck_zeit >= LANG_DRUCK_S):
                 # lange gehalten: Ziehen-und-Ablegen/Markieren wie bisher
-                self._nachreichen()
-                self._abbrechen()
-                return False
+                return self._freigeben(obj, ev)
             schwelle = QApplication.startDragDistance() * (TOUCH_FAKTOR if self._touch else 1)
             if abs(d.x()) + abs(d.y()) < schwelle:
                 # Liste ohne Druck: auch kleine Bewegungen nicht durchlassen,
                 # sonst waehlt sie trotzdem (Zug mit gedrueckter Taste).
-                return self._zurueck is not None
+                return self._zurueck is not None or self._regler_w is not None
             if self._regler is not None:
                 waagerecht = self._regler == Qt.Orientation.Horizontal
                 entlang = (abs(d.x()) >= abs(d.y())) if waagerecht else (abs(d.y()) >= abs(d.x()))
-                if entlang:
+                if entlang and self._am_griff:
                     # Regler bedienen: Druck nachreichen, diese und alle
                     # weiteren Bewegungen gehoeren ihm.
-                    self._nachreichen()
-                    self._abbrechen()
-                    return False
+                    return self._freigeben(obj, ev)
+                if bereich is None:
+                    # Rille oder quer, keine Seite zum Scrollen: nichts tun
+                    self._zurueck = None
+                    self._lang_timer.stop()
+                    self._schlucken = True
+                    return True
             self._zieht = True
             self._lang_timer.stop()
-            if self._zurueck is not None:
-                self._zurueck = None        # Wischen: die Liste bekommt nichts
+            if self._zurueck is not None or self._regler_w is not None:
+                self._zurueck = None        # Wischen: Liste/Regler bekommt nichts
             elif self._touch:
                 self._druck_loesen()
             else:
@@ -409,18 +535,38 @@ class ZiehenScrollen(QObject):
         finally:
             self._reicht = False
 
+    def _freigeben(self, obj, ev) -> bool:
+        """Zurueckgehaltenen Druck nachreichen und den Zug dem Widget lassen.
+        Am Regler-Griff wird die Bewegung selbst verschoben weitergegeben."""
+        self._griff_druck_nachreichen()
+        self._abbrechen()
+        if self._versatz is not None and ev is not None and obj is self._versatz[0]:
+            return self._verschoben(obj, ev)
+        return False
+
+    def _griff_druck_nachreichen(self) -> None:
+        neu = self._versatz_neu
+        self._versatz_neu = None
+        if self._zurueck is not None and neu is not None:
+            self._versatz = neu
+        self._nachreichen()
+
     def _lang_gedrueckt(self) -> None:
         if self._zurueck is None or self._zieht:
             return
-        self._nachreichen()
+        self._griff_druck_nachreichen()
         self._abbrechen()
 
     def _los(self) -> bool:
         gezogen = self._zieht
         if gezogen:
             self._schwung_starten()
+        elif self._schlucken:
+            gezogen = True
         else:
-            self._nachreichen()             # Tippen: Druck nachreichen, Loslassen durch
+            # Tippen: Druck nachreichen, Loslassen durch (am Regler nur am
+            # Griff — eine Rille bekommt nichts, UI-113)
+            self._griff_druck_nachreichen()
         self._abbrechen()
         return gezogen
 

@@ -795,8 +795,18 @@ class MainWindow(QMainWindow):
             qss += "\n/* Touch-Mode Override */\n"
             qss += (
                 "QPushButton { min-height: 38px; padding: 6px 14px; font-size: 14px; }\n"
-                "QSlider::handle:horizontal, QSlider::handle:vertical { "
-                "width: 26px; height: 26px; }\n"
+                # UI-113 (Touch-Audit A-02): Regler >= 40 px, Griff 36 px (vorher
+                # 15 px hoch, Griff 14 px). Der Grand Master in der 34 px hohen
+                # Kopfleiste bekommt eigene Werte (32 px), damit sie nicht platzt.
+                "QSlider:horizontal { min-height: 40px; }\n"
+                "QSlider:vertical { min-width: 40px; }\n"
+                "QSlider::handle:horizontal { width: 36px; height: 36px; "
+                "margin: -15px 0; border-radius: 18px; }\n"
+                "QSlider::handle:vertical { width: 36px; height: 36px; "
+                "margin: 0 -15px; border-radius: 18px; }\n"
+                "QSlider#gmSlider { min-height: 32px; max-height: 32px; }\n"
+                "QSlider#gmSlider::handle:horizontal { width: 30px; height: 30px; "
+                "margin: -12px 0; border-radius: 15px; }\n"
                 "QListWidget::item, QTreeWidget::item, QTableWidget::item { "
                 "min-height: 36px; padding: 6px; }\n"
                 "QComboBox { min-height: 38px; font-size: 14px; }\n"
@@ -1119,7 +1129,9 @@ class MainWindow(QMainWindow):
         self._slider_gm = QSlider(Qt.Orientation.Horizontal)
         self._slider_gm.setRange(0, 100)
         self._slider_gm.setValue(100)
-        self._slider_gm.setFixedWidth(110)
+        self._slider_gm.setObjectName("gmSlider")
+        # UI-113: im Touch-Modus breiter (Hoehe/Griff kommen aus dem Touch-QSS)
+        self._slider_gm.setFixedWidth(170 if getattr(self, "_touch_mode", False) else 110)
         self._slider_gm.setToolTip(
             "Grand Master (0–100 %)\n"
             "Laser ohne Dimmerkanal werden nicht stufenlos gedimmt, "
