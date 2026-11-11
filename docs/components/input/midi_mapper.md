@@ -113,8 +113,9 @@ Schleife sendet die Stellung mit 14 Bit auf dem Kanal des Faders zurück
   zurückgerechnet durch `continuous_min/max`) – nur bei Executor-Fader und Grand Master
   (`_MOTOR_LESBAR`). Andere stufenlose Ziele bekommen nur ihre eigene Stellung zurück.
 
-Schwelle `MOTOR_SCHRITT` = 0,2 % (statt 1 % der LED-Rückmeldung). VC-Fader haben keinen
-MIDI-Rückweg und werden nicht nachgeführt.
+Schwelle `MOTOR_SCHRITT` = 0,2 % (statt 1 % der LED-Rückmeldung). VC-Fader führen ihren
+Motor selbst nach (MIDI-17, `src/core/midi/motor_fader.py`, gleiche Regeln und Zeiten, je Fader;
+Haken „Motorfader nachführen“ im Fader-Dialog, nur Pitchbend mit festem Kanal, nur auf der aktiven Bank).
 
 **Touch-Sperre (MIDI-15):** `MidiOutFeedback.touch_note` nennt die Note des
 Berührungssensors (Mackie: Fader 1..9 = Note 104..112 auf Kanal 1,
