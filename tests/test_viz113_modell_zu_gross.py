@@ -21,10 +21,14 @@ class ZuGrossTest(unittest.TestCase):
             mi.lies_datei(_datei("viz67_quader_binaer.stl"), "m", True)
         e = cm.exception
         self.assertAlmostEqual(max(e.groesse), 100.0, places=3)
-        self.assertLess(e.passend * 100.0, mi.MAX_KANTE_M + 1e-6)
+        self.assertLess(e.passend, 1.0)
         netz = mi.lies_datei(_datei("viz67_quader_binaer.stl"), "m", True, massstab=e.passend)
         self.assertLessEqual(max(netz.groesse[0], netz.groesse[2]), mi.MAX_KANTE_M)
-        self.assertGreater(max(netz.groesse), mi.MAX_KANTE_M * 0.99)
+        self.assertLessEqual(netz.groesse[1], mi.MAX_HOEHE_M)
+        # passend heisst: die engste Grenze (Kante oder Hoehe) ist fast erreicht
+        ausnutzung = max(max(netz.groesse[0], netz.groesse[2]) / mi.MAX_KANTE_M,
+                         netz.groesse[1] / mi.MAX_HOEHE_M)
+        self.assertGreater(ausnutzung, 0.99)
 
     def test_ungueltiger_massstab_wird_abgelehnt(self):
         for m in (0.0, -1.0, 1.5):
@@ -43,7 +47,8 @@ class FensterVerkleinernTest(FensterImportTest):
         frage.assert_called_once()
         self.assertIsNotNone(el)
         self.assertLessEqual(max(el.w, el.d), mi.MAX_KANTE_M)
-        self.assertGreater(max(el.w, el.d), mi.MAX_KANTE_M * 0.99)
+        self.assertLessEqual(el.h, mi.MAX_HOEHE_M + 1e-6)
+        self.assertGreater(max(max(el.w, el.d) / mi.MAX_KANTE_M, el.h / mi.MAX_HOEHE_M), 0.99)
 
     def test_abbrechen_legt_nichts_an(self):
         from PySide6.QtWidgets import QMessageBox
@@ -58,3 +63,16 @@ class FensterVerkleinernTest(FensterImportTest):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GrenzeTest(unittest.TestCase):
+    """VIZ-113: ein Grundriss von 100 x 80 m passt jetzt ohne Verkleinern."""
+
+    def test_grosser_hallenplan_passt_ohne_verkleinern(self):
+        teile = [(0, "SECTION"), (2, "ENTITIES"),
+                 (0, "LINE"), (8, "0"), (10, 0), (20, 0), (30, 0), (11, 100), (21, 80), (31, 0),
+                 (0, "ENDSEC"), (0, "EOF")]
+        daten = "".join(f"{c}\n{w}\n" for c, w in teile).encode("ascii")
+        netz = mi.lies_bytes(daten, ".dxf", "m", True)
+        self.assertAlmostEqual(netz.groesse[0], 100.0, places=3)
+        self.assertAlmostEqual(netz.groesse[2], 80.0, places=3)

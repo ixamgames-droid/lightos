@@ -154,7 +154,7 @@ ist neutral grau. Es lässt sich wie jedes Bühnenelement verschieben, drehen, i
 Die Show öffnet auch auf einem anderen Rechner vollständig, ohne die Originaldatei.
 
 **Grenzen:** höchstens **20 MB** Dateigröße und **200.000 Dreiecke**; das Modell darf höchstens
-60 m breit/tief und 30 m hoch werden. Ist ein Modell größer (zum Beispiel der Grundriss einer
+120 m breit/tief und 30 m hoch werden. Ist ein Modell größer (zum Beispiel der Grundriss einer
 großen Halle), nennt LightOS seine Größe und bietet an, es passend **zu verkleinern** — prüfen Sie
 vorher, ob die Einheit stimmt. Ist eine Datei zu groß oder kaputt, meldet LightOS das und legt
 nichts an. Materialien, Farben und Texturen
