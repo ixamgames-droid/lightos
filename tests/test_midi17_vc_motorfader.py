@@ -113,6 +113,27 @@ class MotorFaderTest(unittest.TestCase):
         m = MotorFader(lambda w: 1 / 0, uhr=self.uhr)
         self.assertFalse(m.melden(100))
 
+    def test_fehlgeschlagenes_senden_gilt_nicht_als_gesendet(self):
+        ok = [False]
+        gesendet = []
+        m = MotorFader(lambda w: (gesendet.append(w), ok[0])[1], uhr=self.uhr)
+        self.assertFalse(m.melden(500))     # kein Ausgang offen
+        ok[0] = True
+        self.uhr.t += 2
+        self.assertTrue(m.melden(500), "nach dem Verbinden erneut senden")
+
+    def test_sensor_bleibt_ueber_vergessen(self):
+        self.m.beruehrung(True)
+        self.m.beruehrung(False)
+        self.m.vergessen()
+        self.m.melden(4000)
+        self.uhr.t += (MOTOR_ECHO_FENSTER_S + MOTOR_NACHLAUF_S) / 2
+        self.assertTrue(self.m.eingang(15000))
+        self.m.vergessen(sensor=True)
+        self.m.melden(4000)
+        self.uhr.t += (MOTOR_ECHO_FENSTER_S + MOTOR_NACHLAUF_S) / 2
+        self.assertFalse(self.m.eingang(15000))
+
 
 class _FakeMM:
     def __init__(self):
@@ -187,6 +208,23 @@ class VcMotorfaderTest(unittest.TestCase):
         self.uhr.t += 2
         self.s.arm_pickup()
         self.assertEqual(len(self.mm.pb), 2)
+
+    def test_laden_faehrt_motor_auf_geladenen_wert(self):
+        self.s.value = 40
+        d = self.s.to_dict()
+        d["value"] = 200
+        self.uhr.t += 2
+        self.s.apply_dict(d)
+        self.assertEqual(self.mm.pb[-1], (2, round(200 / 255 * 16383)))
+
+    def test_bank_verlassen_loest_haengende_beruehrung(self):
+        self.s.handle_midi(_note(1, 105, 127))           # beruehrt, dann Bankwechsel
+        self.s._motor_auf_aktiver_bank = lambda: False
+        self.s.arm_pickup()                              # Bank verlassen
+        self.s._motor_auf_aktiver_bank = lambda: True
+        self.s._value = 77
+        self.s.arm_pickup()                              # zurueck
+        self.assertEqual(self.mm.pb[-1], (2, round(77 / 255 * 16383)))
 
     def test_speichern_laden(self):
         d = self.s.to_dict()

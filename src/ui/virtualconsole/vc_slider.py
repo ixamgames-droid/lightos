@@ -732,6 +732,10 @@ class VCSlider(VCWidget):
         VC-Wert durchfährt. Wird bei jedem Bank-/Seitenwechsel aufgerufen."""
         # MIDI-17: ein Motorfader faehrt nach dem Wechsel auf den Wert der
         # neuen Seite (nur der Fader der aktiven Bank, s. _motor_folgen).
+        if self._motor_aktiv() and not self._motor_auf_aktiver_bank():
+            # Bank verlassen: das Loslassen erreicht diesen Fader nicht mehr
+            # (MIDI geht nur an die aktive Bank) — keine haengende Sperre.
+            self._motor.vergessen()
         self._motor_folgen(erzwingen=True)
         if VCSlider.soft_takeover:
             self._pickup_armed = True
@@ -855,7 +859,7 @@ class VCSlider(VCWidget):
         return ("cc", self.midi_ch, self.midi_cc)
 
     def apply_midi_binding(self, msg_type, channel, data1):
-        self._motor.vergessen()         # MIDI-17: anderer Fader, neuer Zustand
+        self._motor.vergessen(sensor=True)  # MIDI-17: anderer Fader, neuer Zustand
         if data1 is None or data1 < 0:
             self.midi_cc = -1
             self.midi_type = "cc"
@@ -870,9 +874,10 @@ class VCSlider(VCWidget):
             self.midi_ch = channel or 0
 
     def _midi_bindung_aus_dialog(self, art: str, cc: int, kanal: int):
-        self._motor.vergessen()         # MIDI-17
         """MIDI-10: Eingaben des Eigenschaften-Dialogs uebernehmen. Pitchbend
         hat keine Nummer — gewaehlt heisst gebunden, die Kennung ist der Kanal."""
+        if (art, int(kanal)) != (self.midi_type, int(self.midi_ch)):
+            self._motor.vergessen(sensor=True)  # MIDI-17: anderer Fader
         if art == "pitchbend":
             self.midi_type = "pitchbend"
             self.midi_cc = 0
@@ -1431,9 +1436,10 @@ class VCSlider(VCWidget):
                 midi_type_combo.currentData() or "cc",
                 midi_cc_spin.value(), midi_ch_spin.value())
             self.midi_motor = bool(motor_cb.isChecked() and motor_cb.isEnabled())
-            self._motor_folgen(erzwingen=True)   # MIDI-17: gleich hinfahren
             self.update()
             self._post_dialog_mode_sync(_old_mode, _old_group)
+            # MIDI-17: erst NACH dem Modus-Sync (GM spiegelt dort den Live-Wert).
+            self._motor_folgen(erzwingen=True)
             # ENG-41: offene Hinweiszeilen ANDERER Bedienelemente ziehen nach.
             from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert
             belegung_geaendert()
@@ -1604,3 +1610,6 @@ class VCSlider(VCWidget):
             # beim Laden schwarz ziehen. Stattdessen den Fader aus dem live
             # grand_master spiegeln und Aenderungen abonnieren.
             self._ensure_grandmaster_sync()
+        # MIDI-17: der Motor faehrt auf den geladenen (bzw. live gespiegelten)
+        # Wert — sonst springt die erste Beruehrung auf die alte Pult-Stellung.
+        self._motor_folgen(erzwingen=True)

@@ -45,15 +45,18 @@ class MotorFader:
         self._uhr = uhr
         self.vergessen()
 
-    def vergessen(self) -> None:
-        """Alles zuruecksetzen (Bindung geaendert, Motor abgeschaltet)."""
+    def vergessen(self, sensor: bool = False) -> None:
+        """Laufzustand zuruecksetzen (Show geladen, Bank verlassen). Ob der
+        Fader einen Beruehrungssensor hat, bleibt — ausser ``sensor=True``
+        (anderer Pult-Fader gebunden)."""
+        if sensor or not hasattr(self, "_sensor"):
+            self._sensor = False      # der Fader hat einen Beruehrungssensor
         self._hand_ts = float("-inf")
         self._send_ts = float("-inf")
         self._gesendet: int | None = None
         self._offen: int | None = None
         self._beruehrt = False
         self._beruehrt_ts = float("-inf")
-        self._sensor = False          # der Fader hat einen Beruehrungssensor
 
     # ── Eingang vom Pult ──────────────────────────────────────────────────────
 
@@ -145,10 +148,16 @@ class MotorFader:
             self._offen = None
             return False                # steht schon dort, niemand hat ihn bewegt
         # VOR dem Senden merken: was gleich zurueckkommt, gilt schon als Echo.
+        alt = (self._gesendet, self._send_ts)
         self._gesendet = wert14
         self._send_ts = jetzt
         self._offen = None
         try:
-            return bool(self._senden(wert14))
+            ok = bool(self._senden(wert14))
         except Exception:
-            return False
+            ok = False
+        if not ok:
+            # nichts ist angekommen (kein Ausgang offen): nicht als gesendet
+            # merken, sonst schluckt die Doppel-Sperre den Wert spaeter.
+            self._gesendet, self._send_ts = alt
+        return ok
