@@ -12,6 +12,7 @@ from PySide6.QtGui import (
 )
 from src.core.engine.function_manager import get_function_manager
 from src.ui.layout_leeren import layout_leeren
+from src.ui.ziehen_scrollen import FingerHalten   # UI-115
 from src.core.engine.function import FunctionType
 from src.core.engine.show_engine import Show, ShowTrack, ShowFunction
 
@@ -44,6 +45,10 @@ class TimelineCanvas(QWidget):
         self._drag_start_x: int = 0
         self._drag_original_start: float = 0.0
         self._selected_sf: ShowFunction | None = None
+        # UI-115 (Touch-Audit D-05): am Finger zieht ein Block erst nach
+        # langem Druck; ein sofortiger Wisch verschiebt nichts und scrollt die
+        # Zeitleiste. Die Maus zieht sofort wie bisher.
+        self._finger = FingerHalten(self, scrollen=True)
 
     # ── Drag&Drop von Function Manager ───────────────────────────────────────
 
@@ -233,11 +238,15 @@ class TimelineCanvas(QWidget):
             self._drag_sf = sf
             self._drag_track = track
             self._drag_start_x = int(event.position().x())
+            self._finger.druck(event)
             if sf is not None:
                 self._drag_original_start = sf.start_time
             self.update()
 
     def mouseMoveEvent(self, event):
+        if (event.buttons() & Qt.MouseButton.LeftButton
+                and not self._finger.ziehen_erlaubt(event)):
+            return          # UI-115: Finger ohne langen Druck verschiebt nichts
         if self._drag_sf is not None and event.buttons() & Qt.MouseButton.LeftButton:
             dx = int(event.position().x()) - self._drag_start_x
             dt = dx / PX_PER_SEC

@@ -35,6 +35,7 @@ from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
+from src.ui.ziehen_scrollen import FingerHalten   # UI-115
 from src.core.stage import scene_commands as _scmd
 
 
@@ -1122,6 +1123,10 @@ class StageCanvas(QWidget):
         # ans Raster snappen noch die Show als "geaendert" markieren.
         self._drag_press: QPointF = QPointF()
         self._drag_moved: bool = False
+        # UI-115 (Touch-Audit D-02): am Finger verschiebt ein Zug ein Geraet
+        # erst nach langem Druck — ein Wisch, der auf einem Geraet beginnt,
+        # versetzt es nicht mehr. Die Maus zieht sofort wie bisher.
+        self._finger = FingerHalten(self)
 
         # Gruppen-Hervorhebung (Phase 7a)
         self._highlight_fids: set[int] = set()
@@ -2662,6 +2667,7 @@ class StageCanvas(QWidget):
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setFocus()  # Tastaturfokus holen (Esc = Auswahl leeren)
+            self._finger.druck(event)
             pos = self._to_world(event.position())
             shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
             hit = self._fixture_at(pos)
@@ -2719,6 +2725,9 @@ class StageCanvas(QWidget):
 
     def mouseMoveEvent(self, event: QMouseEvent):
         pos = self._to_world(event.position())
+        if ((self._drag_fid is not None or self._multi_drag_start is not None)
+                and not self._finger.ziehen_erlaubt(event)):
+            return          # UI-115: Finger ohne langen Druck verschiebt nichts
         if self._drag_fid is not None:
             if (abs(pos.x() - self._drag_press.x())
                     + abs(pos.y() - self._drag_press.y())) > 3:

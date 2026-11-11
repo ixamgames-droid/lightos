@@ -401,7 +401,6 @@ class ZiehenScrollen(QObject):
 
     def _zuruecksetzen(self) -> None:
         self._bereich: QAbstractScrollArea | None = None
-        self._start = QPointF()
         self._start_h = 0
         self._start_v = 0
         self._zieht = False
@@ -890,3 +889,89 @@ def einrichten(app: QApplication | None = None) -> ZiehenScrollen | None:
     app.installEventFilter(f)
     app._ui110_ziehen_scrollen = f
     return f
+
+
+class FingerHalten:
+    """UI-115: eigene Flaeche — am Finger zieht ein Zug erst nach langem Druck.
+
+    Fuer Widgets mit eigener Mausbehandlung, in denen ein Zug etwas
+    *verschiebt* (Geraet in der 2D-Buehne, Block in der Show-Zeitleiste).
+    Am Finger beginnt fast jeder Wisch auf so einem Objekt; frueher war es
+    dann verschoben. Jetzt gilt am Finger: erst ``LANG_DRUCK_S`` still liegen
+    lassen (Bewegung unter der Touch-Schwelle), dann ziehen. Ein sofortiger
+    Zug verschiebt nichts (auf Wunsch scrollt er den Bereich drumherum,
+    ``scrollen``). Die Maus zieht unveraendert sofort.
+
+    Ablauf: ``druck(ev)`` im ``mousePressEvent``, ``ziehen_erlaubt(ev)`` im
+    ``mouseMoveEvent`` (False = Bewegung ignorieren), ``tipp(ev)`` im
+    ``mouseReleaseEvent`` (True = Finger hat sich nicht bewegt).
+    """
+
+    def __init__(self, widget: QWidget | None = None, scrollen: bool = False):
+        self._widget = widget
+        self._scrollen = scrollen
+        self.touch = False
+        self._t0 = 0.0
+        self._glob = QPointF()
+        self._frei = True
+        self._gesperrt = False
+        self._bewegt = False
+
+    @staticmethod
+    def _global(ev) -> QPointF:
+        try:
+            return QPointF(ev.globalPosition())
+        except Exception:               # Ersatz-Ereignis ohne Bildschirmlage
+            return QPointF(ev.position())
+
+    @staticmethod
+    def schwelle() -> int:
+        return QApplication.startDragDistance() * TOUCH_FAKTOR
+
+    def druck(self, ev) -> None:
+        self.touch = ist_touch(ev)
+        self._t0 = time.monotonic()
+        self._glob = self._global(ev)
+        self._frei = not self.touch
+        self._gesperrt = False
+        self._bewegt = False
+
+    def _weg(self, ev) -> float:
+        d = self._global(ev) - self._glob
+        return abs(d.x()) + abs(d.y())
+
+    def ziehen_erlaubt(self, ev) -> bool:
+        if self._frei:
+            return True
+        if self._gesperrt:
+            self._scroll(ev)
+            return False
+        if time.monotonic() - self._t0 >= LANG_DRUCK_S:
+            self._frei = True               # lange still gelegen: jetzt ziehen
+            return True
+        if self._weg(ev) > self.schwelle():
+            self._gesperrt = True           # sofort gewischt: kein Verschieben
+            self._bewegt = True
+            self._scroll(ev)
+        return False
+
+    def tipp(self, ev) -> bool:
+        """Loslassen ohne Zug (am Finger unter der Touch-Schwelle)?"""
+        if self._bewegt:
+            return False
+        grenze = self.schwelle() if self.touch else QApplication.startDragDistance()
+        return self._weg(ev) <= grenze
+
+    def _scroll(self, ev) -> None:
+        if not self._scrollen or self._widget is None:
+            return
+        w = self._widget.parentWidget()
+        while w is not None and not isinstance(w, QAbstractScrollArea):
+            w = w.parentWidget()
+        if w is None:
+            return
+        g = self._global(ev)
+        d = g - self._glob
+        self._glob = g
+        w.horizontalScrollBar().setValue(w.horizontalScrollBar().value() - round(d.x()))
+        w.verticalScrollBar().setValue(w.verticalScrollBar().value() - round(d.y()))

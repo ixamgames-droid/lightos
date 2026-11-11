@@ -15,6 +15,7 @@ import {
   getFabLastPlaceCoords, _placeFixtureAtMouse, pointerState,
 } from './pointer.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
+import { langDruckPlatziert } from './touch_regeln.js';   // UI-115
 
 let lastTouchDist = 0;
 let lastTouchCx = 0, lastTouchCy = 0;   // Zwei-Finger-Centroid (fuer Pan)
@@ -54,16 +55,23 @@ renderer.domElement.addEventListener('touchstart', function(e) {
     }
     _lastTapTime = now; _lastTapX = t.clientX; _lastTapY = t.clientY;
     _lpTouchX = t.clientX; _lpTouchY = t.clientY;
-    // Long-Press (600ms) = Fixture platzieren (ersetzt Rechtsklick)
+    // Long-Press (600ms) = Fixture platzieren (ersetzt Rechtsklick).
+    // UI-115 (D-03): nur im Modus „Bearbeiten“ und auf freier Flaeche — im
+    // Modus „Ansehen“ bekam sonst ein unplatziertes Geraet eine Position und
+    // ein begonnener Zug brach ab.
     longPressTimer = setTimeout(function() {
       longPressTimer = null;
       setMouseFromCoords(_lpTouchX, _lpTouchY);
+      if (!langDruckPlatziert(view.editMode,
+                              pickFixture() == null && pickStageObject() == null)) {
+        return;
+      }
       _placeFixtureAtMouse();
       _showLongPressRing(_lpTouchX, _lpTouchY);
       pointerState.isLeftDragging = false;
       pointerState.dragMode = 'none';
     }, 600);
-    handlePointerDown(t.clientX, t.clientY, false);
+    handlePointerDown(t.clientX, t.clientY, false, true);
   } else if (e.touches.length === 2) {
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     pointerState.isLeftDragging = false;
