@@ -123,6 +123,15 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
    255 = eng), den Haken **Zoom-Kanal umgekehrt (0 = weit)** rechts daneben
    setzen; dann zeigt die 3D-Ansicht den Kegel richtig herum. An der
    DMX-Ausgabe ändert der Haken nichts.
+   Darunter zeigt **3D-Vorschau:** mit dem Knopf **Vorschau zeigen** eine
+   kleine 3D-Ansicht des gewählten 3D-Modells mit Lichtkegel (weißes Licht,
+   Kamera schräg von vorn). Der Kegel folgt dem Abstrahlwinkel sofort. Bei
+   einer Zoom-Spanne stellt der Regler **Zoom:** den Zoomwert ein; hat ein
+   Modus einen Gobo-Kanal mit benannten Bereichen, legt **Gobo:** eines davon
+   in den Strahl, **Farbe:** färbt das Licht. Die Vorschau lädt erst auf
+   Knopfdruck und verschwindet beim Zuklappen oder Schließen des Dialogs
+   wieder. Hat der Rechner keine 3D-Grafik (WebGL), steht dort ein Hinweis —
+   das Profil lässt sich trotzdem bearbeiten und speichern.
 4. Gibt es für dein Gerät eine QLC+-Datei (`.qxf`), kannst du sie hier als
    Startpunkt laden und danach gegen das Handbuch prüfen. Das gespeicherte
    Profil behält die Herkunft der Datei (QLC+, Lizenz Apache-2.0), auch wenn

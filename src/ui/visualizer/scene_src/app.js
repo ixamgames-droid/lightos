@@ -20,7 +20,7 @@ import { syncSpotPool, noteShadowPass, spotPoolInfo, spotPoolLights, vergeben as
 import { disposeObj } from './scene/grid_floor.js';
 import { view, fixtures, stageObjects, settings } from './state.js';
 
-import './camera/cameras.js';
+import { camTarget, updateCamera } from './camera/cameras.js';   // FM-64: Vorschau-Kamera
 import { setViewMode } from './stage/view_mode.js';
 import {
   setCameraPreset, fitAll, fitSelected, setFpsVisible, fpsTick,
@@ -53,7 +53,8 @@ import { attachGizmoToSelection, axisParamUnderPointer } from './interaction/giz
 import { setMouseFromCoords, intersectGround, mouse, pickFixture } from './interaction/picking.js';
 import { fabDelete, fabRotate, fabPlace, wireTouchLateBindings } from './interaction/touch.js';
 
-import { getBridge, tryChannel, jsAddStageObject } from './bridge/bridge.js';
+import { getBridge, tryChannel, jsAddStageObject, applySettings } from './bridge/bridge.js';
+import { addFixture } from './fixtures/fixtures.js';             // FM-64: Vorschau
 import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
 import { dmxCacheInfo, resetDmxCache } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
@@ -258,7 +259,39 @@ window.fabPlace = fabPlace;
 // ============================================================================
 // Qt WebChannel starten (ehem. stage_scene.html:3513 `setTimeout(tryChannel, 200)`)
 // ============================================================================
-setTimeout(tryChannel, 200);
+// FM-64 (Teil 2): Mini-Vorschau im Fixture-Editor/-Generator (?vorschau=1).
+// Dieselbe Szene, derselbe Bau-Weg (addFixture/applyDmx) — nur ohne Buehne,
+// Werkzeugleisten und WebChannel: die Vorschau schiebt Geraet und Licht per
+// runJavaScript herein (wie der DMX-Push seit VIZ-71), eine Bridge gibt es
+// dort nicht. Die Bedien-Overlays blendet die Klasse `vorschau` am <html>
+// aus (stage_scene.html), die Kamera steht fest schraeg von vorn.
+const VORSCHAU = new URLSearchParams(window.location.search).get('vorschau') === '1';
+
+function vorschauKamera(hoehe) {
+  const h = (typeof hoehe === 'number' && isFinite(hoehe) && hoehe > 0) ? hoehe : 4;
+  camTarget.set(0, h * 0.4, 0);
+  view.theta = 0.55; view.phi = 1.22; view.radius = Math.max(6, h * 2.4);
+  updateCamera();
+  requestRender();
+}
+
+/** FM-64: das EINE Vorschau-Geraet (neu) bauen. `data` = derselbe Payload wie
+ *  `VisualizerBridge._fixture_to_dict`; ein vorhandenes Geraet gleicher fid
+ *  ersetzt addFixture selbst. Rueckgabe 1 = gebaut (Zahl, s. VIZ-65). */
+function vorschauGeraet(data) {
+  addFixture(data);
+  vorschauKamera(data && data.y);
+  requestRender();
+  return fixtures[data.fid] ? 1 : 0;
+}
+
+if (VORSCHAU) {
+  document.documentElement.classList.add('vorschau');
+  applySettings({ showLabels: false });
+  vorschauKamera();
+} else {
+  setTimeout(tryChannel, 200);
+}
 
 // VIZ-96 (Test-Seam): GL-Typkonstante eines aktiven Uniforms -> Name.
 function typName(gl, typ) {
@@ -430,6 +463,8 @@ window.__lightos = {
   __dmxCacheLeeren: () => { resetDmxCache(); return true; },
   // VCG-02: Bild der aktuellen Ansicht als PNG-Data-URL (VC-Tastenbild).
   momentaufnahme,
+  // FM-64 (Teil 2): Mini-Vorschau im Fixture-Editor/-Generator.
+  vorschau: VORSCHAU, vorschauGeraet, vorschauKamera,
 };
 
 // Init-Flag fuer den Smoke-Test (VIZ-13 3a-4): belegt, dass app.js komplett

@@ -354,16 +354,31 @@ def push_bildschirm_hz(view, screen=None) -> float:
     return hz
 
 
-def load_stage_html(view) -> None:
+def load_stage_html(view, zusatz: str = "") -> None:
     """HTML mit Cache-Buster laden (v=Zeitstempel) — sowohl beim Erst-Load als
     auch beim Renderer-Neustart wiederverwendet, damit Three.js/Szene-JS nie
     aus einem alten Chromium-Cache kommt. Eine manuell erzwungene Qualitäts-
     stufe reist als ``gputier``-Query mit — derselbe Override-Mechanismus, den
     auch die Tests nutzen; er greift damit für ALLE Targets (Vollfenster,
-    eingebettete Live-View-3D, Crash-Guard-Selbstheilung, Szene-neu-laden)."""
+    eingebettete Live-View-3D, Crash-Guard-Selbstheilung, Szene-neu-laden).
+
+    ``zusatz`` haengt weitere Query-Felder an (FM-64: ``vorschau=1`` fuer die
+    Mini-Vorschau im Fixture-Editor). Er wird an der View gemerkt, damit ein
+    Neuladen durch den Szenen-Start-Waechter dieselbe Seite wieder holt."""
     try:
         url = QUrl.fromLocalFile(HTML_PATH)
+        if zusatz:
+            try:
+                view._lightos_query_zusatz = zusatz
+            except Exception:
+                pass
+        else:
+            zusatz = getattr(view, "_lightos_query_zusatz", "")
+            if not isinstance(zusatz, str):     # Attrappen (MagicMock) in Tests
+                zusatz = ""
         query = f"v={int(time.time() * 1000)}"
+        if zusatz:
+            query += f"&{zusatz}"
         tier = quality_tier_pref()
         if tier != "auto":
             query += f"&gputier={tier}"

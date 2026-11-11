@@ -41,7 +41,8 @@ ECHTE_GL_FEHLER = ("Error creating WebGL context.", "Context lost during MakeCur
 SZENEN_DATEIEN = ("tests/test_viz14_place_ghost_scene.py",
                   "tests/test_viz14_drag_scene.py",
                   "tests/test_viz14_deselect_scene.py",
-                  "tests/test_viz73_top_hud_scene.py")
+                  "tests/test_viz73_top_hud_scene.py",
+                  "tests/test_fm64_vorschau_scene.py")
 
 
 def _diagnose(err, **rest):

@@ -2043,6 +2043,17 @@ class FixtureGeneratorDialog(QDialog):
         lbl_aw.setToolTip(self._abstrahlwinkel.toolTip())
         grid.addWidget(lbl_aw, 4, 0)
         grid.addWidget(self._abstrahlwinkel, 4, 1)
+        # FM-64 (Teil 2): kleine 3D-Vorschau mit Lichtkegel — QtWebEngine erst
+        # beim Klick auf „Vorschau zeigen“, ``done`` baut sie wieder ab.
+        from src.ui.widgets.fixture_vorschau_3d import FixtureVorschau3D
+        self._vorschau = FixtureVorschau3D(self._vorschau_daten)
+        lbl_vs = QLabel("3D-Vorschau:")
+        lbl_vs.setToolTip(self._vorschau.btn.toolTip())
+        grid.addWidget(lbl_vs, 5, 0, Qt.AlignmentFlag.AlignTop)
+        grid.addWidget(self._vorschau, 5, 1, 1, 3)
+        self._abstrahlwinkel.geaendert.connect(self._vorschau.aktualisieren)
+        self._cb_vizmodel.currentIndexChanged.connect(
+            lambda *_: self._vorschau.aktualisieren())
         grid.setColumnStretch(1, 1)
         grid.setColumnStretch(3, 1)
         root.addWidget(head)
@@ -2276,6 +2287,11 @@ class FixtureGeneratorDialog(QDialog):
             self._tabs.widget(i).set_typ_laser(
                 self._model.fixture_type == "laser")
         self._zeige_hinweise()
+        # FM-64: Typ, Modus und Kanaele (Gobo-Liste) der 3D-Vorschau folgen —
+        # ``_revalidate`` laeuft nach jeder Aenderung (entprellt).
+        vorschau = getattr(self, "_vorschau", None)
+        if vorschau is not None:
+            vorschau.aktualisieren()
 
     def _zeige_hinweise(self):
         issues = validate_model(self._model)
@@ -2465,6 +2481,34 @@ class FixtureGeneratorDialog(QDialog):
             f"Fixture-Profil „{self._model.manufacturer} {self._model.model}“ "
             f"gespeichert.")
         self.accept()
+
+    # ── FM-64 (Teil 2): 3D-Vorschau ──────────────────────────────────────
+    def _vorschau_daten(self):
+        """Was die 3D-Vorschau zeigt — direkt aus den Feldern, der Modus aus
+        dem Modell (die Kanaltabellen schreiben dorthin)."""
+        from src.ui.widgets.fixture_vorschau_3d import VorschauDaten
+        mode = None
+        tabs = getattr(self, "_tabs", None)
+        idx = tabs.currentIndex() if tabs is not None else -1
+        if 0 <= idx < len(self._model.modes):
+            mode = self._model.modes[idx]
+        elif self._model.modes:
+            mode = self._model.modes[0]
+        kanaele = list(mode.channels) if mode else []
+        return VorschauDaten(
+            typ=self._cb_type.currentText(),
+            viz_model=self._cb_vizmodel.currentData() or "",
+            attribute=[(c.attribute or "") for c in kanaele],
+            kanaele=kanaele,
+            abstrahlwinkel=self._abstrahlwinkel.werte(),
+            zoom_umgekehrt=self._abstrahlwinkel.zoom_umgekehrt())
+
+    def done(self, r):
+        # FM-64: WebEngine der Vorschau abbauen (Speichern, Abbrechen, X).
+        vorschau = getattr(self, "_vorschau", None)
+        if vorschau is not None:
+            vorschau.abbauen()
+        super().done(r)
 
     # ── Aufraeumen ───────────────────────────────────────────────────────
     def reject(self):
