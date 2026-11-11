@@ -20,6 +20,7 @@ test_doc_*.py                      # doc_links, doc_images, doc_removed_ui
 test_viz96_gobo_projektion.py      # 3D-Anleitung nennt die Gobo-Projektion
 test_viz67_dxf_import.py           # 3D-Anleitung beschreibt den DXF-Import
 test_viz111_zoom_richtung_doku.py  # Anleitungen + SCHEMA nennen die Zoom-Laufrichtung
+test_fm64_vorschau_doku.py         # Anleitungen beschreiben die 3D-Vorschau im Editor/Generator
 test_doc[0-9]*.py                  # test_doc13_..., test_doc62_installdoku ...
 test_doc72_externe_pulte.py        # Anleitung Externe Pulte: Ports/Beschriftungen gegen den Code (vom Muster darueber schon erfasst)
 test_midi8_konsolen_vorlagen.py    # Anleitung Externe Pulte nennt Pult-Vorlagen + Wing-Grenze (MIDI-8)

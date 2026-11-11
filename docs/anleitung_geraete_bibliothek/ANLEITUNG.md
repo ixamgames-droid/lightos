@@ -142,6 +142,13 @@ Tabelle „DMX-Kanäle“ oder „DMX chart“.
    255 = eng), den Haken **Zoom-Kanal umgekehrt (0 = weit)** daneben setzen —
    sonst zeigt die 3D-Ansicht den Kegel falsch herum. Die DMX-Ausgabe bleibt
    davon unberührt.
+   Unter dem Kopf öffnet **Vorschau zeigen** eine kleine 3D-Ansicht des Geräts
+   mit Lichtkegel (weißes Licht, Kamera schräg von vorn). Ändert sich der
+   Abstrahlwinkel, folgt der Kegel sofort; bei einer Zoom-Spanne gibt es den
+   Regler **Zoom:**, ein Gobo aus dem Gobo-Kanal des gezeigten Modus lässt sich
+   unter **Gobo:** einschalten, **Farbe:** färbt das Licht. Die Ansicht lädt
+   erst auf Knopfdruck (der Editor öffnet so schnell wie vorher) und wird beim
+   Schließen wieder abgebaut. Ohne 3D-Grafik (WebGL) steht dort ein Hinweis.
 2. **Modus-Reiter** — je DMX-Modus ein Reiter. Den Namen änderst du im Feld
    **Modus-Name:** darüber oder mit **Modus umbenennen**.
 3. **Kanaltabelle** — eine Zeile je DMX-Kanal, in DMX-Reihenfolge. **Name** frei;
