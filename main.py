@@ -982,6 +982,15 @@ def main():
         _ziehen_scrollen(app)
     except Exception as _e:
         print(f"[main] Ziehen-Scrollen nicht verfuegbar: {_e}")
+    # UI-111: Touch-Tastatur/Touch-Zustand einrichten (vorher nie aufgerufen,
+    # --touch wirkte deshalb nur im Hauptfenster). Nur mit --touch an — keine
+    # automatische Erkennung, sonst aendert ein Rechner mit Touchscreen
+    # ungefragt das Aussehen. Der Eingabefeld-Filter laeuft immer.
+    try:
+        from src.ui import touch_keyboard as _touch_keyboard
+        _touch_keyboard.install(app, touch=bool(getattr(args, "touch", False)))
+    except Exception as _e:
+        print(f"[main] Touch-Tastatur nicht verfuegbar: {_e}")
 
     # F-9: nutzersichtbarer Crash-Report-Dialog (nach der QApplication, da er
     # QMessageBox nutzt). Ergaenzt das stille crash.log-Logging.

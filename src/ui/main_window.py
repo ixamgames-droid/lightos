@@ -620,6 +620,13 @@ class MainWindow(QMainWindow):
         self._demo_dateiname: str | None = None
         self._kiosk_mode = kiosk
         self._touch_mode = touch
+        # UI-111: EIN Touch-Zustand — vor dem Bau der Ansichten, die
+        # ``touch_keyboard.is_touch_mode()`` lesen (Programmer, Laser, VC).
+        try:
+            from src.ui.touch_keyboard import setze_touch_modus
+            setze_touch_modus(bool(touch))
+        except Exception as e:
+            print(f"[main_window] ERROR: Touch-Zustand: {e}")
 
         # STAB-39: ohne echte Daten (Wegwerf-Ordner) traegt JEDER Titel den
         # Probelauf-Hinweis — einmal festgestellt, ``setWindowTitle`` haengt an.
