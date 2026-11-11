@@ -355,6 +355,22 @@ class ZiehenScrollenTest(unittest.TestCase):
         self.assertLess(bar.value(), vorher, "Seite folgt dem Finger")
         self.assertEqual(geklickt, [], "Wischen loest den Knopf nicht aus")
 
+    def test_echte_maus_ueber_das_fenster(self):
+        """Mausweg ueber QTest (Druck, Bewegung mit gehaltener Taste,
+        Loslassen). Den Fenster-Weg (Druck zuerst ans QWindow) decken die
+        beiden Tests mit echtem Touch-Ablauf ab — nur sie werden ohne den
+        Fix rot."""
+        from PySide6.QtTest import QTest
+        area, text = _seite()
+        bar = area.verticalScrollBar()
+        vp = area.viewport()
+        QTest.mousePress(vp, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(50, 150))
+        for y in range(140, 40, -20):
+            QTest.mouseMove(vp, QPoint(50, y))
+        QTest.mouseRelease(vp, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier, QPoint(50, 50))
+        self.f.schwung_stoppen()
+        self.assertGreater(bar.value(), 50, "Maus zieht die Seite")
+
     def test_ist_touch_erkennt_erzeugte_maus(self):
         ev = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(1, 1), QPointF(1, 1),
                          Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
