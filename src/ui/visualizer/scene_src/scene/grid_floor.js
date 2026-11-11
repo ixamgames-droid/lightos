@@ -53,11 +53,12 @@ export function trackPreset(obj) {
 
 export function buildGridAndFloor() {
   // Grid-Kontrast angehoben (VIZ-10): vorher auf dunklem Boden kaum sichtbar.
-  gridHelper = new THREE.GridHelper(60, 60, 0x686870, 0x303038);
+  // VIZ-113: 120 m (1-m-Raster), passend zur Modell-Grenze grosser Hallenplaene.
+  gridHelper = new THREE.GridHelper(120, 120, 0x686870, 0x303038);
   scene.add(gridHelper);
   // Floor
   floorMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(80, 80),
+    new THREE.PlaneGeometry(160, 160),
     new THREE.MeshStandardMaterial({ color: 0x282828, roughness: 0.95, metalness: 0.0 })
   );
   floorMesh.rotation.x = -Math.PI / 2;

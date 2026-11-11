@@ -41,9 +41,10 @@ from functools import lru_cache
 MAX_DATEI_BYTES = 20 * 1024 * 1024
 MAX_DREIECKE = 200_000
 MAX_LINIEN = 200_000      # Strecken (DXF-Linien)
-# Groesste Kante in Metern nach der Einheiten-Umrechnung. Groesser als das
-# Eingabefeld der Buehnenobjekte (60 m) heisst fast immer: falsche Einheit.
-MAX_KANTE_M = 60.0
+# Groesste Kante in Metern nach der Einheiten-Umrechnung (= Eingabefeld der
+# Buehnenobjekte). VIZ-113: 120 m, damit Grundrisse grosser Hallen passen;
+# groesser heisst meist falsche Einheit -> Verkleinern wird angeboten.
+MAX_KANTE_M = 120.0
 MAX_HOEHE_M = 30.0   # Eingabefeld Hoehe
 # Kleinste gespeicherte Objektgroesse je Achse (flache Modelle, z. B. ein Schild).
 MIN_GROESSE_M = 0.01

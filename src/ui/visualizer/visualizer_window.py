@@ -3867,9 +3867,9 @@ class VisualizerWindow(QMainWindow):
         self._stage_spin_x = LocaleTolerantDoubleSpinBox(); self._stage_spin_x.setRange(-200, 200); self._stage_spin_x.setSingleStep(0.5)
         self._stage_spin_y = LocaleTolerantDoubleSpinBox(); self._stage_spin_y.setRange(0, 30);   self._stage_spin_y.setSingleStep(0.25)
         self._stage_spin_z = LocaleTolerantDoubleSpinBox(); self._stage_spin_z.setRange(-200, 200); self._stage_spin_z.setSingleStep(0.5)
-        self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.01, 60); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
+        self._stage_spin_w = LocaleTolerantDoubleSpinBox(); self._stage_spin_w.setRange(0.01, 120); self._stage_spin_w.setSingleStep(0.5); self._stage_spin_w.setValue(4)
         self._stage_spin_h = LocaleTolerantDoubleSpinBox(); self._stage_spin_h.setRange(0.01, 30); self._stage_spin_h.setSingleStep(0.25); self._stage_spin_h.setValue(0.4)
-        self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.01, 60); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
+        self._stage_spin_d = LocaleTolerantDoubleSpinBox(); self._stage_spin_d.setRange(0.01, 120); self._stage_spin_d.setSingleStep(0.5); self._stage_spin_d.setValue(4)
         self._stage_spin_rot = LocaleTolerantDoubleSpinBox(); self._stage_spin_rot.setRange(-360, 360); self._stage_spin_rot.setSingleStep(15); self._stage_spin_rot.setSuffix(" °")
 
         for sp in (self._stage_spin_x, self._stage_spin_y, self._stage_spin_z,
