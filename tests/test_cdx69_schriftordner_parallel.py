@@ -91,7 +91,7 @@ class RennenTest(unittest.TestCase):
                     print("gesperrt", flush=True)
                     time.sleep(30)
             """)],
-            stdout=subprocess.PIPE, text=True)
+            stdout=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
         try:
             self.assertEqual(kind.stdout.readline().strip(), "gesperrt")
             with self.assertRaises(OSError):
@@ -155,7 +155,8 @@ class ParallelTest(unittest.TestCase):
             kinder = [subprocess.Popen(
                 [sys.executable, "-c", _ARBEITER, os.path.dirname(__file__),
                  os.pathsep.join(quellen), basis, start],
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                encoding="utf-8", errors="replace")
                 for _ in range(self.PROZESSE)]
             time.sleep(1.0)                 # alle Kinder warten auf den Start
             open(start, "w").close()
