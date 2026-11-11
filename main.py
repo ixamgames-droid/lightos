@@ -976,6 +976,12 @@ def main():
     _install_font_substitutions()
     # UI-64(h): Qt-Standardknoepfe deutsch (Ja/Nein statt Yes/No).
     _install_qt_translator(app)
+    # UI-110: Listen und Seiten durch Ziehen auf Text/Flaeche scrollen.
+    try:
+        from src.ui.ziehen_scrollen import einrichten as _ziehen_scrollen
+        _ziehen_scrollen(app)
+    except Exception as _e:
+        print(f"[main] Ziehen-Scrollen nicht verfuegbar: {_e}")
 
     # F-9: nutzersichtbarer Crash-Report-Dialog (nach der QApplication, da er
     # QMessageBox nutzt). Ergaenzt das stille crash.log-Logging.
