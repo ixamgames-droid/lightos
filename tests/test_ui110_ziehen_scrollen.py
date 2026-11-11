@@ -371,6 +371,144 @@ class ZiehenScrollenTest(unittest.TestCase):
         self.f.schwung_stoppen()
         self.assertGreater(bar.value(), 50, "Maus zieht die Seite")
 
+    # ── A-01 (Touch-Audit 11.11.): Wischen darf die Auswahl nicht aendern ──
+
+    def _auswahl_liste(self, modus=QAbstractItemView.SelectionMode.ExtendedSelection):
+        liste = QListWidget()
+        liste.setSelectionMode(modus)
+        liste.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        liste.addItems([f"Geraet {i}" for i in range(200)])
+        liste.resize(200, 160)
+        liste.show()
+        QApplication.processEvents()
+        return liste
+
+    @staticmethod
+    def _gewaehlt(liste):
+        return sorted(liste.row(i) for i in liste.selectedItems())
+
+    def _zeile(self, liste, n):
+        return liste.visualItemRect(liste.item(n)).center()
+
+    def test_a01_wischen_in_mehrfachauswahl_behaelt_auswahl(self):
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        liste = self._auswahl_liste()
+        for n in (1, 2, 3):
+            liste.item(n).setSelected(True)
+        v = liste.viewport()
+        start = self._zeile(liste, 5)
+        QTest.touchEvent(v, dev).press(0, start, v).commit()
+        for dy in range(15, 120, 15):
+            QTest.touchEvent(v, dev).move(0, start - QPoint(0, dy), v).commit()
+        QTest.touchEvent(v, dev).release(0, start - QPoint(0, 105), v).commit()
+        self.f.schwung_stoppen()
+        QApplication.processEvents()
+        self.assertEqual(self._gewaehlt(liste), [1, 2, 3], "Auswahl bleibt beim Wischen")
+        self.assertGreater(liste.verticalScrollBar().value(), 0, "Liste scrollt")
+
+    def test_a01_tippen_waehlt_wie_bisher(self):
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        liste = self._auswahl_liste()
+        liste.item(1).setSelected(True)
+        v = liste.viewport()
+        p = self._zeile(liste, 4)
+        QTest.touchEvent(v, dev).press(0, p, v).commit()
+        QTest.touchEvent(v, dev).release(0, p, v).commit()
+        QApplication.processEvents()
+        self.assertEqual(self._gewaehlt(liste), [4])
+
+    def test_a01_langes_druecken_dann_ziehen_markiert_bereich(self):
+        import time as _t
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        liste = self._auswahl_liste()
+        v = liste.viewport()
+        p = self._zeile(liste, 1)
+        QTest.touchEvent(v, dev).press(0, p, v).commit()
+        ende = _t.monotonic() + zs.LANG_DRUCK_S + 0.2
+        while _t.monotonic() < ende:                       # echter Timer
+            QApplication.processEvents()
+            _t.sleep(0.02)
+        ziel = self._zeile(liste, 3)
+        for i in range(1, 6):
+            QTest.touchEvent(v, dev).move(0, p + (ziel - p) * (i / 5), v).commit()
+        QTest.touchEvent(v, dev).release(0, ziel, v).commit()
+        QApplication.processEvents()
+        self.assertEqual(self._gewaehlt(liste), [1, 2, 3], "Bereich aufgezogen")
+        self.assertEqual(liste.verticalScrollBar().value(), 0, "nicht gescrollt")
+
+    def test_a01_einfache_liste_wischen_aendert_aktuelle_zeile_nicht(self):
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        liste = self._auswahl_liste(QAbstractItemView.SelectionMode.SingleSelection)
+        liste.setCurrentRow(2)
+        v = liste.viewport()
+        start = self._zeile(liste, 5)
+        QTest.touchEvent(v, dev).press(0, start, v).commit()
+        for dy in range(15, 120, 15):
+            QTest.touchEvent(v, dev).move(0, start - QPoint(0, dy), v).commit()
+        QTest.touchEvent(v, dev).release(0, start - QPoint(0, 105), v).commit()
+        self.f.schwung_stoppen()
+        self.assertEqual(liste.currentRow(), 2)
+        self.assertEqual(self._gewaehlt(liste), [2])
+
+    def test_a01_maus_waehlt_weiter_beim_druck(self):
+        liste = self._auswahl_liste(QAbstractItemView.SelectionMode.SingleSelection)
+        _maus(liste.viewport(), QEvent.Type.MouseButtonPress, self._zeile(liste, 3))
+        self.assertEqual(liste.currentRow(), 3, "Maus: Druck geht sofort durch")
+        _maus(liste.viewport(), QEvent.Type.MouseButtonRelease, self._zeile(liste, 3),
+              knoepfe=Qt.MouseButton.NoButton)
+
+    # ── A-02: Wischen ueber einen Regler ────────────────────────────────────
+
+    def _regler_seite(self):
+        regler = QSlider(Qt.Orientation.Horizontal)
+        regler.setRange(0, 255)
+        regler.setValue(0)
+        regler.setMinimumWidth(250)
+        area, _ = _seite(regler)
+        area.resize(320, 220)
+        bar = area.verticalScrollBar()
+        bar.setValue(bar.maximum())
+        QApplication.processEvents()
+        return area, regler
+
+    def test_a02_senkrecht_ueber_regler_scrollt_ohne_wert(self):
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        area, regler = self._regler_seite()
+        bar = area.verticalScrollBar()
+        vorher = bar.value()
+        p = QPoint(regler.width() // 2, regler.height() // 2)
+        g = regler.mapTo(regler.window(), p)
+        win = regler.window()
+        QTest.touchEvent(win, dev).press(0, g, win).commit()
+        for dy in range(15, 100, 15):
+            QTest.touchEvent(win, dev).move(0, g + QPoint(2, dy), win).commit()
+        QTest.touchEvent(win, dev).release(0, g + QPoint(2, 90), win).commit()
+        self.f.schwung_stoppen()
+        self.assertEqual(regler.value(), 0, "Wert unveraendert")
+        self.assertLess(bar.value(), vorher, "Seite gescrollt")
+
+    def test_a02_entlang_ziehen_bedient_den_regler(self):
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        area, regler = self._regler_seite()
+        regler.setValue(128)
+        bar = area.verticalScrollBar()
+        vorher = bar.value()
+        griff = QPoint(regler.width() // 2, regler.height() // 2)   # Griff steht mittig
+        win = regler.window()
+        g = regler.mapTo(win, griff)
+        QTest.touchEvent(win, dev).press(0, g, win).commit()
+        for dx in range(15, 90, 15):
+            QTest.touchEvent(win, dev).move(0, g + QPoint(dx, 1), win).commit()
+        QTest.touchEvent(win, dev).release(0, g + QPoint(75, 1), win).commit()
+        self.assertGreater(regler.value(), 128, "Regler folgt dem Finger")
+        self.assertEqual(bar.value(), vorher, "Seite bleibt")
+
     def test_ist_touch_erkennt_erzeugte_maus(self):
         ev = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(1, 1), QPointF(1, 1),
                          Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
