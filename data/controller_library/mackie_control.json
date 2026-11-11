@@ -296,7 +296,7 @@
     "Tasten-LEDs vom Programm gesteuert",
     "V-Pots als relative Encoder mit LED-Ring",
     "Gerät erst in den MC-Modus schalten: X-Touch: SELECT 1 beim Einschalten halten, Encoder 1 = MC, Encoder 2 = USB/MIDI/Netz, SELECT 1 speichert (ab Werk HUI). X-Touch Compact: MC-Taste beim Einschalten halten.",
-    "Extender: eigener Port, getrennt öffnen; als zweite Vorlage einfügen und den Fadern andere Funktionen geben",
+    "Extender wird noch nicht unterstützt: die Virtual Console unterscheidet die Anschlüsse nicht, Fader 1 am Extender und am Hauptgerät steuern denselben VC-Fader",
     "An echter Hardware noch nicht geprüft"
   ],
   "source": "Apple Logic Pro 7.2 Handbuch, Anhang B „Logic Control MIDI Implementation“ (öffentlich); Ardour-Quellcode libs/surfaces/mackie (device_info.cc, led.cc, pot.cc, surface.cc); Ardour-Handbuch „Behringer Devices in Mackie/Logic Control Mode“; Behringer X-Touch Extender Handbuch; Sweetwater-Hinweis zum MC-Modus des X-Touch. Mit „unsicher“ markierte Blöcke weichen je Gerät/Quelle ab und sind am Gerät mit einem MIDI-Monitor zu prüfen. iCON, PreSonus FaderPort, SSL UF8 und X-Touch One/Compact sind nicht einzeln mit Handbuch belegt.",

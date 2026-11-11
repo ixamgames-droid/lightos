@@ -311,6 +311,19 @@ class ControllerBrowserDialog(QDialog):
             erzeuge_mapping_profil, kann_mapping_erzeugen)
         if not kann_mapping_erzeugen(p):
             return
+        if getattr(p, "vc_template", "") == "mackie_control":
+            # MIDI-18: das Profil belegt dieselben Tasten wie die VC-Vorlage
+            # (SELECT 1 = GO Executor 1 UND die VC-Taste).
+            antwort = QMessageBox.question(
+                self, "Mapping-Profil",
+                "Für dieses Pult gibt es die fertige Vorlage für die Virtual "
+                "Console. Nutzt du beides, löst eine Taste am Pult zwei Dinge "
+                "auf einmal aus.\n\nNimm am besten nur eins von beiden.\n\n"
+                "Mapping-Profil trotzdem erzeugen?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return
         try:
             prof = erzeuge_mapping_profil(p)
             path = prof.save()
@@ -346,7 +359,28 @@ class ControllerBrowserDialog(QDialog):
             return
         from src.ui.virtualconsole.controller_templates import vorlage_bauen
         bank = int(getattr(canvas, "active_bank", 0))
-        erzeugt = canvas.vorlage_einfuegen(vorlage_bauen(p.vc_template))
+        vorlage = vorlage_bauen(p.vc_template)
+        # Zweimal auf dieselbe Seite: zwei Fader auf einem Motor, ein
+        # Tastendruck schaltet zwei Tasten. Erst fragen.
+        pruefen = getattr(canvas, "vorlage_ueberschneidungen", None)
+        try:
+            doppelt = int(pruefen(vorlage)) if callable(pruefen) else 0
+        except Exception:
+            doppelt = 0
+        if doppelt:
+            antwort = QMessageBox.question(
+                self, "Virtual Console",
+                f"Auf Seite {bank + 1} hören schon {doppelt} Bedienelemente auf "
+                "dieselben Tasten oder Fader des Pults. Dann bewegt ein Fader am "
+                "Pult zwei Fader in LightOS, und eine Taste schaltet zwei.\n\n"
+                "Besser: in der Virtual Console erst eine freie Seite wählen.\n\n"
+                "Trotzdem auf diese Seite einfügen?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                self._letzte_meldung = ""
+                return
+        erzeugt = canvas.vorlage_einfuegen(vorlage)
         if not erzeugt:
             QMessageBox.warning(self, "Virtual Console", "Es wurde nichts eingefügt.")
             return

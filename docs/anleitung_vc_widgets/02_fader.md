@@ -145,9 +145,11 @@ Auf der **aktuellen Seite** der Virtual Console liegen dann, unter dem, was dort
 - **8 Kanalzüge**, je mit einem Drehregler (V-Pot, MIDI-Modus „Relativ (Mackie)“), den Tasten **REC, SOLO, MUTE, SELECT** und einem **Fader** (Pitchbend auf Kanal 1–8, Haken „Motorfader nachführen“ an);
 - den **Master-Fader** (Pitchbend Kanal 9) als **Grand Master**.
 
+Liegen auf der Seite schon Elemente mit denselben Pult-Signalen (z. B. die Vorlage ein zweites Mal), fragt LightOS vorher nach. Wähle dann besser eine freie Seite. Ist ein **APC mini** angeschlossen und belegt er den MIDI-Ausgang, schickt LightOS keine Motor- und LED-Befehle dorthin: die Pads des APC behalten ihre Farben, das Motorpult bekommt dann aber auch nichts. Wähle in der MIDI-Ansicht als Ausgang das Motorpult.
+
 Ein Strg+Z in der Virtual Console nimmt das ganze Einfügen zurück. Danach weist du den Fadern und Tasten per Rechtsklick ihre Funktionen zu. Bewegst du einen Fader am Pult, folgt der VC-Fader. Änderst du ihn in LightOS (Maus, Seitenwechsel), fährt der Motor nach. Die Tasten-LEDs am Pult zeigen, ob die Taste in LightOS leuchtet (Haken **„LED am Pult zeigt den Zustand“** im Tasten-Dialog). Ohne Funktion leuchtet eine Taste nur, solange du sie drückst.
 
-Ein **Extender** (z. B. X-Touch Extender) ist ein eigenes Gerät mit eigenem Anschluss und derselben Belegung. LightOS spricht im Moment nur über **einen** MIDI-Ausgang, Motoren und LEDs eines zweiten Geräts bleiben deshalb noch stehen. Die Belegung steht im Profil; Tasten, die je nach Gerät anders liegen, sind dort als „unsicher“ markiert. An echter Hardware ist das noch nicht geprüft.
+Ein **Extender** (z. B. X-Touch Extender) ist ein eigenes Gerät mit eigenem Anschluss und derselben Belegung. Er wird **noch nicht unterstützt**: Die Virtual Console unterscheidet nicht, von welchem Gerät ein Signal kommt. Fader 1 am Extender und Fader 1 am Hauptgerät steuern deshalb denselben VC-Fader, auch mit einer zweiten Vorlage. LightOS spricht außerdem nur über **einen** MIDI-Ausgang, Motoren und LEDs eines zweiten Geräts bleiben stehen. Die Belegung steht im Profil; Tasten, die je nach Gerät anders liegen, sind dort als „unsicher“ markiert. An echter Hardware ist das noch nicht geprüft.
 
 ## Tipps & Fallen
 

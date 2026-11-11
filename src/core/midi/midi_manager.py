@@ -263,6 +263,20 @@ def loese_portnamen_auf(geraet: str, ports) -> str | None:
     return None
 
 
+def ist_apc_ausgang(manager) -> bool:
+    """MIDI-18: Zeigt der GEMEINSAME Ausgang auf einen Akai APC?
+
+    Der APC-LED-Treiber (``apc_mini_feedback``) oeffnet den freien
+    Hauptausgang auf den APC. Mackie-Rueckmeldungen (Tasten-LEDs als Note
+    0..31, Motor-Pitchbend) duerfen dann nicht dorthin: sie wuerden die Pads
+    des APC einfaerben bzw. loeschen. Unbekannt/leer = kein APC."""
+    try:
+        name = str(manager.current_output_name() or "")
+    except Exception:
+        return False
+    return "apc" in name.lower()
+
+
 def _new_rtmidi_out():
     """Neuer RtMidi-Ausgang mit dem eigenen Clientnamen (s. ``OWN_OUTPUT_CLIENT``).
 

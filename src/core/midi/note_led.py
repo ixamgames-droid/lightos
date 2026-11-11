@@ -45,6 +45,11 @@ class NoteLedSpiegel:
         voll = jetzt - self._zuletzt_voll >= AUFFRISCHEN_S
         if voll:
             self._zuletzt_voll = jetzt   # alles einmal neu senden
+        # Was nicht mehr gewuenscht ist und schon aus ist, vergessen — sonst
+        # bliebe es fuer immer im Stand (und der Abgleich-Timer liefe weiter).
+        for k in [k for k, w in self._stand.items()
+                  if k not in wunsch and w == LED_AUS]:
+            del self._stand[k]
         ziel = {k: (LED_AN if an else LED_AUS) for k, an in wunsch.items()}
         # Was nicht mehr gewuenscht ist und an war, geht aus.
         for k, wert in self._stand.items():

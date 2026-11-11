@@ -838,8 +838,12 @@ class VCSlider(VCWidget):
 
     def _motor_senden(self, wert: int) -> bool:
         try:
-            from src.core.midi.midi_manager import get_midi_manager
-            return bool(get_midi_manager().send_pitchbend(int(self.midi_ch), wert))
+            from src.core.midi.midi_manager import (
+                get_midi_manager, ist_apc_ausgang)
+            mm = get_midi_manager()
+            if ist_apc_ausgang(mm):
+                return False            # MIDI-18: kein Motor am APC, spaeter erneut
+            return bool(mm.send_pitchbend(int(self.midi_ch), wert))
         except Exception:
             return False
 

@@ -147,9 +147,11 @@ The **current page** of the Virtual Console then holds, below what was already t
 - **8 channel strips**, each with a rotary control (V-Pot, MIDI mode „Relativ (Mackie)“), the buttons **REC, SOLO, MUTE, SELECT** and a **fader** (pitch bend on channel 1–8, „Motorfader nachführen“ ticked);
 - the **master fader** (pitch bend channel 9) as **Grand Master**.
 
+If the page already holds elements with the same desk signals (e.g. the template a second time), LightOS asks first. Better pick a free page then. If an **APC mini** is connected and holds the MIDI output, LightOS sends no motor or LED commands there: the APC pads keep their colours, but the motor desk gets nothing either. Choose the motor desk as output in the MIDI view.
+
 One Ctrl+Z in the Virtual Console undoes the whole insert. Then give the faders and buttons their functions via right-click. Move a fader on the desk and the VC fader follows. Change it in LightOS (mouse, page change) and the motor follows. The button LEDs on the desk show whether the button is lit in LightOS (tick **„LED am Pult zeigt den Zustand“** in the button dialog). Without a function a button is only lit while you press it.
 
-An **extender** (e.g. X-Touch Extender) is a separate device with its own connection and the same layout. LightOS currently talks through **one** MIDI output, so motors and LEDs of a second device do not move yet. The layout is in the profile; buttons that differ between devices are marked „unsicher“ (uncertain) there. Not yet tested on real hardware.
+An **extender** (e.g. X-Touch Extender) is a separate device with its own connection and the same layout. It is **not supported yet**: the Virtual Console does not tell which device a signal comes from. Fader 1 on the extender and fader 1 on the main unit therefore control the same VC fader, even with a second template. LightOS also talks through only **one** MIDI output, so motors and LEDs of a second device do not move. The layout is in the profile; buttons that differ between devices are marked „unsicher“ (uncertain) there. Not yet tested on real hardware.
 
 ## Tips & pitfalls
 
