@@ -45,13 +45,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest                                            # noqa: E402
 
-rtmidi = pytest.importorskip("rtmidi", reason="python-rtmidi fehlt")
-
-if not sys.platform.startswith("linux"):
-    pytest.skip("virtuelle MIDI-Ports nur mit ALSA (Linux) im Test",
-                allow_module_level=True)
-if not os.path.exists("/dev/snd/seq"):
-    pytest.skip("kein ALSA-Sequencer (/dev/snd/seq fehlt)", allow_module_level=True)
+# Kein Ueberspringen auf Modulebene: dann sammelt pytest nichts und der
+# segmentierte Lauf meldet "exit 5" (CI ohne ALSA-Sequencer). Die Tests
+# werden gesammelt und einzeln uebersprungen.
+try:
+    import rtmidi                                        # noqa: E402
+except Exception:                                        # pragma: no cover
+    rtmidi = None
 
 from PySide6.QtWidgets import QApplication              # noqa: E402
 
@@ -60,8 +60,18 @@ from _qt_lifecycle import destroy_all_top_level_widgets  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
-if not mgr.RTMIDI_OK:
-    pytest.skip("MidiManager ohne python-rtmidi-Backend", allow_module_level=True)
+if rtmidi is None:
+    _GRUND = "python-rtmidi fehlt"
+elif not sys.platform.startswith("linux"):
+    _GRUND = "virtuelle MIDI-Ports nur mit ALSA (Linux) im Test"
+elif not os.path.exists("/dev/snd/seq"):
+    _GRUND = "kein ALSA-Sequencer (/dev/snd/seq fehlt)"
+elif not mgr.RTMIDI_OK:
+    _GRUND = "MidiManager ohne python-rtmidi-Backend"
+else:
+    _GRUND = ""
+pytestmark = pytest.mark.skipif(bool(_GRUND), reason=_GRUND or "-")
+
 
 
 def _pb14(v255: int) -> int:
