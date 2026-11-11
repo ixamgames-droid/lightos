@@ -856,7 +856,18 @@ class EinstellungenReiterTest(unittest.TestCase):
         combo = win._combo_strobe
         self.assertEqual(combo.sizeAdjustPolicy(),
                          QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self.assertEqual(combo.minimumContentsLength(), 12)
+        # VIZ-112: die Zeichenzahl kommt aus der gemessenen Schrift (feste 12
+        # waren unter Windows/Arial 272 > 270 px), hoechstens 12 — und das
+        # erste Wort jedes Eintrags bleibt in der schmalen Auswahl lesbar.
+        from src.ui.visualizer import strobe_prefs
+        fm = combo.fontMetrics()
+        zeichen = combo.minimumContentsLength()
+        self.assertEqual(zeichen, strobe_prefs.auswahl_mindest_zeichen(fm))
+        self.assertLessEqual(zeichen, 12)
+        for i in range(combo.count()):
+            erstwort = combo.itemText(i).split(" ")[0]
+            self.assertGreaterEqual(zeichen * fm.horizontalAdvance("X"),
+                                    fm.horizontalAdvance(erstwort), erstwort)
         titel = [l for l in tab.findChildren(QLabel) if l.text() == "Strobe im 3D zeigen:"]
         self.assertEqual(len(titel), 1)
         # Schmalste Spalte 330 px; davon gehen Raender von Reiter, Gruppe und
