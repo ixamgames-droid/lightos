@@ -3,10 +3,16 @@
 // lassen (tests/test_ui115_flaechen_touch.py ueber node).
 
 // D-03: Langes Druecken platziert ein Geraet nur im Modus „Bearbeiten“ und
-// nur auf freier Flaeche (kein Geraet, kein Buehnenelement unter dem Finger).
+// nur, wenn kein Geraet unter dem Finger liegt. Traversen und Podeste sind
+// erlaubte Ziele — dort dockt das Geraet an (findDockTarget), genau wie beim
+// Rechtsklick der Maus. Gesperrt bleibt der Griff eines Gizmos bzw. einer
+// Groessen-Ecke (dragMode 'gizmoDrag' / 'stageResize'). Ein Element-Zug, der
+// sich schon bewegt hat, kommt hier nie an: touchmove bricht den Timer ab.
 // Im Modus „Ansehen“ (und „Bühne“) tut langes Druecken nichts.
-export function langDruckPlatziert(editMode, ueberLeer) {
-  return editMode === 'edit' && !!ueberLeer;
+const _GESPERRTE_ZUEGE = ['gizmoDrag', 'stageResize'];
+export function langDruckPlatziert(editMode, keinGeraet, dragMode = 'none') {
+  return editMode === 'edit' && !!keinGeraet &&
+         !_GESPERRTE_ZUEGE.includes(dragMode);
 }
 
 // D-06: Ein Finger auf leerer Flaeche im Modus „Bearbeiten“ dreht (3D) bzw.

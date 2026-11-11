@@ -2723,6 +2723,18 @@ class StageCanvas(QWidget):
             self._band_rect = QRectF(pos, pos)
             self.update()
 
+    def lang_druck_menue_erlaubt(self) -> bool:
+        """UI-115 Nachbesserung: ein laufendes Verschieben gewinnt gegen das
+        Lang-Druck-Menue (UI-114). Hat der Finger nach der Freigabe
+        (FingerHalten, 0,45 s) ein Geraet schon bewegt, oeffnet sich bei 0,6 s
+        kein Menue mehr — sonst saehe man ein Menue und haette zugleich eine
+        gespeicherte Verschiebung."""
+        if self._drag_fid is not None and self._drag_moved:
+            return False
+        if self._multi_drag_start is not None and self._multi_moved:
+            return False
+        return True
+
     def mouseMoveEvent(self, event: QMouseEvent):
         pos = self._to_world(event.position())
         if ((self._drag_fid is not None or self._multi_drag_start is not None)

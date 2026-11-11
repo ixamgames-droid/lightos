@@ -148,6 +148,57 @@ def test_buehne_langer_druck_dann_zug_verschiebt(buehne):
     assert c.uebernommen == [[1]]
 
 
+def test_buehne_verschieben_nach_freigabe_gewinnt_gegen_menue(buehne):
+    """Nachbesserung: Freigabe (0,45 s), dann 12 px Zug (unter der Touch-
+    Schwelle des UI-114-Menues), dann still bis ueber 0,6 s — das Verschieben
+    gewinnt, kein Kontextmenue."""
+    c = buehne
+    menues = []
+    c.context_menu_requested.connect(lambda fid, p: menues.append(fid))
+    QTest.touchEvent(c, _DEV).press(0, QPoint(160, 100), c).commit()
+    QApplication.processEvents()
+    _warte(zs.LANG_DRUCK_S + 0.03)
+    QTest.touchEvent(c, _DEV).move(0, QPoint(172, 100), c).commit()
+    QApplication.processEvents()
+    _warte(0.25)                        # ueber die 0,6 s des Menues hinaus
+    assert menues == [], "nach begonnenem Verschieben kein Lang-Druck-Menue"
+    QTest.touchEvent(c, _DEV).release(0, QPoint(172, 100), c).commit()
+    QApplication.processEvents()
+    x, y = c._positions[1]
+    assert (round(x), round(y)) == (172, 100)
+    assert c.uebernommen == [[1]]
+    assert c._drag_fid is None
+
+
+def test_buehne_still_gehalten_oeffnet_menue_ohne_verschieben(buehne):
+    """Gegenprobe: bleibt der Finger still, kommt das Menue (UI-114) wie
+    bisher — und es wird nichts verschoben oder gespeichert."""
+    c = buehne
+    menues = []
+    c.context_menu_requested.connect(lambda fid, p: menues.append(fid))
+    QTest.touchEvent(c, _DEV).press(0, QPoint(160, 100), c).commit()
+    QApplication.processEvents()
+    _warte(0.8)
+    QTest.touchEvent(c, _DEV).release(0, QPoint(160, 100), c).commit()
+    QApplication.processEvents()
+    assert menues == [1]
+    assert c._positions[1] == (160.0, 100.0)
+    assert c.uebernommen == []
+
+
+def test_buehne_menue_sperre_folgt_dem_zug(buehne):
+    c = buehne
+    assert c.lang_druck_menue_erlaubt()
+    c._drag_fid, c._drag_moved = 1, False
+    assert c.lang_druck_menue_erlaubt(), "angefasst, aber nicht bewegt: Menue erlaubt"
+    c._drag_moved = True
+    assert not c.lang_druck_menue_erlaubt()
+    c._drag_fid, c._drag_moved = None, False
+    c._multi_drag_start, c._multi_moved = {1: (0.0, 0.0)}, True
+    assert not c.lang_druck_menue_erlaubt()
+    c._multi_drag_start, c._multi_moved = None, False
+
+
 def test_buehne_maus_zug_verschiebt_sofort(buehne):
     c = buehne
     _maus_zug(c, QPoint(160, 100), QPoint(150, 250))
@@ -277,6 +328,26 @@ def test_3d_langer_druck_platziert_nur_im_bearbeiten_modus_auf_freier_flaeche():
     erg = _node("[R.langDruckPlatziert('view', true), R.langDruckPlatziert('stage', true),"
                 " R.langDruckPlatziert('edit', false), R.langDruckPlatziert('edit', true)]")
     assert erg == "[false,false,false,true]"
+
+
+def test_3d_langer_druck_auf_traverse_oder_podest_platziert_und_dockt():
+    """Nachbesserung: ein Buehnenelement unter dem Finger sperrt nicht mehr —
+    dort dockt das Geraet an (wie der Rechtsklick). Nur ein Gizmo-/Ecken-Griff
+    sperrt."""
+    erg = _node("[R.langDruckPlatziert('edit', true, 'stageDrag'),"
+                " R.langDruckPlatziert('edit', true, 'none'),"
+                " R.langDruckPlatziert('edit', true, 'gizmoDrag'),"
+                " R.langDruckPlatziert('edit', true, 'stageResize'),"
+                " R.langDruckPlatziert('edit', false, 'fixtureDrag')]")
+    assert erg == "[true,true,false,false,false]"
+    from pathlib import Path
+    touch = (Path(_REGELN).resolve().parent / "touch.js").read_text(encoding="utf-8")
+    lp = touch.index("longPressTimer = setTimeout")
+    ende = touch.index("_placeFixtureAtMouse();", lp)
+    block = touch[lp:ende]
+    assert "pickStageObject" not in block, "Buehnenelement darf das Platzieren nicht sperren"
+    assert "langDruckPlatziert(view.editMode, pickFixture() == null," in block
+    assert "pointerState.dragMode" in block
 
 
 def test_3d_ein_finger_zieht_keinen_rahmen():

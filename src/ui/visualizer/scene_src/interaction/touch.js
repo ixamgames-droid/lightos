@@ -56,14 +56,16 @@ renderer.domElement.addEventListener('touchstart', function(e) {
     _lastTapTime = now; _lastTapX = t.clientX; _lastTapY = t.clientY;
     _lpTouchX = t.clientX; _lpTouchY = t.clientY;
     // Long-Press (600ms) = Fixture platzieren (ersetzt Rechtsklick).
-    // UI-115 (D-03): nur im Modus „Bearbeiten“ und auf freier Flaeche — im
+    // UI-115 (D-03): nur im Modus „Bearbeiten“ und nicht auf einem Geraet — im
     // Modus „Ansehen“ bekam sonst ein unplatziertes Geraet eine Position und
     // ein begonnener Zug brach ab.
     longPressTimer = setTimeout(function() {
       longPressTimer = null;
       setMouseFromCoords(_lpTouchX, _lpTouchY);
-      if (!langDruckPlatziert(view.editMode,
-                              pickFixture() == null && pickStageObject() == null)) {
+      // UI-115 Nachbesserung: Traverse/Podest unter dem Finger ist erlaubt
+      // (Andocken wie beim Rechtsklick), nur ein Geraet nicht.
+      if (!langDruckPlatziert(view.editMode, pickFixture() == null,
+                              pointerState.dragMode)) {
         return;
       }
       _placeFixtureAtMouse();
