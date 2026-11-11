@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QGroupBox,
     QDialogButtonBox, QTabWidget, QWidget,
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, Signal
 from src.ui.widgets.dialog_groesse import (InhaltsRollbereich,
                                            beim_ersten_zeigen_anpassen,
                                            mindestzeilen_setzen)
@@ -221,6 +221,10 @@ def segment_auswahl(n_weiss: int, segment) -> list[str]:
 
 class _ModeTab(QWidget):
     """Eine Mode-Tab: Kanaltabelle + die Panel-Geometrie dieses Modus."""
+
+    #: FM-64 (Review): Kanalliste geaendert (Attribut, hinzu, weg, Reihenfolge)
+    #: — die 3D-Vorschau zieht Modell und Gobo-Liste nach.
+    kanaele_geaendert = Signal()
 
     def __init__(self, name: str = "Default", description: str = "", parent=None,
                  grid: tuple = (0, 0), weiss: tuple = (0, 0)):
@@ -466,6 +470,7 @@ class _ModeTab(QWidget):
             self._tbl.setItem(i, 4, QTableWidgetItem(str(ch.get("highlight", 255))))
         self._tbl.blockSignals(False)
         self._refresh_segment_cells()
+        self.kanaele_geaendert.emit()
 
     # ── FM-46: Spalte „Weiß-Segment“ ─────────────────────────────────────
     #
@@ -572,6 +577,7 @@ class _ModeTab(QWidget):
             # verschieben sich die Segmentnummern der uebrigen.
             self._ziele.nachziehen(self.channels)
             self._refresh_segment_cells()
+            self.kanaele_geaendert.emit()
 
     def _sync_from_table(self):
         """Liest Texteingaben (Name, Default, Highlight) aus der Tabelle zurueck."""
@@ -755,12 +761,26 @@ class FixtureEditorDialog(QDialog):
 
         root.addLayout(form)
 
+        # FM-64 (Teil 2): kleine 3D-Vorschau mit Lichtkegel. Laedt QtWebEngine
+        # erst beim Klick auf „Vorschau zeigen“ (das Oeffnen bleibt schnell),
+        # ``done`` baut sie wieder ab.
+        from src.ui.widgets.fixture_vorschau_3d import FixtureVorschau3D
+        #: 3D-Modell-Override des geladenen Profils (der Editor zeigt es nicht).
+        self._viz_model_geladen = ""
+        self._vorschau = FixtureVorschau3D(self._vorschau_daten)
+        root.addWidget(self._vorschau)
+        self._abstrahlwinkel.geaendert.connect(self._vorschau.aktualisieren)
+        self._cb_type.currentTextChanged.connect(
+            lambda *_: self._vorschau.aktualisieren())
+
         # Modes tabs
         modes_box = QGroupBox("Modi && Kanäle")
         mb_layout = QVBoxLayout(modes_box)
 
         self._tabs = QTabWidget()
         mb_layout.addWidget(self._tabs)
+        # FM-64: Gobo-Liste/3D-Modell der Vorschau folgen dem gezeigten Modus.
+        self._tabs.currentChanged.connect(lambda *_: self._vorschau.aktualisieren())
 
         mode_btn_row = QHBoxLayout()
         self._btn_add_mode = QPushButton("+ Modus")
@@ -802,6 +822,30 @@ class FixtureEditorDialog(QDialog):
         self._btn_save = btn_box.button(QDialogButtonBox.StandardButton.Save)
         self._btn_cancel = btn_box.button(QDialogButtonBox.StandardButton.Cancel)
         aussen.addWidget(btn_box)
+
+    # ── FM-64 (Teil 2): 3D-Vorschau ──────────────────────────────────────
+    def _vorschau_daten(self):
+        """Was die 3D-Vorschau zeigt: Typ, Winkel und der gezeigte Modus."""
+        from src.ui.widgets.fixture_vorschau_3d import (
+            VorschauDaten, kanaele_aus_dicts)
+        tab = self._tabs.currentWidget() if hasattr(self, "_tabs") else None
+        kanaele = list(getattr(tab, "channels", None) or [])
+        return VorschauDaten(
+            typ=self._cb_type.currentText(),
+            viz_model=getattr(self, "_viz_model_geladen", "") or "",
+            attribute=[(c.get("attribute", "") or "") for c in kanaele
+                       if isinstance(c, dict)],
+            kanaele=kanaele_aus_dicts(kanaele),
+            abstrahlwinkel=self._abstrahlwinkel.werte(),
+            zoom_umgekehrt=self._abstrahlwinkel.zoom_umgekehrt())
+
+    def done(self, r):
+        # FM-64: WebEngine der Vorschau abbauen — Speichern, Abbrechen und
+        # Fenster-X laufen alle hier durch.
+        vorschau = getattr(self, "_vorschau", None)
+        if vorschau is not None:
+            vorschau.abbauen()
+        super().done(r)
 
     def showEvent(self, e):
         # FM-74: Startgroesse aus dem Bedarf des Inhalts, begrenzt auf den
@@ -1003,6 +1047,10 @@ class FixtureEditorDialog(QDialog):
         tab = _ModeTab(name, description=description, grid=grid, weiss=weiss)
         if channels:
             tab.load_mode_data(name, channels, description=description)
+        # FM-64 (Review): Kanal-Aenderungen erreichen die 3D-Vorschau.
+        vorschau = getattr(self, "_vorschau", None)
+        if vorschau is not None:
+            tab.kanaele_geaendert.connect(vorschau.aktualisieren)
         self._tabs.addTab(tab, name)
         self._tabs.setCurrentWidget(tab)
         return tab
@@ -1046,6 +1094,7 @@ class FixtureEditorDialog(QDialog):
             self._edit_short.setText(profile.short_name)
             self._cb_type.setCurrentText(profile.fixture_type)
             self._spin_power.setValue(profile.power_w)
+            self._viz_model_geladen = getattr(profile, "viz_model", "") or ""
             # FM-64
             self._abstrahlwinkel.setze(profile.beam_angle_min or 0,
                                        profile.beam_angle_max or 0)

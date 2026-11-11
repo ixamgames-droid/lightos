@@ -186,6 +186,15 @@
     color: rgba(215,225,240,0.92); margin-bottom: 6px;
   }
   #empty-state .es-hint { display: block; opacity: 0.85; }
+  /* FM-64 (Teil 2): Mini-Vorschau im Fixture-Editor/-Generator (?vorschau=1,
+     Klasse setzt scene_src/app.js). Nur das Geraet mit Kegel ueber dem dunklen
+     Boden — keine Bedien-Overlays, keine Maus (Kamera steht fest, nichts ist
+     dort zu verschieben). */
+  html.vorschau #overlay, html.vorschau #top-hud, html.vorschau #controls,
+  html.vorschau #mode-frame, html.vorschau #empty-state, html.vorschau #fab-container,
+  html.vorschau #ruler-info, html.vorschau #dock-badge, html.vorschau #tooltip,
+  html.vorschau #marquee, html.vorschau #longpress-ring { display: none !important; }
+  html.vorschau canvas { pointer-events: none; }
 </style>
 </head>
 <body>
