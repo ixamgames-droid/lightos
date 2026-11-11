@@ -74,6 +74,21 @@ class VCInspectorPanel(QWidget):
         self._scroll.setStyleSheet("QScrollArea { border:none; background:#0d1117; }")
         root.addWidget(self._scroll, 1)
 
+        # UI-114/B-01: Loeschen ohne Kontextmenue (am Finger sichtbar). Gleicher
+        # Weg wie der Menuepunkt „Löschen“ (delete_requested -> Canvas legt
+        # vorher einen Rueckgaengig-Schritt an).
+        self._btn_loeschen = QPushButton("🗑 Löschen")
+        self._btn_loeschen.setObjectName("vc_inspector_loeschen")
+        self._btn_loeschen.setMinimumHeight(36)
+        self._btn_loeschen.setToolTip("Das gewählte Element löschen (rückgängig mit Strg+Z)")
+        self._btn_loeschen.setStyleSheet(
+            "QPushButton { color:#f85149; background:#21262d; border:1px solid #30363d;"
+            " border-radius:6px; font-weight:bold; }"
+            "QPushButton:disabled { color:#484f58; }")
+        self._btn_loeschen.setEnabled(False)
+        self._btn_loeschen.clicked.connect(self.loesche_gewaehltes)
+        root.addWidget(self._btn_loeschen)
+
         self._show_empty()
 
     # ── Oeffentliche API ───────────────────────────────────────────────────────
@@ -87,6 +102,7 @@ class VCInspectorPanel(QWidget):
         if not _is_valid(widget):
             widget = None
         self._widget = widget
+        self._btn_loeschen.setEnabled(widget is not None)
         if widget is None:
             self._show_empty()
             return
@@ -96,6 +112,18 @@ class VCInspectorPanel(QWidget):
     def clear(self):
         """Auswahl loesen (z. B. beim Show-Laden oder Verlassen des Edit-Modus)."""
         self.bind(None)
+
+    def loesche_gewaehltes(self) -> bool:
+        """Das gebundene VC-Widget loeschen (wie Kontextmenue „Löschen“)."""
+        w = self._widget
+        if not _is_valid(w) or not hasattr(w, "delete_requested"):
+            return False
+        self._end_session()          # Inspector-Aenderungen zuerst als eigener Schritt
+        self._widget = None
+        self._btn_loeschen.setEnabled(False)
+        self._show_empty()
+        w.delete_requested.emit()
+        return True
 
     # ── Aufbau ─────────────────────────────────────────────────────────────────
 

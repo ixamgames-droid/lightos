@@ -4,6 +4,8 @@
         Linksklick auf leere Fläche  → Punkt hinzufügen
         Linksklick + Ziehen          → Punkt verschieben (Endpunkte nur in Y)
         Rechtsklick auf Punkt        → Punkt löschen
+        Antippen + Knopf „Punkt löschen“ (Dialog) → gewählten Punkt löschen
+        (UI-114/C-06: am Finger; Trefferradius dort 24 px statt 12 px)
   * ``CurveThumbnail`` — kleine, nicht-interaktive Vorschau (für Tabellen).
   * ``CurveEditorDialog`` — Popup mit Editor, Preset-Auswahl, Modus-Umschalter
         und "In Bibliothek speichern".
@@ -17,6 +19,7 @@ from PySide6.QtCore import Qt, QRect, QPoint, QPointF, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QPolygonF
 
 from src.core.engine import fade_curve as fc
+from src.ui.ziehen_scrollen import ist_touch
 from src.core.engine.fade_curve import FadeCurve
 
 
@@ -26,14 +29,17 @@ class CurveEditorWidget(QWidget):
     """Editierbares X/Y-Grid für eine FadeCurve. X = Zeit, Y = Pegel."""
 
     curveChanged = Signal()
+    selectionChanged = Signal()
 
     _MARGIN = 28
     _HIT_RADIUS = 12
+    _HIT_RADIUS_TOUCH = 24      # UI-114/C-06: Finger (wie der EFX-Pfadeditor)
 
     def __init__(self, curve: FadeCurve | None = None, parent=None):
         super().__init__(parent)
         self._curve = curve.copy() if curve else fc.linear()
         self._drag_idx: int | None = None
+        self._sel_idx: int | None = None    # gewaehlter Punkt (Knopf „Punkt löschen“)
         self.setMinimumSize(240, 200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setMouseTracking(True)
@@ -46,6 +52,7 @@ class CurveEditorWidget(QWidget):
     def set_curve(self, curve: FadeCurve):
         self._curve = curve.copy()
         self._drag_idx = None
+        self._waehle(None)
         self.update()
         self.curveChanged.emit()
 
@@ -72,33 +79,67 @@ class CurveEditorWidget(QWidget):
         y = (pr.bottom() - pos.y()) / pr.height() if pr.height() else 0.0
         return (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)))
 
-    def _hit_point(self, pos: QPoint) -> int | None:
+    def _hit_point(self, pos: QPoint, radius: int | None = None) -> int | None:
+        """Naechster Punkt innerhalb ``radius`` (Standard: Maus-Radius)."""
+        r = self._HIT_RADIUS if radius is None else radius
+        best, bd = None, None
         for i, (x, y) in enumerate(self._curve.points):
             c = self._to_px(x, y)
-            if (c.x() - pos.x()) ** 2 + (c.y() - pos.y()) ** 2 <= self._HIT_RADIUS ** 2:
-                return i
-        return None
+            d = (c.x() - pos.x()) ** 2 + (c.y() - pos.y()) ** 2
+            if d <= r ** 2 and (bd is None or d < bd):
+                best, bd = i, d
+        return best
+
+    # ── Auswahl ───────────────────────────────────────────────────────────────
+
+    def _waehle(self, idx: int | None) -> None:
+        if idx != self._sel_idx:
+            self._sel_idx = idx
+            self.update()
+            self.selectionChanged.emit()
+
+    def selected_index(self) -> int | None:
+        i = self._sel_idx
+        return i if i is not None and 0 <= i < len(self._curve.points) else None
+
+    def can_delete_selected(self) -> bool:
+        """Endpunkte (erster/letzter) sind nicht loeschbar."""
+        i = self.selected_index()
+        return i is not None and 0 < i < len(self._curve.points) - 1
+
+    def delete_point(self, idx: int) -> bool:
+        if not (0 < idx < len(self._curve.points) - 1):
+            return False
+        self._curve.points.pop(idx)
+        self._curve.set_points(self._curve.points)
+        # Laufenden Linksklick-Drag invalidieren: die Indizes sind nach dem pop
+        # verschoben — ein stale _drag_idx korrumpierte sonst beim naechsten
+        # mouseMove einen anderen Punkt/Endpunkt.
+        self._drag_idx = None
+        self._waehle(None)
+        self.update()
+        self.curveChanged.emit()
+        return True
+
+    def delete_selected(self) -> bool:
+        """UI-114/C-06: den gewaehlten Punkt loeschen (Knopf am Finger)."""
+        i = self.selected_index()
+        return i is not None and self.delete_point(i)
 
     # ── Maus ──────────────────────────────────────────────────────────────────
 
     def mousePressEvent(self, event):
         pos = event.position().toPoint()
+        radius = self._HIT_RADIUS_TOUCH if ist_touch(event) else self._HIT_RADIUS
         if event.button() == Qt.MouseButton.RightButton:
-            idx = self._hit_point(pos)
+            idx = self._hit_point(pos, radius)
             # Endpunkte (0 und letzter) nicht löschbar
-            if idx is not None and 0 < idx < len(self._curve.points) - 1:
-                self._curve.points.pop(idx)
-                self._curve.set_points(self._curve.points)
-                # Laufenden Linksklick-Drag invalidieren: die Indizes sind nach
-                # dem pop verschoben — ein stale _drag_idx korrumpierte sonst
-                # beim naechsten mouseMove einen anderen Punkt/Endpunkt.
-                self._drag_idx = None
-                self.update()
-                self.curveChanged.emit()
+            if idx is not None:
+                self.delete_point(idx)
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:
-            idx = self._hit_point(pos)
+            idx = self._hit_point(pos, radius)
             if idx is None:
                 # Neuen Punkt einfügen
                 x, y = self._to_norm(pos)
@@ -109,9 +150,18 @@ class CurveEditorWidget(QWidget):
                 self._drag_idx = self._nearest_idx(x)
             else:
                 self._drag_idx = idx
+            self._waehle(self._drag_idx)
             self.update()
             self.curveChanged.emit()
         event.accept()
+
+    def _nearest_point(self, pt) -> int | None:
+        best, bd = None, None
+        for i, (px, py) in enumerate(self._curve.points):
+            d = (px - pt[0]) ** 2 + (py - pt[1]) ** 2
+            if bd is None or d < bd:
+                bd, best = d, i
+        return best
 
     def _nearest_idx(self, x: float) -> int:
         best, bd = 0, 1e9
@@ -147,8 +197,14 @@ class CurveEditorWidget(QWidget):
 
     def mouseReleaseEvent(self, event):
         if self._drag_idx is not None:
+            i = self._drag_idx
+            pts = self._curve.points
+            gezogen = pts[i] if 0 <= i < len(pts) else None
             self._curve.set_points(self._curve.points)   # final normalisieren
             self._drag_idx = None
+            if gezogen is not None:
+                # Auswahl folgt dem Punkt, falls die Normalisierung umsortiert
+                self._waehle(self._nearest_point(gezogen))
             self.update()
             self.curveChanged.emit()
         event.accept()
@@ -197,6 +253,10 @@ class CurveEditorWidget(QWidget):
             c = self._to_px(x, y)
             is_end = (i == 0 or i == len(self._curve.points) - 1)
             col = QColor("#f59e0b") if is_end else QColor("#22d3ee")
+            if i == self._sel_idx:
+                p.setPen(QPen(QColor("#ffffff"), 2))
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawEllipse(c, 9, 9)
             p.setPen(QPen(col.darker(150), 1))
             p.setBrush(col)
             p.drawEllipse(c, 5, 5)
@@ -290,12 +350,23 @@ class CurveEditorDialog(QDialog):
         root.addWidget(self._editor, 1)
         self._sync_mode_combo()
 
-        hint = QLabel("Linksklick: Punkt setzen/ziehen · Rechtsklick: Punkt löschen")
+        hint = QLabel("Tippen/Linksklick: Punkt setzen, wählen, ziehen · "
+                      "Punkt löschen: Knopf unten oder Rechtsklick")
         hint.setStyleSheet("color:#6b7280; font-size:11px;")
         root.addWidget(hint)
 
         # Buttons
         btn_row = QHBoxLayout()
+        # UI-114/C-06: Punkt am Finger loeschen (Rechtsklick gibt es dort nicht)
+        self._btn_del_point = QPushButton("Punkt löschen")
+        self._btn_del_point.setObjectName("curve_punkt_loeschen")
+        self._btn_del_point.setMinimumHeight(36)
+        self._btn_del_point.setToolTip("Den gewählten Punkt löschen (Anfang und Ende bleiben)")
+        self._btn_del_point.clicked.connect(self._editor.delete_selected)
+        self._editor.selectionChanged.connect(self._sync_del_button)
+        self._editor.curveChanged.connect(self._sync_del_button)
+        btn_row.addWidget(self._btn_del_point)
+        self._sync_del_button()
         btn_save = QPushButton("In Bibliothek speichern…")
         btn_save.clicked.connect(self._save_to_library)
         btn_row.addWidget(btn_save)
@@ -307,6 +378,9 @@ class CurveEditorDialog(QDialog):
         box.accepted.connect(self._accept)
         box.rejected.connect(self.reject)
         root.addWidget(box)
+
+    def _sync_del_button(self):
+        self._btn_del_point.setEnabled(self._editor.can_delete_selected())
 
     def _sync_mode_combo(self):
         idx = self._combo_mode.findData(self._editor.curve().mode)

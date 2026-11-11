@@ -120,7 +120,10 @@ class HandyRaster(QWidget):
     RAND = 8                # Rahmen des Handys
     KOPF = 14               # Kopfzeile (Seitenname)
     FUSS = 32               # feste Leiste unten: Master + Blackout
-    GRIFF = 22              # Kantenlaenge der Greifzone unten rechts
+    # Kantenlaenge der Greifzone unten rechts (UI-114/B-13: Fingerbreite). Auf
+    # kleinen Kacheln hoechstens knapp die halbe Kachel — die Mitte bleibt
+    # Verschieben.
+    GRIFF = 34
 
     def __init__(self, leiste):
         super().__init__(leiste)
@@ -220,8 +223,17 @@ class HandyRaster(QWidget):
 
     def _im_griff(self, e, pos) -> bool:
         r = self.feld_rect(e["spalte"], e["zeile"], e["breite"], e["hoehe"])
-        g = min(float(self.GRIFF), r.width() / 2.0, r.height() / 2.0)
+        g = self.griff_kante(r)
         return pos.x() >= r.right() - g and pos.y() >= r.bottom() - g
+
+    def _auswahl_melden(self) -> None:
+        melden = getattr(self._leiste, "auswahl_geaendert", None)
+        if callable(melden):
+            melden()
+
+    def griff_kante(self, r: QRectF) -> float:
+        """Kantenlaenge der Groessen-Greifzone einer Kachel ``r``."""
+        return max(0.0, min(float(self.GRIFF), r.width() / 2.0 - 1.0, r.height() / 2.0 - 1.0))
 
     def auswahl(self) -> str | None:
         return self._auswahl if self._eintrag(self._auswahl) is not None else None
@@ -229,6 +241,7 @@ class HandyRaster(QWidget):
     def waehle(self, kennung) -> None:
         self._auswahl = kennung
         self.update()
+        self._auswahl_melden()
 
     def bedienbar(self) -> bool:
         return self._leiste.bearbeiten() and self._canvas() is not None
@@ -253,6 +266,7 @@ class HandyRaster(QWidget):
         pos = event.position().toPoint()
         e = self._eintrag_bei(pos)
         self._auswahl = e["widget"] if e else None
+        self._auswahl_melden()
         self._zieh = None
         if e is not None and event.button() == Qt.MouseButton.LeftButton:
             s, z = self.zelle_bei(pos)
@@ -331,6 +345,7 @@ class HandyRaster(QWidget):
         ok = c.handy_eintrag_entfernen(c.handy_seite_nr(), kennung)
         if ok:
             self._auswahl = None
+            self._auswahl_melden()
         return ok
 
     def baue_kontextmenue(self, pos) -> QMenu | None:
@@ -353,9 +368,13 @@ class HandyRaster(QWidget):
 
     def contextMenuEvent(self, event):
         menu = self.baue_kontextmenue(event.pos())
-        if menu is not None:
-            menu.exec(event.globalPos())
-            menu.deleteLater()
+        if menu is None:
+            # UI-114: ohne Menue nicht annehmen — sonst haelt langes Druecken
+            # am Finger das fuer ein gezeigtes Menue und loest den Druck.
+            event.ignore()
+            return
+        menu.exec(event.globalPos())
+        menu.deleteLater()
         event.accept()
 
     # ── Zeichnen ─────────────────────────────────────────────────────────────
@@ -822,6 +841,18 @@ class HandyKonsolenLeiste(QWidget):
         self._btn_leeren.clicked.connect(self.alles_leeren)
         zeile.addWidget(self._btn_leeren)
         lay.addLayout(zeile)
+        # UI-114/B-13: Entfernen der gewaehlten Kachel ohne Entf-Taste und
+        # ohne Kontextmenue — am Finger sichtbar erreichbar.
+        self._btn_entfernen = QPushButton("Entfernen")
+        self._btn_entfernen.setObjectName("handy_entfernen")
+        self._btn_entfernen.setFixedHeight(TREFFER)
+        self._btn_entfernen.setToolTip(
+            "Nimmt die gewählte Kachel von der Handy-Seite. Das Element in der "
+            "Konsole bleibt. Rückgängig mit Strg+Z.")
+        self._btn_entfernen.setStyleSheet(_KNOPF_CSS + "QPushButton { color:#f85149; }")
+        self._btn_entfernen.setEnabled(False)
+        self._btn_entfernen.clicked.connect(self._entfernen_geklickt)
+        zeile.insertWidget(1, self._btn_entfernen)
 
         self._lbl_hinweis = QLabel()
         self._lbl_hinweis.setObjectName("handy_hinweis")
@@ -856,6 +887,17 @@ class HandyKonsolenLeiste(QWidget):
 
     def bearbeiten(self) -> bool:
         return self._bearbeiten
+
+    def auswahl_geaendert(self) -> None:
+        """Raster meldet eine neue (oder keine) Auswahl: Entfernen-Knopf nachziehen."""
+        btn = getattr(self, "_btn_entfernen", None)
+        if btn is not None and getattr(self, "raster", None) is not None:
+            btn.setEnabled(self._bearbeiten and self.raster.auswahl() is not None)
+
+    def _entfernen_geklickt(self) -> None:
+        if not self.raster.entferne_auswahl():
+            self.melde("Erst eine Kachel antippen, dann „Entfernen“.")
+        self.auswahl_geaendert()
 
     def set_edit_mode(self, an: bool) -> None:
         """Nur im Bearbeiten-Modus bedienbar — sonst Vorschau."""
@@ -957,6 +999,7 @@ class HandyKonsolenLeiste(QWidget):
         self._btn_seite_weg.setToolTip("Diese Handy-Seite löschen (die Elemente der "
                                        "Konsole bleiben)")
         self._btn_leeren.setEnabled(self._bearbeiten and bool(seiten))
+        self.auswahl_geaendert()
         self._signatur = self._signatur_jetzt()
         if not self._meldung_bis:
             self._hinweis_zeigen()

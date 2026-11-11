@@ -39,6 +39,25 @@ Regeln (``ziel_bereich``):
   UI-110); ohne scrollbare Seite drumherum (z. B. Grand Master in der
   Kopfleiste) wird der Druck genauso zurueckgehalten. Die Maus bedient den
   Regler unveraendert; eigene Regler-Klassen (VC-Fader) sind nicht betroffen.
+* **Langes Druecken = Kontextmenue** (UI-114, Touch-Audit A-05/A-08/B-01):
+  liegt der Finger ``LANG_MENUE_S`` still (Bewegung unter der Touch-
+  Schwelle), oeffnet sich — wie am Telefon, waehrend der Finger noch liegt —
+  das Kontextmenue an der Druckstelle (``QContextMenuEvent``, Grund Maus, an
+  das Widget unter dem Finger; Qt reicht es an die Eltern weiter). Nur wenn
+  dort wirklich ein Menue haengt (``CustomContextMenu`` mit Empfaenger,
+  ``ActionsContextMenu`` mit Aktionen oder eigenes ``contextMenuEvent``).
+  Wurde das Menue gezeigt, ist der Druck geloest: ein Knopf geht hoch und
+  sendet ``released``, aber kein ``clicked`` (ein Snapshot-Knopf faengt also
+  nichts ein); das Loslassen des Fingers wird geschluckt. In einer Liste
+  bekommt die Zeile unter dem Finger vorher einen Rechts-Druck — sie ist
+  gewaehlt wie beim Rechtsklick. Ohne Menue bleibt alles wie oben (langes
+  Druecken zieht/markiert in der Liste). Nie ein Menue: bei VC-Widgets im
+  Spielbetrieb (``lang_druck_menue_erlaubt()`` ist False — FLASH halten geht
+  beliebig lange), bei Tasten, die schon auf ``pressed`` reagieren
+  (Halte-Tasten), am Regler, in Eingabefeldern, waehrend eines Zugs und
+  solange ein Aufklappmenue offen ist. Die Maus bleibt unveraendert
+  (Rechtsklick). Abschalten je Widget: Qt-Eigenschaft
+  ``lang_druck_menue = False``.
 * **Schwung:** nach schnellem Wischen laeuft der Inhalt weiter und bremst
   aus (Maus und Finger); ein neuer Druck haelt ihn an.
 * Mit gedrueckter Umschalt-/Strg-/Alt-Taste wird nicht gescrollt — so laesst
@@ -51,13 +70,13 @@ from __future__ import annotations
 import math
 import time
 
-from PySide6.QtCore import QEvent, QObject, QPointF, QRect, Qt, QTimer
-from PySide6.QtGui import QInputDevice, QMouseEvent
+from PySide6.QtCore import SIGNAL, QEvent, QObject, QPointF, QRect, Qt, QTimer
+from PySide6.QtGui import QContextMenuEvent, QInputDevice, QMouseEvent
 from PySide6.QtWidgets import (
-    QAbstractButton, QAbstractItemView, QAbstractScrollArea, QApplication, QFrame, QGroupBox,
-    QHeaderView, QLabel, QListView, QPlainTextEdit, QProgressBar, QScrollArea,
-    QSlider, QSplitter, QStackedWidget, QStyle, QStyleOptionSlider, QTabWidget, QTextEdit,
-    QToolBox, QWidget,
+    QAbstractButton, QAbstractItemView, QAbstractScrollArea, QAbstractSlider, QAbstractSpinBox,
+    QApplication, QComboBox, QFrame, QGroupBox, QHeaderView, QLabel, QLineEdit, QListView,
+    QPlainTextEdit, QProgressBar, QScrollArea, QSlider, QSplitter, QStackedWidget, QStyle,
+    QStyleOptionSlider, QTabWidget, QTextEdit, QToolBox, QWidget,
 )
 
 try:
@@ -84,6 +103,14 @@ SCHWUNG_ENDE = 20.0
 SCHWUNG_ZEIT_S = 0.325
 # UI-113: so viele Pixel um den Regler-Griff zaehlen am Finger noch als Griff.
 GRIFF_ZONE = 12
+# UI-114: so lange still liegen = Kontextmenue (nicht kuerzer als LANG_DRUCK_S:
+# erst ab hier ist es kein Tippen und kein Anfang eines Zugs mehr).
+LANG_MENUE_S = 0.6
+_MENUE_AUS = "lang_druck_menue"     # Qt-Eigenschaft: False = nie ein Lang-Druck-Menue
+# Qt-Klassen mit eigenem Menue (Ausschneiden/Kopieren …) bzw. eigener Haltebedienung:
+# dort oeffnet langes Druecken nichts.
+_KEIN_MENUE_QT = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit, QComboBox,
+                  QAbstractSlider)
 
 _MAUS = ("mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent")
 _EIN_AUS = "ziehen_scrollen"       # Qt-Eigenschaft: False = hier nie
@@ -212,6 +239,67 @@ def am_griff(regler: QSlider, pos) -> bool:
     return griff_rechteck(regler).adjusted(-z, -z, z, z).contains(p)
 
 
+def _eigenes_menue(obj) -> bool:
+    """Ueberschreibt eine eigene (Python-)Klasse ``contextMenuEvent``?"""
+    for k in type(obj).__mro__:
+        if k.__module__.startswith("PySide6"):
+            return False
+        if "contextMenuEvent" in k.__dict__:
+            return True
+    return False
+
+
+def _empfaenger(w, signatur: str) -> bool:
+    try:
+        return w.receivers(SIGNAL(signatur)) > 0
+    except Exception:
+        return False
+
+
+def lang_druck_menue_moeglich(w: QWidget | None) -> bool:
+    """UI-114: Oeffnet langes Druecken auf ``w`` ein Kontextmenue? Folgt dem
+    Weg, den Qt ein ``QContextMenuEvent`` an die Eltern weiterreicht."""
+    if w is None or not _gueltig(w):
+        return False
+    # Sperren zuerst, ueber die ganze Kette: ein VC-Widget im Spielbetrieb (oder
+    # die VC-Flaeche) bekommt nie ein Menue, auch nicht von einem Vorfahren.
+    x = w
+    while x is not None:
+        if x.property(_MENUE_AUS) is False:
+            return False
+        erlaubt = getattr(x, "lang_druck_menue_erlaubt", None)
+        if callable(erlaubt):
+            try:
+                if not erlaubt():
+                    return False
+            except Exception:
+                return False
+        if x.isWindow():
+            break
+        x = x.parentWidget()
+    if isinstance(w, QAbstractButton) and _empfaenger(w, "pressed()"):
+        return False        # Halte-Taste (FLASH): reagiert schon auf den Druck
+    x = w
+    while x is not None:
+        if isinstance(x, _KEIN_MENUE_QT) and not _eigenes_menue(x):
+            return False
+        pol = x.contextMenuPolicy()
+        if pol == Qt.ContextMenuPolicy.PreventContextMenu:
+            return False
+        if pol == Qt.ContextMenuPolicy.CustomContextMenu:
+            if _empfaenger(x, "customContextMenuRequested(QPoint)"):
+                return True
+        elif pol == Qt.ContextMenuPolicy.ActionsContextMenu:
+            if x.actions():
+                return True
+        elif pol == Qt.ContextMenuPolicy.DefaultContextMenu and _eigenes_menue(x):
+            return True
+        if x.isWindow() or x.testAttribute(Qt.WidgetAttribute.WA_NoMousePropagation):
+            return False
+        x = x.parentWidget()
+    return False
+
+
 def _listen_flaeche(w) -> bool:
     """Ist ``w`` die Flaeche (viewport) einer Liste/eines Baums/einer Tabelle?"""
     eltern = w.parentWidget()
@@ -262,6 +350,15 @@ class ZiehenScrollen(QObject):
         self._schwung_v = QPointF()
         self._schwung_ts = 0.0
         self._versatz = None        # (Regler, Versatz) nach nachgereichtem Griff-Druck
+        # UI-114: langes Druecken = Kontextmenue (eigener Zeitgeber, unabhaengig
+        # vom Scroll-Zustand — gilt fuer jedes Widget unter dem Finger)
+        self._menue_timer = QTimer(self)
+        self._menue_timer.setSingleShot(True)
+        self._menue_timer.timeout.connect(self._lang_menue)
+        self._menue_w = None        # Widget unter dem Finger, das ein Menue hat
+        self._menue_glob = QPointF()
+        self._menue_mods = Qt.KeyboardModifier.NoModifier
+        self._menue_schlucken = False   # Menue gezeigt: Rest bis zum Loslassen schlucken
         self._zuruecksetzen()
 
     def _zuruecksetzen(self) -> None:
@@ -291,6 +388,20 @@ class ZiehenScrollen(QObject):
         if self._reicht:
             return False                # unser eigener, nachgereichter Druck
         t = ev.type()
+        if (t in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)
+                and (self._menue_schlucken or self._menue_w is not None)):
+            if self._loest:
+                return False            # unser eigenes Loslassen (_druck_loesen)
+            if self._menue_schlucken:
+                # Menue gezeigt: Ziehen und Loslassen danach zaehlen nicht.
+                # Auf Fenster-Ebene nur durchlassen (ohne Scroll-Logik), am
+                # Widget schlucken — so bleibt Qts Maus-Buchfuehrung heil.
+                if not isinstance(obj, QWidget):
+                    return False
+                if t == QEvent.Type.MouseButtonRelease:
+                    self._menue_schlucken = False
+                return True
+            self._menue_bewegt(ev)
         if self._versatz is not None and t in (QEvent.Type.MouseMove,
                                                QEvent.Type.MouseButtonRelease):
             if self._verschoben(obj, ev):
@@ -334,6 +445,8 @@ class ZiehenScrollen(QObject):
                 and obj is not letzter and obj.isAncestorOf(letzter)):
             return False
         self._abbrechen()
+        self._menue_aus()
+        self._menue_schlucken = False
         self.schwung_stoppen()                 # Finger drauf haelt die Liste an
         self._press_ts = ev.timestamp()
         self._druck_ziel = obj
@@ -344,6 +457,8 @@ class ZiehenScrollen(QObject):
                              | Qt.KeyboardModifier.AltModifier):
             return False
         touch = ist_touch(ev)
+        if touch and not _einfacher_regler(obj):
+            self._menue_vormerken(obj, ev)
         bereich = ziel_bereich(obj)
         halten = False
         if bereich is None and touch and zurueckhalten and _einfacher_regler(obj):
@@ -455,6 +570,7 @@ class ZiehenScrollen(QObject):
         d = pos - self._start
         if not self._zieht:
             if ((self._halten_gibt_frei or self._zurueck is not None)
+                    and self._menue_w is None
                     and jetzt - self._druck_zeit >= LANG_DRUCK_S):
                 # lange gehalten: Ziehen-und-Ablegen/Markieren wie bisher
                 return self._freigeben(obj, ev)
@@ -491,11 +607,12 @@ class ZiehenScrollen(QObject):
         bereich.verticalScrollBar().setValue(self._start_v - round(d.y() * fy))
         return True
 
-    def _druck_loesen(self) -> None:
+    def _druck_loesen(self, w=None) -> None:
         """Am Finger: das Widget, das den Druck bekam (Knopf, Liste), weit
         ausserhalb loslassen lassen — so loest es nichts aus und steht nicht
-        mehr gedrueckt da, waehrend gescrollt wird."""
-        w = self._druck_widget
+        mehr gedrueckt da, waehrend gescrollt wird (bzw. das Menue offen ist)."""
+        if w is None:
+            w = self._druck_widget
         if w is None or not _gueltig(w):
             return
         weit = QPointF(-100000.0, -100000.0)
@@ -554,6 +671,8 @@ class ZiehenScrollen(QObject):
     def _lang_gedrueckt(self) -> None:
         if self._zurueck is None or self._zieht:
             return
+        if self._menue_w is not None:
+            return      # UI-114: die Liste hat ein Menue — das kommt gleich
         self._griff_druck_nachreichen()
         self._abbrechen()
 
@@ -575,6 +694,87 @@ class ZiehenScrollen(QObject):
             QApplication.restoreOverrideCursor()
         self._lang_timer.stop()
         self._zuruecksetzen()
+
+    # ── UI-114: langes Druecken = Kontextmenue ───────────────────────────────
+
+    def _menue_vormerken(self, w, ev) -> None:
+        try:
+            moeglich = lang_druck_menue_moeglich(w)
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: Lang-Druck-Menue pruefen: {e}")
+            moeglich = False
+        if not moeglich:
+            return
+        self._menue_w = w
+        self._menue_glob = QPointF(ev.globalPosition())
+        self._menue_mods = ev.modifiers()
+        self._menue_timer.start(int(LANG_MENUE_S * 1000))
+
+    def _menue_aus(self) -> None:
+        self._menue_timer.stop()
+        self._menue_w = None
+
+    def _menue_bewegt(self, ev) -> None:
+        """Bewegung ueber die Touch-Schwelle oder Loslassen: kein Menue mehr."""
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            self._menue_aus()           # Tippen: das Loslassen regelt _los wie bisher
+            return
+        try:
+            d = ev.globalPosition() - self._menue_glob
+        except Exception:
+            return
+        schwelle = QApplication.startDragDistance() * TOUCH_FAKTOR
+        if abs(d.x()) + abs(d.y()) >= schwelle or not (ev.buttons() & Qt.MouseButton.LeftButton):
+            self._menue_aus()
+
+    def _lang_menue(self) -> None:
+        """Zeitgeber abgelaufen, Finger liegt still: Kontextmenue zeigen."""
+        w, glob, mods = self._menue_w, QPointF(self._menue_glob), self._menue_mods
+        self._menue_aus()
+        if w is None or not _gueltig(w):
+            return
+        if self._zieht or self._regler_w is not None or QApplication.activePopupWidget():
+            self._lang_gedrueckt()
+            return
+        if not lang_druck_menue_moeglich(w):
+            self._lang_gedrueckt()      # inzwischen kein Menue: wie bisher
+            return
+        z, self._zurueck = self._zurueck, None
+        liste = _listen_flaeche(w)
+        if z is not None and _gueltig(z[0]):
+            # Zurueckgehaltener Listendruck: als RECHTS-Druck nachreichen — die
+            # Zeile unter dem Finger ist dann gewaehlt wie beim Rechtsklick
+            # (eine Mehrfachauswahl bleibt), ohne Klick und ohne Ziehen.
+            zw, lokal, zglob, _knopf, _knoepfe, zmods = z
+            rechts = QMouseEvent(QEvent.Type.MouseButtonPress, lokal, zglob,
+                                 Qt.MouseButton.RightButton, Qt.MouseButton.RightButton, zmods)
+            self._reicht = True
+            try:
+                QApplication.sendEvent(zw, rechts)
+            except Exception as e:
+                print(f"[ziehen_scrollen] ERROR: Rechts-Druck nachreichen: {e}")
+            finally:
+                self._reicht = False
+            liste = True
+        lokal = w.mapFromGlobal(glob).toPoint()
+        ev = QContextMenuEvent(QContextMenuEvent.Reason.Mouse, lokal, glob.toPoint(), mods)
+        self._menue_schlucken = True        # gilt schon waehrend eines blockierenden exec
+        try:
+            QApplication.sendEvent(w, ev)
+            angenommen = ev.isAccepted()
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: Lang-Druck-Menue: {e}")
+            angenommen = False
+        if not angenommen:
+            self._menue_schlucken = False
+            return
+        # Menue gezeigt: der Druck ist erledigt. Knopf/eigenes Widget weit
+        # ausserhalb loslassen (hoch + released, kein clicked). Eine Liste
+        # bekommt wie beim echten Rechtsklick kein Loslassen — ein Loslassen
+        # ausserhalb koennte dort die Auswahl leeren.
+        self._abbrechen()
+        if not liste and _gueltig(w):
+            self._druck_loesen(w)
 
     # ── Schwung nach dem Loslassen ────────────────────────────────────────────
 

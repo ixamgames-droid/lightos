@@ -1856,6 +1856,11 @@ class VCCanvas(QWidget):
 
     # ── Context menu ─────────────────────────────────────────────────────────
 
+    def lang_druck_menue_erlaubt(self) -> bool:
+        """UI-114: langes Druecken am Finger oeffnet auf der VC-Flaeche (und auf
+        allem darauf) nur im Bearbeiten-Modus ein Menue — im Spielbetrieb nie."""
+        return bool(self._edit_mode)
+
     def _context_menu(self, local_pos: QPoint):
         if not self._edit_mode:
             return
