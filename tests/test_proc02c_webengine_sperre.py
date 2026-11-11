@@ -140,6 +140,21 @@ def _lies_protokoll(pfad):
 
 
 @unittest.skipUnless(_LAEUFT, _GRUND)
+
+def _stellvertreter_anlegen(pfad) -> None:
+    """QA-117: ein Prozess mit dem Namen ``QtWebEngineProc``, der ``$1``
+    Sekunden lebt. Frueher eine Kopie von /bin/sleep — seit Ubuntu 26.04 ist
+    sleep Teil eines Rust-Mehrfachprogramms (uutils), das am eigenen Namen
+    erkennt, welches Werkzeug es sein soll; als ``QtWebEngineProc`` beendete
+    es sich sofort und der Runner fand kein Kind (CI rot seit dem Wechsel
+    von ubuntu-latest). Ein Shell-Skript traegt seinen Dateinamen als comm,
+    unabhaengig davon, wie sleep gebaut ist; Schritte von 1 s, damit ein
+    kill den Stellvertreter rasch beendet."""
+    pfad.write_text('#!/bin/sh\nrest="${1:-300}"\n'
+                    'while [ "$rest" -gt 0 ]; do sleep 1; rest=$((rest-1)); done\n',
+                    encoding="ascii")
+    pfad.chmod(0o755)
+
 class SperreUeberLaeufeHinwegTest(unittest.TestCase):
     """Die Zusicherung, um die es in PROC-02c geht."""
 
@@ -630,7 +645,7 @@ def test_spur():
         an der richtigen Stelle ueberhaupt aufruft.
         """
         fake = self._tmp / "QtWebEngineProc"      # comm: genau 15 Zeichen
-        shutil.copy2("/bin/sleep", fake)
+        _stellvertreter_anlegen(fake)
         pidfile = self._tmp / "fake.pid"
         p = self._tmp / "test_langlebig.py"
         # 300 s Lebensdauer, damit der Stellvertreter unter Last sicher noch
@@ -809,7 +824,7 @@ def test_spur():
         verhalten sich Chromiums Hilfsprozesse.
         """
         fake = self._tmp / "QtWebEngineProc"      # comm: genau 15 Zeichen
-        shutil.copy2("/bin/sleep", fake)
+        _stellvertreter_anlegen(fake)
         pidfile = self._tmp / "fake.pid"
         p = self._tmp / "test_langlebig.py"
         p.write_text(MARKER + f'''
