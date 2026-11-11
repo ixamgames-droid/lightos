@@ -20,12 +20,12 @@ from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QPoint, Qt                             # noqa: E402
+from PySide6.QtCore import QPoint, Qt, QTimer                     # noqa: E402
 from PySide6.QtGui import QContextMenuEvent                          # noqa: E402
 from PySide6.QtTest import QTest                                     # noqa: E402
 from PySide6.QtWidgets import (                                      # noqa: E402
-    QApplication, QLabel, QListWidget, QMenu, QPushButton, QScrollArea, QVBoxLayout,
-    QWidget,
+    QApplication, QDialog, QHBoxLayout, QLabel, QListWidget, QMenu, QPushButton,
+    QScrollArea, QVBoxLayout, QWidget,
 )
 
 from src.ui import ziehen_scrollen as zs                             # noqa: E402
@@ -295,6 +295,104 @@ class LangDruckMenueTest(unittest.TestCase):
         self.assertEqual((menue.n, klick.n), (1, 1))
 
     # ── Liste ────────────────────────────────────────────────────────────────
+
+    def test_halte_taste_mit_label_im_knopf_kein_menue(self):
+        """Gegenpruefung: der Finger trifft ein Label IM FLASH-Knopf. Auch dann
+        kein Menue vom Vorfahren, und der FLASH haengt nicht."""
+        huelle = QWidget()
+        menue = _Zaehler()
+        huelle.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        huelle.customContextMenuRequested.connect(menue)
+        lay = QVBoxLayout(huelle)
+        b = QPushButton()
+        b.setMinimumHeight(60)
+        innen = QHBoxLayout(b)
+        lab = QLabel("FL")
+        innen.addWidget(lab)
+        an = []
+        b.pressed.connect(lambda: an.append(True))
+        b.released.connect(lambda: an.append(False))
+        lay.addWidget(b)
+        fenster = _fenster(huelle)
+        self.addCleanup(fenster.deleteLater)
+        self.assertFalse(zs.lang_druck_menue_moeglich(lab))
+        f = _Finger(lab)
+        p = lab.rect().center()
+        f.halten(p, 1.0)
+        self.assertEqual(menue.n, 0, "kein Menue ueber einer Halte-Taste")
+        self.assertEqual(an, [True], "FLASH bleibt an, solange der Finger liegt")
+        self.assertTrue(b.isDown())
+        f.los(p)
+        self.assertEqual(an, [True, False])
+
+    def test_druck_loesen_am_label_sendet_released_am_knopf(self):
+        """``_druck_loesen`` an einem Kind-Widget: der Knopf geht hoch UND
+        bekommt ``released`` (sonst haengt ein FLASH beim Scrollen)."""
+        b = QPushButton()
+        b.setMinimumHeight(60)
+        innen = QHBoxLayout(b)
+        lab = QLabel("FL")
+        innen.addWidget(lab)
+        an = []
+        b.pressed.connect(lambda: an.append(True))
+        b.released.connect(lambda: an.append(False))
+        fenster = _fenster(b)
+        self.addCleanup(fenster.deleteLater)
+        b.setDown(True)
+        self.f._druck_loesen(lab)
+        self.assertFalse(b.isDown())
+        self.assertEqual(an, [False], "released kam am Knopf")
+
+    def test_doppeltipp_mit_modalem_dialog_kein_menue_dahinter(self):
+        """Gegenpruefung: Doppeltipp oeffnet einen modalen Dialog (Patch-
+        Profil). Das Loslassen verwirft Qt — trotzdem kein Menue der Liste
+        hinter dem Dialog, und danach wird nichts geschluckt."""
+        liste = QListWidget()
+        liste.addItems([f"E {i}" for i in range(30)])
+        menue = []
+        liste.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        liste.customContextMenuRequested.connect(
+            lambda _p: menue.append(QApplication.activeModalWidget()))
+        fenster = _fenster(liste)
+        self.addCleanup(fenster.deleteLater)
+        vp = liste.viewport()
+        p = liste.visualItemRect(liste.item(2)).center()
+        f = _Finger(vp)
+        dialoge = []
+
+        def doppelt(_item):
+            dlg = QDialog(fenster)
+            dialoge.append(dlg)
+            QTimer.singleShot(40, lambda: f.los(p))
+            QTimer.singleShot(int(zs.LANG_MENUE_S * 1000) + 500, dlg.reject)
+            dlg.exec()
+
+        liste.itemDoubleClicked.connect(doppelt)
+        f.druck(p)
+        f.los(p)
+        f.druck(p)              # Doppelklick -> Dialog (blockiert bis reject)
+        _warte(0.2)
+        self.assertEqual(len(dialoge), 1, "Doppeltipp hat den Dialog geoeffnet")
+        self.assertEqual(menue, [], "kein Menue hinter dem modalen Dialog")
+        self.assertFalse(self.f._menue_schlucken, "danach wird nichts geschluckt")
+        self.assertIsNone(self.f._menue_w)
+
+    def test_modaler_dialog_eigenes_menue_bleibt(self):
+        """Im Dialog selbst gibt es das Menue am Finger weiter."""
+        b, menue, _klick, _los = _menue_knopf()
+        dlg = QDialog()
+        QVBoxLayout(dlg).addWidget(b)
+        dlg.resize(240, 160)
+        dlg.setModal(True)
+        dlg.show()
+        QTest.qWaitForWindowExposed(dlg)
+        self.addCleanup(dlg.deleteLater)
+        self.assertIs(QApplication.activeModalWidget(), dlg)
+        f = _Finger(b)
+        p = b.rect().center()
+        f.halten(p)
+        f.los(p)
+        self.assertEqual(menue.n, 1)
 
     def test_liste_mit_menue_waehlt_zeile_ohne_klick(self):
         liste = QListWidget()

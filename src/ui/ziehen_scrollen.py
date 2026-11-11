@@ -256,6 +256,44 @@ def _empfaenger(w, signatur: str) -> bool:
         return False
 
 
+def _knopf_von(w) -> QAbstractButton | None:
+    """Naechster Knopf in der Elternkette von ``w`` (``w`` selbst zuerst).
+    Ein Label/Icon im Knopf bekommt den Druck, Qt reicht ihn an den Knopf."""
+    x = w
+    while x is not None:
+        if isinstance(x, QAbstractButton):
+            return x
+        if x.isWindow():
+            return None
+        x = x.parentWidget()
+    return None
+
+
+def _halte_taste(w) -> QAbstractButton | None:
+    """Ein Knopf mit ``pressed``-Empfaenger in der Elternkette (FLASH/GO)."""
+    x = w
+    while x is not None:
+        if isinstance(x, QAbstractButton) and _empfaenger(x, "pressed()"):
+            return x
+        if x.isWindow():
+            return None
+        x = x.parentWidget()
+    return None
+
+
+def _fremd_modal(w) -> bool:
+    """Liegt ein modaler Dialog ueber dem Fenster von ``w``? Dann bekommt
+    ``w`` kein Loslassen mehr (Qt verwirft es) — kein Menue dahinter."""
+    modal = QApplication.activeModalWidget()
+    if modal is None:
+        return False
+    try:
+        fenster = w.window()
+    except Exception:
+        return True
+    return not (fenster is modal or modal.isAncestorOf(w))
+
+
 def lang_druck_menue_moeglich(w: QWidget | None) -> bool:
     """UI-114: Oeffnet langes Druecken auf ``w`` ein Kontextmenue? Folgt dem
     Weg, den Qt ein ``QContextMenuEvent`` an die Eltern weiterreicht."""
@@ -277,7 +315,7 @@ def lang_druck_menue_moeglich(w: QWidget | None) -> bool:
         if x.isWindow():
             break
         x = x.parentWidget()
-    if isinstance(w, QAbstractButton) and _empfaenger(w, "pressed()"):
+    if _halte_taste(w) is not None:
         return False        # Halte-Taste (FLASH): reagiert schon auf den Druck
     x = w
     while x is not None:
@@ -619,7 +657,8 @@ class ZiehenScrollen(QObject):
         ev = QMouseEvent(QEvent.Type.MouseButtonRelease, weit, weit,
                          Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
                          Qt.KeyboardModifier.NoModifier)
-        war_unten = isinstance(w, QAbstractButton) and w.isDown()
+        knopf = _knopf_von(w)       # auch bei einem Label im Knopf
+        war_unten = knopf is not None and knopf.isDown()
         self._loest = True
         try:
             QApplication.sendEvent(w, ev)
@@ -627,8 +666,8 @@ class ZiehenScrollen(QObject):
             # sendet aber kein ``released``. Wer auf ``pressed`` reagiert
             # (Executor GO/FLASH), braucht das Gegenstueck — sonst bleibt
             # ein FLASH an. ``clicked`` kommt bewusst nicht.
-            if war_unten and not w.isDown():
-                w.released.emit()
+            if war_unten and _gueltig(knopf) and not knopf.isDown():
+                knopf.released.emit()
         except Exception as e:
             print(f"[ziehen_scrollen] ERROR: Druck loesen: {e}")
         finally:
@@ -732,6 +771,13 @@ class ZiehenScrollen(QObject):
         w, glob, mods = self._menue_w, QPointF(self._menue_glob), self._menue_mods
         self._menue_aus()
         if w is None or not _gueltig(w):
+            return
+        if _fremd_modal(w):
+            # Der Druck hat einen modalen Dialog geoeffnet (Doppeltipp ->
+            # Profil-Dialog): das Loslassen kommt nie an — der Druck ist
+            # vorbei, kein Menue hinter dem Dialog.
+            self._abbrechen()
+            self._menue_schlucken = False
             return
         if self._zieht or self._regler_w is not None or QApplication.activePopupWidget():
             self._lang_gedrueckt()
