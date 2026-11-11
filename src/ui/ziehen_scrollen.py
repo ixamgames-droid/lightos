@@ -24,7 +24,9 @@ Regeln (``ziel_bereich``):
   Listen mit Ziehen-und-Ablegen oder Mehrfachauswahl und ueber Knoepfe
   hinweg; wer den Finger erst ``LANG_DRUCK_S`` still liegen laesst, zieht/
   markiert in der Liste wie bisher. Tippen klickt; ein Knopf, ueber den
-  gewischt wird, loest nicht aus. Die Schwelle ist am Finger doppelt so gross.
+  gewischt wird, loest kein ``clicked`` aus und bekommt ``released`` (wer
+  wie die Executor-Tasten schon auf ``pressed`` reagiert, sieht den Druck
+  wie vor UI-110 beim Aufsetzen — ein FLASH geht beim Wischen wieder aus). Die Schwelle ist am Finger doppelt so gross.
   Regler, Fader und Eingabefelder behalten den Zug auch am Finger.
 * **Schwung:** nach schnellem Wischen laeuft der Inhalt weiter und bremst
   aus (Maus und Finger); ein neuer Druck haelt ihn an.
@@ -374,9 +376,16 @@ class ZiehenScrollen(QObject):
         ev = QMouseEvent(QEvent.Type.MouseButtonRelease, weit, weit,
                          Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton,
                          Qt.KeyboardModifier.NoModifier)
+        war_unten = isinstance(w, QAbstractButton) and w.isDown()
         self._loest = True
         try:
             QApplication.sendEvent(w, ev)
+            # Loslassen ausserhalb: Qt setzt den Knopf nur hoch (setDown),
+            # sendet aber kein ``released``. Wer auf ``pressed`` reagiert
+            # (Executor GO/FLASH), braucht das Gegenstueck — sonst bleibt
+            # ein FLASH an. ``clicked`` kommt bewusst nicht.
+            if war_unten and not w.isDown():
+                w.released.emit()
         except Exception as e:
             print(f"[ziehen_scrollen] ERROR: Druck loesen: {e}")
         finally:

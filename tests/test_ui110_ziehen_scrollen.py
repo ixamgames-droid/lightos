@@ -509,6 +509,31 @@ class ZiehenScrollenTest(unittest.TestCase):
         self.assertGreater(regler.value(), 128, "Regler folgt dem Finger")
         self.assertEqual(bar.value(), vorher, "Seite bleibt")
 
+    def test_touch_wischen_ueber_flash_taste_bekommt_released(self):
+        """Gegenpruefung 11.11.: Executor-Tasten reagieren auf pressed/
+        released. Wischen ueber eine Taste darf keinen FLASH haengen lassen."""
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        knoepfe = [QPushButton(f"Flash {i}") for i in range(40)]
+        area, _ = _seite(*knoepfe)
+        area.verticalScrollBar().setValue(area.verticalScrollBar().maximum())
+        QApplication.processEvents()
+        vp = area.viewport()
+        k = next(b for b in knoepfe
+                 if 0 <= b.mapTo(vp, QPoint(0, 0)).y() <= vp.height() - b.height())
+        log = []
+        k.pressed.connect(lambda: log.append("p"))
+        k.released.connect(lambda: log.append("r"))
+        k.clicked.connect(lambda: log.append("c"))
+        mitte = QPoint(k.width() // 2, k.height() // 2)
+        QTest.touchEvent(k, dev).press(0, mitte, k).commit()
+        for dy in range(10, 90, 10):
+            QTest.touchEvent(k, dev).move(0, mitte + QPoint(0, dy), k).commit()
+        QTest.touchEvent(k, dev).release(0, mitte + QPoint(0, 80), k).commit()
+        self.f.schwung_stoppen()
+        self.assertEqual(log, ["p", "r"], "gedrueckt und losgelassen, kein Klick")
+        self.assertFalse(k.isDown())
+
     def test_ist_touch_erkennt_erzeugte_maus(self):
         ev = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(1, 1), QPointF(1, 1),
                          Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
