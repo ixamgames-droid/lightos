@@ -78,7 +78,27 @@ class ZiehenScrollenTest(unittest.TestCase):
     def setUp(self):
         self.f = zs.einrichten(_app)
         self.f.aktiv = True
+        alt_uhr = self.f._uhr
+        self.f._uhr = lambda: _Zeit.t / 1000.0    # Ereignis-Takt = Uhr
+        self.addCleanup(setattr, self.f, "_uhr", alt_uhr)
         self.addCleanup(self.f._abbrechen)
+        self.addCleanup(self.f.schwung_stoppen)
+        alt_touch = zs.ist_touch
+        self.addCleanup(setattr, zs, "ist_touch", alt_touch)
+
+    def _finger(self):
+        zs.ist_touch = lambda ev: True
+
+    def _ablege_liste(self):
+        liste = QListWidget()
+        liste.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        liste.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        liste.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        liste.addItems([f"E {i}" for i in range(200)])
+        liste.resize(200, 150)
+        liste.show()
+        QApplication.processEvents()
+        return liste
 
     def test_einrichten_nur_einmal(self):
         self.assertIs(zs.einrichten(_app), self.f)
@@ -207,6 +227,139 @@ class ZiehenScrollenTest(unittest.TestCase):
         _maus(ersatz, QEvent.Type.MouseButtonRelease, QPoint(50, 50), knoepfe=Qt.MouseButton.NoButton)
         self.assertIsNone(self.f._bereich)
         self.assertFalse(QApplication.overrideCursor())
+
+
+    # ── Touch ────────────────────────────────────────────────────────────────
+
+    def test_touch_wischen_scrollt_auch_liste_mit_ablegen(self):
+        liste = self._ablege_liste()
+        self.assertIsNone(zs.ziel_bereich(liste.viewport()))
+        self._finger()
+        _ziehen(liste.viewport(), QPoint(20, 130), QPoint(20, 30))
+        self.f.schwung_stoppen()
+        self.assertEqual(liste.verticalScrollBar().value(), 100)
+        self.assertFalse(QApplication.overrideCursor(), "am Finger kein Hand-Zeiger")
+
+    def test_touch_langes_druecken_gibt_den_zug_an_die_liste(self):
+        liste = self._ablege_liste()
+        self._finger()
+        v = liste.viewport()
+        g0 = v.mapToGlobal(QPoint(20, 130))
+        _maus(v, QEvent.Type.MouseButtonPress, QPoint(20, 130), glob=g0)
+        _Zeit.t += int(zs.LANG_DRUCK_S * 1000) + 50          # Finger liegt still
+        ev = _maus(v, QEvent.Type.MouseMove, QPoint(20, 80), knopf=Qt.MouseButton.NoButton,
+                   glob=g0 + QPoint(0, -50))
+        self.assertIsNone(self.f._bereich, "Zug gehoert jetzt der Liste")
+        self.assertEqual(liste.verticalScrollBar().value(), 0)
+        _maus(v, QEvent.Type.MouseButtonRelease, QPoint(20, 80), knoepfe=Qt.MouseButton.NoButton)
+
+    def test_touch_braucht_groesseren_weg(self):
+        area, text = _seite()
+        self._finger()
+        schwelle = QApplication.startDragDistance()
+        _ziehen(text, QPoint(50, 150), QPoint(50, 150 - int(schwelle * 1.5)), schritte=1)
+        self.assertEqual(area.verticalScrollBar().value(), 0, "Tippen mit Wackeln scrollt nicht")
+
+    def test_touch_regler_bleibt_regler(self):
+        regler = QSlider(Qt.Orientation.Horizontal)
+        area, _ = _seite(regler)
+        self.assertIsNone(zs.ziel_bereich(regler, touch=True))
+
+    def test_schwung_nach_schnellem_wischen_und_finger_haelt_an(self):
+        area, text = _seite()
+        bar = area.verticalScrollBar()
+        _ziehen(text, QPoint(50, 150), QPoint(50, 50))      # 100 px in 50 ms
+        self.assertTrue(self.f.schwingt)
+        nach_zug = bar.value()
+        self.f.schwung_schritt(0.05)
+        self.assertGreater(bar.value(), nach_zug, "laeuft in Wischrichtung weiter")
+        weiter = bar.value()
+        self.f.schwung_schritt(0.05)
+        self.assertLess(bar.value() - weiter, weiter - nach_zug, "bremst ab")
+        _maus(text, QEvent.Type.MouseButtonPress, QPoint(50, 50))
+        self.assertFalse(self.f.schwingt, "Finger drauf haelt an")
+        _maus(text, QEvent.Type.MouseButtonRelease, QPoint(50, 50), knoepfe=Qt.MouseButton.NoButton)
+
+    def test_langsam_losgelassen_kein_schwung_und_auslauf_endet(self):
+        area, text = _seite()
+        g0 = text.mapToGlobal(QPoint(50, 150))
+        _maus(text, QEvent.Type.MouseButtonPress, QPoint(50, 150), glob=g0)
+        _maus(text, QEvent.Type.MouseMove, QPoint(50, 100), knopf=Qt.MouseButton.NoButton,
+              glob=g0 + QPoint(0, -50))
+        _Zeit.t += 300                                        # stehen geblieben
+        _maus(text, QEvent.Type.MouseMove, QPoint(50, 100), knopf=Qt.MouseButton.NoButton,
+              glob=g0 + QPoint(0, -50))
+        _maus(text, QEvent.Type.MouseButtonRelease, QPoint(50, 100),
+              knoepfe=Qt.MouseButton.NoButton, glob=g0 + QPoint(0, -50))
+        self.assertFalse(self.f.schwingt)
+        _ziehen(text, QPoint(50, 150), QPoint(50, 50))
+        for _ in range(400):
+            if not self.f.schwingt:
+                break
+            self.f.schwung_schritt(0.016)
+        self.assertFalse(self.f.schwingt, "Auslauf endet von selbst")
+
+    def test_echter_touch_ueber_das_fenster_eintragsweise_liste(self):
+        """Echter Ablauf: Touch an das Fenster, Qt erzeugt die Maus daraus
+        (zuerst an das QWindow, dann an das Widget). Liste scrollt
+        eintragsweise: 100 px Fingerweg = sichtbare Eintraege, nicht 100."""
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        liste = QListWidget()
+        liste.addItems([f"E {i}" for i in range(300)])
+        liste.resize(200, 150)
+        liste.show()
+        QApplication.processEvents()
+        bar = liste.verticalScrollBar()
+        self.assertEqual(liste.verticalScrollMode(), QAbstractItemView.ScrollMode.ScrollPerItem)
+        v = liste.viewport()
+        QTest.touchEvent(v, dev).press(0, QPoint(20, 120), v).commit()
+        for y in range(110, 15, -15):
+            QTest.touchEvent(v, dev).move(0, QPoint(20, max(y, 20)), v).commit()
+        QTest.touchEvent(v, dev).release(0, QPoint(20, 20), v).commit()
+        self.f.schwung_stoppen()
+        erwartet = round(100 * bar.pageStep() / v.height())
+        self.assertGreater(bar.value(), 0, "Finger scrollt")
+        self.assertLessEqual(abs(bar.value() - erwartet), 1)
+
+    def test_touch_wischen_ueber_knopf_scrollt_ohne_klick_tippen_klickt(self):
+        from PySide6.QtTest import QTest
+        dev = QTest.createTouchDevice()
+        knoepfe = [QPushButton(f"Knopf {i}") for i in range(40)]
+        area, _ = _seite(*knoepfe)
+        area.verticalScrollBar().setValue(area.verticalScrollBar().maximum())
+        QApplication.processEvents()
+        vp = area.viewport()
+
+        def ganz_sichtbar(b):
+            y = b.mapTo(vp, QPoint(0, 0)).y()
+            return 0 <= y <= vp.height() - b.height()
+        k = next(b for b in knoepfe if ganz_sichtbar(b))
+        geklickt = []
+        k.clicked.connect(lambda: geklickt.append(1))
+        self.assertIsNone(zs.ziel_bereich(k), "Maus: Knopf bleibt Knopf")
+        self.assertIs(zs.ziel_bereich(k, touch=True), area)
+        bar = area.verticalScrollBar()
+        mitte = QPoint(k.width() // 2, k.height() // 2)
+        QTest.touchEvent(k, dev).press(0, mitte, k).commit()
+        QTest.touchEvent(k, dev).release(0, mitte, k).commit()
+        self.assertEqual(geklickt, [1], "Tippen klickt")
+        geklickt.clear()
+        vorher = bar.value()
+        QTest.touchEvent(k, dev).press(0, mitte, k).commit()
+        for dy in range(10, 90, 10):
+            QTest.touchEvent(k, dev).move(0, mitte + QPoint(0, dy), k).commit()
+        self.assertFalse(k.isDown(), "Knopf steht beim Wischen nicht gedrueckt")
+        QTest.touchEvent(k, dev).release(0, mitte + QPoint(0, 80), k).commit()
+        self.f.schwung_stoppen()
+        self.assertLess(bar.value(), vorher, "Seite folgt dem Finger")
+        self.assertEqual(geklickt, [], "Wischen loest den Knopf nicht aus")
+
+    def test_ist_touch_erkennt_erzeugte_maus(self):
+        ev = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(1, 1), QPointF(1, 1),
+                         Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
+                         Qt.KeyboardModifier.NoModifier)
+        self.assertFalse(zs.ist_touch(ev))
 
 
 if __name__ == "__main__":
