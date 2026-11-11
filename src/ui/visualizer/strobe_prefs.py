@@ -49,6 +49,24 @@ MODE_LABELS = (
     ("off", "Aus (Dauerlicht wie bisher)"),
 )
 
+#: Hoechstens so viele Zeichen breit ist die Auswahl, wenn die Spalte schmal wird.
+AUSWAHL_HOECHSTENS_ZEICHEN = 12
+
+
+def auswahl_mindest_zeichen(fm) -> int:
+    """VIZ-112: ``minimumContentsLength`` der Strobe-Auswahl aus der gemessenen
+    Schrift (``fm`` = QFontMetrics der Auswahl).
+
+    Qt rechnet die Mindestbreite als Zeichenzahl mal Breite eines „X“. Feste 12
+    waren unter Windows mit Arial 2 px zu breit fuer die schmalste Spalte
+    (272 > 270 px). Gebraucht wird nur, dass das erste Wort jedes Eintrags
+    lesbar bleibt (die aufgeklappte Liste zeigt den Rest) — also so viele „X“,
+    wie das breiteste „Erstwort (…“ braucht, hoechstens 12."""
+    x = max(1, fm.horizontalAdvance("X"))
+    breitestes = max(fm.horizontalAdvance(text.split(" ")[0] + " (…")
+                     for _, text in MODE_LABELS)
+    return max(1, min(AUSWAHL_HOECHSTENS_ZEICHEN, -(-breitestes // x)))
+
 WARNHINWEIS = (
     "Achtung: Schnelle Lichtblitze können bei photosensitiver Epilepsie\n"
     "Anfälle auslösen. Im Zweifel 'Gedämpft' oder 'Aus' wählen."
