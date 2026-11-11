@@ -43,7 +43,7 @@ You open the settings with a double-click (in edit mode) or via the context menu
 | **Weitere Ziel-IDs** (further target IDs) | Additional effects that the same encoder adjusts as well (multi-effect). | Comma-separated integers, e.g. `4, 7` (default: empty) |
 | **Live-Edit-Slot** | Without a fixed effect ID, the encoder adjusts the effect from this editing slot (set by an effect pad) instead of the globally active one. | Free text, e.g. `MH`, `MX` (default: empty) |
 | **Schrittweite (Anteil)** (step size (fraction)) | How much one detent/wheel step adjusts, as a fraction of the total value range. 0.05 = 5 % per step. | 0.005–1.0, step 0.01 (default: 0.05) |
-| **MIDI-Modus** (MIDI mode) | How a bound MIDI CC is interpreted. | **Relativ** (relative) = a hardware encoder sends steps (CC values 1–63 = +, 65–127 = −) · **Absolut** (absolute) = a pot/fader 0–127 is mapped onto the value range (default: Relativ) |
+| **MIDI-Modus** (MIDI mode) | How a bound MIDI CC is interpreted. | **Relativ** (relative) = a hardware encoder sends steps (CC values 1–63 = +, 65–127 = −) · **Relativ (Mackie)** = V-Pots of a Mackie Control desk (1–63 = +, 65–127 = − by value−64; so 65 is one step back) · **Absolut** (absolute) = a pot/fader 0–127 is mapped onto the value range (default: Relativ) |
 | **CC-Nummer (-1=keine)** (CC number (-1=none)) | MIDI control change number for the binding. | -1 (none) to 127 (default: -1) |
 | **MIDI-Kanal (0=alle)** (MIDI channel (0=all)) | MIDI channel of the binding. | 0 (all) to 16 (default: 0) |
 | **Gekoppelte Effekte → Je Effekt steuern** (coupled effects → control per effect) | For each coupled effect (effect ID + further target IDs), a controlled parameter of its own; only appears when effects are bound. | One selection per effect: **(Standard)** (default) = the parameter key set above, otherwise a separate parameter from the list of the respective effect |
@@ -65,6 +65,7 @@ The encoder supports **MIDI teach** (CC only), no key assignment.
 
 - **Assign**: right-click (in edit mode) → „MIDI Teach…", then move the desired CC on your controller. Alternatively, enter the CC number and channel directly in the settings dialog.
 - **Relativ** (default, for hardware encoders without an end stop): the controller sends steps around the center 64 — values 1–63 turn up, 65–127 turn down, 0/64 = no movement. Each step adjusts by the configured step size.
+- **Relativ (Mackie)** (MIDI-18, for the V-Pots of a Mackie Control desk such as X-Touch or MCU): bit 6 is the direction, the rest the step count — 1–63 turn up, 65–127 turn down by (value − 64) steps. With „Relativ“ a slow left turn (65) would jump far up there.
 - **Absolut** (for pots/faders): the CC value 0–127 is mapped linearly onto the parameter's value range — the encoder then jumps to the absolute position.
 - A set MIDI CC shows as a blue square at the top right of the element.
 

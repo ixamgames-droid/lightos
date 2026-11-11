@@ -1,5 +1,8 @@
 """UI-71: der Controller-Browser verspricht keine Aktion, die es nicht gibt.
 
+MIDI-18 (2026-11-11): den Weg gibt es wieder — als Knopf „In Virtual Console
+einfügen“ im Browser selbst. Der Hinweis nennt jetzt diesen Knopf.
+
 Bei APC mini / mk2 zeigte die Detailansicht „✔ VC-Vorlage verfügbar — in der
 Virtual Console über „Controller-Vorlage einfügen“ nutzbar.“ Eine solche Aktion
 gibt es weder in der Werkzeugleiste noch im Rechtsklick-Menü der Virtual
@@ -46,24 +49,21 @@ class ControllerVorlageHinweisTest(unittest.TestCase):
                         "kein Profil mit vc_template (APC mini erwartet)")
 
     def test_keine_verheissung_einer_einfuege_aktion(self):
+        """Der alte Text nannte eine Aktion der Virtual Console, die es nicht
+        gibt — er kommt nicht zurueck."""
         for text in self._details_fuer(True):
             self.assertNotIn("Controller-Vorlage einfügen", text)
-            self.assertNotIn("VC-Vorlage verfügbar", text)
 
-    def test_die_aktion_gibt_es_wirklich_nicht(self):
-        """Faellt rot, sobald jemand die Einfuege-Aktion (wieder) baut — dann
-        darf der Hinweis zurueck, und dieser Test gehoert angepasst."""
-        import glob
-        import re
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        treffer = []
-        for pfad in glob.glob(os.path.join(root, "src", "**", "*.py"), recursive=True):
-            with open(pfad, encoding="utf-8") as fh:
-                quelle = fh.read()
-            if re.search(r"^\s*(from|import)\s.*controller_templates", quelle, re.M):
-                treffer.append(os.path.relpath(pfad, root))
-        self.assertEqual(treffer, [])
-
+    def test_hinweis_nennt_den_knopf_den_es_gibt(self):
+        """MIDI-18: der Weg ist zurueck — als Knopf im Browser selbst."""
+        from src.ui.widgets.controller_browser import ControllerBrowserDialog
+        dlg = ControllerBrowserDialog(midi_only=True)
+        self.addCleanup(dlg.deleteLater)
+        self.assertEqual(dlg._btn_vc.text(), "In Virtual Console einfügen")
+        for text in self._details_fuer(True):
+            self.assertIn("In Virtual Console einfügen", text)
+        for text in self._details_fuer(False):
+            self.assertNotIn("Vorlage für die Virtual Console", text)
 
 if __name__ == "__main__":
     unittest.main()

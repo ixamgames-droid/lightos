@@ -1,0 +1,307 @@
+{
+  "schema": 1,
+  "id": "mackie_control",
+  "manufacturer": "Mackie Control (MC-Modus)",
+  "model": "MCU, X-Touch, iCON …",
+  "device_type": "midi_fader_controller",
+  "connections": [
+    "USB-MIDI",
+    "MIDI (DIN)",
+    "RTP-MIDI (je nach Gerät)"
+  ],
+  "buttons": 102,
+  "faders": 9,
+  "encoders": 8,
+  "pad_matrix": null,
+  "banks": "Keine Hardware-Bänke im Gerät: Bank- und Channel-Tasten sind normale Noten, die Seiten verwaltet das Programm. Ein Extender (X-Touch Extender, MCU XT) ist ein eigenes Gerät mit eigenem Port und derselben Belegung (ohne Master, Transport, Bank, Jog).",
+  "controls": [
+    {
+      "name": "Fader 1 (Motor)",
+      "type": "pitchbend",
+      "channel": 0,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 1, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 2 (Motor)",
+      "type": "pitchbend",
+      "channel": 1,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 2, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 3 (Motor)",
+      "type": "pitchbend",
+      "channel": 2,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 3, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 4 (Motor)",
+      "type": "pitchbend",
+      "channel": 3,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 4, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 5 (Motor)",
+      "type": "pitchbend",
+      "channel": 4,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 5, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 6 (Motor)",
+      "type": "pitchbend",
+      "channel": 5,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 6, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 7 (Motor)",
+      "type": "pitchbend",
+      "channel": 6,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 7, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Fader 8 (Motor)",
+      "type": "pitchbend",
+      "channel": 7,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 8, 14 Bit (genutzt ca. 10 Bit). Beide Richtungen: dieselbe Nachricht vom Programm fährt den Motor."
+    },
+    {
+      "name": "Master-Fader (Motor)",
+      "type": "pitchbend",
+      "channel": 8,
+      "range": [
+        0,
+        0
+      ],
+      "layout": "Pitchbend auf Kanal 9. Nur am Hauptgerät, ein Extender hat keinen Master."
+    },
+    {
+      "name": "SELECT 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        24,
+        31
+      ],
+      "layout": "Taste 127 = gedrückt, 0 = losgelassen. LED: 127 an, 1 blinkt, 0 aus."
+    },
+    {
+      "name": "MUTE 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        16,
+        23
+      ],
+      "layout": "Wie SELECT."
+    },
+    {
+      "name": "SOLO 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        8,
+        15
+      ],
+      "layout": "Wie SELECT."
+    },
+    {
+      "name": "REC ARM 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        0,
+        7
+      ],
+      "layout": "Wie SELECT."
+    },
+    {
+      "name": "V-Pot drücken 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        32,
+        39
+      ],
+      "layout": "127/0, ohne eigene LED (Anzeige über den LED-Ring)."
+    },
+    {
+      "name": "Fader-Bank links / rechts",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        46,
+        47
+      ],
+      "layout": "46 = links, 47 = rechts (8er-Sprung)."
+    },
+    {
+      "name": "Channel links / rechts",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        48,
+        49
+      ],
+      "layout": "48 = links, 49 = rechts (1er-Sprung)."
+    },
+    {
+      "name": "Flip / Global View",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        50,
+        51
+      ],
+      "layout": "50 = Flip, 51 = Global View."
+    },
+    {
+      "name": "Transport: Rewind, Fast Forward, Stop, Play, Record",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        91,
+        95
+      ],
+      "layout": "91 Rewind, 92 Fast Forward, 93 Stop, 94 Play, 95 Record."
+    },
+    {
+      "name": "Assign-Tasten (unsicher)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        40,
+        45
+      ],
+      "layout": "Unsicher: Beschriftung je Gerät/Overlay verschieden (MCU-Mitschnitt: 40 I/O, 41 Sends, 42 Pan, 43 Plug-ins, 44 EQ, 45 Dyn)."
+    },
+    {
+      "name": "Name/Value, F1-F8, View, Modifier, Automation, Utility (unsicher)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        52,
+        90
+      ],
+      "layout": "Unsicher: grob 52 Name/Value, 53 SMPTE/Beats, 54-61 F1-F8, 62-69 View, 70-73 Shift/Option/Ctrl/Alt, 74-79 Automation, 80-90 Save/Undo/Cancel/Enter/Marker/Mixer/Frame/Loop/Punch/Home/End. Beschriftung je Gerät verschieden."
+    },
+    {
+      "name": "Cursor, Zoom, Scrub (unsicher)",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        96,
+        101
+      ],
+      "layout": "Unsicher: nach Ardour 96 hoch, 97 runter, 98 links, 99 rechts, 100 Zoom, 101 Scrub; ein MCU-Mitschnitt nennt 98 Scrub, 99 Zoom, 100 links, 101 rechts. Mit einem MIDI-Monitor am Gerät prüfen."
+    },
+    {
+      "name": "Fader-Berührung 1-8",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        104,
+        111
+      ],
+      "layout": "Nur Eingang: 127 = berührt, 0 (oder Note-Off) = losgelassen. Solange berührt, schickt LightOS nichts an den Motor."
+    },
+    {
+      "name": "Fader-Berührung Master",
+      "type": "note",
+      "channel": 0,
+      "range": [
+        112,
+        112
+      ],
+      "layout": "Wie Fader-Berührung 1-8."
+    },
+    {
+      "name": "V-Pot drehen 1-8",
+      "type": "encoder",
+      "channel": 0,
+      "range": [
+        16,
+        23
+      ],
+      "layout": "CC 16-23, relativ mit Vorzeichenbit: 1..63 = rechts, 65..127 = links (Betrag = Wert - 64). Schnelles Drehen schickt größere Beträge."
+    },
+    {
+      "name": "Jog-Rad",
+      "type": "encoder",
+      "channel": 0,
+      "range": [
+        60,
+        60
+      ],
+      "layout": "CC 60, relativ wie die V-Pots: 1..63 vor, 65..127 zurück."
+    },
+    {
+      "name": "Fußschalter/Pedal (External Controller)",
+      "type": "cc",
+      "channel": 0,
+      "range": [
+        46,
+        46
+      ],
+      "layout": "CC 46 absolut 0-127, nicht an jedem Gerät."
+    },
+    {
+      "name": "V-Pot-LED-Ring 1-8",
+      "type": "other",
+      "channel": 0,
+      "range": [
+        48,
+        55
+      ],
+      "layout": "Nur Ausgang: CC 48-55, Wert 0pmmvvvv (p = Mittel-LED, mm = Modus 0 Punkt/1 Boost-Cut/2 Wrap/3 Spread, vvvv = Position 1..11, 0 = aus). LightOS nutzt das noch nicht."
+    }
+  ],
+  "led_feedback": {
+    "type": "note_velocity",
+    "notes": "Tasten-LEDs per Note-On auf Kanal 1 mit der Nummer der Taste: 127 = an, 1 = blinkt, 0 = aus. Das Gerät schaltet keine LED selbst, das macht das Programm. Motorfader: Pitchbend zurück auf den Kanal des Faders. Ohne Rückmeldung fährt der Fader nach dem Loslassen auf den letzten empfangenen Wert zurück."
+  },
+  "features": [
+    "Motorfader in beide Richtungen (Pitchbend je Kanal)",
+    "Berührungssensor je Fader (Note 104-112)",
+    "Tasten-LEDs vom Programm gesteuert",
+    "V-Pots als relative Encoder mit LED-Ring",
+    "Gerät erst in den MC-Modus schalten: X-Touch: SELECT 1 beim Einschalten halten, Encoder 1 = MC, Encoder 2 = USB/MIDI/Netz, SELECT 1 speichert (ab Werk HUI). X-Touch Compact: MC-Taste beim Einschalten halten.",
+    "Extender: eigener Port, getrennt öffnen; als zweite Vorlage einfügen und den Fadern andere Funktionen geben",
+    "An echter Hardware noch nicht geprüft"
+  ],
+  "source": "Apple Logic Pro 7.2 Handbuch, Anhang B „Logic Control MIDI Implementation“ (öffentlich); Ardour-Quellcode libs/surfaces/mackie (device_info.cc, led.cc, pot.cc, surface.cc); Ardour-Handbuch „Behringer Devices in Mackie/Logic Control Mode“; Behringer X-Touch Extender Handbuch; Sweetwater-Hinweis zum MC-Modus des X-Touch. Mit „unsicher“ markierte Blöcke weichen je Gerät/Quelle ab und sind am Gerät mit einem MIDI-Monitor zu prüfen. iCON, PreSonus FaderPort, SSL UF8 und X-Touch One/Compact sind nicht einzeln mit Handbuch belegt.",
+  "license": "Faktendaten (MIDI-Notes/CCs/Pitchbend-Kanäle sind nicht urheberrechtlich schutzfähig). Dieser Bibliothekseintrag: CC0.",
+  "imported_at": "2026-11-11",
+  "vc_template": "mackie_control",
+  "mapping_template": ""
+}

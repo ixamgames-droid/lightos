@@ -215,6 +215,7 @@ The button supports both MIDI and keyboard assignment (both teach functions retu
 - **Typ** `cc`: evaluated absolutely — value > 63 = pressed, otherwise released.
 - **Kanal** (channel) 0 = all channels. **Note/CC** -1 = no binding.
 - APC buttons are interpreted as `note_on`, faders as `cc`.
+- **„LED am Pult zeigt den Zustand“** (LED on the desk shows the state; MIDI-18, only `note_on` with a fixed channel): when the button is lit in LightOS, LightOS sends the same note with value 127 to the desk, otherwise 0 — so the button LEDs of a Mackie Control desk (X-Touch, MCU) show the state. It is sent through the MIDI output chosen under I/O → MIDI.
 
 **Keyboard** (context menu „Taste zuweisen…"): a hotkey (e.g. `Ctrl+F5`) is treated like a MIDI note — key press = `note_on`, release = `note_off`. This makes toggle and flash work exactly as with MIDI control.
 

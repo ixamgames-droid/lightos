@@ -41,7 +41,7 @@ Einstellungen öffnest du per Doppelklick (im Bearbeiten-Modus) oder über das K
 | **Weitere Ziel-IDs** | Zusätzliche Effekte, die derselbe Encoder mitverstellt (Multi-Effekt). | Komma-getrennte Ganzzahlen, z. B. `4, 7` (Standard: leer) |
 | **Live-Edit-Slot** | Ohne feste Effekt-ID verstellt der Encoder den Effekt aus diesem Bearbeitungs-Slot (von einem Effekt-Pad gesetzt) statt den global aktiven. | Freitext, z. B. `MH`, `MX` (Standard: leer) |
 | **Schrittweite (Anteil)** | Wie viel ein Detent-/Rad-Schritt verstellt, als Anteil des gesamten Wertebereichs. 0,05 = 5 % je Schritt. | 0,005–1,0, Schritt 0,01 (Standard: 0,05) |
-| **MIDI-Modus** | Wie ein gebundener MIDI-CC interpretiert wird. | **Relativ** = Hardware-Encoder sendet Schritte (CC-Werte 1–63 = +, 65–127 = −) · **Absolut** = Poti/Fader 0–127 wird auf den Wertebereich gelegt (Standard: Relativ) |
+| **MIDI-Modus** | Wie ein gebundener MIDI-CC interpretiert wird. | **Relativ** = Hardware-Encoder sendet Schritte (CC-Werte 1–63 = +, 65–127 = −) · **Relativ (Mackie)** = V-Pots eines Mackie-Control-Pults (1–63 = +, 65–127 = − um Wert−64; 65 ist also ein Schritt zurück) · **Absolut** = Poti/Fader 0–127 wird auf den Wertebereich gelegt (Standard: Relativ) |
 | **CC-Nummer (-1=keine)** | MIDI-Control-Change-Nummer für die Bindung. | -1 (keine) bis 127 (Standard: -1) |
 | **MIDI-Kanal (0=alle)** | MIDI-Kanal der Bindung. | 0 (Alle) bis 16 (Standard: 0) |
 | **Gekoppelte Effekte → Je Effekt steuern** | Pro gekoppeltem Effekt (Effekt-ID + weitere Ziel-IDs) ein eigener gesteuerter Parameter; erscheint nur, wenn Effekte gebunden sind. | Pro Effekt eine Auswahl: **(Standard)** = der oben gesetzte Parameter-Key, sonst ein eigener Parameter aus der Liste des jeweiligen Effekts |
@@ -63,6 +63,7 @@ Der Encoder unterstützt **MIDI-Teach** (nur CC), keine Tasten-Zuweisung.
 
 - **Zuweisen**: Rechtsklick (im Bearbeiten-Modus) → „MIDI Teach…", dann am Pult den gewünschten CC bewegen. Alternativ CC-Nummer und Kanal direkt im Einstellungs-Dialog eintragen.
 - **Relativ** (Standard, für Hardware-Encoder ohne Anschlag): Das Pult sendet Schritte um die Mitte 64 — Werte 1–63 drehen hoch, 65–127 drehen runter, 0/64 = keine Bewegung. Jeder Schritt verstellt um die eingestellte Schrittweite.
+- **Relativ (Mackie)** (MIDI-18, für die V-Pots eines Mackie-Control-Pults wie X-Touch oder MCU): Bit 6 ist die Richtung, der Rest die Schrittzahl — 1–63 drehen hoch, 65–127 drehen um (Wert − 64) Schritte runter. Mit „Relativ“ würde ein langsamer Linksdreh (65) dort einen großen Sprung nach oben machen.
 - **Absolut** (für Potis/Fader): Der CC-Wert 0–127 wird linear auf den Wertebereich des Parameters gelegt — der Encoder springt dann auf die absolute Position.
 - Ein gesetzter MIDI-CC zeigt sich als blaues Quadrat oben rechts am Element.
 
