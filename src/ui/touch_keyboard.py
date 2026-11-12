@@ -1,4 +1,8 @@
-"""Touch / Virtual-Keyboard-Unterstützung für Windows-Tablet-Bedienung.
+"""Touch / Virtual-Keyboard-Unterstützung (Tablet-Bedienung).
+
+UI-112: Fingertipp in Zahlenfeld = app-eigener Ziffernblock (alle Systeme),
+in Textfeld = app-eigene Bildschirmtastatur (Linux/macOS) bzw. System-
+Tastatur TabTip (Windows) — siehe ``bildschirm_tastatur``.
 
 Funktionsweise:
   - Der Event-Filter wird IMMER installiert und setzt WA_InputMethodEnabled
@@ -146,16 +150,19 @@ def _configure_widget(widget: QObject) -> None:
     """
     if isinstance(widget, QDoubleSpinBox):
         le = widget.lineEdit()
-        le.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, True)
+        # UI-112: im Touch-Modus uebernimmt der app-eigene Ziffernblock —
+        # ohne Eingabemethode oeffnet Windows nicht zusaetzlich TabTip.
+        le.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, not _touch_mode)
         if not _touch_mode:
             le.setInputMethodHints(Qt.InputMethodHint.ImhFormattedNumbersOnly)
     elif isinstance(widget, QSpinBox):
         le = widget.lineEdit()
-        le.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, True)
+        le.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, not _touch_mode)
         if not _touch_mode:
             le.setInputMethodHints(Qt.InputMethodHint.ImhDigitsOnly)
     elif isinstance(widget, QLineEdit):
-        widget.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled, True)
+        widget.setAttribute(Qt.WidgetAttribute.WA_InputMethodEnabled,
+                            not (_touch_mode and isinstance(widget.parent(), _NUMBER_TYPES)))
         if not _touch_mode:
             parent = widget.parent()
             if isinstance(parent, QDoubleSpinBox):
@@ -164,17 +171,68 @@ def _configure_widget(widget: QObject) -> None:
                 widget.setInputMethodHints(Qt.InputMethodHint.ImhDigitsOnly)
 
 
-# Globaler Stylesheet-Zusatz für Touch-Modus: nur Button-Breite anpassen,
-# Höhe und Pfeil-Rendering bleiben bei Qt's Default → kein Layout-Bruch
-# in schmalen Toolbars, und die Pfeile bleiben sichtbar.
-_TOUCH_STYLESHEET = """
-QSpinBox::up-button, QDoubleSpinBox::up-button {
-    width: 22px;
-}
-QSpinBox::down-button, QDoubleSpinBox::down-button {
-    width: 22px;
-}
-"""
+# UI-112 (Touch-Audit C-02/D-16): Zahlenfelder am Finger. Die Pfeile waren
+# 17x13 px (mit --touch 17x18 px) und lagen ohne Abstand uebereinander. Jetzt
+# sitzt „−" links und „+" rechts neben der Zahl, jeder Knopf 40x36 px, der
+# Abstand zwischen beiden ist das ganze Zahlenfeld. Gilt nur im Touch-Modus.
+ZAHL_KNOPF_B = 40
+ZAHL_KNOPF_H = 36
+
+
+def _icon_url(name: str) -> str:
+    try:
+        from src.core.paths import programm_datei
+        pfad = programm_datei("assets", "icons", name)
+    except Exception:
+        pfad = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))), "assets", "icons", name)
+    return pfad.replace("\\", "/")
+
+
+def zahlenfeld_touch_qss(typen: str = "QSpinBox, QDoubleSpinBox") -> str:
+    """Touch-Regeln fuer Zahlenfelder: grosse −/+-Knoepfe links/rechts.
+
+    ``typen``: die Selektoren (kommagetrennt), z. B. ``"QSpinBox"`` fuer ein
+    Widget-Stylesheet, das selbst nur ``QSpinBox`` stylt (Live-Spalte)."""
+    t = [x.strip() for x in typen.split(",") if x.strip()]
+
+    def sel(suffix: str) -> str:
+        return ", ".join(f"{x}{suffix}" for x in t)
+
+    plus, minus = _icon_url("zahl_plus.svg"), _icon_url("zahl_minus.svg")
+    return (
+        f"{sel('')} {{ min-height: {ZAHL_KNOPF_H}px; min-width: 64px; font-size: 15px; }}\n"
+        f"{sel('::up-button')} {{ subcontrol-origin: border; "
+        f"subcontrol-position: center right; width: {ZAHL_KNOPF_B}px; "
+        f"height: {ZAHL_KNOPF_H}px; border-left: 1px solid #161616; }}\n"
+        f"{sel('::down-button')} {{ subcontrol-origin: border; "
+        f"subcontrol-position: center left; width: {ZAHL_KNOPF_B}px; "
+        f"height: {ZAHL_KNOPF_H}px; border-left: none; border-right: 1px solid #161616; }}\n"
+        f"{sel('::up-arrow')} {{ image: url({plus}); width: 18px; height: 18px; }}\n"
+        f"{sel('::down-arrow')} {{ image: url({minus}); width: 18px; height: 18px; }}\n"
+    )
+
+
+#: UI-112 (D-16): Haken in den Seitenspalten (Live-Ansicht, Visualizer).
+#: Die Spalten tragen ``objectName == "touchSpalte"``; das allgemeine Touch-
+#: Stylesheet fuer Haken ueberall ist UI-119 (A-16).
+SPALTE_TOUCH_QSS = (
+    "#touchSpalte QCheckBox, #touchSpalte QRadioButton { min-height: 36px; spacing: 10px; }\n"
+    "#touchSpalte QCheckBox::indicator, #touchSpalte QRadioButton::indicator "
+    "{ width: 26px; height: 26px; }\n"
+    "#touchSpalte QRadioButton::indicator { border-radius: 13px; }\n"
+)
+
+
+def touch_qss() -> str:
+    """Alle Touch-Regeln dieses Moduls (Hauptfenster haengt sie an sein QSS)."""
+    return zahlenfeld_touch_qss() + SPALTE_TOUCH_QSS
+
+
+# Globaler Stylesheet-Zusatz fuer den Touch-Modus (App-weit, fuer Fenster ohne
+# Hauptfenster als Eltern). Das Hauptfenster setzt ein eigenes Stylesheet, das
+# den App-Stil ueberdeckt — es haengt deshalb ``touch_qss()`` selbst an.
+_TOUCH_STYLESHEET = touch_qss()
 
 
 def _apply_touch_styles(app: QApplication) -> None:
@@ -182,7 +240,20 @@ def _apply_touch_styles(app: QApplication) -> None:
     existing = app.styleSheet() or ""
     if "/* lightos-touch-style */" in existing:
         return
-    app.setStyleSheet(existing + "\n/* lightos-touch-style */\n" + _TOUCH_STYLESHEET)
+    app.setStyleSheet(existing + "\n/* lightos-touch-style */\n" + _TOUCH_STYLESHEET
+                      + "\n/* lightos-touch-style-ende */\n")
+
+
+def _remove_touch_styles(app: QApplication) -> None:
+    """UI-112: Touch-Zusatz wieder entfernen (install(touch=False))."""
+    existing = app.styleSheet() or ""
+    a = existing.find("\n/* lightos-touch-style */\n")
+    if a < 0:
+        return
+    ende = "\n/* lightos-touch-style-ende */\n"
+    b = existing.find(ende, a)
+    rest = existing[b + len(ende):] if b >= 0 else ""
+    app.setStyleSheet(existing[:a] + rest)
 
 
 def _enlarge_spinbox_buttons(widget: QObject) -> None:
@@ -191,44 +262,72 @@ def _enlarge_spinbox_buttons(widget: QObject) -> None:
         widget.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
 
 
-# Fokus-Ursachen die NICHT durch Benutzerinteraktion entstehen (programmatisch)
-_PROGRAMMATIC_REASONS = {
-    Qt.FocusReason.TabFocusReason,
-    Qt.FocusReason.BacktabFocusReason,
-    Qt.FocusReason.ActiveWindowFocusReason,
-    Qt.FocusReason.PopupFocusReason,
-    Qt.FocusReason.ShortcutFocusReason,
-    Qt.FocusReason.MenuBarFocusReason,
-    Qt.FocusReason.NoFocusReason,
-}
-
-# Typen die als Zahlenfelder gelten → TabTip im --touch-Modus immer öffnen
+# Typen die als Zahlenfelder gelten (Touch-Modus: Ziffernblock, UI-112)
 _NUMBER_TYPES = (QSpinBox, QDoubleSpinBox)
 
 
 class OskEventFilter(QObject):
-    """App-weiter Event-Filter für Eingabefelder."""
+    """App-weiter Event-Filter für Eingabefelder.
+
+    UI-112: Im Touch-Modus oeffnet ein Fingertipp (Druck + Loslassen ohne Zug)
+    in ein Zahlenfeld den app-eigenen Ziffernblock, in ein Textfeld die app-
+    eigene Bildschirmtastatur (ausser unter Windows: dort die System-
+    Tastatur). Maus und echte Tastatur oeffnen nie etwas."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._druck_feld = None
+        self._druck_pos = None
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # type: ignore[override]
-        if event.type() == QEvent.Type.FocusIn:
+        typ = event.type()
+        if typ in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
+            if _touch_mode and isinstance(obj, QLineEdit):
+                self._finger_tipp(obj, event, typ == QEvent.Type.MouseButtonPress)
+        elif typ == QEvent.Type.FocusIn:
             if isinstance(obj, (QLineEdit, QSpinBox, QDoubleSpinBox)):
                 # Immer konfigurieren → Windows erkennt das Feld als Text-Input
                 _configure_widget(obj)
-
-                # Im Touch-Modus (--touch): bei jedem Fokus auf ein Zahlenfeld
-                # TabTip öffnen, außer bei rein programmatischem Fokus.
-                if _touch_mode:
-                    reason = getattr(event, "reason", lambda: None)()
-                    is_number_field = isinstance(obj, _NUMBER_TYPES) or (
-                        isinstance(obj, QLineEdit) and isinstance(obj.parent(), _NUMBER_TYPES)
-                    )
-                    if is_number_field and reason not in _PROGRAMMATIC_REASONS:
-                        # Leicht verzögern: bei SpinBox kommt FocusIn manchmal
-                        # *bevor* der interne QLineEdit das Edit-Fenster setzt;
-                        # TabTip ignoriert den Aufruf sonst.
-                        QTimer.singleShot(50, _show_osk)
-
         return False  # Event nicht verbrauchen
+
+    def _finger_tipp(self, feld: QLineEdit, event, druck: bool) -> None:
+        try:
+            from src.ui import ziehen_scrollen as zs
+            if event.button() != Qt.MouseButton.LeftButton or not zs.ist_touch(event):
+                return
+            pos = event.globalPosition()
+        except Exception:
+            return
+        if druck:
+            self._druck_feld, self._druck_pos = feld, pos
+            return
+        start, gedrueckt = self._druck_pos, self._druck_feld
+        self._druck_feld = self._druck_pos = None
+        if start is None or gedrueckt is not feld:
+            return
+        d = pos - start
+        if abs(d.x()) + abs(d.y()) > QApplication.startDragDistance() * zs.TOUCH_FAKTOR:
+            return                      # Zug (Text markieren), kein Tipp
+        from src.ui import bildschirm_tastatur as bt
+        if bt.ziel_fuer(feld) is None:
+            if (sys.platform != "win32" or isinstance(feld.parent(), QAbstractSpinBox)
+                    or feld.isReadOnly() or not feld.isEnabled()):
+                return
+            QTimer.singleShot(50, _show_osk)      # Windows: System-Tastatur
+            return
+        # Nach dem Loslassen: das Feld hat Fokus und Cursor schon gesetzt.
+        QTimer.singleShot(0, lambda f=feld: _oeffnen_wenn_gueltig(f))
+
+
+def _oeffnen_wenn_gueltig(feld) -> None:
+    try:
+        from shiboken6 import isValid
+        if not isValid(feld) or not feld.isVisible():
+            return
+        from src.ui import bildschirm_tastatur as bt
+        bt.oeffnen(feld)
+    except Exception as e:                       # nie die Bedienung abbrechen
+        print(f"[touch_keyboard] Bildschirmtastatur: {e}")
 
 
 def install(app: QApplication, touch: bool | None = None) -> bool:
@@ -262,6 +361,8 @@ def install(app: QApplication, touch: bool | None = None) -> bool:
     if touch:
         _apply_touch_styles(app)
         _enable_tabtip_autoinvoke()
+    else:
+        _remove_touch_styles(app)
 
     return touch
 

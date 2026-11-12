@@ -3389,6 +3389,8 @@ class VisualizerWindow(QMainWindow):
 
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
+        # UI-112 (D-16): Touch-QSS vergroessert hier die Haken (#touchSpalte).
+        panel.setObjectName("touchSpalte")
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(4, 4, 4, 4)
 
