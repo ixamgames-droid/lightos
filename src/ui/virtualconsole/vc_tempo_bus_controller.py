@@ -325,6 +325,10 @@ class VCTempoBusController(VCWidget):
         super().mousePressEvent(event)
 
     def wheelEvent(self, event):
+        # UI-121 (wie B-07): die Touch-Sperre blockt auch das Mausrad.
+        if self._run_input_blocked():
+            event.accept()
+            return
         # Im Fix-Modus die feste BPM per Mausrad feinjustieren (Run-Modus).
         if (not self._edit_mode) and self.source == "fix":
             step = 1.0 if event.angleDelta().y() > 0 else -1.0

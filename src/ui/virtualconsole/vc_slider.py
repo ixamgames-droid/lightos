@@ -8,7 +8,7 @@ from PySide6.QtGui import QPainter, QColor, QFont, QLinearGradient, QPen
 from src.core.midi.midi_manager import fader_wert, wert14  # MIDI-10
 from src.core.midi.motor_fader import MotorFader            # MIDI-17
 from .vc_widget import VCWidget
-from .vc_style import paint_slider_handle   # VC3D-02: plastischer Fader-Griff
+from .vc_style import paint_slider_handle, tz   # VC3D-02 / UI-121 B-09
 
 
 def _clear_submaster_slot(slot):
@@ -894,7 +894,8 @@ class VCSlider(VCWidget):
 
     def _track_rect(self) -> QRect:
         m = 20
-        return QRect(self.width() // 2 - 6, m, 12, self.height() - m * 2)
+        bw = tz(12)                        # UI-121 B-09: Touch ×1,3
+        return QRect(self.width() // 2 - bw // 2, m, bw, self.height() - m * 2)
 
     def _handle_y(self) -> int:
         tr = self._track_rect()
@@ -940,6 +941,10 @@ class VCSlider(VCWidget):
     def wheelEvent(self, event):
         if self._edit_mode:
             return
+        # UI-121 (wie B-07): die Touch-Sperre blockt auch das Mausrad.
+        if self._run_input_blocked():
+            event.accept()
+            return
         steps = event.angleDelta().y() // 120
         self.value = self._value + steps * 5
 
@@ -964,7 +969,10 @@ class VCSlider(VCWidget):
 
         # Handle knob — VC3D-02: plastischer Griff (Woelbung + Bevel + Griff-Rille)
         # statt flachem fillRect, konsistent mit dem 3D-Look der VC-Buttons.
-        paint_slider_handle(p, QRect(tr.x() - 8, hy - 4, tr.width() + 16, 8), QColor("#aaccff"))
+        # UI-121 B-09: im Touch-Modus ×1,3 (Maus unveraendert 8 px hoch).
+        _gx, _gh = tz(8), tz(8)
+        paint_slider_handle(p, QRect(tr.x() - _gx, hy - _gh // 2, tr.width() + 2 * _gx, _gh),
+                            QColor("#aaccff"))
 
         # Soft-Takeover-Hinweis: Fader „armiert" und wartet, bis der physische
         # Fader den VC-Wert (hy) durchfährt. Ziel-Linie + Geist-Position + Pfeil.
