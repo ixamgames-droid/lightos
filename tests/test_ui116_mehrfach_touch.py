@@ -227,6 +227,19 @@ def test_mehrfach_langes_druecken_menue_laesst_auswahl_stehen(touch):
     assert _warte_bis(lambda: bool(gezeigt)), "Menue nach langem Druck"
     QTest.touchEvent(v, _DEV).release(0, p, v).commit()
     QApplication.processEvents()
+    assert gezeigt[0] == [5], ("langer Druck auf eine NICHT gewaehlte Zeile: "
+                               "Menue nur fuer diese Zeile (wie Rechtsklick)")
+    assert _gewaehlt(liste) == [5]
+    # auf einer gewaehlten Zeile wirkt das Menue auf die ganze Mehrfachauswahl
+    gezeigt.clear()
+    liste.clearSelection()
+    for n in (1, 3):
+        liste.item(n).setSelected(True)
+    p = _zeile(liste, 3)
+    QTest.touchEvent(v, _DEV).press(0, p, v).commit()
+    assert _warte_bis(lambda: bool(gezeigt)), "Menue nach langem Druck"
+    QTest.touchEvent(v, _DEV).release(0, p, v).commit()
+    QApplication.processEvents()
     assert gezeigt[0] == [1, 3], "Menue wirkt auf die Mehrfachauswahl"
     assert _gewaehlt(liste) == [1, 3], "langes Druecken schaltet nichts um"
 
