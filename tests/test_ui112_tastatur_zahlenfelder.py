@@ -183,6 +183,37 @@ class ZiffernblockTest(_Basis):
         QApplication.processEvents()
         self.assertEqual(spin.value(), 7)
 
+    def test_echter_tipp_daneben_schliesst_ohne_knopf_dahinter(self):
+        # Pruefung: ein Tipp neben den Block ist nur Abbruch. Qt reicht den
+        # schliessenden Druck sonst (X11/Windows, wo das Popup die Maus
+        # greift) an das Widget dahinter weiter — dort liegen GO/BLACKOUT.
+        from PySide6.QtWidgets import QPushButton
+        spin = QSpinBox()
+        spin.setRange(0, 255)
+        spin.setValue(7)
+        knopf = QPushButton("BLACKOUT")
+        gedrueckt = []
+        knopf.pressed.connect(lambda: gedrueckt.append("pressed"))
+        knopf.clicked.connect(lambda: gedrueckt.append("clicked"))
+        w = self._fenster(knopf, spin)
+        w.layout().insertStretch(1, 1)       # Knopf oben, Feld unten
+        w.resize(420, 760)
+        QApplication.processEvents()
+        block = self._tipp_in_zahl(spin)
+        self.assertIsInstance(block, bt.Ziffernblock)
+        self.assertTrue(block.testAttribute(Qt.WidgetAttribute.WA_NoMouseReplay))
+        self.assertFalse(block.geometry().contains(knopf.mapToGlobal(knopf.rect().center())))
+        block.tippe("2")
+        _Finger(knopf).tipp(knopf.rect().center())
+        QApplication.processEvents()
+        self.assertTrue(_zu(block))
+        self.assertEqual(spin.value(), 7, "Tipp daneben = Abbruch")
+        self.assertEqual(gedrueckt, [], "der Knopf dahinter loest nicht aus")
+
+    def test_tastatur_reicht_tipp_daneben_nicht_weiter(self):
+        kb = bt.oeffnen(self._fenster(QLineEdit()).findChild(QLineEdit))
+        self.assertTrue(kb.testAttribute(Qt.WidgetAttribute.WA_NoMouseReplay))
+
     def test_kommazahl_und_vorzeichen(self):
         spin = QDoubleSpinBox()
         spin.setRange(-10.0, 10.0)

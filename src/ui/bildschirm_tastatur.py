@@ -145,6 +145,10 @@ class _PopupBasis(QFrame):
         super().__init__(anker, Qt.WindowType.Popup | Qt.WindowType.FramelessWindowHint)
         self.setObjectName("bildschirmTastatur")
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        # Ein Tipp daneben schliesst nur (wie Abbruch) — Qt soll den Druck
+        # nicht an das Widget dahinter weiterreichen (GO, BLACKOUT, STOP ALL
+        # liegen oft genau neben dem Feld).
+        self.setAttribute(Qt.WidgetAttribute.WA_NoMouseReplay, True)
         self.setStyleSheet(_STIL)
         self._anker = anker
         self._erledigt = False
