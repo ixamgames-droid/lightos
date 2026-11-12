@@ -1544,6 +1544,8 @@ class MainWindow(QMainWindow):
             print(f"[main_window] DmxMonitorView init error: {e}")
             self._dmx_monitor_view = QWidget()
         self._midi_view = MidiView()
+        # MIDI-18: Controller-Browser -> „In Virtual Console einfügen“
+        self._midi_view.vc_canvas_geber = self._vc_zeichenflaeche
         try:
             from src.ui.views.music_view import MusicView
             self._music_view = MusicView()
@@ -1862,6 +1864,17 @@ class MainWindow(QMainWindow):
     #: So heisst ein Layout-Schritt der Virtual Console im Menue und in der
     #: Statuszeile (der Layout-Verlauf kennt nur Schnappschuesse, keine Namen).
     VC_SCHRITT = "Layout der Virtual Console"
+
+    def _vc_zeichenflaeche(self):
+        """MIDI-18: die Zeichenflaeche der Virtual Console (auch wenn sie
+        gerade nicht sichtbar ist), oder None, wenn sie nicht (mehr) lebt."""
+        vc = getattr(self, "_vc_view", None)
+        try:
+            if vc is None or not vc._canvas_alive():
+                return None
+            return vc._canvas
+        except RuntimeError:        # Ansicht schon abgebaut
+            return None
 
     def _vc_verlauf(self):
         """Zeichenflaeche der Virtual Console, wenn sie die sichtbare Seite

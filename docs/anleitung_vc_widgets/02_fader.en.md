@@ -134,6 +134,25 @@ The fader supports **MIDI teach** for **CC** and **pitch bend** (no note); there
 - **Motor faders (Mackie Control, X-Touch):** these desks send their faders as **pitch bend**, not CC – one MIDI channel per fader, the value with 14 bits (16,384 steps instead of 128). Assign: right-click „MIDI Teach…“ and move the fader on the desk (the note its touch sensor sends when you grab it is skipped), or set **Art = Pitchbend** and the channel in the dialog. The control then reaches all 256 steps; with CC it is only every second one. **Motorised VC faders (MIDI-17):** in the properties dialog, with *Art = Pitchbend* and a fixed channel, tick **„Motorfader nachführen“** – the motor then follows whenever the value changes in LightOS (mouse, page change, grand master from elsewhere); after a page change it drives to the new page's value. Without the tick, „Pickup“ helps against jumps. Motor faders that are bound to an executor fader or the grand master in the **MIDI view** follow as well: select the mapping row, click **Feedback...** and confirm „Motorfader nachführen?“ (MIDI-14). While you move or touch the fader (touch sensor in the Mackie layout, MIDI-15), LightOS sends nothing to its motor.
 - **Soft takeover / „Pickup":** a global VC switch for non-motorized controllers (e.g. APC mini). After a bank/page change, the physical fader is usually somewhere other than the VC value. With pickup active, the fader only takes over once the physical fader **passes through** the current VC value **once** – so there is no jump. Until then the element shows the yellow pickup hint (target line + ghost position + `⊘▲`/`⊘▼` direction arrow) and ignores MIDI.
 
+## Inserting a motor desk as a whole
+
+A motor desk in **Mackie Control mode** (Mackie MCU, Behringer X-Touch, iCON and others) does not have to be set up fader by fader:
+
+1. Switch the desk to MC mode. On the X-Touch: hold **SELECT 1** while powering on, choose **MC** with encoder 1 and the connection (USB, MIDI or network) with encoder 2, save with SELECT 1. Out of the box it is set to HUI.
+2. In LightOS **I/O → MIDI**: select the desk as input **and** output. The motors move and the button LEDs light up through the output.
+3. Open **„Controller-Profile…“** (controller profiles), choose **„Mackie Control (MC-Modus)“** and press **„In Virtual Console einfügen“** (insert into Virtual Console).
+
+The **current page** of the Virtual Console then holds, below what was already there:
+
+- **8 channel strips**, each with a rotary control (V-Pot, MIDI mode „Relativ (Mackie)“), the buttons **REC, SOLO, MUTE, SELECT** and a **fader** (pitch bend on channel 1–8, „Motorfader nachführen“ ticked);
+- the **master fader** (pitch bend channel 9) as **Grand Master**.
+
+If the page already holds elements with the same desk signals (e.g. the template a second time), LightOS asks first. Better pick a free page then. If an **APC mini** is connected and holds the MIDI output, LightOS sends no motor or LED commands there: the APC pads keep their colours, but the motor desk gets nothing either. Choose the motor desk as output in the MIDI view.
+
+One Ctrl+Z in the Virtual Console undoes the whole insert. Then give the faders and buttons their functions via right-click. Move a fader on the desk and the VC fader follows. Change it in LightOS (mouse, page change) and the motor follows. The button LEDs on the desk show whether the button is lit in LightOS (tick **„LED am Pult zeigt den Zustand“** in the button dialog). Without a function a button is only lit while you press it.
+
+An **extender** (e.g. X-Touch Extender) is a separate device with its own connection and the same layout. It is **not supported yet**: the Virtual Console does not tell which device a signal comes from. Fader 1 on the extender and fader 1 on the main unit therefore control the same VC fader, even with a second template. LightOS also talks through only **one** MIDI output, so motors and LEDs of a second device do not move. The layout is in the profile; buttons that differ between devices are marked „unsicher“ (uncertain) there. Not yet tested on real hardware.
+
 ## Tips & pitfalls
 
 - **Percentage display = output value, not fader position.** With min/max or inversion set, the value at the top shows the actual output. If the fader is all the way down and still shows e.g. 30 %, a min limit is set.

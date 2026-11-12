@@ -213,6 +213,7 @@ Der Button unterstützt sowohl MIDI- als auch Tastatur-Zuweisung (beide Teach-Fu
 - **Typ** `cc`: absolut ausgewertet — Wert > 63 = gedrückt, sonst losgelassen.
 - **Kanal** 0 = alle Kanäle. **Note/CC** -1 = keine Bindung.
 - APC-Tasten werden als `note_on`, Fader als `cc` interpretiert.
+- **„LED am Pult zeigt den Zustand“** (MIDI-18, nur `note_on` mit festem Kanal): Leuchtet die Taste in LightOS, schickt LightOS dieselbe Note mit Wert 127 an das Pult, sonst 0 — so zeigen die Tasten-LEDs eines Mackie-Control-Pults (X-Touch, MCU) den Zustand. Gesendet wird über den MIDI-Ausgang aus E/A → MIDI.
 
 **Tastatur** (Kontextmenü „Taste zuweisen…"): Ein Hotkey (z. B. `Ctrl+F5`) wird wie eine MIDI-Note behandelt — Tastendruck = `note_on`, Loslassen = `note_off`. Damit arbeiten Toggle und Flash identisch zur MIDI-Steuerung.
 

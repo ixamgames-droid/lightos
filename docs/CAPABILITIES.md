@@ -14,7 +14,7 @@
 - **SpeedTarget** (5): `Executor`, `Function`, `SpeedNode`, `TempoBus`, `TempoBusMult`
 - **ColorTarget** (7): `Alle Fixtures`, `Effekt (Farbe hinzufügen)`, `Effekt (aktive Farbe)`, `Effekt Farbe 1`, `Effekt Farbe 2`, `Effekt Farbe 3`, `Programmer/Selektion`
   - _ColorTarget-Werte sind deutsche Anzeige-Strings (z. B. 'Effekt Farbe 1'), NICHT die Attribut-Namen._
-- **EncoderMidiMode**: `Absolut`, `Relativ`
+- **EncoderMidiMode**: `Absolut`, `Relativ`, `Relativ (Mackie)`
 
 ## Funktionen
 - **FunctionType** (10): `Audio`, `Chaser`, `Collection`, `EFX`, `MappedChannelChange`, `RGBMatrix`, `Scene`, `Script`, `Sequence`, `Show`

@@ -132,6 +132,25 @@ Der Fader unterstützt **MIDI-Teach** für **CC** und **Pitchbend** (kein Note);
 - **Motorfader (Mackie Control, X-Touch):** Diese Pulte senden ihre Fader nicht als CC, sondern als **Pitchbend** – je Fader ein MIDI-Kanal, der Wert mit 14 Bit (16 384 Stufen statt 128). Zuweisen: Rechtsklick „MIDI Teach…“ und den Fader am Pult bewegen (die Note, die der Berührungssensor beim Anfassen schickt, wird dabei übergangen), oder im Dialog **Art = Pitchbend** und den Kanal eintragen. Damit erreicht der Regler alle 256 Stufen; mit CC ist es nur jede zweite. **VC-Fader nachführen (MIDI-17):** im Eigenschaften-Dialog bei *Art = Pitchbend* und festem Kanal den Haken **„Motorfader nachführen“** setzen – dann fährt der Motor mit, wenn sich der Wert in LightOS ändert (Maus, Seitenwechsel, Grand Master von woanders); nach einem Seitenwechsel fährt er auf den Wert der neuen Seite. Ohne Haken hilft „Pickup“ gegen Sprünge. Ebenso nachgeführt werden Motorfader, die in der **MIDI-Ansicht** an einen Executor-Fader oder den Grand Master gebunden sind: Mapping-Zeile wählen, **Feedback...** und die Frage „Motorfader nachführen?“ bestätigen (MIDI-14). Solange du den Fader bewegst oder berührst (Berührungssensor nach Mackie-Belegung, MIDI-15), sendet LightOS nichts an seinen Motor.
 - **Soft-Takeover / „Pickup":** Ein globaler VC-Schalter für nicht-motorisierte Controller (z. B. APC mini). Nach einem Bank-/Seitenwechsel steht der physische Regler meist woanders als der VC-Wert. Bei aktivem Pickup übernimmt der Fader erst, wenn der physische Regler den aktuellen VC-Wert **einmal durchfährt** – so gibt es keinen Sprung. Bis dahin zeigt das Element den gelben Pickup-Hinweis (Ziel-Linie + Geist-Position + `⊘▲`/`⊘▼`-Richtungspfeil) und ignoriert MIDI.
 
+## Motorpult als Ganzes einfügen
+
+Ein Motorpult im **Mackie-Control-Modus** (Mackie MCU, Behringer X-Touch, iCON u. a.) musst du nicht Fader für Fader einrichten:
+
+1. Am Pult den MC-Modus einschalten. Beim X-Touch: **SELECT 1** gedrückt halten und einschalten, mit Encoder 1 **MC** wählen, mit Encoder 2 den Anschluss (USB, MIDI oder Netz), mit SELECT 1 speichern. Ab Werk steht er auf HUI.
+2. In LightOS **E/A → MIDI**: das Pult als Eingang **und** Ausgang wählen. Über den Ausgang fahren die Motoren und leuchten die Tasten.
+3. **„Controller-Profile…“** öffnen, **„Mackie Control (MC-Modus)“** wählen und **„In Virtual Console einfügen“** drücken.
+
+Auf der **aktuellen Seite** der Virtual Console liegen dann, unter dem, was dort schon war:
+
+- **8 Kanalzüge**, je mit einem Drehregler (V-Pot, MIDI-Modus „Relativ (Mackie)“), den Tasten **REC, SOLO, MUTE, SELECT** und einem **Fader** (Pitchbend auf Kanal 1–8, Haken „Motorfader nachführen“ an);
+- den **Master-Fader** (Pitchbend Kanal 9) als **Grand Master**.
+
+Liegen auf der Seite schon Elemente mit denselben Pult-Signalen (z. B. die Vorlage ein zweites Mal), fragt LightOS vorher nach. Wähle dann besser eine freie Seite. Ist ein **APC mini** angeschlossen und belegt er den MIDI-Ausgang, schickt LightOS keine Motor- und LED-Befehle dorthin: die Pads des APC behalten ihre Farben, das Motorpult bekommt dann aber auch nichts. Wähle in der MIDI-Ansicht als Ausgang das Motorpult.
+
+Ein Strg+Z in der Virtual Console nimmt das ganze Einfügen zurück. Danach weist du den Fadern und Tasten per Rechtsklick ihre Funktionen zu. Bewegst du einen Fader am Pult, folgt der VC-Fader. Änderst du ihn in LightOS (Maus, Seitenwechsel), fährt der Motor nach. Die Tasten-LEDs am Pult zeigen, ob die Taste in LightOS leuchtet (Haken **„LED am Pult zeigt den Zustand“** im Tasten-Dialog). Ohne Funktion leuchtet eine Taste nur, solange du sie drückst.
+
+Ein **Extender** (z. B. X-Touch Extender) ist ein eigenes Gerät mit eigenem Anschluss und derselben Belegung. Er wird **noch nicht unterstützt**: Die Virtual Console unterscheidet nicht, von welchem Gerät ein Signal kommt. Fader 1 am Extender und Fader 1 am Hauptgerät steuern deshalb denselben VC-Fader, auch mit einer zweiten Vorlage. LightOS spricht außerdem nur über **einen** MIDI-Ausgang, Motoren und LEDs eines zweiten Geräts bleiben stehen. Die Belegung steht im Profil; Tasten, die je nach Gerät anders liegen, sind dort als „unsicher“ markiert. An echter Hardware ist das noch nicht geprüft.
+
 ## Tipps & Fallen
 
 - **Prozentanzeige = Ausgabewert, nicht Reglerposition.** Bei gesetztem Min/Max oder Invertierung zeigt der Wert oben den tatsächlichen Ausgang. Steht der Regler ganz unten und es erscheinen trotzdem z. B. 30 %, ist eine Min-Grenze gesetzt.

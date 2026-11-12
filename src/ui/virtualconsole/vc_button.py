@@ -520,6 +520,11 @@ class VCButton(VCWidget):
         self.midi_ch: int = 0          # 0 = alle Kanäle
         self.midi_data1: int = -1      # Note / CC-Nummer
         self.midi_type: str = "note_on"
+        # MIDI-18: Leuchtzustand als Note an das Pult zurueckmelden (Mackie:
+        # 127 = an, 0 = aus, gleiche Note wie die Taste). Nur Note-Bindung mit
+        # festem Kanal; gespeichert nur, wenn an. Gesendet wird von der
+        # VCCanvas (``_led_abgleich``), nicht von der Taste selbst.
+        self.midi_led: bool = False
         self.key_binding: str = ""     # Tastatur-Hotkey ("Ctrl+F5", "" = keiner)
 
         self._pressed = False
@@ -2081,6 +2086,27 @@ class VCButton(VCWidget):
         self._taste(press)
         return True
 
+    def led_ziel(self) -> tuple[int, int] | None:
+        """MIDI-18: ``(kanal, note)`` fuer die LED-Rueckmeldung ans Pult —
+        nur mit Haken, Note-Bindung und festem Kanal, sonst ``None``."""
+        if not self.midi_led or self.midi_type != "note_on":
+            return None
+        try:
+            kanal, note = int(self.midi_ch), int(self.midi_data1)
+        except (TypeError, ValueError):
+            return None
+        if not (1 <= kanal <= 16 and 0 <= note <= 127):
+            return None
+        return kanal, note
+
+    def _led_anmelden(self) -> None:
+        """MIDI-18: der Canvas Bescheid geben, dass es (wieder) eine Taste mit
+        LED-Rueckmeldung geben kann — sie startet dann ihren Abgleich."""
+        canvas = self._find_canvas()
+        fn = getattr(canvas, "led_rueckmeldung_pruefen", None)
+        if callable(fn):
+            fn()
+
     def leuchtet(self) -> bool:
         """WEB-08: „ist diese Taste gerade an?" — dieselbe Summe, aus der
         ``paintEvent`` sein ``lit`` bildet (gedrueckt, Snap-Toggle an, Musik-BPM
@@ -2703,6 +2729,13 @@ class VCButton(VCWidget):
         midi_note_spin.setRange(-1, 127)
         midi_note_spin.setValue(self.midi_data1)
         midi_note_spin.setSpecialValueText("keine")
+        # MIDI-18: LED am Pult leuchten lassen
+        midi_led_cb = QCheckBox("LED am Pult zeigt den Zustand")
+        midi_led_cb.setChecked(bool(self.midi_led))
+        midi_led_cb.setToolTip(
+            "Leuchtet die Taste in LightOS, schickt LightOS dieselbe Note mit "
+            "Wert 127 an das Pult, sonst 0 (Mackie Control, X-Touch). Nur bei "
+            "MIDI-Typ note_on mit festem Kanal.")
 
         pad_style_combo = QComboBox()
         _PAD_STYLES = [("mirror", "Spiegel (Effekt-Farbe)"), ("solid", "Feste Farbe"),
@@ -2883,6 +2916,8 @@ class VCButton(VCWidget):
             self.midi_type = midi_type_combo.currentText()
             self.midi_ch = midi_ch_spin.value()
             self.midi_data1 = midi_note_spin.value()
+            self.midi_led = bool(midi_led_cb.isChecked())     # MIDI-18
+            self._led_anmelden()
             self.pad_style = pad_style_combo.currentData() or "mirror"
             self.pad_color2 = tuple(_pad2["rgb"])
             self.exclusive = exclusive_cb.isChecked()
@@ -2928,6 +2963,7 @@ class VCButton(VCWidget):
                 midi_type_combo:  True,
                 midi_ch_spin:     True,
                 midi_note_spin:   True,
+                midi_led_cb:      True,
             }
             for widget, show in rows.items():
                 set_row_visible(widget, bool(show))
@@ -2960,6 +2996,7 @@ class VCButton(VCWidget):
             midi_type_combo.currentIndexChanged.connect(lambda *_: _live())
             midi_ch_spin.valueChanged.connect(lambda *_: _live())
             midi_note_spin.valueChanged.connect(lambda *_: _live())
+            midi_led_cb.toggled.connect(lambda *_: _live())
             pad_style_combo.currentIndexChanged.connect(lambda *_: _live())
 
         return {
@@ -3000,6 +3037,7 @@ class VCButton(VCWidget):
                     ("MIDI-Typ:", midi_type_combo),
                     ("MIDI-Kanal (0=alle):", midi_ch_spin),
                     ("Note / CC (-1=keine):", midi_note_spin),
+                    ("", midi_led_cb),
                 ]),
                 ("advanced", "Erweitert (Roh-ID / Executor-Slot)", True, "vc_button_advanced", [
                     ("Funktion / Chase (Name):", func_combo),
@@ -3266,6 +3304,8 @@ class VCButton(VCWidget):
         d["midi_ch"] = self.midi_ch
         d["midi_data1"] = self.midi_data1
         d["midi_type"] = self.midi_type
+        if self.midi_led:
+            d["midi_led"] = True           # MIDI-18: nur wenn an
         d["key_binding"] = self.key_binding
         d["long_press_editor"] = self.long_press_editor
         d["bg_image"] = self.bg_image      # VC-IMG: Content-Hash-Key (Asset im ZIP)
@@ -3388,6 +3428,7 @@ class VCButton(VCWidget):
         self.midi_ch = d.get("midi_ch", 0)
         self.midi_data1 = d.get("midi_data1", -1)
         self.midi_type = d.get("midi_type", "note_on")
+        self.midi_led = bool(d.get("midi_led", False))                  # MIDI-18
         self.key_binding = d.get("key_binding", "") or ""
         # VCB-18: Laufzeit-Snap-Toggle-Zustand zuruecksetzen. Wird eine Show neu
         # geladen, waehrend ein LIBRARY_SNAP-Toggle aktiv war, schriebe der naechste

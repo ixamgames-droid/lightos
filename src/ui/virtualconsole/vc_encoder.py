@@ -25,6 +25,14 @@ from .vc_effect_meta import option_label
 class EncoderMidiMode(str):
     RELATIVE = "Relativ"     # Hardware-Encoder: CC sendet Schritte (1..63 = +, 65..127 = −)
     ABSOLUTE = "Absolut"     # Poti/Fader: CC 0..127 → Wertebereich des Parameters
+    # MIDI-18: Mackie Control (V-Pots, Jog-Rad) — Bit 6 ist das Vorzeichen,
+    # Bits 0..5 der Betrag: 1..63 = +, 65..127 = −(Wert−64). Im Zweierkomplement
+    # (RELATIVE) wuerde ein langsamer Linksdreh (65) zu −63 Schritten.
+    RELATIVE_SIGN = "Relativ (Mackie)"
+
+
+_MIDI_MODI = (EncoderMidiMode.RELATIVE, EncoderMidiMode.ABSOLUTE,
+              EncoderMidiMode.RELATIVE_SIGN)
 
 
 class VCEncoder(VCWidget):
@@ -166,6 +174,12 @@ class VCEncoder(VCWidget):
             return False
         if self.midi_mode == EncoderMidiMode.ABSOLUTE:
             self.set_normalized(msg.data2 / 127.0)
+        elif self.midi_mode == EncoderMidiMode.RELATIVE_SIGN:
+            from src.core.midi.midi_mapper import (CC_REL_VORZEICHENBIT,
+                                                   relativ_schritt)
+            steps = relativ_schritt(CC_REL_VORZEICHENBIT, msg.data2)
+            if steps:
+                self.nudge(steps)
         else:
             # Relativ (Zweierkomplement um 64): 1..63 = +, 65..127 = − , 0/64 = 0.
             v = int(msg.data2)
@@ -345,7 +359,10 @@ class VCEncoder(VCWidget):
         form.addRow("Schrittweite (Anteil):", step_sb)
 
         mode_cb = QComboBox()
-        mode_cb.addItems([EncoderMidiMode.RELATIVE, EncoderMidiMode.ABSOLUTE])
+        mode_cb.addItems(list(_MIDI_MODI))
+        mode_cb.setToolTip("Relativ: die meisten Encoder (1 = ein Schritt rechts, "
+                           "127 = ein Schritt links). Relativ (Mackie): V-Pots "
+                           "von Mackie-Control-Pulten (1 = rechts, 65 = links).")
         mode_cb.setCurrentText(self.midi_mode)
         form.addRow("MIDI-Modus:", mode_cb)
 
@@ -479,7 +496,6 @@ class VCEncoder(VCWidget):
         # zukuenftiger Wert faellt auf RELATIVE zurueck statt undefiniertes Verhalten
         # zu aktivieren.
         _mm = d.get("midi_mode", EncoderMidiMode.RELATIVE)
-        self.midi_mode = (_mm if _mm in (EncoderMidiMode.RELATIVE, EncoderMidiMode.ABSOLUTE)
-                          else EncoderMidiMode.RELATIVE)
+        self.midi_mode = _mm if _mm in _MIDI_MODI else EncoderMidiMode.RELATIVE
         self.midi_cc = int(d.get("midi_cc", -1))
         self.midi_ch = int(d.get("midi_ch", 0))

@@ -92,7 +92,8 @@
   "color_targets_note": "ColorTarget-Werte sind deutsche Anzeige-Strings (z. B. 'Effekt Farbe 1'), NICHT die Attribut-Namen.",
   "encoder_modes": [
     "Absolut",
-    "Relativ"
+    "Relativ",
+    "Relativ (Mackie)"
   ],
   "matrix_styles": [
     "Dimmer",
