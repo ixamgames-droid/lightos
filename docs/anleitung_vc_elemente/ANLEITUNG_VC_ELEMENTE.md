@@ -109,9 +109,10 @@ Rechtsklick auf ein Element (im Bearbeiten-Modus) öffnet:
 > Werkzeugleiste noch im Rechtsklick‑Menü „Hinzufügen"). Einzel‑Widgets legst du über die Werkzeugleiste
 > bzw. Rechtsklick auf die leere Canvas → „Hinzufügen" an; einen kompletten Effekt‑Aufbau baust du, indem du einen Effekt aus der Bibliothek
 > aufs Raster ziehst (Karte „Effekt einrichten") — siehe [ANLEITUNG_VC.md](../anleitung_vc/ANLEITUNG_VC.md).
-> Eine **Controller‑Vorlage** lässt sich derzeit nicht in die VC einfügen; der Controller‑Browser
-> (E/A → MIDI → „Controller-Profile…") zeigt nur Belegung und Hinweise. Die folgende Beschreibung ist
-> historisch.
+> Eine **Controller‑Vorlage** (APC mini/mk2, Motorpult im Mackie‑Control‑Modus) legst du seit MIDI‑18
+> über den Controller‑Browser ein: E/A → MIDI → „Controller-Profile…", Gerät wählen, Knopf
+> **„In Virtual Console einfügen“** — siehe [Fader-Anleitung](../anleitung_vc_widgets/02_fader.md#motorpult-als-ganzes-einfügen).
+> Die folgende Beschreibung der Baukasten‑Knöpfe ist historisch.
 
 Drei Knöpfe setzten **nicht** nur ein Einzel-Widget, sondern einen **ganzen Block** inkl.
 eigener Effekt-Funktion:

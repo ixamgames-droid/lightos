@@ -31,6 +31,9 @@ from src.core.midi.midi_mapper import (
 )
 
 VOLL = 16383
+# Kam ein Auftrag nicht an (kein Ausgang offen, Pult fehlt), wird er so oft
+# erneut versucht — gedrosselt, damit der Timer nicht im Takt sendet.
+WIEDERHOLEN_S = 1.0
 
 
 class MotorFader:
@@ -57,6 +60,7 @@ class MotorFader:
         self._offen: int | None = None
         self._beruehrt = False
         self._beruehrt_ts = float("-inf")
+        self._fehl_ts = float("-inf")   # letztes misslungenes Senden
 
     # ── Eingang vom Pult ──────────────────────────────────────────────────────
 
@@ -129,6 +133,8 @@ class MotorFader:
             return False
         if (jetzt - self._hand_ts) < MOTOR_HAND_RUHE_S:
             return False
+        if (jetzt - self._fehl_ts) < WIEDERHOLEN_S:
+            return False                # gerade erst misslungen: kurz warten
         return self._schicken(self._offen, jetzt)
 
     @property
@@ -148,7 +154,7 @@ class MotorFader:
             self._offen = None
             return False                # steht schon dort, niemand hat ihn bewegt
         # VOR dem Senden merken: was gleich zurueckkommt, gilt schon als Echo.
-        alt = (self._gesendet, self._send_ts)
+        alt_ts = self._send_ts
         self._gesendet = wert14
         self._send_ts = jetzt
         self._offen = None
@@ -157,7 +163,16 @@ class MotorFader:
         except Exception:
             ok = False
         if not ok:
-            # nichts ist angekommen (kein Ausgang offen): nicht als gesendet
-            # merken, sonst schluckt die Doppel-Sperre den Wert spaeter.
-            self._gesendet, self._send_ts = alt
+            # Nichts ist angekommen (kein Ausgang offen, Pult fehlt): nicht als
+            # gesendet merken, sonst schluckt die Doppel-Sperre den Wert. Wo
+            # der Motor steht, weiss niemand mehr. Den Auftrag BEHALTEN: der
+            # Nachtrag versucht es gedrosselt wieder — sonst bliebe der Motor
+            # nach dem spaeten Oeffnen des Ausgangs auf der alten Stellung,
+            # und der erste Griff liesse den Wert springen.
+            self._gesendet = None
+            self._send_ts = alt_ts
+            self._offen = wert14
+            self._fehl_ts = jetzt
+        else:
+            self._fehl_ts = float("-inf")
         return ok

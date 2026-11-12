@@ -15,6 +15,10 @@ ausgeblendet. ``midi_only=False`` zeigt die komplette Bibliothek.
   <Datenordner>/input_profiles/ an (Ausgabe → Input-Profile verwalten…): APC mini mit
   fester Vorlage, jedes andere Profil mit Noten/CCs über den allgemeinen
   Generator (MIDI-8, src/core/controllers/mapping_generator.py)
+- „In Virtual Console einfügen" (MIDI-18) — legt die VC-Vorlage des Profils
+  (``vc_template``: APC mini/mk2, Motorpult Mackie Control) als EIN Undo-
+  Schritt auf die aktuelle Seite der Virtual Console. Die Zeichenflaeche kommt
+  als Geber (``vc_canvas``) vom Aufrufer; ohne Geber bleibt der Knopf aus.
 - Pult-Vorlagen (MIDI-8): was ein Lichtpult per Makro/MSC senden muss, damit
   LightOS es versteht — mit Hinweis, dass Hersteller-Wings nicht anschließbar
   sind
@@ -90,9 +94,11 @@ _BTN_STYLE = """
 
 
 class ControllerBrowserDialog(QDialog):
-    def __init__(self, parent=None, midi_only: bool = True):
+    def __init__(self, parent=None, midi_only: bool = True, vc_canvas=None):
         super().__init__(parent)
         self._midi_only = midi_only
+        # MIDI-18: () -> VCCanvas | None, vom Hauptfenster durchgereicht.
+        self._vc_canvas = vc_canvas
         self.setWindowTitle("MIDI-Controller-Profile" if midi_only
                             else "Controller-Bibliothek")
         self.setModal(True)
@@ -141,15 +147,18 @@ class ControllerBrowserDialog(QDialog):
         btns = QHBoxLayout()
         self._btn_import = QPushButton("QLC+ .qxi importieren…")
         self._btn_mapping = QPushButton("MIDI-Mapping-Profil erzeugen")
+        self._btn_vc = QPushButton("In Virtual Console einfügen")
         btn_close = QPushButton("Schließen")
-        for b in (self._btn_import, self._btn_mapping, btn_close):
+        for b in (self._btn_import, self._btn_mapping, self._btn_vc, btn_close):
             b.setMinimumHeight(36)
             b.setStyleSheet(_BTN_STYLE)
         self._btn_import.clicked.connect(self._import_qxi)
         self._btn_mapping.clicked.connect(self._create_mapping_profile)
+        self._btn_vc.clicked.connect(self._vorlage_einfuegen)
         btn_close.clicked.connect(self.accept)
         btns.addWidget(self._btn_import)
         btns.addWidget(self._btn_mapping)
+        btns.addWidget(self._btn_vc)
         btns.addStretch(1)
         btns.addWidget(btn_close)
         root.addLayout(btns)
@@ -183,9 +192,20 @@ class ControllerBrowserDialog(QDialog):
         if p is None:
             self._details.setHtml("")
             self._btn_mapping.setEnabled(False)
+            self._btn_vc.setEnabled(False)
             return
         from src.core.controllers.mapping_generator import kann_mapping_erzeugen
         self._btn_mapping.setEnabled(kann_mapping_erzeugen(p))
+        vorlage = self._vorlage_name(p)
+        self._btn_vc.setEnabled(bool(vorlage) and self._vc_canvas is not None)
+        if not vorlage:
+            self._btn_vc.setToolTip("Für dieses Gerät gibt es keine fertige "
+                                    "Vorlage für die Virtual Console.")
+        elif self._vc_canvas is None:
+            self._btn_vc.setToolTip("Nur im Hauptfenster (MIDI-Ansicht) möglich.")
+        else:
+            self._btn_vc.setToolTip(f"Legt „{vorlage}“ auf die aktuelle Seite der "
+                                    "Virtual Console. Rückgängig mit Strg+Z.")
 
         def esc(s):
             return (str(s).replace("&", "&amp;").replace("<", "&lt;")
@@ -209,7 +229,8 @@ class ControllerBrowserDialog(QDialog):
             rows.append("<tr style='color:#79c0ff'><td>Element</td><td>Typ</td>"
                         "<td>Kanal</td><td>Nummern</td><td>Layout</td></tr>")
             for c in p.controls[:40]:
-                rng = (", ".join(map(str, c.numbers)) if c.numbers  # CDX-64
+                rng = ("–" if c.type == "pitchbend"   # MIDI-18: Kennung ist der Kanal
+                       else ", ".join(map(str, c.numbers)) if c.numbers  # CDX-64
                        else f"{c.range[0]}–{c.range[1]}" if c.range[0] != c.range[1]
                        else str(c.range[0]))
                 ch = "alle" if c.channel < 0 else str(c.channel + 1)
@@ -245,12 +266,12 @@ class ControllerBrowserDialog(QDialog):
             for f in p.features:
                 rows.append(f"<li>{esc(f)}</li>")
             rows.append("</ul>")
-        # UI-71: hier stand „✔ VC-Vorlage verfügbar — in der Virtual Console über
-        # „Controller-Vorlage einfügen“ nutzbar“. Diese Aktion gibt es seit dem
-        # Abbau der Baukasten-Bloecke (2026-07) nirgends mehr; `vc_template`
-        # wird von keinem Bedienweg gelesen. Der Hinweis schickte Robin auf die
-        # Suche nach einem Knopf, den es nicht gibt — er entfaellt, bis es den
-        # Weg wieder gibt.
+        # UI-71/MIDI-18: der Hinweis nennt den Knopf, den es hier wirklich gibt
+        # (bis MIDI-18 fehlte der Weg, der Hinweis war deshalb entfallen).
+        if vorlage:
+            rows.append(f"<p style='color:#3fb950'><b>✔ Vorlage für die Virtual "
+                        f"Console:</b> {esc(vorlage)} — Knopf „In Virtual Console "
+                        f"einfügen“ unten.</p>")
         rows.append("<hr>")
         rows.append(f"<p style='color:#8b949e; font-size:10px'><b>Quelle:</b> {esc(p.source)}<br>"
                     f"<b>Lizenz:</b> {esc(p.license)}<br>"
@@ -290,6 +311,19 @@ class ControllerBrowserDialog(QDialog):
             erzeuge_mapping_profil, kann_mapping_erzeugen)
         if not kann_mapping_erzeugen(p):
             return
+        if getattr(p, "vc_template", "") == "mackie_control":
+            # MIDI-18: das Profil belegt dieselben Tasten wie die VC-Vorlage
+            # (SELECT 1 = GO Executor 1 UND die VC-Taste).
+            antwort = QMessageBox.question(
+                self, "Mapping-Profil",
+                "Für dieses Pult gibt es die fertige Vorlage für die Virtual "
+                "Console. Nutzt du beides, löst eine Taste am Pult zwei Dinge "
+                "auf einmal aus.\n\nNimm am besten nur eins von beiden.\n\n"
+                "Mapping-Profil trotzdem erzeugen?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return
         try:
             prof = erzeuge_mapping_profil(p)
             path = prof.save()
@@ -300,3 +334,66 @@ class ControllerBrowserDialog(QDialog):
                 "Laden über Ausgabe → Input-Profile verwalten...")
         except Exception as e:
             QMessageBox.warning(self, "Mapping-Profil", str(e))
+
+    # ── MIDI-18: Vorlage in die Virtual Console ──────────────────────────────
+
+    @staticmethod
+    def _vorlage_name(p) -> str:
+        if p is None or not p.vc_template:
+            return ""
+        from src.ui.virtualconsole.controller_templates import vorlage_name
+        return vorlage_name(p.vc_template)
+
+    def _vorlage_einfuegen(self):
+        p = self._current()
+        name = self._vorlage_name(p)
+        if not name or self._vc_canvas is None:
+            return
+        try:
+            canvas = self._vc_canvas()
+        except Exception:
+            canvas = None
+        if canvas is None:
+            QMessageBox.warning(self, "Virtual Console",
+                                "Die Virtual Console ist gerade nicht erreichbar.")
+            return
+        from src.ui.virtualconsole.controller_templates import vorlage_bauen
+        bank = int(getattr(canvas, "active_bank", 0))
+        vorlage = vorlage_bauen(p.vc_template)
+        # Zweimal auf dieselbe Seite: zwei Fader auf einem Motor, ein
+        # Tastendruck schaltet zwei Tasten. Erst fragen.
+        pruefen = getattr(canvas, "vorlage_ueberschneidungen", None)
+        try:
+            doppelt = int(pruefen(vorlage)) if callable(pruefen) else 0
+        except Exception:
+            doppelt = 0
+        if doppelt:
+            antwort = QMessageBox.question(
+                self, "Virtual Console",
+                f"Auf Seite {bank + 1} hören schon {doppelt} Bedienelemente auf "
+                "dieselben Tasten oder Fader des Pults. Dann bewegt ein Fader am "
+                "Pult zwei Fader in LightOS, und eine Taste schaltet zwei.\n\n"
+                "Besser: in der Virtual Console erst eine freie Seite wählen.\n\n"
+                "Trotzdem auf diese Seite einfügen?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                self._letzte_meldung = ""
+                return
+        erzeugt = canvas.vorlage_einfuegen(vorlage)
+        if not erzeugt:
+            QMessageBox.warning(self, "Virtual Console", "Es wurde nichts eingefügt.")
+            return
+        zahl: dict[str, int] = {}
+        for w in erzeugt:
+            zahl[type(w).__name__] = zahl.get(type(w).__name__, 0) + 1
+        teile = [f"{zahl[k]} {t}" for k, t in (("VCSlider", "Fader"),
+                                                ("VCButton", "Tasten"),
+                                                ("VCEncoder", "Drehregler"))
+                 if zahl.get(k)]
+        self._letzte_meldung = (
+            f"„{name}“ liegt jetzt auf Seite {bank + 1} der Virtual Console"
+            + (f": {', '.join(teile)}." if teile else ".")
+            + "\n\nRückgängig mit Strg+Z in der Virtual Console. Den Tasten und "
+            "Fadern gibst du dort per Rechtsklick ihre Funktion.")
+        QMessageBox.information(self, "Virtual Console", self._letzte_meldung)

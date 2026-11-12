@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
                                 QMessageBox, QInputDialog, QSizePolicy)
-from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal
+from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
-from .vc_widget import VCWidget
+from .vc_widget import VCWidget, KENNUNG_FELD
 from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert   # ENG-41
 from src.core import undo as _verlauf      # UI-93: gemeinsame Schrittnummern
 
@@ -177,6 +177,12 @@ class VCCanvas(QWidget):
         # (Cross-Thread-Signal -> automatisch QueuedConnection -> _handle_midi laeuft im UI-Thread)
         self._midi_received.connect(self._handle_midi)
         self._bank_change_sig.connect(self.set_active_bank)
+        # MIDI-18: Tasten-LEDs am Pult (VCButton.midi_led). Der Abgleich laeuft
+        # nur, solange es eine solche Taste gibt (led_rueckmeldung_pruefen).
+        self._led_spiegel = None
+        self._led_timer = QTimer(self)
+        self._led_timer.setInterval(150)
+        self._led_timer.timeout.connect(self._led_abgleich)
         self._setup_midi()
         self._setup_keyboard()
         self._setup_engine_page()
@@ -203,6 +209,13 @@ class VCCanvas(QWidget):
             print(f"[VCCanvas] MIDI-Konflikt-Provider-Fehler: {e}")
 
     def _teardown_midi(self):
+        # MIDI-18: angeschaltete Pult-LEDs nicht brennen lassen.
+        spiegel = getattr(self, "_led_spiegel", None)
+        if spiegel is not None:
+            try:
+                spiegel.alle_aus()
+            except Exception:
+                pass
         try:
             from src.core.midi import midi_mapper
             midi_mapper.unregister_vc_binding_provider(self.iter_midi_bindings)
@@ -1930,6 +1943,8 @@ class VCCanvas(QWidget):
         w.setVisible(self.soll_sichtbar(w))
         self.popups_nach_oben()          # VCB-48: neues Widget nicht ueber ein offenes Pop-up
         self._update_content_extent()
+        if not self._laedt_layout:
+            self.led_rueckmeldung_pruefen()     # MIDI-18
         return w
 
     def _on_widget_moved(self, _x=0, _y=0):
@@ -2826,6 +2841,161 @@ class VCCanvas(QWidget):
         self._apply_bank_visibility()
         self._update_content_extent()
         self.bank_changed.emit(self._active_bank)
+        self.led_rueckmeldung_pruefen()         # MIDI-18
+
+    # ── MIDI-18: Tasten-LEDs am Pult ─────────────────────────────────────────
+
+    def _led_tasten(self) -> list:
+        from .vc_button import VCButton
+        try:
+            return [b for b in self.findChildren(VCButton) if b.led_ziel() is not None]
+        except RuntimeError:
+            return []
+
+    def led_rueckmeldung_pruefen(self) -> None:
+        """Abgleich starten, sobald es eine Taste mit LED-Rueckmeldung gibt.
+        Gestoppt wird er im Abgleich selbst (nach dem letzten Ausschalten)."""
+        try:
+            if self._led_tasten() and not self._led_timer.isActive():
+                self._led_timer.start()
+                self._led_abgleich()
+        except RuntimeError:
+            pass                        # Canvas wird gerade zerstoert
+
+    def _led_senden(self, msg) -> bool:
+        try:
+            from src.core.midi.midi_manager import (
+                get_midi_manager, ist_apc_ausgang)
+            mm = get_midi_manager()
+            if ist_apc_ausgang(mm):
+                return False            # die Pads des APC nicht ueberschreiben
+            return bool(mm.send_message(msg))
+        except Exception:
+            return False
+
+    def _led_abgleich(self) -> None:
+        """Je (Kanal, Note) der aktiven Bank: an, wenn eine Taste leuchtet.
+        Tasten anderer Seiten melden nichts — ihre LED geht aus."""
+        if self._led_spiegel is None:
+            from src.core.midi.note_led import NoteLedSpiegel
+            self._led_spiegel = NoteLedSpiegel(self._led_senden)
+        wunsch: dict = {}
+        tasten = self._led_tasten()
+        for b in tasten:
+            if not self.on_active_bank(b):
+                continue
+            ziel = b.led_ziel()
+            try:
+                an = bool(b.leuchtet())
+            except Exception:
+                an = False
+            wunsch[ziel] = wunsch.get(ziel, False) or an
+        self._led_spiegel.abgleichen(wunsch)
+        if not tasten and not self._led_spiegel.stand:
+            self._led_timer.stop()
+
+    # ── MIDI-18: Vorlage einfuegen ───────────────────────────────────────────
+
+    @staticmethod
+    def _bindung_aus_dict(d: dict):
+        """MIDI-Bindung eines ``to_dict``-Dicts wie ``current_midi_binding``."""
+        typ = d.get("type")
+        try:
+            if typ == "VCSlider":
+                cc = int(d.get("midi_cc", -1))
+                if cc < 0:
+                    return None
+                if d.get("midi_type", "cc") == "pitchbend":
+                    return ("pitchbend", int(d.get("midi_ch", 0)), 0)
+                return ("cc", int(d.get("midi_ch", 0)), cc)
+            if typ == "VCButton":
+                d1 = int(d.get("midi_data1", -1))
+                if d1 < 0:
+                    return None
+                return (d.get("midi_type", "note_on"), int(d.get("midi_ch", 0)), d1)
+            if typ == "VCEncoder":
+                cc = int(d.get("midi_cc", -1))
+                return ("cc", int(d.get("midi_ch", 0)), cc) if cc >= 0 else None
+        except (TypeError, ValueError):
+            return None
+        return None
+
+    @staticmethod
+    def _bindungen_treffen(a, b) -> bool:
+        """Reagieren zwei Bindungen auf dasselbe Signal? Kanal 0 = alle."""
+        def art(t):
+            return "note" if t in ("note_on", "note_off") else t
+        return (art(a[0]) == art(b[0]) and int(a[2]) == int(b[2])
+                and (int(a[1]) == int(b[1]) or 0 in (int(a[1]), int(b[1]))))
+
+    def vorlage_ueberschneidungen(self, widgets: list[dict]) -> int:
+        """MIDI-18: Wie viele Widgets der AKTIVEN Seite hoeren schon auf ein
+        Signal der Vorlage? (Zweimal eingefuegt: zwei Fader auf demselben
+        Motor, ein Tastendruck schaltet zwei Tasten.)"""
+        neu = [b for b in (self._bindung_aus_dict(d) for d in (widgets or [])
+                           if isinstance(d, dict)) if b]
+        if not neu:
+            return 0
+        zahl = 0
+        for child in self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            if not self.on_active_bank(child):
+                continue
+            getter = getattr(child, "current_midi_binding", None)
+            try:
+                b = getter() if callable(getter) else None
+            except Exception:
+                b = None
+            if b and any(self._bindungen_treffen(b, n) for n in neu):
+                zahl += 1
+        return zahl
+
+    def vorlage_einfuegen(self, widgets: list[dict]) -> list:
+        """Eine fertige Widget-Liste (``to_dict``-Dicts, z. B. aus
+        ``controller_templates``) auf die aktuelle Seite legen — als EIN
+        Undo-Schritt, unter das, was auf dieser Seite schon liegt. Gibt die
+        erzeugten Widgets zurueck."""
+        widgets = [dict(d) for d in (widgets or []) if isinstance(d, dict)]
+        if not widgets:
+            return []
+        x_min = min(int(d.get("x", 0)) for d in widgets)
+        y_min = min(int(d.get("y", 0)) for d in widgets)
+        # Freie Stelle: unter dem untersten Widget der aktiven Seite.
+        unten = 0
+        for child in self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            if self.on_active_bank(child):
+                unten = max(unten, child.y() + child.height())
+        x0 = self.GRID * 2
+        y0 = (unten + self.GRID * 3) if unten else self.GRID * 2
+        dx, dy = x0 - x_min, y0 - y_min
+        self.push_undo_snapshot(self.to_dict())
+        _prev_restoring, _prev_laedt = self._restoring, self._laedt_layout
+        self._restoring = True
+        self._laedt_layout = True
+        erzeugt: list = []
+        try:
+            for d in widgets:
+                d["x"] = int(d.get("x", 0)) + dx
+                d["y"] = int(d.get("y", 0)) + dy
+                d["bank"] = self._active_bank       # auf die aktuelle Seite
+                d.pop(KENNUNG_FELD, None)           # frische Kennung
+                try:
+                    w = self._add_widget(d.get("type", ""), QPoint(d["x"], d["y"]), d)
+                except Exception as e:
+                    print(f"[VCCanvas] Vorlage: '{d.get('type')}' uebersprungen: {e}")
+                    continue
+                if w is not None:
+                    erzeugt.append(w)
+        finally:
+            self._restoring = _prev_restoring
+            self._laedt_layout = _prev_laedt
+        self._kennungen_reparieren()
+        belegung_geaendert()
+        self._apply_bank_visibility()
+        self._update_content_extent()
+        self.led_rueckmeldung_pruefen()
+        return erzeugt
 
     def _save(self):
         path, _ = QFileDialog.getSaveFileName(self, "VC Layout speichern",

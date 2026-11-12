@@ -78,6 +78,9 @@ class MidiLogSignal(QObject):
 class MidiView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # MIDI-18: () -> VCCanvas | None; setzt das Hauptfenster. Damit kann der
+        # Controller-Browser eine Vorlage in die Virtual Console legen.
+        self.vc_canvas_geber = None
         self._midi = get_midi_manager()
         self._state = get_state()
         self._mapper = self._state.midi_mapper or get_midi_mapper(self._state)
@@ -323,7 +326,8 @@ class MidiView(QWidget):
         """Controller-Profile öffnen (MIDI-Geräte; Feature 6: Controller-DB)."""
         try:
             from src.ui.widgets.controller_browser import ControllerBrowserDialog
-            ControllerBrowserDialog(self, midi_only=True).exec()
+            ControllerBrowserDialog(self, midi_only=True,
+                                    vc_canvas=self.vc_canvas_geber).exec()
         except Exception as e:
             QMessageBox.warning(self, "Controller-Profile", str(e))
 
