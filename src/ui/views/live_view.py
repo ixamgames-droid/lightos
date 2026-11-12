@@ -3457,7 +3457,10 @@ class LiveView(QWidget):
 
         # -- Rechtes Panel: Editor --
         self._right_panel = QWidget()
-        self._right_panel.setFixedWidth(210)
+        # UI-112 (D-16): Touch-QSS vergroessert hier Haken (#touchSpalte); die
+        # Zahlenfelder mit −/+ links/rechts brauchen am Finger mehr Breite.
+        self._right_panel.setObjectName("touchSpalte")
+        self._right_panel.setFixedWidth(260 if self._touch_aktiv() else 210)
         self._right_panel.setStyleSheet("background:#10121a; border-left:1px solid #222;")
         right_layout = QVBoxLayout(self._right_panel)
         right_layout.setContentsMargins(6, 8, 6, 8)
@@ -3479,6 +3482,8 @@ class LiveView(QWidget):
         form.setContentsMargins(6, 4, 6, 6)
         form.setSpacing(6)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        if self._touch_aktiv():          # UI-112: Beschriftung ueber dem Feld
+            form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
 
         lv_prefs = _load_prefs().get("live_view", {})
 
@@ -3718,8 +3723,16 @@ class LiveView(QWidget):
     # ── Hilfsmethode: SpinBox-Style ───────────────────────────────────────────
 
     @staticmethod
+    def _touch_aktiv() -> bool:
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            return bool(is_touch_mode())
+        except Exception:
+            return False
+
+    @staticmethod
     def _spinbox_style() -> str:
-        return """
+        stil = """
             QSpinBox {
                 background: #1a1c28;
                 color: #ccc;
@@ -3729,6 +3742,12 @@ class LiveView(QWidget):
             }
             QSpinBox::up-button, QSpinBox::down-button { width: 16px; }
         """
+        # UI-112 (D-16): das eigene Stylesheet ueberdeckt das Touch-QSS des
+        # Hauptfensters — die grossen −/+-Knoepfe deshalb hier anhaengen.
+        if LiveView._touch_aktiv():
+            from src.ui.touch_keyboard import zahlenfeld_touch_qss
+            stil += zahlenfeld_touch_qss("QSpinBox")
+        return stil
 
     # ── Editor-Handler ────────────────────────────────────────────────────────
 
