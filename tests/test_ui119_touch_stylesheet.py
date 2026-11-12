@@ -223,6 +223,25 @@ class TouchMasseTest(_Basis):
         _Finger(view.viewport()).tipp(r.center())
         self.assertTrue(_warte(lambda: combo.currentIndex() == 2), combo.currentIndex())
 
+    def test_c11_klappliste_trennlinie_bleibt_schmal(self):
+        # Pruefung: der QSS-Delegat darf Trennlinien (insertSeparator, z. B.
+        # Stufenauswahl, Buehnen-Klappliste) nicht zu leeren 44-px-Zeilen machen.
+        combo = QComboBox()
+        combo.addItems(["Kreis", "Acht"])
+        combo.insertSeparator(1)
+        combo.addItem("Linie")
+        self._fenster(combo)
+        combo.showPopup()
+        view = combo.view()
+        self.assertTrue(_warte(view.isVisible))
+        hoehen = [view.visualRect(combo.model().index(i, 0)).height() for i in range(4)]
+        self.assertLess(hoehen[1], 20, hoehen)
+        self.assertGreaterEqual(min(hoehen[0], hoehen[2], hoehen[3]), 44, hoehen)
+        # Fingertipp auf den Eintrag hinter der Trennlinie waehlt ihn
+        r = view.visualRect(combo.model().index(3, 0))
+        _Finger(view.viewport()).tipp(r.center())
+        self.assertTrue(_warte(lambda: combo.currentIndex() == 3), combo.currentIndex())
+
     def test_c12_menue_eintraege(self):
         w = self._fenster(QLabel("x"))
         m = QMenu(w)

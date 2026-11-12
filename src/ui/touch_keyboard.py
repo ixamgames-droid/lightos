@@ -394,6 +394,34 @@ class OskEventFilter(QObject):
         QTimer.singleShot(0, lambda f=feld: _oeffnen_wenn_gueltig(f))
 
 
+class _KlapplistenDelegat(QStyledItemDelegate):
+    """C-11: QSS-faehiger Delegat fuer Klapplisten, der Trennlinien
+    (``QComboBox.insertSeparator``) wie Qts eigener Delegat als schmale
+    Linie zeichnet statt als leere 44-px-Zeile."""
+
+    @staticmethod
+    def _trenner(index) -> bool:
+        return index.data(Qt.ItemDataRole.AccessibleDescriptionRole) == "separator"
+
+    def sizeHint(self, option, index):  # noqa: N802
+        if self._trenner(index):
+            from PySide6.QtCore import QSize
+            return QSize(option.rect.width(), 9)
+        return super().sizeHint(option, index)
+
+    def paint(self, painter, option, index):
+        if self._trenner(index):
+            from PySide6.QtGui import QColor
+            r = option.rect
+            y = r.center().y()
+            painter.save()
+            painter.setPen(QColor("#3a3a3a"))
+            painter.drawLine(r.left() + 6, y, r.right() - 6, y)
+            painter.restore()
+            return
+        super().paint(painter, option, index)
+
+
 def _touch_masse(obj: QObject) -> None:
     """UI-119: was das Stylesheet nicht erreicht, beim Zeigen nachziehen.
 
@@ -411,7 +439,7 @@ def _touch_masse(obj: QObject) -> None:
             # C-11: ``QComboBox QAbstractItemView::item`` greift nur mit einem
             # QStyledItemDelegate — Qts eigener Menue-Delegat ignoriert das QSS.
             if not isinstance(obj.itemDelegate(), QStyledItemDelegate):
-                obj.setItemDelegate(QStyledItemDelegate(obj))
+                obj.setItemDelegate(_KlapplistenDelegat(obj))
         elif isinstance(obj, QDialogButtonBox):
             lay = obj.layout()
             if lay is not None and lay.spacing() < KNOPF_ABSTAND:
