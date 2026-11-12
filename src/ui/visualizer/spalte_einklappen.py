@@ -39,6 +39,10 @@ PFEIL_AUSKLAPPEN = "‹"
 _SPEICHER_VERZUG_MS = 300
 
 
+#: UI-119 (D-10): Breite des Klappknopfs im Touch-Modus.
+KLAPPKNOPF_TOUCH = 34
+
+
 def _lade_prefs() -> dict:
     try:
         from src.ui.views.programmer_view import _load_prefs
@@ -59,7 +63,12 @@ def baue_knopf(parent=None) -> QToolButton:
     """Schmaler Knopf ueber die ganze Hoehe, direkt links neben der Spalte."""
     knopf = QToolButton(parent)
     knopf.setObjectName("vizSpalteKlappen")
-    knopf.setFixedWidth(18)
+    # UI-119 (D-10): am Finger 34 px breit, mit der Maus schmal wie bisher.
+    try:
+        from src.ui.touch_keyboard import is_touch_mode
+        knopf.setFixedWidth(KLAPPKNOPF_TOUCH if is_touch_mode() else 18)
+    except Exception:
+        knopf.setFixedWidth(18)
     knopf.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
     knopf.setFocusPolicy(Qt.FocusPolicy.NoFocus)   # nimmt der 3D-Ansicht keinen Fokus
     knopf.setCursor(Qt.CursorShape.PointingHandCursor)

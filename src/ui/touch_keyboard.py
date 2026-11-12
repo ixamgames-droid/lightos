@@ -16,7 +16,8 @@ import sys
 import os
 import subprocess
 from PySide6.QtWidgets import (QApplication, QSpinBox, QDoubleSpinBox, QLineEdit,
-                                QAbstractSpinBox)
+                                QAbstractSpinBox, QComboBox, QDialogButtonBox,
+                                QStyledItemDelegate, QTableView)
 from PySide6.QtCore import Qt, QObject, QEvent, QTimer
 
 _touch_mode: bool = False
@@ -224,9 +225,80 @@ SPALTE_TOUCH_QSS = (
 )
 
 
+#: UI-119 (Touch-Audit A-11/A-13/A-14/A-16/B-10/C-09/C-11/C-12/C-16/D-10/D-16):
+#: Zielgroessen am Finger fuer alles, was das Hauptfenster-QSS bisher auslies.
+#: Nur im Touch-Modus — mit der Maus bleibt das Theme unveraendert.
+HAKEN_ZEILE = 36          # Haken/Radio: Zeilenhoehe (Text zaehlt zur Flaeche)
+HAKEN_INDIKATOR = 26      # Haken/Radio: Kaestchen (+ 1 px Rand je Seite = 28 px)
+LEISTE_BREITE = 24        # Bildlaufleisten
+LEISTE_GRIFF_MIN = 48     # Mindestlaenge des Leistengriffs
+SPLITTER_GRIFF = 16       # Splitter-Griff (mit Punkt-Marke)
+TABELLEN_ZEILE = 44       # Tabellen-, Klapplisten- und Menue-Zeilen
+KOPFZEILE = 40            # Tabellen-Kopfzeile
+SEITENPFEIL = 40          # Pfeile an zu vielen Reitern
+KNOPF_ABSTAND = 16        # Abstand Ja <-> Nein in Dialog-Knopfleisten
+TOUCH_KNOPF_H = 38        # wie ``QPushButton { min-height }`` im Hauptfenster
+TOUCH_SCHRIFT_PX = 13     # kleinste Knopfschrift im Touch-Modus
+
+
+def allgemein_touch_qss() -> str:
+    """UI-119: Haken, Bildlaufleisten, Splitter, Tabellen/Kopfzeilen,
+    Klapplisten- und Menue-Eintraege, Reiter-Pfeile."""
+    senk, waag = _icon_url("griff_senkrecht.svg"), _icon_url("griff_waagerecht.svg")
+    r = HAKEN_INDIKATOR // 2
+    return (
+        # A-16/D-16: Haken + Radio
+        f"QCheckBox, QRadioButton {{ min-height: {HAKEN_ZEILE}px; spacing: 10px; }}\n"
+        f"QCheckBox::indicator, QRadioButton::indicator {{ width: {HAKEN_INDIKATOR}px; "
+        f"height: {HAKEN_INDIKATOR}px; }}\n"
+        "QCheckBox::indicator { border-radius: 4px; }\n"
+        f"QRadioButton::indicator {{ border-radius: {r}px; }}\n"
+        f"QGroupBox::indicator {{ width: {HAKEN_INDIKATOR}px; height: {HAKEN_INDIKATOR}px; }}\n"
+        # A-14/C-16: Bildlaufleisten
+        f"QScrollBar:vertical {{ width: {LEISTE_BREITE}px; }}\n"
+        f"QScrollBar:horizontal {{ height: {LEISTE_BREITE}px; }}\n"
+        f"QScrollBar::handle:vertical {{ min-height: {LEISTE_GRIFF_MIN}px; "
+        "border-radius: 9px; margin: 3px; }\n"
+        f"QScrollBar::handle:horizontal {{ min-width: {LEISTE_GRIFF_MIN}px; "
+        "border-radius: 9px; margin: 3px; }\n"
+        # A-13/B-10/C-09/D-10: Splitter-Griffe mit sichtbarer Punkt-Marke
+        "QSplitter::handle { background: #262626; }\n"
+        f"QSplitter::handle:horizontal {{ width: {SPLITTER_GRIFF}px; image: url({senk}); }}\n"
+        f"QSplitter::handle:vertical {{ height: {SPLITTER_GRIFF}px; image: url({waag}); }}\n"
+        "QSplitter::handle:pressed { background: #0978FF; }\n"
+        # A-11: Tabellenzeilen + Kopfzeilen
+        f"QTableView::item, QTableWidget::item {{ min-height: {TABELLEN_ZEILE}px; }}\n"
+        f"QHeaderView::section {{ min-height: {KOPFZEILE - 12}px; padding: 6px 8px; }}\n"
+        # C-11: aufgeklappte Klappliste
+        f"QComboBox QAbstractItemView::item {{ min-height: {TABELLEN_ZEILE}px; "
+        "padding: 0 10px; }\n"
+        # C-12: Menue-Eintraege (auch Kontextmenues, Langdruck-Menue)
+        "QMenu::item { padding: 14px 32px 14px 16px; }\n"
+        "QMenu::separator { height: 9px; }\n"
+        # A-11: Seitenpfeile an zu vielen Reitern
+        f"QTabBar QToolButton {{ min-width: {SEITENPFEIL}px; min-height: {SEITENPFEIL}px; }}\n"
+        f"QTabBar::scroller {{ width: {2 * SEITENPFEIL}px; }}\n"
+    )
+
+
+def touch_hoehe(normal: int) -> int:
+    """UI-119 (C-14): feste Knopfhoehe, im Touch-Modus mindestens 38 px."""
+    return max(int(normal), TOUCH_KNOPF_H) if _touch_mode else int(normal)
+
+
+def touch_schrift(qss: str) -> str:
+    """UI-119 (C-14): kleine feste Schrift (9-12 px) in einem Widget-Stylesheet
+    im Touch-Modus auf 13 px anheben; ohne Touch unveraendert."""
+    if not _touch_mode:
+        return qss
+    import re
+    return re.sub(r"font-size\s*:\s*(?:9|10|11|12)px",
+                  f"font-size:{TOUCH_SCHRIFT_PX}px", qss)
+
+
 def touch_qss() -> str:
     """Alle Touch-Regeln dieses Moduls (Hauptfenster haengt sie an sein QSS)."""
-    return zahlenfeld_touch_qss() + SPALTE_TOUCH_QSS
+    return zahlenfeld_touch_qss() + SPALTE_TOUCH_QSS + allgemein_touch_qss()
 
 
 # Globaler Stylesheet-Zusatz fuer den Touch-Modus (App-weit, fuer Fenster ohne
@@ -284,6 +356,9 @@ class OskEventFilter(QObject):
         if typ in (QEvent.Type.MouseButtonPress, QEvent.Type.MouseButtonRelease):
             if _touch_mode and isinstance(obj, QLineEdit):
                 self._finger_tipp(obj, event, typ == QEvent.Type.MouseButtonPress)
+        elif typ == QEvent.Type.Show:
+            if _touch_mode:
+                _touch_masse(obj)
         elif typ == QEvent.Type.FocusIn:
             if isinstance(obj, (QLineEdit, QSpinBox, QDoubleSpinBox)):
                 # Immer konfigurieren → Windows erkennt das Feld als Text-Input
@@ -317,6 +392,32 @@ class OskEventFilter(QObject):
             return
         # Nach dem Loslassen: das Feld hat Fokus und Cursor schon gesetzt.
         QTimer.singleShot(0, lambda f=feld: _oeffnen_wenn_gueltig(f))
+
+
+def _touch_masse(obj: QObject) -> None:
+    """UI-119: was das Stylesheet nicht erreicht, beim Zeigen nachziehen.
+
+    * A-11: Tabellenzeilen — die Hoehe kommt aus ``verticalHeader()``, nicht
+      aus ``::item``; zu niedrige Standardhoehen werden auf 44 px gehoben.
+    * C-11: Klapplisten bekommen einen QSS-faehigen Delegaten (44-px-Zeilen).
+    * C-13: Ja/Nein-Abstand in Dialog-Knopfleisten >= 16 px (Qt nimmt sonst
+      den Stil-Abstand von 6 px)."""
+    try:
+        if isinstance(obj, QTableView):
+            vh = obj.verticalHeader()
+            if vh is not None and vh.defaultSectionSize() < TABELLEN_ZEILE:
+                vh.setDefaultSectionSize(TABELLEN_ZEILE)
+        elif isinstance(obj, QComboBox):
+            # C-11: ``QComboBox QAbstractItemView::item`` greift nur mit einem
+            # QStyledItemDelegate — Qts eigener Menue-Delegat ignoriert das QSS.
+            if not isinstance(obj.itemDelegate(), QStyledItemDelegate):
+                obj.setItemDelegate(QStyledItemDelegate(obj))
+        elif isinstance(obj, QDialogButtonBox):
+            lay = obj.layout()
+            if lay is not None and lay.spacing() < KNOPF_ABSTAND:
+                lay.setSpacing(KNOPF_ABSTAND)
+    except Exception as e:                       # nie die Bedienung abbrechen
+        print(f"[touch_keyboard] Touch-Masse: {e}")
 
 
 def _oeffnen_wenn_gueltig(feld) -> None:

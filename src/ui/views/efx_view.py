@@ -2,6 +2,7 @@
 from __future__ import annotations
 import math
 import weakref
+from src.ui.touch_keyboard import touch_hoehe, touch_schrift  # UI-119 (C-14)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton,
                                 QGroupBox, QFormLayout, QDoubleSpinBox, QSpinBox,
@@ -1104,12 +1105,12 @@ class EfxView(QWidget):
         btn_start = QPushButton("▶ Start")
         btn_stop  = QPushButton("■ Stop")
         for btn in (btn_add, btn_save, btn_del, btn_start, btn_stop):
-            btn.setFixedHeight(26)
-            btn.setStyleSheet("""
+            btn.setFixedHeight(touch_hoehe(26))
+            btn.setStyleSheet(touch_schrift("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; padding:0 6px; }
                 QPushButton:hover { background:#30363d; }
-            """)
+            """))
             btn_row.addWidget(btn)
         btn_add.clicked.connect(self._add_efx)
         btn_save.clicked.connect(self._save_efx)
@@ -1136,13 +1137,13 @@ class EfxView(QWidget):
         header.setContentsMargins(0, 0, 0, 0)
         header.addStretch(1)
         self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
-        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setFixedHeight(touch_hoehe(24))
         self._btn_editor_popout.setToolTip(
             "Den GANZEN EFX-Editor in einem großen, scrollbaren Fenster bearbeiten")
         self._btn_editor_popout.setStyleSheet(
-            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            touch_schrift("QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
             "border-radius:3px;font-size:10px;padding:1px 8px;} "
-            "QPushButton:hover{background:#30363d;}")
+            "QPushButton:hover{background:#30363d;}"))
         self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
         header.addWidget(self._btn_editor_popout)
         rl.addLayout(header)
@@ -1206,12 +1207,12 @@ class EfxView(QWidget):
         self._btn_path_del  = QPushButton("🗑")
         self._btn_path_del.setFixedWidth(30)
         for b in (self._btn_path_new, self._btn_path_edit, self._btn_path_del):
-            b.setFixedHeight(26)
-            b.setStyleSheet("""
+            b.setFixedHeight(touch_hoehe(26))
+            b.setStyleSheet(touch_schrift("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; }
                 QPushButton:hover { background:#30363d; }
-            """)
+            """))
             path_row.addWidget(b)
         # EFX-PATH-BTN-LABEL: Die Text-Buttons duerfen nicht vom stretchenden
         # Combo zusammengequetscht werden ("eich"/"beit"). Ihre Untergrenze ist
@@ -1271,9 +1272,9 @@ class EfxView(QWidget):
             b = QPushButton(label)
             b.setToolTip(SPIDER_PATTERN_TIPS.get(key, ""))
             b.setStyleSheet(
-                "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+                touch_schrift("QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
                 "border-radius:3px;font-size:11px;padding:5px;} "
-                "QPushButton:hover{background:#30363d;}")
+                "QPushButton:hover{background:#30363d;}"))
             b.clicked.connect(weak_slot(self._apply_spider_pattern, key))
             pat_grid.addWidget(b, i // 3, i % 3)
         spv.addLayout(pat_grid)
@@ -1483,13 +1484,13 @@ class EfxView(QWidget):
         # E1: „Neue Zufallsbahn“ — andere Random-Sequenz (nur fuer Algorithmus
         # Random sinnvoll), entspricht der VC/MIDI-Aktion „reseed“.
         self._btn_reseed = QPushButton("🎲 Neue Zufallsbahn")
-        self._btn_reseed.setFixedHeight(24)
+        self._btn_reseed.setFixedHeight(touch_hoehe(24))
         self._btn_reseed.setToolTip("Würfelt für den Random-Algorithmus eine neue Bahn aus")
-        self._btn_reseed.setStyleSheet("""
+        self._btn_reseed.setStyleSheet(touch_schrift("""
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_reseed.clicked.connect(self._reseed_random)
         vform.addRow("Random:", self._btn_reseed)
         ec.addWidget(vis_box)
@@ -1564,14 +1565,14 @@ class EfxView(QWidget):
         prev_head.addWidget(self._prev_hint)
         prev_head.addStretch(1)
         self._btn_popout = QPushButton("⛶ Großansicht")
-        self._btn_popout.setFixedHeight(24)
+        self._btn_popout.setFixedHeight(touch_hoehe(24))
         self._btn_popout.setToolTip("Öffnet ein großes Fenster zum präzisen "
                                     "Einstellen von Zentrum, Größe und Rotation.")
-        self._btn_popout.setStyleSheet("""
+        self._btn_popout.setStyleSheet(touch_schrift("""
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:2px 8px; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_popout.clicked.connect(self._open_popout)
         prev_head.addWidget(self._btn_popout)
         pv.addLayout(prev_head)
@@ -1606,19 +1607,19 @@ class EfxView(QWidget):
         self._btn_fx_add = btn_fx_add = QPushButton("+ Fixture hinzufügen")
         self._btn_fx_rem = btn_fx_rem = QPushButton("Entfernen")
         for b in (btn_fx_add, btn_fx_rem):
-            b.setFixedHeight(24)
-            b.setStyleSheet("""
+            b.setFixedHeight(touch_hoehe(24))
+            b.setStyleSheet(touch_schrift("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; }
                 QPushButton:hover { background:#30363d; }
-            """)
+            """))
             fx_btns.addWidget(b)
         btn_fx_add.clicked.connect(self._add_fixture)
         btn_fx_rem.clicked.connect(self._remove_fixture)
         # UI-91: im Programmer (Folgemodus) die EINE ausdrueckliche Handlung, mit
         # der ein gespeicherter EFX die aktuelle Auswahl als Geraete bekommt.
         self._btn_fx_take = QPushButton("Auswahl übernehmen")
-        self._btn_fx_take.setFixedHeight(24)
+        self._btn_fx_take.setFixedHeight(touch_hoehe(24))
         self._btn_fx_take.setStyleSheet(btn_fx_add.styleSheet())
         self._btn_fx_take.setToolTip(
             "Setzt die Geräte dieses EFX auf die im Programmer gewählten "
@@ -2818,7 +2819,7 @@ class EfxPopoutDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
         close = QPushButton("Schließen")
-        close.setFixedHeight(26)
+        close.setFixedHeight(touch_hoehe(26))
         close.setStyleSheet("""
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                           border-radius:3px; padding:2px 14px; }

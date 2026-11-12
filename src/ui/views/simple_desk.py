@@ -747,7 +747,12 @@ class SimpleDeskView(QWidget):
 
         # ── Splitter: Übersicht (oben) + Fader-Bereich (unten) ──
         self._splitter = QSplitter(Qt.Orientation.Vertical)
-        self._splitter.setHandleWidth(5)
+        # UI-119: im Touch-Modus 16-px-Griff (Marke kommt aus dem Touch-QSS)
+        try:
+            from src.ui.touch_keyboard import is_touch_mode, SPLITTER_GRIFF
+            self._splitter.setHandleWidth(SPLITTER_GRIFF if is_touch_mode() else 5)
+        except Exception:
+            self._splitter.setHandleWidth(5)
         self._splitter.setStyleSheet(f"""
             QSplitter::handle {{ background: {_C_BORDER}; }}
             QSplitter::handle:hover {{ background: {_C_ACCENT2}; }}

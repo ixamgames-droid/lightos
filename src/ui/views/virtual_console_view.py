@@ -524,7 +524,15 @@ class VirtualConsoleView(QWidget):
 
         # ── Splitter: Canvas links, Sidebar rechts ────────────────────────────
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setStyleSheet("QSplitter::handle { background:#30363d; width:2px; }")
+        # UI-119 (B-10): im Touch-Modus breiter Griff mit Marke (Touch-QSS);
+        # mit der Maus bleibt der schmale 2-px-Strich.
+        try:
+            from src.ui.touch_keyboard import is_touch_mode, SPLITTER_GRIFF
+            _griff = SPLITTER_GRIFF if is_touch_mode() else 2
+        except Exception:
+            _griff = 2
+        splitter.setStyleSheet(
+            "QSplitter::handle { background:#30363d; width:%dpx; }" % _griff)
 
         # Die VC-Arbeitsflaeche soll mindestens 1200x800 gross bleiben, auf
         # breiten Touchscreens aber den GANZEN verfuegbaren Viewport nutzen.
