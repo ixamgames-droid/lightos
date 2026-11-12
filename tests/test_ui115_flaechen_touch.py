@@ -319,7 +319,8 @@ def _node(ausdruck: str) -> str:
         mjs.write_text(Path(_REGELN).read_text(encoding="utf-8"), encoding="utf-8")
         code = f"import * as R from '{mjs.as_uri()}'; console.log(JSON.stringify({ausdruck}));"
         r = subprocess.run([node, "--input-type=module", "-e", code],
-                           capture_output=True, text=True, timeout=30)
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=30)
     assert r.returncode == 0, r.stderr
     return r.stdout.strip()
 
