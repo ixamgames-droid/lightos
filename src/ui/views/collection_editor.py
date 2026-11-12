@@ -9,6 +9,7 @@ from src.core.engine.collection import Collection
 from src.core.engine.function_manager import get_function_manager
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufe_zeile
+from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 
 
 class CollectionEditor(QWidget):
@@ -66,6 +67,9 @@ class CollectionEditor(QWidget):
         btn_row.addWidget(btn_remove)
         btn_row.addWidget(btn_up)
         btn_row.addWidget(btn_down)
+        # UI-116 (C-05): Mehrfachauswahl am Finger (nur im Touch-Modus sichtbar)
+        self._mehrfach = MehrfachKnopf(self._lst)
+        btn_row.addWidget(self._mehrfach)
         btn_row.addStretch(1)
         list_layout.addLayout(btn_row)
         root.addWidget(list_box, 1)

@@ -16,6 +16,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl
+from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from src.core.engine.stufen import modify_unter
 
 # ENG-37-A: Die Engine sperrt Modify-Effekte als Chaser-Schritt (gibt nichts
@@ -279,6 +280,9 @@ class ChaserEditor(QWidget):
         btn_refresh.setToolTip("Liste aktualisieren")
         btn_refresh.clicked.connect(self._refresh_picker)
         pick_btn_row.addWidget(btn_refresh)
+        # UI-116 (C-05): Mehrfachauswahl am Finger (nur im Touch-Modus sichtbar)
+        self._mehrfach = MehrfachKnopf(self._add_list)
+        pick_btn_row.addWidget(self._mehrfach)
         pick_btn_row.addStretch(1)
         pick_layout.addLayout(pick_btn_row)
         root.addWidget(grp_pick)
