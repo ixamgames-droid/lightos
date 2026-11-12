@@ -373,10 +373,14 @@ class LangDruckMenueTest(unittest.TestCase):
         # und erst spaeter nachgereicht werden).
         hints = QApplication.styleHints()
         alt = hints.mouseDoubleClickInterval()
-        hints.setMouseDoubleClickInterval(3000)
         self.addCleanup(hints.setMouseDoubleClickInterval, alt)
+        # Qt zaehlt Klicks paarweise, auch ueber fruehere Tests hinweg: mit
+        # 1 ms Fenster beginnt der erste Tipp sicher ein neues Paar, erst
+        # danach wird das Fenster fuer langsame CI-Rechner gross.
+        hints.setMouseDoubleClickInterval(1)
         f.druck(p)
         f.los(p)
+        hints.setMouseDoubleClickInterval(3000)
         f.druck(p)              # Doppelklick -> Dialog (blockiert bis reject)
         ende = time.monotonic() + 5.0
         while not dialoge and time.monotonic() < ende:
