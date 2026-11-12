@@ -870,6 +870,14 @@ class ZiehenScrollen(QObject):
         erzeugten Maus): zwei Finger auf demselben Ziel = Geste."""
         t = ev.type()
         geloest = QEventPoint.State.Released
+        if self._geste is not None and t == QEvent.Type.TouchBegin:
+            # Nachbesserung: ein neuer erster Finger heisst, das Ende der alten
+            # Geste ging verloren (z. B. Fenster gewechselt) — sie endet hier,
+            # statt dass ein einzelner neuer Finger weiter „pincht".
+            ziel = self._geste[0]
+            self._geste = None
+            if _gueltig(ziel):
+                ziel.zwei_finger_ende()
         if self._geste is not None:
             ziel, a, b, lagen = self._geste
             ende = t in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel) or not _gueltig(ziel)

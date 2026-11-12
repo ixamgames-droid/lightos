@@ -35,7 +35,7 @@ from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
-from src.ui.ziehen_scrollen import FingerHalten, ist_touch   # UI-115, UI-117
+from src.ui.ziehen_scrollen import LANG_DRUCK_S, FingerHalten, ist_touch   # UI-115, UI-117
 from src.core.stage import scene_commands as _scmd
 
 
@@ -1145,6 +1145,12 @@ class StageCanvas(QWidget):
         self._pinch: tuple | None = None
         self._pinch_mitte: QPointF = QPointF()
         self._sperre_bis_los: bool = False
+        # UI-117 Nachbesserung: Fingerdruck auf ein Geraet (fid, Weltlage,
+        # Umschalt) wartet auf Tippen oder langen Druck — ein Wisch waehlt nicht.
+        self._geraet_wartet: tuple | None = None
+        self._geraet_timer = QTimer(self)
+        self._geraet_timer.setSingleShot(True)
+        self._geraet_timer.timeout.connect(self._geraet_lang)
 
         # Gruppen-Hervorhebung (Phase 7a)
         self._highlight_fids: set[int] = set()
@@ -2690,52 +2696,26 @@ class StageCanvas(QWidget):
             self._sperre_bis_los = False
             self._band_wartet = False
             self._band_bewegt = False
+            self._geraet_timer.stop()
+            self._geraet_wartet = None
             self.setFocus()  # Tastaturfokus holen (Esc = Auswahl leeren)
             self._finger.druck(event)
             pos = self._to_world(event.position())
             shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
             hit = self._fixture_at(pos)
 
+            if hit is not None and self._finger.touch:
+                # UI-117 Nachbesserung: am Finger waehlt ein Druck auf ein
+                # Geraet erst beim Tippen (Loslassen) oder nach langem Druck
+                # (Verschieben, Menue). Ein Wisch, der auf einem Geraet
+                # beginnt, verschiebt nur die Ansicht und laesst die (globale)
+                # Auswahl stehen — wie in den Listen (UI-110).
+                self._geraet_wartet = (hit, QPointF(pos), shift)
+                self._geraet_timer.start(int(LANG_DRUCK_S * 1000))
+                return
+
             if hit is not None:
-                x, y = self._positions[hit]
-                if shift or self._multi_select_mode:
-                    # Toggle ohne Drag (Shift ODER Touch-Mehrfachauswahl-Modus)
-                    if hit in self._teil_fids and hit not in self._selected_fids:
-                        # FM-51 C (Review): Das Geraet ist nur ueber Weiss-Segmente
-                        # gewaehlt und traegt den Ring der Teil-Markierung. Umschalten
-                        # heisst hier ABWAEHLEN (seine Segment-Zellen raus) — nicht
-                        # hinzufuegen, sonst wuerde aus dem Segment das ganze Geraet.
-                        self._teil_auswahl_entfernen(hit)
-                        self.fixture_clicked.emit(hit)
-                        self.update()
-                        return
-                    if hit in self._selected_fids:
-                        self._selected_fids.remove(hit)
-                    else:
-                        self._selected_fids.append(hit)
-                    self._emit_selection()
-                    self.fixture_clicked.emit(hit)
-                    self.update()
-                    return
-                elif hit in self._selected_fids and len(self._selected_fids) > 1:
-                    # Multi-Drag starten (Auswahl unveraendert)
-                    self._multi_mouse_start = QPointF(pos)
-                    self._multi_moved = False
-                    self._multi_drag_start = {
-                        fid: self._positions[fid]
-                        for fid in self._selected_fids
-                        if fid in self._positions
-                    }
-                else:
-                    # Einzel-Select + Einzel-Drag
-                    self._selected_fids = [hit]
-                    self._drag_fid = hit
-                    self._drag_offset = QPointF(pos.x() - x, pos.y() - y)
-                    self._drag_press = QPointF(pos)
-                    self._drag_moved = False
-                    self._emit_selection()
-                self.fixture_clicked.emit(hit)
-                self.update()
+                self._druck_auf_geraet(hit, pos, shift)
                 return
 
             if self._finger.touch and not shift:
@@ -2756,6 +2736,68 @@ class StageCanvas(QWidget):
             self._band_origin = QPointF(pos)
             self._band_rect = QRectF(pos, pos)
             self.update()
+
+    def _druck_auf_geraet(self, hit: int, pos: QPointF, shift: bool) -> None:
+        """Druck auf ein Geraet: waehlen/umschalten, Verschieben vorbereiten
+        (Maus sofort beim Druecken, am Finger erst beim Tippen oder nach
+        langem Druck — ``_geraet_wartet``)."""
+        x, y = self._positions[hit]
+        if shift or self._multi_select_mode:
+            # Toggle ohne Drag (Shift ODER Touch-Mehrfachauswahl-Modus)
+            if hit in self._teil_fids and hit not in self._selected_fids:
+                # FM-51 C (Review): Das Geraet ist nur ueber Weiss-Segmente
+                # gewaehlt und traegt den Ring der Teil-Markierung. Umschalten
+                # heisst hier ABWAEHLEN (seine Segment-Zellen raus) — nicht
+                # hinzufuegen, sonst wuerde aus dem Segment das ganze Geraet.
+                self._teil_auswahl_entfernen(hit)
+                self.fixture_clicked.emit(hit)
+                self.update()
+                return
+            if hit in self._selected_fids:
+                self._selected_fids.remove(hit)
+            else:
+                self._selected_fids.append(hit)
+            self._emit_selection()
+            self.fixture_clicked.emit(hit)
+            self.update()
+            return
+        elif hit in self._selected_fids and len(self._selected_fids) > 1:
+            # Multi-Drag starten (Auswahl unveraendert)
+            self._multi_mouse_start = QPointF(pos)
+            self._multi_moved = False
+            self._multi_drag_start = {
+                fid: self._positions[fid]
+                for fid in self._selected_fids
+                if fid in self._positions
+            }
+        else:
+            # Einzel-Select + Einzel-Drag
+            self._selected_fids = [hit]
+            self._drag_fid = hit
+            self._drag_offset = QPointF(pos.x() - x, pos.y() - y)
+            self._drag_press = QPointF(pos)
+            self._drag_moved = False
+            self._emit_selection()
+        self.fixture_clicked.emit(hit)
+        self.update()
+
+    def _geraet_freigeben(self) -> None:
+        """UI-117 Nachbesserung: vorgemerkter Fingerdruck auf ein Geraet wird
+        wirksam (Tippen oder langer Druck ohne Wisch)."""
+        self._geraet_timer.stop()
+        w, self._geraet_wartet = self._geraet_wartet, None
+        if w is None:
+            return
+        hit, pos, shift = w
+        if hit in self._positions:
+            self._druck_auf_geraet(hit, pos, shift)
+
+    def _geraet_lang(self) -> None:
+        """Zeitgeber: Finger lag ``LANG_DRUCK_S`` still auf dem Geraet."""
+        if (self._geraet_wartet is None or self._finger._bewegt
+                or self._pinch is not None or self._sperre_bis_los):
+            return
+        self._geraet_freigeben()
 
     def lang_druck_menue_erlaubt(self) -> bool:
         """UI-115 Nachbesserung: ein laufendes Verschieben gewinnt gegen das
@@ -2791,6 +2833,17 @@ class StageCanvas(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent):
         if self._sperre_bis_los or self._pinch is not None:
             return          # UI-117: Rest eines Zwei-Finger-Drucks/Doppeltipps
+        if self._geraet_wartet is not None:
+            # UI-117 Nachbesserung: Finger auf einem Geraet — Wisch verschiebt
+            # die Ansicht (FingerHalten), nach langem Druck gilt der Druck.
+            if not (event.buttons() & Qt.MouseButton.LeftButton):
+                return
+            if not self._finger.ziehen_erlaubt(event):
+                if self._finger._bewegt:
+                    self._geraet_timer.stop()
+                    self._geraet_wartet = None
+                return
+            self._geraet_freigeben()
         pos = self._to_world(event.position())
         if ((self._drag_fid is not None or self._multi_drag_start is not None)
                 and not self._finger.ziehen_erlaubt(event)):
@@ -2840,6 +2893,16 @@ class StageCanvas(QWidget):
             if event.button() == Qt.MouseButton.LeftButton:
                 self._sperre_bis_los = False
             return
+        if self._geraet_wartet is not None:
+            # UI-117 Nachbesserung: Tippen auf ein Geraet waehlt es jetzt
+            # (wie ein Mausklick); nach einem Wisch bleibt alles, wie es war.
+            if event.button() != Qt.MouseButton.LeftButton:
+                return
+            if self._finger.tipp(event):
+                self._geraet_freigeben()
+            else:
+                self._geraet_timer.stop()
+                self._geraet_wartet = None
         if self._band_wartet and self._band_origin is not None:
             # UI-117: Finger ohne Rahmen — Tippen ins Leere leert die Auswahl
             # (wie ein Mausklick), ein Wisch (Ansicht verschoben) laesst sie.
@@ -2911,6 +2974,8 @@ class StageCanvas(QWidget):
         self._band_rect = None
         self._band_wartet = False
         self._band_bewegt = False
+        self._geraet_timer.stop()
+        self._geraet_wartet = None
         self.update()
 
     @staticmethod

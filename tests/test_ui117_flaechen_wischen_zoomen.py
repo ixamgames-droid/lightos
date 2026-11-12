@@ -458,3 +458,75 @@ def test_zeitleiste_knoepfe_am_finger_mindestens_34_px():
 def test_zeitleiste_knoepfe_maus_kompakt_wie_bisher():
     view = _zeitleiste(False)
     assert all(b.size().width() == 22 and b.size().height() == 22 for b in _mute(view))
+
+
+# ── Nachbesserung nach Pruefung ──────────────────────────────────────────────
+
+def test_buehne_finger_wisch_ab_geraet_laesst_auswahl_stehen(buehne):
+    """Ein Wisch, der auf einem Geraet beginnt, verschiebt nur die Ansicht —
+    die (globale) Auswahl bleibt wie vorher (vorher: Geraet 1 gewaehlt)."""
+    b = buehne
+    _finger(b.vp, QPoint(160, 100), QPoint(120, 60))
+    assert _bild(b) == (40, 40)
+    assert b.c._selected_fids == [2]
+
+
+def test_buehne_mehrfach_wisch_ab_geraet_schaltet_nicht_um(buehne):
+    b = buehne
+    b.c._multi_select_mode = True
+    _finger(b.vp, QPoint(160, 100), QPoint(120, 60))
+    assert b.c._selected_fids == [2], "ein Wisch schaltet kein Geraet um"
+    _tipp(b.vp, QPoint(120, 60))             # Ansicht ist um 40/40 verschoben
+    assert b.c._selected_fids == [2, 1], "ein Tipp schon"
+
+
+def test_buehne_finger_langer_druck_auf_geraet_waehlt_vor_dem_menue(buehne):
+    b = buehne
+    auswahl_beim_menue = []
+    b.c.context_menu_requested.connect(
+        lambda fid, p: auswahl_beim_menue.append(list(b.c._selected_fids)))
+    QTest.touchEvent(b.vp, _DEV).press(0, QPoint(160, 100), b.vp).commit()
+    assert _warte_bis(lambda: b.menues == [1])
+    QTest.touchEvent(b.vp, _DEV).release(0, QPoint(160, 100), b.vp).commit()
+    QApplication.processEvents()
+    assert auswahl_beim_menue == [[1]], "das Menue sieht das Geraet unter dem Finger gewaehlt"
+    assert b.c._positions[1] == (160.0, 100.0) and b.c.uebernommen == []
+
+
+def test_buehne_finger_langer_druck_auf_geraet_verschiebt(buehne):
+    b = buehne
+    _finger(b.vp, QPoint(160, 100), QPoint(260, 200), halten=True)
+    assert b.c._selected_fids == [1]
+    assert b.c.uebernommen == [[1]], "nach langem Druck zieht der Finger das Geraet"
+    assert _bild(b) == (0, 0)
+
+
+def test_verlorenes_gestenende_endet_beim_naechsten_ersten_finger():
+    """Ging das Ende einer Zwei-Finger-Geste verloren, darf ein einzelner
+    neuer Finger nicht weiter „pinchen"."""
+    oben = QWidget()
+    oben.resize(400, 200)
+
+    class Ziel(QWidget):
+        def __init__(self, p):
+            super().__init__(p)
+            self.log = []
+
+        def zwei_finger_start(self, a, b):
+            self.log.append("start")
+
+        def zwei_finger_zug(self, a, b):
+            self.log.append("zug")
+
+        def zwei_finger_ende(self):
+            self.log.append("ende")
+
+    z = Ziel(oben)
+    z.setGeometry(0, 0, 400, 200)
+    oben.show()
+    QApplication.processEvents()
+    f = zs.einrichten(_app)
+    f._geste = (z, 0, 1, {0: QPointF(10, 10), 1: QPointF(100, 10)})   # Ende verloren
+    _finger(oben, QPoint(50, 50), QPoint(150, 50))
+    assert f._geste is None
+    assert z.log[0] == "ende" and "zug" not in z.log
