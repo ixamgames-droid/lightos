@@ -13,7 +13,7 @@ import copy
 import weakref
 from typing import Optional
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QAction, QCursor
+from PySide6.QtGui import QColor, QPainter, QBrush, QPen, QAction
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGridLayout, QLabel,
     QMenu, QInputDialog, QMessageBox, QFileDialog, QDialog, QSplitter,
@@ -249,7 +249,9 @@ class SnapshotButton(QPushButton):
             menu.addSeparator()
             a_del = menu.addAction("Löschen")
             a_del.triggered.connect(lambda: self._view.delete(self._index))
-        menu.exec(QCursor.pos())
+        # An der Druckstelle (auch am Finger, UI-114 — dort folgt der Zeiger
+        # dem Finger nicht ueberall)
+        menu.exec(self.mapToGlobal(_pos))
 
 
 class SnapshotsView(QWidget):

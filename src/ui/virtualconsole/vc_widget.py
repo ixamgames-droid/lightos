@@ -225,6 +225,25 @@ class VCWidget(QFrame):
         self._fg_color = color
         self.update()
 
+    # ── UI-114: langes Druecken am Finger ─────────────────────────────────────
+
+    def lang_druck_menue_erlaubt(self) -> bool:
+        """Darf langes Druecken am Finger hier ein Kontextmenue oeffnen
+        (``ziehen_scrollen``)? Nur im Bearbeiten-Modus — im Spielbetrieb muss
+        ein FLASH beliebig lange gehalten werden koennen (Live-Sicherheit)."""
+        return bool(self._edit_mode)
+
+    def contextMenuEvent(self, event):
+        """Kontextmenue-Ereignis (am Finger: langes Druecken, UI-114). Die Maus
+        oeffnet das Menue schon beim Rechts-Druck (``mousePressEvent``, der
+        Druck ist angenommen — Qt schickt dann kein zweites Ereignis). Im
+        Spielbetrieb nichts: weiter an die Eltern."""
+        if not self._edit_mode:
+            event.ignore()
+            return
+        self._show_context_menu(event.globalPos())
+        event.accept()
+
     # ── Maus-Events (Drag + Resize) ───────────────────────────────────────────
 
     def mousePressEvent(self, event):

@@ -2,6 +2,7 @@
 // 3057 handlePointerDown/Move/Up + Maus-Listener + Wheel + hideTooltip +
 // _placeFixtureAtMouse + contextmenu). Reines Verschieben.
 import * as THREE from '../three/three.js';
+import { leerZiehenRahmen } from './touch_regeln.js';   // UI-115
 import { renderer } from '../scene/renderer.js';
 import { rad2deg, deg2rad } from '../scene/renderer.js';
 // VIZ-71: der 2D-Pan schiebt orthoCam direkt (an updateCamera vorbei) und
@@ -145,7 +146,9 @@ renderer.domElement.addEventListener('contextmenu', function(e) {
 }, false);
 
 // Shared pointer logic (called by both mouse and touch handlers)
-export function handlePointerDown(clientX, clientY, shiftKey) {
+// UI-115 (D-06): ``touch`` = vom Finger (touch.js). Ein Finger auf leerer
+// Flaeche dreht dann die Kamera statt einen Auswahlrahmen zu ziehen.
+export function handlePointerDown(clientX, clientY, shiftKey, touch = false) {
   setMouseFromCoords(clientX, clientY);
   isLeftDragging = true;
   downMouseX = clientX; downMouseY = clientY;
@@ -223,8 +226,9 @@ export function handlePointerDown(clientX, clientY, shiftKey) {
       dragMode = 'fixtureDrag';
       updateOutlines();
       return;
-    } else {
-      // Marquee-Selektion (nur mit Maus; Touch springt direkt zu Kamera-Pan)
+    } else if (leerZiehenRahmen(touch)) {
+      // Marquee-Selektion (nur mit Maus; Touch springt direkt zu Kamera-Pan —
+      // seit UI-115 wirklich: der Finger faellt unten auf 'rotate'/'pan' durch)
       dragMode = 'marquee';
       // VIZ-14: OB vorher etwas ausgewaehlt war, entscheidet sich HIER — die
       // Zeile unten leert die Auswahl bereits beim Druecken. Beim Loslassen

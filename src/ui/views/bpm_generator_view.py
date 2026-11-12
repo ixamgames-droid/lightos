@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QDoubleSpinBox, QGroupBox, QFileDialog, QSizePolicy, QComboBox,
 )
 
+from src.ui.ziehen_scrollen import FingerHalten   # UI-115
 from src.core.audio import offline_timeline as OT
 from src.core.audio import analysis_engines as AE
 from src.core.audio import genre_presets as GP
@@ -38,6 +39,8 @@ class _TimelinePlot(QWidget):
         self._wave = []           # Peak-Huellkurve (0..1) hinter dem Grid
         self._playhead = -1       # Wiedergabe-Position (ms) beim Vorhören
         self._geom = (44, 1, 1)   # (x0, pw, dur_ms) — für Klick-Mapping
+        self._finger = FingerHalten(self)   # UI-115
+        self._finger_ms: int | None = None
         self.setMinimumHeight(200)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
@@ -53,12 +56,32 @@ class _TimelinePlot(QWidget):
         self._playhead = int(ms)
         self.update()
 
-    def mousePressEvent(self, e):
+    def _ms_bei(self, e) -> int:
         x0, pw, dur = self._geom
         x = e.position().x() if hasattr(e, "position") else e.x()
-        ms = int(max(0, min(dur, (x - x0) / max(1, pw) * dur)))
-        self.clicked_ms.emit(ms)
+        return int(max(0, min(dur, (x - x0) / max(1, pw) * dur)))
+
+    def mousePressEvent(self, e):
+        # UI-115 (Touch-Audit D-12): am Finger setzt erst das Loslassen ohne
+        # Zug (Tipp) den Downbeat — Aufsetzen oder Wischen verstellt das
+        # Taktraster nicht mehr. Die Maus setzt ihn wie bisher beim Druecken.
+        self._finger.druck(e)
+        self._finger_ms = None
+        if self._finger.touch:
+            self._finger_ms = self._ms_bei(e)
+        else:
+            self.clicked_ms.emit(self._ms_bei(e))
         super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        ms, self._finger_ms = self._finger_ms, None
+        if ms is not None and self._finger.tipp(e):
+            self.clicked_ms.emit(ms)
+        super().mouseReleaseEvent(e)
+
+    def mouseMoveEvent(self, e):
+        self._finger.ziehen_erlaubt(e)      # merkt sich einen Wisch
+        super().mouseMoveEvent(e)
 
     def paintEvent(self, _e):
         p = QPainter(self)

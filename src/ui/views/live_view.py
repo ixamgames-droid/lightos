@@ -35,6 +35,7 @@ from src.core.color_utils import visual_intensity, visual_rgb
 from src.core.stage.coords import world3d_to_live
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
+from src.ui.ziehen_scrollen import FingerHalten   # UI-115
 from src.core.stage import scene_commands as _scmd
 
 
@@ -1122,6 +1123,10 @@ class StageCanvas(QWidget):
         # ans Raster snappen noch die Show als "geaendert" markieren.
         self._drag_press: QPointF = QPointF()
         self._drag_moved: bool = False
+        # UI-115 (Touch-Audit D-02): am Finger verschiebt ein Zug ein Geraet
+        # erst nach langem Druck — ein Wisch, der auf einem Geraet beginnt,
+        # versetzt es nicht mehr. Die Maus zieht sofort wie bisher.
+        self._finger = FingerHalten(self)
 
         # Gruppen-Hervorhebung (Phase 7a)
         self._highlight_fids: set[int] = set()
@@ -2662,6 +2667,7 @@ class StageCanvas(QWidget):
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
             self.setFocus()  # Tastaturfokus holen (Esc = Auswahl leeren)
+            self._finger.druck(event)
             pos = self._to_world(event.position())
             shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
             hit = self._fixture_at(pos)
@@ -2717,8 +2723,23 @@ class StageCanvas(QWidget):
             self._band_rect = QRectF(pos, pos)
             self.update()
 
+    def lang_druck_menue_erlaubt(self) -> bool:
+        """UI-115 Nachbesserung: ein laufendes Verschieben gewinnt gegen das
+        Lang-Druck-Menue (UI-114). Hat der Finger nach der Freigabe
+        (FingerHalten, 0,45 s) ein Geraet schon bewegt, oeffnet sich bei 0,6 s
+        kein Menue mehr — sonst saehe man ein Menue und haette zugleich eine
+        gespeicherte Verschiebung."""
+        if self._drag_fid is not None and self._drag_moved:
+            return False
+        if self._multi_drag_start is not None and self._multi_moved:
+            return False
+        return True
+
     def mouseMoveEvent(self, event: QMouseEvent):
         pos = self._to_world(event.position())
+        if ((self._drag_fid is not None or self._multi_drag_start is not None)
+                and not self._finger.ziehen_erlaubt(event)):
+            return          # UI-115: Finger ohne langen Druck verschiebt nichts
         if self._drag_fid is not None:
             if (abs(pos.x() - self._drag_press.x())
                     + abs(pos.y() - self._drag_press.y())) > 3:
@@ -3504,7 +3525,15 @@ class LiveView(QWidget):
             "background: rgba(16,18,26,215); border:1px solid #333; border-radius:6px;")
         zo = QHBoxLayout(self._zoom_overlay)
         zo.setContentsMargins(8, 4, 8, 4)
-        zo.setSpacing(6)
+        # UI-113 (Touch-Audit D-09): am Finger 44 x 44 px, Abstand 8 px
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            _touch = bool(is_touch_mode())
+        except Exception as e:
+            print(f"[live_view] ERROR: Touch-Zustand: {e}")
+            _touch = False
+        _zk = 44 if _touch else 30
+        zo.setSpacing(8 if _touch else 6)
 
         _zlbl = QLabel("Zoom")
         _zlbl.setStyleSheet("color:#FFD700; font-size:12px; font-weight:bold;")
@@ -3513,7 +3542,7 @@ class LiveView(QWidget):
         self._btn_zoom_out = QPushButton("−")  # echtes Minuszeichen
         self._btn_zoom_in = QPushButton("+")
         for _b in (self._btn_zoom_out, self._btn_zoom_in):
-            _b.setFixedSize(30, 30)
+            _b.setFixedSize(_zk, _zk)
             _b.setStyleSheet(
                 "QPushButton{background:#1a1c28;color:#ccc;border:1px solid #333;"
                 "border-radius:4px;font-size:18px;} QPushButton:hover{background:#252838;color:#fff;}")
@@ -3539,7 +3568,7 @@ class LiveView(QWidget):
 
         # QOL-05: „Einpassen" — Ansicht auf die Fixtures zoomen/zentrieren.
         self._btn_fit = QPushButton("⤢")
-        self._btn_fit.setFixedSize(30, 30)
+        self._btn_fit.setFixedSize(_zk, _zk)
         self._btn_fit.setToolTip("Ansicht auf die Geräte einpassen")
         self._btn_fit.setStyleSheet(
             "QPushButton{background:#1a1c28;color:#ccc;border:1px solid #333;"

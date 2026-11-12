@@ -245,12 +245,17 @@ def install(app: QApplication, touch: bool | None = None) -> bool:
     if touch is None:
         touch = detect_touch_screen()
 
-    _touch_mode = touch
+    _touch_mode = bool(touch)
 
     # Filter immer installieren (WA_InputMethodEnabled braucht kein Touch-Modus)
-    _filter_instance = OskEventFilter(app)
-    app.installEventFilter(_filter_instance)
-    app._touch_keyboard_filter = _filter_instance  # type: ignore[attr-defined]
+    # — UI-111: nur einmal, auch wenn install() mehrfach laeuft.
+    vorhanden = getattr(app, "_touch_keyboard_filter", None)
+    if vorhanden is None:
+        _filter_instance = OskEventFilter(app)
+        app.installEventFilter(_filter_instance)
+        app._touch_keyboard_filter = _filter_instance  # type: ignore[attr-defined]
+    else:
+        _filter_instance = vorhanden
 
     # Im Touch-Modus große ±-Buttons auf allen SpinBoxes aktivieren
     # und Windows TabTip-AutoInvoke im Registry aktivieren.
@@ -259,6 +264,17 @@ def install(app: QApplication, touch: bool | None = None) -> bool:
         _enable_tabtip_autoinvoke()
 
     return touch
+
+
+def setze_touch_modus(an: bool) -> None:
+    """UI-111: Touch-Zustand setzen, ohne Filter, Stylesheet oder Registry.
+
+    Das Hauptfenster ruft das mit seinem ``touch``-Wert auf, BEVOR es seine
+    Ansichten baut — so lesen Programmer, Laser-Bausteine und VC-Effekt-
+    Editor denselben Zustand wie das Hauptfenster (vorher war
+    ``is_touch_mode()`` immer False, weil ``install()`` nie lief)."""
+    global _touch_mode
+    _touch_mode = bool(an)
 
 
 def is_touch_mode() -> bool:
