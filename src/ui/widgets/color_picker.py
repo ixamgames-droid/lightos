@@ -10,6 +10,7 @@ AppState.set_programmer_value (color_r/_g/_b/_w/_a/_uv).
 """
 from __future__ import annotations
 import math
+from src.ui.touch_keyboard import touch_hoehe  # UI-119 (C-14)
 from PySide6.QtCore import Qt, Signal, QPoint, QTimer, QRect
 from PySide6.QtGui import QColor, QPainter, QPen, QBrush, QConicalGradient, QLinearGradient, QMouseEvent
 from PySide6.QtWidgets import (
@@ -242,7 +243,7 @@ class ColorPicker(QWidget):
         header.setContentsMargins(0, 0, 0, 0)
         header.addStretch(1)
         self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
-        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setFixedHeight(touch_hoehe(24))
         self._btn_editor_popout.setToolTip(
             "Den ganzen Farb-Editor in einem großen, scrollbaren Fenster bearbeiten")
         self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)

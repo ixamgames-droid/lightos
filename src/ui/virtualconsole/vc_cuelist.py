@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QSpinBox,
 from PySide6.QtCore import Qt, QRect, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont
 from .vc_widget import VCWidget
+from .vc_style import tz
 
 
 class VCCueList(VCWidget):
@@ -50,12 +51,22 @@ class VCCueList(VCWidget):
         layout.addWidget(self._target_label)
         self._update_target_label()
 
+        # UI-121 B-12: Die Liste ist eine ANZEIGE. Antippen oder Wischen waehlt
+        # nichts (am Finger scrollt ein Wisch, UI-110) — frueher sprang die
+        # Auswahl unter dem Finger, und der Refresh setzte sie wieder zurueck.
+        # Die laufende Cue markiert ``_refresh`` selbst. Springen ist eine
+        # klare Absicht: Doppeltipp auf eine Cue + Bestaetigung (``_gehe_zu``).
         self._cue_list = QListWidget()
+        self._cue_list.setSelectionMode(QListWidget.SelectionMode.NoSelection)
+        self._cue_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._cue_list.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        self._cue_list.setToolTip("Doppeltipp auf eine Cue: dorthin springen (mit Rueckfrage)")
         self._cue_list.setStyleSheet("""
-            QListWidget { background: #161b22; color: #e6edf3; font-size: 9px; border: none; }
-            QListWidget::item:selected { background: #1f6feb; }
-            QListWidget::item:hover { background: #21262d; }
+            QListWidget { background: #161b22; color: #e6edf3; font-size: 12px; border: none; }
+            QListWidget::item { padding: 3px 2px; }
         """)
+        self._cue_list.itemDoubleClicked.connect(self._on_cue_double)
+        self._aktiv_zeile = -1
         layout.addWidget(self._cue_list)
 
         btn_row = QHBoxLayout()
@@ -63,7 +74,7 @@ class VCCueList(VCWidget):
         self._btn_go   = QPushButton("GO ►")
         self._btn_stop = QPushButton("■")
         for btn in (self._btn_back, self._btn_go, self._btn_stop):
-            btn.setFixedHeight(28)
+            btn.setFixedHeight(tz(28))     # UI-121 B-09: Touch ×1,3
             btn.setStyleSheet("""
                 QPushButton { background: #21262d; color: #e6edf3; border: 1px solid #30363d;
                               font-size: 9px; font-weight: bold; border-radius: 3px; }
@@ -75,9 +86,12 @@ class VCCueList(VCWidget):
                                     "QPushButton { background: #0d4f8b; color: #58d68d; }")
         layout.addLayout(btn_row)
 
-        self._btn_back.clicked.connect(self._do_back)
-        self._btn_go.clicked.connect(self._do_go)
-        self._btn_stop.clicked.connect(self._do_stop)
+        # UI-121 (Pruefung): die Knoepfe am Bildschirm respektieren die
+        # Touch-Sperre (Display-only) wie jedes andere VC-Widget. Fernbedienung
+        # und MIDI rufen ``_do_*`` direkt und steuern weiterhin.
+        self._btn_back.clicked.connect(self._klick_back)
+        self._btn_go.clicked.connect(self._klick_go)
+        self._btn_stop.clicked.connect(self._klick_stop)
 
     # ── Transport ─────────────────────────────────────────────────────────────
 
@@ -138,6 +152,20 @@ class VCCueList(VCWidget):
         if lbl.text() != text:
             lbl.setText(text)
 
+    # Klick auf ◄◄/GO/■ am Bildschirm — gesperrt, solange die Konsole im
+    # Spielbetrieb Display-only ist.
+    def _klick_go(self, *_):
+        if not self._run_input_blocked():
+            self._do_go()
+
+    def _klick_back(self, *_):
+        if not self._run_input_blocked():
+            self._do_back()
+
+    def _klick_stop(self, *_):
+        if not self._run_input_blocked():
+            self._do_stop()
+
     def _do_go(self):
         ex = self._executor()
         if ex:
@@ -162,14 +190,65 @@ class VCCueList(VCWidget):
         current = self._cue_list.count()
         if current != len(stack.cues):
             self._cue_list.clear()
+            self._aktiv_zeile = -1
             for cue in stack.cues:
                 label = f"{cue.number:>6.1f}  {cue.label or '---'}"
                 item = QListWidgetItem(label)
+                item.setData(Qt.ItemDataRole.UserRole, cue.number)
                 self._cue_list.addItem(item)
-        # Highlight current cue
+        # Laufende Cue hervorheben (UI-121: Markierung statt Auswahl — die
+        # Liste hat keine Auswahl mehr, die ein Finger verstellen koennte).
         idx = stack.current_index
-        if 0 <= idx < self._cue_list.count():
-            self._cue_list.setCurrentRow(idx)
+        self._markiere(idx if 0 <= idx < self._cue_list.count() else -1)
+
+    def _markiere(self, row: int):
+        if row == self._aktiv_zeile:
+            return
+        alt = self._cue_list.item(self._aktiv_zeile) if self._aktiv_zeile >= 0 else None
+        if alt is not None:
+            alt.setBackground(QColor(0, 0, 0, 0))
+            f = alt.font()
+            f.setBold(False)
+            alt.setFont(f)
+        self._aktiv_zeile = row
+        neu = self._cue_list.item(row) if row >= 0 else None
+        if neu is not None:
+            neu.setBackground(QColor("#1f6feb"))
+            f = neu.font()
+            f.setBold(True)
+            neu.setFont(f)
+            self._cue_list.scrollToItem(neu)
+
+    def aktive_zeile(self) -> int:
+        """Zeile der laufenden Cue (-1 = keine) — fuer Tests/Anzeige."""
+        return self._aktiv_zeile
+
+    # ── UI-121 B-12: Gehe zu Cue nur mit klarer Absicht ──────────────────────
+
+    def _on_cue_double(self, item):
+        if item is None or self._edit_mode or self._run_input_blocked():
+            return
+        nummer = item.data(Qt.ItemDataRole.UserRole)
+        if nummer is None:
+            return
+        if self._bestaetige_sprung(item.text().strip()):
+            self._gehe_zu(float(nummer))
+
+    def _bestaetige_sprung(self, text: str) -> bool:
+        """Rueckfrage vor dem Live-Sprung (Standard: Nein)."""
+        from PySide6.QtWidgets import QMessageBox
+        antwort = QMessageBox.question(
+            self, "Zu Cue springen?",
+            f"Live zu dieser Cue springen?\n\n{text}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        return antwort == QMessageBox.StandardButton.Yes
+
+    def _gehe_zu(self, nummer: float):
+        ex = self._executor()
+        if ex is None or ex.stack is None:
+            return
+        ex.stack.go_to(nummer)
 
     # ── Edit mode pass-through ─────────────────────────────────────────────
 

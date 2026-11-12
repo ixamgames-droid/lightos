@@ -1,5 +1,6 @@
 """Matrix View — GUI for LED grid effects (RGB/RGBW/Dimmer/Shutter)."""
 from __future__ import annotations
+from src.ui.touch_keyboard import touch_hoehe, touch_schrift  # UI-119 (C-14)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton, QGroupBox,
                                 QFormLayout, QDoubleSpinBox, QSpinBox,
@@ -929,12 +930,12 @@ class RgbMatrixView(QWidget):
         for label, cb in [("+ Neu", self._add), ("Löschen", self._delete),
                           ("▶ Start", self._start), ("■ Stop", self._stop)]:
             btn = QPushButton(label)
-            btn.setFixedHeight(26)
-            btn.setStyleSheet("""
+            btn.setFixedHeight(touch_hoehe(26))
+            btn.setStyleSheet(touch_schrift("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; }
                 QPushButton:hover { background:#30363d; }
-            """)
+            """))
             btn.clicked.connect(cb)
             ll.addWidget(btn)
 
@@ -963,13 +964,13 @@ class RgbMatrixView(QWidget):
         header.setContentsMargins(0, 0, 0, 0)
         header.addStretch(1)
         self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
-        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setFixedHeight(touch_hoehe(24))
         self._btn_editor_popout.setToolTip(
             "Den ganzen Matrix-Editor in einem großen, scrollbaren Fenster bearbeiten")
         self._btn_editor_popout.setStyleSheet(
-            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            touch_schrift("QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
             "border-radius:3px;font-size:10px;padding:1px 8px;} "
-            "QPushButton:hover{background:#30363d;}"
+            "QPushButton:hover{background:#30363d;}")
         )
         self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
         header.addWidget(self._btn_editor_popout)
@@ -988,12 +989,12 @@ class RgbMatrixView(QWidget):
         self._btn_save = QPushButton("💾 Speichern")
         self._btn_reset = QPushButton("↩ Zurücksetzen")
         for b in (self._btn_save, self._btn_reset):
-            b.setFixedHeight(24)
+            b.setFixedHeight(touch_hoehe(24))
             b.setStyleSheet(
-                "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+                touch_schrift("QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
                 "border-radius:3px;font-size:10px;} "
                 "QPushButton:hover{background:#30363d;} "
-                "QPushButton:disabled{color:#484f58;}"
+                "QPushButton:disabled{color:#484f58;}")
             )
         self._btn_save.clicked.connect(self._save_edit)
         self._btn_reset.clicked.connect(self._reset_edit)
@@ -1455,20 +1456,20 @@ class RgbMatrixView(QWidget):
         self._grid_label.setStyleSheet("color:#484f58; font-size:9px;")
         grid_l.addWidget(self._grid_label)
 
-        _assign_style = """
+        _assign_style = touch_schrift("""
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; }
             QPushButton:hover { background:#30363d; }
-        """
+        """)
         self._btn_from_sel = QPushButton("Aus Auswahl")
-        self._btn_from_sel.setFixedHeight(26)
+        self._btn_from_sel.setFixedHeight(touch_hoehe(26))
         self._btn_from_sel.setToolTip("Grid aus den links im Programmer gewählten Geräten bilden")
         self._btn_from_sel.setStyleSheet(_assign_style)
         self._btn_from_sel.clicked.connect(self._assign_from_selection)
         grid_l.addWidget(self._btn_from_sel)
 
         self._btn_auto_assign = QPushButton("Auto-Zuweisung aus Patch")
-        self._btn_auto_assign.setFixedHeight(26)
+        self._btn_auto_assign.setFixedHeight(touch_hoehe(26))
         self._btn_auto_assign.setStyleSheet(_assign_style)
         self._btn_auto_assign.clicked.connect(self._auto_assign)
         grid_l.addWidget(self._btn_auto_assign)
@@ -1478,7 +1479,7 @@ class RgbMatrixView(QWidget):
         # bisher: Gruppen-Tab, Raster vergroessern, Geraet finden, aufteilen,
         # zurueck. Hier steht dasselbe Ergebnis in zwei Klicks.
         self._btn_panel_grid = QPushButton("Raster aus Gerät…")
-        self._btn_panel_grid.setFixedHeight(26)
+        self._btn_panel_grid.setFixedHeight(touch_hoehe(26))
         self._btn_panel_grid.setToolTip(
             "Ein Gerät mit mehreren Zonen (Panel/Bar) direkt als Raster "
             "übernehmen — mit Nummerierung und Montage-Drehung des Geräts")
@@ -1488,7 +1489,7 @@ class RgbMatrixView(QWidget):
 
         # FM-22 (2): harte Kanten, die kein Flaechen-Algorithmus liefert.
         self._btn_pattern = QPushButton("Muster-Assistent…")
-        self._btn_pattern.setFixedHeight(26)
+        self._btn_pattern.setFixedHeight(touch_hoehe(26))
         self._btn_pattern.setToolTip(
             "Spalten-/Reihen-/Diagonal-Lauflicht als fertigen Chaser erzeugen")
         self._btn_pattern.setStyleSheet(_assign_style)

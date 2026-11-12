@@ -201,3 +201,26 @@ def paint_dial_knob(painter: QPainter, center, radius: float, base: QColor) -> N
     painter.setBrush(Qt.BrushStyle.NoBrush)
     painter.drawEllipse(QPointF(cx, cy), max(0.5, r - 0.8), max(0.5, r - 0.8))
     painter.restore()
+
+
+# ── UI-121 B-09: Touch-Groessen fuer die gemalten VC-Elemente ────────────────
+# ``--touch`` setzt ein Stylesheet fuer Qt-Widgets; die selbst gemalten
+# VC-Teile (Fader-Griff, Resize-Griffe, SpeedDial-Felder, Stepper-Knoepfe,
+# Standardgroessen) erreicht es nicht. Sie lesen den Touch-Zustand hier ab
+# (eine Stelle: ``touch_keyboard.is_touch_mode()``) und wachsen um TOUCH_SKALA.
+# Ohne Touch-Modus bleibt jede Groesse unveraendert (Maus wie bisher).
+TOUCH_SKALA = 1.3
+
+
+def touch_aktiv() -> bool:
+    """True im Touch-Modus (``--touch`` bzw. erkannter Touchscreen)."""
+    try:
+        from src.ui.touch_keyboard import is_touch_mode
+        return bool(is_touch_mode())
+    except Exception:
+        return False
+
+
+def tz(px: int | float) -> int:
+    """Pixelmass fuer die aktuelle Bedienart: im Touch-Modus ×TOUCH_SKALA."""
+    return int(round(px * TOUCH_SKALA)) if touch_aktiv() else int(round(px))

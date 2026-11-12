@@ -10,6 +10,7 @@ from src.ui.virtualconsole.vc_canvas import VCCanvas
 from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
 from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.weak_slots import weak_slot
+from src.ui.virtualconsole.vc_style import touch_aktiv, tz
 
 
 class GrowingScrollArea(QScrollArea):
@@ -167,13 +168,16 @@ class VirtualConsoleView(QWidget):
         _tb_sp = toolbar.sizePolicy()
         _tb_sp.setHeightForWidth(True)
         toolbar.setSizePolicy(_tb_sp)
-        tb_layout = FlowLayout(toolbar, margin=0, h_spacing=6, v_spacing=4)
+        # UI-121 B-14: im Touch-Modus 8 px Abstand zwischen den Knoepfen
+        # (vorher 6 px ≈ 1,6 mm), mit der Maus wie bisher.
+        _abstand = 8 if touch_aktiv() else 6
+        tb_layout = FlowLayout(toolbar, margin=0, h_spacing=_abstand, v_spacing=_abstand - 2)
         tb_layout.setContentsMargins(8, 3, 8, 3)
 
         self._btn_edit = QPushButton("Bearbeiten")
         self._btn_edit.setCheckable(True)
         self._btn_edit.setChecked(False)
-        self._btn_edit.setFixedSize(90, 28)
+        self._btn_edit.setFixedSize(tz(90), max(28, self._tb_hoehe()))
         self._btn_edit.setStyleSheet("""
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                           border-radius:3px; font-size:11px; }
@@ -189,7 +193,7 @@ class VirtualConsoleView(QWidget):
         self._btn_snap = QPushButton("⊞ Raster")
         self._btn_snap.setCheckable(True)
         self._btn_snap.setChecked(False)
-        self._btn_snap.setFixedHeight(26)
+        self._btn_snap.setFixedHeight(self._tb_hoehe())
         self._btn_snap.setToolTip(
             "Snap auf Grid — Widgets rasten beim Verschieben und Skalieren\n"
             "am Raster ein (Grid-Größe: 8 px)"
@@ -227,7 +231,7 @@ class VirtualConsoleView(QWidget):
         ]
         for label, wtype in widget_buttons:
             btn = QPushButton(label)
-            btn.setFixedHeight(26)
+            btn.setFixedHeight(self._tb_hoehe())
             btn.setStyleSheet("""
                 QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; padding:0 8px; }
@@ -257,7 +261,9 @@ class VirtualConsoleView(QWidget):
                       "derselbe Verlauf wie Bearbeiten → Wiederholen.",
                  self._knopf_wiederholen)]:
             ub = QPushButton(_glyph)
-            ub.setFixedHeight(26)
+            ub.setFixedHeight(self._tb_hoehe())
+            # UI-121 B-14: ↶/↷ waren 30 px schmal — jetzt ≥ 40 px (Touch 44).
+            ub.setMinimumWidth(44 if touch_aktiv() else 40)
             ub.setToolTip(_tip)
             ub.setStyleSheet("""
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
@@ -282,7 +288,7 @@ class VirtualConsoleView(QWidget):
         # MIDI-Learn-Button
         self._btn_midi_learn = QPushButton("MIDI Lernen")
         self._btn_midi_learn.setCheckable(True)
-        self._btn_midi_learn.setFixedHeight(26)
+        self._btn_midi_learn.setFixedHeight(self._tb_hoehe())
         self._btn_midi_learn.setToolTip(
             "MIDI-Patch-Modus: Zuerst einen VC-Button anklicken,\n"
             "dann die gewünschte MIDI-Taste drücken."
@@ -304,7 +310,7 @@ class VirtualConsoleView(QWidget):
         # APC LEDs Toggle
         self._btn_apc_leds = QPushButton("APC LEDs")
         self._btn_apc_leds.setCheckable(True)
-        self._btn_apc_leds.setFixedHeight(26)
+        self._btn_apc_leds.setFixedHeight(self._tb_hoehe())
         self._btn_apc_leds.setToolTip(
             "APC Mini LED-Feedback aktivieren/deaktivieren\n"
             "Grün = aktiv, Grün blinkend = gestoppt, Rot = Flash, Gelb = aktuelle Page"
@@ -322,7 +328,7 @@ class VirtualConsoleView(QWidget):
         # Touch-Lock (Display-only): nur Anzeige, keine Steuerung per Touchscreen
         self._btn_touch_lock = QPushButton("🔒 Touch-Lock")
         self._btn_touch_lock.setCheckable(True)
-        self._btn_touch_lock.setFixedHeight(26)
+        self._btn_touch_lock.setFixedHeight(self._tb_hoehe())
         self._btn_touch_lock.setToolTip(
             "Display-only: Touchscreen/Maus steuert nicht mehr (nur Anzeige).\n"
             "APC mini / MIDI steuern weiterhin. Schützt vor versehentlichem Antippen."
@@ -342,7 +348,7 @@ class VirtualConsoleView(QWidget):
         # Fader den aktuellen VC-Wert einmal durchfahren hat → keine Wertsprünge.
         self._btn_pickup = QPushButton("🎚 Pickup")
         self._btn_pickup.setCheckable(True)
-        self._btn_pickup.setFixedHeight(26)
+        self._btn_pickup.setFixedHeight(self._tb_hoehe())
         self._btn_pickup.setToolTip(
             "Soft-Takeover für nicht-motorisierte Fader (APC mini …):\n"
             "Nach einem Seitenwechsel springt der Wert nicht — der Fader übernimmt\n"
@@ -366,23 +372,34 @@ class VirtualConsoleView(QWidget):
                           border-radius:3px; font-size:12px; font-weight:bold; }
             QPushButton:hover { background:#30363d; color:#e6edf3; }
         """
+        # UI-121 B-05: Bank-Knoepfe waren 26×26 px (6,9 mm breit) — der Bank-
+        # wechsel ist live haeufig. Maus: 44 px breit (Hoehe der Leiste),
+        # Touch: 56×56 px. Das Etikett dazwischen ist antippbar (Bank-Auswahl).
+        _bank_w, _bank_h = (56, 56) if touch_aktiv() else (44, self._tb_hoehe())
         self._btn_bank_prev = QPushButton("◀")
-        self._btn_bank_prev.setFixedSize(26, 26)
+        self._btn_bank_prev.setFixedSize(_bank_w, _bank_h)
         self._btn_bank_prev.setToolTip("Vorherige Bank (Pad-/Widget-Seite)")
         self._btn_bank_prev.setStyleSheet(_bank_btn_css)
         self._btn_bank_prev.clicked.connect(weak_slot(self._step_bank, -1))
         tb_layout.addWidget(self._btn_bank_prev)
 
-        self._lbl_bank = QLabel("Bank 1")
-        self._lbl_bank.setFixedWidth(54)
-        self._lbl_bank.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # UI-121 B-05: Etikett ist ein flacher Knopf — Antippen oeffnet die
+        # Bank-Auswahl (direkt zu Bank 1–10 statt mehrfach ◀/▶).
+        self._lbl_bank = QPushButton("Bank 1")
+        self._lbl_bank.setFlat(True)
+        self._lbl_bank.setFixedWidth(72 if touch_aktiv() else 54)
+        self._lbl_bank.setFixedHeight(_bank_h)
+        self._lbl_bank.setToolTip("Bank waehlen (Pad-/Widget-Seite)")
         self._lbl_bank.setStyleSheet(
-            "color:#58a6ff; font-size:11px; font-weight:bold;"
+            "QPushButton { color:#58a6ff; font-size:11px; font-weight:bold;"
+            " background:transparent; border:none; padding:0; }"
+            "QPushButton:hover { color:#e6edf3; }"
         )
+        self._lbl_bank.clicked.connect(weak_slot(self._bank_menue))
         tb_layout.addWidget(self._lbl_bank)
 
         self._btn_bank_next = QPushButton("▶")
-        self._btn_bank_next.setFixedSize(26, 26)
+        self._btn_bank_next.setFixedSize(_bank_w, _bank_h)
         self._btn_bank_next.setToolTip("Nächste Bank (Pad-/Widget-Seite)")
         self._btn_bank_next.setStyleSheet(_bank_btn_css)
         self._btn_bank_next.clicked.connect(weak_slot(self._step_bank, 1))
@@ -390,7 +407,7 @@ class VirtualConsoleView(QWidget):
 
         # Popout Button
         self._btn_popout = QPushButton("⧉ Popout")
-        self._btn_popout.setFixedHeight(26)
+        self._btn_popout.setFixedHeight(self._tb_hoehe())
         self._btn_popout.setToolTip("Virtual Console in eigenem Fenster öffnen")
         self._btn_popout.setStyleSheet("""
             QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
@@ -401,7 +418,7 @@ class VirtualConsoleView(QWidget):
         tb_layout.addWidget(self._btn_popout)
 
         btn_clear = QPushButton("Alle löschen")
-        btn_clear.setFixedHeight(26)
+        btn_clear.setFixedHeight(self._tb_hoehe())
         btn_clear.setStyleSheet("""
             QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
@@ -413,7 +430,7 @@ class VirtualConsoleView(QWidget):
         tb_layout.addWidget(btn_clear)
 
         btn_save = QPushButton("Canvas exportieren…")
-        btn_save.setFixedHeight(26)
+        btn_save.setFixedHeight(self._tb_hoehe())
         btn_save.setToolTip("Nur dieses VC-Layout als separate JSON-Datei exportieren "
                             "(unabhängig vom Show-Speichern unter Datei → Speichern).")
         btn_save.setStyleSheet("""
@@ -425,7 +442,7 @@ class VirtualConsoleView(QWidget):
         tb_layout.addWidget(btn_save)
 
         btn_load = QPushButton("Canvas importieren…")
-        btn_load.setFixedHeight(26)
+        btn_load.setFixedHeight(self._tb_hoehe())
         btn_load.setToolTip("Ein zuvor exportiertes VC-Layout (JSON) in dieses Canvas laden.")
         btn_load.setStyleSheet("""
             QPushButton { background:#21262d; color:#58a6ff; border:1px solid #30363d;
@@ -449,7 +466,7 @@ class VirtualConsoleView(QWidget):
         self._btn_inspector = QPushButton("⚙ Inspector ✓")
         self._btn_inspector.setCheckable(True)
         self._btn_inspector.setChecked(True)
-        self._btn_inspector.setFixedHeight(26)
+        self._btn_inspector.setFixedHeight(self._tb_hoehe())
         self._btn_inspector.setProperty("edit_only", True)
         self._btn_inspector.setVisible(False)
         self._btn_inspector.setStyleSheet("""
@@ -470,7 +487,7 @@ class VirtualConsoleView(QWidget):
         self._btn_handy.setObjectName("vc_handy_konsole")
         self._btn_handy.setCheckable(True)
         self._btn_handy.setChecked(False)
-        self._btn_handy.setFixedHeight(26)
+        self._btn_handy.setFixedHeight(self._tb_hoehe())
         self._btn_handy.setToolTip(
             "Seitenleiste „Handy-Konsole“: hier baust du, was am Handy zu sehen "
             "ist.\nElemente im Bearbeiten-Modus hineinziehen oder per Rechtsklick "
@@ -524,7 +541,15 @@ class VirtualConsoleView(QWidget):
 
         # ── Splitter: Canvas links, Sidebar rechts ────────────────────────────
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setStyleSheet("QSplitter::handle { background:#30363d; width:2px; }")
+        # UI-119 (B-10): im Touch-Modus breiter Griff mit Marke (Touch-QSS);
+        # mit der Maus bleibt der schmale 2-px-Strich.
+        try:
+            from src.ui.touch_keyboard import is_touch_mode, SPLITTER_GRIFF
+            _griff = SPLITTER_GRIFF if is_touch_mode() else 2
+        except Exception:
+            _griff = 2
+        splitter.setStyleSheet(
+            "QSplitter::handle { background:#30363d; width:%dpx; }" % _griff)
 
         # Die VC-Arbeitsflaeche soll mindestens 1200x800 gross bleiben, auf
         # breiten Touchscreens aber den GANZEN verfuegbaren Viewport nutzen.
@@ -614,7 +639,7 @@ class VirtualConsoleView(QWidget):
         self._btn_sidebar = QPushButton("◀ Bibliothek")
         self._btn_sidebar.setCheckable(True)
         self._btn_sidebar.setChecked(True)
-        self._btn_sidebar.setFixedHeight(26)
+        self._btn_sidebar.setFixedHeight(self._tb_hoehe())
         self._btn_sidebar.setStyleSheet("""
             QPushButton { background:#21262d; color:#ffd700; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
@@ -952,8 +977,29 @@ class VirtualConsoleView(QWidget):
 
     # ── Bank/Page ──────────────────────────────────────────────────────────────
 
+    def _tb_hoehe(self) -> int:
+        """UI-121 B-14: Hoehe der Werkzeugleisten-Knoepfe — Touch 44 px,
+        Maus wie bisher 26 px."""
+        return 44 if touch_aktiv() else 26
+
+    def _bank_menue(self):
+        """UI-121 B-05: Bank-Etikett angetippt — Bank direkt waehlen."""
+        from PySide6.QtWidgets import QMenu
+        menue = QMenu(self)
+        aktiv = self._canvas.active_bank
+        for b in range(10):
+            act = menue.addAction(f"Bank {b + 1}")
+            act.setCheckable(True)
+            act.setChecked(b == aktiv)
+            act.triggered.connect(weak_slot(self._set_bank, b))
+        self._bank_menue_offen = menue          # fuer Tests greifbar
+        menue.popup(self._lbl_bank.mapToGlobal(self._lbl_bank.rect().bottomLeft()))
+
     def _step_bank(self, delta: int):
-        target = max(0, min(9, self._canvas.active_bank + int(delta)))
+        self._set_bank(self._canvas.active_bank + int(delta))
+
+    def _set_bank(self, target: int, *_):
+        target = max(0, min(9, int(target)))
         pe = None
         try:
             from src.core.app_state import get_state

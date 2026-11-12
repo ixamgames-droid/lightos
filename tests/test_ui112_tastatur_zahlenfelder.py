@@ -406,7 +406,8 @@ class SpaltenTest(_Basis):
         r = self._indikator(cb)
         self.assertGreaterEqual(r.height(), 26)
         self.assertGreaterEqual(cb.height(), 36)
-        self.assertLess(self._indikator(draussen).height(), 20, "nur die Spalte (Rest: UI-119)")
+        # UI-119 (A-16): seit dem allgemeinen Touch-QSS auch ausserhalb der Spalte.
+        self.assertGreaterEqual(self._indikator(draussen).height(), 26)
 
     def test_live_spalte_zahlenfelder_trotz_eigenem_stil(self):
         from src.ui.views.live_view import LiveView
