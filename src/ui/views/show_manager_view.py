@@ -336,6 +336,20 @@ class TimelineCanvas(QWidget):
                 self.update()
                 self.updateGeometry()
 
+    def lang_druck_menue_erlaubt(self) -> bool:
+        """UI-124 Nachbesserung: wie in der 2D-Buehne (UI-115) gewinnt ein
+        laufendes Verschieben gegen das Lang-Druck-Menue. Hat der Finger nach
+        der Freigabe (0,45 s) den Block schon ein Stueck bewegt, kommt bei
+        0,6 s kein Menue mehr — sonst stuende ein Menue offen und der Block
+        waere zugleich verschoben."""
+        if self._pinch is not None or self._sperre_bis_los:
+            return False
+        sf = self._drag_sf
+        if sf is not None and (abs(sf.start_time - self._drag_original_start) > 1e-9
+                               or self._drag_track is not self._drag_original_track):
+            return False
+        return True
+
     # ── UI-124: Auswahl, Block loeschen ──────────────────────────────────────
 
     def _auswahl_setzen(self, sf: ShowFunction | None) -> None:

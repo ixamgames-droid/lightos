@@ -411,3 +411,23 @@ def test_knoepfe_am_finger_mindestens_36_px():
 def test_knoepfe_maus_kompakt():
     z = _ansicht(touch=False)
     assert all(b.width() == 22 and b.height() == 22 for b in _mute(z.view))
+
+
+# ── Nachbesserung nach Pruefung ──────────────────────────────────────────────
+
+def test_finger_angefangene_verschiebung_verhindert_lang_druck_menue():
+    """Wie in der 2D-Buehne: hat der Finger den Block nach der Freigabe schon
+    bewegt, kommt kein Menue mehr (sonst Menue offen und Block verschoben)."""
+    z = _ansicht()
+    gezeigt = _menue_abfangen(z.c)
+    p = _block_punkt(z)
+    QTest.touchEvent(z.c, _DEV).press(0, p, z.c).commit()
+    QApplication.processEvents()
+    _warte(zs.LANG_DRUCK_S + 0.05)
+    QTest.touchEvent(z.c, _DEV).move(0, p + QPoint(12, 0), z.c).commit()
+    QApplication.processEvents()
+    _warte(zs.LANG_MENUE_S - zs.LANG_DRUCK_S + 0.3)
+    QTest.touchEvent(z.c, _DEV).release(0, p + QPoint(12, 0), z.c).commit()
+    QApplication.processEvents()
+    assert z.block.start_time > 3.0, "der Block ist verschoben"
+    assert gezeigt == [], "dann kein Menue"
