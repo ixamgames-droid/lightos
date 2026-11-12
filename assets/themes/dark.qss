@@ -137,8 +137,7 @@ QWidget#sectionBar {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 #222222, stop:1 #111111);
     border-bottom: 1px solid #161616;
-    min-height: 34px;
-    max-height: 34px;
+    /* UI-120: Hoehe setzt main_window (38 px, mit --touch 54 px). */
 }
 
 QPushButton#sectionBtn {

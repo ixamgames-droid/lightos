@@ -408,11 +408,17 @@ class _SectionBar(QWidget):
 
     def sizeHint(self):  # noqa: N802
         fw = self._full_widths()
-        return QSize(sum(fw) + self._SP * max(0, len(fw) - 1), 34)
+        return QSize(sum(fw) + self._SP * max(0, len(fw) - 1), self._hoehe())
 
     def minimumSizeHint(self):  # noqa: N802
         n = len(self._tabs)
-        return QSize(SectionButton._CLICK_FLOOR_PX * n + self._SP * max(0, n - 1), 34)
+        return QSize(SectionButton._CLICK_FLOOR_PX * n + self._SP * max(0, n - 1),
+                     self._hoehe())
+
+    def _hoehe(self) -> int:
+        # UI-120 (Touch-Audit A-19): so hoch wie die Knoepfe (36 px, mit
+        # --touch 52 px) — fest 34 px schnitt sie unten ab.
+        return max([34] + [b.sizeHint().height() for b in self._tabs])
 
     def resizeEvent(self, event):  # noqa: N802
         super().resizeEvent(event)
@@ -805,6 +811,11 @@ class MainWindow(QMainWindow):
                 "QSlider::handle:vertical { width: 36px; height: 36px; "
                 "margin: 0 -15px; border-radius: 18px; }\n"
                 "QSlider#gmSlider { min-height: 32px; max-height: 32px; }\n"
+                # UI-120 (A-04): TAP so hoch wie STOP ALL/BLACKOUT (44 px statt 52)
+                "QPushButton#tapBtn { padding-top: 2px; padding-bottom: 2px; }\n"
+                # UI-120: Sektionsknoepfe fuellen die 54 px hohe Leiste (52 px
+                # Trefferflaeche, die gelbe Linie bleibt am unteren Rand).
+                "QPushButton#sectionBtn { min-height: 50px; max-height: 50px; }\n"
                 "QSlider#gmSlider::handle:horizontal { width: 30px; height: 30px; "
                 "margin: -12px 0; border-radius: 15px; }\n"
                 "QListWidget::item, QTreeWidget::item, QTableWidget::item { "
@@ -1053,6 +1064,23 @@ class MainWindow(QMainWindow):
 
     # ── UI aufbauen ───────────────────────────────────────────────────────────
 
+    # UI-120: Hoehe der Kopfleiste (Sektionsleiste) und ihrer kleinen Knoepfe.
+    # 38 = 36 px Sektionsknopf + 2 px Rand unten; mit --touch 44 px Knoepfe.
+    _KOPF_H = 38
+    _KOPF_H_TOUCH = 54
+    _KOPF_KNOPF = 28
+    _KOPF_KNOPF_TOUCH = 44
+
+    def _kopf_knopf_h(self) -> int:
+        return (self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False)
+                else self._KOPF_KNOPF)
+
+    def _page_pfeil_stil(self) -> str:
+        """Page-Pfeile: Mindestmass (Rand 1 px je Seite); mit --touch 44x44."""
+        h = self._kopf_knopf_h() - 2
+        b = h if getattr(self, "_touch_mode", False) else 20
+        return f"padding:0px; min-width:{b}px; min-height:{h}px;"
+
     def _build_ui(self):
         """
         Layout:
@@ -1070,9 +1098,16 @@ class MainWindow(QMainWindow):
         # ── Sektions-Toolbar (Haupt-Navigation) ───────────────────────────────
         self._section_bar = QWidget()
         self._section_bar.setObjectName("sectionBar")
-        self._section_bar.setFixedHeight(34)
+        # UI-120 (Touch-Audit A-04/A-17/A-19): die Leiste ist so hoch wie ihre
+        # Knoepfe (Sektionsknoepfe 36 px, mit ``--touch`` STOP ALL/BLACKOUT
+        # 44 px) — vorher fest 35 px, die Knoepfe wurden unten abgeschnitten.
+        # Unten 2 px Rand; STOP ALL/BLACKOUT sitzen unten, damit zum LASER
+        # NOT-AUS darueber (Ecke der Menueleiste) >= 8 px Luft bleiben.
+        _touch = bool(getattr(self, "_touch_mode", False))
+        self._section_bar.setFixedHeight(
+            self._KOPF_H_TOUCH if _touch else self._KOPF_H)
         bar_layout = QHBoxLayout(self._section_bar)
-        bar_layout.setContentsMargins(4, 0, 4, 0)
+        bar_layout.setContentsMargins(4, 0, 4, 2)
         bar_layout.setSpacing(0)
 
         self._btn_group = QButtonGroup(self)
@@ -1179,7 +1214,10 @@ class MainWindow(QMainWindow):
 
         # Tap-Tempo + BPM (klickbares Label)
         self._btn_tap = QPushButton("TAP")
-        self._btn_tap.setFixedHeight(26)
+        self._btn_tap.setObjectName("tapBtn")    # UI-120: Touch-Hoehe im QSS
+        # UI-120: mit --touch 44 px wie STOP ALL (vorher 52 px, unten abgeschnitten)
+        self._btn_tap.setFixedHeight(
+            self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False) else 26)
         self._btn_tap.setFixedWidth(48)
         self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 4× im Takt = Tempo setzen")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
@@ -1215,11 +1253,11 @@ class MainWindow(QMainWindow):
         # ISO-02: Zentrales Clear-Menue (immer erreichbar: Programmer / Simple Desk
         # / Alle Nicht-VC-Werte). Loescht nur aktive Werte, nie gespeicherte Daten.
         self._btn_clear_nonvc = QPushButton("✖ Clear ▾")
-        self._btn_clear_nonvc.setFixedHeight(22)
         self._btn_clear_nonvc.setToolTip("Aktive Werte zurücksetzen (Programmer / Simple Desk / Alle Nicht-VC)")
+        # UI-120 (A-12): Mindestmass statt fester Hoehe, mit --touch 44 px.
         self._btn_clear_nonvc.setStyleSheet(
             "QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;"
-            " border-radius:3px; padding:0 8px; }"
+            f" border-radius:3px; padding:0 8px; min-height:{self._kopf_knopf_h() - 2}px; }}"
             "QPushButton:hover { background:#30363d; }"
         )
         self._btn_clear_nonvc.clicked.connect(self._open_clear_menu)
@@ -1227,10 +1265,12 @@ class MainWindow(QMainWindow):
 
         # Page-Anzeige + Pfeile (T0.1 Multi-Page)
         page_prev = QPushButton("<")
-        page_prev.setFixedSize(22, 22)
         # UI-108: dark.qss gibt jeder Taste 10 px Innenabstand links/rechts —
         # bei 22 px Breite blieb fuer das Zeichen nichts, die Pfeile waren leer.
-        page_prev.setStyleSheet("padding:0px;")
+        # UI-120 (Touch-Audit A-12): Mindestmass statt fester 22x22 px — mit
+        # ``--touch`` 44x44 px, sonst 22x28 px (so hoch wie STOP ALL; breiter
+        # ginge der Navigation bei 1440 px vom Platz ab: „Virtual Cons…“).
+        page_prev.setStyleSheet(self._page_pfeil_stil())
         page_prev.setToolTip("Vorherige Page (Ctrl+Page Up)")
         page_prev.clicked.connect(self._page_prev)
         bar_layout.addWidget(page_prev)
@@ -1243,8 +1283,7 @@ class MainWindow(QMainWindow):
         bar_layout.addWidget(self._lbl_page)
 
         page_next = QPushButton(">")
-        page_next.setFixedSize(22, 22)
-        page_next.setStyleSheet("padding:0px;")      # UI-108, s. page_prev
+        page_next.setStyleSheet(self._page_pfeil_stil())   # UI-108/UI-120, s. o.
         page_next.setToolTip("Nächste Page (Ctrl+Page Down)")
         page_next.clicked.connect(self._page_next)
         bar_layout.addWidget(page_next)
@@ -1324,7 +1363,9 @@ class MainWindow(QMainWindow):
         # wird „STOP ALL" bei großer Schrift/Skalierung beidseitig abgeschnitten.
         btn_stop.setMinimumWidth(78)
         btn_stop.clicked.connect(self._stop_all)
-        bar_layout.addWidget(btn_stop)
+        # UI-120 (A-17): unten in der Leiste — Abstand zum LASER NOT-AUS darueber
+        bar_layout.addWidget(btn_stop, 0, Qt.AlignmentFlag.AlignBottom)
+        self._btn_stop_all = btn_stop
 
         btn_blackout = QPushButton("BLACKOUT")
         btn_blackout.setObjectName("blackoutBtn")
@@ -1334,7 +1375,7 @@ class MainWindow(QMainWindow):
         btn_blackout.setMinimumWidth(88)
         btn_blackout.clicked.connect(self._toggle_blackout)
         self._btn_blackout = btn_blackout
-        bar_layout.addWidget(btn_blackout)
+        bar_layout.addWidget(btn_blackout, 0, Qt.AlignmentFlag.AlignBottom)   # UI-120
         try:
             om = self._state.output_manager
             self._blackout_abo = lambda an: self._blackout_changed_sig.emit(bool(an))
@@ -3385,6 +3426,9 @@ class MainWindow(QMainWindow):
             self._btn_blackout_kiosk = bo
             self._kiosk_gm_und_stop_bauen(lay, btn.minimumHeight())
             lay.addWidget(bo)
+            # UI-120 (Touch-Audit A-17): >= 8 px Luft zwischen BLACKOUT und
+            # LASER NOT-AUS (vorher 6 px Layout-Abstand)
+            lay.addSpacing(4)
             lay.addWidget(btn)
             root = self.centralWidget().layout()
             root.insertWidget(max(0, root.indexOf(self._section_bar)), leiste)
