@@ -1,5 +1,6 @@
 """Scene Editor — edit a Scene function's channel values."""
 from __future__ import annotations
+from src.ui.touch_keyboard import touch_hoehe, touch_schrift  # UI-119 (C-14)
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QDoubleSpinBox, QPushButton, QTableWidget, QTableWidgetItem,
@@ -35,12 +36,12 @@ class SceneEditor(QWidget):
 
         header = QHBoxLayout(); header.setContentsMargins(0, 0, 0, 0); header.addStretch(1)
         self._btn_editor_popout = QPushButton("⤢ Großes Fenster")
-        self._btn_editor_popout.setFixedHeight(24)
+        self._btn_editor_popout.setFixedHeight(touch_hoehe(24))
         self._btn_editor_popout.setToolTip("Den ganzen Editor in einem großen, scrollbaren Fenster bearbeiten")
         self._btn_editor_popout.setStyleSheet(
-            "QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
+            touch_schrift("QPushButton{background:#21262d;color:#e6edf3;border:1px solid #30363d;"
             "border-radius:3px;font-size:10px;padding:1px 8px;} "
-            "QPushButton:hover{background:#30363d;}")
+            "QPushButton:hover{background:#30363d;}"))
         self._btn_editor_popout.clicked.connect(self._toggle_editor_popout)
         header.addWidget(self._btn_editor_popout)
         outer.addLayout(header)

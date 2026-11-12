@@ -276,7 +276,8 @@ class ReglerTouchTest(unittest.TestCase):
         self.assertEqual(gm.width(), 170, "GM breiter")
         self.assertGreaterEqual(gm.height(), 30, "GM hoeher")
         self.assertLessEqual(gm.height(), w._section_bar.height(), "GM passt in die Kopfleiste")
-        self.assertLessEqual(w._section_bar.height(), 35, "Kopfleiste waechst nicht")
+        # UI-120: die Kopfleiste ist mit --touch bewusst 54 px hoch (44-px-Knoepfe)
+        self.assertLessEqual(w._section_bar.height(), 54, "Kopfleiste nicht hoeher als noetig")
         g = zs.griff_rechteck(gm)
         self.assertGreaterEqual(min(g.width(), g.height()), 28)
         # ohne Scrollflaeche: Rillen-Tipp aendert den GM nicht, Griff ziehen schon
