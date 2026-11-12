@@ -13,10 +13,14 @@ from PySide6.QtGui import (
 from src.core.engine.function_manager import get_function_manager
 from src.ui.layout_leeren import layout_leeren
 from src.ui.ziehen_scrollen import FingerHalten   # UI-115
+from src.ui.touch_keyboard import is_touch_mode   # UI-117
 from src.core.engine.function import FunctionType
 from src.core.engine.show_engine import Show, ShowTrack, ShowFunction
 
 PX_PER_SEC = 50          # pixels per second (default zoom)
+#: UI-117 (Touch-Audit D-05): Mindestgroesse der Knoepfe am Finger (Kopfleiste,
+#: Spur-Stumm). Die Maus behaelt die kompakten Masse.
+TOUCH_KNOPF = 34
 TRACK_H = 40             # pixels per track row
 RULER_H = 24             # pixels for time ruler
 TRACK_LABEL_W = 150      # width of left track label panel
@@ -331,7 +335,8 @@ class TrackLabelPanel(QWidget):
             btn_mute.setToolTip("Track stummschalten")
             btn_mute.setCheckable(True)
             btn_mute.setChecked(track.muted)
-            btn_mute.setFixedSize(22, 22)
+            k = TOUCH_KNOPF if is_touch_mode() else 22   # UI-117 (D-05)
+            btn_mute.setFixedSize(k, k)
             btn_mute.setStyleSheet(
                 "QPushButton:checked { background: #cc6600; color: #fff; font-weight:bold; }"
             )
@@ -402,6 +407,12 @@ class ShowManagerView(QWidget):
         btn_add_fn = QPushButton("+ Funktion")
         btn_add_fn.clicked.connect(self._add_function)
         top_bar.addWidget(btn_add_fn)
+
+        if is_touch_mode():
+            # UI-117 (D-05): Kopfknoepfe am Finger mindestens 34 px hoch
+            for k in (self._show_combo, btn_new_show, btn_add_track, btn_add_fn):
+                k.setMinimumHeight(TOUCH_KNOPF)
+        self._kopf_knoepfe = (btn_new_show, btn_add_track, btn_add_fn)
 
         top_widget = QWidget()
         top_widget.setLayout(top_bar)
