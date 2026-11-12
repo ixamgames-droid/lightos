@@ -813,6 +813,13 @@ class MainWindow(QMainWindow):
                 "QTabBar::tab { min-height: 40px; padding: 8px 16px; font-size: 13px; }\n"
                 "QSpinBox, QDoubleSpinBox, QLineEdit { min-height: 32px; font-size: 13px; }\n"
             )
+            # UI-112 (C-02/D-16): grosse −/+-Knoepfe an Zahlenfeldern, groessere
+            # Haken in den Seitenspalten — Regeln in touch_keyboard (eine Quelle).
+            try:
+                from src.ui.touch_keyboard import touch_qss
+                qss += touch_qss()
+            except Exception as e:
+                print(f"[main_window] ERROR: Touch-QSS Zahlenfelder: {e}")
         self.setStyleSheet(qss)
 
     # ── Menu bar ──────────────────────────────────────────────────────────────
