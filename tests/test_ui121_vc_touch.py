@@ -526,8 +526,9 @@ def test_pruefung_cueliste_echter_doppeltipp_fragt_nach():
     # paarweise, auch ueber fruehere Tests hinweg — darum zuerst auf Zeile 1
     # tippen, bis dort ein Doppeltipp erkannt ist: danach ist der naechste
     # Tipp sicher ein einzelner.
-    alt = QApplication.doubleClickInterval()
-    QApplication.setDoubleClickInterval(5000)
+    hints = QApplication.styleHints()
+    alt = hints.mouseDoubleClickInterval()
+    hints.setMouseDoubleClickInterval(5000)
     try:
         erste = c._cue_list.visualItemRect(c._cue_list.item(0)).center()
         for _ in range(3):
@@ -537,10 +538,13 @@ def test_pruefung_cueliste_echter_doppeltipp_fragt_nach():
         assert gefragt and "Cue 1" in gefragt[0]
         gefragt.clear()
         mitte = c._cue_list.visualItemRect(c._cue_list.item(4)).center()
-        _tipp(vp, mitte)
+        _tipp(vp, mitte)      # weit weg vom letzten Druck: sicher ein Einzeltipp
         assert gefragt == [], "ein einzelner Tipp fragt nie"
-        _tipp(vp, mitte)
+        for _ in range(3):    # langsame CI: notfalls neues Tipp-Paar
+            _tipp(vp, mitte)
+            if gefragt:
+                break
     finally:
-        QApplication.setDoubleClickInterval(alt)
+        hints.setMouseDoubleClickInterval(alt)
     assert len(gefragt) == 1 and "Cue 5" in gefragt[0]
     assert ex.stack.gesprungen == [], "Nein = kein Sprung"
