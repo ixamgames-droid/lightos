@@ -12,6 +12,11 @@ class VCXYPad(VCWidget):
     def __init__(self, caption: str = "XY Pad", parent=None):
         super().__init__(caption, parent)
         self._pan: float = 0.5      # 0.0–1.0
+        # UI-121 B-15: relativer Modus (Positions-Modus) — der Punkt springt
+        # nicht auf den Finger, sondern wandert ab der aktuellen Lage mit,
+        # halb so schnell wie der Finger (Feinbedienung). Standard: absolut.
+        self.relativ: bool = False
+        self._rel_start = None      # (QPoint, pan, tilt) beim Druck
         self._tilt: float = 0.5
         self._dragging_pad = False
         self.pan_attr  = "pan"
@@ -73,6 +78,20 @@ class VCXYPad(VCWidget):
         tilt = max(0.0, min(1.0, (pos.y() - pr.y()) / h))
         self._pan = pan
         self._tilt = tilt
+        self._apply()
+        self.update()
+
+    REL_FAKTOR = 0.5
+
+    def _relativ_bewegen(self, pos: QPoint):
+        """UI-121 B-15: Wert um die Fingerbewegung (× REL_FAKTOR) verschieben."""
+        start, pan0, tilt0 = self._rel_start
+        pr = self._pad_rect()
+        w = pr.width() or 1
+        h = pr.height() or 1
+        d = pos - start
+        self._pan = max(0.0, min(1.0, pan0 + d.x() / w * self.REL_FAKTOR))
+        self._tilt = max(0.0, min(1.0, tilt0 + d.y() / h * self.REL_FAKTOR))
         self._apply()
         self.update()
 
@@ -290,7 +309,10 @@ class VCXYPad(VCWidget):
                 self.update()
             else:
                 self._dragging_pad = True
-                self._pos_to_value(event.position().toPoint())
+                if self.relativ:
+                    self._rel_start = (event.position().toPoint(), self._pan, self._tilt)
+                else:
+                    self._pos_to_value(event.position().toPoint())
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -309,7 +331,10 @@ class VCXYPad(VCWidget):
                 self._path_pts.append(cur)
                 self.update()
         elif self._dragging_pad:
-            self._pos_to_value(event.position().toPoint())
+            if self.relativ and self._rel_start is not None:
+                self._relativ_bewegen(event.position().toPoint())
+            else:
+                self._pos_to_value(event.position().toPoint())
         event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -323,6 +348,7 @@ class VCXYPad(VCWidget):
             self._path_drawing = False
             self._apply_path()      # gezeichnete Bahn -> Custom-EfxPath
         self._dragging_pad = False
+        self._rel_start = None
         event.accept()
 
     # ── Paint ─────────────────────────────────────────────────────────────────
@@ -436,6 +462,11 @@ class VCXYPad(VCWidget):
         bits16_cb.setToolTip("Feinere Pan/Tilt-Auflösung für Moving Heads mit "
                              "16-bit-Kanälen. Geräte ohne Fine-Kanal ignorieren es.")
         form.addRow("Auflösung:", bits16_cb)
+        rel_cb = QCheckBox("Relativ (Punkt springt nicht, folgt halb so schnell)")
+        rel_cb.setChecked(self.relativ)
+        rel_cb.setToolTip("Positions-Modus: Ziehen verschiebt den Punkt ab seiner "
+                          "aktuellen Lage — Feinbedienung am Finger.")
+        form.addRow("Bedienung:", rel_cb)
         fids = QLineEdit(", ".join(str(f) for f in self._fixture_ids))
         form.addRow("Fixture-IDs (Position):", fids)
         efx = QLineEdit("" if self.efx_function_id is None else str(self.efx_function_id))
@@ -479,6 +510,7 @@ class VCXYPad(VCWidget):
                 t = efx.text().strip()
                 self.efx_function_id = int(t) if t.lstrip("-").isdigit() else None
             self.bits16 = bits16_cb.isChecked()
+            self.relativ = rel_cb.isChecked()
             self.midi_cc_pan = cc_pan.value()
             self.midi_cc_tilt = cc_tilt.value()
             self.midi_ch = mch.value()
@@ -501,6 +533,8 @@ class VCXYPad(VCWidget):
         d["midi_ch"] = self.midi_ch
         if self._area is not None:
             d["area"] = list(self._area)
+        if self.relativ:            # UI-121: nur wenn an — alte Shows bleiben gleich
+            d["relativ"] = True
         return d
 
     def apply_dict(self, d: dict):
@@ -512,6 +546,7 @@ class VCXYPad(VCWidget):
         self._fixture_ids = d.get("fixture_ids", [])
         self.mode = d.get("mode", "position")
         self.bits16 = bool(d.get("bits16", False))
+        self.relativ = d.get("relativ") is True
         self.efx_function_id = d.get("efx_function_id")
         self.midi_cc_pan = int(d.get("midi_cc_pan", -1))
         self.midi_cc_tilt = int(d.get("midi_cc_tilt", -1))

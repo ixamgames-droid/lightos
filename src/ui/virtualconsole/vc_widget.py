@@ -5,6 +5,8 @@ from PySide6.QtCore import Qt, QPoint, QRect, Signal, QTimer, QEvent
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QAction
 import re
 import uuid
+from src.ui.ziehen_scrollen import ist_touch
+from src.ui.virtualconsole.vc_style import touch_aktiv, tz
 
 # ── WEB-08: feste Kennung je VC-Widget ───────────────────────────────────────
 #
@@ -137,7 +139,10 @@ class VCWidget(QFrame):
         return False
 
     HANDLE_SIZE = 8            # praezise Greifzone (Maus) — immer aktiv
-    TOUCH_HANDLE_SIZE = 24     # grosse Greifzone (Finger) — erst nach Verweilen
+    TOUCH_HANDLE_SIZE = 24     # grosse Greifzone (Maus nach Verweilen)
+    # UI-121 B-04: am Finger (bzw. im Touch-Modus) erscheinen die grossen
+    # Griffe SOFORT beim Druck und sind so breit — vorher 8 px ohne Vorwissen.
+    FINGER_HANDLE_SIZE = 36
     MIN_SIZE = (40, 30)
     _DWELL_MS = 500            # so lange „draufbleiben" enthuellt die grossen Griffe
     _DWELL_MOVE_TOL = 6        # ab dieser Bewegung gilt es als Verschieben (kein Reveal)
@@ -168,6 +173,7 @@ class VCWidget(QFrame):
         self._resizing = False
         self._resize_zone = None         # aktive Resize-Zone (tl/tr/bl/br/t/b/l/r)
         self._big_handles = False        # grosse Greifbaender enthuellt (Touch/Verweilen)
+        self._finger_griffe = False      # UI-121: zuletzt vom Finger gedrueckt
         self._selected = False
         self._effect_highlight = False   # Glow: „gehoert zum selben Effekt"
         self._snap_grid = 0      # 0 = kein Snap, sonst Grid-Größe in Pixel
@@ -256,6 +262,12 @@ class VCWidget(QFrame):
             return
         if event.button() == Qt.MouseButton.LeftButton:
             self._deselect_siblings()
+            # UI-121 B-04: Fingerdruck enthuellt die grossen Griffe sofort (vor
+            # der Zonen-Pruefung) — der Finger muss nicht erst 0,5 s verweilen.
+            self._finger_griffe = ist_touch(event)
+            if self._finger_griffe and not self._big_handles:
+                self._big_handles = True
+                self._handle_mode_changed()
             self._selected = True
             self.update()
             self._notify_effect_highlight()    # Gruppe „beeinflusst denselben Effekt"
@@ -396,7 +408,16 @@ class VCWidget(QFrame):
         """Greif-Breite: praezise (klein) im Normalfall, gross sobald die
         Greifbaender per Verweilen/Touch enthuellt sind. So skaliert die Maus an
         der Ecke sofort, der Finger nach kurzem Draufbleiben bequem."""
-        return self.TOUCH_HANDLE_SIZE if self._big_handles else self.HANDLE_SIZE
+        if self._big_handles:
+            return self._big_handle_size()
+        return tz(self.HANDLE_SIZE)          # B-09: im Touch-Modus ×1,3
+
+    def _big_handle_size(self) -> int:
+        """UI-121 B-04: Breite der grossen Griffe — am Finger/im Touch-Modus
+        FINGER_HANDLE_SIZE, mit der Maus (nach Verweilen) wie bisher."""
+        if self._finger_griffe or touch_aktiv():
+            return self.FINGER_HANDLE_SIZE
+        return self.TOUCH_HANDLE_SIZE
 
     def _zone_at(self, pos: QPoint):
         """Resize-Zone unter ``pos`` (``tl/tr/bl/br/t/b/l/r``) oder ``None`` (=
@@ -896,7 +917,7 @@ class VCWidget(QFrame):
             if self._big_handles:
                 self._paint_resize_handles(p, r)   # grosse Greifbaender (Touch)
             else:
-                hs = self.HANDLE_SIZE              # praeziser Eck-Griff (Maus)
+                hs = tz(self.HANDLE_SIZE)          # praeziser Eck-Griff (Maus)
                 p.fillRect(r.right() - hs, r.bottom() - hs, hs, hs, QColor("#0088ff"))
             if self._selected:
                 p.setPen(QPen(QColor("#58d68d"), 2, Qt.PenStyle.SolidLine))
@@ -908,7 +929,7 @@ class VCWidget(QFrame):
     def _paint_resize_handles(self, p: QPainter, r: QRect):
         """Zeichnet die grossen Greifbaender (4 Ecken + 4 Kantenmitten), sobald sie
         per Verweilen/Touch enthuellt sind — halbtransparentes Blau."""
-        m = self.TOUCH_HANDLE_SIZE
+        m = self._big_handle_size()
         m = max(4, min(m, min(r.width(), r.height()) // 3))
         fill = QColor(0, 136, 255, 90)
         w, h = r.width(), r.height()

@@ -10,7 +10,8 @@ from PySide6.QtCore import Qt, QRect, QPoint, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QConicalGradient
 import math
 from .vc_widget import VCWidget
-from .vc_style import paint_dial_knob   # VC3D-02: plastische Dreh-Knopf-Flaeche
+from .vc_style import paint_dial_knob, touch_aktiv, tz   # VC3D-02 / UI-121 B-09
+from src.ui.ziehen_scrollen import ist_touch           # UI-121 B-06: Finger fein
 from src.core.engine import tap_uhr     # QA-87: Tap-Zeitquelle (nicht monotonic)
 
 
@@ -135,6 +136,7 @@ class VCSpeedDial(VCWidget):
         self.show_bpm: bool = True          # digitale BPM-Anzeige
         self._drag_y: int | None = None
         self._drag_start_val: float = 120.0
+        self._drag_fein = False          # UI-121: Zug kam vom Finger
         self._tap_times: list[float] = []
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#58a6ff")
@@ -586,7 +588,7 @@ class VCSpeedDial(VCWidget):
         n = len(facs)
         if n == 0:
             return []
-        m, gap, y, h = 4, 4, 22, 28
+        m, gap, y, h = self._gap(), self._gap(), 22, self._tz(28)
         total = self.width() - 2 * m - gap * (n - 1)
         bw = max(18, total // n)
         out, x = [], m
@@ -596,19 +598,21 @@ class VCSpeedDial(VCWidget):
         return out
 
     def _node_step_rects(self) -> tuple[QRect, QRect, QRect, QRect]:
-        y, h, m, bw = 54, 24, 4, 30
+        g = self._gap()
+        y, h, m, bw = 22 + self._tz(28) + g, self._feld_h(), g, self._tz(30)
         minus = QRect(m, y, bw, h)
         reset = QRect(self.width() - m - bw, y, bw, h)
-        plus = QRect(self.width() - m - 2 * bw - 4, y, bw, h)
-        readout = QRect(minus.right() + 4, y, max(10, plus.left() - minus.right() - 8), h)
+        plus = QRect(self.width() - m - 2 * bw - g, y, bw, h)
+        readout = QRect(minus.right() + g, y, max(10, plus.left() - minus.right() - 2 * g), h)
         return minus, readout, plus, reset
 
     def _node_sync_rect(self) -> QRect:
-        y, h, m = 82, 24, 4
+        g = self._gap()
+        y, h, m = 22 + self._tz(28) + 2 * g + self._feld_h(), self._feld_h(), g
         return QRect(m, y, self.width() - 2 * m, h)
 
     def _node_bpm_rect(self) -> QRect:
-        h = 26
+        h = self._tz(26)
         return QRect(0, self.height() - h, self.width(), h)
 
     def _node_sub_click(self, pos: QPoint) -> bool:
@@ -694,11 +698,64 @@ class VCSpeedDial(VCWidget):
 
     # ── Dial geometry ─────────────────────────────────────────────────────────
 
+    # UI-121 B-06/B-09: Feldmasse. Maus wie bisher (24 px hoch, 4 px Abstand),
+    # im Touch-Modus 36 px hoch mit 8 px Abstand. Mit Touch kommt ueber den
+    # Tap/Sync-Feldern eine Zeile −/+ fuer die Feinwahl dazu (das Mausrad gibt
+    # es am Finger nicht), sofern das Widget hoch genug ist.
+    FEIN_BPM = 1.0
+    FEIN_MULT = 0.05
+
+    def _gross(self) -> bool:
+        """Touch-Masse anwenden? Im Touch-Modus ja — das Faktor-Gitter (Sub)
+        braucht dafuer aber 180 px Hoehe (neue Widgets haben das, aeltere,
+        kleinere behalten das bisherige Raster statt sich zu ueberlappen)."""
+        if not touch_aktiv():
+            return False
+        return self.height() >= 180 or not self._factor_grid_mode()
+
+    def _feld_h(self) -> int:
+        return 36 if self._gross() else 24
+
+    def _gap(self) -> int:
+        return 8 if self._gross() else 4
+
+    def _tz(self, px: int) -> int:
+        return tz(px) if self._gross() else px
+
+    def _fein_sichtbar(self) -> bool:
+        return touch_aktiv() and self.height() >= 150
+
+    def _fein_rects(self) -> tuple[QRect, QRect] | None:
+        """−/+ (Feinwahl) — nur im Touch-Modus, sonst None."""
+        if not self._fein_sichtbar():
+            return None
+        g, h = self._gap(), self._feld_h()
+        w = (self.width() - 3 * g) // 2
+        y = self._tap_rect().top() - g - h
+        return QRect(g, y, w, h), QRect(2 * g + w, y, w, h)
+
+    def _dial_unten(self) -> int:
+        """Unterkante der Flaeche fuer Rad + Wert (ueber den Feldern)."""
+        fein = self._fein_rects()
+        return (fein[0].top() if fein else self._tap_rect().top()) - 4
+
     def _dial_center(self) -> QPoint:
-        return QPoint(self.width() // 2, self.height() // 2 - 10)
+        if not touch_aktiv():
+            return QPoint(self.width() // 2, self.height() // 2 - 10)
+        oben = 20
+        return QPoint(self.width() // 2, (oben + self._dial_unten()) // 2)
 
     def _dial_radius(self) -> int:
-        return min(self.width(), self.height() - 40) // 2 - 6
+        if not touch_aktiv():
+            return min(self.width(), self.height() - 40) // 2 - 6
+        return max(8, min(self.width(), self._dial_unten() - 20) // 2 - 4)
+
+    def _fein(self, richtung: int):
+        """UI-121 B-06: Feinschritt (−/+): 1 BPM bzw. 0,05×."""
+        if self.multiplier_mode:
+            self.mult = self._mult + richtung * self.FEIN_MULT
+        else:
+            self.bpm = self._bpm + richtung * self.FEIN_BPM
 
     def _value_fraction(self) -> float:
         if self.multiplier_mode:
@@ -713,12 +770,14 @@ class VCSpeedDial(VCWidget):
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
     def _tap_rect(self) -> QRect:
-        w = (self.width() - 12) // 2
-        return QRect(4, self.height() - 28, w, 24)
+        g, h = self._gap(), self._feld_h()
+        w = (self.width() - 3 * g) // 2
+        return QRect(g, self.height() - h - g, w, h)
 
     def _sync_rect(self) -> QRect:
-        w = (self.width() - 12) // 2
-        return QRect(8 + w, self.height() - 28, w, 24)
+        g, h = self._gap(), self._feld_h()
+        w = (self.width() - 3 * g) // 2
+        return QRect(2 * g + w, self.height() - h - g, w, h)
 
     def mousePressEvent(self, event):
         if self._edit_mode:
@@ -739,9 +798,22 @@ class VCSpeedDial(VCWidget):
         if self._sync_rect().contains(pos):
             self.sync()
             return
+        fein = self._fein_rects()
+        if fein is not None:
+            if fein[0].contains(pos):
+                self._fein(-1)
+                event.accept()
+                return
+            if fein[1].contains(pos):
+                self._fein(+1)
+                event.accept()
+                return
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_y = pos.y()
             self._drag_start_val = self._mult if self.multiplier_mode else self._bpm
+            # UI-121 B-06: am Finger feiner ziehen (0,5 BPM je px statt 2) —
+            # die Maus behaelt die gewohnte Empfindlichkeit.
+            self._drag_fein = ist_touch(event)
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -750,10 +822,11 @@ class VCSpeedDial(VCWidget):
             return
         if self._drag_y is not None:
             dy = self._drag_y - event.position().toPoint().y()
+            k = 0.25 if self._drag_fein else 1.0
             if self.multiplier_mode:
-                self.mult = self._drag_start_val + dy * 0.02
+                self.mult = self._drag_start_val + dy * 0.02 * k
             else:
-                self.bpm = self._drag_start_val + dy * 2.0
+                self.bpm = self._drag_start_val + dy * 2.0 * k
         event.accept()
 
     def mouseReleaseEvent(self, event):
@@ -764,6 +837,14 @@ class VCSpeedDial(VCWidget):
         event.accept()
 
     def wheelEvent(self, event):
+        # UI-121 B-07: wie VCEncoder.wheelEvent — im Bearbeiten-Modus verstellt
+        # das Rad nichts, und die Touch-Sperre (Display-only) blockt auch das
+        # Rad, sonst laesst sich das Tempo trotz Sperre per Scroll verstellen.
+        if self._edit_mode:
+            return
+        if self._run_input_blocked():
+            event.accept()
+            return
         steps = event.angleDelta().y() // 120
         if self.multiplier_mode:
             self.mult = self._mult + steps * 0.1
@@ -847,6 +928,13 @@ class VCSpeedDial(VCWidget):
         p.fillRect(sr, QColor("#1f3a26"))
         p.setPen(QColor("#3fb950"))
         p.drawText(sr, Qt.AlignmentFlag.AlignCenter, "SYNC")
+        fein = self._fein_rects()
+        if fein is not None:
+            p.setFont(QFont("Segoe UI", 11, QFont.Weight.Bold))
+            for rr, txt in zip(fein, ("−", "+")):
+                p.fillRect(rr, QColor("#21262d"))
+                p.setPen(QColor("#e6edf3"))
+                p.drawText(rr, Qt.AlignmentFlag.AlignCenter, txt)
         p.end()
 
     # ── Properties ───────────────────────────────────────────────────────────
