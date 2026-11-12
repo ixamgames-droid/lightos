@@ -465,3 +465,82 @@ def test_operate_finger_lang_druck_wechselt_nicht_in_bearbeiten():
             top.close()
     assert not v._btn_edit.isChecked()
     assert not w._edit_mode
+
+
+# ── Nachbesserung nach Pruefung ──────────────────────────────────────────────
+
+class _ExKnopf(_Ex):
+    def __init__(self, n):
+        super().__init__(n)
+        self.gedrueckt = []
+
+    def press_btn(self, art):
+        self.gedrueckt.append(art)
+
+
+def test_pruefung_cueliste_knoepfe_respektieren_touch_sperre():
+    from src.ui.virtualconsole.vc_cuelist import VCCueList
+    c = VCCueList()
+    c._refresh_timer.stop()
+    ex = _ExKnopf(5)
+    c._executor = lambda: ex
+    c._traeger = _traeger(c, 400, 500)
+    QApplication.processEvents()
+    VCWidget.input_locked = True
+    for b in (c._btn_go, c._btn_back, c._btn_stop):
+        _tipp(b, b.rect().center())
+        b.click()
+    assert ex.gedrueckt == [], "Touch-Sperre: GO/BACK/STOP am Bildschirm wirkungslos"
+    # Fernbedienung/MIDI rufen _do_* direkt und steuern weiterhin.
+    c._do_go()
+    assert ex.gedrueckt == ["go"]
+    VCWidget.input_locked = False
+    c._btn_go.click()
+    c._btn_stop.click()
+    assert ex.gedrueckt == ["go", "go", "stop"]
+
+
+def test_pruefung_cueliste_wisch_scrollt_wirklich():
+    c, _ = _cueliste(60)
+    liste = c._cue_list
+    sb = liste.verticalScrollBar()
+    assert sb.maximum() > 0, "Testaufbau: Liste muss scrollbar sein"
+    sb.setValue(0)
+    QApplication.processEvents()
+    vp = liste.viewport()
+    _finger_zug(vp, QPoint(50, vp.height() - 20), QPoint(50, 20), schritte=10)
+    zs.einrichten(_app).schwung_stoppen()
+    QApplication.processEvents()
+    assert sb.value() > 0, "Wisch ueber die Cueliste scrollt (UI-110)"
+    assert liste.selectedItems() == []
+
+
+def test_pruefung_cueliste_echter_doppeltipp_fragt_nach():
+    """Zwei Finger-Tipps auf dieselbe Cue: Qt macht daraus den Doppelklick,
+    die Rueckfrage kommt; ein einzelner Tipp fragt nie."""
+    c, ex = _cueliste(10)
+    gefragt = []
+    c._bestaetige_sprung = lambda text: gefragt.append(text) or False
+    vp = c._cue_list.viewport()
+    # Grosszuegiges Doppelklick-Fenster (langsame CI). Qt zaehlt Klicks
+    # paarweise, auch ueber fruehere Tests hinweg — darum zuerst auf Zeile 1
+    # tippen, bis dort ein Doppeltipp erkannt ist: danach ist der naechste
+    # Tipp sicher ein einzelner.
+    alt = QApplication.doubleClickInterval()
+    QApplication.setDoubleClickInterval(5000)
+    try:
+        erste = c._cue_list.visualItemRect(c._cue_list.item(0)).center()
+        for _ in range(3):
+            _tipp(vp, erste)
+            if gefragt:
+                break
+        assert gefragt and "Cue 1" in gefragt[0]
+        gefragt.clear()
+        mitte = c._cue_list.visualItemRect(c._cue_list.item(4)).center()
+        _tipp(vp, mitte)
+        assert gefragt == [], "ein einzelner Tipp fragt nie"
+        _tipp(vp, mitte)
+    finally:
+        QApplication.setDoubleClickInterval(alt)
+    assert len(gefragt) == 1 and "Cue 5" in gefragt[0]
+    assert ex.stack.gesprungen == [], "Nein = kein Sprung"

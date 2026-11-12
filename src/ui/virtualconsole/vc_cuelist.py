@@ -86,9 +86,12 @@ class VCCueList(VCWidget):
                                     "QPushButton { background: #0d4f8b; color: #58d68d; }")
         layout.addLayout(btn_row)
 
-        self._btn_back.clicked.connect(self._do_back)
-        self._btn_go.clicked.connect(self._do_go)
-        self._btn_stop.clicked.connect(self._do_stop)
+        # UI-121 (Pruefung): die Knoepfe am Bildschirm respektieren die
+        # Touch-Sperre (Display-only) wie jedes andere VC-Widget. Fernbedienung
+        # und MIDI rufen ``_do_*`` direkt und steuern weiterhin.
+        self._btn_back.clicked.connect(self._klick_back)
+        self._btn_go.clicked.connect(self._klick_go)
+        self._btn_stop.clicked.connect(self._klick_stop)
 
     # ── Transport ─────────────────────────────────────────────────────────────
 
@@ -148,6 +151,20 @@ class VCCueList(VCWidget):
         text = self.target_text()
         if lbl.text() != text:
             lbl.setText(text)
+
+    # Klick auf ◄◄/GO/■ am Bildschirm — gesperrt, solange die Konsole im
+    # Spielbetrieb Display-only ist.
+    def _klick_go(self, *_):
+        if not self._run_input_blocked():
+            self._do_go()
+
+    def _klick_back(self, *_):
+        if not self._run_input_blocked():
+            self._do_back()
+
+    def _klick_stop(self, *_):
+        if not self._run_input_blocked():
+            self._do_stop()
 
     def _do_go(self):
         ex = self._executor()
