@@ -368,9 +368,19 @@ class LangDruckMenueTest(unittest.TestCase):
             dlg.exec()
 
         liste.itemDoubleClicked.connect(doppelt)
+        # Langsame CI-Rechner: Doppelklick-Fenster grosszuegig, und auf den
+        # Dialog warten statt eine feste Zeit (der Tipp kann zurueckgehalten
+        # und erst spaeter nachgereicht werden).
+        hints = QApplication.styleHints()
+        alt = hints.mouseDoubleClickInterval()
+        hints.setMouseDoubleClickInterval(3000)
+        self.addCleanup(hints.setMouseDoubleClickInterval, alt)
         f.druck(p)
         f.los(p)
         f.druck(p)              # Doppelklick -> Dialog (blockiert bis reject)
+        ende = time.monotonic() + 5.0
+        while not dialoge and time.monotonic() < ende:
+            _warte(0.05)
         _warte(0.2)
         self.assertEqual(len(dialoge), 1, "Doppeltipp hat den Dialog geoeffnet")
         self.assertEqual(menue, [], "kein Menue hinter dem modalen Dialog")
