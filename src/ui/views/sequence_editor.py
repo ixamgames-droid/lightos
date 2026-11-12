@@ -14,6 +14,7 @@ from src.core.app_state import get_state
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl
+from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from PySide6.QtWidgets import QDialog
 
 
@@ -172,6 +173,9 @@ class SequenceEditor(QWidget):
         bf_row.addWidget(btn_add_fix)
         bf_row.addWidget(btn_rm_fix)
         bf_row.addWidget(btn_all)
+        # UI-116 (C-05): Mehrfachauswahl am Finger (nur im Touch-Modus sichtbar)
+        self._mehrfach = MehrfachKnopf(self._lst_fixtures)
+        bf_row.addWidget(self._mehrfach)
         bf_row.addStretch(1)
         bb_layout.addLayout(bf_row)
         root.addWidget(bound_box)

@@ -22,6 +22,7 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QCursor, QColor
 from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.flow_layout import FlowLayout
+from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from src.ui.weak_slots import weak_slot
 
 try:
@@ -698,12 +699,17 @@ class SnapFilePanel(QWidget):
         for btn in self._leisten_knoepfe:
             _knopf_mindestmass(btn, symbol=btn is b_ref)
             tb.addWidget(btn)
-        layout.addWidget(tb_host)
 
         # Tree mit Drag & Drop
         self._tree = _SnapTree(self)
         self._tree.setHeaderLabel("Name")
         self._tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        # UI-116 (A-06): am Finger gibt es kein Strg-Klick — „Mehrfach“ (nur
+        # im Touch-Modus sichtbar) laesst jeden Tipp eine Zeile umschalten.
+        self._mehrfach = MehrfachKnopf(self._tree)
+        tb.addWidget(self._mehrfach)
+        self._leisten_knoepfe.append(self._mehrfach)
+        layout.addWidget(tb_host)
         self._tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._context_menu)
         self._tree.itemDoubleClicked.connect(self._on_double_click)

@@ -38,6 +38,7 @@ from src.core.head_mode import effective_color_head_mode, normalize_head_mode
 from src.core import programmer_verlauf as _pv
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.flow_layout import FlowLayout
+from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
 _PREFS_DIR = app_data_dir()
@@ -445,6 +446,10 @@ class ProgrammerView(QWidget):
         b_none.clicked.connect(self._fixture_list.clearSelection)
         btn_row.addWidget(b_all)
         btn_row.addWidget(b_none)
+        # UI-116 (A-06): Luecken wie „Geraet 1, 3, 5“ am Finger — „Mehrfach“
+        # (nur im Touch-Modus sichtbar) laesst jeden Tipp ein Geraet umschalten.
+        self._mehrfach = MehrfachKnopf(self._fixture_list)
+        btn_row.addWidget(self._mehrfach)
         left.addLayout(btn_row)
 
         grp_box = QGroupBox("Gruppen")
