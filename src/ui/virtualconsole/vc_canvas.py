@@ -1936,6 +1936,12 @@ class VCCanvas(QWidget):
                 round(pos.y() / self.GRID) * self.GRID,
             )
             w.move(snapped)
+            # UI-121 B-09: im Touch-Modus starten neue Widgets um TOUCH_SKALA
+            # groesser (Standardgroesse am Finger). Geladene/kopierte Widgets
+            # behalten ihre gespeicherte Groesse; ohne Touch bleibt alles gleich.
+            from src.ui.virtualconsole.vc_style import touch_aktiv, tz
+            if touch_aktiv():
+                w.resize(tz(w.width()), tz(w.height()))
             # Neu angelegte Widgets landen auf der aktuell sichtbaren Bank.
             w.bank = self._active_bank
         w.delete_requested.connect(self._on_widget_delete_requested)
