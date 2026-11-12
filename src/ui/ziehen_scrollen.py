@@ -62,6 +62,17 @@ Regeln (``ziel_bereich``):
   aus (Maus und Finger); ein neuer Druck haelt ihn an.
 * Mit gedrueckter Umschalt-/Strg-/Alt-Taste wird nicht gescrollt — so laesst
   sich Text weiter markieren.
+* **Eigene Flaeche, am Finger scrollbar** (UI-117, Touch-Audit B-03): ein
+  Widget mit eigener Mausbehandlung, auf dessen freier Flaeche ein Zug nichts
+  tut (VC-Arbeitsflaeche), setzt die Qt-Eigenschaft
+  ``ziehen_scrollen_finger = True`` — dann scrollt ein Wisch am Finger den
+  Bereich drumherum. Gilt nur fuer Druecke direkt auf das Widget (nicht auf
+  seine Kinder) und nur am Finger; die Maus bleibt unveraendert.
+* **Zwei Finger** (UI-117, Touch-Audit D-01/A-18): liegen zwei Finger auf
+  einem Widget mit ``zwei_finger_start(a, b)``, ``zwei_finger_zug(a, b)`` und
+  ``zwei_finger_ende()`` (Bildschirmlagen der beiden Finger), bekommt es die
+  Geste (2D-Buehne: Pinch-Zoom und Verschieben). Der Ein-Finger-Zug, ein
+  vorgemerktes Lang-Druck-Menue und ein Schwung enden dabei.
 
 Der Filter haengt einmal an der ``QApplication`` (``einrichten``).
 """
@@ -71,7 +82,7 @@ import math
 import time
 
 from PySide6.QtCore import SIGNAL, QEvent, QObject, QPointF, QRect, Qt, QTimer
-from PySide6.QtGui import QContextMenuEvent, QInputDevice, QMouseEvent
+from PySide6.QtGui import QContextMenuEvent, QEventPoint, QInputDevice, QMouseEvent, QWindow
 from PySide6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QAbstractScrollArea, QAbstractSlider, QAbstractSpinBox,
     QApplication, QComboBox, QFrame, QGroupBox, QHeaderView, QLabel, QLineEdit, QListView,
@@ -114,6 +125,10 @@ _KEIN_MENUE_QT = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit, QCombo
 
 _MAUS = ("mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent")
 _EIN_AUS = "ziehen_scrollen"       # Qt-Eigenschaft: False = hier nie
+# UI-117: Qt-Eigenschaft True = eigene Flaeche, die am Finger trotzdem scrollt
+_FINGER_FLAECHE = "ziehen_scrollen_finger"
+_TOUCH_TYPEN = (QEvent.Type.TouchBegin, QEvent.Type.TouchUpdate, QEvent.Type.TouchEnd,
+                QEvent.Type.TouchCancel)
 
 
 def ist_touch(ev) -> bool:
@@ -149,7 +164,11 @@ def _abgeschaltet(w) -> bool:
 
 
 def _passiv(w: QWidget, touch: bool = False) -> bool:
-    if _abgeschaltet(w) or _eigene_maus(w):
+    if _abgeschaltet(w):
+        return False
+    if touch and w.property(_FINGER_FLAECHE) is True:
+        return True         # UI-117: eigene Flaeche, am Finger scrollbar (VC)
+    if _eigene_maus(w):
         return False
     if touch and isinstance(w, QAbstractButton):
         return True         # Finger: Wischen ueber Knoepfe scrollt, Tippen klickt
@@ -397,6 +416,8 @@ class ZiehenScrollen(QObject):
         self._menue_glob = QPointF()
         self._menue_mods = Qt.KeyboardModifier.NoModifier
         self._menue_schlucken = False   # Menue gezeigt: Rest bis zum Loslassen schlucken
+        # UI-117: laufende Zwei-Finger-Geste (Ziel, Punkt-IDs, letzte Lagen)
+        self._geste = None
         self._zuruecksetzen()
 
     def _zuruecksetzen(self) -> None:
@@ -425,6 +446,14 @@ class ZiehenScrollen(QObject):
         if self._reicht:
             return False                # unser eigener, nachgereichter Druck
         t = ev.type()
+        if t in _TOUCH_TYPEN:
+            if isinstance(obj, QWindow):
+                try:
+                    self._zwei_finger(ev)
+                except Exception as e:
+                    print(f"[ziehen_scrollen] ERROR: Zwei-Finger-Geste: {e}")
+                    self._geste = None
+            return False
         if (t in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)
                 and (self._menue_schlucken or self._menue_w is not None)):
             if self._loest:
@@ -489,6 +518,8 @@ class ZiehenScrollen(QObject):
         self._druck_ziel = obj
         if not self.aktiv or ev.button() != Qt.MouseButton.LeftButton:
             return False
+        if self._geste is not None:
+            return False        # UI-117: zwei Finger liegen — die Geste gehoert dem Ziel
         if ev.modifiers() & (Qt.KeyboardModifier.ShiftModifier
                              | Qt.KeyboardModifier.ControlModifier
                              | Qt.KeyboardModifier.AltModifier):
@@ -820,6 +851,69 @@ class ZiehenScrollen(QObject):
         self._abbrechen()
         if not liste and _gueltig(w):
             self._druck_loesen(w)
+
+    # ── UI-117: zwei Finger ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _geste_ziel(glob: QPointF):
+        w = QApplication.widgetAt(glob.toPoint())
+        while w is not None:
+            if callable(getattr(w, "zwei_finger_start", None)):
+                return w
+            if w.isWindow():
+                return None
+            w = w.parentWidget()
+        return None
+
+    def _zwei_finger(self, ev) -> None:
+        """Beruehrung auf Fensterebene (kommt vor der aus dem ersten Finger
+        erzeugten Maus): zwei Finger auf demselben Ziel = Geste."""
+        t = ev.type()
+        geloest = QEventPoint.State.Released
+        if self._geste is not None and t == QEvent.Type.TouchBegin:
+            # Nachbesserung: ein neuer erster Finger heisst, das Ende der alten
+            # Geste ging verloren (z. B. Fenster gewechselt) — sie endet hier,
+            # statt dass ein einzelner neuer Finger weiter „pincht".
+            ziel = self._geste[0]
+            self._geste = None
+            if _gueltig(ziel):
+                ziel.zwei_finger_ende()
+        if self._geste is not None:
+            ziel, a, b, lagen = self._geste
+            ende = t in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel) or not _gueltig(ziel)
+            for p in ev.points():
+                if p.id() in (a, b):
+                    if p.state() == geloest:
+                        ende = True
+                    lagen[p.id()] = QPointF(p.globalPosition())
+            if ende:
+                self._geste = None
+                if _gueltig(ziel):
+                    ziel.zwei_finger_ende()
+                return
+            ziel.zwei_finger_zug(QPointF(lagen[a]), QPointF(lagen[b]))
+            return
+        if t not in (QEvent.Type.TouchBegin, QEvent.Type.TouchUpdate):
+            return
+        liegen = [p for p in ev.points() if p.state() != geloest]
+        if len(liegen) < 2:
+            return
+        pa, pb = liegen[0], liegen[1]
+        ga, gb = QPointF(pa.globalPosition()), QPointF(pb.globalPosition())
+        ziel = self._geste_ziel(ga)
+        if ziel is None or self._geste_ziel(gb) is not ziel:
+            return
+        # Ein-Finger-Zug (auch ein zurueckgehaltener Listendruck), Menue und
+        # Schwung enden.
+        self._abbrechen()
+        self._menue_aus()
+        self.schwung_stoppen()
+        self._geste = (ziel, pa.id(), pb.id(), {pa.id(): ga, pb.id(): gb})
+        ziel.zwei_finger_start(QPointF(ga), QPointF(gb))
+
+    @property
+    def geste_laeuft(self) -> bool:
+        return self._geste is not None
 
     # ── Schwung nach dem Loslassen ────────────────────────────────────────────
 
