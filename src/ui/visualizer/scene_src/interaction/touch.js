@@ -13,15 +13,31 @@ import { removeStageObject, notifyStageListChanged } from '../stage/stage_object
 import {
   handlePointerDown, handlePointerMove, handlePointerUp,
   getFabLastPlaceCoords, _placeFixtureAtMouse, pointerState,
+  fingerSchildZeigen, fingerSchildBeenden,
 } from './pointer.js';
 import { requestRender } from '../scene/render_loop.js';  // VIZ-13 3c-2
-import { langDruckPlatziert } from './touch_regeln.js';   // UI-115
+import {
+  langDruckPlatziert, tippZeigtName, geraeteText, TIPP_NAME_MS,
+} from './touch_regeln.js';   // UI-115 / UI-123
 
 let lastTouchDist = 0;
 let lastTouchCx = 0, lastTouchCy = 0;   // Zwei-Finger-Centroid (fuer Pan)
 let longPressTimer = null;
 let _lpTouchX = 0, _lpTouchY = 0;
 let _lastTapTime = 0, _lastTapX = 0, _lastTapY = 0;   // Doppel-Tipp-Erkennung
+// UI-123 (D-13): laufender Tipp — wie weit gewandert, zwei Finger, platziert?
+let _tippWeg = 0, _tippZwei = false, _tippPlatziert = false;
+
+// Tipp auf ein Geraet: Name und Position TIPP_NAME_MS ueber dem Finger.
+function _tippSchild(x, y) {
+  setMouseFromCoords(x, y);
+  const fid = pickFixture();
+  if (fid == null || !fixtures[fid]) return;
+  const f = fixtures[fid];
+  const pos = f.group.position;
+  fingerSchildZeigen(geraeteText(fid, f.data.label, f.type, pos.x, pos.y, pos.z),
+                     x, y, TIPP_NAME_MS);
+}
 
 function _showLongPressRing(cx, cy) {
   const ring = document.getElementById('longpress-ring');
@@ -37,9 +53,11 @@ function _showLongPressRing(cx, cy) {
 
 renderer.domElement.addEventListener('touchstart', function(e) {
   e.preventDefault();
+  fingerSchildBeenden();
   document.getElementById('tooltip').style.display = 'none';
   if (e.touches.length === 1) {
     const t = e.touches[0];
+    _tippWeg = 0; _tippZwei = false; _tippPlatziert = false;   // UI-123
     // Doppel-Tipp auf leere Flaeche -> Kamera-Reset (T-VIZ-14)
     const now = Date.now();
     setMouseFromCoords(t.clientX, t.clientY);
@@ -69,12 +87,14 @@ renderer.domElement.addEventListener('touchstart', function(e) {
         return;
       }
       _placeFixtureAtMouse();
+      _tippPlatziert = true;                       // UI-123: kein Namensschild
       _showLongPressRing(_lpTouchX, _lpTouchY);
       pointerState.isLeftDragging = false;
       pointerState.dragMode = 'none';
     }, 600);
     handlePointerDown(t.clientX, t.clientY, false, true);
   } else if (e.touches.length === 2) {
+    _tippZwei = true;                              // UI-123
     if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
     pointerState.isLeftDragging = false;
     pointerState.dragMode = 'none';
@@ -91,6 +111,7 @@ renderer.domElement.addEventListener('touchmove', function(e) {
   if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
   if (e.touches.length === 1) {
     const t = e.touches[0];
+    _tippWeg = Math.max(_tippWeg, Math.abs(t.clientX - _lpTouchX) + Math.abs(t.clientY - _lpTouchY));
     handlePointerMove(t.clientX, t.clientY);
   } else if (e.touches.length === 2) {
     // Zwei-Finger: Pinch-Zoom + Schwenk (Centroid-Verschiebung)
@@ -128,6 +149,11 @@ renderer.domElement.addEventListener('touchend', function(e) {
   if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
   if (e.touches.length === 0) {
     handlePointerUp(false);
+    // UI-123 (D-13): ein Tipp auf ein Geraet zeigt Name und Position
+    const t = e.changedTouches && e.changedTouches[0];
+    if (t && tippZeigtName(_tippWeg, _tippZwei, _tippPlatziert)) {
+      _tippSchild(t.clientX, t.clientY);
+    }
   } else if (e.touches.length === 1) {
     const t = e.touches[0];
     pointerState.lastMouseX = t.clientX;

@@ -804,6 +804,14 @@ class PatchView(QWidget):
         btn_delete = QPushButton("Löschen")
         btn_delete.setObjectName("btn_danger")
         btn_delete.clicked.connect(self._delete_selected)
+        # UI-123 (Touch-Audit A-09): „Gerät bearbeiten“ ging nur per
+        # Doppelklick/Doppeltipp auf die Zeile — jetzt auch sichtbar als Knopf
+        # (und als erster Eintrag im Kontextmenue/Lang-Druck-Menue).
+        self._btn_bearbeiten = QPushButton("Bearbeiten…")
+        self._btn_bearbeiten.setToolTip(
+            "Markiertes Gerät bearbeiten (Name, Adresse, Modus …) — "
+            "wie ein Doppelklick auf die Zeile.")
+        self._btn_bearbeiten.clicked.connect(self._bearbeiten_markiert)
         btn_copy = QPushButton("Mit Offset kopieren…")
         btn_copy.setToolTip(
             "Ausgewählte(s) Gerät(e) mehrfach mit festem Adress-Abstand patchen "
@@ -838,6 +846,7 @@ class PatchView(QWidget):
 
         toolbar.addWidget(btn_add)
         toolbar.addWidget(btn_delete)
+        toolbar.addWidget(self._btn_bearbeiten)
         toolbar.addWidget(btn_copy)
         toolbar.addWidget(self._btn_klonen)
         toolbar.addWidget(self._import_knopf())   # IMP-1
@@ -1131,8 +1140,25 @@ class PatchView(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self._state.auto_patch_fixtures()
 
+    def _bearbeiten_markiert(self):
+        """UI-123 (A-09): Knopf „Bearbeiten…“ — das markierte Geraet (bei
+        Mehrfachauswahl das der aktuellen Zeile) im Bearbeiten-Dialog."""
+        row = self._table.currentRow()
+        rows = sorted({idx.row() for idx in self._table.selectedIndexes()})
+        if rows and row not in rows:
+            row = rows[0]
+        if row < 0:
+            QMessageBox.information(
+                self, "Gerät bearbeiten",
+                "Bitte zuerst ein Gerät in der Liste antippen.")
+            return
+        self._geraet_bearbeiten(row)
+
     def _on_double_click(self, index):
-        fid = self._fid_at_row(index.row())
+        self._geraet_bearbeiten(index.row())
+
+    def _geraet_bearbeiten(self, row: int):
+        fid = self._fid_at_row(row)
         if fid is None:
             return
         fixture = next((f for f in self._state.get_patched_fixtures()
@@ -1171,6 +1197,10 @@ class PatchView(QWidget):
         """``[(text, aufruf)]`` fuer die Zeile ``row`` — getrennt vom Anzeigen,
         damit sich der Inhalt ohne offenes Menue pruefen laesst."""
         eintraege: list[tuple] = []
+        # UI-123 (A-09): Bearbeiten auch hier (lang druecken am Finger)
+        if self._fid_at_row(row) is not None:
+            eintraege.append(("Gerät bearbeiten…",
+                              lambda: self._geraet_bearbeiten(row)))
         pid = self._profil_id_an_zeile(row)
         if pid is not None:
             eintraege.append(("Profil bearbeiten…",

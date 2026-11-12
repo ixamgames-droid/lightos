@@ -51,6 +51,8 @@
     pointer-events: none; display: none; border: 1px solid #444;
     z-index: 10;
   }
+  /* UI-123 (D-13): nach einem Tipp am Finger groesser und ueber dem Finger */
+  #tooltip.finger { font-size: 15px; padding: 8px 12px; border-color: #8b949e; }
   #marquee {
     position: absolute; border: 1px dashed #6cf;
     background: rgba(100,180,255,0.10);
@@ -238,7 +240,7 @@
 <div id="tooltip"></div>
 <div id="marquee"></div>
 <div id="controls">
-  3D: 1-Finger drehen · 2-Finger Pinch/Schwenk · Doppel-Tipp = Kamera-Reset · Lang drücken = Fixture platzieren
+  3D: 1-Finger drehen · 2-Finger Pinch/Schwenk · Doppel-Tipp = Kamera-Reset · Lang drücken = Fixture platzieren · Tipp auf Gerät = Name
 </div>
 <div id="ruler-info"></div>
 <div id="dock-badge" style="position:absolute; left:50%; bottom:72px; transform:translateX(-50%);

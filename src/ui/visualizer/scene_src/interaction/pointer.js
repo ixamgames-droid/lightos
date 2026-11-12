@@ -2,7 +2,7 @@
 // 3057 handlePointerDown/Move/Up + Maus-Listener + Wheel + hideTooltip +
 // _placeFixtureAtMouse + contextmenu). Reines Verschieben.
 import * as THREE from '../three/three.js';
-import { leerZiehenRahmen } from './touch_regeln.js';   // UI-115
+import { leerZiehenRahmen, geraeteText, tippLage } from './touch_regeln.js';   // UI-115/UI-123
 import { renderer } from '../scene/renderer.js';
 import { rad2deg, deg2rad } from '../scene/renderer.js';
 // VIZ-71: der 2D-Pan schiebt orthoCam direkt (an updateCamera vorbei) und
@@ -765,8 +765,35 @@ export function handlePointerUp(shiftKey) {
 // stehen, solange sich die Maus nicht bewegt - auch nach einer Verschiebung ueber
 // das Properties-Panel.
 export function hideTooltip() {
+  fingerSchildBeenden();
   const tt = document.getElementById('tooltip');
   if (tt) tt.style.display = 'none';
+}
+
+// UI-123 (D-13): Zeitgeber des Finger-Schilds (touch.js). Die Maus uebernimmt
+// das Schild wieder, ohne dass es ihr nach Ablauf weggenommen wird.
+let _fingerSchildTimer = null;
+export function fingerSchildBeenden() {
+  if (_fingerSchildTimer) { clearTimeout(_fingerSchildTimer); _fingerSchildTimer = null; }
+  const tt = document.getElementById('tooltip');
+  if (tt) tt.classList.remove('finger');
+}
+export function fingerSchildZeigen(text, fx, fy, ms) {
+  const tt = document.getElementById('tooltip');
+  if (!tt) return;
+  fingerSchildBeenden();
+  tt.textContent = text;
+  tt.classList.add('finger');
+  tt.style.display = 'block';
+  const lage = tippLage(fx, fy, tt.offsetWidth, tt.offsetHeight,
+                        window.innerWidth, window.innerHeight);
+  tt.style.left = lage.x + 'px';
+  tt.style.top = lage.y + 'px';
+  _fingerSchildTimer = setTimeout(function() {
+    _fingerSchildTimer = null;
+    tt.style.display = 'none';
+    tt.classList.remove('finger');
+  }, ms);
 }
 
 // Mouse listeners (thin wrappers)
@@ -803,8 +830,9 @@ window.addEventListener('mousemove', function(e) {
       hidePlaceGhost();
     }
   }
-  // Tooltip (Maus-only, bei Touch irrelevant)
+  // Tooltip (Maus; am Finger zeigt ein Tipp dasselbe Schild, UI-123 in touch.js)
   if (!isLeftDragging) {
+    fingerSchildBeenden();
     const fid = pickFixture();
     const tt = document.getElementById('tooltip');
     if (fid != null && fixtures[fid]) {
@@ -813,8 +841,7 @@ window.addEventListener('mousemove', function(e) {
       tt.style.left = (e.clientX + 12) + 'px';
       tt.style.top = (e.clientY - 8) + 'px';
       const pos = f.group.position;
-      tt.textContent = '[' + fid + '] ' + (f.data.label || '?') + ' - ' + f.type +
-        '  (X:' + pos.x.toFixed(1) + ' Y:' + pos.y.toFixed(1) + ' Z:' + pos.z.toFixed(1) + ')';
+      tt.textContent = geraeteText(fid, f.data.label, f.type, pos.x, pos.y, pos.z);
     } else {
       tt.style.display = 'none';
     }

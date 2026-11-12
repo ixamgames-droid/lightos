@@ -258,8 +258,13 @@ class SectionButton(QPushButton):
     # unten - KEIN Text-Mindestbedarf mehr, siehe resizeEvent).
     _CLICK_FLOOR_PX = 56
 
-    def __init__(self, text: str, icon_color: str = "#6F6F6F"):
+    def __init__(self, text: str, icon_color: str = "#6F6F6F", kurz: str = ""):
         super().__init__(text)
+        # UI-122 (Nachtrag UI-120): Kurzname fuer Platzmangel. Mit --touch und
+        # 1280 px hiessen Patchen, Programmer und Playback alle „P…“. Passt der
+        # volle Titel nicht, steht erst der Kurzname da (z. B. „Prog“), und erst
+        # wenn auch der nicht passt, wird gekuerzt — vom Kurznamen aus.
+        self._kurz = kurz
         # UI-15/Review-Fix (2026-07-02): voller Titel wird fuer sizeHint/Tooltip
         # und als Elide-Quelle in resizeEvent gebraucht - der aktuell angezeigte
         # Text() darf dafuer NICHT herangezogen werden, sonst entsteht eine
@@ -270,7 +275,8 @@ class SectionButton(QPushButton):
         self.setCheckable(True)
         self.setFlat(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setIcon(_colored_icon(icon_color, 14))
+        self._icon_voll = _colored_icon(icon_color, 14)
+        self.setIcon(self._icon_voll)
         self.setIconSize(QSize(14, 14))
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.setToolTip(text)
@@ -285,13 +291,22 @@ class SectionButton(QPushButton):
         # tatsaechlichen Layout-Zuteilung fuehrte -> unnoetiges Elide trotz
         # eigentlich ausreichend Platz).
         current = self.text()
-        if current == self._full_text:
+        # UI-122: ohne Symbol (Platzmangel, s. resizeEvent) trotzdem MIT Symbol
+        # messen — sonst schrumpfte die Wunschbreite mit (Rueckkopplung).
+        ohne_symbol = self.icon().isNull() and not self._icon_voll.isNull()
+        if current == self._full_text and not ohne_symbol:
             return super().sizeHint()
+        self.blockSignals(True)
         QPushButton.setText(self, self._full_text)
+        if ohne_symbol:
+            QPushButton.setIcon(self, self._icon_voll)
         try:
             return super().sizeHint()
         finally:
             QPushButton.setText(self, current)
+            if ohne_symbol:
+                QPushButton.setIcon(self, QIcon())
+            self.blockSignals(False)
 
     def sizeHint(self):  # noqa: N802
         # Breite aus dem VOLLEN Titel, nicht aus dem aktuell ggf. bereits
@@ -332,15 +347,32 @@ class SectionButton(QPushButton):
         # QFontMetrics.elidedText() kann selbst bei exakt horizontalAdvance()
         # wegen Glyph-Bearings noch kuerzen. Wenn unser konsistenter
         # sizeHint-Chrome exakt Platz meldet, ist der Volltext autoritativ.
+        quelle = self._full_text
+        # UI-122: reicht der Platz nicht einmal fuer den Kurznamen, faellt das
+        # Farbsymbol weg (bei --touch und 1280 px: 53 px je Knopf) — der Name
+        # ist wichtiger als der Farbpunkt.
+        symbol_b = self.iconSize().width() + 4
+        brauchte = self.fontMetrics().horizontalAdvance(self._kurz or self._full_text)
+        ohne_symbol = avail < full_text_w and avail < brauchte
+        if ohne_symbol:
+            avail += symbol_b
+        if ohne_symbol != self.icon().isNull():
+            QPushButton.setIcon(self, QIcon() if ohne_symbol else self._icon_voll)
         if avail >= full_text_w:
             shown = self._full_text
+        elif self._kurz:
+            quelle = self._kurz
+            shown = self.fontMetrics().elidedText(
+                self._kurz, Qt.TextElideMode.ElideRight, max(avail, 0))
         else:
             shown = self.fontMetrics().elidedText(
                 self._full_text, Qt.TextElideMode.ElideRight, max(avail, 0))
         # UI-25: nie ein reines "…" (unlesbar) — dann lieber die ersten Zeichen
         # ohne Ellipse zeigen (ein sinnvolles Kuerzel statt Punkte).
-        if shown in ("…", "...", "") and self._full_text:
-            shown = self._full_text[:2]
+        # UI-122: auch „P…“ (ein Buchstabe + Punkte) ist nicht lesbar und war
+        # bei drei Knoepfen gleich — dann die ersten beiden Zeichen.
+        if quelle and len(shown.rstrip("…").rstrip(".")) < 2:
+            shown = quelle[:2]
         if shown != self.text():
             self.setText(shown)
 
@@ -1075,6 +1107,20 @@ class MainWindow(QMainWindow):
         return (self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False)
                 else self._KOPF_KNOPF)
 
+    def _etikett_knopf_stil(self, farbe: str, innen: int, extra: str = "",
+                            fett: bool = False) -> str:
+        """UI-123 (Touch-Audit A-15): Stil fuer anklickbare Kopfleisten-
+        Etiketten (Page, BPM): duenner Rahmen wie ein flacher Knopf, damit man
+        sieht, dass sie antippbar sind. ``innen`` = Innenabstand links/rechts
+        (1 px weniger als ohne Rahmen — die Breite bleibt gleich). Am Finger
+        mindestens so hoch wie die anderen Kopfleisten-Knoepfe."""
+        hoehe = (f" min-height:{self._KOPF_KNOPF_TOUCH - 2}px;"
+                 if getattr(self, "_touch_mode", False) else "")
+        dick = " font-weight:bold;" if fett else ""
+        return (f"QLabel {{ color:{farbe};{dick} border:1px solid #4a4f57;"
+                f" border-radius:3px; padding:0 {innen}px;{hoehe} {extra} }}"
+                "QLabel:hover { border-color:#8b949e; }")
+
     def _page_pfeil_stil(self) -> str:
         """Page-Pfeile: Mindestmass (Rand 1 px je Seite); mit --touch 44x44."""
         h = self._kopf_knopf_h() - 2
@@ -1130,6 +1176,11 @@ class MainWindow(QMainWindow):
 
         # Volle Bezeichnung fuer Tooltip der gekuerzten Buttons (UI-15).
         _section_full_names = {"Bühne": "Bühnen-Layout", "E/A": "Eingabe / Ausgabe"}
+        # UI-122: Kurznamen bei Platzmangel (alle verschieden, keine zwei mit
+        # gleichem Anfang wie „P…“). Kurze Titel brauchen keinen.
+        _section_kurz = {"Patchen": "Patch", "Programmer": "Prog",
+                         "Virtual Console": "VC", "Simple Desk": "Desk",
+                         "Playback": "Play"}
 
         # UI-25: die Tabs leben in einem eigenen Container, der bei Platzmangel
         # ihre Breiten FAIR verteilt (kurze Labels voll, nur lange eliden) statt
@@ -1138,7 +1189,7 @@ class MainWindow(QMainWindow):
         self._tab_container = _SectionBar()
         self._section_btns: list[SectionButton] = []
         for i, (label, color) in enumerate(sections):
-            btn = SectionButton(label, color)
+            btn = SectionButton(label, color, _section_kurz.get(label, ""))
             if label in _section_full_names:
                 btn.setToolTip(_section_full_names[label])
             self._btn_group.addButton(btn, i)
@@ -1276,7 +1327,12 @@ class MainWindow(QMainWindow):
         bar_layout.addWidget(page_prev)
 
         self._lbl_page = QLabel("Page 1")
-        self._lbl_page.setStyleSheet("color:#ffd700; font-weight:bold; padding:0 6px; min-width:60px;")
+        # UI-123 (Touch-Audit A-15): anklickbare Etiketten sehen wie Knoepfe
+        # aus (Rahmen) — am Finger gibt es keinen Tooltip, der es verraet.
+        # Innenabstand um die Rahmenbreite kleiner: die Kopfleiste wird nicht
+        # breiter (bei 1440 px knapp, s. UI-15/UI-108).
+        self._lbl_page.setStyleSheet(
+            self._etikett_knopf_stil("#ffd700", 5, "min-width:60px;", fett=True))
         self._lbl_page.setToolTip("Klick für Page-Auswahl")
         self._lbl_page.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lbl_page.mousePressEvent = lambda _ev: self._select_page_dialog()
@@ -1297,7 +1353,7 @@ class MainWindow(QMainWindow):
             pe.subscribe_page(lambda idx: self._page_changed_sig.emit(int(idx)))
 
         self._lbl_bpm = QLabel("BPM: --")
-        self._lbl_bpm.setStyleSheet("color: #888888; padding: 0 8px;")
+        self._lbl_bpm.setStyleSheet(self._etikett_knopf_stil("#888888", 7))   # UI-123
         self._lbl_bpm.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lbl_bpm.setToolTip("BPM einstellen (klicken)")
         self._lbl_bpm.mousePressEvent = lambda _ev: self._set_bpm_manually()
@@ -1309,7 +1365,9 @@ class MainWindow(QMainWindow):
         # Breite kostet die Kopfleiste dann keinen Platz.
         self._lbl_bpm_mode = _AbzeichenFesteBreite(("AUTO", "MAN", "LOCK"), "AUTO")
         self._lbl_bpm_mode.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._lbl_bpm_mode.setFixedHeight(22)
+        # UI-123: am Finger so hoch wie die anderen Kopfleisten-Knoepfe
+        self._lbl_bpm_mode.setFixedHeight(
+            self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False) else 22)
         self._lbl_bpm_mode.setCursor(Qt.CursorShape.PointingHandCursor)
         self._lbl_bpm_mode.setToolTip("BPM-Modus (Klick: AUTO/MANUAL umschalten)")
         self._lbl_bpm_mode.mousePressEvent = lambda _ev: self._toggle_bpm_mode()
@@ -2087,7 +2145,7 @@ class MainWindow(QMainWindow):
         bpm = get_tap_helper().tap()
         if bpm > 0:
             self._lbl_bpm.setText(f"BPM: {bpm:.1f}".replace(".", ","))
-            self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
+            self._lbl_bpm.setStyleSheet(self._etikett_knopf_stil("#FFD700", 7))
 
     def _on_beat(self, idx: int):
         """Wird vom BPM-Manager im Background-Thread aufgerufen → in UI dispatchen."""
@@ -2101,10 +2159,10 @@ class MainWindow(QMainWindow):
         try:
             if bpm and bpm > 0:
                 self._lbl_bpm.setText(f"BPM: {bpm:.1f}".replace(".", ","))
-                self._lbl_bpm.setStyleSheet("color: #FFD700; padding: 0 8px;")
+                self._lbl_bpm.setStyleSheet(self._etikett_knopf_stil("#FFD700", 7))
             else:
                 self._lbl_bpm.setText("BPM: --")
-                self._lbl_bpm.setStyleSheet("color: #888888; padding: 0 8px;")
+                self._lbl_bpm.setStyleSheet(self._etikett_knopf_stil("#888888", 7))
         except Exception:
             pass
 
@@ -2172,9 +2230,11 @@ class MainWindow(QMainWindow):
             else:
                 txt, bg, fg = "MAN", "#33210f", "#f0883e"
             self._lbl_bpm_mode.setText(txt)
+            # UI-123 (A-15): Rahmen in der Schriftfarbe = sichtbar antippbar;
+            # Innenabstand um den Rahmen kleiner (gleiche Breite wie vorher).
             self._lbl_bpm_mode.setStyleSheet(
                 f"QLabel {{ background:{bg}; color:{fg}; font-weight:bold;"
-                f" border-radius:3px; padding:0 6px; }}")
+                f" border:1px solid {fg}; border-radius:3px; padding:0 5px; }}")
         except Exception:
             pass
 

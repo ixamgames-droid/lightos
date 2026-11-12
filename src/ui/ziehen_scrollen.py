@@ -58,6 +58,19 @@ Regeln (``ziel_bereich``):
   solange ein Aufklappmenue offen ist. Die Maus bleibt unveraendert
   (Rechtsklick). Abschalten je Widget: Qt-Eigenschaft
   ``lang_druck_menue = False``.
+* **Langes Druecken = Erklaerung** (UI-123, Touch-Audit C-15/A-15): haengt
+  an der Druckstelle KEIN Menue, zeigt langes Druecken (``LANG_MENUE_S``
+  still) die Erklaerung, die die Maus beim Verweilen saehe (Tooltip; Qt
+  fragt das Widget unter dem Finger und reicht an die Eltern weiter). Sie
+  erscheint als grosses Schild ueber dem Finger und bleibt nach dem
+  Loslassen ``TIPP_ZEIGEN_MS`` stehen (ein neuer Druck schliesst es). Wurde
+  sie gezeigt, ist der Druck geloest wie beim Menue: ein Knopf loest nichts
+  aus. In Eingabefeldern bleibt der Druck, wie er ist (Cursor). Nie: wenn
+  ein Menue da ist (das hat Vorrang), in Listen (langes Druecken zieht/
+  markiert dort), am Regler, an Halte-/Wiederholtasten, auf eigenen
+  Flaechen (``mouse*Event`` — dort heisst langes Druecken Ziehen) und bei
+  VC-Widgets im Spielbetrieb. Abschalten je Widget: Qt-Eigenschaft
+  ``lang_druck_tooltip = False``. Die Maus bleibt unveraendert.
 * **Schwung:** nach schnellem Wischen laeuft der Inhalt weiter und bremst
   aus (Maus und Finger); ein neuer Druck haelt ihn an.
 * Mit gedrueckter Umschalt-/Strg-/Alt-Taste wird nicht gescrollt — so laesst
@@ -73,6 +86,20 @@ Regeln (``ziel_bereich``):
   ``zwei_finger_ende()`` (Bildschirmlagen der beiden Finger), bekommt es die
   Geste (2D-Buehne: Pinch-Zoom und Verschieben). Der Ein-Finger-Zug, ein
   vorgemerktes Lang-Druck-Menue und ein Schwung enden dabei.
+* **Mehrere Finger auf Bedienelementen** (UI-118, Touch-Audit B-02): Qt macht
+  nur aus dem ersten Finger einer Beruehrung (erster Punkt von ``TouchBegin``)
+  die Maus. Jeder weitere Finger, der auf einem Widget mit
+  ``mehr_finger_erlaubt() == True`` aufsetzt (VC-Fader, -Knoepfe, -Pads im
+  Spielbetrieb; das innerste solche Widget unter dem Finger entscheidet),
+  bekommt hier eigene Maus-Ereignisse (Druck/Zug/Loslassen, Geraet = der
+  Touchscreen, also ``ist_touch``) direkt an dieses Widget — ohne Anwendungs-
+  filter und ohne Weiterreichen an die Eltern. Ein Widget nimmt nur einen
+  Finger (der erste Finger zaehlt mit). Liegt ein Finger auf einem
+  ``finger_bedienelement()`` auf (bis alle Finger weg sind), schiebt Qts
+  Zwei-Finger-Bildlauf (``QPanGesture`` der Bildlaufflaechen) nichts; setzt ein weiterer Finger auf
+  einem Bedienelement auf, waehrend der erste die Flaeche wischt, endet dieser
+  Wisch (der Rest des ersten Fingers wird geschluckt). Zwei Finger auf freier
+  Flaeche bleiben wie bisher. Abbruch/Ende der Beruehrung laesst alle los.
 
 Der Filter haengt einmal an der ``QApplication`` (``einrichten``).
 """
@@ -81,13 +108,15 @@ from __future__ import annotations
 import math
 import time
 
-from PySide6.QtCore import SIGNAL, QEvent, QObject, QPointF, QRect, Qt, QTimer
-from PySide6.QtGui import QContextMenuEvent, QEventPoint, QInputDevice, QMouseEvent, QWindow
+from PySide6.QtCore import SIGNAL, QEvent, QObject, QPoint, QPointF, QRect, Qt, QTimer
+from PySide6.QtGui import (
+    QContextMenuEvent, QEventPoint, QHelpEvent, QInputDevice, QMouseEvent, QWindow,
+)
 from PySide6.QtWidgets import (
     QAbstractButton, QAbstractItemView, QAbstractScrollArea, QAbstractSlider, QAbstractSpinBox,
     QApplication, QComboBox, QFrame, QGroupBox, QHeaderView, QLabel, QLineEdit, QListView,
     QPlainTextEdit, QProgressBar, QScrollArea, QSlider, QSplitter, QStackedWidget, QStyle,
-    QStyleOptionSlider, QTabWidget, QTextEdit, QToolBox, QWidget,
+    QStyleOptionSlider, QTabWidget, QTextEdit, QToolBox, QToolTip, QWidget,
 )
 
 try:
@@ -118,6 +147,11 @@ GRIFF_ZONE = 12
 # erst ab hier ist es kein Tippen und kein Anfang eines Zugs mehr).
 LANG_MENUE_S = 0.6
 _MENUE_AUS = "lang_druck_menue"     # Qt-Eigenschaft: False = nie ein Lang-Druck-Menue
+# UI-123: langes Druecken ohne Menue = Erklaerung (Tooltip) zeigen
+_TIPP_AUS = "lang_druck_tooltip"    # Qt-Eigenschaft: False = nie eine Lang-Druck-Erklaerung
+TIPP_ZEIGEN_MS = 5000               # so lange bleibt sie nach dem Loslassen stehen
+# Eingabefelder: Erklaerung ja, aber der Druck bleibt (Cursor setzen, Tastatur)
+_EINGABE_QT = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit, QComboBox)
 # Qt-Klassen mit eigenem Menue (Ausschneiden/Kopieren …) bzw. eigener Haltebedienung:
 # dort oeffnet langes Druecken nichts.
 _KEIN_MENUE_QT = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit, QComboBox,
@@ -357,6 +391,97 @@ def lang_druck_menue_moeglich(w: QWidget | None) -> bool:
     return False
 
 
+def lang_druck_tooltip_moeglich(w: QWidget | None) -> bool:
+    """UI-123: Darf langes Druecken auf ``w`` die Erklaerung (Tooltip) zeigen?
+    Nur, wenn dort kein Menue haengt; ob ``w`` wirklich eine hat, entscheidet
+    erst die Anfrage beim Zeigen (``QHelpEvent``)."""
+    if w is None or not _gueltig(w):
+        return False
+    if lang_druck_menue_moeglich(w):
+        return False                    # Menue hat Vorrang
+    if _listen_flaeche(w) or isinstance(w, (QAbstractSlider, QHeaderView)):
+        return False
+    if _halte_taste(w) is not None:
+        return False
+    if _knopf_von(w) is not None:
+        # Knoepfe loesen immer aus, auch nach langem Druck: wer BLACKOUT,
+        # STOP ALL oder GO lange haelt, muss die Aktion bekommen, keine
+        # Erklaerung. Erklaert werden nur Felder, Etiketten und Flaechen.
+        return False
+    x = w
+    while x is not None:
+        if x.property(_TIPP_AUS) is False or x.property(_MENUE_AUS) is False:
+            return False
+        erlaubt = getattr(x, "lang_druck_menue_erlaubt", None)
+        if callable(erlaubt):
+            try:
+                if not erlaubt():
+                    return False        # VC im Spielbetrieb: Halten ist Bedienung
+            except Exception:
+                return False
+        if x is w and _eigene_maus(x) and x.property(_FINGER_FLAECHE) is not True:
+            return False                # eigene Flaeche: langes Druecken = Ziehen
+        if x.isWindow():
+            break
+        x = x.parentWidget()
+    return True
+
+
+def _eingabe(w) -> bool:
+    x = w
+    while x is not None:
+        if isinstance(x, _EINGABE_QT):
+            return True
+        if x.isWindow():
+            return False
+        x = x.parentWidget()
+    return False
+
+
+class _TippSchild(QLabel):
+    """UI-123: die Erklaerung am Finger — gross genug zum Lesen, ueber dem
+    Finger (der verdeckt sonst den Text), maus-durchlaessig."""
+
+    def __init__(self):
+        super().__init__(None, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+        self.setObjectName("langDruckTooltip")
+        self.setWordWrap(True)
+        self.setTextFormat(Qt.TextFormat.AutoText)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setStyleSheet(
+            "QLabel#langDruckTooltip { background:#1f2328; color:#f0f3f6;"
+            " border:1px solid #8b949e; border-radius:6px; padding:8px 10px;"
+            " font-size:15px; }")
+        self._aus = QTimer(self)
+        self._aus.setSingleShot(True)
+        self._aus.timeout.connect(self.hide)
+
+    def zeigen(self, text: str, glob: QPoint) -> None:
+        self.setText(text)
+        self.setMaximumWidth(460)
+        self.adjustSize()
+        g = self.size()
+        x, y = glob.x() - g.width() // 2, glob.y() - g.height() - 36
+        try:
+            schirm = QApplication.screenAt(glob) or QApplication.primaryScreen()
+            r = schirm.availableGeometry()
+            x = max(r.left() + 4, min(x, r.right() - g.width() - 4))
+            if y < r.top() + 4:
+                y = glob.y() + 36           # oben kein Platz: unter den Finger
+            y = max(r.top() + 4, min(y, r.bottom() - g.height() - 4))
+        except Exception:
+            pass
+        self.move(x, y)
+        self._aus.stop()
+        self.show()
+        self.raise_()
+
+    def stehen_lassen(self, ms: int) -> None:
+        if self.isVisible():
+            self._aus.start(ms)
+
+
 def _listen_flaeche(w) -> bool:
     """Ist ``w`` die Flaeche (viewport) einer Liste/eines Baums/einer Tabelle?"""
     eltern = w.parentWidget()
@@ -418,6 +543,21 @@ class ZiehenScrollen(QObject):
         self._menue_schlucken = False   # Menue gezeigt: Rest bis zum Loslassen schlucken
         # UI-117: laufende Zwei-Finger-Geste (Ziel, Punkt-IDs, letzte Lagen)
         self._geste = None
+        # UI-123: langes Druecken ohne Menue = Erklaerung (eigener Zeitgeber)
+        self._tipp_timer = QTimer(self)
+        self._tipp_timer.setSingleShot(True)
+        self._tipp_timer.timeout.connect(self._lang_tipp)
+        self._tipp_w = None
+        self._tipp_glob = QPointF()
+        self._tipp_schild = None
+        self._tipp_gezeigt = False      # Schild steht: beim Loslassen stehen lassen
+        # UI-118: weitere Finger auf Bedienelementen
+        self._erster = None         # Punkt-ID, aus der Qt die Maus macht
+        self._erster_w = None       # Bedienelement unter dem ersten Finger
+        self._finger: dict = {}     # Punkt-ID -> [Widget, letzte Bildschirmlage]
+        # Punkt-IDs, die in dieser Beruehrung auf einem Bedienelement aufsetzten:
+        # solange nicht leer, kein Zwei-Finger-Bildlauf (bis alle Finger weg sind)
+        self._auf_element: set = set()
         self._zuruecksetzen()
 
     def _zuruecksetzen(self) -> None:
@@ -453,7 +593,23 @@ class ZiehenScrollen(QObject):
                 except Exception as e:
                     print(f"[ziehen_scrollen] ERROR: Zwei-Finger-Geste: {e}")
                     self._geste = None
+                try:
+                    self._mehr_finger(ev)
+                except Exception as e:
+                    print(f"[ziehen_scrollen] ERROR: weitere Finger: {e}")
             return False
+        if t == QEvent.Type.MouseButtonRelease and self._tipp_gezeigt and not self._loest:
+            self._tipp_gezeigt = False  # UI-123: Erklaerung nach dem Loslassen stehen lassen
+            if self._tipp_schild is not None:
+                self._tipp_schild.stehen_lassen(TIPP_ZEIGEN_MS)
+        if (self._tipp_w is not None and not self._loest
+                and t in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)):
+            self._tipp_bewegt(ev)
+        if t == QEvent.Type.Gesture and self._auf_element:
+            # UI-118: ein Finger liegt auf einem Bedienelement — kein
+            # Zwei-Finger-Bildlauf (QPanGesture der Bildlaufflaeche)
+            ev.accept()
+            return True
         if (t in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)
                 and (self._menue_schlucken or self._menue_w is not None)):
             if self._loest:
@@ -512,6 +668,7 @@ class ZiehenScrollen(QObject):
             return False
         self._abbrechen()
         self._menue_aus()
+        self._tipp_aus(schild=True)
         self._menue_schlucken = False
         self.schwung_stoppen()                 # Finger drauf haelt die Liste an
         self._press_ts = ev.timestamp()
@@ -527,6 +684,8 @@ class ZiehenScrollen(QObject):
         touch = ist_touch(ev)
         if touch and not _einfacher_regler(obj):
             self._menue_vormerken(obj, ev)
+            if self._menue_w is None:
+                self._tipp_vormerken(obj, ev)   # UI-123: kein Menue -> Erklaerung
         bereich = ziel_bereich(obj)
         halten = False
         if bereich is None and touch and zurueckhalten and _einfacher_regler(obj):
@@ -540,6 +699,12 @@ class ZiehenScrollen(QObject):
             halten = bereich is not None
         if bereich is None:
             return False
+        if touch and self._finger:
+            # UI-118: ein weiterer Finger bedient schon ein Element (beide
+            # Finger setzten zugleich auf) — dieser Finger wischt nicht.
+            self._menue_aus()
+            self._menue_schlucken = True
+            return True
         self._bereich = bereich
         self._druck_widget = obj
         self._touch = touch
@@ -852,6 +1017,92 @@ class ZiehenScrollen(QObject):
         if not liste and _gueltig(w):
             self._druck_loesen(w)
 
+    # ── UI-123: langes Druecken ohne Menue = Erklaerung ──────────────────────
+
+    def _tipp_vormerken(self, w, ev) -> None:
+        try:
+            moeglich = lang_druck_tooltip_moeglich(w)
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: Lang-Druck-Erklaerung pruefen: {e}")
+            moeglich = False
+        if not moeglich:
+            return
+        self._tipp_w = w
+        self._tipp_glob = QPointF(ev.globalPosition())
+        self._tipp_timer.start(int(LANG_MENUE_S * 1000))
+
+    def _tipp_aus(self, schild: bool = False) -> None:
+        self._tipp_timer.stop()
+        self._tipp_w = None
+        if schild:
+            self._tipp_gezeigt = False
+            if self._tipp_schild is not None and _gueltig(self._tipp_schild):
+                self._tipp_schild.hide()
+
+    def _tipp_bewegt(self, ev) -> None:
+        if ev.type() == QEvent.Type.MouseButtonRelease:
+            self._tipp_aus()
+            return
+        try:
+            d = ev.globalPosition() - self._tipp_glob
+        except Exception:
+            return
+        schwelle = QApplication.startDragDistance() * TOUCH_FAKTOR
+        if abs(d.x()) + abs(d.y()) >= schwelle or not (ev.buttons() & Qt.MouseButton.LeftButton):
+            self._tipp_aus()
+
+    @property
+    def tipp_schild(self) -> QLabel | None:
+        """Das Schild mit der Erklaerung (fuer Tests), ``None`` = nie gezeigt."""
+        s = self._tipp_schild
+        return s if s is not None and _gueltig(s) else None
+
+    def _tipp_text(self, w, glob: QPoint) -> str:
+        """Fragt ``w`` wie beim Verweilen der Maus nach seiner Erklaerung
+        (``QHelpEvent``; Qt reicht an die Eltern weiter, Reiter/Listen/eigene
+        Widgets antworten selbst). Der Qt-Tooltip wird dabei gleich wieder
+        geschlossen — gezeigt wird das grosse Schild."""
+        QToolTip.hideText()
+        lokal = w.mapFromGlobal(glob)
+        he = QHelpEvent(QEvent.Type.ToolTip, lokal, glob)
+        QApplication.sendEvent(w, he)
+        text = QToolTip.text() if QToolTip.isVisible() else ""
+        QToolTip.hideText()
+        return text.strip()
+
+    def _lang_tipp(self) -> None:
+        """Zeitgeber abgelaufen, Finger liegt still, kein Menue: Erklaerung."""
+        w, glob = self._tipp_w, QPointF(self._tipp_glob)
+        self._tipp_aus()
+        if w is None or not _gueltig(w):
+            return
+        if (_fremd_modal(w) or self._zieht or self._regler_w is not None
+                or self._menue_schlucken or QApplication.activePopupWidget()):
+            return
+        if not lang_druck_tooltip_moeglich(w):
+            return
+        gp = glob.toPoint()
+        try:
+            text = self._tipp_text(w, gp)
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: Lang-Druck-Erklaerung: {e}")
+            return
+        if not text:
+            return                      # keine Erklaerung: alles wie bisher
+        if self._tipp_schild is None or not _gueltig(self._tipp_schild):
+            self._tipp_schild = _TippSchild()
+        self._tipp_schild.zeigen(text, gp)
+        self._tipp_gezeigt = True
+        if _eingabe(w):
+            return                      # Eingabefeld: Druck bleibt, wie er ist
+        # Erklaerung gezeigt: der Druck ist erledigt (wie beim Menue) — ein
+        # Knopf geht hoch ohne clicked, Rest bis zum Loslassen wird geschluckt.
+        self._menue_schlucken = True
+        zurueck = self._zurueck
+        self._abbrechen()
+        if zurueck is None and _gueltig(w):
+            self._druck_loesen(w)
+
     # ── UI-117: zwei Finger ──────────────────────────────────────────────────
 
     @staticmethod
@@ -907,6 +1158,7 @@ class ZiehenScrollen(QObject):
         # Schwung enden.
         self._abbrechen()
         self._menue_aus()
+        self._tipp_aus()
         self.schwung_stoppen()
         self._geste = (ziel, pa.id(), pb.id(), {pa.id(): ga, pb.id(): gb})
         ziel.zwei_finger_start(QPointF(ga), QPointF(gb))
@@ -914,6 +1166,130 @@ class ZiehenScrollen(QObject):
     @property
     def geste_laeuft(self) -> bool:
         return self._geste is not None
+
+    # ── UI-118: weitere Finger auf Bedienelementen ───────────────────────────
+
+    @staticmethod
+    def _element_unter(glob: QPointF, frage: str):
+        """Innerstes Widget mit Methode ``frage`` unter der Bildschirmlage —
+        nur wenn sie dort True sagt (ein Kasten sagt fuer sich False)."""
+        w = QApplication.widgetAt(glob.toPoint())
+        while w is not None:
+            f = getattr(w, frage, None)
+            if callable(f):
+                try:
+                    return w if f() else None
+                except Exception:
+                    return None
+            if w.isWindow():
+                return None
+            w = w.parentWidget()
+        return None
+
+    def _mehr_finger(self, ev) -> None:
+        """Beruehrung auf Fensterebene: weitere Finger (nicht der erste, aus
+        dem Qt die Maus macht) bedienen ihr eigenes Element."""
+        t = ev.type()
+        punkte = ev.points()
+        if t == QEvent.Type.TouchBegin:
+            self._finger_alle_los()         # Ende einer alten Beruehrung verloren
+            self._auf_element = set()
+            self._erster = punkte[0].id() if punkte else None
+            self._erster_w = None
+        if t == QEvent.Type.TouchCancel:
+            self._finger_alle_los()
+            self._erster = None
+            return
+        gedrueckt = QEventPoint.State.Pressed
+        geloest = QEventPoint.State.Released
+        for p in punkte:
+            pid = p.id()
+            glob = QPointF(p.globalPosition())
+            zustand = p.state()
+            if zustand == gedrueckt:
+                if self._element_unter(glob, "finger_bedienelement") is not None:
+                    self._auf_element.add(pid)
+                if pid == self._erster:
+                    self._erster_w = self._element_unter(glob, "mehr_finger_erlaubt")
+                    continue
+                if not self.aktiv or self._geste is not None:
+                    continue
+                w = self._element_unter(glob, "mehr_finger_erlaubt")
+                if (w is None or w is self._erster_w
+                        or any(w is f[0] for f in self._finger.values())
+                        or QApplication.activePopupWidget() is not None
+                        or _fremd_modal(w)):
+                    continue
+                self._ersten_anhalten()
+                self._finger[pid] = [w, glob]
+                self._finger_senden(w, QEvent.Type.MouseButtonPress, glob, ev)
+            elif pid == self._erster and zustand == geloest:
+                # Pruefung: der erste Finger ist weg — sein Element ist wieder
+                # frei fuer einen neuen Finger (sonst bliebe der Fader tot,
+                # solange noch ein anderer Finger liegt).
+                self._erster_w = None
+            elif pid in self._finger:
+                w, alt = self._finger[pid]
+                if zustand == geloest:
+                    del self._finger[pid]
+                    self._finger_senden(w, QEvent.Type.MouseButtonRelease, glob, ev)
+                elif glob != alt:
+                    self._finger[pid][1] = glob
+                    self._finger_senden(w, QEvent.Type.MouseMove, glob, ev)
+        if t == QEvent.Type.TouchEnd:
+            self._finger_alle_los()
+            self._erster = None
+        # ``_auf_element`` bleibt bis zur naechsten Beruehrung: Qt schickt das
+        # Ende der QPanGesture erst nach dem TouchEnd (mit dem Restweg).
+
+    def _ersten_anhalten(self) -> None:
+        """Ein weiterer Finger bedient ein Element: wischt der erste gerade die
+        Flaeche (oder haelt dort einen Druck zurueck), endet das — der Rest
+        dieses Fingers wird bis zum Loslassen geschluckt."""
+        self.schwung_stoppen()
+        self._menue_aus()
+        self._tipp_aus()                # UI-123: laufende Erklaerung abbrechen
+        if self._bereich is None and self._regler_w is None:
+            return          # der erste Finger bedient selbst ein Widget: bleibt
+        if self._touch and not self._zieht and self._zurueck is None and self._regler_w is None:
+            self._druck_loesen()        # Flaeche bekam den Druck: weit weg loslassen
+        self._abbrechen()
+        self._menue_schlucken = True
+
+    def _finger_alle_los(self) -> None:
+        finger, self._finger = self._finger, {}
+        for w, glob in finger.values():
+            self._finger_senden(w, QEvent.Type.MouseButtonRelease, glob, None)
+
+    def _finger_senden(self, w, typ, glob: QPointF, ev) -> None:
+        if not _gueltig(w):
+            return
+        knopf = (Qt.MouseButton.NoButton if typ == QEvent.Type.MouseMove
+                 else Qt.MouseButton.LeftButton)
+        knoepfe = (Qt.MouseButton.NoButton if typ == QEvent.Type.MouseButtonRelease
+                   else Qt.MouseButton.LeftButton)
+        lokal = QPointF(w.mapFromGlobal(glob))
+        geraet = None
+        if ev is not None:
+            try:
+                geraet = ev.pointingDevice()
+            except Exception:
+                geraet = None
+        if geraet is not None:
+            maus = QMouseEvent(typ, lokal, glob, knopf, knoepfe,
+                               Qt.KeyboardModifier.NoModifier, geraet)
+            maus.setTimestamp(ev.timestamp())
+        else:
+            maus = QMouseEvent(typ, lokal, glob, knopf, knoepfe, Qt.KeyboardModifier.NoModifier)
+        # Direkt an das Widget: kein Anwendungsfilter (der kuemmert sich um den
+        # ersten Finger) und kein Weiterreichen an Eltern (VC-Flaeche).
+        self._reicht = True
+        try:
+            w.event(maus)
+        except Exception as e:
+            print(f"[ziehen_scrollen] ERROR: weiterer Finger: {e}")
+        finally:
+            self._reicht = False
 
     # ── Schwung nach dem Loslassen ────────────────────────────────────────────
 

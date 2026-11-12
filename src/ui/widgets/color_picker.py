@@ -25,6 +25,7 @@ except Exception:
     get_state = None  # type: ignore
 
 from src.ui.weak_slots import weak_slot
+from src.ui.widgets.flow_layout import FlowLayout
 
 
 # Color filter database (Lee / Rosco subset)
@@ -160,29 +161,64 @@ class ColorWheel(QWidget):
 
 
 class ColorSwatch(QFrame):
-    """Vorgefertigte Farbe als klickbarer Button."""
+    """Vorgefertigte Farbe als klickbarer Button.
+
+    UI-123 (Touch-Audit C-08): der Name steht IM Feld (vorher nur im Tooltip,
+    den es am Finger nicht gibt), in Schwarz oder Weiss je nach Helligkeit.
+    Das Feld ist 88x44 px (vorher 48x32). Ausgeloest wird beim Loslassen im
+    Feld (wie ein Knopf): ein Wisch ueber die Felder scrollt am Finger die
+    Seite, statt unterwegs eine Farbe zu setzen."""
 
     clicked = Signal(QColor)
+
+    BREITE = 88
+    HOEHE = 44
 
     def __init__(self, color: QColor, name: str, parent=None):
         super().__init__(parent)
         self._color = color
         self._name = name
-        self.setFixedSize(48, 32)
+        self._gedrueckt = False
+        self.setFixedSize(self.BREITE, self.HOEHE)
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setToolTip(f"{name}\nRGB: {color.red()},{color.green()},{color.blue()}")
+        self.setAccessibleName(name)
         self.setAutoFillBackground(False)
+        # UI-117: eigene Flaeche, die am Finger scrollt (Wisch = Seite schieben)
+        self.setProperty("ziehen_scrollen_finger", True)
+
+    def name(self) -> str:
+        return self._name
+
+    def schriftfarbe(self) -> QColor:
+        """Schwarz auf hellen, Weiss auf dunklen Farben (relative Helligkeit)."""
+        c = self._color
+        hell = 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue()
+        return QColor("#111111") if hell >= 140 else QColor("#ffffff")
 
     def paintEvent(self, _ev):
         p = QPainter(self)
         p.fillRect(self.rect(), self._color)
         p.setPen(QColor("#444"))
         p.drawRect(self.rect().adjusted(0, 0, -1, -1))
+        f = p.font()
+        f.setPixelSize(11)
+        p.setFont(f)
+        p.setPen(self.schriftfarbe())
+        p.drawText(self.rect().adjusted(3, 2, -3, -2),
+                   int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap),
+                   self._name)
         p.end()
 
-    def mousePressEvent(self, _ev: QMouseEvent):
-        self.clicked.emit(self._color)
+    def mousePressEvent(self, ev: QMouseEvent):
+        self._gedrueckt = ev.button() == Qt.MouseButton.LeftButton
+
+    def mouseReleaseEvent(self, ev: QMouseEvent):
+        gedrueckt, self._gedrueckt = self._gedrueckt, False
+        if (gedrueckt and ev.button() == Qt.MouseButton.LeftButton
+                and self.rect().contains(ev.position().toPoint())):
+            self.clicked.emit(self._color)
 
 
 class ColorPicker(QWidget):
@@ -463,19 +499,24 @@ class ColorPicker(QWidget):
         w = QWidget()
         layout = QVBoxLayout(w)
         layout.setContentsMargins(8, 8, 8, 8)
-        info = QLabel("Lee / Rosco Gel-Farben - klicken um zu übernehmen.")
+        info = QLabel("Lee / Rosco Gel-Farben - antippen um zu übernehmen.")
         info.setStyleSheet("color: #888; font-size: 11px;")
         layout.addWidget(info)
 
-        grid = QGridLayout()
-        grid.setSpacing(4)
-        cols = 6
-        for i, (name, r, g, b) in enumerate(COLOR_FILTERS):
+        # UI-123 (C-08): Felder mit Namen, umbrechend nach verfuegbarer Breite
+        # (die Seite steckt in einem Scrollbereich, s. _wrap_scroll).
+        host = QWidget()
+        sp = host.sizePolicy()
+        sp.setHeightForWidth(True)
+        host.setSizePolicy(sp)
+        flow = FlowLayout(host, margin=0, h_spacing=4, v_spacing=4)
+        self._filter_felder: list[ColorSwatch] = []
+        for name, r, g, b in COLOR_FILTERS:
             sw = ColorSwatch(QColor(r, g, b), name)
             sw.clicked.connect(self.set_color)
-            grid.addWidget(sw, i // cols, i % cols)
-            # Kein Label unter dem Swatch — der Tooltip reicht.
-        layout.addLayout(grid)
+            flow.addWidget(sw)
+            self._filter_felder.append(sw)
+        layout.addWidget(host)
         layout.addStretch(1)
         return w
 

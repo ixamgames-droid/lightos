@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QGroupBox, QScrollArea, QFrame,
     QTabWidget, QToolButton, QSizePolicy, QMessageBox, QDialog, QSplitter,
     QStackedWidget, QButtonGroup, QInputDialog, QRadioButton, QComboBox,
-    QWhatsThis, QSpacerItem
+    QWhatsThis, QSpacerItem, QMenu
 )
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter
@@ -462,13 +462,37 @@ class ProgrammerView(QWidget):
         self._group_search.setClearButtonEnabled(True)
         self._group_search.setStyleSheet("font-size: 11px; padding: 2px 4px;")
         self._group_search.textChanged.connect(weak_slot(self._refresh_group_list))
-        grp_layout.addWidget(self._group_search)
+        # UI-123 (Touch-Audit A-09): „Gruppe addieren“ ging nur per
+        # Doppelklick. Jetzt sichtbar: Umschalter „＋ Addieren“ — eingeschaltet
+        # fuegt jeder Tipp auf eine Gruppe deren Geraete zur Auswahl hinzu,
+        # statt sie zu ersetzen. Dazu im Kontextmenue (lang druecken).
+        such_zeile = QHBoxLayout()
+        such_zeile.setSpacing(4)
+        such_zeile.addWidget(self._group_search, 1)
+        self._btn_gruppe_addieren = QPushButton("＋ Addieren")
+        self._btn_gruppe_addieren.setObjectName("gruppeAddierenKnopf")
+        self._btn_gruppe_addieren.setCheckable(True)
+        self._btn_gruppe_addieren.setToolTip(
+            "Eingeschaltet: ein Tipp auf eine Gruppe fügt ihre Geräte zur "
+            "Auswahl hinzu (statt sie zu ersetzen) — wie ein Doppelklick.")
+        try:
+            from src.ui.widgets.mehrfach_knopf import TOUCH_HOEHE as _TH
+            from src.ui.touch_keyboard import is_touch_mode as _itm
+            if _itm():
+                self._btn_gruppe_addieren.setMinimumHeight(_TH)
+        except Exception:
+            pass
+        such_zeile.addWidget(self._btn_gruppe_addieren)
+        grp_layout.addLayout(such_zeile)
         self._group_list = QListWidget()
         self._group_list.setMaximumHeight(130)
         self._group_list.itemClicked.connect(self._on_group_clicked)
         self._group_list.itemDoubleClicked.connect(self._on_group_add_clicked)
+        self._group_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._group_list.customContextMenuRequested.connect(self._gruppen_menue)
         grp_layout.addWidget(self._group_list)
-        grp_hint = QLabel("Klick = Gruppe wählen · Doppelklick = zur Auswahl addieren")
+        grp_hint = QLabel("Tippen = Gruppe wählen · „＋ Addieren“ an (oder Doppelklick)"
+                          " = zur Auswahl addieren")
         grp_hint.setWordWrap(True)
         grp_hint.setStyleSheet("color: #888; font-size: 10px;")
         grp_layout.addWidget(grp_hint)
@@ -1366,7 +1390,35 @@ class ProgrammerView(QWidget):
         except Exception as e:
             print(f"[programmer_view] group list error: {e}")
 
+    def _gruppen_menue_eintraege(self, item: QListWidgetItem | None) -> list[tuple]:
+        """UI-123 (A-09): ``[(text, aufruf)]`` fuer das Kontextmenue der
+        Gruppenliste (ohne offenes Menue pruefbar). Ordnerzeilen: keins."""
+        if item is None or item.data(Qt.ItemDataRole.UserRole + 2):
+            return []
+        return [("Nur diese Gruppe wählen", lambda: self._gruppe_waehlen(item)),
+                ("＋ Zur Auswahl addieren", lambda: self._on_group_add_clicked(item))]
+
+    def _gruppen_menue(self, pos):
+        idx = self._group_list.indexAt(pos)
+        item = self._group_list.itemFromIndex(idx) if idx.isValid() else None
+        eintraege = self._gruppen_menue_eintraege(item)
+        if not eintraege:
+            return
+        menu = QMenu(self)
+        aktionen = {menu.addAction(text): aufruf for text, aufruf in eintraege}
+        gewaehlt = menu.exec(self._group_list.viewport().mapToGlobal(pos))
+        if gewaehlt in aktionen:
+            aktionen[gewaehlt]()
+
     def _on_group_clicked(self, item: QListWidgetItem):
+        if (getattr(self, "_btn_gruppe_addieren", None) is not None
+                and self._btn_gruppe_addieren.isChecked()
+                and not item.data(Qt.ItemDataRole.UserRole + 2)):
+            self._on_group_add_clicked(item)     # UI-123: „＋ Addieren“ ist an
+            return
+        self._gruppe_waehlen(item)
+
+    def _gruppe_waehlen(self, item: QListWidgetItem):
         # Ordner-Kopfzeile angetippt → Ordner auf-/zuklappen (Feature:
         # klappbare Programmer-Ordner), Zustand in ui_prefs persistieren.
         folder = item.data(Qt.ItemDataRole.UserRole + 2)
