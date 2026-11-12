@@ -128,7 +128,10 @@ def test_buehne_sofortiger_finger_zug_verschiebt_nicht(buehne):
     _finger(c, QPoint(160, 100), QPoint(150, 250))
     assert c._positions[1] == (160.0, 100.0), "Wisch auf einem Geraet versetzt es nicht"
     assert c.uebernommen == []
-    assert c._selected_fids == [1], "die Auswahl per Druck bleibt"
+    # UI-117 Nachbesserung: seit der Wisch die Ansicht verschiebt (UI-117),
+    # waehlt er auch nicht mehr — gewaehlt wird beim Tippen oder nach langem
+    # Druck (wie in den Listen, UI-110). Vorher: Auswahl schon beim Aufsetzen.
+    assert c._selected_fids == [], "ein Wisch waehlt nicht"
 
 
 def test_buehne_finger_tipp_waehlt(buehne):

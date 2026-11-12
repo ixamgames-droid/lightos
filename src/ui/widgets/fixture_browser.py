@@ -11,6 +11,10 @@ from src.core.database.models import FixtureProfile, PatchedFixture
 
 _UNIVERSE_MIN = 1
 
+#: UI-125: Zeilenhoehe und Einzug des Geraetebaums im Touch-Modus (px).
+TOUCH_ZEILE = 40
+TOUCH_EINZUG = 32
+
 #: FM-63: Knoten im Fixture-Browser fuer QLC+-Importe, die ein mitgeliefertes
 #: LightOS-Profil abloest (``fixture_db.abgeloeste_profile``).
 ABGELOEST_KNOTEN = "Ältere QLC+-Importe (abgelöst durch LightOS-Profil)"
@@ -229,6 +233,19 @@ class FixtureBrowserDialog(QDialog):
         self._tree.setColumnWidth(0, 280)
         self._tree.setColumnWidth(1, 80)
         self._tree.currentItemChanged.connect(self._on_selection)
+        # UI-125 (Touch-Audit C-10): der Baum startet zugeklappt (vorher rund
+        # 2200 Zeilen auf einmal), ein Tipp/Klick auf einen Hersteller klappt
+        # ihn auf und wieder zu. Doppelklick klappt deshalb nicht selbst —
+        # sonst klappte er auf (erster Klick) und gleich wieder zu (Doppelklick).
+        # Ein Klick auf das Dreieck schaltet wie bisher (Qt meldet dort kein
+        # ``itemClicked``). Am Finger haelt ``ziehen_scrollen`` den Druck
+        # zurueck: Tippen kommt als Druck+Loslassen an, ein Wisch scrollt nur.
+        self._tree.setExpandsOnDoubleClick(False)
+        self._tree.itemClicked.connect(self._on_item_clicked)
+        if self._touch_modus():
+            # Finger: Zeilen >= 40 px hoch, Dreieck-Spalte breiter
+            self._tree.setStyleSheet(f"QTreeWidget::item {{ min-height: {TOUCH_ZEILE}px; }}")
+            self._tree.setIndentation(TOUCH_EINZUG)
         splitter.addWidget(self._tree)
 
         # Rechte Seite: Optionen
@@ -348,7 +365,6 @@ class FixtureBrowserDialog(QDialog):
                     mfr_item.addChild(child)
                 if fixtures:
                     self._tree.addTopLevelItem(mfr_item)
-            self._tree.expandAll()
             if alt_items:
                 knoten = QTreeWidgetItem([ABGELOEST_KNOTEN, "", str(len(alt_items))])
                 knoten.setData(0, Qt.ItemDataRole.UserRole, None)
@@ -390,6 +406,20 @@ class FixtureBrowserDialog(QDialog):
             stack.extend(it.child(j) for j in range(it.childCount()))
         breite = max(fm.horizontalAdvance(t) for t in texte) + 24
         self._tree.setColumnWidth(1, max(80, breite))
+
+    @staticmethod
+    def _touch_modus() -> bool:
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            return bool(is_touch_mode())
+        except Exception:
+            return False
+
+    def _on_item_clicked(self, item, _spalte=0):
+        """UI-125: Tipp/Klick auf einen Knoten mit Geraeten klappt auf/zu.
+        Geraete selbst waehlt ``currentItemChanged`` wie bisher."""
+        if item is not None and item.childCount():
+            item.setExpanded(not item.isExpanded())
 
     def _on_search(self, text: str):
         self._load_tree(text.strip())

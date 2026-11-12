@@ -3,12 +3,13 @@ from __future__ import annotations
 import json
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
                                 QMessageBox, QInputDialog, QSizePolicy)
-from PySide6.QtCore import Qt, QPoint, QRect, QSize, Signal, QTimer
+from PySide6.QtCore import Qt, QEvent, QPoint, QRect, QSize, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QAction, QPen
 
 from .vc_widget import VCWidget, KENNUNG_FELD
 from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert   # ENG-41
 from src.core import undo as _verlauf      # UI-93: gemeinsame Schrittnummern
+from src.ui.ziehen_scrollen import FingerHalten, ist_touch   # UI-117
 
 
 WIDGET_REGISTRY: dict[str, type] = {}
@@ -153,6 +154,13 @@ class VCCanvas(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._context_menu)
+        # UI-117 (Touch-Audit B-03): auf der freien Flaeche scrollt ein Wisch
+        # am Finger die VC (Spielbetrieb und Bearbeiten; Widgets bleiben, wo
+        # sie sind). Ein Druck ins Leere wirkt am Finger erst beim Loslassen
+        # eines Tipps (``_finger_leer``) — ein Wisch hebt weder die Auswahl
+        # noch einen Zuweisungsmodus auf. Die Maus bleibt unveraendert.
+        self.setProperty("ziehen_scrollen_finger", True)
+        self._finger_leer = None
         self._bg = QColor("#0d1117")
         self.setAcceptDrops(True)
 
@@ -607,6 +615,16 @@ class VCCanvas(QWidget):
     # ── Mausereignisse für Learn/Assign ──────────────────────────────────────
 
     def mousePressEvent(self, event):
+        self._finger_leer = None
+        if (event.button() == Qt.MouseButton.LeftButton and ist_touch(event)
+                and self.childAt(event.position().toPoint()) is None):
+            # UI-117: Finger ins Leere — erst beim Loslassen (Tippen) auswerten
+            self._finger_leer = event.globalPosition()
+            super().mousePressEvent(event)
+            return
+        self._druck_auswerten(event)
+
+    def _druck_auswerten(self, event):
         mode = getattr(self, "_awaiting_button_click_for", None)
         if mode and event.button() == Qt.MouseButton.LeftButton:
             child = self.childAt(event.position().toPoint())
@@ -679,12 +697,18 @@ class VCCanvas(QWidget):
         if self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
             self.clear_effect_highlight()
             self._on_widget_selected(None)
-        super().mousePressEvent(event)
+        if event.type() != QEvent.Type.MouseButtonRelease:
+            super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        start, self._finger_leer = self._finger_leer, None
+        if start is not None and event.button() == Qt.MouseButton.LeftButton:
+            d = event.globalPosition() - start
+            if abs(d.x()) + abs(d.y()) <= FingerHalten.schwelle():
+                self._druck_auswerten(event)    # UI-117: Tippen ins Leere
         super().mouseReleaseEvent(event)
 
     # ── Edit mode ────────────────────────────────────────────────────────────
