@@ -674,7 +674,16 @@ class SnapFilePanel(QWidget):
         b_folder.clicked.connect(self._new_folder)
 
         b_apply = QPushButton("Anwenden")
+        # UI-123 (Touch-Audit A-09): Effekte starteten nur per Doppelklick —
+        # „Anwenden“ startet jetzt auch den markierten Effekt (Snap: anwenden).
+        # Pruefung: „Anwenden“ STOPPT nie — ein zweiter Tipp (oder ein Tipp auf
+        # einen schon laufenden Effekt) darf live nichts ausschalten. Stoppen:
+        # lang druecken -> „Stop“ oder Doppelklick.
+        b_apply.setToolTip("Markierten Snap auf den Programmer anwenden bzw. "
+                           "markierten Effekt starten (läuft er schon, bleibt er an; "
+                           "Stoppen: lang drücken → „Stop“ oder Doppelklick).")
         b_apply.clicked.connect(self._apply_selected)
+        self._btn_anwenden = b_apply
 
         b_chase = QPushButton("Chase +")
         b_chase.setToolTip("Aus mehreren selektierten Snaps eine Sequence/Chase erzeugen")
@@ -835,7 +844,7 @@ class SnapFilePanel(QWidget):
             item.setIcon(0, _mini.snap_icon())
             # UI-24f: Farbcode erklären — gelb = gespeicherter Snap.
             item.setToolTip(0, f"{snap.name} — Snap (gelb): gespeicherter "
-                               "Programmer-Look. Doppelklick wendet ihn an.")
+                               "Programmer-Look. Doppelklick oder „Anwenden“ wendet ihn an.")
         # Funktionen/Effekte (je Typ farbig)
         fm = self._fm()
         if fm is not None:
@@ -852,7 +861,7 @@ class SnapFilePanel(QWidget):
                 item.setIcon(0, _mini.function_icon(f))
                 # UI-24f: Farbcode erklären — blau/farbig = Effekt/Funktion (nach Typ).
                 item.setToolTip(0, f"{f.name} — Effekt/Funktion (Farbe = Typ, "
-                                   "z. B. blau = Szene). Doppelklick startet/stoppt.")
+                                   "z. B. blau = Szene). Doppelklick startet/stoppt, „Anwenden“ startet.")
                 self._func_items.append((item, int(fid)))
         self._update_running()
         self._tree_rebuilding = False
@@ -1048,6 +1057,16 @@ class SnapFilePanel(QWidget):
         ref, kind = self._selected()
         if kind == "snap" and ref is not None:
             self._apply_snap(int(ref))
+        elif kind == "function" and ref is not None:
+            # UI-123 (A-09): starten, nie stoppen (Pruefung: kein Live-Aus
+            # durch einen versehentlichen zweiten Tipp)
+            fm = self._fm()
+            try:
+                laeuft = bool(fm is not None and fm.is_running(int(ref)))
+            except Exception:
+                laeuft = False
+            if not laeuft:
+                self._start_function(int(ref))
 
     def _apply_snap(self, sid: int):
         if get_state is None:

@@ -33,7 +33,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile, QWebEnginePage
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import (QUrl, Qt, QTimer, Signal, Slot, QObject, QEvent,
-                            QItemSelectionModel, QMimeData)
+                            QItemSelectionModel, QMimeData, QSize)
 from PySide6.QtGui import QAction, QColor, QShortcut, QKeySequence
 
 from src.core.app_state import (
@@ -2915,6 +2915,83 @@ def raster_passt(orte, grenze: float = POSITION_GRENZE_M) -> bool:
     return all(abs(x) <= grenze and abs(z) <= grenze for x, z in orte)
 
 
+class _UmbruchLeiste(QWidget):
+    """UI-122 (Touch-Audit D-04): Inhalt der 3D-Werkzeugleiste, der umbricht.
+
+    Sitzt als EIN Widget in der ``QToolBar``. Seine Wunschbreite ist nur die
+    des breitesten Eintrags — die Leiste laeuft deshalb nie ueber, Qt zeigt
+    keinen Erweiterungsknopf. Die ganze Breite bekommt es ueber die
+    Expanding-Regel; die Hoehe waechst mit der Zeilenzahl (``FlowLayout``
+    meldet sie fuer die aktuelle Breite als Mindesthoehe).
+
+    Aktionen werden zu ``QToolButton`` wie bei ``QToolBar.addAction``
+    (nur Text, flach, ohne Tastaturfokus — der Fokus bleibt in der 3D-Ansicht).
+    Beschriftung + Feld (``paar``) brechen nur gemeinsam um.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        from src.ui.widgets.flow_layout import FlowLayout
+        self.setObjectName("vizWerkzeugleiste")
+        self._flow = FlowLayout(self, margin=0, h_spacing=6, v_spacing=4,
+                                zeilen_zentrieren=True)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding,
+                           QSizePolicy.Policy.Preferred)
+
+    def widget(self, w: QWidget) -> QWidget:
+        self._flow.addWidget(w)
+        return w
+
+    def aktion(self, act: QAction) -> QToolButton:
+        b = QToolButton(self)
+        b.setDefaultAction(act)
+        b.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        b.setAutoRaise(True)
+        b.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        return self.widget(b)
+
+    def paar(self, text: str, feld: QWidget) -> QWidget:
+        box = QWidget(self)
+        lay = QHBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+        lay.addWidget(QLabel(text, box))
+        lay.addWidget(feld)
+        return self.widget(box)
+
+    def trenner(self) -> None:
+        # Kein Strich: am Zeilenanfang staende er allein. Etwas Luft genuegt.
+        luft = QWidget(self)
+        luft.setFixedSize(6, 1)
+        self.widget(luft)
+
+    def heightForWidth(self, breite: int) -> int:  # noqa: N802
+        return self._flow.heightForWidth(breite)
+
+    def hasHeightForWidth(self) -> bool:  # noqa: N802
+        return True
+
+    def _hoehe(self) -> int:
+        # Hoehe fuer die TATSAECHLICHE Breite. Qt fragt sonst heightForWidth
+        # mit der Wunschbreite (= breitester Eintrag) und bekaeme eine Spalte.
+        breite = self.width() if self.width() > 0 else 100000
+        return self._flow.heightForWidth(breite)
+
+    def sizeHint(self):  # noqa: N802
+        return QSize(self._flow.minimumSize().width(), self._hoehe())
+
+    def minimumSizeHint(self):  # noqa: N802
+        return self.sizeHint()
+
+    def resizeEvent(self, event):  # noqa: N802
+        super().resizeEvent(event)
+        hoehe = self._hoehe()
+        if hoehe != getattr(self, "_letzte_hoehe", None):
+            # Zeilenzahl hat sich geaendert -> die Werkzeugleiste neu fragen.
+            self._letzte_hoehe = hoehe
+            self.updateGeometry()
+
+
 class VisualizerWindow(QMainWindow):
 
     STAGE_TYPES = [
@@ -2990,29 +3067,40 @@ class VisualizerWindow(QMainWindow):
         # -------- Toolbar (touch-optimiert) --------
         tb = QToolBar("Visualizer")
         tb.setMovable(False)
-        # VIZ-10: KEIN hartes min-width mehr auf QToolButton - das zwang den Text
-        # bei knappem Platz zum Eliden ("S...ern" statt "Speichern"). Buttons
-        # sollen ihre eigene sizeHint (Text + Padding) nutzen; reicht der Platz
-        # nicht, blendet Qt automatisch den Overflow-Pfeil der Toolbar ein.
+        # UI-122 (Touch-Audit D-04): die Leiste brauchte ~1990 px. Was nicht
+        # passte, lag hinter dem 12 px schmalen Erweiterungsknopf der QToolBar —
+        # am Finger kaum zu treffen, bei 250 % fast die halbe Leiste. Jetzt
+        # liegt alles in EINEM umbrechenden Flow-Behaelter: reicht die Breite
+        # nicht, bricht die Leiste in eine zweite (dritte) Zeile um. Es gibt
+        # keinen Ueberlauf und damit keinen Erweiterungsknopf mehr.
+        # VIZ-10: KEIN hartes min-width auf QToolButton (sonst „S...ern").
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            _touch = bool(is_touch_mode())
+        except Exception:
+            _touch = False
+        _kh = 44 if _touch else 38          # Knopfhoehe; am Finger >= 44 px
         tb.setStyleSheet(
             "QToolBar { spacing: 6px; padding: 4px; }"
-            "QToolButton { min-height: 38px; padding: 6px 12px; font-size: 12px; }"
-            "QComboBox   { min-height: 36px; padding: 4px 8px;"
+            f"QToolButton {{ min-height: {_kh}px; padding: 6px 12px; font-size: 12px; }}"
+            f"QComboBox   {{ min-height: {_kh - 2}px; padding: 4px 8px;"
             "              font-size: 12px; min-width: 130px; }"
             "QComboBox QAbstractItemView::item { min-height: 32px; padding: 4px; }"
             "QToolBar QLabel { padding: 0 4px; font-weight: bold; }"
         )
         tb.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
         self.addToolBar(tb)
+        self._toolbar = tb
+        _leiste = _UmbruchLeiste(tb)
+        self._toolbar_leiste = _leiste
+        tb.addWidget(_leiste)
 
-        tb.addWidget(QLabel("Ansicht:"))
         self._combo_view = QComboBox()
         self._combo_view.addItem("3D Perspective", "3D")
         self._combo_view.addItem("2D Top-Down",    "2D")
         self._combo_view.currentIndexChanged.connect(self._on_view_mode_changed)
-        tb.addWidget(self._combo_view)
+        _leiste.paar("Ansicht:", self._combo_view)
 
-        tb.addWidget(QLabel("Modus:"))
         self._combo_edit = QComboBox()
         # VIZ-14: zwei Modi. WORAN gebaut wird, sagt der Tab (s. resolve_edit_mode).
         self._combo_edit.addItem("Ansehen", "view")
@@ -3022,29 +3110,28 @@ class VisualizerWindow(QMainWindow):
             "Bauen: der Tab rechts entscheidet, woran du arbeitest — "
             "Fixtures oder Bühne.")
         self._combo_edit.currentIndexChanged.connect(self._on_edit_mode_changed)
-        tb.addWidget(self._combo_edit)
+        _leiste.paar("Modus:", self._combo_edit)
 
-        tb.addSeparator()
+        _leiste.trenner()
 
-        tb.addWidget(QLabel("Bühne:"))
         self._combo_stage = QComboBox()
         self._reload_stage_combo()
         self._combo_stage.currentIndexChanged.connect(self._on_stage_combo_changed)
-        tb.addWidget(self._combo_stage)
+        _leiste.paar("Bühne:", self._combo_stage)
 
         act_save = QAction("💾 Speichern", self)
         act_save.triggered.connect(self._on_save_stage)
-        tb.addAction(act_save)
+        _leiste.aktion(act_save)
 
         act_new = QAction("✚ Neu", self)
         act_new.triggered.connect(self._on_new_stage)
-        tb.addAction(act_new)
+        _leiste.aktion(act_new)
 
         act_del = QAction("🗑 Löschen", self)
         act_del.triggered.connect(self._on_delete_stage)
-        tb.addAction(act_del)
+        _leiste.aktion(act_del)
 
-        tb.addSeparator()
+        _leiste.trenner()
 
         # VIZ-13 3b-K: EIN kompakter "Kamera"-Menuebutton statt frueher 6
         # separater Toolbar-Widgets (Reset-Action + Label + Preset-Combo + Fit
@@ -3068,7 +3155,7 @@ class VisualizerWindow(QMainWindow):
         # bestehen (Signal am Menue, nicht an den Einzel-Actions).
         self._menu_cam_saved.triggered.connect(self._on_cam_menu_triggered)
         self._rebuild_camera_menu()
-        tb.addWidget(self._btn_cam_saved)
+        _leiste.widget(self._btn_cam_saved)
 
         # VIZ-12 Schritt 5: "Szene neu laden" ersetzt den frueheren
         # Cache-Buster-Zwang bei jedem show() -- expliziter Menuepunkt statt
@@ -3080,12 +3167,12 @@ class VisualizerWindow(QMainWindow):
             "Nützlich nach Renderer-Problemen oder Grafiktreiber-Updates."
         )
         act_reload_scene.triggered.connect(self._on_reload_scene)
-        tb.addAction(act_reload_scene)
+        _leiste.aktion(act_reload_scene)
 
         act_clear_fx = QAction("✖ Alle entfernen", self)
         act_clear_fx.setToolTip("Alle platzierten Fixtures aus der Szene entfernen")
         act_clear_fx.triggered.connect(self._clear_positions)
-        tb.addAction(act_clear_fx)
+        _leiste.aktion(act_clear_fx)
 
         # LAS-32/LAS-35: Sperrzonen planen (ziehen, Vorlagen), Laser-Felder
         # eintragen oder einmessen.
@@ -3095,10 +3182,10 @@ class VisualizerWindow(QMainWindow):
             "einmessen.\n"
             "Nur Anzeige — schaltet den Laser NICHT ab.")
         act_sperrzonen.triggered.connect(self._on_sperrzonen_dialog)
-        tb.addAction(act_sperrzonen)
+        _leiste.aktion(act_sperrzonen)
         self._act_sperrzonen = act_sperrzonen
 
-        tb.addSeparator()
+        _leiste.trenner()
 
         # Ausrichten/Verteilen der AUSGEWAEHLTEN Fixtures (Multi-Select per Marquee).
         # Die JS-Handler (jsAlignSelected/jsDistributeSelected) sind vorhanden; hier
@@ -3140,9 +3227,9 @@ class VisualizerWindow(QMainWindow):
         _menu_arr.setToolTipsVisible(True)
         self._btn_align.setMenu(_menu_align)
         self._btn_align.setEnabled(False)   # erst ab >=2 selektierten Fixtures
-        tb.addWidget(self._btn_align)
+        _leiste.widget(self._btn_align)
 
-        tb.addSeparator()
+        _leiste.trenner()
 
         # Andock-Modus (opt-in): Strahler rasten beim Platzieren/Ziehen an
         # Trassen (haengen unten) bzw. Plattform/Boden (oben drauf) ein.
@@ -3158,19 +3245,18 @@ class VisualizerWindow(QMainWindow):
             "AUS – freie Platzierung auf fester Höhe (wie bisher)."
         )
         self._act_dock.toggled.connect(self._on_dock_mode_toggled)
-        tb.addAction(self._act_dock)
+        _leiste.aktion(self._act_dock)
 
         # T-VIZ-09: Helligkeit direkt in der Toolbar (sonst nur im Einstellungen-Tab,
         # was im Live-Betrieb den Workflow bremst). Synchron mit dem Tab-Slider.
-        tb.addSeparator()
-        tb.addWidget(QLabel("☀"))
+        _leiste.trenner()
         self._sld_brightness_tb = QSlider(Qt.Orientation.Horizontal)
         self._sld_brightness_tb.setRange(0, 100)
         self._sld_brightness_tb.setValue(20)        # vor connect -> kein Spurious-Fire
         self._sld_brightness_tb.setFixedWidth(120)
         self._sld_brightness_tb.setToolTip("Szenen-Helligkeit (synchron mit Einstellungen-Tab)")
         self._sld_brightness_tb.valueChanged.connect(self._on_brightness_changed)
-        tb.addWidget(self._sld_brightness_tb)
+        _leiste.paar("☀", self._sld_brightness_tb)
 
         # -------- Splitter --------
         splitter = QSplitter(Qt.Orientation.Horizontal)

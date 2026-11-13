@@ -774,6 +774,80 @@ class OutputConfigDialog(QDialog):
         self._artnet_active_univ: int | None = None
         self._sacn_active_univ: int | None = None
         self._setup_ui()
+        self._reiter_eingepasst = False
+
+    # UI-122 (Touch-Audit C-07): Kurznamen der Reiter fuer schmale Bildschirme.
+    _REITER_KURZ = {"Enttec Pro USB": "Enttec", "uDMX (USB)": "uDMX",
+                    "sACN (E1.31)": "sACN"}
+
+    def _verfuegbare_breite(self) -> int:
+        try:
+            p = self.parentWidget()
+            scr = (p.screen() if p is not None else None) or self.screen()
+            if scr is None:
+                from PySide6.QtGui import QGuiApplication
+                scr = QGuiApplication.primaryScreen()
+            return int(scr.availableGeometry().width())
+        except Exception:
+            return 100000
+
+    def _reiter_bedarf(self) -> int:
+        """Breite, die der Dialog braucht, damit ALLE Reiter nebeneinander passen."""
+        bar = self._tabs.tabBar()
+        breite = sum(bar.tabSizeHint(i).width() for i in range(bar.count()))
+        m = self.layout().contentsMargins()
+        # Rahmen des Reiter-Felds + etwas Luft gegen Rundung/Stil-Rahmen.
+        return breite + m.left() + m.right() + 8
+
+    def _reiter_einpassen(self) -> None:
+        """UI-122 (Touch-Audit C-07): alle sechs Reiter sichtbar, keine Pfeile.
+
+        Der Dialog oeffnete 500 px breit; „Universen“ und „DMX-Eingang“ lagen
+        hinter 16 px kleinen Bildlaufpfeilen. Jetzt oeffnet er so breit, dass
+        alle Reiter nebeneinander passen. Reicht der Bildschirm dafuer nicht
+        (hohe Skalierung: 250 % = 640–770 px logisch), stehen Kurznamen auf den
+        langen Reitern (voller Name im Tooltip). Erst wenn auch das nicht
+        passt, bleiben die Pfeile — im Touch-Modus 44 px gross (UI-119)."""
+        self._reiter_eingepasst = True
+        self.ensurePolished()           # Touch-QSS (groessere Reiter) mitmessen
+        tabs = self._tabs
+        bar = tabs.tabBar()
+        platz = self._verfuegbare_breite() - 24
+        if self._reiter_bedarf() > platz:
+            for i in range(tabs.count()):
+                lang = tabs.tabText(i)
+                kurz = self._REITER_KURZ.get(lang)
+                if kurz:
+                    tabs.setTabText(i, kurz)
+                    tabs.setTabToolTip(i, lang)
+        bedarf = self._reiter_bedarf()
+        if bedarf <= platz:
+            tabs.setUsesScrollButtons(False)
+            bar.setElideMode(Qt.TextElideMode.ElideNone)
+            if self.width() < bedarf:
+                self.resize(bedarf, max(self.height(), self.sizeHint().height()))
+                self._im_bildschirm_halten()
+
+    def _im_bildschirm_halten(self) -> None:
+        """Nach dem Verbreitern nicht rechts aus dem Bildschirm ragen."""
+        try:
+            scr = self.screen()
+            if scr is None:
+                return
+            frei = scr.availableGeometry()
+            g = self.frameGeometry()
+            x = min(g.x(), frei.right() + 1 - g.width())
+            x = max(frei.x(), x)
+            if x != g.x():
+                self.move(x, self.y())
+        except Exception:
+            pass
+
+    def showEvent(self, event):  # noqa: N802
+        # Erst beim Zeigen: dann stehen Bildschirm und Stylesheet fest.
+        if not self._reiter_eingepasst:
+            self._reiter_einpassen()
+        super().showEvent(event)
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)

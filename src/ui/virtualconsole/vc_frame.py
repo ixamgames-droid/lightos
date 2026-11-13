@@ -300,6 +300,12 @@ class VCFrame(VCWidget):
 
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
+    def finger_bedienelement(self) -> bool:
+        """UI-118: ein Kasten ist kein Bedienelement — auf seiner Flaeche
+        bleibt der Zwei-Finger-Bildlauf, ein weiterer Finger bedient nichts
+        (die Elemente darin entscheiden fuer sich)."""
+        return False
+
     def mousePressEvent(self, event):
         pos = event.position().toPoint()
         # Tab-Klick wechselt die Seite — auch im Edit-Modus, damit man die Widgets

@@ -20,3 +20,33 @@ export function langDruckPlatziert(editMode, keinGeraet, dragMode = 'none') {
 export function leerZiehenRahmen(touch) {
   return !touch;
 }
+
+// UI-123 (Touch-Audit D-13): Geraetename am Finger. Mit der Maus zeigt das
+// Verweilen ueber einem Geraet Name und Position (Tooltip); am Finger gibt
+// es kein Verweilen. Jetzt: ein Tipp (ein Finger, kaum bewegt, kein
+// Platzieren per langem Druck) auf ein Geraet zeigt dasselbe Schild
+// TIPP_NAME_MS lang ueber dem Finger. Ein neuer Tipp oder die Maus ersetzt es.
+export const TIPP_NAME_MS = 2500;
+export const TIPP_WEG_PX = 12;      // so weit darf der Finger beim Tipp wandern
+
+export function tippZeigtName(wegPx, zweiFinger, platziert) {
+  return !zweiFinger && !platziert && wegPx <= TIPP_WEG_PX;
+}
+
+// Derselbe Text wie beim Maus-Tooltip (eine Quelle fuer beide).
+export function geraeteText(fid, label, typ, x, y, z) {
+  return '[' + fid + '] ' + (label || '?') + ' - ' + typ +
+    '  (X:' + x.toFixed(1) + ' Y:' + y.toFixed(1) + ' Z:' + z.toFixed(1) + ')';
+}
+
+// Lage des Schilds: mittig UEBER dem Finger (der verdeckt sonst den Text),
+// am Fensterrand gehalten; oben kein Platz -> unter den Finger.
+export function tippLage(fx, fy, breite, hoehe, fensterB, fensterH) {
+  const abstand = 28;
+  let x = fx - breite / 2;
+  let y = fy - hoehe - abstand;
+  if (y < 4) y = fy + abstand;
+  x = Math.max(4, Math.min(x, fensterB - breite - 4));
+  y = Math.max(4, Math.min(y, fensterH - hoehe - 4));
+  return { x: Math.round(x), y: Math.round(y) };
+}

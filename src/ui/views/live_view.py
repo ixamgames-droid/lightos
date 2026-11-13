@@ -64,6 +64,13 @@ def _save_prefs(updates: dict) -> None:
         print(f"[live_view] save prefs error: {e}")
 
 
+# UI-122 (D-08): Seitenspalten/Minimap-Schalter und kompaktes Zoom-Overlay.
+SPALTEN_PREF = "live_view_spalten"
+ZOOM_REGLER_BREITE = 200
+ZOOM_REGLER_MIN = 80
+ZOOM_RAND = 10
+
+
 # ── Pan/Tilt-Winkel (EINE Quelle fuer 2D-Glyph, Info-Box UND 3D-Visualizer) ──
 
 def dmx_to_angle_deg(dmx: float, zero_dmx: float = 128.0,
@@ -3307,7 +3314,8 @@ class LiveView(QWidget):
                     pass
             self._view_stack.setCurrentWidget(self._page2d)
             try:
-                self._minimap.show()
+                # UI-122: nur zurueck, wenn der Schalter „Karte“ sie zeigen will.
+                self._minimap.setVisible(self._btn_minimap.isChecked())
             except Exception:
                 pass
             # 2D-Canvas neu aus dem State laden -> spiegelt im 3D vorgenommene
@@ -3446,13 +3454,21 @@ class LiveView(QWidget):
 
         legend = QLabel("PAR  Bar  Moving-Head  Spider  Scanner  Laser  Strobe  Dimmer  Fog")
         legend.setStyleSheet("color:#666; font-size:10px;")
-        header.addWidget(legend)
+        legend.setWordWrap(True)        # UI-122 (D-08): bricht bei Platzmangel um
+        legend.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        header.addWidget(legend, 1)
         root.addLayout(header)
 
         # ── Aktionsleiste (touch-tauglich, immer sichtbar) ────────────────────
-        toolbar = QHBoxLayout()
+        # UI-122 (Touch-Audit D-08): die Leiste bricht um, statt bei hoher
+        # Skalierung (250 % = ~770 px logisch) die Mindestbreite der Ansicht
+        # hochzutreiben. Dazu kommen Schalter fuer die beiden Seitenspalten und
+        # die Minimap — so bekommt die 2D-Flaeche am kleinen Bildschirm Platz.
+        from src.ui.widgets.flow_layout import FlowLayout
+        self._aktionsleiste = QWidget()
+        toolbar = FlowLayout(self._aktionsleiste, margin=0, h_spacing=6,
+                             v_spacing=4, zeilen_zentrieren=True)
         toolbar.setContentsMargins(8, 2, 8, 4)
-        toolbar.setSpacing(6)
         _tb_style = (
             "QPushButton { background:#1a2a3a; color:#9acbff; border:1px solid #2a4a6a;"
             " border-radius:4px; padding:7px 12px; font-size:12px; }"
@@ -3481,7 +3497,6 @@ class LiveView(QWidget):
         self._btn_clear_sel.setStyleSheet(_tb_style)
         self._btn_clear_sel.clicked.connect(self._on_clear_selection)
         toolbar.addWidget(self._btn_clear_sel)
-        toolbar.addStretch()
 
         # ── 2D/3D-Umschalter (eingebettete 3D-Ansicht ohne Extra-Fenster) ─────
         self._btn_view2d = QPushButton("🗺 2D")
@@ -3504,7 +3519,27 @@ class LiveView(QWidget):
         self._btn_view3d.clicked.connect(weak_slot(self._set_view_3d, True))
         toolbar.addWidget(self._btn_view2d)
         toolbar.addWidget(self._btn_view3d)
-        root.addLayout(toolbar)
+
+        # UI-122 (D-08): Seitenspalten + Minimap ein-/ausblenden. Der Zustand
+        # gilt fuer dieses Geraet (ui_prefs.json), nicht fuer die Show.
+        _spalten = _load_prefs().get(SPALTEN_PREF, {})
+        if not isinstance(_spalten, dict):
+            _spalten = {}
+        self._btn_spalte_links = QPushButton("◧ Liste")
+        self._btn_spalte_links.setToolTip("Linke Spalte (Geräte / Gruppen) zeigen oder ausblenden")
+        self._btn_spalte_rechts = QPushButton("Editor ◨")
+        self._btn_spalte_rechts.setToolTip("Rechte Spalte (Welt / Ansicht, Gruppe) zeigen oder ausblenden")
+        self._btn_minimap = QPushButton("▣ Karte")
+        self._btn_minimap.setToolTip("Minimap unten rechts zeigen oder ausblenden")
+        for b, key in ((self._btn_spalte_links, "links"),
+                       (self._btn_spalte_rechts, "rechts"),
+                       (self._btn_minimap, "minimap")):
+            b.setCheckable(True)
+            b.setChecked(bool(_spalten.get(key, True)))
+            b.setMinimumHeight(34)
+            b.setStyleSheet(_tb_style)
+            toolbar.addWidget(b)
+        root.addWidget(self._aktionsleiste)
 
         # ── Mittlere Zeile: Links | Canvas | Rechts ───────────────────────────
         mid = QHBoxLayout()
@@ -3784,7 +3819,7 @@ class LiveView(QWidget):
         self._zoom_slider.setRange(25, 400)
         self._zoom_slider.setSingleStep(5)
         self._zoom_slider.setPageStep(25)
-        self._zoom_slider.setFixedWidth(200)
+        self._zoom_slider.setFixedWidth(ZOOM_REGLER_BREITE)
         self._zoom_slider.blockSignals(True)
         self._zoom_slider.setValue(int(round(zoom_init * 100)))
         self._zoom_slider.blockSignals(False)
@@ -3817,6 +3852,7 @@ class LiveView(QWidget):
         self._btn_zoom_out.clicked.connect(weak_slot(self._zoom_step, -10))
         self._btn_zoom_in.clicked.connect(weak_slot(self._zoom_step, +10))
         self._zoom_overlay.raise_()
+        self._zoom_titel = _zlbl
 
         right_layout.addWidget(gb)
 
@@ -3917,6 +3953,11 @@ class LiveView(QWidget):
 
         root.addLayout(mid, 1)
 
+        # UI-122 (D-08): gemerkten Zustand anwenden, dann erst verbinden.
+        self._spalten_anwenden()
+        for b in (self._btn_spalte_links, self._btn_spalte_rechts, self._btn_minimap):
+            b.toggled.connect(self._on_spalten_schalter)
+
         # ── Footer ────────────────────────────────────────────────────────────
         footer = QHBoxLayout()
         footer.setContentsMargins(8, 2, 8, 2)
@@ -3926,7 +3967,11 @@ class LiveView(QWidget):
         footer.addStretch()
         hint = QLabel("Tippen = Auswahl  ·  Rahmen ziehen = mehrere  ·  'Mehrfachauswahl' (oben) = sammeln  ·  Ziehen = verschieben  ·  Liste→Fläche = platzieren")
         hint.setStyleSheet("color:#555; font-size:10px;")
-        footer.addWidget(hint)
+        # UI-122 (D-08): der lange Hinweis trieb die Mindestbreite der Ansicht
+        # auf 724 px (bei 250 % passt sie dann nicht mehr) — er bricht um.
+        hint.setWordWrap(True)
+        hint.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        footer.addWidget(hint, 1)
         root.addLayout(footer)
 
         # ── Signals verbinden ─────────────────────────────────────────────────
@@ -4115,16 +4160,75 @@ class LiveView(QWidget):
         self._position_zoom_overlay()
 
     def _position_zoom_overlay(self):
-        """Positioniert das Zoom-Overlay unten rechts, direkt ueber der Minimap."""
+        """Positioniert das Zoom-Overlay unten rechts, direkt ueber der Minimap
+        (ohne Minimap: ganz unten)."""
         if not hasattr(self, "_zoom_overlay") or not hasattr(self, "_minimap"):
             return
         vp = self._scroll.viewport()
         zo = self._zoom_overlay
+        self._zoom_overlay_kompakt(vp.width() - 2 * ZOOM_RAND)
         zo.adjustSize()
-        x = vp.width() - zo.width() - 10
-        y = vp.height() - self._minimap.height() - zo.height() - 18
+        x = vp.width() - zo.width() - ZOOM_RAND
+        if self._minimap.isHidden():
+            y = vp.height() - zo.height() - ZOOM_RAND
+        else:
+            y = vp.height() - self._minimap.height() - zo.height() - 18
         zo.move(max(4, x), max(4, y))
         zo.raise_()
+
+    def _zoom_overlay_kompakt(self, platz: int) -> None:
+        """UI-122 (D-08): das Zoom-Overlay passt sich der Breite an.
+
+        Bei 250 % ragte es 73 px aus der Flaeche, „+“ und „⤢“ fehlten. Jetzt
+        wird erst der Regler kuerzer, dann faellt das Wort „Zoom“ weg, zuletzt
+        der Regler ganz, ganz zuletzt die Prozentanzeige. −, + und ⤢ bleiben
+        immer (Ziel am Finger 44 px)."""
+        titel = getattr(self, "_zoom_titel", None)
+        sl = self._zoom_slider
+        lay = self._zoom_overlay.layout()
+        if titel is None or lay is None:
+            return
+        m = lay.contentsMargins()
+        sp = lay.spacing()
+        feste = [self._btn_zoom_out, self._btn_zoom_in, self._btn_fit]
+        knoepfe = (m.left() + m.right()
+                   + sum(max(w.sizeHint().width(), w.minimumWidth()) for w in feste)
+                   + sp * (len(feste) - 1))
+        prozent_b = max(self._lbl_zoom.sizeHint().width(), 44) + sp
+        self._lbl_zoom.setVisible(platz >= knoepfe + prozent_b)
+        basis = knoepfe + prozent_b + sp
+        titel_b = titel.sizeHint().width() + sp
+        frei = platz - basis
+        if frei >= ZOOM_REGLER_BREITE + titel_b:
+            titel.setVisible(True)
+            sl.setVisible(True)
+            sl.setFixedWidth(ZOOM_REGLER_BREITE)
+        elif frei >= ZOOM_REGLER_MIN + titel_b:
+            titel.setVisible(True)
+            sl.setVisible(True)
+            sl.setFixedWidth(frei - titel_b)
+        elif frei >= ZOOM_REGLER_MIN:
+            titel.setVisible(False)
+            sl.setVisible(True)
+            sl.setFixedWidth(min(ZOOM_REGLER_BREITE, frei))
+        else:
+            titel.setVisible(False)
+            sl.setVisible(False)
+
+    def _spalten_anwenden(self) -> None:
+        """UI-122 (D-08): Schalter -> Sichtbarkeit von Spalten und Minimap."""
+        self._left_panel.setVisible(self._btn_spalte_links.isChecked())
+        self._right_panel.setVisible(self._btn_spalte_rechts.isChecked())
+        self._minimap.setVisible(self._btn_minimap.isChecked())
+
+    def _on_spalten_schalter(self, _checked: bool = False) -> None:
+        self._spalten_anwenden()
+        _save_prefs({SPALTEN_PREF: {
+            "links": self._btn_spalte_links.isChecked(),
+            "rechts": self._btn_spalte_rechts.isChecked(),
+            "minimap": self._btn_minimap.isChecked(),
+        }})
+        QTimer.singleShot(0, self._position_minimap)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

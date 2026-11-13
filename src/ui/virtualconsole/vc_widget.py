@@ -239,6 +239,26 @@ class VCWidget(QFrame):
         ein FLASH beliebig lange gehalten werden koennen (Live-Sicherheit)."""
         return bool(self._edit_mode)
 
+    def finger_bedienelement(self) -> bool:
+        """UI-118 (Touch-Audit B-02): ist das ein Bedienelement (Fader, Knopf,
+        Pad …), auf dem ein Finger die VC-Flaeche nicht per Zwei-Finger-
+        Bildlauf verschieben darf (``ziehen_scrollen``)? Ja, wenn die Klasse
+        die Maus selbst auswertet; Kaesten und reine Anzeigen nicht."""
+        for k in type(self).__mro__:
+            if k is VCWidget:
+                return False
+            if any(n in k.__dict__ for n in
+                   ("mousePressEvent", "mouseMoveEvent", "mouseReleaseEvent")):
+                return True
+        return False
+
+    def mehr_finger_erlaubt(self) -> bool:
+        """UI-118: darf ein weiterer Finger (neben dem, aus dem Qt die Maus
+        macht) dieses Element bedienen — zwei Fader gleichzeitig, zwei FLASH
+        halten? Nur im Spielbetrieb; die Touch-Sperre prueft das Widget selbst
+        (es bekommt die Ereignisse wie von der Maus)."""
+        return (not self._edit_mode) and self.finger_bedienelement()
+
     def contextMenuEvent(self, event):
         """Kontextmenue-Ereignis (am Finger: langes Druecken, UI-114). Die Maus
         oeffnet das Menue schon beim Rechts-Druck (``mousePressEvent``, der
