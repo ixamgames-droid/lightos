@@ -44,7 +44,8 @@ steht in [Szenen, Snaps & Cue-Listen](../anleitung_szenen_cues/ANLEITUNG.md).
 ![Programmer ohne Auswahl](img/01_ueberblick.png)
 
 Oben in der Sektionsleiste auf **Programmer** klicken, dann auf den Reiter
-**Attribute**. Das Fenster hat drei Spalten:
+**Attribute**. Links liegen die Listen, in der Mitte die Reiter, rechts die
+Bibliothek. Die Nummern gehören zu den Markierungen im Bild:
 
 1. **Geräte**: alle gepatchten Geräte, `[001] PAR 1` usw.
 2. **Alle**: wählt alle Geräte der Liste aus.
@@ -62,6 +63,9 @@ Darüber liegt die Werkzeugleiste mit **Hervorheben**, **Abdunkeln**, **Löschen
 schaltet **Layout: Zonen** auf das klassische Layout um (dann heißt der Knopf
 **Layout: Klassisch**). Mit **?** startest du den Hilfe-Modus: Der nächste Klick auf
 einen Knopf zeigt dessen Erklärung, statt ihn auszulösen. **Esc** beendet ihn.
+
+Am Touchscreen (Start mit `--touch`) zeigt langes Drücken auf einen Knopf ebenfalls
+die Erklärung. Welche Gesten wirken, schaltest du unter **Ansicht → Touch-Gesten…**.
 
 ## 2. Geräte wählen: Liste und Gruppen
 

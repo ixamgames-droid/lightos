@@ -1,6 +1,6 @@
 # Anleitung: Matrix-Effekte (Feuer · Regen · Radar · Spirale · Wisch · Welle)
 
-> **Lernziel:** Die ausgefallenen **Matrix-Effekte** über die ganze Lichtreihe
+> **Was du danach kannst:** Die ausgefallenen **Matrix-Effekte** über die ganze Lichtreihe
 > (8 PAR + 2 Spider) einsetzen — animierte Farb-Looks, die sich übers Raster bewegen.
 >
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 3 „Matrix-Effekte"** (SCENE-Taste 3). Die Datei
@@ -66,4 +66,7 @@ unabhängig immer auf alle PAR + Spider.
   Sektion **„BPM"** (`Strg+8`). In der Top-Bar gibt es dafür ein klickbares
   **BPM**-Feld (Klick = Wert eingeben) und daneben einen separaten **TAP**-Knopf
   (4× antippen). Für taktgenaue Synchronität siehe [Speed/BPM-Anleitung](../anleitung_speed_bpm/ANLEITUNG_SPEED_BPM.md).
+- **Touch:** Am Touchscreen (Start mit `--touch`) tippst du die Effekt-Tasten an und ziehst
+  die Fader mit dem Finger. Zwei Finger waagerecht auf freier Fläche blättern die Bank;
+  die Gesten stellst du unter **Ansicht → Touch-Gesten…** ein.
 - **Reset:** „Effekt" nochmal drücken schaltet ihn aus; **Stop All** stoppt alles.

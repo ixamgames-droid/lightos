@@ -61,6 +61,7 @@ class VCEncoder(VCWidget):
         self._drag_y: int | None = None
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#58a6ff")
+        self._live_stern_rect = None   # UI-129
         self.resize(96, 110)
 
     # ── Dispatcher-Anbindung (gemeinsam mit VC/MIDI) ──────────────────────────
@@ -318,7 +319,52 @@ class VCEncoder(VCWidget):
         # MIDI-Indikator
         if self.midi_cc >= 0:
             p.fillRect(self.width() - 8, 0, 8, 8, QColor("#00aaff"))
+
+        # UI-129: Sternchen oben links (bzw. darunter, wenn die Beschriftung bis
+        # in die Ecke reicht), wenn der fest gebundene Effekt live bearbeitet ist.
+        self._live_stern_rect = None
+        if self.live_stern_sichtbar():
+            from src.ui.widgets.live_stern import (STERN_D, waehle_stern_rect,
+                                                   zeichne_live_stern)
+            d = STERN_D
+            p.setFont(QFont("Segoe UI", 8))
+            cap_bb = (p.boundingRect(QRect(0, 2, self.width(), 14),
+                                     Qt.AlignmentFlag.AlignCenter, self.caption)
+                      if self.caption else None)
+            self._live_stern_rect = waehle_stern_rect(
+                [QRect(2, 2, d, d), QRect(2, 17, d, d)], [cap_bb])
+            zeichne_live_stern(p, self._live_stern_rect)
         p.end()
+
+    # ── UI-129: Sternchen „Effekt live bearbeitet" ───────────────────────────
+    def live_stern_fid(self):
+        """Die EINE fest gebundene Funktion dieses Encoders — oder None
+        (Edit-Slot/aktiver Effekt = „aktuelles Ziel", mehrere = Gruppe)."""
+        ids = []
+        if self.function_id is not None:
+            ids.append(int(self.function_id))
+        for i in self.function_ids:
+            try:
+                iv = int(i)
+            except (TypeError, ValueError):
+                continue
+            if iv not in ids:
+                ids.append(iv)
+        return ids[0] if len(ids) == 1 else None
+
+    def live_stern_sichtbar(self) -> bool:
+        from src.ui.widgets.live_stern import ist_live_editiert_fid
+        return ist_live_editiert_fid(self.live_stern_fid())
+
+    def event(self, e):
+        # UI-129: Tooltip-Zusatz „live bearbeitet", solange das Sternchen steht.
+        try:
+            from src.ui.widgets.live_stern import zeige_live_stern_tooltip
+            if zeige_live_stern_tooltip(self, e):
+                return True
+        except Exception:
+            pass
+        return super().event(e)
 
     # ── Properties ─────────────────────────────────────────────────────────────
 

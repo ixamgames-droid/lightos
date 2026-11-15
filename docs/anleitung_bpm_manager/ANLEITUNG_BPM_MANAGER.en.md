@@ -7,6 +7,9 @@
 > **beats** that all tempo-coupled effects run on: Matrix, EFX, Chaser, sequences, Virtual
 > Console.
 >
+> **What you will be able to do afterwards:** choose a tempo source, see from the level and
+> the status line whether detection works, and correct the tempo by hand.
+>
 > **Opening it:** click **BPM** in the section bar or press **Strg+8** (Strg = Ctrl). The
 > section has three sub-tabs: **Erkennung · Tempo-Buses · Generator** (detection · tempo
 > buses · generator). This guide mainly explains **Erkennung**; the other two are covered
