@@ -429,7 +429,9 @@ class Bildschirmtastatur(_PopupBasis):
     def _beschriften(self) -> None:
         for t in self._buchstaben:
             z = t.property("zeichen") if self._zeichen else t.property("klein")
-            t.setText(z.upper() if (self._gross and not self._zeichen) else z)
+            g = z.upper() if (self._gross and not self._zeichen) else z
+            # QA-121: 'ß'.upper() == 'SS' (zwei Zeichen) -> Taste bleibt 'ß'.
+            t.setText(g if len(g) == 1 else z)
 
     # Eingabe
     def tippe(self, text: str) -> None:
