@@ -323,7 +323,13 @@ class VCXYPad(VCWidget):
                 self._merke_geo(self._path_vorher, fn)
             pfad = EfxPath("VC-Pfad", pts, mode="linear", closed=False)
             self._path_vorher["eigener_pfad"] = pfad.id
-            fn.set_custom_path(pfad)
+            # Ueber das Live-Tracking: die Sitzungs-Baseline muss den Stand VOR
+            # dem Pfad halten — sonst speicherte die Show nach „Pfad löschen"
+            # den VC-Pfad und das UI-129-Sternchen bliebe stehen.
+            def _setze_pfad():
+                fn.set_custom_path(pfad)
+                return True
+            effect_live._apply_live_mutation(fn, _setze_pfad)
             # Pfad fuellt das ganze Feld -> direkte Pan/Tilt-Bahn.
             effect_live.set_param("x_offset", 128.0, self.efx_function_id)
             effect_live.set_param("y_offset", 128.0, self.efx_function_id)

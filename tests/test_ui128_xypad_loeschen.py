@@ -323,3 +323,30 @@ def test_geloeschter_bereich_bleibt_geloescht(efx):
     q = VCXYPad("y")
     q.apply_dict(d)
     assert q._area is None
+
+
+# ── Pruefung: Freigabe hinterlaesst exakt den gespeicherten Stand ───────────
+
+def _stand(d):
+    return json.dumps(d, sort_keys=True, default=str)
+
+
+@pytest.mark.parametrize("mode", ["area", "path"])
+def test_loeschen_hinterlaesst_gespeicherten_stand_und_kein_live_edit(efx, mode):
+    """Nach dem Loeschen muss ein Show-Save den Stand von VOR dem Pad schreiben
+    und der EFX gilt nicht mehr als live bearbeitet (UI-129-Sternchen weg).
+    Frueher setzte der Pfad-Modus den Custom-Pfad am Live-Tracking vorbei —
+    die Sitzungs-Baseline enthielt dann schon den VC-Pfad."""
+    from src.core.engine import effect_live
+    vorher = _stand(efx.to_dict())
+    p = _pad(efx, mode=mode)
+    if mode == "area":
+        _bereich_aufziehen(p)
+    else:
+        _zug(p, _pt(p, 0.2, 0.2), _pt(p, 0.8, 0.8))
+    assert effect_live.ist_live_editiert(efx.id)
+    assert _stand(effect_live.serialization_dict(efx)) == vorher
+    _klick(p, p._loesch_knopf_rect().center())
+    assert _stand(efx.to_dict()) == vorher
+    assert _stand(effect_live.serialization_dict(efx)) == vorher
+    assert not effect_live.ist_live_editiert(efx.id)
