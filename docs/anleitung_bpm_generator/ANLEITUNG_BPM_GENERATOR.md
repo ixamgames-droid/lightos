@@ -10,6 +10,9 @@
 > Funktionen: Analyse-Engines, Beatgrid-**Editor**, **Wellenform**, **Metronom-Vorhören**,
 > **Auto-Genre/Taktart**, **Songstruktur-Marker**, **Cache** und **Ordner-Stapelanalyse**.
 > Die Grundlagen der BPM-Quellen stehen in der [BPM-Manager-Anleitung](../anleitung_bpm_manager/ANLEITUNG_BPM_MANAGER.md).
+>
+> **Was du danach kannst:** ein Lied analysieren, das Beatgrid prüfen und korrigieren und
+> das Lied als Tempo-Quelle für deine Lichter nutzen.
 
 Stand: 2026-06-21. Verifiziert gegen die laufende App und den Quellcode
 (`src/ui/views/bpm_generator_view.py`, `src/core/audio/{offline_timeline,analysis_engines,genre_presets,bpm_cache,music_show}.py`).
@@ -112,7 +115,7 @@ Struktur) als Datei.
 
 ## 6. Schneller arbeiten: Cache & Stapelanalyse
 
-* **Analyse-Cache:** Jede Analyse wird gespeichert (`%APPDATA%/LightOS/bpm_analysis_cache.json`,
+* **Analyse-Cache:** Jede Analyse wird gespeichert (Datei `bpm_analysis_cache.json` im LightOS-Datenordner; Menü **Hilfe → Datenordner öffnen**,
   je Datei + Genre/Engine/Takt). Lädst du denselben Song mit denselben Einstellungen erneut,
   ist er **sofort** da („✓ Sofort aus Cache geladen") — kein erneutes Dekodieren/Analysieren.
 * **Ordner analysieren…** (Stapelanalyse): wählt einen Ordner und analysiert **alle Songs**

@@ -6,6 +6,9 @@ Die **Virtuelle Konsole (VC)** von LightOS ist eine frei gestaltbare Bedienoberf
 Du legst Tasten, Fader, Farb-Kacheln, Anzeigen usw. auf eine Fläche und steuerst damit
 deine Show — per Maus/Touch, MIDI-Controller (z. B. APC mini) oder Tastatur.
 
+**Was du danach kannst:** für jedes Bedien-Element nachschlagen, was es tut, wie du es
+einstellst und wie du es im Betrieb bedienst.
+
 Diese Referenz beschreibt **jedes Bedien-Element einzeln**: wozu es da ist, wie es im
 Betrieb aussieht, **welcher Knopf was macht** und welche Einstellungen es hat — jeweils mit
 echten Screenshots aus der App.
@@ -26,7 +29,8 @@ Modi um:
 
 - **Bearbeiten ✓** — Elemente **anlegen, verschieben, skalieren, einstellen**. Es
   erscheinen zusätzliche Toolbar-Knöpfe: **ein Knopf je Widget-Typ** (16 Stück),
-  **⊞ Raster**, **Undo/Redo** (`↶ ↷`), **Alle löschen** und **⚙ Inspector**.
+  **⊞ Raster**, **Undo/Redo** (`↶ ↷`), **Ausrichten ▾** (für mehrere gewählte Elemente), am
+  Touchscreen **Mehrfach**, **Alle löschen** und **⚙ Inspector**.
 
   ![Werkzeugleiste im Bearbeiten-Modus](img/toolbar_bearbeiten_modus.png)
 
@@ -103,7 +107,7 @@ Antippen) — **MIDI/APC steuert weiter**.
 
 | Thema | Kurz | Seite |
 |---|---|---|
-| **Smart-Drop & Baukasten** | Effekt einrichten, Widget-Galerie, Konflikt-Karte, Controller-/Color-Chase-Blöcke | [21_baukasten.md](21_baukasten.md) |
+| **Smart-Drop & Baukasten** | Effekt einrichten, Widget-Galerie, Konflikt-Karte (die früheren Baukasten-Blöcke sind entfallen) | [21_baukasten.md](21_baukasten.md) |
 
 ---
 

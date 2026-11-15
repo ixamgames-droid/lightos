@@ -5,6 +5,9 @@
 > Zelle). Sie schreibt nur **Farbe** (kombinierbar mit einer Dimmer-Matrix als Helligkeits-Ebene).
 > Für den konkreten *Blau-Weiß-Chase* siehe die Anleitung **Farbchase** — hier das allgemeine Prinzip.
 
+> **Was du danach kannst:** eine Farb-Matrix für eine Gruppe anlegen, speichern und starten
+> und dafür sorgen, dass die Geräte auch wirklich leuchten.
+
 > **Wichtig – Helligkeit:** Eine **neu angelegte** Farb-Matrix schreibt nur R/G/B(/W) und
 > lässt den **Dimmer-Kanal** in Ruhe. Geräte mit eigenem Dimmer, der standardmäßig auf 0 steht (z. B.
 > Generic „LED PAR Dimmer+RGB 4ch"), bleiben deshalb **dunkel**, bis etwas den Dimmer öffnet:
@@ -17,14 +20,14 @@
 
 ## 1. Anlegen
 
-Erst die **Gruppe** in der Gruppen-Liste wählen (z. B. *Farb-Matrix (10)* = alle PAR + Spider),
-dann Programmer → Tab **Matrix** → **+ Neu** → in **Grundeinstellungen**:
-
-- **Stil: RGB** (reine Farbe) oder **RGBW** (mit Weiß-Kanal — z. B. Spider/RGBW-PAR).
-- **Algorithmus** wählen (siehe unten).
-- **💾 Speichern**, dann in der Liste links **▶ Start**. Gestartet wird immer die
-  **gespeicherte** Fassung — ungespeicherte Änderungen (Hinweis „● ungespeicherte Änderungen")
-  wirken nicht auf den laufenden Effekt.
+1. In der Gruppen-Liste die **Gruppe** wählen (z. B. *Farb-Matrix (10)* = alle PAR + Spider).
+2. Im Programmer den Reiter **Matrix** öffnen und **+ Neu** drücken.
+3. In **Grundeinstellungen** den **Stil** wählen: **RGB** (reine Farbe) oder **RGBW**
+   (mit Weiß-Kanal — z. B. Spider/RGBW-PAR).
+4. Den **Algorithmus** wählen (siehe unten).
+5. **💾 Speichern** drücken, dann in der Liste links **▶ Start**. Gestartet wird immer die
+   **gespeicherte** Fassung — ungespeicherte Änderungen (Hinweis „● ungespeicherte Änderungen")
+   wirken nicht auf den laufenden Effekt.
 
 **Spalten/Zeilen** stellst du nicht von Hand ein: die **neue Matrix nimmt das Raster der
 Programmer-Auswahl** — bei einer Gruppe deren Raster (auch 2D), bei loser Auswahl eine Zeile mit

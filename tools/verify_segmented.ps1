@@ -166,6 +166,9 @@ $py = $pyCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 # nicht als Kopie hier - Pendant zu tools/_gate_webengine.sh, das aus
 # demselben Grund geteilt wird (XPLAT-11 war die Drift zweier Runner).
 . (Join-Path $PSScriptRoot "_gate_webengine.ps1")
+# XPLAT-29 (b): jedes Segment in einem eigenen Job-Objekt (KILL_ON_JOB_CLOSE).
+# Begruendung und Grenzen im Kopf von tools/_gate_job.ps1.
+. (Join-Path $PSScriptRoot "_gate_job.ps1")
 if (-not $py) {
     Write-Host "[seg] FEHLER: venv-Python nicht gefunden. Geprueft:`n  $($pyCandidates -join "`n  ")"
     exit 2
@@ -223,10 +226,13 @@ else {
 # daneben waere NICHT ignoriert und landete als unversionierter Muell im
 # `git status` eines oeffentlichen Repos.
 #
-# Waisen werden BENANNT, nicht beendet. Sie wirklich zu toeten ist XPLAT-29(b)
-# und liegt bei Robin - es hiesse, dass ein Absturz des Hauptprozesses den
-# DMX-Worker mitreisst. Ausserdem haelt die laufende App des Menschen selbst
-# Chromium-Kinder ("Die laufende App gehoert dem Menschen", COORDINATION.md).
+# Waisen werden hier BENANNT, nicht beendet: was jetzt noch eine Datei haelt,
+# hat DIESER Lauf nicht gestartet. Die eigenen Kinder eines Laufs raeumt seit
+# XPLAT-29 (b) dessen Job-Objekt ab (tools/_gate_job.ps1) - beim Segmentende
+# und, wenn der Runner abbricht, durch Windows. Alles andere bleibt unberuehrt:
+# ein Lauf ohne Job-Objekt (alter Stand, direktes pytest), ein zweites Gate,
+# und die laufende App des Menschen, die selbst Chromium-Kinder haelt ("Die
+# laufende App gehoert dem Menschen", COORDINATION.md).
 function Nenne-Waisen {
     $gefunden = @()
     foreach ($name in @("python", "pythonw", "QtWebEngineProcess")) {
@@ -250,7 +256,7 @@ function Nenne-Waisen {
         Write-Host "[seg]        Diese Prozesse laufen noch und koennen Dateien halten:" -ForegroundColor DarkYellow
         $gefunden | ForEach-Object { Write-Host $_ -ForegroundColor DarkYellow }
     }
-    Write-Host "[seg]        Es wurde NICHTS beendet (XPLAT-29(b) liegt bei Robin)." -ForegroundColor DarkYellow
+    Write-Host "[seg]        Es wurde NICHTS beendet - fremde Prozesse fasst der Runner nie an (XPLAT-29)." -ForegroundColor DarkYellow
 }
 
 function Initialize-Ausgabeverzeichnis($pfad) {
@@ -384,19 +390,37 @@ $script:ergebnisSchreibfehler = 0
 function Start-Segment([string]$rel, [bool]$istWeb) {
     $log = Get-LogPfad $rel
     $err = $log + ".err"
-    $p = Start-Process -FilePath $py `
-        -ArgumentList @('-m', 'pytest', $rel, '-q', '--tb=short', '-rf', '-p', 'no:cacheprovider') `
-        -WorkingDirectory $repo -NoNewWindow -PassThru `
-        -RedirectStandardOutput $log -RedirectStandardError $err
-    # ⚠️ PS-5.1-Quirk: ohne einmal gelesenes (und damit gecachtes) Handle liefert
-    # $p.ExitCode nach Prozessende dauerhaft $null -> ALLES wuerde als FAIL
-    # klassifiziert. Real passiert beim ersten Gate-Lauf am 2026-07-19:
-    # 440/440 falsch-FAIL. Diese Zeile ist der Fix, nicht Kosmetik.
-    $null = $p.Handle
+    $argumente = @('-m', 'pytest', $rel, '-q', '--tb=short', '-rf', '-p', 'no:cacheprovider')
+    # XPLAT-29 (b): angehalten starten, in den Job haengen, dann loslassen
+    # (tools/_gate_job.ps1 - cached das Handle selbst, s. Quirk unten). Geht
+    # das nicht, startet das Segment wie bisher, nur ohne Aufraeumen.
+    $start = Start-ImJob -Datei $py -Argumente $argumente -Ordner $repo -Ausgabe $log -Fehler $err
+    if ($start) {
+        $p = $start.Proc; $job = $start.Job
+    }
+    else {
+        $p = Start-Process -FilePath $py -ArgumentList $argumente `
+            -WorkingDirectory $repo -NoNewWindow -PassThru `
+            -RedirectStandardOutput $log -RedirectStandardError $err
+        # ⚠️ PS-5.1-Quirk: ohne einmal gelesenes (und damit gecachtes) Handle liefert
+        # $p.ExitCode nach Prozessende dauerhaft $null -> ALLES wuerde als FAIL
+        # klassifiziert. Real passiert beim ersten Gate-Lauf am 2026-07-19:
+        # 440/440 falsch-FAIL. Diese Zeile ist der Fix, nicht Kosmetik.
+        $null = $p.Handle
+        $job = [IntPtr]::Zero
+    }
     [pscustomobject]@{
         Proc = $p; Rel = $rel; Log = $log; Err = $err
-        Start = Get-Date; IstWeb = $istWeb
+        Start = Get-Date; IstWeb = $istWeb; Job = $job
     }
+}
+
+# XPLAT-29 (b): Segmente, deren Job beim Schliessen noch Prozesse hatte - also
+# Kinder, die ihr pytest ueberlebt haetten. Fuer die Bilanz.
+$script:waisenBeendet = @()
+function Stop-SegmentKinder($rec) {
+    $noch = Close-SegmentJob $rec
+    if ($noch -gt 0) { $script:waisenBeendet += ("{0} ({1})" -f $rec.Rel, $noch) }
 }
 
 function Merge-SegmentLog($rec) {
@@ -500,95 +524,109 @@ function Complete-Segment($rec, [int]$rc, [string]$art) {
     }
 }
 
-while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
+# XPLAT-29 (b): try/finally, damit ein ABGEBROCHENER Lauf nichts stehen laesst.
+# Stirbt der Runner-Prozess, schliesst Windows die Job-Handles selbst. Laeuft
+# das Skript aber im Prozess einer offenen Konsole und der Mensch drueckt
+# Strg+C, lebt der Prozess weiter - und mit ihm die Handles, die laufenden
+# Segmente samt Kindern und die WebEngine-Sperre, auf die der naechste Lauf
+# dann bis zu 900 s wartet.
+try {
+    while ($restQueue.Count -or $webQueue.Count -or $laufend.Count) {
 
-    # XPLAT-23: die schmale Sperre nur so lange halten, wie wirklich ein
-    # WebEngine-Segment laeuft. Ein Punkt, beide Enden - egal ob das Segment
-    # normal endete oder ins Zeitlimit lief.
-    if (-not ($laufend | Where-Object { $_.IstWeb })) { Exit-WebEngineSperre }
+        # XPLAT-23: die schmale Sperre nur so lange halten, wie wirklich ein
+        # WebEngine-Segment laeuft. Ein Punkt, beide Enden - egal ob das Segment
+        # normal endete oder ins Zeitlimit lief.
+        if (-not ($laufend | Where-Object { $_.IstWeb })) { Exit-WebEngineSperre }
 
-    # WebEngine-Spur: genau EIN Prozess gleichzeitig - im Lauf ueber diese
-    # Bedingung, RECHNERWEIT ueber die Sperre aus _gate_webengine.ps1.
-    if ($webQueue.Count -and -not ($laufend | Where-Object { $_.IstWeb })) {
-        $null = Enter-WebEngineSperre
-        if (-not (Wait-FreieGpu)) { $script:gpuDeckelTreffer += $webQueue.Peek() }
-        $script:letzterWebStart = Get-Date   # Bezugspunkt fuer das naechste Warten
-        $null = $laufend.Add((Start-Segment $webQueue.Dequeue() $true))
-    }
-
-    # Schnelle Spur bis zum Job-Limit auffuellen.
-    while ($restQueue.Count -and (@($laufend | Where-Object { -not $_.IstWeb }).Count -lt $Jobs)) {
-        $null = $laufend.Add((Start-Segment $restQueue.Dequeue() $false))
-    }
-
-    Start-Sleep -Milliseconds 120
-
-    foreach ($rec in @($laufend)) {
-        if ($rec.Proc.HasExited) {
-            $rec.Proc.WaitForExit()      # argloser Flush -> finaler ExitCode
-            $rc = $rec.Proc.ExitCode
-            Merge-SegmentLog $rec        # VOR der Einstufung (s. Test-NativerAbbau)
-            if ($null -eq $rc) {
-                # Sollte mit gecachtem Handle nie passieren - falls doch:
-                # Umgebungs-Flakiness melden statt Phantom-FAILs zu erzeugen.
-                Complete-Segment $rec -1 "crash"
-            }
-            elseif ($rc -eq 0) { Complete-Segment $rec 0 "ok" }
-            # Crash-Familie konsistent (uebernommen aus run_tests.ps1): Unix
-            # 128+Signal ODER Windows-NTSTATUS (0x8000xxxx/0xC000xxxx erscheinen
-            # als grosse NEGATIVE Codes). Frueher zaehlten nur 139/-1073741819 ->
-            # dieselbe QtWebEngine-Instabilitaet kippte das Gate mal so, mal so.
-            elseif (($rc -ge 129 -and $rc -le 192) -or $rc -lt -100000000) {
-                Complete-Segment $rec $rc "crash"
-            }
-            # Derselbe native Abbau, aber von pytest als `exit 3` (internal error)
-            # gemeldet statt als NTSTATUS. Nur wenn KEIN Test fehlschlug.
-            elseif (Test-NativerAbbau $rec.Log) {
-                Complete-Segment $rec $rc "crash"
-            }
-            else { Complete-Segment $rec $rc "fail" }
-            $laufend.Remove($rec)
+        # WebEngine-Spur: genau EIN Prozess gleichzeitig - im Lauf ueber diese
+        # Bedingung, RECHNERWEIT ueber die Sperre aus _gate_webengine.ps1.
+        if ($webQueue.Count -and -not ($laufend | Where-Object { $_.IstWeb })) {
+            $null = Enter-WebEngineSperre
+            if (-not (Wait-FreieGpu)) { $script:gpuDeckelTreffer += $webQueue.Peek() }
+            $script:letzterWebStart = Get-Date   # Bezugspunkt fuer das naechste Warten
+            $null = $laufend.Add((Start-Segment $webQueue.Dequeue() $true))
         }
-        elseif (((Get-Date) - $rec.Start).TotalSeconds -gt $TimeoutSec) {
-            # Prozessbaum beenden - pytest kann Qt-/WebEngine-Kinder haben.
-            #
-            # ★ XPLAT-27: `$ErrorActionPreference` MUSS hier lokal auf 'Continue'.
-            # `taskkill` schreibt auf stderr, sobald ein Kind nicht beendet werden
-            # kann ("FEHLER: Der Prozess mit PID <n> (untergeordnetem Prozess von
-            # PID <m>) konnte nicht beendet werden") - und genau das ist bei einem
-            # haengenden Qt-/WebEngine-Segment der Normalfall, nicht die Ausnahme.
-            # PowerShell 5.1 wertet native stderr-Zeilen unter 'Stop' als
-            # TERMINIERENDEN NativeCommandError; `2>$null` unterdrueckt nur die
-            # Anzeige, nicht den ErrorRecord. Der ganze Gate-Lauf brach damit an
-            # dieser Zeile ab, statt das eine Segment als "zeit" zu zaehlen und
-            # weiterzumachen.
-            #
-            # Gemessen am 01.09.2026 auf `main`: der Lauf endete nach 404 von 646
-            # Segmenten mit Exit 1. Das sah aus wie ein rotes Gate und war ein
-            # abgebrochenes - der Unterschied ist erheblich, denn 242 Dateien
-            # waren schlicht nicht gefahren, und die Bilanz darunter zaehlt nur,
-            # was sie gesehen hat.
-            #
-            # Dieselbe Falle ist in `verify_loop.ps1` (beim `& powershell`-Aufruf
-            # des Lock-Runners) laengst benannt und genauso geloest; hier fehlte
-            # sie noch. Der Timeout selbst ist die Aussage - ob `taskkill` jedes
-            # Kind erwischt, aendert daran nichts.
-            $prevEAP = $ErrorActionPreference
-            $ErrorActionPreference = "Continue"
-            try {
-                & taskkill /PID $rec.Proc.Id /T /F 2>$null | Out-Null
+
+        # Schnelle Spur bis zum Job-Limit auffuellen.
+        while ($restQueue.Count -and (@($laufend | Where-Object { -not $_.IstWeb }).Count -lt $Jobs)) {
+            $null = $laufend.Add((Start-Segment $restQueue.Dequeue() $false))
+        }
+
+        Start-Sleep -Milliseconds 120
+
+        foreach ($rec in @($laufend)) {
+            if ($rec.Proc.HasExited) {
+                $rec.Proc.WaitForExit()      # argloser Flush -> finaler ExitCode
+                Stop-SegmentKinder $rec      # XPLAT-29 (b): Waisen des Segments beenden
+                $rc = $rec.Proc.ExitCode
+                Merge-SegmentLog $rec        # VOR der Einstufung (s. Test-NativerAbbau)
+                if ($null -eq $rc) {
+                    # Sollte mit gecachtem Handle nie passieren - falls doch:
+                    # Umgebungs-Flakiness melden statt Phantom-FAILs zu erzeugen.
+                    Complete-Segment $rec -1 "crash"
+                }
+                elseif ($rc -eq 0) { Complete-Segment $rec 0 "ok" }
+                # Crash-Familie konsistent (uebernommen aus run_tests.ps1): Unix
+                # 128+Signal ODER Windows-NTSTATUS (0x8000xxxx/0xC000xxxx erscheinen
+                # als grosse NEGATIVE Codes). Frueher zaehlten nur 139/-1073741819 ->
+                # dieselbe QtWebEngine-Instabilitaet kippte das Gate mal so, mal so.
+                elseif (($rc -ge 129 -and $rc -le 192) -or $rc -lt -100000000) {
+                    Complete-Segment $rec $rc "crash"
+                }
+                # Derselbe native Abbau, aber von pytest als `exit 3` (internal error)
+                # gemeldet statt als NTSTATUS. Nur wenn KEIN Test fehlschlug.
+                elseif (Test-NativerAbbau $rec.Log) {
+                    Complete-Segment $rec $rc "crash"
+                }
+                else { Complete-Segment $rec $rc "fail" }
+                $laufend.Remove($rec)
             }
-            finally { $ErrorActionPreference = $prevEAP }
-            Start-Sleep -Milliseconds 300     # taskkill nachlaufen lassen, dann Log lesbar
-            Merge-SegmentLog $rec
-            if (Test-ZeitToleranzGedeckt $rec.Rel) { Complete-Segment $rec 124 "zeit" }
-            else { Complete-Segment $rec 124 "zeit-rot" }
-            $laufend.Remove($rec)
+            elseif (((Get-Date) - $rec.Start).TotalSeconds -gt $TimeoutSec) {
+                # Prozessbaum beenden - pytest kann Qt-/WebEngine-Kinder haben.
+                #
+                # ★ XPLAT-27: `$ErrorActionPreference` MUSS hier lokal auf 'Continue'.
+                # `taskkill` schreibt auf stderr, sobald ein Kind nicht beendet werden
+                # kann ("FEHLER: Der Prozess mit PID <n> (untergeordnetem Prozess von
+                # PID <m>) konnte nicht beendet werden") - und genau das ist bei einem
+                # haengenden Qt-/WebEngine-Segment der Normalfall, nicht die Ausnahme.
+                # PowerShell 5.1 wertet native stderr-Zeilen unter 'Stop' als
+                # TERMINIERENDEN NativeCommandError; `2>$null` unterdrueckt nur die
+                # Anzeige, nicht den ErrorRecord. Der ganze Gate-Lauf brach damit an
+                # dieser Zeile ab, statt das eine Segment als "zeit" zu zaehlen und
+                # weiterzumachen.
+                #
+                # Gemessen am 01.09.2026 auf `main`: der Lauf endete nach 404 von 646
+                # Segmenten mit Exit 1. Das sah aus wie ein rotes Gate und war ein
+                # abgebrochenes - der Unterschied ist erheblich, denn 242 Dateien
+                # waren schlicht nicht gefahren, und die Bilanz darunter zaehlt nur,
+                # was sie gesehen hat.
+                #
+                # Dieselbe Falle ist in `verify_loop.ps1` (beim `& powershell`-Aufruf
+                # des Lock-Runners) laengst benannt und genauso geloest; hier fehlte
+                # sie noch. Der Timeout selbst ist die Aussage - ob `taskkill` jedes
+                # Kind erwischt, aendert daran nichts.
+                $prevEAP = $ErrorActionPreference
+                $ErrorActionPreference = "Continue"
+                try {
+                    & taskkill /PID $rec.Proc.Id /T /F 2>$null | Out-Null
+                }
+                finally { $ErrorActionPreference = $prevEAP }
+                # XPLAT-29 (b): was taskkill nicht erwischt hat (Kinder, deren
+                # Elternprozess schon weg ist), beendet der Job.
+                Stop-SegmentKinder $rec
+                Start-Sleep -Milliseconds 300     # taskkill nachlaufen lassen, dann Log lesbar
+                Merge-SegmentLog $rec
+                if (Test-ZeitToleranzGedeckt $rec.Rel) { Complete-Segment $rec 124 "zeit" }
+                else { Complete-Segment $rec 124 "zeit-rot" }
+                $laufend.Remove($rec)
+            }
         }
     }
 }
-
-Exit-WebEngineSperre        # XPLAT-23: nicht ueber die Bilanz hinaus halten
+finally {
+    foreach ($rec in @($laufend)) { $null = Close-SegmentJob $rec }
+    Exit-WebEngineSperre    # XPLAT-23: nicht ueber die Bilanz hinaus halten
+}
 
 # ── Bilanz ──────────────────────────────────────────────────────────────────
 Write-Host ""
@@ -600,6 +638,16 @@ if ($script:gpuDeckelTreffer.Count) {
     Write-Host ("[seg] HINWEIS (XPLAT-17): {0} WebEngine-Segmente starteten, obwohl noch" -f $script:gpuDeckelTreffer.Count) -ForegroundColor DarkYellow
     Write-Host "[seg]   Chromium-Kindprozesse liefen (3-s-Deckel erreicht)." -ForegroundColor DarkYellow
     Write-Host "[seg]   Laeuft nebenher eine LightOS-Instanz? Dann ist das erwartet." -ForegroundColor DarkYellow
+}
+# XPLAT-29 (b): nur eine Meldung, nichts davon faerbt rot. Ohne Job-Objekt
+# laeuft das Gate wie vorher - es raeumt nur nicht auf, und das soll man sehen.
+if ($script:gateJobHinweis) {
+    Write-Host ("[seg] HINWEIS (XPLAT-29): Segmente liefen ohne Job-Objekt ({0})." -f $script:gateJobHinweis) -ForegroundColor DarkYellow
+    Write-Host "[seg]   Ihre Kinder koennen als Waisen den naechsten Lauf stoeren." -ForegroundColor DarkYellow
+}
+if ($script:waisenBeendet.Count) {
+    Write-Host ("[seg] XPLAT-29: {0} Segmente hinterliessen laufende Kindprozesse - beim" -f $script:waisenBeendet.Count) -ForegroundColor DarkYellow
+    Write-Host ("[seg]   Segmentende beendet (Datei, Anzahl): {0}" -f ($script:waisenBeendet -join ", ")) -ForegroundColor DarkYellow
 }
 Write-Host ("[seg] {0}/{1} Segmente gruen, {2} Failures, {3} Crashes, {4} Timeouts." -f `
     $okCount, $files.Count, $fail.Count, $crash.Count, $timeout.Count) -ForegroundColor Cyan

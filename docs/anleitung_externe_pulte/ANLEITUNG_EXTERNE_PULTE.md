@@ -486,7 +486,9 @@ Betreibe sie nur in einem eigenen Lichtnetz, nicht im Gäste-WLAN.
   hier beschriebenen Signale so sendet, wie LightOS sie erwartet, ist offen.
 - **Rückmeldungen sind willkommen:** Wenn du einen Aufbau ausprobierst, schreib bitte ein
   Issue im Repository — mit Pult, Softwarestand, Aufbau (A, B oder C) und dem, was
-  funktioniert hat oder nicht. Das Diagnosepaket aus dem Hilfe-Menü hilft dabei.
+  funktioniert hat oder nicht. Häng das Diagnosepaket (Hilfe → Diagnosepaket speichern…)
+  nicht öffentlich an: Es enthält Logs und Systeminfos. Schick es nur auf Nachfrage direkt
+  an die LightOS-Hilfe (per E-Mail oder Messenger, wie es der Dialog beschreibt).
 
 ## Weiterlesen
 
