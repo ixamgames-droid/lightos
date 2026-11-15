@@ -9,6 +9,7 @@
 |---|---|
 | `_builder.py` | Gemeinsame Build-Boilerplate für tools/build_*.py — ersetzt das ~95% copy- |
 | `_ci_beobachtend.py` | XPLAT-41: CI-Checks, die nur beobachten — die EINE Liste fuer die Merge-Werkzeuge. |
+| `_gate_job.ps1` | tools/_gate_job.ps1 - XPLAT-29 (b): Job-Objekt je Segment im Windows-Gate. |
 | `_gate_summary.py` | XPLAT-43: maschinenlesbare Bilanz eines Segment-Gate-Laufs (summary.json). |
 | `_gate_webengine.ps1` | tools/_gate_webengine.ps1 - rechnerweite WebEngine-Absicherung des Windows-Gates. |
 | `_gate_webengine.sh` | tools/_gate_webengine.sh — gemeinsame WebEngine-Absicherung der Linux-Gate-Runner. |
@@ -85,7 +86,7 @@
 | `library_testreste.py` | Findet (und entfernt auf Wunsch) Test-Rueckstaende in der Fixture-Bibliothek. |
 | `lint_show.py` | CLI: prüft eine oder mehrere .lshow (oder show.json) gegen die echten |
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
-| `mh_einmessen.py` | VIZ-60 — Moving Heads am echten Rig einmessen, ohne KI und ohne Rechnerei. |
+| `mh_einmessen.py` | VIZ-60 (VERALTET — nimm das Einmessen in der App) — zwei Moving Heads am Rig vergleichen. |
 | `patch_quarantaene.py` | STAB-DEDUP-OPT: verwaiste Patch-Zeilen anzeigen und (nur auf Ansage) in |
 | `pr_bereit.py` | PROC-03 — ist ein offener PR wirklich pruefbar gruen, oder sieht er nur so aus? |
 | `pr_ci_status.py` | PROC-10: unterscheidet "alle Checks gruen" von "es gibt gar keine Checks". |
