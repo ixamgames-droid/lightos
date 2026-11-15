@@ -8,9 +8,15 @@ zeigte deshalb jeden Strobe ab 5 Hz als dasselbe langsame Blinken (VIZ-104).
 
     Takt / Budget    Bilder/s   UI-Thread-Anteil
     100 ms / 0,25      7,4          0,25   (bisher)
-     50 ms / 0,40     13,6          0,48   <- Strobe-Takt
+     50 ms / 0,40     13,6          0,48
      50 ms / 0,50     16,0          0,58
      33 ms / 1,00     21,3          0,76
+
+**Nach dem Bau** (68 blinkende Geraete, Strobe ~10 Hz): bisher 4,9-6,4
+Bilder/s. Mit 0,40 10-12 Bilder/s, Anteil 0,45 - nach einmal geoeffnetem
+3D-Fenster aber 0,62, weil ein Bild dann ~60 statt ~40 ms kostet und das
+Budget nur paintEvent misst. Mit 0,33 (Strobe-Takt) 8 Bilder/s, Anteil
+0,30-0,37.
 
 Vorgabe der Leitung: nur unter 0,5 und adaptiv. Deshalb gilt der schnellere
 Takt nur, solange ein Geraet sichtbar blinkt (und noch 1 s danach), und nie
@@ -21,6 +27,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest import mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -90,10 +97,34 @@ class StrobeTaktTest(unittest.TestCase):
         self.assertEqual(c._takt_ms(), c.RENDER_INTERVAL_MS)
         w.hide()
         QApplication.processEvents()
+        self.zeit[0] += c.DREID_PRUEF_S          # gemerkt, s. naechster Test
         self.assertEqual(c._takt_ms(), c.STROBE_TAKT_MS)
 
+    def test_3d_fenster_wird_nicht_je_geraet_gesucht(self):
+        """Nachmessung in der echten App (15.11., 68 blinkende Geraete): je
+        Geraet und Bild fragte ``_blink_an`` -> ``_strobe_bildrate`` ->
+        ``_takt_ms``/``_ui_anteil`` nach dem 3D-Fenster, und jede Frage lief
+        ueber alle Top-Level-Fenster. Ein Bild kostete so 70-95 statt ~40 ms,
+        und die 2D-Ansicht zeichnete WENIGER Bilder als ohne UI-130."""
+        c = self.c
+        n = [0]
+        echt = QApplication.topLevelWidgets
+
+        def zaehlen():
+            n[0] += 1
+            return echt()
+
+        with mock.patch.object(QApplication, "topLevelWidgets", side_effect=zaehlen):
+            for _ in range(68):                  # ein Bild, 68 blinkende Geraete
+                self._blinkt()
+                c._strobe_bildrate()
+            self.assertLessEqual(n[0], 1, f"{n[0]} Suchen in einem Bild")
+            self.zeit[0] += c.DREID_PRUEF_S
+            c._takt_ms()
+            self.assertEqual(n[0], 2, "nach DREID_PRUEF_S wird wieder gesucht")
+
     def test_budget_haelt_den_anteil_unter_der_vorgabe(self):
-        """Bei 34 ms je Bild (gemessen, 250 %): Abstand = 34 / 0,40 = 85 ms."""
+        """Bei 34 ms je Bild (gemessen, 250 %): Abstand = 34 / 0,33 = 103 ms."""
         c = self.c
         c._zeichenzeiten.extend([0.034] * 5)
         self._blinkt()

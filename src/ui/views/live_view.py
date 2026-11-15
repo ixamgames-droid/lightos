@@ -1416,20 +1416,37 @@ class StageCanvas(QWidget):
     # Bei 7-8 Bildern/s (Takt 100 ms + Budget 0,25, gemessen 250 %, 80 Geraete,
     # ~34 ms je Bild) zeigte die 2D-Ansicht jeden Strobe ab 5 Hz als dasselbe
     # langsame Blinken (~2-2,5 Blitze/s, VIZ-104). Solange ein Geraet sichtbar
-    # blinkt, gelten deshalb STROBE_TAKT_MS und STROBE_UI_ANTEIL - gemessen in
-    # der echten App: 13,6 Bilder/s bei UI-Thread-Anteil 0,48 (50 ms / 0,25:
-    # 7,4 Bilder/s, 0,25; 50 ms / 0,5 schon 0,58). Bedienung kaum langsamer
-    # (Verzug p95 29 -> 32 ms). NICHT bei sichtbarem 3D-Fenster: das setzt sein
-    # Bild im selben UI-Thread zusammen (VIZ-70) und zeigt den Strobe selbst.
+    # blinkt, gelten deshalb STROBE_TAKT_MS und STROBE_UI_ANTEIL. Ein Drittel,
+    # nicht mehr: das Budget misst nur paintEvent, ein volles Bild samt Ausgabe
+    # ans Fenster kostet mehr - nach einmal geoeffnetem 3D-Fenster ~60 statt
+    # ~40 ms. Gemessen in der echten App (68 blinkende Geraete): 0,40 ergab
+    # 10-12 Bilder/s, aber nach dem 3D-Fenster einen Anteil von 0,62; 0,33
+    # ergibt 8 Bilder/s (bisher 5-6) bei 0,30-0,37. NICHT bei sichtbarem
+    # 3D-Fenster: das setzt sein Bild im selben UI-Thread zusammen (VIZ-70)
+    # und zeigt den Strobe selbst.
     STROBE_TAKT_MS = 50
-    STROBE_UI_ANTEIL = 0.40
+    STROBE_UI_ANTEIL = 0.33
     STROBE_NACHLAUF_S = 1.0         # so lange nach dem letzten blinkenden Geraet
+    DREID_PRUEF_S = 0.25            # so lange gilt die Antwort "3D-Fenster offen?"
 
     def _strobe_gesehen(self) -> None:
         self._strobe_zuletzt = self._uhr()
 
+    def _3d_fenster_sichtbar(self) -> bool:
+        """Gemerkt fuer DREID_PRUEF_S. Gefragt wird je blinkendem Geraet und
+        Bild (``_blink_an`` -> ``_strobe_bildrate`` -> ``_takt_ms``/
+        ``_ui_anteil``), gesucht ueber alle Top-Level-Fenster: ungemerkt
+        kostete das bei 68 blinkenden Geraeten (echte App, 250 %) ein Bild
+        70-95 statt ~40 ms."""
+        jetzt = self._uhr()
+        merk = getattr(self, "_dreid_merk", None)
+        if merk is None or not 0.0 <= jetzt - merk[0] < self.DREID_PRUEF_S:
+            merk = (jetzt, self._3d_fenster_suchen())
+            self._dreid_merk = merk
+        return merk[1]
+
     @staticmethod
-    def _3d_fenster_sichtbar() -> bool:
+    def _3d_fenster_suchen() -> bool:
         try:
             from PySide6.QtWidgets import QApplication
             for w in QApplication.topLevelWidgets():
