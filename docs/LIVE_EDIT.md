@@ -35,6 +35,26 @@ haben ein `edit_slot`-Feld.
 - **F4 MX-Speed**, **F5 MX-Master**, **F6 MX-Param (Weiß/Hold)** → Slot „MX".
 - **F8 Dimmer** (Submaster), **F9 Master** (Grand Master).
 
+## Sternchen: welcher Effekt ist live verändert? (UI-129)
+Live-Änderungen bleiben flüchtig, bis sie übernommen werden (die Show speichert
+weiter den gespeicherten Stand). Damit man sieht, welcher Effekt gerade vom
+gespeicherten Stand abweicht, zeigt jede Taste, jeder Fader und jeder Encoder,
+der **genau diesen einen Effekt** startet oder steuert, ein kleines gelbes
+**Sternchen** in einer oberen Ecke (Tooltip-Zusatz „live bearbeitet"). Auch die
+Handy-Konsole zeigt es an der Kachel.
+
+- Erkannt wird das für alle live bearbeitbaren Effekte (Matrix, EFX, Chaser,
+  Sequence): der Effekt hat eine Sitzungs-Basis und weicht von ihr ab. Wer einen
+  Wert von Hand auf den alten Stand zurückdreht, hat danach keinen Stern mehr.
+- **Kein Stern** an den reinen Bearbeitungs-Widgets dieses Layouts: die
+  Slot-Fader F1–F6 und die Aktions-Tasten über „MH"/„MX" wirken auf das
+  *aktuelle Ziel* und haben keine eigene Funktion. Den Stern trägt das
+  Effekt-Pad, das den Effekt gestartet hat.
+- **Weg** ist er bei **Reset Live** (zurück zum Preset), bei **Commit**
+  (Übernahme als neuer Stand) und beim Laden einer Show.
+- Aktualisiert wird im vorhandenen Statustakt der Konsole (etwa 0,4 s), neu
+  gezeichnet nur, wenn sich etwas ändert. Gespeichert wird nichts.
+
 ## Bedien-Idee
 1. Oben links einen MH-Effekt antippen → läuft, ist „MH"-Edit-Ziel.
 2. Mit F1/F2 Tempo/Größe live formen, Reihe-2-Tasten für Richtung/Relativ.

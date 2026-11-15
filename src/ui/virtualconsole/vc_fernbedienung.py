@@ -334,6 +334,19 @@ def _ziel_fehlt(widget) -> list[str]:
     return raus
 
 
+def _live_editiert(widget) -> bool:
+    """UI-129: zeigt das Widget das Sternchen „live bearbeitet"? Nur Tasten
+    und Fader mit genau einer eigenen Funktion; Cue-Listen nie. Liest den
+    Zwischenstand aus ``effect_live`` (der Takt fragt zehnmal je Sekunde)."""
+    frage = getattr(widget, "live_stern_sichtbar", None)
+    if frage is None:
+        return False
+    try:
+        return bool(frage())
+    except Exception:
+        return False
+
+
 def beschreibe(widget) -> dict | None:
     """Fernbedien-Auskunft zu einem Widget — oder None, wenn es nicht
     fernbedienbar ist. Nur JSON-taugliche Werte. Im UI-Thread aufrufen."""
@@ -353,6 +366,8 @@ def beschreibe(widget) -> dict | None:
         "laser": bool(laser_inhalt(widget)),
         "gesperrt": None,
         "ziel_fehlt": _ziel_fehlt(widget),
+        # UI-129: eigene Funktion live bearbeitet -> Sternchen an der Kachel.
+        "live_editiert": _live_editiert(widget),
     }
     if d["laser"]:
         from src.core.laser import fern_freigabe as _ff
