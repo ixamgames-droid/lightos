@@ -2,7 +2,7 @@
 
 `shows/Party_Demo_2026.lshow` · Generator `tools/build_party_demo_show.py`
 
-Show passend zu Davids Party-Musik (Ordner `Desktop/Musik/BP Party` — HBz-Bounce /
+Show passend zu Robins Party-Musik (Ordner `Desktop/Musik/BP Party` — HBz-Bounce /
 Hardstyle / Hypertechno / Frenchcore, ~150 BPM). **Setup:** Akai APC mini + 8× RGBW-PAR
 (ZQ01424, 8ch @1,9,…,57) + 2× Moving Head (ZQ02001, 11ch @65,@76).
 

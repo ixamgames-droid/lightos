@@ -33,6 +33,12 @@ die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLE
 Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
 
+**Am Touchscreen oder vom Handy?** Die Bedienung am Finger (Start mit `--touch`, Gesten unter
+**Ansicht → Touch-Gesten…**) fasst die [README](../README.md#touchscreen-und-handy) zusammen;
+fürs Handy gibt es die Anleitung [Web-Remote — das Handy als Konsole](anleitung_web_remote/ANLEITUNG.md).
+**Datenschutz:** eigene Shows, Diagnosepakete und den Handy-Schlüssel nie in ein öffentliches
+Issue stellen ([README → Datenschutz](../README.md#datenschutz-was-privat-bleibt)).
+
 ---
 
 ## Einstieg

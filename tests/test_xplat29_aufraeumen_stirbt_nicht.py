@@ -17,12 +17,12 @@ XPLAT-27 (haengendes Segment beendet den Lauf) und XPLAT-31 (kein gruenes
 Segment ergibt Exit 0): *der Runner soll mit dem Schaden umgehen, statt an ihm
 zu sterben.*
 
-**Was hier NICHT passiert:** die Waisen werden benannt, nicht beendet. Sie
-wirklich zu toeten ist XPLAT-29(b) und liegt bei Robin — es hiesse, dass ein
-Absturz des Hauptprozesses den DMX-Worker mitreisst, also im Zweifel Licht aus
-statt eingefrorenem Standbild. Ausserdem haelt die laufende App des Menschen
-selbst Chromium-Kinder (COORDINATION.md: „Die laufende App gehoert dem
-Menschen").
+**Was hier NICHT passiert:** was beim Start eine Datei haelt, hat dieser Lauf
+nicht gestartet — es wird benannt, nicht beendet. Die eigenen Kinder eines
+Laufs raeumt seit XPLAT-29 (b) dessen Job-Objekt ab
+(``test_xplat29_job_objekt.py``); fremde Prozesse fasst der Runner nie an,
+denn die laufende App des Menschen haelt selbst Chromium-Kinder
+(COORDINATION.md: „Die laufende App gehoert dem Menschen").
 """
 from __future__ import annotations
 
@@ -131,10 +131,10 @@ class AufraeumenStirbtNichtTest(unittest.TestCase):
     def test_der_haltende_prozess_wird_NICHT_beendet(self):
         """★ Die Abgrenzung zu XPLAT-29(b), und sie ist keine Formsache.
 
-        Waisen zu toeten liegt bei Robin, weil derselbe Griff im Absturzfall den
-        DMX-Worker mitreisst. Und die laufende App des Menschen haelt ebenfalls
-        Chromium-Kinder — ein Runner, der beim Aufraeumen zuschlaegt, nimmt ihm
-        mitten in der Show das Licht.
+        (b) beendet nur, was der Runner selbst gestartet hat (sein Job-Objekt).
+        Ein fremder Prozess - hier der Halter - bleibt stehen: die laufende App
+        des Menschen haelt ebenfalls Chromium-Kinder, und ein Runner, der beim
+        Aufraeumen zuschlaegt, nimmt ihm mitten in der Show das Licht.
         """
         self._halte_datei(self.out / "alt.log")
         halter = self.halter
@@ -142,8 +142,8 @@ class AufraeumenStirbtNichtTest(unittest.TestCase):
         ausgabe = self._lauf()[1]
         self.assertIsNone(
             halter.poll(),
-            "der haltende Prozess wurde beendet — das ist XPLAT-29(b) und liegt "
-            "bei Robin, nicht hier")
+            "der haltende Prozess wurde beendet — der Runner hat ihn nicht "
+            "gestartet und darf ihn nicht anfassen (XPLAT-29)")
         self.assertIn("NICHTS beendet", ausgabe, ausgabe[-1200:])
 
     def test_ohne_hindernis_wird_normal_geraeumt(self):
