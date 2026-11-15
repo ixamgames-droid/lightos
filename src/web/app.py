@@ -905,7 +905,7 @@ def _register_socketio(sio):
     FOLGE_MAX_JE_SID = 1024
     sio.lightos_vc_folge = folge            # nur lesend, fuer Tests
     # WEB-15: Grenze je Verbindung (gleichzeitig laufende Aktionen + Rate).
-    from src.web.vc_grenze import VerbindungsGrenze, LOS, NACHGEHOLT
+    from src.web.vc_grenze import VerbindungsGrenze, LOS, NACHGEHOLT, LAEUFT_SCHON
     grenze = VerbindungsGrenze()
     sio.lightos_vc_grenze = grenze          # fuer Tests
 
@@ -928,6 +928,21 @@ def _register_socketio(sio):
                 except Exception as e:
                     print(f"[web] ERROR: nachgeholte Handy-Aktion: {type(e).__name__}")
                 weiter = grenze.fertig(sid, schluessel)
+
+    def _sicher(sid, schluessel, fn, einmal=True):
+        """WEB-15 (Nachpruefung): STOP, Blackout AN und sichere Tasten
+        (NOT-AUS, STOP ALL, …) ueber die sichere Spur — nie von Rate oder
+        gewoehnlichen Plaetzen abgewiesen, aber auch kein ungebremster Weg
+        zum Fluten der Oberflaeche (s. ``vc_grenze``)."""
+        zustand = grenze.herein_sicher(sid, schluessel, einmal)
+        if zustand == LAEUFT_SCHON:
+            return {"ok": True, "laeuft_schon": True}
+        if zustand != LOS:
+            return {"ok": False, "fehler": "zu_viele"}
+        try:
+            return fn()
+        finally:
+            grenze.fertig_sicher(sid, schluessel)
 
     def _senden(ereignis, daten):
         sio.emit(ereignis, daten, to=RAUM)
@@ -985,14 +1000,24 @@ def _register_socketio(sio):
             # Loslassen geht immer — ohne Grenze (macht nichts an).
             return vc_remote.loslassen_von(sid, kennung)
         if aktion == "stop":
-            return vc_remote.widget_aktion(kennung, aktion)   # STOP geht immer
+            # STOP geht immer — ueber die sichere Spur
+            return _sicher(sid, ("stop", kennung),
+                           lambda: vc_remote.widget_aktion(kennung, aktion))
+        wert = data.get("wert")
+        if aktion in ("druecken", "umschalten") and vc_remote.ist_sichere_taste(kennung):
+            # NOT-AUS, STOP ALL, Blackout, Effekte stoppen: nie „zu_viele“
+            if aktion == "druecken":
+                return _sicher(sid, (aktion, kennung),
+                               lambda: vc_remote.halten(sid, kennung), einmal=False)
+            return _sicher(sid, (aktion, kennung),
+                           lambda: vc_remote.widget_aktion(kennung, aktion, wert),
+                           einmal=False)
         if aktion == "druecken":
             # WEB-12 (Codex #1030/#1039/#1041): gehalten wird je Halter
             # gezaehlt — ein Druck auf eine Taste, die schon das Pult oder ein
             # anderes Handy haelt, macht dieses Handy nicht zum Halter, der sie
             # beim Loslassen oder Abreissen wieder loslaesst.
             return _begrenzt(sid, lambda: vc_remote.halten(sid, kennung))
-        wert = data.get("wert")
         if aktion == "setzen":
             return _begrenzt(sid, lambda: vc_remote.widget_aktion(kennung, aktion, wert),
                              schluessel=kennung, nachholbar=True)
@@ -1009,8 +1034,9 @@ def _register_socketio(sio):
             return {"ok": True, "veraltet": True}
         gm, blackout, wer = data.get("gm"), data.get("blackout"), geraet()
         if gm is None and blackout is True:
-            # Blackout AN geht immer — ohne Grenze (macht dunkel).
-            return vc_remote.pult(blackout=True, geraet=wer)
+            # Blackout AN geht immer — ueber die sichere Spur (macht dunkel).
+            return _sicher(request.sid, "#blackout",
+                           lambda: vc_remote.pult(blackout=True, geraet=wer))
         nur_gm = blackout is None and gm is not None
         return _begrenzt(request.sid,
                          lambda: vc_remote.pult(gm=gm, blackout=blackout, geraet=wer),

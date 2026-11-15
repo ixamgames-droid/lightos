@@ -16,8 +16,16 @@ Zwei einfache Grenzen je Verbindung:
   Fader-Zug auf einem 120-Hz-Display und schnelles Tippen bleiben weit
   darunter; eine Flut wird gebremst.
 
-Der Aufrufer nimmt Loslassen, STOP und Blackout AN aus — sie machen nichts an
-und muessen immer durchgehen.
+Sicherheits-Aktionen (STOP, Blackout AN, die Tasten NOT-AUS, STOP ALL,
+Blackout, Effekte stoppen) laufen ueber eine eigene **sichere Spur**
+(:meth:`VerbindungsGrenze.herein_sicher`): nie von der Rate oder den
+gewoehnlichen Plaetzen gebremst — gerade wenn die Oberflaeche haengt und sich
+Aktionen stauen, werden sie gebraucht. Damit die Spur kein ungebremster Weg
+zum Fluten ist, laufen je Verbindung hoechstens ``sicher_gleichzeitig``
+(Vorgabe 16) sichere Aktionen gleichzeitig — mehr hat keine echte Bedienung
+—, und STOP bzw. Blackout AN desselben Ziels nur einmal (ein zweites wartet
+nicht, die Wirkung kommt ja schon). Loslassen nimmt der Aufrufer ganz aus (es laeuft nur
+fuer gehaltene Tasten an die Oberflaeche).
 
 Reines Python ohne Qt; wirft nie.
 """
@@ -29,10 +37,11 @@ import time
 ZU_VIELE = "zu_viele"
 LOS = "los"
 NACHGEHOLT = "nachgeholt"
+LAEUFT_SCHON = "laeuft_schon"
 
 
 class _Stand:
-    __slots__ = ("laufend", "schluessel", "nachholen", "marken", "zeit")
+    __slots__ = ("laufend", "schluessel", "nachholen", "marken", "zeit", "sicher")
 
     def __init__(self, marken: float, zeit: float):
         self.laufend = 0
@@ -40,12 +49,15 @@ class _Stand:
         self.nachholen: dict = {}
         self.marken = marken
         self.zeit = zeit
+        self.sicher: dict = {}          # Schluessel -> Anzahl laufender
 
 
 class VerbindungsGrenze:
     def __init__(self, gleichzeitig: int = 4, rate: float = 200.0,
-                 vorrat: float = 400.0, uhr=time.monotonic):
+                 vorrat: float = 400.0, uhr=time.monotonic,
+                 sicher_gleichzeitig: int = 16):
         self.gleichzeitig = int(gleichzeitig)
+        self.sicher_gleichzeitig = int(sicher_gleichzeitig)
         self.rate = float(rate)
         self.vorrat = float(vorrat)
         self._uhr = uhr
@@ -93,6 +105,33 @@ class VerbindungsGrenze:
                 st.schluessel.discard(schluessel)
             st.laufend = max(0, st.laufend - 1)
             return None
+
+    def herein_sicher(self, sid, schluessel, einmal: bool = True) -> str:
+        """Sichere Spur (s. Modulkopf): ``LOS`` (danach :meth:`fertig_sicher`
+        rufen), ``LAEUFT_SCHON`` (``einmal``: dieselbe sichere Aktion dieser
+        Verbindung laeuft gerade — fuer STOP und Blackout AN, deren Wirkung
+        sich nicht aufaddiert) oder ``ZU_VIELE`` (nur bei einer Flut)."""
+        with self._lock:
+            st = self._je.get(sid)
+            if st is None:
+                st = self._je[sid] = _Stand(self.vorrat, self._uhr())
+            if einmal and st.sicher.get(schluessel):
+                return LAEUFT_SCHON
+            if sum(st.sicher.values()) >= self.sicher_gleichzeitig:
+                return ZU_VIELE
+            st.sicher[schluessel] = st.sicher.get(schluessel, 0) + 1
+            return LOS
+
+    def fertig_sicher(self, sid, schluessel) -> None:
+        with self._lock:
+            st = self._je.get(sid)
+            if st is None:
+                return
+            n = st.sicher.get(schluessel, 0) - 1
+            if n > 0:
+                st.sicher[schluessel] = n
+            else:
+                st.sicher.pop(schluessel, None)
 
     def vergessen(self, sid) -> None:
         """Verbindung weg."""

@@ -113,6 +113,38 @@ def widget_liste() -> dict:
             "widgets": eintraege if isinstance(eintraege, list) else []}
 
 
+#: WEB-15 (Nachpruefung): Tasten, die nur dunkel machen oder stoppen (Werte
+#: von ``ButtonAction``). Sie laufen am Socket ueber die sichere Spur der
+#: Grenze (``vc_grenze``) — ein NOT-AUS darf nie „zu_viele“ hoeren.
+SICHERE_TASTEN = frozenset({"Blackout", "StopAll", "StopEffects", "LaserEstop"})
+_sichere: set = set()           # Kennungen sicherer Tasten (aus der Oberflaeche)
+
+
+def _merke_sichere(beschreibungen) -> None:
+    """Merkt aus Widget-Auskuenften der Oberflaeche (``beschreibe``), welche
+    Kennungen sichere Tasten sind. Die Angaben stammen nie vom Handy. Eine
+    veraltete Angabe laesst hoechstens eine Aktion an der Rate vorbei — die
+    Pruefungen (Laser, Blackout, Rechte) laufen trotzdem im UI-Thread."""
+    if isinstance(beschreibungen, dict):
+        beschreibungen = beschreibungen.values()
+    try:
+        with _lock:
+            for d in beschreibungen or ():
+                if not isinstance(d, dict) or not isinstance(d.get("id"), str):
+                    continue
+                if d.get("typ") == "taste" and d.get("funktion") in SICHERE_TASTEN:
+                    _sichere.add(d["id"])
+                else:
+                    _sichere.discard(d["id"])
+    except Exception as e:
+        print(f"[vc_remote] ERROR: sichere Tasten: {type(e).__name__}")
+
+
+def ist_sichere_taste(kennung) -> bool:
+    with _lock:
+        return kennung in _sichere
+
+
 def widget_aktion(kennung, aktion, wert=None) -> dict:
     """Aktion auf einem Widget. Immer ein Dict mit ``ok``."""
     if not ist_aktiv():
@@ -127,6 +159,8 @@ def widget_aktion(kennung, aktion, wert=None) -> dict:
         return _nein("fehler")
     if not isinstance(antwort, dict) or "ok" not in antwort:
         return _nein("fehler")
+    if isinstance(antwort.get("widget"), dict):
+        _merke_sichere([antwort["widget"]])
     return antwort
 
 
@@ -171,6 +205,7 @@ def konsole() -> dict:
         k = None
     if not isinstance(k, dict):
         return leer
+    _merke_sichere(k.get("widgets"))
     return {"ok": True, "aktiv": True, **k}
 
 
@@ -213,6 +248,8 @@ def melde(ereignis: str, daten: dict) -> bool:
         fn = _sender
     if fn is None or not ist_aktiv():
         return False
+    if isinstance(daten, dict):
+        _merke_sichere(daten.get("widgets"))
     try:
         fn(ereignis, daten)
         return True

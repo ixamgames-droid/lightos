@@ -743,3 +743,106 @@ class NaNInHandySeitenTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── Nachpruefung: Sicherheits-Aktionen und die Grenze ────────────────────────
+#
+# Die Grenze darf einen NOT-AUS, STOP ALL oder Blackout nie mit „zu_viele“
+# abweisen — gerade dann, wenn die Oberflaeche haengt und sich Aktionen
+# stauen, wird er gebraucht. Umgekehrt darf die Ausnahme fuer STOP und
+# Blackout AN kein ungebremster Weg sein, die Oberflaeche zu fluten.
+
+class SicherheitsSpurTest(unittest.TestCase):
+
+    def setUp(self):
+        from src.web import vc_grenze
+        self.vg = vc_grenze
+        self.g = vc_grenze.VerbindungsGrenze(uhr=_Uhr())
+
+    def test_sicher_geht_trotz_voller_grenze(self):
+        for _ in range(self.g.gleichzeitig):
+            self.g.herein("s1")
+        for _ in range(5000):                       # Rate auch erschoepft
+            self.g.herein("s2")
+        self.assertEqual(self.g.herein("s1"), self.vg.ZU_VIELE)
+        self.assertEqual(self.g.herein_sicher("s1", "wNot1"), "los")
+        self.assertEqual(self.g.herein_sicher("s2", "wNot1"), "los")
+
+    def test_gleiche_sichere_aktion_laeuft_nur_einmal(self):
+        self.assertEqual(self.g.herein_sicher("s1", "wStop"), "los")
+        for _ in range(100):
+            self.assertEqual(self.g.herein_sicher("s1", "wStop"), self.vg.LAEUFT_SCHON)
+        self.g.fertig_sicher("s1", "wStop")
+        self.assertEqual(self.g.herein_sicher("s1", "wStop"), "los")
+
+    def test_flut_ueber_sichere_aktionen_ist_begrenzt(self):
+        zugelassen = sum(self.g.herein_sicher("s1", f"wK{i:04d}") == "los"
+                         for i in range(2000))
+        self.assertEqual(zugelassen, self.g.sicher_gleichzeitig)
+        self.assertLessEqual(self.g.sicher_gleichzeitig, 32)
+        self.g.vergessen("s1")
+        self.assertEqual(self.g.herein_sicher("s1", "wK0000"), "los")
+
+
+@unittest.skipUnless(HAS_FLASK, "flask fehlt")
+class SicherheitImSocketTest(GrenzeImSocketTest):
+
+    def test_notaus_und_stop_all_trotz_voller_grenze(self):
+        notaus = self._taste(ButtonAction.LASER_ESTOP)
+        stop_all = self._taste(ButtonAction.STOP_ALL, x=120)
+        blackout = self._taste(ButtonAction.BLACKOUT, x=230)
+        self._auf_seite(notaus, stop_all, blackout)
+        self.assertTrue(self._emit("vc_hallo", {})["ok"])
+        self.sio.lightos_vc_grenze.gleichzeitig = 0       # alles belegt
+        for w, aktion in ((notaus, "druecken"), (stop_all, "umschalten"),
+                          (blackout, "druecken")):
+            with self.subTest(w.action):
+                r = self._emit("vc_aktion", {"id": w.widget_id, "aktion": aktion})
+                self.assertNotEqual(r.get("fehler"), "zu_viele", r)
+                self.assertTrue(r.get("ok"), r)
+        self.assertTrue(self.state.output_manager.blackout)   # Taste haelt ihn
+
+    def test_gewoehnliche_taste_bleibt_begrenzt(self):
+        t = self._taste(ButtonAction.FUNCTION_FLASH, fid=self._szene(LICHT, "W15b").id)
+        self._auf_seite(t)
+        self.assertTrue(self._emit("vc_hallo", {})["ok"])
+        self.sio.lightos_vc_grenze.gleichzeitig = 0
+        self.assertEqual(self._emit("vc_aktion", {"id": t.widget_id, "aktion": "druecken"}),
+                         {"ok": False, "fehler": "zu_viele"})
+
+    def test_stop_und_blackout_an_laufen_ueber_die_sichere_spur(self):
+        liste = self.canvas._add_widget("VCCueList", QPoint(10, 120))
+        self._auf_seite(liste)
+        g = self.sio.lightos_vc_grenze
+        with mock.patch.object(g, "herein_sicher", return_value="zu_viele") as m:
+            self.assertEqual(self._emit("vc_aktion",
+                                        {"id": liste.widget_id, "aktion": "stop"})["fehler"],
+                             "zu_viele")
+            self.assertEqual(self._emit("vc_pult", {"blackout": True})["fehler"], "zu_viele")
+        self.assertEqual(m.call_count, 2)
+        self.assertFalse(self.state.output_manager.blackout_schalter)
+        # ohne Flut gehen beide durch, der Platz wird wieder frei
+        self.assertTrue(self._emit("vc_aktion", {"id": liste.widget_id, "aktion": "stop"})["ok"])
+        self.assertTrue(self._emit("vc_pult", {"blackout": True})["ok"])
+        self.assertTrue(self.state.output_manager.blackout_schalter)
+        self.assertEqual(g.herein_sicher(self._sid_von_grenze(), "#blackout"), "los")
+
+    def _sid_von_grenze(self):
+        return next(iter(self.sio.lightos_vc_grenze._je))
+
+
+class SlotWieDieTasteTest(_Basis):
+    """Nachpruefung: ``_slot_laser`` liest den Slot so, wie
+    ``VCButton._trigger_primary`` ihn benutzt. ``True`` als Slot trifft dort
+    ``executors[1]`` — die Pruefung darf ihn nicht als „kein Slot“ abtun."""
+
+    def test_bool_als_slot_wird_wie_eins_geprueft(self):
+        for aktion in (ButtonAction.TOGGLE, ButtonAction.FLASH):
+            with self.subTest(aktion):
+                t = self._taste(aktion)
+                t.function_id = True                    # = executors[1] (Laser)
+                self._auf_seite(t)
+                self.assertTrue(vf.laser_inhalt(t))
+                self.assertEqual(self._aktion(t, "umschalten"),
+                                 {"ok": False, "fehler": "laser_gesperrt"})
+        self.assertEqual(self.ex_laser.gedrueckt, [])

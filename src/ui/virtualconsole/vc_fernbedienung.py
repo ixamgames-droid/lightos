@@ -279,8 +279,10 @@ def _slot_laser(state, slot) -> bool:
     Ohne gueltigen Slot tut die Taste nichts (``_trigger_primary`` bricht ab)
     — dann gibt es auch nichts zu sperren."""
     from src.core.laser import fern_freigabe as ff
-    if slot is None or isinstance(slot, bool):
+    if slot is None:
         return False
+    # Kein Sonderfall fuer ``bool``: ``True`` trifft in ``_trigger_primary``
+    # ``executors[1]`` — also wird auch so geprueft (im Zweifel sperren).
     try:
         slot = int(slot)
     except (TypeError, ValueError):
