@@ -21,7 +21,8 @@ from __future__ import annotations
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (QColorDialog, QDialog, QDialogButtonBox, QGridLayout,
-                               QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu,
+                               QHBoxLayout, QInputDialog, QLabel, QLineEdit,
+                               QListWidget, QListWidgetItem, QMenu,
                                QMessageBox, QPushButton, QScrollArea, QSizePolicy,
                                QTabBar, QToolButton, QVBoxLayout, QWidget)
 
@@ -194,6 +195,83 @@ class HandyAussehenDialog(QDialog):
     def ergebnis(self) -> tuple:
         """(Farbe oder None, Beschriftung oder None) — None = wie Original."""
         return (self._farbe, hs.handy_text_gueltig(self.feld_text.text()))
+
+
+class HandyGruppeDialog(QDialog):
+    """WEB-14: eigene Handy-Gruppe anlegen oder bearbeiten — Name und Kacheln
+    aus beliebigen Rahmen. Am Handy ist dann immer hoechstens eine aktiv.
+
+    ``kandidaten``: Liste ``(kennung, text, gesperrt_grund)`` — mit Grund ist
+    die Kachel sichtbar, aber nicht waehlbar (andere Gruppe, BLACKOUT …)."""
+
+    def __init__(self, name: str, kandidaten, gewaehlt=(), neu: bool = True,
+                 parent=None):
+        super().__init__(parent)
+        self.setObjectName("handy_gruppe_dialog")
+        self.setWindowTitle("Neue Handy-Gruppe" if neu else "Handy-Gruppe bearbeiten")
+        lay = QVBoxLayout(self)
+        zeile = QHBoxLayout()
+        zeile.addWidget(QLabel("Name"))
+        self.feld_name = QLineEdit(name or "")
+        self.feld_name.setObjectName("handy_gruppe_name")
+        self.feld_name.setMaxLength(hs.MAX_NAME)
+        self.feld_name.setPlaceholderText("z. B. Grundfarbe")
+        self.feld_name.setMinimumHeight(TREFFER)
+        zeile.addWidget(self.feld_name, 1)
+        lay.addLayout(zeile)
+        lay.addWidget(QLabel("Kacheln (aus beliebigen Rahmen):"))
+        self.liste = QListWidget()
+        self.liste.setObjectName("handy_gruppe_liste")
+        self.liste.setMinimumHeight(180)
+        gewaehlt = set(gewaehlt or ())
+        for kennung, text, grund in kandidaten:
+            it = QListWidgetItem(text + (f"  — {grund}" if grund else ""))
+            it.setData(Qt.ItemDataRole.UserRole, kennung)
+            it.setSizeHint(QSize(0, TREFFER))
+            if grund:
+                it.setFlags(Qt.ItemFlag.ItemIsSelectable)      # sichtbar, nicht waehlbar
+                it.setCheckState(Qt.CheckState.Unchecked)
+                it.setToolTip(grund)
+            else:
+                it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                it.setCheckState(Qt.CheckState.Checked if kennung in gewaehlt
+                                 else Qt.CheckState.Unchecked)
+            self.liste.addItem(it)
+        lay.addWidget(self.liste, 1)
+        hinweis = QLabel(
+            "Am Handy ist von diesen Tasten immer höchstens eine an: tippst du eine "
+            "an, gehen die anderen aus (auch am Pult sichtbar). Nochmal antippen = "
+            "keine an. Gilt nur für Tipps vom Handy. Eine Kachel kann nur in einer "
+            "Handy-Gruppe sein.")
+        hinweis.setWordWrap(True)
+        hinweis.setStyleSheet("color:#8b949e;")
+        lay.addWidget(hinweis)
+        leiste = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                  | QDialogButtonBox.StandardButton.Cancel)
+        for b in leiste.buttons():
+            b.setMinimumHeight(TREFFER)
+        leiste.accepted.connect(self.accept)
+        leiste.rejected.connect(self.reject)
+        lay.addWidget(leiste)
+
+    def setze_auswahl(self, kennungen) -> None:
+        ziel = set(kennungen or ())
+        for i in range(self.liste.count()):
+            it = self.liste.item(i)
+            if it.flags() & Qt.ItemFlag.ItemIsUserCheckable:
+                it.setCheckState(Qt.CheckState.Checked
+                                 if it.data(Qt.ItemDataRole.UserRole) in ziel
+                                 else Qt.CheckState.Unchecked)
+
+    def ergebnis(self) -> tuple:
+        """(Name, [Kennungen]) — nur waehlbare, angehakte Kacheln."""
+        raus = []
+        for i in range(self.liste.count()):
+            it = self.liste.item(i)
+            if (it.flags() & Qt.ItemFlag.ItemIsUserCheckable
+                    and it.checkState() == Qt.CheckState.Checked):
+                raus.append(it.data(Qt.ItemDataRole.UserRole))
+        return (" ".join(self.feld_name.text().split()), raus)
 
 
 def _schrift(px: int, fett: bool = True) -> QFont:
@@ -515,6 +593,29 @@ class HandyRaster(QWidget):
             zurueck = menu.addAction("Aussehen am Handy zurücksetzen")
             zurueck.setObjectName("handy_aussehen_zurueck")
             zurueck.triggered.connect(lambda: self._leiste.aussehen_setzen(kennung, None, None))
+        # WEB-14: eigene Handy-Gruppen
+        menu.addSeparator()
+        c = self._canvas()
+        nr = hs.gruppe_von(c.handy_seiten(), kennung)
+        if nr is not None:
+            name = c.handy_gruppen()[nr]["name"]
+            bear = menu.addAction(f"Handy-Gruppe „{name}“ bearbeiten…")
+            bear.setObjectName("handy_gruppe_bearbeiten")
+            bear.triggered.connect(lambda: self._leiste.gruppe_bearbeiten(nr))
+            raus = menu.addAction(f"Aus Handy-Gruppe „{name}“ nehmen")
+            raus.setObjectName("handy_gruppe_raus")
+            raus.triggered.connect(lambda: self._leiste.aus_gruppe_nehmen(kennung))
+            weg = menu.addAction(f"Handy-Gruppe „{name}“ auflösen")
+            weg.setObjectName("handy_gruppe_aufloesen")
+            weg.triggered.connect(lambda: self._leiste.gruppe_aufloesen(nr))
+        else:
+            neu = menu.addAction("Neue Handy-Gruppe mit dieser Kachel…")
+            neu.setObjectName("handy_gruppe_neu_mit")
+            ok, grund = c.handy_gruppe_erlaubt(kennung)
+            neu.setEnabled(ok)
+            neu.setToolTip(grund or "Kacheln aus beliebigen Rahmen — am Handy ist "
+                                    "immer höchstens eine davon an.")
+            neu.triggered.connect(lambda: self._leiste.gruppe_bearbeiten(None, [kennung]))
         menu.setToolTipsVisible(True)
         return menu
 
@@ -584,6 +685,7 @@ class HandyRaster(QWidget):
             zieh = self._zieh
             # Einmal nachschlagen statt je Kachel die ganze Konsole abzusuchen.
             nach_kennung = {getattr(w, "widget_id", None): w for w in c.alle_widgets()}
+            in_gruppe = {k for g in c.handy_gruppen() for k in g["widgets"]}
             for e in seite["eintraege"]:
                 kennung = e["widget"]
                 rect = self.feld_rect(e["spalte"], e["zeile"], e["breite"], e["hoehe"])
@@ -594,6 +696,12 @@ class HandyRaster(QWidget):
                 self._male_kachel(p, rect, auskunft)
                 if eigen:
                     self._male_marke(p, rect)
+                # WEB-14: blau = Rahmen mit Einzel-Auswahl am Pult,
+                # gelb gestrichelt = eigene Handy-Gruppe (wie am Handy)
+                if auskunft is not None and auskunft.get("einzel"):
+                    self._male_gruppe(p, rect, "#58a6ff", Qt.PenStyle.SolidLine, 1)
+                if kennung in in_gruppe:
+                    self._male_gruppe(p, rect, "#f2cc60", Qt.PenStyle.DashLine, 3)
                 p.setOpacity(1.0)
                 if bearbeiten and kennung == self._auswahl and not blass:
                     self._male_auswahl(p, rect)
@@ -619,6 +727,15 @@ class HandyRaster(QWidget):
         p.drawRoundedRect(r, 2, 2)
         p.setPen(QColor("#f2cc60"))
         p.drawText(r, Qt.AlignmentFlag.AlignCenter, "Handy")
+        p.restore()
+
+    def _male_gruppe(self, p, rect, farbe, stil, abstand):
+        """WEB-14: Gruppen-Markierung um die Kachel (wie am Handy)."""
+        p.save()
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.setPen(QPen(QColor(farbe), 1.6, stil))
+        p.drawRoundedRect(rect.adjusted(-abstand + 1, -abstand + 1, abstand - 1,
+                                        abstand - 1), 7, 7)
         p.restore()
 
     def _male_ziel(self, p, rect, ok: bool):
@@ -1046,6 +1163,17 @@ class HandyKonsolenLeiste(QWidget):
         zeile2 = QHBoxLayout()
         zeile2.setSpacing(6)
         zeile2.addWidget(self._btn_aussehen, 1)
+        # WEB-14: eigene Handy-Gruppe (nur eine Taste davon an)
+        self._btn_gruppe = QPushButton("Neue Handy-Gruppe…")
+        self._btn_gruppe.setObjectName("handy_gruppe_knopf")
+        self._btn_gruppe.setFixedHeight(TREFFER)
+        self._btn_gruppe.setToolTip(
+            "Tasten aus beliebigen Rahmen zu einer Gruppe nur fürs Handy fassen: "
+            "dort ist immer höchstens eine davon an. Rückgängig mit Strg+Z.")
+        self._btn_gruppe.setStyleSheet(_KNOPF_CSS + "QPushButton { color:#f2cc60; }")
+        self._btn_gruppe.setEnabled(False)
+        self._btn_gruppe.clicked.connect(lambda: self.gruppe_bearbeiten(None))
+        zeile2.addWidget(self._btn_gruppe, 1)
         lay.addLayout(zeile2)
 
         self._lbl_hinweis = QLabel()
@@ -1141,6 +1269,75 @@ class HandyKonsolenLeiste(QWidget):
         ok = c.handy_aussehen_setzen(c.handy_seite_nr(), kennung, farbe, text)
         self.auswahl_geaendert()
         return ok
+
+    # ── WEB-14: eigene Handy-Gruppen ─────────────────────────────────────────
+
+    def gruppe_dialog(self, nr=None, vorauswahl=()):
+        """Dialog fuer Handy-Gruppe ``nr`` (None = neue) — oder None. Zur
+        Wahl stehen alle Kacheln aller Handy-Seiten; nicht erlaubte und solche
+        aus anderen Gruppen sind sichtbar, aber nicht waehlbar."""
+        c = self.canvas()
+        if c is None or not self._bearbeiten:
+            return None
+        abschnitt = c.handy_seiten()
+        gruppen = hs.gruppen(abschnitt)
+        if nr is not None and not (0 <= nr < len(gruppen)):
+            return None
+        if nr is None and len(gruppen) >= hs.MAX_GRUPPEN:
+            self.melde(f"Mehr als {hs.MAX_GRUPPEN} Handy-Gruppen gibt es nicht.")
+            return None
+        gewaehlt = list(gruppen[nr]["widgets"]) if nr is not None else list(vorauswahl or ())
+        kandidaten, gesehen = [], set()
+        for snr, seite in enumerate(abschnitt["seiten"]):
+            for e in seite["eintraege"]:
+                k = e["widget"]
+                if k in gesehen:
+                    continue
+                gesehen.add(k)
+                a = c.handy_auskunft(c.widget_mit_kennung(k)) or {}
+                if a.get("typ") != "taste":
+                    continue                # Fader/Cuelisten gar nicht anbieten
+                text = f"{e.get('handy_text') or a.get('beschriftung') or k}  ·  {seite['name']}"
+                if a.get("gruppe"):
+                    text += f" / {a['gruppe']}"
+                ok, grund = c.handy_gruppe_erlaubt(k)
+                andere = hs.gruppe_von(abschnitt, k)
+                if ok and andere is not None and andere != nr:
+                    grund = f"schon in „{gruppen[andere]['name']}“"
+                kandidaten.append((k, text, grund))
+        name = gruppen[nr]["name"] if nr is not None else f"Gruppe {len(gruppen) + 1}"
+        return HandyGruppeDialog(name, kandidaten, gewaehlt, neu=nr is None, parent=self)
+
+    def gruppe_bearbeiten(self, nr=None, vorauswahl=()) -> bool:
+        dlg = self.gruppe_dialog(nr, vorauswahl)
+        if dlg is None:
+            return False
+        try:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return False
+            name, kennungen = dlg.ergebnis()
+        finally:
+            dlg.deleteLater()
+        return self.gruppe_setzen(nr, name, kennungen)
+
+    def gruppe_setzen(self, nr, name, kennungen) -> bool:
+        c = self.canvas()
+        if c is None:
+            return False
+        if nr is not None and not kennungen:
+            return self.gruppe_aufloesen(nr)
+        ok, grund = c.handy_gruppe_setzen(nr, name, kennungen)
+        if not ok and grund:
+            self.melde(grund)
+        return ok
+
+    def gruppe_aufloesen(self, nr) -> bool:
+        c = self.canvas()
+        return c is not None and c.handy_gruppe_entfernen(nr)
+
+    def aus_gruppe_nehmen(self, kennung) -> bool:
+        c = self.canvas()
+        return c is not None and c.handy_aus_gruppe_nehmen(kennung)
 
     def _entfernen_geklickt(self) -> None:
         if not self.raster.entferne_auswahl():
@@ -1247,6 +1444,7 @@ class HandyKonsolenLeiste(QWidget):
         self._btn_seite_weg.setToolTip("Diese Handy-Seite löschen (die Elemente der "
                                        "Konsole bleiben)")
         self._btn_leeren.setEnabled(self._bearbeiten and bool(seiten))
+        self._btn_gruppe.setEnabled(self._bearbeiten and bool(seiten))
         self.auswahl_geaendert()
         self._signatur = self._signatur_jetzt()
         if not self._meldung_bis:

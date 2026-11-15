@@ -138,7 +138,23 @@ sich nicht belegen).
    in der Vorschau die kleine Marke **„Handy"**; bei eigener Beschriftung steht
    darunter klein der Name am Pult. **BLACKOUT** und **Laser-NOT-AUS** behalten
    ihr festes Warnaussehen und lassen sich nicht umfärben oder umbenennen.
-9. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
+9. **Handy-Gruppen (nur eine an):** **„Neue Handy-Gruppe…"** (oder Rechtsklick
+   bzw. langes Drücken auf eine Kachel → **„Neue Handy-Gruppe mit dieser
+   Kachel…"**) fasst Tasten aus **beliebigen Rahmen** zu einer Gruppe nur fürs
+   Handy: Name eingeben, Kacheln anhaken, OK. Tippst du am Handy eine Taste der
+   Gruppe an, gehen die anderen aktiven Tasten der Gruppe aus — das Pult schaltet
+   sie über denselben Weg wie einen Druck, deshalb sieht man es am Pult genauso.
+   Die aktive Taste noch einmal antippen schaltet sie aus; dann ist **keine** an.
+   Eine Kachel kann nur in **einer** Handy-Gruppe sein (im Dialog steht sie dann
+   mit „schon in …" und lässt sich nicht anhaken). Bearbeiten, „Aus Handy-Gruppe
+   nehmen" und „Auflösen" stehen im Rechtsklick-Menü der Kachel. **BLACKOUT,
+   Laser-NOT-AUS, „Alles stoppen" und „Laser scharf/unscharf"** gehören nie in
+   eine Handy-Gruppe; Fader und Cuelisten auch nicht. Die Gruppe gilt nur für
+   Tipps vom Handy — am Pult selbst ändert sich nichts. In der Vorschau tragen
+   Gruppen-Kacheln einen **gelb gestrichelten** Rand, Tasten aus einem Rahmen mit
+   Einzel-Auswahl einen **blauen**. Handy-Gruppen werden mit der Show
+   gespeichert; ältere Shows laden unverändert.
+10. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
    aus/an"**, darunter der Zustand (**aus** · **an · 0 Handys verbunden** ·
    **an · 2 Handys verbunden**) und — sobald das Web-Interface im WLAN läuft
    und die Handy-Konsole an ist — der **QR-Code** fürs Handy (Klick vergrößert
@@ -183,6 +199,21 @@ Wahl). Hat das Handy in seinen Einstellungen **„Bewegung reduzieren"** an,
 bleiben die Animationen ebenfalls aus. BLACKOUT, NOT-AUS, gesperrte
 Laser-Kacheln und Kacheln mit verlorenem Ziel behalten immer ihr festes
 Warnaussehen.
+
+**Gruppen sichtbar:** Liegen Tasten am Pult in einem Rahmen mit
+**Einzel-Auswahl** („Solo-Frame (nur 1 Button gleichzeitig aktiv)"), zeigt das
+Handy sie als Gruppe — mit **blauem Rahmen** und dem Rahmentitel samt
+**„(immer nur eine)"**; das geschieht von selbst, einstellen musst du nichts.
+Eigene **Handy-Gruppen** ([Abschnitt 2](#2-handy-konsole-bauen), Schritt 9)
+tragen einen **gelb gestrichelten Rahmen** mit dem Gruppennamen und **„(nur
+Handy)"**. Liegen die Kacheln einer Gruppe nebeneinander, umschließt sie ein
+gemeinsamer Rahmen; liegt eine fremde Kachel dazwischen, bekommt jede
+Gruppen-Kachel ihren eigenen Rahmen in der Gruppenfarbe und die erste den
+Titel. Die Rahmen liegen nur darüber — die Anordnung der Seite bleibt so, wie du
+sie gebaut hast. Lässt sich die gerade aktive Taste einer Handy-Gruppe vom
+Handy nicht ausschalten (das Pult oder ein anderes Handy hält sie, ihr Laser ist
+gesperrt), lehnt das Handy den Tipp ab: **„Andere Taste der Gruppe ist gehalten
+oder gesperrt"**.
 
 Oben rechts steht die Verbindung: **verbunden** (grün) oder **getrennt** (rot).
 Solange das Handy getrennt ist, ist die Bedienung **gesperrt** — nichts wird

@@ -2827,6 +2827,11 @@ class VCCanvas(QWidget):
             if a is not None and a.get("gesperrt") != "laser":
                 auskuenfte.append(a)
         neu = _hs.automatisch_fuellen(auskuenfte)
+        # WEB-14: eigene Handy-Gruppen bleiben, soweit ihre Kacheln wieder
+        # auf einer Seite liegen.
+        alte_gruppen = self.handy_seiten().get(_hs.GRUPPEN)
+        if alte_gruppen:
+            neu = _hs.normalisiere(dict(neu, **{_hs.GRUPPEN: alte_gruppen}))
         self.setze_handy_seiten(neu)
         return _hs.anzahl_eintraege(neu), len(neu["seiten"])
 
@@ -3033,6 +3038,51 @@ class VCCanvas(QWidget):
         if (farbe is not None and not darf_farbe) or (text is not None and not darf_text):
             return False
         neu = _hs.eintrag_aussehen(self.handy_seiten(), seite, kennung, farbe, text)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    # ── WEB-14: eigene Handy-Gruppen ─────────────────────────────────────────
+
+    def handy_gruppe_erlaubt(self, kennung) -> tuple[bool, str]:
+        """WEB-14: darf die Kachel ``kennung`` in eine Handy-Gruppe? Nur
+        Tasten, nie BLACKOUT, Laser-NOT-AUS, STOP ALL oder Laser scharf."""
+        from .vc_fernbedienung import gruppe_erlaubt
+        return gruppe_erlaubt(self.widget_mit_kennung(kennung))
+
+    def handy_gruppen(self) -> list:
+        from src.core import handy_seiten as _hs
+        return _hs.gruppen(self.handy_seiten())
+
+    def handy_gruppe_setzen(self, nr, name, kennungen) -> tuple[bool, str]:
+        """WEB-14: Handy-Gruppe anlegen (``nr`` = None) oder neu fassen — ein
+        Rueckgaengig-Schritt. Nicht erlaubte Kacheln werden abgewiesen (nicht
+        still weggelassen). Rueckgabe (ok, Text)."""
+        from src.core import handy_seiten as _hs
+        liste = [k for k in (kennungen or []) if isinstance(k, str)]
+        if not liste:
+            return False, "Mindestens eine Kachel für die Gruppe wählen."
+        frei = self.handy_kennungen()
+        for k in liste:
+            if k not in frei:
+                return False, "Die Kachel liegt auf keiner Handy-Seite."
+            ok, grund = self.handy_gruppe_erlaubt(k)
+            if not ok:
+                return False, grund
+        neu = _hs.gruppe_setzen(self.handy_seiten(), nr, name, liste)
+        if neu is None:
+            return False, (f"Mehr als {_hs.MAX_GRUPPEN} Handy-Gruppen gibt es nicht."
+                           if nr is None else "Die Gruppe gibt es nicht mehr.")
+        if not self.setze_handy_seiten(neu):
+            return False, "Nichts geändert."
+        return True, ""
+
+    def handy_gruppe_entfernen(self, nr) -> bool:
+        from src.core import handy_seiten as _hs
+        neu = _hs.gruppe_entfernen(self.handy_seiten(), nr)
+        return neu is not None and self.setze_handy_seiten(neu)
+
+    def handy_aus_gruppe_nehmen(self, kennung) -> bool:
+        from src.core import handy_seiten as _hs
+        neu = _hs.aus_gruppe_nehmen(self.handy_seiten(), kennung)
         return neu is not None and self.setze_handy_seiten(neu)
 
     def handy_seite_hinzufuegen(self, name=None) -> int | None:
