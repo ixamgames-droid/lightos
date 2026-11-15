@@ -45,13 +45,13 @@ assignees: ''
 ## Diagnosepaket
 
 <!-- Am schnellsten hilft EINE Datei: in LightOS Hilfe → „Diagnosepaket speichern…" -->
-<!-- wählen und die erzeugte zip-Datei hier anhängen. Der Dialog zeigt vorher, was -->
-<!-- hineinkommt (Logs, Absturzprotokoll, Systeminfo, Einstellungen) und was nicht -->
-<!-- (Show-Dateien, Datenbanken). Ein Issue ist öffentlich: bei Bedenken kurz in -->
-<!-- das zip hineinsehen, bevor du es anhängst. -->
+<!-- wählen. Der Dialog zeigt vorher, was hineinkommt (Logs, Absturzprotokoll, -->
+<!-- Systeminfo, Einstellungen) und was nicht (Show-Dateien, Datenbanken). -->
+<!-- Ein Issue ist ÖFFENTLICH: das zip bitte NICHT hier anhängen, sondern privat -->
+<!-- schicken (E-Mail oder Messenger, wie der Dialog sagt). Hier nur ankreuzen. -->
 <!-- Startet LightOS gar nicht mehr: stattdessen den Log-Ausschnitt unten einfügen. -->
 
-- [ ] Diagnosepaket angehängt
+- [ ] Diagnosepaket liegt bereit (privat, nicht hier angehängt)
 
 ---
 
@@ -68,5 +68,8 @@ Hier Log einfügen
 
 ## Weitere Informationen
 
-<!-- Screenshots, Videos, Show-Dateien (.lshow) die das Problem reproduzieren. -->
-<!-- Bitte keine Passwörter oder persönlichen Daten hochladen. -->
+<!-- Screenshots oder Videos, die das Problem zeigen. -->
+<!-- NICHT hochladen (Issues sind öffentlich): Show-Dateien (.lshow), current_show.db, -->
+<!-- universes.json, midi_mappings.json, ui_prefs.json, Lizenzdatei, Diagnosepaket, -->
+<!-- den Link oder QR-Code der Handy-Konsole (Zugangsschlüssel), Passwörter. -->
+<!-- Eine Show, die den Fehler zeigt, bitte privat anbieten. -->

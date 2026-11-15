@@ -418,8 +418,17 @@ App-Datenordner  (Windows %APPDATA%/LightOS · Linux ~/.local/share/LightOS ·
 ├── recent.json
 ├── snapshots.json
 ├── input_profiles/        (MIDI-Profile)
-└── stages/                (3D-Buehnen)
+├── stages/                (3D-Buehnen)
+├── ui_prefs.json          (Einstellungen, u. a. Zugangsschluessel der Handy-Konsole)
+├── lightos-lizenz.lic     (deine Lizenzdatei)
+├── logs/, crash.log       (Sitzungs-Logs, Absturzprotokoll)
+└── osc_zuordnungen.json, dmx_fernsteuerung.json
 ```
+
+**Privat:** Shows, `current_show.db`, `universes.json`, `midi_mappings.json`,
+`ui_prefs.json` (Zugangsschluessel), die Lizenzdatei und Diagnosepakete gehoeren
+nie in ein oeffentliches Issue, einen PR oder Screenshot — siehe
+[README → Datenschutz](README.md#datenschutz-was-privat-bleibt).
 
 ## Windows-Setup (LightOS-Setup.exe) — ohne Python
 
@@ -540,7 +549,9 @@ sehen, was im Hintergrund passiert ist:
    - aus dem Quellordner: `python main.py --diagnose` (bzw. `venv\Scripts\python main.py --diagnose`)
    - optional mit Ziel: `--diagnose D:\lightos-fehler.zip`
 3. Die zip-Datei per E-Mail/Messenger schicken, dazu ein Satz, was du gemacht hast
-   und was passiert ist (ungefaehre Uhrzeit hilft).
+   und was passiert ist (ungefaehre Uhrzeit hilft). **Nicht** an ein oeffentliches
+   GitHub-Issue haengen: Logs und Datei-Namen erzaehlen etwas ueber dein Rig. Im
+   Issue reicht „Diagnosepaket liegt bereit".
 
 **Im Paket:** die Sitzungs-Logs (aktuelle + vorige Sitzungen), `crash.log`,
 Systeminfo (LightOS-Version, Betriebssystem, Python/Qt, Bildschirme, GPU-Stufe,

@@ -88,6 +88,54 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
 #notaus.an{display:block}
 #notaus small{display:block;font-weight:400;font-size:11px;opacity:.85;margin-top:2px}
 
+/* WEB-13: ganze Kachel in der Farbe der VC-Taste. Aus = gedimmt (Farbe mit
+   dunklem Grund gemischt), an = volle Farbe mit Schein. Die Farben rechnet
+   kachelFarben() aus; Textfarbe aus der Helligkeit (Kontrast). */
+.taste.gefaerbt{background:linear-gradient(var(--aus-oben),var(--aus-unten));border-color:var(--aus-rand);
+  border-bottom-color:rgba(0,0,0,.55);color:var(--aus-text)}
+.taste.gefaerbt .streifen{display:none}
+.taste.gefaerbt small,.taste.gefaerbt .pult{color:var(--aus-text);opacity:.75}
+.taste.gefaerbt.aktiv{background:linear-gradient(var(--an-oben),var(--an-unten));border-color:var(--rand);
+  color:var(--an-text);box-shadow:0 0 14px var(--schein)}
+.taste.gefaerbt.aktiv small,.taste.gefaerbt.aktiv .pult{color:var(--an-text);opacity:.85}
+.taste .symbol{font-size:17px;line-height:1;margin-bottom:3px}
+.taste .symbol:empty{display:none}
+.taste .pult{display:block;max-width:100%;font-size:9px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.taste .pult:empty{display:none}
+.zelle .marke{position:absolute;top:4px;left:5px;font-size:9px;font-weight:700;line-height:1.2;background:rgba(13,17,23,.82);
+  color:#f2cc60;border-radius:4px;padding:1px 4px;pointer-events:none;letter-spacing:0}
+.taste .bpm{position:absolute;bottom:3px;right:6px;font-size:9px;font-weight:700;opacity:.9;pointer-events:none}
+.taste .bpm:empty{display:none}
+/* WEB-13: Effekt-Dynamik — nur solange die Taste aktiv ist, rein per CSS.
+   Verlauf: die Effektfarben laufen durch die Kachel. Takt: Blinken im BPM. */
+.taste.gefaerbt.aktiv.lauf{background:var(--verlauf);background-size:300% 100%;color:#fff;
+  animation:lauf var(--lauf-dauer,3s) linear infinite}
+.taste.lauf .name,.taste.lauf .symbol{text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.taste.gefaerbt.aktiv.takt{animation:takt var(--takt-dauer,.5s) steps(1) infinite}
+.taste.gefaerbt.aktiv.lauf.takt{animation:lauf var(--lauf-dauer,3s) linear infinite,takt var(--takt-dauer,.5s) steps(1) infinite}
+@keyframes lauf{from{background-position:0 0}to{background-position:300% 0}}
+@keyframes takt{0%{filter:brightness(1.35)}50%{filter:brightness(.6)}}
+/* Schalter „Animationen am Handy“ aus (body.ruhig) oder System will keine
+   Bewegung: der Verlauf steht still, nichts blinkt. */
+body.ruhig .taste.lauf,body.ruhig .taste.takt{animation:none !important}
+@media (prefers-reduced-motion: reduce){ .taste.lauf,.taste.takt{animation:none !important} }
+#anim{flex:0 0 auto;height:30px;border-radius:15px;border:1px solid #3a424d;background:#21262d;color:#c3ccd5;font:inherit;
+  font-size:11px;font-weight:700;padding:0 9px;white-space:nowrap;touch-action:manipulation}
+#anim[aria-checked="false"]{color:#6e7681;border-style:dashed}
+
+/* WEB-14: Gruppen. Rahmen und Titel liegen als eigene Rasterfelder ÜBER den
+   Kacheln (pointer-events:none) – sie belegen keine Zelle, die Anordnung der
+   Seite bleibt, wie sie am Pult gebaut wurde. */
+.gruppe{position:relative;pointer-events:none;z-index:3;border-radius:13px;margin:-4px}
+.gruppe.einzel{border:2px solid #58a6ff;box-shadow:0 0 0 1px rgba(13,17,23,.6)}
+.gruppe.handy{border:2px dashed #f2cc60;margin:-6px;border-radius:15px}
+.gruppe.einzeln{margin:-3px}
+.gruppe.handy.einzeln{margin:-5px}
+.gruppe .titel{position:absolute;top:-8px;left:8px;max-width:calc(100% - 16px);font-size:10px;line-height:13px;font-weight:700;
+  padding:0 5px;border-radius:6px;background:#0d1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gruppe.einzel .titel{color:#79b8ff}
+.gruppe.handy .titel{color:#f2cc60;top:auto;bottom:-8px}
+
 /* Fader */
 .fader{background:#11161c;border:1px solid #30363d;display:flex;flex-direction:column;align-items:center;padding:6px 0 5px;overflow:hidden}
 .fader .wert{font-size:13px;font-weight:700;color:#58a6ff;flex:0 0 auto}
@@ -177,6 +225,7 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
   <div id="kopf">
     <span class="logo">LightOS</span>
     <span class="titel" id="titel">Handy-Konsole</span>
+    <button id="anim" type="button" role="switch" aria-checked="true" title="Animationen am Handy">✦ Anim. an</button>
     {# WEB-12: die feste Fernbedienung nur verlinken, wenn diese Sitzung sie oeffnen darf #}
     {% if feste_seite %}<a href="/" id="zurueck">‹ Remote</a>{% endif %}
     <span id="verb">getrennt</span>
@@ -214,6 +263,7 @@ var FEHLERTEXT = {
   kein_zugang: 'Kein Zugang – Link mit Schlüssel neu öffnen',
   laser_gesperrt: 'Laser – nur mit Freigabe am Pult',
   blackout_nicht_von_hier: 'Blackout kam nicht von diesem Handy – aufheben am Pult',
+  gruppe_blockiert: 'Andere Taste der Gruppe ist gehalten oder gesperrt',
   kein_recht: 'Nicht erlaubt',
   wert_ungueltig: 'Ungültiger Wert'
 };
@@ -232,6 +282,7 @@ var inHand = {};           // Kennung -> Zeitpunkt der letzten eigenen Bewegung
 var gmInHand = 0;
 var aktiveFinger = [];     // Abbruch-Funktionen laufender Berührungen
 var zaehler = 0;
+var seitenEls = [];        // WEB-14: Seiten-Elemente in Reihenfolge (für die Gruppen-Rahmen)
 
 /* ── Verbindung ─────────────────────────────────────────────────────── */
 
@@ -467,12 +518,103 @@ function farbe(hex) {
   }
   var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return {
+    rgb: [r, g, b],
     voll: 'rgb(' + r + ',' + g + ',' + b + ')',
     rand: 'rgb(' + Math.min(255, r + 70) + ',' + Math.min(255, g + 70) + ',' + Math.min(255, b + 70) + ')',
     schein: 'rgba(' + r + ',' + g + ',' + b + ',.6)',
     text: lum > 0.6 ? '#10141a' : '#ffffff'
   };
 }
+
+/* WEB13-FARBEN-ANFANG — reine Rechnungen (auch im Test mit node geprüft) */
+
+function rgbVon(hex) {
+  var m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) { return null; }
+  var n = parseInt(m[1], 16);
+  return [n >> 16, (n >> 8) & 255, n & 255];
+}
+function rgbText(c) { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+// ``anteil`` von a, Rest von b
+function mische(a, b, anteil) {
+  return [0, 1, 2].map(function (i) { return Math.round(a[i] * anteil + b[i] * (1 - anteil)); });
+}
+// relative Leuchtdichte nach WCAG
+function leuchtdichte(c) {
+  var l = c.map(function (v) { v = v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2];
+}
+function kontrast(a, b) {
+  var la = leuchtdichte(a), lb = leuchtdichte(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+var HELL = [255, 255, 255], DUNKEL = [16, 20, 26];
+// Die lesbarere der beiden Textfarben auf dem Grund ``c``.
+function textFuer(c) { return kontrast(c, HELL) >= kontrast(c, DUNKEL) ? '#ffffff' : '#10141a'; }
+
+// Alle Farben einer Kachel aus der Tastenfarbe: aus = gedimmt, an = voll.
+function kachelFarben(hex) {
+  var f = farbe(hex);
+  if (!f) { return null; }
+  var c = f.rgb;
+  var ausOben = mische(c, [31, 37, 45], 0.38), ausUnten = mische(c, [21, 26, 32], 0.22);
+  var anUnten = mische(c, [0, 0, 0], 0.7);
+  return {
+    aus: {oben: rgbText(ausOben), unten: rgbText(ausUnten), text: textFuer(mische(ausOben, ausUnten, 0.5)),
+          rand: rgbText(mische(c, [58, 66, 77], 0.45))},
+    an: {oben: rgbText(c), unten: rgbText(anUnten), text: textFuer(mische(c, anUnten, 0.5))},
+    rand: f.rand, schein: f.schein
+  };
+}
+
+// Effekt-Dynamik einer aktiven Taste -> CSS: Verlauf und Taktdauer.
+function effektStil(effekt) {
+  var raus = {lauf: false, takt: false, verlauf: '', laufDauer: '', taktDauer: '', bpm: 0};
+  if (!effekt) { return raus; }
+  var farben = (effekt.farben || []).filter(function (h) { return !!rgbVon(h); }).slice(0, 8);
+  if (farben.length >= 2) {
+    raus.lauf = true;
+    raus.verlauf = 'linear-gradient(90deg,' + farben.concat([farben[0]]).join(',') + ')';
+    raus.laufDauer = Math.max(2, farben.length) + 's';
+  }
+  if (effekt.takt) {
+    var bpm = Number(effekt.bpm);
+    if (!isFinite(bpm) || bpm <= 0) { bpm = 120; }
+    bpm = Math.max(30, Math.min(300, Math.round(bpm)));
+    raus.takt = true;
+    raus.bpm = bpm;
+    // ein Schlag = einmal hell, einmal dunkel. Nie schneller als 3 Blitze je
+    // Sekunde (Grenze fuer lichtempfindliche Menschen): ueber 180 BPM blinkt
+    // die Kachel nur auf jeden zweiten Schlag, die Zahl zeigt das echte Tempo.
+    var schlag = 60000 / bpm;
+    while (schlag < 1000 / 3) { schlag *= 2; }
+    raus.taktDauer = (Math.round(schlag) / 1000) + 's';
+  }
+  return raus;
+}
+
+// Feste Warnkacheln: nie umgefärbt, nie animiert, keine eigene Handy-Beschriftung.
+function festesAussehen(w) {
+  return !w || w.funktion === 'Blackout' || w.funktion === 'LaserEstop' ||
+    w.gesperrt === 'laser' || (w.ziel_fehlt || []).length > 0;
+}
+
+/* WEB13-FARBEN-ENDE */
+
+/* ── WEB-13: Schalter „Animationen am Handy“ (Vorgabe an, gemerkt) ───── */
+
+var MERK_ANIM = 'lightos_konsole_anim';
+function zeigeAnim() {
+  var an = merkLies(MERK_ANIM) !== '0';
+  document.body.classList.toggle('ruhig', !an);
+  $('anim').setAttribute('aria-checked', an ? 'true' : 'false');
+  $('anim').textContent = an ? '✦ Anim. an' : '✦ Anim. aus';
+}
+$('anim').addEventListener('click', function () {
+  merkSetze(MERK_ANIM, merkLies(MERK_ANIM) === '0' ? '' : '0');
+  zeigeAnim();
+});
+zeigeAnim();
 
 /* ── Berührung ──────────────────────────────────────────────────────── */
 
@@ -518,15 +660,32 @@ function finger(el, unten, zieh, oben) {
 
 /* ── Elemente ───────────────────────────────────────────────────────── */
 
-function baueTaste(w, el) {
+// Beginnt die Beschriftung mit einem Symbol (Emoji/Zeichen), steht es groß
+// über dem Namen — wie auf der VC-Taste, die es in der Beschriftung trägt.
+function trenneSymbol(text) {
+  var m = /^\s*(\S+)\s+(\S[\s\S]*)$/.exec(text || '');
+  if (m && m[1].length <= 4 && !/[0-9A-Za-zÀ-ɏ]/.test(m[1]) &&
+      !/^[\-–—.,:;!?()\[\]„“"'«»+*\/#&%=<>|~_]+$/.test(m[1])) {
+    return {symbol: m[1], name: m[2]};
+  }
+  return {symbol: '', name: text || ''};
+}
+
+function baueTaste(w, el, eintrag) {
   el.className += ' taste';
   if (w.funktion === 'Blackout') { el.className += ' blackout'; }
   if (w.funktion === 'LaserEstop') { el.className += ' notaus'; }
+  var eigen = eintrag || {};
   var streifen = document.createElement('i'); streifen.className = 'streifen';
+  var symbol = document.createElement('span'); symbol.className = 'symbol';
   var name = document.createElement('span'); name.className = 'name';
+  var pult = document.createElement('span'); pult.className = 'pult';
   var klein = document.createElement('small');
   var punkt = document.createElement('i'); punkt.className = 'punkt';
-  el.appendChild(streifen); el.appendChild(name); el.appendChild(klein); el.appendChild(punkt);
+  var marke = document.createElement('span'); marke.className = 'marke'; marke.textContent = 'Handy';
+  var bpm = document.createElement('span'); bpm.className = 'bpm';
+  el.appendChild(streifen); el.appendChild(symbol); el.appendChild(name); el.appendChild(pult);
+  el.appendChild(klein); el.appendChild(punkt); el.appendChild(bpm);
   var aktuell = w;
   finger(el, function () {
     if (aktuell.gesperrt) { melde(FEHLERTEXT.laser_gesperrt); return false; }
@@ -541,16 +700,44 @@ function baueTaste(w, el) {
   });
   return function (neu) {
     aktuell = neu;
-    name.textContent = neu.beschriftung || '';
+    var fest = festesAussehen(neu);
+    // WEB-13: eigene Handy-Farbe/-Beschriftung — nie auf Warnkacheln.
+    var eigenText = !fest && eigen.handy_text ? eigen.handy_text : '';
+    var eigenFarbe = !fest && eigen.handy_farbe ? eigen.handy_farbe : '';
+    var original = neu.beschriftung || '';
+    var teile = (neu.funktion === 'Blackout' || neu.funktion === 'LaserEstop') ? {symbol: '', name: original}
+      : trenneSymbol(eigenText || original);
+    symbol.textContent = teile.symbol;
+    name.textContent = teile.name;
+    pult.textContent = eigenText && eigenText !== original ? ('Pult: ' + original) : '';
     klein.textContent = neu.bedienung === 'halten' ? 'halten' : '';
-    var f = farbe(neu.farbe);
-    if (f && neu.funktion !== 'Blackout' && neu.funktion !== 'LaserEstop') {
+    var mitMarke = !!(eigenText || eigenFarbe);
+    if (mitMarke && !marke.parentNode) { el.appendChild(marke); }
+    if (!mitMarke && marke.parentNode) { el.removeChild(marke); }
+    var f = fest ? null : farbe(eigenFarbe || neu.farbe);
+    var k = fest ? null : kachelFarben(eigenFarbe || neu.farbe);
+    if (f && k) {
       el.style.setProperty('--farbe', f.voll);
-      el.style.setProperty('--rand', f.rand);
-      el.style.setProperty('--schein', f.schein);
-      el.style.setProperty('--text', f.text);
+      el.style.setProperty('--rand', k.rand);
+      el.style.setProperty('--schein', k.schein);
+      el.style.setProperty('--text', k.an.text);
+      el.style.setProperty('--aus-oben', k.aus.oben);
+      el.style.setProperty('--aus-unten', k.aus.unten);
+      el.style.setProperty('--aus-text', k.aus.text);
+      el.style.setProperty('--aus-rand', k.aus.rand);
+      el.style.setProperty('--an-oben', k.an.oben);
+      el.style.setProperty('--an-unten', k.an.unten);
+      el.style.setProperty('--an-text', k.an.text);
     }
+    el.classList.toggle('gefaerbt', !!(f && k));
     el.classList.toggle('aktiv', !!neu.aktiv);
+    // WEB-13: Effekt-Dynamik nur bei aktiver, gefärbter Taste.
+    var d = effektStil(neu.aktiv && f && k ? neu.effekt : null);
+    el.classList.toggle('lauf', d.lauf);
+    el.classList.toggle('takt', d.takt);
+    if (d.lauf) { el.style.setProperty('--verlauf', d.verlauf); el.style.setProperty('--lauf-dauer', d.laufDauer); }
+    if (d.takt) { el.style.setProperty('--takt-dauer', d.taktDauer); }
+    bpm.textContent = d.takt ? (d.bpm + ' BPM') : '';
   };
 }
 
@@ -600,7 +787,8 @@ function faderBedienung(el, lies, schreibe, darf) {
   return zeige;
 }
 
-function baueFader(w, el) {
+function baueFader(w, el, eintrag) {
+  var eigenText = (eintrag && eintrag.handy_text) || '';
   el.className += ' fader';
   if (w.modus && /grand/i.test(w.modus)) { el.className += ' gm'; }
   el.innerHTML = '<span class="wert"></span><div class="bahn"><i class="fuell"></i><b class="griff"></b></div><span class="name"></span>';
@@ -610,7 +798,8 @@ function baueFader(w, el) {
     function () { if (aktuell.gesperrt) { melde(FEHLERTEXT.laser_gesperrt); return false; } });
   return function (neu) {
     aktuell = neu;
-    el.querySelector('.name').textContent = neu.beschriftung || '';
+    var t = !festesAussehen(neu) && eigenText ? eigenText : (neu.beschriftung || '');
+    el.querySelector('.name').textContent = t;
     // Während der Finger zieht (und kurz danach) gewinnt die eigene Hand –
     // die Rückmeldung des eigenen Werts ließe den Griff sonst zurückspringen.
     if (el._finger !== undefined || Date.now() - (inHand[neu.id] || 0) < 400) { return; }
@@ -627,7 +816,8 @@ function knopf(text, klasse, tun) {
   return b;
 }
 
-function baueCueliste(w, el, hoehe) {
+function baueCueliste(w, el, hoehe, eintrag) {
+  var eigenText = (eintrag && eintrag.handy_text) || '';
   el.className += ' cueliste' + (hoehe < 3 ? ' flach' : '');
   var anzeige = document.createElement('div'); anzeige.className = 'anzeige';
   anzeige.innerHTML = '<div class="z1"><span></span><span></span></div><div class="jetzt"></div><div class="danach"></div><div class="balken"><i></i></div>';
@@ -644,7 +834,8 @@ function baueCueliste(w, el, hoehe) {
     aktuell = neu;
     var z = anzeige.querySelectorAll('.z1 span');
     var laeuft = neu.cue_index >= 0;
-    z[0].textContent = (neu.liste || neu.beschriftung || 'Cueliste') + (neu.liste ? (laeuft ? ' · läuft' : ' · bereit') : ' · keine Liste');
+    var titel = !festesAussehen(neu) && eigenText ? eigenText : (neu.liste || neu.beschriftung || 'Cueliste');
+    z[0].textContent = titel + (neu.liste ? (laeuft ? ' · läuft' : ' · bereit') : ' · keine Liste');
     z[1].textContent = neu.anzahl ? (Math.max(0, neu.cue_index + 1) + ' / ' + neu.anzahl) : '';
     var jetzt = anzeige.querySelector('.jetzt');
     jetzt.innerHTML = '';
@@ -686,8 +877,74 @@ function mitZustand(el, setze) {
 
 function uebernehmeWidget(w) {
   if (!w || !stand) { return; }
+  var vorher = stand.widgets[w.id];
   stand.widgets[w.id] = w;
   (ansichten[w.id] || []).forEach(function (a) { a(w); });
+  // WEB-14: Rahmen mit Einzel-Auswahl am Pult umgestellt -> Gruppen neu zeichnen.
+  if (einzelSchluessel(vorher) !== einzelSchluessel(w)) { zeichneGruppen(); }
+}
+
+/* ── WEB-14: Gruppen sichtbar machen ────────────────────────────────── */
+
+function einzelSchluessel(w) { return (w && w.typ === 'taste' && w.einzel) ? (w.einzel.id + '\u0001' + (w.einzel.titel || '')) : ''; }
+
+// Alle Gruppen einer Seite: Rahmen mit Einzel-Auswahl (blau, vom Pult) und
+// eigene Handy-Gruppen (gelb gestrichelt). Nur Kacheln, die als Taste da sind.
+function gruppenDerSeite(eintraege) {
+  var raus = [], einzel = {};
+  eintraege.forEach(function (e) {
+    var w = stand.widgets[e.widget];
+    if (!w || w.typ !== 'taste' || !w.einzel) { return; }
+    var g = einzel[w.einzel.id];
+    if (!g) { g = einzel[w.einzel.id] = {art: 'einzel', titel: (w.einzel.titel || 'Rahmen') + ' (immer nur eine)', eintraege: []}; raus.push(g); }
+    g.eintraege.push(e);
+  });
+  (stand.gruppen || []).forEach(function (gr) {
+    var drin = eintraege.filter(function (e) { return gr.widgets.indexOf(e.widget) >= 0 && stand.widgets[e.widget]; });
+    if (drin.length) { raus.push({art: 'handy', titel: (gr.name || 'Gruppe') + ' (nur Handy)', eintraege: drin}); }
+  });
+  return raus.filter(function (g) { return g.eintraege.length >= (g.art === 'einzel' ? 2 : 1); });
+}
+
+// Ein gemeinsamer Kasten nur, wenn im umschließenden Rechteck KEINE fremde
+// Kachel liegt – sonst umrahmte er eine Taste, die nicht dazugehört. Dann
+// bekommt jede Kachel ihre eigene Markierung in derselben Farbe, der Titel
+// steht an der ersten. So bleibt das Raster immer, wie es gebaut wurde.
+function gruppenFelder(g, eintraege) {
+  var s0 = 99, z0 = 99, s1 = -1, z1 = -1;
+  g.eintraege.forEach(function (e) {
+    s0 = Math.min(s0, e.spalte); z0 = Math.min(z0, e.zeile);
+    s1 = Math.max(s1, e.spalte + e.breite); z1 = Math.max(z1, e.zeile + e.hoehe);
+  });
+  var fremd = eintraege.some(function (e) {
+    if (g.eintraege.indexOf(e) >= 0) { return false; }
+    return e.spalte < s1 && e.spalte + e.breite > s0 && e.zeile < z1 && e.zeile + e.hoehe > z0;
+  });
+  if (!fremd) { return [{spalte: s0, zeile: z0, breite: s1 - s0, hoehe: z1 - z0, titel: true, einzeln: false}]; }
+  var sortiert = g.eintraege.slice().sort(function (a, b) { return a.zeile - b.zeile || a.spalte - b.spalte; });
+  return sortiert.map(function (e, i) { return {spalte: e.spalte, zeile: e.zeile, breite: e.breite, hoehe: e.hoehe, titel: i === 0, einzeln: true}; });
+}
+
+/* WEB14-GRUPPEN-ENDE */
+
+function zeichneGruppen() {
+  if (!stand) { return; }
+  seitenEls.forEach(function (s) {
+    var alte = s.querySelectorAll('.gruppe');
+    for (var i = 0; i < alte.length; i++) { s.removeChild(alte[i]); }
+    var eintraege = s._eintraege || [];
+    gruppenDerSeite(eintraege).forEach(function (g) {
+      gruppenFelder(g, eintraege).forEach(function (f) {
+        var el = document.createElement('div');
+        el.className = 'gruppe ' + g.art + (f.einzeln ? ' einzeln' : '');
+        el.style.gridColumn = (f.spalte + 1) + ' / span ' + f.breite;
+        el.style.gridRow = (f.zeile + 1) + ' / span ' + f.hoehe;
+        el.setAttribute('aria-hidden', 'true');
+        if (f.titel) { var t = document.createElement('span'); t.className = 'titel'; t.textContent = '◉ ' + g.titel; el.appendChild(t); }
+        s.appendChild(el);
+      });
+    });
+  });
 }
 
 function zeigeGm() { if (stand && $('gm')._finger === undefined && Date.now() - gmInHand > 400) { $('gm')._wert = stand.gm; gmZeige(stand.gm); } }
@@ -709,7 +966,8 @@ function zeigeSeite(nr) {
 function uebernehmeAlles(k) {
   if (!k) { return; }
   stand = {seiten: k.seiten || [], widgets: k.widgets || {}, gm: k.gm, blackout: k.blackout, aktiv: !!k.aktiv,
-           notaus: !!k.notaus};
+           notaus: !!k.notaus, gruppen: k.gruppen || []};
+  seitenEls = [];
   zeigeNotaus();
   rev = k.rev || 0;
   ansichten = {};
@@ -749,17 +1007,23 @@ function uebernehmeAlles(k) {
       var setze;
       if (w.typ === 'fader') {
         if (e.breite > e.hoehe) { el.className += ' quer'; }
-        setze = baueFader(w, el);
+        setze = baueFader(w, el, e);
       } else if (w.typ === 'cueliste') {
-        setze = baueCueliste(w, el, e.hoehe);
+        setze = baueCueliste(w, el, e.hoehe, e);
       } else {
-        setze = baueTaste(w, el);
+        setze = baueTaste(w, el, e);
+      }
+      // WEB-13: Marke „Handy“ auch an Fader/Cueliste mit eigener Beschriftung.
+      if (w.typ !== 'taste' && e.handy_text) {
+        var mk = document.createElement('span'); mk.className = 'marke'; mk.textContent = 'Handy'; el.appendChild(mk);
       }
       setze = mitZustand(el, setze);
       setze(w);
       (ansichten[w.id] = ansichten[w.id] || []).push(setze);
       s.appendChild(el);
     });
+    s._eintraege = seite.eintraege || [];
+    seitenEls.push(s);
     buehne.appendChild(s);
     var b = document.createElement('button');
     b.type = 'button';
@@ -768,6 +1032,7 @@ function uebernehmeAlles(k) {
     reiter.appendChild(b);
   });
   reiter.className = stand.seiten.length > 1 ? 'mehrere' : '';
+  zeichneGruppen();
   var gemerkt = seiteNr;
   try { var g = parseInt(sessionStorage.getItem('lightos_seite'), 10); if (!isNaN(g)) { gemerkt = g; } } catch (e) {}
   zeigeSeite(gemerkt);

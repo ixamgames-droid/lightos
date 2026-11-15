@@ -6,7 +6,7 @@
 - **Moving Heads (ZQ02001, 11-Kanal):** MH Links @ DMX **65**, MH Rechts @ **76**. Kanäle:
   1 Pan · 2 Pan-Fine · 3 Tilt · 4 Tilt-Fine · 5 Farbrad · 6 Gobo · 7 Shutter · 8 Dimmer · 9 Speed · 10 Gobo-FX · 11 Reset.
   Physische MH müssen auf diese Adresse + 16-bit-Pan/Tilt-Modus stehen, sonst landen Kanäle falsch.
-- **MH-Kreis im Center zu langsam (Davids Hinweis):** Wenn der MH zentriert steht und einen Kreis fahren soll,
+- **MH-Kreis im Center zu langsam (Robins Hinweis):** Wenn der MH zentriert steht und einen Kreis fahren soll,
   muss er die Köpfe einmal komplett herumdrehen → das dauert zu lange bei normalem Tempo. → **Kreis-Effekt für MH
   langsamere BPM/kleineren Multiplikator geben** (oder kleineren Radius/Bereich), damit die Mechanik mitkommt.
 - PAR (ZQ01424, 8ch RGBW): 1 Dimmer/Intensity · 2-5 R/G/B/W · 6 Shutter · 7 Macro · 8 Speed. Intensity-Default = 0.

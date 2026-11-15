@@ -316,7 +316,7 @@ Details zu Implementierungs-Schritten, Risiken und offenen Punkten: siehe strukt
 
 ## Orchestrator-Entscheidungen zu den offenen Fragen (2026-07-02, bindend)
 
-1. **Show-Fixtures fuers Migrations-Gate:** Davids persoenliche Shows werden NICHT committet. Der Gate-Test laeuft ueber (a) die committeten Shows in `shows/` UND (b) — falls vorhanden — den Geschwister-Hauptcheckout `../lightos-main/shows/` (dort liegen ~52 inkl. 'david test 2.lshow'); fehlt (b), wird sauber geskippt (CI-freundlich). Damit ist das Gate lokal vollstaendig und remote reproduzierbar.
+1. **Show-Fixtures fuers Migrations-Gate:** Robins persoenliche Shows werden NICHT committet. Der Gate-Test laeuft ueber (a) die committeten Shows in `shows/` UND (b) — falls vorhanden — den Geschwister-Hauptcheckout `../lightos-main/shows/` (dort liegen ~52 inkl. 'robin test 2.lshow'); fehlt (b), wird sauber geskippt (CI-freundlich). Damit ist das Gate lokal vollstaendig und remote reproduzierbar.
 2. **Backup-Ort:** in `_do_save` (main_window.py), exakt vor dem destruktiven Overwrite, NUR wenn die geladene Show-Version < 1.2 war: `<name>.pre-viz11.bak` neben der Datei, idempotent (nicht ueberschreiben, falls schon vorhanden).
 3. **mount_type=HANG:** In dieser Phase NUR Metadatum — KEINE automatische 180-Grad-Basis-Orientierung (keine Optik-Aenderung an Bestands-Shows). Auto-Orientierung kommt in VIZ-14 beim NEUEN Andocken (Ghost-Preview/Auto-Hang), nie retroaktiv.
 4. **Drag-Translation:** Translation gedockter Fixtures bleibt waehrend des Drags JS-seitig (moveDockedFixtures, Latenz). NUR Rotation laeuft ueber den Python-Graph. Bei Drag-ENDE macht Python einen autoritativen Resync (stageListChanged -> Graph -> ggf. Korrektur-Push). Eine Wahrheit am Ende, fluessig waehrenddessen.
