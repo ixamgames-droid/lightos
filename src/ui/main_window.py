@@ -928,6 +928,13 @@ class MainWindow(QMainWindow):
             "Vorschau; vorhandene Geräte bleiben unverändert.")
         a.triggered.connect(lambda: self._import_mvr())
         self._act_mvr_import = a
+        a = fm.addAction("MVR-Datei exportieren …")
+        a.setToolTip(
+            "Den Patch samt Position und Ausrichtung im 3D als MVR-Datei "
+            "speichern — zum Öffnen in grandMA, Vectorworks, Capture & Co. "
+            "Eigene Profile reisen als GDTF mit.")
+        a.triggered.connect(lambda: self._export_mvr())
+        self._act_mvr_export = a
 
         # Show pruefen & reparieren
         fm.addSeparator()
@@ -2880,6 +2887,11 @@ class MainWindow(QMainWindow):
         """VIZ-56: MVR-Datei lesen, Vorschau zeigen, anlegen."""
         from src.ui.widgets.mvr_import_dialog import importieren_starten
         return importieren_starten(self, self._state, pfad)
+
+    def _export_mvr(self, pfad: str | None = None):
+        """VIZ-56: Patch + 3D-Lagen als MVR-Datei schreiben."""
+        from src.ui.widgets.mvr_export import exportieren_starten
+        return exportieren_starten(self, self._state, pfad)
 
     def _import_qxw(self):
         path, _ = QFileDialog.getOpenFileName(

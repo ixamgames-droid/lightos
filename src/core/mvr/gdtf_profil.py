@@ -66,11 +66,21 @@ _ART = {
 }
 
 
+#: Vorsilbe der eigenen GDTF-Attribute, die der Export fuer LightOS-Attribute
+#: ohne GDTF-Gegenstueck schreibt (``LightOS_laser_x``) — siehe
+#: :mod:`.gdtf_schreiben`. Beim Import kommt das LightOS-Attribut zurueck.
+EIGENES_PRAEFIX = "lightos_"
+
+
 def lightos_attribut(gdtf_attribut: str) -> str:
     """``"ColorAdd_R"`` -> ``"color_r"``; Unbekanntes -> ``"raw"``."""
     a = (gdtf_attribut or "").strip().casefold()
     if a in ATTRIBUT_KARTE:
         return ATTRIBUT_KARTE[a]
+    if a.startswith(EIGENES_PRAEFIX):
+        from src.core.database.bibliothek_format import ATTRIBUTE
+        rest = a[len(EIGENES_PRAEFIX):]
+        return rest if rest in ATTRIBUTE else "raw"
     if a.startswith("dimmer"):
         return "intensity"
     return "raw"

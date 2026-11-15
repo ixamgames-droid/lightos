@@ -1,4 +1,4 @@
-# Rig aus einer MVR-Datei übernehmen
+# Rig mit MVR-Dateien austauschen
 
 MVR (*My Virtual Rig*) ist das offene Austauschformat vieler Lichtprogramme, etwa
 grandMA, Vectorworks, Depence, Capture oder Chamsys. Eine `.mvr`-Datei sagt, welches
@@ -6,9 +6,10 @@ Gerät wo hängt, wie es ausgerichtet ist und auf welcher DMX-Adresse es liegt. 
 Gerätetypen stecken als GDTF-Dateien mit drin.
 
 LightOS übernimmt daraus die **Geräte in den Patch** und ihre **Position und
-Ausrichtung im 3D**. Noch ohne Bilder.
+Ausrichtung im 3D** — und schreibt den eigenen Patch auch wieder als `.mvr`-Datei,
+mit den eigenen Profilen als GDTF. Noch ohne Bilder.
 
-## So geht's
+## Importieren
 
 1. **Datei → MVR-Datei importieren …** wählen und die `.mvr`-Datei öffnen.
 2. Es folgt eine **Vorschau**, angelegt wird noch nichts. Je Gerät eine Zeile:
@@ -46,5 +47,28 @@ Ausrichtung im 3D**. Noch ohne Bilder.
   ungewöhnlich große oder stark gepackte Inhalte und XML mit Dokumenttyp-Angaben.
   Eine einzelne unlesbare GDTF-Datei trifft nur ihre Geräte, sie bleiben
   „nicht zugeordnet“.
-- **Noch nicht drin:** der Export als MVR und die Umwandlung eigener Profile nach
-  GDTF (Backlog VIZ-56, Teil 2 und 3).
+
+## Exportieren
+
+1. **Datei → MVR-Datei exportieren …** wählen und Ort und Namen der Datei angeben.
+2. LightOS schreibt alle Geräte des Patches mit Adresse, Modus, Position und
+   Ausrichtung im 3D. Die Meldung danach nennt die Zahl der Geräte.
+3. **Eigene Profile reisen mit:** jeder Gerätetyp steckt als GDTF-Datei in der
+   `.mvr`. Ein anderes Programm (oder ein anderer LightOS-Rechner, der das Profil
+   nicht kennt) bekommt so die Kanäle, auch für selbst angelegte Profile.
+
+Gut zu wissen beim Export:
+
+- **Geräte ohne Position im 3D** stehen in der Datei am Ursprung (0, 0, 0). Die
+  Meldung nennt sie mit Namen.
+- **Fehlt das Profil** eines Geräts in der Bibliothek, wird es nur mit seiner
+  Kanalzahl exportiert (alle Kanäle als einfache Fader). Auch das nennt die Meldung.
+- **Wieder einlesen:** importiert man die Datei in LightOS, erkennt LightOS die
+  vorhandenen Profile wieder und legt sie nicht doppelt an.
+- **Was die GDTF enthält:** Hersteller, Modell, alle Modi mit allen Kanälen und
+  Wertebereichen. Pan/Tilt fein werden als 16-bit-Kanal geschrieben. Gibt es ein
+  Attribut in einem Modus mehrmals (mehrere Köpfe), bekommt jeder Kopf ein eigenes
+  Element. 3D-Modelle, Räder und Lichtdaten schreibt LightOS nicht.
+- **Gleiche Show, gleiche Datei:** zweimal exportiert ergibt dieselbe Datei. Jedes
+  Gerät behält dabei seine Kennung, ein anderes Programm erkennt es beim nächsten
+  Export wieder.
