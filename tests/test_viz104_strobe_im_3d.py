@@ -611,7 +611,10 @@ class LiveView2dBlinktImBildtaktTest(unittest.TestCase):
     def _canvas(self, abstand_s=0.0):
         import src.ui.views.live_view as LV
         c = SimpleNamespace(RENDER_INTERVAL_MS=LV.StageCanvas.RENDER_INTERVAL_MS,
-                            _strobe_bild=0, _bild_abstand_s=lambda: abstand_s)
+                            _strobe_bild=0, _bild_abstand_s=lambda: abstand_s,
+                            # UI-128: hier der Grundtakt (kein Strobe-Takt)
+                            _takt_ms=lambda: LV.StageCanvas.RENDER_INTERVAL_MS,
+                            _strobe_gesehen=lambda: None)
         c._strobe_bildrate = lambda: LV.StageCanvas._strobe_bildrate(c)
         c._blink_an = lambda hz, r=False: LV.StageCanvas._blink_an(c, hz, r)
         return LV, c

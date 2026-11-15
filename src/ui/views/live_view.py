@@ -1412,12 +1412,53 @@ class StageCanvas(QWidget):
             return 0.0
         return proben[(len(proben) - 1) // 2]
 
+    # ── UI-128: schnellerer Takt, solange ein Strobe blinkt ─────────────────
+    # Bei 7-8 Bildern/s (Takt 100 ms + Budget 0,25, gemessen 250 %, 80 Geraete,
+    # ~34 ms je Bild) zeigte die 2D-Ansicht jeden Strobe ab 5 Hz als dasselbe
+    # langsame Blinken (~2-2,5 Blitze/s, VIZ-104). Solange ein Geraet sichtbar
+    # blinkt, gelten deshalb STROBE_TAKT_MS und STROBE_UI_ANTEIL - gemessen in
+    # der echten App: 13,6 Bilder/s bei UI-Thread-Anteil 0,48 (50 ms / 0,25:
+    # 7,4 Bilder/s, 0,25; 50 ms / 0,5 schon 0,58). Bedienung kaum langsamer
+    # (Verzug p95 29 -> 32 ms). NICHT bei sichtbarem 3D-Fenster: das setzt sein
+    # Bild im selben UI-Thread zusammen (VIZ-70) und zeigt den Strobe selbst.
+    STROBE_TAKT_MS = 50
+    STROBE_UI_ANTEIL = 0.40
+    STROBE_NACHLAUF_S = 1.0         # so lange nach dem letzten blinkenden Geraet
+
+    def _strobe_gesehen(self) -> None:
+        self._strobe_zuletzt = self._uhr()
+
+    @staticmethod
+    def _3d_fenster_sichtbar() -> bool:
+        try:
+            from PySide6.QtWidgets import QApplication
+            for w in QApplication.topLevelWidgets():
+                if (type(w).__name__ == "VisualizerWindow" and w.isVisible()
+                        and not w.isMinimized()):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _strobe_takt_aktiv(self) -> bool:
+        zuletzt = getattr(self, "_strobe_zuletzt", None)
+        if zuletzt is None or self._uhr() - zuletzt > self.STROBE_NACHLAUF_S:
+            return False
+        return not self._3d_fenster_sichtbar()
+
+    def _takt_ms(self) -> int:
+        return self.STROBE_TAKT_MS if self._strobe_takt_aktiv() else self.RENDER_INTERVAL_MS
+
+    def _ui_anteil(self) -> float:
+        return self.STROBE_UI_ANTEIL if self._strobe_takt_aktiv() else self.MAX_UI_ANTEIL
+
     def _bild_abstand_s(self) -> float:
         """Mindestabstand zweier Takt-Bilder; 0 = volle Rate (jeder Takt)."""
-        if self.MAX_UI_ANTEIL <= 0:
+        anteil = self._ui_anteil()
+        if anteil <= 0:
             return 0.0
-        abstand = self._zeichenzeit_s() / self.MAX_UI_ANTEIL
-        if abstand <= self.RENDER_INTERVAL_MS / 1000.0:
+        abstand = self._zeichenzeit_s() / anteil
+        if abstand <= self._takt_ms() / 1000.0:
             return 0.0
         return min(abstand, self.MAX_BILD_ABSTAND_S)
 
@@ -1427,14 +1468,14 @@ class StageCanvas(QWidget):
         aus, sodass der MITTLERE Abstand stimmt."""
         if self._bild_abstand_s() <= 0.0:
             return True
-        return jetzt >= self._naechstes_bild - self.RENDER_INTERVAL_MS / 2000.0
+        return jetzt >= self._naechstes_bild - self._takt_ms() / 2000.0
 
     def _bild_verbucht(self, jetzt: float) -> None:
         abstand = self._bild_abstand_s()
         if abstand <= 0.0:
             self._naechstes_bild = 0.0
             return
-        halb = self.RENDER_INTERVAL_MS / 2000.0
+        halb = self._takt_ms() / 2000.0
         # Nach einer Pause kein Guthaben ansparen: ab jetzt zaehlen.
         self._naechstes_bild = max(self._naechstes_bild, jetzt - halb) + abstand
 
@@ -1460,6 +1501,13 @@ class StageCanvas(QWidget):
         # zeigen den Stand des laufenden Takt-Bildes noch einmal.
         self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
         self.update()
+        # UI-128: Zeitgeber auf den Takt der Lage (Strobe sichtbar oder nicht)
+        try:
+            takt = self._takt_ms()
+            if self._update_timer.interval() != takt:
+                self._update_timer.setInterval(takt)
+        except (RuntimeError, AttributeError):
+            pass
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
     # Raster (gepunktete, geglaettete Linien), Buehne und Publikum aendern sich
@@ -2039,6 +2087,7 @@ class StageCanvas(QWidget):
 
         if freq_hz == 0.0:
             return 0.0, True
+        self._strobe_gesehen()          # UI-128: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
@@ -2403,6 +2452,7 @@ class StageCanvas(QWidget):
             freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
         if freq_hz == 0.0:
             return 0.0, True
+        self._strobe_gesehen()          # UI-128: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     # ── VIZ-104: Blinken im Bildtakt ─────────────────────────────────────────
@@ -2419,7 +2469,7 @@ class StageCanvas(QWidget):
 
     def _strobe_bildrate(self) -> float:
         """Takt-Bilder je Sekunde: der Timer, gebremst durch UI-86."""
-        abstand = self.RENDER_INTERVAL_MS / 1000.0
+        abstand = self._takt_ms() / 1000.0
         try:
             abstand = max(abstand, self._bild_abstand_s())
         except Exception:
