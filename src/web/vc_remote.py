@@ -39,6 +39,7 @@ HTTP_STATUS = {
     "nicht_freigegeben": 403,
     "laser_gesperrt": 403,              # WEB-12: Schalter „Laser vom Handy erlauben“ aus
     "blackout_nicht_von_hier": 403,     # WEB-12: Blackout hat jemand anderes gesetzt
+    "gruppe_blockiert": 409,            # WEB-14: andere aktive Gruppen-Taste nicht ausschaltbar
     "nur_ueber_socket": 400,            # WEB-12: Halten nur ueber den Socket
     "kein_recht": 403,
     "kein_zugang": 403,
