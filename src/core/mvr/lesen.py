@@ -38,6 +38,10 @@ class GdtfFunktion:
     von: int
     name: str
     attribut: str
+    #: CDX-73: Art des Bereichs (``ChannelRange.kind``) aus einem LightOS-
+    #: Export (``OriginalAttribute="LightOS_kind:<art>"``); ``None`` = keine
+    #: Angabe, dann leitet der Import sie aus dem Attribut ab.
+    art: str | None = None
 
 
 @dataclass(frozen=True)
@@ -51,6 +55,11 @@ class GdtfKanal:
     name: str = ""
     default: int = 0
     funktionen: tuple[GdtfFunktion, ...] = ()
+    #: CDX-73: der Standardwert in voller Aufloesung (``32895/2`` -> 32895,
+    #: 2 Bytes), damit das Fein-Byte mehrbytiger Kanaele nicht verloren geht.
+    #: ``None`` = nur :attr:`default` (1 Byte) bekannt.
+    default_roh: int | None = None
+    default_bytes: int = 1
 
 
 @dataclass(frozen=True)
@@ -169,6 +178,35 @@ def lies_adresse(text: str) -> tuple[int, int] | None:
     return u, a
 
 
+#: Vorsilbe in ``OriginalAttribute``, unter der ein LightOS-Export die Art
+#: eines Wertebereichs ablegt (Gegenstueck: ``gdtf_schreiben.ART_MARKE``).
+ART_MARKE = "lightos_kind:"
+
+
+def _art(cf) -> str | None:
+    t = (cf.get("OriginalAttribute") or "").strip()
+    if t.casefold().startswith(ART_MARKE):
+        return t[len(ART_MARKE):].strip().casefold()
+    return None
+
+
+def _dmx_roh(text: str) -> tuple[int, int] | None:
+    """GDTF-DMX-Wert ``"32895/2"`` -> ``(32895, 2)``, begrenzt auf den
+    Wertebereich der Byteanzahl; ``None`` bei leer/unlesbar."""
+    t = (text or "").strip()
+    if not t or t.lower() == "none":
+        return None
+    try:
+        if "/" in t:
+            w, n = t.split("/", 1)
+            wert, bytes_ = int(w), max(1, min(4, int(n)))
+        else:
+            wert, bytes_ = int(t), 1
+    except ValueError:
+        return None
+    return max(0, min((1 << (8 * bytes_)) - 1, wert)), bytes_
+
+
 def _dmx_wert(text: str, standard: int = 0) -> int:
     """GDTF-DMX-Wert ``"128/1"`` bzw. ``"32768/2"`` -> 0..255 (grob)."""
     t = (text or "").strip()
@@ -239,14 +277,17 @@ def _lies_kanal(ch) -> GdtfKanal | None:
             funktionen.append(GdtfFunktion(
                 von=_dmx_wert(cf.get("DMXFrom") or "0/1"),
                 name=(cf.get("Name") or cf.get("Attribute") or "").strip(),
-                attribut=(cf.get("Attribute") or "").strip()))
+                attribut=(cf.get("Attribute") or "").strip(),
+                art=_art(cf)))
     default = _dmx_wert(ch.get("Default") or "")
+    roh = _dmx_roh(ch.get("Default") or "")
     if not ch.get("Default") and funktionen:
         # GDTF 1.1+: der Standardwert steht an der ChannelFunction.
         for lc in ch:
             for cf in lc:
                 if _tag(cf) == "ChannelFunction" and cf.get("Default"):
                     default = _dmx_wert(cf.get("Default"))
+                    roh = _dmx_roh(cf.get("Default"))
                     break
             else:
                 continue
@@ -254,7 +295,9 @@ def _lies_kanal(ch) -> GdtfKanal | None:
     return GdtfKanal(offsets=offsets, attribut=attribut,
                      geometrie=(ch.get("Geometry") or "").strip(),
                      name=(ch.get("Name") or "").strip(),
-                     default=default, funktionen=tuple(funktionen))
+                     default=default, funktionen=tuple(funktionen),
+                     default_roh=roh[0] if roh else None,
+                     default_bytes=roh[1] if roh else 1)
 
 
 def lies_gdtf(archiv: S.Archiv, datei: str) -> GdtfTyp:

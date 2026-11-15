@@ -256,6 +256,15 @@ def _gdtf_kanaele(m: ProfilModus) -> list[_GKanal]:
     return aus
 
 
+#: CDX-73: die Art eines Wertebereichs (``ChannelRange.kind``) hat in GDTF
+#: kein eigenes Feld; das Attribut der ChannelFunction ist fuer alle Bereiche
+#: eines Kanals dasselbe (z. B. ``Shutter1``). Der Export legt sie deshalb im
+#: rein beschreibenden ``OriginalAttribute`` ab (``LightOS_kind:closed``), der
+#: Import liest sie dort zurueck (:mod:`.gdtf_profil`). Fremde Programme
+#: werten das Feld nicht aus.
+ART_MARKE = "LightOS_kind:"
+
+
 def _wert(v: int) -> str:
     return f"{max(0, min(255, int(v)))}/1"
 
@@ -357,13 +366,15 @@ def beschreibung_xml(p: ProfilDaten) -> bytes:
             z.append("<LogicalChannel" + _a("Attribute", gk.gdtf) + _a("Snap", "No")
                      + _a("Master", "None") + _a("MibFade", "0")
                      + _a("DMXChangeTimeLimit", "0") + ">")
-            for i, (fname, von, default, _art) in enumerate(funktionen):
+            mit_art = len(funktionen) > 1
+            for i, (fname, von, default, art) in enumerate(funktionen):
                 if gk.default16 is not None:
                     dmx_von, dmx_def = f"{von << 8}/2", f"{gk.default16}/2"
                 else:
                     dmx_von, dmx_def = _wert(von), _wert(default)
                 z.append("<ChannelFunction" + _a("Name", fname) + _a("Attribute", gk.gdtf)
-                         + _a("OriginalAttribute", "") + _a("DMXFrom", dmx_von)
+                         + _a("OriginalAttribute", ART_MARKE + art if mit_art else "")
+                         + _a("DMXFrom", dmx_von)
                          + _a("Default", dmx_def) + _a("PhysicalFrom", "0")
                          + _a("PhysicalTo", "1") + _a("RealFade", "0") + "/>")
             z.append("</LogicalChannel>")
