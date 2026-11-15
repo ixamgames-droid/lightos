@@ -1,6 +1,6 @@
 # Feature-Verifikation LightOS — Sweep 2026-07-09
 
-> Auftrag (David): „Alle Funktionen der Software mit dem Computer beweisen/überprüfen —
+> Auftrag (Robin): „Alle Funktionen der Software mit dem Computer beweisen/überprüfen —
 > Überblick verschaffen, was theoretisch möglich ist, alles einmal durchtesten, und
 > gefundene Fehler beheben lassen."
 >

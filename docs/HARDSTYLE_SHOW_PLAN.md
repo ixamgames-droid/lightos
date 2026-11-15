@@ -10,7 +10,7 @@
 
 ---
 
-## 1. Rig (Davids Standard 2026)
+## 1. Rig (Robins Standard 2026)
 
 Draufsicht: hinten 2 Moving Heads (links/rechts), Mitte eine Reihe aus 8 PAR am Boden,
 davor mittig 2 Spider am Boden. Publikum vorne.
@@ -71,7 +71,7 @@ Diese Looks werden als VC-Buttons/Cues gebaut, damit sie live mix-/triggerbar si
   Adresse/Modus (65/76, 11ch) gegen Patch abgleichen, Reset-Haltedauer. (Hardware-abhängig.)
 - **Autosave-Kollision** beim Laden prüfen (zweite Emissionsquelle).
 
-### 4.2 Neuer Funktionstyp: **Color-Chaser** (Davids Wunsch)
+### 4.2 Neuer Funktionstyp: **Color-Chaser** (Robins Wunsch)
 Eigenständiger Chaser, der **eine `ColorSequence` Schritt für Schritt durchläuft** (nicht
 Szenen verkettet). Pro Schritt Fade-In/Hold/Fade-Out; Farbfolge frei editierbar
 (z. B. *grün-weiß-blau* oder *grün-rot-blau-rot-weiß*). BPM-/Tap-koppelbar (beats_per_step),
@@ -117,7 +117,7 @@ BPM-Anzeige. ColorChaser/Chaser folgen dem Beat bereits (Duck-Typing in `bpm_man
   `docs/anleitung_*/` (Patch · Gruppen · Color-Chaser · Matrix+adaptive Speed · MH+Spider ·
   BPM-Sync · VC+APC). Später ins GitHub-Kit.
 
-Autorisierung: nach Phase 0 direkt mit Phase 1 weiter, **ohne erneute Freigabe** (David).
+Autorisierung: nach Phase 0 direkt mit Phase 1 weiter, **ohne erneute Freigabe** (Robin).
 
 ---
 
@@ -135,7 +135,7 @@ Scene-Tasten → Bank-Wechsel; Fader → RGBW/Speed/Grand Master. LED-Feedback +
 
 ---
 
-## 6b. Live-Show-Modus vs. manuell (Mutual-Exclusion) — David-Anforderung
+## 6b. Live-Show-Modus vs. manuell (Mutual-Exclusion) — Robin-Anforderung
 Zwei Bedienebenen, die sich NICHT überlagern dürfen:
 - **(a) manuell** getriggerte Effekte auf den VC-/APC-Bänken — u. a. der **Color-Chaser auf
   Bank 1 / Seite 1** (den ich live programmiere).
@@ -144,9 +144,9 @@ Zwei Bedienebenen, die sich NICHT überlagern dürfen:
 **Regel:** Beim **Aktivieren der Live-Show** wird der manuelle Color-Chaser (Bank 1/Seite 1)
 **automatisch deaktiviert**, damit beide Ebenen nicht kollidieren. Umsetzung: der „Live-Show"-
 Button stoppt beim Start die kollidierenden manuellen Funktionen (mind. den Bank-1-Color-Chaser).
-**Entschieden (David 2026-06-16):**
+**Entschieden (Robin 2026-06-16):**
 - **Reichweite:** Es wird **nur der Color-Chaser auf Bank 1 / Seite 1** deaktiviert; alle anderen
-  manuell getriggerten Effekte bleiben bedienbar (David mischt manuell dazu).
+  manuell getriggerten Effekte bleiben bedienbar (Robin mischt manuell dazu).
 - **Auto-Show = pro Lied:** Jedes Lied bekommt eine **eigene komplette Show**, die beim Abspielen
   automatisch startet (`MusicShowDirector` + `Track.autoshow_function_ids`, Per-Song-Handoff —
   war AUTODJ-Open-Point, also noch zu bauen).
@@ -159,8 +159,8 @@ Farbquelle** ist (er deckt jetzt PAR + Spider **+ MH** ab). Ein Live-Show, das i
 die Show **farblos** — das ist für Hardstyle klar falsch. **Entscheidung (Default):** der
 **LIVE-SHOW-Button startet den KOMPLETTEN farbigen Look** (MH-Bewegung + Farb-Chase + Dimmer, alle
 `mode=on`), `music_autoshow.function_ids=[1,2,3]`. Alle anderen Tasten bleiben nutzbar.
-→ Falls David doch den **strikten Takeover** will (Chaser wirklich aus), brauchen die MH/PAR eine
-**feste Grundfarbe** (base color), damit „MH immer farbig" trotzdem gilt — offen, auf Davids Wunsch.
+→ Falls Robin doch den **strikten Takeover** will (Chaser wirklich aus), brauchen die MH/PAR eine
+**feste Grundfarbe** (base color), damit „MH immer farbig" trotzdem gilt — offen, auf Robins Wunsch.
 
 ## 7. Aufnahme-/Anleitungs-Pipeline
 

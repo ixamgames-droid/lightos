@@ -4,7 +4,7 @@
 > Wunsch nur **analysiert und dokumentiert**, damit es später abgearbeitet
 > werden kann. Aktuell ist der `Spider 14ch` als ein Fixture mit **einer**
 > gemeinsamen Farbe für beide LED-Bänke eingebaut (siehe
-> [FIXTURE_LIBRARY.md](FIXTURE_LIBRARY.md), `fixture_db._spider_modes_data`).
+> [FIXTURE_LIBRARY.md](../FIXTURE_LIBRARY.md), `fixture_db._spider_modes_data`).
 
 ## 1. Ziel
 

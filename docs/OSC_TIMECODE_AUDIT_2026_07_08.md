@@ -53,7 +53,7 @@ Der OSC/MTC-Eingang ist **grundsolide**: robuste Handler-Kapselung, korrekte int
 Cross-Thread-Locks, spec-konforme MTC-Dekodierung. **Kein neuer P1/P2.** Die zwei P2 sind exakte Parität
 zu **WEB-01** (Remote-Kanal am Renderer vorbei) und **NET-01** (auth-loser `0.0.0.0`-Bind) — das bestätigt,
 dass diese beiden als **querschnittliche** Themen aller externen Eingänge (Web + OSC, vermutlich auch
-MIDI-in) mit **einem** gemeinsamen Fix gelöst werden sollten (Produkt-Entscheidung Davids). Neu sind nur
+MIDI-in) mit **einem** gemeinsamen Fix gelöst werden sollten (Produkt-Entscheidung Robins). Neu sind nur
 vier P3 (OSC-Blackout-Coercion, MTC-Frame-Wrap, MTC-Vollständigkeit, MTC-Torn-Read). Empfehlung: die zwei
 sauber+sicher fixbaren P3 (OSC-04 Blackout-Coercion, MTC-02 Vollständigkeits-Gate) direkt beheben; MTC-01
 (Frame-Wrap mit Drop-Frame) und MTC-03 (Torn-Read) als dokumentierte P3 parken.

@@ -4,11 +4,11 @@
 >
 > **➡ 2026-06-10: Repo-weite Übersicht ALLER offenen Punkte (Bugs, Features,
 > UI, Schulden, Fixture/DMX, Doku) in
-> [docs/OPEN_POINTS_OVERVIEW.md](docs/OPEN_POINTS_OVERVIEW.md)** — dort steht
+> [docs/OPEN_POINTS_OVERVIEW.md](../OPEN_POINTS_OVERVIEW.md)** — dort steht
 > auch, was die Moving-Head-Änderung 2026-06-10 (ZQ02001-Korrektur, Gobo-Tab,
 > Farbrad-Kacheln, Reset-Button) bereits erledigt hat.
 >
-> **➡ 2026-06-08: Konsolidierter Gesamtplan in [docs/MASTERPLAN_2026-06-08.md](docs/MASTERPLAN_2026-06-08.md)**
+> **➡ 2026-06-08: Konsolidierter Gesamtplan in [docs/MASTERPLAN_2026-06-08.md](../MASTERPLAN_2026-06-08.md)**
 > — gleicht den 34-Punkte-Auftrag ("Programmer/VC-Trennung, Matrix-Live, UI-Cleanup,
 > Speed Dial, Folders, Fixtures/Demo") gegen den realen Code-Stand ab (✅/🟡/🔴) und
 > enthält die thematischen To-dos (ISO/OUT/MXP/MLV/SPD/BTN/FRM/FLD/SNP/LIB/DMO/SAV/UIC/TST)
@@ -30,7 +30,7 @@
 - [ ] Abhaengigkeiten in `requirements.txt` auf aktuelle stabile Versionen pruefen.
 
 ## 4) Produkt-Backlog (naechste Ausbaustufe)
-- [ ] **Spider-Köpfe getrennt einfärben + 3D-Modell** (Nutzerwunsch 2026-06-14) → Plan, betroffene Dateien und 3D-Modell-Quellen in [docs/SPIDER_MULTIHEAD_TODO.md](docs/SPIDER_MULTIHEAD_TODO.md); auch als X-6 in [docs/OPEN_POINTS_OVERVIEW.md](docs/OPEN_POINTS_OVERVIEW.md). (Die Dani-Strahler Spider 14ch / Conti MH 11ch / Klein Conti 7ch / Party Laser 7ch / Eurolite Großer Straler 5ch sind bereits als Builtin eingebaut.)
+- [ ] **Spider-Köpfe getrennt einfärben + 3D-Modell** (Nutzerwunsch 2026-06-14) → Plan, betroffene Dateien und 3D-Modell-Quellen in [docs/SPIDER_MULTIHEAD_TODO.md](SPIDER_MULTIHEAD_TODO.md); auch als X-6 in [docs/OPEN_POINTS_OVERVIEW.md](../OPEN_POINTS_OVERVIEW.md). (Die Dani-Strahler Spider 14ch / Conti MH 11ch / Klein Conti 7ch / Party Laser 7ch / Eurolite Großer Straler 5ch sind bereits als Builtin eingebaut.)
 - [x] Fehlerreporting-Workflow definieren → `.github/ISSUE_TEMPLATE/bug_report.md`
 - [x] Preset-/Demo-Shows im Ordner `shows/` bereitstellen → `shows/demo_rgb_par.lshow` (4 PAR, 4 Cues)
 - [x] Priorisierte Roadmap fuer UI/Engine/Visualizer festhalten → `ROADMAP.md`
