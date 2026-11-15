@@ -29,6 +29,15 @@ def neue_kennung() -> str:
     return "w" + uuid.uuid4().hex[:11]
 
 
+def _gueltig(obj) -> bool:
+    """UI-126: lebt das C++-Objekt noch?"""
+    try:
+        import shiboken6
+        return shiboken6.isValid(obj)
+    except Exception:
+        return obj is not None
+
+
 def kennung_gueltig(kennung) -> bool:
     """Nur Buchstabe + [A-Za-z0-9_-], 4–64 Zeichen. Die Kennung wandert in
     URLs und Dateien; alles andere wird beim Laden durch eine neue ersetzt."""
@@ -175,6 +184,8 @@ class VCWidget(QFrame):
         self._big_handles = False        # grosse Greifbaender enthuellt (Touch/Verweilen)
         self._finger_griffe = False      # UI-121: zuletzt vom Finger gedrueckt
         self._selected = False
+        self._mehrfach_klick = None      # UI-126: "dazu"/"ab"/"allein" bis zum Loslassen
+        self._gruppe = []                # UI-126: (Widget, Ausgangs-Rechteck) beim Gruppen-Zug
         self._effect_highlight = False   # Glow: „gehoert zum selben Effekt"
         self._snap_grid = 0      # 0 = kein Snap, sonst Grid-Größe in Pixel
         self._drag_start = QPoint()
@@ -281,7 +292,22 @@ class VCWidget(QFrame):
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:
-            self._deselect_siblings()
+            # UI-126: Mehrfachauswahl. ``additiv`` (Strg/Umschalt oder der
+            # Umschalter „Mehrfach") nimmt dieses Widget dazu bzw. — beim
+            # Loslassen ohne Bewegung — wieder heraus. Ohne ``additiv`` bleibt
+            # eine bestehende Mehrfachauswahl beim Druck auf eines ihrer
+            # Widgets stehen (gemeinsam ziehen); ein Klick ohne Bewegung
+            # waehlt dann nur noch dieses.
+            _cv = self._find_canvas()
+            _mehr = _cv is not None and hasattr(_cv, "mehrfach_additiv")
+            self._mehrfach_klick = None
+            self._gruppe = []
+            if _mehr and _cv.mehrfach_additiv(event):
+                self._mehrfach_klick = "ab" if self._selected else "dazu"
+            elif _mehr and self._selected and len(_cv.ausgewaehlte()) > 1:
+                self._mehrfach_klick = "allein"
+            else:
+                self._deselect_siblings()
             # UI-121 B-04: Fingerdruck enthuellt die grossen Griffe sofort (vor
             # der Zonen-Pruefung) — der Finger muss nicht erst 0,5 s verweilen.
             self._finger_griffe = ist_touch(event)
@@ -291,7 +317,10 @@ class VCWidget(QFrame):
             self._selected = True
             self.update()
             self._notify_effect_highlight()    # Gruppe „beeinflusst denselben Effekt"
-            self._notify_selected()            # Inspector-Panel auf dieses Widget binden
+            if _mehr and len(_cv.ausgewaehlte()) > 1:
+                _cv.auswahl_melden()           # UI-126: Inspector zeigt die Auswahl
+            else:
+                self._notify_selected()        # Inspector-Panel auf dieses Widget binden
             pos = event.position().toPoint()
             self._drag_start = event.globalPosition().toPoint()
             self._orig_rect = self.geometry()
@@ -308,6 +337,10 @@ class VCWidget(QFrame):
                 # enthuellt der Dwell-Timer die grossen Greifbaender (Touch-Betrieb).
                 self._dragging = True
                 self._start_dwell()
+                # UI-126: gehoert das Widget zu einer Mehrfachauswahl, zieht es
+                # alle gewaehlten mit (Kasten-Inhalt nur ueber den Kasten).
+                if _mehr and len(_cv.ausgewaehlte()) > 1:
+                    self._gruppe = _cv.gruppe_fuer_zug()
             # Vorher-Stand fuer Undo erfassen (erst bei echter Geometrie-Aenderung
             # auf Release tatsaechlich auf den Undo-Stapel gelegt).
             self._pre_edit_snapshot = None
@@ -328,6 +361,16 @@ class VCWidget(QFrame):
             self._update_hover_cursor(pos)
             return
         delta = event.globalPosition().toPoint() - self._drag_start
+        if self._dragging and self._gruppe:
+            # UI-126: gemeinsames Verschieben der Auswahl (ein Rueckgaengig-
+            # Schritt beim Loslassen, Raster je Widget).
+            if abs(delta.x()) > self._DWELL_MOVE_TOL or abs(delta.y()) > self._DWELL_MOVE_TOL:
+                self._cancel_dwell()
+            _canvas = self._find_canvas()
+            if _canvas is not None and hasattr(_canvas, "gruppe_ziehen"):
+                _canvas.gruppe_ziehen(self._gruppe, delta, self._snap_grid)
+            event.accept()
+            return
         if self._dragging and self.parent():
             # Echte Bewegung -> es ist ein Verschieben, also kein „Verweilen"-Reveal.
             if abs(delta.x()) > self._DWELL_MOVE_TOL or abs(delta.y()) > self._DWELL_MOVE_TOL:
@@ -372,6 +415,30 @@ class VCWidget(QFrame):
         self._resizing = False
         self._resize_zone = None
         self._cancel_dwell()
+        gruppe, self._gruppe = getattr(self, "_gruppe", []), []
+        klick = getattr(self, "_mehrfach_klick", None)
+        self._mehrfach_klick = None
+        if self._edit_mode and (gruppe or (klick and self.geometry() == self._orig_rect)):
+            # UI-126: Mehrfachauswahl — gemeinsamer Zug oder Umschalt-Klick.
+            # Kein Umhaengen in Kaesten, keine Handy-Ablage (nur Einzel-Zug;
+            # ein einzeln gezogenes oder skaliertes Widget laeuft unten weiter).
+            bewegt = any(w.geometry() != r for w, r in gruppe if _gueltig(w))
+            _canvas = self._find_canvas()
+            if bewegt:
+                _snap = getattr(self, "_pre_edit_snapshot", None)
+                if _canvas is not None and _snap is not None \
+                        and hasattr(_canvas, "push_undo_snapshot"):
+                    _canvas.push_undo_snapshot(_snap)
+            elif klick == "ab":
+                self._selected = False
+                self.update()
+            elif klick == "allein":
+                self._deselect_siblings()
+            self._pre_edit_snapshot = None
+            if _canvas is not None and hasattr(_canvas, "auswahl_melden"):
+                _canvas.auswahl_melden()
+            event.accept()
+            return
         # WEB-10: ueber der Handy-Seitenleiste losgelassen -> Verknuepfung
         # ablegen. Das Widget steht wieder an seinem Platz, also folgt unten
         # weder ein Verschiebe-Schritt noch ein Umhaengen in einen Kasten; der
@@ -407,10 +474,13 @@ class VCWidget(QFrame):
         event.accept()
 
     def _deselect_siblings(self):
-        """Deselektiert alle anderen VCWidgets im selben Parent (und blendet deren
-        grosse Greifbaender wieder aus)."""
-        if self.parent() is not None:
-            for sibling in self.parent().findChildren(VCWidget):
+        """Deselektiert alle anderen VCWidgets der Konsole (UI-126: auch in
+        anderen Kaesten — sonst blieb ein Widget ausserhalb des Kastens
+        gewaehlt und rutschte in die Mehrfachauswahl) und blendet deren grosse
+        Greifbaender wieder aus."""
+        wurzel = self._find_canvas() or self.parent()
+        if wurzel is not None:
+            for sibling in wurzel.findChildren(VCWidget):
                 if sibling is not self and (sibling._selected or sibling._big_handles):
                     sibling._selected = False
                     was_big = sibling._big_handles
@@ -562,6 +632,15 @@ class VCWidget(QFrame):
         """Das Rechtsklick-Menue (Bearbeiten-Modus) — gebaut, nicht gezeigt:
         so laesst es sich ohne offenes Menue pruefen."""
         menu = QMenu(self)
+        # UI-126: Rechtsklick (am Finger: langes Druecken) auf ein Widget einer
+        # Mehrfachauswahl — Ausrichten/Verteilen/Loeschen fuer die ganze Auswahl.
+        _cv = self._find_canvas()
+        if (self._selected and _cv is not None and hasattr(_cv, "auswahl_menue_fuellen")
+                and len(_cv.ausgewaehlte()) > 1):
+            _unter = QMenu(f"Auswahl ({len(_cv.ausgewaehlte())} Elemente)", menu)
+            _cv.auswahl_menue_fuellen(_unter)
+            menu.addMenu(_unter)
+            menu.addSeparator()
         menu.addAction("Einstellungen...").triggered.connect(self._edit_properties)
         # Grafische Widget-Galerie: nur wenn fuer den aktuellen Aspekt mehrere
         # Bedien-Element-Typen passen (z. B. Tempo -> Speed-Rad ODER Fader).

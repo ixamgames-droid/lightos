@@ -55,6 +55,7 @@ class VCInspectorPanel(QWidget):
         )
         self._widget = None
         self._before = None     # Canvas-Stand vor der Bearbeitung (fuer Undo)
+        self._mehrfach = None   # UI-126: (Widgets, Canvas) bei Mehrfachauswahl
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
@@ -96,9 +97,10 @@ class VCInspectorPanel(QWidget):
     def bind(self, widget):
         """Bindet das Panel an ein VC-Widget (``None`` = leeren). Schliesst zuvor die
         laufende Bearbeitungs-Sitzung sauber ab (letztes Apply + Undo-Punkt)."""
-        if widget is self._widget:
+        if widget is self._widget and self._mehrfach is None:
             return
         self._end_session()
+        self._mehrfach_ende()
         if not _is_valid(widget):
             widget = None
         self._widget = widget
@@ -109,12 +111,111 @@ class VCInspectorPanel(QWidget):
         self._before = self._capture_before()
         self._build_for(widget)
 
+    # ── UI-126: Mehrfachauswahl ────────────────────────────────────────────────
+
+    def bind_mehrfach(self, widgets, canvas) -> None:
+        """Mehrere Widgets gewaehlt: Hinweis, Typ-Uebersicht und die
+        gemeinsame Eigenschaft „Bank" (wirkt auf alle, ein Rueckgaengig-
+        Schritt). Einzelne Eigenschaften zeigt der Inspector nur fuer ein
+        einzelnes Element. „Löschen" loescht die ganze Auswahl."""
+        widgets = [w for w in (widgets or []) if _is_valid(w)]
+        if len(widgets) < 2 or canvas is None:
+            self.bind(widgets[0] if widgets else None)
+            return
+        self._end_session()
+        self._widget = None
+        self._mehrfach = (widgets, canvas)
+        n = len(widgets)
+        self._btn_loeschen.setText(f"🗑 {n} Elemente löschen")
+        self._btn_loeschen.setToolTip(
+            "Alle gewählten Elemente löschen (ein Schritt, rückgängig mit Strg+Z)")
+        self._btn_loeschen.setEnabled(True)
+        self._title.setText("Mehrfachauswahl")
+        self._subtitle.setText(f"{n} Elemente gewählt")
+        self._set_body(self._mehrfach_body(widgets, canvas))
+
+    def ist_mehrfach(self) -> bool:
+        return self._mehrfach is not None
+
+    def _mehrfach_ende(self) -> None:
+        if self._mehrfach is None:
+            return
+        self._mehrfach = None
+        self._btn_loeschen.setText("🗑 Löschen")
+        self._btn_loeschen.setToolTip("Das gewählte Element löschen (rückgängig mit Strg+Z)")
+
+    def _mehrfach_body(self, widgets, canvas):
+        from collections import Counter
+        from PySide6.QtWidgets import QComboBox
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 6, 0, 0)
+        arten = Counter(_TYPE_LABELS.get(x.__class__.__name__, x.__class__.__name__)
+                        for x in widgets)
+        liste = QLabel("\n".join(f"• {k}: {v}" for k, v in sorted(arten.items())))
+        liste.setWordWrap(True)
+        lay.addWidget(liste)
+        lay.addWidget(QLabel("Bank (für alle):"))
+        cb = QComboBox()
+        cb.setObjectName("vc_inspector_mehrfach_bank")
+        cb.setMinimumHeight(36)
+        banken = {getattr(x, "bank", -1) for x in widgets}
+        if len(banken) > 1:
+            cb.addItem("(verschieden)", None)
+        cb.addItem("Alle Banks", -1)
+        for i in range(10):
+            cb.addItem(f"Bank {i + 1}", i)
+        if len(banken) == 1:
+            cb.setCurrentIndex(max(0, cb.findData(next(iter(banken)))))
+        cb.currentIndexChanged.connect(self._mehrfach_bank)
+        lay.addWidget(cb)
+        info = QLabel(
+            "Gemeinsam: ziehen verschiebt alle, „Ausrichten“ (Werkzeugleiste "
+            "oder Rechtsklick) richtet aus oder verteilt mit gleichen Abständen. "
+            "Einzelne Eigenschaften: ein Element allein wählen.")
+        info.setWordWrap(True)
+        info.setStyleSheet("color:#8b949e; font-size:11px;")
+        lay.addWidget(info)
+        lay.addStretch(1)
+        return w
+
+    def _mehrfach_bank(self, _idx) -> None:
+        cb = self.sender()
+        if self._mehrfach is None or cb is None:
+            return
+        b = cb.currentData()
+        if b is None:
+            return
+        widgets, canvas = self._mehrfach
+        try:
+            vorher = canvas.to_dict()
+        except Exception:
+            vorher = None
+        for x in widgets:
+            if _is_valid(x) and hasattr(x, "_set_bank"):
+                x._set_bank(int(b))
+        try:
+            if vorher is not None and canvas.to_dict() != vorher:
+                canvas.push_undo_snapshot(vorher)
+        except Exception:
+            pass
+
     def clear(self):
         """Auswahl loesen (z. B. beim Show-Laden oder Verlassen des Edit-Modus)."""
         self.bind(None)
 
     def loesche_gewaehltes(self) -> bool:
-        """Das gebundene VC-Widget loeschen (wie Kontextmenue „Löschen“)."""
+        """Das gebundene VC-Widget loeschen (wie Kontextmenue „Löschen“).
+        UI-126: bei Mehrfachauswahl die ganze Auswahl (ein Schritt)."""
+        if self._mehrfach is not None:
+            _ws, canvas = self._mehrfach
+            self._mehrfach_ende()
+            self._btn_loeschen.setEnabled(False)
+            self._show_empty()
+            try:
+                return bool(canvas.auswahl_loeschen())
+            except RuntimeError:
+                return False
         w = self._widget
         if not _is_valid(w) or not hasattr(w, "delete_requested"):
             return False

@@ -59,6 +59,15 @@ def _register():
 _register()
 
 
+def _lebt(obj) -> bool:
+    """UI-126: lebt das C++-Objekt noch?"""
+    try:
+        import shiboken6
+        return shiboken6.isValid(obj)
+    except Exception:
+        return obj is not None
+
+
 class _DragTargetOverlay(QWidget):
     """Transientes Overlay fuers Drag-Feedback: zeichnet einen farbigen Rahmen
     ueber dem Widget, ueber das gerade ein Effekt gezogen wird.
@@ -107,6 +116,7 @@ class VCCanvas(QWidget):
     snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
     widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
+    auswahl_geaendert = Signal(list)    # UI-126: alle gewaehlten Widgets (Mehrfachauswahl)
     handy_seiten_changed = Signal()     # WEB-09: Handy-Seiten geaendert (Editor/Seitenleiste)
     handy_seite_gewaehlt = Signal(int)  # WEB-10: in der Seitenleiste gezeigte Handy-Seite
     handy_abgelegt = Signal(str)        # WEB-10: Widget (Kennung) auf eine Handy-Seite gelegt
@@ -161,6 +171,13 @@ class VCCanvas(QWidget):
         # noch einen Zuweisungsmodus auf. Die Maus bleibt unveraendert.
         self.setProperty("ziehen_scrollen_finger", True)
         self._finger_leer = None
+        # UI-126: Mehrfachauswahl. ``_mehrfach_an`` = Umschalter „Mehrfach"
+        # (Finger: jeder Tipp nimmt dazu/heraus); ``_rahmen_*`` = Auswahlrahmen
+        # der Maus auf der freien Flaeche.
+        self._mehrfach_an = False
+        self._rahmen_start = None
+        self._rahmen_additiv = False
+        self._rahmen = None
         self._bg = QColor("#0d1117")
         self.setAcceptDrops(True)
 
@@ -616,12 +633,23 @@ class VCCanvas(QWidget):
 
     def mousePressEvent(self, event):
         self._finger_leer = None
+        self._rahmen_start = None
         if (event.button() == Qt.MouseButton.LeftButton and ist_touch(event)
                 and self.childAt(event.position().toPoint()) is None):
             # UI-117: Finger ins Leere — erst beim Loslassen (Tippen) auswerten
             self._finger_leer = event.globalPosition()
             super().mousePressEvent(event)
             return
+        if (self._edit_mode and event.button() == Qt.MouseButton.LeftButton
+                and not getattr(self, "_awaiting_button_click_for", None)
+                and self.childAt(event.position().toPoint()) is None):
+            # UI-126: Maus ins Leere -> moeglicher Auswahlrahmen. Mit Strg/
+            # Umschalt bleibt die bisherige Auswahl stehen (Rahmen nimmt dazu).
+            self._rahmen_start = event.position().toPoint()
+            self._rahmen_additiv = self._modifikator(event)
+            if self._rahmen_additiv:
+                event.accept()
+                return
         self._druck_auswerten(event)
 
     def _druck_auswerten(self, event):
@@ -696,14 +724,38 @@ class VCCanvas(QWidget):
         # Auswahl aufheben.
         if self._edit_mode and event.button() == Qt.MouseButton.LeftButton:
             self.clear_effect_highlight()
+            self.auswahl_aufheben()              # UI-126: auch die Markierungen
             self._on_widget_selected(None)
         if event.type() != QEvent.Type.MouseButtonRelease:
             super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self._rahmen_start is not None and self._edit_mode:
+            from PySide6.QtWidgets import QApplication, QRubberBand
+            p = event.position().toPoint()
+            if self._rahmen is None:
+                if (p - self._rahmen_start).manhattanLength() < QApplication.startDragDistance():
+                    return
+                self._rahmen = QRubberBand(QRubberBand.Shape.Rectangle, self)
+            self._rahmen.setGeometry(QRect(self._rahmen_start, p).normalized())
+            self._rahmen.show()
+            self._rahmen.raise_()
+            event.accept()
+            return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._rahmen_start is not None:
+            self._rahmen_start = None
+            rahmen, self._rahmen = self._rahmen, None
+            if rahmen is not None:
+                r = rahmen.geometry()
+                rahmen.hide()
+                rahmen.deleteLater()
+                if self._edit_mode:
+                    self._rahmen_auswaehlen(r, self._rahmen_additiv)
+                event.accept()
+                return
         start, self._finger_leer = self._finger_leer, None
         if start is not None and event.button() == Qt.MouseButton.LeftButton:
             d = event.globalPosition() - start
@@ -745,6 +797,292 @@ class VCCanvas(QWidget):
         ``None``) aufgerufen; reicht die Auswahl als Signal an den VC-Host
         (Inspector-Panel) weiter."""
         self.widget_selected.emit(w)
+        self.auswahl_geaendert.emit(self.ausgewaehlte())
+
+    # ── UI-126: Mehrfachauswahl ──────────────────────────────────────────────
+    # Quelle der Auswahl sind die ``_selected``-Marken der Widgets. Maus:
+    # Strg/Umschalt-Klick nimmt dazu/heraus, ein Rahmen auf der freien Flaeche
+    # waehlt alles, was er beruehrt. Finger: Umschalter „Mehrfach" (Werkzeug-
+    # leiste), dann wirkt jeder Tipp wie Strg-Klick. Nur im Bearbeiten-Modus;
+    # im Spielbetrieb erreicht kein Druck diese Wege (VCWidget prueft
+    # ``_edit_mode`` zuerst).
+
+    @staticmethod
+    def _modifikator(event) -> bool:
+        try:
+            m = event.modifiers()
+        except Exception:
+            return False
+        return bool(m & (Qt.KeyboardModifier.ControlModifier
+                         | Qt.KeyboardModifier.ShiftModifier))
+
+    def mehrfach_additiv(self, event) -> bool:
+        """Nimmt ein Druck auf ein Widget es zur Auswahl dazu (statt sie zu
+        ersetzen)? Strg/Umschalt oder Umschalter „Mehrfach"."""
+        return bool(self._edit_mode and (self._mehrfach_an or self._modifikator(event)))
+
+    def set_mehrfach_modus(self, an: bool) -> None:
+        self._mehrfach_an = bool(an)
+
+    @property
+    def mehrfach_modus(self) -> bool:
+        return self._mehrfach_an
+
+    def ausgewaehlte(self) -> list:
+        """Alle gewaehlten (sichtbaren) VC-Widgets in Anlage-Reihenfolge."""
+        if not self._edit_mode:
+            return []
+        out = []
+        for w in self.alle_widgets():
+            try:
+                if getattr(w, "_selected", False) and w.isVisibleTo(self):
+                    out.append(w)
+            except RuntimeError:
+                pass
+        return out
+
+    def _oberste(self, widgets) -> list:
+        """Ohne Widgets, deren Kasten selbst gewaehlt ist — der Kasten nimmt
+        seinen Inhalt mit (sonst wanderte der Inhalt doppelt)."""
+        menge = {id(w) for w in widgets}
+        out = []
+        for w in widgets:
+            p = w.parent()
+            innen = False
+            while p is not None and p is not self:
+                if id(p) in menge:
+                    innen = True
+                    break
+                p = p.parent()
+            if not innen:
+                out.append(w)
+        return out
+
+    def auswahl_setzen(self, widgets) -> None:
+        """Genau diese Widgets waehlen (Rest abwaehlen) und — nur wenn sich
+        etwas aenderte — melden (ein leerer Rahmen nach dem Klick ins Leere
+        meldet nicht noch einmal „keine Auswahl")."""
+        menge = {id(w) for w in widgets}
+        geaendert = False
+        for w in self.alle_widgets():
+            an = id(w) in menge
+            if getattr(w, "_selected", False) != an:
+                w._selected = an
+                w.update()
+                geaendert = True
+        if geaendert:
+            self.auswahl_melden()
+
+    def auswahl_aufheben(self) -> None:
+        for w in self.alle_widgets():
+            if getattr(w, "_selected", False):
+                w._selected = False
+                w.update()
+
+    def auswahl_melden(self) -> None:
+        """Auswahl an den VC-Host melden: ein Widget wie bisher
+        (``widget_selected``), mehrere ueber ``auswahl_geaendert``."""
+        aus = self.ausgewaehlte()
+        if len(aus) > 1:
+            self.auswahl_geaendert.emit(aus)
+        else:
+            self._on_widget_selected(aus[0] if aus else None)
+
+    # ── UI-83: Gesten am Finger ──────────────────────────────────────────────
+
+    def _vc_widget_bei(self, glob):
+        """Innerstes VC-Widget dieser Konsole unter der Bildschirmlage."""
+        from PySide6.QtWidgets import QApplication
+        w = QApplication.widgetAt(glob.toPoint())
+        while w is not None and w is not self:
+            if isinstance(w, VCWidget):
+                return w if self.isAncestorOf(w) else None
+            w = w.parentWidget()
+        return None
+
+    def halten_antippen_start(self, glob) -> bool:
+        """Halten + Antippen (``ziehen_scrollen``): nur im Bearbeiten-Modus,
+        der erste Finger liegt auf einem (gewaehlten) Widget. Sein Druck
+        verschiebt danach nichts mehr und waehlt beim Loslassen nicht um."""
+        if not self._edit_mode or self._kiosk:
+            return False
+        w = self._vc_widget_bei(glob)
+        if w is None or not getattr(w, "_selected", False):
+            return False
+        w._mehrfach_klick = None
+        w._gruppe = []
+        w._dragging = False
+        w._resizing = False
+        if w.geometry() != getattr(w, "_orig_rect", w.geometry()):
+            w.setGeometry(w._orig_rect)
+        self._halten_w = w
+        return True
+
+    def halten_antippen(self, glob) -> None:
+        """Weiterer Finger tippt ein Widget an: dazu bzw. heraus."""
+        if not self._edit_mode:
+            return
+        w = self._vc_widget_bei(glob)
+        if w is None or w is getattr(self, "_halten_w", None):
+            return
+        w._selected = not w._selected
+        w.update()
+        self.clear_effect_highlight()
+        self.auswahl_melden()
+
+    def wisch_flaeche(self, glob) -> bool:
+        """Liegt die Bildschirmlage auf freier Flaeche (kein Widget)?
+        Pruefung UI-83: nie bei Touch-Lock im Spielbetrieb — „Display-only"
+        heisst, der Finger steuert nichts, auch nicht die Executor-Page."""
+        if not self._edit_mode and VCWidget.input_locked:
+            return False
+        p = self.mapFromGlobal(glob.toPoint())
+        return (self.rect().contains(p) and self.childAt(p) is None
+                and self._rahmen_start is None)
+
+    def zwei_finger_wischen(self, schritt: int) -> None:
+        """Zwei Finger waagerecht gewischt: Bank weiter (+1) bzw. zurueck (-1),
+        ueber die Executor-Page wie die Bank-Knoepfe der Leiste."""
+        ziel = max(0, min(9, self._active_bank + int(schritt)))
+        if ziel == self._active_bank:
+            return
+        pe = getattr(self, "_pe", None)
+        if pe is not None:
+            pe.set_page(ziel)           # -> _on_engine_page -> set_active_bank
+        else:
+            self.set_active_bank(ziel)
+
+    def _rahmen_auswaehlen(self, rect: QRect, additiv: bool) -> None:
+        """Auswahlrahmen: alle sichtbaren Widgets direkt auf der Flaeche, die
+        der Rahmen beruehrt (ein Kasten zaehlt als Ganzes)."""
+        treffer = [w for w in self.findChildren(
+                       VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
+                   if w.isVisibleTo(self) and w.geometry().intersects(rect)]
+        if additiv:
+            treffer = self.ausgewaehlte() + [w for w in treffer if not w._selected]
+        self.clear_effect_highlight()
+        self.auswahl_setzen(treffer)
+
+    def gruppe_fuer_zug(self) -> list:
+        """(Widget, Ausgangs-Rechteck) fuer das gemeinsame Verschieben."""
+        return [(w, QRect(w.geometry())) for w in self._oberste(self.ausgewaehlte())]
+
+    def gruppe_ziehen(self, gruppe, delta: QPoint, grid: int = 0) -> None:
+        """Alle Widgets der Gruppe um ``delta`` (Bildschirm-Pixel) gegenueber
+        ihrer Ausgangslage verschieben. Die Gruppe bleibt am linken/oberen
+        Rand stehen, statt sich zu stauchen; mit Raster rastet jedes Widget
+        einzeln ein."""
+        gruppe = [(w, r) for w, r in gruppe if _lebt(w)]
+        if not gruppe:
+            return
+        dx = max(delta.x(), -min(r.x() for _w, r in gruppe))
+        dy = max(delta.y(), -min(r.y() for _w, r in gruppe))
+        for w, r in gruppe:
+            nx, ny = r.x() + dx, r.y() + dy
+            if grid > 0:
+                nx = max(0, round(nx / grid) * grid)
+                ny = max(0, round(ny / grid) * grid)
+            if w.pos() != QPoint(nx, ny):
+                w.move(nx, ny)
+                w.moved.emit(nx, ny)
+        self._update_content_extent()
+
+    def _lage(self, w) -> QRect:
+        """Rechteck eines Widgets in Flaechen-Koordinaten (auch im Kasten)."""
+        return QRect(w.mapTo(self, QPoint(0, 0)), w.size())
+
+    AUSRICHTUNGEN = (
+        ("links", "⇤ Links ausrichten", 2),
+        ("rechts", "⇥ Rechts ausrichten", 2),
+        ("oben", "⤒ Oben ausrichten", 2),
+        ("unten", "⤓ Unten ausrichten", 2),
+        ("waagerecht", "↔ Waagerecht gleich verteilen", 3),
+        ("senkrecht", "↕ Senkrecht gleich verteilen", 3),
+    )
+
+    def auswahl_ausrichten(self, art: str) -> bool:
+        """Gewaehlte Widgets ausrichten oder mit gleichen Abstaenden verteilen
+        (ein Rueckgaengig-Schritt). Rueckgabe: True, wenn sich etwas bewegte."""
+        ws = self._oberste(self.ausgewaehlte())
+        mindest = {a: n for a, _t, n in self.AUSRICHTUNGEN}.get(art)
+        if mindest is None or len(ws) < mindest:
+            return False
+        lagen = {id(w): self._lage(w) for w in ws}
+        ziel: dict[int, QPoint] = {}
+        if art == "links":
+            x = min(r.left() for r in lagen.values())
+            ziel = {k: QPoint(x, r.y()) for k, r in lagen.items()}
+        elif art == "rechts":
+            x = max(r.x() + r.width() for r in lagen.values())
+            ziel = {k: QPoint(x - r.width(), r.y()) for k, r in lagen.items()}
+        elif art == "oben":
+            y = min(r.top() for r in lagen.values())
+            ziel = {k: QPoint(r.x(), y) for k, r in lagen.items()}
+        elif art == "unten":
+            y = max(r.y() + r.height() for r in lagen.values())
+            ziel = {k: QPoint(r.x(), y - r.height()) for k, r in lagen.items()}
+        else:
+            waag = art == "waagerecht"
+            def a(r):
+                return r.x() if waag else r.y()
+
+            def g(r):
+                return r.width() if waag else r.height()
+            reihe = sorted(ws, key=lambda w: a(lagen[id(w)]))
+            erst, letzt = lagen[id(reihe[0])], lagen[id(reihe[-1])]
+            frei = (a(letzt) + g(letzt)) - a(erst) - sum(g(lagen[id(w)]) for w in reihe)
+            luecke = frei / (len(reihe) - 1)
+            pos = float(a(erst))
+            for w in reihe:
+                r = lagen[id(w)]
+                v = int(round(pos))
+                ziel[id(w)] = QPoint(v, r.y()) if waag else QPoint(r.x(), v)
+                pos += g(r) + luecke
+        grid = self.GRID if self._snap_to_grid else 0
+        vorher = self.to_dict()
+        bewegt = False
+        for w in ws:
+            r = lagen[id(w)]
+            neu = w.pos() + (ziel[id(w)] - r.topLeft())
+            nx, ny = neu.x(), neu.y()
+            if grid > 0:
+                nx, ny = round(nx / grid) * grid, round(ny / grid) * grid
+            nx, ny = max(0, nx), max(0, ny)
+            if w.pos() != QPoint(nx, ny):
+                w.move(nx, ny)
+                w.moved.emit(nx, ny)
+                bewegt = True
+        if bewegt:
+            self.push_undo_snapshot(vorher)
+            self._update_content_extent()
+        return bewegt
+
+    def auswahl_loeschen(self) -> int:
+        """Alle gewaehlten Widgets loeschen — EIN Rueckgaengig-Schritt
+        (Strg+Z holt alle zurueck). Rueckgabe: Zahl der geloeschten."""
+        ws = self._oberste(self.ausgewaehlte())
+        if not ws:
+            return 0
+        self._push_undo()
+        for w in ws:
+            self._remove_widget(w, undo=False)
+        self._on_widget_selected(None)
+        return len(ws)
+
+    def auswahl_menue_fuellen(self, menu) -> None:
+        """Eintraege fuer die Mehrfachauswahl (Kontextmenue, Werkzeugleiste)."""
+        n = len(self._oberste(self.ausgewaehlte()))
+        for art, text, mindest in self.AUSRICHTUNGEN:
+            if art == "waagerecht":
+                menu.addSeparator()
+            act = menu.addAction(text)
+            act.setEnabled(n >= mindest)
+            act.triggered.connect(
+                lambda checked=False, a=art: self.auswahl_ausrichten(a))
+        menu.addSeparator()
+        act = menu.addAction(f"Auswahl löschen ({n})")
+        act.setEnabled(n > 0)
+        act.triggered.connect(lambda checked=False: self.auswahl_loeschen())
 
     def set_snap_to_grid(self, enabled: bool):
         self._snap_to_grid = enabled
@@ -2226,8 +2564,8 @@ class VCCanvas(QWidget):
         except Exception as e:
             print(f"[VCCanvas] ERROR: Handy-Halter vergessen: {e}")
 
-    def _remove_widget(self, widget: VCWidget):
-        if not self._restoring:
+    def _remove_widget(self, widget: VCWidget, undo: bool = True):
+        if undo and not self._restoring:
             self._push_undo()      # Widget geloescht -> per Strg+Z wiederherstellbar
         self._gehaltene_loslassen(widget)
         self._snap_ansprueche_abmelden(widget)
