@@ -5,6 +5,9 @@
 > ausgeben — **gleichzeitig**. Enttec, Art-Net und sACN lassen sich frei mischen (bis zu 32
 > Universen).
 >
+> **Was du danach kannst:** zwei Universen gleichzeitig über zwei verschiedene Wege ausgeben und
+> prüfen, dass beide wirklich senden.
+>
 > Beispiel dieser Anleitung (live verifiziert): **EventPar** (Universum 1) über **Art-Net** an
 > einen Node (`192.0.2.99`) + **Hydrabeam 4000** (Universum 3) über **Enttec** auf `COM3`.
 
@@ -32,11 +35,14 @@ dürfen dieselbe Adresse haben.
 
 ## 2. Ausgabe konfigurieren — beide Backends setzen
 
-**Menü `Ausgabe` → `Konfigurieren…`** öffnet den Dialog *Ausgabe konfigurieren*. Er hat die
+**Menü `Ausgabe` → `Konfigurieren...`** öffnet den Dialog *Ausgabe konfigurieren*. Er hat die
 Tabs **Enttec Pro USB · Art-Net · sACN (E1.31) · DMX-Eingang · Universen**.
 
 Der eigentliche Dual-Output-Schalter ist der Tab **Universen**. Dort steht pro Universum:
-**Name · Ausgang (Aus / Enttec / uDMX / sACN / ArtNet) · Patch (Port/IP) · Ext. Universum**.
+**Name · Ausgang (Aus / Enttec / uDMX / sACN / ArtNet) · Patch (Port/IP) · Ext. Universum · Dongle**.
+(*Dongle* zeigt bei Enttec die gemerkte Seriennummer des Adapters; so findet LightOS ihn
+auch, wenn er nach einem Neustart an einem anderen Port steckt. Mit Rechtsklick →
+`Dongle neu zuordnen` vergisst du sie beim Speichern wieder.)
 
 Setze:
 
@@ -50,7 +56,7 @@ eintragen. Mit **`Speichern`** übernehmen.
 
 > **Enttec-Port finden:** Der Tab **Enttec Pro USB** listet den erkannten Adapter, z. B.
 > `COM3 — USB Serial Port (COM3) [Enttec Pro]`. Diesen Port trägst du im Universen-Tab bei
-> „Patch" ein. `Ports aktualisieren` frischt die Liste nach dem Einstecken auf.
+> „Patch" ein. Unter Linux sieht der Port z. B. so aus: `/dev/ttyUSB0`. `Ports aktualisieren` frischt die Liste nach dem Einstecken auf.
 
 Im **Universen**-Tab siehst du dann beide Zeilen nebeneinander — Universum 1 mit Ausgang
 `ArtNet` / Patch `192.0.2.99` und Universum 3 mit Ausgang `Enttec` / Patch `COM3`: das

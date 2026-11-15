@@ -82,6 +82,9 @@ body{position:fixed;top:0;right:0;bottom:0;left:0;color:#e6edf3;
 .zelle.ziel_fehlt.aktiv{background:linear-gradient(#2b323c,#1f252d) !important;color:#e6edf3 !important}
 .zelle.ziel_fehlt small,.zelle.ziel_fehlt .punkt,.zelle.gesperrt .punkt{display:none}
 .zelle .warn{position:absolute;top:3px;right:6px;color:#ff5555;font-size:13px;font-weight:700;pointer-events:none}
+/* UI-129: eigene Funktion live bearbeitet — gelbes Sternchen oben links */
+.zelle .stern{position:absolute;top:2px;left:5px;color:#ffd400;font-size:14px;line-height:1;pointer-events:none;
+  text-shadow:0 0 1px #000,0 0 1px #000,0 0 2px #000}
 /* WEB-12 (QA96-37): Laser-NOT-AUS am Pult aktiv */
 #notaus{flex:0 0 auto;display:none;background:#8e2421;border-bottom:2px solid #f0625d;color:#fff;font-weight:700;font-size:14px;
   text-align:center;padding:8px 10px;letter-spacing:.5px}
@@ -857,7 +860,7 @@ function baueCueliste(w, el, hoehe, eintrag) {
 // oder Ziel verloren (Funktion gelöscht, Blackout-Ziel weg). Ein Element mit
 // verlorenem Ziel leuchtet nicht „aktiv“ — es schaltet ja nichts.
 function mitZustand(el, setze) {
-  var schloss = null, warn = null, warntext = null;
+  var schloss = null, warn = null, warntext = null, stern = null;
   return function (w) {
     setze(w);
     var gesperrt = w.gesperrt === 'laser';
@@ -871,6 +874,12 @@ function mitZustand(el, setze) {
       warntext = document.createElement('span'); warntext.className = 'warntext'; el.appendChild(warntext);
     }
     if (warn) { warn.style.display = fehlt ? '' : 'none'; warntext.textContent = fehlt ? w.ziel_fehlt[0] : ''; }
+    // UI-129: Effekt live bearbeitet (weicht vom gespeicherten Stand ab).
+    if (w.live_editiert && !stern) {
+      stern = document.createElement('span'); stern.className = 'stern'; stern.textContent = '★';
+      stern.title = 'live bearbeitet'; el.appendChild(stern);
+    }
+    if (stern) { stern.style.display = w.live_editiert ? '' : 'none'; }
   };
 }
 

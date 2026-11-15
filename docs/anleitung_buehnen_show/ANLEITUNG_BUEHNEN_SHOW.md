@@ -2,7 +2,8 @@
 
 Eine große Testbühne (20 m breit, 11 m tief, 1,5 m hoch) mit drei Traversen-Ebenen
 (7,5 m vor der Bühne, 8,5 m und 9,5 m darüber), zwei PAR-Türmen je Seite, LED-Wand,
-DJ-Pult und Boxen-Türmen. Alle Effekte sind mit vorhandenen LightOS-Funktionen gebaut
+DJ-Pult und Boxen-Türmen. Was du danach kannst: die fertige Show laden, ihre Knöpfe bedienen und wissen, was in jedem
+Look steckt. Alle Effekte sind mit vorhandenen LightOS-Funktionen gebaut
 (Matrix, EFX, Chaser, Collections, Gruppen, Virtuelle Konsole), nur mit mitgelieferten
 Profilen.
 

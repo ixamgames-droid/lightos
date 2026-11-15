@@ -5,6 +5,9 @@
 > Widget-Auswahl, Schutz vor doppelter Belegung und ein Highlighting, das zeigt,
 > welche Bedien-Elemente denselben Effekt steuern.
 >
+> **Was du danach kannst:** aus einem Effekt in einem Schritt fertig verdrahtete Regler bauen,
+> dabei Doppelbelegungen vermeiden und sehen, was zusammengehört.
+>
 > Alle Screenshots stammen aus der Demo-Show **Farb FX VC Show** (live aufgenommen). Die Show
 > liegt nicht im Repository; erzeugen mit `./venv/bin/python tools/build_farb_fx_vc_show.py`
 > (Windows: `venv\Scripts\python.exe tools\build_farb_fx_vc_show.py`).

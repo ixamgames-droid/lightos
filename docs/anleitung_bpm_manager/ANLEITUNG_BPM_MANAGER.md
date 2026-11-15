@@ -7,6 +7,9 @@
 > die **Beats**, auf die alle tempo-gekoppelten Effekte laufen: Matrix, EFX, Chaser,
 > Sequenzen, Virtuelle Konsole.
 >
+> **Was du danach kannst:** eine Tempo-Quelle wählen, am Pegel und an der Statuszeile sehen,
+> ob die Erkennung funktioniert, und das Tempo von Hand korrigieren.
+>
 > **Öffnen:** in der Sektionsleiste auf **BPM** klicken oder **Strg+8**. Die Sektion hat drei
 > Sub-Tabs: **Erkennung · Tempo-Buses · Generator**. Diese Anleitung erklärt vor allem
 > **Erkennung**; die beiden anderen kommen am Ende kurz dran.

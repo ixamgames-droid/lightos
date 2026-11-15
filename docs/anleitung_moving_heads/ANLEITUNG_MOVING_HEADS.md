@@ -1,11 +1,11 @@
 # Anleitung: Moving Heads steuern (Farbe · Gobo · Bewegung)
 
-> **Lernziel:** Die beiden Moving Heads (U King **ZQ02001**, 11-Kanal) komplett über die
+> **Was du danach kannst:** Die beiden Moving Heads (U King **ZQ02001**, 11-Kanal) komplett über die
 > Virtual Console steuern — **Farbrad**, **Gobo**, **Bewegung (EFX)**, **gezieltes Pan/Tilt**
 > per XY-Pad und die **MH-Fader** (Tempo/Größe/Dimmer).
 >
 > Show: `shows/Event_Demo_2026.lshow`, **Bank 4 „Moving Heads"** (SCENE-Taste 4 am APC,
-> bzw. Strg+Bild↓ bis „Moving Heads"). Rig: MH Links @ DMX 65, MH Rechts @ 76 — hinter
+> bzw. Menü **Show → Nächste Page** (Strg+Bild↓) bis „Moving Heads"). Rig: MH Links @ DMX 65, MH Rechts @ 76 — hinter
 > PAR 1 und PAR 8. Die Show liegt nicht im Repo — sie entsteht mit
 > `./venv/bin/python tools/build_event_demo_2026.py` (Windows:
 > `venv\Scripts\python.exe tools\build_event_demo_2026.py`; LightOS vorher einmal gestartet,
@@ -91,6 +91,11 @@ Fächer, Acht, Lissajous, Rechteck oder Pfad:
 Rechts liegt das **XY-Pad „MH zielen (Pan/Tilt)"**. Mit der Maus/dem Finger im Feld ziehen =
 Pan (links/rechts) und Tilt (auf/ab) der MH direkt setzen (16-bit fein). Ideal, um die Köpfe
 von Hand auf eine Stelle zu fahren, bevor/statt eine EFX-Figur läuft.
+
+**Am Touchscreen** (Start mit `--touch`): Das Pad und die Fader bedienst du mit dem Finger;
+jeder Finger bedient sein eigenes Element, du kannst also zwei Fader zugleich ziehen. Mit zwei
+Fingern waagerecht auf freier Fläche blätterst du die Bank. Welche Gesten aktiv sind, stellst du
+unter **Ansicht → Touch-Gesten…** ein.
 
 ## 6. Die MH-Fader
 

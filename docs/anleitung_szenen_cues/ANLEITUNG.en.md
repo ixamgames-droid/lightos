@@ -10,6 +10,9 @@
 > **snap** in the library, the **snapshots** with 48 quick-access slots, the **scene** as a
 > function and the **cue** in a **cue list**. This page shows all four and, at the end,
 > how to start a cue list from the Virtual Console.
+>
+> **What you will be able to do:** store a look, recall it with a click or key, and play
+> several looks one after another as a cue list.
 
 How to select fixtures and set values is described in
 [Programmer-Grundlagen](../anleitung_programmer_grundlagen/ANLEITUNG.md) (Programmer
@@ -275,6 +278,12 @@ list) in the toolbar. The element appears in the middle of the area. A double-cl
 **Careful when counting:** the **Executor-Slot** counts from **0**. Slot 0 is the executor
 that is called **Ex 1** in Playback, slot 1 is **Ex 2** and so on, each on the current
 page. The picture shows slot 0, i.e. „Meine Show“ from step 8.
+
+**On a touchscreen:** start LightOS with `--touch` for larger buttons. Each finger operates
+its own element, so you can touch **GO** and a fader at the same time. In edit mode you
+select several elements with **Ctrl**- or **Shift**-click, by dragging a frame, or with
+"hold + tap" (leave one finger down and tap more with a second). **Ansicht → Touch-Gesten…**
+(View → touch gestures) lists the gestures and lets you switch them off.
 
 Instead of the cue list, a single **Button** with the action
 **Executor: Umschalten (Go)** (executor: toggle/go) works too. Then enter the slot under
