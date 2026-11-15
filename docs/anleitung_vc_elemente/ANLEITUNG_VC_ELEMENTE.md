@@ -3,6 +3,9 @@
 > **Überblick aller 19 Bau-Elemente** der Virtual Console — was sie sind, wie man sie
 > bedient und was man einstellen kann. Plus die **Baukasten-Knöpfe** (komplette Blöcke).
 >
+> **Was du danach kannst:** das passende Element für deine Aufgabe wählen, es anlegen und
+> einstellen.
+>
 > *Die früheren Baukasten-Blöcke Controller-Vorlage, Color-Chase und Chase-Bereich
 > gibt es nicht mehr — an ihre Stelle ist das **Live-Edit-Panel** getreten
 > (siehe [LIVE_EDIT_FENSTER.md](../LIVE_EDIT_FENSTER.md)).*
@@ -26,7 +29,12 @@ Es gibt **zwei Wege**:
 2. In der Toolbar den gewünschten **Knopf** klicken → das Element erscheint in der
    Canvas-Mitte und kann an seinen Platz gezogen werden.
 3. **Doppelklick** auf das Element → **Einstellungen**-Dialog.
-4. **Rechtsklick** → Kontextmenü (siehe unten).
+4. **Rechtsklick** → Kontextmenü (siehe unten). Am Touchscreen öffnet **langes Drücken**
+   (etwa 0,6 s) dasselbe Menü.
+
+Mehrere Elemente zusammen wählst du mit Strg-/Umschalt-Klick oder einem Rahmen auf freier
+Fläche (am Finger: **Mehrfach**) und richtest sie mit **Ausrichten ▾** aus — siehe
+[Anleitung VC](../anleitung_vc/ANLEITUNG_VC.md).
 
 > **Neu:** Die Toolbar bietet **16 Typen** als Knopf an — auch die früher nur
 > intern verfügbaren **Effekt-Farben, Musik, BPM, Tempo-Bus** sowie **Tempo-Controller** und **Live-Edit**. Passt nicht alles in eine
@@ -74,6 +82,8 @@ Rechtsklick auf ein Element (im Bearbeiten-Modus) öffnet:
 - **🎹 MIDI Teach…** / **⌨ Taste zuweisen…** — MIDI- bzw. Tastatur-Bindung lernen
   (je nach Element-Typ).
 - **Bank** (Untermenü) — Element einer Bank zuordnen: **„Alle Banks"** oder **Bank 1…10**.
+- **📱 Auf Handy-Konsole legen** — legt das Element als Kachel auf die Handy-Konsole
+  (siehe [Web-Remote](../anleitung_web_remote/ANLEITUNG.md)).
 - **Löschen** / **Vordergrund-Farbe** / **Hintergrund-Farbe**.
 
 ---

@@ -6,6 +6,9 @@
 > stammen aus der echten App mit echten Geräteprofilen (PAR, Moving Heads, Mehrkopf-Mover,
 > Laser, Nebelmaschine, Pixel-Balken).
 
+> **Was du danach kannst:** zu jedem Gerätetyp die passenden Knöpfe, Kacheln und Regler
+> finden und ihre Farben und Beschriftungen richtig lesen.
+
 > Neu im Programmer? Die Grundbedienung (Geräte wählen, Reiter, Werkzeuge, Löschen)
 > steht in den [Programmer-Grundlagen](../anleitung_programmer_grundlagen/ANLEITUNG.md).
 
@@ -110,6 +113,13 @@ Intensity den Hinweis, dass die Helligkeit über die Farbe läuft.
   Zu-Bereich, bleibt der Shutter, wie er ist — lieber ein dunkles Gerät als ein
   unerwartet blitzendes. Mitgelieferte Geräte sind davon nicht betroffen; es kann
   importierte Profile treffen.
+
+## 6. Mit dem Finger bedienen (Touch)
+
+Auf einem Touchscreen startest du LightOS mit `--touch`: Kacheln und Knöpfe, auch die
+Shutter- und Programm-Kacheln dieser Seite, werden dann größer. Langes Drücken (etwa
+0,6 s) öffnet das Kontextmenü, wo die Maus einen Rechtsklick hätte, sonst zeigt es die
+Erklärung (Tooltip). Welche Gesten gelten, schaltest du unter **Ansicht → Touch-Gesten…** ein oder aus.
 
 ---
 

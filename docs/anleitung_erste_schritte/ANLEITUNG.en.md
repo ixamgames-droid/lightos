@@ -34,7 +34,7 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
 1. **Menu bar** — `Datei` (File), `Bearbeiten` (Edit), `Ansicht` (View), `Show`,
    `Programmer`, `Datenbank` (Database), `Ausgabe` (Output), `Visualizer`, `Command`,
    `Hilfe` (Help). Saving and opening (step 7) and the output settings live here.
-   `Hilfe` brings you back to this guide and also offers **Tastenkürzel…** (all
+   `Hilfe` brings you back to this guide (**Erste Schritte**; all others under **Anleitungen öffnen**) and also offers **Tastenkürzel…** (all
    keyboard shortcuts at a glance) and **Datenordner öffnen** / **Show-Ordner öffnen**
    (open the data folder / the show folder).
 2. **Section bar** — the eight work areas of LightOS, see step 2.
@@ -309,6 +309,23 @@ What you merely operate does not count as a change: Programmer values, **GO** on
 list, faders and the tempo do not trigger the question. A show with content that was
 never saved always asks ("Die Show wurde noch nie gespeichert." = the show has never been
 saved), and so does a show restored from the auto-save.
+
+## Using it on a touchscreen
+
+On a touchscreen or tablet, start LightOS with `--touch`
+(`venv/bin/python main.py --touch`): buttons and lists get bigger. These gestures exist:
+
+- **Long press** (hold a finger still for about 0.6 s) opens the context menu that the mouse
+  gets with a right click. Where there is no menu, the explanation (tooltip) appears.
+- **Hold + tap** selects several items: keep one finger on a fixture on the 2D stage or an
+  element in the Virtual Console (edit mode) and tap more with a second finger.
+- **Two fingers** zoom and pan the 2D stage. On free space in the Virtual Console they flip
+  the bank: swipe left = next, right = previous.
+
+Switch off each gesture under **Ansicht → Touch-Gesten…** (View). There you also choose what
+"three-finger tap" does (default: nothing). BLACKOUT or STOP ALL can deliberately not be put
+on a gesture. Using a phone as a remote is described in
+[Web-Fernsteuerung](../anleitung_web_remote/ANLEITUNG.md) (German).
 
 ---
 
