@@ -1,4 +1,4 @@
-"""UI-128: die 2D-Ansicht zeichnet schneller, solange ein Strobe blinkt.
+"""UI-130: die 2D-Ansicht zeichnet schneller, solange ein Strobe blinkt.
 
 **Befund (Sitzung D, 15.11.2026, echte App, 250 %, 80 Geraete).** Takt 100 ms
 und UI-86-Budget 0,25 ergaben bei ~34 ms je Bild 7-8 Bilder/s. Die 2D-Ansicht

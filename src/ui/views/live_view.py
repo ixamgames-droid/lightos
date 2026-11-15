@@ -1412,7 +1412,7 @@ class StageCanvas(QWidget):
             return 0.0
         return proben[(len(proben) - 1) // 2]
 
-    # ── UI-128: schnellerer Takt, solange ein Strobe blinkt ─────────────────
+    # ── UI-130: schnellerer Takt, solange ein Strobe blinkt ─────────────────
     # Bei 7-8 Bildern/s (Takt 100 ms + Budget 0,25, gemessen 250 %, 80 Geraete,
     # ~34 ms je Bild) zeigte die 2D-Ansicht jeden Strobe ab 5 Hz als dasselbe
     # langsame Blinken (~2-2,5 Blitze/s, VIZ-104). Solange ein Geraet sichtbar
@@ -1501,7 +1501,7 @@ class StageCanvas(QWidget):
         # zeigen den Stand des laufenden Takt-Bildes noch einmal.
         self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
         self.update()
-        # UI-128: Zeitgeber auf den Takt der Lage (Strobe sichtbar oder nicht)
+        # UI-130: Zeitgeber auf den Takt der Lage (Strobe sichtbar oder nicht)
         try:
             takt = self._takt_ms()
             if self._update_timer.interval() != takt:
@@ -2087,7 +2087,7 @@ class StageCanvas(QWidget):
 
         if freq_hz == 0.0:
             return 0.0, True
-        self._strobe_gesehen()          # UI-128: schnellerer Takt
+        self._strobe_gesehen()          # UI-130: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
@@ -2452,7 +2452,7 @@ class StageCanvas(QWidget):
             freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
         if freq_hz == 0.0:
             return 0.0, True
-        self._strobe_gesehen()          # UI-128: schnellerer Takt
+        self._strobe_gesehen()          # UI-130: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     # ── VIZ-104: Blinken im Bildtakt ─────────────────────────────────────────
