@@ -2364,6 +2364,13 @@ class MainWindow(QMainWindow):
         Sicherheitsaktion (BLACKOUT, STOP ALL, GO, LASER NOT-AUS, Sperre)."""
         if self._kiosk_mode:
             return
+        try:
+            # Pruefung UI-83: Touch-Lock (Display-only) = kein Finger steuert
+            from src.ui.virtualconsole.vc_widget import VCWidget
+            if VCWidget.input_locked:
+                return
+        except Exception:
+            return
         ziele = {
             "programmer_leeren": self._global_clear_programmer,
             "page_naechste": self._page_next,

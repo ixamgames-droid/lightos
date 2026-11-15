@@ -931,7 +931,11 @@ class VCCanvas(QWidget):
         self.auswahl_melden()
 
     def wisch_flaeche(self, glob) -> bool:
-        """Liegt die Bildschirmlage auf freier Flaeche (kein Widget)?"""
+        """Liegt die Bildschirmlage auf freier Flaeche (kein Widget)?
+        Pruefung UI-83: nie bei Touch-Lock im Spielbetrieb — „Display-only"
+        heisst, der Finger steuert nichts, auch nicht die Executor-Page."""
+        if not self._edit_mode and VCWidget.input_locked:
+            return False
         p = self.mapFromGlobal(glob.toPoint())
         return (self.rect().contains(p) and self.childAt(p) is None
                 and self._rahmen_start is None)

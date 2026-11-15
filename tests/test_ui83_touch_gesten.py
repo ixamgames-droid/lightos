@@ -163,6 +163,15 @@ def test_main_window_drei_finger_nur_harmlose_aktionen():
     fenster._kiosk_mode = True
     MainWindow._drei_finger_aktion(fenster, "programmer_leeren")
     assert log == ["leeren", "weiter", "zurueck"], "im Kiosk nie"
+    # Pruefung: Touch-Lock (Display-only) sperrt auch das Drei-Finger-Tippen
+    from src.ui.virtualconsole.vc_widget import VCWidget
+    fenster._kiosk_mode = False
+    VCWidget.input_locked = True
+    try:
+        MainWindow._drei_finger_aktion(fenster, "programmer_leeren")
+    finally:
+        VCWidget.input_locked = False
+    assert log == ["leeren", "weiter", "zurueck"], "bei Touch-Lock nie"
 
 
 # ── (a) Halten + Antippen: 2D-Buehne ─────────────────────────────────────────
@@ -356,6 +365,21 @@ def test_vc_bankwechsel_abgeschaltet(vc):
     _zwei_wisch(v, QPoint(500, 500), QPoint(650, 500), QPoint(-200, 0))
     _warte(0.05)
     assert v.canvas.active_bank == b0
+
+
+def test_vc_touch_lock_kein_bankwechsel(vc):
+    """Pruefung: Touch-Lock (Display-only) — der Finger blaettert auch die
+    Bank (Executor-Page) nicht um."""
+    from src.ui.virtualconsole.vc_widget import VCWidget
+    v = vc
+    b0 = v.canvas.active_bank
+    VCWidget.input_locked = True
+    try:
+        _zwei_wisch(v, QPoint(500, 500), QPoint(650, 500), QPoint(-200, 0))
+        _warte(0.05)
+        assert v.canvas.active_bank == b0
+    finally:
+        VCWidget.input_locked = False
 
 
 def test_vc_waagerechter_bildlauf_moeglich_bleibt_bildlauf(vc):
