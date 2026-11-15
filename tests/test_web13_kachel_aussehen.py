@@ -443,7 +443,12 @@ class SeitenRechnungTest(unittest.TestCase):
         self.assertEqual((s["takt"], s["bpm"], s["taktDauer"]), (True, 120, "0.5s"))
         s = self._js("effektStil({farben:['#ff0000'],takt:true,bpm:9999})")
         self.assertFalse(s["lauf"])
-        self.assertEqual((s["bpm"], s["taktDauer"]), (300, "0.2s"))
+        # ueber 180 BPM nur jeder zweite Schlag: nie mehr als 3 Blitze je Sekunde
+        self.assertEqual((s["bpm"], s["taktDauer"]), (300, "0.4s"))
+        s = self._js("effektStil({farben:['#ff0000'],takt:true,bpm:180})")
+        self.assertEqual(s["taktDauer"], "0.333s")
+        s = self._js("effektStil({farben:['#ff0000'],takt:true,bpm:181})")
+        self.assertEqual(s["taktDauer"], "0.663s")
         s = self._js("effektStil(null)")
         self.assertFalse(s["lauf"] or s["takt"])
         self.assertEqual(self._js("effektStil({takt:true}).bpm"), 120)

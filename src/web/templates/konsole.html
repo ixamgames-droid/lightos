@@ -583,7 +583,12 @@ function effektStil(effekt) {
     bpm = Math.max(30, Math.min(300, Math.round(bpm)));
     raus.takt = true;
     raus.bpm = bpm;
-    raus.taktDauer = (Math.round(60000 / bpm) / 1000) + 's';   // ein Schlag = einmal hell, einmal dunkel
+    // ein Schlag = einmal hell, einmal dunkel. Nie schneller als 3 Blitze je
+    // Sekunde (Grenze fuer lichtempfindliche Menschen): ueber 180 BPM blinkt
+    // die Kachel nur auf jeden zweiten Schlag, die Zahl zeigt das echte Tempo.
+    var schlag = 60000 / bpm;
+    while (schlag < 1000 / 3) { schlag *= 2; }
+    raus.taktDauer = (Math.round(schlag) / 1000) + 's';
   }
   return raus;
 }
