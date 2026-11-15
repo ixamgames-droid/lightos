@@ -239,7 +239,8 @@ def bausteine_von(funktion,
     typ = getattr(getattr(f, "function_type", None), "value", "")
 
     if getattr(f, "is_layered_effect", False):
-        return _aus_attributen([getattr(f, "target_attribute", "")])
+        return _aus_attributen([getattr(f, "target_attribute", "")]
+                               + list(getattr(f, "zusatz_ziele", None) or []))
 
     if getattr(f, "is_carousel", False):
         muster = getattr(getattr(f, "pattern", None), "value", "")

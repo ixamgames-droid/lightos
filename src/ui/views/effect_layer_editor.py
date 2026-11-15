@@ -270,6 +270,11 @@ class EffectLayerEditor(QWidget):
         setattr(self._effect, "name", s)
 
     def _on_target_changed(self, t):
+        # LAS-47: ein bewusst neu gewaehltes Ziel ersetzt auch die Zusatzziele
+        # einer migrierten Alt-Show (sonst schriebe der Effekt still weiter
+        # auf ``laser_twist_y``).
+        if t != getattr(self._effect, "target_attribute", None):
+            setattr(self._effect, "zusatz_ziele", [])
         setattr(self._effect, "target_attribute", t)
 
     def _on_base_value_changed(self, v):

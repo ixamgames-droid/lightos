@@ -136,6 +136,12 @@ class VCSlider(VCWidget):
         self.dmx_channel: int = 1
         self.dmx_universe: int = 1
         self.programmer_attr: str = "intensity"   # fuer PROGRAMMER-Modus
+        # LAS-47: weitere Attribute, die im PROGRAMMER-Modus denselben Wert
+        # bekommen. Leer im Normalfall; die Lade-Migration alter
+        # SH-LASER3W-Shows haengt ``laser_twist_y`` an einen Fader auf
+        # ``laser_twist`` (vor LAS-28 trugen alle vier Flips ``laser_twist``).
+        # Ein neues Attribut im Einstellungsdialog leert die Liste.
+        self.programmer_attr_zusatz: list[str] = []
         # FDR-01: Reichweite im PROGRAMMER-Modus — "all" = alle gepatchten Fixtures,
         # "selected" = nur die aktuelle Programmer-Auswahl, "group" = eine FESTE
         # Fixture-Gruppe (programmer_group), unabhaengig von der Live-Auswahl
@@ -411,8 +417,11 @@ class VCSlider(VCWidget):
                 else:
                     fids = [f.fid for f in state.get_patched_fixtures()]
                 pv = self._programmer_mapped(v)   # LAS-Speed: 0..255 → [min,max]
+                attrs = [attr] + [a for a in self.programmer_attr_zusatz
+                                  if a and a != attr]
                 for fid in fids:
-                    state.set_programmer_value(fid, attr, pv)
+                    for _a in attrs:
+                        state.set_programmer_value(fid, _a, pv)
             except Exception:
                 pass
         elif self.mode == SliderMode.LEVEL:
@@ -1433,10 +1442,13 @@ class VCSlider(VCWidget):
             # per itemData, Freitext bleibt wie getippt (leer → alten Wert halten).
             _pa_text = prog_attr_combo.currentText().strip()
             _pa_hit = prog_attr_combo.findText(_pa_text)
+            _pa_alt = self.programmer_attr
             if _pa_hit >= 0 and prog_attr_combo.itemData(_pa_hit):
                 self.programmer_attr = prog_attr_combo.itemData(_pa_hit)
             else:
                 self.programmer_attr = _pa_text or self.programmer_attr
+            if self.programmer_attr != _pa_alt:
+                self.programmer_attr_zusatz = []     # LAS-47
             self.programmer_min = prog_min_spin.value()
             self.programmer_max = prog_max_spin.value()
             self.feature_attr = feature_attr_cb.currentData() or "Intensity"   # F-26b
@@ -1519,6 +1531,9 @@ class VCSlider(VCWidget):
         d["dmx_channel"] = self.dmx_channel
         d["dmx_universe"] = self.dmx_universe
         d["programmer_attr"] = self.programmer_attr
+        if self.programmer_attr_zusatz:
+            # LAS-47: nur wenn belegt (Datei sonst unveraendert).
+            d["programmer_attr_zusatz"] = list(self.programmer_attr_zusatz)
         d["programmer_scope"] = self.programmer_scope
         d["programmer_min"] = self.programmer_min
         d["programmer_max"] = self.programmer_max
@@ -1572,6 +1587,10 @@ class VCSlider(VCWidget):
         self.dmx_channel = d.get("dmx_channel", 1)
         self.dmx_universe = d.get("dmx_universe", 1)
         self.programmer_attr = d.get("programmer_attr", "intensity")
+        _pz = d.get("programmer_attr_zusatz")
+        self.programmer_attr_zusatz = (
+            [str(a) for a in _pz if isinstance(a, str) and a]
+            if isinstance(_pz, list) else [])
         self.programmer_scope = d.get("programmer_scope", "all")
         self.programmer_min = int(d.get("programmer_min", 0))
         self.programmer_max = int(d.get("programmer_max", 255))
