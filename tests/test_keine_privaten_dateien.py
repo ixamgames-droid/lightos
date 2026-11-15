@@ -124,7 +124,15 @@ class KeineFremdenBenutzerpfadeTest(unittest.TestCase):
 
     # Bewusst nur Quell-, Test- und Werkzeugdateien: BACKLOG/CHANGELOG sind
     # Protokolle und werden nicht rueckwirkend umgeschrieben.
-    ORDNER = ("src", "tests", "tools", "docs")
+    # DOC-78: dazu die Startseite und Anleitungen im Wurzelordner, die
+    # GitHub-Vorlagen und Workflows — das sieht ein Besucher zuerst.
+    ORDNER = ("src", "tests", "tools", "docs", ".github/")
+    WURZEL_DATEIEN = ("README.md", "INSTALL.md", "CONTRIBUTING.md", "AGENTS.md",
+                      "WORKFLOW.md", "ARCHITECTURE.md", "ROADMAP.md",
+                      "COORDINATION.md", "DEVELOPMENT_NOTES.md",
+                      "THIRD_PARTY_NOTICES.md", "start.ps1", "start.sh",
+                      "start.bat", "Code-Film.bat", "Code-Film.sh")
+    ENDUNGEN = (".py", ".sh", ".md", ".ps1", ".bat", ".cmd", ".yml", ".yaml")
 
     # PRIV-04: BEIDE Formen. Die Linux-Form stand hier seit jeher allein — und
     # der Waechter war gruen, WEIL nur sie geprueft wurde und nur sie bereits
@@ -146,7 +154,8 @@ class KeineFremdenBenutzerpfadeTest(unittest.TestCase):
         rx = re.compile(muster)
         treffer = []
         for p in _getrackte_dateien():
-            if not p.startswith(self.ORDNER) or not p.endswith((".py", ".sh", ".md")):
+            if p not in self.WURZEL_DATEIEN and (
+                    not p.startswith(self.ORDNER) or not p.endswith(self.ENDUNGEN)):
                 continue
             try:
                 with open(os.path.join(_REPO, p), encoding="utf-8") as f:
@@ -233,6 +242,180 @@ class KeineGeraeteSeriennummerTest(unittest.TestCase):
         probe = "EN" + "123456"   # zusammengesetzt, sonst faende der Test sich selbst
         self.assertTrue(rx.search(f"Seriennr. {probe}"))
         self.assertFalse(rx.search("EN••••••"))
+
+
+# ── DOC-78: Zugangsschluessel ────────────────────────────────────────────────
+#: Nur Formate, die praktisch nie zufaellig entstehen — die weichen Muster aus
+#: ``tools/session_claim.py`` („Kennwort: …", ``token=…``) schlagen in Tests
+#: und Doku zu oft an, um als hartes Gate zu taugen. Gemeldet wird die ART,
+#: nie der Wert.
+ZUGANGS_MUSTER = (
+    ("GitHub-Token", r"(?<![A-Za-z0-9])gh[pousr]_[A-Za-z0-9]{30,}"),
+    ("GitHub-Token (fein)", r"(?<![A-Za-z0-9])github_pat_[A-Za-z0-9_]{30,}"),
+    ("AWS-Schluessel", r"(?<![A-Z0-9])(?:AKIA|ASIA)[0-9A-Z]{16}(?![A-Z0-9])"),
+    ("privater Schluessel-Block",
+     r"-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-----"),
+    ("API-Schluessel (sk-…)", r"(?<![A-Za-z0-9-])sk-(?:ant-|proj-)?[A-Za-z0-9_-]{32,}"),
+    ("GitLab-Token", r"(?<![A-Za-z0-9])glpat-[A-Za-z0-9_-]{20,}"),
+    ("Slack-Token", r"(?<![A-Za-z0-9])xox[abprs]-[A-Za-z0-9-]{20,}"),
+)
+
+#: Handy-Konsole: ein echter Link traegt den Schluessel als ``?k=…`` (8
+#: Zeichen aus ``secrets.token_urlsafe(6)``). In Anleitungen steht dort nur ein
+#: Platzhalter (``<Schlüssel>``, ``…``) — ein konkreter Wert waere ein
+#: abfotografierter Zugang.
+HANDY_LINK_MUSTER = r"[?&](?:k|token|key)=[A-Za-z0-9_-]{6,}"
+
+
+def _textzeilen(pfad: str):
+    try:
+        if os.path.getsize(pfad) > 4 * 1024 * 1024:
+            return
+        with open(pfad, encoding="utf-8") as f:
+            for nr, zeile in enumerate(f, 1):
+                yield nr, zeile
+    except (OSError, UnicodeDecodeError):
+        return
+
+
+class KeineZugangsschluesselTest(unittest.TestCase):
+    """DOC-78: kein Token, kein privater Schluessel, kein Handy-Schluessel.
+
+    Die Durchsicht vom 15.11.2026 fand keinen echten Schluessel im Repo —
+    gewacht hat darueber aber nur ``session_claim.py``, und das nur fuer die
+    Sitzungs-Tafel. Dieses Gate prueft JEDE getrackte Textdatei.
+    """
+
+    def setUp(self):
+        self.dateien = _getrackte_dateien()
+        if not self.dateien:
+            self.skipTest("kein git-Checkout (Tarball/Sandbox) — nichts zu pruefen")
+
+    def test_kein_zugangsschluessel_in_getrackten_dateien(self):
+        import re
+        muster = [(art, re.compile(m)) for art, m in ZUGANGS_MUSTER]
+        funde = []
+        for p in self.dateien:
+            for nr, zeile in _textzeilen(os.path.join(_REPO, p)):
+                for art, rx in muster:
+                    if rx.search(zeile):
+                        funde.append(f"{p}:{nr}: {art}")
+        self.assertEqual(funde, [], "Zugangsschluessel im OEFFENTLICHEN Repo — "
+                                    "Datei bereinigen UND den Schluessel beim "
+                                    "Anbieter wechseln (die Git-Historie behaelt ihn).")
+
+    def test_kein_handy_schluessel_in_anleitungen(self):
+        import re
+        rx = re.compile(HANDY_LINK_MUSTER)
+        funde = []
+        for p in self.dateien:
+            if not p.endswith(".md"):
+                continue
+            for nr, zeile in _textzeilen(os.path.join(_REPO, p)):
+                if rx.search(zeile):
+                    funde.append(f"{p}:{nr}")
+        self.assertEqual(funde, [], "Link mit konkretem Zugangsschluessel in der "
+                                    "Doku — Platzhalter <Schlüssel> verwenden.")
+
+    def test_die_muster_wuerden_einen_fund_erkennen(self):
+        """Gegenprobe mit ZUSAMMENGESETZTEN Proben (sonst faende das Gate sich
+        selbst) — und die Platzhalter der Doku bleiben frei."""
+        import re
+        x30 = "Ab3" * 12
+        proben = {
+            "GitHub-Token": "gh" + "p_" + x30,
+            "GitHub-Token (fein)": "github" + "_pat_" + x30,
+            "AWS-Schluessel": "AK" + "IA" + "ABCDEFGH12345678",
+            "privater Schluessel-Block": "-----BEGIN " + "OPENSSH PRIVATE " + "KEY-----",
+            "API-Schluessel (sk-…)": "s" + "k-ant-" + x30,
+            "GitLab-Token": "gl" + "pat-" + x30,
+            "Slack-Token": "xo" + "xb-" + x30,
+        }
+        for art, m in ZUGANGS_MUSTER:
+            with self.subTest(art=art):
+                self.assertTrue(re.search(m, proben[art]), f"{art}: Probe nicht erkannt")
+        self.assertFalse(re.search(ZUGANGS_MUSTER[3][1], "-----BEGIN PUBLIC KEY-----"))
+        self.assertFalse(re.search(ZUGANGS_MUSTER[4][1], "fix/ui95-kiosk-vollbild-ohne-bearbeiten"))
+        rx = re.compile(HANDY_LINK_MUSTER)
+        self.assertTrue(rx.search("http://192.0.2.10:5000/konsole?k=" + "Ab-_9xYz"))
+        self.assertFalse(rx.search("http://<PC-IP>:5000/konsole?k=<Schlüssel>"))
+        self.assertFalse(rx.search("/konsole?k=…"))
+
+
+def _doku_dateien(repo: str) -> list[str]:
+    """DOC-78: was ein Besucher liest — Startseite, Anleitungen, Vorlagen.
+    CHANGELOG/BACKLOG sind Protokolle (PRIV-06 regelt das Backlog)."""
+    import glob
+    dateien = [os.path.join(repo, n) for n in (
+        "README.md", "INSTALL.md", "CONTRIBUTING.md", "AGENTS.md", "WORKFLOW.md",
+        "ARCHITECTURE.md", "ROADMAP.md")]
+    dateien += sorted(glob.glob(os.path.join(repo, "docs", "**", "*.md"), recursive=True))
+    dateien += sorted(glob.glob(os.path.join(repo, ".github", "**", "*.md"), recursive=True))
+    return [d for d in dateien if os.path.isfile(d)]
+
+
+def _doku_klarnamen_funde(repo: str) -> list[str]:
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_session_claim_doc78", os.path.join(repo, "tools", "session_claim.py"))
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    funde = []
+    for pfad in _doku_dateien(repo):
+        rel = os.path.relpath(pfad, repo).replace(os.sep, "/")
+        for nr, zeile in _textzeilen(pfad):
+            for befund in sc.pruefe_oeffentlich(zeile):
+                if befund.startswith("Klarname"):
+                    funde.append(f"{rel}:{nr}: {befund}")
+    return funde
+
+
+class KeinKlarnameInDerDokuTest(unittest.TestCase):
+    """DOC-78: README, Anleitungen und docs/ sind pseudonym wie das Backlog.
+
+    Bei der Durchsicht standen dort noch 67 Stellen mit dem Klarnamen des
+    Rig-Betreibers (umgestellt mit ``tools/pseudonymisieren.py --nur docs``).
+    Wie PRIV-06 braucht der Namensteil die LOKALE Liste und laeuft deshalb nur
+    auf den Entwicklungsrechnern.
+    """
+
+    def test_kein_klarname_in_der_doku(self):
+        if not _lokale_klarnamen(_REPO):
+            self.skipTest("keine lokale Namensliste (klarnamen.txt) — laeuft nur "
+                          "auf den Entwicklungsrechnern, nicht in der CI")
+        funde = _doku_klarnamen_funde(_REPO)
+        self.assertEqual(funde, [], "Klarname in der Doku — im Repo heisst der "
+                                    "Betreiber „Robin“. Ersetzen mit:  "
+                                    "tools/pseudonymisieren.py --anwenden --nur <datei>")
+
+    def test_der_waechter_wuerde_einen_namen_in_der_doku_finden(self):
+        import shutil
+        import tempfile
+        name = "Kasi" + "mirus"          # zusammengesetzt: kein Fund in dieser Datei
+        alt = os.environ.get("LIGHTOS_KLARNAMEN")
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "tools"))
+            os.makedirs(os.path.join(tmp, "docs", "anleitung_x"))
+            shutil.copy(os.path.join(_REPO, "tools", "session_claim.py"),
+                        os.path.join(tmp, "tools"))
+            liste = os.path.join(tmp, "klarnamen.txt")
+            with open(liste, "w", encoding="utf-8") as f:
+                f.write(f"# Probe\n{name}\n")
+            with open(os.path.join(tmp, "README.md"), "w", encoding="utf-8") as f:
+                f.write("# X\n\nRobin hat es getestet.\n")
+            with open(os.path.join(tmp, "docs", "anleitung_x", "A.md"), "w",
+                      encoding="utf-8") as f:
+                f.write(f"# A\n\n{name}s Rig\n")
+            os.environ["LIGHTOS_KLARNAMEN"] = liste
+            try:
+                funde = _doku_klarnamen_funde(tmp)
+            finally:
+                if alt is None:
+                    os.environ.pop("LIGHTOS_KLARNAMEN", None)
+                else:
+                    os.environ["LIGHTOS_KLARNAMEN"] = alt
+        self.assertEqual([f.split(":")[:2] for f in funde], [["docs/anleitung_x/A.md", "3"]])
+        self.assertTrue(all(name not in f for f in funde))
 
 
 def _backlog_dateien(repo: str) -> list[str]:

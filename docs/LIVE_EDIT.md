@@ -3,7 +3,7 @@
 > **Show:** `shows/Live_Edit.lshow` · **Generator:** `tools/build_live_edit_show.py`
 > **Hardware:** Akai APC mini (mk2) + 4× PAR (ZQ01424) + 2× Moving Head (ZQ02001)
 
-Umsetzung von Davids Wunsch **„Live-Bearbeitung statt Live-Programming"**: die APC
+Umsetzung von Robins Wunsch **„Live-Bearbeitung statt Live-Programming"**: die APC
 ist in **vier 4×4-Quadranten** geteilt. In jedem Quadrant wählt man oben einen
 **vordefinierten, laufenden** Effekt; die Aktionen, Farben und Fader desselben
 Quadranten **bearbeiten dann genau diesen Effekt** — pro Quadrant unabhängig.

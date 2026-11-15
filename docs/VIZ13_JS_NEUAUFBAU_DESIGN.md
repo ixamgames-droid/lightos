@@ -174,7 +174,7 @@ Der Auftrag verlangt die Entfernung des `dmxUpdated`-Einzelsignals (VIZ-12-Entsc
 
 ---
 
-## 3b-Nachtrag (2026-07-04): OHNE externe Controls (Davids Entscheidung)
+## 3b-Nachtrag (2026-07-04): OHNE externe Controls (Robins Entscheidung)
 
 OrbitControls/TransformControls werden NICHT vendored. Stattdessen Eigenbau auf Basis
 der bereits vorhandenen theta/phi/radius-Orbit-Kamera (camera/cameras.js) + eigenes

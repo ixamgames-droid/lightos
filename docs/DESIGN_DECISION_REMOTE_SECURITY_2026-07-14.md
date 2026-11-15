@@ -34,7 +34,7 @@ Der Renderer behandelt diese Kanaele **abweichend von einem Art-Net/sACN-Stream*
   `input_last_seen` und altern damit nie.
 
 Auf einer **gemischten Universe** (Art-Net + Web/OSC auf demselben Universe, bei
-Davids Ein-Universe-Rig der Normalfall) verfaellt der Stream-Anteil bei Stale
+Robins Ein-Universe-Rig der Normalfall) verfaellt der Stream-Anteil bei Stale
 korrekt, der Web-Anteil bleibt.
 
 `clear_programmer()` (globaler Clear, `fid is None`) ist der **Release-Pfad** und

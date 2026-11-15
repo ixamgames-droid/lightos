@@ -60,7 +60,7 @@ Universell auf **jeder** Seite:
 
 ---
 
-## 🔧 Hardware-Test 2026-06-11 (David) — Ergebnisse & Fixes
+## 🔧 Hardware-Test 2026-06-11 (Robin) — Ergebnisse & Fixes
 
 ### Gefixt
 - **Pulse & Wave waren immer weiß**, egal welche Farbe gewählt war. *Ursache:* Das Carousel schrieb bei jedem Pattern seine Eigenfarbe (Default 255/255/255 = weiß) und „besaß" damit die Farbkanäle → die Programmer-Farbe wurde blockiert. *Fix:* Farb-Ausgabe ist jetzt opt-in (`paint_color`, Default aus) in `src/core/engine/carousel.py` — Pulse/Wave modulieren nur noch die Helligkeit, die Farbe kommt aus der Ebene darunter. Regressionstest: `tests/test_carousel_color.py`.
@@ -170,7 +170,7 @@ Universell auf **jeder** Seite:
 
 ---
 
-*Stand nach Hardware-Test 2026-06-11. Punkte 1–6 = beim Bauen gefunden, 7–11 = aus Davids Feedback. Fixes (Pulse/Wave, Police/Color-Chase, MH-Kreis) sind eingebaut; Show neu gebaut.*
+*Stand nach Hardware-Test 2026-06-11. Punkte 1–6 = beim Bauen gefunden, 7–11 = aus Robins Feedback. Fixes (Pulse/Wave, Police/Color-Chase, MH-Kreis) sind eingebaut; Show neu gebaut.*
 *Update 2026-06-12: Großrunde abgearbeitet — #2 (Chaser live baubar), #3 (RgbMatrix
 Live-Algo-Wechsel), #4 (PROGRAMMER-Fader feste Gruppe), #5 (Live-Recolor color1/2/3),
 #7 (relative MH-Bewegung), #9 (Farb-Kachel-Lock bei Effekt-Farbe). Bank 2 (PAR-Dim →
