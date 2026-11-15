@@ -1,0 +1,18 @@
+ID: CDX-75
+Prioritaet: P3
+Status: review
+Titel: Codex-Ernte: 3D-Vorschau Mehrkopf-Geraete leuchten nur mit Kopf 0, Block-Loeschen im Show-Manager stoppt laufendes Kind nicht, VC-Fader laser_twist#1 wird zu laser_twist_y, fehlendes Changelog-Fragment VIZ-112, Fragment UI-125 Status
+
+Herkunft: Neuheiten-Audit von Sitzung A am 15.11.2026 (Codex-Befunde, von einem zweiten Pruefer bestaetigt).
+
+**Befund 1 (PR #1265, niedrig):** `licht_payload` der 3D-Vorschau (`src/ui/widgets/fixture_vorschau_3d.py`) schickte nie ein `heads`-Array; `geraet_payload` baut Mehrkopf-Modelle aber mit `nHeads` = Zahl der `color_r`. `updateParBarDmx`/`updateMoverBarDmx`/`updateMatrixPanelDmx` in `builders.js` faerben ohne Kopf-Daten nur Kopf 0. **Behebung:** `kopf_zahl(d)` wie `nHeads`; `licht_payload(..., n_heads, mit_weiss)` haengt ab zwei Koepfen je Kopf dieselbe Farbe an (`r/g/b`, Rohkanaele `cr/cg/cb` fuer den Spider, `cw` = Weiss-Anteil nur bei eigenem `color_w`, `pan/tilt` 128). Einzelkopf-Geraete ohne `heads` wie bisher. Test: `tests/test_cdx75_vorschau_mehrkopf.py`.
+
+**Befund 2 (PR #1280, niedrig):** `block_loeschen` im Show-Manager entfernte einen laufenden Block nur aus der Spur; danach erfassten ihn weder `Show.write` noch `Show._on_stop`, das Kind blieb als laufend markiert. **Behebung:** `Show.block_kind_beenden(sf)` stoppt vor dem Entfernen das Kind, nur bei laufender Show, nur fuer einen gestarteten und nicht gestoppten Block und nicht, wenn ein anderer aktiver Block dasselbe Kind spielt. Rueckgaengig holt den Block zurueck, ohne das Kind wieder anzuwerfen (er gilt als beendet). Test: `tests/test_cdx75_show_block_loeschen_stoppt_kind.py`.
+
+**Befund 3 (PR #1286, niedrig):** die LAS-47-Migration setzte einen VC-Fader auf `laser_twist#1` (alt: exakter Schluessel, nur Pattern A vertikal) auf den Basis-Schluessel `laser_twist_y`; die Mehrkopf-Aufloesung spiegelt ihn auf `laser_twist_y#1` (Pattern B vertikal), solange dort nichts steht. **Behebung (verhaltenserhaltende Lesart, Projektinhaber 15.11.2026: alte Fader verhalten sich wie vorher):** Umbenennung bleibt, der Fader bekommt `programmer_attr_nur_kopf0` (nur bei gesetzt in der Datei). Damit verankert `VCSlider` vor dem Schreiben jeden weiteren Kopf ohne eigenen Wert auf seinen jetzt wirksamen Wert (Basis-Wert, sonst Kanal-Default), dieselbe Regel wie der Getrennt-Modus im Programmer (UI-06). Nicht umbenennen (Vorschlag a) haette den Fader still auf Pattern B horizontal gelegt; ein eigener Kopf-0-Schluessel haette alle Aufloesungspfade geaendert. Idempotent (zweiter Lauf unveraendert); ein neues Attribut im Einstellungsdialog loescht die Markierung; von Hand angelegte `laser_twist_y`-Fader bleiben geraeteweit. Test: `tests/test_cdx75_laser_twist_kopf1_fader.py`.
+
+**Befund 4 (PR #1270, niedrig):** Changelog-Fragment fuer VIZ-112 fehlte. **Behebung:** `changelog.d/2026-11-16-VIZ-112.md` unter „Behoben“ nachgereicht.
+
+**Befund 5 (PR #1279, niedrig, verworfen):** `backlog.d/UI-125.md` steht auf `done` statt `review`. Der PR ist gemergt, `tools/backlog_sammeln.py` macht auch aus `done` mit PR-Nummer `done (Datum, PR #1279)`. Die Datei jetzt anzufassen waere schaedlich: `pr_aus_git` liest die Nummer aus dem LETZTEN Commit auf dem Fragment, das Item wuerde danach diesem PR zugeschrieben. Kein Schaden, keine Aenderung.
+
+**Offen:** Kanal-Kopplungen (`MappedChannelChange`-Regeln) mit Ziel `laser_twist#1` werden ebenfalls zu `laser_twist_y`; ihr Schreibpfad spiegelt den Basis-Schluessel genauso auf B vertikal (nicht Teil dieses Befunds). Shows, die nach LAS-47 und vor CDX-75 gespeichert wurden, tragen den Fader schon als `laser_twist_y` ohne Markierung und sind von einem neuen Fader nicht zu unterscheiden.

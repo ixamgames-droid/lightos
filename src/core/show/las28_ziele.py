@@ -15,7 +15,10 @@ Stellen, die ein Attribut als ZIEL nennen:
   Datei nicht zu erkennen; gespielt wurde er so, also bleibt er so.
 * VC-Fader im Programmer-Modus auf ``laser_twist#N`` (Freitext) zeigten nach
   LAS-28 auf einen anderen bzw. keinen Kanal; ein Fader auf ``laser_twist``
-  traf vorher alle vier Flips (Zusatzattribut wie beim Effekt).
+  traf vorher alle vier Flips (Zusatzattribut wie beim Effekt). Ein Fader auf
+  ``laser_twist#1`` (A vertikal) wird ``laser_twist_y`` mit
+  ``programmer_attr_nur_kopf0`` (CDX-75): sonst spiegelte die
+  Mehrkopf-Aufloesung den Basis-Schluessel auf B vertikal.
 
 Dieselben Regeln wie CDX-65: nur ohne Marker ``LAS-28`` und nur, wenn ein
 SH-LASER3W im neuen Profilstand gepatcht ist. Ein blosses ``laser_twist``
@@ -254,6 +257,12 @@ def vc_nachziehen(vc_layout, alt_show: bool, andere: bool) -> tuple[int, int]:
             neu_a, unklar = _umbenennen(a, alt_show, andere)
             if neu_a is not None:
                 w["programmer_attr"] = neu_a
+                if a == "laser_twist#1" and neu_a == _TWIST_Y:
+                    # CDX-75: ``laser_twist#1`` war ein exakter Schluessel
+                    # (nur A vertikal). Der Basis-Schluessel ``laser_twist_y``
+                    # spiegelt die Aufloesung auf B vertikal, solange dort
+                    # nichts steht — der Fader verankert die anderen Koepfe.
+                    w["programmer_attr_nur_kopf0"] = True
                 umgesetzt += 1
             elif unklar:
                 offen += 1
