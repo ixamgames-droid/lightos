@@ -39,6 +39,14 @@ Die Bedienung im Betrieb hängt vom Modus ab. Ein Linksklick/Ziehen direkt am Ra
 - Sehr feine Stützpunkte werden ausgedünnt (max. 48 Punkte); eine Bahn aus weniger als 2 Punkten wird verworfen.
 - Während des Zeichnens erscheint die Linie blau, der Startpunkt grün. Ohne Bahn zeigt das Pad den Hinweis „Bahn zeichnen → MH fährt sie ab".
 
+**Bereich bzw. Pfad wieder loswerden** (Knopf „✕ Bereich löschen" / „✕ Pfad löschen"):
+- Sobald ein Bereich aufgezogen bzw. eine Bahn gezeichnet ist, erscheint direkt **unter dem Pad-Feld** ein Knopf. Er wirkt auch im **Spielbetrieb** (live) und im Kiosk-Modus; er löst erst beim **Loslassen auf dem Knopf** aus, wer daneben loslässt, bricht ab.
+- **„Bereich löschen"** entfernt die Markierung und stellt Zentrum und Größe des Ziel-Effekts auf genau die Werte zurück, die er **vor dem ersten Aufziehen** hatte. **„Pfad löschen"** entfernt die Bahn und stellt den vorherigen Pfad bzw. die vorherige Figur (z. B. die Acht) samt Zentrum und Größe wieder her.
+- Zurückgenommen werden **nur die eigenen Änderungen** des Pads: Hat inzwischen ein Fader, die Befehlszeile oder der Effekt-Editor z. B. die Breite verstellt, bleibt dieser Wert stehen. Wurde am Effekt inzwischen ein anderer Pfad gewählt, bleibt dieser ebenfalls.
+- **Touch-Lock** sperrt den Knopf wie das Pad. Im **Bearbeiten-Modus** löst er nicht aus (dort verschiebt man das Widget); derselbe Befehl steht dann im **Kontextmenü** (Rechtsklick bzw. langes Drücken).
+- Im Touch-Modus ist der Knopf mindestens 44 px hoch, das Pad-Feld wird dafür etwas kleiner; mit der Maus ist er kompakt und das Pad bleibt so groß wie bisher. Ist das Widget zu klein, wird der Knopf ausgeblendet — dann nur über das Kontextmenü.
+- Ein gelöschter Bereich bleibt beim Speichern gelöscht. Nach dem Laden einer Show kennt das Pad die Vorwerte nicht mehr; „Bereich löschen" entfernt dann nur die Markierung, der Effekt bleibt, wie er ist.
+
 > Hinweis: Im **Bearbeiten-Modus** der VC reagiert das Pad nicht auf diese Gesten — dort dient Ziehen dem Verschieben/Skalieren des Widgets. Steuerung passiert nur bei ausgeschaltetem „Bearbeiten". Ist „Touch-Lock" aktiv, sind Maus/Touch gesperrt (MIDI steuert weiter). Gemeinsame Grundlagen siehe Übersicht (README.md).
 
 ## Einstellungen

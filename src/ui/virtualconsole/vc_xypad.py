@@ -4,6 +4,10 @@ from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox
 from PySide6.QtCore import Qt, QRect, QPoint, QPointF
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
+from .vc_style import touch_aktiv
+
+#: UI-128: Geometrie-Parameter, die Feld- und Pfad-Modus am Ziel-EFX setzen.
+_GEO_KEYS = ("x_offset", "y_offset", "width", "height")
 
 
 class VCXYPad(VCWidget):
@@ -39,6 +43,14 @@ class VCXYPad(VCWidget):
         # auf den Ziel-EFX (efx_function_id). Punkte 0..1, transient (nicht serialisiert).
         self._path_pts: list[tuple[float, float]] = []
         self._path_drawing: bool = False
+        # UI-128: Loesch-Knopf unter dem Pad. Je Modus die Werte des Ziel-EFX
+        # VOR dem ersten eigenen Schreiben (nicht gespeichert, Laufzeit):
+        #   {"fn": Funktion, "geo": {key: [vorher, zuletzt selbst geschrieben]},
+        #    "pfad": (algorithm, path_id, path_data, _embedded_path) | None,
+        #    "eigener_pfad": path_id des eigenen VC-Pfads}
+        self._area_vorher: dict | None = None
+        self._path_vorher: dict | None = None
+        self._loesch_gedrueckt: bool = False
         # MIDI-Bindung (AUDIT-VCXYPad-MIDI): zwei absolute CCs (Pan/Tilt) auf einem
         # gemeinsamen Kanal. -1 = nicht gebunden, midi_ch 0 = alle Kanaele. Nur im
         # Positions-Modus wirksam; Bindung ueber den Eigenschaften-Dialog.
@@ -60,7 +72,141 @@ class VCXYPad(VCWidget):
 
     def _pad_rect(self) -> QRect:
         m = 24
-        return self.rect().adjusted(m, m, -m, -m)
+        return self.rect().adjusted(m, m, -m, -self._unten_rand())
+
+    # ── UI-128: Knopf „Bereich/Pfad löschen" unter dem Pad ──────────────────
+    #: kleinste sinnvolle Pad-Flaeche (Hoehe/Breite), die der Knopf uebrig
+    #: lassen muss — sonst wird er ausgeblendet (Befehl nur im Kontextmenue).
+    _MIN_PAD_MIT_KNOPF = 40
+
+    def _knopf_hoehe(self) -> int:
+        """Touch-Modus >= 44 px; mit der Maus kompakt (passt in den bisherigen
+        24-px-Rand, die Pad-Flaeche bleibt mit der Maus so gross wie bisher)."""
+        return 44 if touch_aktiv() else 18
+
+    def _knopf_platz(self) -> bool:
+        """Reicht die Widget-Groesse fuer den Knopf? Nur Feld-/Pfad-Modus. Der
+        Platz wird unabhaengig davon reserviert, ob gerade etwas zu loeschen
+        ist — sonst sprang die Pad-Flaeche unter dem Finger, sobald ein
+        Bereich entsteht."""
+        if self.mode not in ("area", "path"):
+            return False
+        unten = self._knopf_hoehe() + 6
+        return (self.height() - 24 - unten >= self._MIN_PAD_MIT_KNOPF
+                and self.width() - 48 >= self._MIN_PAD_MIT_KNOPF + 20)
+
+    def _unten_rand(self) -> int:
+        return max(24, self._knopf_hoehe() + 6) if self._knopf_platz() else 24
+
+    def loeschbar(self) -> bool:
+        """Gibt es im aktuellen Modus etwas zu loeschen?"""
+        if self.mode == "area":
+            return self._area is not None
+        if self.mode == "path":
+            return len(self._path_pts) >= 2 or self._path_vorher is not None
+        return False
+
+    def loesch_text(self) -> str:
+        return "Pfad löschen" if self.mode == "path" else "Bereich löschen"
+
+    def _loesch_knopf_rect(self) -> QRect | None:
+        """Rechteck des Loesch-Knopfs oder None (nicht sichtbar). Mittig unter
+        dem Pad, nicht ueber die ganze Breite — ein Zug, der knapp unter dem
+        Pad endet, trifft ihn so seltener."""
+        if not (self._knopf_platz() and self.loeschbar()):
+            return None
+        h = self._knopf_hoehe()
+        pr = self._pad_rect()
+        b = min(pr.width(), 150 if touch_aktiv() else 110)
+        return QRect(pr.x() + (pr.width() - b) // 2, self.height() - h - 2, b, h)
+
+    def loeschen(self) -> bool:
+        """Bereich (Feld-Modus) bzw. gezeichnete Bahn (Pfad-Modus) entfernen und
+        den Ziel-EFX zuruecksetzen. True, wenn etwas geloescht wurde."""
+        if self.mode == "area":
+            return self.bereich_loeschen()
+        if self.mode == "path":
+            return self.pfad_loeschen()
+        return False
+
+    @staticmethod
+    def _merke_geo(eintrag: dict, fn) -> None:
+        """Vorwerte der Geometrie einmalig merken (vor dem ersten Schreiben)."""
+        geo = eintrag.setdefault("geo", {})
+        for k in _GEO_KEYS:
+            if k not in geo:
+                v = getattr(fn, k, None)
+                geo[k] = [v, v]
+
+    @staticmethod
+    def _notiere_geo(eintrag: dict, fn) -> None:
+        """Nach dem Schreiben: was steht jetzt (eigener Wert) am EFX."""
+        for k, paar in eintrag.get("geo", {}).items():
+            paar[1] = getattr(fn, k, None)
+
+    @staticmethod
+    def _geo_zurueck(eintrag: dict, fn) -> None:
+        """Nur die EIGENEN Aenderungen zuruecknehmen: ein Wert, der noch so am
+        EFX steht, wie das Pad ihn zuletzt schrieb, geht auf den Vorwert; hat ihn
+        inzwischen jemand anderes geaendert (Fader, Command-Line, Editor), bleibt
+        dessen Wert stehen — sonst loeschte der Knopf fremde Bedienung."""
+        from src.core.engine import effect_live
+        def _setzen():
+            geaendert = False
+            for k, (vorher, eigen) in eintrag.get("geo", {}).items():
+                jetzt = getattr(fn, k, None)
+                if vorher is None or jetzt is None or eigen is None:
+                    continue
+                if abs(float(jetzt) - float(eigen)) < 1e-9 and jetzt != vorher:
+                    setattr(fn, k, vorher)
+                    geaendert = True
+            return geaendert
+        try:
+            effect_live._apply_live_mutation(fn, _setzen)
+        except Exception as e:
+            print(f"[VCXYPad] Zuruecksetzen fehlgeschlagen: {e}")
+
+    def bereich_loeschen(self) -> bool:
+        """UI-128: markierten Bereich entfernen; der Ziel-EFX bekommt Zentrum und
+        Groesse von VOR dem ersten Aufziehen zurueck (nur eigene Aenderungen).
+        Nach dem Laden einer Show sind die Vorwerte unbekannt — dann wird nur
+        die Markierung entfernt und der EFX bleibt, wie er ist."""
+        if self._area is None and self._area_vorher is None:
+            return False
+        eintrag, self._area_vorher = self._area_vorher, None
+        self._area = None
+        self._area_drag = None
+        if eintrag and eintrag.get("fn") is not None:
+            self._geo_zurueck(eintrag, eintrag["fn"])
+        self.update()
+        return True
+
+    def pfad_loeschen(self) -> bool:
+        """UI-128: gezeichnete Bahn entfernen und am Ziel-EFX den vorherigen
+        Pfad/Algorithmus samt Geometrie wiederherstellen — sofern dort noch der
+        eigene VC-Pfad liegt (sonst wurde inzwischen ein anderer Pfad gewaehlt,
+        der bleibt)."""
+        if not self._path_pts and self._path_vorher is None:
+            return False
+        eintrag, self._path_vorher = self._path_vorher, None
+        self._path_pts = []
+        self._path_drawing = False
+        fn = eintrag.get("fn") if eintrag else None
+        if fn is not None:
+            from src.core.engine import effect_live
+            alt = eintrag.get("pfad")
+            def _pfad():
+                if alt is None or getattr(fn, "path_id", None) != eintrag.get("eigener_pfad"):
+                    return False
+                (fn.algorithm, fn.path_id, fn.path_data, fn._embedded_path) = alt
+                return True
+            try:
+                effect_live._apply_live_mutation(fn, _pfad)
+            except Exception as e:
+                print(f"[VCXYPad] Pfad zuruecksetzen fehlgeschlagen: {e}")
+            self._geo_zurueck(eintrag, fn)
+        self.update()
+        return True
 
     def _cursor_pos(self) -> QPoint:
         pr = self._pad_rect()
@@ -135,10 +281,19 @@ class VCXYPad(VCWidget):
         try:
             from src.core.engine import effect_live
             fid = self.efx_function_id
+            # UI-128: Vorwerte VOR dem ersten Aufziehen merken (fuer „Bereich
+            # loeschen"); ein neues Ziel (anderer EFX) beginnt neu.
+            fn = effect_live.resolve_target(fid)
+            if fn is not None and (self._area_vorher is None
+                                   or self._area_vorher.get("fn") is not fn):
+                self._area_vorher = {"fn": fn}
+                self._merke_geo(self._area_vorher, fn)
             effect_live.set_param("x_offset", cx * 255.0, fid)
             effect_live.set_param("y_offset", cy * 255.0, fid)
             effect_live.set_param("width", w * 255.0, fid)
             effect_live.set_param("height", h * 255.0, fid)
+            if fn is not None:
+                self._notiere_geo(self._area_vorher, fn)
         except Exception as e:
             print(f"[VCXYPad] area apply error: {e}")
 
@@ -160,12 +315,21 @@ class VCXYPad(VCWidget):
             fn = effect_live.resolve_target(self.efx_function_id)
             if fn is None or not hasattr(fn, "set_custom_path"):
                 return
-            fn.set_custom_path(EfxPath("VC-Pfad", pts, mode="linear", closed=False))
+            # UI-128: vorherigen Pfad/Algorithmus + Geometrie einmalig merken.
+            if self._path_vorher is None or self._path_vorher.get("fn") is not fn:
+                self._path_vorher = {"fn": fn, "pfad": (
+                    getattr(fn, "algorithm", None), getattr(fn, "path_id", None),
+                    getattr(fn, "path_data", None), getattr(fn, "_embedded_path", None))}
+                self._merke_geo(self._path_vorher, fn)
+            pfad = EfxPath("VC-Pfad", pts, mode="linear", closed=False)
+            self._path_vorher["eigener_pfad"] = pfad.id
+            fn.set_custom_path(pfad)
             # Pfad fuellt das ganze Feld -> direkte Pan/Tilt-Bahn.
             effect_live.set_param("x_offset", 128.0, self.efx_function_id)
             effect_live.set_param("y_offset", 128.0, self.efx_function_id)
             effect_live.set_param("width", 255.0, self.efx_function_id)
             effect_live.set_param("height", 255.0, self.efx_function_id)
+            self._notiere_geo(self._path_vorher, fn)
         except Exception as e:
             print(f"[VCXYPad] path apply error: {e}")
 
@@ -298,6 +462,13 @@ class VCXYPad(VCWidget):
             event.accept()
             return
         if event.button() == Qt.MouseButton.LeftButton:
+            knopf = self._loesch_knopf_rect()
+            if knopf is not None and knopf.contains(event.position().toPoint()):
+                # UI-128: Loesch-Knopf — loest erst beim Loslassen AUF ihm aus
+                self._loesch_gedrueckt = True
+                self.update()
+                event.accept()
+                return
             if self.mode == "area":
                 start = self._norm(event.position().toPoint())
                 self._area_drag = start
@@ -319,6 +490,9 @@ class VCXYPad(VCWidget):
         if self._edit_mode:
             super().mouseMoveEvent(event)
             return
+        if self._loesch_gedrueckt:
+            event.accept()
+            return
         if self.mode == "area" and self._area_drag is not None:
             cur = self._norm(event.position().toPoint())
             self._area = (self._area_drag[0], self._area_drag[1], cur[0], cur[1])
@@ -338,8 +512,18 @@ class VCXYPad(VCWidget):
         event.accept()
 
     def mouseReleaseEvent(self, event):
+        gedrueckt, self._loesch_gedrueckt = self._loesch_gedrueckt, False
         if self._edit_mode:
             super().mouseReleaseEvent(event)
+            return
+        if gedrueckt:
+            knopf = self._loesch_knopf_rect()
+            # Touch-Sperre kann waehrend des Druecks angegangen sein
+            if (knopf is not None and knopf.contains(event.position().toPoint())
+                    and not self._run_input_blocked()):
+                self.loeschen()
+            self.update()
+            event.accept()
             return
         if self.mode == "area" and self._area_drag is not None:
             self._area_drag = None
@@ -422,6 +606,17 @@ class VCXYPad(VCWidget):
             p.setBrush(self._fg_color)
             p.drawEllipse(cp, 6, 6)
 
+        # UI-128: Loesch-Knopf unter dem Pad
+        knopf = self._loesch_knopf_rect()
+        if knopf is not None:
+            gesperrt = self._run_input_blocked() or self._edit_mode
+            p.setPen(QPen(QColor("#6e7681" if gesperrt else "#f85149"), 1))
+            p.setBrush(QColor("#3b1d1d" if self._loesch_gedrueckt else "#21262d"))
+            p.drawRoundedRect(knopf.adjusted(0, 0, -1, -1), 4, 4)
+            p.setFont(QFont("Segoe UI", 10 if touch_aktiv() else 7))
+            p.setPen(QColor("#6e7681" if gesperrt else "#ffa198"))
+            p.drawText(knopf, Qt.AlignmentFlag.AlignCenter, "✕ " + self.loesch_text())
+
         # Labels
         p.setPen(self._fg_color)
         p.setFont(QFont("Segoe UI", 8))
@@ -437,6 +632,16 @@ class VCXYPad(VCWidget):
             p.drawText(QRect(self.width() // 2, self.height() - 20, self.width() // 2, 20),
                        Qt.AlignmentFlag.AlignCenter, f"T:{tilt_pct}%")
         p.end()
+
+    def _extend_context_menu(self, menu):
+        """UI-128: im Bearbeiten-Modus loest der Knopf nicht aus (dort verschiebt
+        man das Widget) — derselbe Befehl steht hier im Kontextmenue, auch wenn
+        der Knopf mangels Platz ausgeblendet ist."""
+        if self.mode in ("area", "path"):
+            menu.addSeparator()
+            akt = menu.addAction("✕ " + self.loesch_text())
+            akt.setEnabled(self.loeschbar())
+            akt.triggered.connect(self.loeschen)
 
     # ── Properties ───────────────────────────────────────────────────────────
 
@@ -553,3 +758,7 @@ class VCXYPad(VCWidget):
         self.midi_ch = int(d.get("midi_ch", 0))
         a = d.get("area")
         self._area = tuple(a) if isinstance(a, (list, tuple)) and len(a) == 4 else None
+        # UI-128: Vorwerte gehoeren zur Laufzeit, nicht zur Datei — nach dem
+        # Laden entfernt „Bereich loeschen" nur die Markierung.
+        self._area_vorher = None
+        self._path_vorher = None
