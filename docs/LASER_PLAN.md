@@ -1,6 +1,6 @@
 # Laser-Support in LightOS — Plan (Stand 2026-07-02)
 
-> Davids Auftrag (Chat 2026-07-02): Laser steuerbar machen — konkret der eigene
+> Robins Auftrag (Chat 2026-07-02): Laser steuerbar machen — konkret der eigene
 > „3D Partylight L2600" (identifiziert als **Ehaho L2600**), perspektivisch auch
 > professionelle Laser über Netzwerkschnittstellen. Dazu Fixture-Klassen prüfen,
 > Laser-Fixtures anlegen, eigene Programmer-UI (Paletten + freier Zeichenmodus,
@@ -16,7 +16,7 @@
   ([Forum-Thread](https://forum.dmxcontrol-projects.org/thread/17319-3d-animation-rgb-laserlight-l2600-etwas-unterst%C3%BCtzung/)).
 - **Es gibt am Gerät nur ZWEI DMX-Modi:** „Simple DMX" (**6 Kanäle**) und
   „Professional DMX512" (**34 Kanäle**). 10/19-Kanal-Varianten existieren laut
-  Manual/Community nicht (Davids Beobachtung am Gerät bestätigt das).
+  Manual/Community nicht (Robins Beobachtung am Gerät bestätigt das).
 - **6ch ist ein EIGENES Layout** (On/Off, Auto-/Sound-Programm, Musterbank,
   Farbe, Feinwahl, Speed) — NICHT die ersten 6 Kanäle des 34ch-Charts.
 - **34ch = zwei identische Mustergruppen:** Ch1-17 Gruppe A, Ch18-34 Gruppe B
@@ -106,7 +106,7 @@ Color→6ch-Farbrad) komplett steuerbar — die komfortable Laser-UI folgt.
 | LAS-06 | IDN-Stream-Backend | zweites Backend hinter derselben `LaserFrame`-Abstraktion |
 | LAS-07 | Freier Zeichenmodus | XY-Canvas (Vorbild `_PathCanvas`) → für DMX-Laser: Ch14/15-Ansteuerung (manuell Sinus/Cosinus); für Streaming-Laser: Punktlisten. **Safety-Gates Pflicht** (s. u.) |
 | LAS-08 | Profi-DMX-Profile | Pangolin FB4 (39ch) / FB3 (16ch), ShowNET-Art-Net-Trigger, Moncha — als weitere Builtins/Profile |
-| LAS-09 | Hardware-Verifikation L2600 | David am Gerät: Ch18-0/255-Semantik, 6ch-Ch5, Bank-Grenzen; Profil ggf. per Signatur-Migration nachziehen |
+| LAS-09 | Hardware-Verifikation L2600 | Robin am Gerät: Ch18-0/255-Semantik, 6ch-Ch5, Bank-Grenzen; Profil ggf. per Signatur-Migration nachziehen |
 
 ### Safety-Konzept (gilt ab LAS-02, hart ab LAS-05/07)
 
@@ -126,4 +126,4 @@ Color→6ch-Farbrad) komplett steuerbar — die komfortable Laser-UI folgt.
 - **3D-Viewer/Visualizer** (Beam-Darstellung, Montagehöhe `coords.py`): läuft
   parallel als eigene Überarbeitung — Laser-Darstellung dort erst nach deren
   Abschluss (sonst Merge-Konflikte in wt-viz10/11).
-- 10/19-Kanal-Modi: existieren am Gerät nicht (Manual + Davids Beobachtung).
+- 10/19-Kanal-Modi: existieren am Gerät nicht (Manual + Robins Beobachtung).

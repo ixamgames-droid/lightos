@@ -258,7 +258,7 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   frische SHAs, laesst sich ohne Force-Push pushen, und der Lauf entsteht.
 - **Linux/macOS (XPLAT-02):** `verify_loop.ps1` findet jetzt auch ein `venv/bin/python`
   (Windows-Pfade zuerst → auf Windows unveraendert). Der PowerShell-Lock-Runner
-  `run_tests.ps1` ist aber Windows-spezifisch; auf Linux/macOS gibt es Davids
+  `run_tests.ps1` ist aber Windows-spezifisch; auf Linux/macOS gibt es Robins
   Multi-Session-Parallelitaet nicht → dort den eingecheckten, plattformneutralen
   Runner nutzen: `./tools/verify_loop.sh`. Voraussetzung:
   `python3 -m venv venv && venv/bin/pip install -r requirements.txt` (Linux-Systempakete

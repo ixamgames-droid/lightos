@@ -28,6 +28,23 @@ Vorher-Stand fuer das Rueckgaengig gueltig.
 Die Seiten sind zugleich die FREIGABE: die Web-Schnittstelle liefert und
 bedient nur Widgets, die auf einer Handy-Seite liegen
 (:func:`freigegebene_kennungen`).
+
+WEB-13: ein Eintrag darf zusaetzlich ``handy_farbe`` (``#rrggbb``) und
+``handy_text`` tragen — eigenes Aussehen NUR am Handy. Das Original-Widget
+bleibt unberuehrt. Fehlen beide (jede Show von frueher), steht auch nichts
+davon in der Datei.
+
+WEB-14: eigene Handy-Gruppen stehen unter ``gruppen`` neben den Seiten::
+
+    "gruppen": [{"name": "Grundfarbe", "widgets": ["w1a2b3c4d5e6", ...]}, ...]
+
+In einer Gruppe ist am Handy immer hoechstens EINE Taste aktiv (die
+Fernbedienung schaltet die anderen ueber den Klick-Weg aus). Eine Kachel liegt
+in hoechstens einer Gruppe; Mitglieder muessen auf einer Handy-Seite liegen.
+Ohne Gruppen wird der Schluessel nicht geschrieben — alte Shows bleiben
+unveraendert. Welche Tasten ueberhaupt in eine Gruppe duerfen (nie BLACKOUT,
+Laser-NOT-AUS, STOP ALL, Laser scharf), entscheidet die Konsole
+(``VCCanvas.handy_gruppe_erlaubt``) und die Fernbedienung bei jedem Druck neu.
 """
 from __future__ import annotations
 
@@ -41,6 +58,17 @@ SPALTEN = 4
 ZEILEN = 10
 MAX_SEITEN = 12
 MAX_NAME = 24
+#: WEB-13: Hoechstlaenge der eigenen Handy-Beschriftung einer Kachel.
+MAX_HANDY_TEXT = 32
+#: WEB-13: die beiden optionalen Felder fuer eigenes Aussehen am Handy.
+AUSSEHEN_FELDER = ("handy_farbe", "handy_text")
+
+#: WEB-14: Schluessel und Grenzen der eigenen Handy-Gruppen.
+GRUPPEN = "gruppen"
+MAX_GRUPPEN = 24
+MAX_GRUPPE_MITGLIEDER = 40
+
+_FARB_MUSTER = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 # Dieselbe Form wie ``vc_widget.kennung_gueltig`` — hier wiederholt, damit das
 # Modell ohne Qt-Import auskommt (ein Test haelt beide Muster gleich).
@@ -85,6 +113,39 @@ def _name(roh, nummer: int) -> str:
     text = str(roh).strip() if isinstance(roh, str) else ""
     text = " ".join(text.split())
     return text[:MAX_NAME] if text else f"Seite {nummer}"
+
+
+def handy_farbe_gueltig(roh) -> str | None:
+    """WEB-13: ``#rrggbb`` (klein geschrieben) oder None."""
+    if isinstance(roh, str) and _FARB_MUSTER.match(roh.strip()):
+        return roh.strip().lower()
+    return None
+
+
+def handy_text_gueltig(roh) -> str | None:
+    """WEB-13: bereinigte Handy-Beschriftung (Leerraum zusammengezogen,
+    hoechstens :data:`MAX_HANDY_TEXT` Zeichen) oder None, wenn leer."""
+    if not isinstance(roh, str):
+        return None
+    text = " ".join(roh.split())[:MAX_HANDY_TEXT].strip()
+    return text or None
+
+
+def _aussehen(ed: dict) -> dict:
+    """Die gueltigen WEB-13-Felder eines Roh-Eintrags (nur vorhandene)."""
+    raus = {}
+    farbe = handy_farbe_gueltig(ed.get("handy_farbe"))
+    if farbe is not None:
+        raus["handy_farbe"] = farbe
+    text = handy_text_gueltig(ed.get("handy_text"))
+    if text is not None:
+        raus["handy_text"] = text
+    return raus
+
+
+def hat_eigenes_aussehen(eintrag) -> bool:
+    """WEB-13: traegt die Kachel eigene Handy-Farbe oder -Beschriftung?"""
+    return isinstance(eintrag, dict) and any(eintrag.get(f) for f in AUSSEHEN_FELDER)
 
 
 def _zellen(e: dict):
@@ -144,11 +205,123 @@ def normalisiere(roh, vorhandene_kennungen=None) -> dict:
                 continue
             belegt |= zellen
             gesehen.add(kennung)
+            e.update(_aussehen(ed))         # WEB-13: nur wenn vorhanden
             eintraege.append(e)
         seiten.append({"name": _name(sd.get("name"), len(seiten) + 1),
                        "spalten": SPALTEN, "zeilen": ZEILEN,
                        "eintraege": eintraege})
-    return {"version": VERSION, "seiten": seiten}
+    raus = {"version": VERSION, "seiten": seiten}
+    gruppen = _gruppen_normalisieren(roh.get(GRUPPEN), freigegebene_kennungen(raus))
+    if gruppen:                         # WEB-14: nur schreiben, wenn es welche gibt
+        raus[GRUPPEN] = gruppen
+    return raus
+
+
+def _gruppen_name(roh, nummer: int) -> str:
+    text = " ".join(roh.split()) if isinstance(roh, str) else ""
+    return text[:MAX_NAME] if text else f"Gruppe {nummer}"
+
+
+def _gruppen_normalisieren(roh, frei: set) -> list:
+    """WEB-14: gueltige Gruppen — Mitglieder nur mit gueltiger Kennung, auf
+    einer Handy-Seite (``frei``) und in keiner frueheren Gruppe (die erste
+    gewinnt). Gruppen ohne Mitglied fallen weg."""
+    raus: list = []
+    vergeben: set = set()
+    for gd in (roh if isinstance(roh, list) else []):
+        if len(raus) >= MAX_GRUPPEN:
+            break
+        if not isinstance(gd, dict):
+            continue
+        mitglieder = []
+        roh_w = gd.get("widgets")
+        for k in (roh_w if isinstance(roh_w, list) else []):
+            if not (isinstance(k, str) and _KENNUNG_MUSTER.match(k)):
+                continue
+            if k in vergeben or k not in frei:
+                continue
+            if len(mitglieder) >= MAX_GRUPPE_MITGLIEDER:
+                break
+            vergeben.add(k)
+            mitglieder.append(k)
+        if mitglieder:
+            raus.append({"name": _gruppen_name(gd.get("name"), len(raus) + 1),
+                         "widgets": mitglieder})
+    return raus
+
+
+def gruppen(abschnitt) -> list:
+    """WEB-14: die (bereinigten) Handy-Gruppen als Kopie."""
+    return copy.deepcopy(normalisiere(abschnitt).get(GRUPPEN, []))
+
+
+def gruppe_von(abschnitt, kennung) -> int | None:
+    """WEB-14: Nummer der Handy-Gruppe, in der ``kennung`` liegt, oder None."""
+    for nr, g in enumerate(gruppen(abschnitt)):
+        if kennung in g["widgets"]:
+            return nr
+    return None
+
+
+def _mit_gruppen(abschnitt: dict, liste: list) -> dict:
+    neu = copy.deepcopy(abschnitt)
+    neu.pop(GRUPPEN, None)
+    if liste:
+        neu[GRUPPEN] = liste
+    return normalisiere(neu)
+
+
+def gruppe_setzen(abschnitt, nr, name, kennungen) -> dict | None:
+    """WEB-14: Handy-Gruppe ``nr`` neu fassen (``nr`` = None: neue Gruppe am
+    Ende). Kennungen, die schon in einer ANDEREN Gruppe liegen, wandern in
+    diese (eine Kachel ist nur in einer Gruppe). Ohne gueltiges Mitglied wird
+    die Gruppe entfernt. None, wenn ``nr`` nicht passt oder schon
+    :data:`MAX_GRUPPEN` Gruppen bestehen."""
+    a = normalisiere(abschnitt)
+    liste = copy.deepcopy(a.get(GRUPPEN, []))
+    frei = freigegebene_kennungen(a)
+    mitglieder = []
+    for k in (kennungen if isinstance(kennungen, (list, tuple)) else []):
+        if isinstance(k, str) and k in frei and k not in mitglieder:
+            mitglieder.append(k)
+    if nr is None:
+        if len(liste) >= MAX_GRUPPEN:
+            return None
+        nummer = len(liste) + 1
+    elif isinstance(nr, int) and not isinstance(nr, bool) and 0 <= nr < len(liste):
+        nummer = nr + 1
+    else:
+        return None
+    for i, g in enumerate(liste):
+        if i != nr:
+            g["widgets"] = [k for k in g["widgets"] if k not in mitglieder]
+    gruppe = {"name": _gruppen_name(name, nummer), "widgets": mitglieder}
+    if nr is None:
+        liste.append(gruppe)
+    else:
+        liste[nr] = gruppe
+    return _mit_gruppen(a, [g for g in liste if g["widgets"]])
+
+
+def gruppe_entfernen(abschnitt, nr) -> dict | None:
+    """WEB-14: Handy-Gruppe ``nr`` aufloesen (die Kacheln bleiben liegen)."""
+    a = normalisiere(abschnitt)
+    liste = copy.deepcopy(a.get(GRUPPEN, []))
+    if not (isinstance(nr, int) and not isinstance(nr, bool) and 0 <= nr < len(liste)):
+        return None
+    del liste[nr]
+    return _mit_gruppen(a, liste)
+
+
+def aus_gruppe_nehmen(abschnitt, kennung) -> dict | None:
+    """WEB-14: ``kennung`` aus ihrer Handy-Gruppe nehmen (None: in keiner)."""
+    a = normalisiere(abschnitt)
+    liste = copy.deepcopy(a.get(GRUPPEN, []))
+    for g in liste:
+        if kennung in g["widgets"]:
+            g["widgets"].remove(kennung)
+            return _mit_gruppen(a, [g for g in liste if g["widgets"]])
+    return None
 
 
 def freigegebene_kennungen(abschnitt) -> set:
@@ -260,13 +433,38 @@ def eintrag_setzen(abschnitt, seite: int, kennung: str, spalte: int, zeile: int,
     if not passt(abschnitt, seite, spalte, zeile, breite, hoehe, ausser=kennung):
         return None
     neu = _kopie(abschnitt)
+    alt = [e for e in neu["seiten"][seite]["eintraege"] if e["widget"] == kennung]
     eintraege = [e for e in neu["seiten"][seite]["eintraege"]
                  if e["widget"] != kennung]
-    eintraege.append({"widget": kennung, "spalte": int(spalte), "zeile": int(zeile),
-                      "breite": int(breite), "hoehe": int(hoehe)})
+    e = {"widget": kennung, "spalte": int(spalte), "zeile": int(zeile),
+         "breite": int(breite), "hoehe": int(hoehe)}
+    if alt:
+        e.update(_aussehen(alt[0]))     # WEB-13: Verschieben behaelt das Aussehen
+    eintraege.append(e)
     eintraege.sort(key=lambda e: (e["zeile"], e["spalte"]))
     neu["seiten"][seite]["eintraege"] = eintraege
     return neu
+
+
+def eintrag_aussehen(abschnitt, seite: int, kennung, farbe=None,
+                     text=None) -> dict | None:
+    """WEB-13: eigene Handy-Farbe/-Beschriftung einer Kachel setzen.
+
+    ``farbe``/``text`` = None (oder ungueltig/leer) heisst „wie Original“ —
+    das Feld wird dann entfernt. Gesetzt werden immer BEIDE: wer nur eines
+    aendern will, gibt das andere aus :func:`eintrag` mit. None, wenn die
+    Kachel nicht auf der Seite liegt."""
+    neu = _kopie(abschnitt)
+    if not (isinstance(seite, int) and 0 <= seite < len(neu["seiten"])):
+        return None
+    for e in neu["seiten"][seite]["eintraege"]:
+        if e["widget"] != kennung:
+            continue
+        for feld in AUSSEHEN_FELDER:
+            e.pop(feld, None)
+        e.update(_aussehen({"handy_farbe": farbe, "handy_text": text}))
+        return neu
+    return None
 
 
 def eintrag_entfernen(abschnitt, seite: int, kennung: str) -> dict | None:

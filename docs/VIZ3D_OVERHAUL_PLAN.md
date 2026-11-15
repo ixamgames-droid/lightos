@@ -1,13 +1,13 @@
 # 3D-Visualizer — Komplettüberarbeitung (Plan, 2026-07-02)
 
-> **Auftrag (David):** Der 3D-Viewer funktioniert zwar, ist aber nicht schön, nicht intuitiv
+> **Auftrag (Robin):** Der 3D-Viewer funktioniert zwar, ist aber nicht schön, nicht intuitiv
 > bedienbar und nicht stabil genug. Ziel: Komplettüberarbeitung — intuitiver Bühnenaufbau
 > (Platzieren, Rotieren, Erkennen welches Gerät welches ist), Stabilität, und später ein
 > **eigenständiges, immer sichtbares Fenster mit flüssigem Live-Rendering** (Show bauen ohne
 > Hardware). Sehr viele Änderungen erlaubt, Gesamtkonzept darf sich ändern.
 >
 > **Grundlage:** Multi-Agent-Code-Audit (5 Dimensionen), Live-UI-Audit per Computer Use
-> (LightOS + MagicVis + Magic 3D Easy View auf Davids Rechner), Web-Recherche über
+> (LightOS + MagicVis + Magic 3D Easy View auf Robins Rechner), Web-Recherche über
 > Capture, Depence, grandMA3 3D, Vectorworks Vision, WYSIWYG, Lightkey, Easy View 2,
 > DMXControl, ShowXpress, QLC+-Ökosystem, xLights + generische 3D-Editor-UX-Patterns
 > (Blender/Unity/three.js-Editor/Sweet Home 3D). Altes Bug-Audit (2026-06-23, 33 Befunde)
@@ -96,7 +96,7 @@
 Quellen u. a.: [grandMA3 3D Fixture Setup](https://help.malighting.com/grandMA3/2.2/HTML/qsg_3d_setup.html),
 [Position Fixtures in 3D](https://help.malighting.com/grandMA3/2.3/HTML/patch_position_fixtures.html),
 [Camera Pool](https://help.malighting.com/grandMA3/2.3/HTML/patch_3d_camera.html); MagicVis/Easy View
-live auf Davids Rechner inspiziert (2026-07-02).
+live auf Robins Rechner inspiziert (2026-07-02).
 
 ## 3. Zielbild
 
@@ -155,7 +155,7 @@ Quick Wins ohne Architekturänderung:
 - **Akzeptanz:** Truss-Rotation nimmt gedockte Fixtures mit; **Migrations-Gate:** ALLE
   committeten Shows aus `shows/` (≥35) laden nach Migration fehlerfrei UND ein
   automatisierter Vergleichstest bestätigt äquivalente Welt-Transforms (Position in m,
-  Rotation, Docks) vorher/nachher — Referenz-Realshow „david test 2.lshow"; .lshow auf
+  Rotation, Docks) vorher/nachher — Referenz-Realshow „robin test 2.lshow"; .lshow auf
   frischem Rechner bringt Bühne mit; Undo über alle Editier-Operationen.
 
 ### Phase 2 — Ein Service, ein Dauerfenster (VIZ-12, P1)
@@ -167,7 +167,7 @@ Quick Wins ohne Architekturänderung:
    bleiben erhalten.
 3. Eingebettete Live-View-3D wird durch einen Button „3D-Fenster öffnen" ersetzt ODER
    dockt als reines Spiegel-Target ohne eigenen Timer/Bridge an den Service
-   (Entscheidung David, s. §7 — **Achtung: die Spiegel-Variante vergrößert Phase 2
+   (Entscheidung Robin, s. §7 — **Achtung: die Spiegel-Variante vergrößert Phase 2
    deutlich**; die Button-Variante ist eine Runde, die Spiegel-Variante eher zwei).
 4. Zentrales `reset_interaction_state()` bei `show_loaded`/Stage-Wechsel (stoppt Trace usw.);
    `screenChanged`→`setPixelRatio`-Durchreichung (Zweitmonitor/DPI).
@@ -222,7 +222,7 @@ Quick Wins ohne Architekturänderung:
 3. Qualitätsstufen (Hoch/Mittel/Performance) + pro-Fixture Beam/Projektions-Toggle +
    globale Max-Beam-Range; Schatten-Budget (nur N nächste Lichter).
 - **Akzeptanz:** `all @ full` sieht nach Lichtshow aus (Vorher/Nachher-Screenshots);
-  60 fps bei 40 Fixtures auf Davids Rechner in „Mittel".
+  60 fps bei 40 Fixtures auf Robins Rechner in „Mittel".
 
 ### Phase 6 — Kür (VIZ-16, P3, später)
 Quad-View (4 Viewports); Positions-Kalibrierung über 2–3 Referenzpunkte (grandMA3-Idee);
@@ -240,14 +240,14 @@ MVR-Import/Export; abdockbare Zweitfenster-Views pro Kamera.
 ## 6. Risiken & Migration
 
 - **Größtes Risiko:** Phase 1 (Datenmodell) berührt Show-Persistenz → Einmal-Migration
-  mit `SHOW_VERSION`-Bump, Migrationstests mit echten Alt-Shows (u. a. „david test 2"),
+  mit `SHOW_VERSION`-Bump, Migrationstests mit echten Alt-Shows (u. a. „robin test 2"),
   Backup-Kopie vor Migration.
 - Phase 3 ersetzt viel JS → adversariale Three.js-Review + visuelle Abnahme (Computer
   Use) pro Runde; Altverhalten per Feature-Checkliste (Spider, Laser, LED-Bar, Docking).
 - WebEngine bleibt die Render-Basis (kein Engine-Wechsel) — Aufwand kalkulierbar, alle
   Verbesserungen sind additiv in Three.js machbar.
 
-## 7. Design-Entscheidungen (David, 2026-07-02 — ✅ ENTSCHIEDEN)
+## 7. Design-Entscheidungen (Robin, 2026-07-02 — ✅ ENTSCHIEDEN)
 
 1. **Eingebettete 3D-Ansicht in der Live View: BEHALTEN als Spiegel.** Sie dockt in
    Phase 2 als reines Spiegel-Target (ohne eigenen Timer/eigene Bridge) an den

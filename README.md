@@ -9,6 +9,11 @@
 > **Neu hier?** Fang mit **[Erste Schritte](docs/anleitung_erste_schritte/ANLEITUNG.md)** an —
 > alle bebilderten Anleitungen stehen in der **[Anleitungs-Übersicht](docs/ANLEITUNGEN.md)**.
 
+**Auf dieser Seite:** [Was kann LightOS?](#was-kann-lightos) ·
+[Erste Schritte](#erste-schritte) · [Installation und Start](#installation-und-start) ·
+[Touchscreen und Handy](#touchscreen-und-handy) · [Hilfe bei Problemen](#hilfe-bei-problemen) ·
+[Datenschutz: was privat bleibt](#datenschutz-was-privat-bleibt) · [Status und Grenzen](#status-und-grenzen)
+
 ---
 
 ## Was kann LightOS?
@@ -167,6 +172,17 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
 | MIDI (optional) | z. B. Akai APC mini / mk2; unter Linux mit `python-rtmidi` |
 | macOS | nicht unterstützt |
 
+### Start-Optionen
+
+`LightOS.exe` (Setup) bzw. `python main.py` (Quellcode) verstehen ein paar Schalter:
+
+| Schalter | Wirkung |
+|---|---|
+| `--touch` | Touch-Modus: größere Knöpfe, Regler und Listenzeilen für die Bedienung am Finger ([mehr](#touchscreen-und-handy)) |
+| `--kiosk` | Kiosk-Modus: Vollbild, nur die Virtual Console, keine Bearbeitung ([Anleitung](docs/anleitung_vc/ANLEITUNG_VC.md)) |
+| `--show DATEI` | diese `.lshow` beim Start öffnen statt der zuletzt benutzten Show |
+| `--diagnose [ZIEL.zip]` | Diagnosepaket schreiben und beenden, ohne Fenster ([Hilfe bei Problemen](#hilfe-bei-problemen)) |
+
 ---
 
 ## Funktionen im Detail
@@ -228,7 +244,8 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   Speed-Dial, Tempo-Bus-Auswahl, Tempo-Controller, BPM-Anzeige, Musik-Info, Effekt-Anzeige,
   Effekt-Editor, Effekt-Farben, Live-Editor, Label und Frame (mehrseitig oder Solo).
   Effekte per Drag & Drop auf Elemente legen, Banks, Submaster je Gerät oder Kopf,
-  MIDI-Lernen je Element, Tasten mit Bild oder GIF
+  MIDI-Lernen je Element, Tasten mit Bild oder GIF, Pop-up-Felder mit eigenen Tasten;
+  im Bearbeiten-Modus mehrere Elemente gemeinsam wählen, verschieben und ausrichten
   ([Widget-Referenz](docs/anleitung_vc_widgets/README.md)).
 - **Kommandozeile** im MA-/Avolites-Stil, zum Beispiel:
 
@@ -302,7 +319,8 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   wirklich rausgeht.
 - **MIDI** mit Profil-Editor (APC mini und APC mini mk2 dabei), LED-Feedback, mehrere Ausgänge
   gleichzeitig, Motorfader (Mackie Control/X-Touch) mit Nachführen
-  ([Fader-Referenz](docs/anleitung_vc_widgets/02_fader.md)); Tastatur-Belegung.
+  ([Fader-Referenz](docs/anleitung_vc_widgets/02_fader.md)); als Auslöser auch Program Change,
+  Endlos-Encoder, 14-Bit-CC und NRPN; Tastatur-Belegung.
 - **OSC** (Port 7770) mit freien Adressen, Lernen und Rückmeldung an Pult oder Tablet
   ([Anleitung OSC](docs/anleitung_osc/ANLEITUNG.md)).
 - **Fernsteuerung per Art-Net/sACN:** einzelne Kanäle eines Pults bedienen Executor-Fader,
@@ -310,8 +328,9 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   ([Anleitung](docs/anleitung_externe_pulte/ANLEITUNG_EXTERNE_PULTE.md#fernsteuerung--das-pult-bedient-lightos-über-art-netsacn)).
 - [Unterstützte DMX-Interfaces](docs/anleitung_ausgabe_einrichten/INTERFACES.md):
   Kompatibilitätsliste und Assistent **Interface einrichten…**.
-- **Web-Remote** im Browser von Handy oder Tablet — standardmäßig nur auf `127.0.0.1`, LAN als
-  sichtbares Opt-in mit Token ([Anleitung](docs/anleitung_web_remote/ANLEITUNG.md)).
+- **Handy-Konsole** im Browser von Handy oder Tablet — ab Werk aus; „📱 Handy verbinden“
+  schaltet sie in einem Schritt ein und zeigt einen QR-Code
+  ([mehr](#touchscreen-und-handy), [Anleitung](docs/anleitung_web_remote/ANLEITUNG.md)).
 
 </details>
 
@@ -341,6 +360,46 @@ die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
   Show, Auto-Save und Wiederherstellung nach einem Absturz sind eingebaut.
 
 </details>
+
+---
+
+## Touchscreen und Handy
+
+### Am Touchscreen
+
+Mit `--touch` gestartet, werden Knöpfe, Regler, Haken und Listenzeilen groß genug für den Finger.
+
+- **Wischen scrollt** überall, auch über Knöpfe und Listen hinweg; Tippen klickt wie gewohnt.
+  Wer verschieben oder markieren will, lässt den Finger erst kurz liegen und zieht dann.
+- **Regler bewegt nur der Griff** — ein Tipp auf die Rille verstellt nichts.
+- **Lange drücken** (etwa 0,6 s) öffnet das Kontextmenü, wo die Maus einen Rechtsklick hätte;
+  ohne Menü zeigt es die Erklärung zum Element. Im Spielbetrieb der Virtual Console öffnet
+  langes Drücken nie ein Menü.
+- **Mehrere Finger:** Fader und FLASH-Tasten der Virtual Console lassen sich gleichzeitig
+  bedienen; zwei Finger zoomen in der 2D-Bühne und der Show-Zeitleiste.
+- **Eingaben:** ein Tipp in ein Textfeld öffnet unter Linux die Bildschirmtastatur von
+  LightOS (unter Windows die von Windows), ein Tipp auf eine Zahl einen Ziffernblock.
+- **Mehrfachauswahl** ohne Strg-Taste über den Umschalter „Mehrfach“.
+- **Alle Gesten** stehen unter **Ansicht → Touch-Gesten…**, jede lässt sich dort abschalten.
+  BLACKOUT, STOP ALL und ähnliche Aktionen lassen sich nicht auf eine Geste legen. Mit der Maus
+  ändert sich nichts.
+
+### Vom Handy: die Handy-Konsole
+
+Im Browser von Handy oder Tablet, ohne App:
+
+- **Ab Werk ist alles aus.** **Ausgabe → „Web-Remote: Verbindung & Token…“** →
+  **„📱 Handy verbinden“** schaltet in einem Schritt ein, was das Handy braucht, und zeigt
+  einen QR-Code. Handy und PC müssen im selben WLAN sein; Internet braucht das Handy nicht.
+- Das Handy bedient nur, was auf einer Handy-Seite liegt: eigene Tasten, Fader und Cuelisten aus
+  der Virtual Console, dazu Grand Master und Blackout.
+- **Laser vom Handy** bleiben gesperrt, bis man es ausdrücklich erlaubt
+  ([Bedingungen](docs/anleitung_web_remote/LASER_VOM_HANDY.md)).
+- Wer den QR-Code scannt, kann die Konsole bedienen — den Code nicht zeigen, streamen oder
+  fotografieren. Ist das passiert: **„Schlüssel erneuern (neues Token)“**, dann gelten alle
+  alten Links sofort nicht mehr.
+
+Anleitung: [Web-Remote — das Handy als Konsole](docs/anleitung_web_remote/ANLEITUNG.md).
 
 ---
 
@@ -387,6 +446,35 @@ aus der Ferne sieht, was passiert ist:
   „PROBELAUF (Wegwerf-Daten, keine Ausgabe)“.
 
 Ausführlich: [INSTALL.md — Fehler melden / Diagnosepaket](INSTALL.md#fehler-melden--diagnosepaket).
+
+---
+
+## Datenschutz: was privat bleibt
+
+**Ein GitHub-Issue, ein Pull Request und dieses Repo sind öffentlich.** Folgendes gehört
+deshalb **nie** in ein Issue, einen PR, einen Commit oder einen Screenshot:
+
+| Was | Wo es liegt (im Datenordner, siehe [Hardware und Plattform](#hardware-und-plattform)) |
+|---|---|
+| deine **Shows** und Sicherungen | `shows/*.lshow`, `auto_save.lshow` |
+| die **Show-Datenbank** (Patch, Gruppen, Effekte deines Rigs) | `current_show.db` |
+| die **Universe-Konfiguration** (Interfaces, Netzwerk-Adressen) | `universes.json` |
+| die **MIDI-Zuordnungen** | `midi_mappings.json` |
+| der **Zugangsschlüssel der Handy-Konsole** — auch als Link mit `?k=…` oder als QR-Code | `ui_prefs.json` |
+| deine persönliche **Lizenzdatei** | `lightos-lizenz.lic` |
+| **Diagnosepakete** | `LightOS-Diagnose-<Datum>.zip` (meist auf dem Desktop) |
+
+**Diagnosepaket:** Es enthält Sitzungs-Logs, `crash.log`, Systeminfo (Version, Betriebssystem,
+Bildschirme, GPU, DMX-Ausgänge, MIDI-Geräte), eine Liste der Einstellungen — Texte, Pfade und
+Schlüssel nur als Platzhalter — und die Datei-**Namen** im Datenordner. Show-Dateien,
+Sicherungen und Datenbanken sind nicht drin; der Benutzername in Pfaden wird durch `~` bzw.
+`%USERNAME%` ersetzt. Trotzdem erzählen Logs und Dateinamen etwas über dein Rig: das Paket
+**privat schicken**, wie es der Dialog in LightOS sagt (E-Mail oder Messenger), nicht an ein
+öffentliches Issue hängen. Im Issue reicht der Satz „Diagnosepaket liegt bereit“.
+
+**Schlüssel versehentlich gezeigt?** Im Dialog **„Web-Remote: Verbindung & Token…“** auf
+**„Schlüssel erneuern (neues Token)“** drücken — alle alten Links und QR-Codes gelten sofort
+nicht mehr ([Anleitung](docs/anleitung_web_remote/ANLEITUNG.md)).
 
 ---
 
@@ -449,6 +537,11 @@ Alle Tests laufen ohne Hardware und ohne Fenster (offscreen).
 
 Die Suite nicht als einen einzigen `pytest tests/`-Lauf starten — ein Sammelprozess stirbt an
 aufgestautem nativem Qt-Zustand. Hintergrund und Parallelität: [WORKFLOW.md](WORKFLOW.md).
+
+**Private Daten bleiben draußen:** `tests/test_keine_privaten_dateien.py` lässt die CI scheitern,
+wenn Show-Datenbanken, Sicherungen oder Nutzerdateien unter `data/`/`shows/` getrackt sind, ein
+Benutzername in einem Pfad steht oder ein Zugangsschlüssel (Token, Schlüsselblock) im Repo liegt.
+Beispiel-Adressen in Anleitungen stammen aus `192.0.2.x`.
 
 ### CI
 

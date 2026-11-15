@@ -2,7 +2,7 @@
 
 Stand 2026-06-14. Erste, bewusst **rudimentäre** Umsetzung eines Musik-Players in LightOS
 plus „aktuelles/nächstes Lied" in der Virtuellen Konsole. Dieses Dokument hält den Ist-Stand
-und die offenen Ideen fest (David: „erstmal nur Ideen, die man aufschreiben sollte").
+und die offenen Ideen fest (Robin: „erstmal nur Ideen, die man aufschreiben sollte").
 
 ## Schon umgesetzt (funktional)
 

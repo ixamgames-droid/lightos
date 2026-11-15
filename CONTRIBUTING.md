@@ -191,6 +191,14 @@ dabei `done` mit der PR-Nummer.
 
 **Vor dem PR:** das Test-Gate (`.\tools\verify_segmented.ps1` bzw. `./tools/verify_loop.sh`) lokal ausführen.
 
+**Nichts Privates ins Repo:** Das Repo ist öffentlich. Shows, `current_show.db`,
+`universes.json`, `midi_mappings.json`, `ui_prefs.json` (Zugangsschlüssel der
+Handy-Konsole), Lizenzdateien und Diagnosepakete gehören weder in einen Commit noch in
+ein Issue oder einen PR — auch nicht als Screenshot. In Tests und Anleitungen gelten
+Platzhalter: `/home/user/…`, `C:\Users\X\…`, Beispiel-Adressen aus `192.0.2.x`, der
+Rig-Betreiber heißt „Robin“. `tests/test_keine_privaten_dateien.py` wacht darüber
+(Übersicht: [README → Datenschutz](README.md#datenschutz-was-privat-bleibt)).
+
 ---
 
 ## Fragen?
