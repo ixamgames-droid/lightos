@@ -2,7 +2,7 @@
 
 > Stand: 2026-06-01 · Status: **Phase 0–3 erledigt**, danach **REVISION**
 > (Programmer-Vereinheitlichung, siehe unten) in Planung.
-> Ziel laut David: links Geräte/Gruppen wählen, Mitte programmieren, rechts **eine**
+> Ziel laut Robin: links Geräte/Gruppen wählen, Mitte programmieren, rechts **eine**
 > Bibliothek mit **eigener Ordnerstruktur**, in der Snaps **und** Effekte/Funktionen
 > gemischt liegen — farblich getrennt, **pro Show** gespeichert.
 
@@ -119,7 +119,7 @@ Neuer Top-Level-Key `library` neben dem bestehenden `functions`:
 - Verifiziert (headless): gemischter Baum, Ordner-Umbenennen zieht beide mit,
   Ordner-Löschen schiebt Funktionen hoch, Funktions-Toggle, Editor-Factory.
 
-### Phase 5 — Export/Import einzelner Teile (Davids Wunsch, später)
+### Phase 5 — Export/Import einzelner Teile (Robins Wunsch, später)
 - Rechtsklick auf Item/Ordner → „Exportieren…" → kleine `.json` (Snap/Effekt).
 - Import-Gegenstück (in aktuellen Ordner einfügen).
 
@@ -127,7 +127,7 @@ Neuer Top-Level-Key `library` neben dem bestehenden `functions`:
 
 # REVISION (2026-06-01): Programmer-Vereinheitlichung
 
-> Ersetzt das alte „Phase 4". Auslöser: Rückmeldung von David — die Logik passt
+> Ersetzt das alte „Phase 4". Auslöser: Rückmeldung von Robin — die Logik passt
 > noch nicht. Der eigentliche Wunsch ist **ein einziger Programmer**.
 
 ## Problem im Ist-Zustand
@@ -142,7 +142,7 @@ Neuer Top-Level-Key `library` neben dem bestehenden `functions`:
   (`rgb_matrix_view.py:295`); EFX pflegt eine **eigene** manuelle Geräteliste
   (`efx_view.py:313`). Man kann *nicht* sagen „nimm diese 3 Strahler der Gruppe".
 
-## Zielbild (von David bestätigt)
+## Zielbild (von Robin bestätigt)
 
 **Alles ist EIN Programmer** (Zonen-Layout, das bleibt):
 - **Links:** immer Gruppe/Geräte wählen (eine, gemeinsame Auswahl).
@@ -150,7 +150,7 @@ Neuer Top-Level-Key `library` neben dem bestehenden `functions`:
   Weitere · Effekte · EFX · RGB Matrix · Paletten` — und **jede Kategorie arbeitet
   auf der links gewählten Gruppe**. Mit Effektvorschau.
 - **Rechts:** Bibliothek (Snaps + Effekte, Phase 3) zum Speichern/Abrufen.
-- **Sub-Tabs werden komplett aufgelöst** (Entscheidung David) → alles Kategorien.
+- **Sub-Tabs werden komplett aufgelöst** (Entscheidung Robin) → alles Kategorien.
 
 Beispiel: links 3 Strahler → Kategorie „RGB Matrix" → Effekt nur auf diese 3 →
 als Snap/Effekt in die Bibliothek.
@@ -183,7 +183,7 @@ Kategorie sie nutzen kann, kommt sie zentral in den App-Zustand:
   Auswahl; leere Auswahl → `None` = alle (Fallback). Kein Erzeugen aus Auswahl.
 - **Effekte:** Effekt-Assistent (`effect_wizard` FixturePage) kreuzt vorab nur die
   gewählten Geräte an (leere Auswahl → alle, wie bisher).
-- **EFX:** unverändert (eigene Geräteliste — David-Entscheidung).
+- **EFX:** unverändert (eigene Geräteliste — Robin-Entscheidung).
 - Verifiziert (headless): Matrix-aus-Auswahl + Leerschutz, Paletten-Ziel-fids,
   Wizard-Vorauswahl.
 
@@ -230,7 +230,7 @@ Kategorie sie nutzen kann, kommt sie zentral in den App-Zustand:
 > Behebt den in R3/R4 geflaggten Kern-Defekt: EFX- und RGB-Matrix-Instanzen
 > lebten getrennt in `state._efx_instances` / `_rgb_matrix_instances`, wurden
 > **nie im Renderer getickt** (kein DMX-Output) und konnten **nicht** in der
-> Bibliothek/VC/MIDI abgerufen werden. Auslöser: Rückfrage David — „Matrix-Style
+> Bibliothek/VC/MIDI abgerufen werden. Auslöser: Rückfrage Robin — „Matrix-Style
 > direkt auf eine Strahler-Gruppe legen und als Effekt speichern/abrufen".
 
 ## Was geändert wurde
@@ -282,7 +282,7 @@ Fehler sind pre-existing aus Phase 0/R3, unabhängig von diesem Umbau).
 **R1 → R2 → R3 → R4 → R5**, danach optional die alte **Phase 5** (Export).
 Jede Phase einzeln lauffähig + Smoke-Test (`docs/SMOKE_TEST.md`).
 
-## Geklärte Entscheidungen (David, 2026-06-01)
+## Geklärte Entscheidungen (Robin, 2026-06-01)
 
 - **Snapshots-Sub-Tab bleibt** als Schnellzugriff (nicht auflösen). In R4 nur die
   übrigen Sub-Tabs (Funktionen/EFX/RGB Matrix/Paletten) auflösen, Snapshots behalten.

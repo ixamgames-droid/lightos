@@ -1,6 +1,6 @@
 # Programmer / Matrix / VC / Chaser — Überarbeitungs-Roadmap
 
-> Stand: 2026-06-19, fortgeschrieben 2026-06-20. Quelle: Davids Sprach-Brainstorm + 10-Agenten-Code-Audit (`wf_b9e80fb1-a1e`).
+> Stand: 2026-06-19, fortgeschrieben 2026-06-20. Quelle: Robins Sprach-Brainstorm + 10-Agenten-Code-Audit (`wf_b9e80fb1-a1e`).
 > Status: **✅ ALLE 11 CLUSTER UMGESETZT (Wellen 1–4 erledigt).** Reste = Politur (Box-als-Einheit-Highlight, Memory-Konsolidierung).
 > Offene Aufgaben gehören final in `docs/OPEN_POINTS_OVERVIEW.md`; dieses Doc ist der Plan.
 >
@@ -9,9 +9,9 @@
 > FRM-01 (`add_child_to_page` verdrahtet Delete; `_remove_child` undobar via Canvas-Snapshot).
 > H+I Capability-Filter verifiziert: `control_options` gated jeden Aspekt (Dimmer/Shutter-Matrix → kein Farb-Widget, EFX → Bewegung, syncable → Tempo-Bus).
 
-## 0. Davids Input → 11 Cluster
+## 0. Robins Input → 11 Cluster
 
-| ID | Cluster | Davids Punkte (Kurz) |
+| ID | Cluster | Robins Punkte (Kurz) |
 |----|---------|----------------------|
 | A+D | **matrix-group-scope** | Matrix-Liste nur Gruppen-Fixtures; Speichern nur aktive-Gruppe-Kanäle, keine Altwerte aus voriger Gruppe |
 | B+C+I | **color-channel-semantics** | RGBW = echter W-Kanal & nur 4 Farbkanäle; RGB = nur R/G/B; Dimmer = nur Dimmer; Farb-Preview leuchtet, aber **kein** Dimmer mitspeichern; Effekt-Parameter je nach Fähigkeit |
@@ -31,10 +31,10 @@
 
 - **A (Matrix-Liste pro Gruppe):** Der eingebettete Matrix-Editor ist **bereits gruppen-scoped** (`rgb_matrix_view._assign_from_selection` → `grid_from_positions`). Leck nur in `_auto_assign` („Auto-Zuweisung aus Patch" zieht das ganze Patch) + im Standalone-Matrix-Tab.
 - **D (Speichern pro Gruppe):** **Echtes Leck.** `state.programmer` ist ein **globaler** Dict, der beim Gruppenwechsel **nicht** geleert wird; `ChannelSelectDialog` filtert nur nach Attribut-Klasse, nie nach Gruppen-Fixtures → Altwerte voriger Gruppen landen im neuen Snap. (`snap_file_panel.py:681-711`, `programmer_view.py:691-738`, `app_state.py:600-643`)
-- **B (RGBW):** `RgbMatrixInstance.write()` schreibt bei Weiß **RGB=255 UND W=255** (Doppel-Weiß). Die korrekte „echtes Weiß"-Umrechnung existiert schon in `color_utils.adapt_color_payload`, wird im Matrix-Pfad aber **nicht** genutzt. Der „Weiß-Anteil"-Slider ist der redundante Regler, den David weg will. (`rgb_matrix.py:527-626`)
+- **B (RGBW):** `RgbMatrixInstance.write()` schreibt bei Weiß **RGB=255 UND W=255** (Doppel-Weiß). Die korrekte „echtes Weiß"-Umrechnung existiert schon in `color_utils.adapt_color_payload`, wird im Matrix-Pfad aber **nicht** genutzt. Der „Weiß-Anteil"-Slider ist der redundante Regler, den Robin weg will. (`rgb_matrix.py:527-626`)
 - **C (Preview leuchtet, Save = nur Farbe):** **Funktioniert eigentlich schon korrekt.** Das Leuchten kommt aus render-only „implicit brightness" (`app_state.py:1018-1072`), die **nie** in `programmer`/Scene zurückgeschrieben wird. Gespeichert wird bereits farb-only. Gap = nur Verständlichkeit + ein klarer Schalter (`self.implicit_brightness`).
 - **E (Beam-Bug):** Eine Zeile: `snap_file_panel.py:35` steckt `shutter`+`strobe` in die Gruppe „Beam", während der Programmer sie bewusst unter „Intensity" führt. → umhängen. (3 divergente Maps insgesamt — siehe F2.)
-- **F (Chaser):** David verwechselt zwei Flächen: die Bibliothek-Aktion „Chase +" baut tatsächlich eine **Sequence** (Wertezeilen → das sind die „0 0 0 … 255"), das schöne Bearbeiten-Menü ist der **ChaserEditor** (Funktions-Pointer, zeigt schon nur Namen). Der `<2`-Gate blockt das leere-Chase-Öffnen.
+- **F (Chaser):** Robin verwechselt zwei Flächen: die Bibliothek-Aktion „Chase +" baut tatsächlich eine **Sequence** (Wertezeilen → das sind die „0 0 0 … 255"), das schöne Bearbeiten-Menü ist der **ChaserEditor** (Funktions-Pointer, zeigt schon nur Namen). Der `<2`-Gate blockt das leere-Chase-Öffnen.
 - **G (Stepper):** Fehlt komplett; Plumbing (`effect_live.get/set_param` mit Clamp, Registry, Serialisierung) ist vollständig vorhanden — reiner Neubau eines `VCWidget`.
 - **H+I (Capability-Filter):** Lebt schon zentral in `vc_effect_meta.py`. Dimmer-Matrix → keine Farbe **ist bereits** umgesetzt (Zeile 95-98). Fehlt: der **umgekehrte** Guard (Farb-Effekt → Tempo/Dimmer-Aspekte ausblenden).
 - **L (Effekt-Editor-Box):** Container `VCFrame` + Snap-out-Reparenting (`handle_drag_drop` FRM-01) **existieren**. Fehlt: Auto-Box aus dem Smart-Drop, Live-Display-Kind (`EffectMiniPreview` existiert, ist aber nicht als VCWidget registriert), Drop-Zeit-Wahl. **Label-Bug-Ursache:** `smart_drop_dialog._result_for` setzt `caption = Effektname` und wirft das Aspekt-Label (`opt.label`) weg → jeder Fader heißt „Matrix 1".
@@ -118,7 +118,7 @@
 
 ## 6. Offene Entscheidungen (gruppiert; Defaults vorgeschlagen)
 
-**Davids Entscheidungen 2026-06-19:**
+**Robins Entscheidungen 2026-06-19:**
 - **Capability-Filter (Q9/10): VOM WIDGET abhängig** — nicht pauschal pro Effekt. Baust du ein Farb-Widget → nur Farb-Optionen; baust du bewusst ein Tempo-Widget → Tempo bleibt erlaubt. (Filterung am Widget-Aspekt, nicht am Effekt.)
 - **Chaser (Q14): BEIDES** — ≥2 Snaps markiert → Sequence direkt bauen (wie bisher); nichts markiert → neuer leerer Chaser + Inline-Picker. Step-Liste in beiden nur Namen.
 - **RGBW-Weiß (Q5): ECHTES WEISS, nur W-Kanal** (volle Subtraktion, R=G=B=0).
@@ -152,7 +152,7 @@
 
 **Snap-Editor (M):** 23. Flache Attribut-Liste (empfohlen) oder Fixture×Kanal-Gitter? 24. Hinzufügen erlauben (Mini-Programmer) oder nur ansehen/ändern/entfernen? 25. Overlay auch für Matrix/EFX?
 
-**Live-Mini-Editor (O):** 26. Echtes Staging (erst auf OK senden — matcht Davids Wunsch) oder Matrix-Stil (live, revert bei Cancel)? 27. Long-Press-Dauer (450–600 ms)? 28. Modal oder angepinnt? 29. Volle View-Bodies oder kompakter generischer Editor (empfohlen)? 30. Multi-Effekt-Button: nur primären edit oder Chooser?
+**Live-Mini-Editor (O):** 26. Echtes Staging (erst auf OK senden — matcht Robins Wunsch) oder Matrix-Stil (live, revert bei Cancel)? 27. Long-Press-Dauer (450–600 ms)? 28. Modal oder angepinnt? 29. Volle View-Bodies oder kompakter generischer Editor (empfohlen)? 30. Multi-Effekt-Button: nur primären edit oder Chooser?
 
 **Layout/Refresh (J):** 31. J1: schlanken Sidebar-Header behalten + inneren ausblenden (empfohlen)? 32. J2: Toolbar-Buttons oder 9-Tab-Leiste oder beides? (Screenshot hilft) 33. 400-ms-Poll-Fallback nach K-Fix behalten?
 

@@ -217,4 +217,4 @@ die Annahmen gelten als belegt. Bei einer Abweichung wird daraus ein
 Umsetzungs-Item — bei HW-1 zum Beispiel „Kopf-Reihenfolge pro Profil".
 
 Vollfassung mit Historie: [BACKLOG.md](../BACKLOG.md), Abschnitt
-„🔌 Braucht Davids Hardware".
+„🔌 Braucht Robins Hardware".
