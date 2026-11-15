@@ -2729,7 +2729,11 @@ def _load_show_impl(path: str | os.PathLike):
             _alt, _neu, _mehrdeutig = _las28_befund(data, _laser3w_fids)
             # LAS-47: Effekt-/Regel-Ziele und VC-Bindungen sind ebenfalls
             # Merkmale (``laser_twist#2/#3`` alt, ``laser_twist_y`` neu).
-            _z_alt, _z_neu = _l28z.ziel_befund(data)
+            # Pruefung: ``#2`` ist am L2600 auch neu gueltig, deshalb erst die
+            # anderen Mehrfach-twist-Geraete bestimmen (ziel_befund filtert).
+            _las28_andere_fids = _l28z.mehrfach_twist_fids(state, _laser3w_fids)
+            _z_alt, _z_neu = _l28z.ziel_befund(data, _laser3w_fids,
+                                               _las28_andere_fids)
             _alt += _z_alt
             _neu += _z_neu
             _las28_kopf1 = _neu == 0 and (
@@ -2741,7 +2745,6 @@ def _load_show_impl(path: str | os.PathLike):
                     text=(f"{_mehrdeutig} SH-LASER3W-Wert(e) nur mit laser_twist#1 "
                           "nicht umgesetzt (Speicherstand vor/nach LAS-28 nicht "
                           "erkennbar)"))
-            _las28_andere_fids = _l28z.mehrfach_twist_fids(state, _laser3w_fids)
         except Exception as e:
             print(f"[show_file] SH-LASER3W flip classification failed: {e}")
 

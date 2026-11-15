@@ -288,6 +288,35 @@ class Las47Ziele(unittest.TestCase):
         self.assertEqual(pal.get_values_for_fixture(2)["laser_twist#1"], 9)
         self.assertEqual(pal.get_values_for_fixture(2)["laser_twist"], 8)
 
+    # ── Pruefung: ``#2`` am L2600 ist kein Altstands-Merkmal ─────────────
+
+    def test_l2600_fader_kopf_2_macht_die_show_nicht_alt(self):
+        """Nach LAS-28 gespeichert (kein Marker, Stempel nach Stichtag): ein
+        Fader auf ``laser_twist#2`` meint den L2600 und darf den
+        SH-LASER3W-Wert ``laser_twist#1`` (B horizontal) nicht umsetzen."""
+        _laden(self._show(vc_widgets=[_fader("laser_twist#2")],
+                          mit_l2600=True,
+                          programmer={"1": {"laser_twist#1": 50}}), zeit=NACH)
+        p = get_state().programmer[1]
+        self.assertEqual(p.get("laser_twist#1"), 50)
+        self.assertNotIn("laser_twist_y", p)
+
+    def test_l2600_kopplung_kopf_2_macht_die_show_nicht_alt(self):
+        _laden(self._show(funktionen=[_mapping(ziel="laser_twist#2", fids=(2,))],
+                          mit_l2600=True,
+                          programmer={"1": {"laser_twist#1": 50}}), zeit=NACH)
+        p = get_state().programmer[1]
+        self.assertEqual(p.get("laser_twist#1"), 50)
+        self.assertNotIn("laser_twist_y", p)
+
+    def test_ziel_befund_filtert_l2600(self):
+        show = self._show([_mapping(ziel="laser_twist#2", fids=(2,)),
+                           _mapping(ziel="laser_twist#3", fids=(1,))],
+                          [_fader("laser_twist#2")])
+        self.assertEqual(ziel_befund(show, {1}, {2}), (1, 0))
+        self.assertEqual(ziel_befund(show, {1}, set()), (2, 0))  # Fader + #3
+        self.assertEqual(ziel_befund(show, {1}, None), (0, 0))
+
     # ── Befund ────────────────────────────────────────────────────────────
 
     def test_ziel_befund(self):

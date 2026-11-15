@@ -68,31 +68,50 @@ def _funktions_dicts(data) -> list:
     return [f for f in fl if isinstance(f, dict)] if isinstance(fl, list) else []
 
 
-def ziel_befund(data) -> tuple[int, int]:
+def ziel_befund(data, laser_fids: set | None = None,
+                andere_fids: set | None = frozenset()) -> tuple[int, int]:
     """Altstands- (``laser_twist#2/#3``) und Neustands-Merkmale
     (``laser_twist_y*``) in Effekt-Zielen, Regel-Zielen und VC-Bindungen der
-    ROHEN show.json. Ergaenzt ``_las28_befund`` (der nur Werte-Dicts zaehlt)."""
-    alt = neu = 0
+    ROHEN show.json. Ergaenzt ``_las28_befund`` (der nur Werte-Dicts zaehlt).
 
-    def _zaehle(a) -> None:
+    Pruefung LAS-47: ``laser_twist#2`` ist am L2600 (zwei ``laser_twist``)
+    auch im NEUEN Stand gueltig. Ein Ziel zaehlt deshalb nur dann als
+    Altstands-Merkmal, wenn es kein anderes Geraet mit mehreren
+    ``laser_twist`` treffen kann: eine Funktion nur, wenn ihre Geraete einen
+    SH-LASER3W (``laser_fids``) und keins aus ``andere_fids`` enthalten, ein
+    VC-Fader (Reichweite beliebig) nur, wenn ``andere_fids`` leer ist.
+    ``andere_fids is None`` (nicht bestimmbar) = nie als Altstand zaehlen.
+    Neustands-Merkmale zaehlen immer (sie verhindern nur eine Umsetzung)."""
+    alt = neu = 0
+    vc_alt_ok = andere_fids is not None and not andere_fids
+
+    def _fn_alt_ok(fids) -> bool:
+        if andere_fids is None:
+            return False
+        if laser_fids is None:
+            return not (fids & set(andere_fids))
+        return bool(fids & laser_fids) and not (fids & set(andere_fids))
+
+    def _zaehle(a, alt_ok: bool) -> None:
         nonlocal alt, neu
         if _ist_neu(a):
             neu += 1
-        elif _ist_alt(a):
+        elif alt_ok and _ist_alt(a):
             alt += 1
 
     try:
         for f in _funktions_dicts(data):
-            _zaehle(f.get("target_attribute"))
+            ok = _fn_alt_ok(_fids(f.get("fixture_ids") or f.get("fids") or ()))
+            _zaehle(f.get("target_attribute"), ok)
             for a in f.get("zusatz_ziele") or []:
-                _zaehle(a)
+                _zaehle(a, ok)
             for r in f.get("rules") or []:
                 if isinstance(r, dict):
-                    _zaehle(r.get("target"))
+                    _zaehle(r.get("target"), ok)
         for w in _vc_regler(data.get("virtual_console")):
-            _zaehle(w.get("programmer_attr"))
+            _zaehle(w.get("programmer_attr"), vc_alt_ok)
             for a in w.get("programmer_attr_zusatz") or []:
-                _zaehle(a)
+                _zaehle(a, vc_alt_ok)
     except Exception as e:
         print(f"[las28_ziele] befund failed: {e}")
     return alt, neu
