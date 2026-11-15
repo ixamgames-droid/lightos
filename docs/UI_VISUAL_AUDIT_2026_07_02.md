@@ -1,6 +1,6 @@
 ﻿# UI-Visual-Audit 2026-07-02 (Optik + Bedienbarkeit)
 
-> Autonome Loop-Runde (Davids Auftrag: „visuell anschauen, was wir ändern können, damit's besser aussieht + einfachere Bedienbarkeit").
+> Autonome Loop-Runde (Robins Auftrag: „visuell anschauen, was wir ändern können, damit's besser aussieht + einfachere Bedienbarkeit").
 > **Methode:** Da die Computer-Use-Freigabe nicht verfügbar war, lief der Audit **headless**: das echte `MainWindow` (inkl. globalem Dark-QSS) wurde offscreen mit geladener Demo-Show (`shows/demo_apc_mk2.lshow`) durch alle 8 Hauptsektionen + Sub-Tabs geschaltet und gerendert (15 Screenshots, 1440×900, Segoe-UI-Font-Bootstrap gegen Offscreen-Tofu), dazu ~50 Einzel-Renderings aller Views/VC-Widgets/Live-Edit-Sonderfälle. Zwei unabhängige Audit-Agents (Linsen: Optik/Konsistenz · Bedienbarkeit/Klarheit) + eigene Verifikation jedes P1-Befunds am Screenshot. **Grenze der Methode:** keine Interaktion (Hover/Drag/Dialoge), keine echten Fenstergrößen-Wechsel — ein interaktiver GUI-Nachpass per Computer Use bleibt sinnvoll.
 
 ## ✅ Was gut aussieht (kein Handlungsbedarf)
@@ -43,11 +43,11 @@
 
 
 ## ✅ Nachtrag: Interaktive GUI-Verifikation (Computer Use, 2026-07-02 nachmittags)
-David war am Rechner, Freigabe erteilt — die offene interaktive Verifikation wurde in der echten App (frische Instanz, main `da184fc`) nachgeholt:
+Robin war am Rechner, Freigabe erteilt — die offene interaktive Verifikation wurde in der echten App (frische Instanz, main `da184fc`) nachgeholt:
 - **Farbwechsel-Auswahl (PR #131):** Swatch-Klick im „Farben"-Feld → Farbdialog → Magenta gewählt → Sequenz UND Vorschau übernehmen sofort. ✔
 - **Immer-Vorschau (PR #131):** Matrix nie gestartet, Vorschau animiert trotzdem (Läuferposition wandert zwischen Aufnahmen). ✔
 - **Anzeige-Toggles + Regressions-Fix (PR #131/#132-Review):** „Tempo-Kontrolle" ab- UND wieder angewählt → Tempo-Zeile kommt zurück. ✔
 - **Responsiv (PR #131):** schmal = gestapelt + Tempo einzeilig ab ~430 px; breit gezogen = Vorschau links OBEN (UI-23), Params rechts. ✔
 - **Bearbeiten/Bedienen:** Run-Modus zeigt nur den angehakten Farben-Regler ohne Häkchen-Liste. ✔
 - **UI-Polish (PR #135):** Sektions-Tabs ohne Überlappung (Elide greift), GM „100%" lesbar, Checkbox-Rahmen sichtbar, Tempo-Label „(dieser Effekt)". ✔
-- **Neuer Befund → UI-25:** Bei Davids realer Fensterbreite (1344 px logisch, unter der 1440er-Volltext-Schwelle) verteilt das Layout ungleich — „Virtual Console" voll, „Patchen" elidiert, „E/A" kollabiert zu reinem „…".
+- **Neuer Befund → UI-25:** Bei Robins realer Fensterbreite (1344 px logisch, unter der 1440er-Volltext-Schwelle) verteilt das Layout ungleich — „Virtual Console" voll, „Patchen" elidiert, „E/A" kollabiert zu reinem „…".

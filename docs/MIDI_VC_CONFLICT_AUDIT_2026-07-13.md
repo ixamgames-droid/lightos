@@ -165,7 +165,7 @@ Es gibt **keine** risikofreie **Ein-Zeilen**-Änderung, die die Cross-Ebene-Dopp
 Auslösung beseitigt: Sie entsteht strukturell aus zwei unabhängigen Bus-Subscribern.
 Jede Verhaltensänderung (Option A/C) berührt bewusst-gewollte Fälle und braucht Tests.
 Die **sicherste kleine** Verbesserung ist die **nicht-behaviorale** Learn-Warnung
-(Option B). Empfehlung an David: **Option B umsetzen** (warnt vor Konflikt beim Learn),
+(Option B). Empfehlung an Robin: **Option B umsetzen** (warnt vor Konflikt beim Learn),
 Option A nur mit vollständiger Subscriber-/Regressionsabdeckung.
 
 ---

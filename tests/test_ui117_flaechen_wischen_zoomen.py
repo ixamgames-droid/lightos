@@ -272,15 +272,21 @@ def test_buehne_doppeltipp_ins_leere_passt_ein(buehne):
     b = buehne
     hints = QApplication.styleHints()
     alt = hints.mouseDoubleClickInterval()
-    hints.setMouseDoubleClickInterval(5000)
     try:
         einpassen = []
         b.c.einpassen_requested.connect(lambda: einpassen.append(1))
+        # Qt zaehlt Klicks paarweise, auch ueber fruehere Tests hinweg: mit
+        # 1 ms Fenster beginnt der erste Tipp sicher ein neues Paar, erst
+        # danach wird das Fenster fuer langsame CI-Rechner gross (wie UI-114).
+        hints.setMouseDoubleClickInterval(1)
         _tipp(b.vp, QPoint(400, 300))
+        hints.setMouseDoubleClickInterval(5000)
         _tipp(b.vp, QPoint(400, 300))
         assert einpassen == [1]
         # auf einem Geraet bleibt der Doppeltipp ein Druck (waehlt)
+        hints.setMouseDoubleClickInterval(1)
         _tipp(b.vp, QPoint(160, 100))
+        hints.setMouseDoubleClickInterval(5000)
         _tipp(b.vp, QPoint(160, 100))
         assert einpassen == [1]
         assert b.c._selected_fids == [1]

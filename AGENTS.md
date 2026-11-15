@@ -91,7 +91,7 @@ Code- und Git-Root.
      nachgezogene Screenshots, tote Links/Rezepte, Kommentare im Code. Die
      Software verhält sich unverändert; die Git-Historie trägt es.
 
-   Faustregel bei Zweifel: *Würde David beim Lesen des Eintrags etwas erfahren,
+   Faustregel bei Zweifel: *Würde Robin beim Lesen des Eintrags etwas erfahren,
    das er beim Bedienen merkt?* Wenn nein, gehört es nicht hinein — ein
    CHANGELOG voller Doku-Nachträge verdeckt genau die Zeilen, für die er ihn
    liest.
