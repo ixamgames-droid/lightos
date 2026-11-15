@@ -220,6 +220,11 @@ def funktionen_nachziehen(fm, laser_fids: set, alt_show: bool,
                 neu_t, unklar = _umbenennen(t, alt_show, andere)
                 if neu_t is not None:
                     r.target = neu_t
+                    if t == "laser_twist#1" and neu_t == _TWIST_Y:
+                        # CDX-75: wie beim VC-Fader — ``laser_twist#1`` traf
+                        # nur A vertikal; der Basis-Schluessel spiegelte sonst
+                        # auf B vertikal.
+                        r.nur_kopf0 = True
                     umgesetzt += 1
                 elif unklar:
                     offen += 1
