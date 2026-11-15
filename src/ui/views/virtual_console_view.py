@@ -551,6 +551,7 @@ class VirtualConsoleView(QWidget):
 
         layout.addWidget(toolbar)
         self._toolbar_widget = toolbar
+        self._leiste_touch_hoehe(toolbar)
 
         # ── Status-Zeile: aktiver Effekt ──────────────────────────────────────
         # VCB-47: Die Zeile hat einen FESTEN, immer reservierten Platz. Sie wurde
@@ -1029,6 +1030,24 @@ class VirtualConsoleView(QWidget):
         """UI-121 B-14: Hoehe der Werkzeugleisten-Knoepfe — Touch 44 px,
         Maus wie bisher 26 px."""
         return 44 if touch_aktiv() else 26
+
+    def _leiste_touch_hoehe(self, leiste) -> None:
+        """QA-118 (e): im Hauptfenster bleiben die Leistenknoepfe 44 px hoch.
+
+        Das Touch-Stylesheet des Hauptfensters setzt ``QPushButton
+        { min-height: 38px }``. Beim Polieren ueberschreibt das das Minimum aus
+        ``setFixedHeight`` — gemessen in der echten App (250 %): 38 px + 1 px
+        Rand oben und unten = 40 statt 44. Der eigene Stil eines Knopfs
+        schlaegt das Fenster-Stylesheet, also nennt er die Hoehe dort selbst
+        (``min-height`` zaehlt ohne Rand; die Leistenstile haben 1 px Rand
+        und ``padding: 0``)."""
+        if not touch_aktiv():
+            return
+        h = self._tb_hoehe()
+        for b in leiste.findChildren(QPushButton):
+            if b.maximumHeight() == h and b.styleSheet():
+                b.setStyleSheet(b.styleSheet()
+                                + f"\nQPushButton {{ min-height: {h - 2}px; }}\n")
 
     def _bank_menue(self):
         """UI-121 B-05: Bank-Etikett angetippt — Bank direkt waehlen."""
