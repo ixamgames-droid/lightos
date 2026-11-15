@@ -1,6 +1,6 @@
 ID: LAS-47
-Status: review
-Status-Notiz: (1) (2) (4) umgesetzt; (3) nur verbessert — ohne jedes Merkmal bleibt die Show grundsaetzlich mehrdeutig, jetzt mit sichtbarem Ladehinweis
+Status: done
+Status-Notiz: (1) (2) (4) umgesetzt; (3) nur verbessert — ohne jedes Merkmal bleibt die Show grundsaetzlich mehrdeutig, jetzt mit sichtbarem Ladehinweis — Entscheidung vom Projektinhaber bestaetigt (15.11.2026): alte Effekte auf laser_twist verhalten sich wie vorher (alle vier Flips).
 
 **Geliefert:** Lade-Migration in `src/core/show/las28_ziele.py`, gleiche Regeln wie CDX-65 (nur ohne Marker `LAS-28`, nur fuer erkannte SH-LASER3W im neuen Profilstand, idempotent). (1) Effekte auf `laser_twist` bekommen das neue Zusatzziel `laser_twist_y` (`LayeredEffect.zusatz_ziele`), Kanal-Kopplungen eine Regel-Kopie mit Ziel `laser_twist_y`; Regel-Ziele `laser_twist#N` werden wie die Werte umbenannt. (2) VC-Fader im Programmer-Modus: `laser_twist#1/#2/#3` werden umbenannt, ein Fader auf `laser_twist` bekommt `programmer_attr_zusatz: ["laser_twist_y"]`. (3) Effekt-/Regel-Ziele und VC-Bindungen zaehlen jetzt als Merkmal (`#2`/`#3` alt, `laser_twist_y` neu); was mehrdeutig bleibt, steht zusaetzlich zum Sitzungs-Log als Ladehinweis in der Oberflaeche. (4) Eine generische Palette mit altem `#1` ohne `#2` neben einem L2600: der generische `#1`-Wert wandert in die Overrides der Mehrfach-twist-Geraete (L2600) und verlaesst die generischen Werte, so erreicht er den SH-LASER3W nicht mehr.
 
@@ -9,3 +9,5 @@ Status-Notiz: (1) (2) (4) umgesetzt; (3) nur verbessert — ohne jedes Merkmal b
 **Offen:** Die Entscheidung „alter Effekt trifft weiter alle vier Flips“ ist verhaltenserhaltend getroffen, aber von Robin noch nicht bestaetigt (die Frage aus dem Item). Rest (3) ist nicht loesbar — eine Show ohne jedes Merkmal, nach dem Stichtag mit einem aelteren Programmstand gespeichert, bleibt unveraendert (jetzt mit Hinweis). Rest (4): ein spaeter neu gepatchter L2600 bekommt den nach (4) verschobenen `#1`-Wert der Palette nicht mehr generisch.
 
 **Pruefung (15.11.2026):** `laser_twist#2` ist am L2600 auch im neuen Stand gueltig; Effekt-/Regel-Ziele und VC-Bindungen zaehlen deshalb nur dann als Altstands-Merkmal, wenn sie kein anderes Geraet mit mehreren `laser_twist` treffen koennen (sonst galt eine nach LAS-28 gespeicherte Show mit L2600-Fader auf `#2` als alt und `laser_twist#1` des SH-LASER3W wurde still umgeschluesselt).
+
+**Bestaetigt (15.11.2026):** Der Projektinhaber hat die verhaltenserhaltende Migration bestaetigt: alte Effekte, Kopplungen und Fader auf `laser_twist` treffen nach dem Laden weiter alle vier Flips. Rest (3) und (4) bleiben grundsaetzlich mehrdeutig und sind mit Ladehinweis bzw. Override abgedeckt; kein weiterer Bau.
