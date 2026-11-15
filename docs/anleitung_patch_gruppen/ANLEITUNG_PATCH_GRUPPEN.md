@@ -35,7 +35,8 @@ Hilfen:
   (**Anzahl Kopien:** und **Adress-Abstand:**).
 - **Gerät erstellen…** baut ein eigenes Profil (Kanäle/Attribute), falls dein Gerät nicht in der
   Datenbank ist.
-- **Löschen** entfernt die markierten Zeilen (mit Rückfrage). Doppelklick auf eine Zeile öffnet
+- **Löschen** entfernt die markierten Zeilen (mit Rückfrage). Sind viele markiert, baut sich der
+  Patch danach nur einmal neu auf; Strg+Z holt die Geräte weiterhin einzeln zurück. Doppelklick auf eine Zeile öffnet
   *Gerät bearbeiten* (Label, Modus, Universum, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
   bei Lasern die Laser-Ausrichtung — siehe unten).
 - Die Leiste **„Belegte DMX-Kanäle — Universum:"** unten (mit der Universum-Auswahl direkt daneben)
@@ -125,7 +126,7 @@ ist grau, solange keine Zeile angelegt werden kann. **Vorhandene Geräte werden 
 Überschneidungen. Die Geräte entstehen genau wie von Hand gepatcht (Mehrkopf-Geräte bekommen
 ihre Kopf-Gruppe). **Rückgängig** (Strg+Z) nimmt den ganzen Import in einem Schritt zurück.
 Der Patch und alle Ansichten bauen sich dabei **einmal** neu auf, nicht je Gerät — auch eine lange
-Liste ist in einem Augenblick da; ein importierter Laser ist sofort in NOT-AUS und Blackout erfasst.
+Liste ist in einem Augenblick da (2000 Geräte in wenigen Sekunden, ihr Rückgängig ebenso); ein importierter Laser ist sofort in NOT-AUS und Blackout erfasst.
 Bis der Import fertig ist, gibt keines der neuen Geräte etwas aus.
 
 Mit der Tastatur: liegt der Fokus auf **Tabellen-Import ▾**, öffnet die **Eingabetaste** das Menü,
