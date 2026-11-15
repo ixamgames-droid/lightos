@@ -41,6 +41,7 @@ HTTP_STATUS = {
     "blackout_nicht_von_hier": 403,     # WEB-12: Blackout hat jemand anderes gesetzt
     "gruppe_blockiert": 409,            # WEB-14: andere aktive Gruppen-Taste nicht ausschaltbar
     "nur_ueber_socket": 400,            # WEB-12: Halten nur ueber den Socket
+    "zu_viele": 429,                    # WEB-15: Grenze je Verbindung erreicht
     "kein_recht": 403,
     "kein_zugang": 403,
     "unbekannte_kennung": 404,
@@ -134,9 +135,20 @@ def widget_aktion(kennung, aktion, wert=None) -> dict:
 _sender = None                  # fn(ereignis, daten) -> an alle Zuschauer
 _zuschauer: set = set()         # Verbindungen, die die Konsole anzeigen
 _gehalten: dict = {}            # Verbindung -> Kennungen gehaltener Tasten
-# WEB-12: Druck und Loslassen gehaltener Tasten nacheinander — sonst saehen zwei
+# WEB-12: Druck und Loslassen DERSELBEN Taste nacheinander — sonst saehen zwei
 # Handys, die gleichzeitig druecken, beide „noch niemand haelt“.
-_halte_lock = threading.Lock()
+# WEB-15: nicht mehr ueber einen globalen Lock, der waehrend des Rundlaufs zur
+# Oberflaeche (bis zu ZEITLIMIT_S) gehalten wurde — dahinter warteten das
+# Loslassen und der Verbindungsabbau ALLER anderen Handys. Stattdessen traegt
+# sich ein laufender Druck/Loslassen je Taste ein (``_im_lauf``); nur ein
+# zweiter Druck auf DIESELBE Taste wartet darauf. Loslassen und Abbau warten
+# nie: was waehrenddessen ankommt, wird gemerkt und nach dem Druck erledigt.
+_im_lauf: dict = {}             # Kennung -> (Verbindung, "druecken"|"loslassen", Event)
+_los_nach_druck: set = set()    # (Verbindung, Kennung): nach dem Druck gleich los
+_verwaist: set = set()          # Kennungen: letzter Halter ging, waehrend ein Druck lief
+#: So lange wartet ein Druck hoechstens auf den laufenden Druck/Loslassen
+#: derselben Taste (der Rundlauf selbst ist durch ZEITLIMIT_S begrenzt).
+WARTEN_S = 5.0
 
 
 def konsole() -> dict:
@@ -251,38 +263,85 @@ def halten(verbindung, kennung) -> dict:
     Verbindung wird nur dann Halter, wenn IHR Druck die Taste ausgeloest hat
     oder schon ein anderes Handy sie haelt. Haelt sie das Pult (Maus, MIDI),
     bleibt das Pult der einzige Halter — Loslassen oder Abreissen dieses Handys
-    laesst sie dann nicht los."""
-    with _halte_lock:
+    laesst sie dann nicht los.
+
+    WEB-15: der Rundlauf zur Oberflaeche laeuft OHNE gehaltenen Lock (s.
+    ``_im_lauf``)."""
+    while True:
         with _lock:
             if kennung in _gehalten.get(verbindung, ()):
                 return {"ok": True}             # haelt schon
-            andere = _andere_halten(kennung, verbindung)
+            lauf = _im_lauf.get(kennung)
+            if lauf is None:
+                andere = _andere_halten(kennung, verbindung)
+                fertig = threading.Event()
+                _im_lauf[kennung] = (verbindung, "druecken", fertig)
+                break
+        if lauf[0] == verbindung and lauf[1] == "druecken":
+            return {"ok": True}                 # derselbe Druck laeuft schon
+        if not lauf[2].wait(WARTEN_S):
+            return _nein("zeitueberschreitung")
+    antwort = _nein("fehler")
+    los_jetzt = halter = nachher_los = False
+    try:
         antwort = widget_aktion(kennung, "druecken")
-        if not antwort.get("ok"):
-            return antwort
-        if antwort.get("ausgeloest") or andere:
-            with _lock:
+    finally:
+        with _lock:
+            _im_lauf.pop(kennung, None)
+            nachher_los = (verbindung, kennung) in _los_nach_druck
+            _los_nach_druck.discard((verbindung, kennung))
+            verwaist = kennung in _verwaist
+            _verwaist.discard(kennung)
+            halter = bool(antwort.get("ok")) and bool(
+                antwort.get("ausgeloest") or andere or verwaist)
+            if halter and not nachher_los:
                 _gehalten.setdefault(verbindung, set()).add(kennung)
-        else:
-            antwort = dict(antwort, gehalten_vom_pult=True)
-        return antwort
+            elif (halter or verwaist) and not _andere_halten(kennung, verbindung):
+                # Finger/Verbindung schon wieder weg, oder der fruehere Halter
+                # ging und dieser Druck uebernimmt nicht: niemand haelt mehr.
+                los_jetzt = True
+        fertig.set()
+        if los_jetzt:
+            _loslassen({kennung})
+    if antwort.get("ok") and not halter:
+        antwort = dict(antwort, gehalten_vom_pult=True)
+    return antwort
 
 
 def loslassen_von(verbindung, kennung) -> dict:
     """WEB-12: ``verbindung`` laesst ``kennung`` los. Losgelassen wird die
     Taste nur, wenn diese Verbindung sie hielt UND kein anderes Handy sie noch
-    haelt; ein Loslassen ohne vorheriges Halten tut nichts."""
-    with _halte_lock:
-        with _lock:
-            menge = _gehalten.get(verbindung)
-            if not menge or kennung not in menge:
-                return {"ok": True, "nicht_gehalten": True}
-            menge.discard(kennung)
-            if not menge:
-                _gehalten.pop(verbindung, None)
-            if _andere_halten(kennung, verbindung):
-                return {"ok": True, "andere_halten": True}
+    haelt; ein Loslassen ohne vorheriges Halten tut nichts.
+
+    WEB-15: wartet nie auf einen laufenden Druck. Laeuft gerade der EIGENE
+    Druck, wird das Loslassen danach nachgeholt; laeuft der Druck eines
+    anderen Handys, uebernimmt der (oder laesst los, wenn er nicht Halter
+    wird)."""
+    with _lock:
+        menge = _gehalten.get(verbindung)
+        if not menge or kennung not in menge:
+            lauf = _im_lauf.get(kennung)
+            if lauf is not None and lauf[0] == verbindung and lauf[1] == "druecken":
+                _los_nach_druck.add((verbindung, kennung))
+                return {"ok": True, "nach_dem_druck": True}
+            return {"ok": True, "nicht_gehalten": True}
+        menge.discard(kennung)
+        if not menge:
+            _gehalten.pop(verbindung, None)
+        if _andere_halten(kennung, verbindung):
+            return {"ok": True, "andere_halten": True}
+        if kennung in _im_lauf:
+            _verwaist.add(kennung)
+            return {"ok": True, "uebergeben": True}
+        fertig = threading.Event()
+        _im_lauf[kennung] = (verbindung, "loslassen", fertig)
+    antwort = _nein("fehler")
+    try:
         antwort = widget_aktion(kennung, "loslassen")
+    finally:
+        with _lock:
+            _im_lauf.pop(kennung, None)
+        fertig.set()
         if not antwort.get("ok"):
             # Das Loslassen kam nicht an (Oberflaeche antwortete nicht
             # rechtzeitig, Widget inzwischen von der Seite genommen) — die
@@ -290,7 +349,7 @@ def loslassen_von(verbindung, kennung) -> dict:
             # Verbindungsabbruch liesse sie also auch nicht mehr los. Deshalb
             # jetzt ueber den Weg, der nicht verfaellt.
             _loslassen({kennung})
-        return antwort
+    return antwort
 
 
 def vergessen(kennungen) -> set:
@@ -315,12 +374,20 @@ def zuschauer_weg(verbindung) -> None:
     zaehlen und loslassen, was sie gehalten hat — ausser ein anderes Handy
     haelt dieselbe Taste noch (WEB-12). Eine Flash-Taste oder ein Blackout
     bleibt sonst stehen, wenn das Handy das WLAN verliert."""
-    with _halte_lock:
-        with _lock:
-            _zuschauer.discard(verbindung)
-            kennungen = _gehalten.pop(verbindung, set())
-            kennungen = {k for k in kennungen if not _andere_halten(k, verbindung)}
-        _loslassen(kennungen)
+    with _lock:
+        _zuschauer.discard(verbindung)
+        kennungen = set()
+        for k in _gehalten.pop(verbindung, set()):
+            if _andere_halten(k, verbindung):
+                continue
+            if k in _im_lauf:
+                _verwaist.add(k)            # WEB-15: der laufende Druck entscheidet
+            else:
+                kennungen.add(k)
+        for k, (v, art, _e) in _im_lauf.items():
+            if v == verbindung and art == "druecken":
+                _los_nach_druck.add((v, k))
+    _loslassen(kennungen)
 
 
 def alle_loslassen() -> None:
@@ -329,6 +396,9 @@ def alle_loslassen() -> None:
     with _lock:
         kennungen = {k for menge in _gehalten.values() for k in menge}
         _gehalten.clear()
+        for k, (v, art, _e) in _im_lauf.items():
+            if art == "druecken":
+                _los_nach_druck.add((v, k))
     _loslassen(kennungen)
 
 

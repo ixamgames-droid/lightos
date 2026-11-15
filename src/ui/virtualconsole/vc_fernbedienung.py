@@ -268,10 +268,26 @@ def _eintrag_laser(state, typ, eintrag) -> bool:
     if typ == "library_snap":
         fids = _snap_fids(eintrag.get("snap_id"))
         return True if fids is None else ff.fids_treffen_laser(state, fids)
-    if typ in ("blackout", "stop_all", "clear"):
-        return False
+    if typ in ("blackout", "stop_all", "clear", "clear_non_vc", "tap"):
+        return False                    # (s. VCButton._execute_extra)
     return eintrag.get("function_id") is not None and ff.funktion_trifft_laser(
         state, eintrag.get("function_id"))
+
+
+def _slot_laser(state, slot) -> bool:
+    """WEB-15: steht auf dem Executor-Slot eine Cueliste mit Laser-Inhalt?
+    Ohne gueltigen Slot tut die Taste nichts (``_trigger_primary`` bricht ab)
+    — dann gibt es auch nichts zu sperren."""
+    from src.core.laser import fern_freigabe as ff
+    if slot is None or isinstance(slot, bool):
+        return False
+    try:
+        slot = int(slot)
+    except (TypeError, ValueError):
+        return False
+    executors = list(state.playback_engine.executors)
+    return 0 <= slot < len(executors) and ff.executor_trifft_laser(
+        state, executors[slot])
 
 
 def _taste_laser(widget, state) -> bool:
@@ -284,6 +300,13 @@ def _taste_laser(widget, state) -> bool:
     a = getattr(widget, "action", None)
     if a in _harmlose_tastenaktionen():
         return False
+    if a in (A.TOGGLE, A.FLASH):
+        # WEB-15: „Executor: Umschalten (Go)“ / „Executor: Flash“ tragen in
+        # ``function_id`` den Executor-SLOT, keine Funktions-ID — geprueft wird
+        # die Cueliste auf diesem Slot, genau wie ``VCButton._trigger_primary``
+        # sie ausloest (und wie der Playback-Fader). Der Funktions-Weg darf fuer
+        # diese Aktionen NICHT laufen: eine Slot-Nummer ist keine Funktion.
+        return _slot_laser(state, getattr(widget, "function_id", None))
     fids_fn = list(widget._all_function_ids())
     if any(ff.funktion_trifft_laser(state, f) for f in fids_fn):
         return True
@@ -310,12 +333,7 @@ def _fader_laser(widget, state) -> bool:
     if m == M.LEVEL:
         return ff.adresse_ist_laser(state, widget.dmx_universe, widget.dmx_channel)
     if m == M.PLAYBACK:
-        slot = getattr(widget, "playback_slot", None)
-        if slot is None:
-            return False
-        executors = list(state.playback_engine.executors)
-        return 0 <= slot < len(executors) and ff.executor_trifft_laser(
-            state, executors[slot])
+        return _slot_laser(state, getattr(widget, "playback_slot", None))
     if m == M.SUBMASTER:
         fids, _heads = widget._submaster_targets(state)
         return True if fids is None else ff.fids_treffen_laser(state, fids)
@@ -1050,7 +1068,6 @@ class VCFernbedienung(QObject):
             from src.core.laser import fern_freigabe as _ff
             from src.web import fern_pult
             state = get_state()
-            om = state.output_manager
             v = None
             if gm is not None:
                 v = _fader_wert(gm)
@@ -1058,14 +1075,12 @@ class VCFernbedienung(QObject):
                     return _nein(WERT_UNGUELTIG)
             if blackout is not None and not isinstance(blackout, bool):
                 return _nein(WERT_UNGUELTIG)
-            if blackout is not None:
-                r = fern_pult.blackout_setzen(om, blackout, geraet)
-                if not r.get("ok"):
-                    return dict(r, **self._pult_jetzt())
-            if v is not None:
-                r = fern_pult.gm_setzen(state, v / 255.0, geraet, _ff.laser_erlaubt())
-                if not r.get("ok"):
-                    return dict(r, **self._pult_jetzt())
+            # WEB-15: Pruefen und Setzen beider Werte in EINEM Schritt — ein
+            # abgelehnter GM liess vorher den Blackout schon gesetzt zurueck.
+            r = fern_pult.pult_setzen(state, None if v is None else v / 255.0,
+                                      blackout, geraet, _ff.laser_erlaubt())
+            if not r.get("ok"):
+                return dict(r, **self._pult_jetzt())
             return {"ok": True, **self._pult_jetzt()}
         try:
             return self._im_ui_thread(_tun, _nein)

@@ -904,6 +904,30 @@ def _register_socketio(sio):
     # erfundener Kennungen belegt sonst Speicher bis zum Abbau der Verbindung.
     FOLGE_MAX_JE_SID = 1024
     sio.lightos_vc_folge = folge            # nur lesend, fuer Tests
+    # WEB-15: Grenze je Verbindung (gleichzeitig laufende Aktionen + Rate).
+    from src.web.vc_grenze import VerbindungsGrenze, LOS, NACHGEHOLT
+    grenze = VerbindungsGrenze()
+    sio.lightos_vc_grenze = grenze          # fuer Tests
+
+    def _begrenzt(sid, fn, schluessel=None, nachholbar=False):
+        """``fn()`` innerhalb der Grenze von ``sid`` ausfuehren. Ein Fader-Wert
+        (``nachholbar``), der ankommt, waehrend der vorige noch laeuft, wird
+        danach nachgeholt statt abgewiesen."""
+        zustand = grenze.herein(sid, schluessel, fn if nachholbar else None)
+        if zustand == NACHGEHOLT:
+            return {"ok": True, "nachgeholt": True}
+        if zustand != LOS:
+            return {"ok": False, "fehler": "zu_viele"}
+        try:
+            return fn()
+        finally:
+            weiter = grenze.fertig(sid, schluessel)
+            while weiter is not None:
+                try:
+                    weiter()
+                except Exception as e:
+                    print(f"[web] ERROR: nachgeholte Handy-Aktion: {type(e).__name__}")
+                weiter = grenze.fertig(sid, schluessel)
 
     def _senden(ereignis, daten):
         sio.emit(ereignis, daten, to=RAUM)
@@ -956,15 +980,23 @@ def _register_socketio(sio):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         if aktion == "setzen" and _veraltet(request.sid, kennung, data.get("n")):
             return {"ok": True, "veraltet": True}
+        sid = request.sid
+        if aktion == "loslassen":
+            # Loslassen geht immer — ohne Grenze (macht nichts an).
+            return vc_remote.loslassen_von(sid, kennung)
+        if aktion == "stop":
+            return vc_remote.widget_aktion(kennung, aktion)   # STOP geht immer
         if aktion == "druecken":
             # WEB-12 (Codex #1030/#1039/#1041): gehalten wird je Halter
             # gezaehlt — ein Druck auf eine Taste, die schon das Pult oder ein
             # anderes Handy haelt, macht dieses Handy nicht zum Halter, der sie
             # beim Loslassen oder Abreissen wieder loslaesst.
-            return vc_remote.halten(request.sid, kennung)
-        if aktion == "loslassen":
-            return vc_remote.loslassen_von(request.sid, kennung)
-        return vc_remote.widget_aktion(kennung, aktion, data.get("wert"))
+            return _begrenzt(sid, lambda: vc_remote.halten(sid, kennung))
+        wert = data.get("wert")
+        if aktion == "setzen":
+            return _begrenzt(sid, lambda: vc_remote.widget_aktion(kennung, aktion, wert),
+                             schluessel=kennung, nachholbar=True)
+        return _begrenzt(sid, lambda: vc_remote.widget_aktion(kennung, aktion, wert))
 
     @sio.on("vc_pult")
     def on_vc_pult(data=None):
@@ -975,8 +1007,14 @@ def _register_socketio(sio):
             return {"ok": False, "fehler": "anfrage_ungueltig"}
         if "gm" in data and _veraltet(request.sid, "#gm", data.get("n")):
             return {"ok": True, "veraltet": True}
-        return vc_remote.pult(gm=data.get("gm"), blackout=data.get("blackout"),
-                              geraet=geraet())
+        gm, blackout, wer = data.get("gm"), data.get("blackout"), geraet()
+        if gm is None and blackout is True:
+            # Blackout AN geht immer — ohne Grenze (macht dunkel).
+            return vc_remote.pult(blackout=True, geraet=wer)
+        nur_gm = blackout is None and gm is not None
+        return _begrenzt(request.sid,
+                         lambda: vc_remote.pult(gm=gm, blackout=blackout, geraet=wer),
+                         schluessel="#gm" if nur_gm else None, nachholbar=nur_gm)
 
     @sio.on("disconnect")
     def on_disconnect(*_args):
@@ -985,6 +1023,7 @@ def _register_socketio(sio):
         sid = request.sid
         with folge_lock:
             folge.pop(sid, None)
+        grenze.vergessen(sid)
         vc_remote.zuschauer_weg(sid)
 
 
