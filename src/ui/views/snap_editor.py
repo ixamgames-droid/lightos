@@ -492,10 +492,10 @@ class SnapEditor(QWidget):
             tbl.setCellWidget(r, 5, btn)
 
         # Tabelle auf Inhaltshoehe fixieren (kein verschachtelter Scroll).
-        h = hh.height() + 4
-        for r in range(tbl.rowCount()):
-            h += tbl.rowHeight(r) or 30
-        tbl.setFixedHeight(max(h, 60))
+        # CDX-74: ueber die gemeinsame Hilfe, damit der Touch-Modus (44-px-
+        # Zeilen beim Zeigen) die Hoehe nachzieht.
+        from src.ui.touch_keyboard import inhalt_hoehe_fixieren
+        inhalt_hoehe_fixieren(tbl, minimum=60, ersatz_zeile=30)
         cv.addWidget(tbl)
         self._tables.append(tbl)
 

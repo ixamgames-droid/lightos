@@ -422,6 +422,29 @@ class _KlapplistenDelegat(QStyledItemDelegate):
         super().paint(painter, option, index)
 
 
+#: Qt-Eigenschaft an einer Tabelle: Hoehe ist auf den Inhalt fixiert (CDX-74).
+INHALT_HOEHE = "inhalt_hoehe"
+
+
+def inhalt_hoehe_fixieren(tbl, minimum: int = 60, ersatz_zeile: int = 30) -> int:
+    """CDX-74: Tabelle ohne eigenen Bildlauf auf Inhaltshoehe fixieren.
+
+    Kopfzeile + 4 px Rahmen + Summe der Zeilenhoehen. Markiert die Tabelle
+    (``INHALT_HOEHE``), damit ``_touch_masse`` nach dem Anheben der Zeilen
+    im Touch-Modus neu bemisst. Gibt die gesetzte Hoehe zurueck."""
+    hh = tbl.horizontalHeader()
+    kopf = 0
+    if hh is not None and not hh.isHidden():
+        kopf = max(hh.height(), hh.sizeHint().height())
+    h = kopf + 4
+    for r in range(tbl.rowCount()):
+        h += tbl.rowHeight(r) or ersatz_zeile
+    h = max(h, int(minimum))
+    tbl.setProperty(INHALT_HOEHE, True)
+    tbl.setFixedHeight(h)
+    return h
+
+
 def _touch_masse(obj: QObject) -> None:
     """UI-119: was das Stylesheet nicht erreicht, beim Zeigen nachziehen.
 
@@ -435,6 +458,10 @@ def _touch_masse(obj: QObject) -> None:
             vh = obj.verticalHeader()
             if vh is not None and vh.defaultSectionSize() < TABELLEN_ZEILE:
                 vh.setDefaultSectionSize(TABELLEN_ZEILE)
+            # CDX-74: auf Inhaltshoehe fixierte Tabellen (Snap-Editor) muessen
+            # die groesseren Zeilen mitnehmen, sonst fehlen unten Zeilen.
+            if obj.property(INHALT_HOEHE) is True:
+                inhalt_hoehe_fixieren(obj)
         elif isinstance(obj, QComboBox):
             # C-11: ``QComboBox QAbstractItemView::item`` greift nur mit einem
             # QStyledItemDelegate — Qts eigener Menue-Delegat ignoriert das QSS.
