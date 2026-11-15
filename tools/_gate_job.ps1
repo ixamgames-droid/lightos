@@ -142,9 +142,12 @@ public static class LightOSGateJob
     const int KLASSE_ERWEITERT = 9;     // JobObjectExtendedLimitInformation
     const uint CREATE_SUSPENDED = 0x4;
     const int STARTF_USESTDHANDLES = 0x100;
+    const uint GENERIC_READ = 0x80000000;
     const uint GENERIC_WRITE = 0x40000000;
     const uint FILE_SHARE_READ_WRITE = 0x3;
     const uint CREATE_ALWAYS = 2;
+    const uint OPEN_EXISTING = 3;
+    const uint WARTEN_MS = 10000;
     static readonly IntPtr UNGUELTIG = new IntPtr(-1);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
@@ -160,8 +163,6 @@ public static class LightOSGateJob
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     static extern IntPtr CreateFileW(string pfad, uint zugriff, uint teilen, ref Sicherheit sa,
                                      uint anlegen, uint attribute, IntPtr vorlage);
-    [DllImport("kernel32.dll")]
-    static extern IntPtr GetStdHandle(int welches);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     static extern bool CreateProcessW(string programm, StringBuilder befehl, IntPtr pa, IntPtr ta,
                                       bool erben, uint flags, IntPtr umgebung, string ordner,
@@ -170,6 +171,8 @@ public static class LightOSGateJob
     static extern int ResumeThread(IntPtr thread);
     [DllImport("kernel32.dll", SetLastError = true)]
     static extern bool TerminateProcess(IntPtr prozess, uint code);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    static extern uint WaitForSingleObject(IntPtr objekt, uint ms);
 
     // Job mit KILL_ON_JOB_CLOSE; IntPtr.Zero, wenn es nicht geht. Das Handle
     // ist NICHT vererbbar - die Segmente halten ihren Job also nicht selbst
@@ -234,6 +237,21 @@ public static class LightOSGateJob
         return h;
     }
 
+    // QA-120: stdin der Segmente ist NUL, vererbbar geoeffnet. Das Handle aus
+    // GetStdHandle gehoert dem Runner und ist nicht immer vererbbar - dann
+    // stuende im Segment eine Handle-Nummer ohne (oder mit fremdem) Objekt.
+    static IntPtr LeereEingabe()
+    {
+        Sicherheit sa = new Sicherheit();
+        sa.nLength = Marshal.SizeOf(typeof(Sicherheit));
+        sa.bInheritHandle = 1;
+        IntPtr h = CreateFileW("NUL", GENERIC_READ, FILE_SHARE_READ_WRITE, ref sa,
+                               OPEN_EXISTING, 0, IntPtr.Zero);
+        if (h == UNGUELTIG)
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "NUL");
+        return h;
+    }
+
     // Startet `programm args` angehalten, mit stdout/stderr in die Dateien,
     // haengt ihn in den Job (falls job != Zero) und laesst ihn erst dann los.
     // Wirft nur, wenn KEIN Prozess weiterlaeuft - dann darf der Aufrufer neu
@@ -246,14 +264,16 @@ public static class LightOSGateJob
 
         IntPtr hOut = Ausgabedatei(ausgabe);
         IntPtr hErr = IntPtr.Zero;
+        IntPtr hIn = IntPtr.Zero;
         ProzessInfo pi;
         try
         {
             hErr = Ausgabedatei(fehler);
+            hIn = LeereEingabe();
             StartInfo si = new StartInfo();
             si.cb = Marshal.SizeOf(typeof(StartInfo));
             si.dwFlags = STARTF_USESTDHANDLES;
-            si.hStdInput = GetStdHandle(-10);
+            si.hStdInput = hIn;
             si.hStdOutput = hOut;
             si.hStdError = hErr;
             if (!CreateProcessW(programm, befehl, IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED,
@@ -264,6 +284,7 @@ public static class LightOSGateJob
         {
             CloseHandle(hOut);
             if (hErr != IntPtr.Zero) CloseHandle(hErr);
+            if (hIn != IntPtr.Zero) CloseHandle(hIn);
         }
 
         LightOSGateStart erg = new LightOSGateStart();
@@ -283,7 +304,11 @@ public static class LightOSGateJob
         }
         catch
         {
+            // QA-120: TerminateProcess kehrt sofort zurueck; erst wenn der
+            // Prozess wirklich weg ist, sind seine Logdateien frei - der
+            // Aufrufer startet danach mit Start-Process in DIESELBEN Dateien.
             TerminateProcess(pi.hProcess, 1);
+            WaitForSingleObject(pi.hProcess, WARTEN_MS);
             throw;
         }
         finally

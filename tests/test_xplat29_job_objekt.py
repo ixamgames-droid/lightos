@@ -267,5 +267,68 @@ class JobObjektTest(unittest.TestCase):
                          "dann prueft der erste Test nicht den Job")
 
 
+#: QA-120: startet EIN Segment ueber ``Start-ImJob``, nachdem der "Runner" sein
+#: eigenes stdin unvererbbar gemacht hat (so kann es ein Runner ohne Konsole
+#: oder mit fremder Umleitung vorfinden).
+_EINGABE_SKRIPT = r'''
+param($GateJob, $Py, $Kind, $Ordner)
+. $GateJob
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class Qa120Handle {
+    [DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int n);
+    [DllImport("kernel32.dll")] public static extern bool SetHandleInformation(IntPtr h, uint maske, uint flags);
+}
+"@
+if (-not [Qa120Handle]::SetHandleInformation([Qa120Handle]::GetStdHandle(-10), 1, 0)) {
+    "SETHANDLE gescheitert"; exit 4
+}
+if (-not (Initialize-GateJob)) { "KEIN JOB: $script:gateJobHinweis"; exit 3 }
+$rec = Start-ImJob $Py @($Kind) $Ordner (Join-Path $Ordner 'aus.txt') (Join-Path $Ordner 'fehler.txt')
+if (-not $rec) { "START gescheitert: $script:gateJobHinweis"; exit 5 }
+[void]$rec.Proc.WaitForExit(60000)
+[void](Close-SegmentJob $rec)
+"FERTIG"
+'''
+
+#: Das Segment: prueft sein stdin, ohne zu blockieren (gelesen wird nur NUL).
+_EINGABE_KIND = '''\
+import ctypes, msvcrt, sys
+if sys.stdin is None:
+    print("STDIN fehlt")
+else:
+    typ = ctypes.windll.kernel32.GetFileType(msvcrt.get_osfhandle(0))
+    print("STDIN leer" if typ == 2 and sys.stdin.buffer.read(1) == b"" else f"STDIN Typ {typ}")
+'''
+
+
+@unittest.skipUnless(_IST_WINDOWS, _GRUND)
+class SegmentEingabeTest(unittest.TestCase):
+    """QA-120: das stdin eines Segments ist ein gueltiges, leeres NUL.
+
+    Vorher bekam das Segment das stdin-Handle des Runners (``GetStdHandle``).
+    Ist es nicht vererbbar, steht im Segment nur eine Handle-Nummer ohne Objekt
+    (Python: ``sys.stdin`` fehlt) - oder, schlimmer, eine fremde Datei."""
+
+    def test_stdin_ist_nul_auch_wenn_das_des_runners_nicht_vererbbar_ist(self):
+        with tempfile.TemporaryDirectory(prefix="lightos_qa120_",
+                                         ignore_cleanup_errors=True) as tmp:
+            tmp = Path(tmp)
+            (tmp / "start.ps1").write_text(_EINGABE_SKRIPT, encoding="ascii")
+            (tmp / "kind.py").write_text(_EINGABE_KIND, encoding="ascii")
+            exe = getattr(sys, "_base_executable", None) or sys.executable
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                 "-File", str(tmp / "start.ps1"), str(REPO / "tools" / "_gate_job.ps1"),
+                 exe, str(tmp / "kind.py"), str(tmp)],
+                stdin=subprocess.PIPE, capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=180)
+            self.assertIn("FERTIG", r.stdout, r.stdout[-1500:] + r.stderr[-1500:])
+            aus = (tmp / "aus.txt").read_text(encoding="utf-8", errors="replace")
+            fehler = (tmp / "fehler.txt").read_text(encoding="utf-8", errors="replace")
+            self.assertEqual("STDIN leer", aus.strip(), aus + fehler[-1500:])
+
+
 if __name__ == "__main__":
     unittest.main()

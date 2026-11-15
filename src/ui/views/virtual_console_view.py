@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QPushButton,
     QLabel, QSizePolicy, QSplitter, QMessageBox,
 )
-from PySide6.QtCore import Qt, QEvent, QPoint, QSize, QTimer
+from PySide6.QtCore import Qt, QEvent, QObject, QPoint, QSize, QTimer
 
 from src.ui.virtualconsole.vc_canvas import VCCanvas
 from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
@@ -112,6 +112,29 @@ class SnapshotSidebar(QWidget):
 
     def refresh_functions(self):
         self.refresh()
+
+
+class _FesteHoehe(QObject):
+    """QA-120: haelt die feste Hoehe von Knoepfen gegen ein Fenster-Stylesheet.
+
+    Qt setzt beim Polieren das Minimum aus ``min-height`` + Polsterung + Rand
+    des Stylesheets und vergisst dabei ``setFixedHeight``. Poliert wird beim
+    ersten Zeigen und bei jedem neuen Stylesheet eines Vorfahren; danach kommt
+    ``Show`` bzw. ``StyleChange`` - dort wird die Hoehe neu gesetzt (das
+    ``Polish``-Ereignis selbst laeuft VOR dem Polieren)."""
+
+    _EREIGNISSE = (QEvent.Type.Show, QEvent.Type.StyleChange)
+
+    def halten(self, knopf, hoehe: int) -> None:
+        knopf.setProperty("_qa120_hoehe", int(hoehe))
+        knopf.installEventFilter(self)
+
+    def eventFilter(self, obj, event):  # noqa: N802 (Qt-API)
+        if event.type() in self._EREIGNISSE:
+            h = obj.property("_qa120_hoehe")
+            if h and (obj.minimumHeight() != h or obj.maximumHeight() != h):
+                obj.setFixedHeight(h)
+        return False
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1032,22 +1055,21 @@ class VirtualConsoleView(QWidget):
         return 44 if touch_aktiv() else 26
 
     def _leiste_touch_hoehe(self, leiste) -> None:
-        """QA-118 (e): im Hauptfenster bleiben die Leistenknoepfe 44 px hoch.
+        """QA-118 (e): im Hauptfenster behalten die Leistenknoepfe ihre Hoehe.
 
         Das Touch-Stylesheet des Hauptfensters setzt ``QPushButton
-        { min-height: 38px }``. Beim Polieren ueberschreibt das das Minimum aus
-        ``setFixedHeight`` — gemessen in der echten App (250 %): 38 px + 1 px
-        Rand oben und unten = 40 statt 44. Der eigene Stil eines Knopfs
-        schlaegt das Fenster-Stylesheet, also nennt er die Hoehe dort selbst
-        (``min-height`` zaehlt ohne Rand; die Leistenstile haben 1 px Rand
-        und ``padding: 0``)."""
+        { min-height: 38px; padding: 6px 14px }``. Beim Polieren ueberschreibt
+        das das Minimum aus ``setFixedHeight`` — gemessen in der echten App
+        (250 %): 38 px + 1 px Rand oben und unten = 40 statt 44. QA-120: eine
+        eigene ``min-height`` im Knopf-Stil half nur ohne Polsterung (Bank ◀/▶
+        blieben 52 statt 56, das Bank-Etikett 38, „Bearbeiten“ wurde 56 statt
+        44). Deshalb setzt ``_FesteHoehe`` die Hoehe nach jedem Polieren neu."""
         if not touch_aktiv():
             return
-        h = self._tb_hoehe()
+        halter = _FesteHoehe(leiste)
         for b in leiste.findChildren(QPushButton):
-            if b.maximumHeight() == h and b.styleSheet():
-                b.setStyleSheet(b.styleSheet()
-                                + f"\nQPushButton {{ min-height: {h - 2}px; }}\n")
+            if b.minimumHeight() == b.maximumHeight():
+                halter.halten(b, b.maximumHeight())
 
     def _bank_menue(self):
         """UI-121 B-05: Bank-Etikett angetippt — Bank direkt waehlen."""
