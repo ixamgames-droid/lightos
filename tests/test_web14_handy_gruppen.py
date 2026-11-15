@@ -377,6 +377,40 @@ class HandyGruppeTest(_MitKonsole):
         self.assertEqual(self.canvas.handy_gruppen()[0]["widgets"],
                          [self.b.widget_id, self.c.widget_id])
 
+    def test_snap_tasten_setzen_die_alte_farbe_nicht_erneut(self):
+        """Pruefung: Snap-Tasten im Modus „setzen" leuchten nach dem ersten
+        Druck dauerhaft. Ein Tipp zum Ausschalten setzte die ALTE Farbe
+        erneut ueber die neue. Wie im Solo-Rahmen: alte zuruecknehmen, dann
+        die neue setzen."""
+        rot = self._taste(ButtonAction.LIBRARY_SNAP, text="Rot", x=900)
+        gruen = self._taste(ButtonAction.LIBRARY_SNAP, text="Gruen", x=1000)
+        log = []
+        for w in (rot, gruen):
+            w.snap_mode = "set"
+            w._apply_library_snap = (lambda w=w: log.append(("setzen", w.caption)))
+            w._restore_library_snap = (lambda w=w: log.append(("zurueck", w.caption)))
+        self._auf_seite(self.a, self.b, self.c, self.fremd, rot, gruen)
+        ok, grund = self.canvas.handy_gruppe_setzen(
+            None, "Farbe", [rot.widget_id, gruen.widget_id])
+        self.assertTrue(ok, grund)
+        self.assertTrue(self._tipp(rot)["ok"])
+        r = self._tipp(gruen)
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(log, [("setzen", "Rot"), ("zurueck", "Rot"), ("setzen", "Gruen")])
+        self.assertEqual(r["gruppe_aus"], [rot.widget_id])
+        self.assertEqual([rot.leuchtet(), gruen.leuchtet()], [False, True])
+
+    def test_taste_ohne_ziel_schaltet_die_gruppe_nicht_aus(self):
+        """Ginge die gedrueckte Taste nicht an (Ziel verloren), bleibt die
+        aktive Gruppen-Taste an — die Gruppe wird nicht grundlos dunkel."""
+        self.assertTrue(self._tipp(self.a)["ok"])
+        echt = vf._ziel_fehlt
+        with mock.patch.object(vf, "_ziel_fehlt",
+                               lambda w: ["Funktion nicht gefunden"] if w is self.b else echt(w)):
+            self._tipp(self.b)
+        self.assertTrue(self.a.leuchtet())
+        self.assertTrue(self.fm.is_running(self.a.function_id))
+
     def test_blackout_aus_manipulierter_datei_bleibt_aussen_vor(self):
         bo = self._taste(ButtonAction.BLACKOUT, text="BLACKOUT", x=900)
         na = self._taste(ButtonAction.LASER_ESTOP, text="NOT-AUS", x=1000)

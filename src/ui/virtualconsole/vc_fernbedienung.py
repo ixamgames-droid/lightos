@@ -72,9 +72,10 @@ Tastatur: beide betreffen nur Maus und Finger am Pult.
   Einzel-Auswahl (Solo-Frame), in dem sie direkt liegt. Das Handy zeichnet
   diese Kacheln als Gruppe; die Regel selbst greift im Rahmen (Klick-Weg).
 * Eigene Handy-Gruppen (``handy_seiten.GRUPPEN``): ein Druck vom Handy, der
-  eine Gruppen-Taste EINSCHALTET, schaltet die anderen aktiven Tasten der
-  Gruppe danach per Tipp aus — ueber :func:`ausfuehren`, also mit allen
-  Regeln eines Handy-Drucks (Freigabe, Laser-Sperre, Blackout). Laesst sich
+  eine Gruppen-Taste EINSCHALTET, schaltet vorher die anderen aktiven Tasten
+  der Gruppe aus — Funktions- und Snap-Tasten wie der Solo-Rahmen am Pult
+  (``deactivate_for_solo``), alle anderen per Tipp ueber :func:`ausfuehren`
+  mit den Regeln eines Handy-Drucks (Freigabe, Laser-Sperre, Blackout). Laesst sich
   eine aktive Taste so nicht ausschalten (vom Pult/anderen Handy gehalten,
   Laser gesperrt, nicht freigegeben), wird der Druck VORHER abgelehnt
   (``gruppe_blockiert``) — die Gruppe zeigt nie zwei aktive Tasten.
@@ -683,6 +684,46 @@ def _ausschaltbar(widget, frei: set) -> bool:
     return True
 
 
+def _druck_wird_abgelehnt(widget) -> bool:
+    """WEB-14: lehnt ``_taste_ausfuehren`` diesen Druck sicher ab (Laser
+    scharf schalten nur am Pult, fremder Blackout)? Dann darf die Gruppe
+    vorher nichts ausschalten. Ebenso, wenn der Taste das Ziel fehlt — sie
+    ginge nicht an, die Gruppe stuende sonst ohne Grund dunkel."""
+    from .vc_button import ButtonAction
+    if _ziel_fehlt(widget):
+        return True
+    if (widget.action == ButtonAction.LASER_ARM
+            and not widget._aktionszustand()):
+        return True
+    if _hebt_blackout_auf(widget):
+        from src.core.app_state import get_state
+        if get_state().output_manager.blackout_schalter:
+            return True
+    return False
+
+
+def _gruppe_aus(w, ausloeser) -> bool:
+    """WEB-14: eine aktive Gruppen-Taste ausschalten — Funktions- und
+    Snap-Tasten ueber denselben Weg wie der Solo-Rahmen am Pult
+    (``deactivate_for_solo``): ein Tipp auf eine Snap-Taste im Modus
+    „setzen" setzte die alte Farbe sonst ERNEUT, und eine Funktion, die der
+    Ausloeser selbst steuert, bleibt (VCB-41). Andere Tasten (Freeze,
+    Pop-up, …) per Tipp mit allen Regeln eines Handy-Drucks."""
+    from .vc_button import ButtonAction as A
+    if getattr(w, "action", None) in (A.FUNCTION_TOGGLE, A.FUNCTION_FLASH,
+                                      A.LIBRARY_SNAP):
+        try:
+            from src.core.app_state import laser_notaus_nicht_loesbar
+            with laser_notaus_nicht_loesbar():
+                w.deactivate_for_solo(activator=ausloeser)
+            return True
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: Handy-Gruppe ausschalten: "
+                  f"{type(e).__name__}")
+            return False
+    return bool(ausfuehren(w, "umschalten").get("ok"))
+
+
 def _gruppe_ausfuehren(canvas, widget, aktion) -> dict:
     """WEB-14: Druck vom Handy mit eigener Handy-Gruppe. Schaltet der Druck
     die Taste EIN, gehen die anderen aktiven Tasten der Gruppe per Tipp aus
@@ -695,27 +736,31 @@ def _gruppe_ausfuehren(canvas, widget, aktion) -> dict:
     except Exception as e:
         print(f"[vc_fernbedienung] ERROR: Handy-Gruppe: {type(e).__name__}")
         return _nein(FEHLER)
-    if not andere or war_an or _laser_gesperrt(widget):
+    if (not andere or war_an or _laser_gesperrt(widget)
+            or _druck_wird_abgelehnt(widget)):
         # Ausschalten der eigenen Taste, keine Gruppe — oder gesperrt: dann
-        # lehnt ``ausfuehren`` mit dem richtigen Grund ab.
+        # lehnt ``ausfuehren`` mit dem richtigen Grund ab (und die anderen
+        # Gruppen-Tasten bleiben unberuehrt).
         return ausfuehren(widget, aktion)
     frei = VCFernbedienung._freigegeben(canvas)
     for w in andere:
         if w.leuchtet() and not _ausschaltbar(w, frei):
             return _nein(GRUPPE_BLOCKIERT)
-    ergebnis = ausfuehren(widget, aktion)
-    if not ergebnis.get("ok") or not widget.leuchtet():
-        return ergebnis
+    # Pruefung nach WEB-14: wie im Solo-Rahmen am Pult (``on_child_activated``
+    # VOR dem eigenen Ausloesen) gehen die anderen ZUERST aus — sonst nimmt das
+    # Ruecksetzen eines alten Snaps die gerade gesetzte Farbe wieder weg.
     aus = []
     for w in andere:
         if not w.leuchtet():
             continue
-        r = ausfuehren(w, "umschalten")
-        if r.get("ok"):
+        if _gruppe_aus(w, widget):
             aus.append(w.widget_id)
         if w.leuchtet():
             print(f"[vc_fernbedienung] Handy-Gruppe: {w.widget_id} bleibt an "
-                  f"(Taste schaltet per Tipp nicht aus)")
+                  f"(Taste laesst sich nicht ausschalten)")
+    ergebnis = ausfuehren(widget, aktion)
+    if not ergebnis.get("ok"):
+        return ergebnis
     ergebnis["gruppe_aus"] = aus
     ergebnis["widget"] = beschreibe(widget)
     return ergebnis
