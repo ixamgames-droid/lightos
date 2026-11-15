@@ -78,11 +78,120 @@ def _enable_tabtip_autoinvoke() -> None:
         pass
 
 
+# ── UI-133: Touch-Tastatur unter Windows 11 ─────────────────────────────────
+# Unter Windows 11 gibt es IPTip_Main_Window weiter, aber unsichtbar: der alte
+# Weg (SC_RESTORE + SetForegroundWindow) fand es, tat nichts und kehrte zurueck
+# - ein Tipp ins Textfeld zeigte GAR KEINE Tastatur (B, Finger-Probe 15.11.).
+# Was unter Windows 10 und 11 wirkt, ist die COM-Schnittstelle von TabTip:
+# ITipInvocation::Toggle. Sie SCHALTET UM - deshalb nur, wenn die Tastatur
+# nicht schon zu sehen ist.
+
+_CLSID_UIHOSTNOLAUNCH = "{4CE576FA-83DC-4F88-951C-9D0782B4E376}"
+_IID_ITIPINVOCATION = "{37C994E7-432B-4834-A2F7-DCE1F13B834B}"
+_CLSCTX_INPROC_UND_LOCAL = 0x1 | 0x4
+_VTBL_RELEASE = 2                   # IUnknown: QueryInterface, AddRef, Release
+_VTBL_TOGGLE = 3                    # ITipInvocation::Toggle(HWND)
+_NACHFASSEN_MS = 600                # nach dem Start von TabTip.exe
+
+
+def _tip_sichtbar(user32=None, dwmapi=None) -> bool:
+    """Ist die Touch-Tastatur schon zu sehen?
+
+    Windows 11: das Fenster „Microsoft Text Input Application“ von
+    TextInputHost ist da und nicht verhuellt (DWM ``cloaked``). Windows 10:
+    ``IPTip_Main_Window`` ist sichtbar und nicht deaktiviert."""
+    import ctypes
+    user32 = user32 or ctypes.windll.user32
+    hwnd = user32.FindWindowW("Windows.UI.Core.CoreWindow",
+                              "Microsoft Text Input Application")
+    if hwnd:
+        dwmapi = dwmapi or ctypes.windll.dwmapi
+        verhuellt = ctypes.c_int(0)
+        if dwmapi.DwmGetWindowAttribute(hwnd, 14, ctypes.byref(verhuellt),  # DWMWA_CLOAKED
+                                        ctypes.sizeof(verhuellt)) == 0:
+            return verhuellt.value == 0 and bool(user32.IsWindowVisible(hwnd))
+    hwnd = user32.FindWindowW("IPTip_Main_Window", None)
+    if hwnd:
+        stil = user32.GetWindowLongW(hwnd, -16)                  # GWL_STYLE
+        return bool(user32.IsWindowVisible(hwnd)) and not (stil & 0x08000000)
+    return False
+
+
+def _tip_umschalten(ole32=None, user32=None) -> bool:
+    """``ITipInvocation::Toggle`` per COM, ohne neue Abhaengigkeit (ctypes).
+
+    ``UIHostNoLaunch`` startet TabTip nicht selbst: laeuft es nicht, scheitert
+    ``CoCreateInstance`` - dann False, und der alte Weg startet TabTip.exe."""
+    import ctypes
+
+    class _GUID(ctypes.Structure):
+        _fields_ = [("Data1", ctypes.c_uint32), ("Data2", ctypes.c_uint16),
+                    ("Data3", ctypes.c_uint16), ("Data4", ctypes.c_ubyte * 8)]
+
+    ole32 = ole32 or ctypes.windll.ole32
+    user32 = user32 or ctypes.windll.user32
+    clsid, iid = _GUID(), _GUID()
+    if (ole32.CLSIDFromString(_CLSID_UIHOSTNOLAUNCH, ctypes.byref(clsid)) != 0
+            or ole32.IIDFromString(_IID_ITIPINVOCATION, ctypes.byref(iid)) != 0):
+        return False
+    init = ole32.CoInitializeEx(None, 0x2)               # COINIT_APARTMENTTHREADED
+    try:
+        zeiger = ctypes.c_void_p()
+        if (ole32.CoCreateInstance(ctypes.byref(clsid), None, _CLSCTX_INPROC_UND_LOCAL,
+                                   ctypes.byref(iid), ctypes.byref(zeiger)) != 0
+                or not zeiger.value):
+            return False
+        vtbl = ctypes.cast(zeiger, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+        toggle = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, ctypes.c_void_p)(
+            vtbl[_VTBL_TOGGLE])
+        release = ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p)(vtbl[_VTBL_RELEASE])
+        try:
+            return toggle(zeiger, user32.GetDesktopWindow()) == 0
+        finally:
+            release(zeiger)
+    finally:
+        if init in (0, 1):          # S_OK/S_FALSE: eigene Anmeldung wieder abgeben
+            ole32.CoUninitialize()
+
+
+def _tastatur_zeigen(sichtbar, umschalten, alter_weg, spaeter) -> str:
+    """Reihenfolge fuer Windows; Rueckgabe = genommener Weg (fuer Tests).
+
+    Erst nachsehen, dann COM; scheitert COM, der alte Weg. Hat der TabTip.exe
+    gestartet, einmal nachfassen: Windows 10 zeigt die Tastatur dabei selbst,
+    Windows 11 erst auf Toggle."""
+    try:
+        if sichtbar():
+            return "schon sichtbar"
+    except Exception:
+        pass
+    try:
+        if umschalten():
+            return "com"
+    except Exception:
+        pass
+    weg = alter_weg()
+    if weg == "tabtip":
+        def _nachfassen():
+            try:
+                if not sichtbar():
+                    umschalten()
+            except Exception:
+                pass
+        spaeter(_NACHFASSEN_MS, _nachfassen)
+    return weg
+
+
 def _show_windows_osk() -> None:
     """Öffnet die Windows-Bildschirmtastatur (Windows 10 und 11)."""
     if sys.platform != "win32":
         return
+    _tastatur_zeigen(_tip_sichtbar, _tip_umschalten, _tabtip_alter_weg,
+                     lambda ms, f: QTimer.singleShot(ms, f))
 
+
+def _tabtip_alter_weg() -> str:
+    """Der Weg bis UI-133 - jetzt nur noch Rueckfall, wenn COM scheitert."""
     import ctypes
 
     # Versuch 1: vorhandenes TabTip-Fenster reaktivieren
@@ -95,7 +204,7 @@ def _show_windows_osk() -> None:
             SC_RESTORE = 0xF120
             ctypes.windll.user32.SendMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0)
             ctypes.windll.user32.SetForegroundWindow(hwnd)
-            return
+            return "iptip"
     except Exception:
         pass
 
@@ -115,15 +224,16 @@ def _show_windows_osk() -> None:
         if os.path.exists(path):
             try:
                 subprocess.Popen([path])
-                return
+                return "tabtip"
             except OSError:
                 pass
 
     # Versuch 3: klassische On-Screen-Keyboard als Fallback
     try:
         subprocess.Popen(["osk.exe"])
+        return "osk"
     except OSError:
-        pass
+        return "nichts"
 
 
 def _show_osk() -> None:
