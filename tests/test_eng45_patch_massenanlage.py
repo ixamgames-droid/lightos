@@ -1,6 +1,6 @@
 """ENG-45: viele Geräte auf einmal anlegen ist nicht mehr quadratisch.
 
-Gemessen (backlog.d/ENG-45.md): innerhalb von ``patch_sammeln`` lud
+Gemessen (Backlog-Eintrag ENG-45): innerhalb von ``patch_sammeln`` lud
 ``add_fixture`` je Gerät die GANZE Geräteliste aus der Show-DB neu
 (``_reload_patch_cache``), ``remove_fixture`` beim Rückgängig ebenso — 2000
 Geräte: 2001 Neuladungen und ~2 Mio. geladene Zeilen je Richtung. Jetzt wird
