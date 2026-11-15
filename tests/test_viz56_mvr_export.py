@@ -111,7 +111,27 @@ def _modus(name, kanaele, kanalzahl=None, luecke=None):
 
 
 @pytest.fixture(scope="module")
-def eigene():
+def _eigene_bibliothek():
+    """QA-54: die Profile dieser Datei entstehen in einer eigenen, frisch
+    geseedeten Bibliothek, nicht in der geteilten des Testprozesses."""
+    from tests._fixture_quelle import frische_library
+
+    class _Fall:
+        def __init__(self):
+            self.auf = []
+
+        def addCleanup(self, fn):
+            self.auf.append(fn)
+
+    fall = _Fall()
+    frische_library(fall)
+    yield
+    for fn in reversed(fall.auf):
+        fn()
+
+
+@pytest.fixture(scope="module")
+def eigene(_eigene_bibliothek):
     """Zwei eigene Profile mit eindeutigen Namen (je Lauf neu)."""
     tag = uuid.uuid4().hex[:8]
     spot = fdb.create_user_profile({
