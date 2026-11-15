@@ -53,4 +53,4 @@ Der einzige harte Defekt ist der **Adapter-Lifecycle** (OUT-05, P2): mangels Rem
 nach einem Typ-Wechsel zwei Adapter parallel und ein „deaktiviertes" Universe gibt weiter Licht aus.
 Die übrigen Befunde sind P3 — Netz-Egress-Interface (NET-04, braucht Produkt-Entscheidung),
 Serial-Diagnose/Reconnect (SERIAL-01/02) und sACN-Interop-Hygiene (OUT-06). Empfehlung: **OUT-05 zuerst**
-(konkreter, testbarer P2), der Rest nach Priorität / Davids Netzwerk-Präferenz.
+(konkreter, testbarer P2), der Rest nach Priorität / Robins Netzwerk-Präferenz.

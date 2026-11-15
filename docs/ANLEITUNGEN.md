@@ -33,6 +33,12 @@ die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLE
 Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
 
+**Am Touchscreen oder vom Handy?** Die Bedienung am Finger (Start mit `--touch`, Gesten unter
+**Ansicht → Touch-Gesten…**) fasst die [README](../README.md#touchscreen-und-handy) zusammen;
+fürs Handy gibt es die Anleitung [Web-Remote — das Handy als Konsole](anleitung_web_remote/ANLEITUNG.md).
+**Datenschutz:** eigene Shows, Diagnosepakete und den Handy-Schlüssel nie in ein öffentliches
+Issue stellen ([README → Datenschutz](../README.md#datenschutz-was-privat-bleibt)).
+
 ---
 
 ## Einstieg
@@ -55,6 +61,7 @@ der Sektionsleiste. Die Abläufe gelten weiter.
 | [Gruppen und Matrizen anlegen](anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md) | Mehrkopf-Geräte und Panels: Kopf-Gruppe beim Patchen, Köpfe als Raster oder Block, zu einer Zelle zusammenfassen, Matrizen zusammenlegen. | Keine Show nötig |
 | [Geräte-Bibliothek & eigene Profile](anleitung_geraete_bibliothek/ANLEITUNG.md) | Mitgelieferte Profile und LightOS-Bibliothek (Herkunft, „geprüft“), Gerät aus der Bibliothek patchen, freie Bibliothek herunterladen, eigenes Profil im Fixture-Editor, LightOS-Profil exportieren/importieren, Zuordnung Dimmer → Weiß-Segment, die neuen 3D-Modelle. | Keine Show nötig |
 | [Eigenes Gerät mit dem Fixture Generator anlegen](anleitung_fixture_generator/ANLEITUNG_FIXTURE_GENERATOR.md) | Am Beispiel des Show-Lasers Laserworld EL-400RGB MK2: Angaben von Typenschild und Handbuch-DMX-Tabelle, DIP-Schalter, Generator (Kopf, Kanäle, Attribute, Bereiche), Laser-Sicherheit über den Aus-Wert, Laser-Seiten (Muster mit Schemabild, Farben, Richtungen), Prüfen/Speichern, patchen, Reiter Laser, Laser-NOT-AUS, EFX auf den Laser-Achsen, 3D, sicherer Abgleich am echten Gerät. | Keine Show nötig |
+| [Rig mit MVR-Dateien austauschen](anleitung_mvr/ANLEITUNG.md) | Geräte samt Position und Ausrichtung aus grandMA, Vectorworks, Capture & Co. übernehmen (Vorschau, Zuordnung zur Bibliothek, unbekannte Typen neu aus GDTF, Adresskonflikte, ein Rückgängig-Schritt) und den eigenen Patch als MVR exportieren, eigene Profile als GDTF dabei. Noch ohne Bilder. | Keine Show nötig |
 | [Geräte klonen](anleitung_klonen/ANLEITUNG_KLONEN.md) | Was ein Gerät in der Show tut (Gruppen, Effekte, Snaps, Szenen, Cues, Paletten), auf andere übertragen — mit Vorschau, Sicherung und einem Rückgängig-Schritt; Dimmer und Farbe auch zwischen verschiedenen Gerätetypen. Noch ohne Bilder. | Keine Show nötig |
 | [Programmer: jedes Gerät richtig bedienen](anleitung_geraete_bedienen/ANLEITUNG_GERAETE_BEDIENEN.md) | Was der Programmer je Gerät zeigt: Shutter-/Strobe-Knöpfe, Programm-Kacheln, zweite gleiche Kanäle, Mehrkopf-Umschalter, Nebel und Laser. | Keine Show nötig |
 | [Moving Heads steuern](anleitung_moving_heads/ANLEITUNG_MOVING_HEADS.md) | Farbrad, Gobo, Bewegung und gezieltes Pan/Tilt über die Virtual Console. | Generator `build_event_demo_2026.py` → `Event_Demo_2026.lshow` |

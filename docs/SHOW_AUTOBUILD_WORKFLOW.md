@@ -7,7 +7,7 @@
 > [`ANLEITUNGEN_WALKTHROUGH_PLAN.md`](ANLEITUNGEN_WALKTHROUGH_PLAN.md),
 > [`SHOW_2026_BUGLOG.md`](SHOW_2026_BUGLOG.md).
 
-## 0. Mandat (David, 2026-06-15)
+## 0. Mandat (Robin, 2026-06-15)
 - **Voller Zugang, voll automatisch.** Künftige Shows komplett selbst bauen — Patch, Gruppen,
   Farb-/Dimmer-Matrizen, EFX, Szenen/Cues, **Virtual Console + APC-Mapping**, Musik-Sync.
 - **Fehler SOFORT selbst fixen**, ohne auf Freigabe zu warten. Build → bei Crash/Fehler Ursache
@@ -15,7 +15,7 @@
 - **Live bauen UND dabei aufnehmen**: wie man anpasst, wie man die VC patcht/mappt, wie man
   Effekte programmiert, Musik-Sync — alles als Screenshots/GIFs → Einzelanleitungen.
 
-## 1. Davids reales Rig (Test-Aufbau, alles auf dem Boden)
+## 1. Robins reales Rig (Test-Aufbau, alles auf dem Boden)
 ```
             [ MH Links ]   PAR1 PAR2 PAR3 PAR4 PAR5 PAR6 PAR7 PAR8   [ MH Rechts ]
                                   Spider1        Spider2            (vorne, am Boden)
@@ -116,7 +116,7 @@ dann in der App nur **laden + vorführen/filmen**.
 ## 7. Stand der Testshow 2026 (Pause-Punkt 2026-06-15)
 - `shows/Testshow_2026.lshow` + `tools/build_testshow_2026.py` **fertig** (32 Funktionen,
   130 VC-Widgets, 6 Bänke, Auto-Show an Musik gekoppelt, 2 Beat-Sync-Cuelisten).
-- **Live verifiziert (David):** 3 Farbschemata (grün/weiß, blau/weiß, grün/blau), Dimmer-Layering,
+- **Live verifiziert (Robin):** 3 Farbschemata (grün/weiß, blau/weiß, grün/blau), Dimmer-Layering,
   APC Bank-Wechsel + LED-Feedback + Master/Dimmer-Fader.
 - **Gefilmt:** Layout Bank 1/2/3, Live-Stills grün/weiß · blau/weiß · grün/blau,
   Layering-GIF (`docs/anleitung_dimmermatrix/gif/layering_gruenweiss_atmen.gif`).
@@ -125,7 +125,7 @@ dann in der App nur **laden + vorführen/filmen**.
 - **Offene Befunde:**
   - **BUG-01 🔴** Reload-Crash (`load_show → add_fixture → programmer_view._refresh_effects_list`).
   - **MH-EFX live** 🟠 (wiederkehrend): Engine/Render erzeugen korrekte Bewegung+Beam (headless
-    verifiziert: pan/tilt ändern sich, intensity=255, shutter offen), aber an Davids echten MH bewegte
+    verifiziert: pan/tilt ändern sich, intensity=255, shutter offen), aber an Robins echten MH bewegte
     sich nichts. **Beim Fortsetzen zuerst:** Live-DMX-Ausgabe (Simple Desk) der Kanäle 65–86 prüfen
     UND physische MH-Geräteadresse/-Modus (soll 65/76, 11-Kanal) abgleichen.
   - **HINWEIS-02** APC-LEDs manuell aktivieren.

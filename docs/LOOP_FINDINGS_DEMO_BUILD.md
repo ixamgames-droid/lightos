@@ -2,7 +2,7 @@
 
 > Laufendes Log von **Bugs / Stolpersteinen / Verbesserungsideen**, die mir beim Bauen der
 > `Hochzeit_Komplett_2026`-Show und der Minianleitungen (Übernahmemodus im echten UI) auffallen.
-> **Loop-fertig formuliert** (Problem + Fix-Vorschlag + Akzeptanzkriterium), damit David später den
+> **Loop-fertig formuliert** (Problem + Fix-Vorschlag + Akzeptanzkriterium), damit Robin später den
 > Loop drüberlaufen lassen kann. Verlinkt aus [`BACKLOG.md`](../BACKLOG.md).
 >
 > Reihenfolge ≈ Relevanz. Stand: laufend (Session 2026-06-29).
