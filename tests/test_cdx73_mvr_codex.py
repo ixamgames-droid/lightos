@@ -132,3 +132,12 @@ def test_fein_default_rundreise_export_import():
     chs = _rund(_profil([pan, fein]))["channels"]
     assert [(c["attribute"], c["default_value"]) for c in chs] == \
         [("pan", 128), ("pan_fine", 127)]
+
+
+def test_grobes_byte_bleibt_bei_mehr_als_vier_bytes():
+    # Pruefung CDX-73: mehr als 4 Bytes duerfen das grobe Byte nicht anders
+    # liefern als bisher (_dmx_wert); 2**32 auf 5 Bytes ist grob 1, nicht 255.
+    for text in ("4294967296/5", f"{(7 << 32) | 0x12345678}/5", "32895/2", "300/1"):
+        alt = L._dmx_wert(text)
+        assert _defaults(_gdtf_pan("1", text))[0] == alt, text
+    assert _defaults(_gdtf_pan("1,2", f"{(7 << 32) | (9 << 24)}/5")) == [7, 9]

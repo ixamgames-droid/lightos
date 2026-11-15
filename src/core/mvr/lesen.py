@@ -199,7 +199,12 @@ def _dmx_roh(text: str) -> tuple[int, int] | None:
     try:
         if "/" in t:
             w, n = t.split("/", 1)
-            wert, bytes_ = int(w), max(1, min(4, int(n)))
+            wert, bytes_ = int(w), max(1, int(n))
+            if bytes_ > 4:
+                # wie _dmx_wert: das grobe Byte ist das oberste — auf 4 Bytes
+                # kuerzen statt den Wert zu kappen.
+                wert >>= 8 * (bytes_ - 4)
+                bytes_ = 4
         else:
             wert, bytes_ = int(t), 1
     except ValueError:
