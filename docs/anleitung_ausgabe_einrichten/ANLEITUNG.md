@@ -10,6 +10,9 @@
 > Universen. Diese Anleitung zeigt den Dialog *Ausgabe konfigurieren*, die beiden
 > Monitore zur Kontrolle und die Warnungen in der Statusleiste. Die roten Zahlen in den
 > Bildern gehören zu den gleich nummerierten Punkten im Text.
+>
+> **Was du danach kannst:** einem Universum einen Ausgang geben, prüfen, ob DMX wirklich
+> hinausgeht, und eine Warnung in der Statusleiste richtig lesen.
 
 ## Was du brauchst
 
@@ -304,7 +307,7 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    Universum sucht, gekürzt (`Seriennr. …5123`). LightOS merkt sie sich, sobald der
    Adapter einmal gesendet hat, und findet ihn darüber auch nach einem Neustart an einem
    anderen Port wieder — zwei ENTTEC tauschen ihre Universen also nicht, wenn Linux die
-   Portnummern vertauscht. Wählen Sie für die Zeile **ausdrücklich einen anderen Port**
+   Portnummern vertauscht. Wählst du für die Zeile **ausdrücklich einen anderen Port**
    (hier oder mit **Verbinden** im Reiter Enttec), gilt die alte Nummer nicht mehr: das
    Universum lernt den Adapter am neuen Port. Soll das Universum einen **anderen**
    Adapter nehmen: Zeile markieren, **Dongle neu zuordnen** (oder Rechtsklick auf die

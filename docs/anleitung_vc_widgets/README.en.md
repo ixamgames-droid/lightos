@@ -9,6 +9,9 @@ The **Virtual Console (VC)** of LightOS is a control surface you design yourself
 buttons, faders, color tiles, displays and so on onto an area and control your show with
 them — by mouse/touch, MIDI controller (e.g. APC mini) or keyboard.
 
+**What you will be able to do:** look up what each control does, how to set it up and how to
+operate it live.
+
 This reference describes **every control element on its own**: what it is for, what it
 looks like while running, **which button does what** and which settings it has — each with
 real screenshots from the app.
@@ -30,7 +33,8 @@ two modes:
 
 - **Bearbeiten ✓** — **create, move, resize and configure** elements. Extra toolbar buttons
   appear: **one button per widget type** (16 of them), **⊞ Raster** (grid), **Undo/Redo**
-  (`↶ ↷`), **Alle löschen** (delete all) and **⚙ Inspector**.
+  (`↶ ↷`), **Ausrichten ▾** (align, for several selected elements), **Mehrfach** (multi-select, touch
+  screens only), **Alle löschen** (delete all) and **⚙ Inspector**.
 
   ![Toolbar in edit mode](img/toolbar_bearbeiten_modus.png)
 
@@ -109,7 +113,7 @@ accidental taps) — **MIDI/APC keeps working**.
 
 | Topic | In short | Page |
 |---|---|---|
-| **Smart-Drop & Baukasten** | set up an effect, widget gallery, conflict map, controller/color-chase blocks | [21_baukasten.en.md](21_baukasten.en.md) |
+| **Smart-Drop & Baukasten** | set up an effect, widget gallery, conflict map (the former building-block presets are gone) | [21_baukasten.en.md](21_baukasten.en.md) |
 
 ---
 

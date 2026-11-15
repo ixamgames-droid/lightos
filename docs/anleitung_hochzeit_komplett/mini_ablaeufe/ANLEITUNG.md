@@ -25,7 +25,7 @@ Rechts siehst du die Cuelisten „Aufwärmen“ und „Drop-Sequenz“ mit ihren
 
 ### Schritt-für-Schritt (Beispiel: Party-Moment)
 1. **Bank 6** → **„Mix: Party"** → Regenbogen-Farbe + Lauflicht + Kreis-Bewegung starten gemeinsam.
-2. Reicht das nicht? **„GO Drop-Sequenz"** dazu → harte Farbwechsel auf den Beat.
+2. Reicht das nicht? **„GO Drop-Se"** (die Cueliste „Drop-Sequenz“) dazu → harte Farbwechsel auf den Beat.
 3. Beenden: unten **„Stop All“** (universelle Leiste) oder die Kachel erneut tippen.
 
 ### Begriffe kurz

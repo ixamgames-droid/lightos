@@ -8,6 +8,9 @@
 > mit 48 Schnellzugriff-Plätzen, die **Szene** als Funktion und die **Cue** in einer
 > **Cueliste**. Diese Seite zeigt alle vier und am Ende, wie du eine Cueliste aus der
 > Virtual Console startest.
+>
+> **Was du danach kannst:** einen Look speichern, ihn per Klick oder Taste wieder
+> abrufen und mehrere Looks als Cueliste nacheinander abfahren.
 
 Wie du Geräte wählst und Werte einstellst, steht in den
 [Programmer-Grundlagen](../anleitung_programmer_grundlagen/ANLEITUNG.md).
@@ -267,6 +270,13 @@ Sektion **Virtual Console**, **Bearbeiten** einschalten und in der Werkzeugleist
 **Achtung beim Zählen:** Der **Executor-Slot** zählt ab **0**. Slot 0 ist der Executor,
 der im Playback **Ex 1** heißt, Slot 1 ist **Ex 2** usw., jeweils auf der aktuellen
 Page. Das Bild zeigt Slot 0, also „Meine Show“ aus Schritt 8.
+
+**Am Touchscreen:** Starte LightOS mit `--touch`, dann sind die Knöpfe größer. Ein Finger
+bedient jeweils sein eigenes Element, du kannst also **GO** und einen Fader gleichzeitig
+berühren. Im Bearbeiten-Modus wählst du mehrere Elemente mit **Strg**- oder
+**Umschalt**-Klick, mit einem aufgezogenen Rahmen oder mit „Halten + Antippen“ (einen
+Finger liegen lassen, mit dem zweiten weitere antippen). Welche Gesten es gibt und wie du
+sie abschaltest, zeigt **Ansicht → Touch-Gesten…**.
 
 Statt der Cueliste geht auch ein einzelner **Button** mit der Aktion
 **Executor: Umschalten (Go)**. Dann den Slot unter **Erweitert (Roh-ID / Executor-Slot)**
