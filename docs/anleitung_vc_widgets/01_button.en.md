@@ -205,6 +205,10 @@ Without a valid binding nothing happens: with „Funktion an/aus"/„nur gehalte
 
 Via **Live-Edit-Slot**, the started effect becomes the active editing target of this slot — faders and color tiles with the same slot then edit exactly this effect (exclusive per quadrant, without a global stop-all).
 
+### Star „live edited" (UI-129)
+
+If the bound effect was changed live (fader, effect action, color tile, live-edit panel, MIDI …), the button shows a small **yellow star** with a dark outline in its top left corner, and its tooltip gets the addition „live bearbeitet". This only applies to buttons with **exactly one** function of their own (Funktion an/aus, nur gehalten, Effekt-Aktion with a fixed ID). Group buttons and pure editing keys via a Live-Edit-Slot (without a function of their own) show none. If the key shortcut or „+n" already sits there, the star moves below it; if the caption reaches into the corner, it moves to the bottom right. It disappears on **Reset Live**, on **Commit** (taken over as the new state) and when a show is loaded. None of this is saved. More in [LIVE_EDIT.md](../LIVE_EDIT.md).
+
 ## MIDI & keyboard
 
 The button supports both MIDI and keyboard assignment (both teach functions return `True`).
