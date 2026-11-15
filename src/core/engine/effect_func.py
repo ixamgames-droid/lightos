@@ -19,6 +19,12 @@ class LayeredEffect(Function):
         self.layers: list[EffectLayer] = []
         self.fixture_ids: list[int] = []     # Fixtures die der Effekt steuert
         self.target_attribute: str = "intensity"
+        # LAS-47: weitere Ziel-Attribute, die denselben Wert bekommen. Leer im
+        # Normalfall; die Lade-Migration alter SH-LASER3W-Shows (vor LAS-28
+        # trugen alle vier Flips ``laser_twist``) haengt ``laser_twist_y`` an,
+        # damit ein Effekt auf „Verdrehung" weiter alle vier Flips trifft.
+        # Ein neues Ziel im Editor leert die Liste.
+        self.zusatz_ziele: list[str] = []
         self.base_value: float = 0.5         # Startwert (0-1, wird *255 ausgegeben)
         # Marker fuer FunctionManager.from_dict-Routing
         self.is_layered_effect = True
@@ -85,10 +91,10 @@ class LayeredEffect(Function):
             try:
                 from src.core.app_state import apply_pan_tilt_orientation
                 werte = apply_pan_tilt_orientation(
-                    fixture, {self.target_attribute: dmx_val})
+                    fixture, self._ziel_werte(dmx_val))
             except Exception as exc:
                 print(f"[LayeredEffect] orientation error: {exc}")
-                werte = {self.target_attribute: dmx_val}
+                werte = self._ziel_werte(dmx_val)
 
             # ENG-17: ALLE Vorkommen des Attributs bedienen, nicht nur das erste.
             # Ein `break` nach dem ersten Treffer liess an einer Vierkopf-Bar drei
@@ -105,6 +111,17 @@ class LayeredEffect(Function):
                 except Exception as exc:
                     print(f"[LayeredEffect] set_channel error: {exc}")
 
+    def ziel_attribute(self) -> list[str]:
+        """Alle Attribute, auf die der Effekt schreibt (LAS-47)."""
+        out = [self.target_attribute]
+        for a in self.zusatz_ziele or ():
+            if a and a not in out:
+                out.append(a)
+        return out
+
+    def _ziel_werte(self, dmx_val: int) -> dict:
+        return {a: dmx_val for a in self.ziel_attribute()}
+
     def to_dict(self):
         d = super().to_dict()
         d.update({
@@ -113,6 +130,10 @@ class LayeredEffect(Function):
             "base_value": self.base_value,
             "layers": [l.to_dict() for l in self.layers],
         })
+        if self.zusatz_ziele:
+            # LAS-47: nur wenn belegt — ein Effekt ohne Zusatzziel bleibt in der
+            # Datei Zeichen fuer Zeichen wie bisher.
+            d["zusatz_ziele"] = list(self.zusatz_ziele)
         return d
 
     @classmethod
@@ -120,6 +141,9 @@ class LayeredEffect(Function):
         e = cls(d.get("name", "Effekt"), fid=d.get("id"))
         e.fixture_ids = list(d.get("fixture_ids", []))
         e.target_attribute = d.get("target_attribute", "intensity")
+        _zz = d.get("zusatz_ziele")
+        e.zusatz_ziele = ([str(a) for a in _zz if isinstance(a, str) and a]
+                          if isinstance(_zz, list) else [])
         try:
             e.base_value = float(d.get("base_value", 0.5))
         except (TypeError, ValueError):

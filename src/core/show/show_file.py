@@ -1317,7 +1317,8 @@ def _andere_mit_mehrfach_twist(state, laser_fids: set) -> bool:
 
 
 def _las28_palette_nachziehen(palette, laser_fids: set, kopf1: bool,
-                              andere: bool) -> None:
+                              andere: bool,
+                              andere_fids: set | None = None) -> None:
     """CDX-65: eine Palette umsetzen — zuerst die Overrides je Geraet, dann
     die generischen Werte. Generische Werte haben keinen Geraetebezug und
     gelten fuer JEDES Geraet ohne eigenen Wert (``get_values_for_fixture``).
@@ -1348,6 +1349,21 @@ def _las28_palette_nachziehen(palette, laser_fids: set, kopf1: bool,
         if isinstance(eigen, dict):
             neu.update(eigen)
         fv[fid] = neu
+    # LAS-47 (Rest 4): traegt die umgesetzte Zuordnung KEIN ``laser_twist#1``
+    # (alt nur #1, kein #2), liefe das generische ``laser_twist#1`` weiter auf
+    # den SH-LASER3W (B horizontal) — ein Override kann einen generischen Wert
+    # nicht loeschen. Deshalb wandert der generische Wert in die Overrides der
+    # Geraete, fuer die er gedacht war (andere mit mehreren ``laser_twist``,
+    # z. B. L2600; ein eigener Wert gewinnt), und verlaesst die generischen
+    # Werte. Einkopf-Geraete lesen ``#1`` ohnehin nicht (ENG-03).
+    if ("laser_twist#1" in vals and "laser_twist#1" not in twist
+            and andere_fids):
+        v1 = vals.pop("laser_twist#1")
+        for fid in sorted(andere_fids):
+            eigen = fv.get(fid)
+            ziel = dict(eigen) if isinstance(eigen, dict) else {}
+            ziel.setdefault("laser_twist#1", v1)
+            fv[fid] = ziel
 
 
 def _collect_fixture_groups(state, probleme: list | None = None) -> list:
@@ -2705,12 +2721,25 @@ def _load_show_impl(path: str | os.PathLike):
     # ZIP-Zeitstempel vor LAS-28 gespeichert wurde — sonst bleibt es, einmal
     # gemeldet.
     _las28_kopf1 = False
+    _las28_offen = 0          # LAS-47: mehrdeutig gebliebene Stellen (Hinweis)
+    _las28_andere_fids: set | None = set()
     if _laser3w_fids:
         try:
+            from . import las28_ziele as _l28z
             _alt, _neu, _mehrdeutig = _las28_befund(data, _laser3w_fids)
+            # LAS-47: Effekt-/Regel-Ziele und VC-Bindungen sind ebenfalls
+            # Merkmale (``laser_twist#2/#3`` alt, ``laser_twist_y`` neu).
+            # Pruefung: ``#2`` ist am L2600 auch neu gueltig, deshalb erst die
+            # anderen Mehrfach-twist-Geraete bestimmen (ziel_befund filtert).
+            _las28_andere_fids = _l28z.mehrfach_twist_fids(state, _laser3w_fids)
+            _z_alt, _z_neu = _l28z.ziel_befund(data, _laser3w_fids,
+                                               _las28_andere_fids)
+            _alt += _z_alt
+            _neu += _z_neu
             _las28_kopf1 = _neu == 0 and (
                 _alt > 0 or _las28_vor_las28(_show_json_zeit))
             if _mehrdeutig and not _las28_kopf1:
+                _las28_offen += _mehrdeutig
                 _melde_still(
                     "show.las28",
                     text=(f"{_mehrdeutig} SH-LASER3W-Wert(e) nur mit laser_twist#1 "
@@ -2827,7 +2856,7 @@ def _load_show_impl(path: str | os.PathLike):
                     _fill_fan_from_dimmer(_attrs, _fid, _euron10_fids)
                 if _laser3w_fids:
                     _las28_palette_nachziehen(_p, _laser3w_fids, _las28_kopf1,
-                                              _andere)
+                                              _andere, _las28_andere_fids)
         except Exception as e:
             print(f"[show_file] EURON10 fan palette migration failed: {e}")
 
@@ -2925,6 +2954,17 @@ def _load_show_impl(path: str | os.PathLike):
             if not isinstance(functions_payload, dict):
                 functions_payload = {"functions": []}
             fm.from_dict(functions_payload)
+            # LAS-47: Effekt-Ziele und Kanal-Kopplungen auf laser_twist (vor
+            # LAS-28 = alle vier Flips) nachziehen — VOR dem ersten Render.
+            if _laser3w_fids:
+                from . import las28_ziele as _l28z
+                _u, _o = _l28z.funktionen_nachziehen(
+                    fm, _laser3w_fids, _las28_kopf1, _las28_andere_fids)
+                if _o:
+                    _las28_offen += _o
+                    _melde_still("show.las28", text=(
+                        f"{_o} SH-LASER3W-Funktionsziel(e) auf laser_twist nicht "
+                        "umgesetzt (Speicherstand vor/nach LAS-28 nicht erkennbar)"))
     except Exception as e:
         _lenient("load function manager error", e)
 
@@ -2997,6 +3037,28 @@ def _load_show_impl(path: str | os.PathLike):
         _lenient("migrate legacy rgb matrix error", e)
 
     state._vc_layout = data.get("virtual_console", {}) or {}
+    # LAS-47: VC-Fader auf laser_twist / laser_twist#N nachziehen (rohes Layout,
+    # die Widgets entstehen erst im UI-Thread daraus).
+    if _laser3w_fids:
+        try:
+            from . import las28_ziele as _l28z
+            _u, _o = _l28z.vc_nachziehen(
+                state._vc_layout, _las28_kopf1,
+                _las28_andere_fids is None or bool(_las28_andere_fids))
+            if _o:
+                _las28_offen += _o
+                _melde_still("show.las28", text=(
+                    f"{_o} VC-Fader auf laser_twist nicht umgesetzt "
+                    "(Speicherstand vor/nach LAS-28 nicht erkennbar)"))
+        except Exception as e:
+            print(f"[show_file] SH-LASER3W VC migration failed: {e}")
+    # LAS-47 (Rest 3): was mehrdeutig blieb, soll Robin SEHEN, nicht nur das
+    # Sitzungs-Log — ein Hinweis, kein Verlust (STAB-37).
+    if _las28_offen:
+        _ladehinweis(
+            f"SH-LASER3W: {_las28_offen} Flip-Angabe(n) nicht umgestellt — "
+            "die Show verrät nicht, ob sie vor oder nach dem Flip-Umbau (LAS-28) "
+            "gespeichert wurde. Bitte die Flips (Verdrehung) prüfen.")
 
     # Snapshots pro Show: Rohdaten ablegen, die SnapshotsView spielt sie im
     # show_loaded-Handler des Hauptfensters zurück (UI-Thread).
