@@ -733,6 +733,11 @@ class MainWindow(QMainWindow):
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
 
+        # UI-136: im Touch-Modus einmal pruefen, ob System-Gesten die Finger
+        # vor LightOS abfangen (nur lesen; Hinweis wegklickbar, Kiosk: Statuszeile).
+        if touch:
+            QTimer.singleShot(1500, self, self._system_gesten_pruefen)
+
         # Kiosk-Modus: Menubar + Statusbar ausblenden, direkt zur Virtual Console
         if kiosk:
             self.menuBar().hide()
@@ -2386,6 +2391,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Drei-Finger-Tippen: {text}", 2500)
         except Exception:
             pass
+
+    def _system_gesten_pruefen(self) -> None:
+        """UI-136: Hinweis auf aktive System-Gesten (s. ``system_gesten``)."""
+        try:
+            from src.ui import system_gesten
+            system_gesten.beim_start(self, bool(self._kiosk_mode))
+        except Exception as e:
+            print(f"[main_window] System-Gesten pruefen: {e}")
 
     def _open_gesten_dialog(self) -> None:
         from src.ui.widgets.gesten_dialog import GestenDialog

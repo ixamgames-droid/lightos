@@ -814,7 +814,23 @@ class VCCanvas(QWidget):
         if not enabled:
             self._on_widget_selected(None)   # Inspector leeren, wenn Edit-Modus aus
         self._handy_abzeichen_aktualisieren()   # WEB-10: Abzeichen nur beim Bearbeiten
+        if getattr(self, "_auswahl_marke_w", None) is not None:
+            self.auswahl_marke().planen()      # UI-136: im Spielbetrieb unsichtbar
         self.update()
+
+    def auswahl_marke_geaendert(self) -> None:
+        """UI-136: eine Auswahl-Marke (``VCWidget._selected``) hat sich
+        geaendert — die Ueberlagerung liest die Auswahl gebuendelt neu ein."""
+        self.auswahl_marke().planen()
+
+    def auswahl_marke(self):
+        """UI-136: die Ueberlagerung, die die Auswahl sichtbar macht (bei
+        Bedarf angelegt)."""
+        m = getattr(self, "_auswahl_marke_w", None)
+        if m is None or not _lebt(m):
+            from src.ui.virtualconsole.vc_auswahl_marke import AuswahlMarke
+            m = self._auswahl_marke_w = AuswahlMarke(self)
+        return m
 
     def _on_widget_selected(self, w):
         """Von einem VCWidget beim Anklicken (oder vom Canvas bei Klick ins Leere mit

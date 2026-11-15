@@ -109,7 +109,10 @@ Regeln (``ziel_bereich``):
   Auswahl und sperrt den Rest dieses Drucks). Sagt es ja, ist jeder weitere
   Finger, der ohne Bewegung wieder loslaesst, ein Antippen
   (``halten_antippen``: Element dazu/heraus) — bis der erste Finger loslaesst.
-  Kein Pinch, kein Menue, keine Erklaerung waehrend dessen.
+  Kein Pinch, kein Menue, keine Erklaerung waehrend dessen. UI-136: „still"
+  heisst am echten Finger bis zur doppelten Touch-Schwelle Zittern; hat langes
+  Halten schon das Lang-Druck-Menue geoeffnet, schliesst der zweite Finger es
+  und das Halten + Antippen beginnt trotzdem.
 * **Zwei Finger waagerecht = Bank blaettern** (UI-83): setzen zwei Finger auf
   freier Flaeche eines Widgets mit ``wisch_flaeche(glob)`` und
   ``zwei_finger_wischen(schritt)`` auf (VC-Arbeitsflaeche; nie, wenn ein
@@ -597,6 +600,7 @@ class ZiehenScrollen(QObject):
         self._erster_lage = None    # (Zeit, Bildschirmlage) beim Aufsetzen
         self._erster_weg = 0.0      # weiteste Entfernung des ersten Fingers davon
         self._halten = None         # laufendes Halten + Antippen
+        self._lang_menue_offen = False  # UI-136: Lang-Druck-Menue des ersten Fingers offen
         self._wisch = None          # laufender Zwei-Finger-Bankwechsel
         self._drei = None           # Buchfuehrung fuers Drei-Finger-Tippen
         self._zuruecksetzen()
@@ -1060,12 +1064,15 @@ class ZiehenScrollen(QObject):
         lokal = w.mapFromGlobal(glob).toPoint()
         ev = QContextMenuEvent(QContextMenuEvent.Reason.Mouse, lokal, glob.toPoint(), mods)
         self._menue_schlucken = True        # gilt schon waehrend eines blockierenden exec
+        self._lang_menue_offen = True       # UI-136: ein zweiter Finger darf es schliessen
         try:
             QApplication.sendEvent(w, ev)
             angenommen = ev.isAccepted()
         except Exception as e:
             print(f"[ziehen_scrollen] ERROR: Lang-Druck-Menue: {e}")
             angenommen = False
+        finally:
+            self._lang_menue_offen = False
         if not angenommen:
             self._menue_schlucken = False
             return
@@ -1477,10 +1484,28 @@ class ZiehenScrollen(QObject):
                            if p.id() == self._erster_id and p.state() != geloest), None)
             if not neue or erster is None:
                 return False
+            # UI-136: ein echter Finger zittert und rollt beim Halten — die
+            # Toleranz des gehaltenen Fingers ist die doppelte Touch-Schwelle.
+            # Und wer laenger als LANG_MENUE_S haelt, hat schon das Lang-Druck-
+            # Menue vor sich: das schliesst der zweite Finger (nur dieses,
+            # kein fremdes Pop-up).
+            popup = QApplication.activePopupWidget()
             if (self._uhr() - self._erster_lage[0] < HALTEN_MIN_S
-                    or self._erster_weg >= self._schwelle()
-                    or QApplication.activePopupWidget() is not None):
+                    or self._erster_weg >= self._schwelle() * 2
+                    or (popup is not None and not self._lang_menue_offen)):
                 return False
+            if popup is not None:
+                # Das Menue oeffnet unter dem gehaltenen Finger und verdeckt
+                # meist auch die Nachbarn. Bedienen kann der zweite Finger es
+                # nicht (Qt macht nur aus dem ersten Finger eine Maus) — er
+                # schliesst es, dann wird das Halten unter dem Menue geprueft.
+                try:
+                    popup.close()
+                except Exception as e:
+                    print(f"[ziehen_scrollen] ERROR: Lang-Druck-Menue schliessen: {e}")
+                    return False
+                if QApplication.activePopupWidget() is not None:
+                    return False
             ge = QPointF(erster.globalPosition())
             ziel = self._methode_unter(ge, "halten_antippen")
             if ziel is None or any(

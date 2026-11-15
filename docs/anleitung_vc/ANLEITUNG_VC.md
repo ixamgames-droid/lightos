@@ -100,6 +100,12 @@ Wegen:
 passen (z. B. Tempo: Speed-Rad oder Fader), per **Rechtsklick → „↔ Widget ändern…"** → dieselbe Galerie.
 (An/Aus-Tasten, Bus-Auswahl, Effekt-Farben oder XY-Feld haben den Eintrag nicht.) Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung, Position) bleibt.
 
+**Mehrere Elemente wählen:** mit Strg/Umschalt-Klick, einem Rahmen auf freier Fläche oder am
+Finger über „Mehrfach“ bzw. Halten + Antippen. Gewählte Elemente tragen einen bernsteinfarbenen
+Rahmen mit Haken oben links, bei mehreren steht „3 gewählt“ daneben. Ein Raum-Pad mit
+„Lock AUS“ zeigt nach dem Loslassen einen gestrichelten grauen Ring und kurz „freigegeben“ —
+die Köpfe zielen dann nicht mehr.
+
 **Farb-Snap aus der Bibliothek:** Ein **Farb-Snap** (`blau`) erzeugt beim Ziehen **direkt eine
 Snap-Taste** (Button mit Aktion „Bibliothek-Farbe/Snap", farbiger Strich) — ohne Drop-Karte. Alternativ
 **Rechtsklick auf einen Bibliothek-Eintrag → „➡ Auf VC-Taste legen"** und danach einen **vorhandenen**
