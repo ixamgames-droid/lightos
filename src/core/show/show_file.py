@@ -1874,6 +1874,8 @@ _LIVE_FELDER_LIVE_VIEW_META = ("zoom",)          # Ansicht, wie das Fensterlayou
 #:   VCSlider            value                    Fader ziehen / MIDI
 #:   VCSpeedDial         bpm, active_factor, mult Rad, Tap, Faktor-Gitter
 #:   VCXYPad             pan, tilt, area          Pad ziehen, Feld markieren, MIDI
+#:   VCRaumPad           ziel, hoehe, flaeche,    Ziel antippen (Boden/Wand),
+#:                       wand_hoehe               Zielhoehe (UI-127)
 #:   VCTempoBusController source, factor, fixed_bpm  Quelle/Tap, Faktor, Fix-Rad
 #:   VCMultiLiveEditor   joint                    Dropdown „Alle gemeinsam" (VCB-49)
 #: Bewusst NICHT live: VCColor-Farbe (der Doppelklick-Waehler aendert, WAS die
@@ -1888,6 +1890,7 @@ _LIVE_FELDER_VC = {
     "VCSlider": ("value",),
     "VCSpeedDial": ("bpm", "active_factor", "mult"),
     "VCXYPad": ("pan", "tilt", "area"),
+    "VCRaumPad": ("ziel", "hoehe", "flaeche", "wand_hoehe"),
     "VCTempoBusController": ("source", "factor", "fixed_bpm"),
     # VCB-49: Wahl „Alle gemeinsam" im Dropdown = Bedienung (wie die Einzel-
     # Auswahl, die gar nicht gespeichert wird); der Haken-Satz joint_checked
