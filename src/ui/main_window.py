@@ -665,6 +665,16 @@ class MainWindow(QMainWindow):
             setze_touch_modus(bool(touch))
         except Exception as e:
             print(f"[main_window] ERROR: Touch-Zustand: {e}")
+        # UI-83: Drei-Finger-Tippen fuehrt die gewaehlte Aktion hier aus
+        # (Fenster nur schwach gehalten; im Kiosk nie).
+        try:
+            from PySide6.QtWidgets import QApplication
+            from src.ui.weak_slots import weak_slot_fwd
+            _zs = getattr(QApplication.instance(), "_ui110_ziehen_scrollen", None)
+            if _zs is not None and not kiosk:
+                _zs.drei_finger_rueckruf = weak_slot_fwd(self._drei_finger_aktion)
+        except Exception as e:
+            print(f"[main_window] ERROR: Drei-Finger-Geste: {e}")
 
         # STAB-39: ohne echte Daten (Wegwerf-Ordner) traegt JEDER Titel den
         # Probelauf-Hinweis — einmal festgestellt, ``setWindowTitle`` haengt an.
@@ -954,6 +964,11 @@ class MainWindow(QMainWindow):
         a.setShortcut("F5")
         a.triggered.connect(self._refresh_all_views)
         am.addAction("Musik-Fenster (Now Playing)").triggered.connect(self._open_music_window)
+        if not self._kiosk_mode:
+            # UI-83: Uebersicht der Finger-Gesten mit Schaltern (Kiosk: kein
+            # Weg in die Einstellungen).
+            am.addSeparator()
+            am.addAction("Touch-Gesten…").triggered.connect(self._open_gesten_dialog)
 
         # Show
         sm = mb.addMenu("&Show")
@@ -2343,6 +2358,31 @@ class MainWindow(QMainWindow):
             with schritt(self._state, "Abdunkeln"):
                 for f in self._state.get_patched_fixtures():
                     self._state.set_programmer_value(f.fid, "intensity", 76)
+
+    def _drei_finger_aktion(self, aktion: str) -> None:
+        """UI-83: Drei-Finger-Tippen. Abschliessende Liste — nie eine
+        Sicherheitsaktion (BLACKOUT, STOP ALL, GO, LASER NOT-AUS, Sperre)."""
+        if self._kiosk_mode:
+            return
+        ziele = {
+            "programmer_leeren": self._global_clear_programmer,
+            "page_naechste": self._page_next,
+            "page_vorherige": self._page_prev,
+        }
+        f = ziele.get(aktion)
+        if f is None:
+            return
+        f()
+        try:
+            from src.ui.gesten_prefs import DREI_FINGER_AKTIONEN
+            text = dict(DREI_FINGER_AKTIONEN).get(aktion, aktion)
+            self.statusBar().showMessage(f"Drei-Finger-Tippen: {text}", 2500)
+        except Exception:
+            pass
+
+    def _open_gesten_dialog(self) -> None:
+        from src.ui.widgets.gesten_dialog import GestenDialog
+        GestenDialog(self).exec()
 
     def _global_clear_programmer(self):
         self._state.clear_programmer()

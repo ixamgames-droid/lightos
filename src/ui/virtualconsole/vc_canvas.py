@@ -888,6 +888,66 @@ class VCCanvas(QWidget):
         else:
             self._on_widget_selected(aus[0] if aus else None)
 
+    # ── UI-83: Gesten am Finger ──────────────────────────────────────────────
+
+    def _vc_widget_bei(self, glob):
+        """Innerstes VC-Widget dieser Konsole unter der Bildschirmlage."""
+        from PySide6.QtWidgets import QApplication
+        w = QApplication.widgetAt(glob.toPoint())
+        while w is not None and w is not self:
+            if isinstance(w, VCWidget):
+                return w if self.isAncestorOf(w) else None
+            w = w.parentWidget()
+        return None
+
+    def halten_antippen_start(self, glob) -> bool:
+        """Halten + Antippen (``ziehen_scrollen``): nur im Bearbeiten-Modus,
+        der erste Finger liegt auf einem (gewaehlten) Widget. Sein Druck
+        verschiebt danach nichts mehr und waehlt beim Loslassen nicht um."""
+        if not self._edit_mode or self._kiosk:
+            return False
+        w = self._vc_widget_bei(glob)
+        if w is None or not getattr(w, "_selected", False):
+            return False
+        w._mehrfach_klick = None
+        w._gruppe = []
+        w._dragging = False
+        w._resizing = False
+        if w.geometry() != getattr(w, "_orig_rect", w.geometry()):
+            w.setGeometry(w._orig_rect)
+        self._halten_w = w
+        return True
+
+    def halten_antippen(self, glob) -> None:
+        """Weiterer Finger tippt ein Widget an: dazu bzw. heraus."""
+        if not self._edit_mode:
+            return
+        w = self._vc_widget_bei(glob)
+        if w is None or w is getattr(self, "_halten_w", None):
+            return
+        w._selected = not w._selected
+        w.update()
+        self.clear_effect_highlight()
+        self.auswahl_melden()
+
+    def wisch_flaeche(self, glob) -> bool:
+        """Liegt die Bildschirmlage auf freier Flaeche (kein Widget)?"""
+        p = self.mapFromGlobal(glob.toPoint())
+        return (self.rect().contains(p) and self.childAt(p) is None
+                and self._rahmen_start is None)
+
+    def zwei_finger_wischen(self, schritt: int) -> None:
+        """Zwei Finger waagerecht gewischt: Bank weiter (+1) bzw. zurueck (-1),
+        ueber die Executor-Page wie die Bank-Knoepfe der Leiste."""
+        ziel = max(0, min(9, self._active_bank + int(schritt)))
+        if ziel == self._active_bank:
+            return
+        pe = getattr(self, "_pe", None)
+        if pe is not None:
+            pe.set_page(ziel)           # -> _on_engine_page -> set_active_bank
+        else:
+            self.set_active_bank(ziel)
+
     def _rahmen_auswaehlen(self, rect: QRect, additiv: bool) -> None:
         """Auswahlrahmen: alle sichtbaren Widgets direkt auf der Flaeche, die
         der Rahmen beruehrt (ein Kasten zaehlt als Ganzes)."""
