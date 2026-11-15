@@ -24,6 +24,10 @@ from .sicher import MvrFehler
 SZENE = "GeneralSceneDescription.xml"
 GDTF_BESCHREIBUNG = "description.xml"
 UNIVERSUM_GROESSE = 512
+#: Hoechstens so viele Geraete je Datei. LightOS patcht hoechstens
+#: 32 Universen = 16384 Kanaele; die Vorschau baut je Geraet eine Zeile mit
+#: Auswahlfeldern — eine Datei mit 100000 Geraeten legte sie lahm.
+GERAETE_MAX = 10000
 
 
 # ── Dataclasses ──────────────────────────────────────────────────────────────
@@ -307,6 +311,10 @@ class _Leser:
             self.lauf(kind, welt, unter, tiefe + 1)
 
     def _geraet(self, el, welt: MvrMatrix, pfad, matrix_kaputt: bool):
+        if len(self.datei.geraete) >= GERAETE_MAX:
+            raise MvrFehler(f"Die MVR-Datei enthält mehr als {GERAETE_MAX} Geräte "
+                            "— so viele lassen sich in LightOS nicht patchen. "
+                            "Die Datei wird nicht gelesen.")
         hinweise = []
         if matrix_kaputt:
             hinweise.append("Die Lage (Matrix) ist unlesbar — das Gerät steht "

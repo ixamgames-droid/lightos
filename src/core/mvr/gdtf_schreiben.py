@@ -288,8 +288,19 @@ def _funktionen(gk: _GKanal) -> list[tuple[str, int, int, str]]:
     return eindeutig
 
 
+#: Zeichen, die XML 1.0 nicht erlaubt (Steuerzeichen ausser Tab/LF/CR,
+#: einzelne Surrogate, U+FFFE/U+FFFF). Stehen sie in einem Namen, waere die
+#: Datei kaputt — auch fuer den eigenen Import.
+_XML_UNGUELTIG = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+
+
+def xml_sauber(text) -> str:
+    """Text ohne Zeichen, die in XML 1.0 nicht stehen duerfen."""
+    return _XML_UNGUELTIG.sub("", str(text))
+
+
 def _a(name: str, wert) -> str:
-    return f" {name}={quoteattr(str(wert))}"
+    return f" {name}={quoteattr(xml_sauber(wert))}"
 
 
 def beschreibung_xml(p: ProfilDaten) -> bytes:

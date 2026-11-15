@@ -25,13 +25,14 @@ und setzt Position und Drehung im 3D. Alles ist EIN Rueckgaengig-Schritt.
 """
 from __future__ import annotations
 
+import bisect
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 
 from src.core import patch_tabelle as T
 
 from . import gdtf_profil as GP
-from .achsen import mvr_zu_lightos
+from .achsen import ist_gespiegelt, mvr_zu_lightos
 from .lesen import GdtfModus, GdtfTyp, MvrDatei, MvrGeraet
 
 UNIVERSUM_MAX = T.UNIVERSUM_MAX
@@ -164,7 +165,13 @@ def finde_profil(bibliothek: T.Bibliothek, typ: GdtfTyp,
     Langname) + Kanalzahl, ohne Gross/Klein und Leerzeichen. Rueckgabe
     ``(Profil, Modus, Hinweis)`` oder ``None``."""
     h = _v(typ.hersteller)
-    namen = {n for n in (_v(typ.name), _v(typ.langname)) if n}
+    roh = [n for n in (typ.name, typ.langname) if n]
+    if not roh:
+        # Ohne Name/LongName heisst das neu angelegte Profil wie die GDTF-Datei
+        # (gdtf_profil.profil_payload) — sonst entstuende bei jedem Import ein
+        # weiteres, gleiches Profil.
+        roh = [typ.datei] if typ.datei else []
+    namen = {_v(n) for n in roh}
     if not namen:
         return None
     k = gmodus.kanalzahl
@@ -172,7 +179,7 @@ def finde_profil(bibliothek: T.Bibliothek, typ: GdtfTyp,
     for p in bibliothek.profile:
         passt = ((_v(p.name) in namen and (not h or _v(p.hersteller) == h))
                  or _v(p.anzeige) in {_v(f"{typ.hersteller} {n}") for n in
-                                      (typ.name, typ.langname) if n})
+                                      roh})
         if not passt:
             continue
         gleich = [m for m in p.modi if m.kanaele == k]
@@ -191,7 +198,8 @@ def finde_profil(bibliothek: T.Bibliothek, typ: GdtfTyp,
     return treffer[0][0], treffer[0][1], hinweis
 
 
-def _zuordnen(e: Eintrag, datei: MvrDatei, bibliothek: T.Bibliothek, gewaehlt) -> None:
+def _zuordnen(e: Eintrag, datei: MvrDatei, bibliothek: T.Bibliothek, gewaehlt,
+              funde: dict | None = None) -> None:
     g = e.geraet
     e.typ = datei.typ_fuer(g)
     if e.typ is not None:
@@ -221,7 +229,15 @@ def _zuordnen(e: Eintrag, datei: MvrDatei, bibliothek: T.Bibliothek, gewaehlt) -
         e.gruende.append(f"Der Modus „{e.gdtf_modus.name}“ hat keine DMX-Kanäle "
                          "— bitte ein Profil wählen.")
         return
-    fund = finde_profil(bibliothek, e.typ, e.gdtf_modus)
+    # Je GDTF-Datei und Modus EINMAL suchen (sonst durchsucht jedes Geraet
+    # die ganze Bibliothek — bei tausenden Geraeten Minuten).
+    schluessel = (e.typ.datei, id(e.gdtf_modus))
+    if funde is not None and schluessel in funde:
+        fund = funde[schluessel]
+    else:
+        fund = finde_profil(bibliothek, e.typ, e.gdtf_modus)
+        if funde is not None:
+            funde[schluessel] = fund
     if fund is not None:
         e.art, e.profil, e.modus = BIBLIOTHEK, fund[0], fund[1]
         e.kanaele = fund[1].kanaele
@@ -236,27 +252,38 @@ def _zuordnen(e: Eintrag, datei: MvrDatei, bibliothek: T.Bibliothek, gewaehlt) -
 class _Belegung:
     def __init__(self, vorhandene):
         self.bereiche: dict[int, list[tuple[int, int, str]]] = {}
+        #: (ab_universum, k) -> (Stelle in der Suchreihenfolge, Adresse):
+        #: Belegung waechst nur, also rueckt der erste freie Platz fuer ``k``
+        #: Kanaele nie nach vorn — die Suche darf dort weitermachen.
+        self._ab: dict[tuple[int, int], tuple[int, int]] = {}
         for b in vorhandene:
             if getattr(b, "belegt_dmx", True) and b.kanaele > 0:
                 self.dazu(b.universum, b.adresse, b.kanaele, b.name)
 
     def dazu(self, u, a, k, name):
-        self.bereiche.setdefault(u, []).append((a, a + k - 1, name))
+        bisect.insort(self.bereiche.setdefault(u, []), (a, a + k - 1, name))
 
     def trifft(self, u, a, k) -> list[tuple[int, int, str]]:
         ende = a + k - 1
         return [b for b in self.bereiche.get(u, []) if b[0] <= ende and a <= b[1]]
 
     def frei(self, ab_universum: int, k: int) -> tuple[int, int] | None:
-        for u in list(range(max(1, ab_universum), UNIVERSUM_MAX + 1)) + \
-                list(range(1, max(1, ab_universum))):
-            a = 1
-            for s, ende, _n in sorted(self.bereiche.get(u, [])):
+        start = max(1, ab_universum)
+        reihe = list(range(start, UNIVERSUM_MAX + 1)) + list(range(1, start))
+        stelle, ab = self._ab.get((start, k), (0, 1))
+        for i in range(stelle, len(reihe)):
+            u = reihe[i]
+            a = ab if i == stelle else 1
+            for s, ende, _n in self.bereiche.get(u, []):
+                if ende < a:
+                    continue
                 if s - a >= k:
                     break
                 a = max(a, ende + 1)
             if a + k - 1 <= UNIVERSUM_GROESSE:
+                self._ab[(start, k)] = (i, a)
                 return u, a
+        self._ab[(start, k)] = (len(reihe), 1)
         return None
 
 
@@ -319,11 +346,16 @@ def baue_plan(datei: MvrDatei, bibliothek: T.Bibliothek, vorhandene=(),
     belegung = _Belegung(vorhandene)
     namen = {T.namens_schluessel(b.name) for b in vorhandene}
     merker: dict = {}
+    funde: dict = {}
     eintraege = []
     for i, g in enumerate(datei.geraete):
         e = Eintrag(index=i, geraet=g, hinweise=list(g.hinweise))
         e.position, e.rotation = mvr_zu_lightos(g.matrix)
-        _zuordnen(e, datei, bibliothek, wahl.get(i))
+        if ist_gespiegelt(g.matrix):
+            e.hinweise.append("Die Lage ist in der Datei gespiegelt — LightOS "
+                              "übernimmt nur die Strahlrichtung, nicht die "
+                              "Spiegelung.")
+        _zuordnen(e, datei, bibliothek, wahl.get(i), funde)
         e.name = g.name
         if e.kanaele:
             _adressieren(e, belegung, konflikt_wahl.get(i))
@@ -444,12 +476,17 @@ def wende_an(state, plan: Plan, bibliothek: T.Bibliothek, *, engine=None) -> Erg
     try:
         with sammeln(), stack.gruppe(etikett, rahmen=sammeln):
             try:
+                dual: dict[tuple[int, str], bool] = {}
                 for e in anlegbar:
                     if e.art == NEU:
                         profil = neue[e.typ.datei]
                         modus = _modus_zum_gdtf(profil, e.gdtf_modus, e.typ)
                     else:
                         profil, modus = e.profil, e.modus
+                    # Je Profil+Modus EINMAL in der Bibliothek nachsehen.
+                    if (profil.id, modus.name) not in dual:
+                        dual[(profil.id, modus.name)] = T._auto_dual_tilt(
+                            profil.id, modus.name)
                     fid = state.add_fixture(PatchedFixture(
                         fid=state.next_fid(), label=e.name,
                         fixture_profile_id=profil.id, mode_name=modus.name,
@@ -457,7 +494,7 @@ def wende_an(state, plan: Plan, bibliothek: T.Bibliothek, *, engine=None) -> Erg
                         channel_count=modus.kanaele,
                         manufacturer_name=profil.hersteller,
                         fixture_name=profil.name, fixture_type=profil.typ,
-                        spider_dual_tilt=T._auto_dual_tilt(profil.id, modus.name)))
+                        spider_dual_tilt=dual[(profil.id, modus.name)]))
                     angelegt.append((fid, e))
                 lagen = {fid: (e.position, e.rotation) for fid, e in angelegt}
                 setzen = _lagen_setzer(state, lagen)

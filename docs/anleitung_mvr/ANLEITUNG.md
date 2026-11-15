@@ -41,10 +41,13 @@ mit den eigenen Profilen als GDTF. Noch ohne Bilder.
 - **Achsen:** MVR rechnet in Millimetern mit der Höhe nach oben in Z. LightOS rechnet
   in Metern mit der Höhe in Y. Das Publikum (in MVR meist vorn bei −Y) liegt in
   LightOS bei +Z. Ein hängendes Gerät ohne Drehung strahlt nach unten.
+  Eine gespiegelte Lage aus der Datei übernimmt LightOS nur mit ihrer
+  Strahlrichtung; die Vorschau zeigt dazu einen Hinweis.
 - **Traversen und Fokuspunkte** zählt die Vorschau, übernimmt sie aber noch nicht.
 - **Kaputte oder verdächtige Dateien** werden mit einer Meldung abgelehnt und nichts
   wird verändert. Dazu zählen beschädigte Archive, unzulässige Dateinamen,
-  ungewöhnlich große oder stark gepackte Inhalte und XML mit Dokumenttyp-Angaben.
+  ungewöhnlich große oder stark gepackte Inhalte, mehr als 10 000 Geräte und XML
+  mit Dokumenttyp-Angaben.
   Eine einzelne unlesbare GDTF-Datei trifft nur ihre Geräte, sie bleiben
   „nicht zugeordnet“.
 

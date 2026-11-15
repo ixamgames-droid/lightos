@@ -617,3 +617,123 @@ def test_menue_eintrag_im_datei_menue():
     assert quelle.index("MVR-Datei importieren") > quelle.index("XML-Workspace importieren")
     from src.ui.main_window import MainWindow
     assert callable(getattr(MainWindow, "_import_mvr", None))
+
+
+# ── Nachbesserung nach Pruefung ──────────────────────────────────────────────
+
+def _strahl_aus_datei(u, v, w):
+    """Unabhaengig nachgerechnet: GDTF strahlt lokal nach -Z, in der Welt
+    also nach -w (normiert); MVR (x, y, z) -> LightOS (x, z, -y)."""
+    n = math.sqrt(sum(x * x for x in w))
+    return (-w[0] / n, -w[2] / n, w[1] / n)
+
+
+@pytest.mark.parametrize("u,v,w", [
+    ((-1, 0, 0), (0, 1, 0), (0, 0, 1)),        # gespiegelt, haengend
+    ((1, 0, 0), (0, -1, 0), (0, 0, 1)),        # gespiegelt (v), haengend
+    ((0, 1, 0), (1, 0, 0), (0, 0, -1)),        # gespiegelt, stehend
+    ((1, 0, 0), (0, 0, -1), (0, -1, 0)),       # gespiegelt, Strahl nach vorn
+    ((2, 0, 0), (0, 3, 0), (0, 0, 0.5)),       # ungleich skaliert
+    ((1, 0.3, 0), (0, 1, 0.2), (0, 0, 1)),     # schief
+    ((1, 0, 0), (0, 0, 1), (0, 0, 1)),         # v liegt auf der Strahlachse
+])
+def test_strahl_bleibt_bei_spiegelung_schiefe_und_skalierung(u, v, w):
+    m = AX.MvrMatrix.aus_uvwo(u, v, w, (0, 0, 0))
+    _pos, rot = AX.mvr_zu_lightos(m)
+    assert _nah(AX.strahl_richtung(rot), _strahl_aus_datei(u, v, w), 1e-3), rot
+
+
+def test_gespiegeltes_geraet_bekommt_einen_hinweis(tmp_path, bib):
+    inhalt = ('<Layer name="a"><ChildList>'
+              + fixture_xml("Spiegel", "{-1,0,0}{0,1,0}{0,0,1}{0,0,5000}", nr="1")
+              + fixture_xml("Normal", ID + "{0,0,5000}", nr="2")
+              + '</ChildList></Layer>')
+    plan = I.baue_plan(L.lies_mvr(mvr_schreiben(tmp_path / "s.mvr", szene_xml(inhalt))),
+                       bib, ())
+    spiegel, normal = plan.eintraege
+    assert any("gespiegelt" in h for h in spiegel.hinweise)
+    assert not any("gespiegelt" in h for h in normal.hinweise)
+    assert _nah(AX.strahl_richtung(spiegel.rotation), (0.0, -1.0, 0.0), 1e-6)
+
+
+def test_gdtf_ohne_namen_legt_beim_zweiten_import_kein_doppel_an(tmp_path, state):
+    from src.core.database import fixture_db as fdb
+    from src.core.database.models import FixtureProfile
+    from sqlalchemy.orm import Session
+    g = gdtf_xml("Namenlos-Werk", "", [("M", [("1", "Dimmer", "Base")])]).replace(
+        'LongName=" lang"', 'LongName=""')
+    datei = f"ohne_namen_{uuid.uuid4().hex[:6]}.gdtf"
+    inhalt = ('<Layer name="a"><ChildList>'
+              + fixture_xml("X", ID + "{0,0,0}", datei, "M", "1.1")
+              + '</ChildList></Layer>')
+    pfad = mvr_schreiben(tmp_path / "r.mvr", szene_xml(inhalt), {datei: gdtf_bytes(g)})
+    angelegt = []
+    try:
+        for runde in range(2):
+            b = T.bibliothek_aus_db()
+            plan = I.baue_plan(L.lies_mvr(pfad), b, T.belegung_aus_state(state),
+                               konflikt_wahl={0: I.FREIE_ADRESSE})
+            assert plan.eintraege[0].art == (I.NEU if runde == 0 else I.BIBLIOTHEK)
+            erg = I.wende_an(state, plan, b)
+            assert erg.fehler == []
+            angelegt += [f.fixture_profile_id for f in state.get_patched_fixtures()]
+        with Session(fdb.engine()) as s:
+            assert s.query(FixtureProfile).filter_by(name=datei).count() == 1
+    finally:
+        I.profile_loeschen(sorted(set(angelegt)))
+
+
+def _frei_naiv(bereiche, ab, k):
+    for u in list(range(max(1, ab), I.UNIVERSUM_MAX + 1)) + list(range(1, max(1, ab))):
+        a = 1
+        for s, ende, _n in sorted(bereiche.get(u, [])):
+            if s - a >= k:
+                break
+            a = max(a, ende + 1)
+        if a + k - 1 <= I.UNIVERSUM_GROESSE:
+            return u, a
+    return None
+
+
+def test_freie_adresse_schnell_und_wie_die_einfache_suche():
+    import random
+    rnd = random.Random(56)
+    b = I._Belegung([])
+    for _ in range(4000):
+        k, ab = rnd.choice((1, 3, 8, 16, 40)), rnd.choice((1, 1, 5, 31))
+        if rnd.random() < 0.3:      # fremd belegte Stelle dazwischen
+            u, a = rnd.randint(1, I.UNIVERSUM_MAX), rnd.randint(1, 500)
+            b.dazu(u, a, rnd.randint(1, 12), "x")
+            continue
+        erwartet = _frei_naiv(b.bereiche, ab, k)
+        assert b.frei(ab, k) == erwartet
+        if erwartet:
+            b.dazu(erwartet[0], erwartet[1], k, "n")
+
+
+def test_viele_geraete_ohne_adresse_planen_schnell(tmp_path, bib):
+    import time
+    par = gdtf_bytes(gdtf_xml("Generic", "stage light  zq01424",
+                              [("8-Kanal RGBW", [(str(i), "Dimmer", "Base")
+                                                 for i in range(1, 9)])]))
+    teile = "".join(f'<Fixture name="F{i}" uuid=""><GDTFSpec>par.gdtf</GDTFSpec>'
+                    '<GDTFMode>8-Kanal RGBW</GDTFMode></Fixture>' for i in range(3000))
+    pfad = mvr_schreiben(tmp_path / "v.mvr",
+                         szene_xml(f'<Layer name="a"><ChildList>{teile}</ChildList></Layer>'),
+                         {"par.gdtf": par})
+    datei = L.lies_mvr(pfad)
+    t = time.perf_counter()
+    plan = I.baue_plan(datei, bib, ())
+    assert time.perf_counter() - t < 10     # vorher ~16 s (quadratisch)
+    assert len(plan.anlegbare()) == I.UNIVERSUM_MAX * (I.UNIVERSUM_GROESSE // 8)
+    adressen = {(e.universum, e.adresse) for e in plan.anlegbare()}
+    assert len(adressen) == len(plan.anlegbare())
+
+
+def test_zu_viele_geraete_werden_abgelehnt(tmp_path, monkeypatch):
+    monkeypatch.setattr(L, "GERAETE_MAX", 3)
+    teile = "".join(fixture_xml(f"F{i}", nr=str(i)) for i in range(4))
+    pfad = mvr_schreiben(tmp_path / "v.mvr",
+                         szene_xml(f'<Layer name="a"><ChildList>{teile}</ChildList></Layer>'))
+    with pytest.raises(S.MvrFehler, match="mehr als 3 Geräte"):
+        L.lies_mvr(pfad)

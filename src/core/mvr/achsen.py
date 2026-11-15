@@ -118,23 +118,52 @@ def verkette(aussen: MvrMatrix, innen: MvrMatrix) -> MvrMatrix:
 
 
 def _orthonormal(r) -> Matrix3:
-    """Skalierung und kleine Schiefe aus einer Drehung nehmen (Gram-Schmidt
-    der Spalten u, v; w = u x v). Entartete Matrix -> Einheit."""
-    u = [r[i][0] for i in range(3)]
+    """Skalierung, Schiefe und Spiegelung aus einer Drehung nehmen.
+
+    Massgeblich ist die STRAHLACHSE ``w`` (GDTF strahlt lokal nach ``-Z``):
+    sie bleibt exakt erhalten, ``v`` wird senkrecht dazu gestellt und
+    ``u = v x w`` ergaenzt. Eine gespiegelte Matrix (det < 0) verliert so nur
+    die Spiegelung quer zum Strahl — ein haengendes Geraet bleibt haengend
+    (vorher drehte ``w = u x v`` den Strahl um). Entartete Matrix -> Einheit."""
+    w = [r[i][2] for i in range(3)]
     v = [r[i][1] for i in range(3)]
-    nu = math.sqrt(sum(x * x for x in u))
-    if nu < 1e-12:
+    nw = math.sqrt(sum(x * x for x in w))
+    if nw < 1e-12:
         return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-    u = [x / nu for x in u]
-    d = sum(u[i] * v[i] for i in range(3))
-    v = [v[i] - d * u[i] for i in range(3)]
+    w = [x / nw for x in w]
+    d = sum(w[i] * v[i] for i in range(3))
+    v = [v[i] - d * w[i] for i in range(3)]
     nv = math.sqrt(sum(x * x for x in v))
-    if nv < 1e-12:
-        return ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
-    v = [x / nv for x in v]
-    w = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2],
-         u[0] * v[1] - u[1] * v[0]]
+    if nv < 1e-9:
+        # v liegt auf der Strahlachse: u nehmen, u x w ergibt -v'.
+        u0 = [r[i][0] for i in range(3)]
+        d = sum(w[i] * u0[i] for i in range(3))
+        u0 = [u0[i] - d * w[i] for i in range(3)]
+        nu = math.sqrt(sum(x * x for x in u0))
+        if nu < 1e-9:
+            # Nur die Strahlachse ist brauchbar: irgendeine Senkrechte.
+            hilf = (1.0, 0.0, 0.0) if abs(w[0]) < 0.9 else (0.0, 1.0, 0.0)
+            u0 = [hilf[1] * w[2] - hilf[2] * w[1], hilf[2] * w[0] - hilf[0] * w[2],
+                  hilf[0] * w[1] - hilf[1] * w[0]]
+            nu = math.sqrt(sum(x * x for x in u0))
+        u0 = [x / nu for x in u0]
+        v = [w[1] * u0[2] - w[2] * u0[1], w[2] * u0[0] - w[0] * u0[2],
+             w[0] * u0[1] - w[1] * u0[0]]
+    else:
+        v = [x / nv for x in v]
+    u = [v[1] * w[2] - v[2] * w[1], v[2] * w[0] - v[0] * w[2],
+         v[0] * w[1] - v[1] * w[0]]
     return tuple((u[i], v[i], w[i]) for i in range(3))
+
+
+def ist_gespiegelt(m: "MvrMatrix") -> bool:
+    """Spiegelt die Matrix (Determinante < 0)? LightOS kennt keine gespiegelten
+    Geraete — die Spiegelung quer zum Strahl faellt weg."""
+    r = m.r
+    det = (r[0][0] * (r[1][1] * r[2][2] - r[1][2] * r[2][1])
+           - r[0][1] * (r[1][0] * r[2][2] - r[1][2] * r[2][0])
+           + r[0][2] * (r[1][0] * r[2][1] - r[1][1] * r[2][0]))
+    return det < -1e-12
 
 
 def _rund(x: float, stellen: int) -> float:

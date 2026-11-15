@@ -504,3 +504,18 @@ def test_menue_eintrag_export_neben_import():
     assert quelle.index("MVR-Datei exportieren") > quelle.index("MVR-Datei importieren")
     from src.ui.main_window import MainWindow
     assert callable(getattr(MainWindow, "_export_mvr", None))
+
+
+def test_steuerzeichen_im_namen_geben_trotzdem_gueltige_datei(tmp_path, eigene, staaten):
+    """Ein Geraetename mit Steuerzeichen (aus einer alten Show, Copy & Paste)
+    machte die XML ungueltig — auch der eigene Import las sie nicht mehr."""
+    st = staaten("steuer")
+    _rig(st, eigene, RIG[:1])
+    pfad = str(tmp_path / "s.mvr")
+    gs = W.geraete_aus_state(st)
+    gs = [W.ExportGeraet(**{**g.__dict__, "name": "Spot\x01 <links> & \"ä\"\x0b"}) for g in gs]
+    daten, _erg = W.baue_mvr(gs)
+    with open(pfad, "wb") as d:
+        d.write(daten)
+    datei = L.lies_mvr(pfad)
+    assert [g.name for g in datei.geraete] == ['Spot <links> & "ä"']

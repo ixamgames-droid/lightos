@@ -160,10 +160,12 @@ def szene_xml(geraete: list[ExportGeraet], zuordnung: dict[int, str],
         datei = zuordnung[g.fid]
         matrix = lightos_zu_mvr(g.position or (0.0, 0.0, 0.0), g.rotation)
         absolut = (g.universum - 1) * UNIVERSUM_GROESSE + g.adresse
-        z += [f"<Fixture name={quoteattr(g.name)} uuid={quoteattr(fixture_uuid(g.fid))}>",
+        z += [f"<Fixture name={quoteattr(GS.xml_sauber(g.name))} "
+              f"uuid={quoteattr(fixture_uuid(g.fid))}>",
               f"<Matrix>{matrix.als_text()}</Matrix>",
-              f"<GDTFSpec>{escape(datei)}</GDTFSpec>",
-              f"<GDTFMode>{escape(_modus_name(g, dateien[datei]))}</GDTFMode>",
+              f"<GDTFSpec>{escape(GS.xml_sauber(datei))}</GDTFSpec>",
+              f"<GDTFMode>{escape(GS.xml_sauber(_modus_name(g, dateien[datei])))}"
+              "</GDTFMode>",
               "<Addresses>", f'<Address break="0">{absolut}</Address>', "</Addresses>",
               f"<FixtureID>{g.fid}</FixtureID>",
               "<UnitNumber>0</UnitNumber>",
