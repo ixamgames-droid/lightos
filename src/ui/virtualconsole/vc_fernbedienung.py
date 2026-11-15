@@ -334,6 +334,89 @@ def _ziel_fehlt(widget) -> list[str]:
     return raus
 
 
+#: WEB-13: Takt, wenn das Pult keinen nennt; Grenzen gegen Unsinn (0 = Freeze).
+STANDARD_BPM = 120
+_BPM_GRENZEN = (30, 300)
+
+
+def _bpm_von(fn) -> int:
+    """Takt (ganze BPM) fuer eine Funktion: ihr Tempo-Bus, sonst der globale
+    Takt. Ganzzahlig, damit ein leicht schwankender Audio-Takt nicht bei jedem
+    Abgleich eine neue Meldung ans Handy ausloest."""
+    bpm = 0.0
+    try:
+        bus_id = str(getattr(fn, "tempo_bus_id", "") or "").strip()
+        if bus_id:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().bus_for_effect(bus_id)
+            if bus is not None:
+                bpm = float(bus.bpm)
+        if bpm <= 0:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            bpm = float(get_bpm_manager().bpm)
+    except Exception:
+        bpm = 0.0
+    if not math.isfinite(bpm) or bpm <= 0:
+        return STANDARD_BPM
+    return int(round(max(_BPM_GRENZEN[0], min(_BPM_GRENZEN[1], bpm))))
+
+
+def _laeuft_im_takt(fn) -> bool:
+    """Blinkt der Effekt sichtbar im Takt? Chaser/Sequenz (Schritte),
+    Strobe-/Shutter-Matrix und alles, was an einem Tempo-Bus haengt."""
+    typ = str(getattr(getattr(fn, "function_type", None), "value", "") or "")
+    if typ in ("Chaser", "Sequence"):
+        return True
+    if str(getattr(fn, "tempo_bus_id", "") or "").strip():
+        return True
+    for attr in ("style", "algorithm"):
+        wert = getattr(fn, attr, None)
+        text = str(getattr(wert, "value", wert) or "").lower()
+        if "strobe" in text or "shutter" in text:
+            return True
+    return False
+
+
+def effekt_dynamik(widget) -> dict | None:
+    """WEB-13: was hinter einer AKTIVEN Taste laeuft, fuer die Animation am
+    Handy: ``{"farben": ["#rrggbb", …], "takt": bool, "bpm": int}`` oder None.
+
+    Die Animation laeuft im Handy rein per CSS — gemeldet wird nur, wenn sich
+    Farben, Takt-Art oder die ganze BPM-Zahl aendern (keine hohe
+    Nachrichtenrate). BLACKOUT und Laser-NOT-AUS haben keine Dynamik."""
+    from .vc_button import ButtonAction as A
+    aktion = getattr(widget, "action", None)
+    if aktion in (A.BLACKOUT, A.LASER_ESTOP):
+        return None
+    farben = []
+    try:
+        farben = [c.name() for c in widget._color_badge_colors()][:8]
+    except Exception:
+        farben = []
+    takt = False
+    bpm = None
+    if aktion in (A.FUNCTION_TOGGLE, A.FUNCTION_FLASH):
+        try:
+            from src.core.app_state import get_state
+            fm = get_state().function_manager
+            for fid in widget._all_function_ids():
+                fn = fm.get(fid) if hasattr(fm, "get") else None
+                if fn is None or not fm.is_running(fid):
+                    continue
+                if _laeuft_im_takt(fn):
+                    takt = True
+                    bpm = _bpm_von(fn)
+                    break
+        except Exception:
+            takt = False
+    if len(farben) < 2 and not takt:
+        return None
+    raus = {"farben": farben if len(farben) >= 2 else [], "takt": takt}
+    if takt:
+        raus["bpm"] = bpm or STANDARD_BPM
+    return raus
+
+
 def beschreibe(widget) -> dict | None:
     """Fernbedien-Auskunft zu einem Widget — oder None, wenn es nicht
     fernbedienbar ist. Nur JSON-taugliche Werte. Im UI-Thread aufrufen."""
@@ -365,6 +448,14 @@ def beschreibe(widget) -> dict | None:
         d["gedrueckt"] = bool(widget._pressed)
         d["aktiv"] = bool(widget.leuchtet())
         d["aktionen"] = list(AKTIONEN_TASTE)
+        # WEB-13: Effekt-Dynamik nur, solange die Taste aktiv ist und weder
+        # gesperrt noch ohne Ziel — sonst steht die Kachel ruhig.
+        d["effekt"] = None
+        if d["aktiv"] and d["gesperrt"] is None and not d["ziel_fehlt"]:
+            try:
+                d["effekt"] = effekt_dynamik(widget)
+            except Exception:
+                d["effekt"] = None
     elif art == "fader":
         d["modus"] = str(getattr(widget, "mode", "") or "")
         d["wert"] = int(widget.value)

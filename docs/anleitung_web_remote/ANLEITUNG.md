@@ -128,7 +128,17 @@ sich nicht belegen).
    **Laser-Inhalt** lässt es weg, solange **„Laser vom Handy erlauben"** aus
    ist. Gibt es schon Seiten, werden sie nach einer Rückfrage **ersetzt**.
    **„Alles leeren"** entfernt alle Handy-Seiten (ebenfalls mit Rückfrage).
-8. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
+8. **Aussehen am Handy:** Kachel anklicken und **„Aussehen am Handy…"** drücken (oder
+   Rechtsklick bzw. langes Drücken → **„Aussehen am Handy…"**). Dort gibst du
+   der Kachel eine **eigene Beschriftung** und — bei Tasten — eine **eigene
+   Farbe**, nur für das Handy. Leer bzw. **„wie Original"** heißt: die Kachel
+   folgt der Taste in der Konsole. **„Zurücksetzen"** stellt beides wieder auf
+   „wie Original" (auch im Rechtsklick-Menü). Das **Original in der Konsole
+   bleibt unverändert**. Eine Kachel mit eigener Einstellung trägt am Handy und
+   in der Vorschau die kleine Marke **„Handy"**; bei eigener Beschriftung steht
+   darunter klein der Name am Pult. **BLACKOUT** und **Laser-NOT-AUS** behalten
+   ihr festes Warnaussehen und lassen sich nicht umfärben oder umbenennen.
+9. **Verbinden:** oben in der Leiste steht der Schalter **„Handy-Konsole:
    aus/an"**, darunter der Zustand (**aus** · **an · 0 Handys verbunden** ·
    **an · 2 Handys verbunden**) und — sobald das Web-Interface im WLAN läuft
    und die Handy-Konsole an ist — der **QR-Code** fürs Handy (Klick vergrößert
@@ -155,12 +165,24 @@ rückgängig, ist auch die Verknüpfung wieder da.
 
 | Element | Am Handy |
 |---|---|
-| **Taste** | Antippen löst aus. Der Zustand kommt vom Pult zurück: läuft die Funktion, leuchtet die Taste in ihrer Farbe aus der Konsole. Tasten mit dem Zusatz **„halten"** (Flash, „nur gehalten", Blackout, Alles Weiß, Bibliothek-Snap im Flash-Modus) wirken, solange der Finger darauf liegt. Hält das Pult oder ein anderes Handy eine solche Taste gerade, ändert ein Antippen nichts. |
+| **Taste** | Antippen löst aus. Die ganze Kachel trägt die Farbe der Taste aus der Konsole: **aus** gedimmt, **an** in voller Farbe mit Schein; die Schrift wird hell oder dunkel, je nachdem, was auf der Farbe besser lesbar ist. Beginnt die Beschriftung mit einem Symbol (zum Beispiel ⚡ oder 🌈), steht es groß über dem Namen. Der Zustand kommt vom Pult zurück: läuft die Funktion, leuchtet die Taste. Tasten mit dem Zusatz **„halten"** (Flash, „nur gehalten", Blackout, Alles Weiß, Bibliothek-Snap im Flash-Modus) wirken, solange der Finger darauf liegt. Hält das Pult oder ein anderes Handy eine solche Taste gerade, ändert ein Antippen nichts. |
 | **Fader** | Senkrecht oder waagerecht, mit Prozentanzeige. Gezogen wird **relativ**: ein versehentliches Antippen verstellt nichts. Bewegt jemand den Fader am Pult, wandert er am Handy mit. |
 | **Cueliste** | Laufende Cue, die nächste Cue und **GO / BACK / STOP** — für genau diese Cueliste. |
 | **Master** (unten, immer da) | Grand Master als waagerechter Fader. |
 | **BLACKOUT** (unten, immer da) | Antippen = dunkel; noch einmal antippen hebt den Blackout auf — aber **nur, wenn dieses Handy ihn gesetzt hat**. Leuchtet rot, solange das Pult dunkel ist. |
 | **Seiten** | Reiter oben, oder auf freier Fläche seitlich wischen. |
+
+**Effekte sichtbar:** Läuft hinter einer aktiven Taste ein Farbverlauf oder
+Farbwechsel, läuft ein Verlauf mit den Effektfarben durch die Kachel. Strobe,
+Chaser und Effekte, die an einem Tempo-Bus hängen, lassen die Kachel **im Takt
+blinken**; klein unten rechts steht die BPM-Zahl. Das Pult schickt dafür nur
+die Farben und den Takt — die Bewegung rechnet das Handy selbst. Ist die Taste
+aus, steht die Kachel still. Oben im Kopf schaltet **„✦ Anim."** die
+Animationen am Handy **aus und an** (Vorgabe: an; das Handy merkt sich die
+Wahl). Hat das Handy in seinen Einstellungen **„Bewegung reduzieren"** an,
+bleiben die Animationen ebenfalls aus. BLACKOUT, NOT-AUS, gesperrte
+Laser-Kacheln und Kacheln mit verlorenem Ziel behalten immer ihr festes
+Warnaussehen.
 
 Oben rechts steht die Verbindung: **verbunden** (grün) oder **getrennt** (rot).
 Solange das Handy getrennt ist, ist die Bedienung **gesperrt** — nichts wird

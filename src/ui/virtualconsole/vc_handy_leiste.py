@@ -20,9 +20,10 @@ from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPen
-from PySide6.QtWidgets import (QHBoxLayout, QInputDialog, QLabel, QMenu, QMessageBox,
-                               QPushButton, QScrollArea, QSizePolicy, QTabBar,
-                               QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QColorDialog, QDialog, QDialogButtonBox, QGridLayout,
+                               QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu,
+                               QMessageBox, QPushButton, QScrollArea, QSizePolicy,
+                               QTabBar, QToolButton, QVBoxLayout, QWidget)
 
 from src.core import handy_seiten as hs
 
@@ -57,6 +58,142 @@ def handy_farbe(hex_farbe):
             r, g, b = round(r * f), round(g * f), round(b * f)
     lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
     return QColor(r, g, b), QColor("#10141a" if lum > 0.6 else "#ffffff")
+
+
+def _gemischt(farbe: QColor, grund: QColor, anteil: float) -> QColor:
+    """``anteil`` von ``farbe``, Rest von ``grund`` (WEB-13: gedimmte Kachel)."""
+    return QColor(round(farbe.red() * anteil + grund.red() * (1 - anteil)),
+                  round(farbe.green() * anteil + grund.green() * (1 - anteil)),
+                  round(farbe.blue() * anteil + grund.blue() * (1 - anteil)))
+
+
+def _lesbare_textfarbe(grund: QColor) -> QColor:
+    """Weiss oder Fast-Schwarz — was auf ``grund`` den hoeheren Kontrast hat
+    (WCAG-Leuchtdichte, wie ``textFuer`` in ``konsole.html``)."""
+    def _l(c: QColor) -> float:
+        def k(v):
+            v = v / 255.0
+            return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+        return 0.2126 * k(c.red()) + 0.7152 * k(c.green()) + 0.0722 * k(c.blue())
+    lg = _l(grund)
+    hell = (1.05) / (lg + 0.05)
+    dunkel = (lg + 0.05) / (_l(QColor("#10141a")) + 0.05)
+    return QColor("#ffffff" if hell >= dunkel else "#10141a")
+
+
+def handy_aussehen(auskunft, eintrag):
+    """WEB-13: die Auskunft so, wie das Handy die Kachel zeigt — mit eigener
+    Handy-Farbe/-Beschriftung aus dem Eintrag der Handy-Seite. Warnkacheln
+    (BLACKOUT, Laser-NOT-AUS, gesperrter Laser, verlorenes Ziel) bleiben wie
+    sie sind. Rueckgabe (Auskunft-Kopie, eigenes Aussehen aktiv?)."""
+    if auskunft is None:
+        return None, False
+    a = dict(auskunft)
+    if (a.get("funktion") in ("Blackout", "LaserEstop") or a.get("gesperrt")
+            or a.get("ziel_fehlt")):
+        return a, False
+    e = eintrag or {}
+    eigen = False
+    if e.get("handy_text"):
+        a["original"] = a.get("beschriftung")
+        a["beschriftung"] = e["handy_text"]
+        eigen = True
+    if e.get("handy_farbe") and a.get("typ") == "taste":
+        a["farbe"] = e["handy_farbe"]
+        eigen = True
+    return a, eigen
+
+
+class HandyAussehenDialog(QDialog):
+    """WEB-13: eigene Farbe und Beschriftung einer Kachel NUR fuers Handy.
+
+    Leer bzw. „wie Original“ heisst: die Kachel folgt der VC-Taste. Das
+    Original-Widget wird hier nie geaendert."""
+
+    def __init__(self, original_text: str, original_farbe, farbe=None, text=None,
+                 farbe_erlaubt: bool = True, parent=None):
+        super().__init__(parent)
+        self.setObjectName("handy_aussehen_dialog")
+        self.setWindowTitle("Kachel am Handy")
+        self._original_farbe = original_farbe
+        self._farbe = farbe if farbe_erlaubt else None
+        self._farbe_erlaubt = bool(farbe_erlaubt)
+        lay = QVBoxLayout(self)
+        gitter = QGridLayout()
+        gitter.addWidget(QLabel("Beschriftung (Handy)"), 0, 0)
+        self.feld_text = QLineEdit(text or "")
+        self.feld_text.setObjectName("handy_aussehen_text")
+        self.feld_text.setMaxLength(hs.MAX_HANDY_TEXT)
+        self.feld_text.setPlaceholderText(f"wie Original: {original_text}" if original_text
+                                          else "wie Original")
+        self.feld_text.setMinimumHeight(TREFFER)
+        gitter.addWidget(self.feld_text, 0, 1, 1, 2)
+        gitter.addWidget(QLabel("Farbe (Handy)"), 1, 0)
+        self.muster = QLabel()
+        self.muster.setObjectName("handy_aussehen_muster")
+        self.muster.setFixedSize(TREFFER, TREFFER)
+        gitter.addWidget(self.muster, 1, 1)
+        knoepfe = QHBoxLayout()
+        self.btn_wie_original = QPushButton("wie Original")
+        self.btn_wie_original.setObjectName("handy_aussehen_wie_original")
+        self.btn_wie_original.setMinimumHeight(TREFFER)
+        self.btn_wie_original.clicked.connect(lambda: self.setze_farbe(None))
+        self.btn_eigene = QPushButton("eigene…")
+        self.btn_eigene.setObjectName("handy_aussehen_eigene")
+        self.btn_eigene.setMinimumHeight(TREFFER)
+        self.btn_eigene.clicked.connect(self._farbe_waehlen)
+        for b in (self.btn_wie_original, self.btn_eigene):
+            b.setEnabled(self._farbe_erlaubt)
+            knoepfe.addWidget(b)
+        gitter.addLayout(knoepfe, 1, 2)
+        lay.addLayout(gitter)
+        hinweis = QLabel(
+            f"Gilt nur für die Handy-Konsole. Die VC-Taste „{original_text}“ bleibt "
+            "unverändert." + ("" if self._farbe_erlaubt else
+                              "\nDie Farbe lässt sich hier nicht ändern (nur bei Tasten)."))
+        hinweis.setWordWrap(True)
+        hinweis.setStyleSheet("color:#8b949e;")
+        lay.addWidget(hinweis)
+        leiste = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
+                                  | QDialogButtonBox.StandardButton.Cancel)
+        self.btn_zuruecksetzen = leiste.addButton(
+            "Zurücksetzen", QDialogButtonBox.ButtonRole.ResetRole)
+        self.btn_zuruecksetzen.setObjectName("handy_aussehen_zuruecksetzen")
+        self.btn_zuruecksetzen.clicked.connect(self.zuruecksetzen)
+        for b in leiste.buttons():
+            b.setMinimumHeight(TREFFER)
+        leiste.accepted.connect(self.accept)
+        leiste.rejected.connect(self.reject)
+        lay.addWidget(leiste)
+        self._muster_zeigen()
+
+    def _muster_zeigen(self) -> None:
+        f = self._farbe or self._original_farbe
+        c = QColor(f) if isinstance(f, str) else QColor()
+        rand = "#f2cc60" if self._farbe else "#3a424d"
+        self.muster.setStyleSheet(
+            f"background:{c.name() if c.isValid() else '#2b323c'}; "
+            f"border:2px solid {rand}; border-radius:4px;")
+        self.muster.setToolTip("eigene Handy-Farbe" if self._farbe else "wie Original")
+
+    def setze_farbe(self, farbe) -> None:
+        self._farbe = hs.handy_farbe_gueltig(farbe) if self._farbe_erlaubt else None
+        self._muster_zeigen()
+
+    def _farbe_waehlen(self) -> None:
+        start = QColor(self._farbe or self._original_farbe or "#58a6ff")
+        c = QColorDialog.getColor(start, self, "Farbe am Handy")
+        if c.isValid():
+            self.setze_farbe(c.name())
+
+    def zuruecksetzen(self) -> None:
+        """Beides wieder „wie Original“."""
+        self.feld_text.clear()
+        self.setze_farbe(None)
+
+    def ergebnis(self) -> tuple:
+        """(Farbe oder None, Beschriftung oder None) — None = wie Original."""
+        return (self._farbe, hs.handy_text_gueltig(self.feld_text.text()))
 
 
 def _schrift(px: int, fett: bool = True) -> QFont:
@@ -363,6 +500,21 @@ class HandyRaster(QWidget):
         akt.setToolTip("Entfernt nur die Verknüpfung — das Element in der "
                        "Konsole bleibt unverändert.")
         akt.triggered.connect(self.entferne_auswahl)
+        # WEB-13: eigene Farbe/Beschriftung nur fuers Handy
+        aus = menu.addAction("Aussehen am Handy…")
+        aus.setObjectName("handy_aussehen")
+        darf_farbe, darf_text = self._canvas().handy_aussehen_erlaubt(e["widget"])
+        aus.setEnabled(darf_farbe or darf_text)
+        aus.setToolTip("Eigene Farbe und Beschriftung nur für die Handy-Konsole — "
+                       "die Taste in der Konsole bleibt unverändert."
+                       if (darf_farbe or darf_text) else
+                       "BLACKOUT und Laser-NOT-AUS behalten am Handy ihr festes Aussehen.")
+        kennung = e["widget"]
+        aus.triggered.connect(lambda: self._leiste.aussehen_bearbeiten(kennung))
+        if hs.hat_eigenes_aussehen(e):
+            zurueck = menu.addAction("Aussehen am Handy zurücksetzen")
+            zurueck.setObjectName("handy_aussehen_zurueck")
+            zurueck.triggered.connect(lambda: self._leiste.aussehen_setzen(kennung, None, None))
         menu.setToolTipsVisible(True)
         return menu
 
@@ -435,10 +587,13 @@ class HandyRaster(QWidget):
             for e in seite["eintraege"]:
                 kennung = e["widget"]
                 rect = self.feld_rect(e["spalte"], e["zeile"], e["breite"], e["hoehe"])
-                auskunft = c.handy_auskunft(nach_kennung.get(kennung))
+                auskunft, eigen = handy_aussehen(
+                    c.handy_auskunft(nach_kennung.get(kennung)), e)
                 blass = zieh is not None and zieh["kennung"] == kennung
                 p.setOpacity(0.35 if blass else 1.0)
                 self._male_kachel(p, rect, auskunft)
+                if eigen:
+                    self._male_marke(p, rect)
                 p.setOpacity(1.0)
                 if bearbeiten and kennung == self._auswahl and not blass:
                     self._male_auswahl(p, rect)
@@ -451,6 +606,20 @@ class HandyRaster(QWidget):
 
         self._male_fuss(p, handy, feld)
         p.end()
+
+    def _male_marke(self, p, rect):
+        """WEB-13: kleine Marke „Handy“ oben links — eigenes Aussehen."""
+        p.save()
+        p.setFont(_schrift(6))
+        fm = QFontMetrics(p.font())
+        r = QRectF(rect.left() + 2, rect.top() + 2, fm.horizontalAdvance("Handy") + 6,
+                   fm.height() + 1)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(13, 17, 23, 210))
+        p.drawRoundedRect(r, 2, 2)
+        p.setPen(QColor("#f2cc60"))
+        p.drawText(r, Qt.AlignmentFlag.AlignCenter, "Handy")
+        p.restore()
 
     def _male_ziel(self, p, rect, ok: bool):
         farbe = QColor("#3fb950" if ok else "#f85149")
@@ -519,7 +688,16 @@ class HandyRaster(QWidget):
         elif aktiv and farbe is not None:
             p.setBrush(farbe[0])
             p.setPen(QPen(farbe[0].lighter(140), 1))
-            text_farbe = farbe[1].name()
+            text_farbe = _lesbare_textfarbe(farbe[0]).name()
+        elif farbe is not None and not a.get("gesperrt") and not a.get("ziel_fehlt"):
+            # WEB-13: aus = ganze Kachel gedimmt in der Tastenfarbe
+            oben = _gemischt(farbe[0], QColor("#1f252d"), 0.38)
+            g = QLinearGradient(rect.topLeft(), rect.bottomLeft())
+            g.setColorAt(0, oben)
+            g.setColorAt(1, _gemischt(farbe[0], QColor("#151a20"), 0.22))
+            p.setBrush(g)
+            p.setPen(QPen(_gemischt(farbe[0], QColor("#3a424d"), 0.45), 1))
+            text_farbe = _lesbare_textfarbe(oben).name()
         else:
             g = QLinearGradient(rect.topLeft(), rect.bottomLeft())
             g.setColorAt(0, QColor("#2b323c"))
@@ -529,7 +707,8 @@ class HandyRaster(QWidget):
         p.drawRoundedRect(rect, 6, 6)
         innen = rect.adjusted(3, 2, -3, -2)
         halten = a.get("bedienung") == "halten"
-        streifen = funktion not in ("Blackout", "LaserEstop") and rect.height() >= 30
+        streifen = (funktion not in ("Blackout", "LaserEstop") and rect.height() >= 30
+                    and (farbe is None or a.get("gesperrt") or a.get("ziel_fehlt")))
         if streifen:
             sf = QColor(text_farbe) if aktiv else (farbe[0] if farbe else QColor("#58a6ff"))
             p.setPen(QPen(QColor(0, 0, 0, 130), 1))
@@ -853,6 +1032,21 @@ class HandyKonsolenLeiste(QWidget):
         self._btn_entfernen.setEnabled(False)
         self._btn_entfernen.clicked.connect(self._entfernen_geklickt)
         zeile.insertWidget(1, self._btn_entfernen)
+        # WEB-13: Aussehen der gewaehlten Kachel nur fuers Handy
+        self._btn_aussehen = QPushButton("Aussehen am Handy…")
+        self._btn_aussehen.setObjectName("handy_aussehen_knopf")
+        self._btn_aussehen.setFixedHeight(TREFFER)
+        self._btn_aussehen.setToolTip(
+            "Eigene Farbe und Beschriftung der gewählten Kachel — nur am Handy. "
+            "Die Taste in der Konsole bleibt unverändert. Rückgängig mit Strg+Z.")
+        self._btn_aussehen.setStyleSheet(_KNOPF_CSS + "QPushButton { color:#f2cc60; }")
+        self._btn_aussehen.setEnabled(False)
+        self._btn_aussehen.clicked.connect(self._aussehen_geklickt)
+        # eigene Zeile: neben den drei Knoepfen waere die Leiste zu breit
+        zeile2 = QHBoxLayout()
+        zeile2.setSpacing(6)
+        zeile2.addWidget(self._btn_aussehen, 1)
+        lay.addLayout(zeile2)
 
         self._lbl_hinweis = QLabel()
         self._lbl_hinweis.setObjectName("handy_hinweis")
@@ -893,6 +1087,60 @@ class HandyKonsolenLeiste(QWidget):
         btn = getattr(self, "_btn_entfernen", None)
         if btn is not None and getattr(self, "raster", None) is not None:
             btn.setEnabled(self._bearbeiten and self.raster.auswahl() is not None)
+        knopf = getattr(self, "_btn_aussehen", None)
+        if knopf is not None and getattr(self, "raster", None) is not None:
+            k = self.raster.auswahl() if self._bearbeiten else None
+            c = self.canvas()
+            erlaubt = (k is not None and c is not None
+                       and any(c.handy_aussehen_erlaubt(k)))
+            knopf.setEnabled(bool(erlaubt))
+
+    def _aussehen_geklickt(self) -> None:
+        k = self.raster.auswahl()
+        if k is None:
+            self.melde("Erst eine Kachel antippen, dann „Aussehen am Handy…“.")
+            return
+        self.aussehen_bearbeiten(k)
+
+    def aussehen_dialog(self, kennung):
+        """WEB-13: der Dialog fuer die Kachel ``kennung`` auf der gezeigten
+        Seite (oder None) — fuer :meth:`aussehen_bearbeiten` und Tests."""
+        c = self.canvas()
+        if c is None or not self._bearbeiten:
+            return None
+        darf_farbe, darf_text = c.handy_aussehen_erlaubt(kennung)
+        if not (darf_farbe or darf_text):
+            self.melde("BLACKOUT und Laser-NOT-AUS behalten am Handy ihr festes Aussehen.")
+            return None
+        e = hs.eintrag(c.handy_seiten(), c.handy_seite_nr(), kennung)
+        if e is None:
+            return None
+        a = c.handy_auskunft(c.widget_mit_kennung(kennung)) or {}
+        return HandyAussehenDialog(str(a.get("beschriftung") or ""), a.get("farbe"),
+                                   e.get("handy_farbe"), e.get("handy_text"),
+                                   farbe_erlaubt=darf_farbe, parent=self)
+
+    def aussehen_bearbeiten(self, kennung) -> bool:
+        dlg = self.aussehen_dialog(kennung)
+        if dlg is None:
+            return False
+        try:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return False
+            farbe, text = dlg.ergebnis()
+        finally:
+            dlg.deleteLater()
+        return self.aussehen_setzen(kennung, farbe, text)
+
+    def aussehen_setzen(self, kennung, farbe, text) -> bool:
+        """WEB-13: eigenes Aussehen der Kachel auf der gezeigten Seite setzen
+        (None = wie Original). Aendert nie das Original-Widget."""
+        c = self.canvas()
+        if c is None:
+            return False
+        ok = c.handy_aussehen_setzen(c.handy_seite_nr(), kennung, farbe, text)
+        self.auswahl_geaendert()
+        return ok
 
     def _entfernen_geklickt(self) -> None:
         if not self.raster.entferne_auswahl():

@@ -28,6 +28,11 @@ Vorher-Stand fuer das Rueckgaengig gueltig.
 Die Seiten sind zugleich die FREIGABE: die Web-Schnittstelle liefert und
 bedient nur Widgets, die auf einer Handy-Seite liegen
 (:func:`freigegebene_kennungen`).
+
+WEB-13: ein Eintrag darf zusaetzlich ``handy_farbe`` (``#rrggbb``) und
+``handy_text`` tragen — eigenes Aussehen NUR am Handy. Das Original-Widget
+bleibt unberuehrt. Fehlen beide (jede Show von frueher), steht auch nichts
+davon in der Datei.
 """
 from __future__ import annotations
 
@@ -41,6 +46,12 @@ SPALTEN = 4
 ZEILEN = 10
 MAX_SEITEN = 12
 MAX_NAME = 24
+#: WEB-13: Hoechstlaenge der eigenen Handy-Beschriftung einer Kachel.
+MAX_HANDY_TEXT = 32
+#: WEB-13: die beiden optionalen Felder fuer eigenes Aussehen am Handy.
+AUSSEHEN_FELDER = ("handy_farbe", "handy_text")
+
+_FARB_MUSTER = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 # Dieselbe Form wie ``vc_widget.kennung_gueltig`` — hier wiederholt, damit das
 # Modell ohne Qt-Import auskommt (ein Test haelt beide Muster gleich).
@@ -85,6 +96,39 @@ def _name(roh, nummer: int) -> str:
     text = str(roh).strip() if isinstance(roh, str) else ""
     text = " ".join(text.split())
     return text[:MAX_NAME] if text else f"Seite {nummer}"
+
+
+def handy_farbe_gueltig(roh) -> str | None:
+    """WEB-13: ``#rrggbb`` (klein geschrieben) oder None."""
+    if isinstance(roh, str) and _FARB_MUSTER.match(roh.strip()):
+        return roh.strip().lower()
+    return None
+
+
+def handy_text_gueltig(roh) -> str | None:
+    """WEB-13: bereinigte Handy-Beschriftung (Leerraum zusammengezogen,
+    hoechstens :data:`MAX_HANDY_TEXT` Zeichen) oder None, wenn leer."""
+    if not isinstance(roh, str):
+        return None
+    text = " ".join(roh.split())[:MAX_HANDY_TEXT].strip()
+    return text or None
+
+
+def _aussehen(ed: dict) -> dict:
+    """Die gueltigen WEB-13-Felder eines Roh-Eintrags (nur vorhandene)."""
+    raus = {}
+    farbe = handy_farbe_gueltig(ed.get("handy_farbe"))
+    if farbe is not None:
+        raus["handy_farbe"] = farbe
+    text = handy_text_gueltig(ed.get("handy_text"))
+    if text is not None:
+        raus["handy_text"] = text
+    return raus
+
+
+def hat_eigenes_aussehen(eintrag) -> bool:
+    """WEB-13: traegt die Kachel eigene Handy-Farbe oder -Beschriftung?"""
+    return isinstance(eintrag, dict) and any(eintrag.get(f) for f in AUSSEHEN_FELDER)
 
 
 def _zellen(e: dict):
@@ -144,6 +188,7 @@ def normalisiere(roh, vorhandene_kennungen=None) -> dict:
                 continue
             belegt |= zellen
             gesehen.add(kennung)
+            e.update(_aussehen(ed))         # WEB-13: nur wenn vorhanden
             eintraege.append(e)
         seiten.append({"name": _name(sd.get("name"), len(seiten) + 1),
                        "spalten": SPALTEN, "zeilen": ZEILEN,
@@ -260,13 +305,38 @@ def eintrag_setzen(abschnitt, seite: int, kennung: str, spalte: int, zeile: int,
     if not passt(abschnitt, seite, spalte, zeile, breite, hoehe, ausser=kennung):
         return None
     neu = _kopie(abschnitt)
+    alt = [e for e in neu["seiten"][seite]["eintraege"] if e["widget"] == kennung]
     eintraege = [e for e in neu["seiten"][seite]["eintraege"]
                  if e["widget"] != kennung]
-    eintraege.append({"widget": kennung, "spalte": int(spalte), "zeile": int(zeile),
-                      "breite": int(breite), "hoehe": int(hoehe)})
+    e = {"widget": kennung, "spalte": int(spalte), "zeile": int(zeile),
+         "breite": int(breite), "hoehe": int(hoehe)}
+    if alt:
+        e.update(_aussehen(alt[0]))     # WEB-13: Verschieben behaelt das Aussehen
+    eintraege.append(e)
     eintraege.sort(key=lambda e: (e["zeile"], e["spalte"]))
     neu["seiten"][seite]["eintraege"] = eintraege
     return neu
+
+
+def eintrag_aussehen(abschnitt, seite: int, kennung, farbe=None,
+                     text=None) -> dict | None:
+    """WEB-13: eigene Handy-Farbe/-Beschriftung einer Kachel setzen.
+
+    ``farbe``/``text`` = None (oder ungueltig/leer) heisst „wie Original“ —
+    das Feld wird dann entfernt. Gesetzt werden immer BEIDE: wer nur eines
+    aendern will, gibt das andere aus :func:`eintrag` mit. None, wenn die
+    Kachel nicht auf der Seite liegt."""
+    neu = _kopie(abschnitt)
+    if not (isinstance(seite, int) and 0 <= seite < len(neu["seiten"])):
+        return None
+    for e in neu["seiten"][seite]["eintraege"]:
+        if e["widget"] != kennung:
+            continue
+        for feld in AUSSEHEN_FELDER:
+            e.pop(feld, None)
+        e.update(_aussehen({"handy_farbe": farbe, "handy_text": text}))
+        return neu
+    return None
 
 
 def eintrag_entfernen(abschnitt, seite: int, kennung: str) -> dict | None:

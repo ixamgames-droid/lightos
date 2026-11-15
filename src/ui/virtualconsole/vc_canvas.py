@@ -3007,6 +3007,34 @@ class VCCanvas(QWidget):
         neu = _hs.eintrag_entfernen(self.handy_seiten(), seite, kennung)
         return neu is not None and self.setze_handy_seiten(neu)
 
+    #: WEB-13: Tasten mit festem Warnaussehen — am Handy nicht umfaerbbar
+    #: und nicht umbenennbar (man muss sie im Ernstfall blind erkennen).
+    HANDY_FESTES_AUSSEHEN = ("Blackout", "LaserEstop")
+
+    def handy_aussehen_erlaubt(self, kennung) -> tuple[bool, bool]:
+        """WEB-13: (Farbe aenderbar, Beschriftung aenderbar) fuer die Kachel
+        ``kennung``. Farbe nur bei Tasten; BLACKOUT und Laser-NOT-AUS weder
+        noch."""
+        auskunft = self.handy_auskunft(self.widget_mit_kennung(kennung))
+        if auskunft is None:
+            return (False, False)
+        if auskunft.get("funktion") in self.HANDY_FESTES_AUSSEHEN:
+            return (False, False)
+        return (auskunft.get("typ") == "taste", True)
+
+    def handy_aussehen_setzen(self, seite: int, kennung: str, farbe=None,
+                              text=None) -> bool:
+        """WEB-13: eigene Handy-Farbe/-Beschriftung der Kachel setzen (None =
+        wie Original; ein Rueckgaengig-Schritt). Aendert NUR den Eintrag der
+        Handy-Seite, nie das Original-Widget. False, wenn nicht erlaubt oder
+        nichts geaendert."""
+        from src.core import handy_seiten as _hs
+        darf_farbe, darf_text = self.handy_aussehen_erlaubt(kennung)
+        if (farbe is not None and not darf_farbe) or (text is not None and not darf_text):
+            return False
+        neu = _hs.eintrag_aussehen(self.handy_seiten(), seite, kennung, farbe, text)
+        return neu is not None and self.setze_handy_seiten(neu)
+
     def handy_seite_hinzufuegen(self, name=None) -> int | None:
         """Neue leere Seite am Ende; gibt ihre Nummer zurueck (None bei 12)."""
         from src.core import handy_seiten as _hs
