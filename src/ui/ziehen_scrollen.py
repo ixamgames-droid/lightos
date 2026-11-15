@@ -101,6 +101,32 @@ Regeln (``ziel_bereich``):
   Wisch (der Rest des ersten Fingers wird geschluckt). Zwei Finger auf freier
   Flaeche bleiben wie bisher. Abbruch/Ende der Beruehrung laesst alle los.
 
+* **Halten + Antippen** (UI-83): liegt ein Finger mindestens
+  ``HALTEN_MIN_S`` still auf einem Widget mit ``halten_antippen_start(glob)``
+  und ``halten_antippen(glob)`` (2D-Buehne, VC im Bearbeiten-Modus) und setzt
+  ein weiterer Finger auf demselben Widget auf, fragt der Filter
+  ``halten_antippen_start`` (das Widget nimmt das gehaltene Element in die
+  Auswahl und sperrt den Rest dieses Drucks). Sagt es ja, ist jeder weitere
+  Finger, der ohne Bewegung wieder loslaesst, ein Antippen
+  (``halten_antippen``: Element dazu/heraus) — bis der erste Finger loslaesst.
+  Kein Pinch, kein Menue, keine Erklaerung waehrend dessen.
+* **Zwei Finger waagerecht = Bank blaettern** (UI-83): setzen zwei Finger auf
+  freier Flaeche eines Widgets mit ``wisch_flaeche(glob)`` und
+  ``zwei_finger_wischen(schritt)`` auf (VC-Arbeitsflaeche; nie, wenn ein
+  Finger auf einem Bedienelement liegt) und wandert ihre Mitte mindestens
+  ``WISCH_MIN_PX`` ueberwiegend waagerecht, blaettert das Loslassen die Bank
+  (nach links = naechste). Kann der Bildlauf in diese Richtung noch scrollen,
+  bleibt es ein Bildlauf (die Flaeche wird nicht blind umgeschaltet);
+  senkrecht bleibt der Zwei-Finger-Bildlauf wie bisher.
+* **Drei-Finger-Tippen** (UI-83): drei Finger setzen binnen
+  ``DREI_FENSTER_S`` auf, keiner bewegt sich, alle sind binnen
+  ``DREI_DAUER_S`` wieder weg, keiner lag auf einem Knopf, Regler, Feld oder
+  VC-Bedienelement: dann ruft der Filter ``drei_finger_rueckruf(aktion)`` mit
+  der in den Einstellungen gewaehlten Aktion (Vorgabe ``aus`` = nichts; nie
+  eine Sicherheitsaktion, siehe ``gesten_prefs``).
+* **Schalter** (UI-83): ``ZiehenScrollen.gesten`` (``gesten_prefs.GestenSchalter``)
+  schaltet die Finger-Gesten einzeln ab; die Maus ist davon nie betroffen.
+
 Der Filter haengt einmal an der ``QApplication`` (``einrichten``).
 """
 from __future__ import annotations
@@ -149,6 +175,11 @@ LANG_MENUE_S = 0.6
 _MENUE_AUS = "lang_druck_menue"     # Qt-Eigenschaft: False = nie ein Lang-Druck-Menue
 # UI-123: langes Druecken ohne Menue = Erklaerung (Tooltip) zeigen
 _TIPP_AUS = "lang_druck_tooltip"    # Qt-Eigenschaft: False = nie eine Lang-Druck-Erklaerung
+# UI-83: Halten + Antippen, Zwei-Finger-Bankwechsel, Drei-Finger-Tippen
+HALTEN_MIN_S = 0.2      # so lange liegt der erste Finger, bevor ein zweiter „antippt"
+WISCH_MIN_PX = 80       # so weit wandert die Mitte zweier Finger fuer einen Bankwechsel
+DREI_FENSTER_S = 0.3    # alle drei Finger setzen binnen dieser Zeit auf
+DREI_DAUER_S = 0.7      # ... und sind binnen dieser Zeit (ab dem ersten) wieder weg
 TIPP_ZEIGEN_MS = 5000               # so lange bleibt sie nach dem Loslassen stehen
 # Eingabefelder: Erklaerung ja, aber der Druck bleibt (Cursor setzen, Tastatur)
 _EINGABE_QT = (QLineEdit, QAbstractSpinBox, QTextEdit, QPlainTextEdit, QComboBox)
@@ -558,6 +589,16 @@ class ZiehenScrollen(QObject):
         # Punkt-IDs, die in dieser Beruehrung auf einem Bedienelement aufsetzten:
         # solange nicht leer, kein Zwei-Finger-Bildlauf (bis alle Finger weg sind)
         self._auf_element: set = set()
+        # UI-83: Gesten-Schalter (Vorgabe: alles an, Drei-Finger aus) und Zustand
+        from src.ui.gesten_prefs import GestenSchalter
+        self.gesten = GestenSchalter()
+        self.drei_finger_rueckruf = None    # callable(aktion: str)
+        self._erster_id = None      # erster Punkt der laufenden Beruehrung
+        self._erster_lage = None    # (Zeit, Bildschirmlage) beim Aufsetzen
+        self._erster_weg = 0.0      # weiteste Entfernung des ersten Fingers davon
+        self._halten = None         # laufendes Halten + Antippen
+        self._wisch = None          # laufender Zwei-Finger-Bankwechsel
+        self._drei = None           # Buchfuehrung fuers Drei-Finger-Tippen
         self._zuruecksetzen()
 
     def _zuruecksetzen(self) -> None:
@@ -589,10 +630,27 @@ class ZiehenScrollen(QObject):
         if t in _TOUCH_TYPEN:
             if isinstance(obj, QWindow):
                 try:
-                    self._zwei_finger(ev)
+                    self._beruehrung_buchen(ev)
                 except Exception as e:
-                    print(f"[ziehen_scrollen] ERROR: Zwei-Finger-Geste: {e}")
-                    self._geste = None
+                    print(f"[ziehen_scrollen] ERROR: Beruehrung buchen: {e}")
+                    self._drei = None
+                try:
+                    halten = self._halten_antippen(ev)
+                except Exception as e:
+                    print(f"[ziehen_scrollen] ERROR: Halten + Antippen: {e}")
+                    self._halten = None
+                    halten = False
+                if not halten:
+                    try:
+                        self._zwei_finger(ev)
+                    except Exception as e:
+                        print(f"[ziehen_scrollen] ERROR: Zwei-Finger-Geste: {e}")
+                        self._geste = None
+                    try:
+                        self._bank_wisch(ev)
+                    except Exception as e:
+                        print(f"[ziehen_scrollen] ERROR: Zwei-Finger-Wisch: {e}")
+                        self._wisch = None
                 try:
                     self._mehr_finger(ev)
                 except Exception as e:
@@ -605,7 +663,9 @@ class ZiehenScrollen(QObject):
         if (self._tipp_w is not None and not self._loest
                 and t in (QEvent.Type.MouseMove, QEvent.Type.MouseButtonRelease)):
             self._tipp_bewegt(ev)
-        if t == QEvent.Type.Gesture and self._auf_element:
+        if t == QEvent.Type.Gesture and (
+                self._auf_element or self._halten is not None
+                or (self._wisch is not None and self._wisch["zustand"] == "wisch")):
             # UI-118: ein Finger liegt auf einem Bedienelement — kein
             # Zwei-Finger-Bildlauf (QPanGesture der Bildlaufflaeche)
             ev.accept()
@@ -937,7 +997,7 @@ class ZiehenScrollen(QObject):
         except Exception as e:
             print(f"[ziehen_scrollen] ERROR: Lang-Druck-Menue pruefen: {e}")
             moeglich = False
-        if not moeglich:
+        if not moeglich or not self.gesten.lang_menue:
             return
         self._menue_w = w
         self._menue_glob = QPointF(ev.globalPosition())
@@ -1025,7 +1085,7 @@ class ZiehenScrollen(QObject):
         except Exception as e:
             print(f"[ziehen_scrollen] ERROR: Lang-Druck-Erklaerung pruefen: {e}")
             moeglich = False
-        if not moeglich:
+        if not moeglich or not self.gesten.lang_erklaerung:
             return
         self._tipp_w = w
         self._tipp_glob = QPointF(ev.globalPosition())
@@ -1147,7 +1207,7 @@ class ZiehenScrollen(QObject):
         if t not in (QEvent.Type.TouchBegin, QEvent.Type.TouchUpdate):
             return
         liegen = [p for p in ev.points() if p.state() != geloest]
-        if len(liegen) < 2:
+        if len(liegen) < 2 or not self.gesten.zwei_finger_zoom:
             return
         pa, pb = liegen[0], liegen[1]
         ga, gb = QPointF(pa.globalPosition()), QPointF(pb.globalPosition())
@@ -1212,7 +1272,8 @@ class ZiehenScrollen(QObject):
                 if pid == self._erster:
                     self._erster_w = self._element_unter(glob, "mehr_finger_erlaubt")
                     continue
-                if not self.aktiv or self._geste is not None:
+                if (not self.aktiv or self._geste is not None
+                        or not self.gesten.mehr_finger):
                     continue
                 w = self._element_unter(glob, "mehr_finger_erlaubt")
                 if (w is None or w is self._erster_w
@@ -1290,6 +1351,254 @@ class ZiehenScrollen(QObject):
             print(f"[ziehen_scrollen] ERROR: weiterer Finger: {e}")
         finally:
             self._reicht = False
+
+    # ── UI-83: Halten + Antippen, Zwei-Finger-Bankwechsel, Drei-Finger ───────
+
+    @staticmethod
+    def _schwelle() -> int:
+        return QApplication.startDragDistance() * TOUCH_FAKTOR
+
+    @staticmethod
+    def _weg(a: QPointF, b: QPointF) -> float:
+        d = a - b
+        return abs(d.x()) + abs(d.y())
+
+    @staticmethod
+    def _methode_unter(glob: QPointF, name: str):
+        """Naechstes Widget (vom innersten nach aussen) mit Methode ``name``."""
+        w = QApplication.widgetAt(glob.toPoint())
+        while w is not None:
+            if callable(getattr(w, name, None)):
+                return w
+            if w.isWindow():
+                return None
+            w = w.parentWidget()
+        return None
+
+    @staticmethod
+    def _drei_frei(glob: QPointF) -> bool:
+        """Liegt hier kein Knopf, Regler, Feld oder VC-Bedienelement? Nur dann
+        zaehlt ein Finger fuers Drei-Finger-Tippen."""
+        w = QApplication.widgetAt(glob.toPoint())
+        while w is not None:
+            if isinstance(w, (QAbstractButton, QAbstractSlider, QAbstractSpinBox,
+                              QComboBox, QLineEdit)):
+                return False
+            f = getattr(w, "finger_bedienelement", None)
+            if callable(f):
+                try:
+                    if f():
+                        return False
+                except Exception:
+                    return False
+            if w.isWindow():
+                break
+            w = w.parentWidget()
+        return True
+
+    def _beruehrung_buchen(self, ev) -> None:
+        """Erster Finger (Lage, Weg) und Drei-Finger-Tippen."""
+        t = ev.type()
+        jetzt = self._uhr()
+        punkte = ev.points()
+        if t == QEvent.Type.TouchBegin:
+            self._erster_id = punkte[0].id() if punkte else None
+            self._erster_lage = ((jetzt, QPointF(punkte[0].globalPosition()))
+                                 if punkte else None)
+            self._erster_weg = 0.0
+            self._drei = {"t0": jetzt, "start": {}, "ok": True, "max": 0, "angehalten": False}
+        d = self._drei
+        gedrueckt = QEventPoint.State.Pressed
+        geloest = QEventPoint.State.Released
+        liegen = 0
+        for p in punkte:
+            glob = QPointF(p.globalPosition())
+            if p.id() == self._erster_id and self._erster_lage is not None:
+                self._erster_weg = max(self._erster_weg, self._weg(glob, self._erster_lage[1]))
+            if p.state() != geloest:
+                liegen += 1
+            if d is None:
+                continue
+            if p.state() == gedrueckt:
+                d["start"][p.id()] = glob
+                if jetzt - d["t0"] > DREI_FENSTER_S or not self._drei_frei(glob):
+                    d["ok"] = False
+            elif p.id() in d["start"] and self._weg(glob, d["start"][p.id()]) >= self._schwelle():
+                d["ok"] = False
+        if d is None:
+            return
+        d["max"] = max(d["max"], liegen)
+        if (liegen == 3 and d["ok"] and not d["angehalten"]
+                and self.gesten.drei_finger != "aus"):
+            # Drei Finger liegen: der erste soll beim Loslassen nicht noch
+            # „tippen" (Liste, Flaeche) und kein Menue oeffnen.
+            d["angehalten"] = True
+            self._ersten_anhalten()
+        if t in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel):
+            self._drei = None
+            if (t == QEvent.Type.TouchEnd and d["ok"] and d["max"] == 3
+                    and len(d["start"]) == 3 and jetzt - d["t0"] <= DREI_DAUER_S
+                    and not self._auf_element and self.aktiv):
+                self._drei_finger_ausloesen()
+
+    def _drei_finger_ausloesen(self) -> None:
+        from src.ui.gesten_prefs import DREI_FINGER_WERTE
+        aktion = self.gesten.drei_finger
+        rueckruf = self.drei_finger_rueckruf
+        if aktion == "aus" or aktion not in DREI_FINGER_WERTE or rueckruf is None:
+            return
+
+        def _los():
+            try:
+                rueckruf(aktion)
+            except Exception as e:
+                print(f"[ziehen_scrollen] ERROR: Drei-Finger-Aktion {aktion}: {e}")
+        QTimer.singleShot(0, _los)
+
+    def _halten_antippen(self, ev) -> bool:
+        """``True`` = Halten + Antippen laeuft (kein Pinch, kein Wisch)."""
+        t = ev.type()
+        if t == QEvent.Type.TouchBegin:
+            self._halten = None         # Ende einer alten Beruehrung verloren
+        if t == QEvent.Type.TouchCancel:
+            self._halten = None
+            return False
+        gedrueckt = QEventPoint.State.Pressed
+        geloest = QEventPoint.State.Released
+        h = self._halten
+        if h is None:
+            if (t != QEvent.Type.TouchUpdate or not self.gesten.halten_antippen
+                    or not self.aktiv or self._geste is not None or self._wisch is not None
+                    or self._erster_lage is None):
+                return False
+            neue = [p for p in ev.points()
+                    if p.state() == gedrueckt and p.id() != self._erster_id]
+            erster = next((p for p in ev.points()
+                           if p.id() == self._erster_id and p.state() != geloest), None)
+            if not neue or erster is None:
+                return False
+            if (self._uhr() - self._erster_lage[0] < HALTEN_MIN_S
+                    or self._erster_weg >= self._schwelle()
+                    or QApplication.activePopupWidget() is not None):
+                return False
+            ge = QPointF(erster.globalPosition())
+            ziel = self._methode_unter(ge, "halten_antippen")
+            if ziel is None or any(
+                    self._methode_unter(QPointF(p.globalPosition()), "halten_antippen")
+                    is not ziel for p in neue):
+                return False
+            try:
+                ok = bool(ziel.halten_antippen_start(QPointF(ge)))
+            except Exception as e:
+                print(f"[ziehen_scrollen] ERROR: Halten + Antippen (Start): {e}")
+                ok = False
+            if not ok:
+                return False
+            self._menue_aus()
+            self._tipp_aus()
+            self.schwung_stoppen()
+            h = self._halten = {"ziel": ziel, "erster": self._erster_id, "tipps": {}}
+        ziel = h["ziel"]
+        if not _gueltig(ziel):
+            self._halten = None
+            return False
+        ende = t == QEvent.Type.TouchEnd
+        for p in ev.points():
+            pid = p.id()
+            glob = QPointF(p.globalPosition())
+            if pid == h["erster"]:
+                if p.state() == geloest:
+                    ende = True
+                continue
+            if p.state() == gedrueckt:
+                h["tipps"][pid] = [glob, True]
+            elif pid in h["tipps"]:
+                tipp = h["tipps"][pid]
+                if self._weg(glob, tipp[0]) >= self._schwelle():
+                    tipp[1] = False         # gewischt: kein Antippen
+                if p.state() == geloest:
+                    del h["tipps"][pid]
+                    if tipp[1]:
+                        try:
+                            ziel.halten_antippen(QPointF(glob))
+                        except Exception as e:
+                            print(f"[ziehen_scrollen] ERROR: Halten + Antippen: {e}")
+        if ende:
+            self._halten = None
+        return True
+
+    @property
+    def halten_laeuft(self) -> bool:
+        return self._halten is not None
+
+    def _bank_wisch(self, ev) -> None:
+        t = ev.type()
+        if t == QEvent.Type.TouchBegin:
+            self._wisch = None
+        geloest = QEventPoint.State.Released
+        w = self._wisch
+        if w is None:
+            if (t not in (QEvent.Type.TouchBegin, QEvent.Type.TouchUpdate)
+                    or not self.gesten.zwei_finger_bank or not self.aktiv
+                    or self._geste is not None or self._halten is not None
+                    or self._auf_element):
+                return
+            liegen = [p for p in ev.points() if p.state() != geloest]
+            if (len(liegen) != 2
+                    or not any(p.state() == QEventPoint.State.Pressed for p in liegen)):
+                return                  # nur in dem Moment, in dem der zweite aufsetzt
+            pa, pb = liegen
+            ga, gb = QPointF(pa.globalPosition()), QPointF(pb.globalPosition())
+            ziel = self._methode_unter(ga, "zwei_finger_wischen")
+            if ziel is None or self._methode_unter(gb, "zwei_finger_wischen") is not ziel:
+                return
+            try:
+                if not (ziel.wisch_flaeche(QPointF(ga)) and ziel.wisch_flaeche(QPointF(gb))):
+                    return
+            except Exception:
+                return
+            raum = (False, False)
+            b = ziel.parentWidget()
+            while b is not None and not isinstance(b, QAbstractScrollArea):
+                b = b.parentWidget()
+            if b is not None:
+                hb = b.horizontalScrollBar()
+                raum = (hb.value() > hb.minimum(), hb.value() < hb.maximum())
+            self._wisch = {"ziel": ziel, "ids": (pa.id(), pb.id()),
+                           "start": (ga + gb) / 2, "lagen": {pa.id(): ga, pb.id(): gb},
+                           "zustand": "offen", "raum": raum}
+            return
+        ziel = w["ziel"]
+        ende = t in (QEvent.Type.TouchEnd, QEvent.Type.TouchCancel) or not _gueltig(ziel)
+        for p in ev.points():
+            if p.id() in w["ids"]:
+                w["lagen"][p.id()] = QPointF(p.globalPosition())
+                if p.state() == geloest:
+                    ende = True
+            elif p.state() == QEventPoint.State.Pressed:
+                w["zustand"] = "nein"   # dritter Finger: keine Bank-Geste
+        if self._auf_element:
+            w["zustand"] = "nein"
+        a, b = w["ids"]
+        d = (w["lagen"][a] + w["lagen"][b]) / 2 - w["start"]
+        waagerecht = abs(d.x()) >= WISCH_MIN_PX and abs(d.x()) > 2 * abs(d.y())
+        if w["zustand"] == "offen":
+            if waagerecht:
+                # Finger nach links = Inhalt nach rechts: Bildlauf noch moeglich?
+                hat_raum = w["raum"][1] if d.x() < 0 else w["raum"][0]
+                w["zustand"] = "nein" if hat_raum else "wisch"
+                if w["zustand"] == "wisch":
+                    self._ersten_anhalten()     # Ein-Finger-Bildlauf endet
+            elif abs(d.y()) >= WISCH_MIN_PX:
+                w["zustand"] = "nein"   # senkrecht: Zwei-Finger-Bildlauf
+        if ende:
+            self._wisch = None
+            if (w["zustand"] == "wisch" and t != QEvent.Type.TouchCancel
+                    and waagerecht and _gueltig(ziel)):
+                try:
+                    ziel.zwei_finger_wischen(1 if d.x() < 0 else -1)
+                except Exception as e:
+                    print(f"[ziehen_scrollen] ERROR: Zwei-Finger-Wisch: {e}")
 
     # ── Schwung nach dem Loslassen ────────────────────────────────────────────
 

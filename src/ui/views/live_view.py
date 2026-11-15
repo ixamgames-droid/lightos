@@ -3020,6 +3020,38 @@ class StageCanvas(QWidget):
         self._fokus_halten(fokus, self._pinch_mitte)
         self.zoom_requested.emit(pct)      # LiveView: Regler, Anzeige, Speichern
 
+    # ── UI-83: Halten + Antippen = Mehrfachauswahl ───────────────────────────
+
+    def _geraet_bei(self, glob: QPointF):
+        return self._fixture_at(self._to_world(QPointF(self.mapFromGlobal(glob))))
+
+    def halten_antippen_start(self, glob: QPointF) -> bool:
+        """Ein Finger liegt still auf einem Geraet, ein zweiter setzt auf
+        (``ziehen_scrollen``): das gehaltene Geraet kommt in die Auswahl
+        (eine Auswahl, zu der es schon gehoert, bleibt), der Rest dieses
+        Drucks verschiebt nichts und waehlt nichts mehr um."""
+        if self._pinch is not None:
+            return False
+        hit = self._geraet_bei(glob)
+        if hit is None:
+            return False
+        self._finger_aktion_abbrechen()        # Zug/Rahmen/Vormerkung ohne Folgen
+        self._sperre_bis_los = True
+        if hit not in self._selected_fids:
+            self._selected_fids = [hit]
+            self._emit_selection()
+            self.fixture_clicked.emit(hit)
+        self.update()
+        return True
+
+    def halten_antippen(self, glob: QPointF) -> None:
+        """Weiterer Finger tippt ein Geraet an: dazu bzw. heraus (wie
+        Umschalt-Klick)."""
+        hit = self._geraet_bei(glob)
+        if hit is None or hit not in self._positions:
+            return
+        self._druck_auf_geraet(hit, self._to_world(QPointF(self.mapFromGlobal(glob))), True)
+
     def _fokus_halten(self, fokus: QPointF, mitte_glob: QPointF) -> None:
         area = self._bildlauf()
         if area is None:

@@ -979,7 +979,11 @@ def main():
     # UI-110: Listen und Seiten durch Ziehen auf Text/Flaeche scrollen.
     try:
         from src.ui.ziehen_scrollen import einrichten as _ziehen_scrollen
-        _ziehen_scrollen(app)
+        _zs_filter = _ziehen_scrollen(app)
+        # UI-83: Gesten-Schalter dieses Rechners (ui_prefs.json)
+        from src.ui import gesten_prefs as _gesten_prefs
+        if _zs_filter is not None:
+            _zs_filter.gesten = _gesten_prefs.laden()
     except Exception as _e:
         print(f"[main] Ziehen-Scrollen nicht verfuegbar: {_e}")
     # UI-111: Touch-Tastatur/Touch-Zustand einrichten (vorher nie aufgerufen,

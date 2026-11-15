@@ -274,6 +274,48 @@ class VirtualConsoleView(QWidget):
             ub.setProperty("edit_only", True)
             ub.setVisible(False)
             tb_layout.addWidget(ub)
+        # UI-126: Mehrfachauswahl. „Mehrfach" (nur im Touch-Modus sichtbar,
+        # wie UI-116): jeder Tipp nimmt ein Widget dazu/heraus — die Maus hat
+        # Strg/Umschalt-Klick und den Auswahlrahmen. „Ausrichten" wirkt auf
+        # die Auswahl (ab zwei Elementen).
+        _knopf_stil = """
+            QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
+                          border-radius:3px; font-size:10px; padding:0 8px; }
+            QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
+            QPushButton:hover:!disabled { background:#30363d; color:#e6edf3; }
+            QPushButton:disabled { color:#484f58; }
+        """
+        self._btn_mehrfach = QPushButton("Mehrfach")
+        self._btn_mehrfach.setObjectName("vc_mehrfach")
+        self._btn_mehrfach.setCheckable(True)
+        self._btn_mehrfach.setFixedHeight(max(44, self._tb_hoehe()) if touch_aktiv()
+                                          else self._tb_hoehe())
+        self._btn_mehrfach.setMinimumWidth(44)
+        self._btn_mehrfach.setToolTip(
+            "Mehrfachauswahl am Finger: eingeschaltet nimmt jeder Tipp ein "
+            "Element dazu oder heraus. Gewählte zusammen ziehen verschiebt alle.")
+        self._btn_mehrfach.setStyleSheet(_knopf_stil)
+        self._btn_mehrfach.setProperty("edit_only", True)
+        self._btn_mehrfach.setProperty("nur_touch", True)
+        self._btn_mehrfach.setVisible(False)
+        self._btn_mehrfach.toggled.connect(self._toggle_mehrfach)
+        tb_layout.addWidget(self._btn_mehrfach)
+
+        self._btn_ausrichten = QPushButton("Ausrichten ▾")
+        self._btn_ausrichten.setObjectName("vc_ausrichten")
+        self._btn_ausrichten.setFixedHeight(self._tb_hoehe())
+        self._btn_ausrichten.setToolTip(
+            "Gewählte Elemente ausrichten (links/rechts/oben/unten), mit gleichen "
+            "Abständen verteilen oder gemeinsam löschen.\nMehrere wählen: "
+            "Strg/Umschalt-Klick, Rahmen auf freier Fläche aufziehen oder am "
+            "Finger „Mehrfach“.")
+        self._btn_ausrichten.setStyleSheet(_knopf_stil)
+        self._btn_ausrichten.setEnabled(False)
+        self._btn_ausrichten.setProperty("edit_only", True)
+        self._btn_ausrichten.setVisible(False)
+        self._btn_ausrichten.clicked.connect(self._ausrichten_zeigen)
+        tb_layout.addWidget(self._btn_ausrichten)
+
         # UI-93: eigene Kuerzel nur fuer den Betrieb OHNE Hauptfenster. Im
         # Hauptfenster liegen dieselben Folgen schon auf Bearbeiten →
         # Rückgängig; doppelt belegt loest Qt keine von beiden aus. Dort
@@ -565,6 +607,7 @@ class VirtualConsoleView(QWidget):
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
         self._canvas.bank_changed.connect(self._on_bank_changed)
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
+        self._canvas.auswahl_geaendert.connect(self._on_canvas_auswahl)   # UI-126
         self._on_bank_changed(self._canvas.active_bank)
         self._main_scroll.setWidget(self._canvas)
         # WEB-08: die Konsole fuer die Fernausloesung anmelden. Die Bruecke
@@ -886,7 +929,12 @@ class VirtualConsoleView(QWidget):
         # im Bearbeiten-Modus zeigen -> aufgeraeumtes Fenster im Live-Betrieb.
         for btn in self._toolbar_widget.findChildren(QPushButton):
             if btn.property("edit_only"):
-                btn.setVisible(enabled)
+                # UI-126: „Mehrfach" nur im Touch-Modus (Maus: Strg/Umschalt)
+                btn.setVisible(enabled and (not btn.property("nur_touch")
+                                            or touch_aktiv()))
+        if not enabled:
+            self._btn_mehrfach.setChecked(False)
+            self._btn_ausrichten.setEnabled(False)
         # Inspector-Panel folgt dem Edit-Modus; beim Verlassen Auswahl loesen.
         if self._inspector is not None:
             if enabled:
@@ -1129,6 +1177,37 @@ class VirtualConsoleView(QWidget):
             self._inspector.bind(w)
         elif w is None:
             self._inspector.clear()
+
+    # ── UI-126: Mehrfachauswahl ──────────────────────────────────────────────
+
+    def _toggle_mehrfach(self, an: bool):
+        self._btn_mehrfach.setText("Mehrfach ✓" if an else "Mehrfach")
+        if self._canvas_alive():
+            self._canvas.set_mehrfach_modus(an)
+
+    def _on_canvas_auswahl(self, widgets):
+        """Auswahl der Canvas geaendert: „Ausrichten" ab zwei Elementen;
+        der Inspector zeigt mehrere als Mehrfachauswahl."""
+        n = len(widgets)
+        self._btn_ausrichten.setEnabled(self._edit_mode and n > 1)
+        if (n > 1 and self._inspector is not None and self._edit_mode
+                and self._btn_inspector.isChecked()):
+            self._inspector.bind_mehrfach(widgets, self._canvas)
+
+    def ausrichten_menue(self):
+        """Das Menue des Knopfs „Ausrichten" (gebaut, nicht gezeigt)."""
+        from PySide6.QtWidgets import QMenu
+        menue = QMenu(self._btn_ausrichten)
+        self._canvas.auswahl_menue_fuellen(menue)
+        return menue
+
+    def _ausrichten_zeigen(self):
+        if not self._edit_mode or not self._canvas_alive():
+            return
+        menue = self.ausrichten_menue()
+        menue.exec(self._btn_ausrichten.mapToGlobal(
+            QPoint(0, self._btn_ausrichten.height())))
+        menue.deleteLater()
 
     # ── Widget actions ────────────────────────────────────────────────────────
 
