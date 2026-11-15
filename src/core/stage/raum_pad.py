@@ -136,3 +136,140 @@ def ziel_werte(f, kanaele, pos, rot, ziel) -> list[tuple[str, int | None, int]]:
             werte.append((achse, a8))
     koepfe = [None] if n == 1 else list(range(n))
     return [(attr, kopf, wert) for kopf in koepfe for attr, wert in werte]
+
+
+# ── Teil B: aufgeklappter Raum ──────────────────────────────────────────────
+#
+# Der Raum als auseinandergefalteter Wuerfel ohne Decke: Boden in der Mitte,
+# Rueckwand oben, Wand links/rechts seitlich, Wand vorn (Publikum) unten. Alles
+# in Metern, massstabsgetreu. Ebene Koordinaten ``(a, b)``: ``a`` nach rechts,
+# ``b`` nach unten (wie am Bildschirm), Ursprung oben links der Abwicklung.
+#
+# Jede Wand haengt an ihrer Klappkante am Boden; die Hoehe ueber dem Boden ist
+# der Abstand zur Klappkante. Ein Punkt auf der Klappkante ist deshalb auf Boden
+# und Wand derselbe Raumpunkt (bei Zielhoehe 0, s. ``Aufklappung.raumpunkt``).
+
+BODEN = "boden"
+RUECKWAND = "rueckwand"
+LINKS = "links"
+RECHTS = "rechts"
+VORN = "vorn"
+#: Reihenfolge = Vorrang auf gemeinsamen Kanten (der Boden gewinnt).
+FLAECHEN = (BODEN, RUECKWAND, LINKS, RECHTS, VORN)
+WAENDE = FLAECHEN[1:]
+FLAECHEN_NAMEN = {BODEN: "Boden", RUECKWAND: "Rückwand", LINKS: "Wand links",
+                  RECHTS: "Wand rechts", VORN: "Wand vorn"}
+
+
+def waende_normal(waende) -> tuple[str, ...]:
+    """Gueltige Wandnamen in fester Reihenfolge (Unbekanntes faellt weg)."""
+    try:
+        gew = set(str(w) for w in (waende or ()))
+    except TypeError:
+        gew = set()
+    return tuple(w for w in WAENDE if w in gew)
+
+
+@dataclass(frozen=True)
+class Aufklappung:
+    """Abwicklung von ``raum`` mit den Waenden ``waende`` (der Boden ist immer
+    dabei)."""
+    raum: RaumMasse
+    waende: tuple[str, ...] = WAENDE
+
+    def __post_init__(self):
+        object.__setattr__(self, "waende", waende_normal(self.waende))
+
+    @property
+    def flaechen(self) -> tuple[str, ...]:
+        return (BODEN,) + self.waende
+
+    @property
+    def _links_b(self) -> float:
+        return self.raum.hoehe if LINKS in self.waende else 0.0
+
+    @property
+    def _oben_h(self) -> float:
+        return self.raum.hoehe if RUECKWAND in self.waende else 0.0
+
+    @property
+    def groesse(self) -> tuple[float, float]:
+        """(Breite, Hoehe) der ganzen Abwicklung in Metern."""
+        h = self.raum.hoehe
+        return (self._links_b + self.raum.breite + (h if RECHTS in self.waende else 0.0),
+                self._oben_h + self.raum.tiefe + (h if VORN in self.waende else 0.0))
+
+    def rechtecke(self) -> dict[str, tuple[float, float, float, float]]:
+        """``{flaeche: (a0, b0, a1, b1)}`` der gezeigten Flaechen."""
+        r, h = self.raum, self.raum.hoehe
+        a0, b0 = self._links_b, self._oben_h
+        a1, b1 = a0 + r.breite, b0 + r.tiefe
+        alle = {
+            BODEN: (a0, b0, a1, b1),
+            RUECKWAND: (a0, b0 - h, a1, b0),
+            LINKS: (a0 - h, b0, a0, b1),
+            RECHTS: (a1, b0, a1 + h, b1),
+            VORN: (a0, b1, a1, b1 + h),
+        }
+        return {k: alle[k] for k in self.flaechen}
+
+    def flaeche_bei(self, a: float, b: float) -> tuple[str, float, float]:
+        """Flaeche unter ``(a, b)`` und der darauf begrenzte Punkt. Ausserhalb
+        aller gezeigten Flaechen: die naechste Flaeche (bei Gleichstand die
+        erste in ``FLAECHEN``-Reihenfolge)."""
+        a, b = float(a), float(b)
+        beste = None
+        for name, (a0, b0, a1, b1) in self.rechtecke().items():
+            ka, kb = min(max(a, a0), a1), min(max(b, b0), b1)
+            d = (ka - a) ** 2 + (kb - b) ** 2
+            if d <= 1e-18:
+                return name, ka, kb
+            if beste is None or d < beste[0] - 1e-12:
+                beste = (d, name, ka, kb)
+        return beste[1], beste[2], beste[3]
+
+    def raumpunkt(self, a: float, b: float, zielhoehe: float = 0.0
+                  ) -> tuple[str, tuple[float, float, float]]:
+        """Abwicklungspunkt -> ``(flaeche, (x, y, z))`` im Raum.
+
+        Boden: ``(x, zielhoehe, z)`` wie in der Draufsicht. Wand: Punkt AUF der
+        Wand; die Hoehe ist der Abstand zur Klappkante (0..Raumhoehe), die
+        andere Achse laeuft an der Kante entlang mit dem Boden mit."""
+        name, a, b = self.flaeche_bei(a, b)
+        r = self.raum
+        a0, b0, a1, b1 = self.rechtecke()[BODEN]
+        x = r.x0 + (a - a0)
+        z = r.z0 + (b - b0)
+        if name == BODEN:
+            return name, (x, float(zielhoehe), z)
+        if name == RUECKWAND:
+            return name, (x, b0 - b, r.z0)
+        if name == VORN:
+            return name, (x, b - b1, r.z1)
+        if name == LINKS:
+            return name, (r.x0, a0 - a, z)
+        return name, (r.x1, a - a1, z)                     # RECHTS
+
+    def abwicklung(self, flaeche: str, punkt) -> tuple[float, float]:
+        """Raumpunkt auf ``flaeche`` -> ``(a, b)`` (Umkehrung von ``raumpunkt``;
+        beim Boden zaehlt nur x/z)."""
+        x, y, z = (float(v) for v in punkt)
+        r = self.raum
+        a0, b0, a1, b1 = self.rechtecke()[BODEN]
+        a, b = a0 + (x - r.x0), b0 + (z - r.z0)
+        if flaeche == RUECKWAND:
+            return a, b0 - y
+        if flaeche == VORN:
+            return a, b1 + y
+        if flaeche == LINKS:
+            return a0 - y, b
+        if flaeche == RECHTS:
+            return a1 + y, b
+        return a, b
+
+
+def erreichbar(f, pos, rot, ziel) -> bool:
+    """Trifft der Kopf ``f`` an ``pos`` das Ziel, oder wuerde ``aim_pan_tilt``
+    es nur still auf den Anschlag begrenzen?"""
+    from .aim import aim_erreichbar
+    return aim_erreichbar(pos, ziel, normalize_rotation(rot), **aim_kw(f))

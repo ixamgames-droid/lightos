@@ -97,7 +97,7 @@ accidental taps) — **MIDI/APC keeps working**.
 | 18 | **Effekt-Editor-Box** (effect editor box, `VCEffectEditor`) | movable box: preview + the matching faders of an effect | [18_effekt_editor.en.md](18_effekt_editor.en.md) |
 | 22 | **Tempo-Controller** (`VCTempoBusController`) | bus, source, factor, effect assignment and sync on one tile | [22_tempo_controller.en.md](22_tempo_controller.en.md) |
 | 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | fader workspace for SEVERAL effects, with tick-box selection | [23_live_edit.en.md](23_live_edit.en.md) |
-| 24 | **Raum-Pad** (room pad, `VCRaumPad`) | top view of the stage: tap a point, every assigned moving head aims at it; on/off and position lock | [24_raum_pad.en.md](24_raum_pad.en.md) |
+| 24 | **Raum-Pad** (room pad, `VCRaumPad`) | top view or unfolded room (floor + walls): tap a point, every assigned moving head aims at it; on/off and position lock | [24_raum_pad.en.md](24_raum_pad.en.md) |
 
 ## Large editors (reachable from the VC)
 

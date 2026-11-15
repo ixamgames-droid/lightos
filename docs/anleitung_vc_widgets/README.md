@@ -90,7 +90,7 @@ Antippen) — **MIDI/APC steuert weiter**.
 | 18 | **Effekt-Editor-Box** (`VCEffectEditor`) | Bewegliche Box: Vorschau + passende Regler eines Effekts | [18_effekt_editor.md](18_effekt_editor.md) |
 | 22 | **Tempo-Controller** (`VCTempoBusController`) | Bus, Quelle, Faktor, Effekt-Zuordnung und Sync auf einer Kachel | [22_tempo_controller.md](22_tempo_controller.md) |
 | 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | Regler-Arbeitsplatz für MEHRERE Effekte, mit Haken-Auswahl | [23_live_edit.md](23_live_edit.md) |
-| 24 | **Raum-Pad** (`VCRaumPad`) | Draufsicht der Bühne: Punkt antippen, alle zugeordneten Moving Heads zielen darauf; AN/AUS und Position Lock | [24_raum_pad.md](24_raum_pad.md) |
+| 24 | **Raum-Pad** (`VCRaumPad`) | Draufsicht oder aufgeklappter Raum (Boden + Wände): Punkt antippen, alle zugeordneten Moving Heads zielen darauf; AN/AUS und Position Lock | [24_raum_pad.md](24_raum_pad.md) |
 
 ## Große Editoren (aus der VC erreichbar)
 

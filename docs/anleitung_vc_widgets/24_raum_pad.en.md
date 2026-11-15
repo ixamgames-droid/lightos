@@ -23,6 +23,19 @@ The values go into the **programmer** (`pan`, `tilt` and, if the fixture has the
 
 The on state is **not** saved, so a loaded show never writes into the programmer by itself. Saved are the assignment, last target, target height and position lock. A bank change releases a target that is only **held** (lock off). Touch lock blocks the pad. In edit mode, dragging moves the widget. On a touchscreen, swiping on the pad does not scroll the console. In touch mode the switches and the height slider are at least 44 px high.
 
+## Unfolded view (“Aufgeklappt”)
+
+Set **Ansicht** (view) to **“Aufgeklappt”** in the inspector or the settings dialog. The pad then shows the room like an unfolded box without a ceiling, true to scale: the **floor** in the middle, the **back wall** above, the **side walls** left and right, the **front wall** (audience side) below. Every surface is labelled.
+
+- Tapping the **floor** works like the top view (target height applies).
+- Tapping a **wall** aims at a point **on that wall**: the height is the distance from the fold edge, the other direction follows the floor. The height slider is greyed out and shows the wall height (“Wand … m”).
+- **Dragging across a fold edge** moves continuously onto the neighbouring surface; at the edge floor and wall give the same point (exactly so at target height 0 m, the default; with a higher target height the target drops by that height once when crossing — a dashed line on the walls shows it). Outside all surfaces the point is clamped to the nearest one; a tap into an empty corner sets nothing.
+- Heads stand on the floor at their location; hanging heads show their height.
+- Each wall can be switched off (the floor always stays); a hidden wall cannot be tapped.
+- A head that cannot reach the target (outside its pan/tilt range, e.g. high up a wall with a 180° tilt fixture) gets a **red ring with “!”** and is named in the tooltip. Its value is still the one the visualizer's aim tool gives, clamped at the end stop.
+
+Position lock and on/off work the same in both views. View and visible walls are saved with the show; older shows open in the top view.
+
 ## Settings
 
 Double-click the pad in edit mode: “Raum-Pad Einstellungen”. Tick the **moving heads** (the list only shows fixtures with pan **and** tilt, so a PAR cannot be assigned), use **“Aktuelle Auswahl übernehmen”** to take over the current selection, and tick **groups** if you like. Without an assignment the pad shows “Keine Moving Heads zugeordnet” and does nothing. Unlike the XY pad, it never falls back to the selection or to all fixtures.
@@ -31,4 +44,4 @@ Double-click the pad in edit mode: “Raum-Pad Einstellungen”. Tick the **movi
 
 - The pad is only as accurate as the positions in the visualizer. Calibrate the heads for real hits on the rig.
 - Several pads on the same heads: the last one used wins. Off only releases values that still come from that pad.
-- Planned (part B): a second view with the room unfolded (floor and walls) to aim at walls.
+- The phone console cannot operate surface widgets like the room pad yet.
