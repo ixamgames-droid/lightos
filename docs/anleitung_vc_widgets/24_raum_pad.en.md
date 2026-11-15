@@ -19,9 +19,9 @@ The values go into the **programmer** (`pan`, `tilt` and, if the fixture has the
 | Switch | Effect |
 | --- | --- |
 | **AN / AUS** (on/off) | On: the heads aim at the point. **Off** releases pan/tilt/fine of these heads: each value gets back what was in the programmer before. If there was nothing, it is removed and the heads return to whatever runs underneath. Output is then the same as before. A value someone else changed in the meantime is left alone. |
-| **Lock AN / Lock AUS** (position lock, default on) | **Lock on:** the target stays after you let go. **Lock off:** the target only counts while the finger or mouse button is down. Letting go releases like AUS. With lock off, the AN button also only works while held, like a flash button. |
+| **Lock AN / Lock AUS** (position lock, default on) | **Lock on:** the target stays after you let go. **Lock off:** the target only counts while the finger or mouse button is down. Letting go releases like AUS. With lock off, the AN button also only works while held, like a flash button. Switching the lock off while a target is standing releases it at once. |
 
-The on state is **not** saved, so a loaded show never writes into the programmer by itself. Saved are the assignment, last target, target height and position lock. A bank change releases a target that is only **held** (lock off). Touch lock blocks the pad. In edit mode, dragging moves the widget. On a touchscreen, swiping on the pad does not scroll the console. In touch mode the switches and the height slider are at least 44 px high.
+The on state is **not** saved, so a loaded show never writes into the programmer by itself. Saved are the assignment, last target, target height and position lock. A target that is only **held** (lock off) never gets stuck: it is also released on a bank change, when the window loses focus, when the system cancels the touch, or when touch lock comes on while holding. Touch lock blocks the pad. In edit mode, dragging moves the widget. On a touchscreen, swiping on the pad does not scroll the console. In touch mode the switches and the height slider are at least 44 px high.
 
 ## Unfolded view (“Aufgeklappt”)
 

@@ -44,11 +44,11 @@ Liegt ein Ziel außerhalb des Bewegungsbereichs eines Kopfes (typisch: ein Punkt
 | Schalter | Wirkung |
 | --- | --- |
 | **AN / AUS** | AN: Die Köpfe zielen auf den Punkt. **AUS** gibt Pan/Tilt/Fein dieser Köpfe wieder frei: Jeder Wert bekommt zurück, was vor dem Raum-Pad im Programmer stand. Stand dort nichts, wird er entfernt, und die Köpfe gehen zurück in das, was darunter läuft (Cue, Effekt, Grundstellung). Die Ausgabe ist danach dieselbe wie vorher. Hat inzwischen jemand anderes einen dieser Werte geändert, bleibt seine Änderung stehen. |
-| **Lock AN / Lock AUS** (Position Lock, Vorgabe AN) | **Lock AN:** Das Ziel bleibt nach dem Loslassen stehen. **Lock AUS:** Das Ziel gilt nur, solange der Finger oder die Maustaste gedrückt ist. Beim Loslassen wird freigegeben wie bei AUS. Mit Lock AUS wirkt auch der AN-Knopf nur, solange er gedrückt ist, wie eine Flash-Taste. |
+| **Lock AN / Lock AUS** (Position Lock, Vorgabe AN) | **Lock AN:** Das Ziel bleibt nach dem Loslassen stehen. **Lock AUS:** Das Ziel gilt nur, solange der Finger oder die Maustaste gedrückt ist. Beim Loslassen wird freigegeben wie bei AUS. Mit Lock AUS wirkt auch der AN-Knopf nur, solange er gedrückt ist, wie eine Flash-Taste. Schaltet man den Lock bei stehendem Ziel aus, wird sofort freigegeben. |
 
 > Der AN-Zustand wird **nicht** gespeichert. Eine geladene Show schreibt nichts von selbst in den Programmer. Gespeichert werden Zuordnung, letzter Zielpunkt (mit Fläche und Wandhöhe), Zielhöhe, Position Lock, Ansicht und gezeigte Wände. Shows aus der Zeit vor der aufgeklappten Ansicht öffnen in der Draufsicht.
 
-Ein Bankwechsel gibt ein nur **gehaltenes** Ziel (Lock AUS) frei. Mit **Touch-Lock** ist das Pad gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Widget, es zielt nichts.
+Ein nur **gehaltenes** Ziel (Lock AUS) bleibt nie hängen: Es wird auch freigegeben, wenn die Bank wechselt, das Fenster den Fokus verliert, das System die Berührung abbricht oder während des Haltens die Touch-Sperre angeht. Mit **Touch-Lock** ist das Pad gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Widget, es zielt nichts.
 
 **Am Finger:** Das Pad ist ein Bedienelement wie ein Fader. Wischen auf dem Pad scrollt die Konsole nicht, es zieht das Ziel. Im Touch-Modus sind AN/AUS, Lock und der Höhenregler mindestens 44 px hoch.
 

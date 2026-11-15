@@ -26,6 +26,7 @@ Publikum (Meter). In der Draufsicht des Pads ist oben die Rueckwand (kleines
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from .aim import aim_pan_tilt, aim_pan_tilt_16
@@ -65,10 +66,18 @@ class RaumMasse:
 
 
 def _pos3(p):
+    """``(x, y, z)`` als Floats — ``None`` bei fehlendem, zu kurzem oder nicht
+    endlichem Standort (NaN/inf zielt nie, sondern gilt als „ohne Position")."""
     try:
-        return (float(p[0]), float(p[1]), float(p[2]))
-    except (TypeError, ValueError, IndexError):
+        q = (float(p[0]), float(p[1]), float(p[2]))
+    except (TypeError, ValueError, IndexError, KeyError):
         return None
+    return q if all(math.isfinite(v) for v in q) else None
+
+
+def standort(p):
+    """Oeffentlich fuer das Widget: gueltiger Standort oder ``None``."""
+    return _pos3(p)
 
 
 def raum_masse(positionen) -> RaumMasse:

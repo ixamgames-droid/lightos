@@ -49,7 +49,8 @@ from __future__ import annotations
 
 import math
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, Qt
+from PySide6.QtGui import QWindow
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
                                QFormLayout, QLabel, QLineEdit, QListWidget,
@@ -84,6 +85,30 @@ def _kanaele(f):
         return []
 
 
+class _HaltWaechter(QObject):
+    """Nur waehrend eines GEHALTENEN Ziels (Lock AUS) am QApplication: meldet
+    ein abgebrochenes Halten — Touch-Abbruch durch das System, Fenster bzw.
+    Programm verliert den Fokus. Dann kommt das Loslassen nie an, und ohne
+    diesen Waechter bliebe das Ziel stehen (Nachpruefung UI-127)."""
+
+    def __init__(self, pad):
+        super().__init__()
+        self._pad = pad
+
+    def eventFilter(self, obj, ev):                      # noqa: N802 (Qt)
+        t = ev.type()
+        try:
+            if t == QEvent.Type.TouchCancel and isinstance(obj, QWindow):
+                self._pad._halten_abbrechen()
+            elif t == QEvent.Type.ApplicationDeactivate:
+                self._pad._halten_abbrechen()
+            elif t == QEvent.Type.WindowDeactivate and obj is self._pad.window():
+                self._pad._halten_abbrechen()
+        except RuntimeError:
+            pass                                          # Pad schon zerstoert
+        return False
+
+
 class VCRaumPad(VCWidget):
     """Draufsicht des Raums: Ziel antippen, alle zugeordneten Koepfe zielen."""
 
@@ -106,6 +131,7 @@ class VCRaumPad(VCWidget):
         # (fid, attr, kopf) -> [Wert vorher, zuletzt selbst geschriebener Wert]
         self._eigene: dict[tuple, list] = {}
         self._zug: str | None = None                      # "pad" / "hoehe" / "an" / "lock"
+        self._waechter: _HaltWaechter | None = None       # nur waehrend Halten
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#58a6ff")
         self.resize(260, 240)
@@ -246,9 +272,10 @@ class VCRaumPad(VCWidget):
             kan = _kanaele(f)
             if bewegung(f, kan) < 1:
                 continue
-            pos = positionen.get(fid) if positionen is not None else None
-            if pos:
-                mit.append((fid, f, kan, tuple(float(v) for v in pos[:3])))
+            from src.core.stage.raum_pad import standort
+            pos = standort(positionen.get(fid)) if positionen is not None else None
+            if pos is not None:
+                mit.append((fid, f, kan, pos))
             else:
                 ohne.append((fid, f, kan, None))
         return mit, ohne
@@ -308,8 +335,14 @@ class VCRaumPad(VCWidget):
             for fid, f, kan, pos in mit:
                 for attr, kopf, wert in ziel_werte(f, kan, pos, rots.get(fid), ziel):
                     k = (fid, attr, kopf)
+                    jetzt = state.get_programmer_value(fid, attr, head=kopf)
                     if k not in self._eigene:
-                        self._eigene[k] = [state.get_programmer_value(fid, attr, head=kopf), None]
+                        self._eigene[k] = [jetzt, None]
+                    elif jetzt != self._eigene[k][1]:
+                        # Inzwischen fremd ueberschrieben, jetzt zieht das Pad
+                        # wieder drueber: beim Freigeben DIESEN Wert zurueck,
+                        # nicht den von vor dem ersten Schreiben.
+                        self._eigene[k][0] = jetzt
                     state.set_programmer_value(fid, attr, wert, head=kopf)
                     self._eigene[k][1] = state.get_programmer_value(fid, attr, head=kopf)
         finally:
@@ -394,11 +427,46 @@ class VCRaumPad(VCWidget):
 
     def release_if_held(self) -> bool:
         """Bankwechsel: ein nur gehaltenes Ziel (Lock AUS) freigeben."""
-        if self._zug is not None and not self.position_lock and self.aktiv:
-            self._zug = None
+        return self._halten_abbrechen()
+
+    def _gehalten(self, zug) -> bool:
+        """Haengt die Ausgabe an einem Druck (Lock AUS, Pad oder AN gedrueckt)?"""
+        return zug in ("pad", "an") and not self.position_lock
+
+    def _waechter_an(self):
+        if self._waechter is None:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is not None:
+                self._waechter = _HaltWaechter(self)
+                app.installEventFilter(self._waechter)
+
+    def _waechter_aus(self):
+        w, self._waechter = self._waechter, None
+        if w is not None:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is not None:
+                app.removeEventFilter(w)
+            w.deleteLater()
+
+    def _halten_abbrechen(self) -> bool:
+        """Ein Druck endet ohne Loslassen (Bankwechsel, Touch-Abbruch, Fokus
+        weg, verdeckt): ein nur gehaltenes Ziel freigeben. Rueckgabe: True,
+        wenn wirklich etwas freigegeben wurde."""
+        zug, self._zug = self._zug, None
+        self._waechter_aus()
+        if self._gehalten(zug) and self.aktiv:
             return self.freigeben()
-        self._zug = None
         return False
+
+    def set_position_lock(self, an: bool):
+        """Lock umschalten. Lock AUS heisst „nur solange gedrueckt" — ein vorher
+        eingerastetes Ziel wird deshalb sofort freigegeben."""
+        self.position_lock = bool(an)
+        if not self.position_lock and self.aktiv and self._zug is None:
+            self.freigeben()
+        self.update()
 
     # ── Maus / Finger ──────────────────────────────────────────────────────
 
@@ -448,6 +516,8 @@ class VCRaumPad(VCWidget):
         p = event.position().toPoint()
         zone = self._zone_bei(p)
         self._zug = zone
+        if self._gehalten(zone):
+            self._waechter_an()
         if zone == "pad":
             self._pad_ziel(p, einschalten=True)
         elif zone == "hoehe":
@@ -466,6 +536,11 @@ class VCRaumPad(VCWidget):
         if self._run_input_blocked() or self._zug is None:
             event.accept()
             return
+        if not (event.buttons() & Qt.MouseButton.LeftButton):
+            # Das Loslassen ist verloren gegangen (z. B. Fenster dazwischen)
+            self._halten_abbrechen()
+            event.accept()
+            return
         p = event.position().toPoint()
         if self._zug == "pad":
             self._pad_ziel(p, einschalten=False)
@@ -474,25 +549,40 @@ class VCRaumPad(VCWidget):
         event.accept()
 
     def mouseReleaseEvent(self, event):
+        zug, self._zug = self._zug, None
+        self._waechter_aus()
+        # Ein gehaltenes Ziel endet mit dem Loslassen IMMER — auch wenn
+        # waehrenddessen die Touch-Sperre oder der Bearbeiten-Modus anging.
+        if self._gehalten(zug) and self.aktiv:
+            self.freigeben()
+            zug = None
         if self._edit_mode:
             super().mouseReleaseEvent(event)
             return
-        zug, self._zug = self._zug, None
         if self._run_input_blocked() or zug is None:
             event.accept()
             return
         p = event.position().toPoint()
-        if zug in ("pad", "an") and not self.position_lock:
-            self.freigeben()
+        if self._gehalten(zug):
+            pass
         elif zug == "an" and self._zonen()["an"].contains(p):
             if self.aktiv:
                 self.freigeben()
             elif self.ziel is not None:
                 self.einschalten()
         elif zug == "lock" and self._zonen()["lock"].contains(p):
-            self.position_lock = not self.position_lock
-            self.update()
+            self.set_position_lock(not self.position_lock)
         event.accept()
+
+    def hideEvent(self, event):
+        super().hideEvent(event)
+        self._halten_abbrechen()      # verdeckt: das Loslassen kommt nie an
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if (event.type() == QEvent.Type.ActivationChange and self._zug is not None
+                and not self.isActiveWindow()):
+            self._halten_abbrechen()
 
     def mouseDoubleClickEvent(self, event):
         if self._edit_mode:
