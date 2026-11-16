@@ -88,7 +88,7 @@ class InputProfileEditor(QDialog):
         # Mappings-Tabelle
         self._table = QTableWidget(0, 7)
         self._table.setHorizontalHeaderLabels([
-            "Name", "Typ", "Channel", "Note/CC", "Action", "Param", "Port-Filter"
+            "Name", "Typ", "Kanal", "Note/CC", "Aktion", "Parameter", "Port-Filter"
         ])
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
