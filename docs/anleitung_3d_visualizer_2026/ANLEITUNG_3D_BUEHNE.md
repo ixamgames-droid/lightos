@@ -548,10 +548,12 @@ Frequenz blitzen gemeinsam.
   ein Bild dauert: Normal belegt sie höchstens ein Viertel der Rechenzeit der
   Oberfläche. Bei hoher Bildschirmskalierung und vielen Geräten sind das etwa
   7–8 Bilder je Sekunde, also höchstens gut zwei Blitze. Solange ein Gerät
-  blinkt und kein 3D-Fenster offen ist, zeichnet sie schneller (alle 50 ms,
-  höchstens ein Drittel der Rechenzeit). Gemessen bei 250 % und 68 blinkenden
-  Geräten waren das rund 8 statt 5–6 Bilder je Sekunde. Ist das 3D-Fenster offen,
-  bleibt sie beim ruhigeren Takt — das 3D-Fenster zeigt den Strobe dann selbst.
+  sichtbar blinkt — es muss dabei auch leuchten — und kein 3D-Fenster offen
+  ist, zeichnet sie schneller (alle 50 ms, höchstens ein Drittel der
+  Rechenzeit). Gemessen bei 250 % und 68 blinkenden Geräten waren das rund 11
+  statt 8 Bilder je Sekunde; die Bedienung reagierte dabei gleich schnell. Bei
+  Blackout oder Dimmer auf null bleibt sie beim ruhigeren Takt. Ebenso bei
+  offenem 3D-Fenster — das zeigt den Strobe dann selbst.
 - **Nur die Helligkeit** wird getaktet. Farbe und Dimmerwert bleiben, wie sie
   sind; ein Dimmer-Effekt, der selbst an- und ausschaltet, sieht aus wie bisher.
 - **Einstellung „Strobe im 3D zeigen":**
