@@ -1,7 +1,7 @@
 {
   "anleitung": "showcase",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "58884624",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py showcase'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "68dfa587da0acea11f2ae00af0e16479"
+      "md5": "bb402b0958e919b71bf49c3945fafc41"
     },
     {
       "datei": "club_02_playback.png",
@@ -122,7 +122,7 @@
         900
       ],
       "marken": [],
-      "md5": "eb734c750558d936089ac3ef7e173e16"
+      "md5": "848fd8bbb55b9b6a1d130205c1eef6e9"
     },
     {
       "datei": "theater_02_playback.png",

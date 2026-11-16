@@ -1,7 +1,7 @@
 {
   "anleitung": "szenen_cues",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "58884624",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py szenen_cues'.",
@@ -120,7 +120,7 @@
           "beschriftung": "leerer Slot"
         }
       ],
-      "md5": "dcb8fef9f2cf208e5546455881bdd3ec"
+      "md5": "4f63d29b4b66a40aace85589b075a603"
     },
     {
       "datei": "06_preset_browser.png",
@@ -168,7 +168,7 @@
           "beschriftung": "Quick-Rec"
         }
       ],
-      "md5": "3ff2538fa6f64b545a343875a72b12ed"
+      "md5": "033f140dc2b9203608f56132b6d6d4c5"
     },
     {
       "datei": "08_executor.png",
@@ -216,7 +216,7 @@
           "beschriftung": "Aktive Cue"
         }
       ],
-      "md5": "04b91f85cbfb2f3cae7a218a84193a7e"
+      "md5": "a0b80499d973aab1d8c3c36b1f246954"
     },
     {
       "datei": "10_vc_cueliste.png",
@@ -236,7 +236,7 @@
           "beschriftung": "GO"
         }
       ],
-      "md5": "cdc6c012452053eb43bff907ead54070"
+      "md5": "bc79c03ff4afcd690c4a28c61520d72c"
     },
     {
       "datei": "11_go_ohne_executor.png",

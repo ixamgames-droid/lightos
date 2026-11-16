@@ -1,7 +1,7 @@
 {
   "anleitung": "geraete_bibliothek",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "58884624",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py geraete_bibliothek'.",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "51b30fcc0526195588125e224512ce04"
+      "md5": "bf2c83f527ae751b358c88a621d46ed1"
     },
     {
       "datei": "05_lightos_profil.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "bdcc6042d791cd4d401936b264832750"
+      "md5": "b387945ae1cdb040776c29a60bd823ca"
     },
     {
       "datei": "06_weiss_segment_hinweis.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "592c895d661833fcb68fa4bb77516a98"
+      "md5": "dc7f45776b7eae8832e232e474633e45"
     },
     {
       "datei": "07_weiss_segment_gesetzt.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "fd3328af6d0d752d6883b8dd5483f80e"
+      "md5": "0174d22e3bc61acd50725aec322c5464"
     },
     {
       "datei": "08_matrix_hinweis.png",
