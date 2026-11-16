@@ -33,7 +33,7 @@ def _is_valid(obj) -> bool:
 _TYPE_LABELS = {
     "VCButton": "Button", "VCSlider": "Fader", "VCSpeedDial": "Speed-Rad",
     "VCColor": "Farb-Kachel", "VCEncoder": "Encoder", "VCStepper": "Schrittzähler",
-    "VCBusSelector": "Tempo-Bus", "VCXYPad": "XY-Feld", "VCFrame": "Rahmen",
+    "VCBusSelector": "Tempo-Bus", "VCXYPad": "XY-Feld", "VCRaumPad": "Raum-Pad", "VCFrame": "Rahmen",
     "VCEffectEditor": "Effekt-Box", "VCLabel": "Beschriftung",
     "VCEffectDisplay": "Effekt-Vorschau", "VCColorList": "Farbliste",
     "VCEffectColors": "Effekt-Farben", "VCCueList": "Cueliste",

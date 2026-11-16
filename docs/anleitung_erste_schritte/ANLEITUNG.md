@@ -30,7 +30,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
 1. **Menüleiste** — `Datei`, `Bearbeiten`, `Ansicht`, `Show`, `Programmer`, `Datenbank`,
    `Ausgabe`, `Visualizer`, `Command`, `Hilfe`. Hier liegen Speichern und Öffnen
    (Schritt 7) und die Ausgabe-Einstellungen. Unter `Hilfe` findest du diese
-   Anleitung wieder, dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und
+   Anleitung wieder (**Erste Schritte**; alle weiteren unter **Anleitungen öffnen**), dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und
    **Datenordner öffnen** / **Show-Ordner öffnen**.
 2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2.
 3. **GM** — der Grand Master. Er regelt die Gesamthelligkeit von 0 bis 100 %.
@@ -293,6 +293,24 @@ Was du nur bedienst, zählt nicht als Änderung: Programmer-Werte, **GO** auf ei
 Cueliste, Fader und das Tempo lösen die Frage nicht aus. Eine nie gespeicherte Show mit
 Inhalt fragt immer („Die Show wurde noch nie gespeichert."), ebenso eine aus dem
 Auto-Save wiederhergestellte.
+
+## Am Touchscreen bedienen
+
+Hast du einen Touchscreen oder ein Tablet? Dann starte LightOS mit `--touch`
+(`venv/bin/python main.py --touch`): Knöpfe und Listen werden größer. Diese Gesten gibt es:
+
+- **Lange drücken** (Finger etwa 0,6 s still halten) öffnet das Kontextmenü, das die Maus
+  per Rechtsklick bekommt. Wo kein Menü existiert, erscheint die Erklärung (Tooltip).
+- **Halten + Antippen** wählt mehrere aus: Finger auf einem Gerät der 2D-Bühne oder einem
+  Element der Virtual Console (Bearbeiten-Modus) liegen lassen, mit einem zweiten Finger
+  weitere antippen.
+- **Zwei Finger** zoomen und verschieben die 2D-Bühne. Auf freier Fläche der Virtual Console
+  blätterst du damit die Bank: nach links wischen = nächste, nach rechts = vorherige.
+
+Jede Geste schaltest du unter **Ansicht → Touch-Gesten…** ab. Dort legst du auch fest, was
+„Drei Finger tippen“ tut (Vorgabe: nichts). BLACKOUT oder STOP ALL lassen sich bewusst nicht
+auf eine Geste legen. Das Handy als Fernbedienung beschreibt
+[Web-Fernsteuerung](../anleitung_web_remote/ANLEITUNG.md).
 
 ---
 

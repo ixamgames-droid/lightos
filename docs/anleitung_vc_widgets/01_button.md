@@ -203,6 +203,10 @@ Ohne gültige Bindung passiert nichts: Bei „Funktion an/aus"/„nur gehalten" 
 
 Über **Live-Edit-Slot** wird der gestartete Effekt zum aktiven Bearbeitungsziel dieses Slots — Fader und Farb-Kacheln mit demselben Slot bearbeiten dann genau diesen Effekt (pro Quadrant exklusiv, ohne globales Stop-All).
 
+### Sternchen „live bearbeitet" (UI-129)
+
+Wurde der gebundene Effekt live verändert (Fader, Effekt-Aktion, Farb-Kachel, Live-Edit-Panel, MIDI …), zeigt der Button oben links ein kleines **gelbes Sternchen** mit dunklem Rand; der Tooltip bekommt den Zusatz „live bearbeitet". Das gilt nur für Buttons mit **genau einer** eigenen Funktion (Funktion an/aus, nur gehalten, Effekt-Aktion mit fester ID). Gruppen-Buttons und reine Bearbeitungs-Tasten über einen Live-Edit-Slot (ohne eigene Funktion) zeigen keins. Liegen dort schon das Tastenkürzel oder „+n", rutscht der Stern darunter; reicht die Beschriftung in die Ecke, weicht er nach unten rechts aus. Er verschwindet bei **Reset Live**, bei **Commit** (Übernahme als neuer Stand) und beim Laden einer Show. Gespeichert wird nichts davon. Mehr dazu in [LIVE_EDIT.md](../LIVE_EDIT.md).
+
 ## MIDI & Tastatur
 
 Der Button unterstützt sowohl MIDI- als auch Tastatur-Zuweisung (beide Teach-Funktionen liefern `True`).
