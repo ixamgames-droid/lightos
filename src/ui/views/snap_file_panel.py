@@ -24,6 +24,7 @@ from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from src.ui.weak_slots import weak_slot
+from src.ui import dialog_hilfe
 
 try:
     from src.core.app_state import get_state
@@ -1023,20 +1024,21 @@ class SnapFilePanel(QWidget):
                                         KEINE_WERTE_IM_SCOPE)
                 return
             dlg = ChannelSelectDialog(prog, self, **_scope(state))
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return
-            filtered = dlg.filter_programmer(prog)
-            if not filtered:
-                QMessageBox.information(self, "Snap speichern",
-                    "Keine Kanäle ausgewählt.")
-                return
+            with dialog_hilfe.offen(dlg):
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    return
+                filtered = dlg.filter_programmer(prog)
+                if not filtered:
+                    QMessageBox.information(self, "Snap speichern",
+                        "Keine Kanäle ausgewählt.")
+                    return
 
-            name, ok = QInputDialog.getText(self, "Snap speichern", "Name:")
-            if not ok or not name.strip():
-                return
+                name, ok = QInputDialog.getText(self, "Snap speichern", "Name:")
+                if not ok or not name.strip():
+                    return
 
-            lib.add_snap(name.strip(), self._target_folder(), filtered)
-            self._refresh_tree()
+                lib.add_snap(name.strip(), self._target_folder(), filtered)
+                self._refresh_tree()
         except Exception as e:
             QMessageBox.warning(self, "Fehler", str(e))
 
@@ -1113,7 +1115,7 @@ class SnapFilePanel(QWidget):
         dlg.resize(720, 600)
         lay = QVBoxLayout(dlg)
         lay.addWidget(editor)
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
         try:
             from src.core.sync import get_sync, SyncEvent
             get_sync().emit(SyncEvent.FUNCTION_CHANGED, {"id": getattr(chaser, "id", None)})
@@ -1130,86 +1132,87 @@ class SnapFilePanel(QWidget):
             return
 
         dlg = ChaseCreateDialog(parent=self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        opts = dlg.values()
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            opts = dlg.values()
 
-        lib = self._lib()
-        snap_payloads: list[tuple[str, dict]] = []
-        for sid in snap_ids:
-            snap = lib.get(sid) if lib is not None else None
-            if snap is None or not snap.values:
-                continue
-            values = {str(fid): attrs for fid, attrs in snap.values.items()}
-            snap_payloads.append((snap.name, values))
-        if len(snap_payloads) < 2:
-            QMessageBox.warning(
-                self,
-                "Chase erstellen",
-                "Zu wenige gültige Snaps gefunden (mindestens 2 mit Werten nötig).",
-            )
-            return
-
-        try:
-            from src.core.engine.function import RunOrder, Direction
-            from src.core.engine.function_manager import get_function_manager
-            from src.core.engine.sequence import SequenceStep
-        except Exception as e:
-            QMessageBox.warning(self, "Chase erstellen", f"Engine-Import fehlgeschlagen: {e}")
-            return
-
-        fm = get_function_manager()
-        seq = fm.new_sequence(opts["name"])
-        seq.speed = float(opts["speed"])
-        try:
-            seq.run_order = RunOrder(str(opts["order"]))
-        except Exception:
-            seq.run_order = RunOrder.Loop
-        try:
-            seq.direction = Direction(str(opts["direction"]))
-        except Exception:
-            seq.direction = Direction.Forward
-
-        bound: set[int] = set()
-        for snap_name, snap_values in snap_payloads:
-            for fid_str in snap_values.keys():
-                try:
-                    bound.add(int(fid_str))
-                except Exception:
+            lib = self._lib()
+            snap_payloads: list[tuple[str, dict]] = []
+            for sid in snap_ids:
+                snap = lib.get(sid) if lib is not None else None
+                if snap is None or not snap.values:
                     continue
-            seq.steps.append(
-                SequenceStep(
-                    values=snap_values,
-                    fade_in=float(opts["fade_in"]),
-                    hold=float(opts["hold"]),
-                    fade_out=float(opts["fade_out"]),
-                    note=snap_name,
+                values = {str(fid): attrs for fid, attrs in snap.values.items()}
+                snap_payloads.append((snap.name, values))
+            if len(snap_payloads) < 2:
+                QMessageBox.warning(
+                    self,
+                    "Chase erstellen",
+                    "Zu wenige gültige Snaps gefunden (mindestens 2 mit Werten nötig).",
                 )
+                return
+
+            try:
+                from src.core.engine.function import RunOrder, Direction
+                from src.core.engine.function_manager import get_function_manager
+                from src.core.engine.sequence import SequenceStep
+            except Exception as e:
+                QMessageBox.warning(self, "Chase erstellen", f"Engine-Import fehlgeschlagen: {e}")
+                return
+
+            fm = get_function_manager()
+            seq = fm.new_sequence(opts["name"])
+            seq.speed = float(opts["speed"])
+            try:
+                seq.run_order = RunOrder(str(opts["order"]))
+            except Exception:
+                seq.run_order = RunOrder.Loop
+            try:
+                seq.direction = Direction(str(opts["direction"]))
+            except Exception:
+                seq.direction = Direction.Forward
+
+            bound: set[int] = set()
+            for snap_name, snap_values in snap_payloads:
+                for fid_str in snap_values.keys():
+                    try:
+                        bound.add(int(fid_str))
+                    except Exception:
+                        continue
+                seq.steps.append(
+                    SequenceStep(
+                        values=snap_values,
+                        fade_in=float(opts["fade_in"]),
+                        hold=float(opts["hold"]),
+                        fade_out=float(opts["fade_out"]),
+                        note=snap_name,
+                    )
+                )
+            seq.bound_fixtures = sorted(bound)
+
+            try:
+                from src.core.sync import get_sync, SyncEvent
+                sync = get_sync()
+                sync.emit(SyncEvent.FUNCTION_CHANGED, {"id": seq.id})
+                sync.emit(SyncEvent.REFRESH_ALL, None)
+            except Exception:
+                pass
+
+            QMessageBox.information(
+                self,
+                "Chase erstellt",
+                (
+                    f"Sequence '{seq.name}' erstellt.\n"
+                    f"Funktions-ID: {seq.id}\n"
+                    f"Schritte: {len(seq.steps)}\n\n"
+                    "Virtuelle Konsole – Tipp:\n"
+                    "Im Button-Dialog Aktion 'FunctionToggle' wählen und die Funktion\n"
+                    "im Dropdown 'Funktion/Chase (Name)' direkt nach Namen auswählen.\n"
+                    "Beim SpeedDial dieselbe Funktion im Namens-Dropdown wählen\n"
+                    "(Target wird automatisch auf 'Function' gesetzt)."
+                ),
             )
-        seq.bound_fixtures = sorted(bound)
-
-        try:
-            from src.core.sync import get_sync, SyncEvent
-            sync = get_sync()
-            sync.emit(SyncEvent.FUNCTION_CHANGED, {"id": seq.id})
-            sync.emit(SyncEvent.REFRESH_ALL, None)
-        except Exception:
-            pass
-
-        QMessageBox.information(
-            self,
-            "Chase erstellt",
-            (
-                f"Sequence '{seq.name}' erstellt.\n"
-                f"Funktions-ID: {seq.id}\n"
-                f"Schritte: {len(seq.steps)}\n\n"
-                "Virtuelle Konsole – Tipp:\n"
-                "Im Button-Dialog Aktion 'FunctionToggle' wählen und die Funktion\n"
-                "im Dropdown 'Funktion/Chase (Name)' direkt nach Namen auswählen.\n"
-                "Beim SpeedDial dieselbe Funktion im Namens-Dropdown wählen\n"
-                "(Target wird automatisch auf 'Function' gesetzt)."
-            ),
-        )
 
     def _create_scene_from_selection(self):
         """UXT-03: markierte Snaps in wiederverwendbare **Szenen**-Funktionen
@@ -1625,7 +1628,7 @@ class SnapFilePanel(QWidget):
         dlg.resize(640, 480)
         lay = QVBoxLayout(dlg)
         lay.addWidget(editor)
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
         self._refresh_tree()
 
     def _edit_function(self, fid: int):
@@ -1646,7 +1649,7 @@ class SnapFilePanel(QWidget):
         btn = QPushButton("Schließen")
         btn.clicked.connect(dlg.accept)
         v.addWidget(btn)
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
         self._emit_function_changed()
         self._refresh_tree()
 

@@ -1,11 +1,22 @@
 {
   "anleitung": "prioritaeten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b51fdd5a",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py prioritaeten'.",
   "bilder": [
+    {
+      "datei": "01_schichten.png",
+      "szene": "01_schichten",
+      "titel": "Schaubild: die zehn Schichten eines Bildes von Grundwerte bis Laser-NOT-AUS/Grand Master, Stufen nur in Schicht 2",
+      "groesse": [
+        1600,
+        1062
+      ],
+      "marken": [],
+      "md5": "a2878f5b0fd82f1ec80eed34f4d9ee00"
+    },
     {
       "datei": "02_ansicht.png",
       "szene": "02_ansicht",
@@ -15,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "7fee30f6c7e47c4a5960559676defc72"
+      "md5": "b840440af2d4131738ab6e7b9895cc6b"
     },
     {
       "datei": "03_stufe_aendern.gif",
@@ -30,7 +41,7 @@
         [],
         []
       ],
-      "md5": "4a02692b6f73c00aea56fc01984ccc51",
+      "md5": "3c57d7fd86ca689d65420e09ce43570a",
       "frames": 3,
       "dauern_ms": [
         1600,
@@ -47,7 +58,7 @@
         900
       ],
       "marken": [],
-      "md5": "d9b220813ad5f35582fcfdec746e9afd"
+      "md5": "f38c13db62bc57884d763f6d66d44f83"
     },
     {
       "datei": "05_stufe_szene.png",
@@ -58,7 +69,7 @@
         900
       ],
       "marken": [],
-      "md5": "dda708cf07154bc8c4e2c917375ee608"
+      "md5": "be664660b6fdb5ccf6b27b4d2cbe4261"
     },
     {
       "datei": "06_eigene_zahl.png",
@@ -69,7 +80,7 @@
         900
       ],
       "marken": [],
-      "md5": "34a14dc04d665af7e8e695e53a6ece43"
+      "md5": "33afb66553b4b4748a6f7a71d4625557"
     },
     {
       "datei": "07_snap_haken.png",
@@ -80,7 +91,7 @@
         900
       ],
       "marken": [],
-      "md5": "5bad021b557b3aa3d744c7e60a52bcee"
+      "md5": "ff51ca16f05d748a3f575b42a9a2c1a4"
     },
     {
       "datei": "08_blinder_gegen_lauflicht.png",
@@ -91,7 +102,7 @@
         369
       ],
       "marken": [],
-      "md5": "4423fac56471ac0c0a23e8f46dfacf19"
+      "md5": "e97d93a1986a2e15a89bf12db9629841"
     },
     {
       "datei": "09_ueberschneidung.png",
@@ -102,7 +113,7 @@
         900
       ],
       "marken": [],
-      "md5": "6297e29851c97c64be51be508ac21f16"
+      "md5": "94ecff361c3b387fadbe3b79e200bc64"
     },
     {
       "datei": "10_verdeckt.png",
@@ -113,7 +124,7 @@
         900
       ],
       "marken": [],
-      "md5": "47d4801f7735d799ed991022bf6caca9"
+      "md5": "59d0a28aeae9106f8d08cb0e4e925871"
     }
   ]
 }

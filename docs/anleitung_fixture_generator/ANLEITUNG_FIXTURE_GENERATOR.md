@@ -139,9 +139,19 @@ Im Bereich **Patchen**, Reiter **Patch**, auf **Gerät erstellen…** klicken (1
 5. Ein schon gespeichertes **eigenes** Profil holst du mit **Eigenes Profil
    öffnen…** zurück in den Generator (Liste nur eigener Profile; mitgelieferte
    und QLC+-Importe öffnest du über die Datei bzw. den Fixture Editor). Die
-   Herkunft des Profils reist mit. **Speichern** legt danach ein **neues**
-   Profil an — das geöffnete bleibt unverändert; wer es ersetzen will, löscht
-   das alte danach im Fixture Editor.
+   Herkunft des Profils reist mit. Danach hast du zwei Wege:
+   **Profil aktualisieren** (unten neben **Speichern**) überschreibt genau das
+   geöffnete Profil — nach einer Rückfrage („Nein“ ist vorgewählt). Die
+   Profilnummer bleibt, gepatchte Geräte behalten ihr Profil und bekommen die
+   neue Kanalbelegung sofort. Ist das Profil in der geladenen Show gepatcht
+   und ändert sich ein Modusname, die Kanalzahl oder Hersteller/Modell, nennt
+   die Rückfrage die betroffenen Geräte (wie im Fixture Editor). Einen Namen,
+   den schon ein anderes Profil trägt, nimmt sie nicht an. **Speichern** legt
+   dagegen ein **neues** Profil an, das geöffnete bleibt unverändert.
+   **Profil aktualisieren** ist nur aktiv, solange ein eigenes Profil geöffnet
+   ist; lädst du danach eine andere Vorlage (QLC+, `.json`), ist er wieder
+   grau. Mitgelieferte Profile und Importe werden nie überschrieben, sie
+   lassen sich nur als neues Profil speichern.
 
 ## 4. Modus und Kanäle
 
@@ -336,6 +346,9 @@ Der **Live-Test** (3) schreibt Werte direkt an das echte Gerät — beim Laser
 nur unter den Sicherheitsregeln aus Abschnitt 9. **Speichern** (4) legt das
 Profil in deiner Bibliothek an, schließt den Generator und bestätigt das in der
 Statuszeile unten im Hauptfenster (ohne Meldungsfenster zum Wegklicken).
+Daneben steht **Profil aktualisieren** (5): grau, solange kein eigenes Profil
+geöffnet ist (Abschnitt 3, Punkt 5) — sonst überschreibt er das geöffnete
+Profil, statt ein neues anzulegen.
 
 **Live-Test mit einem Laser.** **Test starten** sendet sofort die Default-Werte
 aller Kanäle. Bei einem Laser-Profil fragt LightOS deshalb vorher nach
@@ -406,9 +419,13 @@ von einer VC-Taste) nimmt nur Moving Heads.
 
 ![3D-Visualizer mit dem Laser](img/10_3d_laser.png)
 
-Die 3D-Ansicht zeichnet die Strahlen nach Position, Größe und Betriebsart. Die
-echten Muster des Geräts kennt sie nicht, und weil das Handbuch für Kanal 8 nur
-„0–255 Farbe“ nennt, erscheinen die Strahlen weiß.
+Die 3D-Ansicht zeichnet die Strahlen nach Position, Größe und Betriebsart.
+Ohne Laser-Seiten kennt sie die echten Muster des Geräts nicht, und weil das
+Handbuch für Kanal 8 nur „0–255 Farbe“ nennt, erscheinen die Strahlen weiß.
+Sind die Laser-Seiten ausgefüllt (Muster, Farben), zeichnet sie das gewählte
+Muster in der eingetragenen Farbe; steht die Farbe auf **„bunt“** (beim
+EL-400RGB MK2 Kanal 8 auf 0–1), sind die Strahlen mehrfarbig — reihum Rot,
+Grün, Blau, Gelb, Cyan und Magenta, jeder Strahl immer in derselben Farbe.
 
 ---
 

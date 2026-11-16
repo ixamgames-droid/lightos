@@ -59,7 +59,7 @@ two modes:
 (settings) (exception: color tile — double-click = color picker). A **right-click** (in
 edit mode) opens the context menu:
 
-- **Einstellungen…** (settings), **🎹 MIDI Teach…**, **⌨ Taste zuweisen…** (assign key)
+- **Einstellungen…** (settings), **🎹 MIDI Lernen…**, **⌨ Taste zuweisen…** (assign key)
 - **Bank** (Alle Banks = all banks / Bank 1…10), **Löschen** (delete),
   **Vordergrund-/Hintergrund-Farbe** (foreground/background color)
 - for effect-bound elements additionally **⚡ Live-Parameter…** (live parameters) and
@@ -75,6 +75,17 @@ shared interface (`effect_live`). MIDI uses the same binding.
 
 **Touch-Lock.** Locks mouse/touch during operation (display only, protects against
 accidental taps) — **MIDI/APC keeps working**.
+
+**Gestures on the touchscreen.** With `--touch` the Virtual Console knows three gestures, each of
+which you can switch off under **Ansicht → Touch-Gesten…** (View → touch gestures):
+
+- **Hold + tap:** in edit mode, leave one finger on an element and tap further ones with a
+  second finger — this selects several (like the **Mehrfach** toggle).
+- **Swipe the bank:** on free space, swipe horizontally with two fingers — left = next bank,
+  right = previous bank. This never applies while a finger rests on a fader or button.
+- **Three-finger tap:** runs the action you choose in the same dialog (default: nothing; the
+  choices are „Programmer leeren“ (clear programmer), „Nächste Page“ (next page) and
+  „Vorherige Page“ (previous page)). BLACKOUT or STOP ALL are deliberately not offered.
 
 ---
 

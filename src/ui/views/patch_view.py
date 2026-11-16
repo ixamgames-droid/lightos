@@ -21,6 +21,7 @@ from src.core.app_state import (get_state, AppState, color_head_count,
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
 from src.ui.widgets.fixture_browser import FixtureBrowserDialog, typ_anzeige
+from src.ui import dialog_hilfe
 
 TYPE_COLORS = {
     "moving_head": "#1a4a6e",
@@ -950,7 +951,7 @@ class PatchView(QWidget):
         aufbauen — die Adressen koennen sich geaendert haben."""
         try:
             from src.ui.widgets.address_conflict_dialog import AddressConflictDialog
-            AddressConflictDialog(self._state, self).exec()
+            dialog_hilfe.ausfuehren(AddressConflictDialog(self._state, self))
         except Exception as e:
             print(f"[patch_view] Konflikt-Dialog fehlgeschlagen: {e}")
         self._refresh_table()
@@ -970,33 +971,34 @@ class PatchView(QWidget):
 
     def _add_fixture(self):
         dlg = FixtureBrowserDialog(self._state.next_fid(), self)
-        if not dlg.exec():
-            return
-        # FM-39: Meldung VOR dem Patchen bauen — nach add_fixture sind die
-        # Objekte von der Sitzung geloest, ein Lesen von ``label`` wirft dann.
-        gerollt = getattr(dlg, "gerollt", [])
-        zeilen = []
-        if gerollt and dlg.result_fixture:
-            alle = [dlg.result_fixture] + list(getattr(dlg, "extra_fixtures", []))
-            zeilen = [f"• {alle[i].label}: Universum {alle[i].universe}, Adresse 1"
-                      for i in gerollt if i < len(alle)]
-        if dlg.result_fixture:
-            self._state.add_fixture(dlg.result_fixture)
-            for extra in getattr(dlg, "extra_fixtures", []):
-                self._state.add_fixture(extra)
-        skipped = getattr(dlg, "skipped_count", 0)
-        if skipped:
-            QMessageBox.warning(
-                self, "Nicht alle Geräte gepatcht",
-                f"{skipped} Gerät(e) konnten nicht gepatcht werden — "
-                "ab Universum 32 war kein Platz mehr.")
-        # FM-39: ein Ausweichen ins naechste Universe nicht still passieren lassen.
-        if zeilen:
-            QMessageBox.information(
-                self, "Ins nächste Universum verschoben",
-                "Diese Geräte hätten über Kanal 512 hinausgereicht und liegen "
-                "deshalb im nächsten Universum:\n\n" + "\n".join(zeilen[:12])
-                + (f"\n… und {len(zeilen) - 12} weitere" if len(zeilen) > 12 else ""))
+        with dialog_hilfe.offen(dlg):
+            if not dlg.exec():
+                return
+            # FM-39: Meldung VOR dem Patchen bauen — nach add_fixture sind die
+            # Objekte von der Sitzung geloest, ein Lesen von ``label`` wirft dann.
+            gerollt = getattr(dlg, "gerollt", [])
+            zeilen = []
+            if gerollt and dlg.result_fixture:
+                alle = [dlg.result_fixture] + list(getattr(dlg, "extra_fixtures", []))
+                zeilen = [f"• {alle[i].label}: Universum {alle[i].universe}, Adresse 1"
+                          for i in gerollt if i < len(alle)]
+            if dlg.result_fixture:
+                self._state.add_fixture(dlg.result_fixture)
+                for extra in getattr(dlg, "extra_fixtures", []):
+                    self._state.add_fixture(extra)
+            skipped = getattr(dlg, "skipped_count", 0)
+            if skipped:
+                QMessageBox.warning(
+                    self, "Nicht alle Geräte gepatcht",
+                    f"{skipped} Gerät(e) konnten nicht gepatcht werden — "
+                    "ab Universum 32 war kein Platz mehr.")
+            # FM-39: ein Ausweichen ins naechste Universe nicht still passieren lassen.
+            if zeilen:
+                QMessageBox.information(
+                    self, "Ins nächste Universum verschoben",
+                    "Diese Geräte hätten über Kanal 512 hinausgereicht und liegen "
+                    "deshalb im nächsten Universum:\n\n" + "\n".join(zeilen[:12])
+                    + (f"\n… und {len(zeilen) - 12} weitere" if len(zeilen) > 12 else ""))
 
     # ── IMP-1: Patch aus einer Tabelle ──────────────────────────────────────
     def _import_knopf(self) -> QPushButton:
@@ -1056,15 +1058,16 @@ class PatchView(QWidget):
                                 f"Generator konnte nicht geladen werden:\n{e}")
             return
         dlg = FixtureGeneratorDialog(self)
-        if dlg.exec() and dlg.saved_id is not None:
-            self._refresh_table()
-            # FM-71: Erfolg nicht-modal in der Statuszeile (statt Meldungsbox).
-            meldung = getattr(dlg, "gespeichert_meldung", "")
-            if meldung:
-                try:
-                    self.window().statusBar().showMessage(meldung, 6000)
-                except Exception:
-                    pass
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() and dlg.saved_id is not None:
+                self._refresh_table()
+                # FM-71: Erfolg nicht-modal in der Statuszeile (statt Meldungsbox).
+                meldung = getattr(dlg, "gespeichert_meldung", "")
+                if meldung:
+                    try:
+                        self.window().statusBar().showMessage(meldung, 6000)
+                    except Exception:
+                        pass
 
     def _fid_at_row(self, row: int) -> int | None:
         """FID der angezeigten Zeile (aus den Item-Daten, nicht positionsbasiert)."""
@@ -1111,24 +1114,25 @@ class PatchView(QWidget):
             return
         default_offset = max((s.channel_count for s in sources), default=1)
         dlg = CopyWithOffsetDialog(default_offset, self)
-        if not dlg.exec():
-            return
-        count, offset = dlg.count(), dlg.offset()
-        made = skipped = 0
-        for src in sources:
-            # next_fid() je Quelle frisch lesen: nach den Kopien der vorigen Quelle
-            # ist die naechste freie fid bereits weitergewandert.
-            specs, sk = plan_offset_copies(src, count, offset, self._state.next_fid())
-            skipped += sk
-            for spec in specs:
-                self._state.add_fixture(
-                    _copy_fixture(src, spec["fid"], spec["universe"], spec["address"]))
-                made += 1
-        if skipped:
-            QMessageBox.warning(
-                self, "Mit Offset kopieren",
-                f"{made} Kopie(n) angelegt, {skipped} übersprungen "
-                "(Adresse läge außerhalb 1–512).")
+        with dialog_hilfe.offen(dlg):
+            if not dlg.exec():
+                return
+            count, offset = dlg.count(), dlg.offset()
+            made = skipped = 0
+            for src in sources:
+                # next_fid() je Quelle frisch lesen: nach den Kopien der vorigen Quelle
+                # ist die naechste freie fid bereits weitergewandert.
+                specs, sk = plan_offset_copies(src, count, offset, self._state.next_fid())
+                skipped += sk
+                for spec in specs:
+                    self._state.add_fixture(
+                        _copy_fixture(src, spec["fid"], spec["universe"], spec["address"]))
+                    made += 1
+            if skipped:
+                QMessageBox.warning(
+                    self, "Mit Offset kopieren",
+                    f"{made} Kopie(n) angelegt, {skipped} übersprungen "
+                    "(Adresse läge außerhalb 1–512).")
 
     def _auto_patch(self):
         fixtures = self._state.get_patched_fixtures()
@@ -1172,19 +1176,20 @@ class PatchView(QWidget):
         if fixture is None:
             return
         dlg = PatchFixtureEditDialog(self._state, fixture, self)
-        if dlg.exec() and dlg.result_updates:
-            self._state.update_fixture(fixture.fid, **dlg.result_updates)
-            # FM-HEADLAYOUT: Modus „Köpfe einzeln" -> Kopf-Matrix-Gruppe NACH dem
-            # Persistieren aus dem FRISCHEN Patch-Objekt anlegen (Label/Modus/
-            # Kanalzahl sind dann aktuell; idempotent, nicht-destruktiv).
-            if getattr(dlg, "wants_head_group", False):
-                fresh = next((f for f in self._state.get_patched_fixtures()
-                              if f.fid == fid), None)
-                if fresh is not None:
-                    try:
-                        self._state.create_head_matrix_group(fresh)
-                    except Exception as e:
-                        print(f"[patch] Kopf-Matrix-Gruppe anlegen: {e}")
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() and dlg.result_updates:
+                self._state.update_fixture(fixture.fid, **dlg.result_updates)
+                # FM-HEADLAYOUT: Modus „Köpfe einzeln" -> Kopf-Matrix-Gruppe NACH dem
+                # Persistieren aus dem FRISCHEN Patch-Objekt anlegen (Label/Modus/
+                # Kanalzahl sind dann aktuell; idempotent, nicht-destruktiv).
+                if getattr(dlg, "wants_head_group", False):
+                    fresh = next((f for f in self._state.get_patched_fixtures()
+                                  if f.fid == fid), None)
+                    if fresh is not None:
+                        try:
+                            self._state.create_head_matrix_group(fresh)
+                        except Exception as e:
+                            print(f"[patch] Kopf-Matrix-Gruppe anlegen: {e}")
 
     def _profil_id_an_zeile(self, row: int) -> int | None:
         """UI-74: Profil-ID des gepatchten Geraets in Zeile ``row``."""

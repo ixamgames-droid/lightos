@@ -21,7 +21,7 @@ Die Werte landen im **Programmer** (`pan`, `tilt` und, wenn das Gerät sie hat, 
 In den Einstellungen (Inspector oder Doppelklick) lässt sich die **Ansicht** von „Draufsicht“ auf **„Aufgeklappt“** stellen. Dann zeigt das Pad den Raum wie einen auseinandergefalteten Würfel ohne Decke, maßstabsgetreu aus Raumbreite, -tiefe und -höhe:
 
 - **Mitte:** der **Boden** (wie die Draufsicht),
-- **oben:** die **Rückwand**, **links/rechts:** die **Seitenwände**, **unten:** die **Wand vorn** (Publikumsseite). Jede Wand ist an ihrer Kante zum Boden „heruntergeklappt“, jede Fläche ist beschriftet.
+- **oben:** die **Rückwand**, **links/rechts:** die **Seitenwände**, **unten:** die **Wand vorn** (Publikumsseite). Jede Wand ist an ihrer Kante zum Boden „heruntergeklappt“, jede Fläche ist beschriftet — ist ein Pad klein, steht nur „links“/„rechts“ oder gar kein Name, abgeschnitten wird nichts.
 
 | Tipp auf … | Ziel |
 | --- | --- |
@@ -30,7 +30,7 @@ In den Einstellungen (Inspector oder Doppelklick) lässt sich die **Ansicht** vo
 
 - **Ziehen über eine Klappkante** wechselt stetig auf die Nachbarfläche: an der Kante ist der Punkt auf Boden und Wand derselbe, die Köpfe springen nicht. Das gilt genau bei Zielhöhe 0 m (Vorgabe). Steht die Zielhöhe höher, liegt der Boden-Punkt an der Kante auf der Wand in dieser Höhe; beim Überqueren rutscht das Ziel dann einmal um die Zielhöhe an der Wand nach unten. Eine gestrichelte Linie auf den Wänden zeigt diese Höhe.
 - **Außerhalb aller Flächen** (z. B. in den leeren Ecken oder beim Ziehen über den Rand) wird auf die nächste Fläche begrenzt. Ein Tipp in eine leere Ecke setzt kein Ziel.
-- **Köpfe** stehen auf dem Boden an ihrem Standort; hängende Köpfe tragen ihre Hängehöhe (z. B. „4,5 m“).
+- **Köpfe** stehen auf dem Boden an ihrem Standort; hängende Köpfe tragen ihre Hängehöhe (z. B. „4,5 m“). Hängen mehrere Köpfe gleich hoch in einer Reihe, steht die Höhe nur **einmal** daran (z. B. „10× 4,5 m“). Wo der Platz nicht reicht, werden die Kreise kleiner, Nummern und Höhen fallen weg, statt sich zu überdecken; der Tooltip nennt die Höhen aller hängenden Köpfe immer („Höhen: 4,5 m: 1, 2, …“).
 - **Welche Wände** gezeigt werden, ist abwählbar (der Boden bleibt immer). Eine abgewählte Wand verschwindet aus der Abwicklung und ist nicht antippbar.
 
 Position Lock und AN/AUS gelten in beiden Ansichten gleich.
@@ -48,7 +48,7 @@ Liegt ein Ziel außerhalb des Bewegungsbereichs eines Kopfes (typisch: ein Punkt
 
 > Der AN-Zustand wird **nicht** gespeichert. Eine geladene Show schreibt nichts von selbst in den Programmer. Gespeichert werden Zuordnung, letzter Zielpunkt (mit Fläche und Wandhöhe), Zielhöhe, Position Lock, Ansicht und gezeigte Wände. Shows aus der Zeit vor der aufgeklappten Ansicht öffnen in der Draufsicht.
 
-Ein nur **gehaltenes** Ziel (Lock AUS) bleibt nie hängen: Es wird auch freigegeben, wenn die Bank wechselt, das Fenster den Fokus verliert, das System die Berührung abbricht oder während des Haltens die Touch-Sperre angeht. Mit **Touch-Lock** ist das Pad gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Widget, es zielt nichts.
+Ein nur **gehaltenes** Ziel (Lock AUS) bleibt nie hängen: Es wird auch freigegeben, wenn die Bank wechselt, das Fenster den Fokus verliert, das System die Berührung abbricht oder während des Haltens die Touch-Sperre angeht. Wird das Pad gelöscht (auch in einem gelöschten Rahmen), per Rückgängig/Wiederholen ersetzt oder eine Show neu geladen, gibt es seine Pan/Tilt-Werte ebenfalls frei, auch bei Lock AN. Nur der Bankwechsel behält ein eingerastetes Ziel (Lock AN). Mit **Touch-Lock** ist das Pad gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Widget, es zielt nichts.
 
 **Am Finger:** Das Pad ist ein Bedienelement wie ein Fader. Wischen auf dem Pad scrollt die Konsole nicht, es zieht das Ziel. Im Touch-Modus sind AN/AUS, Lock und der Höhenregler mindestens 44 px hoch.
 

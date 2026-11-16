@@ -26,6 +26,7 @@ Die Bedienung im Betrieb hängt vom Modus ab. Ein Linksklick/Ziehen direkt am Ra
 - **Klick ins Feld** setzt Pan/Tilt sofort auf die geklickte Stelle — die Geräte springen dorthin.
 - **Ziehen** fährt Pan/Tilt kontinuierlich mit der Maus mit (Live-Bewegung).
 - Der Punkt und die `P:`/`T:`-Prozentanzeige folgen der Bewegung.
+- Mit der Option **Relativ** (siehe Einstellungen) springt der Punkt beim Aufsetzen nicht: Ziehen verschiebt ihn ab seiner aktuellen Lage, und zwar nur halb so schnell wie der Finger — praktisch für Feinbedienung am Touchscreen.
 
 **Modus „Feld"** (`[Feld]`):
 - **Aufziehen eines Rechtecks** (drücken, ziehen, loslassen) markiert einen Bereich. Beim Loslassen wird daraus **Zentrum** (`x_offset`/`y_offset`) und **Größe** (`width`/`height`) des Ziel-Effekts gesetzt — der Effekt fährt seine Figur (z. B. eine Acht) genau in diesem Feld ab.
@@ -42,7 +43,7 @@ Die Bedienung im Betrieb hängt vom Modus ab. Ein Linksklick/Ziehen direkt am Ra
 **Bereich bzw. Pfad wieder loswerden** (Knopf „✕ Bereich löschen" / „✕ Pfad löschen"):
 - Sobald ein Bereich aufgezogen bzw. eine Bahn gezeichnet ist, erscheint direkt **unter dem Pad-Feld** ein Knopf. Er wirkt auch im **Spielbetrieb** (live) und im Kiosk-Modus; er löst erst beim **Loslassen auf dem Knopf** aus, wer daneben loslässt, bricht ab.
 - **„Bereich löschen"** entfernt die Markierung und stellt Zentrum und Größe des Ziel-Effekts auf genau die Werte zurück, die er **vor dem ersten Aufziehen** hatte. **„Pfad löschen"** entfernt die Bahn und stellt den vorherigen Pfad bzw. die vorherige Figur (z. B. die Acht) samt Zentrum und Größe wieder her.
-- Zurückgenommen werden **nur die eigenen Änderungen** des Pads: Hat inzwischen ein Fader, die Befehlszeile oder der Effekt-Editor z. B. die Breite verstellt, bleibt dieser Wert stehen. Wurde am Effekt inzwischen ein anderer Pfad gewählt, bleibt dieser ebenfalls.
+- Zurückgenommen werden **nur die eigenen Änderungen** des Pads: Hat inzwischen ein Fader, die Befehlszeile oder der Effekt-Editor z. B. die Breite verstellt, bleibt dieser Wert stehen. Wurde am Effekt inzwischen ein anderer Pfad gewählt, bleibt dieser ebenfalls. Wurde nach dem Zeichnen die Figur umgestellt (z. B. auf Kreis), bleibt die neue Figur; nur die gezeichnete Bahn verschwindet.
 - **Touch-Lock** sperrt den Knopf wie das Pad. Im **Bearbeiten-Modus** löst er nicht aus (dort verschiebt man das Widget); derselbe Befehl steht dann im **Kontextmenü** (Rechtsklick bzw. langes Drücken).
 - Im Touch-Modus ist der Knopf mindestens 44 px hoch, das Pad-Feld wird dafür etwas kleiner; mit der Maus ist er kompakt und das Pad bleibt so groß wie bisher. Ist das Widget zu klein, wird der Knopf ausgeblendet — dann nur über das Kontextmenü.
 - Ein gelöschter Bereich bleibt beim Speichern gelöscht. Nach dem Laden einer Show kennt das Pad die Vorwerte nicht mehr; „Bereich löschen" entfernt dann nur die Markierung, der Effekt bleibt, wie er ist.
@@ -62,6 +63,7 @@ Doppelklick auf das Pad (im Bearbeiten-Modus) öffnet den Dialog „XY Pad Einst
 | **Pan-Attribut** | Programmer-Attribut für die horizontale Achse. | Freitext, Standard `pan` (leer → `pan`) |
 | **Tilt-Attribut** | Programmer-Attribut für die vertikale Achse. | Freitext, Standard `tilt` (leer → `tilt`) |
 | **Auflösung** | 16-bit-Modus: schreibt zusätzlich die Fine-Kanäle `pan_fine`/`tilt_fine` für ruckelfreie Bewegung. Geräte ohne Fine-Kanal ignorieren den Extra-Wert. | Checkbox „16-bit (Fine-Kanäle pan_fine/tilt_fine)"; aus = klassisch 8-bit |
+| **Bedienung** | Nur im Positions-Modus: der Haken „Relativ (Punkt springt nicht, folgt halb so schnell)“ schaltet die relative Bedienung ein. | Checkbox; aus (Standard) = der Punkt springt zur berührten Stelle |
 | **Fixture-IDs (Position)** | Feste Ziel-Fixtures im Positions-Modus. Leer = aktuelle Auswahl, sonst alle gepatchten. | Komma-getrennte Zahlen (z. B. `1, 2, 3, 4, 5, 6`) |
 | **EFX-ID (Feld-Modus)** | Ziel-Effekt-ID für Feld-/Pfad-Modus per Zahl. | Zahl; leer = aktiver Effekt |
 | **Steuert** | Ziel-Effekt für Feld-/Pfad-Modus per Dropdown wählen statt ID tippen. Hat Vorrang vor „EFX-ID". | Aufklappbare Liste, ein Effekt; leer = aktiver Effekt |
@@ -84,7 +86,7 @@ Die Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/effect_live.p
 
 Das XY-Pad unterstützt **MIDI** (zwei absolute Control-Change-Achsen), aber **kein** Tasten-Teach.
 
-- **Zuweisen:** im Eigenschaften-Dialog **„MIDI CC Pan"** und **„MIDI CC Tilt"** auf die gewünschten CC-Nummern setzen sowie den **„MIDI-Kanal"** wählen (0 = alle Kanäle). Ein separates „MIDI Teach…" ist hier nicht nötig — die Bindung läuft über den Dialog.
+- **Zuweisen:** im Eigenschaften-Dialog **„MIDI CC Pan"** und **„MIDI CC Tilt"** auf die gewünschten CC-Nummern setzen sowie den **„MIDI-Kanal"** wählen (0 = alle Kanäle). Ein separates „MIDI Lernen…" ist hier nicht nötig — die Bindung läuft über den Dialog.
 - **Wirkung:** Beide CCs sind **absolut** — der eingehende Wert (0–127) wird direkt auf 0–100 % der jeweiligen Achse abgebildet.
 - **Nur im Positions-Modus** wirksam: In den Modi Feld/Pfad steuert MIDI das Pad nicht.
 

@@ -35,6 +35,6 @@ Gespeichert werden (zusätzlich zu den gemeinsamen VC-Feldern) die Schriftgröß
 
 ## Tipps & Fallen
 
-- Das Label ist **passiv**: Es kann nicht an einen Effekt gebunden werden und unterstützt **kein** MIDI-Teach und **keine** Tastenzuweisung. Nutze es nur zur Beschriftung.
+- Das Label ist **passiv**: Es kann nicht an einen Effekt gebunden werden und unterstützt **kein** MIDI Lernen und **keine** Tastenzuweisung. Nutze es nur zur Beschriftung.
 - Halte den Text kurz. Wird er zu lang, bricht er innerhalb der Fläche um — vergrößere das Element oder reduziere die Schriftgröße, damit alles lesbar bleibt.
 - Für gute Lesbarkeit kannst du Vorder- und Hintergrundfarbe über das Rechtsklick-Menü an dein Layout anpassen.

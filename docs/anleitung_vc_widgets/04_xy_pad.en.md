@@ -28,6 +28,7 @@ How you use the pad during operation depends on the mode. A left-click/drag righ
 - **Clicking into the field** sets pan/tilt immediately to the clicked spot — the fixtures jump there.
 - **Dragging** moves pan/tilt continuously along with the mouse (live movement).
 - The dot and the `P:`/`T:` percentage display follow the movement.
+- With the **Relativ** (relative) option (see settings) the dot does not jump when you touch down: dragging moves it from its current position, at only half the speed of the finger — handy for fine control on a touchscreen.
 
 **Mode „Feld"** (`[Feld]`):
 - **Dragging out a rectangle** (press, drag, release) marks an area. On release, this sets the **center** (`x_offset`/`y_offset`) and **size** (`width`/`height`) of the target effect — the effect runs its figure (e.g. a figure eight) exactly within this field.
@@ -44,7 +45,7 @@ How you use the pad during operation depends on the mode. A left-click/drag righ
 **Getting rid of an area or path again** (button „✕ Bereich löschen" (clear area) / „✕ Pfad löschen" (clear path)):
 - As soon as an area has been dragged out or a path drawn, a button appears directly **below the pad field**. It also works **during operation** (live) and in kiosk mode; it only triggers when you **release on the button** — releasing next to it cancels.
 - **„Bereich löschen"** removes the marking and resets the target effect's center and size to exactly the values it had **before the first drag**. **„Pfad löschen"** removes the path and restores the previous path or figure (e.g. the figure eight) including center and size.
-- Only the pad's **own changes** are undone: if a fader, the command line or the effect editor has changed e.g. the width in the meantime, that value stays. If another path has been chosen on the effect in the meantime, it stays as well.
+- Only the pad's **own changes** are undone: if a fader, the command line or the effect editor has changed e.g. the width in the meantime, that value stays. If another path has been chosen on the effect in the meantime, it stays as well. If the figure was switched after drawing (e.g. to circle), the new figure stays; only the drawn path goes away.
 - **Touch-Lock** locks the button like the pad. In **edit mode** it does not trigger (there you move the widget); the same command is then in the **context menu** (right-click or long press).
 - In touch mode the button is at least 44 px high and the pad field becomes slightly smaller for it; with the mouse it is compact and the pad keeps its previous size. If the widget is too small, the button is hidden — then use the context menu.
 - A cleared area stays cleared when saving. After loading a show the pad no longer knows the previous values; „Bereich löschen" then only removes the marking and the effect stays as it is.
@@ -64,6 +65,7 @@ Double-clicking the pad (in edit mode) opens the „XY Pad Einstellungen" (XY pa
 | **Pan-Attribut** (pan attribute) | Programmer attribute for the horizontal axis. | Free text, default `pan` (empty → `pan`) |
 | **Tilt-Attribut** (tilt attribute) | Programmer attribute for the vertical axis. | Free text, default `tilt` (empty → `tilt`) |
 | **Auflösung** (resolution) | 16-bit mode: additionally writes the fine channels `pan_fine`/`tilt_fine` for smooth movement. Fixtures without a fine channel ignore the extra value. | Checkbox „16-bit (Fine-Kanäle pan_fine/tilt_fine)" (16-bit (fine channels pan_fine/tilt_fine)); off = classic 8-bit |
+| **Bedienung** (operation) | Position mode only: the checkbox „Relativ (Punkt springt nicht, folgt halb so schnell)" (relative: the dot does not jump, follows at half speed) switches on relative operation. | Checkbox; off (default) = the dot jumps to the touched spot |
 | **Fixture-IDs (Position)** | Fixed target fixtures in position mode. Empty = current selection, otherwise all patched. | Comma-separated numbers (e.g. `1, 2, 3, 4, 5, 6`) |
 | **EFX-ID (Feld-Modus)** (EFX ID (field mode)) | Target effect ID for field/path mode, as a number. | Number; empty = active effect |
 | **Steuert** (controls) | Select the target effect for field/path mode from a dropdown instead of typing the ID. Takes precedence over „EFX-ID". | Drop-down list, one effect; empty = active effect |
@@ -86,7 +88,7 @@ The live effect runs through the shared seam `src/core/engine/effect_live.py` (`
 
 The XY pad supports **MIDI** (two absolute control change axes), but **no** key teach.
 
-- **Assign:** in the properties dialog, set **„MIDI CC Pan"** and **„MIDI CC Tilt"** to the desired CC numbers and select the **„MIDI-Kanal"** (0 = all channels). A separate „MIDI Teach…" is not needed here — the binding is done in the dialog.
+- **Assign:** in the properties dialog, set **„MIDI CC Pan"** and **„MIDI CC Tilt"** to the desired CC numbers and select the **„MIDI-Kanal"** (0 = all channels). A separate „MIDI Lernen…" is not needed here — the binding is done in the dialog.
 - **Effect:** both CCs are **absolute** — the incoming value (0–127) is mapped directly to 0–100 % of the respective axis.
 - Effective **only in position mode**: in the modes Feld/Pfad, MIDI does not control the pad.
 

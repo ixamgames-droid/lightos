@@ -1,8 +1,8 @@
 {
   "anleitung": "buehnen_show",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "8148ec3f",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "3a9e7ca3",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_show'.",
   "bilder": [
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "6cef087be3e4bae0be504b0e69007f49"
+      "md5": "bb8984dc630a25eeaa298fcc6d197a25"
     },
     {
       "datei": "02_aufbau.png",

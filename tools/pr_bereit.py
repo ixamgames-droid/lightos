@@ -77,6 +77,16 @@ sind:
    ``--ohne-claim "Begruendung"`` — nur zusammen mit PR-Nummern und nur mit
    Begruendung, damit daraus keine Pauschalabschaltung wird.
 
+6. **Doppelt vergebene Backlog-ID.** (PROC-06) Fuehrt der PR eine NEUE ID
+   ein (neue Zeile oder neues Fragment ``backlog.d/<ID>.md`` gegenueber dem
+   Merge-Base mit ``main``) und fuehrt ein ANDERER offener PR dieselbe ID mit
+   anderem Titel ein — oder steht sie inzwischen so auf ``main`` —, heisst
+   das Urteil „ID-Konflikt"; bei der Merge-Pruefung Exit 1 wie ohne Claim.
+   Still bleiben: eine geerbte, nur umformulierte ID, ein Status-Fragment fuer
+   ein vorhandenes Item und zwei PRs am selben vorhandenen Item. Gelesen wird
+   der lokale Ref-Stand (kein ``git fetch``); fehlt ``gh``, Netz oder ein Ref,
+   gibt es einen Hinweis, kein Rot. Die Logik steht in ``backlog_ids.id_gate``.
+
 Das Werkzeug beantwortet die andere Frage: **sind Checks tatsaechlich GELAUFEN,
 und gilt ihr Ergebnis noch?**
 
@@ -106,6 +116,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import session_claim  # noqa: E402
 # XPLAT-41: die Liste der nur beobachtenden Checks — dieselbe wie in pr_ci_status.
 import _ci_beobachtend  # noqa: E402
+# PROC-06: dieselbe ID-Logik wie `backlog_ids.py` (Titelvergleich, Fragmente).
+import backlog_ids  # noqa: E402
 
 BEREIT = "bereit"
 NIE_GEPRUEFT = "nie geprueft"
@@ -122,6 +134,7 @@ ALT = "gruen auf altem Stand"
 KONFLIKT = "Konflikt"
 ENTWURF = "Entwurf"
 OHNE_CLAIM = "ohne Claim"
+ID_KONFLIKT = "ID-Konflikt"
 
 
 def urteil(anzahl_checks: int, schluesse: list[str], zurueck: int,
@@ -264,6 +277,50 @@ def mit_claim(u: str, grund: str, claim_ok: bool, claim_grund: str,
     return u, f"{grund}; ausserdem {claim_grund}", True
 
 
+def mit_id_pruefung(u: str, grund: str, konflikte: list,
+                    hinweise: list) -> tuple[str, str, bool]:
+    """PROC-06: ``(Urteil, Begruendung, Konflikt?)`` — wie :func:`mit_claim`.
+
+    Ein Konflikt macht aus „bereit" das Urteil „ID-Konflikt"; ein anderes
+    Problem behaelt seinen Namen, der Konflikt wird angehaengt. Hinweise (die
+    Pruefung konnte nicht laufen — kein ``gh``, kein Netz, Ref fehlt) aendern
+    das Urteil NICHT: kein Rot aus fehlender Auskunft.
+    """
+    for h in hinweise:
+        grund = f"{grund}; Hinweis: {h}"
+    if not konflikte:
+        return u, grund, False
+    text = f"ID-Konflikt: {backlog_ids.konflikt_text(konflikte)}"
+    if u == BEREIT:
+        return ID_KONFLIKT, f"{grund}, aber {text}", True
+    return u, f"{grund}; ausserdem {text}", True
+
+
+def id_pruefung(info: dict, zweige_cache: dict) -> tuple[list, list]:
+    """PROC-06: ``(Konflikte, Hinweise)`` fuer einen PR aus ``gh pr view``.
+
+    Die offenen PR-Zweige werden EINMAL je Aufruf geholt (``zweige_cache``).
+    Gelesen wird der lokale Stand der Refs — die Warteschlange holt nach jedem
+    Merge ohnehin mit ``git fetch``."""
+    if "zweige" not in zweige_cache:
+        zweige_cache["zweige"] = backlog_ids.offene_pr_zweige()
+    zweige, warnung = zweige_cache["zweige"]
+    eigener = _zweig_norm(info.get("headRefName") or "")
+    kopf = info.get("headRefOid") or ""
+    hinweise = []
+    if not kopf or not backlog_ids._ref_da(kopf):
+        kopf = f"origin/{eigener}"
+    if warnung:
+        hinweise.append(f"offene PRs nur teilweise bekannt ({warnung})")
+    andere = {f"origin/{z}": f"origin/{z}" for z in zweige
+              if _zweig_norm(z) != eigener}
+    try:
+        konflikte, mehr = backlog_ids.id_gate(kopf, andere)
+    except Exception as e:  # noqa: BLE001 — git fehlt o. ae.: Hinweis, kein Rot
+        return [], hinweise + [f"ID-Pruefung nicht gelaufen ({e})"]
+    return konflikte, hinweise + mehr
+
+
 def _lade_tafel() -> dict:
     """Tafel ueber ``session_claim`` (PROC-25: privates Tafel-Repo neben
     ``repo/``). Wirft ``session_claim.TafelFehlt``, wenn der Klon fehlt."""
@@ -330,6 +387,7 @@ def main(argv=None) -> int:
     t = session_claim.jetzt()
 
     zeilen, nicht_bereit, ohne_claim, verfallen = [], 0, 0, 0
+    id_konflikt, zweige_cache = 0, {}
     for nr in sorted(nummern):
         info = _gh_json("pr", "view", str(nr), "--json",
                         "headRefOid,headRefName,title,mergeable,isDraft")
@@ -353,6 +411,11 @@ def main(argv=None) -> int:
         u, grund = urteil(len(liste), schluesse, zurueck,
                           info.get("mergeable"), alter,
                           bool(info.get("isDraft")), beobachtet)
+        # PROC-06: eine NEUE Backlog-ID, die ein anderer offener PR (oder
+        # inzwischen main) mit anderem Titel vergeben hat.
+        konflikte, id_hinweise = id_pruefung(info, zweige_cache)
+        u, grund, id_rot = mit_id_pruefung(u, grund, konflikte, id_hinweise)
+        id_konflikt += id_rot and not info.get("isDraft")
         if tafel_warnung:
             # PROC-25 (Gegenpruefung): ungeprueft ist bei der Merge-Pruefung
             # (PR-Nummern) KEIN gruen — `pr_bereit.py N && gh pr merge N`
@@ -411,6 +474,15 @@ def main(argv=None) -> int:
             return 1
         print(f"{ohne_claim} PR(s) ohne Claim (nur Bericht — Exit 1 erst mit "
               "PR-Nummern oder --strict, PROC-14).")
+    if id_konflikt:
+        # Wie der fehlende Claim eine Regel, keine Frage der Geduld: bei der
+        # Merge-Pruefung Exit 1 auch ohne --strict (PROC-06).
+        if args.pr or args.strict:
+            print(f"{id_konflikt} PR(s) mit ID-Konflikt — Exit 1 (PROC-06). "
+                  "Neue Nummer holen und Fragment umbenennen.")
+            return 1
+        print(f"{id_konflikt} PR(s) mit ID-Konflikt (nur Bericht — Exit 1 erst "
+              "mit PR-Nummern oder --strict, PROC-06).")
     return 1 if (nicht_bereit and args.strict) else 0
 
 

@@ -160,6 +160,28 @@ class VCWidget(QFrame):
     # ueber den Touchscreen (APC/MIDI steuert weiter). Vom VC-Toolbar gesetzt.
     input_locked = False
 
+    # UI-136: die Auswahl-Marke meldet jede Aenderung der Flaeche — die
+    # Ueberlagerung (``vc_auswahl_marke``) malt die Markierung fuer ALLE
+    # Widget-Typen an einer Stelle. Ueberall im Code bleibt es beim schlichten
+    # ``w._selected = …``.
+    @property
+    def _selected(self) -> bool:
+        return self.__dict__.get("_vc_ausgewaehlt", False)
+
+    @_selected.setter
+    def _selected(self, an) -> None:
+        an = bool(an)
+        if self.__dict__.get("_vc_ausgewaehlt", False) == an:
+            return
+        self.__dict__["_vc_ausgewaehlt"] = an
+        try:
+            cv = self._find_canvas()
+        except RuntimeError:
+            cv = None
+        melden = getattr(cv, "auswahl_marke_geaendert", None)
+        if callable(melden):
+            melden()
+
     def _run_input_blocked(self) -> bool:
         """True, wenn im Run-Modus Touch/Maus gesperrt ist (Display-only)."""
         return (not self._edit_mode) and VCWidget.input_locked
@@ -671,7 +693,7 @@ class VCWidget(QFrame):
                 menu.addAction("⚡ Live-Parameter…").triggered.connect(
                     lambda checked=False, f=_fid: self._open_live_editor(f))
         if self.supports_midi_teach():
-            menu.addAction("🎹 MIDI Teach...").triggered.connect(self._teach_midi)
+            menu.addAction("🎹 MIDI Lernen...").triggered.connect(self._teach_midi)
         if self.supports_key_teach():
             menu.addAction("⌨ Taste zuweisen...").triggered.connect(self._teach_key)
         # Bank-Zuweisung (einheitlich fuer alle Widget-Typen)
@@ -800,7 +822,7 @@ class VCWidget(QFrame):
         from src.ui.widgets.midi_teach_dialog import MidiTeachDialog
         dlg = MidiTeachDialog(self, current=self.current_midi_binding(),
                               accept_kinds=self._midi_teach_kinds(),
-                              title=f"MIDI Teach — {self.caption}")
+                              title=f"MIDI Lernen — {self.caption}")
         if dlg.exec() == QDialog.DialogCode.Accepted:
             b = dlg.result_binding
             if b is None:

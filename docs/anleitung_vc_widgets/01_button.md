@@ -12,7 +12,7 @@ Die VC-Grundlagen (Bearbeiten-Modus, Anlegen, Banks, Touch-Lock) sind in der Üb
 
 ## So sieht es aus & Bedienung im Betrieb
 
-Das sichtbare Element ist eine rechteckige Kachel mit zentrierter, mehrzeiliger **Beschriftung** (im Bild „Effekt an/aus"). Standardgröße 120 × 60 px, Hintergrund dunkelblau (`#1a3a5c`), Schrift weiß. Vorder- und Hintergrundfarbe lassen sich per Rechtsklick-Menü ändern.
+Das sichtbare Element ist eine rechteckige Kachel mit zentrierter, mehrzeiliger **Beschriftung** (im Bild „Effekt an/aus"). Standardgröße 120 × 60 px, Hintergrund dunkelblau (`#1a3a5c`), Schrift weiß. Vorder- und Hintergrundfarbe lassen sich per Rechtsklick-Menü ändern. Passt die Beschriftung nicht in die Taste, wird die Schrift kleiner (bis 7 pt). Ein zu langes Wort wird mit Bindestrich getrennt. Reicht auch das nicht, endet der Text mit „…“, und der Tooltip zeigt ihn vollständig. Der gespeicherte Text bleibt dabei unverändert.
 
 Optische Hinweise auf der Kachel:
 
@@ -41,7 +41,7 @@ Bedienung (nur im Betrieb, d. h. „Bearbeiten" AUS):
 - **Lang gedrückt halten (ca. 500 ms)** = öffnet bei Aktion „Funktion an/aus" oder „Effekt-Aktion (Live)" mit gebundenem Effekt den **Live-Mini-Editor** (Werte werden erst beim Klick auf „Anwenden" gesendet). Nur aktiv, wenn die Option **Long-Press** gesetzt ist; kurzer Tap bricht den Timer ab. Bei „Flash" bewusst nicht verfügbar (kollidiert mit dem Halten).
 - Ist **Touch-Lock** aktiv, ignoriert der Button Maus/Touch (reine Anzeige); MIDI/APC steuert weiter.
 
-Im **Bearbeiten-Modus** dient die linke Maustaste zum Verschieben/Skalieren; Doppelklick öffnet die Einstellungen; Rechtsklick öffnet das Kontextmenü (Einstellungen, MIDI Teach, Taste zuweisen, Bank, Löschen, Farben).
+Im **Bearbeiten-Modus** dient die linke Maustaste zum Verschieben/Skalieren; Doppelklick öffnet die Einstellungen; Rechtsklick öffnet das Kontextmenü (Einstellungen, MIDI Lernen, Taste zuweisen, Bank, Löschen, Farben).
 
 ## Einstellungen
 
@@ -211,13 +211,13 @@ Wurde der gebundene Effekt live verändert (Fader, Effekt-Aktion, Farb-Kachel, L
 
 Der Button unterstützt sowohl MIDI- als auch Tastatur-Zuweisung (beide Teach-Funktionen liefern `True`).
 
-**MIDI** (Kontextmenü „MIDI Teach…" oder die Felder im Dialog):
+**MIDI** (Kontextmenü „MIDI Lernen…" oder die Felder im Dialog):
 
 - **Typ** `note_on`: Note gedrückt (`data2 > 0`) = Druck, Note los (`note_off` oder `data2 = 0`) = Loslassen — so funktionieren Toggle UND Flash exakt wie an der Maus.
 - **Typ** `cc`: absolut ausgewertet — Wert > 63 = gedrückt, sonst losgelassen.
 - **Kanal** 0 = alle Kanäle. **Note/CC** -1 = keine Bindung.
 - APC-Tasten werden als `note_on`, Fader als `cc` interpretiert.
-- **„LED am Pult zeigt den Zustand“** (MIDI-18, nur `note_on` mit festem Kanal): Leuchtet die Taste in LightOS, schickt LightOS dieselbe Note mit Wert 127 an das Pult, sonst 0 — so zeigen die Tasten-LEDs eines Mackie-Control-Pults (X-Touch, MCU) den Zustand. Gesendet wird über den MIDI-Ausgang aus E/A → MIDI.
+- **„LED am Pult zeigt den Zustand“** (MIDI-18, nur `note_on` mit festem Kanal): Leuchtet die Taste in LightOS, schickt LightOS dieselbe Note mit Wert 127 an das Pult, sonst 0 — so zeigen die Tasten-LEDs eines Mackie-Control-Pults (X-Touch, MCU) den Zustand. Gesendet wird über den MIDI-Ausgang aus E/A → MIDI. Beim Beenden von LightOS gehen die LEDs aus, bevor der Ausgang geschlossen wird.
 
 **Tastatur** (Kontextmenü „Taste zuweisen…"): Ein Hotkey (z. B. `Ctrl+F5`) wird wie eine MIDI-Note behandelt — Tastendruck = `note_on`, Loslassen = `note_off`. Damit arbeiten Toggle und Flash identisch zur MIDI-Steuerung.
 

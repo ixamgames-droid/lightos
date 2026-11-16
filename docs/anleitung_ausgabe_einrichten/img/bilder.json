@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b0cc8008",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "4f4e0d864f46d790b6d80305798781e8"
+      "md5": "3ff613339d0784ba56483a11287796e3"
     },
     {
       "datei": "02_enttec.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "3a6b680f03b9baf9c4e2ce78f62c7c11"
+      "md5": "fdad51673d71ce2865e923869423dd8a"
     },
     {
       "datei": "03_artnet.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "e9f7dfc4e64048126c86f8a0ee8b5a6c"
+      "md5": "af692aac73d69dc1ec2e63bb882254ad"
     },
     {
       "datei": "04_sacn.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "ff9fca3f6a538675df34514955272d00"
+      "md5": "dc2dd1f557cf5b1a9a3ba4369dfd4b22"
     },
     {
       "datei": "05_universen.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "079605699bf6f373c11395e555a587b4"
+      "md5": "1dbad0f8a7b5357a3e91fcf9b1b5d74a"
     },
     {
       "datei": "06_output_monitor.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "727bb85c8ff903482e1a7cafe132a40e"
+      "md5": "665f02e7335cd217a4c38bd2c9639f81"
     },
     {
       "datei": "07_dmx_monitor.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "f0c4c22ad5ae8c3ec04893079019cba8"
+      "md5": "9af09b257d8a637c8ce7f68425c9b085"
     },
     {
       "datei": "08_warnungen.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "e300f3ef8653fee74b52bbf8a634f81e"
+      "md5": "2f3885c1d965e658e1c04b6e5a19b201"
     },
     {
       "datei": "09_blackout_dmx_monitor.png",
@@ -103,7 +103,7 @@
         325
       ],
       "marken": [],
-      "md5": "2db48f98d2e0afb99d6dfb970d9c60f7"
+      "md5": "3d26a0143a2cdfe67268e9a1b9efb4c4"
     },
     {
       "datei": "10_assistent.png",
@@ -114,7 +114,7 @@
         900
       ],
       "marken": [],
-      "md5": "5e7cdbc70582d466264eff745db10004"
+      "md5": "b0da274fb44e74e61ff96b093d5cb6a4"
     },
     {
       "datei": "11_testsignal.png",
@@ -125,7 +125,7 @@
         900
       ],
       "marken": [],
-      "md5": "8b35c628ba011cc193466a2ef166c172"
+      "md5": "7e22a3b31a5d812d92c80e1fe652da89"
     },
     {
       "datei": "12_assistent_nichts_gefunden.png",
@@ -136,7 +136,7 @@
         900
       ],
       "marken": [],
-      "md5": "1ad221d385f1068f3b56ee20b51d4632"
+      "md5": "818760a2224df2ccd65eaa3ad0d67281"
     },
     {
       "datei": "13_testsignal_ablauf.gif",

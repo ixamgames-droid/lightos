@@ -1,12 +1,14 @@
 """Fixture Group View - 2D grid where fixtures are placed (drag&drop)."""
 from __future__ import annotations
 import json
+import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidget, QTreeWidgetItem,
     QPushButton, QComboBox, QSpinBox, QInputDialog, QMessageBox, QGroupBox,
     QFormLayout, QFrame, QSizePolicy, QGridLayout,
     QDialog, QListWidget, QListWidgetItem, QAbstractItemView, QDialogButtonBox,
-    QMenu,
+    QMenu, QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
+    QScrollArea,
 )
 from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, QRect, Signal
 from PySide6.QtGui import (
@@ -29,6 +31,7 @@ from sqlalchemy import select, delete
 from src.core.group_cells import (          # noqa: E402  (nach den Qt-Importen)
     ACHSE_FARBE, ACHSE_WEISS, parse_zelle, zelle_fuer, zelle_gehoert_zu,
 )
+from src.ui import dialog_hilfe
 
 
 def _split_cell(v):
@@ -858,6 +861,45 @@ class FixtureGridWidget(QWidget):
 
 # ── Fixture Tree with Drag ────────────────────────────────────────────────────
 
+class _GeraeteNameDelegat(QStyledItemDelegate):
+    """CDX-74: Kuerzung, die die Geraetenummer nie anschneidet.
+
+    Eintraege wie ``[013] PAR Tri LED RGBW`` behalten bei Platzmangel immer
+    das ``[013] ``-Praefix; gekuerzt wird nur der Name, und zwar mittig
+    (QOL-03: der unterscheidende Namens-Schwanz bleibt sichtbar). Andere
+    Zeilen (Universe-Ordner) kuerzt Qt rechts (``textElideMode``)."""
+
+    _PRAEFIX = re.compile(r"^(\[\d+\]\s+)(.+)$", re.S)
+
+    def angezeigter_text(self, opt, breite: int) -> str:
+        text = opt.text or ""
+        fm = opt.fontMetrics
+        w = opt.widget
+        stil = w.style() if w is not None else QApplication.style()
+        # Qt zieht vom Text-Rechteck je Seite (Fokusrahmen-Rand + 1) ab.
+        rand = stil.pixelMetric(QStyle.PixelMetric.PM_FocusFrameHMargin, None, w) + 1
+        frei = int(breite) - 2 * rand
+        if fm.horizontalAdvance(text) <= frei:
+            return text
+        m = self._PRAEFIX.match(text)
+        if not m:
+            return text                     # Qt kuerzt selbst (textElideMode)
+        praefix, name = m.group(1), m.group(2)
+        rest = frei - fm.horizontalAdvance(praefix)
+        if rest <= fm.horizontalAdvance("…"):
+            return fm.elidedText(text, Qt.TextElideMode.ElideRight, frei)
+        return praefix + fm.elidedText(name, Qt.TextElideMode.ElideMiddle, rest)
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        w = opt.widget
+        stil = w.style() if w is not None else QApplication.style()
+        flaeche = stil.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, w)
+        opt.text = self.angezeigter_text(opt, flaeche.width())
+        stil.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, painter, w)
+
+
 class FixtureTreeWithDrag(QTreeWidget):
     """QTreeWidget mit Universe-Ordnern als Top-Level-Items.
 
@@ -868,10 +910,17 @@ class FixtureTreeWithDrag(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setHeaderHidden(True)
-        # QOL-03: laenger Namen mittig kuerzen (statt rechts) — so bleibt der
-        # unterscheidende Namens-Schwanz sichtbar (`[013] PAR …RGBW` statt
-        # `[013] PAR T…`); der Vollname haengt zusaetzlich im Tooltip.
-        self.setTextElideMode(Qt.TextElideMode.ElideMiddle)
+        # QOL-03 + CDX-74: Geraetezeilen kuerzt der Delegat — das Praefix
+        # `[013] ` bleibt immer ganz, der Name wird mittig gekuerzt (der
+        # unterscheidende Schwanz bleibt sichtbar: `[013] PAR …RGBW`). Die
+        # mittige Qt-Kuerzung schnitt vorher in der schmalen Buehnen-Leiste die
+        # Nummer an (`[00…R 1`). Alles andere kuerzt Qt rechts. Der Vollname
+        # haengt zusaetzlich im Tooltip.
+        self.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.setItemDelegate(_GeraeteNameDelegat(self))
+        # CDX-74: 12 statt 20 px Einzug je Ebene — die Liste lebt in 190 bzw.
+        # 260 px breiten Leisten; Universe-Ordner -> Geraet bleibt erkennbar.
+        self.setIndentation(12)
         self.setDragEnabled(True)
         self.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
         self.setStyleSheet("""
@@ -881,6 +930,7 @@ class FixtureTreeWithDrag(QTreeWidget):
                 border: 1px solid #333;
                 border-radius: 4px;
             }
+            QTreeWidget::item { padding-left: 2px; padding-right: 2px; }
             QTreeWidget::item:hover { background: #2a2a3a; }
             QTreeWidget::item:selected { background: #0978FF; color: #fff; }
         """)
@@ -951,6 +1001,16 @@ class FixtureGroupView(QWidget):
         # sonst nur ~43px breit -> die Labels wurden zu unleserlichen Fragmenten
         # beschnitten. 2 Spalten verdoppeln die Button-Breite -> Text lesbar.
         btns = QGridLayout()
+        # UI-141: im Touch-Modus 8 px Zeilenabstand zwischen den 44-px-Knoepfen
+        # (waagerecht bleibt der Standard — sonst passt „Umbenennen" nicht mehr).
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            _touch = bool(is_touch_mode())
+        except Exception as e:
+            print(f"[fixture_group_view] ERROR: Touch-Zustand: {e}")
+            _touch = False
+        if _touch:
+            btns.setVerticalSpacing(8)
         b_new = QPushButton("+ Neu")
         b_new.clicked.connect(self._new_group)
         btns.addWidget(b_new, 0, 0)
@@ -986,6 +1046,8 @@ class FixtureGroupView(QWidget):
         # Fixture tree (Universe-Ordner)
         left.addWidget(QLabel("Fixtures (drag auf Raster):"))
         self._fixture_list = FixtureTreeWithDrag()
+        # UI-141: der Baum darf in der Bildlaufspalte nicht auf null schrumpfen.
+        self._fixture_list.setMinimumHeight(160)
         left.addWidget(self._fixture_list, 1)
 
         # FM-HEADLAYOUT Slice 3: Köpfe eines Multi-Head-Geräts als EINZELNE Zellen
@@ -1021,7 +1083,11 @@ class FixtureGroupView(QWidget):
             # Menue-Pfeil loeste unter Windows "QFont::setPointSize: Point
             # size <= 0 (-1)" aus (s. widgets/menue_knopf.py); der Pfeil steht
             # als "▾" schon im Text.
-            _btn = MenueKnopf(_titel)
+            # UI-141: Touch-Innenabstand + 14-px-Schrift sprengen die 260 px
+            # breite Spalte ("Weiß-Segmente einzeln → Raster ▾" war links
+            # abgeschnitten) -> dort zweizeilig. Der Wortlaut bleibt (Anleitung).
+            _zweizeilig = _touch and _achse == ACHSE_WEISS
+            _btn = MenueKnopf(_titel.replace(" → ", "\n→ ", 1) if _zweizeilig else _titel)
             _btn.setToolTip(_hilfe)
             _menu = QMenu(_btn)
             # FM-40: die im Gerät hinterlegte Form steht OBEN — sie ist die
@@ -1070,8 +1136,23 @@ class FixtureGroupView(QWidget):
 
         left_w = QWidget()
         left_w.setLayout(left)
+        # UI-141: die Spalte scrollt senkrecht statt ihre Knoepfe unter die
+        # Mindesthoehe zu quetschen — bei 1280x800 im Touch-Modus lagen sie
+        # sonst uebereinander. Breite bleibt 260 px (Inhalt), die Bildlaufleiste
+        # kommt nur bei Bedarf dazu.
+        self._left_scroll = QScrollArea()
+        self._left_scroll.setWidgetResizable(True)
+        self._left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._left_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._left_scroll.setWidget(left_w)
         left_w.setFixedWidth(260)
-        root.addWidget(left_w)
+        # Platz fuer die Bildlaufleiste (Touch-QSS: 24 px breit), damit die
+        # 260 px Inhalt nie rechts angeschnitten werden.
+        _leiste = max(self._left_scroll.verticalScrollBar().sizeHint().width(),
+                      24 if _touch else 0)
+        self._left_scroll.setFixedWidth(260 + _leiste)
+        root.addWidget(self._left_scroll)
 
         # ── Right: container with grid + floating panel ───────────────────
         right_w = QWidget()
@@ -1483,44 +1564,45 @@ class FixtureGroupView(QWidget):
             patched_labels=labels,
             parent=self,
         )
-        if not dlg.exec():
-            return
-        name = dlg.result_name()
-        if not name:
-            QMessageBox.warning(self, "Bearbeiten", "Der Name darf nicht leer sein.")
-            return
-        pos_json, cols, rows = dlg.result_positions()
-        s = self._session()
-        if s is None:
-            return
-        try:
-            with s:
-                if name != (self._current_group.name or ""):
-                    dup = s.execute(
-                        select(FixtureGroup)
-                        .where(FixtureGroup.name == name)
-                        .where(FixtureGroup.id != self._current_group.id)
-                    ).scalars().first()
-                    if dup is not None:
-                        if QMessageBox.question(
-                            self, "Doppelter Name",
-                            f'Eine Gruppe "{name}" existiert bereits. Trotzdem verwenden?',
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        ) != QMessageBox.StandardButton.Yes:
-                            return
-                g = s.get(FixtureGroup, self._current_group.id)
-                if g is None:
-                    return
-                g.name = name
-                g.positions_json = pos_json
-                g.cols = cols
-                g.rows = rows
-                s.commit()
-        except Exception as e:
-            QMessageBox.warning(self, "Fehler", str(e))
-            return
-        self._reload_group_list()
-        self._notify_groups_changed()
+        with dialog_hilfe.offen(dlg):
+            if not dlg.exec():
+                return
+            name = dlg.result_name()
+            if not name:
+                QMessageBox.warning(self, "Bearbeiten", "Der Name darf nicht leer sein.")
+                return
+            pos_json, cols, rows = dlg.result_positions()
+            s = self._session()
+            if s is None:
+                return
+            try:
+                with s:
+                    if name != (self._current_group.name or ""):
+                        dup = s.execute(
+                            select(FixtureGroup)
+                            .where(FixtureGroup.name == name)
+                            .where(FixtureGroup.id != self._current_group.id)
+                        ).scalars().first()
+                        if dup is not None:
+                            if QMessageBox.question(
+                                self, "Doppelter Name",
+                                f'Eine Gruppe "{name}" existiert bereits. Trotzdem verwenden?',
+                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            ) != QMessageBox.StandardButton.Yes:
+                                return
+                    g = s.get(FixtureGroup, self._current_group.id)
+                    if g is None:
+                        return
+                    g.name = name
+                    g.positions_json = pos_json
+                    g.cols = cols
+                    g.rows = rows
+                    s.commit()
+            except Exception as e:
+                QMessageBox.warning(self, "Fehler", str(e))
+                return
+            self._reload_group_list()
+            self._notify_groups_changed()
 
     def _delete_group(self):
         if self._current_group is None:
@@ -1615,21 +1697,22 @@ class FixtureGroupView(QWidget):
         bb.accepted.connect(dlg.accept)
         bb.rejected.connect(dlg.reject)
         lay.addWidget(bb)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        # FM-16e: in VISUELLER Reihenfolge (Listen-Zeile) stapeln, nicht in Klick-/
-        # Selektions-Reihenfolge — sonst passt „von oben nach unten" nicht zum Ergebnis.
-        gids = [it.data(Qt.ItemDataRole.UserRole)
-                for it in sorted(lst.selectedItems(), key=lst.row)]
-        if len(gids) < 2:
-            QMessageBox.information(self, "Zusammenlegen",
-                                    "Mindestens zwei Gruppen wählen.")
-            return
-        new_gid = get_state().merge_head_matrix_groups(gids)
-        if new_gid is None:
-            QMessageBox.warning(self, "Zusammenlegen", "Zusammenlegen fehlgeschlagen.")
-            return
-        self._reload_group_list(select_gid=new_gid)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            # FM-16e: in VISUELLER Reihenfolge (Listen-Zeile) stapeln, nicht in Klick-/
+            # Selektions-Reihenfolge — sonst passt „von oben nach unten" nicht zum Ergebnis.
+            gids = [it.data(Qt.ItemDataRole.UserRole)
+                    for it in sorted(lst.selectedItems(), key=lst.row)]
+            if len(gids) < 2:
+                QMessageBox.information(self, "Zusammenlegen",
+                                        "Mindestens zwei Gruppen wählen.")
+                return
+            new_gid = get_state().merge_head_matrix_groups(gids)
+            if new_gid is None:
+                QMessageBox.warning(self, "Zusammenlegen", "Zusammenlegen fehlgeschlagen.")
+                return
+            self._reload_group_list(select_gid=new_gid)
 
     def _notify_groups_changed(self):
         """Zentrale GROUP_CHANGED-Benachrichtigung: Programmer, Live View, Matrix

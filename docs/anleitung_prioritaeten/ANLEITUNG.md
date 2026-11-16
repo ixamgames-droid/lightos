@@ -30,6 +30,8 @@ der Tabelle steht, kommt später und setzt sich durch.
 Nicht in der Tabelle: die **Szenen-Vorschau** aus dem Editor. Sie gilt für ein einzelnes Bild,
 liegt zwischen Schicht 5 und 6 und wird von Fadern, Master und Blackout genauso begrenzt.
 
+![Schaubild der zehn Schichten von unten nach oben: 1 Grundwerte, 2 Effekte und Funktionen mit den fünf Stufen Grundlicht < Effekte < Akzente < Strobe & Blinder < Notfall, 3 Cue-Listen, 4 Programmer mit allen Snap-Tasten, 5 Automatische Helligkeit, 6 „Alles Weiß“, 7 Gruppen-Fader, Geräte-Dimmer, Submaster, 8 Eingemischtes DMX von außen, 9 Simple Desk mit „Manueller Override“, 10 Laser-NOT-AUS, Grand Master, Blackout, Ziel-Blackout](img/01_schichten.png)
+
 **Die Stufen ordnen nur Schicht 2.** Snap-Tasten, Cue-Listen, Fader und Master behalten
 ihren festen Platz.
 
@@ -61,12 +63,12 @@ der Effekte darunter und rechnet deshalb absichtlich direkt nach der Stufe „Ef
 2. Ganz oben steht ausgegraut **Snaps / Programmer — liegt immer darüber**. Die Zeile ist
    fest; sie erinnert daran, dass Snap-Tasten keine Effekte sind.
 3. Darunter die fünf Stufen, die stärkste zuerst. Jeder Effekt der Show steht in seiner
-   Stufe mit **Art** (Szene, Chaser, Matrix …) und **Fasst an**: Dimmer, Farbe, Bewegung,
+   Stufe mit **Art** (Szene, Chaser, Matrix …) und **Betrifft**: Dimmer, Farbe, Bewegung,
    Gobo oder Sonstiges. Steht dort **unbekannt**, lässt sich das nicht aus der Show ablesen
    (zum Beispiel bei einem Skript oder einer Szene mit Geräten, die nicht mehr gepatcht sind).
 4. Ein laufender Effekt ist fett und trägt **● läuft**.
 
-   ![Reiter Prioritäten mit der Doku-Demo-Show: oben ausgegraut die feste Zeile „Snaps / Programmer — liegt immer darüber“ (1), darunter die Stufen, hier aufgeklappt „Effekte (8)“ (2), die Spalte „Fasst an“ (3) und „● läuft“ am fett geschriebenen Lauflicht HG (4)](img/02_ansicht.png)
+   ![Reiter Prioritäten mit der Doku-Demo-Show: oben ausgegraut die feste Zeile „Snaps / Programmer — liegt immer darüber“ (1), darunter die Stufen, hier aufgeklappt „Effekte (8)“ (2), die Spalte „Fasst an“ (heute „Betrifft“) (3) und „● läuft“ am fett geschriebenen Lauflicht HG (4)](img/02_ansicht.png)
 
 5. Die Spalte **Verdeckt** zeigt live, ob ein laufender Effekt wirklich ankommt. Liegt
    jemand darüber, steht dort zum Beispiel **verdeckt von Blinder auf 4 Geräten** — oder
@@ -118,7 +120,7 @@ einen Stelle, zieht die andere nach.
 Eine Farb-Matrix und ein Dimmer-Lauflicht auf denselben Lampen nehmen sich nichts weg: sie
 schreiben getrennte Kanäle. Die Stufe spielt erst eine Rolle, wenn zwei Effekte **denselben**
 Baustein derselben Lampe treiben — zwei Dimmer-Effekte, zwei Farb-Effekte, zwei Bewegungen.
-Die Spalte **Fasst an** zeigt dir das auf einen Blick.
+Die Spalte **Betrifft** zeigt dir das auf einen Blick.
 
 ## 6. Blinder und Strobe als Snap-Taste
 
@@ -241,7 +243,7 @@ Wann **kein** Hinweis kommt:
   stoppt sie sie nicht — dann bleibt der Hinweis ebenfalls. Das gilt für die gelbe Zeile an der Taste und am Fader;
   der Tooltip im Reiter **Prioritäten** kennt diese Regeln noch nicht.
 - Es lässt sich nicht sicher ablesen, was ein Effekt anfasst (Skript, **unbekannt** in der
-  Spalte **Fasst an**), oder es ist nur **Sonstiges** wie Shutter oder Zoom.
+  Spalte **Betrifft**), oder es ist nur **Sonstiges** wie Shutter oder Zoom.
 
 Bei einer **Sammlung**, einem **Chaser** oder einer **Show** auf der Taste zählt das Ganze:
 alle Geräte der Mitglieder und die Stufe des Behälters.
@@ -264,8 +266,3 @@ alle Geräte der Mitglieder und die Stufe des Behälters.
   stehen dort genau 70 %.
 - **Master und Blackout:** Grand Master, Gruppen-Fader, Blackout und Laser-NOT-AUS wirken
   nach allen Effekten, egal auf welcher Stufe.
-
-## Noch fehlendes Bild
-
-Das **Schichten-Schaubild** (Grundwerte bis NOT-AUS) aus Abschnitt 1 ist noch nicht gezeichnet;
-bis dahin gilt die Tabelle dort.

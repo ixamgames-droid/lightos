@@ -51,6 +51,7 @@ from src.ui.widgets.laser_tab_bausteine import (
     TOUCH, BetriebsartUmschalter, FarbFelder, LageAnzeige, LageFeld,
     MusterGalerie, SprechRegler, bedien_hoehe, farbe_als_qt, lage_text,
     nebentext, trefferflaechen_anheben, ueberschrift)
+from src.ui import dialog_hilfe
 
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
 # gehören (Musterauswahl = gobo_wheel, Rotation = gobo_rotation usw.).
@@ -203,7 +204,9 @@ SPRECH_REGLER: tuple[tuple[str, str, str, str, dict | None], ...] = (
 #: gibt es das Modul nicht — dann bleibt das Abzeichen der Sicherheitsleiste
 #: weg. Bewusst KEIN Import am Dateianfang.
 SPERRZONEN_MODUL = "src.core.laser.sperrzonen"
-NUR_ANZEIGE = "Nur Anzeige · schaltet nicht ab"
+#: UI-139 (Klick-Test 16.11.2026, Fund 23): sagt jetzt, WAS nicht abschaltet
+#: — vorher „Nur Anzeige · schaltet nicht ab“ (unklar, wer was nicht abschaltet).
+NUR_ANZEIGE = "Nur Anzeige · schaltet den Laser nicht ab"
 #: Meldung je Laser (LAS-32) und Planer (LAS-35) — ebenfalls nur als Text
 #: genannt und erst zur Laufzeit gesucht: fehlt eines der Module, fehlt im
 #: Tab genau das zugehoerige Bedienelement (kein toter Knopf).
@@ -1488,28 +1491,28 @@ class LaserView(QWidget):
         dlg = LaserDrawDialog(
             figure=base, parent=self, capability=cap,
             on_live_update=lambda fig: self._apply_figure_to_selection(fig))
-        dlg.exec()
-        # Nach dem Dialog: aktive Combo-Figur wieder streamen (Live-Preview end).
-        self._apply_figure_to_selection()
-        fig = getattr(dlg, "result_figure", None)
-        dlg.deleteLater()      # Modal-Dialog nicht am Parent ansammeln lassen
-        if fig is None or not fig.points:
-            return
-        # In der Show speichern (gleicher Name ersetzt) und aktiv setzen.
-        try:
-            state = get_state()
-            figs = [f for f in getattr(state, "laser_figures", [])
-                    if f.name != fig.name]
-            figs.append(fig)
-            state.laser_figures = figs
-        except Exception as e:
-            print(f"[laser_view] save figure error: {e}")
-        self._rebuild_figure_combo()
-        for i in range(self._combo_figure.count()):
-            d = self._combo_figure.itemData(i)
-            if getattr(d, "name", None) == fig.name:
-                self._combo_figure.setCurrentIndex(i)
-                break
+        with dialog_hilfe.offen(dlg):
+            dlg.exec()
+            # Nach dem Dialog: aktive Combo-Figur wieder streamen (Live-Preview end).
+            self._apply_figure_to_selection()
+            fig = getattr(dlg, "result_figure", None)
+            if fig is None or not fig.points:
+                return
+            # In der Show speichern (gleicher Name ersetzt) und aktiv setzen.
+            try:
+                state = get_state()
+                figs = [f for f in getattr(state, "laser_figures", [])
+                        if f.name != fig.name]
+                figs.append(fig)
+                state.laser_figures = figs
+            except Exception as e:
+                print(f"[laser_view] save figure error: {e}")
+            self._rebuild_figure_combo()
+            for i in range(self._combo_figure.count()):
+                d = self._combo_figure.itemData(i)
+                if getattr(d, "name", None) == fig.name:
+                    self._combo_figure.setCurrentIndex(i)
+                    break
 
     def _template_channels(self) -> list:
         """Vereinigung der Laser-Kanäle aller selektierten Laser (ein Kanal je

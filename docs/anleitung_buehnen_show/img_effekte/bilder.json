@@ -1,7 +1,7 @@
 {
   "anleitung": "buehnen_effekte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b51fdd5a",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_effekte'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "d18f3385beecf7c6c6dcf2955436dcdd"
+      "md5": "04a20617a48a3b6c6a948664769e883c"
     },
     {
       "datei": "02_matrix_grundeinstellungen.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "e17e6d4d2082303c968e48caceadf47a"
+      "md5": "8c1b88294c0312c5e05dd91a5a8af075"
     },
     {
       "datei": "03_matrix_bewegung.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "cff365308560b2e1b462d98d8548d7e3"
+      "md5": "564d94c2738a11a5504b89c8036cf524"
     },
     {
       "datei": "04_lauflicht_3d.gif",
@@ -99,7 +99,7 @@
         900
       ],
       "marken": [],
-      "md5": "09881939ed90fc4b1642718dd1f235a2"
+      "md5": "c008eea02676e2eda5140b2f1dcd58be"
     },
     {
       "datei": "06_efx_form.png",
@@ -110,7 +110,7 @@
         900
       ],
       "marken": [],
-      "md5": "59e15f606ea4136a3b8bc5f0ce4a6b55"
+      "md5": "5ce6008bc7526a2e77c12348644b38cf"
     },
     {
       "datei": "07_efx_tempo.png",
@@ -121,7 +121,7 @@
         900
       ],
       "marken": [],
-      "md5": "dc39a2c9ff68f1188beedc302db8c6c2"
+      "md5": "63c3a388b8a9e7fbec4a1877bec6b7e3"
     },
     {
       "datei": "08_efx_verhaeltnis.png",
@@ -132,7 +132,7 @@
         900
       ],
       "marken": [],
-      "md5": "18df84bbbcd369d91a1bcf2f38730767"
+      "md5": "e9d5ccc244f57951bc4c0f3a32841768"
     },
     {
       "datei": "09_welle_3d.gif",
@@ -188,7 +188,7 @@
         900
       ],
       "marken": [],
-      "md5": "895936b2d4084f39855cc2b1ad63a9c5"
+      "md5": "b193ce5f04ab3751899c098494fa6b28"
     },
     {
       "datei": "11_schwenker_3d.gif",
@@ -250,7 +250,7 @@
         900
       ],
       "marken": [],
-      "md5": "12fe754530a46a9ed1df73a832b3f6c2"
+      "md5": "cd6c55da1a92967b52d879afbde0c352"
     },
     {
       "datei": "13_strobe_3d.gif",
@@ -308,7 +308,7 @@
         900
       ],
       "marken": [],
-      "md5": "3aea9e3762524eb6bb3219708a6b9317"
+      "md5": "eedebe8f28331226288994fff5ad36e5"
     },
     {
       "datei": "15_laser_kanaele.png",
@@ -319,18 +319,18 @@
         900
       ],
       "marken": [],
-      "md5": "1a1efeefb993e65e697c843cd495a9da"
+      "md5": "7d09e302cda7d1a18223449684059262"
     },
     {
       "datei": "16_laser_chaser.png",
       "szene": "16_laser_chaser",
-      "titel": "Chaser „Mein Laser langsam“: Name, Run Order Loop, Tempo-Bus frei",
+      "titel": "Chaser „Mein Laser langsam“: Name, Ablauf Loop, Tempo-Bus frei",
       "groesse": [
         1600,
         900
       ],
       "marken": [],
-      "md5": "f7b1501146ca85ec79a3441726ad28f1"
+      "md5": "50cbaf213f2e57d3e4df2ec252d9d84e"
     },
     {
       "datei": "17_laser_schritte.png",
@@ -341,7 +341,7 @@
         900
       ],
       "marken": [],
-      "md5": "c3462ae90e8d402b181b63e796240543"
+      "md5": "7f580c687d020590fd787f4349db03b8"
     },
     {
       "datei": "18_laser_3d.gif",
@@ -415,7 +415,7 @@
         900
       ],
       "marken": [],
-      "md5": "6712d342405632f690791f54f3e2e049"
+      "md5": "92d017050482f1792490e970f96103bb"
     },
     {
       "datei": "20_vc_seite.png",
@@ -426,7 +426,7 @@
         900
       ],
       "marken": [],
-      "md5": "73d3f027456500617081f850b88a71cd"
+      "md5": "eba2f394a7dfc0d58f442cddec1e148f"
     },
     {
       "datei": "21_3d_einstellungen.png",

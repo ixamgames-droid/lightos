@@ -28,6 +28,7 @@ _app = QApplication.instance() or QApplication([])
 _DEV = QTest.createTouchDevice()
 
 from _qt_lifecycle import destroy_all_top_level_widgets              # noqa: E402
+from _doppeltipp import DruckUhr                                     # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -272,26 +273,34 @@ def test_buehne_doppeltipp_ins_leere_passt_ein(buehne):
     b = buehne
     hints = QApplication.styleHints()
     alt = hints.mouseDoubleClickInterval()
+    uhr = DruckUhr()
     try:
         einpassen = []
         b.c.einpassen_requested.connect(lambda: einpassen.append(1))
         # Qt zaehlt Klicks paarweise, auch ueber fruehere Tests hinweg: mit
         # 1 ms Fenster beginnt der erste Tipp sicher ein neues Paar, erst
         # danach wird das Fenster fuer langsame CI-Rechner gross (wie UI-114).
+        # QA-123: vor dem zweiten Tipp auf einen groesseren Zeitstempel
+        # warten — gleiche Millisekunde ist fuer Qt kein Doppelklick.
         hints.setMouseDoubleClickInterval(1)
         _tipp(b.vp, QPoint(400, 300))
         hints.setMouseDoubleClickInterval(5000)
+        uhr.naechster_zeitstempel()
         _tipp(b.vp, QPoint(400, 300))
+        assert uhr.doppelklicks == 1, "Qt hat den Doppeltipp erkannt"
         assert einpassen == [1]
         # auf einem Geraet bleibt der Doppeltipp ein Druck (waehlt)
         hints.setMouseDoubleClickInterval(1)
         _tipp(b.vp, QPoint(160, 100))
         hints.setMouseDoubleClickInterval(5000)
+        uhr.naechster_zeitstempel()
         _tipp(b.vp, QPoint(160, 100))
+        assert uhr.doppelklicks == 2, "auch der zweite Doppeltipp kam als Doppelklick an"
         assert einpassen == [1]
         assert b.c._selected_fids == [1]
     finally:
         hints.setMouseDoubleClickInterval(alt)
+        uhr.entfernen()
 
 
 def test_buehne_trefferradius_mindestens_24_px_bei_jedem_zoom(buehne):

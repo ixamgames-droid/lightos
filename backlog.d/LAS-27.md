@@ -1,0 +1,5 @@
+ID: LAS-27
+Status: review
+Status-Notiz: Rest umgesetzt — bunt (laser_color 0-1) zeichnet die Strahlen im 3D mehrfarbig; die Optik wird beim naechsten Blick des Projektinhabers auf das 3D-Bild mit angesehen
+
+**Rest umgesetzt (LAS-27):** `scene_src/fixtures/laser.js` wertet `payload.laser.bunt` jetzt aus: jeder Einzelstrahl bekommt reihum eine feste Farbe aus `LASER_BUNT_PALETTE` (Rot, Gruen, Blau, Gelb, Cyan, Magenta — die gemessenen Einzelfarben des EL-400RGB MK2), fest nach seinem Strahl-Index, ohne Zufall und ohne Flackern; der Mantel eines Musters (z. B. Kreis bei DMX alle 0) bekommt dieselbe Palette je Segment ueber Eckpunkt-Farben. Deckkraft/Helligkeit wie bisher (Dimmer), eine gemessene Farbe hat Vorrang vor bunt, die Flaeche und der Grobweg fuer Profile ohne LAS-33-Angaben bleiben unveraendert; NOT-AUS, Freigabe und Sperrzonen-Darstellung unberuehrt. Tests: `tests/test_las27_bunt_payload.py` (bunt=True bei laser_color 0/1 inkl. Item-Fall DMX alle 0, sonst nicht), `tests/test_las27_bunt_scene.py` (bunt mind. 3 Farben, ohne bunt genau eine, gleiche Zuordnung nach zwei Bildern, Helligkeit 0 dunkel). Offen: Sichtpruefung der Optik durch den Projektinhaber.

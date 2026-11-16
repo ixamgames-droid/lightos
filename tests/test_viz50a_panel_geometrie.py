@@ -49,7 +49,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import create_engine, select, text            # noqa: E402
 from sqlalchemy.orm import Session, selectinload              # noqa: E402
 
-from _fixture_quelle import frische_library                   # noqa: E402
+from _fixture_quelle import eingespielte_vorlage, frische_library  # noqa: E402
 from src.core.database.models import (                        # noqa: E402
     Base, ChannelRange, FixtureChannel, FixtureMode, FixtureProfile,
     migrate_fixtures_db)
@@ -246,12 +246,43 @@ def _modus(session, short, mode_name):
     return next(m for m in _profil(session, short).modes if m.name == mode_name)
 
 
+#: QA-122: je Modul EINE geseedete und EINE eingespielte Library; jeder Test
+#: bekommt eine Kopie (``frische_library(..., vorlage=...)``).
+#: Aufgeraeumt in ``tearDownModule`` (das ruft pytest wie unittest auf).
+_VORLAGEN: dict[bool, str] = {}
+_AUFRAEUMEN: list = []
+
+
+def _vorlage(eingespielt: bool) -> str:
+    if eingespielt not in _VORLAGEN:
+        _VORLAGEN[eingespielt] = eingespielte_vorlage(
+            lambda f, *a, **k: _AUFRAEUMEN.append((f, a, k)),
+            einspielen=eingespielt)
+    return _VORLAGEN[eingespielt]
+
+
+def tearDownModule():
+    _VORLAGEN.clear()
+    while _AUFRAEUMEN:
+        f, a, k = _AUFRAEUMEN.pop()
+        f(*a, **k)
+
+
 class _LibraryCase(unittest.TestCase):
-    """Frisch aus dem Quelltext geseedete Bibliothek (FIXTEST-FRESH)."""
+    """Frisch aus dem Quelltext geseedete Bibliothek (FIXTEST-FRESH).
+
+    Jeder Test bekommt eine eigene Kopie einer je Modul EINMAL gebauten
+    Library (QA-122: das Seeden kostete je Test ~1 s).
+    ``_EINGESPIELT = True``: die Vorlage ist eine Library, auf der
+    ``ensure_builtins`` schon lief — der Zustand eines Rechners nach dem
+    ersten Start. Der erste ``ensure_builtins``
+    je Library spielt alle Bibliotheksdateien ein und kostete je Test 6–9 s."""
+
+    _EINGESPIELT = False
 
     def setUp(self):
         from src.core.app_state import clear_channel_cache
-        self._eng = frische_library(self)
+        self._eng = frische_library(self, vorlage=_vorlage(self._EINGESPIELT))
         clear_channel_cache()
         self.addCleanup(clear_channel_cache)
 
@@ -269,6 +300,8 @@ class NachtragTest(_LibraryCase):
     ausschliesslich bei abweichender ATTRIBUT-Signatur neu — und eine Rasterform
     steht in keinem Attribut. Auf einem gewachsenen Rechner waere das Feld also
     dauerhaft 0 geblieben und der ZQ06121 weiter ein 7x7-Quadrat."""
+
+    _EINGESPIELT = True
 
     def test_ensure_builtins_traegt_die_form_nach(self):
         from src.core.database.fixture_db import ensure_builtins
@@ -401,6 +434,8 @@ class LightosFormKommtAusDerDateiTest(_LibraryCase):
     die Form. Bewacht wird hier beides — die eingespielte Form ist die der
     Datei, und ein Einspielen ohne Stempel stellt eine fehlende wieder her.
     """
+
+    _EINGESPIELT = True
 
     def setUp(self):
         # Der Seed legt nur die Builtins an; die Dateien spielt der erste

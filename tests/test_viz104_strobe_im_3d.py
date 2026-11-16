@@ -728,7 +728,7 @@ class VerdrahtungTest(unittest.TestCase):
         self.assertIn("_strobeBild", m.group(1))
         tick = block[block.index("export function tickStrobe()"):block.index("export function strobeNeuBewerten")]
         self.assertIn("_strobeBild += 1;", tick)
-        self.assertIn("taktFps(_strobeTakt, _strobeFps)", tick)
+        self.assertIn("taktMessen(_takt, ", tick)   # VIZ-104 3D-Takt: robuste Messung
         # Die Uhr dient nur noch der Messung der Bildrate, nie der Phase.
         self.assertNotIn("performance.now", block.replace(tick, ""))
         self.assertNotIn("strobeFaktor(jetzt", block)

@@ -63,7 +63,7 @@ Per Smart-Drop angelegt, ist der Stepper bereits an den fallengelassenen Effekt 
 
 ## MIDI & Tastatur
 
-Der Stepper unterstützt **MIDI-Teach** (kein Tasten-Teach). Du weist eine Steuerung per Rechtsklick → „MIDI Teach…" zu oder trägst CC-Nummer und Kanal direkt im Einstellungs-Dialog ein.
+Der Stepper unterstützt **MIDI Lernen** (kein Tasten-Teach). Du weist eine Steuerung per Rechtsklick → „MIDI Lernen…" zu oder trägst CC-Nummer und Kanal direkt im Einstellungs-Dialog ein.
 
 - Es wird **nur Control Change (CC)** ausgewertet, und zwar als **relativer** Encoder:
   - Werte **1–63** = je nach Wert mehrere Schritte **hoch** (`+`),

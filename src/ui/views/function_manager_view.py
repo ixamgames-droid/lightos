@@ -12,6 +12,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.core.engine.script_func import ScriptFunction
 from src.ui.widgets import mini_icons as _mini
 from src.ui.weak_slots import weak_slot
+from src.ui import dialog_hilfe
 
 
 FUNCTION_MIME = "application/x-lightos-function"
@@ -362,9 +363,10 @@ class FunctionManagerView(QWidget):
             from src.ui.widgets.effect_wizard import EffectWizard
             from PySide6.QtWidgets import QDialog
             wiz = EffectWizard(self)
-            if wiz.exec() == QDialog.DialogCode.Accepted and wiz.created_function is not None:
-                self._refresh_tree()
-                self._select_by_id(wiz.created_function.id)
+            with dialog_hilfe.offen(wiz):
+                if wiz.exec() == QDialog.DialogCode.Accepted and wiz.created_function is not None:
+                    self._refresh_tree()
+                    self._select_by_id(wiz.created_function.id)
         except Exception as e:
             QMessageBox.warning(self, "Effekt-Assistent", str(e))
 

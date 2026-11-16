@@ -10,6 +10,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufe_zeile
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
+from src.ui import dialog_hilfe
 
 
 class CollectionEditor(QWidget):
@@ -114,13 +115,14 @@ class CollectionEditor(QWidget):
             print(f"[CollectionEditor] FunctionSelectorDialog import: {e}")
             return
         dlg = FunctionSelectorDialog(self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        fid = dlg.selected_id
-        if fid is None or fid == self._coll.id:
-            return
-        self._coll.add_function(fid)
-        self._refresh()
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            fid = dlg.selected_id
+            if fid is None or fid == self._coll.id:
+                return
+            self._coll.add_function(fid)
+            self._refresh()
 
     def _remove_selected(self):
         for it in self._lst.selectedItems():

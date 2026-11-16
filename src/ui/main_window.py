@@ -33,6 +33,7 @@ from src.ui.views.dmx_monitor_view import DmxMonitorView
 from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
+from src.ui import dialog_hilfe
 from src.ui.weak_slots import weak_slot
 from src.ui import undo_kuerzel
 from src.ui import leertaste_fokus
@@ -77,7 +78,7 @@ class QMessageBox(_QtMessageBox):          # noqa: F811 — bewusst derselbe Nam
                 b.setText(beschriftung)
         if defaultButton != _QtMessageBox.StandardButton.NoButton:
             box.setDefaultButton(defaultButton)
-        return _QtMessageBox.StandardButton(box.exec())
+        return _QtMessageBox.StandardButton(dialog_hilfe.ausfuehren(box))
 
 
 def _recent_files_path() -> str:
@@ -733,6 +734,11 @@ class MainWindow(QMainWindow):
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
 
+        # UI-136: im Touch-Modus einmal pruefen, ob System-Gesten die Finger
+        # vor LightOS abfangen (nur lesen; Hinweis wegklickbar, Kiosk: Statuszeile).
+        if touch:
+            QTimer.singleShot(1500, self, self._system_gesten_pruefen)
+
         # Kiosk-Modus: Menubar + Statusbar ausblenden, direkt zur Virtual Console
         if kiosk:
             self.menuBar().hide()
@@ -838,6 +844,12 @@ class MainWindow(QMainWindow):
         if os.path.exists(theme_path):
             with open(theme_path, "r", encoding="utf-8") as f:
                 qss = f.read()
+        # UI-140: weisser Haken im AN-Zustand (absoluter Pfad, darum nicht in dark.qss)
+        try:
+            from src.ui.haken_stil import haken_qss
+            qss += "\n" + haken_qss(bool(getattr(self, "_touch_mode", False)))
+        except Exception as e:
+            print(f"[main_window] ERROR: Haken-QSS: {e}")
         # Touch-Mode: Buttons + Slider + Items vergroessern via Override
         if getattr(self, "_touch_mode", False):
             qss += "\n/* Touch-Mode Override */\n"
@@ -854,7 +866,8 @@ class MainWindow(QMainWindow):
                 "margin: 0 -15px; border-radius: 18px; }\n"
                 "QSlider#gmSlider { min-height: 32px; max-height: 32px; }\n"
                 # UI-120 (A-04): TAP so hoch wie STOP ALL/BLACKOUT (44 px statt 52)
-                "QPushButton#tapBtn { padding-top: 2px; padding-bottom: 2px; }\n"
+                # UI-137: links/rechts 6 px statt 14 px — sonst „TAF“
+                "QPushButton#tapBtn { padding: 2px 6px; }\n"
                 # UI-120: Sektionsknoepfe fuellen die 54 px hohe Leiste (52 px
                 # Trefferflaeche, die gelbe Linie bleibt am unteren Rand).
                 "QPushButton#sectionBtn { min-height: 50px; max-height: 50px; }\n"
@@ -1002,6 +1015,7 @@ class MainWindow(QMainWindow):
 
         # Programmer-Hotkeys (T0.2)
         pm = mb.addMenu("&Programmer")
+        pm.setToolTipsVisible(True)   # UI-140: „Farbe macht automatisch hell“
         a = pm.addAction("Highlight (selektierte Fixtures voll an)")
         a.setShortcut("H")
         a.triggered.connect(self._global_highlight)
@@ -1050,6 +1064,7 @@ class MainWindow(QMainWindow):
 
         # Ausgabe
         om = mb.addMenu("&Ausgabe")
+        om.setToolTipsVisible(True)   # UI-140: Erklaerungen der Schalter
         om.addAction("Konfigurieren...").triggered.connect(self._open_output_config)
         om.addAction("Channel-Modifier...").triggered.connect(self._open_channel_modifiers)
         om.addAction("Interface einrichten…").triggered.connect(
@@ -1064,8 +1079,14 @@ class MainWindow(QMainWindow):
         self._act_interface_hinweis.triggered.connect(
             self._interface_hinweis_schalten)
         om.addSeparator()
-        self._act_mock = om.addAction("Mock Mode AN/AUS")
+        # UI-140: vorher „Mock Mode AN/AUS“. Der Schalter zeigt nur „MOCK“ in
+        # der Statusleiste und oeffnet den 3D-Visualizer; der DMX-Ausgang laeuft
+        # weiter. „kein DMX-Ausgang“ im Namen waere deshalb falsch (Laser!).
+        self._act_mock = om.addAction("Simulations-Hinweis „MOCK“")
         self._act_mock.setCheckable(True)
+        self._act_mock.setToolTip(
+            "Zeigt „MOCK“ in der Statusleiste und öffnet den 3D-Visualizer.\n"
+            "Der DMX-Ausgang läuft dabei unverändert weiter.")
         self._act_mock.triggered.connect(self._toggle_mock)
         om.addSeparator()
         self._act_web = om.addAction("Web-Interface (Port 5000)")
@@ -1097,13 +1118,13 @@ class MainWindow(QMainWindow):
         vm.addAction("Visualizer schließen").triggered.connect(self._close_visualizer)
 
         # Command-Line (T1.1)
-        cm = mb.addMenu("&Command")
-        a = cm.addAction("Command-Line fokussieren")
-        a.setShortcut(":")
-        a.triggered.connect(self._focus_command_line)
-        a2 = cm.addAction("Command-Line fokussieren (F12)")
-        a2.setShortcut("F12")
-        a2.triggered.connect(self._focus_command_line)
+        # UI-140: ein Eintrag mit beiden Kuerzeln statt zwei gleicher Eintraege.
+        # „Be&fehl“: das B traegt schon „&Bearbeiten“.
+        cm = mb.addMenu("Be&fehl")
+        self._act_befehlszeile = cm.addAction("Befehlszeile fokussieren")
+        self._act_befehlszeile.setShortcuts([QKeySequence(":"), QKeySequence("F12")])
+        self._act_befehlszeile.setToolTip("Kürzel: „:“ oder F12")
+        self._act_befehlszeile.triggered.connect(self._focus_command_line)
 
         # Hilfe
         hm = mb.addMenu("&Hilfe")
@@ -1184,7 +1205,10 @@ class MainWindow(QMainWindow):
         self._section_bar.setFixedHeight(
             self._KOPF_H_TOUCH if _touch else self._KOPF_H)
         bar_layout = QHBoxLayout(self._section_bar)
-        bar_layout.setContentsMargins(4, 0, 4, 2)
+        # Nachbesserung UI-137: Touch links 2 statt 4 px — der 6-px-Abstand
+        # zwischen STOP ALL und BLACKOUT kostete bei 1440 px 2 px zu viel,
+        # „Patchen“ wurde zu „Patch“. Rechts (BLACKOUT) bleibt alles gleich.
+        bar_layout.setContentsMargins(2 if _touch else 4, 0, 4, 2)
         bar_layout.setSpacing(0)
 
         self._btn_group = QButtonGroup(self)
@@ -1295,12 +1319,22 @@ class MainWindow(QMainWindow):
         bar_layout.addWidget(gm_group)
 
         # Tap-Tempo + BPM (klickbares Label)
-        self._btn_tap = QPushButton("TAP")
+        # Nachbesserung UI-137: mit dem Fenster als Eltern bauen — die Leiste
+        # haengt hier noch nicht am Fenster, ohne Eltern polierte der Knopf ohne
+        # Theme/Touch-QSS (sizeHint = Stil-Minimum 80 px). TAP wurde dadurch im
+        # Touch-Modus 80 px breit und kuerzte die Reiternamen („Büh…“ bei
+        # 1280 px). ``addWidget`` unten haengt ihn in die Leiste um.
+        self._btn_tap = QPushButton("TAP", self)
         self._btn_tap.setObjectName("tapBtn")    # UI-120: Touch-Hoehe im QSS
         # UI-120: mit --touch 44 px wie STOP ALL (vorher 52 px, unten abgeschnitten)
         self._btn_tap.setFixedHeight(
             self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False) else 26)
-        self._btn_tap.setFixedWidth(48)
+        # UI-137: Breite aus Schrift + Polsterung ableiten (Theme/Touch-QSS
+        # liegen ueber das Fenster an). Fest 48 px schnitt „TAP“ im Touch-Modus ab.
+        self._btn_tap.ensurePolished()
+        from src.ui.touch_keyboard import is_touch_mode as _touch
+        self._btn_tap.setFixedWidth(
+            max(48, self._btn_tap.sizeHint().width()) if _touch() else 48)
         self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 4× im Takt = Tempo setzen")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
@@ -1455,6 +1489,7 @@ class MainWindow(QMainWindow):
         # UI-120 (A-17): unten in der Leiste — Abstand zum LASER NOT-AUS darueber
         bar_layout.addWidget(btn_stop, 0, Qt.AlignmentFlag.AlignBottom)
         self._btn_stop_all = btn_stop
+        bar_layout.addSpacing(6)     # UI-137: STOP ALL und BLACKOUT getrennt
 
         btn_blackout = QPushButton("BLACKOUT")
         btn_blackout.setObjectName("blackoutBtn")
@@ -2013,6 +2048,15 @@ class MainWindow(QMainWindow):
         except RuntimeError:        # Ansicht schon abgebaut
             return None
 
+    def _vc_leds_abschalten(self) -> None:
+        """CDX-72: beim Beenden die Pult-LEDs der VC loeschen (vor close_all)."""
+        try:
+            canvas = self._vc_zeichenflaeche()
+            if canvas is not None:
+                canvas.led_abschalten()
+        except Exception as e:
+            print(f"[MainWindow] VC-LEDs beim Beenden: {e}")
+
     def _vc_verlauf(self):
         """Zeichenflaeche der Virtual Console, wenn sie die sichtbare Seite
         dieses Fensters ist — sonst None. Die Zeichenflaeche nimmt keinen
@@ -2106,6 +2150,13 @@ class MainWindow(QMainWindow):
 
     def _refresh_undo_labels(self):
         if not hasattr(self, "_act_undo"):
+            return
+        # STAB-41 Nebenbefund: ``_stack.currentChanged`` und der Undo-Verlauf
+        # rufen hier auch dann noch an, wenn die Menue-Aktionen schon abgebaut
+        # sind (Fensterabbau; im Klick-Test nach fremdem deleteLater) — dann
+        # still nichts tun statt „Internal C++ object already deleted“.
+        import shiboken6
+        if not (shiboken6.isValid(self._act_undo) and shiboken6.isValid(self._act_redo)):
             return
         quelle_u, u = self._naechster_verlauf(False)
         quelle_r, r = self._naechster_verlauf(True)
@@ -2403,9 +2454,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    def _system_gesten_pruefen(self) -> None:
+        """UI-136: Hinweis auf aktive System-Gesten (s. ``system_gesten``)."""
+        try:
+            from src.ui import system_gesten
+            system_gesten.beim_start(self, bool(self._kiosk_mode))
+        except Exception as e:
+            print(f"[main_window] System-Gesten pruefen: {e}")
+
     def _open_gesten_dialog(self) -> None:
         from src.ui.widgets.gesten_dialog import GestenDialog
-        GestenDialog(self).exec()
+        dialog_hilfe.ausfuehren(GestenDialog(self))
 
     def _global_clear_programmer(self):
         self._state.clear_programmer()
@@ -2474,7 +2533,7 @@ class MainWindow(QMainWindow):
             if issues is None:
                 from src.core.sync import validate_and_repair
                 issues = validate_and_repair(self._state, fix=False)
-            ValidationDialog(issues, self).exec()
+            dialog_hilfe.ausfuehren(ValidationDialog(issues, self))
             # Nach Dialog ggf. neu pruefen (User koennte Auto-Repair gestartet haben)
             self._refresh_validation_banner()
         except Exception as e:
@@ -2531,9 +2590,10 @@ class MainWindow(QMainWindow):
             # FM-51 Scheibe B: derselbe Schluessel-Scope wie die drei anderen
             # Speicherwege (vorher fehlte hier sogar die Kopf-Einschraenkung).
             dlg = ChannelSelectDialog(vals, self, **_scope(self._state))
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return
-            vals = dlg.filter_programmer(vals)
+            with dialog_hilfe.offen(dlg):
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    return
+                vals = dlg.filter_programmer(vals)
             if not vals:
                 QMessageBox.information(self, "Snapshot",
                     "Keine Kanäle ausgewählt - Snapshot nicht gespeichert.")
@@ -2632,7 +2692,7 @@ class MainWindow(QMainWindow):
             t.setSingleShot(True)
             t.timeout.connect(dlg._assistent_oeffnen)
             t.start(0)
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
         self._check_hardware()
 
     # ── OUT-70: Hinweis „neues DMX-Interface“ ────────────────────────────────
@@ -2663,7 +2723,7 @@ class MainWindow(QMainWindow):
     def _open_channel_modifiers(self):
         try:
             from src.ui.widgets.channel_modifier_dialog import ChannelModifierDialog
-            ChannelModifierDialog(self).exec()
+            dialog_hilfe.ausfuehren(ChannelModifierDialog(self))
         except Exception as e:
             print(f"[main_window] channel_modifier open error: {e}")
 
@@ -3183,7 +3243,7 @@ class MainWindow(QMainWindow):
         dlg = WebRemoteDialog(self, steuerung=_WebSteuerung(self))
         if verbinden:
             dlg.handy_verbinden()
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
 
     def _toggle_web_server(self, checked: bool):
         if checked:
@@ -3219,9 +3279,7 @@ class MainWindow(QMainWindow):
     def _open_osc_einstellungen(self):
         """OSC-06: Dialog „OSC-Zuordnungen & Rückmeldung“."""
         from src.ui.widgets.osc_einstellungen_dialog import OscEinstellungenDialog
-        dlg = OscEinstellungenDialog(self)
-        dlg.exec()
-        dlg.deleteLater()
+        dialog_hilfe.ausfuehren(OscEinstellungenDialog(self))
 
     def _toggle_osc_server(self, checked: bool):
         if checked:
@@ -3281,11 +3339,11 @@ class MainWindow(QMainWindow):
 
     def _open_qxf_import(self):
         from src.ui.widgets.qxf_import_dialog import QxfImportDialog
-        QxfImportDialog(self).exec()
+        dialog_hilfe.ausfuehren(QxfImportDialog(self))
 
     def _open_bibliothek_download(self, erststart: bool = False):
         from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
-        BibliothekDownloadDialog(self, erststart=erststart).exec()
+        dialog_hilfe.ausfuehren(BibliothekDownloadDialog(self, erststart=erststart))
 
     def _bibliothek_hinweis_zeigen(self):
         """FM-72: die Erststart-Frage als Knopf in der Statuszeile statt als
@@ -3311,15 +3369,14 @@ class MainWindow(QMainWindow):
     def _open_fixture_editor(self):
         try:
             from src.ui.widgets.fixture_editor import FixtureEditorDialog
-            dlg = FixtureEditorDialog(self)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(FixtureEditorDialog(self))
         except Exception as e:
             QMessageBox.warning(self, "Fixture-Editor", str(e))
 
     def _open_profil_auswahl(self):
         try:
             from src.ui.widgets.profil_auswahl_dialog import ProfilAuswahlDialog
-            ProfilAuswahlDialog(self).exec()
+            dialog_hilfe.ausfuehren(ProfilAuswahlDialog(self))
         except Exception as e:
             QMessageBox.warning(self, "Fixture-Profil bearbeiten", str(e))
 
@@ -3361,9 +3418,7 @@ class MainWindow(QMainWindow):
             hilfe.sammle_tastenkuerzel(wurzeln, bereiche), self)
 
     def _tastenkuerzel_zeigen(self):
-        dlg = self._tastenkuerzel_dialog()
-        dlg.exec()
-        dlg.deleteLater()
+        dialog_hilfe.ausfuehren(self._tastenkuerzel_dialog())
 
     def _diagnosepaket_speichern(self, ziel: str | None = None):
         """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
@@ -3986,7 +4041,7 @@ class MainWindow(QMainWindow):
                         or getattr(i, "auto_fixed", False)]
             if relevant:
                 from src.ui.widgets.validation_dialog import ValidationDialog
-                ValidationDialog(issues, self).exec()
+                dialog_hilfe.ausfuehren(ValidationDialog(issues, self))
         except Exception as e:
             print(f"[main_window] show_loaded handler error: {e}")
         # LAS-32: Kopfzeile sofort nachziehen + einmalige Wechselmeldung.
@@ -4030,7 +4085,7 @@ class MainWindow(QMainWindow):
         """T1.4 Input-Profile-Editor (MIDI/OSC/Keyboard)."""
         try:
             from src.ui.widgets.input_profile_editor import InputProfileEditor
-            InputProfileEditor(self).exec()
+            dialog_hilfe.ausfuehren(InputProfileEditor(self))
         except Exception as e:
             QMessageBox.warning(self, "Input-Profile", str(e))
 
@@ -4048,7 +4103,7 @@ class MainWindow(QMainWindow):
             dlg = ValidationDialog(
                 issues, self,
                 reparieren=lambda: validate_and_repair(self._state, fix=True))
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
             # Trigger Refresh-All danach
             try:
                 self._state.sync.refresh_all()
@@ -4211,12 +4266,10 @@ class MainWindow(QMainWindow):
         # gewaehlte aeltere Version aus der Staffelung.
         with sicherungen.aufraeumen_angehalten():
             dlg = SicherungenDialog(self._sicherungs_name(), self)
-            try:
+            with dialog_hilfe.offen(dlg):
                 if dlg.exec() != QDialog.DialogCode.Accepted:
                     return
                 wahl = dlg.auswahl()
-            finally:
-                dlg.deleteLater()
             if wahl is not None:
                 self._oeffne_sicherung(wahl)
 
@@ -4337,6 +4390,10 @@ class MainWindow(QMainWindow):
             pass
         if self._state.playback_engine:
             self._state.playback_engine.stop()
+        # CDX-72: Pult-LEDs der VC ausschalten, solange der Ausgang noch offen
+        # ist — die Canvas baut sich erst nach close_all() ab, dann gingen die
+        # Note-Offs ins Leere und die LEDs blieben bis zum naechsten Start an.
+        self._vc_leds_abschalten()
         from src.core.midi.midi_manager import get_midi_manager
         get_midi_manager().close_all()
         try:

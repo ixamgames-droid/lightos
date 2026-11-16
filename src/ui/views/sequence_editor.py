@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from src.core.engine.sequence import Sequence, SequenceStep
 from src.core.engine.function import RunOrder, Direction
+from src.ui.views.chaser_editor import RICHTUNG_TEXT
 from src.core.engine.function_manager import get_function_manager
 from src.core.app_state import get_state
 from src.ui.widgets.curve_editor import CurveThumbnail, CurveEditorDialog
@@ -16,6 +17,7 @@ from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from PySide6.QtWidgets import QDialog
+from src.ui import dialog_hilfe
 
 
 COLS = ["#", "Schritt", "Fade In", "In-Kurve",
@@ -81,23 +83,25 @@ class SequenceEditor(QWidget):
         self._stufe_combo = StufeAuswahl(self._seq)
         prop_row.addWidget(self._stufe_combo)
 
-        prop_row.addWidget(QLabel("Order:"))
+        # UI-142: deutsche Beschriftung wie im Chaser-Editor; gespeichert
+        # bleibt der Enum-Wert (itemData)
+        prop_row.addWidget(QLabel("Ablauf:"))
         self._cb_order = QComboBox()
         for ro in RunOrder:
             self._cb_order.addItem(ro.value, ro)
-        self._cb_order.setCurrentText(self._seq.run_order.value)
+        self._cb_order.setCurrentIndex(max(0, self._cb_order.findData(self._seq.run_order)))
         self._cb_order.currentIndexChanged.connect(self._on_props_changed)
         prop_row.addWidget(self._cb_order)
 
-        prop_row.addWidget(QLabel("Dir:"))
+        prop_row.addWidget(QLabel("Richtung:"))
         self._cb_dir = QComboBox()
         for d in Direction:
-            self._cb_dir.addItem(d.value, d)
-        self._cb_dir.setCurrentText(self._seq.direction.value)
+            self._cb_dir.addItem(RICHTUNG_TEXT.get(d, d.value), d)
+        self._cb_dir.setCurrentIndex(max(0, self._cb_dir.findData(self._seq.direction)))
         self._cb_dir.currentIndexChanged.connect(self._on_props_changed)
         prop_row.addWidget(self._cb_dir)
 
-        prop_row.addWidget(QLabel("Speed:"))
+        prop_row.addWidget(QLabel("Geschwindigkeit:"))
         self._sp_speed = QDoubleSpinBox()
         self._sp_speed.setRange(0.01, 100.0)
         self._sp_speed.setValue(self._seq.speed)
@@ -355,10 +359,11 @@ class SequenceEditor(QWidget):
         label = "Fade-In" if attr == "fade_in_curve" else "Fade-Out"
         dlg = CurveEditorDialog(cur, title=f"{label}-Kurve – Step {row + 1}",
                                 parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
-            setattr(step, attr, dlg.result_curve)
-            self._refresh_steps()
-            self._tbl.selectRow(row)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+                setattr(step, attr, dlg.result_curve)
+                self._refresh_steps()
+                self._tbl.selectRow(row)
 
     def _format_values(self, vals: dict) -> str:
         parts = []

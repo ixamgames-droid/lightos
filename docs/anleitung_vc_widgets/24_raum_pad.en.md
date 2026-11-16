@@ -25,12 +25,12 @@ The on state is **not** saved, so a loaded show never writes into the programmer
 
 ## Unfolded view (“Aufgeklappt”)
 
-Set **Ansicht** (view) to **“Aufgeklappt”** in the inspector or the settings dialog. The pad then shows the room like an unfolded box without a ceiling, true to scale: the **floor** in the middle, the **back wall** above, the **side walls** left and right, the **front wall** (audience side) below. Every surface is labelled.
+Set **Ansicht** (view) to **“Aufgeklappt”** in the inspector or the settings dialog. The pad then shows the room like an unfolded box without a ceiling, true to scale: the **floor** in the middle, the **back wall** above, the **side walls** left and right, the **front wall** (audience side) below. Every surface is labelled; on a small pad only “links”/“rechts” or no name is shown, nothing is cut off.
 
 - Tapping the **floor** works like the top view (target height applies).
 - Tapping a **wall** aims at a point **on that wall**: the height is the distance from the fold edge, the other direction follows the floor. The height slider is greyed out and shows the wall height (“Wand … m”).
 - **Dragging across a fold edge** moves continuously onto the neighbouring surface; at the edge floor and wall give the same point (exactly so at target height 0 m, the default; with a higher target height the target drops by that height once when crossing — a dashed line on the walls shows it). Outside all surfaces the point is clamped to the nearest one; a tap into an empty corner sets nothing.
-- Heads stand on the floor at their location; hanging heads show their height.
+- Heads stand on the floor at their location; hanging heads show their height. Several heads hanging at the same height in a row get the height only **once** (e.g. “10× 4,5 m”). When space runs out, the circles get smaller and numbers and heights are left out instead of overlapping; the tooltip always lists the heights of all hanging heads (“Höhen: …”).
 - Each wall can be switched off (the floor always stays); a hidden wall cannot be tapped.
 - A head that cannot reach the target (outside its pan/tilt range, e.g. high up a wall with a 180° tilt fixture) gets a **red ring with “!”** and is named in the tooltip. Its value is still the one the visualizer's aim tool gives, clamped at the end stop.
 

@@ -96,6 +96,7 @@ test_backlog_*.py
 test_changelog_fragmente.py
 test_qa55_doku_und_backlog_gates.py
 test_qa64_status_drift.py
+test_qa64_implizite_spur.py        # QA-64: todo-Item mit ID-Testdatei im Baum (liest BACKLOG.md + Fragmente)
 test_tool28_sammeln_freitext.py    # TOOL-28: Sammel-Lauf haengt fehlenden Freitext an vorhandene BACKLOG-Zeilen an
 
 # ── Privatsphaere, Lizenz, Repo-Hygiene (laufen ueber ALLE Dateien) ─────────
@@ -124,6 +125,7 @@ test_tool1_verwaiste_werkzeuge.py
 !test_fm56_review.py               # tools/README.md ist keine Doku -> volle Suite
 !test_session_claim.py             # "docs/y.md" nur als Beispielwert fuer --files
 !test_proc25_tafel_privat.py       # "SESSIONS.md" nur als Datei in Wegwerf-Repos (Tafel), keine Doku
+!test_proc06_id_gate.py            # "BACKLOG.md" nur als Datei in Wegwerf-Repos, keine Doku
 !test_pseudonymisieren.py         # "BACKLOG.md" nur als Datei in Wegwerf-Repos, keine Doku
 !test_tool11_bildschirm_windows.py # docs/.../img nur als Beispielpfade
 !test_tool3_generator_annahmen.py  # "docs" nur in erzeugtem Beispielcode

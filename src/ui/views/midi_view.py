@@ -22,6 +22,7 @@ from src.core.midi.midi_mapper import (
     _binding_type_from_msg_type, typ_text, typ_aus_text,
 )
 from src.core.app_state import get_state
+from src.ui import dialog_hilfe
 try:
     from src.core.timecode.mtc_reader import get_mtc_reader
 except Exception:
@@ -326,8 +327,8 @@ class MidiView(QWidget):
         """Controller-Profile öffnen (MIDI-Geräte; Feature 6: Controller-DB)."""
         try:
             from src.ui.widgets.controller_browser import ControllerBrowserDialog
-            ControllerBrowserDialog(self, midi_only=True,
-                                    vc_canvas=self.vc_canvas_geber).exec()
+            dialog_hilfe.ausfuehren(ControllerBrowserDialog(self, midi_only=True,
+                                    vc_canvas=self.vc_canvas_geber))
         except Exception as e:
             QMessageBox.warning(self, "Controller-Profile", str(e))
 

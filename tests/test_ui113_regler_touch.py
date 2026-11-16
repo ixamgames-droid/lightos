@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (                                      # noqa: E40
 
 from src.ui import touch_keyboard as tk                              # noqa: E402
 from src.ui import ziehen_scrollen as zs                             # noqa: E402
+from _doppeltipp import DruckUhr                                     # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
@@ -129,9 +130,20 @@ class ReglerTouchTest(unittest.TestCase):
         fenster = _ohne_scroll(r)
         self.addCleanup(fenster.deleteLater)
         f = _Finger(r)
+        # QA-123: wirklich ein Doppeltipp — erster Tipp beginnt mit 1 ms
+        # Fenster ein neues Klick-Paar, der zweite traegt einen groesseren
+        # Zeitstempel (gleiche Millisekunde waere fuer Qt kein Doppelklick).
+        hints = QApplication.styleHints()
+        self.addCleanup(hints.setMouseDoubleClickInterval, hints.mouseDoubleClickInterval())
+        uhr = DruckUhr()
+        self.addCleanup(uhr.entfernen)
+        hints.setMouseDoubleClickInterval(1)
         f.tipp(_rille(r))
+        hints.setMouseDoubleClickInterval(5000)
+        uhr.naechster_zeitstempel()
         f.tipp(_rille(r))
         QApplication.processEvents()
+        self.assertEqual(uhr.doppelklicks, 1, "Qt hat den Doppeltipp erkannt")
         self.assertEqual(r.value(), 0)
 
     def test_rillen_halten_1_5_s_aendert_nichts(self):

@@ -272,7 +272,9 @@ list) in the toolbar. The element appears in the middle of the area. A double-cl
 **Cueliste-Einstellungen** (cue list settings) with **Beschriftung:** (caption) and
 **Executor-Slot:**. Then switch **Bearbeiten** off again.
 
-1. **The cue list** shows the cues of the chosen executor; the active cue is marked.
+1. **The cue list** shows the cues of the chosen executor. The running cue has a blue
+   background and bold text. Tapping or swiping selects nothing; a double-click or
+   double-tap on a cue jumps there after a confirmation.
 2. **GO ►** triggers the next cue, **◄◄** goes back, **■** stops.
 
 **Careful when counting:** the **Executor-Slot** counts from **0**. Slot 0 is the executor

@@ -74,7 +74,7 @@ The live effect runs through the shared seam `src/core/engine/effect_live.py`: �
 
 ## MIDI & keyboard
 
-The color tile supports **MIDI teach** (right-click in edit mode → „MIDI Teach…", or the fields in the settings dialog). This widget does not offer a keyboard assignment of its own.
+The color tile supports **MIDI teach** (right-click in edit mode → „MIDI Lernen…", or the fields in the settings dialog). This widget does not offer a keyboard assignment of its own.
 
 - **Note (`note_on`):** pressing the pad/key (velocity > 0) applies the color; releasing only resets the visual pressed state.
 - **CC (`cc`):** a value > 63 counts as “pressed” and applies the color, a value ≤ 63 as “released”. This also lets you switch the tile with a push-button CC.

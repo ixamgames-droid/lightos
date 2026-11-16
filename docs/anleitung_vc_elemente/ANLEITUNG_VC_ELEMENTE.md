@@ -79,7 +79,7 @@ Rechtsklick auf ein Element (im Bearbeiten-Modus) öffnet:
   **Widget-Galerie** (nur wenn für den Aspekt mehrere Typen passen, z. B. Tempo →
   Speed-Rad *oder* Fader).
 - **⚡ Live-Parameter…** — nur bei effektgebundenen Elementen mit Live-Parametern.
-- **🎹 MIDI Teach…** / **⌨ Taste zuweisen…** — MIDI- bzw. Tastatur-Bindung lernen
+- **🎹 MIDI Lernen…** / **⌨ Taste zuweisen…** — MIDI- bzw. Tastatur-Bindung lernen
   (je nach Element-Typ).
 - **Bank** (Untermenü) — Element einer Bank zuordnen: **„Alle Banks"** oder **Bank 1…10**.
 - **📱 Auf Handy-Konsole legen** — legt das Element als Kachel auf die Handy-Konsole

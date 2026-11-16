@@ -65,8 +65,13 @@ class VCCueList(VCWidget):
             QListWidget { background: #161b22; color: #e6edf3; font-size: 12px; border: none; }
             QListWidget::item { padding: 3px 2px; }
         """)
+        # UI-144: die Markierung der laufenden Cue (Zeilenfarbe) malt unter dem
+        # App-Stylesheet (``QListWidget::item``) nur ein eigener Delegat.
+        from src.ui.zeilen_hintergrund import hintergrund_sichtbar
+        hintergrund_sichtbar(self._cue_list)
         self._cue_list.itemDoubleClicked.connect(self._on_cue_double)
         self._aktiv_zeile = -1
+        self._sig: tuple | None = None   # CDX-72: (Stapel, Nummern+Namen) der Liste
         layout.addWidget(self._cue_list)
 
         btn_row = QHBoxLayout()
@@ -187,19 +192,35 @@ class VCCueList(VCWidget):
         if ex is None or ex.stack is None:
             return
         stack = ex.stack
-        current = self._cue_list.count()
-        if current != len(stack.cues):
+        # CDX-72: neu aufbauen, sobald sich Stapel, Nummern oder Namen aendern —
+        # nicht nur die Anzahl. Sonst blieben nach einem Seitenwechsel mit
+        # gleicher Cue-Zahl die Eintraege der alten Seite stehen, und der
+        # Sprung (Doppeltipp) traf auf dem neuen Stapel eine andere Cue.
+        sig = self._cue_signatur(stack)
+        if sig != getattr(self, "_sig", None) or self._cue_list.count() != len(sig[1]):
             self._cue_list.clear()
             self._aktiv_zeile = -1
-            for cue in stack.cues:
-                label = f"{cue.number:>6.1f}  {cue.label or '---'}"
-                item = QListWidgetItem(label)
-                item.setData(Qt.ItemDataRole.UserRole, cue.number)
+            for nummer, text in sig[1]:
+                item = QListWidgetItem(self._zeilen_text(nummer, text))
+                item.setData(Qt.ItemDataRole.UserRole, nummer)
                 self._cue_list.addItem(item)
+            self._sig = sig
         # Laufende Cue hervorheben (UI-121: Markierung statt Auswahl — die
         # Liste hat keine Auswahl mehr, die ein Finger verstellen koennte).
         idx = stack.current_index
         self._markiere(idx if 0 <= idx < self._cue_list.count() else -1)
+
+    @staticmethod
+    def _cue_signatur(stack) -> tuple:
+        try:
+            cues = tuple((c.number, c.label or "") for c in list(stack.cues))
+        except Exception:
+            cues = ()
+        return (id(stack), cues)
+
+    @staticmethod
+    def _zeilen_text(nummer, label: str) -> str:
+        return f"{nummer:>6.1f}  {label or '---'}"
 
     def _markiere(self, row: int):
         if row == self._aktiv_zeile:
@@ -207,6 +228,7 @@ class VCCueList(VCWidget):
         alt = self._cue_list.item(self._aktiv_zeile) if self._aktiv_zeile >= 0 else None
         if alt is not None:
             alt.setBackground(QColor(0, 0, 0, 0))
+            alt.setData(Qt.ItemDataRole.ForegroundRole, None)
             f = alt.font()
             f.setBold(False)
             alt.setFont(f)
@@ -214,6 +236,7 @@ class VCCueList(VCWidget):
         neu = self._cue_list.item(row) if row >= 0 else None
         if neu is not None:
             neu.setBackground(QColor("#1f6feb"))
+            neu.setForeground(QColor("#ffffff"))
             f = neu.font()
             f.setBold(True)
             neu.setFont(f)
@@ -231,8 +254,24 @@ class VCCueList(VCWidget):
         nummer = item.data(Qt.ItemDataRole.UserRole)
         if nummer is None:
             return
-        if self._bestaetige_sprung(item.text().strip()):
-            self._gehe_zu(float(nummer))
+        text = item.text()
+        # CDX-72: erst gegen den aktuellen Stapel abgleichen. Hat die Seite
+        # gewechselt (der Abgleich-Timer lief noch nicht), war der Eintrag
+        # veraltet: Liste neu aufbauen, nicht springen, nicht fragen.
+        sig_vorher = getattr(self, "_sig", None)
+        self._refresh()
+        if getattr(self, "_sig", None) != sig_vorher:
+            return
+        if not self._bestaetige_sprung(text.strip()):
+            return
+        # CDX-72 (Pruefung): die Rueckfrage ist modal — waehrenddessen kann die
+        # Seite (Pult, Web) wechseln. Dann gilt die bestaetigte Zeile nicht fuer
+        # den neuen Stapel, auch wenn es dort dieselbe Nummer gibt.
+        ex = self._executor()
+        if ex is None or ex.stack is None or self._cue_signatur(ex.stack) != sig_vorher:
+            self._refresh()
+            return
+        self._gehe_zu(float(nummer))
 
     def _bestaetige_sprung(self, text: str) -> bool:
         """Rueckfrage vor dem Live-Sprung (Standard: Nein)."""
@@ -248,6 +287,12 @@ class VCCueList(VCWidget):
         ex = self._executor()
         if ex is None or ex.stack is None:
             return
+        try:
+            da = any(abs(float(c.number) - float(nummer)) < 0.001 for c in ex.stack.cues)
+        except Exception:
+            da = False
+        if not da:
+            return                      # CDX-72: Nummer gibt es hier nicht (mehr)
         ex.stack.go_to(nummer)
 
     # ── Edit mode pass-through ─────────────────────────────────────────────

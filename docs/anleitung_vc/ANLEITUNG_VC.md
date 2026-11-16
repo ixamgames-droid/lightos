@@ -106,6 +106,14 @@ Wegen:
 passen (z. B. Tempo: Speed-Rad oder Fader), per **Rechtsklick → „↔ Widget ändern…"** → dieselbe Galerie.
 (An/Aus-Tasten, Bus-Auswahl, Effekt-Farben oder XY-Feld haben den Eintrag nicht.) Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung, Position) bleibt.
 
+**Mehrere Elemente wählen:** mit Strg/Umschalt-Klick, einem Rahmen auf freier Fläche oder am
+Finger über „Mehrfach“ bzw. Halten + Antippen (hat der gehaltene Finger die Auswahl dabei ein paar Pixel mitgezogen, rückt die ganze Auswahl wieder an ihren Platz). Gewählte Elemente tragen einen bernsteinfarbenen
+Rahmen und einen Haken auf ihrer Ecke oben links (halb außerhalb, damit er keine Beschriftung
+verdeckt). Bei mehreren zeigt der Knopf **Ausrichten** in der Werkzeugleiste die Anzahl, etwa
+„Ausrichten · 3 gewählt ▾“. Ein Raum-Pad mit
+„Lock AUS“ zeigt nach dem Loslassen einen gestrichelten grauen Ring und kurz „freigegeben“ —
+die Köpfe zielen dann nicht mehr.
+
 **Farb-Snap aus der Bibliothek:** Ein **Farb-Snap** (`blau`) erzeugt beim Ziehen **direkt eine
 Snap-Taste** (Button mit Aktion „Bibliothek-Farbe/Snap", farbiger Strich) — ohne Drop-Karte. Alternativ
 **Rechtsklick auf einen Bibliothek-Eintrag → „➡ Auf VC-Taste legen"** und danach einen **vorhandenen**
@@ -258,11 +266,11 @@ Es gibt **zwei Wege**, ein VC-Widget auf eine APC-mini-Taste/-Fader zu legen:
 VC-**Button** anklicken → am APC mini die Taste **drücken** → Bindung wird gespeichert (Note). Fader
 (CC) bindest du über Weg B.
 
-**B — Per MIDI-Teach-Dialog (mit APC-Abbild):** im **Bearbeiten**-Modus das Widget **rechtsklicken**
-→ **🎹 MIDI Teach...**. Es öffnet sich ein Abbild der APC mini — entweder am Gerät die Taste/den Fader
+**B — Per Lern-Dialog (mit APC-Abbild):** im **Bearbeiten**-Modus das Widget **rechtsklicken**
+→ **🎹 MIDI Lernen...**. Es öffnet sich ein Abbild der APC mini — entweder am Gerät die Taste/den Fader
 betätigen **oder** das Element im Bild direkt anklicken (geht auch **ohne** angeschlossene APC):
 
-![MIDI-Teach-Dialog (APC mini Abbild)](img/09_midi_teach.png)
+![Lern-Dialog (APC mini Abbild)](img/09_midi_teach.png)
 
 1. Das APC-mini-Abbild: Pad-Grid, Track-Tasten, Scene-Tasten, Fader.
 2. **Bindung entfernen** — löst eine vorhandene Bindung.

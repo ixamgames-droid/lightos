@@ -24,7 +24,7 @@ selbst an.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import QMenu, QPushButton
 
 
@@ -46,6 +46,22 @@ class MenueKnopf(QPushButton):
         if menu is None or not self.isEnabled():
             return
         menu.popup(self.mapToGlobal(self.rect().bottomLeft()))
+
+    def event(self, e):                              # noqa: N802 — Qt-Name
+        """UI-141: mehrzeilige Beschriftung (``\n``) nicht anschneiden.
+
+        Ein Stylesheet mit ``min-height`` (Touch-QSS des Hauptfensters) setzt
+        beim Polieren eine feste Mindesthoehe fuer EINE Zeile; danach zieht der
+        Knopf sie auf seine volle Inhaltshoehe nach. Einzeilige Knoepfe bleiben
+        unberuehrt."""
+        r = super().event(e)
+        if (e.type() in (QEvent.Type.Polish, QEvent.Type.StyleChange,
+                         QEvent.Type.FontChange)
+                and "\n" in self.text()):
+            h = self.sizeHint().height()
+            if self.minimumHeight() < h:
+                self.setMinimumHeight(h)
+        return r
 
     def keyPressEvent(self, event) -> None:          # noqa: N802 — Qt-Name
         if (event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)

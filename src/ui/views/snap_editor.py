@@ -37,6 +37,7 @@ from src.core.attr_groups import (  # kanonisch, kein Zyklus
     group_label as _group_label,
 )
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui import dialog_hilfe
 
 
 _COLS = ["Gerät", "Kanal", "Gruppe", "DMX", "Wert", ""]
@@ -492,10 +493,10 @@ class SnapEditor(QWidget):
             tbl.setCellWidget(r, 5, btn)
 
         # Tabelle auf Inhaltshoehe fixieren (kein verschachtelter Scroll).
-        h = hh.height() + 4
-        for r in range(tbl.rowCount()):
-            h += tbl.rowHeight(r) or 30
-        tbl.setFixedHeight(max(h, 60))
+        # CDX-74: ueber die gemeinsame Hilfe, damit der Touch-Modus (44-px-
+        # Zeilen beim Zeigen) die Hoehe nachzieht.
+        from src.ui.touch_keyboard import inhalt_hoehe_fixieren
+        inhalt_hoehe_fixieren(tbl, minimum=60, ersatz_zeile=30)
         cv.addWidget(tbl)
         self._tables.append(tbl)
 
@@ -568,48 +569,49 @@ class SnapEditor(QWidget):
             return
 
         dlg = _AddDeviceDialog(ordered, self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        chosen = dlg.selected_fids()
-        if not chosen:
-            return
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            chosen = dlg.selected_fids()
+            if not chosen:
+                return
 
-        controlled_attrs = snap_controlled_attrs(self._snap.values)
-        # Vorbild je Typ (erstes Snap-Gerät desselben Typs) cachen.
-        template_by_type: dict[tuple, dict] = {}
-        for fid in in_snap:
-            fx = fixtures.get(int(fid))
-            if fx is None:
-                continue
-            tkey = fixture_type_key(fx)
-            template_by_type.setdefault(tkey, dict(self._snap.values.get(int(fid), {})))
+            controlled_attrs = snap_controlled_attrs(self._snap.values)
+            # Vorbild je Typ (erstes Snap-Gerät desselben Typs) cachen.
+            template_by_type: dict[tuple, dict] = {}
+            for fid in in_snap:
+                fx = fixtures.get(int(fid))
+                if fx is None:
+                    continue
+                tkey = fixture_type_key(fx)
+                template_by_type.setdefault(tkey, dict(self._snap.values.get(int(fid), {})))
 
-        added = 0
-        skipped = 0
-        for fid in chosen:
-            fx = fixtures.get(int(fid))
-            if fx is None:
-                skipped += 1
-                continue
-            caps = self._caps(fx)
-            template = template_by_type.get(fixture_type_key(fx))
-            new_vals = values_for_new_device(template, caps, controlled_attrs)
-            if not new_vals:
-                skipped += 1   # kompatibel auf Gruppen-Ebene, aber kein exakt passender Kanal
-                continue
-            for attr, val in new_vals.items():
-                self._set_value(int(fid), attr, val)
-            added += 1
+            added = 0
+            skipped = 0
+            for fid in chosen:
+                fx = fixtures.get(int(fid))
+                if fx is None:
+                    skipped += 1
+                    continue
+                caps = self._caps(fx)
+                template = template_by_type.get(fixture_type_key(fx))
+                new_vals = values_for_new_device(template, caps, controlled_attrs)
+                if not new_vals:
+                    skipped += 1   # kompatibel auf Gruppen-Ebene, aber kein exakt passender Kanal
+                    continue
+                for attr, val in new_vals.items():
+                    self._set_value(int(fid), attr, val)
+                added += 1
 
-        if added == 0:
-            QMessageBox.information(self, "Gerät hinzufügen",
-                                   "Keine passenden Kanäle für die Auswahl gefunden.")
-        elif skipped:
-            QMessageBox.information(
-                self, "Gerät hinzufügen",
-                f"{added} Gerät(e) hinzugefügt, {skipped} übersprungen "
-                f"(keine passenden Kanäle).")
-        self._load()
+            if added == 0:
+                QMessageBox.information(self, "Gerät hinzufügen",
+                                       "Keine passenden Kanäle für die Auswahl gefunden.")
+            elif skipped:
+                QMessageBox.information(
+                    self, "Gerät hinzufügen",
+                    f"{added} Gerät(e) hinzugefügt, {skipped} übersprungen "
+                    f"(keine passenden Kanäle).")
+            self._load()
 
     # ── Kanal hinzufügen (pro Typ) ───────────────────────────────────────────────
 
@@ -641,21 +643,22 @@ class SnapEditor(QWidget):
         dlg = _AddChannelDialog(type_label, addable, len(present), self,
                                 fixtures=[fixtures.get(int(f)) for f in sorted(present)
                                           if fixtures.get(int(f)) is not None])
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        attrs = dlg.selected_attrs()
-        if not attrs:
-            return
-        value = dlg.value()
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            attrs = dlg.selected_attrs()
+            if not attrs:
+                return
+            value = dlg.value()
 
-        for attr in attrs:
-            for fid in present:
-                # nur dort nachtragen, wo der Kanal fehlt (vorhandene Werte schonen)
-                existing = self._snap.values.get(int(fid), {})
-                if attr in existing:
-                    continue
-                self._set_value(int(fid), attr, value)
-        self._load()
+            for attr in attrs:
+                for fid in present:
+                    # nur dort nachtragen, wo der Kanal fehlt (vorhandene Werte schonen)
+                    existing = self._snap.values.get(int(fid), {})
+                    if attr in existing:
+                        continue
+                    self._set_value(int(fid), attr, value)
+            self._load()
 
     # ── Vorschau ──────────────────────────────────────────────────────────────
 
