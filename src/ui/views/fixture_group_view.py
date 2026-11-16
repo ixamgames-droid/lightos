@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFormLayout, QFrame, QSizePolicy, QGridLayout,
     QDialog, QListWidget, QListWidgetItem, QAbstractItemView, QDialogButtonBox,
     QMenu, QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
+    QScrollArea,
 )
 from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, QRect, Signal
 from PySide6.QtGui import (
@@ -1000,6 +1001,16 @@ class FixtureGroupView(QWidget):
         # sonst nur ~43px breit -> die Labels wurden zu unleserlichen Fragmenten
         # beschnitten. 2 Spalten verdoppeln die Button-Breite -> Text lesbar.
         btns = QGridLayout()
+        # UI-141: im Touch-Modus 8 px Zeilenabstand zwischen den 44-px-Knoepfen
+        # (waagerecht bleibt der Standard — sonst passt „Umbenennen" nicht mehr).
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            _touch = bool(is_touch_mode())
+        except Exception as e:
+            print(f"[fixture_group_view] ERROR: Touch-Zustand: {e}")
+            _touch = False
+        if _touch:
+            btns.setVerticalSpacing(8)
         b_new = QPushButton("+ Neu")
         b_new.clicked.connect(self._new_group)
         btns.addWidget(b_new, 0, 0)
@@ -1035,6 +1046,8 @@ class FixtureGroupView(QWidget):
         # Fixture tree (Universe-Ordner)
         left.addWidget(QLabel("Fixtures (drag auf Raster):"))
         self._fixture_list = FixtureTreeWithDrag()
+        # UI-141: der Baum darf in der Bildlaufspalte nicht auf null schrumpfen.
+        self._fixture_list.setMinimumHeight(160)
         left.addWidget(self._fixture_list, 1)
 
         # FM-HEADLAYOUT Slice 3: Köpfe eines Multi-Head-Geräts als EINZELNE Zellen
@@ -1070,7 +1083,11 @@ class FixtureGroupView(QWidget):
             # Menue-Pfeil loeste unter Windows "QFont::setPointSize: Point
             # size <= 0 (-1)" aus (s. widgets/menue_knopf.py); der Pfeil steht
             # als "▾" schon im Text.
-            _btn = MenueKnopf(_titel)
+            # UI-141: Touch-Innenabstand + 14-px-Schrift sprengen die 260 px
+            # breite Spalte ("Weiß-Segmente einzeln → Raster ▾" war links
+            # abgeschnitten) -> dort zweizeilig. Der Wortlaut bleibt (Anleitung).
+            _zweizeilig = _touch and _achse == ACHSE_WEISS
+            _btn = MenueKnopf(_titel.replace(" → ", "\n→ ", 1) if _zweizeilig else _titel)
             _btn.setToolTip(_hilfe)
             _menu = QMenu(_btn)
             # FM-40: die im Gerät hinterlegte Form steht OBEN — sie ist die
@@ -1119,8 +1136,23 @@ class FixtureGroupView(QWidget):
 
         left_w = QWidget()
         left_w.setLayout(left)
+        # UI-141: die Spalte scrollt senkrecht statt ihre Knoepfe unter die
+        # Mindesthoehe zu quetschen — bei 1280x800 im Touch-Modus lagen sie
+        # sonst uebereinander. Breite bleibt 260 px (Inhalt), die Bildlaufleiste
+        # kommt nur bei Bedarf dazu.
+        self._left_scroll = QScrollArea()
+        self._left_scroll.setWidgetResizable(True)
+        self._left_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._left_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._left_scroll.setWidget(left_w)
         left_w.setFixedWidth(260)
-        root.addWidget(left_w)
+        # Platz fuer die Bildlaufleiste (Touch-QSS: 24 px breit), damit die
+        # 260 px Inhalt nie rechts angeschnitten werden.
+        _leiste = max(self._left_scroll.verticalScrollBar().sizeHint().width(),
+                      24 if _touch else 0)
+        self._left_scroll.setFixedWidth(260 + _leiste)
+        root.addWidget(self._left_scroll)
 
         # ── Right: container with grid + floating panel ───────────────────
         right_w = QWidget()
