@@ -88,7 +88,7 @@
 | `linux_audio_input_guard.sh` | Haelt auf Linux-Systemen mit zwei Realtek-Mikrofonbuchsen den Capture-MUX auf |
 | `mh_einmessen.py` | VIZ-60 (VERALTET — nimm das Einmessen in der App) — zwei Moving Heads am Rig vergleichen. |
 | `patch_quarantaene.py` | STAB-DEDUP-OPT: verwaiste Patch-Zeilen anzeigen und (nur auf Ansage) in |
-| `pr_bereit.py` | PROC-03 — ist ein offener PR wirklich pruefbar gruen, oder sieht er nur so aus? |
+| `pr_bereit.py` | PROC-03 — ist ein offener PR wirklich pruefbar gruen, oder sieht er nur so aus? Seit PROC-06 auch: fuehrt er eine Backlog-ID neu ein, die ein anderer offener PR schon vergeben hat? |
 | `pr_ci_status.py` | PROC-10: unterscheidet "alle Checks gruen" von "es gibt gar keine Checks". |
 | `pseudonymisieren.py` | pseudonymisieren.py — Klarnamen im OEFFENTLICHEN Repo durch ein Pseudonym ersetzen. |
 | `qt_module_befund.py` | XPLAT-45: welche Qt-Module bringt das installierte PySide6 mit? |

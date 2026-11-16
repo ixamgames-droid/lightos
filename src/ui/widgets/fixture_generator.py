@@ -931,6 +931,55 @@ def eigene_profile(eng=None) -> list[tuple[int, str]]:
             for pid, text in eigene]
 
 
+#: FM-71: Beschriftung und Meldungstitel von „Profil aktualisieren“.
+AKTUALISIEREN_KNOPF = "Profil aktualisieren"
+AKTUALISIEREN_TITEL = "Profil aktualisieren"
+
+
+def profil_dubletten(hersteller: str, modell: str, *, ohne: int | None = None,
+                     eng=None) -> list[int]:
+    """FM-71: IDs ANDERER Profile mit demselben Hersteller + Modell (ohne
+    Gross/klein und Mehrfach-Leerzeichen) — derselbe Riegel wie im
+    Fixture-Editor (UI-74/FM-63): ein Ueberschreiben darf keine Dublette
+    erzeugen (FM-43: mehrdeutige Aufloesung beim Laden einer Show)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from src.core.database import fixture_db as fdb
+    from src.core.database.bibliothek_format import hersteller_ohne_gross_klein
+    from src.core.database.models import FixtureProfile
+    eng = eng if eng is not None else fdb.engine()
+    schluessel = fdb.profil_schluessel("", modell)[1]
+    with Session(eng) as s:
+        ids = [m.id for m in hersteller_ohne_gross_klein(s, hersteller)]
+        if not ids:
+            return []
+        zeilen = s.execute(select(FixtureProfile.id, FixtureProfile.name)
+                           .where(FixtureProfile.manufacturer_id.in_(ids))).all()
+    return [int(i) for i, n in zeilen
+            if int(i) != ohne and fdb.profil_schluessel("", n)[1] == schluessel]
+
+
+def ueberschreiben_fragen(parent, pid: int, name: str,
+                          folgen: list[str]) -> bool:
+    """FM-71: Rueckfrage vor dem Ueberschreiben; Vorauswahl „Nein“. Nennt
+    die Folgen fuer gepatchte Geraete (``profil_patch_folgen``) wie der
+    Fixture-Editor. ``True`` = ueberschreiben."""
+    text = (f"Das eigene Profil „{name}“ (Nr. {pid}) mit dem aktuellen Stand "
+            "überschreiben? Das lässt sich nicht rückgängig machen.")
+    if folgen:
+        text += ("\n\nDieses Profil ist in der geladenen Show gepatcht. "
+                 "Überschreiben ändert diese Geräte:\n\n• "
+                 + "\n• ".join(folgen[:12])
+                 + (f"\n… und {len(folgen) - 12} weitere"
+                    if len(folgen) > 12 else "")
+                 + "\n\nAndere Show-Dateien werden nicht geprüft.")
+    antwort = QMessageBox.question(
+        parent, AKTUALISIEREN_TITEL, text,
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No)
+    return antwort == QMessageBox.StandardButton.Yes
+
+
 class _RangeEditor(QWidget):
     """Bereichs-Tabelle eines Kanals + kompakte Schnellwahl-Vorschau."""
 
@@ -1935,6 +1984,13 @@ class FixtureGeneratorDialog(QDialog):
         self._hinweis_timer.setSingleShot(True)
         self._hinweis_timer.setInterval(HINWEIS_VERZOEGERUNG_MS)
         self._hinweis_timer.timeout.connect(self._revalidate)
+        #: FM-71: ID des ueber „Eigenes Profil öffnen…“ geladenen EIGENEN
+        #: Profils — nur dann ist „Profil aktualisieren“ aktiv. Jede andere
+        #: Vorlage (QLC+, .json, Konstruktor) setzt sie zurueck.
+        self._geoeffnet_id: int | None = None
+        #: FM-71: (Hersteller, Modell) wie geoeffnet — fuer Patch-Folgen und
+        #: den Dubletten-Riegel beim Ueberschreiben.
+        self._geoeffnet_name: tuple[str, str] | None = None
         self._model = model or _default_model()
         self._setup_ui()
         self._reload_modes()
@@ -2023,8 +2079,8 @@ class FixtureGeneratorDialog(QDialog):
         b_eigen = QPushButton("Eigenes Profil öffnen…")
         b_eigen.setToolTip(
             "Ein im Generator oder Fixture-Editor angelegtes eigenes Profil "
-            "zum Weiterbearbeiten laden. Speichern legt ein NEUES Profil an "
-            "— das geöffnete bleibt unverändert.")
+            "zum Weiterbearbeiten laden. „Profil aktualisieren“ überschreibt "
+            "danach genau dieses Profil, „Speichern“ legt ein NEUES an.")
         b_eigen.clicked.connect(self._eigenes_profil_oeffnen)
         laden = QHBoxLayout()
         laden.addWidget(b_eigen)
@@ -2095,6 +2151,15 @@ class FixtureGeneratorDialog(QDialog):
         b_md.clicked.connect(self._export_markdown)
         btns.addWidget(b_md)
         btns.addStretch(1)
+        # FM-71: das geoeffnete EIGENE Profil an Ort und Stelle ueberschreiben
+        # (wie der Fixture-Editor, UI-81). Nur aktiv nach „Eigenes Profil
+        # öffnen…“; mitgelieferte Profile und Importe kommen dort nicht hin.
+        self._btn_aktualisieren = QPushButton(AKTUALISIEREN_KNOPF)
+        # Return im Dialog speichert nie (FM-30) — auch nicht ueber diesen Knopf.
+        self._btn_aktualisieren.setAutoDefault(False)
+        self._btn_aktualisieren.clicked.connect(self._aktualisieren)
+        btns.addWidget(self._btn_aktualisieren)
+        self._aktualisieren_zustand()
         self._btn_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Save |
             QDialogButtonBox.StandardButton.Cancel)
@@ -2352,7 +2417,8 @@ class FixtureGeneratorDialog(QDialog):
     def _eigenes_profil_oeffnen(self):
         """FM-71: ein eigenes Profil (``source='user'``) aus der Fixture-DB
         laden (:func:`model_from_profile` — die Herkunft reist mit, FM-76).
-        Gespeichert wird danach wie immer ein NEUES Profil."""
+        „Speichern“ legt danach ein NEUES Profil an, „Profil aktualisieren“
+        ueberschreibt genau dieses (FM-71)."""
         try:
             profile = eigene_profile()
         except Exception as e:
@@ -2379,9 +2445,21 @@ class FixtureGeneratorDialog(QDialog):
                                 f"Laden fehlgeschlagen:\n{e}")
             return
         self.set_model(model)
+        # FM-71: NACH ``set_model`` (das setzt die ID zurueck) — ab jetzt kann
+        # „Profil aktualisieren“ genau dieses Profil ueberschreiben.
+        self._geoeffnet_id = int(pid)
+        self._geoeffnet_name = (model.manufacturer, model.model)
+        self._aktualisieren_zustand()
 
     def set_model(self, model: GeneratorModel) -> None:
-        """Ein anderes Modell in den Dialog laden (Import, Vorlage)."""
+        """Ein anderes Modell in den Dialog laden (Import, Vorlage).
+
+        FM-71: vergisst das geoeffnete eigene Profil — eine neue Vorlage darf
+        es nie still ueberschreiben (``_eigenes_profil_oeffnen`` setzt die ID
+        danach selbst wieder)."""
+        self._geoeffnet_id = None
+        self._geoeffnet_name = None
+        self._aktualisieren_zustand()
         self._model = model
         self._edit_mfr.setText(model.manufacturer)
         self._edit_model.setText(model.model)
@@ -2418,7 +2496,10 @@ class FixtureGeneratorDialog(QDialog):
         QMessageBox.information(self, "Export", f"Markdown gespeichert:\n{path}")
 
     # ── Speichern ────────────────────────────────────────────────────────
-    def _save(self):
+    def _vorpruefen(self) -> bool:
+        """Was vor JEDEM Schreiben gilt — „Speichern“ wie „Profil
+        aktualisieren“ (FM-71): Kopf, Modi, Herkunft, Fehler-Rueckfrage.
+        ``True`` = weiter; bei ``False`` ist nichts geaendert."""
         self._sync_all()
         # FM-35: EINE Wache fuer beide Dialoge. Vorher war der Modus-Check
         # unten die einzige Huerde — und die nimmt ein frisch geoeffneter
@@ -2432,16 +2513,16 @@ class FixtureGeneratorDialog(QDialog):
                                          self._model.model)
         if beanstandung:
             QMessageBox.warning(self, "Speichern", beanstandung)
-            return
+            return False
         if not self._model.modes or not any(m.channels for m in self._model.modes):
             QMessageBox.warning(self, "Speichern",
                                 "Mindestens ein Modus mit Kanälen nötig.")
-            return
+            return False
         # FM-76: Vorlage ohne belegbare Herkunft — nicht still als „eigen“.
         if self._model.herkunft_fehlt:
             QMessageBox.warning(self, HERKUNFT_FEHLT_TITEL,
                                 herkunft_fehlt_hinweis(self._model))
-            return
+            return False
         # Live-Test sauber beenden, bevor wir speichern.
         self._live.shutdown()
 
@@ -2454,7 +2535,12 @@ class FixtureGeneratorDialog(QDialog):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No)
             if ans != QMessageBox.StandardButton.Yes:
-                return
+                return False
+        return True
+
+    def _save(self):
+        if not self._vorpruefen():
+            return
         try:
             self.saved_id = save_generated_profile(
                 self._model.to_payload(),
@@ -2464,8 +2550,9 @@ class FixtureGeneratorDialog(QDialog):
             return
         try:
             # FM-12: gecachte viz_model-Overrides/Channels des Profils verwerfen.
-            # Kein profil_geaendert() wie im Editor (UI-81): der Generator legt
-            # immer ein NEUES Profil an, kein gepatchtes Geraet nutzt es schon.
+            # Kein profil_geaendert() wie im Editor (UI-81): „Speichern“ legt
+            # immer ein NEUES Profil an, kein gepatchtes Geraet nutzt es schon
+            # (das Ueberschreiben, FM-71, ruft es in `_aktualisieren`).
             from src.core.app_state import clear_channel_cache
             clear_channel_cache()
         except Exception:
@@ -2480,6 +2567,95 @@ class FixtureGeneratorDialog(QDialog):
         self.gespeichert_meldung = (
             f"Fixture-Profil „{self._model.manufacturer} {self._model.model}“ "
             f"gespeichert.")
+        self.accept()
+
+    # ── FM-71: geoeffnetes eigenes Profil ueberschreiben ─────────────────
+    def _aktualisieren_zustand(self) -> None:
+        """Knopf nur aktiv, wenn ein eigenes Profil geoeffnet ist."""
+        b = getattr(self, "_btn_aktualisieren", None)
+        if b is None:
+            return
+        an = self._geoeffnet_id is not None
+        b.setEnabled(an)
+        b.setToolTip(
+            f"Das geöffnete eigene Profil (Nr. {self._geoeffnet_id}) mit dem "
+            "aktuellen Stand überschreiben — mit Rückfrage. Gepatchte Geräte "
+            "behalten das Profil." if an else
+            "Erst über „Eigenes Profil öffnen…“ ein eigenes Profil laden. "
+            "Mitgelieferte Profile und Importe werden nicht überschrieben — "
+            "„Speichern“ legt ein neues eigenes Profil an.")
+
+    def _aktualisieren(self):
+        """FM-71: das geoeffnete eigene Profil an Ort und Stelle
+        ueberschreiben (gleiche Profil-ID). Muster des Fixture-Editors
+        (UI-74/UI-81): kein neues Hersteller+Modell-Duplikat, Patch-Folgen
+        nennen, danach ``profil_geaendert`` fuer die gepatchten Geraete.
+        Mitgelieferte und importierte Profile sind geschuetzt — die schuetzt
+        zusaetzlich ``update_user_profile`` selbst."""
+        pid = self._geoeffnet_id
+        if pid is None:
+            return
+        if not self._vorpruefen():
+            return
+        from src.core.database import fixture_db as fdb
+        payload = self._model.to_payload()
+        mfr, modell = payload["manufacturer"], payload["name"]
+        # Wie der Editor (FM-63/UI-74): der Riegel verhindert nur NEUE
+        # Dubletten. Bleiben Hersteller + Modell, entsteht keine — so bleibt
+        # ein eigenes Profil, das schon gleichnamige Geschwister hat (altes
+        # „öffnen → speichern“), aktualisierbar.
+        name_bleibt = (self._geoeffnet_name is not None
+                       and fdb.profil_schluessel(*self._geoeffnet_name)
+                       == fdb.profil_schluessel(mfr, modell))
+        try:
+            andere = ([] if name_bleibt
+                      else profil_dubletten(mfr, modell, ohne=pid))
+        except Exception as e:
+            QMessageBox.warning(self, AKTUALISIEREN_TITEL,
+                                f"Bibliothek nicht lesbar:\n{e}")
+            return
+        if andere:
+            QMessageBox.warning(
+                self, AKTUALISIEREN_TITEL,
+                f"„{mfr} / {modell}“ steht schon in der Bibliothek (Nr. "
+                f"{', '.join(str(i) for i in andere)}). Bitte einen anderen "
+                "Modellnamen wählen — sonst wäre die Zuordnung beim Laden "
+                "einer Show mehrdeutig.")
+            return
+        from src.ui.widgets.fixture_editor import (_gepatchte_geraete,
+                                                    profil_patch_folgen)
+        folgen = profil_patch_folgen(
+            pid, _gepatchte_geraete(),
+            [(m["name"], m["channel_count"]) for m in payload["modes"]],
+            name_alt=self._geoeffnet_name, name_neu=(mfr, modell))
+        if not ueberschreiben_fragen(self, pid, f"{mfr} {modell}", folgen):
+            return
+        try:
+            fdb.update_user_profile(pid, payload)
+        except fdb.ProfilGeschuetzt as e:
+            # Kein eigenes Profil (mehr) — der Knopf geht aus.
+            self._geoeffnet_id = None
+            self._aktualisieren_zustand()
+            QMessageBox.warning(self, AKTUALISIEREN_TITEL, str(e))
+            return
+        except Exception as e:
+            QMessageBox.warning(self, AKTUALISIEREN_TITEL,
+                                f"Fehlgeschlagen:\n{e}")
+            return
+        self.saved_id = pid
+        # UI-81: gepatchte Geraete sehen die neue Kanalbelegung sofort.
+        try:
+            from src.core.app_state import profil_geaendert
+            profil_geaendert(pid)
+        except Exception as e:
+            print(f"[fixture_generator] Profil-Aenderung nicht uebernommen: {e}")
+        try:
+            from src.core.sync import get_sync, SyncEvent
+            get_sync().emit(SyncEvent.REFRESH_ALL, None)
+        except Exception:
+            pass
+        self.gespeichert_meldung = (
+            f"Fixture-Profil „{mfr} {modell}“ aktualisiert.")
         self.accept()
 
     # ── FM-64 (Teil 2): 3D-Vorschau ──────────────────────────────────────
