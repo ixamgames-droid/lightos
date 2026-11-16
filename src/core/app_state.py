@@ -962,14 +962,20 @@ class AppState:
         # auf die naechste freie fid ausweichen statt mit IntegrityError die App
         # einzufrieren.
         try:
-            existing = {f.fid for f in self._patch_cache}
-            if self._show_engine is not None:
+            idx = self._sammel_index()          # ENG-45 (nur Sammelweg)
+            belegt = (fixture.fid in idx if idx is not None
+                      else any(f.fid == fixture.fid for f in self._patch_cache))
+            if not belegt and self._show_engine is not None:
+                # ENG-45: nur nach DIESER Nummer fragen — vorher kamen alle
+                # fids der Tabelle zurueck (je Geraet, beim Massen-Anlegen
+                # quadratisch). Dieselbe Antwort: belegt in Cache ODER DB.
                 from sqlalchemy import select
                 with self._session() as s:
-                    existing |= set(
-                        s.execute(select(PatchedFixture.fid)).scalars()
-                    )
-            if fixture.fid in existing:
+                    belegt = s.execute(
+                        select(PatchedFixture.fid)
+                        .where(PatchedFixture.fid == fixture.fid)
+                    ).first() is not None
+            if belegt:
                 fixture.fid = self.next_fid()
         except Exception as e:
             debug_swallow("app_state.add_fixture.fid_guard", e)
@@ -978,7 +984,13 @@ class AppState:
         with self._session() as s:
             s.add(fixture)
             s.commit()
-        self._reload_patch_cache()
+        nachgetragen = None
+        if self._patch_sammelt():
+            # ENG-45: im Sammelweg nur die eine neue Zeile nachladen statt
+            # der ganzen Geraeteliste je Geraet (2048 Geraete: ~88 s).
+            nachgetragen = self._patch_cache_nachtragen(snapshot["fid"])
+        else:
+            self._reload_patch_cache()
         self._emit("patch_changed")
         # FM-16: Multi-Head-Fixture (Spider/Mover-/Beam-Bar) -> automatisch eine
         # Pro-Kopf-Matrix-Gruppe anlegen, damit die Einzelkoepfe sofort als Matrix
@@ -999,9 +1011,12 @@ class AppState:
         # dessen das frisch aus _reload_patch_cache() GEBUNDENE Cache-Objekt
         # (Spalten geladen, nicht expired) an create_head_matrix_group geben.
         if not getattr(self, "_suppress_emits", False):
-            bound = next(
-                (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
-            )
+            if nachgetragen is not None and nachgetragen.fid == snapshot["fid"]:
+                bound = nachgetragen        # ENG-45: dasselbe Objekt wie im Cache
+            else:
+                bound = next(
+                    (f for f in self._patch_cache if f.fid == snapshot["fid"]), None
+                )
             # LAS-37: gilt das Geraet NUR ueber einen Namen als Laser (Lichtset
             # mit „Laser: Red“, Moving Head mit Laserdiode), das beim Patchen
             # sagen — NOT-AUS und Blackout schalten dann das GANZE Geraet dunkel.
@@ -1504,10 +1519,15 @@ class AppState:
     def remove_fixture(self, fid: int, undoable: bool = True):
         # Snapshot before delete
         snap = None
-        for f in self._patch_cache:
-            if f.fid == fid:
-                snap = self._fixture_to_dict(f)
-                break
+        idx = self._sammel_index()              # ENG-45 (nur Sammelweg)
+        if idx is not None:
+            if idx.get(fid) is not None:
+                snap = self._fixture_to_dict(idx[fid])
+        else:
+            for f in self._patch_cache:
+                if f.fid == fid:
+                    snap = self._fixture_to_dict(f)
+                    break
         # FM-38: mitgeloeschte Kopf-Gruppen FELDWEISE merken (Name, Raster,
         # Mitglieder, Ordner) — das Undo holt sie so zurueck statt als Werksstand.
         gruppen_snaps: list[dict] = []
@@ -1545,7 +1565,12 @@ class AppState:
         # Rueckgaengig (unten bzw. in add_fixture) holt sie wieder.
         feld_snap = self._sperrzonen_feld_nehmen(fid)
         self._sperrzonen_feld_entfernt = feld_snap
-        self._reload_patch_cache()
+        if self._patch_sammelt():
+            # ENG-45: im Sammelweg (Rueckgaengig eines Imports, viele Geraete
+            # loeschen) nur diese Zeile aus der Liste nehmen.
+            self._patch_cache_austragen(fid)
+        else:
+            self._reload_patch_cache()
         self._emit("patch_changed")
         if removed_group:
             try:
@@ -1878,6 +1903,102 @@ class AppState:
         clear_channel_cache()
         self._laser_profile_bestimmen()          # LAS-38
         self._rebuild_render_plan()
+
+    # ── ENG-45: Geraeteliste im Sammelweg fortschreiben statt neu laden ─────
+
+    def _sammel_index(self):
+        """ENG-45: ``{fid: Geraet}`` zur JETZIGEN Geraeteliste — nur im
+        Sammelweg (``patch_sammeln``) und nur, solange ``_patch_cache`` die
+        Liste ist, zu der der Index gehoert, und sie nach fid sortiert ist
+        (so liefert sie ``_reload_patch_cache``). Sonst ``None``: dann suchen
+        die Aufrufer wie bisher die Liste ab. Ersetzt jemand die Liste im
+        Block (voller Neuaufbau), wird der Index einmal neu gebaut."""
+        if not self._patch_sammelt():
+            return None
+        cache = self._patch_cache
+        idx = getattr(self, "_patch_sammel_idx", None)
+        if idx is not None and idx[0] is cache:
+            return idx[1]
+        fids = [f.fid for f in cache]
+        if any(x >= y for x, y in zip(fids, fids[1:])):
+            self._patch_sammel_idx = None
+            return None
+        d = dict(zip(fids, cache))
+        self._patch_sammel_idx = (cache, d)
+        return d
+
+    def _patch_cache_nachtragen(self, fid):
+        """ENG-45: NUR im Sammelweg — die eine eben eingefuegte Zeile aus der
+        DB holen und an ihre Stelle (nach fid sortiert, wie
+        ``_reload_patch_cache``) in eine NEUE Liste setzen; die alte Liste
+        wird nie veraendert (andere Threads lesen sie ohne Sperre). Das
+        Objekt ist wie beim vollen Neuladen gebunden geladen und danach
+        losgeloest — Kopf-Gruppe und Laser-Hinweis lesen seine Spalten.
+        Der volle Neuaufbau (Liste, Universen, Kanal-Cache, Render-Plan)
+        laeuft beim Verlassen des Blocks unveraendert EINMAL. Scheitert
+        etwas, wird wie bisher die ganze Liste neu geladen.
+        Rueckgabe: das geladene Geraet (oder ``None``)."""
+        if not self._show_engine:
+            return None
+        try:
+            import bisect
+            from sqlalchemy import select
+            with self._session() as s:
+                neu = list(s.execute(select(PatchedFixture).where(
+                    PatchedFixture.fid == fid)).scalars())
+            if len(neu) != 1:
+                self._reload_patch_cache()
+                return None
+            fx = neu[0]
+            idx = self._sammel_index()
+            cache = self._patch_cache
+            if idx is not None and fx.fid not in idx:
+                if not cache or cache[-1].fid < fx.fid:
+                    liste = cache + [fx]
+                else:
+                    pos = bisect.bisect_right(cache, fx.fid, key=lambda f: f.fid)
+                    liste = cache[:pos] + [fx] + cache[pos:]
+                idx[fx.fid] = fx
+                self._patch_cache = liste
+                self._patch_sammel_idx = (liste, idx)
+            else:
+                liste = [f for f in cache if f.fid != fx.fid]
+                pos = bisect.bisect_right([f.fid for f in liste], fx.fid)
+                liste.insert(pos, fx)
+                self._patch_cache = liste
+            if fx.universe not in self.universes:
+                self.universes[fx.universe] = \
+                    self.output_manager.add_universe(fx.universe)
+            self._patch_sammel_neuaufbau = True
+            return fx
+        except Exception as e:
+            debug_swallow("app_state.patch_cache_nachtragen", e)
+            self._reload_patch_cache()
+            return None
+
+    def _patch_cache_austragen(self, fid) -> None:
+        """ENG-45: Gegenstueck zu :meth:`_patch_cache_nachtragen` fuer
+        ``remove_fixture`` im Sammelweg (neue Liste ohne diese fid)."""
+        if not self._show_engine:
+            return
+        import bisect
+        idx = self._sammel_index()
+        cache = self._patch_cache
+        liste = None
+        if idx is not None:
+            fx = idx.get(fid)
+            if fx is None:
+                liste = cache
+            else:
+                pos = bisect.bisect_left(cache, fid, key=lambda f: f.fid)
+                if pos < len(cache) and cache[pos] is fx:
+                    liste = cache[:pos] + cache[pos + 1:]
+                    del idx[fid]
+                    self._patch_sammel_idx = (liste, idx)
+        if liste is None:
+            liste = [f for f in cache if f.fid != fid]
+        self._patch_cache = liste
+        self._patch_sammel_neuaufbau = True
 
     def _laser_profile_bestimmen(self):
         """LAS-38: je Profil der gepatchten Geraete EINMAL bestimmen, ob
@@ -2537,6 +2658,7 @@ class AppState:
             self._patch_sammel_thread = threading.get_ident()
             self._patch_sammel_neuaufbau = False
             self._patch_sammel_ereignisse = []
+            self._patch_sammel_idx = None        # ENG-45
             # Der Ausgabe-Thread rendert die Funktionen mit der Geraeteliste
             # des geltenden Plans (s. _render_frame). Gibt es noch keinen
             # Plan, die jetzige Liste festhalten — BEVOR die erste Aenderung
@@ -2563,6 +2685,7 @@ class AppState:
         ereignisse = list(getattr(self, "_patch_sammel_ereignisse", ()) or ())
         self._patch_sammel_neuaufbau = False
         self._patch_sammel_ereignisse = []
+        self._patch_sammel_idx = None            # ENG-45
         try:
             if neuaufbau:
                 self._reload_patch_cache()
@@ -2967,7 +3090,11 @@ class AppState:
         belegte fid INSERTen -> IntegrityError (UNIQUE constraint failed:
         patched_fixtures.fid), der bis zum globalen Fehlerdialog durchschlaegt
         und das Hauptfenster einfriert."""
-        cache_max = max((f.fid for f in self._patch_cache), default=0)
+        if self._sammel_index() is not None:
+            # ENG-45: im Sammelweg ist die Liste nach fid sortiert (geprueft)
+            cache_max = self._patch_cache[-1].fid if self._patch_cache else 0
+        else:
+            cache_max = max((f.fid for f in self._patch_cache), default=0)
         db_max = 0
         if self._show_engine is not None:
             try:

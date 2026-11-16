@@ -43,25 +43,71 @@ def _nein(code: str) -> dict:
     return {"ok": False, "fehler": code}
 
 
+def _blackout_pruefen(om, an: bool, geraet: str) -> dict | None:
+    """Ablehnung fuer den Blackout-Schalter oder None (unter ``_lock``)."""
+    if an or not om.blackout_schalter:
+        return None
+    if geraet and _blackout_von == (geraet, om.blackout_epoch):
+        return None
+    return _nein(BLACKOUT_NICHT_VON_HIER)
+
+
+def _blackout_tun(om, an: bool, geraet: str) -> None:
+    """Setzt den geprueften Blackout (unter ``_lock``)."""
+    global _blackout_von
+    if an:
+        if not om.blackout_schalter:
+            om.set_blackout(True)
+            _blackout_von = (geraet, om.blackout_epoch) if geraet else None
+        return
+    if om.blackout_schalter:
+        # Nichts zu loesen, wenn er schon aus ist. (Haelt eine Taste den
+        # Blackout, bleibt es dunkel — das loest nur, wer die Taste haelt.)
+        om.set_blackout(False)
+        _blackout_von = None
+
+
+def _gm_eigen(geraet: str, jetzt: float) -> bool:
+    von = _gm_von
+    return bool(geraet and von is not None and von[0] == geraet
+                and abs(von[1] - jetzt) < 1e-6)
+
+
+def _gm_pruefen(state, wert: float, geraet: str, laser_erlaubt: bool) -> dict | None:
+    """Ablehnung fuer den Grand Master oder None (unter ``_lock``)."""
+    om = state.output_manager
+    schwelle = float(getattr(type(om), "GM_LASER_AUS_SCHWELLE", 0.01))
+    jetzt = float(om.grand_master)
+    if jetzt <= schwelle < wert and not laser_erlaubt:
+        from src.core.laser import fern_freigabe
+        if fern_freigabe.gibt_laser(state) and not _gm_eigen(geraet, jetzt):
+            return _nein(LASER_GESPERRT)
+    return None
+
+
+def _gm_tun(state, wert: float, geraet: str) -> None:
+    global _gm_von
+    om = state.output_manager
+    schwelle = float(getattr(type(om), "GM_LASER_AUS_SCHWELLE", 0.01))
+    jetzt = float(om.grand_master)
+    eigen = _gm_eigen(geraet, jetzt)
+    om.set_grand_master(wert)
+    neu = float(om.grand_master)
+    if neu > schwelle:
+        _gm_von = None
+    elif jetzt > schwelle or eigen:
+        # selbst hineingezogen (oder innerhalb der Zone weiterbewegt)
+        _gm_von = (geraet, neu) if geraet else None
+
+
 def blackout_setzen(om, an: bool, geraet: str) -> dict:
     """Blackout-Schalter aus der Ferne. ``an`` muss schon ein ``bool`` sein."""
-    global _blackout_von
     with _lock:
-        if an:
-            if not om.blackout_schalter:
-                om.set_blackout(True)
-                _blackout_von = (geraet, om.blackout_epoch) if geraet else None
-            return {"ok": True}
-        if not om.blackout_schalter:
-            # Nichts zu loesen. (Haelt eine Taste den Blackout, bleibt es dunkel —
-            # das loest nur, wer die Taste haelt.)
-            return {"ok": True}
-        von = _blackout_von
-        if geraet and von == (geraet, om.blackout_epoch):
-            om.set_blackout(False)
-            _blackout_von = None
-            return {"ok": True}
-        return _nein(BLACKOUT_NICHT_VON_HIER)
+        nein = _blackout_pruefen(om, an, geraet)
+        if nein:
+            return nein
+        _blackout_tun(om, an, geraet)
+        return {"ok": True}
 
 
 def blackout_urheber() -> tuple | None:
@@ -72,30 +118,33 @@ def blackout_urheber() -> tuple | None:
 
 def gm_setzen(state, wert: float, geraet: str, laser_erlaubt: bool) -> dict:
     """Grand Master (0..1) aus der Ferne setzen."""
-    global _gm_von
-    om = state.output_manager
-    schwelle = float(getattr(type(om), "GM_LASER_AUS_SCHWELLE", 0.01))
     with _lock:
-        jetzt = float(om.grand_master)
-        heraus = jetzt <= schwelle < wert
-        if heraus and not laser_erlaubt:
-            from src.core.laser import fern_freigabe
-            if fern_freigabe.gibt_laser(state):
-                von = _gm_von
-                selbst = (geraet and von is not None and von[0] == geraet
-                          and abs(von[1] - jetzt) < 1e-6)
-                if not selbst:
-                    return _nein(LASER_GESPERRT)
-        von = _gm_von
-        eigen = bool(geraet and von is not None and von[0] == geraet
-                     and abs(von[1] - jetzt) < 1e-6)
-        om.set_grand_master(wert)
-        neu = float(om.grand_master)
-        if neu > schwelle:
-            _gm_von = None
-        elif jetzt > schwelle or eigen:
-            # selbst hineingezogen (oder innerhalb der Zone weiterbewegt)
-            _gm_von = (geraet, neu) if geraet else None
+        nein = _gm_pruefen(state, wert, geraet, laser_erlaubt)
+        if nein:
+            return nein
+        _gm_tun(state, wert, geraet)
+        return {"ok": True}
+
+
+def pult_setzen(state, wert, an, geraet: str, laser_erlaubt: bool) -> dict:
+    """WEB-15: Grand Master (0..1 oder None) und Blackout (bool oder None) in
+    EINEM Schritt — ganz oder gar nicht. Erst beide pruefen, dann beide
+    setzen, alles unter demselben Lock. Frueher stand der Blackout schon,
+    wenn der GM danach mit ``laser_gesperrt`` abgelehnt wurde."""
+    om = state.output_manager
+    with _lock:
+        if an is not None:
+            nein = _blackout_pruefen(om, an, geraet)
+            if nein:
+                return nein
+        if wert is not None:
+            nein = _gm_pruefen(state, wert, geraet, laser_erlaubt)
+            if nein:
+                return nein
+        if an is not None:
+            _blackout_tun(om, an, geraet)
+        if wert is not None:
+            _gm_tun(state, wert, geraet)
         return {"ok": True}
 
 
