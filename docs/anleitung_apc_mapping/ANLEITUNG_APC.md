@@ -10,19 +10,19 @@
 ## 1. Was wird gemappt?
 
 Jedes **VC-Widget** kann an ein APC-Element gebunden werden:
-- **VCButton** (Look-Toggle, Farb-Kachel, TAP, Blackout …) → an ein **Pad** (Note) oder eine Track-/Scene-Taste. Geht **beidseitig**: per „MIDI Lernen" (Weg A) **oder** „MIDI Teach" (Weg B).
-- **VCSlider** (Master, BPM, Effekt-Tempo …) → an einen **Fader** (**CC**). Fader werden **nur über „MIDI Teach" (Weg B)** gebunden — „MIDI Lernen" (Weg A) armiert ausschließlich Tasten/Pads, **kein** angeklickter Fader.
+- **VCButton** (Look-Toggle, Farb-Kachel, TAP, Blackout …) → an ein **Pad** (Note) oder eine Track-/Scene-Taste. Geht **beidseitig**: per Leisten-Knopf „MIDI Lernen" (Weg A) **oder** Rechtsklick → „MIDI Lernen..." mit Lern-Dialog (Weg B).
+- **VCSlider** (Master, BPM, Effekt-Tempo …) → an einen **Fader** (**CC**). Fader werden **nur über den Lern-Dialog (Weg B, Rechtsklick → „MIDI Lernen...")** gebunden — der Leisten-Knopf „MIDI Lernen" (Weg A) armiert ausschließlich Tasten/Pads, **kein** angeklickter Fader.
 
 Die Bindung wird **mit der Show** gespeichert.
 
-> **Anderes Pult mit Motorfadern (Mackie Control, X-Touch)?** Deren Fader senden Pitchbend statt CC. „MIDI Teach“ am VC-Fader lernt sie genauso – siehe [Fader, Abschnitt MIDI](../anleitung_vc_widgets/02_fader.md#midi--tastatur). In der Mapping-Tabelle der MIDI-Ansicht lassen sich solche Fader an Executor-Fader und Grand Master binden und über **Feedback...** nachführen (der Motor fährt mit, wenn sich der Wert anderswo ändert).
+> **Anderes Pult mit Motorfadern (Mackie Control, X-Touch)?** Deren Fader senden Pitchbend statt CC. Rechtsklick → „MIDI Lernen...“ am VC-Fader lernt sie genauso – siehe [Fader, Abschnitt MIDI](../anleitung_vc_widgets/02_fader.md#midi--tastatur). In der Mapping-Tabelle der MIDI-Ansicht lassen sich solche Fader an Executor-Fader und Grand Master binden und über **Feedback...** nachführen (der Motor fährt mit, wenn sich der Wert anderswo ändert).
 
 > **Andere Pulte mit Program Change, Endlos-Encodern, 14-Bit-Reglern oder NRPN?** In der Mapping-Tabelle der MIDI-Ansicht (**E/A → MIDI**) trägt die Spalte **Typ** auch: `pc` (Program Change — z. B. eine Szene oder ein GO je Programmnummer, Daten 1 = Programmnummer), `nrpn` (Daten 1 = Parameternummer, Wert mit 14 Bit), `cc14` (Regler mit 14 Bit: CC 0–31 plus Feinwert auf CC 32–63) und für Endlos-Encoder `cc_rel_zk`, `cc_rel_bo` oder `cc_rel_vz` (Zweierkomplement, Binär-Offset, Vorzeichenbit — welche Art das Pult sendet, steht in seinem Handbuch). Ein Encoder bewegt das Ziel dann schrittweise ab der aktuellen Stellung. **MIDI Learn** in dieser Tabelle erkennt Program Change und NRPN von selbst (das „MIDI Lernen“ der VC-Tasten nicht); `cc14` oder einen Encoder-Typ nach dem Lernen in der Spalte Typ eintragen.
 
 ## 2. Weg A — schnell per „MIDI Lernen" (nur Tasten/Pads)
 
 > **Wichtig:** „MIDI Lernen" bindet **ausschließlich VCButtons** (Pads/Tasten). Ein angeklickter
-> **Fader/VCSlider wird NICHT armiert** — für Fader gibt es **Weg B** (MIDI Teach, bindet **CC**).
+> **Fader/VCSlider wird NICHT armiert** — für Fader gibt es **Weg B** (Rechtsklick → „MIDI Lernen...", bindet **CC**).
 
 1. In der **Virtual Console** die Toolbar **„MIDI Lernen"** aktivieren (wird orange, der Hinweis
    „MIDI-Learn: Klicke einen Button an..." erscheint auf dem Raster).
@@ -32,15 +32,15 @@ Die Bindung wird **mit der Show** gespeichert.
    zugewiesen (Pad/Taste = Note).
 4. **„MIDI Lernen"** wieder ausschalten.
 
-> Für **Fader/VCSlider** stattdessen **Weg B** nutzen (Rechtsklick → **„🎹 MIDI Teach..."**) — dort wird
+> Für **Fader/VCSlider** stattdessen **Weg B** nutzen (Rechtsklick → **„🎹 MIDI Lernen..."**) — dort wird
 > der Fader an einen **CC** gebunden.
 
-## 3. Weg B — MIDI-Teach-Dialog (mit APC-Abbild)
+## 3. Weg B — Lern-Dialog (mit APC-Abbild)
 
-Im **Bearbeiten**-Modus das Widget **rechtsklicken → „🎹 MIDI Teach..."**. Es öffnet sich ein Abbild
+Im **Bearbeiten**-Modus das Widget **rechtsklicken → „🎹 MIDI Lernen..."**. Es öffnet sich ein Abbild
 der APC mini:
 
-![MIDI-Teach-Dialog mit APC-Abbild](img/01_midi_teach.png)
+![Lern-Dialog mit APC-Abbild](img/01_midi_teach.png)
 
 - Entweder am Gerät die Taste/den Fader **betätigen** (das Element leuchtet im Bild auf),
 - **oder** das Element im Bild direkt **anklicken** — das funktioniert **auch ohne angeschlossene APC**.
@@ -80,7 +80,7 @@ der Fader bewegt werden muss. In der VC-Toolbar als **„🎚 Pickup"** schaltba
 ---
 
 **Kurz:** **Tasten/Pads** → Virtual Console → **MIDI Lernen** an → Button klicken → APC-Pad drücken.
-**Fader** → Rechtsklick → **🎹 MIDI Teach...** → Fader bewegen oder Element im Bild anklicken (bindet **CC**).
+**Fader** → Rechtsklick → **🎹 MIDI Lernen...** → Fader bewegen oder Element im Bild anklicken (bindet **CC**).
 Danach **APC LEDs** an für Rückmeldung. Bindungen werden mit der Show gespeichert. Ohne APC läuft alles
 per Touch/Tastatur weiter (für Tablets startest du LightOS mit `--touch`: größere Bedienelemente;
 die Finger-Gesten stellst du unter **Ansicht → Touch-Gesten…** ein).

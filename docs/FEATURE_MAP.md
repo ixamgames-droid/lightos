@@ -79,9 +79,9 @@ Visualizer als separates Fenster.
 | **Show** | Cue aufnehmen (R) · Nächste/Vorherige Page |
 | **Programmer** | Highlight (H) · Lowlight (Shift+H) · Programmer leeren (Esc) · Kopieren/Einfügen · Snapshot aufnehmen |
 | **Datenbank** | Fixtures importieren (XML) · Neues Fixture-Profil |
-| **Ausgabe** | Konfigurieren · Channel-Modifier · Mock Mode · Web-Interface (:5000) · OSC (:7770) · OS2L (:1234) · Input-Profile |
+| **Ausgabe** | Konfigurieren · Channel-Modifier · Simulations-Hinweis „MOCK“ (DMX läuft weiter) · Web-Interface (:5000) · OSC (:7770) · OS2L (:1234) · Input-Profile |
 | **Visualizer** | 3D-Visualizer öffnen/schließen |
-| **Command** | Command-Line fokussieren (`:` / F12) |
+| **Befehl** | Befehlszeile fokussieren (`:` / F12, ein Eintrag) |
 | **Hilfe** | Erste Schritte · Anleitungen öffnen · Tastenkürzel… (Liste aus den vorhandenen Aktionen, `ui/hilfe.py`) · Datenordner öffnen · Show-Ordner öffnen · Diagnosepaket speichern… · Über LightOS (Version, Build-Art, Datenordner, Doku-Link) |
 
 ---
@@ -108,7 +108,7 @@ Visualizer als separates Fenster.
 | Fixture-Browser | `widgets/fixture_browser.py` (199) | Gerät aus DB wählen & patchen |
 | QXF-Import | `widgets/qxf_import_dialog.py` (151) | QLC+-Fixtures bulk-importieren |
 | Input-Profil-Editor | `widgets/input_profile_editor.py` (327) | MIDI/OSC-Mappings verwalten + lernen |
-| MIDI-Teach | `widgets/midi_teach_dialog.py` (296) | APC-mini-Tasten/Fader visuell an VC-Widget binden |
+| MIDI Lernen (Lern-Dialog) | `widgets/midi_teach_dialog.py` (296) | APC-mini-Tasten/Fader visuell an VC-Widget binden |
 | Output-Konfig | `widgets/output_config.py` (400) | Enttec · Art-Net · sACN · DMX-Input · Universen |
 | Channel-Modifier | `widgets/channel_modifier_dialog.py` (129) | Pro Kanal eine Kurve zuweisen |
 | Channel-Range-Lock | `widgets/channel_range_lock_dialog.py` (155) | Kanal auf Sub-Range sperren |

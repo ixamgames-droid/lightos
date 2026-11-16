@@ -693,7 +693,7 @@ class VCWidget(QFrame):
                 menu.addAction("⚡ Live-Parameter…").triggered.connect(
                     lambda checked=False, f=_fid: self._open_live_editor(f))
         if self.supports_midi_teach():
-            menu.addAction("🎹 MIDI Teach...").triggered.connect(self._teach_midi)
+            menu.addAction("🎹 MIDI Lernen...").triggered.connect(self._teach_midi)
         if self.supports_key_teach():
             menu.addAction("⌨ Taste zuweisen...").triggered.connect(self._teach_key)
         # Bank-Zuweisung (einheitlich fuer alle Widget-Typen)
@@ -822,7 +822,7 @@ class VCWidget(QFrame):
         from src.ui.widgets.midi_teach_dialog import MidiTeachDialog
         dlg = MidiTeachDialog(self, current=self.current_midi_binding(),
                               accept_kinds=self._midi_teach_kinds(),
-                              title=f"MIDI Teach — {self.caption}")
+                              title=f"MIDI Lernen — {self.caption}")
         if dlg.exec() == QDialog.DialogCode.Accepted:
             b = dlg.result_binding
             if b is None:

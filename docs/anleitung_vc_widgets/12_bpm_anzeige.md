@@ -56,4 +56,4 @@ Gespeichert werden Schriftgröße (`font_size`) und gewählte Quelle (`tempo_bus
 - **Farbe als schnelle Statusinfo:** Grüne Zahl = Tempo läuft. Gedankenstrich `—` = es liegt kein Tempo an (z. B. keine aktive Quelle). Orange untere Zeile = manueller Modus, blau = Automatik.
 - **Mehrere Anzeigen nebeneinander:** Du kannst je ein Element auf „Global" und weitere auf Bus A/B/C/D stellen, um mehrere Tempi gleichzeitig im Blick zu behalten.
 - **Bus-Anzeige zeigt keine Quelle:** Im Bus-Modus steht in der unteren Zeile immer `BUS x`, nicht `AUTO`/`MANUAL` — die Quelle/Modus-Info gilt nur für den globalen Leader.
-- Dieses Element kennt **keine** Effekt-Bindung, **kein** MIDI-Teach und **kein** Tasten-Teach — es ist rein passiv.
+- Dieses Element kennt **keine** Effekt-Bindung, **kein** MIDI Lernen und **kein** Tasten-Teach — es ist rein passiv.

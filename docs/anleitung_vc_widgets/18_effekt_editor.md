@@ -70,4 +70,4 @@ Tiefere Live-Eingriffe (zusätzliche Parameter/Aktionen) findest du nicht an der
 - **Solo betrifft nur Buttons:** Der Solo-Modus wirkt auf Buttons in der Box, nicht auf Fader. Bei einer reinen Fader-Box hat er keinen Effekt.
 - **Header ausblenden spart Höhe:** Brauchst du keinen Titel/keine Tabs, schalte „Header anzeigen“ aus — die Vorschau rückt dann ganz nach oben.
 - **Skalieren beeinflusst die Fader-Höhe:** Beim Vergrößern/Verkleinern der Box wachsen/schrumpfen die Fader mit. Mach die Box hoch genug, damit die Fader gut bedienbar bleiben.
-- **MIDI/Tastatur:** Die Box als Ganzes bietet **kein** MIDI-Teach und **keine** Tastenzuweisung. Belege stattdessen die einzelnen **Fader** (deren Effekt-Bindung nutzt dieselbe Naht auch für MIDI) — siehe die Doku zum Fader und die README.md.
+- **MIDI/Tastatur:** Die Box als Ganzes bietet **kein** MIDI Lernen und **keine** Tastenzuweisung. Belege stattdessen die einzelnen **Fader** (deren Effekt-Bindung nutzt dieselbe Naht auch für MIDI) — siehe die Doku zum Fader und die README.md.

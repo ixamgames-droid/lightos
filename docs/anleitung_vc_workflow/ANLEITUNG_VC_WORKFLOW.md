@@ -32,9 +32,9 @@ lassen sich auswählen / verschieben / per Rechtsklick bearbeiten.
 > **keinen** Dialog. Vor dem Editieren also sicherstellen, dass
 > „MIDI Lernen" **aus** ist (nur Umriss, nicht gefüllt).
 >
-> Nicht verwechseln: Der Eintrag **„🎹 MIDI Teach..."** (mit Tastatur-Emoji) ist eine
-> **separate Kontextmenü-Funktion** (Rechtsklick auf ein Widget) und öffnet erst dann
-> den eigentlichen Teach-Dialog mit APC-mini-Abbild.
+> Nicht verwechseln: Der gleichnamige Eintrag **„🎹 MIDI Lernen..."** im Kontextmenü
+> (Rechtsklick auf ein Widget, mit Tastatur-Emoji) ist eine **separate Funktion**: Er
+> schaltet nichts scharf, sondern öffnet den Lern-Dialog mit APC-mini-Abbild.
 
 ---
 
