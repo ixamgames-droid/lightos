@@ -52,10 +52,10 @@ const KRANZ_STRAHLEN = 8;               // Grobform „Strahlenkranz" (VIZ-79)
 // ueberlagert sich vorn und hinten).
 export const LASER_MUSTER_MAX_KONTUR = 192;
 export const LASER_KEGEL_OPACITY = 0.22;
-const MUSTER_TAN = Math.tan(0.3);
+const MUSTER_TAN = Math.tan(0.3);      // halber Oeffnungswinkel bei voller Groesse
 // LAS-27: Farben fuer „bunt" — die gemessenen Einzelfarben des EL-400RGB MK2
 // (Profil-Farbbereiche), reihum: Rot, Gruen, Blau, Gelb, Cyan, Magenta.
-export const LASER_BUNT_PALETTE = [0xff2a2a, 0x2aff4a, 0x3a6aff, 0xffe32a, 0x2ae6ff, 0xff3ad8];      // halber Oeffnungswinkel bei voller Groesse
+export const LASER_BUNT_PALETTE = [0xff2a2a, 0x2aff4a, 0x3a6aff, 0xffe32a, 0x2ae6ff, 0xff3ad8];
 
 const LASER_PITCH = 0.06;        // rad (~3,5°) nach unten — ueber den Koepfen
 const FAN_HALF = 0.35;           // halbe Faecherbreite bei voller Groesse (rad)
