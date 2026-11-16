@@ -17,6 +17,7 @@ from src.ui.ziehen_scrollen import FingerHalten   # UI-115
 from src.ui.touch_keyboard import is_touch_mode   # UI-117
 from src.core.engine.function import FunctionType
 from src.core.engine.show_engine import Show, ShowTrack, ShowFunction
+from src.ui import dialog_hilfe
 
 PX_PER_SEC = 50          # pixels per second (default zoom)
 #: UI-124: Zoom der Zeitleiste (Pixel je Sekunde). Strg+Mausrad, Knoepfe -/+,
@@ -865,23 +866,24 @@ class ShowManagerView(QWidget):
 
         from src.ui.views.chaser_editor import FunctionSelectorDialog
         dlg = FunctionSelectorDialog(self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        fid = dlg.selected_id
-        if fid is None:
-            return
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            fid = dlg.selected_id
+            if fid is None:
+                return
 
-        # Pick track (use first for now)
-        track = self._current_show.tracks[0]
-        sf = ShowFunction(
-            function_id=fid,
-            start_time=self._elapsed,
-            duration=5.0,
-        )
-        track.add_function(sf)
-        self._current_show.recalc_duration()
-        self._timeline.update()
-        self._timeline.updateGeometry()
+            # Pick track (use first for now)
+            track = self._current_show.tracks[0]
+            sf = ShowFunction(
+                function_id=fid,
+                start_time=self._elapsed,
+                duration=5.0,
+            )
+            track.add_function(sf)
+            self._current_show.recalc_duration()
+            self._timeline.update()
+            self._timeline.updateGeometry()
 
     def _refresh_track_panel(self):
         self._track_panel.refresh()

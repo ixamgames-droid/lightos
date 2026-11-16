@@ -11,6 +11,7 @@ from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
 from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.weak_slots import weak_slot
 from src.ui.virtualconsole.vc_style import touch_aktiv, tz
+from src.ui import dialog_hilfe
 
 
 class GrowingScrollArea(QScrollArea):
@@ -140,8 +141,9 @@ def _alle_loeschen_box(parent, anzahl: int) -> QMessageBox:
 def _frage_alle_loeschen(parent, anzahl: int) -> bool:
     """True nur, wenn ausdruecklich „Löschen“ gewaehlt wurde."""
     box = _alle_loeschen_box(parent, anzahl)
-    box.exec()
-    return box.clickedButton() is box._ui137_loeschen
+    with dialog_hilfe.offen(box):
+        box.exec()
+        return box.clickedButton() is box._ui137_loeschen
 
 
 class VirtualConsoleView(QWidget):

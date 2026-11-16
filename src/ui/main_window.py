@@ -33,6 +33,7 @@ from src.ui.views.dmx_monitor_view import DmxMonitorView
 from src.ui.views.fixture_group_view import FixtureGroupView
 from src.ui.views.channel_groups_view import ChannelGroupsView
 from src.ui.views.live_view import LiveView
+from src.ui import dialog_hilfe
 from src.ui.weak_slots import weak_slot
 from src.ui import undo_kuerzel
 from src.ui import leertaste_fokus
@@ -77,7 +78,7 @@ class QMessageBox(_QtMessageBox):          # noqa: F811 — bewusst derselbe Nam
                 b.setText(beschriftung)
         if defaultButton != _QtMessageBox.StandardButton.NoButton:
             box.setDefaultButton(defaultButton)
-        return _QtMessageBox.StandardButton(box.exec())
+        return _QtMessageBox.StandardButton(dialog_hilfe.ausfuehren(box))
 
 
 def _recent_files_path() -> str:
@@ -2128,6 +2129,13 @@ class MainWindow(QMainWindow):
     def _refresh_undo_labels(self):
         if not hasattr(self, "_act_undo"):
             return
+        # STAB-41 Nebenbefund: ``_stack.currentChanged`` und der Undo-Verlauf
+        # rufen hier auch dann noch an, wenn die Menue-Aktionen schon abgebaut
+        # sind (Fensterabbau; im Klick-Test nach fremdem deleteLater) — dann
+        # still nichts tun statt „Internal C++ object already deleted“.
+        import shiboken6
+        if not (shiboken6.isValid(self._act_undo) and shiboken6.isValid(self._act_redo)):
+            return
         quelle_u, u = self._naechster_verlauf(False)
         quelle_r, r = self._naechster_verlauf(True)
         # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
@@ -2434,7 +2442,7 @@ class MainWindow(QMainWindow):
 
     def _open_gesten_dialog(self) -> None:
         from src.ui.widgets.gesten_dialog import GestenDialog
-        GestenDialog(self).exec()
+        dialog_hilfe.ausfuehren(GestenDialog(self))
 
     def _global_clear_programmer(self):
         self._state.clear_programmer()
@@ -2503,7 +2511,7 @@ class MainWindow(QMainWindow):
             if issues is None:
                 from src.core.sync import validate_and_repair
                 issues = validate_and_repair(self._state, fix=False)
-            ValidationDialog(issues, self).exec()
+            dialog_hilfe.ausfuehren(ValidationDialog(issues, self))
             # Nach Dialog ggf. neu pruefen (User koennte Auto-Repair gestartet haben)
             self._refresh_validation_banner()
         except Exception as e:
@@ -2560,9 +2568,10 @@ class MainWindow(QMainWindow):
             # FM-51 Scheibe B: derselbe Schluessel-Scope wie die drei anderen
             # Speicherwege (vorher fehlte hier sogar die Kopf-Einschraenkung).
             dlg = ChannelSelectDialog(vals, self, **_scope(self._state))
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return
-            vals = dlg.filter_programmer(vals)
+            with dialog_hilfe.offen(dlg):
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    return
+                vals = dlg.filter_programmer(vals)
             if not vals:
                 QMessageBox.information(self, "Snapshot",
                     "Keine Kanäle ausgewählt - Snapshot nicht gespeichert.")
@@ -2661,7 +2670,7 @@ class MainWindow(QMainWindow):
             t.setSingleShot(True)
             t.timeout.connect(dlg._assistent_oeffnen)
             t.start(0)
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
         self._check_hardware()
 
     # ── OUT-70: Hinweis „neues DMX-Interface“ ────────────────────────────────
@@ -2692,7 +2701,7 @@ class MainWindow(QMainWindow):
     def _open_channel_modifiers(self):
         try:
             from src.ui.widgets.channel_modifier_dialog import ChannelModifierDialog
-            ChannelModifierDialog(self).exec()
+            dialog_hilfe.ausfuehren(ChannelModifierDialog(self))
         except Exception as e:
             print(f"[main_window] channel_modifier open error: {e}")
 
@@ -3212,7 +3221,7 @@ class MainWindow(QMainWindow):
         dlg = WebRemoteDialog(self, steuerung=_WebSteuerung(self))
         if verbinden:
             dlg.handy_verbinden()
-        dlg.exec()
+        dialog_hilfe.ausfuehren(dlg)
 
     def _toggle_web_server(self, checked: bool):
         if checked:
@@ -3248,9 +3257,7 @@ class MainWindow(QMainWindow):
     def _open_osc_einstellungen(self):
         """OSC-06: Dialog „OSC-Zuordnungen & Rückmeldung“."""
         from src.ui.widgets.osc_einstellungen_dialog import OscEinstellungenDialog
-        dlg = OscEinstellungenDialog(self)
-        dlg.exec()
-        dlg.deleteLater()
+        dialog_hilfe.ausfuehren(OscEinstellungenDialog(self))
 
     def _toggle_osc_server(self, checked: bool):
         if checked:
@@ -3310,11 +3317,11 @@ class MainWindow(QMainWindow):
 
     def _open_qxf_import(self):
         from src.ui.widgets.qxf_import_dialog import QxfImportDialog
-        QxfImportDialog(self).exec()
+        dialog_hilfe.ausfuehren(QxfImportDialog(self))
 
     def _open_bibliothek_download(self, erststart: bool = False):
         from src.ui.widgets.bibliothek_download_dialog import BibliothekDownloadDialog
-        BibliothekDownloadDialog(self, erststart=erststart).exec()
+        dialog_hilfe.ausfuehren(BibliothekDownloadDialog(self, erststart=erststart))
 
     def _bibliothek_hinweis_zeigen(self):
         """FM-72: die Erststart-Frage als Knopf in der Statuszeile statt als
@@ -3340,15 +3347,14 @@ class MainWindow(QMainWindow):
     def _open_fixture_editor(self):
         try:
             from src.ui.widgets.fixture_editor import FixtureEditorDialog
-            dlg = FixtureEditorDialog(self)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(FixtureEditorDialog(self))
         except Exception as e:
             QMessageBox.warning(self, "Fixture-Editor", str(e))
 
     def _open_profil_auswahl(self):
         try:
             from src.ui.widgets.profil_auswahl_dialog import ProfilAuswahlDialog
-            ProfilAuswahlDialog(self).exec()
+            dialog_hilfe.ausfuehren(ProfilAuswahlDialog(self))
         except Exception as e:
             QMessageBox.warning(self, "Fixture-Profil bearbeiten", str(e))
 
@@ -3390,9 +3396,7 @@ class MainWindow(QMainWindow):
             hilfe.sammle_tastenkuerzel(wurzeln, bereiche), self)
 
     def _tastenkuerzel_zeigen(self):
-        dlg = self._tastenkuerzel_dialog()
-        dlg.exec()
-        dlg.deleteLater()
+        dialog_hilfe.ausfuehren(self._tastenkuerzel_dialog())
 
     def _diagnosepaket_speichern(self, ziel: str | None = None):
         """STAB-30: Hilfe → „Diagnosepaket speichern…“. Erklaert vorher, was im
@@ -4015,7 +4019,7 @@ class MainWindow(QMainWindow):
                         or getattr(i, "auto_fixed", False)]
             if relevant:
                 from src.ui.widgets.validation_dialog import ValidationDialog
-                ValidationDialog(issues, self).exec()
+                dialog_hilfe.ausfuehren(ValidationDialog(issues, self))
         except Exception as e:
             print(f"[main_window] show_loaded handler error: {e}")
         # LAS-32: Kopfzeile sofort nachziehen + einmalige Wechselmeldung.
@@ -4059,7 +4063,7 @@ class MainWindow(QMainWindow):
         """T1.4 Input-Profile-Editor (MIDI/OSC/Keyboard)."""
         try:
             from src.ui.widgets.input_profile_editor import InputProfileEditor
-            InputProfileEditor(self).exec()
+            dialog_hilfe.ausfuehren(InputProfileEditor(self))
         except Exception as e:
             QMessageBox.warning(self, "Input-Profile", str(e))
 
@@ -4077,7 +4081,7 @@ class MainWindow(QMainWindow):
             dlg = ValidationDialog(
                 issues, self,
                 reparieren=lambda: validate_and_repair(self._state, fix=True))
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
             # Trigger Refresh-All danach
             try:
                 self._state.sync.refresh_all()
@@ -4240,12 +4244,10 @@ class MainWindow(QMainWindow):
         # gewaehlte aeltere Version aus der Staffelung.
         with sicherungen.aufraeumen_angehalten():
             dlg = SicherungenDialog(self._sicherungs_name(), self)
-            try:
+            with dialog_hilfe.offen(dlg):
                 if dlg.exec() != QDialog.DialogCode.Accepted:
                     return
                 wahl = dlg.auswahl()
-            finally:
-                dlg.deleteLater()
             if wahl is not None:
                 self._oeffne_sicherung(wahl)
 

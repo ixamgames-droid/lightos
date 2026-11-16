@@ -39,6 +39,7 @@ from src.core import programmer_verlauf as _pv
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
+from src.ui import dialog_hilfe
 
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
 _PREFS_DIR = app_data_dir()
@@ -905,8 +906,9 @@ class ProgrammerView(QWidget):
         try:
             from src.ui.widgets.effect_wizard import EffectWizard
             wiz = EffectWizard(self)
-            if wiz.exec() == QDialog.DialogCode.Accepted:
-                self._refresh_effects_list()
+            with dialog_hilfe.offen(wiz):
+                if wiz.exec() == QDialog.DialogCode.Accepted:
+                    self._refresh_effects_list()
         except Exception as e:
             QMessageBox.warning(self, "Effekt-Assistent", str(e))
 
@@ -947,7 +949,7 @@ class ProgrammerView(QWidget):
             btn = QPushButton("Schließen")
             btn.clicked.connect(dlg.accept)
             lay.addWidget(btn)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
         except Exception as e:
             QMessageBox.warning(self, "Editor", str(e))
         # Liste + Bibliothek aktualisieren
@@ -982,9 +984,10 @@ class ProgrammerView(QWidget):
                                         KEINE_WERTE_IM_SCOPE)
                 return
             dlg = ChannelSelectDialog(prog, self, **_scope(state))
-            if dlg.exec() != QDialog.DialogCode.Accepted:
-                return
-            filtered = dlg.filter_programmer(prog)
+            with dialog_hilfe.offen(dlg):
+                if dlg.exec() != QDialog.DialogCode.Accepted:
+                    return
+                filtered = dlg.filter_programmer(prog)
         except Exception as e:
             QMessageBox.warning(self, "Programmer → Szene", str(e))
             return
@@ -3488,7 +3491,7 @@ class ProgrammerView(QWidget):
             dlg = _ToolDialog("Color Tool", self)
             cp = ColorPicker()
             dlg.set_content(cp)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
         except Exception as e:
             QMessageBox.warning(self, "Color Tool", str(e))
 
@@ -3498,7 +3501,7 @@ class ProgrammerView(QWidget):
             dlg = _ToolDialog("Position Tool", self)
             pt = PositionTool()
             dlg.set_content(pt)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
         except Exception as e:
             QMessageBox.warning(self, "Position Tool", str(e))
 
@@ -3526,7 +3529,7 @@ class ProgrammerView(QWidget):
             ft = FanTool()
             self._feed_fan_targets(ft)
             dlg.set_content(ft)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
         except Exception as e:
             QMessageBox.warning(self, "Fan Tool", str(e))
 
@@ -3550,7 +3553,7 @@ class ProgrammerView(QWidget):
                     ft._combo_attr.setCurrentIndex(i)
                     break
             dlg.set_content(ft)
-            dlg.exec()
+            dialog_hilfe.ausfuehren(dlg)
         except Exception as e:
             QMessageBox.warning(self, "Fan Tool", str(e))
 
