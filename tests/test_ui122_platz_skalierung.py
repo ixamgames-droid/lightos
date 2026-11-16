@@ -23,7 +23,7 @@ import os
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -398,33 +398,28 @@ def test_nachtrag_kurzname_statt_p_punkte():
 
 # ── Echte 250 %: Unterprozess mit QT_SCALE_FACTOR ───────────────────────────
 
-def _qpa_pfad(pfad, basis) -> str:
-    """Pfad fuer ``QT_QPA_PLATFORM=offscreen:configfile=<pfad>``.
+def _qpa_aufruf(cfg) -> tuple[str, str]:
+    """``QT_QPA_PLATFORM`` und Arbeitsordner fuer den 250-%-Unterprozess.
 
     QA-118: Qt trennt die Plattform-Argumente am Doppelpunkt. Ein Windows-Pfad
     mit Laufwerk („C:\\...“) zerfiel dort, und der Unterprozess starb ohne jede
-    Ausgabe (0xC0000409) — gemessen auf Windows x64, jedes Mal. Deshalb relativ
-    zum Arbeitsordner des Unterprozesses."""
-    p = str(pfad)
-    if ":" not in p:
-        return p
-    try:
-        rel = os.path.relpath(p, str(basis))
-    except ValueError:                      # anderes Laufwerk als der Arbeitsordner
-        pytest.skip("Testordner und Repo auf verschiedenen Laufwerken - "
-                    "configfile laesst sich dann nicht ohne Doppelpunkt angeben")
-    if ":" in rel:
-        pytest.skip(f"configfile-Pfad enthaelt einen Doppelpunkt: {rel}")
-    return rel
+    Ausgabe (0xC0000409) — gemessen auf Windows x64, jedes Mal. QA-120: ein
+    Pfad relativ zum Repo half nur, solange Repo und Testordner auf DEMSELBEN
+    Laufwerk liegen; auf GitHub-Windows (Repo D:\\a, Temp C:\\) wurde der Test
+    still uebersprungen. Deshalb laeuft der Unterprozess im Ordner der Datei
+    und bekommt nur ihren Namen."""
+    return f"offscreen:configfile={cfg.name}", str(cfg.parent)
 
 
-def test_qpa_pfad_ohne_doppelpunkt(tmp_path):
-    """QA-118: der Pfad im Plattform-Argument hat nie einen Doppelpunkt."""
-    p = _qpa_pfad(tmp_path / "bildschirm.json", _WURZEL)
-    assert ":" not in p, p
-    # ... und zeigt, vom Arbeitsordner des Unterprozesses aus, auf dieselbe Datei
-    assert os.path.normcase(os.path.abspath(os.path.join(str(_WURZEL), p))) == \
-        os.path.normcase(str(tmp_path / "bildschirm.json"))
+@pytest.mark.parametrize("cfg", [r"C:\Users\x\AppData\Local\Temp\p0\bildschirm.json",
+                                 r"D:\a\_temp\bildschirm.json", "/tmp/p0/bildschirm.json"])
+def test_qpa_aufruf_ohne_doppelpunkt_auf_jedem_laufwerk(cfg):
+    """QA-120: kein Doppelpunkt im Plattform-Argument, egal wo Repo und Temp liegen."""
+    p = PureWindowsPath(cfg) if ":" in cfg else PurePosixPath(cfg)
+    arg, ordner = _qpa_aufruf(p)
+    wert = arg.split("configfile=", 1)[1]
+    assert ":" not in wert, arg
+    assert type(p)(ordner) / wert == p
 
 
 @pytest.mark.skipif(_SKALIERT, reason="laeuft schon im Unterprozess")
@@ -433,14 +428,17 @@ def test_bei_echter_skalierung_250_prozent(tmp_path):
     cfg.write_text(json.dumps({"screens": [{
         "name": "S", "x": 0, "y": 0, "width": 1600, "height": 900,
         "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1}]}), encoding="utf-8")
+    qpa, ordner = _qpa_aufruf(cfg)
     env = dict(os.environ)
-    env.update(QT_QPA_PLATFORM=f"offscreen:configfile={_qpa_pfad(cfg, _WURZEL)}",
-               QT_SCALE_FACTOR="2.5", UI122_SKALIERT="1")
+    # Arbeitsordner ist der Testordner: ``src`` kommt ueber PYTHONPATH.
+    env.update(QT_QPA_PLATFORM=qpa, QT_SCALE_FACTOR="2.5", UI122_SKALIERT="1",
+               PYTHONPATH=os.pathsep.join(filter(None, [str(_WURZEL),
+                                                        env.get("PYTHONPATH")])))
     env.pop("PYTEST_ADDOPTS", None)
     r = subprocess.run(
         [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
          str(Path(__file__)), "-k", "skaliert"],
-        cwd=str(_WURZEL), env=env, capture_output=True, text=True,
+        cwd=ordner, env=env, capture_output=True, text=True,
         encoding="utf-8", errors="replace", timeout=300)
     assert r.returncode == 0, r.stdout[-4000:] + r.stderr[-2000:]
     assert " passed" in r.stdout and "skipped" not in r.stdout.split("\n")[-2], r.stdout[-800:]
