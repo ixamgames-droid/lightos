@@ -28,10 +28,10 @@ from __future__ import annotations
 import weakref
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtGui import QBrush, QColor, QFont, QPalette
 from PySide6.QtWidgets import (
     QAbstractItemView, QHBoxLayout, QHeaderView, QLabel, QMenu, QPushButton,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QStyledItemDelegate, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from src.core.engine import stufen
@@ -42,8 +42,32 @@ from src.ui.widgets.stufe_auswahl import (StufeAuswahl, setze_stufen,
 
 _ROLLE_FID = Qt.ItemDataRole.UserRole          # Funktions-ID einer Effekt-Zeile
 _ROLLE_ZAHL = Qt.ItemDataRole.UserRole + 1     # Zahl einer Stufen-Zeile
-_SPALTEN = ("Effekt", "Art", "Fasst an", "Zustand", "Verdeckt")
+#: UI-139 (Klick-Test 16.11.2026, Fund 22): „Betrifft“ statt „Fasst an“.
+_SPALTEN = ("Effekt", "Art", "Betrifft", "Zustand", "Verdeckt")
+_SP_ZUSTAND = 3
 _SP_VERDECKT = 4
+#: UI-139: Platzhalter fuer leere Zellen in „Zustand“/„Verdeckt“ (nur gemalt —
+#: die Daten bleiben leer, daran haengen Laufzustand und „Verdeckt“).
+PLATZHALTER = "—"
+
+
+def kopf_text(zahl, anzahl: int) -> str:
+    """UI-139 (Fund 22): Gruppenkopf „Akzente · 2 Effekte“ — vorher
+    „eigene Zahl (9999)  (1)“ mit doppelten Klammern."""
+    wort = "Effekt" if anzahl == 1 else "Effekte"
+    return f"{stufen.stufen_name(zahl)} · {anzahl} {wort}"
+
+
+class _PlatzhalterDelegate(QStyledItemDelegate):
+    """Malt „—“ in leere Zellen „Zustand“/„Verdeckt“ einer Effekt-Zeile."""
+
+    def initStyleOption(self, option, index):  # noqa: N802 (Qt-Name)
+        super().initStyleOption(option, index)
+        if (index.column() in (_SP_ZUSTAND, _SP_VERDECKT) and not option.text
+                and index.parent().isValid()):
+            option.text = PLATZHALTER
+            option.palette.setColor(QPalette.ColorRole.Text, _GRAU)
+            option.palette.setColor(QPalette.ColorRole.HighlightedText, _GRAU)
 WG_INTERVALL_MS = 333           # ENG-35 Schritt 4: 3 Hz, nur sichtbar
 _BERNSTEIN = QColor("#ffb000")
 _GRAU = QColor("#7d8590")
@@ -200,6 +224,8 @@ class PrioritaetenView(QWidget):
         self._baum = _StufenBaum(self)
         self._baum.setColumnCount(len(_SPALTEN))
         self._baum.setHeaderLabels(list(_SPALTEN))
+        self._platzhalter = _PlatzhalterDelegate(self._baum)   # UI-139
+        self._baum.setItemDelegate(self._platzhalter)
         self._baum.setRootIsDecorated(True)
         self._baum.setUniformRowHeights(True)
         self._baum.setSelectionMode(
@@ -498,7 +524,7 @@ class PrioritaetenView(QWidget):
                 zeilen.sort(key=lambda f: (str(getattr(f, "name", "")).lower(),
                                            getattr(f, "id", 0)))
                 kopf = QTreeWidgetItem(self._baum, [
-                    f"{stufen.stufen_name(zahl)}  ({len(zeilen)})", "", "", ""])
+                    kopf_text(zahl, len(zeilen)), "", "", ""])
                 kopf.setData(0, _ROLLE_ZAHL, zahl)
                 kopf.setFont(0, fett)
                 kopf.setFlags(Qt.ItemFlag.ItemIsEnabled

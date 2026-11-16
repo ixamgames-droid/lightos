@@ -2,8 +2,10 @@
 Kuerzung, damit lange, gleich beginnende Namen unterscheidbar bleiben.
 
 Sichert:
-- `FixtureTreeWithDrag` kuerzt Text mittig (ElideMiddle) statt rechts — so bleibt
-  der unterscheidende Namens-Schwanz sichtbar.
+- `FixtureTreeWithDrag` kuerzt den NAMEN mittig — so bleibt der unterscheidende
+  Namens-Schwanz sichtbar. Seit CDX-74 macht das ein Delegat, der das
+  `[013] `-Praefix nie anschneidet (Qts eigene Kuerzung ist rechts, nur fuer
+  Zeilen ohne Praefix); Messung im Touch-Modus: test_cdx74_buehne_liste.py.
 - `LiveView._refresh_fixture_list` UND `FixtureGroupView._refresh_fixtures` setzen
   auf jedem Fixture-Kind einen Tooltip == angezeigtem Text (Vollname bei Kuerzung).
 """
@@ -63,11 +65,13 @@ def _xplat15_no_leaked_widgets():
 
 
 class TestElideMode(unittest.TestCase):
-    def test_tree_elides_middle(self):
-        from src.ui.views.fixture_group_view import FixtureTreeWithDrag
+    def test_tree_elides_name_middle_keeps_fid(self):
+        from src.ui.views.fixture_group_view import (
+            FixtureTreeWithDrag, _GeraeteNameDelegat)
         t = FixtureTreeWithDrag()
         try:
-            self.assertEqual(t.textElideMode(), Qt.TextElideMode.ElideMiddle)
+            self.assertIsInstance(t.itemDelegate(), _GeraeteNameDelegat)
+            self.assertEqual(t.textElideMode(), Qt.TextElideMode.ElideRight)
         finally:
             t.deleteLater()
 

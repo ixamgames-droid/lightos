@@ -1,6 +1,7 @@
 """VCCanvas — Free-form layout surface for all VC widgets."""
 from __future__ import annotations
 import json
+import time
 from PySide6.QtWidgets import (QWidget, QScrollArea, QMenu, QFileDialog,
                                 QMessageBox, QInputDialog, QSizePolicy)
 from PySide6.QtCore import Qt, QEvent, QPoint, QRect, QSize, Signal, QTimer
@@ -207,6 +208,11 @@ class VCCanvas(QWidget):
         # MIDI-18: Tasten-LEDs am Pult (VCButton.midi_led). Der Abgleich laeuft
         # nur, solange es eine solche Taste gibt (led_rueckmeldung_pruefen).
         self._led_spiegel = None
+        # CDX-72: Beruehrungs-Note -> Zeitpunkt (Motorfader, bankunabhaengig).
+        self._motor_beruehrt: dict[int, float] = {}
+        # CDX-72 (Pruefung): Pitchbend-Kanal -> letzte Fader-Eingabe, fuer
+        # Motorfader OHNE Beruehrungssensor (Hand schiebt beim Bankwechsel).
+        self._motor_hand: dict[int, float] = {}
         self._led_timer = QTimer(self)
         self._led_timer.setInterval(150)
         self._led_timer.timeout.connect(self._led_abgleich)
@@ -235,14 +241,24 @@ class VCCanvas(QWidget):
         except Exception as e:
             print(f"[VCCanvas] MIDI-Konflikt-Provider-Fehler: {e}")
 
-    def _teardown_midi(self):
-        # MIDI-18: angeschaltete Pult-LEDs nicht brennen lassen.
+    def led_abschalten(self) -> None:
+        """MIDI-18/CDX-72: alle Pult-LEDs dieser Konsole ausschalten und den
+        Abgleich anhalten. Das Hauptfenster ruft das beim Beenden VOR
+        ``close_all()`` — danach erreicht kein Note-Off mehr das Pult."""
+        try:
+            self._led_timer.stop()
+        except (AttributeError, RuntimeError):
+            pass
         spiegel = getattr(self, "_led_spiegel", None)
         if spiegel is not None:
             try:
                 spiegel.alle_aus()
             except Exception:
                 pass
+
+    def _teardown_midi(self):
+        # MIDI-18: angeschaltete Pult-LEDs nicht brennen lassen.
+        self.led_abschalten()
         try:
             from src.core.midi import midi_mapper
             midi_mapper.unregister_vc_binding_provider(self.iter_midi_bindings)
@@ -565,6 +581,7 @@ class VCCanvas(QWidget):
             self.midi_learn_done.emit()
             return
 
+        self._motor_beruehrung_merken(msg)
         # Dispatch an alle VCWidgets (VCButton, VCSlider, …)
         try:
             widgets = self.findChildren(VCWidget)
@@ -577,6 +594,45 @@ class VCCanvas(QWidget):
             if not self.on_active_bank(widget):
                 continue
             widget.handle_midi(msg)
+
+    def _motor_beruehrung_merken(self, msg) -> None:
+        """CDX-72: Beruehrungs-Noten der Motorfader je physischem Fader merken,
+        unabhaengig von der Bank. Ein Bankwechsel bei gehaltenem Fader gibt so
+        die Sperre an den Fader der neuen Bank weiter (``motor_beruehrt``)."""
+        try:
+            from src.core.midi.midi_mapper import TOUCH_KANAL
+            if msg.msg_type == "pitchbend":
+                hand = getattr(self, "_motor_hand", None)
+                if hand is not None:
+                    hand[int(msg.channel)] = time.monotonic()
+                return
+            if msg.msg_type not in ("note_on", "note_off") or msg.channel != TOUCH_KANAL:
+                return
+            note = int(msg.data1)
+        except Exception:
+            return
+        gemerkt = getattr(self, "_motor_beruehrt", None)
+        if gemerkt is None:
+            return
+        if msg.msg_type == "note_on" and msg.data2 > 0:
+            gemerkt[note] = time.monotonic()
+        else:
+            gemerkt.pop(note, None)
+
+    def motor_hand_vor(self, kanal: int) -> float | None:
+        """CDX-72 (Pruefung): vor wie vielen Sekunden kam zuletzt eine
+        Fader-Eingabe (Pitchbend) auf diesem Kanal — egal an welche Bank.
+        ``None`` = noch nie. Ein Fader ohne Beruehrungssensor erkennt die Hand
+        nur so; der Fader der neuen Bank wartet dann wie nach eigener Eingabe."""
+        ts = (getattr(self, "_motor_hand", None) or {}).get(int(kanal))
+        return None if ts is None else max(0.0, time.monotonic() - ts)
+
+    def motor_beruehrt(self, note: int) -> bool:
+        """Haelt gerade eine Hand den Pult-Fader mit dieser Beruehrungs-Note?
+        Ein verlorenes Loslassen gilt nach ``MOTOR_BERUEHRT_MAX_S`` als vorbei."""
+        from src.core.midi.midi_mapper import MOTOR_BERUEHRT_MAX_S
+        ts = (getattr(self, "_motor_beruehrt", None) or {}).get(int(note))
+        return ts is not None and time.monotonic() - ts < MOTOR_BERUEHRT_MAX_S
 
     # ── MIDI-Learn-Modus ─────────────────────────────────────────────────────
 
@@ -814,7 +870,23 @@ class VCCanvas(QWidget):
         if not enabled:
             self._on_widget_selected(None)   # Inspector leeren, wenn Edit-Modus aus
         self._handy_abzeichen_aktualisieren()   # WEB-10: Abzeichen nur beim Bearbeiten
+        if getattr(self, "_auswahl_marke_w", None) is not None:
+            self.auswahl_marke().planen()      # UI-136: im Spielbetrieb unsichtbar
         self.update()
+
+    def auswahl_marke_geaendert(self) -> None:
+        """UI-136: eine Auswahl-Marke (``VCWidget._selected``) hat sich
+        geaendert — die Ueberlagerung liest die Auswahl gebuendelt neu ein."""
+        self.auswahl_marke().planen()
+
+    def auswahl_marke(self):
+        """UI-136: die Ueberlagerung, die die Auswahl sichtbar macht (bei
+        Bedarf angelegt)."""
+        m = getattr(self, "_auswahl_marke_w", None)
+        if m is None or not _lebt(m):
+            from src.ui.virtualconsole.vc_auswahl_marke import AuswahlMarke
+            m = self._auswahl_marke_w = AuswahlMarke(self)
+        return m
 
     def _on_widget_selected(self, w):
         """Von einem VCWidget beim Anklicken (oder vom Canvas bei Klick ins Leere mit
@@ -934,11 +1006,26 @@ class VCCanvas(QWidget):
         if w is None or not getattr(w, "_selected", False):
             return False
         w._mehrfach_klick = None
-        w._gruppe = []
+        # CDX-72: der erste Finger hat beim Zittern unter der Gesten-Schwelle
+        # schon die ganze gewaehlte Gruppe verschoben (gruppe_ziehen) — alle
+        # zuruecksetzen, nicht nur das gehaltene Widget. Ohne Gruppe legt das
+        # Loslassen keinen Rueckgaengig-Schritt an; die Verschiebung bliebe.
+        gruppe, w._gruppe = list(getattr(w, "_gruppe", []) or []), []
+        zurueck = False
+        for gw, r in gruppe:
+            if gw is w or not _lebt(gw) or gw.geometry() == r:
+                continue
+            gw.setGeometry(r)
+            gw.moved.emit(r.x(), r.y())
+            zurueck = True
         w._dragging = False
         w._resizing = False
         if w.geometry() != getattr(w, "_orig_rect", w.geometry()):
             w.setGeometry(w._orig_rect)
+            w.moved.emit(w._orig_rect.x(), w._orig_rect.y())
+            zurueck = True
+        if zurueck:
+            self._update_content_extent()
         self._halten_w = w
         return True
 
@@ -2579,6 +2666,20 @@ class VCCanvas(QWidget):
         Loslassen die Kennung nicht mehr, und Flash oder Blackout bleibt
         haengen — auch beim Laden einer Show (``_clear``)."""
         from .vc_button import VCButton
+        # CDX-72: Widgets mit eigenen Programmer-Werten (Raum-Pad) geben sie
+        # hier frei — unabhaengig vom Lock. hideEvent darf das nicht, weil ein
+        # Bankwechsel ein eingerastetes Ziel bewusst behaelt.
+        try:
+            alle = [widget] + list(widget.findChildren(VCWidget))
+        except RuntimeError:
+            return
+        for w in alle:
+            fn = getattr(w, "vor_entfernen", None)
+            if callable(fn):
+                try:
+                    fn()
+                except Exception as e:
+                    print(f"[VCCanvas] ERROR: Freigeben vor dem Loeschen: {e}")
         try:
             betroffen = [widget] + list(widget.findChildren(VCButton))
         except RuntimeError:

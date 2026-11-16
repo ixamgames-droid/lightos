@@ -10,6 +10,21 @@ from src.ui.layout_leeren import layout_leeren
 from src.ui.weak_slots import weak_slot
 
 
+#: UI-139 (Klick-Test 16.11.2026, Fund 16): Leerzustand eines Paletten-Reiters.
+LEER_TEXT = ("Noch keine Paletten.\n"
+             "Gerät wählen, Wert einstellen, dann „+ Neu aufzeichnen“.")
+#: UI-139: „+ Neu aufzeichnen“ am Finger.
+NEU_KNOPF_TOUCH = 44
+
+
+def _touch() -> bool:
+    try:
+        from src.ui.touch_keyboard import is_touch_mode
+        return bool(is_touch_mode())
+    except Exception:
+        return False
+
+
 class PaletteButton(QPushButton):
     """Button showing a palette swatch."""
     SIZE = 72
@@ -72,12 +87,21 @@ class PalettePage(QWidget):
         # Toolbar
         tbar = QHBoxLayout()
         btn_new = QPushButton("+ Neu aufzeichnen")
-        btn_new.setFixedHeight(26)
-        btn_new.setStyleSheet("""
+        qss = """
             QPushButton { background:#21262d; color:#3fb950; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """
+        if _touch():
+            # UI-139 (Klick-Test 16.11.2026, Fund 16): am Finger 44 px hoch
+            # (Hoehe im eigenen Stil, sonst schlaegt sie das Fenster-Stylesheet).
+            btn_new.setFixedHeight(NEU_KNOPF_TOUCH)
+            qss += ("QPushButton { font-size:13px; padding:0 12px; "
+                    f"min-height:{NEU_KNOPF_TOUCH - 2}px; }}")
+        else:
+            btn_new.setFixedHeight(26)
+        btn_new.setStyleSheet(qss)
+        self._btn_new = btn_new
         btn_new.clicked.connect(self._record_new)
         tbar.addWidget(btn_new)
         tbar.addStretch()
@@ -150,6 +174,23 @@ class PalettePage(QWidget):
             if col >= col_count:
                 col = 0
                 row += 1
+        # UI-139 (Fund 16): ohne Kacheln ein Hinweis statt leerer schwarzer
+        # Flaeche — sonst sieht man nicht, ob noch geladen wird.
+        self._leer_hinweis = None
+        if not palettes:
+            if q:
+                text = (f"Keine Palette passt zu „{self._search.text().strip()}“.")
+            else:
+                text = LEER_TEXT
+            lbl = QLabel(text)
+            lbl.setObjectName("paletteLeer")
+            # Suchtext steht im Hinweis -> nie als Rich Text deuten.
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
+            lbl.setWordWrap(True)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet("color:#8b949e; font-size:13px; padding:24px;")
+            self._grid.addWidget(lbl, 0, 0, 1, col_count)
+            self._leer_hinweis = lbl
 
     def _on_tile_context_menu(self, pos):
         # sender()-Adapter statt Lambda (STAB-09): Palette haengt als Attribut am Button.
