@@ -1,7 +1,7 @@
 {
   "anleitung": "fixture_generator",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "000e51c2",
+  "stand": "b827d00f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py fixture_generator'.",
@@ -31,7 +31,7 @@
         1000
       ],
       "marken": [],
-      "md5": "2e0dabf217a0a378719618cb790b402e"
+      "md5": "3e2ed5042863d09eb5805fd31babd05b"
     },
     {
       "datei": "03_generator_kanaele.png",
@@ -42,7 +42,7 @@
         1000
       ],
       "marken": [],
-      "md5": "5cc2f4c4b0340c0fa5ff6b52ea20b48f"
+      "md5": "b65477e06f00b01bb8381cf75cf70e66"
     },
     {
       "datei": "04_generator_bereiche.png",
@@ -53,7 +53,7 @@
         1000
       ],
       "marken": [],
-      "md5": "769e00ccf1f788a13cc960545effa3c5"
+      "md5": "c158c3acfb8f9334e0749564f395f902"
     },
     {
       "datei": "05_generator_pruefen.png",
@@ -64,7 +64,7 @@
         1000
       ],
       "marken": [],
-      "md5": "7488bd1cb0fc3393d37481e2e375dd19"
+      "md5": "b0449889f9f989dca117c79fc268251d"
     },
     {
       "datei": "06_patch_dialog.png",

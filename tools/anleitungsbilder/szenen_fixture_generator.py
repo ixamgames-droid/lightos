@@ -367,9 +367,16 @@ def _generator_schritte(ui):
         _klick(ui, _knopf(dlg, "Prüfen"))
         speichern = dlg._btn_box.button(QDialogButtonBox.StandardButton.Save)
         ui._doku_pruefung = dlg._issues.toPlainText()
+        # FM-71: ans Ende rollen — Hinweisliste und Live-Test stehen dann
+        # ganz im Bild (der Inhalt ist hoeher als der Dialog, FM-74).
+        from src.ui.widgets.dialog_groesse import InhaltsRollbereich
+        rolle = dlg.findChildren(InhaltsRollbereich)[0]
+        rolle.verticalScrollBar().setValue(rolle.verticalScrollBar().maximum())
+        ui.pump(0.2)
         bilder["05_generator_pruefen"] = _dialog_bild(ui, dlg, [
             (_knopf(dlg, "Prüfen"), 1, "links"), (dlg._issues, 2, "oben"),
-            (dlg._live, 3, "oben"), (speichern, 4, "oben")])
+            (dlg._live, 3, "oben"), (speichern, 4, "oben"),
+            (dlg._btn_aktualisieren, 5, "oben")])
         _video(ui, 15)
         ui._doku_generator = dlg
         _meldungen_beantworten(ui)
