@@ -1,7 +1,7 @@
 {
   "anleitung": "vc",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b0cc8008",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "fa2cc5cb6e31bc53b56b8c5ac2da074d"
+      "md5": "68e8081ddce2984a838a2e39d2fc136d"
     },
     {
       "datei": "02_bearbeiten_modus.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "0404215c4e83f49b638d7f08e4de8333"
+      "md5": "7926f32ee73a692304d1f0d035589d95"
     },
     {
       "datei": "03_drop_karte.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "5e72fb32dd4c9176fb64d369d7436510"
+      "md5": "c54587306b2f62c0d5223e9f68289046"
     },
     {
       "datei": "04_widget_galerie.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "3e228a52bf895dbd9c12b3588e6344d8"
+      "md5": "afd250777613cb8c7e6868e4d8d61909"
     },
     {
       "datei": "05_konflikt_karte.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "ca24627d16a1363821325750ba05128c"
+      "md5": "79da8e91cbae1d31ffb763398db4bef8"
     },
     {
       "datei": "06_button_einstellungen.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "8549d73f8eb5c02d3c5841d8b48a4fbc"
+      "md5": "aac3a8b33eeeab86e67f0f3729e7ac76"
     },
     {
       "datei": "07_taste_aktiv.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "9069518ec5bcffbc01f31934e35c896b"
+      "md5": "26923871127a1fd8564ec22360b6a938"
     },
     {
       "datei": "08_bank2_tempo_musik.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "590aca571e773a35b1aeeac0e5874cbd"
+      "md5": "70c4a25a9d68570048d61cab12a1cc58"
     },
     {
       "datei": "09_midi_teach.png",
@@ -103,7 +103,7 @@
         900
       ],
       "marken": [],
-      "md5": "9af4baeb3347feb00c67cd217c1ab2c3"
+      "md5": "44de342ed8d6e3a2a904636b14fb1c75"
     },
     {
       "datei": "10_kiosk_streifen.png",
@@ -114,7 +114,7 @@
         154
       ],
       "marken": [],
-      "md5": "6af060815d3dd664ed3d62aed7ba315b"
+      "md5": "8b9a7d76cb72c07261098cdb47e5e085"
     }
   ]
 }

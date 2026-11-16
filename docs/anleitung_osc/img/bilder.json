@@ -1,7 +1,7 @@
 {
   "anleitung": "osc",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b0cc8008",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py osc'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "4fa1717ac85db166cefbb626a984c010"
+      "md5": "1a3fbc55cbd8b44d43e4d286c4edb1fe"
     },
     {
       "datei": "02_eingang.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "502d79f45818c0a254d6a4bb9aaf479f"
+      "md5": "d106b09b26ac2e8b722b6a854f0a7d14"
     },
     {
       "datei": "03_rueckmeldung.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "0becc6dbb8ba54f13409967e2b0dbeef"
+      "md5": "4ab9cdf5270e8e4c4c6c28609e4309a9"
     },
     {
       "datei": "04_lernen.gif",
@@ -52,7 +52,7 @@
         [],
         []
       ],
-      "md5": "471a72a1c1166b1166c1ca6dca663797",
+      "md5": "dde27ffe2b12fa941004fd00b04a794e",
       "frames": 3,
       "dauern_ms": [
         1600,

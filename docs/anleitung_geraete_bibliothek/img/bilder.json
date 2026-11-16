@@ -1,7 +1,7 @@
 {
   "anleitung": "geraete_bibliothek",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "000e51c2",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py geraete_bibliothek'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "a2606cb1d56013590caebf74ec63fbd0"
+      "md5": "3165afb32fc2d2651ed3e9f0f69ce96d"
     },
     {
       "datei": "02_menue_datenbank.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "a8e4edf25f20289ebbf6a76cec1cf29e"
+      "md5": "799e9001292b45fbd3dc52c5f8c473bb"
     },
     {
       "datei": "03_download_dialog.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "64a67167c9772f8a31bd97e2f485c510"
+      "md5": "47648966c0b09851bc08f9bc6579a906"
     },
     {
       "datei": "04_fixture_editor.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "e65559d16a86f38fcf9333497f6044f4"
+      "md5": "51b30fcc0526195588125e224512ce04"
     },
     {
       "datei": "05_lightos_profil.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "61f22efe2fba1f8fedc9b479ac46986e"
+      "md5": "bdcc6042d791cd4d401936b264832750"
     },
     {
       "datei": "06_weiss_segment_hinweis.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "75f3739b61d7b53c681b7cf1360b35bf"
+      "md5": "592c895d661833fcb68fa4bb77516a98"
     },
     {
       "datei": "07_weiss_segment_gesetzt.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "cb30a0d0e3f3d2c66b67f1d4439cf4de"
+      "md5": "fd3328af6d0d752d6883b8dd5483f80e"
     },
     {
       "datei": "08_matrix_hinweis.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "f2a550c48888582cf50463d263603be6"
+      "md5": "5824044d7c29b947af041b7a0a2da733"
     },
     {
       "datei": "09_3d_modelle.png",

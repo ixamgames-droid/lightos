@@ -18,8 +18,9 @@ Modale Dialoge (Eigenschaften einer Taste, „Bearbeiten: …") werden ueber
 ihren echten Aufruf geoeffnet, im modalen Loop aufgenommen und mit Abbrechen
 bzw. Schliessen ohne Aenderung beendet.
 
-Nicht hier: Bild 1 der Anleitung (Schichten-Schaubild) ist eine Zeichnung,
-kein Bildschirmbild.
+Bild 1 der Anleitung (Schichten-Schaubild, ``01_schichten``) ist eine
+Zeichnung, kein Bildschirmbild: ``_b01`` malt die Tabelle aus Abschnitt 1
+(:data:`SCHICHTEN`) per QPainter.
 """
 from __future__ import annotations
 
@@ -124,6 +125,183 @@ def _spalte_rechteck(ui, v, spalte):
     x = kopf.sectionViewportPosition(spalte)
     r = QRect(x, 0, kopf.sectionSize(spalte), kopf.height())
     return QRect(kopf.viewport().mapTo(ui.win, r.topLeft()), r.size())
+
+
+# ── 01: Schichten-Schaubild (Zeichnung) ─────────────────────────────────────
+
+#: Abschnitt 1 der Anleitung, Tabelle „Die Reihenfolge in einem Bild“:
+#: ``(Nr., Schicht, Zusatz unter dem Namen, Regel kurz)`` — von unten nach oben.
+SCHICHTEN = [
+    (1, "Grundwerte", "",
+     "Jedes Bild beginnt mit den Ruhewerten der Geräte."),
+    (2, "Effekte und Funktionen", "Szene, Chaser, Sequenz, Bewegung, Matrix …",
+     "Höhere Stufe gewinnt; bei gleicher Stufe, wer zuletzt gestartet wurde. "
+     "Kein „höchster Wert gewinnt“ — auch nicht beim Dimmer."),
+    (3, "Cue-Listen (Wiedergabe)", "",
+     "Liegen über allen Effekten und ersetzen deren Werte."),
+    (4, "Programmer", "dazu gehören alle Snap-Tasten der Virtual Console",
+     "Liegt über Effekten und Cue-Listen — was ein laufender Effekt gerade treibt, "
+     "behält der Effekt (Dimmer: außer mit Haken „übersteuert …“)."),
+    (5, "Automatische Helligkeit", "",
+     "Leuchtet eine Farbe und treibt niemand den Dimmer, öffnet er von selbst."),
+    (6, "„Alles Weiß“", "",
+     "Überschreibt alles darunter, auch laufende Farb-Effekte."),
+    (7, "Gruppen-Fader, Geräte-Dimmer, Submaster", "",
+     "Multiplizieren die Helligkeit, ersetzen nichts."),
+    (8, "Eingemischtes DMX von außen", "",
+     "Je Universum: höchster Wert gewinnt oder ersetzt."),
+    (9, "Simple Desk mit „Manueller Override“", "",
+     "Nur bei gesetztem Haken: die dort gezogenen Kanäle gewinnen."),
+    (10, "Laser-NOT-AUS, Grand Master, Blackout, Ziel-Blackout", "",
+     "Wirken ganz am Ende und behalten immer das letzte Wort."),
+]
+
+#: Abschnitt 2: die fünf Stufen, schwächste zuerst (nur in Schicht 2).
+STUFEN = ["Grundlicht", "Effekte", "Akzente", "Strobe & Blinder", "Notfall"]
+
+
+def _b01(ui):
+    """Zeichnung: zehn Schichten als Balken, Schicht 1 unten, 10 oben; die
+    Stufen nur in Schicht 2. Kein Fenster, nur QPainter."""
+    from PySide6.QtCore import QPointF, QRect, QRectF, Qt
+    from PySide6.QtGui import (QColor, QFont, QFontMetrics, QPainter,
+                               QPainterPath, QPen, QPixmap, QPolygonF)
+    from PySide6.QtWidgets import QLabel
+    from anleitungsbilder.runner import SCHRIFT_FAMILIE
+
+    def schrift(px, fett=False):
+        f = QFont(SCHRIFT_FAMILIE)
+        f.setPixelSize(px)
+        f.setBold(fett)
+        return f
+
+    GRUND, BALKEN, TEXT, LEISE = (QColor("#0d1117"), QColor("#1b222c"),
+                                  QColor("#f0f4f8"), QColor("#a9b4c0"))
+    AKZENT = {1: "#6e7681", 2: "#3fb950", 3: "#58a6ff", 4: "#d29922",
+              5: "#a371f7", 6: "#e6edf3", 7: "#39c5cf", 8: "#8b949e",
+              9: "#db6d28", 10: "#f85149"}
+    B, rand, links = 1600, 36, 170
+    kopf, fuss, h_norm, h_zwei, h_stufen, luecke = 132, 70, 66, 82, 142, 8
+    hoehen = {n: (h_stufen if n == 2 else h_zwei if zusatz else h_norm)
+              for n, _s, zusatz, _r in SCHICHTEN}
+    H = kopf + sum(hoehen.values()) + luecke * (len(SCHICHTEN) - 1) + fuss + rand
+    x0, x1 = links, B - rand
+    spalte_name, spalte_regel = x0 + 84, x0 + 700
+
+    pix = QPixmap(B, H)
+    pix.fill(GRUND)
+    p = QPainter(pix)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+    p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+
+    def text(rect, t, f, farbe=TEXT, flags=None):
+        flags = flags if flags is not None else (
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter | Qt.TextFlag.TextWordWrap)
+        fm = QFontMetrics(f)
+        noetig = fm.boundingRect(rect, int(flags), t)
+        if noetig.width() > rect.width() + 1 or noetig.height() > rect.height() + 1:
+            raise SzenenFehler(f"Text passt nicht ins Schaubild: {t!r} "
+                               f"({noetig.width()}x{noetig.height()} > "
+                               f"{rect.width()}x{rect.height()})")
+        p.setFont(f)
+        p.setPen(farbe)
+        p.drawText(rect, int(flags), t)
+
+    # Kopf
+    text(QRect(rand, rand - 6, B - 2 * rand, 44),
+         "Wer gewinnt? Die Schichten eines Bildes — von unten nach oben",
+         schrift(32, True))
+    text(QRect(rand, rand + 38, B - 2 * rand, 30),
+         "44-mal je Sekunde neu aufgebaut. Was weiter oben liegt, kommt später und setzt sich durch.",
+         schrift(20), LEISE)
+
+    # Balken von unten nach oben
+    y = H - fuss - rand
+    oben_y = unten_y = None
+    for nr, name, zusatz, regel in SCHICHTEN:
+        h = hoehen[nr]
+        y -= h
+        r = QRectF(x0, y, x1 - x0, h)
+        if unten_y is None:
+            unten_y = y + h
+        oben_y = y
+        weg = QPainterPath()
+        weg.addRoundedRect(r, 10, 10)
+        p.fillPath(weg, BALKEN)
+        akzent = QColor(AKZENT[nr])
+        p.fillRect(QRectF(x0, y + 6, 8, h - 12), akzent)
+        # Nummernkreis
+        d = 42
+        kreis = QRectF(x0 + 24, y + (min(h, h_zwei) - d) / 2 if nr == 2 else y + (h - d) / 2, d, d)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(akzent)
+        p.drawEllipse(kreis)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        text(kreis.toRect(), str(nr), schrift(22, True), GRUND,
+             Qt.AlignmentFlag.AlignCenter)
+        oben_h = h_zwei if nr == 2 else h
+        bn = spalte_regel - spalte_name - 24
+        if zusatz:
+            text(QRect(spalte_name, int(y) + 6, bn, 38), name, schrift(25, True))
+            text(QRect(spalte_name, int(y) + 42, bn, 30), zusatz, schrift(18), LEISE)
+        else:
+            text(QRect(spalte_name, int(y), bn, int(h)), name, schrift(25, True))
+        text(QRect(spalte_regel, int(y) + 4, int(x1) - spalte_regel - 20, int(oben_h) - 8),
+             regel, schrift(19), TEXT)
+        if nr == 2:
+            # Die fünf Stufen: nur hier
+            sy = y + h_zwei + 4
+            text(QRect(spalte_name, int(sy), 170, 44), "Stufen:", schrift(19, True), LEISE)
+            sx = spalte_name + 84
+            f = schrift(20, True)
+            fm = QFontMetrics(f)
+            for i, stufe in enumerate(STUFEN):
+                w = fm.horizontalAdvance(stufe) + 36
+                chip = QRectF(sx, sy + 2, w, 42)
+                gruen = QColor("#3fb950")
+                gruen.setAlpha(60 + 38 * i)
+                weg = QPainterPath()
+                weg.addRoundedRect(chip, 21, 21)
+                p.fillPath(weg, gruen)
+                text(chip.toRect(), stufe, f, TEXT, Qt.AlignmentFlag.AlignCenter)
+                sx += w
+                if i < len(STUFEN) - 1:
+                    text(QRect(int(sx), int(sy) + 2, 34, 42), "<", schrift(22, True), LEISE,
+                         Qt.AlignmentFlag.AlignCenter)
+                    sx += 34
+            text(QRect(int(sx) + 16, int(sy), int(x1) - int(sx) - 36, 44),
+                 "schwächste links, stärkste rechts", schrift(18), LEISE)
+            if sx > x1 - 20:
+                raise SzenenFehler("Stufen-Reihe ragt aus dem Balken")
+        y -= luecke
+
+    # Pfeil links: von unten nach oben = später
+    px_ = rand + 50
+    p.setPen(QPen(QColor("#8b949e"), 6, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+    p.drawLine(QPointF(px_, unten_y - 10), QPointF(px_, oben_y + 40))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(QColor("#8b949e"))
+    p.drawPolygon(QPolygonF([QPointF(px_, oben_y + 6), QPointF(px_ - 18, oben_y + 42),
+                             QPointF(px_ + 18, oben_y + 42)]))
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.save()
+    mitte = (oben_y + unten_y) / 2
+    p.translate(px_ + 40, mitte)
+    p.rotate(-90)
+    text(QRect(-300, -16, 600, 34), "später — setzt sich durch", schrift(22, True), LEISE,
+         Qt.AlignmentFlag.AlignCenter)
+    p.restore()
+
+    # Fuß
+    text(QRect(rand, H - rand - fuss + 18, B - 2 * rand, 50),
+         "Die Stufen ordnen nur Schicht 2. Snap-Tasten, Cue-Listen, Fader und Master "
+         "behalten ihren festen Platz.", schrift(21), LEISE)
+    p.end()
+    beleg("Schichten: " + " | ".join(f"{n} {s}" for n, s, _z, _r in SCHICHTEN))
+    lab = QLabel()
+    lab.setFixedSize(pix.size())
+    lab.setPixmap(pix)
+    return lab
 
 
 # ── 02: Ansicht mit laufender Show ──────────────────────────────────────────
@@ -498,6 +676,9 @@ def _abraeumen(ui):
 
 
 SZENEN = [
+    Szene("01_schichten", sektion="Programmer", dialog=_b01,
+          titel="Schaubild: die zehn Schichten eines Bildes von Grundwerte bis "
+                "Laser-NOT-AUS/Grand Master, Stufen nur in Schicht 2"),
     Szene("02_ansicht", sektion="Programmer", dialog=_b02,
           titel="Reiter Prioritäten mit laufender Show: Snap-Zeile, Stufen, Fasst an, ● läuft"),
     Szene("03_stufe_aendern", sektion="Programmer", vorher=_gif03_vorher,

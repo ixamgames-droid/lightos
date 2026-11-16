@@ -1,7 +1,7 @@
 {
   "anleitung": "laser",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b0cc8008",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py laser'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "ee2004c362a15d6a0c501980e19e9880"
+      "md5": "25485c2f0428e1e1f5d7d156f93111d8"
     },
     {
       "datei": "02_statische_muster.png",
@@ -23,10 +23,10 @@
       "titel": "Statische Muster: Musterkachel angeklickt, Vorschau folgt",
       "groesse": [
         1048,
-        413
+        432
       ],
       "marken": [],
-      "md5": "cb878e2094a70dda7c8120b76c0a0e1b"
+      "md5": "ecd7af97984eba3eb5ff0ec98a9c53e1"
     },
     {
       "datei": "03_musik_hinweis.png",
@@ -37,7 +37,7 @@
         289
       ],
       "marken": [],
-      "md5": "0ab30fcc7c1ff3a5396e01e41ae88788"
+      "md5": "014c9568c3b5590df33f7250cafa6342"
     },
     {
       "datei": "04_notaus_ablauf.gif",
@@ -54,7 +54,7 @@
         [],
         []
       ],
-      "md5": "188b797ec4dac3565b1be05332824c2d",
+      "md5": "02513f650761c387208f409324cf77f0",
       "frames": 5,
       "dauern_ms": [
         1600,
