@@ -534,7 +534,7 @@ class VCColor(VCWidget):
         form_target.addRow("Kopf / Bar (0=L, 1=R):", head_spin)
 
         # ── MIDI-Bindung ─────────────────────────────────────────────────────
-        form_midi = _mk_group("MIDI-Bindung (oder Rechtsklick → Teach)")
+        form_midi = _mk_group("MIDI-Bindung (oder Rechtsklick → MIDI Lernen)")
         midi_type_combo = QComboBox()
         midi_type_combo.addItems(["note_on", "cc"])
         midi_type_combo.setCurrentText(self.midi_type)

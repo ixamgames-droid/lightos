@@ -14,6 +14,7 @@ from src.core.engine.efx import EfxInstance, EfxAlgorithm, EfxFixture, advance_p
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.widgets.flow_layout import FlowLayout
+from src.ui import dialog_hilfe
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
 # NUR fuer die Anzeige (Vorschau-Statuszeile) — der gespeicherte Wert bleibt
@@ -2515,18 +2516,19 @@ class EfxView(QWidget):
         from src.core.engine.efx_path import get_efx_path_library
         from src.ui.widgets.efx_path_editor import EfxPathEditorDialog
         dlg = EfxPathEditorDialog(parent=self)
-        if not dlg.exec():
-            return
-        path = get_efx_path_library().add(dlg.result_path)
-        cur = getattr(self, "_current", None)
-        if cur is not None:
-            cur.set_custom_path(path)
-        self._refresh_path_combo()
-        if cur is not None:
-            self._algo_combo.blockSignals(True)
-            self._algo_combo.setCurrentText(EfxAlgorithm.CUSTOM.value)
-            self._algo_combo.blockSignals(False)
-        self._notify_change()
+        with dialog_hilfe.offen(dlg):
+            if not dlg.exec():
+                return
+            path = get_efx_path_library().add(dlg.result_path)
+            cur = getattr(self, "_current", None)
+            if cur is not None:
+                cur.set_custom_path(path)
+            self._refresh_path_combo()
+            if cur is not None:
+                self._algo_combo.blockSignals(True)
+                self._algo_combo.setCurrentText(EfxAlgorithm.CUSTOM.value)
+                self._algo_combo.blockSignals(False)
+            self._notify_change()
 
     def _edit_current_path(self):
         """Popout: den in der Liste gewählten Pfad bearbeiten."""
@@ -2539,14 +2541,15 @@ class EfxView(QWidget):
             self._record_new_path()
             return
         dlg = EfxPathEditorDialog(p, parent=self)
-        if not dlg.exec():
-            return
-        updated = lib.add(dlg.result_path)  # gleiche id → ersetzt
-        cur = getattr(self, "_current", None)
-        if cur is not None and getattr(cur, "path_id", None) == updated.id:
-            cur.set_custom_path(updated)  # eingebettete Kopie aktualisieren
-        self._refresh_path_combo()
-        self._notify_change()
+        with dialog_hilfe.offen(dlg):
+            if not dlg.exec():
+                return
+            updated = lib.add(dlg.result_path)  # gleiche id → ersetzt
+            cur = getattr(self, "_current", None)
+            if cur is not None and getattr(cur, "path_id", None) == updated.id:
+                cur.set_custom_path(updated)  # eingebettete Kopie aktualisieren
+            self._refresh_path_combo()
+            self._notify_change()
 
     def _delete_current_path(self):
         """Gewählten Pfad aus der Bibliothek entfernen (EFX behalten ihre

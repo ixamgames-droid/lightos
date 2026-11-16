@@ -18,6 +18,7 @@ from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from src.core.engine.stufen import modify_unter
+from src.ui import dialog_hilfe
 
 # ENG-37-A: Die Engine sperrt Modify-Effekte als Chaser-Schritt (gibt nichts
 # aus, auch tief in einer Sammlung/Show — chaser._render_child_target). Der
@@ -25,6 +26,8 @@ from src.core.engine.stufen import modify_unter
 MODIFY_SCHRITT_HINWEIS = ("Modify-Effekte geben als Chaser-Schritt nichts aus – "
                           "direkt, in einer Sammlung oder der Show-Zeitleiste starten")
 _HINWEIS_GELB = "#e3b341"
+# UI-142: Anzeige deutsch, gespeichert bleibt der Enum-Wert (itemData)
+RICHTUNG_TEXT = {Direction.Forward: "Vorwärts", Direction.Backward: "Rückwärts"}
 
 
 class FunctionSelectorDialog(QDialog):
@@ -127,13 +130,13 @@ class ChaserEditor(QWidget):
         for ro in RunOrder:
             self._combo_order.addItem(ro.value, ro)
         self._combo_order.currentIndexChanged.connect(self._on_props_changed)
-        play_form.addRow("Run Order:", self._combo_order)
+        play_form.addRow("Ablauf:", self._combo_order)
 
         self._combo_dir = QComboBox()
         for d in Direction:
-            self._combo_dir.addItem(d.value, d)
+            self._combo_dir.addItem(RICHTUNG_TEXT.get(d, d.value), d)
         self._combo_dir.currentIndexChanged.connect(self._on_props_changed)
-        play_form.addRow("Direction:", self._combo_dir)
+        play_form.addRow("Richtung:", self._combo_dir)
 
         self._spin_speed = QDoubleSpinBox()
         self._spin_speed.setRange(0.01, 100.0)
@@ -142,7 +145,7 @@ class ChaserEditor(QWidget):
         self._spin_speed.setSuffix("x")
         self._spin_speed.setMinimumWidth(70)
         self._spin_speed.valueChanged.connect(self._on_props_changed)
-        play_form.addRow("Speed:", self._spin_speed)
+        play_form.addRow("Geschwindigkeit:", self._spin_speed)
 
         # Trigger-Modus
         self._combo_trigger = QComboBox()
@@ -478,10 +481,11 @@ class ChaserEditor(QWidget):
         step = self._chaser.steps[row]
         dlg = CurveEditorDialog(step.fade_in_curve,
                                 title=f"Fade-Kurve – Schritt {row + 1}", parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
-            step.fade_in_curve = dlg.result_curve
-            self._rebuild_table()
-            self._table.selectRow(row)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+                step.fade_in_curve = dlg.result_curve
+                self._rebuild_table()
+                self._table.selectRow(row)
 
     def _on_note_changed(self, item):
         """Schreibt die editierte Notiz-Zelle (Spalte 6) in den Step zurueck."""
@@ -502,14 +506,15 @@ class ChaserEditor(QWidget):
 
     def _add_step(self):
         dlg = FunctionSelectorDialog(self, exclude_id=getattr(self._chaser, "id", None))
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        fid = dlg.selected_id
-        if fid is None:
-            return
-        step = ChaserStep(function_id=fid, fade_in=0.0, hold=1.0, fade_out=0.0)
-        self._chaser.steps.append(step)
-        self._rebuild_table()
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            fid = dlg.selected_id
+            if fid is None:
+                return
+            step = ChaserStep(function_id=fid, fade_in=0.0, hold=1.0, fade_out=0.0)
+            self._chaser.steps.append(step)
+            self._rebuild_table()
 
     def _remove_step(self):
         row = self._table.currentRow()

@@ -14,6 +14,7 @@ from src.core.engine.cue_stack import CueStack
 from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
 from src.ui.weak_slots import weak_slot
+from src.ui import dialog_hilfe
 
 CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
@@ -1088,11 +1089,12 @@ class ExecutorWidget(QWidget):
         if not ex:
             return
         dlg = ExecutorConfigDialog(ex, self)
-        if dlg.exec():
-            dlg.apply()
-            self._relabel_buttons()
-            self._lbl.setText(self._display_name(ex))
-            self._sync_fader_for_function(ex)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec():
+                dlg.apply()
+                self._relabel_buttons()
+                self._lbl.setText(self._display_name(ex))
+                self._sync_fader_for_function(ex)
 
     def _sync_fader_for_function(self, ex):
         """Fader-Startwert je nach Funktion: Crossfade ruht auf 0, Volume auf
