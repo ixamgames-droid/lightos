@@ -716,7 +716,23 @@ def _ausschaltbar(widget, frei: set) -> bool:
         from src.core.app_state import get_state
         if get_state().output_manager.blackout_schalter:
             return False
+    if _absolut_an(widget):
+        return False
     return True
+
+
+# CDX-77: Effekt-Aktionen, die ABSOLUT einschalten (ENG-23). Die Taste leuchtet,
+# solange ihr Effekt eingefroren ist; ein Tipp friert nur erneut ein — vom Handy
+# laesst sie sich nicht ausschalten.
+_ABSOLUT_AN_SCHLUESSEL = frozenset({"freeze"})
+
+
+def _absolut_an(widget) -> bool:
+    """CDX-77: ist das eine Taste, die ein Tipp nie ausschaltet?"""
+    from .vc_button import ButtonAction
+    return (getattr(widget, "action", None) == ButtonAction.EFFECT_ACTION
+            and getattr(widget, "effect_action_key", None)
+            in _ABSOLUT_AN_SCHLUESSEL)
 
 
 def _druck_wird_abgelehnt(widget) -> bool:
@@ -791,8 +807,11 @@ def _gruppe_ausfuehren(canvas, widget, aktion) -> dict:
         if _gruppe_aus(w, widget):
             aus.append(w.widget_id)
         if w.leuchtet():
+            # CDX-77: bliebe die Taste an, leuchteten nach dem Druck zwei
+            # Kacheln der Gruppe — der neue Druck wird abgelehnt.
             print(f"[vc_fernbedienung] Handy-Gruppe: {w.widget_id} bleibt an "
-                  f"(Taste laesst sich nicht ausschalten)")
+                  f"(Taste laesst sich nicht ausschalten) — Druck abgelehnt")
+            return _nein(GRUPPE_BLOCKIERT)
     ergebnis = ausfuehren(widget, aktion)
     if not ergebnis.get("ok"):
         return ergebnis
