@@ -146,7 +146,9 @@ sich nicht belegen).
    sie über denselben Weg wie einen Druck, deshalb sieht man es am Pult genauso.
    Die aktive Taste noch einmal antippen schaltet sie aus; dann ist **keine** an.
    Eine Kachel kann nur in **einer** Handy-Gruppe sein (im Dialog steht sie dann
-   mit „schon in …" und lässt sich nicht anhaken). Im Rechtsklick-Menü der Kachel stehen
+   mit „schon in …" und lässt sich nicht anhaken). Andere nicht wählbare Kacheln
+   tragen in der Liste nur „— gesperrt"; tippst du so eine Zeile an, steht der
+   volle Grund darunter. Im Rechtsklick-Menü der Kachel stehen
    „Handy-Gruppe … bearbeiten…", „Aus Handy-Gruppe … nehmen" und „Handy-Gruppe … auflösen". **BLACKOUT,
    Laser-NOT-AUS, „Alles stoppen" und „Laser scharf/unscharf"** gehören nie in
    eine Handy-Gruppe; Fader und Cuelisten auch nicht. Die Gruppe gilt nur für

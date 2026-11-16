@@ -21,7 +21,7 @@ Die Werte landen im **Programmer** (`pan`, `tilt` und, wenn das Gerät sie hat, 
 In den Einstellungen (Inspector oder Doppelklick) lässt sich die **Ansicht** von „Draufsicht“ auf **„Aufgeklappt“** stellen. Dann zeigt das Pad den Raum wie einen auseinandergefalteten Würfel ohne Decke, maßstabsgetreu aus Raumbreite, -tiefe und -höhe:
 
 - **Mitte:** der **Boden** (wie die Draufsicht),
-- **oben:** die **Rückwand**, **links/rechts:** die **Seitenwände**, **unten:** die **Wand vorn** (Publikumsseite). Jede Wand ist an ihrer Kante zum Boden „heruntergeklappt“, jede Fläche ist beschriftet.
+- **oben:** die **Rückwand**, **links/rechts:** die **Seitenwände**, **unten:** die **Wand vorn** (Publikumsseite). Jede Wand ist an ihrer Kante zum Boden „heruntergeklappt“, jede Fläche ist beschriftet — ist ein Pad klein, steht nur „links“/„rechts“ oder gar kein Name, abgeschnitten wird nichts.
 
 | Tipp auf … | Ziel |
 | --- | --- |
@@ -30,7 +30,7 @@ In den Einstellungen (Inspector oder Doppelklick) lässt sich die **Ansicht** vo
 
 - **Ziehen über eine Klappkante** wechselt stetig auf die Nachbarfläche: an der Kante ist der Punkt auf Boden und Wand derselbe, die Köpfe springen nicht. Das gilt genau bei Zielhöhe 0 m (Vorgabe). Steht die Zielhöhe höher, liegt der Boden-Punkt an der Kante auf der Wand in dieser Höhe; beim Überqueren rutscht das Ziel dann einmal um die Zielhöhe an der Wand nach unten. Eine gestrichelte Linie auf den Wänden zeigt diese Höhe.
 - **Außerhalb aller Flächen** (z. B. in den leeren Ecken oder beim Ziehen über den Rand) wird auf die nächste Fläche begrenzt. Ein Tipp in eine leere Ecke setzt kein Ziel.
-- **Köpfe** stehen auf dem Boden an ihrem Standort; hängende Köpfe tragen ihre Hängehöhe (z. B. „4,5 m“).
+- **Köpfe** stehen auf dem Boden an ihrem Standort; hängende Köpfe tragen ihre Hängehöhe (z. B. „4,5 m“). Hängen mehrere Köpfe gleich hoch in einer Reihe, steht die Höhe nur **einmal** daran (z. B. „10× 4,5 m“). Wo der Platz nicht reicht, werden die Kreise kleiner, Nummern und Höhen fallen weg, statt sich zu überdecken; der Tooltip nennt die Höhen aller hängenden Köpfe immer („Höhen: 4,5 m: 1, 2, …“).
 - **Welche Wände** gezeigt werden, ist abwählbar (der Boden bleibt immer). Eine abgewählte Wand verschwindet aus der Abwicklung und ist nicht antippbar.
 
 Position Lock und AN/AUS gelten in beiden Ansichten gleich.
