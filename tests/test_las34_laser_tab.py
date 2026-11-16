@@ -279,7 +279,7 @@ def test_sperrzonen_abzeichen_mit_der_funktion(monkeypatch):
     assert not abz.isHidden()
     assert "Sperrzonen: 1 Hinweis" in abz.text()      # nur der gewaehlte Laser
     # Nie wie ein Schutz: „Nur Anzeige“ steht im Abzeichen selbst.
-    assert "Nur Anzeige" in abz.text() and "schaltet nicht ab" in abz.text()
+    assert "Nur Anzeige" in abz.text() and "schaltet den Laser nicht ab" in abz.text()
     assert "Publikum" in abz.toolTip() and "Bar" not in abz.toolTip()
     # Kaputte Auskunft -> kein Abzeichen, kein Absturz.
     modul.state_befunde = lambda state: 1 / 0
