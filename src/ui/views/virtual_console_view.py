@@ -215,6 +215,7 @@ class VirtualConsoleView(QWidget):
             ("Button",    "VCButton"),
             ("Fader",     "VCSlider"),
             ("XY Pad",    "VCXYPad"),
+            ("Raum-Pad",  "VCRaumPad"),    # UI-127
             ("Cueliste",  "VCCueList"),
             ("SpeedDial", "VCSpeedDial"),
             ("Encoder",   "VCEncoder"),
@@ -551,6 +552,7 @@ class VirtualConsoleView(QWidget):
 
         layout.addWidget(toolbar)
         self._toolbar_widget = toolbar
+        self._leiste_touch_hoehe(toolbar)
 
         # ── Status-Zeile: aktiver Effekt ──────────────────────────────────────
         # VCB-47: Die Zeile hat einen FESTEN, immer reservierten Platz. Sie wurde
@@ -819,14 +821,26 @@ class VirtualConsoleView(QWidget):
                 modify_sig = modify_signatur(funcs)
             except Exception:
                 modify_sig = None
+            # UI-129: ebenso, wenn sich die Menge der live bearbeiteten Effekte
+            # aendert (Sternchen an Taste/Fader/Encoder). Gerechnet wird hier im
+            # vorhandenen Statustakt — kein eigener Timer, neu gezeichnet nur bei
+            # Aenderung.
+            try:
+                from src.core.engine import effect_live
+                live_ids = effect_live.live_editiert_ids()
+            except Exception:
+                live_ids = None
             if (running_ids != getattr(self, "_last_running_ids", None)
-                    or modify_sig != getattr(self, "_last_modify_sig", None)):
+                    or modify_sig != getattr(self, "_last_modify_sig", None)
+                    or live_ids != getattr(self, "_last_live_ids", None)):
                 self._last_running_ids = running_ids
                 self._last_modify_sig = modify_sig
+                self._last_live_ids = live_ids
                 if self._canvas_alive():
                     from src.ui.virtualconsole.vc_button import VCButton
                     from src.ui.virtualconsole.vc_slider import VCSlider
-                    for cls in (VCButton, VCSlider):
+                    from src.ui.virtualconsole.vc_encoder import VCEncoder
+                    for cls in (VCButton, VCSlider, VCEncoder):
                         for w in self._canvas.findChildren(cls):
                             try:
                                 w.update()
@@ -1029,6 +1043,24 @@ class VirtualConsoleView(QWidget):
         """UI-121 B-14: Hoehe der Werkzeugleisten-Knoepfe — Touch 44 px,
         Maus wie bisher 26 px."""
         return 44 if touch_aktiv() else 26
+
+    def _leiste_touch_hoehe(self, leiste) -> None:
+        """QA-118 (e): im Hauptfenster bleiben die Leistenknoepfe 44 px hoch.
+
+        Das Touch-Stylesheet des Hauptfensters setzt ``QPushButton
+        { min-height: 38px }``. Beim Polieren ueberschreibt das das Minimum aus
+        ``setFixedHeight`` — gemessen in der echten App (250 %): 38 px + 1 px
+        Rand oben und unten = 40 statt 44. Der eigene Stil eines Knopfs
+        schlaegt das Fenster-Stylesheet, also nennt er die Hoehe dort selbst
+        (``min-height`` zaehlt ohne Rand; die Leistenstile haben 1 px Rand
+        und ``padding: 0``)."""
+        if not touch_aktiv():
+            return
+        h = self._tb_hoehe()
+        for b in leiste.findChildren(QPushButton):
+            if b.maximumHeight() == h and b.styleSheet():
+                b.setStyleSheet(b.styleSheet()
+                                + f"\nQPushButton {{ min-height: {h - 2}px; }}\n")
 
     def _bank_menue(self):
         """UI-121 B-05: Bank-Etikett angetippt — Bank direkt waehlen."""

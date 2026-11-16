@@ -55,6 +55,7 @@ from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
 from src.ui.virtualconsole.vc_tempo_bus_controller import VCTempoBusController
 from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
+from src.ui.virtualconsole.vc_raumpad import VCRaumPad
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # DOC-14: LIGHTOS_GEN_OUT / LIGHTOS_GEN_GEO lenken Show und Geometrie um — so
@@ -276,6 +277,12 @@ tbc.function_id = mtx.id; tbc.function_ids = [mtx.id]
 reihe(tbc, "VCTempoBusController", "Tempo-Controller (VCTempoBusController)", 280, 196)
 le = VCMultiLiveEditor("Live-Edit"); le.add_effect(mtx.id)
 reihe(le, "VCMultiLiveEditor", "Live-Edit (VCMultiLiveEditor)", 320, 400)
+# UI-127: Raum-Pad. Fest unter Effekt-Anzeige/Rahmen gesetzt statt per `reihe()`
+# — eine vierte Reihe passte nicht mehr in die Aufnahmeflaeche (900 hoch), und
+# die Rechtecke davor bleiben so unveraendert. Die PARs haben kein Pan/Tilt; das
+# Pad zeigt deshalb seinen Leerhinweis (der Platz ist das, was hier zaehlt).
+rp = VCRaumPad("Raum-Pad")
+place(rp, "VCRaumPad", "Raum-Pad (VCRaumPad)", _START_X, 700, 260, 170)
 
 # ── Speichern ────────────────────────────────────────────────────────────────
 state._vc_layout = {"widgets": widgets}

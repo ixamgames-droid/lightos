@@ -60,8 +60,8 @@ Im **BPM**-Tab, Sub-Tab **„Tempo-Buses"**, gibt es das Panel **„Tempo-Speeds
 - **Bus-Tabelle:** zeigt alle Speeds (Default/Sound-BPM zuerst) mit
   **Rolle / Folgt / Faktor / BPM**. Im Bild: `Bass` (Master 128),
   `Drums` (Sub von Bass, `½` → 64), `Lead` (Sub von Bass, `×2` → 256).
-- **Master anlegen / Löschen / Aktualisieren** (Name eingeben → „Master
-  anlegen"). Es lassen sich beliebig viele Tap-Master anlegen.
+- **Master anlegen / Löschen** (Name eingeben → „Master anlegen"). Es lassen
+  sich beliebig viele Tap-Master anlegen.
 - **Editor-Zeile:** den gewählten Bus auf **Master/Sub** stellen, den **Master,
   dem gefolgt wird**, und den **Faktor** wählen → **Übernehmen**.
 

@@ -18,6 +18,7 @@ def _register():
     from .vc_button   import VCButton
     from .vc_slider   import VCSlider
     from .vc_xypad    import VCXYPad
+    from .vc_raumpad  import VCRaumPad
     from .vc_label    import VCLabel
     from .vc_cuelist  import VCCueList
     from .vc_speedial import VCSpeedDial
@@ -38,6 +39,7 @@ def _register():
         "VCButton":   VCButton,
         "VCSlider":   VCSlider,
         "VCXYPad":    VCXYPad,
+        "VCRaumPad":  VCRaumPad,       # UI-127
         "VCLabel":    VCLabel,
         "VCCueList":  VCCueList,
         "VCSpeedDial":VCSpeedDial,
@@ -381,13 +383,35 @@ class VCCanvas(QWidget):
 
     def set_active_bank(self, b: int):
         b = max(0, min(9, int(b)))
-        if b != self._active_bank:
+        gewechselt = b != self._active_bank
+        if gewechselt:
             self._release_held_widgets()
         self._active_bank = b
         self._apply_bank_visibility()
+        if gewechselt:
+            self._auswahl_unsichtbare_loesen()   # UI-132
         self._rearm_slider_pickup()    # Soft-Takeover: Fader nach Seitenwechsel neu armieren
         self.update()
         self.bank_changed.emit(b)
+
+    def _auswahl_unsichtbare_loesen(self) -> None:
+        """UI-132: Nach dem Bankwechsel sind Widgets der verlassenen Bank
+        unsichtbar. Ihre Auswahl-Marke faellt weg (sie kaeme sonst beim
+        Zurueckwechseln wieder), und der Inspector bekommt die verbleibende
+        Auswahl gemeldet — sonst bliebe er an ein unsichtbares Widget
+        gebunden und „Löschen" traefe etwas, das man nicht sieht. Widgets auf
+        „Alle Banks" bleiben sichtbar und gewaehlt."""
+        geaendert = False
+        for w in self.alle_widgets():
+            try:
+                if getattr(w, "_selected", False) and not w.isVisibleTo(self):
+                    w._selected = False
+                    w.update()
+                    geaendert = True
+            except RuntimeError:
+                pass
+        if geaendert and self._edit_mode:
+            self.auswahl_melden()
 
     def _release_held_widgets(self):
         """UI-57: gehaltene Moment-Taster der VERLASSENEN Bank freigeben.
@@ -975,13 +999,19 @@ class VCCanvas(QWidget):
         gruppe = [(w, r) for w, r in gruppe if _lebt(w)]
         if not gruppe:
             return
-        dx = max(delta.x(), -min(r.x() for _w, r in gruppe))
-        dy = max(delta.y(), -min(r.y() for _w, r in gruppe))
+        # UI-132: r liegt in Koordinaten des jeweiligen Elternteils. Die
+        # Gruppe bleibt deshalb nur am Rand der FLAECHE stehen (Widgets direkt
+        # auf ihr); ein Kasten-Kind klemmt fuer sich an seinem Kastenrand,
+        # statt die ganze Gruppe auszubremsen.
+        rand = [r for w, r in gruppe if w.parent() is self] or [r for _w, r in gruppe]
+        dx = max(delta.x(), -min(r.x() for r in rand))
+        dy = max(delta.y(), -min(r.y() for r in rand))
         for w, r in gruppe:
             nx, ny = r.x() + dx, r.y() + dy
             if grid > 0:
-                nx = max(0, round(nx / grid) * grid)
-                ny = max(0, round(ny / grid) * grid)
+                nx = round(nx / grid) * grid
+                ny = round(ny / grid) * grid
+            nx, ny = max(0, nx), max(0, ny)
             if w.pos() != QPoint(nx, ny):
                 w.move(nx, ny)
                 w.moved.emit(nx, ny)
@@ -1008,18 +1038,26 @@ class VCCanvas(QWidget):
         if mindest is None or len(ws) < mindest:
             return False
         lagen = {id(w): self._lage(w) for w in ws}
+        # UI-132: gerastert wird in Flaechen-Koordinaten und nur an der
+        # Bezugskante/-achse (rechts/unten an der Kante, nicht an der
+        # linken oberen Ecke) — sonst laegen Kasten-Kinder und Widgets mit
+        # krummer Breite nach dem Rastern nicht buendig.
+        grid = self.GRID if self._snap_to_grid else 0
+
+        def ras(v):
+            return int(round(v / grid) * grid) if grid > 0 else int(v)
         ziel: dict[int, QPoint] = {}
         if art == "links":
-            x = min(r.left() for r in lagen.values())
+            x = ras(min(r.left() for r in lagen.values()))
             ziel = {k: QPoint(x, r.y()) for k, r in lagen.items()}
         elif art == "rechts":
-            x = max(r.x() + r.width() for r in lagen.values())
+            x = ras(max(r.x() + r.width() for r in lagen.values()))
             ziel = {k: QPoint(x - r.width(), r.y()) for k, r in lagen.items()}
         elif art == "oben":
-            y = min(r.top() for r in lagen.values())
+            y = ras(min(r.top() for r in lagen.values()))
             ziel = {k: QPoint(r.x(), y) for k, r in lagen.items()}
         elif art == "unten":
-            y = max(r.y() + r.height() for r in lagen.values())
+            y = ras(max(r.y() + r.height() for r in lagen.values()))
             ziel = {k: QPoint(r.x(), y - r.height()) for k, r in lagen.items()}
         else:
             waag = art == "waagerecht"
@@ -1035,19 +1073,15 @@ class VCCanvas(QWidget):
             pos = float(a(erst))
             for w in reihe:
                 r = lagen[id(w)]
-                v = int(round(pos))
+                v = ras(pos) if grid > 0 else int(round(pos))
                 ziel[id(w)] = QPoint(v, r.y()) if waag else QPoint(r.x(), v)
                 pos += g(r) + luecke
-        grid = self.GRID if self._snap_to_grid else 0
         vorher = self.to_dict()
         bewegt = False
         for w in ws:
             r = lagen[id(w)]
             neu = w.pos() + (ziel[id(w)] - r.topLeft())
-            nx, ny = neu.x(), neu.y()
-            if grid > 0:
-                nx, ny = round(nx / grid) * grid, round(ny / grid) * grid
-            nx, ny = max(0, nx), max(0, ny)
+            nx, ny = max(0, neu.x()), max(0, neu.y())
             if w.pos() != QPoint(nx, ny):
                 w.move(nx, ny)
                 w.moved.emit(nx, ny)
@@ -2665,6 +2699,7 @@ class VCCanvas(QWidget):
 
     def undo(self):
         """Letzte Aenderung rueckgaengig (Strg+Z)."""
+        self._auswahl_vor_restore_loesen()
         if not self._undo_stack:
             return
         self._redo_pruefen()
@@ -2675,12 +2710,27 @@ class VCCanvas(QWidget):
 
     def redo(self):
         """Rueckgaengig gemachte Aenderung wiederholen (Strg+Y / Strg+Umschalt+Z)."""
+        self._auswahl_vor_restore_loesen()
         self._redo_pruefen()
         if not self._redo_stack:
             return
         self._undo_stack.append(self.to_dict())
         self._undo_marken.append(self._redo_marken.pop()[1])
         self._restore(self._redo_stack.pop())
+
+    def _auswahl_vor_restore_loesen(self) -> None:
+        """UI-132: Undo/Redo baut alle Widgets neu (``from_dict``). Vorher die
+        Auswahl loesen und ``widget_selected(None)`` melden, damit der
+        Inspector nicht an abgebauten Widgets haengen bleibt. Das geschieht
+        VOR dem Stapel-Umbau: eine offene Panel-Aenderung schliesst der
+        Inspector dabei als eigenen Schritt ab (letztes Apply am noch
+        lebenden Widget) — Strg+Z nimmt dann genau sie zurueck."""
+        if self._restoring:
+            return
+        hatte = bool([w for w in self.alle_widgets() if getattr(w, "_selected", False)])
+        self.auswahl_aufheben()
+        if hatte or self._edit_mode:
+            self._on_widget_selected(None)
 
     def _restore(self, layout: dict):
         # VCB-48: offen/zu ist Laufzeit und steht nicht im Layout. Ein Undo
@@ -2844,7 +2894,7 @@ class VCCanvas(QWidget):
 
     #: Bezeichnungen fuer die Begruendung „nicht fernbedienbar".
     _HANDY_TYPNAMEN = {
-        "VCXYPad": "XY-Pad", "VCLabel": "Beschriftung", "VCSpeedDial": "Tempo-Rad",
+        "VCXYPad": "XY-Pad", "VCRaumPad": "Raum-Pad", "VCLabel": "Beschriftung", "VCSpeedDial": "Tempo-Rad",
         "VCFrame": "Kasten", "VCColor": "Farbwähler", "VCEncoder": "Drehregler",
         "VCColorList": "Chase-Liste", "VCSongInfo": "Musik-Anzeige",
         "VCBpmDisplay": "BPM-Anzeige", "VCBusSelector": "Tempo-Bus-Wahl",
@@ -3284,6 +3334,8 @@ class VCCanvas(QWidget):
         except Exception as e:
             print(f"[VCCanvas] ERROR: Handy-Seiten nicht lesbar: {e}")
             self._handy_seiten = {"version": 1, "seiten": []}
+            # WEB-15: der Nutzer erfaehrt es wie bei uebersprungenen Widgets
+            self._uebersprungen.append(f"Handy-Seiten: {type(e).__name__}")
         self.handy_seiten_changed.emit()
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.

@@ -3,6 +3,10 @@
 Diese Anleitung zeigt, wie eine RGB-/RGBW-Matrix **weich zwischen mehreren Farben
 überblendet**, ohne dass der Tempo-Sync verloren geht.
 
+**Was du danach kannst:** einen Weiß-Rot-Farbverlauf anlegen, per Regler auf der
+virtuellen Konsole (VC) von „weich" bis „harter Wechsel" steuern und optional beim
+Starten und Stoppen weich ein- und ausblenden.
+
 Die Beispielwerte stammen aus einer privaten Show, die nicht im Repository liegt und
 von keinem Generator erzeugt wird. Lege den Effekt wie unten beschrieben selbst an;
 die Zielwerte sind:
@@ -45,7 +49,8 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
 ## 2. Den VC-Regler richtig belegen
 
 1. Öffne die gewünschte VC-Bank und aktiviere **Bearbeiten**.
-2. Rechtsklicke den bisherigen Fade-Regler und öffne **Einstellungen**.
+2. Rechtsklicke den bisherigen Fade-Regler und öffne **Einstellungen...** (am
+   Touchscreen: Finger 0,6 s still auf dem Regler halten, dann erscheint dasselbe Menü).
 3. Verwende diese Werte:
    - **Beschriftung:** `Übergangs-Pause (0 = weich)`
    - **Modus:** `Effekt-Parameter`
@@ -72,6 +77,9 @@ verwendet. Der Start-/Stop-Fade ist davon unabhängig.
   BPM nicht.
 - **SYNC** setzt nur die Phase neu; die Übergangs-Pause und Farbreihenfolge bleiben erhalten.
 - Der An/Aus-Schalter auf einer anderen Bank darf denselben Effekt steuern.
+- Am Touchscreen (Start mit `--touch`) bedient jeder Finger seinen eigenen Regler,
+  du kannst also zwei Regler gleichzeitig ziehen. Abschalten kannst du das unter
+  **Ansicht → Touch-Gesten…**.
 
 ## Start-/Stop-Fade zusätzlich verwenden
 

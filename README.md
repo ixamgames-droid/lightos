@@ -147,7 +147,7 @@ stürzte damit in 6 von 12 Starts ab, und die ARM64-Pakete von PySide6 enthalten
 
 ```bash
 sudo apt-get install -y python3 python3-venv python3-pip \
-    build-essential libasound2-dev libpulse0 fonts-noto fonts-dejavu
+    build-essential libasound2-dev libpulse0 libxcb-cursor0 fonts-noto fonts-dejavu
 
 git clone https://github.com/ixamgames-droid/lightos.git
 cd lightos
@@ -158,7 +158,8 @@ venv/bin/python main.py
 ```
 
 `build-essential` und `libasound2-dev` braucht MIDI (`python-rtmidi` wird gebaut), `libpulse0`
-die BPM-Erkennung aus PC-Audio. Linux-Besonderheiten stehen in
+die BPM-Erkennung aus PC-Audio, `libxcb-cursor0` braucht Qt 6 für das X11-Plugin xcb (fehlt es,
+startet LightOS ohne Fenster mit „Could not load the Qt platform plugin "xcb"“). Linux-Besonderheiten stehen in
 [INSTALL.md](INSTALL.md#linux-x86_64).
 
 ### Systemanforderungen

@@ -17,8 +17,9 @@ In dieser Anleitung lernst du, wie du deine Geräte in der Sektion **Bühne** (2
 
    *Bild zeigt eine ältere Oberfläche: die Sektion links oben hieß damals „Live View“, heute **Bühne**; „Eingabe / Ausgabe“ heißt heute **E/A**.*
 
-4. Schalte oben rechts auf **„3D"** um. Die in der 2D-View platzierten Geräte erscheinen automatisch im 3D-Visualizer. Kamera-Steuerung im 3D:
+4. Schalte oben auf **🧊 3D** um (zurück mit **🗺 2D**). Die in der 2D-View platzierten Geräte erscheinen automatisch im 3D-Visualizer. Kamera-Steuerung im 3D:
    - **1-Finger- / Maus-Drag** = drehen
+   - **2-Finger Pinch/Schwenk** = zoomen und verschieben
    - **Doppel-Tipp auf eine leere Fläche** = Kamera-Reset
 
 ## Hinweis (offen)

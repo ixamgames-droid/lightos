@@ -52,8 +52,17 @@ class RegelTest(unittest.TestCase):
         self.assertIsNone(conftest._offscreen_schriftordner(umgebung, plattform="win32"))
         self.assertEqual(umgebung["QT_QPA_FONTDIR"], "VORGABE")
 
+    def test_offscreen_mit_plattform_argumenten_bekommt_den_schriftordner(self):
+        """QA-118: ``offscreen:configfile=...`` (test_ui122, 250-%-Unterprozess)
+        ist auch offscreen. Vorher blieb der Unterprozess ohne Schrift und
+        mass Text mit Ersatzkaestchen (ein Reiter ragte aus der Leiste)."""
+        umgebung = self._umgebung(QT_QPA_PLATFORM=r"offscreen:configfile=..\x\b.json")
+        ordner = conftest._offscreen_schriftordner(umgebung, plattform="win32")
+        self.assertEqual(ordner, os.path.join(self.windows, "Fonts"))
+        self.assertEqual(umgebung["QT_QPA_FONTDIR"], ordner)
+
     def test_andere_plattform_als_offscreen_bleibt_unberuehrt(self):
-        for qpa in ("windows", "minimal", ""):
+        for qpa in ("windows", "minimal", "", "offscreenx", "windows:fontengine=freetype"):
             with self.subTest(qpa=qpa):
                 umgebung = self._umgebung(QT_QPA_PLATFORM=qpa)
                 self.assertIsNone(conftest._offscreen_schriftordner(umgebung, plattform="win32"))

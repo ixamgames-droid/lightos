@@ -171,17 +171,7 @@ def _aim_dmx(
                 tilt_zero_dmx + t_deg / half_tilt * 128.0)
 
     erster = _dmx(pan_deg, theta_deg)
-    wege = [_dmx(p + 360.0 * k, t)
-            for p, t in ((pan_deg, theta_deg), (pan_deg + 180.0, -theta_deg))
-            for k in (0, -1, 1, -2, 2)]
-    # Bis zu EINEM DMX-Schritt Ueberstand gilt als erreichbar: die Abbildung
-    # hat die Mitte bei 128, der Anschlag „+halber Bereich" liegt rechnerisch bei
-    # 256 (waagerecht bei 180 Grad Tilt). Das wird wie bisher abgeschnitten —
-    # dafuer auf den anderen Weg umzuschlagen waere ein Sprung ueber den ganzen
-    # Bereich fuer einen Fehler von einem Schritt.
-    tol = 1.0 + 1e-9
-    erreichbar = [w for w in wege
-                  if -tol <= w[0] <= 255.0 + tol and -tol <= w[1] <= 255.0 + tol]
+    erreichbar = _erreichbare_wege(_dmx, pan_deg, theta_deg)
     if not erreichbar:
         pan, tilt = erster
     elif aktuell is None:
@@ -195,6 +185,59 @@ def _aim_dmx(
         pan, tilt = min(erreichbar, key=lambda w: (abs(w[0] - ap) * half_pan
                                                    + abs(w[1] - at) * half_tilt))
     return (_clamp(pan, 0.0, 255.0), _clamp(tilt, 0.0, 255.0))
+
+
+#: Bis zu EINEM DMX-Schritt Ueberstand gilt als erreichbar: die Abbildung hat
+#: die Mitte bei 128, der Anschlag „+halber Bereich" liegt rechnerisch bei 256
+#: (waagerecht bei 180 Grad Tilt). Das wird wie bisher abgeschnitten — dafuer
+#: auf den anderen Weg umzuschlagen waere ein Sprung ueber den ganzen Bereich
+#: fuer einen Fehler von einem Schritt.
+_WEG_TOLERANZ = 1.0 + 1e-9
+
+
+def _erreichbare_wege(_dmx, pan_deg, theta_deg):
+    """Alle Wege (Pan, Tilt) zum selben Ziel, die im DMX-Bereich liegen."""
+    wege = [_dmx(p + 360.0 * k, t)
+            for p, t in ((pan_deg, theta_deg), (pan_deg + 180.0, -theta_deg))
+            for k in (0, -1, 1, -2, 2)]
+    tol = _WEG_TOLERANZ
+    return [w for w in wege
+            if -tol <= w[0] <= 255.0 + tol and -tol <= w[1] <= 255.0 + tol]
+
+
+def aim_erreichbar(pos, target, rot_deg=(0.0, 0.0, 0.0),
+                   pan_range_deg: float = 360.0, tilt_range_deg: float = 180.0,
+                   pan_zero_dmx: float = 128.0, tilt_zero_dmx: float = 128.0) -> bool:
+    """Kann der Kopf ``target`` ueberhaupt treffen (UI-127)?
+
+    ``aim_pan_tilt`` schneidet ein unerreichbares Ziel still auf den Anschlag
+    ab (der Strahl zeigt dann daneben, z. B. bei 180 Grad Tilt ein Ziel ueber
+    der Kopfhoehe). Diese Abfrage nimmt exakt dieselbe Rechnung und meldet,
+    ob es mindestens einen Weg im DMX-Bereich gibt — fuer Bedienelemente, die
+    einen solchen Kopf markieren statt ihn still daneben zielen zu lassen."""
+    dx = float(target[0]) - float(pos[0])
+    dy = float(target[1]) - float(pos[1])
+    dz = float(target[2]) - float(pos[2])
+    length = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if length < 1e-9:
+        return True
+    dw = (dx / length, dy / length, dz / length)
+    R = _mount_matrix(rot_deg[0], rot_deg[1], rot_deg[2])
+    lx, ly, lz = _mat_transpose_mul(R, dw)
+    theta = math.acos(_clamp(-ly, -1.0, 1.0))
+    half_pan = max(1.0, pan_range_deg / 2.0)
+    half_tilt = max(1.0, tilt_range_deg / 2.0)
+    tol = _WEG_TOLERANZ
+    if math.sin(theta) < 1e-6:
+        tilt = tilt_zero_dmx + (math.degrees(theta) / half_tilt) * 128.0
+        return -tol <= tilt <= 255.0 + tol
+    pan_deg = math.degrees(math.atan2(-lx, -lz))
+
+    def _dmx(p_deg, t_deg):
+        return (pan_zero_dmx + p_deg / half_pan * 128.0,
+                tilt_zero_dmx + t_deg / half_tilt * 128.0)
+
+    return bool(_erreichbare_wege(_dmx, pan_deg, math.degrees(theta)))
 
 
 # ── Statische Fixtures (PAR etc.): die ganze Montage-Ausrichtung drehen ──────

@@ -186,17 +186,20 @@ glTF-Import ist nicht vorgesehen.
 
 1. **Gerät wählen** — in der Liste (`[X]` = im Raum, `[ ]` = noch nicht platziert) oder
    in der Szene antippen. Mehrere Geräte wählst du in der Liste mit `Strg`/`Umschalt`
-   oder in der Szene mit einem Rahmen.
+   oder in der Szene mit einem Rahmen (mit der Maus; am Finger wählst du mehrere in
+   der Liste). Am Touchscreen zeigt ein Tipp auf ein Gerät kurz dessen Namen und
+   Position.
 2. **Im Raum platzieren** setzt das gewählte Gerät in die Szene; **Entfernen** nimmt
    es wieder heraus. Schneller geht es per **Ziehen**: Gerät aus der Liste in die
    3D-Ansicht ziehen. Ein halbtransparenter Geist zeigt, wo es landet; färbt er sich
    **grün**, dockt es beim Loslassen an die Traverse darunter an. Ziehen wirkt nur im
    Bauen-Modus — im Ansehen-Modus zeigt der Mauszeiger, dass hier nichts abgelegt werden
-   kann.
-3. **Andocken** (Taste `D`): an, rasten Geräte beim Platzieren und Ziehen an Traversen
+   kann. Am Touchscreen setzt **langes Drücken** auf freie Fläche (nur im Bauen-Modus)
+   das Gerät dorthin, so wie der Rechtsklick mit der Maus; auf einer Traverse dockt es an.
+3. **Andocken** (Taste `D`): Ist es an, rasten Geräte beim Platzieren und Ziehen an Traversen
    ein (sie hängen darunter) bzw. stehen oben auf Plattform, Boden, Lautsprecher,
    Publikumsfläche oder DJ-Booth — und wandern mit, wenn du das Element verschiebst.
-   Aus, platzierst du frei auf fester Höhe. Die Statuszeile meldet den Zustand.
+   Ist es aus, platzierst du frei auf fester Höhe. Die Statuszeile meldet den Zustand.
    **Moving Heads hängen kopfüber:** Ist ein Moving Head an eine horizontale Traverse
    angedockt, sitzt sein Sockel oben an der Unterkante der Traverse, Bügel und Kopf
    hängen frei darunter — der Strahl beginnt unter der Traverse, nicht in ihr. Pan und

@@ -4,8 +4,13 @@ Diese Anleitung zeigt die Demo-/Testshow **`shows/Grosse Demo Show 2026.lshow`**
 erklärt Schritt für Schritt, wie du **Bilder/GIFs auf Virtual-Console-Buttons** legst
 (die Funktion steckt im Rechtsklick-Kontextmenü — deshalb ist sie leicht zu übersehen).
 
-Die Show wird reproduzierbar per Generator gebaut:
-`./venv/Scripts/python.exe tools/build_grosse_demo_show_2026.py`
+**Was du danach kannst:** die Demoshow öffnen, die drei Bank-Seiten der Virtual Console
+(kurz **VC**, das ist deine Bedienoberfläche aus Knöpfen und Fadern) durchblättern,
+einem Button ein eigenes Bild oder GIF geben und die Effekte im 3D-Visualizer ansehen.
+
+Die Show wird reproduzierbar per Generator gebaut (Windows:
+`./venv/Scripts/python.exe tools/build_grosse_demo_show_2026.py`, Linux:
+`./venv/bin/python tools/build_grosse_demo_show_2026.py`)
 (validiert + `tools/lint_show.py --strict` = 0 Fehler / 0 Warnungen).
 
 ---
@@ -37,7 +42,9 @@ Nach dem Laden zeigt die **Bühne**-Sektion alle 30 Geräte („30 Geräte im Pa
 ## 2. Virtual Console — 3 Bank-Seiten
 
 Die Effekte sind über **drei Bank-Seiten** verteilt (Umschalten mit den Pfeilen
-`◀ Bank X ▶` oben links). Jeder Effekt-Button trägt eine passende **Galerie-Grafik/GIF**
+**◀** und **▶** links und rechts neben dem Etikett **„Bank 1“** in der Werkzeugleiste der VC;
+ein Antippen des Etiketts öffnet eine Liste, mit der du direkt zu einer Bank springst.
+Am Touchscreen blätterst du auch mit **zwei Fingern waagerecht** über freie Fläche). Jeder Effekt-Button trägt eine passende **Galerie-Grafik/GIF**
 als Hintergrund (VC-IMG).
 
 **Bank 1 — PARs & Farbe:** Rainbow, Chase, ColorFade, Lauflicht, Strobe, Effekte-Stop, Blackout + Master-Fader.
@@ -61,8 +68,8 @@ BPM gilt dessen Takt (im EFX-Editor über **„Tempo ×“** zu ändern).
 Genau **hier** sitzt die Funktion (nicht in einem sichtbaren Feld, sondern im
 Kontextmenü):
 
-1. Oben links **Bearbeiten** einschalten (Bearbeiten-Modus).
-2. **Rechtsklick** auf den gewünschten VC-Button.
+1. In der VC-Werkzeugleiste **Bearbeiten** einschalten (der Knopf zeigt dann **„Bearbeiten ✓“**).
+2. **Rechtsklick** auf den gewünschten VC-Button. (Am Touchscreen: den Button **lange drücken**.)
 3. Im Kontextmenü unten **„Hintergrundbild wählen…"** wählen (darunter „Hintergrundbild entfernen" zum Löschen).
 
 ![Rechtsklick-Kontextmenü eines Buttons mit „Hintergrundbild wählen…"](img/05_button_bild_kontextmenu.png)
@@ -73,6 +80,14 @@ Kontextmenü):
 5. Für ein **eigenes Bild** unten links **„Eigene Datei…"** wählen (PNG/JPG/**GIF**).
 
 ![Galerie „Button-Grafik wählen" mit fertigen Grafiken und „Eigene Datei…"](img/06_button_bild_galerie.png)
+
+> **Mehrere Elemente auf einmal:** Im Bearbeiten-Modus wählst du mehrere VC-Elemente mit
+> **Strg-** oder **Umschalt-Klick** oder mit einem Rahmen, den du auf freier Fläche aufziehst.
+> Mit `--touch` gibt es zusätzlich den Knopf **Mehrfach**: eingeschaltet nimmt jeder Tipp
+> ein Element dazu oder heraus. Die Auswahl verschiebst du gemeinsam; im **Inspector**
+> (Knopf **⚙ Inspector**) legst du unter **Mehrfachauswahl** die **Bank** für alle fest. Ein Hintergrundbild setzt du weiter einzeln.
+> Welche Finger-Gesten aktiv sind, stellst du unter **Ansicht → Touch-Gesten…** ein;
+> LightOS startest du für Tablets mit `--touch` (größere Knöpfe).
 
 > **Gut zu wissen:**
 > - Es gehen **statische Bilder UND animierte GIFs** (rein kosmetisch, kein DMX; der Text bleibt sichtbar).
@@ -85,7 +100,7 @@ Kontextmenü):
 
 ## 4. Effekte im 3D-Visualizer
 
-Effekt-Button antippen (Bearbeiten-Modus **aus**), Master hochziehen — der laufende
+Effekt-Button antippen (**Bearbeiten** aus), Master hochziehen — der laufende
 Effekt steht in der Statuszeile („Aktiver Effekt: …"). Über **Visualizer → 3D Visualizer öffnen**
 zeigt der 3D-Raum das ganze Rig live: weiße MH-Beams, regenbogenfarbene PAR-Bodenpools
 (PAR Rainbow), Spider, Laser & Nebel:

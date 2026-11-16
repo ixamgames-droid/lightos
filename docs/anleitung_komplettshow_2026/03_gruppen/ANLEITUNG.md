@@ -6,13 +6,13 @@ In dieser Anleitung lernst du, wie du in LightOS aus deinen Fixtures drei Gruppe
 
 1. Öffne die **Bühne**.
 
-2. Ziehe auf einer leeren Bühnenfläche einen Rahmen um die 8 PAR. Das Aufziehen eines Rahmens ist eine Mehrfachauswahl. Oben erscheint die Meldung **"Selektion: 8 Fixtures"**.
+2. Ziehe auf einer leeren Bühnenfläche einen Rahmen um die 8 PAR. Das Aufziehen eines Rahmens ist eine Mehrfachauswahl. (Am Touch-Bildschirm schaltest du oben **☑ Mehrfachauswahl** ein und tippst dann die Geräte nacheinander an — kein Shift nötig.) Oben erscheint die Meldung **"Selektion: 8 Fixtures"**.
 
 ![In der Bühne ein Auswahl-Rahmen um die 8 PAR, Anzeige "Selektion: 8 Fixtures"](img/01_par_auswahl_rahmen.png)
 
 3. Klicke auf den Button **"＋ Gruppe aus Auswahl"**, vergib den Namen **"PAR"** und bestätige mit **OK**.
 
-4. Leere die Auswahl. Für die Moving Heads wechselst du in den **Fixtures-Tab**, klickst **MH 1** an und fügst **MH 2** mit **Strg-Klick** hinzu. Klicke dann auf **"＋ Gruppe aus Auswahl"** und vergib den Namen **"MH"**.
+4. Leere die Auswahl mit **Auswahl leeren**. Für die Moving Heads wechselst du in den **Fixtures-Tab**, klickst **MH 1** an und fügst **MH 2** mit **Strg-Klick** hinzu. Klicke dann auf **"＋ Gruppe aus Auswahl"** und vergib den Namen **"MH"**.
 
 5. Gehe genauso für **Spider 1** und **Spider 2** vor und erstelle daraus die Gruppe **"Spider"**.
 

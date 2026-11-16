@@ -1,5 +1,7 @@
 # Anleitung: Virtual Console live bearbeiten (Workflow verifiziert)
 
+> **Was du danach kannst:** Die Virtual Console live umbauen.
+>
 > **Lernziel:** Wie man die Virtual Console (VC) **live** anpasst — bestehende Elemente
 > löschen, neue Elemente hinzufügen, einen **Effekt an einen Aus-/Anschalter** binden,
 > **Geschwindigkeit** und **Submaster** steuern, **mehrere Effekte auf dieselbe BPM**
@@ -33,6 +35,23 @@ lassen sich auswählen / verschieben / per Rechtsklick bearbeiten.
 > Nicht verwechseln: Der Eintrag **„🎹 MIDI Teach..."** (mit Tastatur-Emoji) ist eine
 > **separate Kontextmenü-Funktion** (Rechtsklick auf ein Widget) und öffnet erst dann
 > den eigentlichen Teach-Dialog mit APC-mini-Abbild.
+
+---
+
+## 0b. Am Touchscreen und mit mehreren Elementen
+
+- **Touch:** Mit dem Startschalter `--touch` (oder in einer Show für Tablets) werden die
+  Knöpfe größer. Wo du mit der Maus rechtsklickst, genügt am Finger **langes Drücken**
+  (öffnet das Kontextmenü). Welche Gesten gelten, schaltest du unter
+  **Ansicht → Touch-Gesten…** ein oder aus.
+- **Mehrere Elemente wählen:** Mit **Strg**- oder **Umschalt-Klick**, oder einen Rahmen auf
+  freier Fläche aufziehen. Am Finger schaltest du in der Leiste **„Mehrfach"** ein
+  (nur im Touch-Modus sichtbar): Jeder Tipp nimmt ein Element dazu oder heraus.
+  Gewählte Elemente zusammen ziehen verschiebt alle. Ab zwei Elementen richtet
+  **„Ausrichten ▾"** sie aus, verteilt sie gleichmäßig oder löscht sie gemeinsam.
+- **Aufs Handy legen:** Rechtsklick auf ein Widget → **„📱 Auf Handy-Konsole legen"**
+  legt eine Verknüpfung auf die Handy-Seite (siehe
+  [Web-Remote-Anleitung](../anleitung_web_remote/ANLEITUNG.md)).
 
 ---
 
