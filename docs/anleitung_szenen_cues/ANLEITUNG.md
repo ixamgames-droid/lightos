@@ -264,7 +264,9 @@ Sektion **Virtual Console**, **Bearbeiten** einschalten und in der Werkzeugleist
 **Cueliste-Einstellungen** mit **Beschriftung:** und **Executor-Slot:**. Danach
 **Bearbeiten** wieder ausschalten.
 
-1. **Die Cueliste** zeigt die Cues des gewählten Executors, die aktive Cue ist markiert.
+1. **Die Cueliste** zeigt die Cues des gewählten Executors. Die laufende Cue ist blau
+   hinterlegt und fett. Antippen oder Wischen wählt nichts aus; ein Doppelklick bzw.
+   Doppeltipp auf eine Cue springt nach einer Rückfrage dorthin.
 2. **GO ►** löst die nächste Cue aus, **◄◄** geht zurück, **■** stoppt.
 
 **Achtung beim Zählen:** Der **Executor-Slot** zählt ab **0**. Slot 0 ist der Executor,
