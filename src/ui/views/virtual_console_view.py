@@ -118,6 +118,32 @@ class SnapshotSidebar(QWidget):
 #  VirtualConsoleView
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _alle_loeschen_box(parent, anzahl: int) -> QMessageBox:
+    """UI-137: Rueckfrage vor „Alle löschen“ — Vorgabe und Escape „Abbrechen“,
+    im Touch-Modus Knoepfe >= 44 px hoch. Nicht ausgefuehrt (fuer Tests)."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Alle löschen")
+    box.setText(f"Alle {anzahl} Elemente der Virtuellen Konsole löschen?")
+    box.setInformativeText("Mit Strg+Z lässt sich das rückgängig machen.")
+    loeschen = box.addButton("Löschen", QMessageBox.ButtonRole.DestructiveRole)
+    abbrechen = box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+    if touch_aktiv():
+        for k in (loeschen, abbrechen):
+            k.setMinimumHeight(44)
+    box.setDefaultButton(abbrechen)
+    box.setEscapeButton(abbrechen)
+    box._ui137_loeschen = loeschen
+    return box
+
+
+def _frage_alle_loeschen(parent, anzahl: int) -> bool:
+    """True nur, wenn ausdruecklich „Löschen“ gewaehlt wurde."""
+    box = _alle_loeschen_box(parent, anzahl)
+    box.exec()
+    return box.clickedButton() is box._ui137_loeschen
+
+
 class VirtualConsoleView(QWidget):
     """Full Virtual Console tab: Toolbar + Canvas + Snapshot-Sidebar."""
 
@@ -464,9 +490,12 @@ class VirtualConsoleView(QWidget):
         btn_clear.setFixedHeight(self._tb_hoehe())
         btn_clear.setStyleSheet("""
             QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;
-                          border-radius:3px; font-size:10px; padding:0 8px; }
+                          border-radius:3px; font-size:10px; padding:0 8px;
+                          margin:0 10px; }
             QPushButton:hover { background:#30363d; }
         """)
+        # UI-137: „margin:0 10px“ setzt den Knopf von den Nachbarn ab (die
+        # FlowLayout-Leiste kennt kein addSpacing); verschwindet mit ihm.
         btn_clear.clicked.connect(self._clear_all)
         btn_clear.setProperty("edit_only", True)
         btn_clear.setVisible(False)
@@ -1300,8 +1329,22 @@ class VirtualConsoleView(QWidget):
             self._canvas.redo()
 
     def _clear_all(self):
-        if self._edit_mode:
-            self._canvas._clear()
+        """„Alle löschen“ (Bearbeiten-Leiste). UI-137: erst Rueckfrage, dann
+        ein Rueckgaengig-Stand (Strg+Z holt alles zurueck). ``_clear`` selbst
+        bleibt ohne Undo — es wird auch vom Laden/Undo benutzt."""
+        if not self._edit_mode:
+            return
+        from src.ui.virtualconsole.vc_widget import VCWidget
+        canvas = self._canvas
+        anzahl = len(canvas.findChildren(
+            VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly))
+        if anzahl == 0:
+            return
+        if not _frage_alle_loeschen(self if isinstance(self, QWidget) else None,
+                                    anzahl):
+            return
+        canvas._push_undo()
+        canvas._clear()
 
     # ── WEB-10: Handy-Konsole ────────────────────────────────────────────────
 

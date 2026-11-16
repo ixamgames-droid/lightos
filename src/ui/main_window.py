@@ -859,7 +859,8 @@ class MainWindow(QMainWindow):
                 "margin: 0 -15px; border-radius: 18px; }\n"
                 "QSlider#gmSlider { min-height: 32px; max-height: 32px; }\n"
                 # UI-120 (A-04): TAP so hoch wie STOP ALL/BLACKOUT (44 px statt 52)
-                "QPushButton#tapBtn { padding-top: 2px; padding-bottom: 2px; }\n"
+                # UI-137: links/rechts 6 px statt 14 px — sonst „TAF“
+                "QPushButton#tapBtn { padding: 2px 6px; }\n"
                 # UI-120: Sektionsknoepfe fuellen die 54 px hohe Leiste (52 px
                 # Trefferflaeche, die gelbe Linie bleibt am unteren Rand).
                 "QPushButton#sectionBtn { min-height: 50px; max-height: 50px; }\n"
@@ -1305,7 +1306,10 @@ class MainWindow(QMainWindow):
         # UI-120: mit --touch 44 px wie STOP ALL (vorher 52 px, unten abgeschnitten)
         self._btn_tap.setFixedHeight(
             self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False) else 26)
-        self._btn_tap.setFixedWidth(48)
+        # UI-137: Breite aus Schrift + Polsterung ableiten (Theme/Touch-QSS
+        # liegen schon an). Fest 48 px schnitt „TAP“ im Touch-Modus ab.
+        self._btn_tap.ensurePolished()
+        self._btn_tap.setFixedWidth(max(48, self._btn_tap.sizeHint().width()))
         self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 4× im Takt = Tempo setzen")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
@@ -1460,6 +1464,7 @@ class MainWindow(QMainWindow):
         # UI-120 (A-17): unten in der Leiste — Abstand zum LASER NOT-AUS darueber
         bar_layout.addWidget(btn_stop, 0, Qt.AlignmentFlag.AlignBottom)
         self._btn_stop_all = btn_stop
+        bar_layout.addSpacing(8)     # UI-137: STOP ALL und BLACKOUT getrennt
 
         btn_blackout = QPushButton("BLACKOUT")
         btn_blackout.setObjectName("blackoutBtn")
