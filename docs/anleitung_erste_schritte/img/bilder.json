@@ -1,7 +1,7 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "fc00172022f9d95fa4d1e5ec3fcb51cb"
+      "md5": "d60af75dbee929bc29b6a15cfe8e1555"
     },
     {
       "datei": "02_sektionen.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "eceb16bfeabd0f3d17ea9a7ec5eca41d"
+      "md5": "bbcd8f3f05cdc62c6995f019b92c7331"
     },
     {
       "datei": "03_datei_neu.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "a871544f6785f10367c4900d6b8003d4"
+      "md5": "71a527599ba0b29b1ffa2239ae06ff08"
     },
     {
       "datei": "04_rueckfrage.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "8e11618451ea63ee1129edcea17cbab6"
+      "md5": "3fcc5ed72137120e2c5605343e81c63f"
     },
     {
       "datei": "05_patch_leer.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "7e5940cd2d284f9c8609e108db73a242"
+      "md5": "1338eb2523505d901e5bd34795785d1f"
     },
     {
       "datei": "06_geraet_waehlen.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "a012b1774934c4a8cea9a69e71bf60f1"
+      "md5": "e4ea28e53cf9a631aad4959828ca486a"
     },
     {
       "datei": "07_patch_ein_geraet.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "608b7e76868f6fd97566b2b10baa3a9a"
+      "md5": "0ba735a380b7edad4326f6d010be69d7"
     },
     {
       "datei": "08_programmer.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "7c91afc5efae62b5ca236480665f3724"
+      "md5": "3f96a7625ca287471d5f0755a7ccb1dd"
     },
     {
       "datei": "09_programmer_farbe.png",
@@ -103,7 +103,7 @@
         900
       ],
       "marken": [],
-      "md5": "fa3dc73c3c97445c052ad943750f5f60"
+      "md5": "697f8666612c9de3fb81bd0144f64b96"
     },
     {
       "datei": "10_datei_speichern.png",
@@ -114,7 +114,7 @@
         900
       ],
       "marken": [],
-      "md5": "217810393c1781c4e6236625d16bafe0"
+      "md5": "590414b0a751f33eccaf806ed1315fb7"
     },
     {
       "datei": "11_beenden.png",
@@ -125,7 +125,7 @@
         900
       ],
       "marken": [],
-      "md5": "f4d660453a5050cf2f31faf8eb76f1ab"
+      "md5": "1e55563af05ecac3050833db75c8ad4b"
     },
     {
       "datei": "12_buehne_namen.png",
@@ -136,7 +136,7 @@
         900
       ],
       "marken": [],
-      "md5": "4523bd1784c3c23cc8888410a7e47dc8"
+      "md5": "b74f6bd32100ade8f09870155b462917"
     },
     {
       "datei": "13_buehne_auswahl.png",
@@ -147,7 +147,7 @@
         900
       ],
       "marken": [],
-      "md5": "6b5f92b789c5a3558a441914a8ad042c"
+      "md5": "a6555e8756ffb6fb320036f18bbcf877"
     },
     {
       "datei": "14_buehne_gm_blackout.gif",
@@ -165,7 +165,7 @@
         [],
         []
       ],
-      "md5": "b278a42e3bb61a566365e1883f0bf703",
+      "md5": "9bcbaaaafc96e9ac9641ea2a79408557",
       "frames": 6,
       "dauern_ms": [
         1600,

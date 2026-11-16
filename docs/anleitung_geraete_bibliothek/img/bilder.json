@@ -1,7 +1,7 @@
 {
   "anleitung": "geraete_bibliothek",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "58884624",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py geraete_bibliothek'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "3165afb32fc2d2651ed3e9f0f69ce96d"
+      "md5": "09365ebe10cddee4ca32b7897fcfd36b"
     },
     {
       "datei": "02_menue_datenbank.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "799e9001292b45fbd3dc52c5f8c473bb"
+      "md5": "e8a7d40be78e3c6b462115304d0c96b0"
     },
     {
       "datei": "03_download_dialog.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "47648966c0b09851bc08f9bc6579a906"
+      "md5": "0623b9bced624f97e5cc0597a1d5265e"
     },
     {
       "datei": "04_fixture_editor.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "5824044d7c29b947af041b7a0a2da733"
+      "md5": "d811f723e9bcf779688ca55d565f4d6c"
     },
     {
       "datei": "09_3d_modelle.png",
