@@ -16,6 +16,7 @@ from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from PySide6.QtWidgets import QDialog
+from src.ui import dialog_hilfe
 
 
 COLS = ["#", "Schritt", "Fade In", "In-Kurve",
@@ -355,10 +356,11 @@ class SequenceEditor(QWidget):
         label = "Fade-In" if attr == "fade_in_curve" else "Fade-Out"
         dlg = CurveEditorDialog(cur, title=f"{label}-Kurve – Step {row + 1}",
                                 parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
-            setattr(step, attr, dlg.result_curve)
-            self._refresh_steps()
-            self._tbl.selectRow(row)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+                setattr(step, attr, dlg.result_curve)
+                self._refresh_steps()
+                self._tbl.selectRow(row)
 
     def _format_values(self, vals: dict) -> str:
         parts = []

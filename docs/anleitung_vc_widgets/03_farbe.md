@@ -72,7 +72,7 @@ Die Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/effect_live.p
 
 ## MIDI & Tastatur
 
-Die Farb-Kachel unterstützt **MIDI-Teach** (Rechtsklick im Bearbeiten-Modus → „MIDI Teach…", oder die Felder im Einstellungsdialog). Eine eigene Tastatur-Zuweisung bietet dieses Widget nicht.
+Die Farb-Kachel unterstützt **MIDI Lernen** (Rechtsklick im Bearbeiten-Modus → „MIDI Lernen…", oder die Felder im Einstellungsdialog). Eine eigene Tastatur-Zuweisung bietet dieses Widget nicht.
 
 - **Note (`note_on`):** Drücken des Pads/der Taste (Velocity > 0) wendet die Farbe an; Loslassen setzt nur den optischen Druck-Zustand zurück.
 - **CC (`cc`):** Wert > 63 gilt als „gedrückt" und wendet die Farbe an, Wert ≤ 63 als „losgelassen". Damit lässt sich die Kachel auch über einen Taster-CC schalten.

@@ -59,9 +59,9 @@ Gespeichert wird nur die Bindung (Effekt-IDs, Parameter-Keys, Schrittweite, MIDI
 
 ## MIDI & Tastatur
 
-Der Encoder unterstützt **MIDI-Teach** (nur CC), keine Tasten-Zuweisung.
+Der Encoder unterstützt **MIDI Lernen** (nur CC), keine Tasten-Zuweisung.
 
-- **Zuweisen**: Rechtsklick (im Bearbeiten-Modus) → „MIDI Teach…", dann am Pult den gewünschten CC bewegen. Alternativ CC-Nummer und Kanal direkt im Einstellungs-Dialog eintragen.
+- **Zuweisen**: Rechtsklick (im Bearbeiten-Modus) → „MIDI Lernen…", dann am Pult den gewünschten CC bewegen. Alternativ CC-Nummer und Kanal direkt im Einstellungs-Dialog eintragen.
 - **Relativ** (Standard, für Hardware-Encoder ohne Anschlag): Das Pult sendet Schritte um die Mitte 64 — Werte 1–63 drehen hoch, 65–127 drehen runter, 0/64 = keine Bewegung. Jeder Schritt verstellt um die eingestellte Schrittweite.
 - **Relativ (Mackie)** (MIDI-18, für die V-Pots eines Mackie-Control-Pults wie X-Touch oder MCU): Bit 6 ist die Richtung, der Rest die Schrittzahl — 1–63 drehen hoch, 65–127 drehen um (Wert − 64) Schritte runter. Mit „Relativ“ würde ein langsamer Linksdreh (65) dort einen großen Sprung nach oben machen.
 - **Absolut** (für Potis/Fader): Der CC-Wert 0–127 wird linear auf den Wertebereich des Parameters gelegt — der Encoder springt dann auf die absolute Position.

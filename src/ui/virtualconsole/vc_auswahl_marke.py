@@ -13,8 +13,13 @@ Widget, auch in Kaesten und Pop-up-Feldern:
 * einen kraeftigen Rahmen in der Akzentfarbe (3 px, im Touch-Modus 4 px) mit
   dunkler Kontur aussen und innen — auf hellen und dunklen Widgets sichtbar,
 * eine leichte halbtransparente Toenung,
-* ein Haken-Abzeichen oben links (oben rechts sitzt das Handy-Abzeichen),
-* bei mehreren gewaehlten Widgets einen Zaehler „3 gewählt" an der Auswahl.
+* ein Haken-Abzeichen auf der Ecke oben links — zur Haelfte AUSSERHALB des
+  Widgets (UI-138: innen ueberdeckte es den Textanfang, „fekt-Stop",
+  „LACKOUT"; oben rechts sitzt das Handy-Abzeichen).
+
+Den Zaehler „3 gewählt" malt die Ueberlagerung seit UI-138 nicht mehr: er lag
+unter der Auswahl auf der Nachbartaste („Musik-BPM"). Er steht jetzt fest im
+Knopf „Ausrichten" der Werkzeugleiste (``VirtualConsoleView``).
 
 Nachgefuehrt wird bei jeder Aenderung der Auswahl-Marke (``VCWidget._selected``
 meldet sich selbst), beim Verschieben/Groesse-Aendern der gewaehlten Widgets
@@ -26,7 +31,7 @@ ist sie versteckt und beobachtet nichts: dann kostet sie nichts.
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
 from src.ui.virtualconsole.vc_style import touch_aktiv
@@ -196,18 +201,23 @@ class AuswahlMarke(QWidget):
                 _rahmen(p, r, b + 2, KONTUR)                 # Kontur aussen + innen
                 _rahmen(p, r.adjusted(1, 1, -1, -1), b, AKZENT)
                 self._haken(p, r, b, 22 if touch else 16)
-            if len(self._ws) > 1:
-                self._zaehler(p, rects, len(self._ws), touch)
         finally:
             p.end()
 
     @staticmethod
-    def _haken(p: QPainter, r: QRect, b: int, d: int) -> None:
-        d = min(d, r.width() - 2 * b - 4, r.height() - 2 * b - 4)
+    def haken_kreis(r: QRect, d: int) -> QRectF:
+        """UI-138: Kreis des Haken-Abzeichens — Mittelpunkt auf der Ecke oben
+        links, also zur Haelfte ausserhalb des Widgets. Nur ein Viertel liegt
+        auf dem Widget, und das ist die Rahmen-Ecke, nicht die Beschriftung."""
+        return QRectF(r.x() - d / 2.0, r.y() - d / 2.0, d, d)
+
+    @classmethod
+    def _haken(cls, p: QPainter, r: QRect, b: int, d: int) -> None:
+        d = min(d, r.width() // 2, r.height() // 2)
         if d < 10:
             return
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        kreis = QRectF(r.x() + b + 2, r.y() + b + 2, d, d)
+        kreis = cls.haken_kreis(r, d)
         p.setPen(QPen(KONTUR, 1.5))
         p.setBrush(AKZENT)
         p.drawEllipse(kreis)
@@ -224,52 +234,9 @@ class AuswahlMarke(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
     def zaehler_text(self) -> str:
+        """„3 gewählt" ab zwei Widgets (angezeigt im Knopf „Ausrichten")."""
         n = len(self._ws)
         return f"{n} gewählt" if n > 1 else ""
-
-    def zaehler_lage(self, rects=None, touch=None) -> QRect:
-        """Wo der Zaehler steht: ueber der Auswahl, sonst darunter, sonst innen."""
-        rects = self.rechtecke() if rects is None else rects
-        if not rects:
-            return QRect()
-        touch = touch_aktiv() if touch is None else touch
-        fm = QFontMetrics(self._zaehler_schrift(touch))
-        text = self.zaehler_text()
-        w = fm.horizontalAdvance(text) + 16
-        h = fm.height() + (10 if touch else 6)
-        box = rects[0]
-        for r in rects[1:]:
-            box = box.united(r)
-        x = max(0, min(box.left(), self.width() - w))
-        if box.top() - h - 3 >= 0:
-            y = box.top() - h - 3
-        elif box.bottom() + 3 + h <= self.height():
-            y = box.bottom() + 3
-        else:
-            y = box.top() + 4
-        return QRect(x, y, w, h)
-
-    @staticmethod
-    def _zaehler_schrift(touch: bool) -> QFont:
-        f = QFont()
-        f.setPixelSize(15 if touch else 12)
-        f.setBold(True)
-        return f
-
-    def _zaehler(self, p: QPainter, rects, n: int, touch: bool) -> None:
-        lage = self.zaehler_lage(rects, touch)
-        if lage.isEmpty():
-            return
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.setPen(QPen(AKZENT, 2))
-        hinter = QColor(KONTUR)
-        hinter.setAlpha(235)
-        p.setBrush(hinter)
-        p.drawRoundedRect(QRectF(lage).adjusted(1, 1, -1, -1), 6, 6)
-        p.setFont(self._zaehler_schrift(touch))
-        p.setPen(AKZENT)
-        p.drawText(lage, Qt.AlignmentFlag.AlignCenter, self.zaehler_text())
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
 
 
 def mitte_des_rahmens(r: QRect, b: int | None = None) -> QPointF:

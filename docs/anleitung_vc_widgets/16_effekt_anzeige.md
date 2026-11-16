@@ -54,4 +54,4 @@ Ohne Bindung zeigt die Fläche den Hinweis **„Effekt zuweisen (Drag)"** und es
 - **Grünes Quadrat = läuft:** Fehlt es, läuft der gebundene Effekt nicht. Die Vorschau bewegt sich trotzdem, weil sie einen gestoppten Entwurf selbst weiterdreht — das ist nur eine Vorschau-Animation, nicht der echte Live-Ausgang.
 - **Gepunktete Kästchen:** Grau gepunktete Felder im Raster sind **Lücken im Grid** (nicht belegte Matrix-Zellen), keine „schwarzen" Pixel.
 - **Bank/Sichtbarkeit spart CPU:** Liegt die Kachel auf einer inaktiven Bank oder ist verdeckt, pausiert die Vorschau automatisch. Lege Live-Vorschauen also bedenkenlos an — unsichtbare kosten keine Rechenzeit.
-- **MIDI/Tastatur:** Die Effekt-Anzeige unterstützt **keine** MIDI- oder Tastenzuweisung (sie ist nicht bedienbar). „MIDI Teach…" / „Taste zuweisen…" sind für dieses Element ohne Funktion.
+- **MIDI/Tastatur:** Die Effekt-Anzeige unterstützt **keine** MIDI- oder Tastenzuweisung (sie ist nicht bedienbar). „MIDI Lernen…" / „Taste zuweisen…" sind für dieses Element ohne Funktion.
