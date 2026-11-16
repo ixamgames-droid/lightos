@@ -23,6 +23,7 @@ from PySide6.QtCore import Qt
 
 from src.core.audio.media_player import get_media_player
 from src.ui.views.spectrum_bars import SpectrumBars
+from src.ui import dialog_hilfe
 
 
 def _fmt_time(ms: int) -> str:
@@ -345,12 +346,13 @@ class MusicView(QWidget):
         bb.accepted.connect(dlg.accept)
         bb.rejected.connect(dlg.reject)
         lay.addWidget(bb)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        ids = [lst.item(i).data(Qt.ItemDataRole.UserRole)
-               for i in range(lst.count())
-               if lst.item(i).checkState() == Qt.CheckState.Checked]
-        self._assign_autoshow(row, ids)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            ids = [lst.item(i).data(Qt.ItemDataRole.UserRole)
+                   for i in range(lst.count())
+                   if lst.item(i).checkState() == Qt.CheckState.Checked]
+            self._assign_autoshow(row, ids)
 
     def _assign_autoshow(self, row: int, ids: list[int]):
         """Per-Song-Look einem Lied zuweisen (testbar, ohne Dialog)."""

@@ -31,6 +31,7 @@ from sqlalchemy import select, delete
 from src.core.group_cells import (          # noqa: E402  (nach den Qt-Importen)
     ACHSE_FARBE, ACHSE_WEISS, parse_zelle, zelle_fuer, zelle_gehoert_zu,
 )
+from src.ui import dialog_hilfe
 
 
 def _split_cell(v):
@@ -1563,44 +1564,45 @@ class FixtureGroupView(QWidget):
             patched_labels=labels,
             parent=self,
         )
-        if not dlg.exec():
-            return
-        name = dlg.result_name()
-        if not name:
-            QMessageBox.warning(self, "Bearbeiten", "Der Name darf nicht leer sein.")
-            return
-        pos_json, cols, rows = dlg.result_positions()
-        s = self._session()
-        if s is None:
-            return
-        try:
-            with s:
-                if name != (self._current_group.name or ""):
-                    dup = s.execute(
-                        select(FixtureGroup)
-                        .where(FixtureGroup.name == name)
-                        .where(FixtureGroup.id != self._current_group.id)
-                    ).scalars().first()
-                    if dup is not None:
-                        if QMessageBox.question(
-                            self, "Doppelter Name",
-                            f'Eine Gruppe "{name}" existiert bereits. Trotzdem verwenden?',
-                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        ) != QMessageBox.StandardButton.Yes:
-                            return
-                g = s.get(FixtureGroup, self._current_group.id)
-                if g is None:
-                    return
-                g.name = name
-                g.positions_json = pos_json
-                g.cols = cols
-                g.rows = rows
-                s.commit()
-        except Exception as e:
-            QMessageBox.warning(self, "Fehler", str(e))
-            return
-        self._reload_group_list()
-        self._notify_groups_changed()
+        with dialog_hilfe.offen(dlg):
+            if not dlg.exec():
+                return
+            name = dlg.result_name()
+            if not name:
+                QMessageBox.warning(self, "Bearbeiten", "Der Name darf nicht leer sein.")
+                return
+            pos_json, cols, rows = dlg.result_positions()
+            s = self._session()
+            if s is None:
+                return
+            try:
+                with s:
+                    if name != (self._current_group.name or ""):
+                        dup = s.execute(
+                            select(FixtureGroup)
+                            .where(FixtureGroup.name == name)
+                            .where(FixtureGroup.id != self._current_group.id)
+                        ).scalars().first()
+                        if dup is not None:
+                            if QMessageBox.question(
+                                self, "Doppelter Name",
+                                f'Eine Gruppe "{name}" existiert bereits. Trotzdem verwenden?',
+                                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                            ) != QMessageBox.StandardButton.Yes:
+                                return
+                    g = s.get(FixtureGroup, self._current_group.id)
+                    if g is None:
+                        return
+                    g.name = name
+                    g.positions_json = pos_json
+                    g.cols = cols
+                    g.rows = rows
+                    s.commit()
+            except Exception as e:
+                QMessageBox.warning(self, "Fehler", str(e))
+                return
+            self._reload_group_list()
+            self._notify_groups_changed()
 
     def _delete_group(self):
         if self._current_group is None:
@@ -1695,21 +1697,22 @@ class FixtureGroupView(QWidget):
         bb.accepted.connect(dlg.accept)
         bb.rejected.connect(dlg.reject)
         lay.addWidget(bb)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        # FM-16e: in VISUELLER Reihenfolge (Listen-Zeile) stapeln, nicht in Klick-/
-        # Selektions-Reihenfolge — sonst passt „von oben nach unten" nicht zum Ergebnis.
-        gids = [it.data(Qt.ItemDataRole.UserRole)
-                for it in sorted(lst.selectedItems(), key=lst.row)]
-        if len(gids) < 2:
-            QMessageBox.information(self, "Zusammenlegen",
-                                    "Mindestens zwei Gruppen wählen.")
-            return
-        new_gid = get_state().merge_head_matrix_groups(gids)
-        if new_gid is None:
-            QMessageBox.warning(self, "Zusammenlegen", "Zusammenlegen fehlgeschlagen.")
-            return
-        self._reload_group_list(select_gid=new_gid)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            # FM-16e: in VISUELLER Reihenfolge (Listen-Zeile) stapeln, nicht in Klick-/
+            # Selektions-Reihenfolge — sonst passt „von oben nach unten" nicht zum Ergebnis.
+            gids = [it.data(Qt.ItemDataRole.UserRole)
+                    for it in sorted(lst.selectedItems(), key=lst.row)]
+            if len(gids) < 2:
+                QMessageBox.information(self, "Zusammenlegen",
+                                        "Mindestens zwei Gruppen wählen.")
+                return
+            new_gid = get_state().merge_head_matrix_groups(gids)
+            if new_gid is None:
+                QMessageBox.warning(self, "Zusammenlegen", "Zusammenlegen fehlgeschlagen.")
+                return
+            self._reload_group_list(select_gid=new_gid)
 
     def _notify_groups_changed(self):
         """Zentrale GROUP_CHANGED-Benachrichtigung: Programmer, Live View, Matrix

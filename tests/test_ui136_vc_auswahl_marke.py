@@ -94,9 +94,10 @@ def test_jeder_typ_zeigt_kraeftige_markierung(typ):
     assert _nah(nachher, am.AKZENT), (typ, nachher.name(), vorher.name())
     # dunkle Kontur ganz aussen
     assert _pixel(c, QPoint(r.x(), r.center().y())).lightness() < 60
-    # Haken-Abzeichen oben links: Akzent-Kreis
+    # Haken-Abzeichen auf der Ecke oben links (UI-138: halb ausserhalb, damit
+    # es die Beschriftung nicht verdeckt): Akzent-Kreis ausserhalb der Ecke
     d = 22 if am.touch_aktiv() else 16
-    kreis = QPoint(r.x() + b + 2 + d // 2 + d // 4, r.y() + b + 2 + d // 5)
+    kreis = QPoint(r.x() - d // 4, r.y() - d // 4)
     assert _nah(_pixel(c, kreis), am.AKZENT, 60), typ
     # Toenung: Mitte veraendert sich gegen vorher
     w._selected = False
@@ -130,9 +131,9 @@ def test_mehrfachauswahl_zaehler_und_toolbar():
         ws[t]._selected = True
     m = _warte_marke(c)
     assert m.zaehler_text() == "3 gewählt"
-    lage = m.zaehler_lage()
-    assert not lage.isEmpty()
-    assert _nah(_pixel(c, QPoint(lage.x() + 1, lage.center().y())), am.AKZENT, 70)
+    # UI-138: der Zaehler steht im Knopf „Ausrichten" der Werkzeugleiste,
+    # nicht mehr auf der Flaeche (er lag dort auf der Nachbartaste).
+    assert not hasattr(m, "zaehler_lage")
     ws["VCSlider"]._selected = False
     _warte_marke(c)
     assert m.zaehler_text() == "2 gewählt"

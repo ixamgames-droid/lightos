@@ -195,9 +195,9 @@ Im Editor steuerst du alles, was einen Chase ausmacht:
   Schritt **erfassen**.
 - **Fade In / Hold / Fade Out** pro Schritt – wie schnell ein‑/wie lange gehalten wird.
 - **Nach oben / Nach unten** – **Reihenfolge** ändern.
-- **Run Order** (Loop / PingPong / …) – das **Hin‑und‑Her** ist die Run Order
-  **PingPong**, nicht eine Direction.
-- **Direction** (Forward/Backward) und **Speed** (×‑Faktor).
+- **Ablauf** (Loop / PingPong / …) – das **Hin‑und‑Her** ist der Ablauf
+  **PingPong**, nicht eine Richtung.
+- **Richtung** (Vorwärts/Rückwärts) und **Geschwindigkeit** (×‑Faktor).
 
 Gestartet wandert das Licht über die 4×2‑Matrix:
 

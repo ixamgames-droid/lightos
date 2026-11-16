@@ -65,7 +65,7 @@ When created via Smart-Drop, the stepper is already bound to the dropped effect.
 
 ## MIDI & keyboard
 
-The stepper supports **MIDI teach** (no key teach). You assign a control via right-click → „MIDI Teach…" or enter the CC number and channel directly in the settings dialog.
+The stepper supports **MIDI teach** (no key teach). You assign a control via right-click → „MIDI Lernen…" or enter the CC number and channel directly in the settings dialog.
 
 - **Only control change (CC)** is evaluated, namely as a **relative** encoder:
   - values **1–63** = several steps **up** (`+`), depending on the value,

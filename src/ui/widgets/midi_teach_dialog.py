@@ -166,7 +166,7 @@ class MidiTeachDialog(QDialog):
     _midi_received = Signal(object)
 
     def __init__(self, parent=None, current=None,
-                 accept_kinds=("note", "cc"), title="MIDI Teach"):
+                 accept_kinds=("note", "cc"), title="MIDI Lernen"):
         super().__init__(parent)
         self.setWindowTitle(title)
         self._accept = set(accept_kinds)

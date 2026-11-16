@@ -18,6 +18,7 @@ from PySide6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
     QLineEdit, QDoubleSpinBox, QGroupBox, QFileDialog, QSizePolicy, QComboBox,
+    QScrollArea, QFrame,
 )
 
 from src.ui.ziehen_scrollen import FingerHalten   # UI-115
@@ -232,7 +233,19 @@ class BpmGeneratorView(QWidget):
 
     # ── Aufbau ────────────────────────────────────────────────────────────────
     def _build_ui(self):
-        root = QVBoxLayout(self)
+        # UI-142: Die Seite scrollt. Bei 1280x800 (Touch) blieb ihr weniger
+        # Hoehe als die Mindestgroessen zusammen; Qt drueckte den Plot dann auf
+        # fast null und legte die Beatgrid-Knoepfe in ihn hinein.
+        aussen = QVBoxLayout(self)
+        aussen.setContentsMargins(0, 0, 0, 0)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        inhalt = QWidget()
+        self._scroll.setWidget(inhalt)
+        aussen.addWidget(self._scroll)
+        root = QVBoxLayout(inhalt)
         root.setContentsMargins(14, 12, 14, 12)
         root.setSpacing(12)
 

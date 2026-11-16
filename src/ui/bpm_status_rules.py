@@ -83,6 +83,9 @@ class StatusLine:
     aktion: str | None = None    # None | reconnect | record | range | source
     key: str = ""                # Situation (fuer Hysterese/Tests)
     stabil: bool = False         # True = Stoerung mit Hysterese 2 s an / 3 s aus
+    # UI-142: technische Details (Befehle, Pakete) — die View zeigt sie als Tooltip,
+    # nicht in der Zeile; ``text`` enthaelt sie nicht.
+    details: str = ""
     # Nur bei stabil: die Zeile, die OHNE Stoerungen gaelte (Zustandszeile). Die Hysterese
     # zeigt sie, solange die Stoerung noch nicht 2 s anhaelt (auch beim allerersten Update).
     basis: "StatusLine | None" = field(default=None, compare=False, repr=False)
@@ -220,31 +223,35 @@ def _r_aufnahme(cap, det, m, o, now):
         "Musik so laufen lassen wie im Problemfall", None, key="aufnahme")
 
 
+# UI-142: Ohne Audio hilft fuer die Show sofort nur eine andere Quelle oder TAP —
+# das steht in der Zeile. Was der Techniker reparieren kann, steht im Tooltip.
+AUDIO_FEHLT_PROBLEM = "Kein Audioeingang"
+AUDIO_FEHLT_ABHILFE = "Quelle OS2L oder Lied-Analyse wählen oder TAP nutzen"
+
+
 def _r_audio_fehlt(cap, det, m, o, now):
     if m.kind in AUDIO_KINDS and not m.audio_available:
         if m.audio_grund == "bibliothek":
             # Review BPM-19: Client-Bibliothek fehlt — weder pip noch ein
             # Server-Neustart hilft.
             return StatusLine(
-                "problem", "Audio nicht verfügbar",
-                "Audio-Bibliothek fehlt (libpulse, Paket ist installiert)",
-                "Linux: sudo apt install libpulse0 (INSTALL.md) — danach LightOS neu "
-                "starten; oder OS2L/Lied-Analyse wählen",
-                "source", key="audio_bibliothek")
+                "problem", AUDIO_FEHLT_PROBLEM, "Audio-Bibliothek (libpulse) fehlt",
+                AUDIO_FEHLT_ABHILFE, "source", key="audio_bibliothek",
+                details="Linux: sudo apt install libpulse0 (INSTALL.md) — danach "
+                        "LightOS neu starten.")
         if m.audio_grund == "server":
             # BPM-19: Paket installiert, aber der Audio-Server antwortet nicht —
             # „pip install" waere hier eine falsche Faehrte.
             return StatusLine(
-                "problem", "Audio nicht verfügbar",
-                "Audio-Server nicht erreichbar (Paket ist installiert)",
-                "Linux: läuft PulseAudio/PipeWire? (pactl info) · Windows: Audiodienst "
-                "prüfen — danach LightOS neu starten; oder OS2L/Lied-Analyse wählen",
-                "source", key="audio_server")
+                "problem", AUDIO_FEHLT_PROBLEM, "Audio-Server nicht erreichbar",
+                AUDIO_FEHLT_ABHILFE, "source", key="audio_server",
+                details="Linux: läuft PulseAudio/PipeWire? (pactl info) · Windows: "
+                        "Audiodienst prüfen — danach LightOS neu starten. Die Pakete "
+                        "soundcard/numpy sind installiert.")
         return StatusLine(
-            "problem", "Audio nicht verfügbar",
-            "Paket soundcard oder numpy fehlt",
-            "pip install soundcard numpy (INSTALL.md) — oder OS2L/Lied-Analyse wählen",
-            "source", key="audio_fehlt")
+            "problem", AUDIO_FEHLT_PROBLEM, "Paket soundcard oder numpy fehlt",
+            AUDIO_FEHLT_ABHILFE, "source", key="audio_fehlt",
+            details="pip install soundcard numpy (INSTALL.md) — danach LightOS neu starten.")
     return None
 
 

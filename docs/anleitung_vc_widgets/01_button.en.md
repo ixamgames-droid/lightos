@@ -14,7 +14,7 @@ The VC basics (edit mode, creating widgets, banks, Touch-Lock) are described in 
 
 ## What it looks like & how to use it during operation
 
-The visible element is a rectangular tile with a centered, multi-line **Beschriftung** (label) (in the picture „Effekt an/aus"). Default size 120 × 60 px, dark blue background (`#1a3a5c`), white text. You can change the foreground and background colors via the right-click menu.
+The visible element is a rectangular tile with a centered, multi-line **Beschriftung** (label) (in the picture „Effekt an/aus"). Default size 120 × 60 px, dark blue background (`#1a3a5c`), white text. You can change the foreground and background colors via the right-click menu. If the label does not fit into the button, the font gets smaller (down to 7 pt). A word that is still too long is split with a hyphen. If even that is not enough, the text ends with „…“ and the tooltip shows it in full. The saved text stays unchanged.
 
 Visual indicators on the tile:
 
@@ -43,7 +43,7 @@ How to use it (only during operation, i.e. „Bearbeiten" (edit) OFF):
 - **Long press (approx. 500 ms)** = with the action „Funktion an/aus" or „Effekt-Aktion (Live)" (effect action (live)) and a bound effect, opens the **Live-Mini-Editor** (values are only sent when you click „Anwenden" (apply)). Only active if the option **Long-Press** is set; a short tap cancels the timer. Deliberately not available for „Flash" (it clashes with holding).
 - If **Touch-Lock** is active, the button ignores mouse/touch (display only); MIDI/APC keeps controlling it.
 
-In **edit mode** the left mouse button moves/resizes the button; a double-click opens the settings; a right-click opens the context menu (Einstellungen (settings), MIDI Teach, Taste zuweisen (assign key), Bank, Löschen (delete), Farben (colors)).
+In **edit mode** the left mouse button moves/resizes the button; a double-click opens the settings; a right-click opens the context menu (Einstellungen (settings), MIDI Lernen, Taste zuweisen (assign key), Bank, Löschen (delete), Farben (colors)).
 
 ## Settings
 
@@ -213,7 +213,7 @@ If the bound effect was changed live (fader, effect action, color tile, live-edi
 
 The button supports both MIDI and keyboard assignment (both teach functions return `True`).
 
-**MIDI** (context menu „MIDI Teach…" or the fields in the dialog):
+**MIDI** (context menu „MIDI Lernen…" or the fields in the dialog):
 
 - **Typ** (type) `note_on`: note pressed (`data2 > 0`) = press, note released (`note_off` or `data2 = 0`) = release — so toggle AND flash work exactly as with the mouse.
 - **Typ** `cc`: evaluated absolutely — value > 63 = pressed, otherwise released.

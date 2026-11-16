@@ -65,7 +65,8 @@ def test_fehlende_bibliothek_heisst_bibliothek(fehler):
 def test_bibliothek_meldung_nennt_libpulse_nicht_pip():
     line = status_line(None, None, replace(IN, audio_available=False, audio_grund="bibliothek"),
                        None, 0)
-    text = f"{line.problem} {line.ursache} {line.abhilfe}"
+    # UI-142: die Technik steht in ``details`` (Tooltip), nicht in der Zeile
+    text = f"{line.problem} {line.ursache} {line.abhilfe} {line.details}"
     assert line.key == "audio_bibliothek"
     assert "libpulse0" in text
     assert "pip" not in text
@@ -74,7 +75,8 @@ def test_bibliothek_meldung_nennt_libpulse_nicht_pip():
 # ── Statuszeile: getrennte Meldung + Abhilfe ────────────────────────────────
 
 def _text(line):
-    return f"{line.problem} {line.ursache} {line.abhilfe}"
+    # UI-142: Befehle/Pakete stehen in ``details`` (Tooltip der Statuszeile)
+    return f"{line.problem} {line.ursache} {line.abhilfe} {line.details}"
 
 
 def test_server_nicht_erreichbar_raet_nicht_zu_pip():
@@ -113,4 +115,6 @@ def test_view_zeigt_paket_meldung(env, monkeypatch):
     monkeypatch.setattr(cap_mod, "AUDIO_FEHLT_GRUND", "paket", raising=False)
     v, *_ = make()
     txt = _tick(v, clock, 0.0)
-    assert "pip install soundcard numpy" in txt
+    assert "soundcard oder numpy fehlt" in txt
+    # UI-142: der Befehl steht im Tooltip, nicht in der Zeile
+    assert "pip install soundcard numpy" in v._lbl_problem.toolTip()
