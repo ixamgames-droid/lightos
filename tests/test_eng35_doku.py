@@ -29,7 +29,7 @@ def test_anleitung_nennt_die_bedienelemente_wie_im_code():
     text = _text(ANLEITUNG)
     ansicht = _text(REPO / "src/ui/views/prioritaeten_view.py")
     for wort in ("▲ Stufe höher", "▼ Stufe tiefer", "Auswahl in Stufe",
-                 "● läuft", "Fasst an"):
+                 "● läuft", "Betrifft"):
         assert wort in text, wort
         assert wort in ansicht, f"„{wort}“ steht nicht mehr in der Ansicht"
     assert stufen.SNAP_ZEILE in text
