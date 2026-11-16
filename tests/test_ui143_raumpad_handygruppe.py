@@ -24,7 +24,7 @@ from types import SimpleNamespace as NS
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest                                                        # noqa: E402
-from PySide6.QtCore import QPoint, Qt                                # noqa: E402
+from PySide6.QtCore import QEvent, QPoint, Qt                        # noqa: E402
 from PySide6.QtGui import QFontMetrics                               # noqa: E402
 from PySide6.QtTest import QTest                                     # noqa: E402
 from PySide6.QtWidgets import QApplication, QWidget                  # noqa: E402
@@ -340,3 +340,56 @@ def test_dialog_nicht_breiter(reihe):
     finally:
         dlg.close()
         dlg.deleteLater()
+
+
+# ── Halte-Waechter: Pad im Abbau (einmal im Testlauf zu UI-143 gesehen) ──────
+
+def test_halt_waechter_ueberlebt_pad_im_abbau_und_haengt_sich_ab():
+    """Der Waechter haengt waehrend eines gehaltenen Ziels am Programm. Ist das
+    Pad schon im Abbau (Attribute fehlen -> AttributeError, zerstoert ->
+    RuntimeError), darf sein Filter nicht mit einer Ausnahme enden — und er
+    haengt sich ab, statt bei jedem Fokuswechsel wieder hineinzulaufen."""
+    from PySide6.QtCore import QEvent
+    from src.ui.virtualconsole.vc_raumpad import _HaltWaechter
+
+    app = QApplication.instance() or QApplication([])
+    for fehler in (AttributeError("'VCRaumPad' object has no attribute '_zug'"),
+                   RuntimeError("Internal C++ object already deleted")):
+        rufe = []
+
+        class _TotesPad:
+            def _halten_abbrechen(self, _f=fehler):
+                rufe.append(1)
+                raise _f
+
+            def window(self):
+                return None
+
+        w = _HaltWaechter(_TotesPad())
+        app.installEventFilter(w)
+        try:
+            ev = QEvent(QEvent.Type.ApplicationDeactivate)
+            assert w.eventFilter(app, ev) is False
+            assert rufe == [1]
+            # abgehaengt: ein weiteres Ereignis am Programm erreicht ihn nicht mehr
+            QApplication.sendEvent(app, QEvent(QEvent.Type.ApplicationDeactivate))
+            assert rufe == [1]
+        finally:
+            app.removeEventFilter(w)
+            w.deleteLater()
+
+
+def test_pad_im_abbau_wirft_im_hide_event_nichts(reihe):
+    """Beim Zerstoeren schickt Qt dem Pad noch ein hideEvent, wenn Python seine
+    Attribute schon geleert hat. Das warf AttributeError — mitten im paintEvent
+    eines ANDEREN Pads (dessen Maler blieb offen, danach nativer Absturz beim
+    Aufraeumen; in dieser Datei erst sporadisch, dann bei jedem Lauf)."""
+    from PySide6.QtGui import QHideEvent
+    p = _pad(260, 240)
+    del p._zug                                   # Zustand „im Abbau"
+    try:
+        assert p._halten_abbrechen() is False
+        p.hideEvent(QHideEvent())                # darf nichts werfen
+        p.changeEvent(QEvent(QEvent.Type.ActivationChange))
+    finally:
+        p._zug = None

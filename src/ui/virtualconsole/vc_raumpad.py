@@ -156,8 +156,15 @@ class _HaltWaechter(QObject):
                 self._pad._halten_abbrechen()
             elif t == QEvent.Type.WindowDeactivate and obj is self._pad.window():
                 self._pad._halten_abbrechen()
-        except RuntimeError:
-            pass                                          # Pad schon zerstoert
+        except (RuntimeError, AttributeError):
+            # Pad schon zerstoert (RuntimeError) oder mitten im Abbau — dann
+            # fehlen ihm schon Attribute (AttributeError, einmal im Testlauf
+            # zu UI-143 gesehen). Der Waechter haengt dann noch am Programm
+            # und wuerde bei jedem Fokuswechsel wieder hineinlaufen: abhaengen.
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance()
+            if app is not None:
+                app.removeEventFilter(self)
         return False
 
 
@@ -554,7 +561,15 @@ class VCRaumPad(VCWidget):
         """Ein Druck endet ohne Loslassen (Bankwechsel, Touch-Abbruch, Fokus
         weg, verdeckt): ein nur gehaltenes Ziel freigeben. Rueckgabe: True,
         wenn wirklich etwas freigegeben wurde."""
-        zug, self._zug = self._zug, None
+        try:
+            zug, self._zug = self._zug, None
+        except AttributeError:
+            # Objekt im Abbau: Python hat seine Attribute schon geleert, Qt
+            # schickt beim Zerstoeren aber noch ein hideEvent. Gesehen im
+            # Testlauf zu UI-143 — die Ausnahme landete im gerade laufenden
+            # paintEvent eines ANDEREN Pads (Maler blieb offen, danach
+            # nativer Absturz beim Aufraeumen). Hier ist nichts mehr freizugeben.
+            return False
         self._waechter_aus()
         if self._gehalten(zug) and self.aktiv:
             return self.freigeben()
@@ -680,7 +695,8 @@ class VCRaumPad(VCWidget):
 
     def changeEvent(self, event):
         super().changeEvent(event)
-        if (event.type() == QEvent.Type.ActivationChange and self._zug is not None
+        if (event.type() == QEvent.Type.ActivationChange
+                and getattr(self, "_zug", None) is not None
                 and not self.isActiveWindow()):
             self._halten_abbrechen()
 
