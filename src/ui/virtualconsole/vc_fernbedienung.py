@@ -727,12 +727,30 @@ def _ausschaltbar(widget, frei: set) -> bool:
 _ABSOLUT_AN_SCHLUESSEL = frozenset({"freeze"})
 
 
+_UMSCHALT_FREEZE_SCHLUESSEL = frozenset({"toggle_freeze", "toggleFreeze"})
+
+
 def _absolut_an(widget) -> bool:
-    """CDX-77: ist das eine Taste, die ein Tipp nie ausschaltet?"""
+    """CDX-77: ist das eine Taste, die ein Tipp nie ausschaltet? Dazu zaehlt
+    auch eine „Einfrieren an/aus"-Taste mit mehreren Effekten, von denen nur
+    ein Teil steht: sie leuchtet („einer reicht"), ein Tipp kehrt jeden
+    Effekt einzeln um — danach steht ein anderer, die Taste leuchtet weiter."""
     from .vc_button import ButtonAction
-    return (getattr(widget, "action", None) == ButtonAction.EFFECT_ACTION
-            and getattr(widget, "effect_action_key", None)
-            in _ABSOLUT_AN_SCHLUESSEL)
+    if getattr(widget, "action", None) != ButtonAction.EFFECT_ACTION:
+        return False
+    key = getattr(widget, "effect_action_key", None)
+    if key in _ABSOLUT_AN_SCHLUESSEL:
+        return True
+    if key in _UMSCHALT_FREEZE_SCHLUESSEL:
+        try:
+            from src.core.engine.function_manager import get_function_manager
+            fm = get_function_manager()
+            fids = widget._all_function_ids()
+            return not all(bool(getattr(fm.get(f), "_frozen", False))
+                           for f in fids)
+        except Exception:
+            return True                 # im Zweifel nicht anfassen
+    return False
 
 
 def _druck_wird_abgelehnt(widget) -> bool:

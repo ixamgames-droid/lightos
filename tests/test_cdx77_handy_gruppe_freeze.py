@@ -104,6 +104,21 @@ class HandyGruppeFreezeTest(unittest.TestCase):
         self.assertEqual([self.umschalten.leuchtet(), self.tanz.leuchtet()],
                          [False, True])
 
+    def test_gemischt_gefrorene_umschalt_taste_blockiert_vorher(self):
+        """Nachbesserung: eine „Einfrieren an/aus"-Taste mit ZWEI Effekten,
+        von denen nur einer steht, leuchtet („einer reicht"). Ein Tipp kehrt
+        beide um — sie leuchtet weiter. Die Vorpruefung muss das ablehnen,
+        BEVOR irgendein Effekt umgeschaltet wird."""
+        self.umschalten.function_ids = [self.efx_frieren.id]
+        self._gruppe(self.umschalten, self.tanz)
+        self.efx_toggle._frozen = True
+        self.assertTrue(self.umschalten.leuchtet())
+        r = self._tipp(self.tanz)
+        self.assertEqual(r, {"ok": False, "fehler": vf.GRUPPE_BLOCKIERT})
+        self.assertEqual([self.efx_toggle._frozen, self.efx_frieren._frozen],
+                         [True, False])
+        self.assertFalse(self.fm.is_running(self.efx_tanz.id))
+
     def test_bleibt_eine_taste_unerwartet_an_wird_nicht_ausgeloest(self):
         """Rueckfallnetz: laesst sich eine Taste trotz Vorpruefung nicht
         ausschalten (leuchtet nach dem Ausschalteversuch weiter), wird der
