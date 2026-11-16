@@ -6,7 +6,7 @@
 
 ## Wozu & was es steuert
 
-Die Cue-Liste ist an **einen Executor** (einen Platz in der Executor-Leiste des Playbacks, mit seinem Cuestack) gebunden. Sie zeigt die Cues dieses Slots als Liste und hebt den aktuell laufenden Cue hervor. Mit den drei Transport-Knöpfen am unteren Rand schaltest du im Betrieb durch die Liste — vor, zurück oder Stopp.
+Die Cue-Liste ist an **einen Executor** (einen Platz in der Executor-Leiste des Playbacks, mit seinem Cuestack) gebunden. Sie zeigt die Cues dieses Slots als Liste und hebt den aktuell laufenden Cue hervor. Mit den drei Transport-Knöpfen am unteren Rand schaltest du im Betrieb durch die Liste — vor, zurück oder Stopp; ein Doppeltipp auf eine Zeile springt nach Rückfrage direkt zu dieser Cue.
 
 Das Element spiegelt den Zustand des Slots laufend: Es fragt den Executor etwa **5-mal pro Sekunde** (alle 200 ms) ab, übernimmt Änderungen an der Cue-Liste automatisch und markiert den gerade aktiven Cue. Du steuerst also immer denselben Cuestack, den auch das Playback selbst verwendet — das Widget ist eine Fernbedienung dafür.
 
@@ -25,7 +25,7 @@ Das Element besteht von oben nach unten aus drei Teilen:
 | GO | `GO ►` (hervorgehoben, blau/grün) | Startet bzw. springt zum **nächsten** Cue (sendet `go` an den Executor-Slot). Der Hauptknopf, deutlich abgesetzt. |
 | STOP | `■` | **Stoppt** das Playback des Slots (sendet `stop` an den Executor-Slot). |
 
-**Bedienung:** Im Betrieb (Bearbeiten AUS) wirken Klicks auf die Knöpfe sofort auf den gebundenen Slot. Die Liste selbst dient nur der Anzeige des aktuellen Cues; das Anklicken einer Zeile löst keinen Sprung aus — geschaltet wird ausschließlich über die drei Transport-Knöpfe.
+**Bedienung:** Im Betrieb (Bearbeiten AUS) wirken Klicks auf die Knöpfe sofort auf den gebundenen Slot. Ein einfaches Anklicken oder Antippen einer Zeile löst keinen Sprung aus. Ein **Doppelklick bzw. Doppeltipp** auf eine Zeile springt dagegen direkt zu dieser Cue — vorher fragt LightOS „Live zu dieser Cue springen?“ (vorbelegt ist **Nein**, damit ein versehentlicher Doppeltipp nichts auslöst). Bei aktiver Touch-Sperre geschieht nichts. Sonst wird über die drei Transport-Knöpfe geschaltet.
 
 Ein **Doppeltipp** (Doppelklick) auf eine Cue springt nach einer Rückfrage (Standard „Nein“) live dorthin.
 
