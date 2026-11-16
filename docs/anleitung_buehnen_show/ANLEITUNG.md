@@ -217,10 +217,10 @@ Programmer die X-Bewegung fest und der Chaser bewegt nichts.
 
 Im Reiter **Assistent** auf **+ Chaser**. Es öffnet sich **Bearbeiten: Neuer Chaser**:
 
-![Chaser: Name, Run Order, Tempo-Bus](img_effekte/16_laser_chaser.png)
+![Chaser: Name, Ablauf, Tempo-Bus](img_effekte/16_laser_chaser.png)
 
 1. **Name:** `Mein Laser langsam`
-2. **Run Order:** **Loop**
+2. **Ablauf:** **Loop**
 3. **Tempo-Bus:** **Frei (nicht taktgebunden)**
 
 ![Chaser: Schritte mit Fade In 4 s](img_effekte/17_laser_schritte.png)

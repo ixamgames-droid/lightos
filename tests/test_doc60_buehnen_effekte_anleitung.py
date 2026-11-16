@@ -99,7 +99,7 @@ def test_bedien_namen_stehen_so_im_code():
         "Gleichmäßig verteilt (Fächer)", "Fächer-Streuung:", "Fester Versatz pro Gerät (°)",
         "Versatz pro Gerät:", "Dimmer/Shutter mit öffnen", "Sichtbarkeit:",
         "Programmer → Szene", "Kanäle auswählen", "Name der Szene:", "+ Chaser",
-        "Run Order:", "Fade In", "Hold", "↳ In Chase übernehmen", "Schließen",
+        "Ablauf:", "Fade In", "Hold", "↳ In Chase übernehmen", "Schließen",
         "Funktionen zum Chase hinzufügen", "Bearbeiten", "Hinzufügen",
         "Button Einstellungen", "Beschriftung:", "Aktion:", "Funktion an/aus",
         "+ Funktion/Effekt hinzufügen", "Live-Edit-Slot:", "3D Visualizer öffnen",

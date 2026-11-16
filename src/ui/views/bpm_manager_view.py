@@ -518,6 +518,8 @@ class BpmManagerView(QWidget):
                        (self._lbl_abhilfe, "Was du tun kannst. Unterstrichen = anklicken, "
                                            "LightOS führt es aus.")):
             w.setToolTip(tip)
+        self._status_tipps = [(w, w.toolTip()) for w in (
+            self._lbl_problem, self._lbl_ursache, self._lbl_abhilfe)]
         top.addWidget(self._lbl_problem)
         top.addWidget(self._lbl_ursache, 1)
         lay.addLayout(top)
@@ -1058,6 +1060,10 @@ class BpmManagerView(QWidget):
         else:
             self._lbl_abhilfe.setText("")
             self._lbl_abhilfe.setVisible(False)
+        # UI-142: technische Details (Befehle, Pakete) nur im Tooltip
+        for w, tip in self._status_tipps:
+            w.setToolTip(f"{tip}\n\nTechnische Details: {line.details}" if line.details
+                         else tip)
         self._status_box.setStyleSheet(
             f"QFrame#bpmStatusLine {{ border-left:3px solid {col}; background:#161b22; }}")
 

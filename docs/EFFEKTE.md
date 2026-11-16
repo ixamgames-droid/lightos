@@ -163,9 +163,9 @@ Ein Chaser spielt mehrere **Funktionen** (meist Szenen) der Reihe nach ab.
 3. **+ Hinzufügen** → Funktion(en) als Schritte wählen.
    **Nach oben / Nach unten** ordnet, **Entfernen** löscht.
 4. Pro Schritt in der Tabelle: **Fade In · Hold · Fade Out** (Sekunden).
-5. **Run Order** und **Direction** legen den Durchlauf fest.
+5. **Ablauf** (Loop, PingPong, …) und **Richtung** (Vorwärts/Rückwärts) legen den Durchlauf fest.
 6. **Geschwindigkeit – zwei Modi über „Trigger":**
-   - **Trigger = Timer:** läuft nach den Schrittzeiten; **Speed (x)** regelt das
+   - **Trigger = Timer:** läuft nach den Schrittzeiten; **Geschwindigkeit (x)** regelt das
      Gesamttempo (`0.5x` = halb, `2.0x` = doppelt so schnell).
    - **Trigger = Beat:** läuft **synchron zur globalen BPM**; **Beats/Step** =
      wie viele Beats ein Schritt dauert (1 = jeder Beat, 4 = alle 4 Beats).
@@ -234,7 +234,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 |------|----------|
 | Ein EFX schneller/langsamer | `Geschwindigkeit (Hz)` im EFX-Editor |
 | Eine RGB Matrix schneller/langsamer | `Geschwindigkeit` im Matrix-Editor |
-| Ein Chaser frei schneller/langsamer | Trigger = Timer, **Speed (x)** ziehen |
+| Ein Chaser frei schneller/langsamer | Trigger = Timer, **Geschwindigkeit (x)** ziehen |
 | Effekt **im Takt der Musik** | Chaser Trigger = Beat + **Beats/Step**, dann BPM regeln |
 | Globales Tempo setzen | **TAP** / Klick auf **BPM** / **BPM → Erkennung** |
 | Globale Helligkeit | **GM**-Fader oben |

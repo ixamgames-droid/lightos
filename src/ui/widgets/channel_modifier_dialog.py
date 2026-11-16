@@ -1,4 +1,7 @@
-"""Channel-Modifier Editor: pro Universe/Channel eine Curve zuweisen."""
+"""Channel-Modifier Editor: pro Universum/Kanal eine Kennlinie zuweisen.
+
+UI-142: Beschriftungen deutsch (Kennlinie, Universum, Adresse).
+"""
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QSpinBox, QComboBox, QPushButton, QTableWidget, QTableWidgetItem,
@@ -22,15 +25,15 @@ class ChannelModifierDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         info = QLabel(
-            "Pro DMX-Channel kann eine Curve zugewiesen werden, die beim Output "
-            "angewandt wird. Z.B. Gamma 2.2 für LED-Wahrnehmungs-Helligkeit, "
+            "Pro DMX-Kanal kann eine Kennlinie zugewiesen werden, die bei der "
+            "Ausgabe angewandt wird. Z. B. Gamma 2.2 für LED-Wahrnehmungs-Helligkeit, "
             "Inverse für invertierte Dimmer."
         )
         info.setWordWrap(True)
         layout.addWidget(info)
 
         self._table = QTableWidget(0, 4)
-        self._table.setHorizontalHeaderLabels(["Universe", "Adresse", "Curve", "Name"])
+        self._table.setHorizontalHeaderLabels(["Universum", "Adresse", "Kennlinie", "Name"])
         # Name-Spalte (3) ist editierbar -> Edits sofort zurueck ins Modifier-Objekt
         # schreiben, sonst gingen sie beim Speichern verloren (nur der Manager wird
         # persistiert, nicht der Tabellentext).
@@ -44,23 +47,22 @@ class ChannelModifierDialog(QDialog):
         self._table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         layout.addWidget(self._table, 1)
 
-        # Add-Row
+        # Zeile zum Hinzufuegen
         add_row = QHBoxLayout()
-        add_row.addWidget(QLabel("Add:"))
         self._spin_univ = QSpinBox()
         self._spin_univ.setRange(1, 32)
         self._spin_univ.setValue(1)
-        add_row.addWidget(QLabel("U:"))
+        add_row.addWidget(QLabel("Universum:"))
         add_row.addWidget(self._spin_univ)
         self._spin_addr = QSpinBox()
         self._spin_addr.setRange(1, 512)
         self._spin_addr.setValue(1)
-        add_row.addWidget(QLabel("Adr:"))
+        add_row.addWidget(QLabel("Adresse:"))
         add_row.addWidget(self._spin_addr)
         self._combo_curve = QComboBox()
         for c in CurveType:
             self._combo_curve.addItem(c.value, c)
-        add_row.addWidget(QLabel("Curve:"))
+        add_row.addWidget(QLabel("Kennlinie:"))
         add_row.addWidget(self._combo_curve)
         btn_add = QPushButton("+ Hinzufügen")
         btn_add.clicked.connect(self._add_modifier)

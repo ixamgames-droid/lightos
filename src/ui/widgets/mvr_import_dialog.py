@@ -3,8 +3,11 @@
 Der Dialog rechnet nichts selbst: Lesen macht ``src.core.mvr.lesen``,
 Zuordnen/Pruefen/Anlegen ``src.core.mvr.importieren``. Hier steht nur, was man
 sieht — je Geraet eine Zeile (Name, Ebene, Typ aus der Datei, Profil,
-Adresse, Konflikt, Position, Status), eine Zusammenfassung und
-„Importieren“/„Abbrechen“.
+Adresse, Position, Konflikt, Status), eine Zusammenfassung und
+„Importieren“/„Abbrechen“. UI-142: Status steht neben „Konflikt“ in der
+letzten, mitwachsenden Spalte und bricht um; ueber der Tabelle fuehren
+„Alle Konflikte: überspringen / auf freie Adresse“ und ein Hinweis aus einem
+Adresskonflikt. Vorhandene Geraete werden nie veraendert (kein Ersetzen).
 
 Qt-Fallen wie beim Tabellen-Import (``patch_import_dialog``): Auswahlfelder
 werden EINMAL beim Aufbau erzeugt und nie ersetzt (STAB-38), eine Wahl
@@ -16,7 +19,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QComboBox, QCompleter, QDialog,
@@ -32,8 +35,8 @@ from src.core.mvr.sicher import MvrFehler
 TITEL = "MVR-Datei importieren"
 DATEI_FILTER = "MVR-Dateien (*.mvr);;Alle Dateien (*)"
 
-SPALTEN = ["Name", "Ebene", "Typ (Datei)", "Profil", "Adresse", "Konflikt",
-           "Position (m)", "Status"]
+SPALTEN = ["Name", "Ebene", "Typ (Datei)", "Profil", "Adresse", "Position (m)",
+           "Konflikt", "Status"]
 SPALTEN_TIPP = {
     0: "Name, unter dem das Gerät im Patch angelegt wird.",
     1: "Ebene (Layer) und Gruppe, in der das Gerät in der Datei steht.",
@@ -42,24 +45,22 @@ SPALTEN_TIPP = {
        "und wird mit den Kanälen aus der Datei als eigenes Profil angelegt. "
        "Bei „nicht zugeordnet“ hier ein Profil wählen.",
     4: "Universum.Adresse, auf die das Gerät gepatcht wird.",
-    5: "Belegt die Adresse schon ein Gerät, oder fehlt sie, steht hier, was "
+    5: "Position im 3D in Metern (x, Höhe, z), aus der Datei umgerechnet.",
+    6: "Belegt die Adresse schon ein Gerät, oder fehlt sie, steht hier, was "
        "passieren soll: überspringen oder auf die nächste freie Adresse legen. "
        "Vorhandene Geräte werden nie verändert.",
-    6: "Position im 3D in Metern (x, Höhe, z), aus der Datei umgerechnet.",
     7: "Was mit dem Gerät passiert und warum.",
 }
-S_NAME, S_EBENE, S_TYP, S_PROFIL, S_ADRESSE, S_KONFLIKT, S_POS, S_STATUS = range(8)
+S_NAME, S_EBENE, S_TYP, S_PROFIL, S_ADRESSE, S_POS, S_KONFLIKT, S_STATUS = range(8)
+#: Bis zu so vielen Zeilen passt die Tabelle die Zeilenhoehe an den
+#: umgebrochenen Status an (sonst bleibt der volle Text im Tooltip).
+ZEILEN_ANPASSEN_MAX = 400
 
 NICHT_ANLEGEN = "— nicht zugeordnet —"
 KEIN_KONFLIKT = "—"
 
 _FARBE = {I.ANLEGBAR: "#3fb950", I.OFFEN: "#d29922", I.UEBERSPRUNGEN: "#f85149"}
 
-# UI-143 (B1): die Leitworte des Status (``Eintrag.status_text`` beginnt mit
-# einem davon) — die Spalte ist so breit, dass jedes ganz zu lesen ist.
-STATUS_LEITWORTE = ("wird angelegt", "wird übersprungen", "offen", "Status")
-HINWEIS_ZEILE_ANTIPPEN = ("Zeile antippen: der ganze Status (Grund, Hinweise) "
-                          "steht dann hier.")
 TIPP_IMPORTIEREN = ("Legt alle Geräte an, bei denen „wird angelegt“ steht, und "
                     "setzt ihre Position und Drehung im 3D. Unbekannte Typen "
                     "werden als neue Profile in der Bibliothek angelegt. "
@@ -68,6 +69,15 @@ TIPP_IMPORTIEREN = ("Legt alle Geräte an, bei denen „wird angelegt“ steht, 
 TIPP_IMPORTIEREN_AUS = ("Noch kein Gerät lässt sich anlegen — bei „nicht "
                         "zugeordnet“ ein Profil wählen oder bei Konflikten "
                         "„auf freie Adresse“.")
+HINWEIS_KONFLIKT = ("Kein Gerät wird angelegt: die Adressen aus der Datei sind im "
+                    "Patch schon belegt. „Alle auf freie Adresse“ legt die Geräte "
+                    "auf die nächsten freien Adressen, oder je Zeile unter "
+                    "„Konflikt“ wählen. Vorhandene Geräte bleiben unverändert.")
+TIPP_ALLE_UEBERSPRINGEN = ("Alle Geräte mit Adresskonflikt oder fehlender Adresse "
+                           "werden nicht angelegt.")
+TIPP_ALLE_FREI = ("Alle Geräte mit Adresskonflikt oder fehlender Adresse kommen "
+                  "auf die nächste freie Adresse. Vorhandene Geräte werden nie "
+                  "verändert oder überschrieben.")
 
 
 class _AuswahlOhneRad(QComboBox):
@@ -142,6 +152,25 @@ class MvrImportDialog(QDialog):
             h.setWordWrap(True)
             layout.addWidget(h)
 
+        # UI-142: Sammelwahl fuer alle Konflikte + Hinweis, wenn nichts angelegt wird
+        self.hinweis_konflikt = QLabel(HINWEIS_KONFLIKT)
+        self.hinweis_konflikt.setWordWrap(True)
+        self.hinweis_konflikt.setStyleSheet("color:#d29922;")
+        layout.addWidget(self.hinweis_konflikt)
+        sammel = QHBoxLayout()
+        sammel.addWidget(QLabel("Alle Konflikte:"))
+        self.knopf_alle_ueberspringen = QPushButton("Alle überspringen")
+        self.knopf_alle_ueberspringen.setToolTip(TIPP_ALLE_UEBERSPRINGEN)
+        self.knopf_alle_ueberspringen.clicked.connect(
+            lambda: self._alle_konflikte(I.UEBERSPRINGEN))
+        self.knopf_alle_frei = QPushButton("Alle auf freie Adresse")
+        self.knopf_alle_frei.setToolTip(TIPP_ALLE_FREI)
+        self.knopf_alle_frei.clicked.connect(lambda: self._alle_konflikte(I.FREIE_ADRESSE))
+        sammel.addWidget(self.knopf_alle_ueberspringen)
+        sammel.addWidget(self.knopf_alle_frei)
+        sammel.addStretch(1)
+        layout.addLayout(sammel)
+
         self.tabelle = QTableWidget(len(self.plan.eintraege), len(SPALTEN))
         self.tabelle.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tabelle.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -153,15 +182,12 @@ class MvrImportDialog(QDialog):
         kopfzeile = self.tabelle.horizontalHeader()
         for s in range(len(SPALTEN)):
             kopfzeile.setSectionResizeMode(s, QHeaderView.ResizeMode.Interactive)
-        # UI-143 (B1): frueher standen hier 1100 px feste Breiten, fuer die
-        # letzte Spalte „Status“ blieben bei 1200 px Dialogbreite 64 px —
-        # „wird angele“. Jetzt hat der Status eine eigene Breite, in die sein
-        # Leitwort sicher passt, und „Profil“ nimmt, was uebrig ist (waechst
-        # mit dem Fenster). Breiter als 1200 px darf der Dialog nicht werden
-        # (Full-HD bei 150 % = 1280 px).
-        kopfzeile.setStretchLastSection(False)
-        kopfzeile.setSectionResizeMode(S_PROFIL, QHeaderView.ResizeMode.Stretch)
-        kopfzeile.setMinimumSectionSize(48)
+        kopfzeile.setStretchLastSection(True)      # Status waechst mit
+        self.tabelle.setWordWrap(True)
+        # Zeilenhoehe folgt der Spaltenbreite (Fenster groesser/kleiner,
+        # Spalte gezogen) — sonst stuende der Status in zu hohen oder zu
+        # niedrigen Zeilen.
+        kopfzeile.sectionResized.connect(lambda *_: self._zeilen_anpassen())
         for e in self.plan.eintraege:
             r = e.index
             if e.art in (I.NICHT_ZUGEORDNET, I.GEWAEHLT):
@@ -172,22 +198,11 @@ class MvrImportDialog(QDialog):
             # zeigt das Feld „—“ und ist gesperrt.
             self._konflikt_auswahl[r] = self._baue_konflikt_auswahl(r)
             self.tabelle.setCellWidget(r, S_KONFLIKT, self._konflikt_auswahl[r])
-        for s, breite in ((S_NAME, 150), (S_EBENE, 96), (S_TYP, 190),
-                          (S_ADRESSE, 64), (S_KONFLIKT, 144), (S_POS, 124),
-                          (S_STATUS, self._status_breite())):
+        for s, breite in ((S_NAME, 120), (S_EBENE, 90), (S_TYP, 160),
+                          (S_PROFIL, 220), (S_ADRESSE, 64), (S_POS, 116),
+                          (S_KONFLIKT, 150)):
             self.tabelle.setColumnWidth(s, breite)
         layout.addWidget(self.tabelle, 1)
-
-        # UI-143 (B1): der ganze Statustext (Grund des Ueberspringens, Hinweise)
-        # passt in keine Spalte und stand nur im Tooltip — am Finger nicht
-        # erreichbar. Antippen einer Zeile zeigt ihn hier ausgeschrieben.
-        self.zeilen_hinweis = QLabel(HINWEIS_ZEILE_ANTIPPEN)
-        self.zeilen_hinweis.setWordWrap(True)
-        self.zeilen_hinweis.setTextFormat(Qt.TextFormat.PlainText)
-        self.zeilen_hinweis.setStyleSheet("color: #9aa4af;")
-        layout.addWidget(self.zeilen_hinweis)
-        self._hinweis_zeile = -1
-        self.tabelle.cellClicked.connect(lambda r, _s: self._zeige_zeile(r))
 
         self.zusammenfassung = QLabel()
         self.zusammenfassung.setWordWrap(True)
@@ -245,6 +260,14 @@ class MvrImportDialog(QDialog):
         self.plan = self._rechne()
         self._zeigen()
 
+    def _alle_konflikte(self, wert: str):
+        """Sammelwahl: fuer JEDE Zeile — auch eine, deren Konflikt erst durch
+        die Wahl weiter oben entsteht. Ohne Konflikt wird die Wahl nicht
+        gelesen (``importieren._adressieren``)."""
+        self.konflikt_wahl = {e.index: wert for e in self.plan.eintraege}
+        self.plan = self._rechne()
+        self._zeigen()
+
     def _konflikt_gewaehlt(self, zeile: int, cb: QComboBox):
         wert = cb.currentData()
         if wert:
@@ -265,21 +288,6 @@ class MvrImportDialog(QDialog):
         item.setToolTip(tipp or text)
         if farbe:
             item.setForeground(QColor(farbe))
-
-    def _status_breite(self) -> int:
-        """Breite der Statusspalte: das laengste Leitwort plus Rand (UI-143)."""
-        fm = self.tabelle.fontMetrics()
-        return max(fm.horizontalAdvance(w) for w in STATUS_LEITWORTE) + 28
-
-    def _zeige_zeile(self, r: int):
-        """Voller Statustext der angetippten Zeile unter der Tabelle (UI-143)."""
-        if not 0 <= r < len(self.plan.eintraege):
-            self._hinweis_zeile = -1
-            self.zeilen_hinweis.setText(HINWEIS_ZEILE_ANTIPPEN)
-            return
-        e = self.plan.eintraege[r]
-        self._hinweis_zeile = r
-        self.zeilen_hinweis.setText(f"Zeile {r + 1} · {e.name}: {e.status_text}")
 
     def _zeigen(self):
         for e in self.plan.eintraege:
@@ -305,10 +313,28 @@ class MvrImportDialog(QDialog):
                         f"Drehung {rx:.1f}° / {ry:.1f}° / {rz:.1f}°")
             self._setze(r, S_STATUS, e.status_text, farbe=_FARBE.get(e.status, ""))
         self.zusammenfassung.setText(self.plan.zaehlerzeile() + ".")
-        self._zeige_zeile(self._hinweis_zeile)   # nach einer Wahl neu rechnen
         geht = bool(self.plan.anlegbare())
+        konflikte = [e for e in self.plan.eintraege if e.konflikt]
+        self.knopf_alle_ueberspringen.setEnabled(bool(konflikte))
+        self.knopf_alle_frei.setEnabled(bool(konflikte))
+        self.hinweis_konflikt.setVisible(
+            not geht and any(e.aktion == I.UEBERSPRINGEN for e in konflikte))
         self.knopf_importieren.setEnabled(geht)
         self.knopf_importieren.setToolTip(TIPP_IMPORTIEREN if geht else TIPP_IMPORTIEREN_AUS)
+        self._zeilen_anpassen()
+
+    def _zeilen_anpassen(self):
+        if self.tabelle.rowCount() <= ZEILEN_ANPASSEN_MAX:
+            self.tabelle.resizeRowsToContents()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Die mitwachsende Status-Spalte hat ihre Breite erst nach dem Layout
+        QTimer.singleShot(0, self._zeilen_anpassen)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        QTimer.singleShot(0, self._zeilen_anpassen)
 
     # ── Anwenden ─────────────────────────────────────────────────────────────
 

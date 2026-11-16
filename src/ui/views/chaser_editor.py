@@ -26,6 +26,8 @@ from src.ui import dialog_hilfe
 MODIFY_SCHRITT_HINWEIS = ("Modify-Effekte geben als Chaser-Schritt nichts aus – "
                           "direkt, in einer Sammlung oder der Show-Zeitleiste starten")
 _HINWEIS_GELB = "#e3b341"
+# UI-142: Anzeige deutsch, gespeichert bleibt der Enum-Wert (itemData)
+RICHTUNG_TEXT = {Direction.Forward: "Vorwärts", Direction.Backward: "Rückwärts"}
 
 
 class FunctionSelectorDialog(QDialog):
@@ -128,13 +130,13 @@ class ChaserEditor(QWidget):
         for ro in RunOrder:
             self._combo_order.addItem(ro.value, ro)
         self._combo_order.currentIndexChanged.connect(self._on_props_changed)
-        play_form.addRow("Run Order:", self._combo_order)
+        play_form.addRow("Ablauf:", self._combo_order)
 
         self._combo_dir = QComboBox()
         for d in Direction:
-            self._combo_dir.addItem(d.value, d)
+            self._combo_dir.addItem(RICHTUNG_TEXT.get(d, d.value), d)
         self._combo_dir.currentIndexChanged.connect(self._on_props_changed)
-        play_form.addRow("Direction:", self._combo_dir)
+        play_form.addRow("Richtung:", self._combo_dir)
 
         self._spin_speed = QDoubleSpinBox()
         self._spin_speed.setRange(0.01, 100.0)
@@ -143,7 +145,7 @@ class ChaserEditor(QWidget):
         self._spin_speed.setSuffix("x")
         self._spin_speed.setMinimumWidth(70)
         self._spin_speed.valueChanged.connect(self._on_props_changed)
-        play_form.addRow("Speed:", self._spin_speed)
+        play_form.addRow("Geschwindigkeit:", self._spin_speed)
 
         # Trigger-Modus
         self._combo_trigger = QComboBox()
