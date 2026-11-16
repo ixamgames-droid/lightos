@@ -1169,6 +1169,78 @@ def _waechter_bibliothek_ist_eine_kopie():
     assert not stellen, _waechter_meldung(stellen)
 
 
+# ── QA-118 (d): Tests aendern nie die Registry des Rechners ─────────────────
+#
+# Befund 15.11.2026 (Windows x64): test_ui111/ui112/ui119 rufen
+# ``touch_keyboard.install(app, touch=True)``, und das schrieb ueber
+# ``_enable_tabtip_autoinvoke`` HKCU\Software\Microsoft\TabletTip\1.7
+# EnableDesktopModeAutoInvoke = 1 - in JEDEM vollen Windows-Gate, auf jedem
+# Rechner und in der CI (belegt ueber die Schreibzeit des Schluessels, genau
+# als ui111/ui112 im Gate liefen). ``_show_windows_osk`` startet TabTip/osk
+# bzw. holt ein offenes TabTip nach vorn - ein Fenster auf dem Desktop des
+# Menschen.
+#
+# Zwei Riegel:
+#  1. beide Funktionen sind fuer ALLE Tests Attrappen, die sich den Aufruf nur
+#     merken (``SYSTEM_TASTATUR_AUFRUFE``);
+#  2. jede schreibende winreg-Funktion wirft und wird gemerkt, und nach jedem
+#     Test ist der Test rot, der schreiben wollte - auch wenn der Aufrufer die
+#     Ausnahme schluckt (``_enable_tabtip_autoinvoke`` faengt ``Exception``).
+# Lesen bleibt erlaubt. Beleg: tests/test_qa118_keine_registry.py.
+SYSTEM_TASTATUR_AUFRUFE: list = []
+_REGISTRY_VERSUCHE: list = []
+_REGISTRY_SCHREIBER = ("SetValue", "SetValueEx", "CreateKey", "CreateKeyEx",
+                       "DeleteKey", "DeleteKeyEx", "DeleteValue")
+
+
+def _registry_riegel_einbauen() -> None:
+    try:
+        import winreg
+    except ImportError:                     # Linux/macOS: keine Registry
+        return
+    for name in _REGISTRY_SCHREIBER:
+        echt = getattr(winreg, name, None)
+        if echt is None or getattr(echt, "qa118_riegel", False):
+            continue
+
+        def _gesperrt(*_a, _name=name, **_k):
+            _REGISTRY_VERSUCHE.append(_name)
+            raise PermissionError(
+                f"QA-118: Tests schreiben nicht in die Registry (winreg.{_name})")
+        _gesperrt.qa118_riegel = True
+        setattr(winreg, name, _gesperrt)
+
+
+_registry_riegel_einbauen()
+
+
+def _attrappe(name: str):
+    def _merken(*_a, **_k):
+        SYSTEM_TASTATUR_AUFRUFE.append(name)
+    _merken.qa118_attrappe = True
+    return _merken
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _keine_system_tastatur():
+    """QA-118: ``touch_keyboard`` ruft weder Registry noch TabTip/osk."""
+    from src.ui import touch_keyboard as _tk
+    _tk._enable_tabtip_autoinvoke = _attrappe("registry")
+    _tk._show_windows_osk = _attrappe("system_tastatur")
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _waechter_keine_registry():
+    """QA-118: der Test, der in die Registry schreiben wollte, wird rot."""
+    yield
+    versuche = list(_REGISTRY_VERSUCHE)
+    _REGISTRY_VERSUCHE.clear()
+    assert not versuche, (
+        f"QA-118: dieser Test wollte in die Registry des Rechners schreiben "
+        f"({', '.join(versuche)}) - Tests aendern keine Systemeinstellungen")
+
+
 @pytest.fixture(autouse=True)
 def _reset_sync_subscribers():
     """Verhindert, dass geleakte View-Subscriber des globalen Event-Bus

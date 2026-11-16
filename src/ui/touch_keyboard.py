@@ -272,8 +272,12 @@ def allgemein_touch_qss() -> str:
         # C-11: aufgeklappte Klappliste
         f"QComboBox QAbstractItemView::item {{ min-height: {TABELLEN_ZEILE}px; "
         "padding: 0 10px; }\n"
-        # C-12: Menue-Eintraege (auch Kontextmenues, Langdruck-Menue)
-        "QMenu::item { padding: 14px 32px 14px 16px; }\n"
+        # C-12: Menue-Eintraege (auch Kontextmenues, Langdruck-Menue).
+        # QA-118: nur der Innenabstand reichte unter Windows nicht (Schrift
+        # niedriger: 42 px). min-height zaehlt bei QMenu::item OHNE Innenabstand
+        # - Zeile = 2 x 14 + Inhalt, also Inhalt mindestens 44 - 28.
+        f"QMenu::item {{ padding: 14px 32px 14px 16px; "
+        f"min-height: {TABELLEN_ZEILE - 2 * 14}px; }}\n"
         "QMenu::separator { height: 9px; }\n"
         # A-11: Seitenpfeile an zu vielen Reitern
         f"QTabBar QToolButton {{ min-width: {SEITENPFEIL}px; min-height: {SEITENPFEIL}px; }}\n"
