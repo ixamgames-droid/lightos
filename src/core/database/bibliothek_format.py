@@ -1031,6 +1031,38 @@ def _anlegen(s, daten: dict, source: str):
     return prof
 
 
+class _OhneSession:
+    """Stellvertreter fuer die Session beim Bau des Soll-Profils (QA-122):
+    ``add``/``flush`` tun nichts, die Objekte bleiben transient."""
+
+    def add(self, obj) -> None:
+        pass
+
+    def flush(self) -> None:
+        pass
+
+
+def _soll_profil(daten: dict):
+    """Das Profil, wie ``_anlegen`` es aus ``daten`` baut — aber NUR im
+    Speicher, fuer :func:`_vergleichsform`.
+
+    ★ QA-122: frueher wurde es zur Probe in einem Savepoint angelegt, geflusht
+    und zurueckgerollt — je abgeglichenem Profil alle Modi/Kanaele/Bereiche als
+    INSERT (gemessen ~34 000 Anweisungen fuer die eingebaute Bibliothek). Fuer
+    den Vergleich zaehlen nur die Python-Werte: der Flush schrieb sie, las aber
+    nichts zurueck, und jedes Feld der Vergleichsform wird von
+    ``_kopf_setzen``/``_add_modes``/``_modi_anlegen`` ausdruecklich gesetzt —
+    Spalten-Defaults spielen keine Rolle. Derselbe Codeweg wie beim Anlegen
+    bleibt erhalten; nur die Session ist ein Stellvertreter. Der Hersteller
+    gehoert nicht zur Vergleichsform und wird nicht gesucht (keine Abfrage,
+    kein versehentliches Anlegen)."""
+    from .models import FixtureProfile
+    prof = FixtureProfile(source=SOURCE_LIGHTOS, modes=[])
+    _kopf_setzen(prof, daten)
+    _modi_anlegen(_OhneSession(), prof, daten)
+    return prof
+
+
 def _vergleichsform(prof) -> tuple:
     """Alles, was eine Datei ueber ein Profil sagt — fuer „hat sich etwas geaendert?“."""
     return (prof.name, prof.short_name, prof.fixture_type, int(prof.power_w or 0),
@@ -1138,13 +1170,11 @@ def _abgleichen(s, daten: dict) -> str:
         prof.manufacturer = hersteller
         s.flush()
     ist = _vergleichsform(prof)
-    # Soll ueber DENSELBEN Weg bauen wie das Anlegen (Savepoint, danach
-    # zurueckgerollt) — eine zweite Normalisierung der Datei koennte von
-    # `_add_modes` abweichen (abgeleitete Bereichs-Arten) und dann bei jedem
-    # Lauf „aktualisieren“. Laeuft nur fuer GEAENDERTE Dateien (Stempel).
-    sp = s.begin_nested()
-    soll = _vergleichsform(_anlegen(s, daten, SOURCE_LIGHTOS))
-    sp.rollback()
+    # Soll ueber DENSELBEN Weg bauen wie das Anlegen — eine zweite
+    # Normalisierung der Datei koennte von `_add_modes` abweichen (abgeleitete
+    # Bereichs-Arten) und dann bei jedem Lauf „aktualisieren“. Laeuft nur fuer
+    # GEAENDERTE Dateien (Stempel).
+    soll = _vergleichsform(_soll_profil(daten))
     if soll == ist:
         return "aktualisiert" if umgezogen else "gleich"
     _kopf_setzen(prof, daten)

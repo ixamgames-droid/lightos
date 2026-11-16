@@ -415,16 +415,23 @@ def _add_modes(s, profile, modes_data):
         (mode_name, channels, (grid_rows, grid_cols),
          (white_rows, white_cols)) = _mode_eintrag(eintrag)
         ch_count = len(channels)
+        # QA-122: die Sammlungen leer VORBELEGEN. Ein Kanal ohne Bereiche
+        # bekam sonst nach dem Flush beim ersten Zugriff auf ``.ranges`` je
+        # Kanal ein eigenes SELECT (N+1) — in ``bibliothek_format._abgleichen``
+        # rund 7500 Abfragen je Einspielen. Inhaltlich aendert sich nichts:
+        # ein neues Objekt hat ohnehin keine Kinder in der DB.
         mode = FixtureMode(fixture=profile, name=mode_name, channel_count=ch_count,
                            grid_rows=grid_rows, grid_cols=grid_cols,
-                           white_rows=white_rows, white_cols=white_cols)
+                           white_rows=white_rows, white_cols=white_cols,
+                           channels=[])
         s.add(mode)
         for i, ch_data in enumerate(channels, 1):
             ch_name, attr, default, highlight = ch_data[:4]
             ranges = ch_data[4] if len(ch_data) > 4 else None
             ch = FixtureChannel(
                 mode=mode, channel_number=i, name=ch_name,
-                attribute=attr, default_value=default, highlight_value=highlight
+                attribute=attr, default_value=default, highlight_value=highlight,
+                ranges=[],
             )
             s.add(ch)
             for r in (ranges or ()):

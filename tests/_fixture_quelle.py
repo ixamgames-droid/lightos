@@ -28,7 +28,52 @@ import tempfile
 from sqlalchemy.orm import Session
 
 
-def frische_library(fall):
+def eingespielte_vorlage(fall, *, einspielen: bool = True):
+    """QA-122: EINMAL je Testklasse eine frisch geseedete Library bauen, auf der
+    ``ensure_builtins()`` gelaufen ist (Builtins + eingespielte Dateien aus
+    ``fixtures/bibliothek/`` samt Stempel) — wie ein Rechner nach dem ersten
+    Programmstart. Liefert den Pfad der Datei; ``frische_library(fall,
+    vorlage=pfad)`` gibt dann jedem Test eine eigene KOPIE davon.
+
+    Warum: der erste ``ensure_builtins`` je Library spielt jede Datei neu ein
+    (alle LightOS-Profile anlegen, gemessen 6–9 s). Testklassen, die das in
+    ``setUp`` je Test wiederholten, brauchten dafuer den Grossteil ihrer
+    Laufzeit. Die Kopie haelt die Tests voneinander getrennt.
+
+    ``einspielen=False``: nur geseedet, ohne ``ensure_builtins`` — dieselbe
+    Library wie :func:`frische_library` sie baut, nur einmal statt je Test.
+
+    ``fall`` ist die Testklasse (``setUpClass``, aufgeraeumt ueber
+    ``addClassCleanup``) oder eine Funktion, die das Aufraeumen registriert
+    (z. B. ``unittest.addModuleCleanup``). ``fixture_db._engine`` ist danach
+    wieder der alte."""
+    import contextlib
+    import io
+
+    from src.core.database import fixture_db as FDB
+    from src.core.database.fixture_db import _seed, ensure_builtins, get_engine
+
+    verzeichnis = tempfile.mkdtemp(prefix="lightos_vorlage_")
+    pfad = os.path.join(verzeichnis, "fixtures.db")
+    alt = FDB._engine
+    motor = get_engine(pfad)
+    try:
+        with Session(motor) as s:
+            _seed(s)
+            s.commit()
+        if einspielen:
+            FDB._engine = motor
+            with contextlib.redirect_stdout(io.StringIO()):
+                ensure_builtins()
+    finally:
+        FDB._engine = alt
+        motor.dispose()
+    aufraeumen = fall.addClassCleanup if isinstance(fall, type) else fall
+    aufraeumen(shutil.rmtree, verzeichnis, ignore_errors=True)
+    return pfad
+
+
+def frische_library(fall, vorlage: str | None = None):
     """Engine auf einer frisch geseedeten Library — aus dem QUELLTEXT gebaut.
 
     ``fall`` ist der Testfall: die Klasse (Aufruf aus ``setUpClass``) oder die
@@ -38,16 +83,23 @@ def frische_library(fall):
     Setzt zusaetzlich ``fixture_db._engine`` um, damit auch Code, der sich die
     Engine selbst holt, waehrend des Tests die frische Library sieht — und
     stellt den alten Zustand danach wieder her.
+
+    ``vorlage``: Pfad aus :func:`eingespielte_vorlage` — dann wird statt zu
+    seeden eine Kopie dieser Datei benutzt (QA-122).
     """
     from src.core.database import fixture_db as FDB
     from src.core.database.fixture_db import _seed, get_engine
 
     verzeichnis = tempfile.mkdtemp(prefix="lightos_fixtures_")
     alt = FDB._engine
-    motor = get_engine(os.path.join(verzeichnis, "fixtures.db"))
-    with Session(motor) as s:
-        _seed(s)
-        s.commit()
+    ziel = os.path.join(verzeichnis, "fixtures.db")
+    if vorlage:
+        shutil.copyfile(vorlage, ziel)
+    motor = get_engine(ziel)
+    if not vorlage:
+        with Session(motor) as s:
+            _seed(s)
+            s.commit()
     FDB._engine = motor
 
     def zurueck():
