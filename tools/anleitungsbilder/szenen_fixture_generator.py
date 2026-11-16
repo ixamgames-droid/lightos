@@ -199,6 +199,14 @@ def _dialog_bild(ui, dlg, kreise):
     from PySide6.QtCore import QRect
     from anleitungsbilder import marker
     ui.pump(0.2)
+    # FM-71 (Pruefung): die Hinweisliste rechnet entprellt nach
+    # (HINWEIS_VERZOEGERUNG_MS). Ohne Warten zeigte Bild 03 neben der fertigen
+    # 9-Kanal-Tabelle noch „Modus 'Default': keine Kanäle“ aus Bild 02.
+    timer = getattr(dlg, "_hinweis_timer", None)
+    for _ in range(50):
+        if timer is None or not timer.isActive():
+            break
+        ui.pump(0.05)
     pix = dlg.grab()
     ziele = [(r if isinstance(r, QRect) else rechteck(dlg, r), nr, lage)
              for r, nr, lage in kreise]

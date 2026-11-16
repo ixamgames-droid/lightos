@@ -2417,7 +2417,8 @@ class FixtureGeneratorDialog(QDialog):
     def _eigenes_profil_oeffnen(self):
         """FM-71: ein eigenes Profil (``source='user'``) aus der Fixture-DB
         laden (:func:`model_from_profile` — die Herkunft reist mit, FM-76).
-        Gespeichert wird danach wie immer ein NEUES Profil."""
+        „Speichern“ legt danach ein NEUES Profil an, „Profil aktualisieren“
+        ueberschreibt genau dieses (FM-71)."""
         try:
             profile = eigene_profile()
         except Exception as e:
