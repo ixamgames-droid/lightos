@@ -65,6 +65,10 @@ class VCCueList(VCWidget):
             QListWidget { background: #161b22; color: #e6edf3; font-size: 12px; border: none; }
             QListWidget::item { padding: 3px 2px; }
         """)
+        # UI-144: die Markierung der laufenden Cue (Zeilenfarbe) malt unter dem
+        # App-Stylesheet (``QListWidget::item``) nur ein eigener Delegat.
+        from src.ui.zeilen_hintergrund import hintergrund_sichtbar
+        hintergrund_sichtbar(self._cue_list)
         self._cue_list.itemDoubleClicked.connect(self._on_cue_double)
         self._aktiv_zeile = -1
         self._sig: tuple | None = None   # CDX-72: (Stapel, Nummern+Namen) der Liste
@@ -224,6 +228,7 @@ class VCCueList(VCWidget):
         alt = self._cue_list.item(self._aktiv_zeile) if self._aktiv_zeile >= 0 else None
         if alt is not None:
             alt.setBackground(QColor(0, 0, 0, 0))
+            alt.setData(Qt.ItemDataRole.ForegroundRole, None)
             f = alt.font()
             f.setBold(False)
             alt.setFont(f)
@@ -231,6 +236,7 @@ class VCCueList(VCWidget):
         neu = self._cue_list.item(row) if row >= 0 else None
         if neu is not None:
             neu.setBackground(QColor("#1f6feb"))
+            neu.setForeground(QColor("#ffffff"))
             f = neu.font()
             f.setBold(True)
             neu.setFont(f)

@@ -443,7 +443,9 @@ SZENEN = [
           titel="Snapshots: 48 Schnellzugriff-Slots",
           vorher=_snapshots, nachher=_snapshots_weg,
           marken=[(_slot(1), 1, "gefüllter Slot"),
-                  (_slot(2), 2, "leerer Slot")]),
+                  # Rundum Nachbar-Slots und die Werkzeugleiste: der Kreis
+                  # sitzt in der freien Ecke des Slots selbst.
+                  (_slot(2), 2, "leerer Slot", "innen")]),
     Szene("06_preset_browser", sektion="Programmer", unterreiter="Preset-Browser",
           titel="Preset-Browser: Suche nach „PAR“",
           vorher=_preset_browser, nachher=_preset_zurueck,
@@ -453,7 +455,10 @@ SZENEN = [
     Szene("07_cueliste_neu", sektion="Playback", unterreiter="Playback",
           titel="Neue, leere Cueliste",
           vorher=_neue_cueliste,
-          marken=[("+ Neu", 1, "+ Neu"),
+          # Rund um „+ Neu" ist alles belegt (Page-Leiste, Auswahlfeld,
+          # „Löschen", Knopfreihe darunter): Kreis fest darueber, ueber der
+          # Page-Leiste, Linie durch die Luecke zwischen Page 7 und 8.
+          marken=[("+ Neu", 1, "+ Neu", (2, -68)),
                   ("+ Cue aufnehmen", 2, "+ Cue aufnehmen"),
                   ("⚡ Quick-Rec", 3, "Quick-Rec")]),
     Szene("08_executor", sektion="Playback", unterreiter="Playback",
@@ -467,7 +472,8 @@ SZENEN = [
           marken=[("GO", 1, "GO"),
                   ("◀ BACK", 2, "BACK"),
                   ("■ STOP", 3, "STOP"),
-                  (_aktive_cue, 4, "Aktive Cue")]),
+                  # Links liegt die Cuetabelle dicht an: innen oben rechts.
+                  (_aktive_cue, 4, "Aktive Cue", "innen")]),
     Szene("10_vc_cueliste", sektion="Virtual Console",
           titel="Cueliste in der Virtual Console",
           vorher=_vc_cueliste, nachher=_alles_abraeumen, warte_s=0.8,

@@ -1,7 +1,7 @@
 {
   "anleitung": "vc_widgets",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b0cc8008",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc_widgets'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "7221af2dfe609f1c916b4f12a1f85fd4"
+      "md5": "290df06718c40d2dc636893041c616c7"
     },
     {
       "datei": "02_blackout_tasten.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "d7d0ee422e04ff3091507eb3a78990f2"
+      "md5": "8dc9d9636bf61005d519f9bdfc6a3150"
     },
     {
       "datei": "03_blackout_links_monitor.png",
@@ -37,7 +37,7 @@
         325
       ],
       "marken": [],
-      "md5": "60dc33aac5fa998ec6e5c93097a1fe31"
+      "md5": "0bd2392612bca41360eb08793af51f93"
     },
     {
       "datei": "04_blackout_links_ablauf.gif",
@@ -52,7 +52,7 @@
         [],
         []
       ],
-      "md5": "e9dd8335987eec5f151d3607d4790555",
+      "md5": "d45b08f364d66d5b51f245476dfdaa91",
       "frames": 3,
       "dauern_ms": [
         1400,

@@ -53,6 +53,9 @@ class ColorSequenceEditor(QWidget):
             self._list.setFixedHeight(96)
         else:
             self._list.setMinimumHeight(180)
+        # UI-144: Schrittfarbe auch unter dem App-Stylesheet zeigen.
+        from src.ui.zeilen_hintergrund import hintergrund_sichtbar
+        hintergrund_sichtbar(self._list)
         self._list.setStyleSheet(
             "QListWidget{background:#0d1117;color:#e6edf3;border:1px solid #30363d;"
             "border-radius:3px;font-size:10px;} QListWidget::item:selected{outline:2px solid #1f6feb;}"
