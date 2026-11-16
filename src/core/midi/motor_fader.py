@@ -84,6 +84,12 @@ class MotorFader:
         self._hand_ts = jetzt
         return False
 
+    def hand_gesehen(self, vor_s: float = 0.0) -> None:
+        """Die Hand hat diesen Pult-Fader vor ``vor_s`` Sekunden bewegt — die
+        Eingabe ging aber an einen anderen VC-Fader (Bankwechsel, CDX-72).
+        Danach gilt ``MOTOR_HAND_RUHE_S`` wie nach eigener Eingabe."""
+        self._hand_ts = max(self._hand_ts, self._uhr() - max(0.0, float(vor_s)))
+
     def beruehrung(self, beruehrt: bool) -> bool:
         """Beruehrungssensor. Loslassen traegt sofort nach; ``True`` = dabei
         gesendet."""
