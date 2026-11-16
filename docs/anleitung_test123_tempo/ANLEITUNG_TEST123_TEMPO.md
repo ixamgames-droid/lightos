@@ -1,5 +1,11 @@
 # Test123 Lightshow: drei Geschwindigkeiten aus einer Master-BPM
 
+**Was du danach kannst:** drei Effektgruppen (Farbe, Dimmer, Bewegung) laufen mit
+unterschiedlicher Geschwindigkeit und bleiben trotzdem im selben Takt.
+
+Kurz erklärt: Die **Master-BPM** ist der Haupttakt (Schläge pro Minute). Ein
+**Multiplikator** (Faktor) macht eine Gruppe relativ dazu schneller oder langsamer.
+
 Diese Anleitung richtet die drei Multiplikator-Fenster auf **Bank 4** so ein, dass:
 
 - der **Farbwechsel** eine eigene relative Geschwindigkeit erhält,
@@ -34,11 +40,13 @@ Geschwindigkeit, aber sie laufen noch nicht wirklich phasengenau an der Master-B
 1. **Virtual Console → Bank 4** öffnen.
 2. **Bearbeiten** einschalten.
 3. Rechtsklick auf **Farb wechsel** → **Einstellungen…**.
+   (Am Touchscreen: Finger etwa 0,6 s still halten statt Rechtsklick; ein/aus unter
+   **Ansicht → Touch-Gesten…**.)
 4. Prüfen:
    - **Ziel:** `Effekt ×½/×2 (Multiplier)`
    - **Multiplikator-Modus:** eingeschaltet
    - **Steuert:** `Farb wechsel`
-   - **Faktor-Set:** `¼, ½, 1×, 2×, 4×`
+   - **Faktor-Set (Sub):** `¼, ½, 1×, 2×, 4×`
 
 ![Speed-Dial für den Farbwechsel](img/02_speed_farbe_ziele.png)
 
@@ -107,11 +115,12 @@ Das wird wiederholt für:
 ## 6. Master-BPM und gemeinsame Phase aktivieren
 
 1. Die Sektion **BPM** öffnen, am schnellsten mit **Strg+8**.
-2. Oben die gewünschte Master-BPM festlegen:
+2. Im Reiter **Erkennung** die gewünschte Master-BPM festlegen:
    - automatisch aus Audio,
    - per **TAP**,
    - oder manuell als BPM-Zahl.
-3. Im Panel **Tempo-Speeds & Grand-Master** **Auto-Sync** einschalten.
+3. Zum Reiter **Tempo-Buses** wechseln. Im Panel **Tempo-Speeds & Grand-Master**
+   **Auto-Sync** einschalten.
 4. Einmal **Jetzt synchronisieren** drücken.
 
 ![Auto-Sync und Jetzt synchronisieren](img/06_bpm_auto_sync.png)
@@ -140,7 +149,7 @@ Master-BPM verloren geht.
 ## 8. Welchen Sync-Knopf verwenden?
 
 - **SYNC in einem Multiplikator-Fenster:** synchronisiert nur die Effekte dieses Fensters.
-- **Jetzt synchronisieren im BPM-Tab:** synchronisiert Farbe, Dimmer und Bewegung
+- **Jetzt synchronisieren im Reiter Tempo-Buses:** synchronisiert Farbe, Dimmer und Bewegung
   gemeinsam. Das ist der richtige Knopf, wenn alle drei Gruppen auf demselben Schlag
   neu beginnen sollen.
 - **Auto-Sync:** eingeschaltet lassen, damit später zugeschaltete Effekte automatisch

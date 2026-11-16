@@ -22,6 +22,10 @@ Wechsle in die Sektion **Programmer** und wähle links unter **Gruppen** die Gru
 der Chase laufen soll — hier **„Farb-Matrix (10)"** (8 PAR + 2 Spider).
 Oben erscheint „**10 Gerät(e): …**".
 
+> **Mehrere Gruppen?** Schalte rechts neben dem Suchfeld **＋ Addieren** ein (oder doppelklicke
+> bzw. drücke eine Gruppe lang, dann Kontextmenü). Dann fügt jeder Tipp die Geräte der Gruppe zur
+> Auswahl hinzu, statt sie zu ersetzen. Das geht auch am Touchscreen (Start mit `--touch`).
+
 > **Tipp:** Ein Klick auf die Gruppe springt automatisch in den Tab **Matrix** und
 > übernimmt die Geräte. Du musst den Tab also nicht von Hand öffnen.
 

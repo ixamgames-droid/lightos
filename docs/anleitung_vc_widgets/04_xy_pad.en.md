@@ -41,6 +41,14 @@ How you use the pad during operation depends on the mode. A left-click/drag righ
 - Very finely spaced sample points are thinned out (max. 48 points); a path of fewer than 2 points is discarded.
 - While you draw, the line appears blue and the start point green. Without a path, the pad shows the hint „Bahn zeichnen → MH fährt sie ab" (draw a path → MH follows it).
 
+**Getting rid of an area or path again** (button „✕ Bereich löschen" (clear area) / „✕ Pfad löschen" (clear path)):
+- As soon as an area has been dragged out or a path drawn, a button appears directly **below the pad field**. It also works **during operation** (live) and in kiosk mode; it only triggers when you **release on the button** — releasing next to it cancels.
+- **„Bereich löschen"** removes the marking and resets the target effect's center and size to exactly the values it had **before the first drag**. **„Pfad löschen"** removes the path and restores the previous path or figure (e.g. the figure eight) including center and size.
+- Only the pad's **own changes** are undone: if a fader, the command line or the effect editor has changed e.g. the width in the meantime, that value stays. If another path has been chosen on the effect in the meantime, it stays as well.
+- **Touch-Lock** locks the button like the pad. In **edit mode** it does not trigger (there you move the widget); the same command is then in the **context menu** (right-click or long press).
+- In touch mode the button is at least 44 px high and the pad field becomes slightly smaller for it; with the mouse it is compact and the pad keeps its previous size. If the widget is too small, the button is hidden — then use the context menu.
+- A cleared area stays cleared when saving. After loading a show the pad no longer knows the previous values; „Bereich löschen" then only removes the marking and the effect stays as it is.
+
 > Note: in the VC's **edit mode** the pad does not respond to these gestures — there, dragging moves/resizes the widget. Control only happens with „Bearbeiten" (edit) switched off. If „Touch-Lock" is active, mouse/touch are locked (MIDI keeps working). For the shared basics see the overview (README.en.md).
 
 ## Settings

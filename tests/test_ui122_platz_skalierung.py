@@ -398,6 +398,35 @@ def test_nachtrag_kurzname_statt_p_punkte():
 
 # ── Echte 250 %: Unterprozess mit QT_SCALE_FACTOR ───────────────────────────
 
+def _qpa_pfad(pfad, basis) -> str:
+    """Pfad fuer ``QT_QPA_PLATFORM=offscreen:configfile=<pfad>``.
+
+    QA-118: Qt trennt die Plattform-Argumente am Doppelpunkt. Ein Windows-Pfad
+    mit Laufwerk („C:\\...“) zerfiel dort, und der Unterprozess starb ohne jede
+    Ausgabe (0xC0000409) — gemessen auf Windows x64, jedes Mal. Deshalb relativ
+    zum Arbeitsordner des Unterprozesses."""
+    p = str(pfad)
+    if ":" not in p:
+        return p
+    try:
+        rel = os.path.relpath(p, str(basis))
+    except ValueError:                      # anderes Laufwerk als der Arbeitsordner
+        pytest.skip("Testordner und Repo auf verschiedenen Laufwerken - "
+                    "configfile laesst sich dann nicht ohne Doppelpunkt angeben")
+    if ":" in rel:
+        pytest.skip(f"configfile-Pfad enthaelt einen Doppelpunkt: {rel}")
+    return rel
+
+
+def test_qpa_pfad_ohne_doppelpunkt(tmp_path):
+    """QA-118: der Pfad im Plattform-Argument hat nie einen Doppelpunkt."""
+    p = _qpa_pfad(tmp_path / "bildschirm.json", _WURZEL)
+    assert ":" not in p, p
+    # ... und zeigt, vom Arbeitsordner des Unterprozesses aus, auf dieselbe Datei
+    assert os.path.normcase(os.path.abspath(os.path.join(str(_WURZEL), p))) == \
+        os.path.normcase(str(tmp_path / "bildschirm.json"))
+
+
 @pytest.mark.skipif(_SKALIERT, reason="laeuft schon im Unterprozess")
 def test_bei_echter_skalierung_250_prozent(tmp_path):
     cfg = tmp_path / "bildschirm.json"
@@ -405,7 +434,7 @@ def test_bei_echter_skalierung_250_prozent(tmp_path):
         "name": "S", "x": 0, "y": 0, "width": 1600, "height": 900,
         "logicalDpi": 96, "logicalBaseDpi": 96, "dpr": 1}]}), encoding="utf-8")
     env = dict(os.environ)
-    env.update(QT_QPA_PLATFORM=f"offscreen:configfile={cfg}",
+    env.update(QT_QPA_PLATFORM=f"offscreen:configfile={_qpa_pfad(cfg, _WURZEL)}",
                QT_SCALE_FACTOR="2.5", UI122_SKALIERT="1")
     env.pop("PYTEST_ADDOPTS", None)
     r = subprocess.run(

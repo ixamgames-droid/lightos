@@ -82,7 +82,8 @@ der Fader bewegt werden muss. In der VC-Toolbar als **„🎚 Pickup"** schaltba
 **Kurz:** **Tasten/Pads** → Virtual Console → **MIDI Lernen** an → Button klicken → APC-Pad drücken.
 **Fader** → Rechtsklick → **🎹 MIDI Teach...** → Fader bewegen oder Element im Bild anklicken (bindet **CC**).
 Danach **APC LEDs** an für Rückmeldung. Bindungen werden mit der Show gespeichert. Ohne APC läuft alles
-per Touch/Tastatur weiter.
+per Touch/Tastatur weiter (für Tablets startest du LightOS mit `--touch`: größere Bedienelemente;
+die Finger-Gesten stellst du unter **Ansicht → Touch-Gesten…** ein).
 
 ## 7. MIDI Show Control (MSC) — Cues vom Lichtpult
 

@@ -33,6 +33,6 @@ Anleitung steht für sich und hat ein klares Lernziel.
 - ✅ Patch, Positionen, Gruppen, Color-Looks, PAR-Mix (Farbe×Dimmer), MH-Bewegung+Steuerung,
   Virtuelle Konsole (live getestet) — alle gebaut & gespeichert.
 - ⏳ **Spider-Tilt-Bewegung** (in dieser Show noch nicht als Effekt gebaut) — geht jetzt über eine
-  **EFX im Spider-Modus** (Tilt-Bewegungsmuster wie „Wippe"/„Welle", siehe Anleitung 6),
+  **EFX im Spider-Modus** (Tilt-Bewegungsmuster wie „Wippe"/„Welle", siehe Anleitung 7),
   alternativ per Chaser/Position. Sowie **APC-Mini-Pad-Belegung** (das Drücken der Pads
   beim „MIDI Lernen" erfolgt an der Hardware) — als nächster Schritt vorgesehen.

@@ -6,13 +6,16 @@ Die **Virtuelle Konsole (VC)** von LightOS ist eine frei gestaltbare Bedienoberf
 Du legst Tasten, Fader, Farb-Kacheln, Anzeigen usw. auf eine Fläche und steuerst damit
 deine Show — per Maus/Touch, MIDI-Controller (z. B. APC mini) oder Tastatur.
 
+**Was du danach kannst:** für jedes Bedien-Element nachschlagen, was es tut, wie du es
+einstellst und wie du es im Betrieb bedienst.
+
 Diese Referenz beschreibt **jedes Bedien-Element einzeln**: wozu es da ist, wie es im
 Betrieb aussieht, **welcher Knopf was macht** und welche Einstellungen es hat — jeweils mit
 echten Screenshots aus der App.
 
 ![Übersicht der VC-Widgets](img/uebersicht_alle_widgets.png)
 
-> Diese Übersicht zeigt **alle 19** Widget-Typen, jeweils beschriftet. Sie stammt aus der
+> Diese Übersicht zeigt **19 der 20** Widget-Typen, jeweils beschriftet; das **Raum-Pad** ([24](24_raum_pad.md)) ist noch nicht im Bild. Sie stammt aus der
 > Vorlage-Show `shows/VC_Widgets_Showcase.lshow` (Generator:
 > `tools/build_vc_widgets_showcase.py`). **Tempo-Controller** und **Live-Edit-Panel** stehen
 > unten rechts; beschrieben sind sie in [22](22_tempo_controller.md) und [23](23_live_edit.md).
@@ -26,7 +29,8 @@ Modi um:
 
 - **Bearbeiten ✓** — Elemente **anlegen, verschieben, skalieren, einstellen**. Es
   erscheinen zusätzliche Toolbar-Knöpfe: **ein Knopf je Widget-Typ** (16 Stück),
-  **⊞ Raster**, **Undo/Redo** (`↶ ↷`), **Alle löschen** und **⚙ Inspector**.
+  **⊞ Raster**, **Undo/Redo** (`↶ ↷`), **Ausrichten ▾** (für mehrere gewählte Elemente), am
+  Touchscreen **Mehrfach**, **Alle löschen** und **⚙ Inspector**.
 
   ![Werkzeugleiste im Bearbeiten-Modus](img/toolbar_bearbeiten_modus.png)
 
@@ -90,6 +94,7 @@ Antippen) — **MIDI/APC steuert weiter**.
 | 18 | **Effekt-Editor-Box** (`VCEffectEditor`) | Bewegliche Box: Vorschau + passende Regler eines Effekts | [18_effekt_editor.md](18_effekt_editor.md) |
 | 22 | **Tempo-Controller** (`VCTempoBusController`) | Bus, Quelle, Faktor, Effekt-Zuordnung und Sync auf einer Kachel | [22_tempo_controller.md](22_tempo_controller.md) |
 | 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | Regler-Arbeitsplatz für MEHRERE Effekte, mit Haken-Auswahl | [23_live_edit.md](23_live_edit.md) |
+| 24 | **Raum-Pad** (`VCRaumPad`) | Draufsicht oder aufgeklappter Raum (Boden + Wände): Punkt antippen, alle zugeordneten Moving Heads zielen darauf; AN/AUS und Position Lock | [24_raum_pad.md](24_raum_pad.md) |
 
 ## Große Editoren (aus der VC erreichbar)
 
@@ -102,7 +107,7 @@ Antippen) — **MIDI/APC steuert weiter**.
 
 | Thema | Kurz | Seite |
 |---|---|---|
-| **Smart-Drop & Baukasten** | Effekt einrichten, Widget-Galerie, Konflikt-Karte, Controller-/Color-Chase-Blöcke | [21_baukasten.md](21_baukasten.md) |
+| **Smart-Drop & Baukasten** | Effekt einrichten, Widget-Galerie, Konflikt-Karte (die früheren Baukasten-Blöcke sind entfallen) | [21_baukasten.md](21_baukasten.md) |
 
 ---
 

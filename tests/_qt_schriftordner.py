@@ -156,7 +156,9 @@ def offscreen_schriftordner(umgebung, plattform=sys.platform):
     Gibt den gesetzten Ordner zurueck, sonst None."""
     if not plattform.startswith("win"):
         return None
-    if umgebung.get("QT_QPA_PLATFORM", "").strip().lower() != "offscreen":
+    # QA-118: auch ``offscreen:<argumente>`` (z. B. ``offscreen:configfile=...``)
+    # - Qt trennt den Plattformnamen am ersten Doppelpunkt ab.
+    if umgebung.get("QT_QPA_PLATFORM", "").strip().lower().split(":", 1)[0] != "offscreen":
         return None
     if umgebung.get("QT_QPA_FONTDIR"):
         return None

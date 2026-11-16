@@ -65,6 +65,23 @@ Tastatur: beide betreffen nur Maus und Finger am Pult.
   einzeln einen Haken zu pflegen.
 * :meth:`VCFernbedienung.loslassen` laesst gehaltene Tasten los, OHNE auf den
   UI-Thread zu warten — der Weg fuer „Verbindung zum Handy abgerissen".
+
+**WEB-14: Einzel-Auswahl am Handy**
+
+* ``beschreibe`` meldet je Taste ``einzel`` — Kennung und Titel des Rahmens mit
+  Einzel-Auswahl (Solo-Frame), in dem sie direkt liegt. Das Handy zeichnet
+  diese Kacheln als Gruppe; die Regel selbst greift im Rahmen (Klick-Weg).
+* Eigene Handy-Gruppen (``handy_seiten.GRUPPEN``): ein Druck vom Handy, der
+  eine Gruppen-Taste EINSCHALTET, schaltet vorher die anderen aktiven Tasten
+  der Gruppe aus — Funktions- und Snap-Tasten wie der Solo-Rahmen am Pult
+  (``deactivate_for_solo``), alle anderen per Tipp ueber :func:`ausfuehren`
+  mit den Regeln eines Handy-Drucks (Freigabe, Laser-Sperre, Blackout). Laesst sich
+  eine aktive Taste so nicht ausschalten (vom Pult/anderen Handy gehalten,
+  Laser gesperrt, nicht freigegeben), wird der Druck VORHER abgelehnt
+  (``gruppe_blockiert``) — die Gruppe zeigt nie zwei aktive Tasten.
+  BLACKOUT, Laser-NOT-AUS, STOP ALL und Laser scharf sind nie Mitglied
+  (:func:`gruppe_erlaubt`, auch zur Laufzeit geprueft). Am Pult selbst gilt
+  die Handy-Gruppe nicht.
 """
 from __future__ import annotations
 
@@ -85,6 +102,7 @@ KEINE_KONSOLE = "keine_konsole"
 NICHT_FREIGEGEBEN = "nicht_freigegeben"     # WEB-09: liegt auf keiner Handy-Seite
 LASER_GESPERRT = "laser_gesperrt"           # WEB-12: Laser-Inhalt ohne Schalter
 BLACKOUT_NICHT_VON_HIER = "blackout_nicht_von_hier"   # WEB-12
+GRUPPE_BLOCKIERT = "gruppe_blockiert"       # WEB-14
 ZEITUEBERSCHREITUNG = "zeitueberschreitung"
 FEHLER = "fehler"
 
@@ -131,6 +149,38 @@ def _gruppe(widget) -> str | None:
     except Exception:
         pass
     return None
+
+
+def _einzel_rahmen(widget) -> dict | None:
+    """WEB-14: der Rahmen mit Einzel-Auswahl (Solo-Frame), in dem die Taste
+    DIREKT liegt — dort sorgt ``VCFrame.on_child_activated`` dafuer, dass
+    immer nur eine an ist. ``{"id", "titel"}`` oder None."""
+    try:
+        p = widget.parent()
+        if p is not None and type(p).__name__ == "VCFrame" and p.is_solo():
+            return {"id": str(getattr(p, "widget_id", "") or ""),
+                    "titel": str(getattr(p, "caption", "") or "")}
+    except Exception:
+        pass
+    return None
+
+
+#: WEB-14: Tasten, die nie Mitglied einer Handy-Gruppe sind — weder als
+#: Ausloeser noch zum Ausschalten.
+GRUPPE_VERBOTEN = ("Blackout", "LaserEstop", "StopAll", "LaserArm")
+
+
+def gruppe_erlaubt(widget) -> tuple[bool, str]:
+    """WEB-14: darf ``widget`` in eine eigene Handy-Gruppe? (ja/nein, Grund)"""
+    if widget is None:
+        return False, "Das Element gibt es nicht mehr."
+    if _art(widget) != "taste":
+        return False, "In eine Handy-Gruppe können nur Tasten."
+    aktion = getattr(widget, "action", None)
+    if str(getattr(aktion, "value", aktion) or "") in GRUPPE_VERBOTEN:
+        return False, ("BLACKOUT, Laser-NOT-AUS, Alles stoppen und Laser scharf/"
+                       "unscharf gehören nie in eine Handy-Gruppe.")
+    return True, ""
 
 
 def _halteart(widget) -> str:
@@ -334,6 +384,102 @@ def _ziel_fehlt(widget) -> list[str]:
     return raus
 
 
+def _live_editiert(widget) -> bool:
+    """UI-129: zeigt das Widget das Sternchen „live bearbeitet"? Nur Tasten
+    und Fader mit genau einer eigenen Funktion; Cue-Listen nie. Liest den
+    Zwischenstand aus ``effect_live`` (der Takt fragt zehnmal je Sekunde)."""
+    frage = getattr(widget, "live_stern_sichtbar", None)
+    if frage is None:
+        return False
+    try:
+        return bool(frage())
+    except Exception:
+        return False
+
+
+#: WEB-13: Takt, wenn das Pult keinen nennt; Grenzen gegen Unsinn (0 = Freeze).
+STANDARD_BPM = 120
+_BPM_GRENZEN = (30, 300)
+
+
+def _bpm_von(fn) -> int:
+    """Takt (ganze BPM) fuer eine Funktion: ihr Tempo-Bus, sonst der globale
+    Takt. Ganzzahlig, damit ein leicht schwankender Audio-Takt nicht bei jedem
+    Abgleich eine neue Meldung ans Handy ausloest."""
+    bpm = 0.0
+    try:
+        bus_id = str(getattr(fn, "tempo_bus_id", "") or "").strip()
+        if bus_id:
+            from src.core.engine.tempo_bus import get_tempo_bus_manager
+            bus = get_tempo_bus_manager().bus_for_effect(bus_id)
+            if bus is not None:
+                bpm = float(bus.bpm)
+        if bpm <= 0:
+            from src.core.engine.bpm_manager import get_bpm_manager
+            bpm = float(get_bpm_manager().bpm)
+    except Exception:
+        bpm = 0.0
+    if not math.isfinite(bpm) or bpm <= 0:
+        return STANDARD_BPM
+    return int(round(max(_BPM_GRENZEN[0], min(_BPM_GRENZEN[1], bpm))))
+
+
+def _laeuft_im_takt(fn) -> bool:
+    """Blinkt der Effekt sichtbar im Takt? Chaser/Sequenz (Schritte),
+    Strobe-/Shutter-Matrix und alles, was an einem Tempo-Bus haengt."""
+    typ = str(getattr(getattr(fn, "function_type", None), "value", "") or "")
+    if typ in ("Chaser", "Sequence"):
+        return True
+    if str(getattr(fn, "tempo_bus_id", "") or "").strip():
+        return True
+    for attr in ("style", "algorithm"):
+        wert = getattr(fn, attr, None)
+        text = str(getattr(wert, "value", wert) or "").lower()
+        if "strobe" in text or "shutter" in text:
+            return True
+    return False
+
+
+def effekt_dynamik(widget) -> dict | None:
+    """WEB-13: was hinter einer AKTIVEN Taste laeuft, fuer die Animation am
+    Handy: ``{"farben": ["#rrggbb", …], "takt": bool, "bpm": int}`` oder None.
+
+    Die Animation laeuft im Handy rein per CSS — gemeldet wird nur, wenn sich
+    Farben, Takt-Art oder die ganze BPM-Zahl aendern (keine hohe
+    Nachrichtenrate). BLACKOUT und Laser-NOT-AUS haben keine Dynamik."""
+    from .vc_button import ButtonAction as A
+    aktion = getattr(widget, "action", None)
+    if aktion in (A.BLACKOUT, A.LASER_ESTOP):
+        return None
+    farben = []
+    try:
+        farben = [c.name() for c in widget._color_badge_colors()][:8]
+    except Exception:
+        farben = []
+    takt = False
+    bpm = None
+    if aktion in (A.FUNCTION_TOGGLE, A.FUNCTION_FLASH):
+        try:
+            from src.core.app_state import get_state
+            fm = get_state().function_manager
+            for fid in widget._all_function_ids():
+                fn = fm.get(fid) if hasattr(fm, "get") else None
+                if fn is None or not fm.is_running(fid):
+                    continue
+                if _laeuft_im_takt(fn):
+                    takt = True
+                    bpm = _bpm_von(fn)
+                    break
+        except Exception:
+            takt = False
+    if len(farben) < 2 and not takt:
+        return None
+    raus = {"farben": farben if len(farben) >= 2 else [], "takt": takt}
+    if takt:
+        raus["bpm"] = bpm or STANDARD_BPM
+    return raus
+
+
 def beschreibe(widget) -> dict | None:
     """Fernbedien-Auskunft zu einem Widget — oder None, wenn es nicht
     fernbedienbar ist. Nur JSON-taugliche Werte. Im UI-Thread aufrufen."""
@@ -353,6 +499,8 @@ def beschreibe(widget) -> dict | None:
         "laser": bool(laser_inhalt(widget)),
         "gesperrt": None,
         "ziel_fehlt": _ziel_fehlt(widget),
+        # UI-129: eigene Funktion live bearbeitet -> Sternchen an der Kachel.
+        "live_editiert": _live_editiert(widget),
     }
     if d["laser"]:
         from src.core.laser import fern_freigabe as _ff
@@ -365,6 +513,15 @@ def beschreibe(widget) -> dict | None:
         d["gedrueckt"] = bool(widget._pressed)
         d["aktiv"] = bool(widget.leuchtet())
         d["aktionen"] = list(AKTIONEN_TASTE)
+        d["einzel"] = _einzel_rahmen(widget)    # WEB-14
+        # WEB-13: Effekt-Dynamik nur, solange die Taste aktiv ist und weder
+        # gesperrt noch ohne Ziel — sonst steht die Kachel ruhig.
+        d["effekt"] = None
+        if d["aktiv"] and d["gesperrt"] is None and not d["ziel_fehlt"]:
+            try:
+                d["effekt"] = effekt_dynamik(widget)
+            except Exception:
+                d["effekt"] = None
     elif art == "fader":
         d["modus"] = str(getattr(widget, "mode", "") or "")
         d["wert"] = int(widget.value)
@@ -504,6 +661,124 @@ def ausfuehren(widget, aktion, wert=None) -> dict:
         print(f"[vc_fernbedienung] ERROR: Aktion '{aktion}' auf "
               f"{type(widget).__name__}: {e}")
         return _nein(FEHLER)
+
+
+def _gruppe_der_taste(canvas, kennung) -> list:
+    """WEB-14: die ANDEREN Mitglieder der Handy-Gruppe von ``kennung`` als
+    Widgets (nur erlaubte; leer ohne Gruppe)."""
+    from src.core import handy_seiten as _hs
+    abschnitt = canvas.handy_seiten()
+    nr = _hs.gruppe_von(abschnitt, kennung)
+    if nr is None:
+        return []
+    raus = []
+    for k in _hs.gruppen(abschnitt)[nr]["widgets"]:
+        if k == kennung:
+            continue
+        w = canvas.widget_mit_kennung(k)
+        if w is not None and gruppe_erlaubt(w)[0]:
+            raus.append(w)
+    return raus
+
+
+def _ausschaltbar(widget, frei: set) -> bool:
+    """WEB-14: kann ein Tipp vom Handy diese aktive Taste ausschalten? Nicht,
+    wenn jemand sie haelt (Pult, MIDI, anderes Handy — WEB-12), wenn sie nicht
+    freigegeben ist, ihr Laser gesperrt ist oder der Tipp einen fremden
+    Blackout aufhoebe."""
+    if bool(getattr(widget, "_pressed", False)):
+        return False
+    if getattr(widget, "widget_id", None) not in frei:
+        return False
+    if _laser_gesperrt(widget):
+        return False
+    if _hebt_blackout_auf(widget):
+        from src.core.app_state import get_state
+        if get_state().output_manager.blackout_schalter:
+            return False
+    return True
+
+
+def _druck_wird_abgelehnt(widget) -> bool:
+    """WEB-14: lehnt ``_taste_ausfuehren`` diesen Druck sicher ab (Laser
+    scharf schalten nur am Pult, fremder Blackout)? Dann darf die Gruppe
+    vorher nichts ausschalten. Ebenso, wenn der Taste das Ziel fehlt — sie
+    ginge nicht an, die Gruppe stuende sonst ohne Grund dunkel."""
+    from .vc_button import ButtonAction
+    if _ziel_fehlt(widget):
+        return True
+    if (widget.action == ButtonAction.LASER_ARM
+            and not widget._aktionszustand()):
+        return True
+    if _hebt_blackout_auf(widget):
+        from src.core.app_state import get_state
+        if get_state().output_manager.blackout_schalter:
+            return True
+    return False
+
+
+def _gruppe_aus(w, ausloeser) -> bool:
+    """WEB-14: eine aktive Gruppen-Taste ausschalten — Funktions- und
+    Snap-Tasten ueber denselben Weg wie der Solo-Rahmen am Pult
+    (``deactivate_for_solo``): ein Tipp auf eine Snap-Taste im Modus
+    „setzen" setzte die alte Farbe sonst ERNEUT, und eine Funktion, die der
+    Ausloeser selbst steuert, bleibt (VCB-41). Andere Tasten (Freeze,
+    Pop-up, …) per Tipp mit allen Regeln eines Handy-Drucks."""
+    from .vc_button import ButtonAction as A
+    if getattr(w, "action", None) in (A.FUNCTION_TOGGLE, A.FUNCTION_FLASH,
+                                      A.LIBRARY_SNAP):
+        try:
+            from src.core.app_state import laser_notaus_nicht_loesbar
+            with laser_notaus_nicht_loesbar():
+                w.deactivate_for_solo(activator=ausloeser)
+            return True
+        except Exception as e:
+            print(f"[vc_fernbedienung] ERROR: Handy-Gruppe ausschalten: "
+                  f"{type(e).__name__}")
+            return False
+    return bool(ausfuehren(w, "umschalten").get("ok"))
+
+
+def _gruppe_ausfuehren(canvas, widget, aktion) -> dict:
+    """WEB-14: Druck vom Handy mit eigener Handy-Gruppe. Schaltet der Druck
+    die Taste EIN, gehen die anderen aktiven Tasten der Gruppe per Tipp aus
+    (derselbe Weg wie ein Handy-Druck). Ausschalten der eigenen Taste und
+    Tasten ohne Gruppe laufen unveraendert."""
+    try:
+        erlaubt = gruppe_erlaubt(widget)[0]
+        andere = _gruppe_der_taste(canvas, widget.widget_id) if erlaubt else []
+        war_an = bool(widget.leuchtet()) if andere else True
+    except Exception as e:
+        print(f"[vc_fernbedienung] ERROR: Handy-Gruppe: {type(e).__name__}")
+        return _nein(FEHLER)
+    if (not andere or war_an or _laser_gesperrt(widget)
+            or _druck_wird_abgelehnt(widget)):
+        # Ausschalten der eigenen Taste, keine Gruppe — oder gesperrt: dann
+        # lehnt ``ausfuehren`` mit dem richtigen Grund ab (und die anderen
+        # Gruppen-Tasten bleiben unberuehrt).
+        return ausfuehren(widget, aktion)
+    frei = VCFernbedienung._freigegeben(canvas)
+    for w in andere:
+        if w.leuchtet() and not _ausschaltbar(w, frei):
+            return _nein(GRUPPE_BLOCKIERT)
+    # Pruefung nach WEB-14: wie im Solo-Rahmen am Pult (``on_child_activated``
+    # VOR dem eigenen Ausloesen) gehen die anderen ZUERST aus — sonst nimmt das
+    # Ruecksetzen eines alten Snaps die gerade gesetzte Farbe wieder weg.
+    aus = []
+    for w in andere:
+        if not w.leuchtet():
+            continue
+        if _gruppe_aus(w, widget):
+            aus.append(w.widget_id)
+        if w.leuchtet():
+            print(f"[vc_fernbedienung] Handy-Gruppe: {w.widget_id} bleibt an "
+                  f"(Taste laesst sich nicht ausschalten)")
+    ergebnis = ausfuehren(widget, aktion)
+    if not ergebnis.get("ok"):
+        return ergebnis
+    ergebnis["gruppe_aus"] = aus
+    ergebnis["widget"] = beschreibe(widget)
+    return ergebnis
 
 
 class _Auftrag:
@@ -658,6 +933,8 @@ class VCFernbedienung(QObject):
                 return _nein(UNBEKANNTE_KENNUNG)
             if nur_handy_seiten and kennung not in self._freigegeben(c):
                 return _nein(NICHT_FREIGEGEBEN)
+            if nur_handy_seiten and aktion in ("druecken", "umschalten"):
+                return _gruppe_ausfuehren(c, w, aktion)     # WEB-14
             return ausfuehren(w, aktion, wert)
         try:
             return self._im_ui_thread(_tun, _nein)
@@ -715,8 +992,20 @@ class VCFernbedienung(QObject):
                            "spalten": seite.get("spalten"),
                            "zeilen": seite.get("zeilen"),
                            "eintraege": eintraege})
+        # WEB-14: eigene Handy-Gruppen — nur erlaubte Mitglieder, die gerade
+        # als Taste gemeldet werden (ein Typwechsel nimmt sie heraus).
+        gruppen = []
+        for g in abschnitt.get("gruppen", []) or []:
+            drin = []
+            for k in g.get("widgets", []):
+                w = nach_kennung.get(k)
+                if widgets.get(k) is not None and w is not None and gruppe_erlaubt(w)[0]:
+                    drin.append(k)
+            if drin:
+                gruppen.append({"name": g.get("name", ""), "widgets": drin})
         return {"seiten": seiten,
                 "widgets": {k: v for k, v in widgets.items() if v is not None},
+                "gruppen": gruppen,
                 **self._pult_jetzt()}
 
     @staticmethod
@@ -852,6 +1141,7 @@ class VCFernbedienung(QObject):
                 return
             alt = self._gemeldet
             if (alt is None or jetzt["seiten"] != alt["seiten"]
+                    or jetzt.get("gruppen") != alt.get("gruppen")
                     or set(jetzt["widgets"]) != set(alt["widgets"])):
                 # Die Seiten selbst haben sich geaendert (Editor, Rueckgaengig,
                 # Show geladen) — oder es gibt noch keine Vergleichsbasis: alles neu.
