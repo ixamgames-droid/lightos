@@ -361,3 +361,26 @@ def test_lern_dialog_titel():
     from src.ui.widgets.midi_teach_dialog import MidiTeachDialog
     sig = inspect.signature(MidiTeachDialog.__init__)
     assert sig.parameters["title"].default == "MIDI Lernen"
+
+
+@pytest.mark.parametrize("text,w,h", [("Farbe Blau", 64, 40), ("Effekt-Stop", 64, 40),
+                                      ("Musik-BPM", 64, 40), ("Laser Grün", 64, 40)])
+def test_zweizeilig_kurz_bleibt_9pt_wie_bisher(text, w, h):
+    """Nachbesserung nach Pruefung: zweizeilige kurze Texte, die bisher
+    vollstaendig zu sehen waren (Zeilenkasten nur in der leeren Oberlaenge
+    knapp zu hoch), werden nicht kleiner — Pixel wie mit dem alten Maler."""
+    from PySide6.QtGui import QFont
+    c, b = _taste(text, w, h)
+    neu = _bild(b)
+    assert b._beschriftung_cache[1].pointSizeF() == 9.0
+    echt = vb.VCButton._beschriftung
+
+    def alt(self, rect, t):
+        return (QFont("Segoe UI", 9, QFont.Weight.Bold), t,
+                Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap)
+    vb.VCButton._beschriftung = alt
+    try:
+        vorher = _bild(b)
+    finally:
+        vb.VCButton._beschriftung = echt
+    assert neu == vorher

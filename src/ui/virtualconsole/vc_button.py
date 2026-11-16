@@ -422,6 +422,12 @@ BESCHRIFTUNG_FLAGS = Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap
 # Gemessen wird gegen ein um 1 px eingerueckten Rechteck — Kanten-Pixel der
 # Glyphen sollen nicht auf dem Tastenrand landen.
 _BESCHRIFTUNG_RAND = 1
+# Nachbesserung UI-138: Bei der Ausgangsschrift (9 pt) gilt das alte Mass —
+# das ganze Textrechteck, und in der Hoehe darf der Zeilenkasten bis 2 px
+# ueberstehen. Das ist leerer Raum ueber den Grossbuchstaben (Oberlaenge 12,8 px,
+# Versalhoehe 8,6 px): sichtbar war dort nichts abgeschnitten. Sonst wuerden
+# zweizeilige kurze Texte wie „Farbe Blau" auf 64x40 ohne Not kleiner.
+_ALTES_MASS_LUFT = 2.0
 
 
 def beschriftung_schrift(pt: float) -> QFont:
@@ -479,7 +485,13 @@ def beschriftung_einpassen(text: str, breite: float, hoehe: float,
     erste = beschriftung_schrift(BESCHRIFTUNG_STUFEN[0])
     if not text:
         return erste, text, BESCHRIFTUNG_FLAGS, False
-    for pt in BESCHRIFTUNG_STUFEN:
+    # Ausgangsschrift: altes Mass (siehe ``_ALTES_MASS_LUFT``) — was bisher
+    # vollstaendig zu sehen war, bleibt Zeichen fuer Zeichen gleich.
+    voll_w, voll_h = max(1.0, float(breite)), max(1.0, float(hoehe))
+    br = _fm(erste).boundingRect(QRectF(0, 0, voll_w, voll_h), BESCHRIFTUNG_FLAGS, text)
+    if br.width() <= voll_w + 0.01 and br.height() <= voll_h + _ALTES_MASS_LUFT:
+        return erste, text, BESCHRIFTUNG_FLAGS, False
+    for pt in BESCHRIFTUNG_STUFEN[1:]:
         f = beschriftung_schrift(pt)
         br = _fm(f).boundingRect(QRectF(0, 0, w, h), BESCHRIFTUNG_FLAGS, text)
         if br.width() <= w + 0.01 and br.height() <= h + 0.01:
