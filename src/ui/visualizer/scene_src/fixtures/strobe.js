@@ -213,12 +213,26 @@ export function taktFps(takt, fps) {
  * kurze Bilder gleichmaessig, bleibt beides im Mittel. 0 = zu wenig Abstaende.
  */
 export function fpsRobust(abstaende) {
-  const n = abstaende ? abstaende.length : 0;
+  return abstaende ? _gekappt(abstaende, 0, []) : 0;
+}
+
+// Gekapptes Mittel ueber quelle[von..], sortiert in `puffer` (wird
+// wiederverwendet: taktMessen laeuft JEDES Bild, auch ohne Strobe — so
+// entsteht dabei kein neues Array). Einfuegesortieren: hoechstens
+// MESS_FENSTER Werte, fast schon sortiert.
+function _gekappt(quelle, von, puffer) {
+  const n = quelle.length - von;
   if (n < MESS_MINDESTENS) return 0;
-  const s = abstaende.slice().sort((a, b) => a - b);
+  puffer.length = n;
+  for (let i = 0; i < n; i++) {
+    const v = quelle[von + i];
+    let j = i - 1;
+    while (j >= 0 && puffer[j] > v) { puffer[j + 1] = puffer[j]; j -= 1; }
+    puffer[j + 1] = v;
+  }
   const k = Math.floor(n * MESS_KAPPEN);
   let summe = 0;
-  for (let i = k; i < n - k; i++) summe += s[i];
+  for (let i = k; i < n - k; i++) summe += puffer[i];
   return 1000 / (summe / (n - 2 * k));
 }
 
@@ -231,7 +245,7 @@ export function fpsRobust(abstaende) {
 export function taktZustand(fps = FPS_VORGABE) {
   const f = (fps > 0) ? fps : FPS_VORGABE;
   return { abst: [], fps: f, takt: f, geduld: 0, wechsel: 0, wechselBild: 0,
-           phasen: Object.create(null), nPhasen: 0 };
+           phasen: Object.create(null), nPhasen: 0, puffer: [] };
 }
 
 /**
@@ -247,10 +261,10 @@ export function taktMessen(z, dtMs, bild) {
   if (!(dtMs >= 2 && dtMs <= PAUSE_MS)) return false;
   z.abst.push(dtMs);
   if (z.abst.length > MESS_FENSTER) z.abst.shift();
-  const fps = fpsRobust(z.abst);
+  const fps = _gekappt(z.abst, 0, z.puffer);
   if (!(fps > 0)) return false;
   z.fps = fps;
-  const neu = fpsRobust(z.abst.slice(-MESS_NEU));
+  const neu = _gekappt(z.abst, Math.max(0, z.abst.length - MESS_NEU), z.puffer);
   const grenze = z.takt * TAKT_TRAEGHEIT;
   const da = fps - z.takt, dn = neu - z.takt;
   if (!(Math.abs(da) > grenze && Math.abs(dn) > grenze && (da > 0) === (dn > 0)
@@ -300,7 +314,15 @@ export function taktBild(z, bild, hz, modus = STROBE_MODUS_VORGABE) {
     const pNeu = _taktPeriode(hz, modus, z.takt);
     const s = z.wechselBild;
     const rAlt = _rest(s + e.versatz, pAlt);
-    const rNeu = Math.floor(rAlt * pNeu / pAlt);
+    let rNeu = Math.floor(rAlt * pNeu / pAlt);
+    if (!soft) {
+      // Rundung: war das Geraet im alten Takt schon AUS, darf es im neuen
+      // nicht mitten in der Periode wieder angehen — das waere ein
+      // Doppelblitz (z. B. 144 -> 60 bei 2 Hz: 18 an, 1 aus, wieder an).
+      const anAlt = strobeBilder(hz, e.takt).an;
+      const anNeu = strobeBilder(hz, z.takt).an;
+      if (rAlt >= anAlt && rNeu < anNeu) rNeu = anNeu;
+    }
     e.versatz = _rest(rNeu - s, pNeu);
     e.nr = z.wechsel;
     e.takt = z.takt;

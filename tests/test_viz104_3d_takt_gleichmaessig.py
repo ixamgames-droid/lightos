@@ -363,6 +363,39 @@ for (const [schirm, normal] of [[60, 1000 / 60], [30, 1000 / 30]]) for (const hz
   aus.verloren[schirm + '/' + hz + '/' + v] = { mittel: summe / n, groesste, ausfall, n, ueberlang };
 }
 
+// Nachpruefung: Wechsel von HOHER auf niedrige Bildrate (144-Hz-Bildschirm
+// unter Last). Die Blitzlaenge wird je Bildrate gerundet; ohne Schutz ging
+// ein Geraet, das im alten Takt schon AUS war, im neuen mitten in der
+// Periode wieder AN (18 an, 1 aus, wieder an). Gemessen in ZEIT.
+{
+  const paare = [[144, 60], [144, 30], [144, 45], [144, 50], [120, 50], [120, 30],
+                 [90, 45], [75, 30], [50, 30], [165, 60], [240, 60]];
+  const r = { faelle: 0, doppel: 0, luecke: 0, beispiele: [] };
+  for (const [A, B] of paare) for (const hz of [1, 2, 3, 5, 7, 10]) {
+    const pA = S.strobeBilder(hz, A).periode, pB = S.strobeBilder(hz, B).periode;
+    for (let s = 3 * pA; s < 4 * pA; s++) {
+      const z = S.taktZustand(A); const f = [];
+      for (let b = 1; b < s; b++) f.push(S.taktFaktor(z, b, hz, 'flash'));
+      z.takt = B; z.wechsel += 1; z.wechselBild = s;
+      for (let b = s; b < s + 3 * pB; b++) f.push(S.taktFaktor(z, b, hz, 'flash'));
+      const T = (b) => b < s ? b * 1000 / A : (s - 1) * 1000 / A + (b - s + 1) * 1000 / B;
+      const beg = [];
+      for (let i = 1; i < f.length; i++) if (f[i] === 1 && f[i - 1] === 0) beg.push(i + 1);
+      const pAms = pA * 1000 / A, pBms = pB * 1000 / B;
+      r.faelle += 1;
+      for (let k = 1; k < beg.length; k++) {
+        const g = T(beg[k]) - T(beg[k - 1]);
+        if (g < 0.5 * Math.min(pAms, pBms)) {
+          r.doppel += 1;
+          if (r.beispiele.length < 5) r.beispiele.push([A, B, hz, s % pA, +g.toFixed(1)]);
+        }
+        if (g > 1.6 * Math.max(pAms, pBms)) r.luecke += 1;
+      }
+    }
+  }
+  aus.phaseHochRunter = r;
+}
+
 console.log(JSON.stringify(aus));
 """
 
@@ -488,6 +521,16 @@ class EchterWechselTest(unittest.TestCase):
                 self.assertLessEqual(r["laengeMax"], 0.34 * laengst + 1000 / 30 + 0.01, r)
                 for u in r["ueber"]:
                     self.assertTrue(u is None or u["ok"], u)
+
+    def test_hoch_auf_niedrig_kein_doppelblitz(self):
+        """Nachpruefung: 144 -> 60/50/45/30, 120 -> 50/30, 90 -> 45 ...: war
+        das Geraet im alten Takt schon aus, geht es im neuen nicht mitten in
+        der Periode wieder an (vorher 85 Doppelblitze in diesen Faellen);
+        keine Luecke ueber 1,6 Perioden."""
+        r = _js()["phaseHochRunter"]
+        self.assertGreater(r["faelle"], 500, r)
+        self.assertEqual(r["doppel"], 0, r)
+        self.assertEqual(r["luecke"], 0, r)
 
     def test_gleiche_frequenz_bleibt_gemeinsam_in_phase(self):
         g = _js()["c"]["gemeinsam"]
