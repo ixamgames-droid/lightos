@@ -18,6 +18,7 @@ from __future__ import annotations
 import ctypes
 import sys
 import unittest
+from unittest import mock
 
 from src.ui import touch_keyboard as tk
 
@@ -165,6 +166,98 @@ class SichtbarTest(unittest.TestCase):
 
     def test_kein_fenster(self):
         self.assertFalse(tk._tip_sichtbar(_User32({}, {}), _Dwm(verhuellt=0)))
+
+
+class _User32AlterWeg:
+    """user32 fuer den alten Weg. ``oeffnet``: SC_RESTORE macht das Fenster
+    auf (Windows 10). Sonst bleibt es unsichtbar wie unter Windows 11."""
+
+    def __init__(self, hwnd=9, oeffnet=False):
+        self.hwnd, self.oeffnet, self.offen = hwnd, oeffnet, False
+        self.aufrufe: list = []
+
+    def FindWindowW(self, klasse, titel):  # noqa: N802 (Win32-Name)
+        return self.hwnd if klasse == "IPTip_Main_Window" else 0
+
+    def SendMessageW(self, hwnd, nachricht, w, l):  # noqa: N802, E741
+        self.aufrufe.append(("SendMessage", nachricht, w))
+        self.offen = self.offen or self.oeffnet
+        return 0
+
+    def SetForegroundWindow(self, hwnd):  # noqa: N802
+        self.aufrufe.append("SetForegroundWindow")
+        return 1
+
+    def IsWindowVisible(self, hwnd):  # noqa: N802
+        return 1 if self.offen else 0
+
+    def GetWindowLongW(self, hwnd, index):  # noqa: N802
+        return 0 if self.offen else 0x08000000          # WS_DISABLED = zu
+
+
+class AlterWegTest(unittest.TestCase):
+    """Gegenpruefung der Leitung zu #1300 (16.11.): scheitert COM und gibt es
+    ``IPTip_Main_Window``, schickte der alte Weg wieder nur SC_RESTORE und
+    hoerte auf - unter Windows 11 genau das alte Fehlerbild (keine Tastatur,
+    TabTip.exe nie gestartet). Jetzt zaehlt das Fenster nur, wenn es danach
+    wirklich offen ist. Alle Systemzugriffe sind Attrappen."""
+
+    def _weg(self, user32, tabtip_da=True, start_fehler=()):
+        gestartet: list = []
+
+        def starten(befehl):
+            gestartet.append(befehl[0].replace("\\", "/").rsplit("/", 1)[-1].lower())
+            if gestartet[-1] in start_fehler:
+                raise OSError("nicht da")
+
+        with mock.patch.object(tk.os.path, "exists", return_value=tabtip_da):
+            return tk._tabtip_alter_weg(user32, starten), gestartet
+
+    def test_windows11_fenster_bleibt_zu_dann_tabtip_starten(self):
+        """★ Das Restloch: Fenster da, bleibt unsichtbar -> weiter mit TabTip.exe."""
+        u = _User32AlterWeg(oeffnet=False)
+        weg, gestartet = self._weg(u)
+        self.assertEqual("tabtip", weg)
+        self.assertEqual(["tabtip.exe"], gestartet)
+        self.assertIn(("SendMessage", 0x0112, 0xF120), u.aufrufe, "SC_RESTORE bleibt der erste Versuch")
+
+    def test_windows10_fenster_geht_auf_dann_nichts_starten(self):
+        u = _User32AlterWeg(oeffnet=True)
+        weg, gestartet = self._weg(u)
+        self.assertEqual("iptip", weg)
+        self.assertEqual([], gestartet)
+        self.assertIn("SetForegroundWindow", u.aufrufe)
+
+    def test_ohne_fenster_wie_bisher(self):
+        ohne = _User32AlterWeg(hwnd=0)
+        self.assertEqual(("tabtip", ["tabtip.exe"]), self._weg(ohne))
+        self.assertEqual(("osk", ["osk.exe"]), self._weg(ohne, tabtip_da=False))
+        self.assertEqual(("nichts", ["osk.exe"]),
+                         self._weg(ohne, tabtip_da=False, start_fehler=("osk.exe",)))
+        self.assertEqual([], ohne.aufrufe, "kein Fenster -> keine Nachricht")
+
+    def test_com_scheitert_fenster_zu_fasst_nach_dem_start_nach(self):
+        """Die ganze Kette unter Windows 11, wenn COM beim ersten Mal scheitert:
+        Fenster bleibt zu -> TabTip.exe -> nach 600 ms noch einmal umschalten."""
+        u = _User32AlterWeg(oeffnet=False)
+        gestartet: list = []
+        com: list = []
+        spaeter: list = []
+
+        def umschalten():
+            com.append(len(com))
+            return len(com) > 1                 # erst beim Nachfassen erfolgreich
+
+        with mock.patch.object(tk.os.path, "exists", return_value=True):
+            weg = tk._tastatur_zeigen(
+                lambda: False, umschalten,
+                lambda: tk._tabtip_alter_weg(u, lambda b: gestartet.append(b)),
+                lambda ms, f: spaeter.append((ms, f)))
+        self.assertEqual("tabtip", weg)
+        self.assertEqual(1, len(gestartet))
+        self.assertEqual([tk._NACHFASSEN_MS], [ms for ms, _f in spaeter])
+        spaeter[0][1]()
+        self.assertEqual(2, len(com))
 
 
 @unittest.skipUnless(sys.platform == "win32", "COM-Aufruf per WINFUNCTYPE gibt es nur unter Windows")

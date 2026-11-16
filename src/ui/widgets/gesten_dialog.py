@@ -75,8 +75,10 @@ class GestenDialog(QDialog):
         if _ist_windows():
             # UI-134: unter Windows 11 kommt das Drei-Finger-TIPPEN nie an
             # (Systemgeste), Ziehen mit drei Fingern schon (B, 15.11.2026).
+            # Der genannte Einstellungs-Pfad ist der von Windows 11 - unter
+            # Windows 10 gibt es ihn nicht, deshalb steht die Version voran.
             self.windows_hinweis = QLabel(
-                "Windows: Das Tippen mit drei Fingern nutzt Windows selbst als "
+                "Windows 11: Das Tippen mit drei Fingern nutzt Windows selbst als "
                 "Systemgeste – es kommt dann nicht bei LightOS an. Abhilfe: in den "
                 "Windows-Einstellungen (Bluetooth und Geräte → Toucheingabe) die "
                 "Drei- und Vier-Finger-Gesten ausschalten. LightOS ändert diese "

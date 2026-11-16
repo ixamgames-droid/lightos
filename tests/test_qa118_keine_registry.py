@@ -45,6 +45,52 @@ class SystemTastaturIstAttrappeTest(unittest.TestCase):
                          conftest.SYSTEM_TASTATUR_AUFRUFE[vorher:])
 
 
+class BausteineNurMitAttrappenTest(unittest.TestCase):
+    """UI-133: unter ``_show_windows_osk`` liegen drei Bausteine, die das System
+    selbst anfassen - COM-Toggle, FindWindow/SC_RESTORE, TabTip.exe/osk starten.
+    Ihre Tests geben JEDEN Systemzugriff als Attrappe mit. Ein Aufruf ohne (oder
+    mit nur einem Teil der) Attrappen darf nie beim System ankommen: er wird nur
+    gemerkt. Fehlt der Riegel, endet jeder Test hier VOR dem Aufruf."""
+
+    BAUSTEINE = (("_tip_sichtbar", False), ("_tip_umschalten", False),
+                 ("_tabtip_alter_weg", "nichts"))
+
+    def _verriegelt(self, name):
+        self.assertTrue(
+            getattr(getattr(tk, name), "qa118_riegel", False),
+            f"touch_keyboard.{name} ist im Test unverriegelt - ohne Attrappen "
+            "schaltete es die Tastatur des Rechners um bzw. startete TabTip")
+        return getattr(tk, name)
+
+    def test_ohne_attrappen_nur_gemerkt(self):
+        for name, ersatz in self.BAUSTEINE:
+            with self.subTest(funktion=name):
+                fn = self._verriegelt(name)
+                vorher = len(conftest.SYSTEM_TASTATUR_AUFRUFE)
+                self.assertEqual(ersatz, fn())
+                self.assertEqual([name.lstrip("_")], conftest.SYSTEM_TASTATUR_AUFRUFE[vorher:])
+
+    def test_ein_teil_der_attrappen_reicht_nicht(self):
+        """Nur EIN Systemzugriff ersetzt - der andere ginge an das echte System."""
+        for name, ersatz in self.BAUSTEINE:
+            with self.subTest(funktion=name):
+                fn = self._verriegelt(name)
+                vorher = len(conftest.SYSTEM_TASTATUR_AUFRUFE)
+                self.assertEqual(ersatz, fn(object()))
+                self.assertEqual(1, len(conftest.SYSTEM_TASTATUR_AUFRUFE) - vorher)
+
+    def test_mit_allen_attrappen_laeuft_die_echte_funktion(self):
+        fn = self._verriegelt("_tip_sichtbar")
+
+        class _KeinFenster:
+            def FindWindowW(self, klasse, titel):  # noqa: N802 (Win32-Name)
+                return 0
+
+        vorher = len(conftest.SYSTEM_TASTATUR_AUFRUFE)
+        self.assertFalse(fn(_KeinFenster(), object()))
+        self.assertEqual([], conftest.SYSTEM_TASTATUR_AUFRUFE[vorher:])
+
+
 @unittest.skipUnless(_WINDOWS, "Registry gibt es nur unter Windows")
 class RegistryRiegelTest(unittest.TestCase):
 

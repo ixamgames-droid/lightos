@@ -190,21 +190,33 @@ def _show_windows_osk() -> None:
                      lambda ms, f: QTimer.singleShot(ms, f))
 
 
-def _tabtip_alter_weg() -> str:
-    """Der Weg bis UI-133 - jetzt nur noch Rueckfall, wenn COM scheitert."""
+def _tabtip_alter_weg(user32=None, starten=None) -> str:
+    """Der Weg bis UI-133 - jetzt nur noch Rueckfall, wenn COM scheitert.
+
+    ``user32``/``starten`` (Vorgabe: ``ctypes.windll.user32``/``subprocess.Popen``)
+    sind die beiden Systemzugriffe - Tests geben Attrappen mit."""
     import ctypes
+    user32 = user32 or ctypes.windll.user32
+    starten = starten or subprocess.Popen
 
     # Versuch 1: vorhandenes TabTip-Fenster reaktivieren
     # Windows 10 1803+ ignoriert ShowWindow auf IPTip_Main_Window;
     # stattdessen WM_SYSCOMMAND SC_RESTORE senden.
     try:
-        hwnd = ctypes.windll.user32.FindWindowW("IPTip_Main_Window", None)
+        hwnd = user32.FindWindowW("IPTip_Main_Window", None)
         if hwnd:
             WM_SYSCOMMAND = 0x0112
             SC_RESTORE = 0xF120
-            ctypes.windll.user32.SendMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0)
-            ctypes.windll.user32.SetForegroundWindow(hwnd)
-            return "iptip"
+            user32.SendMessageW(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0)
+            user32.SetForegroundWindow(hwnd)
+            # UI-133: das Fenster zaehlt nur, wenn es danach wirklich offen
+            # ist (sichtbar, nicht deaktiviert - wie in ``_tip_sichtbar``).
+            # Unter Windows 11 gibt es das Fenster, es bleibt aber unsichtbar:
+            # hier aufzuhoeren war das alte Fehlerbild - keine Tastatur, und
+            # TabTip.exe wurde nie gestartet. Dann weiter mit Versuch 2.
+            stil = user32.GetWindowLongW(hwnd, -16)              # GWL_STYLE
+            if user32.IsWindowVisible(hwnd) and not (stil & 0x08000000):
+                return "iptip"
     except Exception:
         pass
 
@@ -223,14 +235,14 @@ def _tabtip_alter_weg() -> str:
     for path in tabtip_candidates:
         if os.path.exists(path):
             try:
-                subprocess.Popen([path])
+                starten([path])
                 return "tabtip"
             except OSError:
                 pass
 
     # Versuch 3: klassische On-Screen-Keyboard als Fallback
     try:
-        subprocess.Popen(["osk.exe"])
+        starten(["osk.exe"])
         return "osk"
     except OSError:
         return "nichts"

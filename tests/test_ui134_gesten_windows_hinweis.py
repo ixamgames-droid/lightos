@@ -32,6 +32,9 @@ class WindowsHinweisTest(unittest.TestCase):
         label = d.findChild(QLabel, "gesten_windows_hinweis")
         self.assertIsNotNone(label)
         text = label.text()
+        # Gegenpruefung der Leitung (16.11.): den genannten Einstellungs-Pfad
+        # gibt es nur unter Windows 11 - der Text sagt das zuerst.
+        self.assertTrue(text.startswith("Windows 11:"), text[:40])
         self.assertIn("Drei- und Vier-Finger-Gesten", text)
         self.assertIn("Windows-Einstellungen", text)
         self.assertIn("nicht selbst", text, "LightOS stellt nichts am System um")
