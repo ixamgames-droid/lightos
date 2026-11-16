@@ -273,8 +273,9 @@ class _LibraryCase(unittest.TestCase):
 
     Jeder Test bekommt eine eigene Kopie einer je Modul EINMAL gebauten
     Library (QA-122: das Seeden kostete je Test ~1 s).
-    ``_EINGESPIELT = True``: die Vorlage ist eine Library, auf der ``ensure_builtins`` schon lief — der
-    Zustand eines Rechners nach dem ersten Start. Der erste ``ensure_builtins``
+    ``_EINGESPIELT = True``: die Vorlage ist eine Library, auf der
+    ``ensure_builtins`` schon lief — der Zustand eines Rechners nach dem
+    ersten Start. Der erste ``ensure_builtins``
     je Library spielt alle Bibliotheksdateien ein und kostete je Test 6–9 s."""
 
     _EINGESPIELT = False
@@ -282,8 +283,6 @@ class _LibraryCase(unittest.TestCase):
     def setUp(self):
         from src.core.app_state import clear_channel_cache
         self._eng = frische_library(self, vorlage=_vorlage(self._EINGESPIELT))
-
-
         clear_channel_cache()
         self.addCleanup(clear_channel_cache)
 

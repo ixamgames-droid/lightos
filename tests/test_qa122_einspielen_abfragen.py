@@ -83,6 +83,11 @@ class EinspielenAbfragenTest(unittest.TestCase):
         self.assertGreater(self._profile(bericht), 50, "Vorbedingung: volle Bibliothek")
         self.assertEqual(zaehler["lazy"], 0,
                          f"{zaehler['lazy']} Einzel-Nachladungen in einspielen()")
+        # Nachbesserung QA-122: nichts geaendert -> nichts geschrieben. Das
+        # Soll entsteht nur im Speicher; der alte Weg (Probe-Anlage im
+        # Savepoint) setzte hier ~34 000 INSERTs ab.
+        self.assertEqual(zaehler["INSERT"], 0,
+                         f"{zaehler['INSERT']} INSERTs, obwohl sich nichts geaendert hat")
 
     def test_selects_wachsen_nicht_mit_den_kanaelen(self):
         zaehler, bericht = self._zaehle()
