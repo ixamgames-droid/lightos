@@ -40,11 +40,18 @@ WINDOWS_ABSCHALTEN = ("Abschalten: Einstellungen → Bluetooth und Geräte → T
                       "„Drei- und Vier-Finger-Touchgesten“.")
 
 
+class _Zeitlimit(Exception):
+    """Ein ``gsettings``-Aufruf hing — keine weiteren Aufrufe (der Start bzw.
+    der Dialog wartet hoechstens einmal ``ZEITLIMIT_S``)."""
+
+
 def _lesen(argumente, lauf) -> str | None:
     """Ein ``gsettings``-Aufruf (nur lesend). ``None`` = gibt es nicht."""
     try:
         r = lauf(["gsettings", *argumente], capture_output=True, text=True,
                  encoding="utf-8", errors="replace", timeout=ZEITLIMIT_S)
+    except subprocess.TimeoutExpired as e:
+        raise _Zeitlimit() from e
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
     if getattr(r, "returncode", 1) != 0:
@@ -81,14 +88,20 @@ def pruefen(plattform: str | None = None, lauf=None) -> list[str]:
     if not plattform.startswith("linux"):
         return []
     lauf = subprocess.run if lauf is None else lauf
-    an = _lesen(["get", SCHEMA, "enabled"], lauf)
-    if an is None or an.strip().lower() != "true":
-        return []
     gefunden = []
-    for schluessel, text in LINUX_SCHLUESSEL:
-        wert = _lesen(["get", SCHEMA, schluessel], lauf)
-        if _belegt(wert):
-            gefunden.append(f"{text} ({wert.strip().strip(chr(39))})")
+    try:
+        an = _lesen(["get", SCHEMA, "enabled"], lauf)
+        if an is None or an.strip().lower() != "true":
+            return []
+        for schluessel, text in LINUX_SCHLUESSEL:
+            wert = _lesen(["get", SCHEMA, schluessel], lauf)
+            if _belegt(wert):
+                gefunden.append(f"{text} ({wert.strip().strip(chr(39))})")
+    except _Zeitlimit:
+        # Pruefung nach Befund: vier haengende Aufrufe hielten die Oberflaeche
+        # sonst bis zu 8 s an. Nach dem ersten Zeitlimit wird nicht weiter
+        # gefragt; was bis dahin feststand, gilt.
+        return gefunden
     return gefunden
 
 

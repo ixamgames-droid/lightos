@@ -601,6 +601,7 @@ class ZiehenScrollen(QObject):
         self._erster_weg = 0.0      # weiteste Entfernung des ersten Fingers davon
         self._halten = None         # laufendes Halten + Antippen
         self._lang_menue_offen = False  # UI-136: Lang-Druck-Menue des ersten Fingers offen
+        self._lang_menue_ziel = None    # ... und das Widget, dessen Menue es ist
         self._wisch = None          # laufender Zwei-Finger-Bankwechsel
         self._drei = None           # Buchfuehrung fuers Drei-Finger-Tippen
         self._zuruecksetzen()
@@ -1065,6 +1066,7 @@ class ZiehenScrollen(QObject):
         ev = QContextMenuEvent(QContextMenuEvent.Reason.Mouse, lokal, glob.toPoint(), mods)
         self._menue_schlucken = True        # gilt schon waehrend eines blockierenden exec
         self._lang_menue_offen = True       # UI-136: ein zweiter Finger darf es schliessen
+        self._lang_menue_ziel = w
         try:
             QApplication.sendEvent(w, ev)
             angenommen = ev.isAccepted()
@@ -1073,6 +1075,7 @@ class ZiehenScrollen(QObject):
             angenommen = False
         finally:
             self._lang_menue_offen = False
+            self._lang_menue_ziel = None
         if not angenommen:
             self._menue_schlucken = False
             return
@@ -1492,7 +1495,7 @@ class ZiehenScrollen(QObject):
             popup = QApplication.activePopupWidget()
             if (self._uhr() - self._erster_lage[0] < HALTEN_MIN_S
                     or self._erster_weg >= self._schwelle() * 2
-                    or (popup is not None and not self._lang_menue_offen)):
+                    or (popup is not None and not self._menue_fuer_halten())):
                 return False
             if popup is not None:
                 # Das Menue oeffnet unter dem gehaltenen Finger und verdeckt
@@ -1551,6 +1554,22 @@ class ZiehenScrollen(QObject):
         if ende:
             self._halten = None
         return True
+
+    def _menue_fuer_halten(self) -> bool:
+        """UI-136 (Pruefung): das offene Pop-up ist das Lang-Druck-Menue des
+        ersten Fingers UND gehoert zu einem Halten-+-Antippen-Ziel (VC,
+        2D-Buehne). Ein Lang-Druck-Menue anderswo (Liste, Tabelle …) schliesst
+        ein zweiter Finger nicht — dort gibt es kein Halten + Antippen."""
+        if not self._lang_menue_offen:
+            return False
+        w = self._lang_menue_ziel
+        while w is not None and _gueltig(w):
+            if callable(getattr(w, "halten_antippen_start", None)):
+                return True
+            if w.isWindow():
+                return False
+            w = w.parentWidget()
+        return False
 
     @property
     def halten_laeuft(self) -> bool:
