@@ -205,3 +205,33 @@ def test_zoom_leiste_maus_knopf_klein_und_klickbar(prefs):
     knopf.click()
     _ruhe()
     assert lv._zoom_slider.isVisible() and lv._zoom_slider.width() == 200
+
+
+# ── 4. Erstes Anzeigen bei 1280x800 (Nachbesserung nach Pruefung) ───────────
+
+def test_erstes_anzeigen_1280_schiebt_geraete_unter_der_leiste_hervor(prefs):
+    """Originalbild touch_1280x800_buehne_2d: das Rig fuellt bei 100 % schon
+    eine Achse (> 35 %), das automatische Einpassen beim Laden greift deshalb
+    nicht ein (CDX-09) — die vorderen Geraete lagen unter Zoom-Leiste und
+    Karte. Der Zoom bleibt, aber die Ansicht ruckt das Rig in den freien Teil."""
+    host, lv = _live(True, 1280, 585)
+    lv._canvas.set_zoom(1.0)
+    lv._canvas._positions = _mega_arena_rig()
+    lv._scroll.horizontalScrollBar().setValue(0)
+    lv._scroll.verticalScrollBar().setValue(0)
+    _ruhe()
+    belegt = [QRectF(lv._zoom_overlay.geometry()), QRectF(lv._minimap.geometry())]
+
+    def verdeckt():
+        return [fid for fid, pos in lv._canvas._positions.items()
+                if any(b.intersects(_bildschirm_rechteck(lv, pos)) for b in belegt)]
+
+    assert verdeckt(), "Vorbedingung: ohne Nachfuehren liegt ein Geraet unter der Leiste"
+    lv._fit_2d_to_fixtures()           # wie _on_show_loaded_2d (ohne force)
+    _ruhe()
+    assert abs(lv._canvas.zoom - 1.0) < 1e-6      # CDX-09: Zoom bleibt
+    vp = lv._scroll.viewport()
+    sicht = QRectF(0, 0, vp.width(), vp.height())
+    assert not verdeckt()
+    for fid, pos in lv._canvas._positions.items():
+        assert sicht.contains(_bildschirm_rechteck(lv, pos)), fid

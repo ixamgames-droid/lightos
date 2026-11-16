@@ -4149,19 +4149,36 @@ class LiveView(QWidget):
                 frei_w = min(g.left() for g in belegt) - ZOOM_RAND
         except (RuntimeError, AttributeError):
             pass
-        if not force:
-            # CDX-09: nur beim kompakten KLUMPEN eingreifen. `or` statt `and`: fuellt
-            # das Rig schon EINE Achse gut aus (breite flache Reihe / hohe schmale
-            # Saeule), gilt es als ausreichend gespreizt und wird NICHT geschrumpft;
-            # nur ein Rig, das BEIDE Achsen schlecht ausfuellt, ist ein echter Klumpen.
-            if bw * canvas.zoom >= 0.35 * vw or bh * canvas.zoom >= 0.35 * vh:
-                return
         # UI-141: die Geraete selbst (nicht nur ihre Mittelpunkte) muessen
         # hinein — je Seite eine Geraetegroesse in Welt-px plus Platz fuer die
         # Beschriftung (feste Bildschirmgroesse) unter dem Glyph.
         rand = float(getattr(canvas, "_fixture_size", 30.0))
         bbw, bbh = bw + 2 * rand, bh + 2 * rand
         beschr = 32                      # Beschriftung unter dem untersten Glyph
+        if not force:
+            # CDX-09: nur beim kompakten KLUMPEN eingreifen. `or` statt `and`: fuellt
+            # das Rig schon EINE Achse gut aus (breite flache Reihe / hohe schmale
+            # Saeule), gilt es als ausreichend gespreizt und wird NICHT geschrumpft;
+            # nur ein Rig, das BEIDE Achsen schlecht ausfuellt, ist ein echter Klumpen.
+            if bw * canvas.zoom >= 0.35 * vw or bh * canvas.zoom >= 0.35 * vh:
+                # UI-141 (Nachbesserung): der Zoom bleibt — passt das Rig bei
+                # diesem Zoom aber in den freien Teil ueber bzw. links neben
+                # Zoom-Leiste und Karte, wird es dorthin geschoben (1280x800:
+                # die vorderen Geraete lagen sonst unter der Leiste).
+                # Senkrecht reicht der Glyph-Radius (0.6 x Groesse, wie der
+                # Treffertest) — die Beschriftung steht unten extra.
+                z = canvas.zoom
+                hoehe = (bh + 2 * 0.6 * rand) * z + beschr
+                for ziel_w, ziel_h in ((vw, frei_h), (frei_w, vh)):
+                    if (ziel_w, ziel_h) == (vw, vh):
+                        break                    # keine Overlays -> nichts zu tun
+                    if bbw * z <= ziel_w - ZOOM_RAND and hoehe <= ziel_h:
+                        cx = (min(xs) + max(xs)) / 2 * z
+                        cy = (min(ys) + max(ys)) / 2 * z
+                        scroll.horizontalScrollBar().setValue(int(cx - ziel_w / 2))
+                        scroll.verticalScrollBar().setValue(int(cy - ziel_h / 2))
+                        break
+                return
         kandidaten = [(_compute_fit_zoom(bbw, bbh, vw - 2 * ZOOM_RAND, vh - beschr), vw, vh)]
         if frei_h < vh and frei_h >= 0.4 * vh:     # ueber den Overlays
             kandidaten.append((_compute_fit_zoom(bbw, bbh, vw - 2 * ZOOM_RAND,
