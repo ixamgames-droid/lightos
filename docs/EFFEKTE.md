@@ -163,9 +163,9 @@ Ein Chaser spielt mehrere **Funktionen** (meist Szenen) der Reihe nach ab.
 3. **+ Hinzufügen** → Funktion(en) als Schritte wählen.
    **Nach oben / Nach unten** ordnet, **Entfernen** löscht.
 4. Pro Schritt in der Tabelle: **Fade In · Hold · Fade Out** (Sekunden).
-5. **Run Order** und **Direction** legen den Durchlauf fest.
+5. **Ablauf** (Loop, PingPong, …) und **Richtung** (Vorwärts/Rückwärts) legen den Durchlauf fest.
 6. **Geschwindigkeit – zwei Modi über „Trigger":**
-   - **Trigger = Timer:** läuft nach den Schrittzeiten; **Speed (x)** regelt das
+   - **Trigger = Timer:** läuft nach den Schrittzeiten; **Geschwindigkeit (x)** regelt das
      Gesamttempo (`0.5x` = halb, `2.0x` = doppelt so schnell).
    - **Trigger = Beat:** läuft **synchron zur globalen BPM**; **Beats/Step** =
      wie viele Beats ein Schritt dauert (1 = jeder Beat, 4 = alle 4 Beats).
