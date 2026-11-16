@@ -55,6 +55,7 @@ class VCInspectorPanel(QWidget):
         )
         self._widget = None
         self._before = None     # Canvas-Stand vor der Bearbeitung (fuer Undo)
+        self._before_kopf = None  # UI-132: Verlaufs-Kopf der Canvas beim Binden
         self._mehrfach = None   # UI-126: (Widgets, Canvas) bei Mehrfachauswahl
 
         root = QVBoxLayout(self)
@@ -109,6 +110,7 @@ class VCInspectorPanel(QWidget):
             self._show_empty()
             return
         self._before = self._capture_before()
+        self._before_kopf = self._verlauf_kopf()
         self._build_for(widget)
 
     # ── UI-126: Mehrfachauswahl ────────────────────────────────────────────────
@@ -219,6 +221,15 @@ class VCInspectorPanel(QWidget):
         w = self._widget
         if not _is_valid(w) or not hasattr(w, "delete_requested"):
             return False
+        canvas = self._find_canvas()
+        try:
+            unsichtbar = canvas is not None and not w.isVisibleTo(canvas)
+        except RuntimeError:
+            unsichtbar = True
+        if unsichtbar:
+            # UI-132: nie loeschen, was man nicht sieht (andere Bank/Seite).
+            self.bind(None)
+            return False
         self._end_session()          # Inspector-Aenderungen zuerst als eigener Schritt
         self._widget = None
         self._btn_loeschen.setEnabled(False)
@@ -290,6 +301,17 @@ class VCInspectorPanel(QWidget):
 
     # ── Undo-Sitzung ───────────────────────────────────────────────────────────
 
+    def _verlauf_kopf(self):
+        """UI-132: Stand des Canvas-Verlaufs (Laenge, oberste Marke). Aendert
+        er sich waehrend der Sitzung, kam ein fremder Schritt dazwischen."""
+        canvas = self._find_canvas()
+        if canvas is None:
+            return None
+        try:
+            return (len(canvas._undo_stack), canvas.undo_schritt())
+        except Exception:
+            return None
+
     def _capture_before(self):
         canvas = self._find_canvas()
         if canvas is None:
@@ -303,11 +325,18 @@ class VCInspectorPanel(QWidget):
         """Schliesst die laufende Bearbeitung ab: letztes Apply (faengt Aenderungen
         ohne Live-Signal, z. B. Ziel-Listen) + ein Undo-Punkt, wenn sich der Layout-
         Stand geaendert hat."""
-        w, before = self._widget, self._before
+        w, before, kopf = self._widget, self._before, self._before_kopf
         self._before = None
+        self._before_kopf = None
         if w is None or before is None:
             return
         canvas = self._find_canvas()
+        # UI-132: Kam seit dem Binden ein fremder Schritt dazwischen (Zug,
+        # Kontextmenue, Rueckgaengig ...), ist ``before`` veraltet. Ihn jetzt
+        # obenauf zu legen, wuerfe den Verlauf durcheinander (Strg+Z spraenge
+        # mehrere Schritte zurueck). Panel-Aenderungen danach gehen dann im
+        # fremden Schritt auf — Strg+Y bringt sie wieder.
+        fremd = kopf is not None and self._verlauf_kopf() != kopf
         if _is_valid(w):
             apply = getattr(w, "_inspector_apply", None)
             if callable(apply):
@@ -315,7 +344,7 @@ class VCInspectorPanel(QWidget):
                     apply()
                 except Exception:
                     pass
-        if canvas is None:
+        if canvas is None or fremd:
             return
         try:
             if canvas.to_dict() != before:
