@@ -380,7 +380,13 @@ Mit `--touch` gestartet, werden Knöpfe, Regler, Haken und Listenzeilen groß ge
   bedienen; zwei Finger zoomen in der 2D-Bühne und der Show-Zeitleiste.
 - **Eingaben:** ein Tipp in ein Textfeld öffnet unter Linux die Bildschirmtastatur von
   LightOS (unter Windows die von Windows), ein Tipp auf eine Zahl einen Ziffernblock.
-- **Mehrfachauswahl** ohne Strg-Taste über den Umschalter „Mehrfach“.
+- **Mehrfachauswahl** ohne Strg-Taste über den Umschalter „Mehrfach“ oder durch Halten +
+  Antippen: einen Finger auf einem Element liegen lassen, mit einem zweiten weitere antippen
+  (auch wenn schon das Kontextmenü aufgegangen ist). Gewählte Elemente tragen einen
+  bernsteinfarbenen Rahmen mit Haken, mehrere zusätzlich „3 gewählt“.
+- **System-Gesten:** Linux Mint (Cinnamon) und Windows 11 fangen manche Zwei-, Drei- und
+  Vier-Finger-Gesten ab, bevor LightOS sie sieht. LightOS meldet das beim Start im Touch-Modus
+  einmal; abschalten lassen sie sich in den Gesten-Einstellungen des Systems.
 - **Alle Gesten** stehen unter **Ansicht → Touch-Gesten…**, jede lässt sich dort abschalten.
   BLACKOUT, STOP ALL und ähnliche Aktionen lassen sich nicht auf eine Geste legen. Mit der Maus
   ändert sich nichts.

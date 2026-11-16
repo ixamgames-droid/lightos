@@ -48,7 +48,7 @@ Liegt ein Ziel außerhalb des Bewegungsbereichs eines Kopfes (typisch: ein Punkt
 
 > Der AN-Zustand wird **nicht** gespeichert. Eine geladene Show schreibt nichts von selbst in den Programmer. Gespeichert werden Zuordnung, letzter Zielpunkt (mit Fläche und Wandhöhe), Zielhöhe, Position Lock, Ansicht und gezeigte Wände. Shows aus der Zeit vor der aufgeklappten Ansicht öffnen in der Draufsicht.
 
-Ein nur **gehaltenes** Ziel (Lock AUS) bleibt nie hängen: Es wird auch freigegeben, wenn die Bank wechselt, das Fenster den Fokus verliert, das System die Berührung abbricht oder während des Haltens die Touch-Sperre angeht. Mit **Touch-Lock** ist das Pad gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Widget, es zielt nichts.
+Ein nur **gehaltenes** Ziel (Lock AUS) bleibt nie hängen: Es wird auch freigegeben, wenn die Bank wechselt, das Fenster den Fokus verliert, das System die Berührung abbricht oder während des Haltens die Touch-Sperre angeht. Wird das Pad gelöscht (auch in einem gelöschten Rahmen), per Rückgängig/Wiederholen ersetzt oder eine Show neu geladen, gibt es seine Pan/Tilt-Werte ebenfalls frei, auch bei Lock AN. Nur der Bankwechsel behält ein eingerastetes Ziel (Lock AN). Mit **Touch-Lock** ist das Pad gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Widget, es zielt nichts.
 
 **Am Finger:** Das Pad ist ein Bedienelement wie ein Fader. Wischen auf dem Pad scrollt die Konsole nicht, es zieht das Ziel. Im Touch-Modus sind AN/AUS, Lock und der Höhenregler mindestens 44 px hoch.
 

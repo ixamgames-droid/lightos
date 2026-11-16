@@ -23,7 +23,7 @@ def _ist_windows() -> bool:
 
 
 class GestenDialog(QDialog):
-    def __init__(self, parent=None, pfad: str | None = None):
+    def __init__(self, parent=None, pfad: str | None = None, system_zeile: str | None = None):
         super().__init__(parent)
         self.setWindowTitle("Touch-Gesten")
         self.setObjectName("gesten_dialog")
@@ -40,6 +40,21 @@ class GestenDialog(QDialog):
             "bleibt davon unberührt.")
         kopf.setWordWrap(True)
         lay.addWidget(kopf)
+        # UI-136: System-Gesten, die Finger vor LightOS abfangen (nur lesen)
+        if system_zeile is None:
+            try:
+                from src.ui import system_gesten
+                system_zeile = system_gesten.dialog_zeile()
+            except Exception as e:
+                print(f"[gesten_dialog] System-Gesten: {e}")
+                system_zeile = ""
+        self.system_hinweis = None
+        if system_zeile:
+            self.system_hinweis = QLabel("⚠ " + system_zeile)
+            self.system_hinweis.setObjectName("system_gesten_zeile")
+            self.system_hinweis.setWordWrap(True)
+            self.system_hinweis.setStyleSheet("color:#d29922;")
+            lay.addWidget(self.system_hinweis)
 
         inhalt = QWidget()
         il = QVBoxLayout(inhalt)
