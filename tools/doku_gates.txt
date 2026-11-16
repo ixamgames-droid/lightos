@@ -80,6 +80,7 @@ test_out70_qa96_befunde.py         # D-09: Ausgabe-Anleitung (de/en), ANLEITUNGE
 test_las36_doku_notaus_loesen.py   # Wortlaut NOT-AUS loesen: Erste Schritte, Laser, Buehnen-Show, Geraete-Generator
 test_fm52_programmer_verlauf.py    # Wortlaut in anleitung_programmer_grundlagen
 test_ui92_kleinkram_qa96.py        # Speichern-Frage: Knopfnamen wie in anleitung_erste_schritte
+test_qa121_readme_linux_pakete.py  # README/INSTALL: Linux-Paketliste nennt libxcb-cursor0
 test_ui93_wiederholen_kuerzel.py   # Wort „Wiederholen“ und beide Tastenfolgen in README und Anleitungen
 test_ui94_leertaste_fokus.py       # Tastenkuerzel-Tabelle in docs/ANLEITUNG.md nennt die Leertaste-Regel (Tabulator/Eingabetaste)
 test_ui64_programmer_playback.py

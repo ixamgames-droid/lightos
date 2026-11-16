@@ -139,8 +139,6 @@ def _lies_protokoll(pfad):
     return zeiten
 
 
-@unittest.skipUnless(_LAEUFT, _GRUND)
-
 def _stellvertreter_anlegen(pfad) -> None:
     """QA-117: ein Prozess mit dem Namen ``QtWebEngineProc``, der ``$1``
     Sekunden lebt. Frueher eine Kopie von /bin/sleep — seit Ubuntu 26.04 ist
@@ -155,6 +153,12 @@ def _stellvertreter_anlegen(pfad) -> None:
                     encoding="ascii")
     pfad.chmod(0o755)
 
+
+# QA-118: QA-117 hatte die Hilfsfunktion oben zwischen diesen Dekorator und
+# die Klasse gesetzt - der Skip traf die Funktion, und unter Windows liefen die
+# Tests der Klasse los (bash/flock fehlen). Waechter:
+# tests/test_qa118_skip_trifft_klasse.py.
+@unittest.skipUnless(_LAEUFT, _GRUND)
 class SperreUeberLaeufeHinwegTest(unittest.TestCase):
     """Die Zusicherung, um die es in PROC-02c geht."""
 
