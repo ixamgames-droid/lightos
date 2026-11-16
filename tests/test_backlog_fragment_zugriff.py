@@ -20,6 +20,7 @@ AUSNAHMEN = {
     "test_backlog_ids.py": "Werkzeug-Test backlog_ids.py, erfundene Fragmente",
     "test_proc19_doku_schnellweg.py": "Pfad nur als Beispiel fuer die Doku-Klasse",
     "test_tool23_backlog_ids_tafel_fragmente.py": "Werkzeug-Test, Wegwerf-Fragmente",
+    "test_proc06_id_gate.py": "Werkzeug-Test pr_bereit/backlog_ids, Wegwerf-Repo",
     "test_backlog_fragment_zugriff.py": "dieser Waechter selbst",
     "test_keine_privaten_dateien.py": "PRIV-06-Gegenprobe, Wegwerf-Fragment in tmp",
     "test_pseudonymisieren.py": "Werkzeug-Test pseudonymisieren.py, Wegwerf-Repo",

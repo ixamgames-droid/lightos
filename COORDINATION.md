@@ -123,6 +123,11 @@ Claims nur an (Exit 1 erst mit `--strict`), Entwuerfe zaehlen nie als
 Merge-Pruefung (PR-Nummern) Exit 1 wie ohne Claim, im Bericht nur Warnung. Ein alter PR von vor der Regel laesst sich bewusst durchwinken:
 `pr_bereit.py <PR> --ohne-claim "Begruendung"`.
 
+**Doppelt vergebene Backlog-IDs faengt derselbe Aufruf (PROC-06):** fuehrt der
+PR eine neue ID ein, die ein anderer offener PR mit anderem Titel fuehrt, heisst
+das Urteil „ID-Konflikt" (Exit 1) — wer spaeter kam, holt eine neue Nummer
+(`tools/backlog_ids.py --gruppe <G>`). `--ohne-claim` hebt das NICHT auf.
+
 **Reine Doku-/Backlog-PRs sind schnell gruen (PROC-19):** aendert ein PR nur
 `*.md` im Wurzelverzeichnis, `changelog.d/` oder Markdown/Bilder unter `docs/`,
 faehrt die CI statt der vollen Suite nur die Gates aus `tools/doku_gates.txt`.

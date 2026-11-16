@@ -1,0 +1,7 @@
+ID: PROC-06
+Status: review
+Status-Notiz: Gate in tools/pr_bereit.py (ID-Konflikt, Exit 1 bei der Merge-Pruefung), 16.11.2026
+
+**Geliefert:** `tools/pr_bereit.py` prueft je PR, ob er eine NEUE Backlog-ID einfuehrt (neue Zeile oder neues Fragment `backlog.d/<ID>.md` gegenueber dem Merge-Base mit `main`), die ein anderer offener PR-Zweig oder inzwischen `main` mit anderem Titel fuehrt. Dann heisst das Urteil „ID-Konflikt", bei der Merge-Pruefung (PR-Nummern, also auch in der Merge-Warteschlange mit `--strict`) Exit 1. Still bleiben: eine geerbte, nur umformulierte ID, ein Status-Fragment fuer ein vorhandenes Item, zwei PRs am selben vorhandenen Item, gestapelte Zweige mit gleichem Titel. Die Logik steht in `tools/backlog_ids.py` (`id_gate`, `neue_id_konflikte`, Titelvergleich wie bei `kollisionen`). Gelesen wird der lokale Ref-Stand ohne `git fetch`; gemessen rund 0,1-0,25 s je PR. Ohne `gh`/Netz oder bei fehlendem Ref gibt es einen Hinweis, kein Rot. Test: `tests/test_proc06_id_gate.py` (Wegwerf-Git-Repo, gh als Attrappe). WORKFLOW.md und COORDINATION.md nachgezogen.
+
+**Offen:** Ein Zweig, der `main` erst NACH dem Landen der fremden ID einmergt und dabei den Add/Add-Konflikt aufloest, erbt die ID und faellt nicht mehr auf (dann greift `test_ids_are_unique`). Die Merge-Warteschlange (Skript ausserhalb des Repos) kennt die Meldung „ID-Konflikt" noch nicht eigens und wartet dann wie bei einem unbekannten Zustand.

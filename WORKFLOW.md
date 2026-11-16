@@ -110,6 +110,13 @@ Was fehlt, woran man es merkt, wann es erledigt ist.
   (`todo`, `review`, `done`, `teils`, `blocked`), optional `Status-Notiz:`.
 - **ID holen:** `./venv/bin/python tools/backlog_ids.py --gruppe <GRUPPE>` —
   sieht auch die Fragmente der offenen PR-Zweige.
+- **Doppelt vergeben faellt beim Merge auf (PROC-06):** `tools/pr_bereit.py <PR>`
+  meldet „ID-Konflikt" (Exit 1), wenn der PR eine NEUE ID einfuehrt (neue Zeile
+  oder neues Fragment gegenueber dem Merge-Base mit `main`), die ein anderer
+  offener PR — oder inzwischen `main` — mit anderem Titel fuehrt. Abhilfe: neue
+  Nummer holen, Fragment umbenennen. Still bleiben eine geerbte, nur
+  umformulierte ID und Status-Fragmente fuer vorhandene Items. Gelesen wird der
+  lokale Ref-Stand; ohne `gh`/Netz oder bei fehlendem Ref nur ein Hinweis.
 - **Sammeln** regelmaessig durch die leitende Sitzung, als kleiner eigener PR
   auf frischem `main`: `./venv/bin/python tools/backlog_sammeln.py --pruefen`,
   dann `--dry-run`, dann ohne Schalter; Commit-Betreff `backlog: sammeln`. Neue
@@ -322,6 +329,20 @@ Das verbindliche Test-Gate des Loop-Modus laeuft ueber `tools/verify_loop.ps1`:
   > „keine `FAILED`-Zeile" ein echter Fehlschlag stecken.
 
 Details zur Sperre: `SecondBrain/reference_pytest_lock.md`.
+
+### CI-Lauf fehlt: „no checks reported" (PROC-03)
+
+Manchmal legt GitHub fuer den Kopf-Commit eines PR **gar keinen** Check-Run an
+(gemessen am 24.08.2026 an #653/#659): `gh pr checks <PR>` meldet woertlich
+„no checks reported", `gh api repos/:owner/:repo/commits/<sha>/check-runs -q
+.total_count` ergibt `0`. Das sieht aus wie „nichts rot" und ist **nie
+geprueft**. `tools/pr_bereit.py` meldet es als „nie geprueft" (in den ersten
+Minuten nach einem Push als „gerade gepusht" — dann nur abwarten).
+
+**Abhilfe:** `origin/main` in den Zweig mergen und pushen
+(`git fetch origin && git merge origin/main && git push`) — der neue Commit
+holt den Lauf zurueck. Close/Reopen des PR hilft nicht. Danach erneut
+`pr_bereit.py <PR>`.
 
 ### CI-Schnellweg fuer reine Doku-/Backlog-PRs (PROC-19)
 
