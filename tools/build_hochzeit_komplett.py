@@ -81,6 +81,7 @@ from src.ui.virtualconsole.vc_frame import VCFrame
 from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
 from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
+from src.ui.virtualconsole.vc_raumpad import VCRaumPad
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # TOOL-10: LIGHTOS_GEN_OUT lenkt die Show in einen Wegwerf-Ordner um (Test baut
@@ -924,6 +925,13 @@ def effect_display(caption, x, y, bank, function_id, ww=260, hh=130):
     _add(w, x, y, ww, hh, bank)
 
 
+def raum_pad(caption, x, y, bank, fids, ww=260, hh=240):
+    """UI-127: Raum antippen statt Pan/Tilt — Koepfe zielen auf den Punkt."""
+    w = VCRaumPad(caption)
+    w._fixture_ids = list(fids)
+    _add(w, x, y, ww, hh, bank)
+
+
 def multi_live_editor(caption, x, y, bank, fids, ww=300, hh=240):
     w = VCMultiLiveEditor(caption)
     for fid in fids:
@@ -1023,6 +1031,7 @@ effect_action_btn("Neustart", note_rc(3, 3), B_MOVE, "#553010", "restart", efx_c
 select_group_btn("Mover", "Alle Mover", note_rc(3, 5), B_MOVE)
 xy_pad("MH zielen (Pan/Tilt)", RX, Y0, B_MOVE, mh_fids, mode="position")
 xy_pad("EFX-Feld aufziehen", RX + 210, Y0, B_MOVE, mover_fids, mode="area", efx_function_id=efx_circle.id)
+raum_pad("MH Raum-Pad", RX + 420, Y0, B_MOVE, mh_fids)
 encoder("EFX-Tempo", 7, B_MOVE, efx_circle.id, "tempo_multiplier", step=0.005)
 tempo_fader("Mover-Speed", 0, B_MOVE, function_ids=[e.id for e in EFX_ALL], rng=TEMPO_X1, value=48, midi_cc=48)
 fader("Mover-Größe", 1, B_MOVE, SliderMode.EFFECT_PARAM, function_ids=[e.id for e in EFX_ALL], param_key="size", midi_cc=49, value=150)

@@ -1,5 +1,6 @@
 """Patch-Ansicht — Geräte patchen und verwalten."""
 from __future__ import annotations
+from contextlib import nullcontext
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
     QTableWidgetItem, QHeaderView, QLabel, QMessageBox, QAbstractItemView,
@@ -1089,8 +1090,13 @@ class PatchView(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            for f in to_delete:
-                self._state.remove_fixture(f.fid)
+            # ENG-45: viele Geraete -> EIN Neuaufbau und EIN patch_changed am
+            # Ende statt je Geraet (die Patch-Tabelle baute sich N-mal neu
+            # auf). Jedes Loeschen bleibt ein eigener Rueckgaengig-Schritt.
+            sammeln = getattr(self._state, "patch_sammeln", None) or nullcontext
+            with sammeln():
+                for f in to_delete:
+                    self._state.remove_fixture(f.fid)
 
     def _copy_with_offset(self):
         """UI-03: ausgewaehlte Geraete mehrfach mit festem Adress-Abstand patchen.

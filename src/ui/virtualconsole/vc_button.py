@@ -558,6 +558,8 @@ class VCButton(VCWidget):
         self._badge_timer = QTimer(self)
         self._badge_timer.setInterval(900)   # ~0.9 s pro Farbe
         self._badge_timer.timeout.connect(self._advance_badge)
+        # UI-129: zuletzt gemalte Flaeche des Live-Sternchens (None = keins).
+        self._live_stern_rect = None
 
         self.resize(DEFAULT_BUTTON_SIZE, DEFAULT_BUTTON_SIZE)
 
@@ -1011,7 +1013,35 @@ class VCButton(VCWidget):
                 return True
         except Exception:
             pass
+        # UI-129: Tooltip-Zusatz „live bearbeitet", solange das Sternchen steht.
+        try:
+            from src.ui.widgets.live_stern import zeige_live_stern_tooltip
+            if zeige_live_stern_tooltip(self, e):
+                return True
+        except Exception:
+            pass
         return super().event(e)
+
+    # ── UI-129: Sternchen „Effekt live bearbeitet" ───────────────────────────
+    def live_stern_fid(self):
+        """Die EINE eigene Funktion dieser Taste — oder None.
+
+        Nur Tasten, die genau eine fest gebundene Funktion starten/umschalten
+        oder auf ihr eine Effekt-Aktion ausloesen, zeigen das Sternchen. Eine
+        Gruppen-Taste (mehrere Funktionen) und eine reine Bearbeitungs-Taste
+        (Edit-Slot ohne eigene Funktion: wirkt auf „das aktuelle Ziel") nicht.
+        Bei anderen Aktionen ist ``function_id`` z. B. ein Executor-Slot."""
+        if self.action not in (ButtonAction.FUNCTION_TOGGLE,
+                               ButtonAction.FUNCTION_FLASH,
+                               ButtonAction.EFFECT_ACTION):
+            return None
+        fids = self._all_function_ids()
+        return fids[0] if len(fids) == 1 else None
+
+    def live_stern_sichtbar(self) -> bool:
+        """Zeigt diese Taste gerade das Sternchen? (Zustand ohne Malen pruefbar.)"""
+        from src.ui.widgets.live_stern import ist_live_editiert_fid
+        return ist_live_editiert_fid(self.live_stern_fid())
 
     # ── Farb-Vorschau-Badge (oben rechts) ────────────────────────────────────
     def _color_badge_colors(self) -> list:
@@ -2355,6 +2385,11 @@ class VCButton(VCWidget):
         if _modify and face.height() >= 3 * _mz_h:
             text_rect = text_rect.adjusted(0, 0, 0, -(_mz_h + 2))
         p.drawText(text_rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
+        # UI-129: belegte Flaeche der Beschriftung (mit IHRER Schrift gemessen) —
+        # das Live-Sternchen weicht ihr aus.
+        _text_bb = (p.boundingRect(text_rect, Qt.AlignmentFlag.AlignCenter
+                                   | Qt.TextFlag.TextWordWrap, display)
+                    if display else None)
 
         # Gobo-Icon (oben rechts), wenn dieser Button einen Gobo setzt.
         if _has_gobo:
@@ -2483,6 +2518,29 @@ class VCButton(VCWidget):
             p.setPen(QColor("#000000"))
             p.setFont(QFont("Segoe UI", 7, QFont.Weight.Bold))
             p.drawText(QRect(0, 0, 14, 10), Qt.AlignmentFlag.AlignCenter, f"+{len(self.actions)}")
+
+        # UI-129: Sternchen oben links, wenn die eigene Funktion live bearbeitet
+        # ist. Oben rechts gehoeren MIDI-Punkt/Gobo/Farb-Badge/⚠, unten links das
+        # Modify-Zeichen. Belegen Tasten-Kuerzel oder „+n" die Ecke, rutscht der
+        # Stern darunter; trifft er die Beschriftung, weicht er nach unten rechts
+        # (ueber den Aktions-Streifen) aus.
+        self._live_stern_rect = None
+        if self.live_stern_sichtbar():
+            from src.ui.widgets.live_stern import (STERN_D, waehle_stern_rect,
+                                                   zeichne_live_stern)
+            d = STERN_D
+            fx, fy = int(face.left()), int(face.top())
+            oben_y = fy + 3 if not (self.actions or self.key_binding) else 12
+            kandidaten = [
+                QRect(fx + 3, oben_y, d, d),
+                QRect(int(face.right()) - 3 - d, int(face.bottom()) - 4 - 2 - d, d, d),
+            ]
+            belegt = [_text_bb, self._modify_zeichen_rect]
+            if self.key_binding:
+                belegt.append(QRect(16 if self.actions else 2, 0,
+                                    max(0, self.width() - 26), 10))
+            self._live_stern_rect = waehle_stern_rect(kandidaten, belegt)
+            zeichne_live_stern(p, self._live_stern_rect)
 
         p.end()
 

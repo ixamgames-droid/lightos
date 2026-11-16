@@ -3,6 +3,9 @@
 > Die **Virtuelle Konsole** ist deine eigene Bedienoberfläche: Buttons, Fader und Farb-Kacheln,
 > frei platziert, optional auf den **APC mini** gemappt. Hier baust du sie Schritt für Schritt —
 > alles in der Oberfläche, ohne Code.
+>
+> **Was du danach kannst:** eine eigene Konsole bauen (Tasten, Fader, Farben), sie in Bänken
+> ordnen, im Betrieb bedienen — per Maus, Touch oder APC mini — und mit der Show speichern.
 
 **Zum Mitklicken:** Die Bilder zeigen die **Doku-Demo-Show** (acht PAR, zwei Wash, zwei Spot,
 eine LED-Leiste, drei Farb-Szenen, ein Lauflicht, ein Regenbogen, ein Kreis). Dieselbe Show
@@ -49,8 +52,11 @@ Console**). Das gilt auch im Bedienmodus, wenn das Layout gar nicht bearbeitet w
 einem Rückgängig etwas Neues, ist der Wiederholen-Zweig für beide Bereiche verworfen. Auf den anderen
 Seiten der App bleibt das Layout der Konsole unberührt – dort gilt nur der Verlauf von Patch und
 Geräten. In einem Textfeld mit Schreibmarke gelten die Tasten für den getippten Text. Eine fertige
-**Controller-Vorlage** (etwa ein komplettes APC-mini-Layout) lässt sich derzeit **nicht** per Knopf in
-die VC einfügen; den Aufbau übernimmst du Widget für Widget (siehe *APC mini mappen*).
+**Controller-Vorlage** (etwa ein komplettes APC-mini-Layout) fügst du nicht über die
+Werkzeugleiste ein, sondern über **E/A → MIDI → „Controller-Profile…"**: Gerät wählen, dann
+**„In Virtual Console einfügen"** (Details in der
+[Fader-Anleitung](../anleitung_vc_widgets/02_fader.md#motorpult-als-ganzes-einfügen)).
+Sonst baust du Widget für Widget (siehe *APC mini mappen*).
 
 ![Bearbeiten-Modus mit Werkzeugleiste](img/02_bearbeiten_modus.png)
 
@@ -120,10 +126,22 @@ die Eigenschaften (im Rechtsklick-Menü heißt dieser Eintrag **„Einstellungen
 1. **Aktion** — hier „Funktion an/aus" mit der Szene „Alle PAR Rot" als Ziel.
 2. **OK** übernimmt die Einstellungen.
 
+### Mehrere Elemente auswählen und ausrichten
+
+Im Bearbeiten-Modus wählst du mehrere Widgets auf einmal:
+
+1. **Strg**- oder **Umschalt**-Klick auf die Widgets, **oder** einen Rahmen auf freier Fläche
+   aufziehen. Am Finger schaltest du vorher **Mehrfach** ein (der Knopf erscheint nur im
+   Touch-Modus): Dann nimmt jeder Tipp ein Element dazu oder heraus.
+2. Gewählte Widgets zusammen ziehen — alle wandern mit.
+3. **Ausrichten ▾** in der Werkzeugleiste (ab zwei gewählten Elementen) richtet sie links, rechts,
+   oben oder unten aus, verteilt sie mit gleichen Abständen oder löscht sie gemeinsam.
+
 ## 3. Bänke mit Labels gliedern
 
 Oben über **◀ / Bank X / ▶** (oder Tastatur **Strg + Bild↑ / Bild↓**) zwischen Bänken wechseln.
-Ein neu angelegtes Widget landet auf der **gerade sichtbaren** Bank. Mit **Label-Widgets** als
+Ein neu angelegtes Widget landet auf der **gerade sichtbaren** Bank. Es gibt bis zu zehn Bänke;
+einem Widget weist du per Rechtsklick → **Bank** eine bestimmte Bank oder **Alle Banks** zu. Mit **Label-Widgets** als
 Zonen-Überschriften wird die Konsole übersichtlich. Eine bewährte Aufteilung:
 
 - **Bank 1 — Looks und Master:** Funktions-Tasten für die Looks (grüner Strich unten =
@@ -180,6 +198,33 @@ Statusleiste, die das sonst anzeigt. Gelöst wird der NOT-AUS auch hier nur mit 
 samt Rückfrage ([Laser-Anleitung](../anleitung_laser/ANLEITUNG_LASER.md#blackout-ziel-blackout-und-not-aus)).
 
 ![Kiosk-Streifen oben rechts: (1) GM-Regler mit Prozentwert, (2) STOP ALL, (3) BLACKOUT, (4) LASER NOT-AUS (ausgelöst: „LASER NOT-AUS AKTIV“), darunter (5) der rote Balken „LASER NOT-AUS ausgelöst — alle Laser dunkel …“](img/10_kiosk_streifen.png)
+
+### Touch-Bedienung
+
+Mit `python main.py --touch` werden Knöpfe und Regler größer (ohne den Schalter bleibt
+die Oberfläche auch an einem Touchscreen unverändert). Am Finger gilt:
+
+- **Lange drücken** (etwa 0,6 s still halten) öffnet das Kontextmenü wie der Rechtsklick;
+  ohne Menü zeigt es die Erklärung des Elements. Im Betrieb gilt das nie für VC-Elemente —
+  eine gehaltene Taste (z. B. FLASH) bleibt eine gehaltene Taste.
+- **Mehrere Fader gleichzeitig:** jeder Finger bedient sein eigenes Element.
+- **Zwei Finger waagerecht** auf freier Fläche der Konsole blättern die Bank
+  (nach links = nächste, nach rechts = vorherige).
+- **Mehrfach** (siehe oben) wählt im Bearbeiten-Modus mehrere Elemente.
+
+Welche Gesten gelten, stellst du unter **Ansicht → Touch-Gesten…** ein (jede lässt sich
+abschalten; mit **Übernehmen** sofort gültig). Dort legst du auch fest, was **Drei Finger
+tippen** tut — Vorgabe „Aus"; BLACKOUT oder STOP ALL gibt es dort bewusst nicht. Im Kiosk-Modus
+fehlt dieser Menüpunkt.
+
+### Handy-Konsole
+
+Ein Klick auf **📱 Handy-Konsole** in der Werkzeugleiste öffnet eine Seitenleiste, in der du
+zusammenstellst, was am Handy zu sehen ist: Elemente als Kacheln hineinziehen (oder Rechtsklick
+→ **Auf Handy-Konsole legen**), anordnen, **Neue Handy-Gruppe…** für Tasten, von denen nur
+eine gleichzeitig an sein soll. Am Handy schaltet **✦ Anim.** die Animationen aus und an.
+Verbinden, Seiten und Gruppen im Einzelnen:
+[Handy-Konsole / Web-Remote](../anleitung_web_remote/ANLEITUNG.md).
 
 ### Konsole auf einen zweiten Bildschirm legen (Popout)
 
@@ -272,5 +317,5 @@ Layout über **Canvas exportieren…** als Datei sichern und später wieder **im
 
 **Kurz:** Virtual Console → Bearbeiten → Effekt aus der Bibliothek aufs Raster ziehen → in der Karte
 „Effekt einrichten" ankreuzen → Erstellen (Farb-Snaps werden direkt zur Kachel; manuell geht es auch über
-die Werkzeugleiste + Doppelklick→Einstellungen) → 5 Bänke füllen → Bearbeiten aus → testen → optional APC
+die Werkzeugleiste + Doppelklick→Einstellungen) → Bänke füllen → Bearbeiten aus → testen → optional APC
 mini per „MIDI Lernen" mappen → mit der Show speichern.

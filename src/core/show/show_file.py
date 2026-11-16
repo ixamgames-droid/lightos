@@ -1131,13 +1131,22 @@ def _sh_laser3w_fids(state) -> set[int]:
     Stand (LAS-28) traegt. Eine eigene Profilkopie im Altstand (vier
     ``laser_twist``) faellt durch die Formpruefung und wird nie umgeschluesselt.
     Best-effort wie ``_euron10_2ch_fids``: bei Fehlern wird nichts migriert."""
+    return _sh_laser3w_befund(state)[0]
+
+
+def _sh_laser3w_befund(state) -> tuple[set[int], bool]:
+    """QA-121: wie ``_sh_laser3w_fids``, dazu ``gesichert``: False, wenn die
+    Erkennung an einem Fehler scheiterte oder ein SH-LASER3W noch die alte
+    Kanalform traegt. Dann ist die LAS-28-Umsetzung NICHT gelaufen und das
+    naechste Speichern darf den Marker nicht schreiben — sonst sperrt er die
+    Umsetzung fuer immer."""
     out: set[int] = set()
     try:
         fixtures = list(state.get_patched_fixtures())
     except Exception:
-        return out
+        return out, False
     if not fixtures:
-        return out
+        return out, True
     try:
         from sqlalchemy import select
         from sqlalchemy.orm import Session
@@ -1147,7 +1156,7 @@ def _sh_laser3w_fids(state) -> set[int]:
         pids = {getattr(f, "fixture_profile_id", None) for f in fixtures}
         pids.discard(None)
         if not pids:
-            return out
+            return out, True
         with Session(_fdb_engine()) as s:
             laser_pids = set(s.execute(
                 select(FixtureProfile.id).where(
@@ -1156,7 +1165,8 @@ def _sh_laser3w_fids(state) -> set[int]:
                 )
             ).scalars().all())
         if not laser_pids:
-            return out
+            return out, True
+        gesichert = True
         for f in fixtures:
             if getattr(f, "fixture_profile_id", None) not in laser_pids:
                 continue
@@ -1166,12 +1176,16 @@ def _sh_laser3w_fids(state) -> set[int]:
                         in ("laser_twist", "laser_twist_y")]
                 fid_i = int(getattr(f, "fid"))
             except Exception:
+                gesichert = False
                 continue
             if form == _LAS28_FORM:
                 out.add(fid_i)
+            else:
+                gesichert = False     # Profilkopie im Altstand: nicht umgesetzt
     except Exception as e:
         print(f"[show_file] SH-LASER3W flip detection failed: {e}")
-    return out
+        return out, False
+    return out, gesichert
 
 
 def _las28_basis(k) -> str:
@@ -1686,7 +1700,9 @@ def _show_daten(state, probleme: list) -> dict:
         or {"enabled": False, "function_ids": [], "bank": 0},
         # CDX-65: Attribut-Umbauten, deren neue Schluessel diese Show schon
         # traegt — der Loader migriert sie dann nicht noch einmal.
-        "attribut_migrationen": [_LAS28_MARKER],
+        # QA-121: nur wenn die Umsetzung beim Laden gesichert lief.
+        "attribut_migrationen": ([] if getattr(state, "_las28_ungesichert", False)
+                                 else [_LAS28_MARKER]),
     }
     # LAS-32 (S1): Sperrzonen als EIGENER Abschnitt mit eigener Versionsnummer
     # — bewusst kein Knoten im Szenengraph (ein aelterer Programmstand macht aus
@@ -1874,6 +1890,8 @@ _LIVE_FELDER_LIVE_VIEW_META = ("zoom",)          # Ansicht, wie das Fensterlayou
 #:   VCSlider            value                    Fader ziehen / MIDI
 #:   VCSpeedDial         bpm, active_factor, mult Rad, Tap, Faktor-Gitter
 #:   VCXYPad             pan, tilt, area          Pad ziehen, Feld markieren, MIDI
+#:   VCRaumPad           ziel, hoehe, flaeche,    Ziel antippen (Boden/Wand),
+#:                       wand_hoehe               Zielhoehe (UI-127)
 #:   VCTempoBusController source, factor, fixed_bpm  Quelle/Tap, Faktor, Fix-Rad
 #:   VCMultiLiveEditor   joint                    Dropdown „Alle gemeinsam" (VCB-49)
 #: Bewusst NICHT live: VCColor-Farbe (der Doppelklick-Waehler aendert, WAS die
@@ -1888,6 +1906,7 @@ _LIVE_FELDER_VC = {
     "VCSlider": ("value",),
     "VCSpeedDial": ("bpm", "active_factor", "mult"),
     "VCXYPad": ("pan", "tilt", "area"),
+    "VCRaumPad": ("ziel", "hoehe", "flaeche", "wand_hoehe"),
     "VCTempoBusController": ("source", "factor", "fixed_bpm"),
     # VCB-49: Wahl „Alle gemeinsam" im Dropdown = Bedienung (wie die Einzel-
     # Auswahl, die gar nicht gespeichert wird); der Haken-Satz joint_checked
@@ -2386,6 +2405,7 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
     state._vc_layout = {}
     state._snapshots_data = []
     state._channel_groups_data = []
+    state._las28_ungesichert = False   # QA-121: neue Show bekommt den Marker
     # VIZ-11: Szenegraph komplett neu (deckt den echten AppState, dessen 5
     # Legacy-Felder Views auf state._scene sind, siehe app_state.py). Die
     # expliziten Feld-Resets darunter bleiben zusaetzlich bestehen, damit
@@ -2708,11 +2728,17 @@ def _load_show_impl(path: str | os.PathLike):
     # CDX-65: SH-LASER3W-Flip-Schluessel (LAS-28) nur fuer Shows OHNE Marker —
     # eine seit CDX-65 gespeicherte Show traegt die neuen Schluessel schon.
     _laser3w_fids: set[int] = set()
+    # QA-121: Marker beim Speichern nur, wenn die Umsetzung gesichert lief
+    # (oder der Marker schon da war). Scheitert die Erkennung, bleibt die Show
+    # ohne Marker und wird beim naechsten Laden erneut geprueft.
+    state._las28_ungesichert = False
     try:
         _migr = data.get("attribut_migrationen") or []
         if _LAS28_MARKER not in (_migr if isinstance(_migr, list) else []):
-            _laser3w_fids = _sh_laser3w_fids(state)
+            _laser3w_fids, _las28_gesichert = _sh_laser3w_befund(state)
+            state._las28_ungesichert = not _las28_gesichert
     except Exception as e:
+        state._las28_ungesichert = True
         print(f"[show_file] SH-LASER3W flip marker check failed: {e}")
     # CDX-65 (Nachbesserung): ein Dict NUR mit ``laser_twist#1`` ist mehrdeutig
     # (Shows zwischen LAS-28 und dieser Migration tragen keinen Marker). Es wird
@@ -2746,6 +2772,7 @@ def _load_show_impl(path: str | os.PathLike):
                           "nicht umgesetzt (Speicherstand vor/nach LAS-28 nicht "
                           "erkennbar)"))
         except Exception as e:
+            state._las28_ungesichert = True     # QA-121
             print(f"[show_file] SH-LASER3W flip classification failed: {e}")
 
     try:

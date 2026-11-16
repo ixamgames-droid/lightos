@@ -27,9 +27,10 @@ Jede Installation bringt zwei Sorten Geräteprofile mit:
   RGBWA, Moving Heads, Strobe, LED-Leisten, Matrix-Panel) und eine Reihe
   Markengeräte, die fest im Programm stehen.
 - **Die eigene LightOS-Bibliothek** — eine Datei je Gerät im Ordner
-  `fixtures/bibliothek/`. Mitgeliefert sind derzeit 117 Geräte von **American DJ**,
-  **BeamZ**, **Cameo**, **Chauvet**, **Eurolite**, **Showtec**, **Stairville** und
-  **Varytec**: PARs, Washes, Moving Heads, Strobes, Leisten, Hazer und Nebelmaschinen.
+  `fixtures/bibliothek/`. Mitgeliefert sind derzeit 244 Geräte von 19 Herstellern, darunter
+  **American DJ**, **BeamZ**, **Cameo**, **Chauvet**, **Eurolite**, **Showtec**,
+  **Stairville**, **Varytec**, **Martin** und **U King**: PARs, Washes, Moving Heads,
+  Strobes, Leisten, Hazer und Nebelmaschinen.
   LightOS spielt sie beim Start in die Geräte-Datenbank ein. Du musst dafür nichts tun.
 
 **Herkunft und „geprüft“.** Jede Bibliotheksdatei sagt, woher sie stammt und wie gut sie
@@ -40,7 +41,7 @@ geprüft ist:
   wurde, steht in `herkunft.geaendert`.
 - `quelle` nennt das Handbuch des Herstellers (Titel, Link).
 - `geprueft` sagt, ob jemand das Profil **Kanal für Kanal** gegen das Handbuch oder das
-  echte Gerät geprüft hat (`"ok": true`) und wie. Bei 74 der 117 Geräte ist das der Fall.
+  echte Gerät geprüft hat (`"ok": true`) und wie. Bei 123 der 244 Geräte ist das der Fall.
   Bei den übrigen steht `"ok": false` — die Kanalbelegung stammt dann ungeprüft aus
   der Vorlage. Vergleiche sie vor der ersten Show kurz mit dem Handbuch deines Geräts.
 

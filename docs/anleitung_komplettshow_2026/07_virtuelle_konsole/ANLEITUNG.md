@@ -4,7 +4,7 @@ In dieser Anleitung baust du eine Virtuelle Konsole (VC) mit Tasten und einem XY
 
 ## Schritt-für-Schritt
 
-1. Öffne die Sektion **„Virtual Console"** und schalte oben den Button **„Bearbeiten"** ein (aktiv).
+1. Öffne die Sektion **„Virtual Console"** und schalte oben den Button **„Bearbeiten"** ein (er zeigt dann **„Bearbeiten ✓"**).
 
 2. Ziehe einen Eintrag aus der Bibliothek rechts auf den **leeren Canvas**. Alternativ: Rechtsklick auf den Eintrag → **„Auf VC-Taste legen"** aktiviert einen Zuweis-Modus (Fadenkreuz-Cursor) – der nächste Klick auf eine **bereits vorhandene Taste** bindet sie direkt als An/Aus-Toggle, **ohne** den Dialog.
 
@@ -28,6 +28,13 @@ In dieser Anleitung baust du eine Virtuelle Konsole (VC) mit Tasten und einem XY
    3. Drücke am APC den zugehörigen Pad bzw. Fader (das Drücken am Gerät machst du an der Hardware). Die Bindung steht.
    4. Schalte **„APC LEDs"** ein, um LED-Feedback am Gerät zu erhalten.
    - Ein **mk2** wird am Port automatisch erkannt. **VC-Bank N** entspricht **Playback-Seite N**.
+
+## Touch und Handy
+
+- **Touch-Bildschirm:** Startest du LightOS mit `--touch`, werden die Knöpfe größer. Mit **Ansicht → Touch-Gesten…** siehst du die Gesten und kannst sie ein- und ausschalten.
+- **Mehrere Elemente auf einmal wählen:** Im Bearbeiten-Modus erscheint mit `--touch` der Knopf **„Mehrfach"**. Ist er an, nimmt jeder Tipp ein Element dazu oder heraus. Die gewählten ziehst du dann gemeinsam.
+- **Versehentliches Antippen verhindern:** **„🔒 Touch-Lock"** macht die Konsole zur reinen Anzeige. Ein APC Mini steuert weiter.
+- **Handy-Konsole:** Der Knopf **„📱 Handy-Konsole"** öffnet die Seitenleiste, in der du festlegst, was am Handy zu sehen ist. Ziehe Elemente hinein oder wähle per Rechtsklick **„Auf Handy-Konsole legen"**. Am Handy zeigt die Konsole Kacheln; der Schalter **„✦ Anim. an"** schaltet die Animationen dort aus. Mit **„Neue Handy-Gruppe mit dieser Kachel…"** (Rechtsklick auf eine Kachel in der Seitenleiste) fasst du Kacheln zu einer Gruppe zusammen.
 
 ## Tipps / Fallen
 

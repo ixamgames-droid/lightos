@@ -123,6 +123,10 @@ In den Modi **Effekt-Helligkeit**, **Effekt-Tempo** und **Effekt-Parameter** wir
 
 Die eigentliche Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/effect_live.py` (`list_params`/`set_param`/`do_action`); das Widget speichert nur die Effekt-ID. Dieselbe Bindung nutzt auch MIDI (siehe [README.md](README.md)). Über **Effekt An/Aus (EFFECT-Modi)** kann der Fader zusätzlich starten/stoppen: An = Wert > 0 startet den Ziel-Effekt (falls nicht laufend), Wert 0 stoppt ihn; Aus = der Fader regelt nur, der Effekt muss separat gestartet werden (bei 0 läuft er mit Wert 0 weiter).
 
+### Sternchen „live bearbeitet" (UI-129)
+
+Ist ein Fader in einem der Effekt-Modi fest an **genau einen** Effekt gebunden und wurde dieser live verändert, zeigt er in einer freien oberen Ecke (links, sonst rechts) ein kleines gelbes Sternchen; der Tooltip sagt „live bearbeitet". Fader ohne feste Bindung (aktiver Effekt / Live-Edit-Slot) und Gruppen-Fader zeigen keins. Der Stern verschwindet bei **Reset Live**, **Commit** und beim Laden einer Show und wird nicht gespeichert. Dasselbe gilt für den Encoder.
+
 ## MIDI & Tastatur
 
 Der Fader unterstützt **MIDI-Teach** für **CC** und **Pitchbend** (kein Note); eine **Tasten-Zuweisung gibt es nicht** (ein Fader braucht einen kontinuierlichen Wert, keinen Tastendruck).

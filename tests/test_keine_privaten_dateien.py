@@ -546,5 +546,156 @@ class KeinKlarnameImBacklogTest(unittest.TestCase):
         self.assertEqual([f.split(":")[:2] for f in pfade], [["backlog.d/X-3.md", "5"]])
 
 
+# ── PRIV-8: in getrackte Archive hineinsehen ─────────────────────────────────
+def _archiv_dateien(repo: str, pfade: list[str]) -> list[str]:
+    """Getrackte ZIP-artige Dateien: ``.lshow`` (Show-Archiv) und alles, was
+    mit der ZIP-Kennung ``PK`` beginnt — die Endung allein ist kein Beleg."""
+    out = []
+    for p in pfade:
+        voll = os.path.join(repo, p)
+        try:
+            with open(voll, "rb") as f:
+                kopf = f.read(4)
+        except OSError:
+            continue
+        if p.lower().endswith(".lshow") or kopf.startswith(b"PK\x03\x04"):
+            out.append(p)
+    return out
+
+
+def _archiv_funde(repo: str, pfade: list[str], nur_klarnamen: bool) -> list[str]:
+    """``datei!eintrag:zeile: art`` fuer jede Textzeile IN einem Archiv, die
+    ``pruefe_oeffentlich()`` beanstandet. Gemeldet wird die ART, nie der Wert
+    (der Befund nennt vom Namen nur den Anfangsbuchstaben).
+
+    ``nur_klarnamen`` trennt wie bei PRIV-06: der Namensteil braucht die
+    LOKALE Liste, der Pfad-Teil (``/home/<konto>/``, ``C:/Users/<konto>/``)
+    laeuft ueberall. E-Mail bleibt aussen vor (Show-JSON kennt ``x@y``-artige
+    Bezeichner)."""
+    import importlib.util
+    import zipfile
+    spec = importlib.util.spec_from_file_location(
+        "_session_claim_priv8", os.path.join(repo, "tools", "session_claim.py"))
+    sc = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sc)
+    funde = []
+    for p in _archiv_dateien(repo, pfade):
+        try:
+            z = zipfile.ZipFile(os.path.join(repo, p))
+        except (OSError, zipfile.BadZipFile):
+            funde.append(f"{p}: kein lesbares ZIP — von Hand pruefen")
+            continue
+        with z:
+            for info in z.infolist():
+                if info.is_dir() or info.file_size > 64 * 1024 * 1024:
+                    continue
+                try:
+                    text = z.read(info).decode("utf-8")
+                except UnicodeDecodeError:
+                    continue            # Bilder/Binaeres: kein Text
+                for nr, zeile in enumerate(text.splitlines(), 1):
+                    for befund in sc.pruefe_oeffentlich(zeile):
+                        ist_name = befund.startswith("Klarname")
+                        if befund == "E-Mail-Adresse" or ist_name != nur_klarnamen:
+                            continue
+                        funde.append(f"{p}!{info.filename}:{nr}: {befund}")
+    return funde
+
+
+class KeinPrivatesInGetracktenArchivenTest(unittest.TestCase):
+    """PRIV-8: Demo-Shows (``shows/*.lshow``) sind ZIP-Archive.
+
+    Die Positivliste oben erlaubt sie nach dem Namen, und die Textwaechter
+    lesen nur Klartext-Dateien. So stand in ``Demo_Show_Full.lshow`` (show.json,
+    Audio-Playlist) ein Windows-Benutzerpfad samt Klarname des Betreibers —
+    16 Mal, unbemerkt. Dieses Gate oeffnet jedes getrackte Archiv.
+    """
+
+    def setUp(self):
+        self.dateien = _getrackte_dateien()
+        if not self.dateien:
+            self.skipTest("kein git-Checkout (Tarball/Sandbox) — nichts zu pruefen")
+
+    def test_archive_werden_ueberhaupt_gesehen(self):
+        archive = _archiv_dateien(_REPO, self.dateien)
+        self.assertTrue(any(a.startswith("shows/") for a in archive),
+                        "keine getrackte Demo-Show gefunden — der Waechter schaut ins Leere")
+
+    def test_keine_privaten_pfade_in_archiven(self):
+        alt = os.environ.get("LIGHTOS_KLARNAMEN")
+        os.environ["LIGHTOS_KLARNAMEN"] = os.path.join(_REPO, "gibt-es-nicht", "x.txt")
+        try:
+            funde = _archiv_funde(_REPO, self.dateien, nur_klarnamen=False)
+        finally:
+            if alt is None:
+                os.environ.pop("LIGHTOS_KLARNAMEN", None)
+            else:
+                os.environ["LIGHTOS_KLARNAMEN"] = alt
+        self.assertEqual(funde, [], "Privater Pfad IN einem getrackten Archiv — "
+                                    "Generator/Show bereinigen (neutrale, relative "
+                                    "Pfade; Platzhalter /home/user/…, C:\\Users\\X\\…)")
+
+    def test_kein_klarname_in_archiven(self):
+        if not _lokale_klarnamen(_REPO):
+            self.skipTest("keine lokale Namensliste (klarnamen.txt) — laeuft nur "
+                          "auf den Entwicklungsrechnern, nicht in der CI")
+        funde = _archiv_funde(_REPO, self.dateien, nur_klarnamen=True)
+        self.assertEqual(funde, [], "Klarname IN einem getrackten Archiv — im Repo "
+                                    "heisst der Betreiber „Robin“.")
+
+    def test_der_waechter_wuerde_es_im_archiv_finden(self):
+        """Gegenprobe mit KUENSTLICHEN Archiven in einer tmp-Kopie — Proben
+        zusammengesetzt, sonst faende das Gate sich selbst."""
+        import json
+        import shutil
+        import tempfile
+        import zipfile
+        name = "Kasi" + "mirus"
+        alt = os.environ.get("LIGHTOS_KLARNAMEN")
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "tools"))
+            os.makedirs(os.path.join(tmp, "shows"))
+            shutil.copy(os.path.join(_REPO, "tools", "session_claim.py"),
+                        os.path.join(tmp, "tools"))
+            liste = os.path.join(tmp, "klarnamen.txt")
+            with open(liste, "w", encoding="utf-8") as f:
+                f.write(f"# Probe\n{name}\n")
+
+            def _zip(rel, eintraege):
+                with zipfile.ZipFile(os.path.join(tmp, rel), "w") as z:
+                    for n, inhalt in eintraege.items():
+                        z.writestr(n, inhalt)
+
+            win = "C:/" + "Users/" + name + "/Desktop/Musik/a.mp3"
+            _zip("shows/demo_win.lshow", {"show.json": json.dumps(
+                {"playlist": [{"path": win, "title": "a"}]}, indent=1)})
+            _zip("shows/demo_home.lshow", {
+                "show.json": "{}", "notiz.txt": "x\n/ho" + "me/konto" + "name/musik/b.mp3\n",
+                "bild.png": b"\x89PNG\r\n\x1a\n\xff\xfe"})
+            # ZIP unter fremder Endung: wird an der Kennung erkannt.
+            _zip("assets_paket.bin", {"a.json": "\"" + name + "s Rig\""})
+            _zip("shows/demo_sauber.lshow", {"show.json": json.dumps(
+                {"playlist": [{"path": "Musik/a.mp3"},
+                              {"path": "C:/Users/X/Musik/a.mp3"}]}, indent=1)})
+            pfade = ["shows/demo_win.lshow", "shows/demo_home.lshow",
+                     "assets_paket.bin", "shows/demo_sauber.lshow"]
+            os.environ["LIGHTOS_KLARNAMEN"] = liste
+            try:
+                pfad_funde = _archiv_funde(tmp, pfade, nur_klarnamen=False)
+                namen_funde = _archiv_funde(tmp, pfade, nur_klarnamen=True)
+            finally:
+                if alt is None:
+                    os.environ.pop("LIGHTOS_KLARNAMEN", None)
+                else:
+                    os.environ["LIGHTOS_KLARNAMEN"] = alt
+        orte = sorted({f.split(":")[0] for f in pfad_funde})
+        self.assertEqual(orte, ["shows/demo_home.lshow!notiz.txt",
+                                "shows/demo_win.lshow!show.json"])
+        self.assertEqual(sorted({f.split(":")[0] for f in namen_funde}),
+                         ["assets_paket.bin!a.json", "shows/demo_win.lshow!show.json"])
+        self.assertTrue(all(name not in f for f in pfad_funde + namen_funde),
+                        "die Meldung darf den Namen nicht weitertragen")
+
+
 if __name__ == "__main__":
     unittest.main()

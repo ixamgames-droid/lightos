@@ -9,13 +9,16 @@ The **Virtual Console (VC)** of LightOS is a control surface you design yourself
 buttons, faders, color tiles, displays and so on onto an area and control your show with
 them — by mouse/touch, MIDI controller (e.g. APC mini) or keyboard.
 
+**What you will be able to do:** look up what each control does, how to set it up and how to
+operate it live.
+
 This reference describes **every control element on its own**: what it is for, what it
 looks like while running, **which button does what** and which settings it has — each with
 real screenshots from the app.
 
 ![Overview of the VC widgets](img/uebersicht_alle_widgets.png)
 
-> This overview shows **all 19** widget types, each labelled. It comes from the template
+> This overview shows **19 of the 20** widget types, each labelled; the **room pad** ([24](24_raum_pad.en.md)) is not in the picture yet. It comes from the template
 > show `shows/VC_Widgets_Showcase.lshow` (generator:
 > `tools/build_vc_widgets_showcase.py`). **Tempo-Controller** and **Live-Edit-Panel** are at
 > the bottom right; they are described in [22](22_tempo_controller.en.md) and
@@ -30,7 +33,8 @@ two modes:
 
 - **Bearbeiten ✓** — **create, move, resize and configure** elements. Extra toolbar buttons
   appear: **one button per widget type** (16 of them), **⊞ Raster** (grid), **Undo/Redo**
-  (`↶ ↷`), **Alle löschen** (delete all) and **⚙ Inspector**.
+  (`↶ ↷`), **Ausrichten ▾** (align, for several selected elements), **Mehrfach** (multi-select, touch
+  screens only), **Alle löschen** (delete all) and **⚙ Inspector**.
 
   ![Toolbar in edit mode](img/toolbar_bearbeiten_modus.png)
 
@@ -97,6 +101,7 @@ accidental taps) — **MIDI/APC keeps working**.
 | 18 | **Effekt-Editor-Box** (effect editor box, `VCEffectEditor`) | movable box: preview + the matching faders of an effect | [18_effekt_editor.en.md](18_effekt_editor.en.md) |
 | 22 | **Tempo-Controller** (`VCTempoBusController`) | bus, source, factor, effect assignment and sync on one tile | [22_tempo_controller.en.md](22_tempo_controller.en.md) |
 | 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | fader workspace for SEVERAL effects, with tick-box selection | [23_live_edit.en.md](23_live_edit.en.md) |
+| 24 | **Raum-Pad** (room pad, `VCRaumPad`) | top view or unfolded room (floor + walls): tap a point, every assigned moving head aims at it; on/off and position lock | [24_raum_pad.en.md](24_raum_pad.en.md) |
 
 ## Large editors (reachable from the VC)
 
@@ -109,7 +114,7 @@ accidental taps) — **MIDI/APC keeps working**.
 
 | Topic | In short | Page |
 |---|---|---|
-| **Smart-Drop & Baukasten** | set up an effect, widget gallery, conflict map, controller/color-chase blocks | [21_baukasten.en.md](21_baukasten.en.md) |
+| **Smart-Drop & Baukasten** | set up an effect, widget gallery, conflict map (the former building-block presets are gone) | [21_baukasten.en.md](21_baukasten.en.md) |
 
 ---
 
