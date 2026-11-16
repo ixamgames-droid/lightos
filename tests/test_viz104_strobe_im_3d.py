@@ -611,7 +611,10 @@ class LiveView2dBlinktImBildtaktTest(unittest.TestCase):
     def _canvas(self, abstand_s=0.0):
         import src.ui.views.live_view as LV
         c = SimpleNamespace(RENDER_INTERVAL_MS=LV.StageCanvas.RENDER_INTERVAL_MS,
-                            _strobe_bild=0, _bild_abstand_s=lambda: abstand_s)
+                            _strobe_bild=0, _bild_abstand_s=lambda: abstand_s,
+                            # UI-130: hier der Grundtakt (kein Strobe-Takt)
+                            _takt_ms=lambda: LV.StageCanvas.RENDER_INTERVAL_MS,
+                            _strobe_gesehen=lambda *_a: None)
         c._strobe_bildrate = lambda: LV.StageCanvas._strobe_bildrate(c)
         c._blink_an = lambda hz, r=False: LV.StageCanvas._blink_an(c, hz, r)
         return LV, c
@@ -677,7 +680,13 @@ class LiveView2dBlinktImBildtaktTest(unittest.TestCase):
         self.assertEqual(quelle.count("self._blink_an(freq_hz, rechteck)"), 2)
         tick = quelle[quelle.index("    def _on_render_tick(self)"):]
         tick = tick[:tick.index("\n    # ── VIZ-70")]
-        self.assertLess(tick.index("_strobe_bild"), tick.index("self.update()"))
+        # UI-135: der Takt meldet das Bild an, gezaehlt wird beim Zeichnen.
+        self.assertLess(tick.index("self._takt_bild_offen = True"), tick.index("self.update()"))
+        zaehlen = quelle[quelle.index("    def _takt_bild_zaehlen(self)"):]
+        zaehlen = zaehlen[:zaehlen.index("\n    def paintEvent")]
+        self.assertIn("_strobe_bild", zaehlen)
+        zeichnen = quelle[quelle.index("    def paintEvent(self, event)"):]
+        self.assertLess(zeichnen.index("self._takt_bild_zaehlen()"), zeichnen.index("self._zeichne("))
 
 
 class VerdrahtungTest(unittest.TestCase):

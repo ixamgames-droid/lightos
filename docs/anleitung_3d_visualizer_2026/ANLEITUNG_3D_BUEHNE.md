@@ -543,9 +543,18 @@ Frequenz blitzen gemeinsam.
 - **Rechenlast:** Eine ruhende Szene zeichnet nichts. Solange etwas blitzt,
   entsteht bei jedem Wechsel ein neues Bild; auf schwacher Grafik sinkt die
   Bildrate dabei spürbar. „Gedämpft" ändert die Helligkeit achtmal je Welle.
-- **2D-Ansicht der Live View:** Sie zeichnet zehn Bilder je Sekunde und blinkt
-  nach derselben Regel — also höchstens gut dreimal je Sekunde (ein Bild an,
-  zwei aus), bei langsamerem Strobe in dessen Frequenz, und gleichmäßig.
+- **2D-Ansicht der Live View:** Sie blinkt nach derselben Regel, gleichmäßig
+  in ganzen Bildern. Wie viele Bilder sie zeichnet, hängt davon ab, wie lange
+  ein Bild dauert: Normal belegt sie höchstens ein Viertel der Rechenzeit der
+  Oberfläche. Bei hoher Bildschirmskalierung und vielen Geräten sind das etwa
+  7–8 Bilder je Sekunde, also höchstens gut zwei Blitze. Solange ein Gerät
+  sichtbar blinkt — es muss dabei auch leuchten — und kein 3D-Fenster offen
+  ist, zeichnet sie schneller und in festem Abstand (höchstens ein Drittel der
+  Rechenzeit, frühestens alle 50 ms) — so kommen die Blitze gleichmäßig.
+  Gemessen bei 250 % und 68 blinkenden Geräten waren das rund 11
+  statt 8 Bilder je Sekunde; die Bedienung reagierte dabei gleich schnell. Bei
+  Blackout oder Dimmer auf null bleibt sie beim ruhigeren Takt. Ebenso bei
+  offenem 3D-Fenster — das zeigt den Strobe dann selbst.
 - **Nur die Helligkeit** wird getaktet. Farbe und Dimmerwert bleiben, wie sie
   sind; ein Dimmer-Effekt, der selbst an- und ausschaltet, sieht aus wie bisher.
 - **Einstellung „Strobe im 3D zeigen":**

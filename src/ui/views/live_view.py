@@ -1207,6 +1207,7 @@ class StageCanvas(QWidget):
         self._zeichenzeiten: deque = deque(maxlen=self.ZEICHENZEIT_PROBEN)
         self._naechstes_bild: float = 0.0
         self._strobe_bild: int = 0     # VIZ-104: Zaehler der Takt-Bilder
+        self._takt_bild_offen: bool = False     # UI-135: Takt-Bild angefordert, noch nicht gezeichnet
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
         # DEMO-9: {fid: (Patch-Label, (text, ist_name))} — siehe _beschriftung_fuer.
@@ -1419,12 +1420,150 @@ class StageCanvas(QWidget):
             return 0.0
         return proben[(len(proben) - 1) // 2]
 
+    # ── UI-130: schnellerer Takt, solange ein Strobe blinkt ─────────────────
+    # Bei 7-8 Bildern/s (Takt 100 ms + Budget 0,25, gemessen 250 %, 80 Geraete,
+    # ~34 ms je Bild) zeigte die 2D-Ansicht jeden Strobe ab 5 Hz als dasselbe
+    # langsame Blinken (~2-2,5 Blitze/s, VIZ-104). Solange ein Geraet sichtbar
+    # blinkt, gelten deshalb STROBE_TAKT_MS und STROBE_UI_ANTEIL. Ein Drittel,
+    # nicht mehr: das Budget misst nur paintEvent, ein volles Bild samt Ausgabe
+    # ans Fenster kostet mehr - nach einmal geoeffnetem 3D-Fenster ~60 statt
+    # ~40 ms. Gemessen in der echten App (68 blinkende Geraete): 0,40 ergab
+    # 10-12 Bilder/s, aber nach dem 3D-Fenster einen Anteil von 0,62; 0,33
+    # ergibt 8 Bilder/s (bisher 5-6) bei 0,30-0,37. NICHT bei sichtbarem
+    # 3D-Fenster: das setzt sein Bild im selben UI-Thread zusammen (VIZ-70)
+    # und zeigt den Strobe selbst.
+    STROBE_TAKT_MS = 50
+    STROBE_UI_ANTEIL = 0.33
+    STROBE_NACHLAUF_S = 1.0         # so lange nach dem letzten blinkenden Geraet
+    STROBE_NACHLAUF_MAX_S = 5.0     # Deckel fuer langsame Blink-Effekte, s. u.
+    DREID_PRUEF_S = 0.25            # so lange gilt die Antwort "3D-Fenster offen?"
+
+    @staticmethod
+    def _leuchtet(color: QColor, intensity: int) -> bool:
+        """Zeichnet dieses Bild das Geraet hell? Massgeblich ist, was die
+        Ansicht zeigt (Display-Frame: nach Blackout, Grand Master, NOT-AUS):
+        Helligkeit 0 oder Farbe Schwarz (Geraet ohne Dimmer) ist dunkel."""
+        return intensity > 0 and (color.red() > 0 or color.green() > 0
+                                  or color.blue() > 0)
+
+    def _strobe_gesehen(self, freq_hz: float = 0.0) -> None:
+        """Ein Geraet blinkt in diesem Bild UND leuchtet sichtbar. Nur dann
+        lohnt der schnellere Takt: ein Strobe-Wert bei Helligkeit 0 (Blackout,
+        geparkter Strobe-Kanal) zeigt nichts und zaehlt nicht. Ein Blink-Effekt
+        auf dem Dimmer ist die halbe Periode dunkel - der Nachlauf reicht
+        deshalb mindestens eine Periode weit (``freq_hz``), sonst spraenge der
+        Takt bei langsamen Effekten je Periode hin und her."""
+        jetzt = self._uhr()
+        bis = getattr(self, "_strobe_bis", None)
+        if bis is None or not 0.0 <= bis - jetzt <= self.STROBE_NACHLAUF_MAX_S:
+            self._strobe_takt_merk = None       # UI-135: ein neuer Strobe rechnet neu
+        halt = self.STROBE_NACHLAUF_S
+        if freq_hz > 0.0:
+            halt = max(halt, min(1.0 / freq_hz, self.STROBE_NACHLAUF_MAX_S))
+        self._strobe_bis = jetzt + halt
+
+    def _3d_fenster_sichtbar(self) -> bool:
+        """Gemerkt fuer DREID_PRUEF_S. Gefragt wird je blinkendem Geraet und
+        Bild (``_blink_an`` -> ``_strobe_bildrate`` -> ``_takt_ms``/
+        ``_ui_anteil``), gesucht ueber alle Top-Level-Fenster: ungemerkt
+        kostete das bei 68 blinkenden Geraeten (echte App, 250 %) ein Bild
+        70-95 statt ~40 ms."""
+        jetzt = self._uhr()
+        merk = getattr(self, "_dreid_merk", None)
+        if merk is None or not 0.0 <= jetzt - merk[0] < self.DREID_PRUEF_S:
+            merk = (jetzt, self._3d_fenster_suchen())
+            self._dreid_merk = merk
+        return merk[1]
+
+    @staticmethod
+    def _3d_fenster_suchen() -> bool:
+        try:
+            from PySide6.QtWidgets import QApplication
+            for w in QApplication.topLevelWidgets():
+                if (type(w).__name__ == "VisualizerWindow" and w.isVisible()
+                        and not w.isMinimized()):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _strobe_takt_aktiv(self) -> bool:
+        bis = getattr(self, "_strobe_bis", None)
+        # Untergrenze: eine zurueckgestellte Uhr haelt den Takt nicht fest.
+        if bis is None or not 0.0 <= bis - self._uhr() <= self.STROBE_NACHLAUF_MAX_S:
+            return False
+        return not self._3d_fenster_sichtbar()
+
+    # ── UI-135: im Strobe-Takt IST der Zeitgeber der Budget-Abstand ──────────
+    # Befund (B am echten Bildschirm, 15.11.2026): Strobe 1x gleichmaessig,
+    # 2x/4x unregelmaessig. Geblitzt wird in ganzen Takt-Bildern (VIZ-104) -
+    # die Bilder selbst kamen aber ungleichmaessig: der Zeitgeber feuerte fest
+    # alle STROBE_TAKT_MS, und das Budget liess nur jedes zweite oder dritte
+    # Feuern zeichnen. Gemessen (16.11., Windows x64, 250 %, 68 blinkende
+    # Geraete): Bildabstaende rund 63 und 125 ms im Wechsel (der grobe
+    # Windows-Zeitgeber rastet auf 15,6 ms), Blitzabstand bei 3 Bildern je
+    # Blitz 239-315 ms. Jetzt stellt sich der Zeitgeber selbst auf den
+    # Budget-Abstand (Zeichenzeit / STROBE_UI_ANTEIL, mindestens
+    # STROBE_TAKT_MS), als GENAUER Zeitgeber, und jedes Feuern zeichnet. Die
+    # Hysterese haelt den Takt bei kleinen Schwankungen der Zeichenzeit fest -
+    # sonst spraenge die Blitzperiode (ganze Bilder aus Bildrate / Frequenz).
+    STROBE_TAKT_HYSTERESE = 0.15
+    # ... und nur, wenn die Abweichung so viele Feuern hintereinander anhaelt.
+    # Gemessen (16.11.): eine kurze Stoerung (einige langsame Bilder, UI-Thread
+    # belegt) hob den Takt sonst an und gleich wieder ab - zwei Spruenge der
+    # Blitzphase fuer nichts, und danach ein leicht anderer Takt (85, 81, 88 ms
+    # in aufeinanderfolgenden Messfenstern bei gleicher Lage).
+    STROBE_TAKT_GEDULD = 8
+
+    def _strobe_takt_roh(self) -> int:
+        """Budget-Abstand in ms aus der gemessenen Zeichenzeit, ohne Hysterese."""
+        zeit, anteil = self._zeichenzeit_s(), self.STROBE_UI_ANTEIL
+        if zeit <= 0.0 or anteil <= 0:
+            return self.STROBE_TAKT_MS
+        roh = int(math.ceil(zeit * 1000.0 / anteil - 1e-9))
+        return max(self.STROBE_TAKT_MS, min(roh, int(self.MAX_BILD_ABSTAND_S * 1000)))
+
+    def _strobe_takt_nachfuehren(self) -> None:
+        """Einmal je Feuern: den gemerkten Strobe-Takt nur bei deutlicher UND
+        anhaltender Aenderung der Zeichenzeit neu setzen."""
+        if not self._strobe_takt_aktiv():
+            self._strobe_takt_merk = None
+            self._strobe_takt_abweichung = 0
+            return
+        roh = self._strobe_takt_roh()
+        merk = getattr(self, "_strobe_takt_merk", None)
+        if merk is None:
+            self._strobe_takt_merk = roh
+            self._strobe_takt_abweichung = 0
+        elif abs(roh - merk) > merk * self.STROBE_TAKT_HYSTERESE:
+            n = getattr(self, "_strobe_takt_abweichung", 0) + 1
+            if n >= self.STROBE_TAKT_GEDULD:
+                self._strobe_takt_merk, n = roh, 0
+            self._strobe_takt_abweichung = n
+        else:
+            self._strobe_takt_abweichung = 0
+
+    def _takt_ms(self) -> int:
+        if not self._strobe_takt_aktiv():
+            self._strobe_takt_merk = None
+            return self.RENDER_INTERVAL_MS
+        merk = getattr(self, "_strobe_takt_merk", None)
+        if merk is None:
+            merk = self._strobe_takt_merk = self._strobe_takt_roh()
+        return merk
+
+    def _ui_anteil(self) -> float:
+        return self.STROBE_UI_ANTEIL if self._strobe_takt_aktiv() else self.MAX_UI_ANTEIL
+
     def _bild_abstand_s(self) -> float:
         """Mindestabstand zweier Takt-Bilder; 0 = volle Rate (jeder Takt)."""
-        if self.MAX_UI_ANTEIL <= 0:
+        if self._strobe_takt_aktiv():
+            return 0.0          # UI-135: der Zeitgeber haelt das Budget selbst
+        anteil = self._ui_anteil()
+        if anteil <= 0:
             return 0.0
-        abstand = self._zeichenzeit_s() / self.MAX_UI_ANTEIL
-        if abstand <= self.RENDER_INTERVAL_MS / 1000.0:
+        abstand = self._zeichenzeit_s() / anteil
+        if abstand <= self._takt_ms() / 1000.0:
             return 0.0
         return min(abstand, self.MAX_BILD_ABSTAND_S)
 
@@ -1434,20 +1573,45 @@ class StageCanvas(QWidget):
         aus, sodass der MITTLERE Abstand stimmt."""
         if self._bild_abstand_s() <= 0.0:
             return True
-        return jetzt >= self._naechstes_bild - self.RENDER_INTERVAL_MS / 2000.0
+        return jetzt >= self._naechstes_bild - self._takt_ms() / 2000.0
 
     def _bild_verbucht(self, jetzt: float) -> None:
         abstand = self._bild_abstand_s()
         if abstand <= 0.0:
             self._naechstes_bild = 0.0
             return
-        halb = self.RENDER_INTERVAL_MS / 2000.0
+        halb = self._takt_ms() / 2000.0
         # Nach einer Pause kein Guthaben ansparen: ab jetzt zaehlen.
         self._naechstes_bild = max(self._naechstes_bild, jetzt - halb) + abstand
 
+    def _zeitgeber_auf(self, takt_ms: int, genau: bool = False) -> None:
+        """Abstand und Art des Zeitgebers. ``genau`` (UI-135, im Strobe-Takt):
+        der grobe Zeitgeber rastet unter Windows auf 15,6 ms - aus 50 ms
+        wurden 62,5, aus 100 ms 109. Fuer gleichmaessige Blitze muss der
+        Bildabstand stimmen; ausserhalb des Strobe-Takts bleibt er grob."""
+        try:
+            t = self._update_timer
+            art = Qt.TimerType.PreciseTimer if genau else Qt.TimerType.CoarseTimer
+            if t.timerType() != art:
+                t.setTimerType(art)
+                if t.isActive():
+                    t.start(takt_ms)        # die Art gilt erst ab dem naechsten Start
+                    return
+            if t.interval() != takt_ms:
+                t.setInterval(takt_ms)
+        except (RuntimeError, AttributeError):
+            pass
+
     def _on_render_tick(self) -> None:
         if not self._darf_zeichnen():
+            # UI-130: verdeckt/minimiert zeichnet nichts - dann auch nicht im
+            # Strobe-Takt feuern (der wird sonst erst nach einem Bild umgestellt).
+            self._zeitgeber_auf(self.RENDER_INTERVAL_MS)
             return
+        # UI-135: Zeitgeber ZUERST auf den Takt der Lage - auch wenn dieses
+        # Feuern gleich nichts zeichnet (nichts animiert, Signatur gleich).
+        self._strobe_takt_nachfuehren()
+        self._zeitgeber_auf(self._takt_ms(), genau=self._strobe_takt_aktiv())
         jetzt = self._uhr()
         if not self._bild_im_budget(jetzt):
             return      # Signatur bleibt stehen -> Aenderung kommt im naechsten
@@ -1465,7 +1629,9 @@ class StageCanvas(QWidget):
         # VIZ-104: ein Takt-Bild weiter — danach blinkt der Strobe (_blink_an).
         # Bilder aus der Bedienung (Maus, Auswahl) zaehlen nicht mit: sie
         # zeigen den Stand des laufenden Takt-Bildes noch einmal.
-        self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
+        # UI-135: weitergezaehlt wird erst, wenn das Bild wirklich gezeichnet
+        # wird (_takt_bild_zaehlen in paintEvent), nicht schon hier.
+        self._takt_bild_offen = True
         self.update()
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
@@ -2005,9 +2171,11 @@ class StageCanvas(QWidget):
         return {"namen": namen, "square": square, "prog": prog}
 
     def _get_strobe_info(self, fid: int, fixture, running=None,
-                         vorab: dict | None = None) -> tuple[float, bool]:
+                         vorab: dict | None = None,
+                         leuchtet: bool = True) -> tuple[float, bool]:
         """Gibt (freq_hz, is_currently_on) zurück. freq_hz=0 → kein Blinken.
-        ``vorab`` (VIZ-70): Ergebnis von ``_effekt_vorab`` fuer dieses Bild."""
+        ``vorab`` (VIZ-70): Ergebnis von ``_effekt_vorab`` fuer dieses Bild.
+        ``leuchtet`` (UI-130): das Geraet ist in diesem Bild sichtbar hell."""
         freq_hz = 0.0
 
         # 1. Shutter/Strobe-DMX-Kanal auslesen
@@ -2046,6 +2214,8 @@ class StageCanvas(QWidget):
 
         if freq_hz == 0.0:
             return 0.0, True
+        if leuchtet:
+            self._strobe_gesehen(freq_hz)   # UI-130: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
@@ -2391,7 +2561,8 @@ class StageCanvas(QWidget):
         except Exception:
             return QColor(60, 60, 60), 0
 
-    def _strobe_aus_steckbrief(self, sb: dict, lese, vorab) -> tuple[float, bool]:
+    def _strobe_aus_steckbrief(self, sb: dict, lese, vorab,
+                               leuchtet: bool = True) -> tuple[float, bool]:
         """Wie :meth:`_get_strobe_info` mit ``vorab``, aus dem Steckbrief;
         ``_strobe_hz`` je Kanal und Wert gemerkt."""
         freq_hz = 0.0
@@ -2410,6 +2581,8 @@ class StageCanvas(QWidget):
             freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
         if freq_hz == 0.0:
             return 0.0, True
+        if leuchtet:
+            self._strobe_gesehen(freq_hz)   # UI-130: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     # ── VIZ-104: Blinken im Bildtakt ─────────────────────────────────────────
@@ -2426,7 +2599,7 @@ class StageCanvas(QWidget):
 
     def _strobe_bildrate(self) -> float:
         """Takt-Bilder je Sekunde: der Timer, gebremst durch UI-86."""
-        abstand = self.RENDER_INTERVAL_MS / 1000.0
+        abstand = self._takt_ms() / 1000.0
         try:
             abstand = max(abstand, self._bild_abstand_s())
         except Exception:
@@ -2451,7 +2624,21 @@ class StageCanvas(QWidget):
         except Exception:
             return True
 
+    def _takt_bild_zaehlen(self) -> None:
+        """UI-135: am Anfang jedes Zeichnens - steht ein Takt-Bild aus, zaehlt
+        es JETZT, genau einmal. Bis dahin zaehlte ``_on_render_tick`` selbst:
+        feuerte der Zeitgeber zweimal, bevor gezeichnet war (UI-Thread kurz
+        belegt), stand der Zaehler zwei Bilder weiter fuer EIN gezeichnetes
+        Bild. Traf das uebersprungene Bild den Blitz (bei der kleinsten Periode
+        ein Bild von dreien), fiel der Blitz aus - gemessen (16.11., Windows
+        x64, 250 %, 68 blinkende Geraete) war rund jeder zwanzigste
+        Blitzabstand doppelt so lang."""
+        if getattr(self, "_takt_bild_offen", False):
+            self._takt_bild_offen = False
+            self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
+
     def paintEvent(self, event):
+        self._takt_bild_zaehlen()
         # UI-86: Zeichenzeit messen — nur volle Bilder, ein Teil-Repaint (z. B.
         # unter der Minimap) ist billiger und wuerde die Rate schoenrechnen.
         voll = self._ist_vollbild(event)
@@ -2639,7 +2826,8 @@ class StageCanvas(QWidget):
                     tilt = _pt.get("tilt", 128) + (_pt.get("tilt_fine", 0) or 0) / 256.0
             except Exception:
                 pass
-            strobe_hz, blink_on = self._strobe_aus_steckbrief(sb, lese, vorab)
+            strobe_hz, blink_on = self._strobe_aus_steckbrief(
+                sb, lese, vorab, self._leuchtet(color, intensity))
             effects = self._get_active_effects(fixture.fid, strobe_hz, running, vorab)
             if effects or strobe_hz != 0.0:
                 animiert = True
