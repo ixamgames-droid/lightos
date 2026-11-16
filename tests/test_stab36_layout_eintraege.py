@@ -200,6 +200,7 @@ _ITEMAT_ERLAUBT = {
     "src/ui/views/snap_file_panel.py": "Listen-Eintrag unter dem Mauszeiger, kein Layout",
     "src/ui/views/function_manager_view.py": "Baum-Eintrag unter dem Mauszeiger, kein Layout",
     "src/ui/views/prioritaeten_view.py": "Baum-Eintrag unter dem Mauszeiger, kein Layout",
+    "src/ui/virtualconsole/vc_handy_leiste.py": "Listen-Eintrag unter dem Finger (UI-143), kein Layout",
     "src/ui/widgets/flow_layout.py": "eigenes Layout, definiert itemAt selbst",
 }
 
