@@ -268,7 +268,9 @@ class _Belegung:
         return [b for b in self.bereiche.get(u, []) if b[0] <= ende and a <= b[1]]
 
     def frei(self, ab_universum: int, k: int) -> tuple[int, int] | None:
-        start = max(1, ab_universum)
+        # CDX-73: nie ausserhalb 1..UNIVERSUM_MAX suchen — ein Geraet auf
+        # Universum 100 sucht ab dem letzten erlaubten Universum.
+        start = min(max(1, ab_universum), UNIVERSUM_MAX)
         reihe = list(range(start, UNIVERSUM_MAX + 1)) + list(range(1, start))
         stelle, ab = self._ab.get((start, k), (0, 1))
         for i in range(stelle, len(reihe)):
