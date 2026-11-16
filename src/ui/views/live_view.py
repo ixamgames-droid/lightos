@@ -66,6 +66,13 @@ def _save_prefs(updates: dict) -> None:
 
 # UI-122 (D-08): Seitenspalten/Minimap-Schalter und kompaktes Zoom-Overlay.
 SPALTEN_PREF = "live_view_spalten"
+#: UI-141: Zustand der einklappbaren Zoom-Leiste (je Geraet, ui_prefs.json).
+ZOOM_LEISTE_PREF = "live_view_zoom_leiste"
+#: UI-141: Linke Geraeteliste — am Finger breiter (Touch-Innenabstand und
+#: Bildlaufleiste fressen sonst den Namen), mit Maus wie bisher.
+LISTE_BREITE_MAUS = 190
+LISTE_BREITE_TOUCH = 214
+LISTE_TOUCH_AB_BREITE = 1000
 ZOOM_REGLER_BREITE = 200
 ZOOM_REGLER_MIN = 80
 ZOOM_RAND = 10
@@ -3580,7 +3587,7 @@ class LiveView(QWidget):
 
         # -- Linkes Panel: Tab-Widget mit "Fixtures" und "Gruppen" --
         self._left_panel = QWidget()
-        self._left_panel.setFixedWidth(190)
+        self._left_panel.setFixedWidth(LISTE_BREITE_MAUS)   # UI-141: s. _liste_breite_anpassen
         self._left_panel.setStyleSheet("background:#10121a; border-right:1px solid #222;")
         left_layout = QVBoxLayout(self._left_panel)
         left_layout.setContentsMargins(4, 6, 4, 6)
@@ -3834,6 +3841,23 @@ class LiveView(QWidget):
         _zk = 44 if _touch else 30
         zo.setSpacing(8 if _touch else 6)
 
+        # UI-141: die Leiste liegt ueber der Zeichenflaeche -> einklappbar,
+        # damit sie keine Geraete dauerhaft verdeckt. Zoomen geht eingeklappt
+        # weiter (Strg+Mausrad, zwei Finger, Doppeltippen = Einpassen).
+        _zl = _load_prefs().get(ZOOM_LEISTE_PREF, {})
+        self._zoom_eingeklappt = bool(_zl.get("eingeklappt", False)) if isinstance(_zl, dict) else False
+        self._btn_zoom_klapp = QPushButton()
+        # Groesse im eigenen QSS (Inhalt + 1 px Rahmen je Seite): das Touch-QSS
+        # des Hauptfensters (min-height/padding fuer alle Knoepfe) wuerde ein
+        # setFixedHeight beim Neu-Polieren nach dem Textwechsel ueberstimmen.
+        self._btn_zoom_klapp.setStyleSheet(
+            "QPushButton{background:#1a1c28;color:#FFD700;border:1px solid #333;"
+            "border-radius:4px;font-size:13px;font-weight:bold;padding:0 6px;"
+            f"min-height:{_zk - 2}px;max-height:{_zk - 2}px;min-width:{_zk - 14}px;}}"
+            " QPushButton:hover{background:#252838;}")
+        self._btn_zoom_klapp.clicked.connect(weak_slot(self._zoom_leiste_umschalten))
+        zo.addWidget(self._btn_zoom_klapp)
+
         _zlbl = QLabel("Zoom")
         _zlbl.setStyleSheet("color:#FFD700; font-size:12px; font-weight:bold;")
         zo.addWidget(_zlbl)
@@ -3885,6 +3909,7 @@ class LiveView(QWidget):
         self._btn_zoom_in.clicked.connect(weak_slot(self._zoom_step, +10))
         self._zoom_overlay.raise_()
         self._zoom_titel = _zlbl
+        self._zoom_klapp_text()
 
         right_layout.addWidget(gb)
 
@@ -4107,6 +4132,23 @@ class LiveView(QWidget):
         bh = max(ys) - min(ys)
         vp = scroll.viewport().size()
         vw, vh = max(1, vp.width()), max(1, vp.height())
+        # UI-141: Zoom-Leiste und Karte liegen unten ueber der Flaeche. Beim
+        # Einpassen zaehlt nur der freie Teil darueber — sonst landeten die
+        # vorderen Geraete (Laser 4, MH 6) genau darunter. Bleibt darueber
+        # kaum Platz (sehr flaches Fenster), gilt die ganze Hoehe.
+        # Zwei freie Rechtecke: ueber den Overlays (volle Breite) oder links
+        # daneben (volle Hoehe) — das mit dem groesseren Zoom gewinnt.
+        frei_h, frei_w = vh, vw
+        try:
+            self._position_minimap()
+            belegt = [w.geometry() for w in (getattr(self, "_zoom_overlay", None),
+                                             getattr(self, "_minimap", None))
+                      if w is not None and not w.isHidden()]
+            if belegt:
+                frei_h = min(g.top() for g in belegt) - ZOOM_RAND
+                frei_w = min(g.left() for g in belegt) - ZOOM_RAND
+        except (RuntimeError, AttributeError):
+            pass
         if not force:
             # CDX-09: nur beim kompakten KLUMPEN eingreifen. `or` statt `and`: fuellt
             # das Rig schon EINE Achse gut aus (breite flache Reihe / hohe schmale
@@ -4114,13 +4156,28 @@ class LiveView(QWidget):
             # nur ein Rig, das BEIDE Achsen schlecht ausfuellt, ist ein echter Klumpen.
             if bw * canvas.zoom >= 0.35 * vw or bh * canvas.zoom >= 0.35 * vh:
                 return
-        z = _compute_fit_zoom(bw, bh, vw, vh)
+        # UI-141: die Geraete selbst (nicht nur ihre Mittelpunkte) muessen
+        # hinein — je Seite eine Geraetegroesse in Welt-px plus Platz fuer die
+        # Beschriftung (feste Bildschirmgroesse) unter dem Glyph.
+        rand = float(getattr(canvas, "_fixture_size", 30.0))
+        bbw, bbh = bw + 2 * rand, bh + 2 * rand
+        beschr = 32                      # Beschriftung unter dem untersten Glyph
+        kandidaten = [(_compute_fit_zoom(bbw, bbh, vw - 2 * ZOOM_RAND, vh - beschr), vw, vh)]
+        if frei_h < vh and frei_h >= 0.4 * vh:     # ueber den Overlays
+            kandidaten.append((_compute_fit_zoom(bbw, bbh, vw - 2 * ZOOM_RAND,
+                                                 frei_h - beschr), vw, frei_h))
+        if frei_w < vw and frei_w >= 0.4 * vw:     # links neben den Overlays
+            kandidaten.append((_compute_fit_zoom(bbw, bbh, frei_w - ZOOM_RAND,
+                                                 vh - beschr), frei_w, vh))
+        if len(kandidaten) > 1:
+            kandidaten = kandidaten[1:]  # ohne Overlays nur, wenn kein Teil reicht
+        z, ziel_w, ziel_h = max(kandidaten, key=lambda k: k[0])
         self._zoom_slider.setValue(int(round(z * 100)))   # -> _on_zoom_changed: Canvas-Zoom + Label
-        # Fixture-Bbox-Mitte ins Sichtfeld zentrieren
+        # Fixture-Bbox-Mitte in den freien Teil des Sichtfelds zentrieren
         cx = (min(xs) + max(xs)) / 2 * canvas.zoom
         cy = (min(ys) + max(ys)) / 2 * canvas.zoom
-        scroll.horizontalScrollBar().setValue(int(cx - vw / 2))
-        scroll.verticalScrollBar().setValue(int(cy - vh / 2))
+        scroll.horizontalScrollBar().setValue(int(cx - ziel_w / 2))
+        scroll.verticalScrollBar().setValue(int(cy - ziel_h / 2))
 
     def _on_show_loaded_2d(self) -> None:
         """Show-Load: Steuerelemente angleichen. QOL-05: die 2D-Ansicht NUR
@@ -4220,12 +4277,29 @@ class LiveView(QWidget):
         lay = self._zoom_overlay.layout()
         if titel is None or lay is None:
             return
+        klapp = getattr(self, "_btn_zoom_klapp", None)
+        if klapp is not None and getattr(self, "_zoom_eingeklappt", False):
+            # UI-141: eingeklappt bleibt nur der Knopf zum Aufklappen.
+            for w in (titel, sl, self._lbl_zoom, self._btn_zoom_out,
+                      self._btn_zoom_in, self._btn_fit):
+                w.setVisible(False)
+            klapp.setVisible(True)
+            return
+        for w in (self._btn_zoom_out, self._btn_zoom_in, self._btn_fit):
+            w.setVisible(True)
         m = lay.contentsMargins()
         sp = lay.spacing()
         feste = [self._btn_zoom_out, self._btn_zoom_in, self._btn_fit]
         knoepfe = (m.left() + m.right()
                    + sum(max(w.sizeHint().width(), w.minimumWidth()) for w in feste)
                    + sp * (len(feste) - 1))
+        if klapp is not None:
+            # UI-141: der Klapp-Knopf kommt vor Prozent, Titel und Regler —
+            # nur wenn selbst −, + und ⤢ kaum Platz haben, faellt er weg.
+            klapp_b = max(klapp.sizeHint().width(), klapp.minimumWidth()) + sp
+            klapp.setVisible(platz >= knoepfe + klapp_b)
+            if klapp.isVisibleTo(self._zoom_overlay):
+                knoepfe += klapp_b
         prozent_b = max(self._lbl_zoom.sizeHint().width(), 44) + sp
         self._lbl_zoom.setVisible(platz >= knoepfe + prozent_b)
         basis = knoepfe + prozent_b + sp
@@ -4247,6 +4321,26 @@ class LiveView(QWidget):
             titel.setVisible(False)
             sl.setVisible(False)
 
+    def _zoom_klapp_text(self) -> None:
+        """UI-141: Beschriftung/Tooltip des Klapp-Knopfs zum Zustand."""
+        b = getattr(self, "_btn_zoom_klapp", None)
+        if b is None:
+            return
+        if self._zoom_eingeklappt:
+            b.setText("◂ Zoom")
+            b.setToolTip("Zoom-Leiste aufklappen")
+        else:
+            b.setText("▸")
+            b.setToolTip("Zoom-Leiste einklappen (gibt die Fläche darunter frei; "
+                         "Zoomen geht weiter mit Strg+Mausrad oder zwei Fingern)")
+
+    def _zoom_leiste_umschalten(self, *_) -> None:
+        """UI-141: Zoom-Leiste ein-/ausklappen und den Zustand merken."""
+        self._zoom_eingeklappt = not self._zoom_eingeklappt
+        self._zoom_klapp_text()
+        _save_prefs({ZOOM_LEISTE_PREF: {"eingeklappt": self._zoom_eingeklappt}})
+        self._position_zoom_overlay()
+
     def _spalten_anwenden(self) -> None:
         """UI-122 (D-08): Schalter -> Sichtbarkeit von Spalten und Minimap."""
         self._left_panel.setVisible(self._btn_spalte_links.isChecked())
@@ -4262,8 +4356,21 @@ class LiveView(QWidget):
         }})
         QTimer.singleShot(0, self._position_minimap)
 
+    def _liste_breite_anpassen(self) -> None:
+        """UI-141: am Finger bekommt die Geraeteliste mehr Breite — aber nur,
+        wenn die Ansicht breit genug ist. In schmalen Fenstern (UI-122, 250 %
+        Skalierung) bleibt die Zeichenflaeche wichtiger."""
+        lp = getattr(self, "_left_panel", None)
+        if lp is None:
+            return
+        breit = self._touch_aktiv() and self.width() >= LISTE_TOUCH_AB_BREITE
+        soll = LISTE_BREITE_TOUCH if breit else LISTE_BREITE_MAUS
+        if lp.width() != soll or lp.minimumWidth() != soll:
+            lp.setFixedWidth(soll)
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._liste_breite_anpassen()
         QTimer.singleShot(0, self._position_minimap)
 
     # ── Timer pausieren, wenn die Live View nicht der sichtbare Tab ist ───────
