@@ -71,6 +71,16 @@ class PageKnoepfeTest(_Basis):
             self.assertLessEqual(b.width(), 40)
             self.assertLessEqual(b.height(), 32)
 
+    def test_maus_hoehe_wie_bisher(self):
+        """Nachbesserung nach Pruefung: mit der Maus waren die Page-Knoepfe
+        32 px hoch (Theme: min-height 22 + Innenabstand 4 + Rand) — der
+        schmale Innenabstand darf sie nicht auf 26 px schrumpfen lassen."""
+        r, v = self._ansicht(False, m.KLEIN["1366x768"])
+        for b in v._page_buttons:
+            with self.subTest(page=b.text()):
+                self.assertEqual(b.height(), 32)
+                self.assertTrue(m.text_passt(b), b.text())
+
     def test_fingertipp_auf_page_10(self):
         r, v = self._ansicht(True, m.KLEIN["1280x800"])
         b = v._page_buttons[9]

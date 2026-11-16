@@ -66,6 +66,15 @@ class PalettenLeerTest(unittest.TestCase):
         seite._search.setText("")
         self.assertIsNone(seite._leer_hinweis)
 
+    def test_suchtext_wird_nicht_als_html_gezeigt(self):
+        """Nachbesserung nach Pruefung: der Suchtext landet im Hinweis — ein
+        eingetipptes „<b>…“ darf nicht als Rich Text gedeutet werden."""
+        from PySide6.QtCore import Qt
+        r, seite, _ = self._seite(False)
+        seite._search.setText("<b>fett</b>")
+        self.assertEqual(seite._leer_hinweis.textFormat(), Qt.TextFormat.PlainText)
+        self.assertIn("<b>fett</b>", seite._leer_hinweis.text())
+
     def test_neu_knopf_am_finger(self):
         r, seite, _ = self._seite(True)
         b = seite._btn_new

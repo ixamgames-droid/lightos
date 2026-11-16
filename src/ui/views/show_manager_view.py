@@ -982,7 +982,13 @@ class ShowManagerView(QWidget):
         ids = [s.id for s in shows]
         in_auswahl = [self._show_combo.itemData(i)
                       for i in range(self._show_combo.count())]
-        if in_auswahl != ids:
+        # Nachbesserung UI-139: auch die Namen vergleichen — eine andere
+        # Show-Datei behaelt beim Laden ihre IDs (from_dict), dann stuenden
+        # sonst die alten Namen in der Auswahl.
+        namen = [s.name for s in shows]
+        alt_namen = [self._show_combo.itemText(i)
+                     for i in range(self._show_combo.count())]
+        if in_auswahl != ids or alt_namen != namen:
             current_id = self._show_combo.currentData()
             self._show_combo.blockSignals(True)
             self._show_combo.clear()
@@ -999,7 +1005,10 @@ class ShowManagerView(QWidget):
         # Eine gezeigte Show bleibt, solange sie nicht aus der Liste verschwand
         # (auch eine von aussen per ``_load_show`` gezeigte, die nicht im
         # FunctionManager steht).
-        entfernt = cur is not None and cur.id in in_auswahl and cur.id not in ids
+        # Nachbesserung UI-139: „verschwunden" heisst auch „unter derselben ID
+        # steht jetzt ein anderes Show-Objekt" (andere Show-Datei geladen).
+        entfernt = (cur is not None and cur.id in in_auswahl
+                    and self._fm.get(cur.id) is not cur)
         if cur is not None and not entfernt:
             return
         if entfernt and self._playing:

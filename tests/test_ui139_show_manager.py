@@ -121,6 +121,24 @@ class AuswahlUndZeitleisteTest(_Basis):
         self.assertEqual(v._show_combo.count(), 0)
         self.assertIsNone(v._current_show)
 
+    def test_andere_show_datei_mit_gleicher_id(self):
+        """Nachbesserung nach Pruefung: Show-Dateien behalten ihre IDs beim
+        Laden (from_dict + bump_next_id). Eine andere Datei, deren Show
+        dieselbe ID hat, darf nicht die alte Show in der Zeitleiste und den
+        alten Namen in der Auswahl stehen lassen."""
+        from src.core.engine.show_engine import Show
+        r, v = self._ansicht(False, m.KLEIN["1366x768"])
+        fm = get_function_manager()
+        alt = fm.new_show("UI139 Alte Datei")
+        v._refresh_ui()
+        self.assertIs(v._current_show, alt)
+        neu = Show("UI139 Neue Datei")
+        neu.id = alt.id
+        fm._functions[alt.id] = neu          # wie from_dict: gleiche ID
+        v._refresh_ui()
+        self.assertIs(v._current_show, neu, "Zeitleiste zeigt die alte Show")
+        self.assertEqual(v._show_combo.currentText(), "UI139 Neue Datei")
+
     def test_gewaehlte_show_bleibt_gewaehlt(self):
         r, v = self._ansicht(False, m.KLEIN["1366x768"])
         fm = get_function_manager()

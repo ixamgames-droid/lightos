@@ -184,6 +184,8 @@ class PalettePage(QWidget):
                 text = LEER_TEXT
             lbl = QLabel(text)
             lbl.setObjectName("paletteLeer")
+            # Suchtext steht im Hinweis -> nie als Rich Text deuten.
+            lbl.setTextFormat(Qt.TextFormat.PlainText)
             lbl.setWordWrap(True)
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lbl.setStyleSheet("color:#8b949e; font-size:13px; padding:24px;")

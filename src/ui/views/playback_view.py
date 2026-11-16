@@ -123,7 +123,9 @@ class PlaybackView(QWidget):
                         f"min-height:{PAGE_KNOPF_TOUCH[1] - 2}px;")
             else:
                 btn.setFixedSize(34, 26)
-                mass = "padding:0 2px;"
+                # Nachbesserung: oben/unten der Theme-Abstand (4 px) — so
+                # bleiben die Knoepfe mit der Maus 32 px hoch wie bisher.
+                mass = "padding:4px 2px;"
             btn.setStyleSheet(
                 "QPushButton { background:#2a3a4a; color:#ddd; border:1px solid #4a5a6a; "
                 f"{mass} }}"
@@ -502,6 +504,10 @@ class PlaybackView(QWidget):
             breite = max(breite, sh.width())
             hoehe = max(hoehe, sh.height())
         if not breite:
+            # Leere Cueliste: so breit wie die Ueberschrift (wie vorher
+            # ResizeToContents) statt der 100-px-Vorgabe.
+            hdr = t.horizontalHeader()
+            hdr.resizeSection(6, hdr.sectionSizeFromContents(6).width())
             return
         # Die Zelle legt die Auswahl in ihre Textflaeche — im Touch-Modus
         # zieht der Zellen-Innenabstand des Stylesheets davon noch etwas ab.
