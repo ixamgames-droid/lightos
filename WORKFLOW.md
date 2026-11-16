@@ -567,7 +567,8 @@ dabei mitgeschrieben) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
   Ereignis nur in diesem Zustand; echte Fehler bleiben laut. Eine Klasse, die
   auch GESUND ohne Instanz-Attribute auskommt, gehoert stattdessen mit Grund in
   die Ausnahmeliste des Waechters `tests/test_stab42_abbau_ereignisse.py`.
-  `eventFilter` eines Widgets auf fremde Objekte: `@abbau_still_filter`.
+  Jedes `eventFilter` in `src/ui` bekommt `@abbau_still_filter` (Ausnahmen mit
+  Grund in `FILTER_AUSNAHMEN` desselben Waechters).
 
 ## Plattform-Kompatibilitaet
 

@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
     QVBoxLayout, QWidget,
 )
-from src.ui.abbau import abbau_still
+from src.ui.abbau import abbau_still, abbau_still_filter
 
 try:                                             # Gueltigkeit eines Qt-Objekts
     from shiboken6 import isValid as _qt_gueltig
@@ -521,6 +521,7 @@ class MitschnittDialog(QDialog):
             return
         self._rollbereich.ensureWidgetVisible(self._lbl_hilfe, 0, 8)
 
+    @abbau_still_filter
     def eventFilter(self, obj, ev):
         # Das Hauptfenster verschwindet (geschlossen oder versteckt, nicht
         # bloss minimiert): der Assistent schliesst mit und raeumt ab.

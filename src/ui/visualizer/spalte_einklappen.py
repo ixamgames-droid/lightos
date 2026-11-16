@@ -24,6 +24,8 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent, QObject, QTimer, Qt, Signal
 from PySide6.QtWidgets import QSizePolicy, QSplitter, QToolButton
 
+from src.ui.abbau import abbau_still_filter
+
 PREF_EINGEKLAPPT = "viz_right_panel_collapsed"
 PREF_BREITE = "viz_right_panel_width"
 
@@ -282,6 +284,7 @@ class SpaltenKlappe(QObject):
         self._splitter.setSizes(groessen)
         return True
 
+    @abbau_still_filter
     def eventFilter(self, obj, event):
         if obj is not self._splitter:
             return False

@@ -59,11 +59,29 @@ AUSNAHMEN = {
         "wie changeEvent (Andocken des Canvas muss immer laufen)",
 }
 
-#: eventFilter-Objekte, die ein fremdes Widget halten und nur RuntimeError
-#: abfangen (Muster _HaltWaechter) — tragen @abbau_still_filter.
-FILTER_GESCHUETZT = {
-    ("virtualconsole/vc_handy_leiste.py", "HandyGruppeDialog"),
-    ("widgets/mehrfach_knopf.py", "MehrfachKnopf"),
+#: eventFilter: ein Filter-Objekt, das ein ANDERES Objekt beobachtet (Eltern,
+#: Geschwister, Kinder), bekommt im Abbau dessen Ereignisse (z. B. Hide beim
+#: Verstecken der Kinder) mit schon leerem Woerterbuch — belegt an
+#: AuswahlMarke (Nachbesserung nach Pruefung). Darum traegt jedes eventFilter
+#: in src/ui @abbau_still_filter, ausser:
+#: (Datei relativ zu src/ui, Klasse) -> Begruendung
+FILTER_AUSNAHMEN = {
+    ("touch_keyboard.py", "OskEventFilter"):
+        "app-weiter Modul-Singleton (Touch), wird nie eingesammelt",
+    ("ziehen_scrollen.py", "ZiehenScrollen"):
+        "app-weiter Touch-Filter, faengt Exception selbst; heisser Pfad",
+    ("virtualconsole/vc_raumpad.py", "_HaltWaechter"):
+        "app-weit, faengt AttributeError seit UI-143 selbst",
+    ("virtualconsole/vc_widget.py", "HandyAbzeichen"):
+        "keine Instanz-Attribute: gesund mit leerem Woerterbuch, der Schutz "
+        "wuerde den Filter abschalten; braucht ihn nicht (nur Qt-Methoden)",
+    ("views/playback_view.py", "_ExecutorLeiste"):
+        "keine Instanz-Attribute (wie HandyAbzeichen)",
+    ("views/virtual_console_view.py", "_FesteHoehe"):
+        "kein __init__, nur Klassenattribut (wie HandyAbzeichen)",
+    ("main_window.py", "_KioskNotausMeldung"):
+        "LAS-41 NOT-AUS-Anzeige (Sicherheit, nicht anfassen); reagiert nur "
+        "auf Resize/Move/Show des Stapels",
 }
 
 
@@ -116,13 +134,23 @@ def test_waechter_ausnahmen_gibt_es_noch():
         assert grund
 
 
-def test_waechter_filter_mit_fremdem_widget_geschuetzt():
-    gefunden = set()
-    for rel, klasse, name, _z, deko in _overrides():
-        if name == "eventFilter" and (rel, klasse) in FILTER_GESCHUETZT:
-            assert "abbau_still_filter" in deko, (rel, klasse)
-            gefunden.add((rel, klasse))
-    assert gefunden == FILTER_GESCHUETZT
+def test_waechter_jedes_eventfilter_ist_geschuetzt():
+    fehlt, gesehen, ausnahmen = [], 0, set()
+    for rel, klasse, name, zeile, deko in _overrides():
+        if name != "eventFilter":
+            continue
+        gesehen += 1
+        if (rel, klasse) in FILTER_AUSNAHMEN:
+            assert "abbau_still_filter" not in deko, (rel, klasse)
+            ausnahmen.add((rel, klasse))
+            continue
+        if "abbau_still_filter" not in deko:
+            fehlt.append(f"src/ui/{rel}:{zeile} {klasse}.eventFilter")
+    assert gesehen >= 15, gesehen
+    assert ausnahmen == set(FILTER_AUSNAHMEN), "Filter-Ausnahme veraltet"
+    assert not fehlt, (
+        "eventFilter ohne @abbau_still_filter (src/ui/abbau.py, STAB-42):\n"
+        + "\n".join(fehlt))
 
 
 # ── 2. Der Dekorator selbst ──────────────────────────────────────────────────
@@ -461,5 +489,58 @@ def test_einsammeln_waehrend_grab_eines_anderen_widgets(app, capfd):
     assert "Error calling Python override" not in fehler, fehler
     assert "AttributeError" not in fehler, fehler
     assert "Cannot destroy paint device" not in fehler, fehler
+    m.deleteLater()
+    _loeschungen_zustellen()
+
+
+def test_auswahlmarke_filter_im_abbau_waehrend_grab(app, capfd):
+    """Nachbesserung nach Pruefung: ein eventFilter-Objekt (AuswahlMarke,
+    Kind der Flaeche, beobachtet die Flaeche) bekommt beim Abbau noch deren
+    Ereignisse — mit leerem Woerterbuch. Ohne @abbau_still_filter kam
+    ``'AuswahlMarke' object has no attribute '_canvas'`` im paintEvent eines
+    anderen Widgets an."""
+    from src.ui.virtualconsole.vc_auswahl_marke import AuswahlMarke
+
+    def muell_bauen():
+        flaeche = QWidget()
+        flaeche.resize(120, 80)
+        QWidget(flaeche).resize(20, 20)
+        AuswahlMarke(flaeche)
+        flaeche._stab42_zyklus = flaeche
+        flaeche.show()
+        app.processEvents()
+
+    befund = {}
+
+    class Maler(QWidget):
+        def paintEvent(self, ev):                        # noqa: N802
+            p = QPainter(self)
+            try:
+                vorher = abbau.uebergangen
+                gc.collect()
+                befund["uebergangen"] = abbau.uebergangen - vorher
+            except BaseException as e:     # pragma: no cover - der Fehlerfall
+                befund["fehler"] = repr(e)
+            finally:
+                p.end()
+                befund["maler_offen"] = p.isActive()
+
+    gc.collect()
+    m = Maler()
+    m.resize(40, 30)
+    m.show()
+    app.processEvents()
+    capfd.readouterr()
+    gc.disable()
+    try:
+        muell_bauen()
+        m.grab()
+    finally:
+        gc.enable()
+    fehler = capfd.readouterr().err
+    assert "fehler" not in befund, befund
+    assert befund.get("maler_offen") is False
+    assert befund.get("uebergangen", 0) >= 1, befund
+    assert "AttributeError" not in fehler, fehler
     m.deleteLater()
     _loeschungen_zustellen()
