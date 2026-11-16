@@ -464,6 +464,16 @@ class VCRaumPad(VCWidget):
             self.anwenden()
         self.update()
 
+    def vor_entfernen(self) -> None:
+        """CDX-72: Pad wird geloescht oder die Konsole neu geladen (``_clear``,
+        Undo/Redo, Show laden): eigene Pan/Tilt-Werte freigeben, auch bei
+        Lock AN. Fremd ueberschriebene Werte bleiben (s. ``freigeben``)."""
+        self._zug = None
+        self._waechter_aus()
+        self.aktiv = False              # kein „freigegeben"-Hinweis mehr (Widget geht)
+        if self._eigene:
+            self.freigeben()
+
     def release_if_held(self) -> bool:
         """Bankwechsel: ein nur gehaltenes Ziel (Lock AUS) freigeben."""
         return self._halten_abbrechen()

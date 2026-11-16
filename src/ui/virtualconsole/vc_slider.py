@@ -768,15 +768,37 @@ class VCSlider(VCWidget):
         VC-Wert durchfährt. Wird bei jedem Bank-/Seitenwechsel aufgerufen."""
         # MIDI-17: ein Motorfader faehrt nach dem Wechsel auf den Wert der
         # neuen Seite (nur der Fader der aktiven Bank, s. _motor_folgen).
-        if self._motor_aktiv() and not self._motor_auf_aktiver_bank():
-            # Bank verlassen: das Loslassen erreicht diesen Fader nicht mehr
-            # (MIDI geht nur an die aktive Bank) — keine haengende Sperre.
-            self._motor.vergessen()
-        self._motor_folgen(erzwingen=True)
         if VCSlider.soft_takeover:
+            # Zuerst armieren: kommt die Motorfahrt gleich an (_motor_senden),
+            # steht der Pult-Fader am VC-Wert und der Pickup faellt wieder weg
+            # (CDX-72). Ohne Motor oder ohne Ausgang bleibt er armiert.
             self._pickup_armed = True
             self._last_cc = None
+        if self._motor_aktiv():
+            if not self._motor_auf_aktiver_bank():
+                # Bank verlassen: das Loslassen erreicht diesen Fader nicht mehr
+                # (MIDI geht nur an die aktive Bank) — keine haengende Sperre.
+                self._motor.vergessen()
+            else:
+                # CDX-72: haelt die Hand den Pult-Fader gerade (Beruehrung kam
+                # noch an den Fader der vorigen Bank), uebernimmt der Fader der
+                # neuen Bank die Sperre — sonst fuehre er gegen die Hand.
+                self._beruehrung_uebernehmen()
+        self._motor_folgen(erzwingen=True)
+        if VCSlider.soft_takeover:
             self.update()
+
+    def _beruehrung_uebernehmen(self) -> None:
+        canvas = self._find_canvas()
+        fn = getattr(canvas, "motor_beruehrt", None)
+        if not callable(fn):
+            return
+        try:
+            from src.core.midi.midi_mapper import mackie_touch_note
+            if fn(mackie_touch_note(self.midi_ch)):
+                self._motor.beruehrung(True)
+        except Exception:
+            pass
 
     def handle_midi(self, msg) -> bool:
         if self._motor_aktiv() and self._motor_beruehrung(msg):
@@ -879,9 +901,20 @@ class VCSlider(VCWidget):
             mm = get_midi_manager()
             if ist_apc_ausgang(mm):
                 return False            # MIDI-18: kein Motor am APC, spaeter erneut
-            return bool(mm.send_pitchbend(int(self.midi_ch), wert))
+            ok = bool(mm.send_pitchbend(int(self.midi_ch), wert))
         except Exception:
             return False
+        if ok and getattr(self, "_pickup_armed", False):
+            # CDX-72: der Motor faehrt den Pult-Fader auf den VC-Wert — es gibt
+            # nichts mehr abzuholen. Sonst entschiede der erste Handbericht
+            # allein, und ein Sprung > Toleranz wuerde ignoriert.
+            self._pickup_armed = False
+            self._last_cc = None
+            try:
+                self.update()
+            except RuntimeError:
+                pass
+        return ok
 
     # ── MIDI Teach (siehe VCWidget) — Fader bindet CC oder Pitchbend ───────────
 

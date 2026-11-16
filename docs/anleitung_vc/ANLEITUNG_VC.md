@@ -101,7 +101,7 @@ passen (z. B. Tempo: Speed-Rad oder Fader), per **Rechtsklick → „↔ Widget 
 (An/Aus-Tasten, Bus-Auswahl, Effekt-Farben oder XY-Feld haben den Eintrag nicht.) Der Typ wird getauscht, die Effekt-Bindung (Effekt, Beschriftung, Position) bleibt.
 
 **Mehrere Elemente wählen:** mit Strg/Umschalt-Klick, einem Rahmen auf freier Fläche oder am
-Finger über „Mehrfach“ bzw. Halten + Antippen. Gewählte Elemente tragen einen bernsteinfarbenen
+Finger über „Mehrfach“ bzw. Halten + Antippen (hat der gehaltene Finger die Auswahl dabei ein paar Pixel mitgezogen, rückt die ganze Auswahl wieder an ihren Platz). Gewählte Elemente tragen einen bernsteinfarbenen
 Rahmen mit Haken oben links, bei mehreren steht „3 gewählt“ daneben. Ein Raum-Pad mit
 „Lock AUS“ zeigt nach dem Loslassen einen gestrichelten grauen Ring und kurz „freigegeben“ —
 die Köpfe zielen dann nicht mehr.

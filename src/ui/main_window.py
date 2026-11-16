@@ -2002,6 +2002,15 @@ class MainWindow(QMainWindow):
         except RuntimeError:        # Ansicht schon abgebaut
             return None
 
+    def _vc_leds_abschalten(self) -> None:
+        """CDX-72: beim Beenden die Pult-LEDs der VC loeschen (vor close_all)."""
+        try:
+            canvas = self._vc_zeichenflaeche()
+            if canvas is not None:
+                canvas.led_abschalten()
+        except Exception as e:
+            print(f"[MainWindow] VC-LEDs beim Beenden: {e}")
+
     def _vc_verlauf(self):
         """Zeichenflaeche der Virtual Console, wenn sie die sichtbare Seite
         dieses Fensters ist — sonst None. Die Zeichenflaeche nimmt keinen
@@ -4324,6 +4333,10 @@ class MainWindow(QMainWindow):
             pass
         if self._state.playback_engine:
             self._state.playback_engine.stop()
+        # CDX-72: Pult-LEDs der VC ausschalten, solange der Ausgang noch offen
+        # ist — die Canvas baut sich erst nach close_all() ab, dann gingen die
+        # Note-Offs ins Leere und die LEDs blieben bis zum naechsten Start an.
+        self._vc_leds_abschalten()
         from src.core.midi.midi_manager import get_midi_manager
         get_midi_manager().close_all()
         try:

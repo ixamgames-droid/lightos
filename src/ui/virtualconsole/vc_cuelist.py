@@ -67,6 +67,7 @@ class VCCueList(VCWidget):
         """)
         self._cue_list.itemDoubleClicked.connect(self._on_cue_double)
         self._aktiv_zeile = -1
+        self._sig: tuple | None = None   # CDX-72: (Stapel, Nummern+Namen) der Liste
         layout.addWidget(self._cue_list)
 
         btn_row = QHBoxLayout()
@@ -187,19 +188,35 @@ class VCCueList(VCWidget):
         if ex is None or ex.stack is None:
             return
         stack = ex.stack
-        current = self._cue_list.count()
-        if current != len(stack.cues):
+        # CDX-72: neu aufbauen, sobald sich Stapel, Nummern oder Namen aendern —
+        # nicht nur die Anzahl. Sonst blieben nach einem Seitenwechsel mit
+        # gleicher Cue-Zahl die Eintraege der alten Seite stehen, und der
+        # Sprung (Doppeltipp) traf auf dem neuen Stapel eine andere Cue.
+        sig = self._cue_signatur(stack)
+        if sig != getattr(self, "_sig", None) or self._cue_list.count() != len(sig[1]):
             self._cue_list.clear()
             self._aktiv_zeile = -1
-            for cue in stack.cues:
-                label = f"{cue.number:>6.1f}  {cue.label or '---'}"
-                item = QListWidgetItem(label)
-                item.setData(Qt.ItemDataRole.UserRole, cue.number)
+            for nummer, text in sig[1]:
+                item = QListWidgetItem(self._zeilen_text(nummer, text))
+                item.setData(Qt.ItemDataRole.UserRole, nummer)
                 self._cue_list.addItem(item)
+            self._sig = sig
         # Laufende Cue hervorheben (UI-121: Markierung statt Auswahl — die
         # Liste hat keine Auswahl mehr, die ein Finger verstellen koennte).
         idx = stack.current_index
         self._markiere(idx if 0 <= idx < self._cue_list.count() else -1)
+
+    @staticmethod
+    def _cue_signatur(stack) -> tuple:
+        try:
+            cues = tuple((c.number, c.label or "") for c in list(stack.cues))
+        except Exception:
+            cues = ()
+        return (id(stack), cues)
+
+    @staticmethod
+    def _zeilen_text(nummer, label: str) -> str:
+        return f"{nummer:>6.1f}  {label or '---'}"
 
     def _markiere(self, row: int):
         if row == self._aktiv_zeile:
@@ -231,7 +248,15 @@ class VCCueList(VCWidget):
         nummer = item.data(Qt.ItemDataRole.UserRole)
         if nummer is None:
             return
-        if self._bestaetige_sprung(item.text().strip()):
+        text = item.text()
+        # CDX-72: erst gegen den aktuellen Stapel abgleichen. Hat die Seite
+        # gewechselt (der Abgleich-Timer lief noch nicht), war der Eintrag
+        # veraltet: Liste neu aufbauen, nicht springen, nicht fragen.
+        sig_vorher = getattr(self, "_sig", None)
+        self._refresh()
+        if getattr(self, "_sig", None) != sig_vorher:
+            return
+        if self._bestaetige_sprung(text.strip()):
             self._gehe_zu(float(nummer))
 
     def _bestaetige_sprung(self, text: str) -> bool:
@@ -248,6 +273,12 @@ class VCCueList(VCWidget):
         ex = self._executor()
         if ex is None or ex.stack is None:
             return
+        try:
+            da = any(abs(float(c.number) - float(nummer)) < 0.001 for c in ex.stack.cues)
+        except Exception:
+            da = False
+        if not da:
+            return                      # CDX-72: Nummer gibt es hier nicht (mehr)
         ex.stack.go_to(nummer)
 
     # ── Edit mode pass-through ─────────────────────────────────────────────
