@@ -1,6 +1,6 @@
 # Anleitung: Musik-Sync & automatische Live-Show
 
-> Ziel: Die Lichtshow läuft **automatisch zur Musik** — beim **Play** startet die hinterlegte
+> **Was du danach kannst:** Die Lichtshow läuft **automatisch zur Musik** — beim **Play** startet die hinterlegte
 > Auto-Show, das Tempo folgt der Musik (BPM-Erkennung), und in der Virtuellen Konsole zeigen
 > Widgets **Now-Playing** und **BPM** an. Genutzt wird der interne Player + `music_autoshow`
 > (alles vorhanden, kein Code).

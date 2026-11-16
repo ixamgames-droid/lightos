@@ -278,6 +278,12 @@ In der Sektion **Virtual Console**:
 Die Beschriftung **Mein Laser** hält den Knopf vom gleichnamigen Show-Knopf **Laser langsam**
 auf Bank 1 getrennt.
 
+> **Mehrere Knöpfe auf einmal bewegen:** Mit der Maus Strg- oder Umschalt-Klick oder einen
+> Rahmen auf freier Fläche aufziehen. Am Touchscreen (Start mit `--touch`) erscheint im
+> Bearbeiten-Modus der Knopf **Mehrfach**: Ist er an, nimmt jeder Tipp einen Knopf dazu oder
+> heraus. Die gewählten ziehst du gemeinsam; **Ausrichten ▾** ordnet sie. Welche Gesten am
+> Finger gelten (langes Drücken, zwei Finger), stellst du unter **Ansicht → Touch-Gesten…** ein.
+
 Knöpfe mit **demselben** Live-Edit-Slot lösen einander ab: **Schwenker** stoppt die
 **MH-Welle** und umgekehrt, weil zwei Bewegungen derselben Köpfe nicht gleichzeitig laufen
 sollen. Knöpfe in anderen Slots laufen weiter.

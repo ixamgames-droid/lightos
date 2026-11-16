@@ -7,6 +7,9 @@
 > die Virtuelle Konsole dient zum Live-Umschalten). Genutzt wird die vorhandene **RGB-Matrix**
 > mit **Stil = Dimmer**.
 
+**Was du danach kannst:** eine Dimmer-Matrix anlegen, ihr Tempo an die Musik koppeln, sie als
+„Modify-Effekt" auf laufende Effekte rechnen und Taste oder Fader dafür auf der Virtuellen Konsole belegen.
+
 ---
 
 ## 1. Idee: Farbe und Helligkeit als getrennte Ebenen
@@ -89,6 +92,11 @@ Die Virtuelle Konsole dient anschließend zum Live-Umschalten der Faktoren:
 - Der **Default-/Leader-Bus** spiegelt die **Master-/Sound-BPM** (`bpm_global`), die der **Musik**
   folgt: legst du Farb- und Dimmer-Matrix auf den Default-Bus, laufen beide automatisch im
   Lied-Tempo (siehe Anleitung *Musik-Sync*).
+
+- Mehrere Bedienelemente der VC auf einmal markieren (nur im Modus **Bearbeiten**): mit der Maus
+  **Strg**/**Umschalt**-Klick oder einen Rahmen auf freier Fläche ziehen, am Touchscreen
+  (Start mit `--touch`) den Umschalter **Mehrfach** einschalten und dann tippen. Der Knopf
+  **Ausrichten** richtet die Auswahl aus.
 
 ![SpeedDial und Tempo-Bus in der Virtuellen Konsole](img/02_vc_tempo_bus.png)
 

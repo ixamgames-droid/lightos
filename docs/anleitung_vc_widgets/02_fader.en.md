@@ -125,6 +125,10 @@ In the modes **Effekt-Helligkeit**, **Effekt-Tempo** and **Effekt-Parameter**, t
 
 The actual live effect runs through the shared seam `src/core/engine/effect_live.py` (`list_params`/`set_param`/`do_action`); the widget only stores the effect ID. MIDI uses the same binding (see [README.en.md](README.en.md)). With **Effekt An/Aus (EFFECT-Modi)** the fader can additionally start/stop: on = value > 0 starts the target effect (if it isn't running), value 0 stops it; off = the fader only adjusts, the effect must be started separately (at 0 it keeps running with value 0).
 
+### Star „live edited" (UI-129)
+
+If a fader in one of the effect modes is bound to **exactly one** effect and that effect was changed live, it shows a small yellow star in a free top corner (left, otherwise right); the tooltip says „live bearbeitet". Faders without a fixed binding (active effect / Live-Edit-Slot) and group faders show none. The star disappears on **Reset Live**, **Commit** and when a show is loaded, and it is not saved. The same applies to the encoder.
+
 ## MIDI & keyboard
 
 The fader supports **MIDI teach** for **CC** and **pitch bend** (no note); there is **no key assignment** (a fader needs a continuous value, not a key press).

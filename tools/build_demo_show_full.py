@@ -66,7 +66,14 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # TOOL-5: LIGHTOS_GEN_OUT lenkt die Show um (Test faehrt den Generator bis „FERTIG",
 # ohne die mitgelieferte shows/Demo_Show_Full.lshow zu ueberschreiben).
 OUT = os.environ.get("LIGHTOS_GEN_OUT") or os.path.join(_ROOT, "shows", "Demo_Show_Full.lshow")
-MUSIC_DIR = r"C:/Users/X/Desktop/Musik/BP Party"
+# PRIV-8: Die Show ist GETRACKT (oeffentliches Repo). Bis 15.11.2026 las der
+# Generator einen festen Musikordner und schrieb dessen absolute Pfade in die
+# Playlist — so landeten Kontoname und Ordnerstruktur des Rigs in der Show.
+# Jetzt: echte Dateien nur auf ausdruecklichen Wunsch (LIGHTOS_DEMO_MUSIC_DIR,
+# fuer eine LOKALE Show), und in der Show steht immer nur ein neutraler,
+# relativer Pfad ``Musik/<datei>`` — nie der Ordner, aus dem gelesen wurde.
+MUSIC_DIR = os.environ.get("LIGHTOS_DEMO_MUSIC_DIR", "")
+MUSIK_REL = "Musik"              # neutraler Ablageort in der Playlist
 BUS = "Global"          # alle Effekte folgen diesem Master-Bus (= globale Musik-BPM)
 # ENG-31: Am Tempo-Bus ist bei tempo_multiplier 1 EIN BEAT EINE VOLLE FIGUR — bei
 # 150 BPM also 2,5 Kreise/Schwenks pro Sekunde, und die Geraete fahren das am Rig
@@ -499,9 +506,14 @@ def _dup_score(p):
     return (p.lower().count("kopie"), len(p))
 
 
+def _neutral(datei: str) -> str:
+    """PRIV-8: nur ``Musik/<Dateiname>`` — kein Laufwerk, kein Konto, kein Ordner."""
+    return MUSIK_REL + "/" + os.path.basename(datei.replace("\\", "/"))
+
+
 def build_playlist():
     seen: dict[str, str] = {}
-    for p in sorted(glob.glob(os.path.join(MUSIC_DIR, "*.mp3"))):
+    for p in (sorted(glob.glob(os.path.join(MUSIC_DIR, "*.mp3"))) if MUSIC_DIR else []):
         key = clean_title(p).lower()
         if key not in seen or _dup_score(p) < _dup_score(seen[key]):
             seen[key] = p
@@ -510,11 +522,12 @@ def build_playlist():
         pl = []
         for p in uniq:
             genre, bpm = guess_genre_bpm(os.path.basename(p))
-            pl.append({"path": p, "title": clean_title(p), "genre": genre, "bpm": float(bpm)})
+            pl.append({"path": _neutral(p), "title": clean_title(p), "genre": genre,
+                       "bpm": float(bpm)})
         return pl, True
     fb = [("Bounce Anthem", "Bounce", 150.0), ("Hardstyle Hero", "Hardstyle", 150.0),
           ("Hypertechno Drop", "Hypertechno", 150.0), ("Phonk Cruise", "Bounce", 145.0)]
-    return [{"path": os.path.join(MUSIC_DIR, t + ".mp3"), "title": t, "genre": g, "bpm": b}
+    return [{"path": _neutral(t + ".mp3"), "title": t, "genre": g, "bpm": b}
             for t, g, b in fb], False
 
 
@@ -976,6 +989,10 @@ assert len(gm) >= 1 and len(gd) >= 3, f"Master-Fader: GM={len(gm)} GroupDim={len
 
 # Musik + Auto-Show
 assert 1 <= len(state.playlist) <= PLAYLIST_MAX, f"Playlist: {len(state.playlist)}"
+# PRIV-8: getrackte Show — nur neutrale, relative Pfade in der Playlist.
+assert all(str(t.get("path", "")).startswith(MUSIK_REL + "/")
+           and "Users" not in str(t.get("path", "")) for t in state.playlist), \
+    "Playlist traegt einen absoluten/privaten Pfad"
 ma = state.music_autoshow
 assert ma.get("enabled") and all(fid in fn_ids for fid in ma.get("function_ids", [])), ma
 shows = [f for f in fm.all() if isinstance(f, Show)]

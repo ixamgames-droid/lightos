@@ -215,6 +215,7 @@ class VirtualConsoleView(QWidget):
             ("Button",    "VCButton"),
             ("Fader",     "VCSlider"),
             ("XY Pad",    "VCXYPad"),
+            ("Raum-Pad",  "VCRaumPad"),    # UI-127
             ("Cueliste",  "VCCueList"),
             ("SpeedDial", "VCSpeedDial"),
             ("Encoder",   "VCEncoder"),
@@ -819,14 +820,26 @@ class VirtualConsoleView(QWidget):
                 modify_sig = modify_signatur(funcs)
             except Exception:
                 modify_sig = None
+            # UI-129: ebenso, wenn sich die Menge der live bearbeiteten Effekte
+            # aendert (Sternchen an Taste/Fader/Encoder). Gerechnet wird hier im
+            # vorhandenen Statustakt — kein eigener Timer, neu gezeichnet nur bei
+            # Aenderung.
+            try:
+                from src.core.engine import effect_live
+                live_ids = effect_live.live_editiert_ids()
+            except Exception:
+                live_ids = None
             if (running_ids != getattr(self, "_last_running_ids", None)
-                    or modify_sig != getattr(self, "_last_modify_sig", None)):
+                    or modify_sig != getattr(self, "_last_modify_sig", None)
+                    or live_ids != getattr(self, "_last_live_ids", None)):
                 self._last_running_ids = running_ids
                 self._last_modify_sig = modify_sig
+                self._last_live_ids = live_ids
                 if self._canvas_alive():
                     from src.ui.virtualconsole.vc_button import VCButton
                     from src.ui.virtualconsole.vc_slider import VCSlider
-                    for cls in (VCButton, VCSlider):
+                    from src.ui.virtualconsole.vc_encoder import VCEncoder
+                    for cls in (VCButton, VCSlider, VCEncoder):
                         for w in self._canvas.findChildren(cls):
                             try:
                                 w.update()

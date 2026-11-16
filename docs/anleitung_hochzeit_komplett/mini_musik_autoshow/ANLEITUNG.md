@@ -24,7 +24,7 @@ Die Show hat die **Auto-Show eingeschaltet**: Sobald du **▶ Play** drückst, s
 ### Schritt-für-Schritt
 1. **Bank 6** → **„>/|| Play“** drücken. → Musik läuft, die Auto-Show startet automatisch das Licht.
 2. **„Musik-BPM"** tippen → die Effekte laufen auf den Takt des Lieds.
-3. Anderes Lied: **„Lied ▶"**. Auto-Show passt sich an.
+3. Anderes Lied: **„Lied >>"**. Auto-Show passt sich an.
 
 ### Was du anpassen kannst
 - **Pro Lied** eine eigene Auto-Show: in **E/A → Musik** (`Strg+7`) lässt sich je Lied
