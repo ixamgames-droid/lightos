@@ -268,11 +268,13 @@ QPushButton#goBtn:hover {
         stop:0 #22aa22, stop:1 #165a16);
 }
 
-/* Blackout button (auch STOP ALL). UI-137: weisse, fette Schrift auf
-   kraeftigem Rot (Kontrast >= 4,5:1) — vorher Rot auf Dunkelrot in 11 px. */
+/* Blackout button (auch STOP ALL). UI-137: weisse, fette Schrift in 13 px
+   (Kontrast >= 4,5:1) — vorher rote Schrift auf Dunkelrot in 11 px. Der
+   Grund bleibt im Ruhezustand dunkel, damit der AKTIVE Zustand (helles Rot,
+   weisser Rand) weiter auf einen Blick zu unterscheiden ist. */
 QPushButton#blackoutBtn {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #b71c1c, stop:1 #8b1515);
+        stop:0 #7a1a1a, stop:1 #4f0f0f);
     border-color: #3a0a0a;
     font-weight: bold;
     font-size: 13px;
