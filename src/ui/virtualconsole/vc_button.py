@@ -10,7 +10,8 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QComboBox,
                                 QCheckBox)
 from PySide6.QtCore import Qt, QRect, QRectF
 from PySide6.QtGui import (QPainter, QColor, QFont, QPen, QPainterPath,
-                           QPixmap, QMovie, QImageReader, QLinearGradient, QBrush)
+                           QPixmap, QMovie, QImageReader, QLinearGradient, QBrush,
+                           QFontMetricsF)
 from .vc_widget import VCWidget
 from .vc_style import paint_button_surface, RADIUS as VC_RADIUS
 from src.core.show import vc_assets   # VC-IMG: Button-Hintergrundbild/GIF-Assets
@@ -404,6 +405,100 @@ def _loese_halte_blackout(slot) -> None:
             om.halte_blackout(slot, False)
     except Exception:
         pass
+
+
+# ── UI-138: Beschriftung einpassen ─────────────────────────────────────────
+# Die Beschriftung stand immer in fester Schrift „Segoe UI 9 bold" mit
+# Zeilenumbruch im Tastenrechteck. Ein Wort, breiter als die Taste, wurde links
+# und rechts abgeschnitten („PAR egenboge", „uflic"); zu viele Zeilen liefen
+# oben und unten heraus. Jetzt: die Schrift schrittweise bis 7 pt verkleinern,
+# bis der umbrochene Text passt. Reicht das nicht, bricht ein zu langes Wort mit
+# Bindestrich um und die letzte Zeile endet mit „…" — der Volltext steht dann im
+# Tooltip. Kurze Texte bleiben Zeichen fuer Zeichen wie bisher (9 pt, derselbe
+# drawText-Aufruf). Die gespeicherte Show bleibt unberuehrt (nur Anzeige).
+BESCHRIFTUNG_FAMILIE = "Segoe UI"
+BESCHRIFTUNG_STUFEN = (9.0, 8.5, 8.0, 7.5, 7.0)
+BESCHRIFTUNG_FLAGS = Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap
+# Gemessen wird gegen ein um 1 px eingerueckten Rechteck — Kanten-Pixel der
+# Glyphen sollen nicht auf dem Tastenrand landen.
+_BESCHRIFTUNG_RAND = 1
+
+
+def beschriftung_schrift(pt: float) -> QFont:
+    f = QFont(BESCHRIFTUNG_FAMILIE)
+    f.setPointSizeF(pt)
+    f.setBold(True)
+    return f
+
+
+def _umbrechen(text: str, fm: QFontMetricsF, breite: float) -> tuple[list[str], bool]:
+    """Text zeilenweise so umbrechen, dass jede Zeile <= ``breite`` ist. Ein
+    Wort, das allein nicht passt, wird mit Bindestrich getrennt. Liefert
+    (Zeilen, ob ein Wort getrennt wurde)."""
+    zeilen: list[str] = []
+    getrennt = False
+    for absatz in text.split("\n"):
+        woerter = absatz.split()
+        if not woerter:
+            zeilen.append("")
+            continue
+        akt = ""
+        for wort in woerter:
+            kand = f"{akt} {wort}" if akt else wort
+            if fm.horizontalAdvance(kand) <= breite:
+                akt = kand
+                continue
+            if akt:
+                zeilen.append(akt)
+                akt = ""
+            while len(wort) > 1 and fm.horizontalAdvance(wort) > breite:
+                n = len(wort) - 1
+                while n > 1 and fm.horizontalAdvance(wort[:n] + "-") > breite:
+                    n -= 1
+                if len(wort) >= 4:              # kein einzelner Rest-Buchstabe
+                    n = max(1, min(n, len(wort) - 2))
+                zeilen.append(wort[:n] + "-")
+                wort = wort[n:]
+                getrennt = True
+            akt = wort
+        zeilen.append(akt)
+    return zeilen, getrennt
+
+
+def beschriftung_einpassen(text: str, breite: float, hoehe: float,
+                           geraet=None) -> tuple[QFont, str, object, bool]:
+    """Schrift und Text fuer eine Beschriftung im Rechteck ``breite``x``hoehe``.
+
+    Liefert (Schrift, zu zeichnender Text, drawText-Flags, gekuerzt). Reine
+    Funktion (``geraet`` = Paint-Device fuer die Masse, sonst Bildschirm)."""
+    def _fm(f):
+        return QFontMetricsF(f, geraet) if geraet is not None else QFontMetricsF(f)
+
+    w = max(1.0, float(breite) - 2 * _BESCHRIFTUNG_RAND)
+    h = max(1.0, float(hoehe) - 2 * _BESCHRIFTUNG_RAND)
+    erste = beschriftung_schrift(BESCHRIFTUNG_STUFEN[0])
+    if not text:
+        return erste, text, BESCHRIFTUNG_FLAGS, False
+    for pt in BESCHRIFTUNG_STUFEN:
+        f = beschriftung_schrift(pt)
+        br = _fm(f).boundingRect(QRectF(0, 0, w, h), BESCHRIFTUNG_FLAGS, text)
+        if br.width() <= w + 0.01 and br.height() <= h + 0.01:
+            return f, text, BESCHRIFTUNG_FLAGS, False
+    # Kleinste Stufe reicht nicht: selbst umbrechen, notfalls kuerzen.
+    f = beschriftung_schrift(BESCHRIFTUNG_STUFEN[-1])
+    fm = _fm(f)
+    zeilen, getrennt = _umbrechen(text, fm, w)
+    platz = max(1, int((h + fm.leading()) // fm.lineSpacing()))
+    gekuerzt = getrennt
+    if len(zeilen) > platz:
+        rest = " ".join(z for z in zeilen[platz - 1:] if z)
+        zeilen = zeilen[:platz - 1] + [rest]
+        gekuerzt = True
+    letzte = zeilen[-1]
+    if fm.horizontalAdvance(letzte) > w:
+        zeilen[-1] = fm.elidedText(letzte, Qt.TextElideMode.ElideRight, w)
+        gekuerzt = True
+    return f, "\n".join(zeilen), Qt.AlignmentFlag.AlignCenter, gekuerzt
 
 
 def _badge_text_right_inset(has_gobo: bool, gobo_w: int, has_badge: bool,
@@ -1020,7 +1115,37 @@ class VCButton(VCWidget):
                 return True
         except Exception:
             pass
+        # UI-138: gekuerzte Beschriftung -> Volltext im Tooltip.
+        if e.type() == e.Type.ToolTip and self.beschriftung_gekuerzt():
+            from PySide6.QtWidgets import QToolTip
+            QToolTip.showText(e.globalPos(), self.beschriftung_tooltip(), self)
+            return True
         return super().event(e)
+
+    # ── UI-138: Beschriftung einpassen ───────────────────────────────────────
+    def _beschriftung(self, text_rect: QRect, text: str):
+        """(Schrift, Text, Flags) fuer die Beschriftung — zwischengespeichert
+        je (Text, Groesse des Textrechtecks)."""
+        key = (text, text_rect.width(), text_rect.height(), self.logicalDpiY())
+        cache = getattr(self, "_beschriftung_cache", None)
+        if cache is None or cache[0] != key:
+            f, t, flags, gekuerzt = beschriftung_einpassen(
+                text, text_rect.width(), text_rect.height(), self)
+            cache = (key, f, t, flags, gekuerzt)
+            self._beschriftung_cache = cache
+        return cache[1], cache[2], cache[3]
+
+    def beschriftung_gekuerzt(self) -> bool:
+        """True, wenn die Beschriftung zuletzt nicht vollstaendig passte."""
+        cache = getattr(self, "_beschriftung_cache", None)
+        return bool(cache and cache[4] and cache[0][0])
+
+    def beschriftung_tooltip(self) -> str:
+        """Volltext der Beschriftung (plus eigener Tooltip, falls gesetzt)."""
+        cache = getattr(self, "_beschriftung_cache", None)
+        voll = cache[0][0] if cache else self.caption
+        eigen = self.toolTip()
+        return f"{voll}\n\n{eigen}" if eigen else voll
 
     # ── UI-129: Sternchen „Effekt live bearbeitet" ───────────────────────────
     def live_stern_fid(self):
@@ -2358,8 +2483,6 @@ class VCButton(VCWidget):
             p.drawRoundedRect(brect, br, br)
 
         p.setPen(self._fg_color)
-        font = QFont("Segoe UI", 9, QFont.Weight.Bold)
-        p.setFont(font)
 
         # Snapshot-Index anzeigen wenn Snapshot-Aktion
         display = self.caption
@@ -2384,11 +2507,14 @@ class VCButton(VCWidget):
         _mz_h = 16
         if _modify and face.height() >= 3 * _mz_h:
             text_rect = text_rect.adjusted(0, 0, 0, -(_mz_h + 2))
-        p.drawText(text_rect, Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap, display)
+        # UI-138: Schrift/Text passend zum Textrechteck (je Taste zwischen-
+        # gespeichert — gesucht wird nur bei neuem Text oder neuer Groesse).
+        font, display, _tflags = self._beschriftung(text_rect, display)
+        p.setFont(font)
+        p.drawText(text_rect, _tflags, display)
         # UI-129: belegte Flaeche der Beschriftung (mit IHRER Schrift gemessen) —
         # das Live-Sternchen weicht ihr aus.
-        _text_bb = (p.boundingRect(text_rect, Qt.AlignmentFlag.AlignCenter
-                                   | Qt.TextFlag.TextWordWrap, display)
+        _text_bb = (p.boundingRect(text_rect, _tflags, display)
                     if display else None)
 
         # Gobo-Icon (oben rechts), wenn dieser Button einen Gobo setzt.

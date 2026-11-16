@@ -108,7 +108,7 @@ Visualizer als separates Fenster.
 | Fixture-Browser | `widgets/fixture_browser.py` (199) | Gerät aus DB wählen & patchen |
 | QXF-Import | `widgets/qxf_import_dialog.py` (151) | QLC+-Fixtures bulk-importieren |
 | Input-Profil-Editor | `widgets/input_profile_editor.py` (327) | MIDI/OSC-Mappings verwalten + lernen |
-| MIDI-Teach | `widgets/midi_teach_dialog.py` (296) | APC-mini-Tasten/Fader visuell an VC-Widget binden |
+| MIDI Lernen (Lern-Dialog) | `widgets/midi_teach_dialog.py` (296) | APC-mini-Tasten/Fader visuell an VC-Widget binden |
 | Output-Konfig | `widgets/output_config.py` (400) | Enttec · Art-Net · sACN · DMX-Input · Universen |
 | Channel-Modifier | `widgets/channel_modifier_dialog.py` (129) | Pro Kanal eine Kurve zuweisen |
 | Channel-Range-Lock | `widgets/channel_range_lock_dialog.py` (155) | Kanal auf Sub-Range sperren |

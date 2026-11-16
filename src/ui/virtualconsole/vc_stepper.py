@@ -281,7 +281,7 @@ class VCStepper(VCWidget):
         step_sb.setValue(int(self.step))
         step_sb.setToolTip("Schrittweite je Tastendruck (ganzzahlig).")
         form.addRow("Schrittweite:", step_sb)
-        form.addRow(QLabel("── MIDI CC (relativ; oder Rechtsklick → Teach) ──"))
+        form.addRow(QLabel("── MIDI CC (relativ; oder Rechtsklick → MIDI Lernen) ──"))
         cc_sb = QSpinBox()
         cc_sb.setRange(-1, 127)
         cc_sb.setValue(self.midi_cc)

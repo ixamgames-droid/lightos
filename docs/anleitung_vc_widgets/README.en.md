@@ -59,7 +59,7 @@ two modes:
 (settings) (exception: color tile — double-click = color picker). A **right-click** (in
 edit mode) opens the context menu:
 
-- **Einstellungen…** (settings), **🎹 MIDI Teach…**, **⌨ Taste zuweisen…** (assign key)
+- **Einstellungen…** (settings), **🎹 MIDI Lernen…**, **⌨ Taste zuweisen…** (assign key)
 - **Bank** (Alle Banks = all banks / Bank 1…10), **Löschen** (delete),
   **Vordergrund-/Hintergrund-Farbe** (foreground/background color)
 - for effect-bound elements additionally **⚡ Live-Parameter…** (live parameters) and

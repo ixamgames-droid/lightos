@@ -84,7 +84,7 @@ Die Live-Wirkung läuft über die gemeinsame Naht `src/core/engine/effect_live.p
 
 Das XY-Pad unterstützt **MIDI** (zwei absolute Control-Change-Achsen), aber **kein** Tasten-Teach.
 
-- **Zuweisen:** im Eigenschaften-Dialog **„MIDI CC Pan"** und **„MIDI CC Tilt"** auf die gewünschten CC-Nummern setzen sowie den **„MIDI-Kanal"** wählen (0 = alle Kanäle). Ein separates „MIDI Teach…" ist hier nicht nötig — die Bindung läuft über den Dialog.
+- **Zuweisen:** im Eigenschaften-Dialog **„MIDI CC Pan"** und **„MIDI CC Tilt"** auf die gewünschten CC-Nummern setzen sowie den **„MIDI-Kanal"** wählen (0 = alle Kanäle). Ein separates „MIDI Lernen…" ist hier nicht nötig — die Bindung läuft über den Dialog.
 - **Wirkung:** Beide CCs sind **absolut** — der eingehende Wert (0–127) wird direkt auf 0–100 % der jeweiligen Achse abgebildet.
 - **Nur im Positions-Modus** wirksam: In den Modi Feld/Pfad steuert MIDI das Pad nicht.
 

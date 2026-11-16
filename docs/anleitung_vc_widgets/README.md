@@ -54,7 +54,7 @@ Modi um:
 (Ausnahme Farb-Kachel: Doppelklick = Farb-Picker). **Rechtsklick** (im Bearbeiten-Modus)
 öffnet das Kontextmenü:
 
-- **Einstellungen…**, **🎹 MIDI Teach…**, **⌨ Taste zuweisen…**
+- **Einstellungen…**, **🎹 MIDI Lernen…**, **⌨ Taste zuweisen…**
 - **Bank** (Alle Banks / Bank 1…10), **Löschen**, **Vordergrund-/Hintergrund-Farbe**
 - bei effektgebundenen Elementen zusätzlich **⚡ Live-Parameter…** und **↔ Widget ändern…**
 

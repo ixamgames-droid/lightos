@@ -86,7 +86,7 @@ The live effect runs through the shared seam `src/core/engine/effect_live.py` (`
 
 The XY pad supports **MIDI** (two absolute control change axes), but **no** key teach.
 
-- **Assign:** in the properties dialog, set **„MIDI CC Pan"** and **„MIDI CC Tilt"** to the desired CC numbers and select the **„MIDI-Kanal"** (0 = all channels). A separate „MIDI Teach…" is not needed here — the binding is done in the dialog.
+- **Assign:** in the properties dialog, set **„MIDI CC Pan"** and **„MIDI CC Tilt"** to the desired CC numbers and select the **„MIDI-Kanal"** (0 = all channels). A separate „MIDI Lernen…" is not needed here — the binding is done in the dialog.
 - **Effect:** both CCs are **absolute** — the incoming value (0–127) is mapped directly to 0–100 % of the respective axis.
 - Effective **only in position mode**: in the modes Feld/Pfad, MIDI does not control the pad.
 
