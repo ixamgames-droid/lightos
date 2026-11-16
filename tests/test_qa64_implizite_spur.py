@@ -110,6 +110,22 @@ class UrteilTest(unittest.TestCase):
         self.assertEqual(erg["ausnahme"], ["QA-910"])
         self.assertEqual(erg["ausdruecklich"], [])
 
+    def test_ausnahme_ist_keine_spur_datei(self):
+        """Nachbesserung nach Pruefung: die Ausnahme darf fuer die ausdrueckliche
+        Pruefung nie als Datei „keine" gelten — sonst wird ein erledigtes Item
+        mit Ausnahme in test_qa64_status_drift rot (Spur ohne Datei)."""
+        for t in ("<!-- spur: keine -->", "<!-- spur: keine :: Grund -->",
+                  "<!--spur:keine-->"):
+            self.assertIsNone(bsd.SPUR.search("Text " + t), t)
+        m = bsd.SPUR.search("<!-- spur: keine --> <!-- spur: tools/x.py :: Y -->")
+        self.assertEqual(m.group(1), "tools/x.py")
+        self.assertEqual(bsd.SPUR.search("<!-- spur: keine_x.py -->").group(1),
+                         "keine_x.py")
+        erg = bsd.implizite_pruefung(_items(
+            "| QA-912 | P2 | todo | X | <!-- spur: keine --> <!-- spur: tools/x.py :: Y --> |\n"),
+            ["test_qa912_x.py"])
+        self.assertEqual(erg["ausdruecklich"], ["QA-912"])
+
     def test_ausdrueckliche_spur_geht_vor(self):
         erg = bsd.implizite_pruefung(_items(
             "| QA-911 | P2 | todo | X | Text <!-- spur: tools/x.py :: Y --> |\n"),

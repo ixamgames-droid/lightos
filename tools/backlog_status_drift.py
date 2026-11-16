@@ -114,7 +114,14 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKLOG = os.path.join(REPO, "BACKLOG.md")
 
 # <!-- spur: pfad/zur/datei.py :: KENNZEICHEN -->   (Kennzeichen optional)
-SPUR = re.compile(r"<!--\s*spur:\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
+# ★ QA-64 (Nachbesserung): `<!-- spur: keine -->` ist die Ausnahme fuer die
+# implizite Spur, KEINE Datei namens „keine". Der Ausschluss steht im Muster
+# selbst, damit JEDER Leser (auch tests/test_qa64_status_drift.py, der fuer
+# erledigte Items die Spur-Datei verlangt) die Ausnahme ueberspringt — sonst
+# wuerde ein Item mit Ausnahme spaetestens nach dem Einsammeln als `done` dort
+# rot („Spuren ohne Datei: keine"). Steht daneben eine echte Spur, findet
+# ``search`` die.
+SPUR = re.compile(r"<!--\s*spur:(?!\s*keine\s*(?:::|-->))\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
 # Nur was der STATUS behauptet — nicht jeder Backtick in der Beschreibung.
 ZWEIG = re.compile(r"Umsetzung auf `([^`]+)`")
 
@@ -355,12 +362,13 @@ def implizite_pruefung(items, testdateien) -> dict:
     erg = {"ausdruecklich": [], "implizit": [], "ohne": [], "ausnahme": [],
            "wartet": [], "beanstandet": []}
     for item, status, text in items:
+        # Eine echte ausdrueckliche Spur geht vor (SPUR ueberspringt die
+        # Ausnahme selbst); die Ausnahme betrifft nur die implizite Spur.
+        if SPUR.search(text):
+            erg["ausdruecklich"].append(item)
+            continue
         if KEINE_SPUR.search(text):
             erg["ausnahme"].append(item)
-            continue
-        m = SPUR.search(text)
-        if m:
-            erg["ausdruecklich"].append(item)
             continue
         dateien = implizite_spur(item, index)
         if not dateien:
@@ -510,10 +518,10 @@ def main(argv=None) -> int:
     mit_spur = 0
     geurteilt = 0
     for item, status, zeile in items:
+        # SPUR ueberspringt `<!-- spur: keine -->` (Ausnahme der impliziten
+        # Spur, keine Datei namens „keine") von selbst.
         m = SPUR.search(zeile)
-        # `<!-- spur: keine -->` ist die Ausnahme fuer die implizite Spur,
-        # keine Datei namens „keine".
-        if not m or KEINE_SPUR.search(zeile):
+        if not m:
             continue
         mit_spur += 1
         datei, kennzeichen = m.group(1), m.group(2)
