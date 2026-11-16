@@ -8,18 +8,12 @@ gespeichert. Die Maus ist von keinem Schalter betroffen.
 """
 from __future__ import annotations
 
-import sys
-
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout,
     QLabel, QScrollArea, QVBoxLayout, QWidget,
 )
 
 from src.ui import gesten_prefs
-
-
-def _ist_windows() -> bool:
-    return sys.platform == "win32"
 
 
 class GestenDialog(QDialog):
@@ -87,21 +81,6 @@ class GestenDialog(QDialog):
         hinweis.setWordWrap(True)
         hinweis.setStyleSheet("color:#8b949e;")
         il.addWidget(hinweis)
-        if _ist_windows():
-            # UI-134: unter Windows 11 kommt das Drei-Finger-TIPPEN nie an
-            # (Systemgeste), Ziehen mit drei Fingern schon (B, 15.11.2026).
-            # Der genannte Einstellungs-Pfad ist der von Windows 11 - unter
-            # Windows 10 gibt es ihn nicht, deshalb steht die Version voran.
-            self.windows_hinweis = QLabel(
-                "Windows 11: Das Tippen mit drei Fingern nutzt Windows selbst als "
-                "Systemgeste – es kommt dann nicht bei LightOS an. Abhilfe: in den "
-                "Windows-Einstellungen (Bluetooth und Geräte → Toucheingabe) die "
-                "Drei- und Vier-Finger-Gesten ausschalten. LightOS ändert diese "
-                "Einstellung nicht selbst.")
-            self.windows_hinweis.setObjectName("gesten_windows_hinweis")
-            self.windows_hinweis.setWordWrap(True)
-            self.windows_hinweis.setStyleSheet("color:#d29922;")
-            il.addWidget(self.windows_hinweis)
         il.addStretch(1)
 
         sc = QScrollArea()
