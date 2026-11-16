@@ -30,6 +30,8 @@ der Tabelle steht, kommt später und setzt sich durch.
 Nicht in der Tabelle: die **Szenen-Vorschau** aus dem Editor. Sie gilt für ein einzelnes Bild,
 liegt zwischen Schicht 5 und 6 und wird von Fadern, Master und Blackout genauso begrenzt.
 
+![Schaubild der zehn Schichten von unten nach oben: 1 Grundwerte, 2 Effekte und Funktionen mit den fünf Stufen Grundlicht < Effekte < Akzente < Strobe & Blinder < Notfall, 3 Cue-Listen, 4 Programmer mit allen Snap-Tasten, 5 Automatische Helligkeit, 6 „Alles Weiß“, 7 Gruppen-Fader, Geräte-Dimmer, Submaster, 8 Eingemischtes DMX von außen, 9 Simple Desk mit „Manueller Override“, 10 Laser-NOT-AUS, Grand Master, Blackout, Ziel-Blackout](img/01_schichten.png)
+
 **Die Stufen ordnen nur Schicht 2.** Snap-Tasten, Cue-Listen, Fader und Master behalten
 ihren festen Platz.
 
@@ -264,8 +266,3 @@ alle Geräte der Mitglieder und die Stufe des Behälters.
   stehen dort genau 70 %.
 - **Master und Blackout:** Grand Master, Gruppen-Fader, Blackout und Laser-NOT-AUS wirken
   nach allen Effekten, egal auf welcher Stufe.
-
-## Noch fehlendes Bild
-
-Das **Schichten-Schaubild** (Grundwerte bis NOT-AUS) aus Abschnitt 1 ist noch nicht gezeichnet;
-bis dahin gilt die Tabelle dort.

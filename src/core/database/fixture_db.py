@@ -557,66 +557,129 @@ def create_user_profile(payload: dict, *, engine=None,
         prof.zoom_inverted = bool(payload.get("zoom_inverted", False))
         s.add(prof)
         s.flush()
-        # FM-73: keine zwei Modi gleichen Namens speichern — ein gepatchtes
-        # Geraet findet seinen Modus ueber Profil + Modusname. Der Generator
-        # meldet Doppelte schon im Dialog; hier steht der Riegel fuer JEDES
-        # Payload (auch von Hand gebaut): der zweite heisst „Name (2)“.
-        from .modus_wahl import eindeutiger_modusname
-        vergeben: set[str] = set()
-        for m in payload.get("modes", []):
-            channels = m.get("channels", [])
-            mode = FixtureMode(
-                fixture_id=prof.id,
-                name=eindeutiger_modusname(
-                    (m.get("name") or "Modus").strip(), vergeben),
-                channel_count=int(m.get("channel_count", len(channels))),
-                description="",
-                # FM-26: die physische Rasterform des Modus mitschreiben —
-                # Farbzonen (VIZ-50a) und eigene Weiss-Leiste (CDX-52). Ohne
-                # diese vier Spalten endet die Eingabe des Generators an
-                # dieser Stelle: der Modus entstuende mit den Default-Nullen
-                # der Spalten, also "nicht hinterlegt", und `panel_grid_for`
-                # gaebe dem Renderer weiter (0, 0). Fehlende Schluessel sind
-                # ausdruecklich erlaubt (aeltere Payloads, Handbau) und
-                # bedeuten dasselbe wie 0.
-                grid_rows=_geo_wert(m.get("grid_rows")),
-                grid_cols=_geo_wert(m.get("grid_cols")),
-                white_rows=_geo_wert(m.get("white_rows")),
-                white_cols=_geo_wert(m.get("white_cols")),
-            )
-            s.add(mode)
-            s.flush()
-            for i, ch in enumerate(channels, 1):
-                fc = FixtureChannel(
-                    mode_id=mode.id,
-                    channel_number=int(ch.get("channel_number", i)),
-                    name=ch.get("name", f"Kanal {i}"),
-                    attribute=ch.get("attribute", "raw") or "raw",
-                    default_value=int(ch.get("default_value", 0)),
-                    highlight_value=int(ch.get("highlight_value", 255)),
-                    invert=bool(ch.get("invert", False)),
-                    resolution=ch.get("resolution", "8bit") or "8bit",
-                    # FM-46: Zuordnung Dimmer -> Weiss-Segment (0-basiert).
-                    # Fehlt der Schluessel (aeltere Payloads, Handbau), ist
-                    # das „keine Zuordnung" — dasselbe wie NULL.
-                    segment=segment_wert(ch.get("segment")),
-                    # LAS-33: Laser-Angaben (Muster, Farben, Richtung,
-                    # Betriebsart) als JSON-Text; fehlt der Schluessel oder
-                    # ist er ungueltig, bleibt das Feld leer = keine Angaben.
-                    laser_angaben=_laser_text(ch.get("laser")),
-                )
-                s.add(fc)
-                s.flush()
-                for r in ch.get("ranges", []):
-                    s.add(ChannelRange(
-                        channel_id=fc.id,
-                        range_from=int(r.get("range_from", 0)),
-                        range_to=int(r.get("range_to", 255)),
-                        name=r.get("name", ""),
-                        kind=r.get("kind", "") or "",
-                    ))
+        _modi_schreiben(s, prof, payload)
         s.commit()
         return prof.id
+
+
+class ProfilGeschuetzt(ValueError):
+    """FM-71: ein Profil, das nicht dem Nutzer gehoert (mitgeliefert,
+    QLC+-/OFL-Import), wird nicht ueberschrieben."""
+
+
+def update_user_profile(profil_id: int, payload: dict, *, engine=None) -> int:
+    """FM-71: ein EIGENES Profil (``source='user'``) an Ort und Stelle mit
+    einem Generator-Payload ueberschreiben — Kopf, Modi, Kanaele, Bereiche.
+    Die Profil-ID bleibt, gepatchte Geraete finden es also weiter (sie haengen
+    an Profil-ID + Modusname, s. ``fixture_editor.profil_patch_folgen``).
+
+    Geschuetzt (``ProfilGeschuetzt``): jedes Profil mit anderer Quelle —
+    mitgelieferte (``builtin``/``lightos``) und Importe (``qlc``/``ofl``…)
+    lassen sich nur als NEUES Profil speichern. ``source`` und die
+    gespeicherte Herkunft (``herkunft``/``provenance``) bleiben unveraendert:
+    Bearbeiten aendert nicht, woher das Profil stammt.
+
+    Alte Modi werden ueber die ORM-Session geloescht (Cascade raeumt Kanaele
+    und Bereiche mit ab, wie im Fixture-Editor). Gibt ``profil_id`` zurueck."""
+    eng = engine if engine is not None else globals()["engine"]()
+    with Session(eng) as s:
+        prof = s.get(FixtureProfile, int(profil_id))
+        if prof is None:
+            raise ValueError(f"Profil {profil_id} steht nicht mehr in der "
+                             "Bibliothek — nichts gespeichert.")
+        if (prof.source or "").lower() != "user":
+            raise ProfilGeschuetzt(
+                f"„{prof.name}“ ist kein eigenes Profil (Quelle "
+                f"„{prof.source or '?'}“) und wird nicht überschrieben — "
+                "„Speichern“ legt ein neues eigenes Profil an.")
+        mfr = _get_or_create_mfr(
+            s,
+            (payload.get("manufacturer") or "Generic").strip(),
+            (payload.get("short_mfr") or payload.get("manufacturer", "GEN")[:8]).strip().upper(),
+        )
+        prof.manufacturer_id = mfr.id
+        prof.name = (payload.get("name") or "Neues Fixture").strip()
+        prof.short_name = (payload.get("short_name") or "FIXTURE")[:40]
+        prof.fixture_type = (payload.get("fixture_type") or "other").strip()
+        prof.power_w = int(payload.get("power_w", 0) or 0)
+        prof.notes = payload.get("notes", "") or ""
+        prof.viz_model = (payload.get("viz_model") or "").strip()[:40]
+        from src.core import abstrahlwinkel as _AW
+        prof.beam_angle_min, prof.beam_angle_max = _AW.normalisiere(
+            payload.get("beam_angle_min"), payload.get("beam_angle_max"))
+        prof.zoom_inverted = bool(payload.get("zoom_inverted", False))
+        for alt in s.execute(select(FixtureMode).where(
+                FixtureMode.fixture_id == prof.id)).scalars().all():
+            s.delete(alt)
+        s.flush()
+        _modi_schreiben(s, prof, payload)
+        s.commit()
+        return int(prof.id)
+
+
+def _modi_schreiben(s, prof, payload: dict) -> None:
+    """Modi, Kanaele und Bereiche eines Generator-Payloads unter ``prof``
+    anlegen — gemeinsam fuer :func:`create_user_profile` und
+    :func:`update_user_profile` (FM-71), damit Anlegen und Ueberschreiben
+    dasselbe schreiben."""
+    # FM-73: keine zwei Modi gleichen Namens speichern — ein gepatchtes
+    # Geraet findet seinen Modus ueber Profil + Modusname. Der Generator
+    # meldet Doppelte schon im Dialog; hier steht der Riegel fuer JEDES
+    # Payload (auch von Hand gebaut): der zweite heisst „Name (2)“.
+    from .modus_wahl import eindeutiger_modusname
+    vergeben: set[str] = set()
+    for m in payload.get("modes", []):
+        channels = m.get("channels", [])
+        mode = FixtureMode(
+            fixture_id=prof.id,
+            name=eindeutiger_modusname(
+                (m.get("name") or "Modus").strip(), vergeben),
+            channel_count=int(m.get("channel_count", len(channels))),
+            description="",
+            # FM-26: die physische Rasterform des Modus mitschreiben —
+            # Farbzonen (VIZ-50a) und eigene Weiss-Leiste (CDX-52). Ohne
+            # diese vier Spalten endet die Eingabe des Generators an
+            # dieser Stelle: der Modus entstuende mit den Default-Nullen
+            # der Spalten, also "nicht hinterlegt", und `panel_grid_for`
+            # gaebe dem Renderer weiter (0, 0). Fehlende Schluessel sind
+            # ausdruecklich erlaubt (aeltere Payloads, Handbau) und
+            # bedeuten dasselbe wie 0.
+            grid_rows=_geo_wert(m.get("grid_rows")),
+            grid_cols=_geo_wert(m.get("grid_cols")),
+            white_rows=_geo_wert(m.get("white_rows")),
+            white_cols=_geo_wert(m.get("white_cols")),
+        )
+        s.add(mode)
+        s.flush()
+        for i, ch in enumerate(channels, 1):
+            fc = FixtureChannel(
+                mode_id=mode.id,
+                channel_number=int(ch.get("channel_number", i)),
+                name=ch.get("name", f"Kanal {i}"),
+                attribute=ch.get("attribute", "raw") or "raw",
+                default_value=int(ch.get("default_value", 0)),
+                highlight_value=int(ch.get("highlight_value", 255)),
+                invert=bool(ch.get("invert", False)),
+                resolution=ch.get("resolution", "8bit") or "8bit",
+                # FM-46: Zuordnung Dimmer -> Weiss-Segment (0-basiert).
+                # Fehlt der Schluessel (aeltere Payloads, Handbau), ist
+                # das „keine Zuordnung" — dasselbe wie NULL.
+                segment=segment_wert(ch.get("segment")),
+                # LAS-33: Laser-Angaben (Muster, Farben, Richtung,
+                # Betriebsart) als JSON-Text; fehlt der Schluessel oder
+                # ist er ungueltig, bleibt das Feld leer = keine Angaben.
+                laser_angaben=_laser_text(ch.get("laser")),
+            )
+            s.add(fc)
+            s.flush()
+            for r in ch.get("ranges", []):
+                s.add(ChannelRange(
+                    channel_id=fc.id,
+                    range_from=int(r.get("range_from", 0)),
+                    range_to=int(r.get("range_to", 255)),
+                    name=r.get("name", ""),
+                    kind=r.get("kind", "") or "",
+                ))
 
 
 def _add_zq01424(s, mfr):

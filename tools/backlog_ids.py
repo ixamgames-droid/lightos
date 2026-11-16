@@ -241,6 +241,8 @@ def _git(*args: str) -> tuple[int, str]:
 # offenen PRs als hier faellt der Rest still weg — und ein Werkzeug, das „alle
 # offenen PRs" verspricht, darf nicht stillschweigend weniger liefern (CDX-57).
 _PR_LIMIT = 200
+#: PROC-06: laenger wartet niemand auf die PR-Liste (sonst haengt die Warteschlange).
+_GH_TIMEOUT_S = 30
 
 
 def offene_pr_zweige() -> tuple:
@@ -249,11 +251,17 @@ def offene_pr_zweige() -> tuple:
     **Nie stillschweigend weniger liefern:** wer die Liste nicht vollstaendig
     bekommt, bekommt hier einen Grund statt einer kuerzeren Liste.
     """
-    p = subprocess.run(
-        ("gh", "pr", "list", "--state", "open", "--limit", str(_PR_LIMIT),
-         "--json", "headRefName,isCrossRepository,number",
-         "-q", ".[] | [.number, .headRefName, (.isCrossRepository|tostring)] | @tsv"),
-        capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        p = subprocess.run(
+            ("gh", "pr", "list", "--state", "open", "--limit", str(_PR_LIMIT),
+             "--json", "headRefName,isCrossRepository,number",
+             "-q", ".[] | [.number, .headRefName, (.isCrossRepository|tostring)] | @tsv"),
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=_GH_TIMEOUT_S)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        # PROC-06: pr_bereit fragt das in der Merge-Warteschlange — ohne `gh`
+        # oder ohne Netz ein Grund statt eines Absturzes oder Haengers.
+        return [], f"`gh pr list` nicht ausfuehrbar ({type(e).__name__})"
     if p.returncode != 0:
         return [], f"`gh pr list` fehlgeschlagen: {p.stderr.strip()[:160]}"
     zeilen = [z.split("\t") for z in p.stdout.splitlines() if z.strip()]
@@ -299,6 +307,140 @@ def fragmente_je_zweig(refs: list) -> dict:
                 dateien[name] = text
         je_zweig[ref] = dateien
     return je_zweig
+
+
+# ── PROC-06: das Gate fuer EINEN PR (aufgerufen von pr_bereit.py) ───────────
+
+def neue_id_konflikte(eigene: dict, basis: set, auf_main: dict,
+                      andere: dict) -> list:
+    """``[(ID, eigener Titel, Wo, fremder Titel)]`` — rein, ohne git.
+
+    * ``eigene``: ``{ID: Titel}`` des PR-Kopfs (Zeilen + Fragmente mit Titel).
+    * ``basis``: alle IDs am Merge-Base mit ``main`` — was der Zweig GEERBT hat.
+    * ``auf_main``: ``{ID: Titel}`` auf dem heutigen ``main``.
+    * ``andere``: ``{Zweig: {ID: Titel}}`` der ANDEREN offenen PRs.
+
+    ★ Gemessen wird gegen den Merge-Base, nicht gegen das heutige ``main``:
+    ein Zweig, der eine geerbte ID nur umformuliert, hat sie am Merge-Base
+    schon — still (Positivkontrolle aus PROC-06). Eine NEUE ID dagegen, die
+    inzwischen auf ``main`` mit anderem Titel steht, ist genau die Kollision,
+    die sonst erst ``test_ids_are_unique`` faengt — gegen ``main`` allein
+    verglichen saehe sie wie eine geerbte aus. Gleicher Titel (ohne
+    Fettschrift) ist derselbe Eintrag, etwa bei gestapelten Zweigen.
+    """
+    treffer = []
+    for item_id, titel in sorted(eigene.items()):
+        if item_id in basis or not _titel_kern(titel):
+            continue
+        kern = _titel_kern(titel)
+        if item_id in auf_main:
+            fremd = auf_main[item_id]
+            if _titel_kern(fremd) and _titel_kern(fremd) != kern:
+                treffer.append((item_id, titel, "main", fremd))
+            continue
+        for zweig, items in sorted(andere.items()):
+            fremd = items.get(item_id)
+            if fremd and _titel_kern(fremd) != kern:
+                treffer.append((item_id, titel, zweig, fremd))
+    return treffer
+
+
+def _ref_da(ref: str) -> bool:
+    rc, _ = _git("rev-parse", "--verify", "-q", f"{ref}^{{commit}}")
+    return rc == 0
+
+
+def _backlog_items(ref: str, cache: dict) -> dict:
+    """``{ID: Titel}`` aus ``BACKLOG.md`` von ``ref`` — je Blob nur einmal gelesen.
+
+    Das BACKLOG ist knapp 2 MB gross; die meisten Zweige tragen seit PROC-20
+    denselben Blob wie ihr Merge-Base, das Zwischenspeichern spart also fast
+    jeden zweiten Lesevorgang."""
+    rc, blob = _git("rev-parse", "-q", "--verify", f"{ref}:BACKLOG.md")
+    blob = blob.strip()
+    if rc != 0 or not blob:
+        return {}
+    if blob not in cache:
+        rc, text = _git("cat-file", "blob", blob)
+        cache[blob] = items_aus_backlog(text) if rc == 0 else {}
+    return cache[blob]
+
+
+def _fragment_namen(ref: str) -> set:
+    rc, out = _git("ls-tree", "--name-only", ref, "backlog.d/")
+    namen = set()
+    for name in (out.split("\n") if rc == 0 else []):
+        m = _FRAGMENT_NAME.match(name.strip().rsplit("/", 1)[-1])
+        if m:
+            namen.add(m.group(1))
+    return namen
+
+
+def _titel_an(ref: str, ids, cache: dict) -> dict:
+    """``{ID: Titel}`` fuer die genannten IDs auf ``ref`` — Zeile vor Fragment."""
+    zeilen = _backlog_items(ref, cache)
+    gefunden = {i: zeilen[i] for i in ids if i in zeilen}
+    for item_id in ids:
+        if item_id in gefunden:
+            continue
+        rc, text = _git("show", f"{ref}:backlog.d/{item_id}.md")
+        if rc == 0:
+            gefunden.update(items_aus_fragmenten({f"{item_id}.md": text}))
+    return gefunden
+
+
+def id_gate(kopf: str, andere: dict, main_ref: str = "origin/main") -> tuple:
+    """``(Konflikte, Hinweise)`` fuer den PR-Kopf ``kopf`` (PROC-06).
+
+    ``andere`` ist ``{Anzeigename: Ref}`` der ANDEREN offenen PR-Zweige.
+    Gelesen wird nur der lokale Stand der Refs (kein ``git fetch``, damit die
+    Merge-Warteschlange schnell bleibt). Was sich nicht lesen laesst, wird ein
+    HINWEIS, kein Rot: die Pruefung ist dann nicht gelaufen, und das sagt sie.
+
+    Schneller Weg: fuehrt der Zweig keine neue ID ein — der Normalfall, denn
+    die meisten PRs aktualisieren vorhandene Items —, wird kein anderer Zweig
+    gelesen.
+    """
+    hinweise: list = []
+    for ref in (main_ref, kopf):
+        if not _ref_da(ref):
+            return [], [f"ID-Pruefung nicht gelaufen: `{ref}` lokal nicht "
+                        "vorhanden (`git fetch`)"]
+    rc, mb = _git("merge-base", main_ref, kopf)
+    mb = mb.strip()
+    if rc != 0 or not mb:
+        return [], [f"ID-Pruefung nicht gelaufen: kein Merge-Base von "
+                    f"`{kopf}` mit `{main_ref}`"]
+    cache: dict = {}
+    basis = set(_backlog_items(mb, cache)) | _fragment_namen(mb)
+    kandidaten = ((set(_backlog_items(kopf, cache)) | _fragment_namen(kopf))
+                  - basis)
+    if not kandidaten:
+        return [], []
+    eigene = _titel_an(kopf, kandidaten, cache)
+    auf_main = _titel_an(main_ref, kandidaten, cache)
+    fremd: dict = {}
+    fehlend = []
+    for name, ref in andere.items():
+        if not _ref_da(ref):
+            fehlend.append(name)
+            continue
+        fremd[name] = _titel_an(ref, kandidaten, cache)
+    if fehlend:
+        hinweise.append("ID-Pruefung ohne diese Zweige (lokal nicht vorhanden, "
+                        f"`git fetch`): {', '.join(sorted(fehlend))}")
+    return neue_id_konflikte(eigene, basis, auf_main, fremd), hinweise
+
+
+def konflikt_text(treffer: list) -> str:
+    """Eine Zeile je Konflikt, mit dem Weg zur freien Nummer."""
+    teile = []
+    for item_id, titel, wo, fremd in treffer:
+        gruppe = (zerlege(item_id) or (item_id,))[0]
+        teile.append(f"{item_id} hier „{_titel_kern(titel)[:60]}“, auf {wo} "
+                     f"„{_titel_kern(fremd)[:60]}“ — neue Nummer: "
+                     f"`tools/backlog_ids.py --gruppe {gruppe}`")
+    return "; ".join(teile)
 
 
 #: Nur noch Beschreibung fuer Meldungen — gelesen wird ueber

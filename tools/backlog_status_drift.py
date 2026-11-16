@@ -70,6 +70,15 @@ Zwei getrennte Pruefungen
    Zuschnitt „nur was der STATUS als Umsetzungszweig behauptet" fand dieselbe
    eine echte Drift und sonst nichts.
 
+3. **Implizite Spur** (QA-64, 16.11.2026): Items ohne ausdrueckliche Spur
+   gelten als gespurt, wenn eine Testdatei nach ihrer ID heisst
+   (``UI-137`` -> ``tests/test_ui137_*.py``). Beanstandet wird nur ``todo`` +
+   Datei im Baum; ``review`` + Datei wird als „wartet aufs Einsammeln" gezaehlt.
+   Wirksamer Status = BACKLOG.md plus Fragment unter ``backlog.d`` (das
+   Fragment uebersteuert). Ausnahme am Item: ``<!-- spur: keine -->``. Diese
+   Pruefung braucht KEINE Refs und laeuft deshalb auch als CI-Test
+   (``tests/test_qa64_implizite_spur.py``); ``--nur-implizit`` faehrt nur sie.
+
 Warum ein Werkzeug und kein CI-Test
 -----------------------------------
 Beide Pruefungen brauchen Git-Refs, die es in der CI nicht gibt:
@@ -105,7 +114,14 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BACKLOG = os.path.join(REPO, "BACKLOG.md")
 
 # <!-- spur: pfad/zur/datei.py :: KENNZEICHEN -->   (Kennzeichen optional)
-SPUR = re.compile(r"<!--\s*spur:\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
+# ★ QA-64 (Nachbesserung): `<!-- spur: keine -->` ist die Ausnahme fuer die
+# implizite Spur, KEINE Datei namens „keine". Der Ausschluss steht im Muster
+# selbst, damit JEDER Leser (auch tests/test_qa64_status_drift.py, der fuer
+# erledigte Items die Spur-Datei verlangt) die Ausnahme ueberspringt — sonst
+# wuerde ein Item mit Ausnahme spaetestens nach dem Einsammeln als `done` dort
+# rot („Spuren ohne Datei: keine"). Steht daneben eine echte Spur, findet
+# ``search`` die.
+SPUR = re.compile(r"<!--\s*spur:(?!\s*keine\s*(?:::|-->))\s*([^:>]+?)\s*(?:::\s*(.+?)\s*)?-->")
 # Nur was der STATUS behauptet — nicht jeder Backtick in der Beschreibung.
 ZWEIG = re.compile(r"Umsetzung auf `([^`]+)`")
 
@@ -212,6 +228,191 @@ def spur_urteil(klasse: str, auf_main: bool) -> str | None:
     return None
 
 
+# ── Implizite Spur: die Testdatei, die nach der Item-ID heisst ───────────────
+#
+# ★★ Warum es sie gibt. Ausdrueckliche Spuren trugen am 16.11.2026 27 von 1064
+# Items — von Hand nachzutragen waeren rund 1000 Zeilen in einer Datei, die seit
+# PROC-20 kein PR mehr anfasst. Fast jedes Item bringt aber ohnehin eine
+# Testdatei mit, die nach seiner ID heisst: ``UI-137`` -> ``test_ui137_*.py``.
+# Diese Datei IST eine Spur, und sie braucht keine Git-Refs: es zaehlt nur, ob
+# sie im Arbeitsbaum steht. Deshalb wirkt diese Pruefung als echter Test in der
+# CI (``tests/test_qa64_implizite_spur.py``), die ausdrueckliche nicht.
+#
+# ★ Das Urteil ist bewusst ENG — nur ein einziger Fall wird beanstandet:
+#   ``todo`` + ID-Testdatei im Baum. Genau der ist teuer: das Item wird beim
+#   naechsten Lauf erneut angeboten, obwohl seine Arbeit (samt Test) gelandet ist.
+#   * ``review`` + Datei ist seit dem Fragment-Verfahren (PROC-20) der NORMALE
+#     Zustand — im PR und nach dem Merge, bis der Sammel-Lauf ``done`` daraus
+#     macht. Das wird nur gezaehlt („wartet aufs Einsammeln"), nie rot.
+#   * ``teils``/``blocked``/``decision``/zurueckgestellt: Vorarbeit samt Test darf
+#     gelandet sein — kein Urteil (gleiche Begruendung wie beim Freibrief oben).
+#   * ``done`` OHNE Datei: kein Urteil. Fehlt eine implizite Spur, gibt es
+#     schlicht keine; viele Items haben ihren Test anders benannt.
+#
+# ★ Ausnahme am Item: ``<!-- spur: keine -->`` (optional ``:: Grund``) in der
+# Zeile bzw. im Freitext des Fragments schaltet die implizite Spur ab — fuer den
+# seltenen Fall, dass ein ``todo``-Item absichtlich schon eine ID-Testdatei hat.
+
+KEINE_SPUR = re.compile(r"<!--\s*spur:\s*keine\s*(?:::[^>]*?)?-->")
+
+IMPLIZIT_TODO = ("Status sagt todo, aber eine Testdatei mit dieser ID steht im"
+                 " Baum — die Arbeit ist gelandet (oder: Ausnahme"
+                 " <!-- spur: keine --> am Item)")
+
+
+def id_schluessel(item_id: str) -> str:
+    """Der Teil des Testdatei-Namens, der der ID entspricht.
+
+    ``UI-137`` -> ``ui137``, ``FM-14b`` -> ``fm14b``, ``QA-LIVE`` -> ``qalive``.
+    Bindestriche fallen weg, alles klein — so benennt das Repo seine Tests.
+    """
+    return re.sub(r"[^0-9a-z]", "", item_id.lower())
+
+
+def datei_schluessel(dateiname: str) -> str | None:
+    """Das ID-Stueck eines Testdatei-Namens: ``test_ui137_x.py`` -> ``ui137``.
+
+    ★ Die ID-GRENZE ist der Unterstrich (bzw. das Dateiende): das Stueck ist
+    alles zwischen ``test_`` und dem naechsten ``_``. Damit trifft ``UI-13``
+    (``ui13``) die Datei ``test_ui137_x.py`` (``ui137``) nicht, und ``FM-14``
+    nicht ``test_fm14b_x.py`` — verglichen wird auf GLEICHHEIT, nie per Praefix.
+    """
+    if not (dateiname.startswith("test_") and dateiname.endswith(".py")):
+        return None
+    stueck = dateiname[len("test_"):-len(".py")].split("_", 1)[0]
+    return stueck or None
+
+
+def testdateien_nach_schluessel(dateinamen) -> dict[str, list[str]]:
+    """Die Dateiliste EINMAL zum Nachschlage-Index machen: Schluessel -> Namen."""
+    index: dict[str, list[str]] = {}
+    for n in sorted(dateinamen):
+        s = datei_schluessel(n)
+        if s:
+            index.setdefault(s, []).append(n)
+    return index
+
+
+def implizite_spur(item_id: str, index: dict[str, list[str]]) -> list[str]:
+    """Die Testdateien, die nach ``item_id`` heissen (leer = keine Spur).
+
+    ★ Sonder-IDs ohne Nummer (``QA-LIVE``, ``VIZ-PERF``) werden genauso
+    behandelt: ``qalive`` trifft nur ``test_qalive_*.py``, nie
+    ``test_qa_live_*.py`` oder ``test_qalive2_*.py``. Gemessen am 16.11.2026:
+    keine der 80 Sonder-IDs hat so eine Datei, also auch keinen Zufallstreffer
+    (jede Backlog-ID hat einen Bindestrich; zusammengezogen ergibt das kein
+    gewoehnliches Wort wie ``test_backlog_``).
+    """
+    return list(index.get(id_schluessel(item_id), ()))
+
+
+def implizit_urteil(klasse: str, hat_datei: bool) -> str | None:
+    """``None`` = kein Befund; ``"wartet"`` = review + Datei (nur zaehlen);
+    sonst der Text der Beanstandung. Bewusst eng, siehe Kommentar oben."""
+    if not hat_datei:
+        return None
+    if klasse == "offen":
+        return IMPLIZIT_TODO
+    if klasse == "review":
+        return "wartet"
+    return None
+
+
+def _sammler():
+    """``tools/backlog_sammeln.py`` — derselbe Leseweg fuer Fragmente wie dort."""
+    hier = os.path.dirname(os.path.abspath(__file__))
+    if hier not in sys.path:
+        sys.path.insert(0, hier)
+    import backlog_sammeln  # noqa: E402
+    return backlog_sammeln
+
+
+def wirksame_items(backlog_text: str, fragmente) -> list[tuple[str, str, str]]:
+    """``(item, wirksamer Status, Text fuer Spur-Kommentare)`` je Item.
+
+    Wirksam ist BACKLOG.md PLUS das Fragment: ein Fragment uebersteuert den
+    Status der Zeile (so schreibt der Sammel-Lauf es spaeter hinein), sein
+    Freitext zaehlt fuer Spur-Kommentare mit. Ein Fragment ohne Zeile ist ein
+    neues Item und zaehlt ebenso. ``fragmente`` sind ``Fragment``-Objekte aus
+    ``backlog_sammeln.lies_alle``.
+    """
+    je_frag = {f.id: f for f in fragmente}
+    aus = []
+    gesehen = set()
+    for item, status, zeile in zeilen_mit_items(backlog_text):
+        gesehen.add(item)
+        f = je_frag.get(item)
+        if f is None:
+            aus.append((item, status, zeile))
+        else:
+            aus.append((item, f.status, zeile + "\n" + (f.freitext or "")))
+    for item, f in sorted(je_frag.items()):
+        if item not in gesehen:
+            aus.append((item, f.status, f.freitext or ""))
+    return aus
+
+
+def implizite_pruefung(items, testdateien) -> dict:
+    """Die ref-freie Pruefung ueber ``wirksame_items`` und eine Dateiliste.
+
+    Liefert ``ausdruecklich``/``implizit``/``ohne``/``ausnahme`` (Item-Listen),
+    ``wartet`` (review + Datei) und ``beanstandet`` (Texte).
+    """
+    index = testdateien_nach_schluessel(testdateien)
+    erg = {"ausdruecklich": [], "implizit": [], "ohne": [], "ausnahme": [],
+           "wartet": [], "beanstandet": []}
+    for item, status, text in items:
+        # Eine echte ausdrueckliche Spur geht vor (SPUR ueberspringt die
+        # Ausnahme selbst); die Ausnahme betrifft nur die implizite Spur.
+        if SPUR.search(text):
+            erg["ausdruecklich"].append(item)
+            continue
+        if KEINE_SPUR.search(text):
+            erg["ausnahme"].append(item)
+            continue
+        dateien = implizite_spur(item, index)
+        if not dateien:
+            erg["ohne"].append(item)
+            continue
+        erg["implizit"].append(item)
+        urteil = implizit_urteil(status_klasse(status), True)
+        if urteil == "wartet":
+            erg["wartet"].append(item)
+        elif urteil:
+            erg["beanstandet"].append(
+                f"{item}: {urteil}  (tests/{', tests/'.join(dateien)})")
+    return erg
+
+
+def implizite_pruefung_im_repo(repo: str = REPO) -> dict:
+    """Dasselbe gegen den Arbeitsbaum: BACKLOG.md, Fragmente, ``tests/``."""
+    from pathlib import Path
+    bs = _sammler()
+    with open(os.path.join(repo, "BACKLOG.md"), encoding="utf-8") as f:
+        text = f.read()
+    frags, _fehler = bs.lies_alle(Path(repo))
+    tests = os.path.join(repo, "tests")
+    namen = os.listdir(tests) if os.path.isdir(tests) else []
+    return implizite_pruefung(wirksame_items(text, frags), namen)
+
+
+def abdeckung(erg: dict) -> float:
+    """Anteil der Items mit IRGENDEINER Spur (ausdruecklich oder implizit)."""
+    gesamt = sum(len(erg[k]) for k in ("ausdruecklich", "implizit", "ohne", "ausnahme"))
+    return (len(erg["ausdruecklich"]) + len(erg["implizit"])) / gesamt if gesamt else 0.0
+
+
+def bericht_implizit(erg: dict) -> list[str]:
+    gesamt = sum(len(erg[k]) for k in ("ausdruecklich", "implizit", "ohne", "ausnahme"))
+    z = [f"[abdeckung] {gesamt} Items: ausdrueckliche Spur {len(erg['ausdruecklich'])},"
+         f" implizite Spur (ID-Testdatei) {len(erg['implizit'])},"
+         f" keine {len(erg['ohne'])}"
+         + (f", Ausnahme 'spur: keine' {len(erg['ausnahme'])}" if erg["ausnahme"] else "")
+         + f" — Abdeckung {abdeckung(erg):.0%}",
+         f"[implizit] review + ID-Testdatei, wartet aufs Einsammeln: {len(erg['wartet'])}"]
+    return z
+
+
 # ── Der Griff nach dem echten Repo (in der CI nicht verfuegbar) ──────────────
 
 def _git(*args: str) -> tuple[int, str]:
@@ -268,7 +469,25 @@ def main(argv=None) -> int:
                     help="Exit 1, wenn eine Drift gefunden wurde")
     ap.add_argument("--kein-fetch", action="store_true",
                     help="nicht vorher `git fetch` — dann gilt der zuletzt geholte Stand")
+    ap.add_argument("--nur-implizit", action="store_true",
+                    help="nur die ref-freie Pruefung der ID-Testdateien (ohne git)")
     args = ap.parse_args(argv)
+
+    # ── 0) Implizite Spur (ref-frei; dieselbe Pruefung wie der CI-Test) ─────
+    # Aus dem Ordner von BACKLOG (nicht fest REPO): so faehrt der Test von
+    # main() auf seiner Wegwerf-Tabelle auch diese Pruefung im Wegwerf-Ordner.
+    implizit = implizite_pruefung_im_repo(os.path.dirname(BACKLOG))
+    if args.nur_implizit:
+        for z in bericht_implizit(implizit):
+            print(z)
+        print()
+        if implizit["beanstandet"]:
+            print(f"⚠ {len(implizit['beanstandet'])} Drift(s):")
+            for b in implizit["beanstandet"]:
+                print(f"  - {b}")
+        else:
+            print("✓ kein todo-Item mit ID-Testdatei im Baum.")
+        return 1 if (implizit["beanstandet"] and args.strict) else 0
 
     if not args.kein_fetch:
         rc, _ = _git("fetch", "--quiet", "--prune", "origin")
@@ -299,6 +518,8 @@ def main(argv=None) -> int:
     mit_spur = 0
     geurteilt = 0
     for item, status, zeile in items:
+        # SPUR ueberspringt `<!-- spur: keine -->` (Ausnahme der impliziten
+        # Spur, keine Datei namens „keine") von selbst.
         m = SPUR.search(zeile)
         if not m:
             continue
@@ -334,6 +555,9 @@ def main(argv=None) -> int:
     if mit_spur == 0:
         print("        -> es wurde NICHTS geprueft. Spuren hinterlegen:"
               " <!-- spur: datei :: kennzeichen -->")
+    for z in bericht_implizit(implizit):
+        print(z)
+    beanstandet.extend(implizit["beanstandet"])
 
     # ── 2) Zweig-Behauptung ──────────────────────────────────────────────────
     zweige = zweige_auf_origin()

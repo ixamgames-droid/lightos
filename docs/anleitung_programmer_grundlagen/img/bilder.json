@@ -1,8 +1,8 @@
 {
   "anleitung": "programmer_grundlagen",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "07a09e56",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "3a9e7ca3",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py programmer_grundlagen'.",
   "bilder": [
@@ -40,7 +40,7 @@
           "beschriftung": "Bibliothek"
         }
       ],
-      "md5": "430233a3c421de6cab821efbc96f54a1"
+      "md5": "b5f0c37ce183001d185c2a7ea7551255"
     },
     {
       "datei": "02_gruppe.png",
@@ -64,7 +64,7 @@
           "beschriftung": "Matrix"
         }
       ],
-      "md5": "3996ee32f439b4d8fe9daa9f04ea0f23"
+      "md5": "a46b26ebb411fbaadec91765707d170e"
     },
     {
       "datei": "03_intensity.png",
@@ -96,7 +96,7 @@
           "beschriftung": "Lampen-Vorschau"
         }
       ],
-      "md5": "1146fc79d592da1a073f51cb94e924d8"
+      "md5": "e82bd1d5eaac17d44b06a44e5891672f"
     },
     {
       "datei": "04_color.png",
@@ -120,7 +120,7 @@
           "beschriftung": "Rot"
         }
       ],
-      "md5": "56812e7bcaaeaed6149890c41df9d8a4"
+      "md5": "8c4d304f8cdf9e291949938fc2006e3a"
     },
     {
       "datei": "05_position.png",
@@ -136,7 +136,7 @@
           "beschriftung": "Position"
         }
       ],
-      "md5": "9817632a5c9340215bacba228083c864"
+      "md5": "ab7b380eba2ba2c085ea277bea222839"
     },
     {
       "datei": "06_paletten.png",
@@ -160,7 +160,7 @@
           "beschriftung": "Palette"
         }
       ],
-      "md5": "5dfbbca4ba25b2c411183dfb28dd2895"
+      "md5": "f0c75576d40741a8b8befceccf0e795b"
     },
     {
       "datei": "07_hervorheben.png",
@@ -184,7 +184,7 @@
           "beschriftung": "Lampen-Vorschau"
         }
       ],
-      "md5": "b1de1b307b6cc754e29758b0c630761f"
+      "md5": "3c9e817e98c5457781e3bfdf6567dc79"
     },
     {
       "datei": "08_farbwerkzeug.png",
@@ -208,7 +208,7 @@
           "beschriftung": "Als Palette"
         }
       ],
-      "md5": "f84592bc8a7e3b7492709a78a6579fc0"
+      "md5": "3fa50c1486a072d9c1db2b3a9cd9662d"
     },
     {
       "datei": "09_positionswerkzeug.png",
@@ -232,7 +232,7 @@
           "beschriftung": "Mitte"
         }
       ],
-      "md5": "a3d4b6c75816675eaf6127ea1dc6f92e"
+      "md5": "a9fdcddb688fb536adfd481dc2909393"
     },
     {
       "datei": "10_faecher.png",
@@ -248,7 +248,7 @@
           "beschriftung": "Anwenden"
         }
       ],
-      "md5": "ef039c86955e8cc6087eaeec5766ef10"
+      "md5": "656c17f40f7163562412a26bcccbae36"
     },
     {
       "datei": "11_loeschen.png",
@@ -272,7 +272,7 @@
           "beschriftung": "Wiederholen"
         }
       ],
-      "md5": "9fa29f9de2f480afbb88f67a7d20c510"
+      "md5": "770eebe6ff6494fc31d23061a109c1d1"
     }
   ]
 }

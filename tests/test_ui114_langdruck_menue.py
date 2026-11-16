@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (                                      # noqa: E40
 )
 
 from src.ui import ziehen_scrollen as zs                             # noqa: E402
+from _doppeltipp import DruckUhr                                     # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 _GERAET = QTest.createTouchDevice()
@@ -374,14 +375,21 @@ class LangDruckMenueTest(unittest.TestCase):
         hints = QApplication.styleHints()
         alt = hints.mouseDoubleClickInterval()
         self.addCleanup(hints.setMouseDoubleClickInterval, alt)
+        uhr = DruckUhr()
+        self.addCleanup(uhr.entfernen)
         # Qt zaehlt Klicks paarweise, auch ueber fruehere Tests hinweg: mit
-        # 1 ms Fenster beginnt der erste Tipp sicher ein neues Paar, erst
-        # danach wird das Fenster fuer langsame CI-Rechner gross.
+        # 1 ms Fenster beginnt der erste Tipp sicher ein neues Paar (Qt
+        # verlangt 0 < Abstand < Fenster), erst danach wird das Fenster fuer
+        # langsame CI-Rechner gross.
         hints.setMouseDoubleClickInterval(1)
         f.druck(p)
         f.los(p)
         hints.setMouseDoubleClickInterval(3000)
+        # QA-123: der zweite Druck braucht einen groesseren Zeitstempel als
+        # der erste, sonst ist er fuer Qt kein Doppelklick (schnelle CI).
+        uhr.naechster_zeitstempel()
         f.druck(p)              # Doppelklick -> Dialog (blockiert bis reject)
+        self.assertEqual(uhr.doppelklicks, 1, "Qt hat den Doppeltipp erkannt")
         ende = time.monotonic() + 5.0
         while not dialoge and time.monotonic() < ende:
             _warte(0.05)

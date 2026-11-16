@@ -1,7 +1,7 @@
 {
   "anleitung": "dimmermatrix",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b51fdd5a",
+  "stand": "3a9e7ca3",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py dimmermatrix'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "e8ebd044b528efdb2c7519224e8e7e6d"
+      "md5": "e6761084976939234e6cd39a316b5670"
     },
     {
       "datei": "04_modify_an.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "8d7f8dacde3f0279cd1cc631685e4aa6"
+      "md5": "5a9d3bdb6e5558982aef5802fa277ec3"
     },
     {
       "datei": "05_lampen_addieren.png",
@@ -37,7 +37,7 @@
         369
       ],
       "marken": [],
-      "md5": "9bbb6ec9ac4be58b3014698a33bc6025"
+      "md5": "672b434ab9e5d96d934168ba133a7baa"
     },
     {
       "datei": "06_lampen_abziehen_abdunkeln.png",
@@ -48,7 +48,7 @@
         369
       ],
       "marken": [],
-      "md5": "f07e7e7645ab273dc5a859c2db2d77f2"
+      "md5": "8454dfb987ef8aae028be1590d144906"
     },
     {
       "datei": "07_vc_taste_fader.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "128360d15e9d9bb56f8a57ee32431f7e"
+      "md5": "5224581946e3815078cff2e064babd8d"
     },
     {
       "datei": "08_taste_an_aus.gif",
@@ -77,7 +77,7 @@
         [],
         []
       ],
-      "md5": "fb66bebbd3e3ced19a0f5cc75d953266",
+      "md5": "a3f232725eed4391a583da98e8a7a936",
       "frames": 6,
       "dauern_ms": [
         1000,
@@ -97,7 +97,7 @@
         900
       ],
       "marken": [],
-      "md5": "c6b675f9b7fc1540413d15d4880719bc"
+      "md5": "671551481823b872d546712e5e245a01"
     },
     {
       "datei": "10_zweierbloecke.gif",
@@ -113,7 +113,7 @@
         [],
         []
       ],
-      "md5": "69832a7a4c4a557d0e0262c58c3c7ade",
+      "md5": "0b33a17403769a93902487c91cb3ba0a",
       "frames": 4,
       "dauern_ms": [
         900,
@@ -128,10 +128,10 @@
       "titel": "Stil RGB mit Haken Modify-Effekt: Gruppe Modify mit dem Hinweis zum Dimmer",
       "groesse": [
         858,
-        754
+        776
       ],
       "marken": [],
-      "md5": "9cfb5cd738f6e2ad924e4003ee615bbd"
+      "md5": "4d6ee7f1188952e6c5b79ae4e81c8ebb"
     },
     {
       "datei": "12_farbe_lampen.png",
@@ -142,7 +142,7 @@
         369
       ],
       "marken": [],
-      "md5": "851c75b00e137551e3dd152e6c8a7d9a"
+      "md5": "98359317e6bdd28f6844453791278b80"
     },
     {
       "datei": "13_wirkt_auf.png",
@@ -150,10 +150,10 @@
       "titel": "Gruppe Modify: Wirkt auf nur Weiß, Abziehen; Vorschau „− nur Weiß“",
       "groesse": [
         1150,
-        243
+        265
       ],
       "marken": [],
-      "md5": "2f117d532d5d7ad3a2657fa00904b895"
+      "md5": "4f5a74046943dbd066293b17426a5d6a"
     },
     {
       "datei": "14_chaser_modify.png",
@@ -164,7 +164,7 @@
         900
       ],
       "marken": [],
-      "md5": "8f71df03e427f68574276a66ff803e48"
+      "md5": "b9d25944c59b32a1ebdcebdd81887278"
     }
   ]
 }

@@ -1,8 +1,8 @@
 {
   "anleitung": "szenen_cues",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "07a09e56",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "58884624",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py szenen_cues'.",
   "bilder": [
@@ -24,7 +24,7 @@
           "beschriftung": "Ordner +"
         }
       ],
-      "md5": "e6e088209d1ffb9d8eb0b09ae15308f6"
+      "md5": "35f14804af07ced0bed9dbb83831c2ca"
     },
     {
       "datei": "02_kanaele.png",
@@ -48,7 +48,7 @@
           "beschriftung": "OK"
         }
       ],
-      "md5": "e195d7bb92eb747bf659a765a6c414f7"
+      "md5": "30c202d461936c4ce4c500f8316fb468"
     },
     {
       "datei": "03_snap_abrufen.png",
@@ -72,7 +72,7 @@
           "beschriftung": "Szene"
         }
       ],
-      "md5": "0f5d655d303771acc3b2fec644c65cc3"
+      "md5": "f6d6ecad6f0c70439e203cbd8979bd46"
     },
     {
       "datei": "04_assistent.png",
@@ -100,7 +100,7 @@
           "beschriftung": "Stop"
         }
       ],
-      "md5": "41eb19cf41d031d905344afb6b5c7029"
+      "md5": "1d7d13f3e4df0c6e2d5fa0cb884aff11"
     },
     {
       "datei": "05_snapshots.png",
@@ -120,7 +120,7 @@
           "beschriftung": "leerer Slot"
         }
       ],
-      "md5": "fca2d8f8ce1d2a64f5693519c28c1f00"
+      "md5": "4f63d29b4b66a40aace85589b075a603"
     },
     {
       "datei": "06_preset_browser.png",
@@ -144,7 +144,7 @@
           "beschriftung": "Status"
         }
       ],
-      "md5": "a765575fbd39648633bc32faf73a4b9b"
+      "md5": "f26d334312c9d4c41cd477a7e10f8af9"
     },
     {
       "datei": "07_cueliste_neu.png",
@@ -168,7 +168,7 @@
           "beschriftung": "Quick-Rec"
         }
       ],
-      "md5": "5786286b24a4e8ce3fc0bb2fd85e21cb"
+      "md5": "033f140dc2b9203608f56132b6d6d4c5"
     },
     {
       "datei": "08_executor.png",
@@ -188,7 +188,7 @@
           "beschriftung": "Executor 1"
         }
       ],
-      "md5": "79289954ec2a0a419840da8250fe15ed"
+      "md5": "917246f982b7a75d579b3beae45c0c62"
     },
     {
       "datei": "09_go.png",
@@ -216,7 +216,7 @@
           "beschriftung": "Aktive Cue"
         }
       ],
-      "md5": "3d7fc3ef82a0b916fbf5995d80cc309c"
+      "md5": "a0b80499d973aab1d8c3c36b1f246954"
     },
     {
       "datei": "10_vc_cueliste.png",
@@ -236,7 +236,7 @@
           "beschriftung": "GO"
         }
       ],
-      "md5": "3403e6023ac12b5faf7036d7571a8262"
+      "md5": "bc79c03ff4afcd690c4a28c61520d72c"
     },
     {
       "datei": "11_go_ohne_executor.png",
@@ -260,7 +260,7 @@
           "beschriftung": "Executor 1"
         }
       ],
-      "md5": "270240bd0b2865013601a27610ca9c71"
+      "md5": "9b9f735151f4d1e7f0490927c1909332"
     },
     {
       "datei": "12_go_fader_null.png",
@@ -280,7 +280,7 @@
           "beschriftung": "Executor 1"
         }
       ],
-      "md5": "aac19ae7fbd5317ab5119a1460efa804"
+      "md5": "7227df3fc17bbeb25c65e1ce827831d5"
     },
     {
       "datei": "13_go_ohne_executor_ablauf.gif",
@@ -326,7 +326,7 @@
           }
         ]
       ],
-      "md5": "1fb539876b70f3efd5d01b96f227d642",
+      "md5": "a1a1e38b3a61ac419cd7ece7accf1d35",
       "frames": 3,
       "dauern_ms": [
         1500,

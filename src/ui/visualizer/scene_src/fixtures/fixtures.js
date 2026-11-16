@@ -32,7 +32,7 @@ import { initSpotPool, resizeSpotPool, vergissSpotPoolGeraet } from '../scene/sp
 import { goboProjektionInfo } from '../scene/gobo_projektion.js';   // VIZ-96
 import { vergissLaserAnimation } from './laser.js';   // VIZ-110
 import {
-  FPS_VORGABE, fpsNachfuehren, strobeBilder, strobeFaktor, strobeModus, taktFps,
+  FPS_VORGABE, strobeBilder, strobeModus, taktFaktor, taktMessen, taktZustand,
 } from './strobe.js';   // VIZ-104
 import { hellMerken, hellSchnell, hellSetzen } from './strobe_hell.js';   // VIZ-104
 import { kegelDaempfen, fleckDaempfen, ausbrennMelden, ausbrennAbmelden } from './ausbrennen.js';   // VIZ-91
@@ -750,10 +750,12 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
 // zeichnet nichts — ein Strobe fordert je Wechsel eines an.
 const _strobeAktiv = new Set();
 let _strobeBild = 0;              // laufender Bildzaehler (ein rAF-Tick = ein Bild)
-let _strobeFps = FPS_VORGABE;     // gemessen
-let _strobeTakt = FPS_VORGABE;    // traege nachgefuehrt — daraus entstehen die Perioden
+// Takt: gemessene Bildrate (robust), traege uebernommener Takt, Phase je
+// Frequenz beim Wechsel (strobe.js#taktZustand/taktMessen/taktBild).
+let _takt = taktZustand(FPS_VORGABE);
 let _strobeLetzt = -1;
 let _strobeUhr = null;
+let _strobeMessUhr = null;
 let _strobeFest = false;
 const _strobeStat = { billig: 0, voll: 0, bilder: 0 };
 /**
@@ -764,13 +766,28 @@ const _strobeStat = { billig: 0, voll: 0, bilder: 0 };
  */
 export function setStrobeUhr(fn, fps) {
   _strobeUhr = (typeof fn === 'function') ? fn : null;
+  _strobeMessUhr = null;
   _strobeFest = fps > 0;
   _strobeLetzt = -1;
   _strobeBild = 0;
-  _strobeFps = _strobeTakt = (fps > 0) ? fps : FPS_VORGABE;
+  _takt = taktZustand((fps > 0) ? fps : FPS_VORGABE);
+}
+/**
+ * Test-Seam (zweite Sichtprobe): der BETRIEBSWEG — Zaehler je Tick, Bildrate
+ * gemessen —, nur dass die Zeit je Tick aus `fn` (ms) kommt statt aus der
+ * Bildschirm-Uhr. So laesst sich eine Bildfolge mit einzelnen langen Bildern
+ * nachstellen. `fps` = Takt zu Beginn (sonst FPS_VORGABE). `fn` leer: Betrieb.
+ */
+export function setStrobeMessUhr(fn, fps) {
+  _strobeUhr = null;
+  _strobeMessUhr = (typeof fn === 'function') ? fn : null;
+  _strobeFest = false;
+  _strobeLetzt = -1;
+  _strobeBild = 0;
+  _takt = taktZustand((fps > 0) ? fps : FPS_VORGABE);
 }
 function _bildJetzt() {
-  return _strobeUhr ? Math.round(_strobeUhr() * _strobeTakt / 1000) : _strobeBild;
+  return _strobeUhr ? Math.round(_strobeUhr() * _takt.takt / 1000) : _strobeBild;
 }
 
 function _mitStrobe(dmx, fak) {
@@ -799,7 +816,7 @@ function _strobeEinordnen(f) {
     let geaendert = !vorKopf || vorKopf.length !== f.kopfHz.length || vorFak !== 1;
     const kf = geaendert ? new Array(f.kopfHz.length) : vorKopf;
     for (let i = 0; i < f.kopfHz.length; i++) {
-      const v = strobeFaktor(bild, f.kopfHz[i], modus, _strobeTakt);
+      const v = taktFaktor(_takt, bild, f.kopfHz[i], modus);
       if (kf[i] !== v) { kf[i] = v; geaendert = true; }
     }
     f._kopfFak = kf;
@@ -810,7 +827,7 @@ function _strobeEinordnen(f) {
   let fak = 1;
   if (hell && f.strobeHz > 0 && !f.kopfHz) {
     _strobeAktiv.add(f);
-    fak = strobeFaktor(bild, f.strobeHz, modus, _strobeTakt);
+    fak = taktFaktor(_takt, bild, f.strobeHz, modus);
   } else {
     _strobeAktiv.delete(f);
   }
@@ -841,10 +858,11 @@ export function tickStrobe() {
   if (!_strobeUhr) {
     _strobeBild += 1;
     if (!_strobeFest) {
-      const jetzt = performance.now();
-      if (_strobeLetzt >= 0) _strobeFps = fpsNachfuehren(_strobeFps, jetzt - _strobeLetzt);
+      // Ein verlorenes Bild zaehlt als EIN Bild (Blitz kommt etwas spaeter
+      // statt auszufallen) — Begruendung im Kopf von strobe.js.
+      const jetzt = _strobeMessUhr ? _strobeMessUhr() : performance.now();
+      if (_strobeLetzt >= 0) taktMessen(_takt, jetzt - _strobeLetzt, _strobeBild);
       _strobeLetzt = jetzt;
-      _strobeTakt = taktFps(_strobeTakt, _strobeFps);
     }
   }
   if (!_strobeAktiv.size) return false;
@@ -874,13 +892,14 @@ export function strobeInfo(fid) {
   const f = fixtures[fid];
   if (!f) return null;
   const modus = strobeModus(settings.strobeMode);
-  const b = strobeBilder(f.strobeHz || 0, _strobeTakt);
+  const b = strobeBilder(f.strobeHz || 0, _takt.takt);
   return {
     hz: f.strobeHz || 0,
-    anzeigeHz: b.periode ? _strobeFps / b.periode : 0,
+    anzeigeHz: b.periode ? _takt.fps / b.periode : 0,
     periode: b.periode, an: b.an,
     faktor: (f._strobeFaktor === undefined) ? 1 : f._strobeFaktor,
-    modus, fps: _strobeFps, taktFps: _strobeTakt, bild: _bildJetzt(),
+    modus, fps: _takt.fps, taktFps: _takt.takt, bild: _bildJetzt(),
+    taktWechsel: _takt.wechsel,
     aktiv: _strobeAktiv.has(f), blitzend: _strobeAktiv.size,
     kopfHz: f.kopfHz || null, kopfFaktor: f._kopfFak ? f._kopfFak.slice() : null,
   };

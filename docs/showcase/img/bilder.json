@@ -1,8 +1,8 @@
 {
   "anleitung": "showcase",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "b3a8673f",
-  "schrift": "Noto Sans (statt Roboto Condensed)",
+  "stand": "58884624",
+  "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py showcase'.",
   "bilder": [
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "b03e2cd25ec38a33da3d9d83700fe43f"
+      "md5": "bb402b0958e919b71bf49c3945fafc41"
     },
     {
       "datei": "club_02_playback.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "e9975df19f8ba436acd40980542dc511"
+      "md5": "e7265a3b8cda8c6edb32c21d40b3a172"
     },
     {
       "datei": "club_03_groove.png",
@@ -122,7 +122,7 @@
         900
       ],
       "marken": [],
-      "md5": "7f81f1fb9a1db42b468d4f03e78aa4dd"
+      "md5": "848fd8bbb55b9b6a1d130205c1eef6e9"
     },
     {
       "datei": "theater_02_playback.png",
@@ -133,7 +133,7 @@
         900
       ],
       "marken": [],
-      "md5": "bded439f1921f600b9982158502c6bf0"
+      "md5": "3779f7537e3490e389b346b50834afe5"
     },
     {
       "datei": "theater_03_rede.png",

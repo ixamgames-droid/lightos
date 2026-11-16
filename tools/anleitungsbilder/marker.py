@@ -19,7 +19,12 @@ der
 * keinen anderen Rahmen und keinen anderen Kreis beruehrt.
 
 Eine in der Szene angegebene Lage (``links``/``rechts``/``oben``/``unten``)
-wird zuerst probiert, bei einer Kollision aber verworfen. :func:`platzieren`
+wird zuerst probiert, bei einer Kollision aber verworfen. ``innen`` setzt den
+Kreis zuerst in eine freie Ecke INNERHALB des Rahmens (auch eines kleinen, etwa
+einer Kachel, die rundum Nachbarn hat). Ein Zahlenpaar ``(dx, dy)`` setzt ihn
+fest um diesen Versatz neben die Rahmenmitte (mit Verbindungslinie, wenn er
+nicht am Rahmen haengt) — nur fuer Stellen, an denen die Suche nichts Freies
+findet. :func:`platzieren`
 ist reine Geometrie (nur ``QRect``/``QPoint``) und ohne App testbar.
 """
 from __future__ import annotations
@@ -182,6 +187,16 @@ def platzieren(ziele, breite: int, hoehe: int, hindernisse=(), vorzuege=None,
     aus = []
     reichweite = _ABSTAENDE[-1] + 2 * r + 6
     for i, ziel in enumerate(ziele):
+        vz = vorzuege[i]
+        if isinstance(vz, (tuple, list)) and len(vz) == 2:
+            # Fester Versatz zur Rahmenmitte: nur fuer Stellen, an denen die
+            # Suche keinen freien Platz findet (die Szene prueft das Bild).
+            m = rahmen[i].center()
+            c = _geklemmt(QPoint(m.x() + int(vz[0]), m.y() + int(vz[1])),
+                          r + 2, breite, hoehe)
+            aus.append((c, _luecke(rahmen[i], c, r) > 5, True))
+            belegt.append(_kreisfeld(c, r))
+            continue
         # Nur was in Reichweite eines Kandidaten liegt (spart Rechenzeit).
         umfeld = rahmen[i].adjusted(-reichweite, -reichweite, reichweite, reichweite)
         nahe = [h for h in hindernisse if h.intersects(umfeld)]
@@ -238,7 +253,16 @@ def platzieren(ziele, breite: int, hoehe: int, hindernisse=(), vorzuege=None,
             g = _geklemmt(c, r + 2, breite, hoehe)
             if abs(g.x() - c.x()) + abs(g.y() - c.y()) <= r:
                 liste.append((g, aussen))
-        for c, aussen in liste:
+        if vorzuege[i] == "innen":
+            # Ausdruecklich innen (z. B. eine Kachel, rundum von Nachbarn
+            # umgeben): auch in einem kleinen Rahmen, und vor allen
+            # Plaetzen aussen. Die Szene stellt sicher, dass die Ecke frei ist.
+            for c, aussen in liste:
+                if not aussen and frei(_kreisfeld(c, r), fremd_innen) \
+                        and eindeutig(c):
+                    wahl = (c, False)
+                    break
+        for c, aussen in ([] if wahl is not None else liste):
             feld = _kreisfeld(c, r)
             if not aussen:
                 # Innen nur in grossen Rahmen (Bereiche, Listen) — in einem

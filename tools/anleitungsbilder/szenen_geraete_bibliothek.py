@@ -65,7 +65,10 @@ LEISTE_GRUPPE = "Weiß-Leiste"
 LEISTE_ADRESSE = 101
 MATRIX_NAME = "Leiste Regenbogen"
 
-EDITOR_GROESSE = (1060, 760)
+# Hoehe: seit FM-64 (Abstrahlwinkel + „Vorschau zeigen") ist der Kopf rund
+# 70 px hoeher; bei 760 lag die Kanal-Knopfreihe halb unter dem Rand des
+# Rollbereichs (Gegenpruefung DOC-16). 830 passt noch ins 900-px-Bild.
+EDITOR_GROESSE = (1060, 830)
 
 
 # ── Hilfen ──────────────────────────────────────────────────────────────────
@@ -233,8 +236,13 @@ def _editor_eigen(ui):
 def _bild_editor(ui):
     from PySide6.QtWidgets import QDialogButtonBox, QFormLayout
     dlg, tab = _editor_eigen(ui)
+    from PySide6.QtCore import QRect
     form = dlg.findChildren(QFormLayout)[0]
-    kopf = form.geometry()
+    # Das Formular liegt seit FM-74 im Rollbereich: seine Geometrie ist in
+    # Koordinaten des Inhalts, nicht des Dialogs (sonst sitzt der Rahmen ein
+    # Stueck links oben versetzt und schneidet die letzte Zeile).
+    g = form.geometry()
+    kopf = QRect(form.parentWidget().mapTo(dlg, g.topLeft()), g.size())
     if tab.segment_hinweis_sichtbar():
         raise SzenenFehler("FM-46-Hinweis bei einem einfachen PAR sichtbar")
     tbl = tab._tbl
@@ -273,6 +281,20 @@ def _editor_leiste(ui):
     return dlg, tab
 
 
+def _ganz_zeigen(ui, dlg, widget):
+    """``widget`` im Rollbereich des Editors ganz sichtbar machen; sonst
+    Abbruch, statt eine Markierung auf einen halb verdeckten Knopf zu setzen."""
+    from PySide6.QtCore import QPoint, QRect
+    from src.ui.widgets.dialog_groesse import InhaltsRollbereich
+    roll = dlg.findChildren(InhaltsRollbereich)[0]
+    roll.ensureWidgetVisible(widget, 0, 8)
+    ui.pump(0.1)
+    vp = roll.viewport()
+    r = QRect(widget.mapTo(vp, QPoint(0, 0)), widget.size())
+    if not vp.rect().contains(r):
+        raise SzenenFehler(f"{widget.text()!r} liegt nicht ganz im Rollbereich")
+
+
 def _segment_zellen(tab):
     from src.core.dimmer_segmente import ist_dimmer
     return [i for i, ch in enumerate(tab.channels) if ist_dimmer(ch.get("attribute"))]
@@ -287,6 +309,7 @@ def _bild_segment_hinweis(ui):
     zelle = rechteck(dlg, tbl.cellWidget(zeilen[0], 5))
     if tbl.cellWidget(zeilen[0], 5).currentText() != "—":
         raise SzenenFehler("Dimmer 1 hat schon ein Segment")
+    _ganz_zeigen(ui, dlg, tab._btn_vorschlag)
     return bild(ui, dlg, [
         (rechteck(dlg, tab._lbl_segment_hinweis), 1, "rechts"),
         (_spaltenkopf(tbl, dlg, "Weiß-Segment"), 2, "oben"),
