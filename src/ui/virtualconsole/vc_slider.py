@@ -142,6 +142,12 @@ class VCSlider(VCWidget):
         # ``laser_twist`` (vor LAS-28 trugen alle vier Flips ``laser_twist``).
         # Ein neues Attribut im Einstellungsdialog leert die Liste.
         self.programmer_attr_zusatz: list[str] = []
+        # CDX-75: nur Kopf 0 des Attributs steuern. Der Basis-Schluessel
+        # (``attr``) spiegelt sich in der Mehrkopf-Aufloesung auf jeden Kopf
+        # ohne eigenen Wert; mit dieser Markierung verankert der Fader die
+        # anderen Koepfe vorher (wie der Getrennt-Modus, UI-06). Setzt nur die
+        # Lade-Migration (``laser_twist#1`` -> ``laser_twist_y``, LAS-47).
+        self.programmer_nur_kopf0: bool = False
         # FDR-01: Reichweite im PROGRAMMER-Modus — "all" = alle gepatchten Fixtures,
         # "selected" = nur die aktuelle Programmer-Auswahl, "group" = eine FESTE
         # Fixture-Gruppe (programmer_group), unabhaengig von der Live-Auswahl
@@ -312,6 +318,31 @@ class VCSlider(VCWidget):
             lo, hi = hi, lo
         return max(0, min(255, int(round(lo + ratio * (hi - lo)))))
 
+    @staticmethod
+    def _andere_koepfe_verankern(state, fid, attr: str) -> None:
+        """CDX-75: vor dem Schreiben des Basis-Schluessels ``attr`` jeden
+        weiteren Kopf (``attr#N``) ohne eigenen Wert auf seinen JETZT
+        wirksamen Wert setzen (Basis-Wert, sonst Kanal-Default) — dieselbe
+        Regel wie ``ProgrammerView._seed_separate_head`` (UI-06). Danach
+        trifft der Fader nur Kopf 0. Best-effort: ein Fehler laesst alles,
+        wie es war."""
+        try:
+            from src.core.app_state import channel_occurrence_keys
+            chans = state._channels_for_fid(fid)
+            if not chans:
+                return
+            prog = state.programmer.get(fid, {})
+            for ch, key in channel_occurrence_keys(chans):
+                if ch.attribute != attr or key == attr or key in prog:
+                    continue
+                base = prog.get(attr)
+                if base is None:
+                    base = int(getattr(ch, "default_value", 0) or 0)
+                state.set_programmer_value(fid, key, base)
+                prog = state.programmer.get(fid, {})
+        except Exception:
+            pass
+
     def _programmer_mapped(self, v) -> int:
         """0..255-Faderwert auf das Teilband [programmer_min, programmer_max]
         abbilden (Default 0/255 = identisch). Für Laser-Speed: der Fader hält den
@@ -421,6 +452,8 @@ class VCSlider(VCWidget):
                 attrs = [attr] + [a for a in self.programmer_attr_zusatz
                                   if a and a != attr]
                 for fid in fids:
+                    if self.programmer_nur_kopf0:
+                        self._andere_koepfe_verankern(state, fid, attr)
                     for _a in attrs:
                         state.set_programmer_value(fid, _a, pv)
             except Exception:
@@ -768,15 +801,50 @@ class VCSlider(VCWidget):
         VC-Wert durchfährt. Wird bei jedem Bank-/Seitenwechsel aufgerufen."""
         # MIDI-17: ein Motorfader faehrt nach dem Wechsel auf den Wert der
         # neuen Seite (nur der Fader der aktiven Bank, s. _motor_folgen).
-        if self._motor_aktiv() and not self._motor_auf_aktiver_bank():
-            # Bank verlassen: das Loslassen erreicht diesen Fader nicht mehr
-            # (MIDI geht nur an die aktive Bank) — keine haengende Sperre.
-            self._motor.vergessen()
-        self._motor_folgen(erzwingen=True)
         if VCSlider.soft_takeover:
+            # Zuerst armieren: kommt die Motorfahrt gleich an (_motor_senden),
+            # steht der Pult-Fader am VC-Wert und der Pickup faellt wieder weg
+            # (CDX-72). Ohne Motor oder ohne Ausgang bleibt er armiert.
             self._pickup_armed = True
             self._last_cc = None
+        if self._motor_aktiv():
+            if not self._motor_auf_aktiver_bank():
+                # Bank verlassen: das Loslassen erreicht diesen Fader nicht mehr
+                # (MIDI geht nur an die aktive Bank) — keine haengende Sperre.
+                self._motor.vergessen()
+            else:
+                # CDX-72: haelt die Hand den Pult-Fader gerade (Beruehrung kam
+                # noch an den Fader der vorigen Bank), uebernimmt der Fader der
+                # neuen Bank die Sperre — sonst fuehre er gegen die Hand.
+                self._beruehrung_uebernehmen()
+        self._motor_folgen(erzwingen=True)
+        if VCSlider.soft_takeover:
             self.update()
+
+    def _beruehrung_uebernehmen(self) -> None:
+        canvas = self._find_canvas()
+        # CDX-72 (Pruefung): auch ohne Beruehrungssensor — hat die Hand den
+        # Pult-Fader eben noch geschoben (Eingabe ging an den Fader der vorigen
+        # Bank), wartet der Motor die Hand-Ruhe ab wie nach eigener Eingabe.
+        vor = getattr(canvas, "motor_hand_vor", None)
+        if callable(vor):
+            try:
+                from src.core.midi.midi_mapper import MOTOR_HAND_RUHE_S
+                seit = vor(int(self.midi_ch))
+                if seit is not None and seit < MOTOR_HAND_RUHE_S:
+                    self._motor.hand_gesehen(seit)
+            except Exception:
+                pass
+        fn = getattr(canvas, "motor_beruehrt", None)
+        if not callable(fn):
+            return
+        try:
+            from src.core.midi.midi_mapper import mackie_touch_note
+            note = mackie_touch_note(self.midi_ch)
+            if note is not None and fn(note):
+                self._motor.beruehrung(True)
+        except Exception:
+            pass
 
     def handle_midi(self, msg) -> bool:
         if self._motor_aktiv() and self._motor_beruehrung(msg):
@@ -879,9 +947,20 @@ class VCSlider(VCWidget):
             mm = get_midi_manager()
             if ist_apc_ausgang(mm):
                 return False            # MIDI-18: kein Motor am APC, spaeter erneut
-            return bool(mm.send_pitchbend(int(self.midi_ch), wert))
+            ok = bool(mm.send_pitchbend(int(self.midi_ch), wert))
         except Exception:
             return False
+        if ok and getattr(self, "_pickup_armed", False):
+            # CDX-72: der Motor faehrt den Pult-Fader auf den VC-Wert — es gibt
+            # nichts mehr abzuholen. Sonst entschiede der erste Handbericht
+            # allein, und ein Sprung > Toleranz wuerde ignoriert.
+            self._pickup_armed = False
+            self._last_cc = None
+            try:
+                self.update()
+            except RuntimeError:
+                pass
+        return ok
 
     # ── MIDI Teach (siehe VCWidget) — Fader bindet CC oder Pitchbend ───────────
 
@@ -1496,6 +1575,7 @@ class VCSlider(VCWidget):
                 self.programmer_attr = _pa_text or self.programmer_attr
             if self.programmer_attr != _pa_alt:
                 self.programmer_attr_zusatz = []     # LAS-47
+                self.programmer_nur_kopf0 = False    # CDX-75
             self.programmer_min = prog_min_spin.value()
             self.programmer_max = prog_max_spin.value()
             self.feature_attr = feature_attr_cb.currentData() or "Intensity"   # F-26b
@@ -1581,6 +1661,9 @@ class VCSlider(VCWidget):
         if self.programmer_attr_zusatz:
             # LAS-47: nur wenn belegt (Datei sonst unveraendert).
             d["programmer_attr_zusatz"] = list(self.programmer_attr_zusatz)
+        if self.programmer_nur_kopf0:
+            # CDX-75: nur wenn gesetzt (Datei sonst unveraendert).
+            d["programmer_attr_nur_kopf0"] = True
         d["programmer_scope"] = self.programmer_scope
         d["programmer_min"] = self.programmer_min
         d["programmer_max"] = self.programmer_max
@@ -1638,6 +1721,7 @@ class VCSlider(VCWidget):
         self.programmer_attr_zusatz = (
             [str(a) for a in _pz if isinstance(a, str) and a]
             if isinstance(_pz, list) else [])
+        self.programmer_nur_kopf0 = d.get("programmer_attr_nur_kopf0") is True
         self.programmer_scope = d.get("programmer_scope", "all")
         self.programmer_min = int(d.get("programmer_min", 0))
         self.programmer_max = int(d.get("programmer_max", 255))

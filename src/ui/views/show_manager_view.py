@@ -390,6 +390,9 @@ class TimelineCanvas(QWidget):
                 pass
 
         def _weg():
+            if show is not None:
+                # CDX-75: ein gerade laufender Block nimmt sein Kind mit.
+                show.block_kind_beenden(sf)
             track.show_functions[:] = [x for x in track.show_functions if x is not sf]
             if show is not None:
                 show.recalc_duration()

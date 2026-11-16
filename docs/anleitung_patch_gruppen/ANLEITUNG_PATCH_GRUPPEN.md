@@ -12,7 +12,7 @@
 ## 1. Geräte patchen
 
 Sektion **Patchen** → Tab **Patch**. Mit **+ Gerät hinzufügen** öffnet sich der Dialog
-*Gerät hinzufügen*: links das Profil im Baum wählen, rechts unter *Patch-Optionen* den
+*Gerät hinzufügen*: links das Profil im Baum wählen (der Baum startet zugeklappt: ein Tipp auf den Hersteller klappt ihn auf, bei einer Eingabe in *Suche:* erscheint stattdessen eine flache Trefferliste), rechts unter *Patch-Optionen* den
 **Modus** (= Kanal-Layout), **Universum:** und die **DMX-Adresse:** setzen (unter dem Feld
 schlägt LightOS automatisch den nächsten freien Bereich vor), dann **Hinzufügen**.
 

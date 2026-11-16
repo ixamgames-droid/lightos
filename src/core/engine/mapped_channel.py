@@ -76,6 +76,10 @@ class MappedRule:
     "scurve"/"ease_*" = fließend, "snap" = harter Sprung am Ende.
     ``per_head``: bei Mehrkopf-Geräten (Spider mit 2 Tilts/Farb-Bänken) jeden Kopf
     aus SEINER eigenen Quell-Position mappen (Kopf 1 anders als Kopf 2).
+    ``nur_kopf0`` (CDX-75): der Basis-Schluessel trifft NUR Kopf 0 und wird
+    nicht auf die weiteren Koepfe gespiegelt. Setzt nur die Lade-Migration
+    (``laser_twist#1`` -> ``laser_twist_y``, LAS-47: vorher ein exakter
+    Schluessel, Pattern A vertikal); ein neues Ziel im Editor loescht es.
     """
     source: str = SOURCE_TILT
     target: str = "color_r"
@@ -89,6 +93,7 @@ class MappedRule:
     curve: str = "linear"
     invert: bool = False
     per_head: bool = False
+    nur_kopf0: bool = False
 
     def evaluate(self, src_value: float) -> dict:
         """Bildet einen Quellwert (0..255) auf das Ergebnis ab.
@@ -107,7 +112,7 @@ class MappedRule:
     # ── Serialisierung ──────────────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "source": self.source,
             "target": self.target,
             "mode": self.mode,
@@ -121,6 +126,9 @@ class MappedRule:
             "invert": bool(self.invert),
             "per_head": bool(self.per_head),
         }
+        if self.nur_kopf0:
+            d["nur_kopf0"] = True     # CDX-75: nur wenn gesetzt (Datei sonst gleich)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "MappedRule":
@@ -148,6 +156,7 @@ class MappedRule:
             curve=curve if curve in CURVE_NAMES else "linear",
             invert=bool(d.get("invert", False)),
             per_head=bool(d.get("per_head", False)),
+            nur_kopf0=d.get("nur_kopf0") is True,
         )
 
 
@@ -262,6 +271,9 @@ class MappedChannelChange(Function):
             chans = get_channels_for_patched(fx)
             attr_set = {str(a) for ch in chans if (a := getattr(ch, "attribute", None))}
             attrs: dict[str, int] = {}
+            # CDX-75: Basis-Schluessel, deren letzter Schreiber eine
+            # ``nur_kopf0``-Regel war -> nicht auf Kopf>0 spiegeln.
+            nur0: set[str] = set()
             for rule in self.rules:
                 heads = self._target_heads(rule, chans) if rule.per_head else [None]
                 for h in heads:
@@ -278,6 +290,10 @@ class MappedChannelChange(Function):
                         _k = programmer_key_for_head(chans, rule.target, h)
                         if _k is not None:
                             attrs[_k] = res["value"]
+                            if rule.nur_kopf0 and h is None:
+                                nur0.add(_k)
+                            else:
+                                nur0.discard(_k)
                     else:
                         payload = color_attrs_for_fixture(chans, res["rgb"])
                         payload = adapt_color_payload(attr_set, payload)
@@ -296,7 +312,7 @@ class MappedChannelChange(Function):
                 key = a if head == 0 else f"{a}#{head}"
                 if key in attrs:
                     val = attrs[key]
-                elif a in attrs:
+                elif a in attrs and a not in nur0:
                     # Kopf>0 SPIEGELT den Basiswert (kein `head == 0`-Gate mehr).
                     # Vorher erreichte eine Regel mit per_head=False — dem
                     # DEFAULT jeder neuen Regel — bei Mehrkopf-Fixtures
