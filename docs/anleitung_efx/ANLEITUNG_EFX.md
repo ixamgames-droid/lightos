@@ -5,6 +5,10 @@
 > Moving Heads, und mit **„Dimmer/Shutter mit öffnen"** **öffnet** er sie auch (Shutter + Dimmer),
 > sonst bleiben sie dunkel.
 
+**Was du danach kannst:** Moving Heads auf Kreis, Acht oder Linie fahren lassen, sie sichtbar
+öffnen (Shutter + Dimmer), die Bewegung taktgenau zur Musik laufen lassen und
+eine laufende Position nur leicht verschieben.
+
 ---
 
 ## 1. EFX anlegen & an die Geräte binden

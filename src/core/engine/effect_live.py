@@ -29,6 +29,18 @@ _edit_targets: dict[str, int] = {}
 # VC-/MIDI-Aenderungen auf die aktuelle Show-Sitzung begrenzt.
 _live_baselines: WeakKeyDictionary = WeakKeyDictionary()
 
+# UI-129: zuletzt ermittelte Menge der live bearbeiteten Funktions-IDs (fuer das
+# Sternchen an VC-Tasten/-Fadern und die Handy-Konsole). Reiner Laufzeit-Zwischen-
+# stand: ``live_editiert_ids(max_alter=…)`` rechnet hoechstens so oft neu, wie
+# der Aufrufer es erlaubt; jede Aenderung am Tracking verwirft ihn sofort.
+_stand_ids: frozenset = frozenset()
+_stand_zeit: float | None = None
+
+
+def _stand_verwerfen() -> None:
+    global _stand_zeit
+    _stand_zeit = None
+
 
 def set_edit_target(slot: str, function_id) -> None:
     """Merkt ``function_id`` als aktives Bearbeitungsziel für ``slot``."""
@@ -55,7 +67,10 @@ def clear_edit_targets() -> None:
 
 def clear_live_overrides() -> None:
     """Vergisst alle Laufzeit-Baselines (beim Laden/Anlegen einer Show)."""
+    global _stand_ids
     _live_baselines.clear()
+    _stand_ids = frozenset()
+    _stand_verwerfen()
 
 
 def resolve_target(function_id=None):
@@ -98,6 +113,7 @@ def _serialized(fn) -> dict:
 def _apply_live_mutation(fn, mutation) -> bool:
     """Mutation ausfuehren und nur bei einer persistent sichtbaren Aenderung den
     Zustand DAVOR als Sitzungs-Baseline merken."""
+    _stand_verwerfen()
     if fn in _live_baselines:
         return bool(mutation())
     before = _serialized(fn)
@@ -117,6 +133,7 @@ def begin_live_edit(function_id=None) -> bool:
         return False
     if fn not in _live_baselines:
         _live_baselines[fn] = _serialized(fn)
+    _stand_verwerfen()
     return True
 
 
@@ -132,12 +149,69 @@ def commit_live_override(function_id=None) -> bool:
     if fn is None:
         return False
     _live_baselines.pop(fn, None)
+    _stand_verwerfen()
     return True
 
 
 def discard_live_override_tracking(function_id=None) -> bool:
     """Tracking entfernen, nachdem ein Effekt selbst auf sein Preset zurueckfiel."""
     return commit_live_override(function_id)
+
+
+# ── UI-129: „ist dieser Effekt gerade live bearbeitet?" ──────────────────────
+# Eine Wahrheit fuer ALLE live editierbaren Typen (RGB-Matrix, EFX, Chaser,
+# Sequence …): Live-Aenderungen laufen ueber ``_apply_live_mutation`` bzw.
+# ``begin_live_edit`` und hinterlassen eine Sitzungs-Baseline. Live bearbeitet
+# heisst: es gibt eine Baseline UND der laufende Zustand weicht von ihr ab —
+# also genau dann, wenn ein Show-Save etwas anderes schreiben wuerde, als gerade
+# zu sehen ist. Ein nur „angepinnter" Effekt (Live-Edit-Panel, Farb-Kachel vor
+# dem Wechsel) zaehlt nicht; wer einen Wert von Hand zurueckdreht, ebenso nicht.
+# ``clear_live_override`` (Reset Live), ``commit_live_override`` (als neuer
+# Stand/Preset uebernehmen) und ``clear_live_overrides`` (Show laden/neu)
+# beenden den Zustand. Nur lesen — das Verhalten der Effekte bleibt gleich.
+
+def _weicht_ab(fn, baseline) -> bool:
+    try:
+        return fn.to_dict() != baseline
+    except Exception:
+        return False
+
+
+def ist_live_editiert(function_id) -> bool:
+    """True, wenn die Funktion ``function_id`` gegenueber ihrem gespeicherten
+    Stand live veraendert ist. Ohne feste ID (None) immer False — der
+    „aktive Effekt" ist kein fester Bezug fuer eine Anzeige."""
+    if function_id is None:
+        return False
+    fn = resolve_target(function_id)
+    if fn is None:
+        return False
+    baseline = _live_baselines.get(fn)
+    return baseline is not None and _weicht_ab(fn, baseline)
+
+
+def live_editiert_ids(max_alter: float | None = None) -> frozenset:
+    """IDs aller live bearbeiteten Funktionen.
+
+    ``max_alter`` (Sekunden): ein hoechstens so alter Zwischenstand darf
+    zurueckkommen, statt neu zu vergleichen — so koennen Malen und die
+    Handy-Konsole oft fragen, ohne jedes Mal alle Effekte zu serialisieren.
+    Ohne ``max_alter`` wird immer neu gerechnet."""
+    global _stand_ids, _stand_zeit
+    import time
+    jetzt = time.monotonic()
+    if (max_alter is not None and _stand_zeit is not None
+            and jetzt - _stand_zeit <= max_alter):
+        return _stand_ids
+    ids = set()
+    for fn, baseline in list(_live_baselines.items()):
+        if _weicht_ab(fn, baseline):
+            fid = getattr(fn, "id", None)
+            if fid is not None:
+                ids.add(int(fid))
+    _stand_ids = frozenset(ids)
+    _stand_zeit = jetzt
+    return _stand_ids
 
 
 def list_params(function_id=None) -> list:

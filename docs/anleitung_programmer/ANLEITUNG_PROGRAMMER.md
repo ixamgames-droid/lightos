@@ -92,10 +92,9 @@ die **Intensität** wieder auf voll; die Intensität deshalb erst **nach** der K
 > **Hinweis – getrennte Hälften:** „linke Hälfte rot, rechte Hälfte blau" lässt sich mit den Fadern
 > dieser Bank **nicht** von Hand bauen (sie wirken immer auf alle Fixtures). Nutze dafür die fertigen
 > **Split-Szenen** der Show („Grün links / Blau rechts", „Rot links / Weiß rechts") — sie liegen nur
-> in der Funktions-Bibliothek, nicht als Taste in der VC; starten z. B. per Doppelklick in der
-> App-Sektion **Programmer** → Reiter **Assistent** — oder die
-> App-Sektion **„Programmer"** in der Reiter-Leiste: dort eine Gruppe auswählen und gezielt nur die
-> Auswahl einfärben.
+> in der Funktions-Bibliothek, nicht als Taste in der VC. Starte sie in der App-Sektion
+> **Programmer** → Reiter **Assistent**: Funktion in der Liste wählen, dann **Start** (oder
+> Doppelklick). Oder wähle in derselben Sektion eine Gruppe und färbe gezielt nur die Auswahl ein.
 
 > **Speichern als Look:** Was im Programmer steht, lässt sich als **Szene** in die Bibliothek
 > übernehmen: App-Sektion **Programmer** → Reiter **Assistent** → Knopf **„Programmer → Szene"**

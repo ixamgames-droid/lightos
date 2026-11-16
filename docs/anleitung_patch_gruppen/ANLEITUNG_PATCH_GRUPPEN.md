@@ -3,6 +3,9 @@
 > **Patchen** = jedes Gerät auf seine **DMX-Adresse** legen (damit LightOS weiß, welche Kanäle
 > welches Gerät steuern). **Gruppen** fassen Geräte zusammen und legen über ein **Raster** ihre
 > Reihenfolge fest — die Basis für Matrix-/EFX-Effekte (neue Effekte nehmen die Gruppen-Auswahl).
+>
+> **Was du danach kannst:** Geräte auf ihre DMX-Adresse legen, eine Geräteliste aus einer Tabelle
+> einlesen und Gruppen mit sauberem Raster für Effekte anlegen.
 
 ---
 
@@ -33,10 +36,13 @@ Hilfen:
   verloren. Es fragt vorher nach; **Strg+Z** macht es rückgängig.
 - **Mit Offset kopieren…** patcht die markierten Geräte mehrfach mit festem Abstand
   (**Anzahl Kopien:** und **Adress-Abstand:**).
+- **Klonen…** überträgt, was ausgewählte Geräte in der Show tun (Gruppen, Effekte, Snaps, Cues),
+  auf andere Geräte — mit Vorschau.
 - **Gerät erstellen…** baut ein eigenes Profil (Kanäle/Attribute), falls dein Gerät nicht in der
   Datenbank ist.
 - **Löschen** entfernt die markierten Zeilen (mit Rückfrage). Sind viele markiert, baut sich der
-  Patch danach nur einmal neu auf; Strg+Z holt die Geräte weiterhin einzeln zurück. Doppelklick auf eine Zeile öffnet
+  Patch danach nur einmal neu auf; Strg+Z holt die Geräte weiterhin einzeln zurück.
+  **Bearbeiten…** (oder Doppelklick auf eine Zeile; am Touchscreen: Zeile lange drücken) öffnet
   *Gerät bearbeiten* (Label, Modus, Universum, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
   bei Lasern die Laser-Ausrichtung — siehe unten).
 - Die Leiste **„Belegte DMX-Kanäle — Universum:"** unten (mit der Universum-Auswahl direkt daneben)

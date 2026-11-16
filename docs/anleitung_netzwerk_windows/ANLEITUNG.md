@@ -1,5 +1,8 @@
 # Netzwerk vorbereiten (Windows): Firewall, feste Adresse, Fehlerbilder
 
+> **Was du danach kannst:** Dein Windows-Rechner nimmt Handy, Art-Net, sACN und MSC
+> an und erreicht den Node im Lichtnetz.
+>
 > LightOS spricht über das Netzwerk mit Art-Net- und sACN-Nodes, mit dem Handy
 > (Web-Remote) und mit anderen Pulten (DMX-Eingang, MIDI Show Control). **Senden**
 > klappt unter Windows ohne Vorbereitung. **Empfangen** nicht: Die Windows-Firewall
