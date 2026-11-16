@@ -83,14 +83,17 @@ class _Text:
     """UI-143: eine Beschriftung des Pads. ``varianten``: Liste
     ``(rechteck, ausrichtung, text, schrift)`` in Wunschreihenfolge; gesetzt
     wird die erste, die in ``flaeche`` passt und nichts ueberdeckt."""
-    __slots__ = ("art", "flaeche", "varianten", "farbe", "ueber_koepfe")
+    __slots__ = ("art", "flaeche", "varianten", "farbe", "ueber_koepfe", "kreis")
 
-    def __init__(self, art, flaeche, varianten, farbe, ueber_koepfe=False):
+    def __init__(self, art, flaeche, varianten, farbe, ueber_koepfe=False, kreis=None):
         self.art = art
         self.flaeche = QRectF(flaeche)
         self.varianten = [(QRectF(r), f, t, s) for r, f, t, s in varianten]
         self.farbe = farbe
         self.ueber_koepfe = ueber_koepfe
+        #: ``(mitte, radius)``: die Schrift muss ganz im Kreis liegen (Kopfnummer
+        #: in Kreisfarbe — was ueber den Kreis hinausragt, ist unsichtbar)
+        self.kreis = kreis
 
 
 def _ueberlappt(a: QRectF, b: QRectF) -> bool:
@@ -100,6 +103,19 @@ def _ueberlappt(a: QRectF, b: QRectF) -> bool:
 
 def _innen(flaeche: QRectF, r: QRectF) -> bool:
     return flaeche.adjusted(-0.5, -0.5, 0.5, 0.5).contains(r)
+
+
+def _tinte_im_kreis(p, br: QRectF, text: str, font: QFont, mitte: QPointF, r: float) -> bool:
+    """Liegt die tatsaechlich gemalte Schrift (ohne Zeilenabstand) von
+    ``text`` im Kasten ``br`` ganz im Kreis um ``mitte`` mit Radius ``r``?"""
+    fm = QFontMetricsF(font, p.device())
+    tinte = fm.tightBoundingRect(text)
+    grund = br.top() + fm.ascent()                    # Grundlinie der Zeile
+    x0 = br.left() + (br.width() - fm.horizontalAdvance(text)) / 2.0
+    tr = QRectF(x0 + tinte.left(), grund + tinte.top(), tinte.width(), tinte.height())
+    r2 = (r + 0.5) ** 2
+    return all((q.x() - mitte.x()) ** 2 + (q.y() - mitte.y()) ** 2 <= r2
+               for q in (tr.topLeft(), tr.topRight(), tr.bottomLeft(), tr.bottomRight()))
 
 
 def _px_font(px: int) -> QFont:
@@ -707,6 +723,8 @@ class VCRaumPad(VCWidget):
                 br = p.boundingRect(rect, flags, text)
                 if not _innen(t.flaeche, br):
                     continue
+                if t.kreis is not None and not _tinte_im_kreis(p, br, text, font, *t.kreis):
+                    continue
                 if any(_ueberlappt(br, b) for b in belegt):
                     continue
                 if not t.ueber_koepfe and any(_ueberlappt(br, k) for k in kreise):
@@ -882,7 +900,7 @@ class VCRaumPad(VCWidget):
             # Nummer nur, wenn sie in den Kreis passt (sonst im Tooltip)
             nummern.append(_Text("nummer", quadrat.adjusted(-1, -1, 1, 1),
                                  [(quadrat, zentriert, str(fid), f) for f in nr_fonts],
-                                 QColor("#0d1117"), ueber_koepfe=True))
+                                 QColor("#0d1117"), ueber_koepfe=True, kreis=(QPointF(c), r)))
             if fid in weg:
                 # Ziel nicht erreichbar: roter Ring + „!" statt still begrenzt
                 p.setPen(QPen(_ROT, 2))

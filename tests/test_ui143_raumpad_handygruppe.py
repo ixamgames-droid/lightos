@@ -182,6 +182,57 @@ def test_zielrechnung_unveraendert(reihe):
     assert a == pytest.approx(bw / 2, abs=1 / s) and b == pytest.approx(bh / 2, abs=1 / s)
 
 
+def test_kopfnummer_nur_ganz_im_kreis():
+    """Pruefung: die Nummer ist in Kreisfarbe — ragt sie ueber den Kreis
+    hinaus, ist der Rest unsichtbar („10" las sich bei 320x300 wie „1(").
+    Gesetzt wird sie nur, wenn die gemalte Schrift ganz im Kreis liegt."""
+    from PySide6.QtCore import QPointF, QRectF
+    from PySide6.QtGui import QImage, QPainter
+
+    from src.ui.virtualconsole.vc_raumpad import _px_font, _tinte_im_kreis
+    bild = QImage(60, 60, QImage.Format.Format_ARGB32)
+    p = QPainter(bild)
+    try:
+        f = _px_font(9)
+        p.setFont(f)
+        mitte = QPointF(30, 30)
+
+        def passt(text, r):
+            quadrat = QRectF(mitte.x() - r, mitte.y() - r, 2 * r, 2 * r)
+            br = p.boundingRect(quadrat, Qt.AlignmentFlag.AlignCenter, text)
+            return _tinte_im_kreis(p, br, text, f, mitte, r)
+
+        assert passt("1", 7) and passt("10", 9)
+        assert not passt("10", 4.5)          # zweistellig im kleinen Kreis: weg
+        assert not passt("1", 2.5)
+    finally:
+        p.end()
+
+
+def test_kopfnummern_im_bild_ganz_im_kreis(reihe):
+    """Jede gesetzte Nummer liegt bei allen Groessen ganz in ihrem Kreis."""
+    from PySide6.QtGui import QFontMetricsF, QImage, QPainter
+
+    from src.ui.virtualconsole.vc_raumpad import _px_font, _tinte_im_kreis
+    from PySide6.QtGui import QFont
+    klein = QFont("Segoe UI", 8)
+    for w, h in ((260, 240), (320, 300), (460, 420)):
+        p = _pad(w, h)
+        p.grab()
+        kreise = p.kopf_kreise()
+        nummern = [(r, t) for a, r, _f, t in p.gezeichnete_texte() if a == "nummer"]
+        bild = QImage(10, 10, QImage.Format.Format_ARGB32)
+        maler = QPainter(bild)
+        try:
+            for br, t in nummern:
+                mitte, rad = kreise[int(t)]
+                assert any(_tinte_im_kreis(maler, br, t, f, mitte, rad)
+                           for f in (klein, _px_font(10), _px_font(9))
+                           if QFontMetricsF(f).height() <= br.height() + 0.5), (w, h, t, rad)
+        finally:
+            maler.end()
+
+
 # ── B3: Handy-Gruppen-Dialog ────────────────────────────────────────────────
 
 class VCButton:                         # gruppe_erlaubt sieht nur auf den Klassennamen
