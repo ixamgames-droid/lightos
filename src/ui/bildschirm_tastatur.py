@@ -370,6 +370,12 @@ class Bildschirmtastatur(_PopupBasis):
         self.anzeige = QLabel()
         self.anzeige.setObjectName("anzeige")
         self.anzeige.setTextFormat(Qt.TextFormat.PlainText)
+        # CDX-74: ein langer Feldinhalt (Pfad, Suchtext) darf die Tastatur nicht
+        # breiter als den Bildschirm machen. Die Anzeige bestimmt die Breite
+        # nicht mit (Ignored); der Text wird links gekuerzt (_zeige), damit das
+        # Ende — dort steht beim Tippen der Cursor — sichtbar bleibt.
+        self.anzeige.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.anzeige.setMinimumWidth(0)
         lay.addWidget(self.anzeige)
 
         self._buchstaben: list[_Taste] = []
@@ -421,10 +427,19 @@ class Bildschirmtastatur(_PopupBasis):
         return t
 
     def _zeige(self, *_):
-        if not _gueltig(self._feld) or not _gueltig(self.anzeige):
+        anzeige = getattr(self, "anzeige", None)
+        if anzeige is None or not _gueltig(self._feld) or not _gueltig(anzeige):
             return
         text = self._feld.displayText()
+        frei = self.anzeige.contentsRect().width() - 24   # QSS-Innenabstand
+        if text and frei > 0:
+            text = self.anzeige.fontMetrics().elidedText(
+                text, Qt.TextElideMode.ElideLeft, frei)
         self.anzeige.setText(text if text else " ")
+
+    def resizeEvent(self, ev):               # noqa: N802 (Qt)
+        super().resizeEvent(ev)
+        self._zeige()                        # Kuerzung an die echte Breite
 
     def _beschriften(self) -> None:
         for t in self._buchstaben:
@@ -467,6 +482,11 @@ class Bildschirmtastatur(_PopupBasis):
     def _abbrechen_intern(self) -> None:
         if _gueltig(self._feld) and self._feld.text() != self._alt:
             self._feld.setText(self._alt)
+            # CDX-74: setText() sendet kein textEdited. Verbraucher, die ihr
+            # Modell nur an textEdited haengen (Sperrzonen-Planer: Zonenname),
+            # behielten sonst den abgebrochenen Text. Gilt fuer alle
+            # Abbruchpfade, auch das Schliessen per Tipp daneben (hideEvent).
+            self._feld.textEdited.emit(self._alt)
 
     def fertig(self) -> None:
         self._erledigt = True

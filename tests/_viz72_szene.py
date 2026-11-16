@@ -22,6 +22,10 @@ from PySide6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QObject, QUrl, Signal, Slot
 from _qt_lifecycle import destroy_webengine_view  # XPLAT-09
+from _szene_warten import (  # QA-115: feiner Pump-Takt statt 50-ms-Schlaf
+    POLL_PAUSE_S as _POLL_PAUSE_S, js_eval as _js_eval, pumpen as _pumpen,
+    warte_bis as _warte_bis,
+)
 from _viz_dmx import dmx_push as _dmx_push
 
 _app = QApplication.instance() or QApplication([])
@@ -122,22 +126,16 @@ class Viz72SzeneBasis(unittest.TestCase):
         url = QUrl.fromLocalFile(_HTML_PATH)
         url.setQuery(f"v={int(time.time() * 1000)}&gputier={tier}")
         self._view.load(url)
-        deadline = time.monotonic() + _LOAD_TIMEOUT_S
-        while not self._loaded_ok and time.monotonic() < deadline:
-            _app.processEvents()
-            time.sleep(_POLL_INTERVAL_S)
+        # QA-115: 5-ms-Takt statt 50 ms Schlaf (tests/_szene_warten.py).
+        _warte_bis(lambda: bool(self._loaded_ok), _LOAD_TIMEOUT_S)
         self.assertTrue(self._loaded_ok and self._loaded_ok[-1], "Seite nicht geladen")
         self._poll_until_true("!!window.__lightosAppReady")
 
     def _eval(self, js_expr):
-        box = []
-        self._view.page().runJavaScript(js_expr, lambda result: box.append(result))
-        deadline = time.monotonic() + _POLL_TIMEOUT_S
-        while not box and time.monotonic() < deadline:
-            _app.processEvents()
-            time.sleep(_POLL_INTERVAL_S)
-        self.assertTrue(box, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
-        return box[0]
+        # QA-115: auf den Callback warten, im 5-ms-Takt (vorher 50 ms je Runde).
+        ok, ergebnis = _js_eval(self._view, js_expr, _POLL_TIMEOUT_S)
+        self.assertTrue(ok, f"runJavaScript-Callback nie ausgeloest fuer: {js_expr}")
+        return ergebnis
 
     def _json(self, js_expr):
         return json.loads(self._eval(f"JSON.stringify({js_expr})"))
@@ -149,7 +147,7 @@ class Viz72SzeneBasis(unittest.TestCase):
             last = self._eval(js_expr)
             if last:
                 return last
-            time.sleep(_POLL_INTERVAL_S)
+            _pumpen(_POLL_PAUSE_S)       # QA-115: pumpen statt 50 ms Schlaf
         self.fail(f"Timeout beim Warten auf '{js_expr}' (letzter Wert: {last!r})")
 
     def _emit_until_true(self, emit_fn, js_expr, timeout_s=_POLL_TIMEOUT_S):
@@ -160,7 +158,7 @@ class Viz72SzeneBasis(unittest.TestCase):
             last = self._eval(js_expr)
             if last:
                 return last
-            time.sleep(_POLL_INTERVAL_S)
+            _pumpen(_POLL_PAUSE_S)       # QA-115: pumpen statt 50 ms Schlaf
         self.fail(f"Timeout nach wiederholtem Emit: '{js_expr}' (letzter Wert: {last!r})")
 
     def _tick(self):

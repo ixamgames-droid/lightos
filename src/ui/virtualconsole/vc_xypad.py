@@ -198,7 +198,14 @@ class VCXYPad(VCWidget):
             def _pfad():
                 if alt is None or getattr(fn, "path_id", None) != eintrag.get("eigener_pfad"):
                     return False
-                (fn.algorithm, fn.path_id, fn.path_data, fn._embedded_path) = alt
+                # CDX-72: den Algorithmus nur zuruecknehmen, wenn noch der
+                # eigene (CUSTOM) gilt. Wer ihn danach umgestellt hat (Editor,
+                # next_algorithm), behaelt seine Wahl; der Pfad geht trotzdem.
+                if "eigener_algo" in eintrag and \
+                        getattr(fn, "algorithm", None) != eintrag["eigener_algo"]:
+                    (fn.path_id, fn.path_data, fn._embedded_path) = alt[1:]
+                else:
+                    (fn.algorithm, fn.path_id, fn.path_data, fn._embedded_path) = alt
                 return True
             try:
                 effect_live._apply_live_mutation(fn, _pfad)
@@ -330,6 +337,7 @@ class VCXYPad(VCWidget):
                 fn.set_custom_path(pfad)
                 return True
             effect_live._apply_live_mutation(fn, _setze_pfad)
+            self._path_vorher["eigener_algo"] = getattr(fn, "algorithm", None)
             # Pfad fuellt das ganze Feld -> direkte Pan/Tilt-Bahn.
             effect_live.set_param("x_offset", 128.0, self.efx_function_id)
             effect_live.set_param("y_offset", 128.0, self.efx_function_id)

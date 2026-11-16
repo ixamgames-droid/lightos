@@ -48,6 +48,7 @@ nichts von selbst in den Programmer.
 from __future__ import annotations
 
 import math
+import time
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QPointF, QRect, QRectF, Qt
 from PySide6.QtGui import QWindow
@@ -61,6 +62,9 @@ from .vc_style import touch_aktiv
 from .vc_widget import VCWidget
 
 _GELB = QColor("#e3b341")
+# UI-136: nach einer Freigabe steht so lange „freigegeben" an der Marke
+FREI_HINWEIS_S = 2.5
+_FREI = QColor("#8b949e")
 _AN = QColor("#2ea043")
 _AUS = QColor("#30363d")
 _ZIEL = QColor("#ff5c8a")
@@ -132,6 +136,7 @@ class VCRaumPad(VCWidget):
         self._eigene: dict[tuple, list] = {}
         self._zug: str | None = None                      # "pad" / "hoehe" / "an" / "lock"
         self._waechter: _HaltWaechter | None = None       # nur waehrend Halten
+        self._frei_seit: float | None = None              # UI-136: Zeitpunkt der Freigabe
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#58a6ff")
         self.resize(260, 240)
@@ -352,6 +357,8 @@ class VCRaumPad(VCWidget):
 
     def freigeben(self) -> bool:
         """Eigene Pan/Tilt/Fein-Werte zuruecknehmen (s. Modulkopf)."""
+        if self.aktiv:
+            self._frei_merken()
         self.aktiv = False
         if not self._eigene:
             self.update()
@@ -381,7 +388,39 @@ class VCRaumPad(VCWidget):
         self.update()
         return True
 
+    def _frei_merken(self) -> None:
+        """UI-136: die Marke zeigt kurz „freigegeben" — ein frei gegebenes Ziel
+        blieb sonst sichtbar stehen und sah aus wie „klebt fest"."""
+        self._frei_seit = time.monotonic()
+        try:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(int(FREI_HINWEIS_S * 1000) + 50, self._frei_neu_malen)
+        except Exception:
+            pass
+
+    def _frei_neu_malen(self) -> None:
+        try:
+            self.update()
+        except RuntimeError:
+            pass                        # Pad schon abgebaut
+
+    def ziel_zustand(self) -> str | None:
+        """UI-136: ``"aktiv"`` (Koepfe zielen), ``"frei"`` (Marke steht nur
+        noch als Erinnerung, Ausgabe freigegeben) oder ``None`` (kein Ziel)."""
+        if self.ziel is None:
+            return None
+        return "aktiv" if self.aktiv else "frei"
+
+    def frei_hinweis(self) -> str:
+        """„freigegeben" kurz nach einer Freigabe, sonst leer."""
+        if self.aktiv or self._frei_seit is None:
+            return ""
+        if time.monotonic() - self._frei_seit > FREI_HINWEIS_S:
+            return ""
+        return "freigegeben"
+
     def einschalten(self):
+        self._frei_seit = None
         self.aktiv = True
         self.anwenden()
         self.update()
@@ -424,6 +463,16 @@ class VCRaumPad(VCWidget):
         if self.aktiv:
             self.anwenden()
         self.update()
+
+    def vor_entfernen(self) -> None:
+        """CDX-72: Pad wird geloescht oder die Konsole neu geladen (``_clear``,
+        Undo/Redo, Show laden): eigene Pan/Tilt-Werte freigeben, auch bei
+        Lock AN. Fremd ueberschriebene Werte bleiben (s. ``freigeben``)."""
+        self._zug = None
+        self._waechter_aus()
+        self.aktiv = False              # kein „freigegeben"-Hinweis mehr (Widget geht)
+        if self._eigene:
+            self.freigeben()
 
     def release_if_held(self) -> bool:
         """Bankwechsel: ein nur gehaltenes Ziel (Lock AUS) freigeben."""
@@ -736,20 +785,30 @@ class VCRaumPad(VCWidget):
             p.setPen(QColor("#6e7681"))
             p.drawText(boden, Qt.AlignmentFlag.AlignCenter,
                        "Keine Moving Heads zugeordnet\n(Bearbeiten → Doppelklick)")
-        # Zielmarke + Koordinaten
+        # Zielmarke + Koordinaten. UI-136: frei gegeben ist die Marke nur noch
+        # ein gestrichelter grauer Ring ohne Fadenkreuz (Linien zu den Koepfen
+        # sind dann schon weg) — sonst sah ein freigegebenes Ziel aus, als
+        # stuende es noch.
         if ziel_px is not None:
-            farbe = _ZIEL if self.aktiv else QColor("#6e7681")
-            p.setPen(QPen(farbe, 2))
-            p.setBrush(Qt.BrushStyle.NoBrush)
-            p.drawEllipse(ziel_px, 8, 8)
-            p.drawLine(ziel_px + QPointF(-12, 0), ziel_px + QPointF(12, 0))
-            p.drawLine(ziel_px + QPointF(0, -12), ziel_px + QPointF(0, 12))
+            if self.aktiv:
+                p.setPen(QPen(_ZIEL, 2))
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawEllipse(ziel_px, 8, 8)
+                p.drawLine(ziel_px + QPointF(-12, 0), ziel_px + QPointF(12, 0))
+                p.drawLine(ziel_px + QPointF(0, -12), ziel_px + QPointF(0, 12))
+            else:
+                p.setPen(QPen(_FREI, 1.5, Qt.PenStyle.DashLine))
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawEllipse(ziel_px, 8, 8)
         if self.ziel is not None:
-            p.setPen(_ZIEL if self.aktiv else QColor("#6e7681"))
+            frei = self.frei_hinweis()
+            p.setPen(_ZIEL if self.aktiv else (QColor("#e6edf3") if frei else QColor("#6e7681")))
             p.setFont(klein)
             # eine Zeile ueber „Publikum"/Raumgroesse, damit nichts ueberlappt
+            text = (f"freigegeben · {self.koordinaten_text()}" if frei
+                    else self.koordinaten_text())
             p.drawText(text_rect, Qt.AlignmentFlag.AlignBottom
-                       | Qt.AlignmentFlag.AlignRight, self.koordinaten_text())
+                       | Qt.AlignmentFlag.AlignRight, text)
 
         # Schalter
         p.setFont(mittel)

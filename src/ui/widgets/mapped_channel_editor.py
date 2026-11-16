@@ -536,6 +536,8 @@ class MappedChannelEditor(QWidget):
             return
         rule.source = self._src_combo.currentData() or SOURCE_TILT
         if self._target_combo.currentData():
+            if rule.target != self._target_combo.currentData():
+                rule.nur_kopf0 = False      # CDX-75: neues Ziel = geraeteweit
             rule.target = self._target_combo.currentData()
         rule.mode = self._mode_combo.currentData() or MODE_VALUE
         rule.in_min = self._in_min.value()
