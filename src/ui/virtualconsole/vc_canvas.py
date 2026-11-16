@@ -3334,6 +3334,8 @@ class VCCanvas(QWidget):
         except Exception as e:
             print(f"[VCCanvas] ERROR: Handy-Seiten nicht lesbar: {e}")
             self._handy_seiten = {"version": 1, "seiten": []}
+            # WEB-15: der Nutzer erfaehrt es wie bei uebersprungenen Widgets
+            self._uebersprungen.append(f"Handy-Seiten: {type(e).__name__}")
         self.handy_seiten_changed.emit()
         # Aktive Bank an die (ggf. aus der Show geladene) Engine-Page angleichen
         # und Sichtbarkeit setzen.
