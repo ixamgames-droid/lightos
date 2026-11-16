@@ -1200,6 +1200,7 @@ class StageCanvas(QWidget):
         self._zeichenzeiten: deque = deque(maxlen=self.ZEICHENZEIT_PROBEN)
         self._naechstes_bild: float = 0.0
         self._strobe_bild: int = 0     # VIZ-104: Zaehler der Takt-Bilder
+        self._takt_bild_offen: bool = False     # UI-135: Takt-Bild angefordert, noch nicht gezeichnet
         # VIZ-78: Geraete-Steckbriefe (siehe _steckbrief).
         self._steckbriefe: dict = {}
         # DEMO-9: {fid: (Patch-Label, (text, ist_name))} — siehe _beschriftung_fuer.
@@ -1500,6 +1501,12 @@ class StageCanvas(QWidget):
     # Hysterese haelt den Takt bei kleinen Schwankungen der Zeichenzeit fest -
     # sonst spraenge die Blitzperiode (ganze Bilder aus Bildrate / Frequenz).
     STROBE_TAKT_HYSTERESE = 0.15
+    # ... und nur, wenn die Abweichung so viele Feuern hintereinander anhaelt.
+    # Gemessen (16.11.): eine kurze Stoerung (einige langsame Bilder, UI-Thread
+    # belegt) hob den Takt sonst an und gleich wieder ab - zwei Spruenge der
+    # Blitzphase fuer nichts, und danach ein leicht anderer Takt (85, 81, 88 ms
+    # in aufeinanderfolgenden Messfenstern bei gleicher Lage).
+    STROBE_TAKT_GEDULD = 8
 
     def _strobe_takt_roh(self) -> int:
         """Budget-Abstand in ms aus der gemessenen Zeichenzeit, ohne Hysterese."""
@@ -1510,15 +1517,24 @@ class StageCanvas(QWidget):
         return max(self.STROBE_TAKT_MS, min(roh, int(self.MAX_BILD_ABSTAND_S * 1000)))
 
     def _strobe_takt_nachfuehren(self) -> None:
-        """Einmal je Feuern: den gemerkten Strobe-Takt nur bei deutlicher
-        Aenderung der Zeichenzeit neu setzen."""
+        """Einmal je Feuern: den gemerkten Strobe-Takt nur bei deutlicher UND
+        anhaltender Aenderung der Zeichenzeit neu setzen."""
         if not self._strobe_takt_aktiv():
             self._strobe_takt_merk = None
+            self._strobe_takt_abweichung = 0
             return
         roh = self._strobe_takt_roh()
         merk = getattr(self, "_strobe_takt_merk", None)
-        if merk is None or abs(roh - merk) > merk * self.STROBE_TAKT_HYSTERESE:
+        if merk is None:
             self._strobe_takt_merk = roh
+            self._strobe_takt_abweichung = 0
+        elif abs(roh - merk) > merk * self.STROBE_TAKT_HYSTERESE:
+            n = getattr(self, "_strobe_takt_abweichung", 0) + 1
+            if n >= self.STROBE_TAKT_GEDULD:
+                self._strobe_takt_merk, n = roh, 0
+            self._strobe_takt_abweichung = n
+        else:
+            self._strobe_takt_abweichung = 0
 
     def _takt_ms(self) -> int:
         if not self._strobe_takt_aktiv():
@@ -1606,7 +1622,9 @@ class StageCanvas(QWidget):
         # VIZ-104: ein Takt-Bild weiter — danach blinkt der Strobe (_blink_an).
         # Bilder aus der Bedienung (Maus, Auswahl) zaehlen nicht mit: sie
         # zeigen den Stand des laufenden Takt-Bildes noch einmal.
-        self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
+        # UI-135: weitergezaehlt wird erst, wenn das Bild wirklich gezeichnet
+        # wird (_takt_bild_zaehlen in paintEvent), nicht schon hier.
+        self._takt_bild_offen = True
         self.update()
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
@@ -2599,7 +2617,21 @@ class StageCanvas(QWidget):
         except Exception:
             return True
 
+    def _takt_bild_zaehlen(self) -> None:
+        """UI-135: am Anfang jedes Zeichnens - steht ein Takt-Bild aus, zaehlt
+        es JETZT, genau einmal. Bis dahin zaehlte ``_on_render_tick`` selbst:
+        feuerte der Zeitgeber zweimal, bevor gezeichnet war (UI-Thread kurz
+        belegt), stand der Zaehler zwei Bilder weiter fuer EIN gezeichnetes
+        Bild. Traf das uebersprungene Bild den Blitz (bei der kleinsten Periode
+        ein Bild von dreien), fiel der Blitz aus - gemessen (16.11., Windows
+        x64, 250 %, 68 blinkende Geraete) war rund jeder zwanzigste
+        Blitzabstand doppelt so lang."""
+        if getattr(self, "_takt_bild_offen", False):
+            self._takt_bild_offen = False
+            self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
+
     def paintEvent(self, event):
+        self._takt_bild_zaehlen()
         # UI-86: Zeichenzeit messen — nur volle Bilder, ein Teil-Repaint (z. B.
         # unter der Minimap) ist billiger und wuerde die Rate schoenrechnen.
         voll = self._ist_vollbild(event)

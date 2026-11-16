@@ -680,7 +680,13 @@ class LiveView2dBlinktImBildtaktTest(unittest.TestCase):
         self.assertEqual(quelle.count("self._blink_an(freq_hz, rechteck)"), 2)
         tick = quelle[quelle.index("    def _on_render_tick(self)"):]
         tick = tick[:tick.index("\n    # ── VIZ-70")]
-        self.assertLess(tick.index("_strobe_bild"), tick.index("self.update()"))
+        # UI-135: der Takt meldet das Bild an, gezaehlt wird beim Zeichnen.
+        self.assertLess(tick.index("self._takt_bild_offen = True"), tick.index("self.update()"))
+        zaehlen = quelle[quelle.index("    def _takt_bild_zaehlen(self)"):]
+        zaehlen = zaehlen[:zaehlen.index("\n    def paintEvent")]
+        self.assertIn("_strobe_bild", zaehlen)
+        zeichnen = quelle[quelle.index("    def paintEvent(self, event)"):]
+        self.assertLess(zeichnen.index("self._takt_bild_zaehlen()"), zeichnen.index("self._zeichne("))
 
 
 class VerdrahtungTest(unittest.TestCase):

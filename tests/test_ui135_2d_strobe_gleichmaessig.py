@@ -42,7 +42,13 @@ class GleichmaessigTest(unittest.TestCase):
         c._darf_zeichnen = lambda: True
         c._animiert = True
         self.bilder: list[float] = []
-        c.update = lambda *a: self.bilder.append(self.zeit[0])      # statt zu zeichnen
+        self.zeichnet = True                 # False: das Bild bleibt aus (UI-Thread belegt)
+
+        def update(*_a):                     # statt zu zeichnen
+            if self.zeichnet:
+                self.bilder.append(self.zeit[0])
+                c._takt_bild_zaehlen()       # wie am Anfang von paintEvent
+        c.update = update
         self.addCleanup(c.deleteLater)
         self.c = c
 
@@ -103,12 +109,35 @@ class GleichmaessigTest(unittest.TestCase):
         self._zeichenzeit(31)                    # 94 ms: -10 %
         c._on_render_tick()
         self.assertEqual(c._takt_ms(), 104)
-        self._zeichenzeit(45)                    # 137 ms: +32 %
+        self._zeichenzeit(45)                    # 137 ms: +32 % - gilt erst, wenn es anhaelt
+        for _ in range(c.STROBE_TAKT_GEDULD - 1):
+            c._on_render_tick()
+            self.assertEqual(c._takt_ms(), 104)
         c._on_render_tick()
         self.assertEqual(c._takt_ms(), 137)
         self._zeichenzeit(40)                    # 122 ms: -11 % von 137
-        c._on_render_tick()
+        for _ in range(c.STROBE_TAKT_GEDULD + 2):
+            c._on_render_tick()
         self.assertEqual(c._takt_ms(), 137)
+
+    def test_kurze_stoerung_aendert_den_takt_nicht(self):
+        """Nachmessung 16.11.: einige langsame Bilder (UI-Thread kurz belegt)
+        hoben den Takt an und gleich wieder ab - zwei Spruenge der Blitzphase,
+        und danach ein leicht anderer Takt. Jetzt muss die Abweichung
+        STROBE_TAKT_GEDULD Feuern hintereinander anhalten."""
+        c = self.c
+        self._zeichenzeit(34)
+        self._blinkt()
+        c._on_render_tick()
+        self.assertEqual(c._takt_ms(), 104)
+        for _runde in range(3):
+            self._zeichenzeit(60)                # 182 ms: +75 %
+            for _ in range(c.STROBE_TAKT_GEDULD - 1):
+                c._on_render_tick()
+            self.assertEqual(c._takt_ms(), 104)
+            self._zeichenzeit(33)                # wieder wie vorher: die Geduld beginnt neu
+            c._on_render_tick()
+            self.assertEqual(c._takt_ms(), 104)
 
     def test_neuer_strobe_rechnet_neu(self):
         """Nach dem Nachlauf ist der gemerkte Takt weg - der naechste Strobe
@@ -197,6 +226,65 @@ class GleichmaessigTest(unittest.TestCase):
                 abst = [round((b - a) * 1000) for a, b in zip(blitze, blitze[1:])]
                 self.assertGreater(len(abst), 8)
                 self.assertEqual(len(set(abst)), 1, f"Blitzabstaende {sorted(set(abst))} ms")
+
+    def test_zwei_feuern_vor_einem_bild_zaehlen_als_eines(self):
+        """★ Nachmessung 16.11.: rund jeder zwanzigste Blitzabstand war doppelt
+        so lang. Der Zaehler zaehlte je Feuern; feuerte der Zeitgeber zweimal,
+        bevor gezeichnet war, uebersprang er ein Bild - bei der kleinsten
+        Periode (ein Bild von dreien leuchtet) fiel so der Blitz aus."""
+        c = self.c
+        self._zeichenzeit(34)
+        self._blinkt()
+        c._on_render_tick()
+        vorher = c._strobe_bild
+        self.zeichnet = False                    # UI-Thread belegt: kein Bild
+        for _ in range(2):
+            self.zeit[0] += c._update_timer.interval() / 1000.0
+            c._on_render_tick()
+        self.assertEqual(c._strobe_bild, vorher, "ohne Bild zaehlt nichts weiter")
+        c._takt_bild_zaehlen()                   # jetzt wird gezeichnet
+        self.assertEqual(c._strobe_bild, vorher + 1)
+        c._takt_bild_zaehlen()                   # Bild aus der Bedienung (Maus, Auswahl)
+        self.assertEqual(c._strobe_bild, vorher + 1)
+
+    def test_kein_blitz_faellt_aus_wenn_bilder_ausbleiben(self):
+        """Jedes fuenfte Feuern bleibt ohne Bild: trotzdem leuchtet in der
+        Folge der GEZEICHNETEN Bilder genau jedes dritte."""
+        c = self.c
+        self._zeichenzeit(34)
+        self._blinkt()
+        c._on_render_tick()
+        self.bilder.clear()
+        folge = []
+        for i in range(60):
+            self._blinkt()
+            self.zeichnet = i % 5 != 4
+            n = len(self.bilder)
+            c._on_render_tick()
+            if len(self.bilder) > n:
+                folge.append("#" if c._blink_an(10.0) else ".")
+            self.zeit[0] += c._update_timer.interval() / 1000.0
+        text = "".join(folge)
+        self.assertEqual(len(text), 48)
+        erster = text.index("#")
+        self.assertEqual(text[erster:erster + 45], "#.." * 15, text)
+
+    def test_echtes_zeichnen_zaehlt_das_takt_bild(self):
+        """Durch den echten Zeichenweg: ein Feuern + ein Bild = ein Schritt,
+        ein weiteres Bild ohne Feuern = kein Schritt."""
+        c = live_view.StageCanvas()
+        c._update_timer.stop()
+        self.addCleanup(c.deleteLater)
+        c._darf_zeichnen = lambda: True
+        c._animiert = True
+        c.resize(200, 150)
+        vorher = c._strobe_bild
+        c._on_render_tick()
+        self.assertEqual(c._strobe_bild, vorher, "der Takt meldet das Bild nur an")
+        c.grab()
+        self.assertEqual(c._strobe_bild, vorher + 1)
+        c.grab()
+        self.assertEqual(c._strobe_bild, vorher + 1)
 
     def test_anteil_bleibt_unter_der_vorgabe(self):
         c = self.c
