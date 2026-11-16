@@ -39,6 +39,7 @@ from src.core.engine.function_manager import get_function_manager
 from src.ui.menue_text import menue_text
 from src.ui.widgets.stufe_auswahl import (StufeAuswahl, setze_stufen,
                                           stufen_melder)
+from src.ui.abbau import abbau_still
 
 _ROLLE_FID = Qt.ItemDataRole.UserRole          # Funktions-ID einer Effekt-Zeile
 _ROLLE_ZAHL = Qt.ItemDataRole.UserRole + 1     # Zahl einer Stufen-Zeile
@@ -424,6 +425,7 @@ class PrioritaetenView(QWidget):
             self._neu_timer.start()
         self._wg_einschalten()
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._wg_ausschalten()

@@ -579,6 +579,17 @@ dabei mitgeschrieben) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
   und das Lesen (`src/ui/dialog_hilfe.py`). Der Waechter
   `tests/test_stab41_dialoge_freigeben.py` prueft `main_window.py` und `views/`.
   `QMessageBox`/`QInputDialog`/`QFileDialog`-Statics brauchen das nicht.
+- Ereignisse im Abbau (STAB-42): jedes Override von `hideEvent`, `closeEvent`,
+  `changeEvent`, `leaveEvent` oder `focusOutEvent` in `src/ui` bekommt
+  `@abbau_still` (`src/ui/abbau.py`). Raeumt Pythons Speicherbereinigung ein
+  Widget ab, ist sein Instanz-Woerterbuch schon leer, wenn Qt beim Zerstoeren
+  noch diese Ereignisse schickt — ein `self.<attribut>` wirft dann im gerade
+  laufenden fremden Code (z. B. einem `paintEvent`). Der Dekorator uebergeht das
+  Ereignis nur in diesem Zustand; echte Fehler bleiben laut. Eine Klasse, die
+  auch GESUND ohne Instanz-Attribute auskommt, gehoert stattdessen mit Grund in
+  die Ausnahmeliste des Waechters `tests/test_stab42_abbau_ereignisse.py`.
+  Jedes `eventFilter` in `src/ui` bekommt `@abbau_still_filter` (Ausnahmen mit
+  Grund in `FILTER_AUSNAHMEN` desselben Waechters).
 
 ## Plattform-Kompatibilitaet
 

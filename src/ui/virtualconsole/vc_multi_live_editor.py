@@ -60,6 +60,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QHBoxLayout,
 from .vc_widget import VCWidget
 from .vc_effect_meta import option_label as _option_label, prettify_option
 from src.ui.weak_slots import weak_slot
+from src.ui.abbau import abbau_still
 
 # Muss exakt dem Funktions-MIME der VC entsprechen (vc_canvas.VCCanvas._MIME_FUNCTION).
 _MIME_FUNCTION = "application/x-lightos-function"
@@ -160,6 +161,7 @@ class _EffectPreview(QWidget):
         super().showEvent(event)
         self._timer.start()
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._timer.stop()
@@ -379,6 +381,7 @@ class _TempoControl(QWidget):
         super().showEvent(event)
         self._timer.start()
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._timer.stop()
@@ -667,6 +670,7 @@ class VCMultiLiveEditor(VCWidget):
             QTimer.singleShot(0, self._deferred_show_refresh)
         self._drift_timer.start()
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._drift_timer.stop()

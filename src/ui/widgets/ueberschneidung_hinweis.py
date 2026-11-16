@@ -42,6 +42,7 @@ from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import QAbstractScrollArea, QLabel, QSizePolicy
 
 from src.core.engine import ueberschneidung
+from src.ui.abbau import abbau_still_filter
 
 HINWEIS_STIL = ("QLabel#vcUeberschneidungsHinweis { background:#3a3214; "
                 "color:#f2d675; border:1px solid #8a7426; border-radius:4px; "
@@ -624,6 +625,7 @@ class UeberschneidungsHinweis(QLabel):
         except RuntimeError:
             pass                        # Zeile oder Rollbereich schon abgebaut
 
+    @abbau_still_filter
     def eventFilter(self, obj, event):
         if obj is self._rollflaeche and event.type() == QEvent.Type.Resize:
             self._an_sichtbare_breite_halten()

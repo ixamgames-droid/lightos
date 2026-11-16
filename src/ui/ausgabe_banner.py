@@ -43,6 +43,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
+from src.ui.abbau import abbau_still, abbau_still_filter
 
 ART_KEIN = ""
 ART_STOERUNG = "stoerung"
@@ -666,6 +667,7 @@ class AusgabeBanner(_FolgtAnsicht, QLabel):
         self._kuerze()
         self.raise_()
 
+    @abbau_still_filter
     def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
         if ((obj is self._anker and ev.type() in _ANKER_EREIGNISSE)
                 or self._ist_platz_ereignis(obj, ev)
@@ -703,6 +705,7 @@ class AusgabeBanner(_FolgtAnsicht, QLabel):
         super().focusInEvent(ev)
         self.update()
 
+    @abbau_still
     def focusOutEvent(self, ev):  # noqa: N802 (Qt-Name)
         super().focusOutEvent(ev)
         self.update()
@@ -826,6 +829,7 @@ class AusgabeChip(_FolgtAnsicht, QLabel):
         links = feld.left() + feld.width() - CHIP_RAND - breite
         return QRect(links, oben, breite, hoehe)
 
+    @abbau_still_filter
     def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
         if ((obj is self._anker and ev.type() in _ANKER_EREIGNISSE)
                 or self._ist_platz_ereignis(obj, ev)

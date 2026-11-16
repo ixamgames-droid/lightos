@@ -2,6 +2,7 @@
 from __future__ import annotations
 import json
 from src.core.stage.einmessen import effektive_nullpunkte   # VIZ-55
+from src.ui.abbau import abbau_still
 _PT_ATTRS = frozenset(("pan", "tilt", "pan_fine", "tilt_fine"))
 
 
@@ -4397,6 +4398,7 @@ class LiveView(QWidget):
         self._set_views_active(True)
         QTimer.singleShot(0, self._position_minimap)
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._set_views_active(False)

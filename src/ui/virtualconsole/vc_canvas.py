@@ -11,6 +11,7 @@ from .vc_widget import VCWidget, KENNUNG_FELD
 from src.ui.widgets.ueberschneidung_hinweis import belegung_geaendert   # ENG-41
 from src.core import undo as _verlauf      # UI-93: gemeinsame Schrittnummern
 from src.ui.ziehen_scrollen import FingerHalten, ist_touch   # UI-117
+from src.ui.abbau import abbau_still
 
 
 WIDGET_REGISTRY: dict[str, type] = {}
@@ -296,6 +297,7 @@ class VCCanvas(QWidget):
             out.append((label, msg_type, channel, data1))
         return out
 
+    @abbau_still
     def closeEvent(self, event):
         self._teardown_midi()
         self._teardown_keyboard()

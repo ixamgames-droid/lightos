@@ -17,6 +17,7 @@ from src.core.dmx.fernsteuerung import (
     ZIEL_STOP, TASTEN_ZIELE, Konfig, Zuordnung,
 )
 from src.ui.widgets.tabellen_spalten import combo_breite, spalte_fest
+from src.ui.abbau import abbau_still
 
 QUELLEN_TEXT = [(QUELLE_ARTNET, "Art-Net"), (QUELLE_SACN, "sACN")]
 ZIELE_TEXT = [
@@ -98,6 +99,7 @@ class FernsteuerungBox(QGroupBox):
         for sp, texte in ((SP_QUELLE, QUELLEN_TEXT), (SP_ZIEL, ZIELE_TEXT)):
             spalte_fest(self.tabelle, sp, self._combo_breite(texte))
 
+    @abbau_still
     def changeEvent(self, ev):
         super().changeEvent(ev)
         if (ev.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange)
