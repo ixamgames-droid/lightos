@@ -19,6 +19,10 @@
 //            Strahl; `unbekannt` = neutraler Einzelstrahl.
 //   farbe    VIZ-95: [r,g,b] aus den Farb-Bereichen des Profils — NUR der
 //            Farbton der Strahlen, die Helligkeit bleibt beim Dimmer.
+//   bunt     LAS-27: der Farbkanal steht auf „bunt/mehrfarbig" — jeder Strahl
+//            (und jedes Mantel-Segment eines Musters) bekommt reihum eine
+//            Farbe aus LASER_BUNT_PALETTE, fest nach seinem Index (kein Zufall,
+//            kein Flackern). Nur der Farbton: Deckkraft/Helligkeit wie sonst.
 //   dx, dy, dz, dr   Bewegung laeuft im Geraet selbst (dynamische Bereiche
 //            der Kanaele bzw. Auto-Programm mit Geschwindigkeit > 0)
 //   tempo    0..1 (speed) — Tempo dieser Eigenbewegung
@@ -48,7 +52,10 @@ const KRANZ_STRAHLEN = 8;               // Grobform „Strahlenkranz" (VIZ-79)
 // ueberlagert sich vorn und hinten).
 export const LASER_MUSTER_MAX_KONTUR = 192;
 export const LASER_KEGEL_OPACITY = 0.22;
-const MUSTER_TAN = Math.tan(0.3);      // halber Oeffnungswinkel bei voller Groesse
+const MUSTER_TAN = Math.tan(0.3);
+// LAS-27: Farben fuer „bunt" — die gemessenen Einzelfarben des EL-400RGB MK2
+// (Profil-Farbbereiche), reihum: Rot, Gruen, Blau, Gelb, Cyan, Magenta.
+export const LASER_BUNT_PALETTE = [0xff2a2a, 0x2aff4a, 0x3a6aff, 0xffe32a, 0x2ae6ff, 0xff3ad8];      // halber Oeffnungswinkel bei voller Groesse
 
 const LASER_PITCH = 0.06;        // rad (~3,5°) nach unten — ueber den Koepfen
 const FAN_HALF = 0.35;           // halbe Faecherbreite bei voller Groesse (rad)
@@ -93,6 +100,10 @@ function kegelGeo() {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(
     new Float32Array(LASER_MUSTER_MAX_KONTUR * 9), 3));
+  // LAS-27: Eckpunkt-Farben (multipliziert mit der Materialfarbe) — weiss,
+  // ausser bei „bunt"; dann je Segment eine Palettenfarbe (kegelFarben).
+  g.setAttribute('color', new THREE.Float32BufferAttribute(
+    new Float32Array(LASER_MUSTER_MAX_KONTUR * 9).fill(1), 3));
   g.setDrawRange(0, 0);
   // Feste Huelle statt computeBoundingSphere je Musterwechsel.
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, LASER_BEAM_LENGTH / 2),
@@ -134,6 +145,7 @@ export function buildLaserRig(group, fensterZ) {
   for (let i = 0; i < LASER_MAX_BEAMS; i++) {
     const bm = new THREE.Mesh(beamGeo(), mat.clone());
     bm.userData.deckkraft = LASER_BEAM_OPACITY;
+    bm.userData.strahlIndex = i;      // LAS-27: feste Palettenfarbe bei „bunt"
     nurLicht(bm);
     pivot.add(bm);
     laserBeams.push(bm);
@@ -147,6 +159,7 @@ export function buildLaserRig(group, fensterZ) {
   pivot.add(sheet);
   laserBeams.push(sheet);
   const kegelMat = sheetMat.clone();
+  kegelMat.vertexColors = true;   // LAS-27: Segmentfarben bei „bunt"
   const kegel = new THREE.Mesh(kegelGeo(), kegelMat);
   kegel.userData.deckkraft = LASER_KEGEL_OPACITY;
   kegel.userData.kegel = true;
@@ -157,7 +170,12 @@ export function buildLaserRig(group, fensterZ) {
                 state: defaultState(), key: '',
                 muster: null, musterId: '', kegelSegmente: 0,
                 punkte: new Float32Array(LASER_MAX_BEAMS * 2), punktN: 0,
-                farbe: null, farbeObj: new THREE.Color() };
+                farbe: null, farbeObj: new THREE.Color(),
+                // LAS-27: Palette EINMAL je Rig (eigene Objekte — niemand
+                // ausserhalb kann sie umfaerben), dazu Weiss fuer den Mantel.
+                bunt: false, kegelBunt: false, kegelId: '',
+                bunte: LASER_BUNT_PALETTE.map(h => new THREE.Color(h)),
+                weiss: new THREE.Color(1, 1, 1) };
   poseLaser(rig, 0);
   return { rig, laserBeams };
 }
@@ -284,6 +302,37 @@ function setzeFarbe(rig, farbe) {
   rig.state.farbe = `${r},${g},${b}`;
 }
 
+// LAS-27: Eckpunkt-Farben des Mantels nachziehen — nur wenn „bunt" oder das
+// Muster gewechselt hat. Segment j bekommt Palettenfarbe j % 6 (Spitze und
+// beide Konturpunkte gleich: ein einfarbiges Dreieck je Segment).
+function kegelFarben(rig) {
+  const attr = rig.kegel.geometry.getAttribute('color');
+  const a = attr.array;
+  const n = rig.bunte.length;
+  for (let seg = 0; seg < rig.kegelSegmente; seg++) {
+    const c = rig.bunt ? rig.bunte[seg % n] : rig.weiss;
+    for (let v = 0; v < 3; v++) {
+      const o = seg * 9 + v * 3;
+      a[o] = c.r; a[o + 1] = c.g; a[o + 2] = c.b;
+    }
+  }
+  attr.needsUpdate = true;
+  rig.kegelBunt = rig.bunt;
+}
+
+// LAS-27: Farbe EINES Laser-Meshs fuer applyGenericColor. Bei „bunt" ein
+// Einzelstrahl seine feste Palettenfarbe (Index), der Mantel Weiss (die
+// Segmentfarben stehen in den Eckpunkten); die Flaeche und alles ohne „bunt"
+// wie bisher `farbe` (laserFarbe).
+export function laserStrahlFarbe(f, bm, farbe) {
+  const rig = f && f.laserRig;
+  if (!rig || !rig.bunt || !bm) return farbe;
+  if (bm.userData.kegel) return rig.weiss;
+  const i = bm.userData.strahlIndex;
+  if (typeof i !== 'number') return farbe;
+  return rig.bunte[i % rig.bunte.length];
+}
+
 // VIZ-95: Farbe der Laserstrahlen fuer applyGenericColor — die Profilfarbe,
 // sonst die allgemeine Geraetefarbe. Nur der Farbton: Deckkraft und
 // Sichtbarkeit rechnet der Aufrufer weiter aus der Helligkeit.
@@ -310,10 +359,16 @@ export function applyLaser(f, dmx) {
     s.tempo = zahl(L.tempo, 0, 1, 0);
     setzeMuster(rig, (L.muster && typeof L.muster === 'object') ? L.muster : null);
     setzeFarbe(rig, L.farbe);
+    rig.bunt = !!L.bunt && !rig.farbe;   // eine gemessene Farbe hat Vorrang
   } else {
     Object.assign(s, defaultState());
     setzeMuster(rig, null);
     setzeFarbe(rig, null);
+    rig.bunt = false;
+  }
+  if (rig.bunt !== rig.kegelBunt || rig.kegelId !== rig.musterId) {
+    rig.kegelId = rig.musterId;
+    kegelFarben(rig);
   }
   // Nur neu setzen, wenn sich etwas geaendert hat (DMX kommt im Takt, auch
   // wenn der Laser steht); bewegte Laser setzt der Frame-Takt.
@@ -385,6 +440,7 @@ export function laserInfo(fid, t) {
     punkte: rig.muster && !rig.muster.unbekannt ? rig.punktN : 0,
     kegelSkala: [rig.kegel.scale.x, rig.kegel.scale.y],
     farbe: rig.state.farbe,
+    bunt: !!rig.bunt,
     yaw: rig.pivot.rotation.y, pitch: rig.pivot.rotation.x, roll: rig.pivot.rotation.z,
     bewegt: _bewegt.has(Number(fid)),
     animationAktiv: laserAnimationAktiv(),

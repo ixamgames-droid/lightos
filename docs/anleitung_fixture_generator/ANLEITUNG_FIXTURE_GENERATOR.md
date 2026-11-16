@@ -406,9 +406,13 @@ von einer VC-Taste) nimmt nur Moving Heads.
 
 ![3D-Visualizer mit dem Laser](img/10_3d_laser.png)
 
-Die 3D-Ansicht zeichnet die Strahlen nach Position, Größe und Betriebsart. Die
-echten Muster des Geräts kennt sie nicht, und weil das Handbuch für Kanal 8 nur
-„0–255 Farbe“ nennt, erscheinen die Strahlen weiß.
+Die 3D-Ansicht zeichnet die Strahlen nach Position, Größe und Betriebsart.
+Ohne Laser-Seiten kennt sie die echten Muster des Geräts nicht, und weil das
+Handbuch für Kanal 8 nur „0–255 Farbe“ nennt, erscheinen die Strahlen weiß.
+Sind die Laser-Seiten ausgefüllt (Muster, Farben), zeichnet sie das gewählte
+Muster in der eingetragenen Farbe; steht die Farbe auf **„bunt“** (beim
+EL-400RGB MK2 Kanal 8 auf 0–1), sind die Strahlen mehrfarbig — reihum Rot,
+Grün, Blau, Gelb, Cyan und Magenta, jeder Strahl immer in derselben Farbe.
 
 ---
 
