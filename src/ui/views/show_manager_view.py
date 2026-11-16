@@ -28,6 +28,8 @@ ZOOM_SCHRITT = 1.25
 #: UI-117/UI-124 (Touch-Audit D-05): Mindestgroesse der Knoepfe am Finger
 #: (Kopfleiste, Spur-Stumm). Die Maus behaelt die kompakten Masse.
 TOUCH_KNOPF = 36
+#: UI-139 (Klick-Test 16.11.2026, Fund 3): Transportknoepfe am Finger.
+TRANSPORT_KNOPF_TOUCH = 44
 TRACK_H = 40             # pixels per track row
 RULER_H = 24             # pixels for time ruler
 TRACK_LABEL_W = 150      # width of left track label panel
@@ -389,6 +391,9 @@ class TimelineCanvas(QWidget):
                 pass
 
         def _weg():
+            if show is not None:
+                # CDX-75: ein gerade laufender Block nimmt sein Kind mit.
+                show.block_kind_beenden(sf)
             track.show_functions[:] = [x for x in track.show_functions if x is not sf]
             if show is not None:
                 show.recalc_duration()
@@ -772,6 +777,13 @@ class ShowManagerView(QWidget):
         # zähmt die Schrift, Mindestbreiten halten die Buttons kompakt UND
         # vollständig (Höhe wächst unter Touch ohnehin auf eine Touch-Größe).
         _tp_css = "QPushButton { font-size:13px; padding:4px 12px; }"
+        touch = is_touch_mode()
+        if touch:
+            # UI-139 (Klick-Test, Fund 3): am Finger >= 44 px. Die Hoehe steht
+            # im eigenen Stil — das Fenster-Stylesheet (``min-height: 38px``
+            # + Innenabstand) schlaegt sonst ``setMinimumHeight``.
+            _tp_css = ("QPushButton { font-size:13px; padding:0 12px; "
+                       f"min-height:{TRANSPORT_KNOPF_TOUCH - 2}px; }}")
 
         self._btn_rewind = QPushButton("|<<")
         self._btn_rewind.setStyleSheet(_tp_css)
@@ -807,7 +819,10 @@ class ShowManagerView(QWidget):
         transport.addWidget(self._lbl_time)
 
         transport_widget = QWidget()
-        transport_widget.setFixedHeight(38)
+        # UI-139 (Fund 3): Leiste so hoch wie ihre Knoepfe — vorher fest 38 px,
+        # die Touch-Knoepfe (48 px) ragten unter die Befehlszeile.
+        transport_widget.setFixedHeight(
+            TRANSPORT_KNOPF_TOUCH + 8 if touch else 38)
         transport_widget.setLayout(transport)
         root.addWidget(transport_widget)
 
@@ -961,9 +976,24 @@ class ShowManagerView(QWidget):
         self._lbl_time.setText(f"{mins:02d}:{secs:02d}.{ms:03d}")
 
     def _refresh_ui(self):
-        """Refresh show list if new shows were added from FunctionManager."""
+        """Refresh show list if new shows were added from FunctionManager.
+
+        UI-139 (Klick-Test, Fund 12): verglichen werden die IDs, nicht nur die
+        Anzahl (eine andere Show-Datei mit gleich vielen Shows), und danach
+        steht in der Zeitleiste dieselbe Show wie in der Auswahl. Vorher
+        fuellte das die Auswahl bei blockierten Signalen — sie zeigte eine
+        Show, die Zeitleiste meldete „Keine Timeline-Show ausgewählt“."""
         shows = self._fm.by_type(FunctionType.Show)
-        if self._show_combo.count() != len(shows):
+        ids = [s.id for s in shows]
+        in_auswahl = [self._show_combo.itemData(i)
+                      for i in range(self._show_combo.count())]
+        # Nachbesserung UI-139: auch die Namen vergleichen — eine andere
+        # Show-Datei behaelt beim Laden ihre IDs (from_dict), dann stuenden
+        # sonst die alten Namen in der Auswahl.
+        namen = [s.name for s in shows]
+        alt_namen = [self._show_combo.itemText(i)
+                     for i in range(self._show_combo.count())]
+        if in_auswahl != ids or alt_namen != namen:
             current_id = self._show_combo.currentData()
             self._show_combo.blockSignals(True)
             self._show_combo.clear()
@@ -975,6 +1005,28 @@ class ShowManagerView(QWidget):
                 if idx >= 0:
                     self._show_combo.setCurrentIndex(idx)
             self._show_combo.blockSignals(False)
+        cur = self._current_show
+        gewaehlt = self._show_combo.currentData()
+        # Eine gezeigte Show bleibt, solange sie nicht aus der Liste verschwand
+        # (auch eine von aussen per ``_load_show`` gezeigte, die nicht im
+        # FunctionManager steht).
+        # Nachbesserung UI-139: „verschwunden" heisst auch „unter derselben ID
+        # steht jetzt ein anderes Show-Objekt" (andere Show-Datei geladen).
+        entfernt = (cur is not None and cur.id in in_auswahl
+                    and self._fm.get(cur.id) is not cur)
+        if cur is not None and not entfernt:
+            return
+        if entfernt and self._playing:
+            self._stop()                     # Show gibt es nicht mehr
+        show = self._fm.get(gewaehlt) if gewaehlt is not None else None
+        if isinstance(show, Show):
+            self._load_show(show)
+        elif cur is not None:
+            self._current_show = None
+            self._timeline._auswahl_setzen(None)
+            self._refresh_track_panel()
+            self._timeline.update()
+            self._timeline.updateGeometry()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

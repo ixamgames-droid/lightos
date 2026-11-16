@@ -204,7 +204,9 @@ SPRECH_REGLER: tuple[tuple[str, str, str, str, dict | None], ...] = (
 #: gibt es das Modul nicht — dann bleibt das Abzeichen der Sicherheitsleiste
 #: weg. Bewusst KEIN Import am Dateianfang.
 SPERRZONEN_MODUL = "src.core.laser.sperrzonen"
-NUR_ANZEIGE = "Nur Anzeige · schaltet nicht ab"
+#: UI-139 (Klick-Test 16.11.2026, Fund 23): sagt jetzt, WAS nicht abschaltet
+#: — vorher „Nur Anzeige · schaltet nicht ab“ (unklar, wer was nicht abschaltet).
+NUR_ANZEIGE = "Nur Anzeige · schaltet den Laser nicht ab"
 #: Meldung je Laser (LAS-32) und Planer (LAS-35) — ebenfalls nur als Text
 #: genannt und erst zur Laufzeit gesucht: fehlt eines der Module, fehlt im
 #: Tab genau das zugehoerige Bedienelement (kein toter Knopf).

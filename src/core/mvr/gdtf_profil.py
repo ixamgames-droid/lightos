@@ -104,8 +104,29 @@ def _ranges(k: GdtfKanal) -> list[dict]:
             continue
         aus.append({"range_from": f.von, "range_to": bis,
                     "name": f.name or f.attribut or "",
-                    "kind": _ART.get((f.attribut or "").casefold(), "")})
+                    "kind": _art(f)})
     return aus
+
+
+def _art(f) -> str:
+    """CDX-73: die Art aus einem LightOS-Export gilt (auch leer); sonst aus
+    dem Attribut der ChannelFunction abgeleitet."""
+    if f.art is not None:
+        from src.core.database.bibliothek_format import RANGE_ARTEN
+        return f.art if f.art in RANGE_ARTEN else ""
+    return _ART.get((f.attribut or "").casefold(), "")
+
+
+def _default_bytes(k: GdtfKanal) -> list[int]:
+    """CDX-73: Standardwert je Offset (grob zuerst). Weicht die Byteanzahl
+    des Werts von der Offsetzahl ab, wird er links ausgerichtet (fehlende
+    Fein-Bytes 0, ueberzaehlige abgeschnitten)."""
+    n = len(k.offsets)
+    if k.default_roh is None:
+        return [k.default] + [0] * (n - 1)
+    roh, b = k.default_roh, max(1, k.default_bytes)
+    roh = roh >> (8 * (b - n)) if b > n else roh << (8 * (n - b))
+    return [(roh >> (8 * (n - 1 - i))) & 0xFF for i in range(n)]
 
 
 def modus_payload(modus: GdtfModus) -> dict:
@@ -115,20 +136,21 @@ def modus_payload(modus: GdtfModus) -> dict:
     for k in modus.kanaele:
         attr = lightos_attribut(k.attribut)
         name = _kanal_name(k, mehrere)
+        defaults = _default_bytes(k)
         for stufe, offset in enumerate(k.offsets):
             if offset in belegt:
                 continue        # doppelt belegter Offset: der erste gilt
             if stufe == 0:
                 eintrag = {"name": name, "attribute": attr,
-                           "default_value": k.default,
+                           "default_value": defaults[0],
                            "ranges": _ranges(k)}
             elif stufe == 1:
                 fein = {"pan": "pan_fine", "tilt": "tilt_fine"}.get(attr, "raw")
                 eintrag = {"name": f"{name} fein", "attribute": fein,
-                           "default_value": 0, "ranges": []}
+                           "default_value": defaults[1], "ranges": []}
             else:
                 eintrag = {"name": f"{name} ultra", "attribute": "raw",
-                           "default_value": 0, "ranges": []}
+                           "default_value": defaults[stufe], "ranges": []}
             belegt[offset] = eintrag
     kanalzahl = modus.kanalzahl
     kanaele = []

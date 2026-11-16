@@ -28,6 +28,7 @@ How you use the pad during operation depends on the mode. A left-click/drag righ
 - **Clicking into the field** sets pan/tilt immediately to the clicked spot — the fixtures jump there.
 - **Dragging** moves pan/tilt continuously along with the mouse (live movement).
 - The dot and the `P:`/`T:` percentage display follow the movement.
+- With the **Relativ** (relative) option (see settings) the dot does not jump when you touch down: dragging moves it from its current position, at only half the speed of the finger — handy for fine control on a touchscreen.
 
 **Mode „Feld"** (`[Feld]`):
 - **Dragging out a rectangle** (press, drag, release) marks an area. On release, this sets the **center** (`x_offset`/`y_offset`) and **size** (`width`/`height`) of the target effect — the effect runs its figure (e.g. a figure eight) exactly within this field.
@@ -64,6 +65,7 @@ Double-clicking the pad (in edit mode) opens the „XY Pad Einstellungen" (XY pa
 | **Pan-Attribut** (pan attribute) | Programmer attribute for the horizontal axis. | Free text, default `pan` (empty → `pan`) |
 | **Tilt-Attribut** (tilt attribute) | Programmer attribute for the vertical axis. | Free text, default `tilt` (empty → `tilt`) |
 | **Auflösung** (resolution) | 16-bit mode: additionally writes the fine channels `pan_fine`/`tilt_fine` for smooth movement. Fixtures without a fine channel ignore the extra value. | Checkbox „16-bit (Fine-Kanäle pan_fine/tilt_fine)" (16-bit (fine channels pan_fine/tilt_fine)); off = classic 8-bit |
+| **Bedienung** (operation) | Position mode only: the checkbox „Relativ (Punkt springt nicht, folgt halb so schnell)" (relative: the dot does not jump, follows at half speed) switches on relative operation. | Checkbox; off (default) = the dot jumps to the touched spot |
 | **Fixture-IDs (Position)** | Fixed target fixtures in position mode. Empty = current selection, otherwise all patched. | Comma-separated numbers (e.g. `1, 2, 3, 4, 5, 6`) |
 | **EFX-ID (Feld-Modus)** (EFX ID (field mode)) | Target effect ID for field/path mode, as a number. | Number; empty = active effect |
 | **Steuert** (controls) | Select the target effect for field/path mode from a dropdown instead of typing the ID. Takes precedence over „EFX-ID". | Drop-down list, one effect; empty = active effect |

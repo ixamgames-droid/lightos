@@ -69,6 +69,19 @@ eine gemeinsame Schnittstelle (`effect_live`). Dieselbe Bindung nutzt auch MIDI.
 **Touch-Lock.** Sperrt im Betrieb Maus/Touch (reine Anzeige, schützt vor versehentlichem
 Antippen) — **MIDI/APC steuert weiter**.
 
+**Gesten am Touchscreen.** Mit `--touch` gibt es auf der Virtual Console drei Gesten, die du unter
+**Ansicht → Touch-Gesten…** einzeln abschalten kannst:
+
+- **Halten + Antippen:** Im Bearbeiten-Modus einen Finger auf einem Element liegen lassen und
+  mit einem zweiten Finger weitere antippen — so wählst du mehrere aus (wie der Umschalter
+  **Mehrfach**).
+- **Bank wischen:** Auf freier Fläche mit zwei Fingern waagerecht wischen — nach links =
+  nächste Bank, nach rechts = vorherige. Das gilt nie, wenn ein Finger auf einem Fader oder
+  Knopf liegt.
+- **Drei Finger tippen:** führt die Aktion aus, die du im selben Dialog wählst (Vorgabe:
+  nichts; zur Wahl stehen „Programmer leeren“, „Nächste Page“ und „Vorherige Page“).
+  BLACKOUT oder STOP ALL gibt es dort bewusst nicht.
+
 ---
 
 ## Die 19 Bedien-Elemente

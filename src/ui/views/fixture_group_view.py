@@ -1,12 +1,13 @@
 """Fixture Group View - 2D grid where fixtures are placed (drag&drop)."""
 from __future__ import annotations
 import json
+import re
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTreeWidget, QTreeWidgetItem,
     QPushButton, QComboBox, QSpinBox, QInputDialog, QMessageBox, QGroupBox,
     QFormLayout, QFrame, QSizePolicy, QGridLayout,
     QDialog, QListWidget, QListWidgetItem, QAbstractItemView, QDialogButtonBox,
-    QMenu,
+    QMenu, QApplication, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
 )
 from PySide6.QtCore import Qt, QMimeData, QSize, QPoint, QRect, Signal
 from PySide6.QtGui import (
@@ -859,6 +860,45 @@ class FixtureGridWidget(QWidget):
 
 # ── Fixture Tree with Drag ────────────────────────────────────────────────────
 
+class _GeraeteNameDelegat(QStyledItemDelegate):
+    """CDX-74: Kuerzung, die die Geraetenummer nie anschneidet.
+
+    Eintraege wie ``[013] PAR Tri LED RGBW`` behalten bei Platzmangel immer
+    das ``[013] ``-Praefix; gekuerzt wird nur der Name, und zwar mittig
+    (QOL-03: der unterscheidende Namens-Schwanz bleibt sichtbar). Andere
+    Zeilen (Universe-Ordner) kuerzt Qt rechts (``textElideMode``)."""
+
+    _PRAEFIX = re.compile(r"^(\[\d+\]\s+)(.+)$", re.S)
+
+    def angezeigter_text(self, opt, breite: int) -> str:
+        text = opt.text or ""
+        fm = opt.fontMetrics
+        w = opt.widget
+        stil = w.style() if w is not None else QApplication.style()
+        # Qt zieht vom Text-Rechteck je Seite (Fokusrahmen-Rand + 1) ab.
+        rand = stil.pixelMetric(QStyle.PixelMetric.PM_FocusFrameHMargin, None, w) + 1
+        frei = int(breite) - 2 * rand
+        if fm.horizontalAdvance(text) <= frei:
+            return text
+        m = self._PRAEFIX.match(text)
+        if not m:
+            return text                     # Qt kuerzt selbst (textElideMode)
+        praefix, name = m.group(1), m.group(2)
+        rest = frei - fm.horizontalAdvance(praefix)
+        if rest <= fm.horizontalAdvance("…"):
+            return fm.elidedText(text, Qt.TextElideMode.ElideRight, frei)
+        return praefix + fm.elidedText(name, Qt.TextElideMode.ElideMiddle, rest)
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        w = opt.widget
+        stil = w.style() if w is not None else QApplication.style()
+        flaeche = stil.subElementRect(QStyle.SubElement.SE_ItemViewItemText, opt, w)
+        opt.text = self.angezeigter_text(opt, flaeche.width())
+        stil.drawControl(QStyle.ControlElement.CE_ItemViewItem, opt, painter, w)
+
+
 class FixtureTreeWithDrag(QTreeWidget):
     """QTreeWidget mit Universe-Ordnern als Top-Level-Items.
 
@@ -869,10 +909,17 @@ class FixtureTreeWithDrag(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setHeaderHidden(True)
-        # QOL-03: laenger Namen mittig kuerzen (statt rechts) — so bleibt der
-        # unterscheidende Namens-Schwanz sichtbar (`[013] PAR …RGBW` statt
-        # `[013] PAR T…`); der Vollname haengt zusaetzlich im Tooltip.
-        self.setTextElideMode(Qt.TextElideMode.ElideMiddle)
+        # QOL-03 + CDX-74: Geraetezeilen kuerzt der Delegat — das Praefix
+        # `[013] ` bleibt immer ganz, der Name wird mittig gekuerzt (der
+        # unterscheidende Schwanz bleibt sichtbar: `[013] PAR …RGBW`). Die
+        # mittige Qt-Kuerzung schnitt vorher in der schmalen Buehnen-Leiste die
+        # Nummer an (`[00…R 1`). Alles andere kuerzt Qt rechts. Der Vollname
+        # haengt zusaetzlich im Tooltip.
+        self.setTextElideMode(Qt.TextElideMode.ElideRight)
+        self.setItemDelegate(_GeraeteNameDelegat(self))
+        # CDX-74: 12 statt 20 px Einzug je Ebene — die Liste lebt in 190 bzw.
+        # 260 px breiten Leisten; Universe-Ordner -> Geraet bleibt erkennbar.
+        self.setIndentation(12)
         self.setDragEnabled(True)
         self.setSelectionMode(QTreeWidget.SelectionMode.SingleSelection)
         self.setStyleSheet("""
@@ -882,6 +929,7 @@ class FixtureTreeWithDrag(QTreeWidget):
                 border: 1px solid #333;
                 border-radius: 4px;
             }
+            QTreeWidget::item { padding-left: 2px; padding-right: 2px; }
             QTreeWidget::item:hover { background: #2a2a3a; }
             QTreeWidget::item:selected { background: #0978FF; color: #fff; }
         """)

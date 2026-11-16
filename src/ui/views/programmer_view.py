@@ -41,6 +41,16 @@ from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from src.ui import dialog_hilfe
 
+#: UI-139 (Klick-Test 16.11.2026, Fund 15): Hilfeknopf am Finger.
+HILFE_KNOPF_TOUCH = 44
+#: UI-139 (Fund 6): unter dieser Hoehe des Programmers klappt die Lampen-
+#: Vorschau auf dem Matrix-Reiter von selbst zu (der eingebettete Matrix-
+#: Editor bekam bei 1280 x 800 am Finger sonst nur ~180 px). Gemessen an der
+#: Hoehe, die der Programmer im Hauptfenster bei 1280 x 800 / 1366 x 768
+#: (Touch) bzw. 1366 x 768 (Maus) bekommt; bei 1920 x 1080 bleibt sie offen.
+MATRIX_PLATZ_TOUCH = 800
+MATRIX_PLATZ_MAUS = 700
+
 # ── UI-Praeferenzen (Layout-Modus, eingeklappte Zonen) ───────────────────────
 _PREFS_DIR = app_data_dir()
 _PREFS_PATH = os.path.join(_PREFS_DIR, "ui_prefs.json")
@@ -350,8 +360,18 @@ class ProgrammerView(QWidget):
         # auf ein Bedienelement zeigt dessen Hilfetext (setWhatsThis) als Sprechblase,
         # statt die Aktion auszuloesen. Esc beendet den Modus.
         self._btn_help = QPushButton("?")
-        self._btn_help.setFixedHeight(26)
-        self._btn_help.setFixedWidth(30)
+        if self._is_touch():
+            # UI-139 (Klick-Test, Fund 15): am Finger 44 x 44 px und ohne den
+            # Touch-Innenabstand (14 px je Seite) — der frass bei 30 px Breite
+            # das „?“, der Knopf war leer. Hoehe im eigenen Stil, sonst
+            # schlaegt sie das Fenster-Stylesheet.
+            self._btn_help.setFixedSize(HILFE_KNOPF_TOUCH, HILFE_KNOPF_TOUCH)
+            self._btn_help.setStyleSheet(
+                "QPushButton { padding: 0; font-size: 16px; "
+                f"min-height: {HILFE_KNOPF_TOUCH - 2}px; }}")
+        else:
+            self._btn_help.setFixedHeight(26)
+            self._btn_help.setFixedWidth(30)
         self._btn_help.setToolTip(
             "Hilfe-Modus: danach auf ein Bedienelement klicken, um seine "
             "Erklärung zu sehen (Esc beendet)."
@@ -400,6 +420,8 @@ class ProgrammerView(QWidget):
         # LAS-34: Lampen-Vorschau für reine Laser von selbst zugeklappt?
         self._vorschau_auto_zu = False
         self._vorschau_vorher = False
+        # LAS-34 / UI-139: Gruende fuer das automatische Zuklappen
+        self._vorschau_grund_laser = False
         self._effects_list = None
         self._body = QWidget()
         self._root.addWidget(self._body, stretch=1)
@@ -644,6 +666,7 @@ class ProgrammerView(QWidget):
             self._state.set_programmer_focus(key)
         except Exception as e:
             print(f"[programmer_view] tab-focus error: {e}")
+        self._vorschau_auto_anwenden()          # UI-139: Matrix-Reiter
 
     def _make_snap_panel(self) -> QWidget:
         """RECHTS: Snap-/Datei-Browser (LAYOUT-04)."""
@@ -1749,18 +1772,49 @@ class ProgrammerView(QWidget):
         Vorschau wieder so da wie vorher."""
         try:
             self._color_preview.setVisible(not reiner_laser)
+            self._vorschau_grund_laser = bool(reiner_laser)
+            self._vorschau_auto_anwenden()
+        except RuntimeError:
+            pass
+
+    def _matrix_platz_knapp(self) -> bool:
+        """UI-139 (Klick-Test, Fund 6): Matrix-Reiter offen und der Programmer
+        so niedrig, dass der eingebettete Matrix-Editor mit offener Lampen-
+        Vorschau nicht mehr bedienbar ist (1280 x 800 am Finger: ~180 px)."""
+        try:
+            tabs = getattr(self, "_main_tabs", None)
+            idx = getattr(self, "_matrix_tab_index", -1)
+            if tabs is None or idx < 0 or tabs.currentIndex() != idx:
+                return False
+            grenze = MATRIX_PLATZ_TOUCH if self._is_touch() else MATRIX_PLATZ_MAUS
+            return 0 < self.height() < grenze
+        except RuntimeError:
+            return False
+
+    def _vorschau_auto_anwenden(self):
+        """LAS-34 / UI-139: Lampen-Vorschau von selbst zu, solange ein Grund
+        besteht (reiner Laser gewaehlt; Matrix-Reiter bei knapper Hoehe).
+        Das Zuklappen wird nicht gemerkt; faellt der letzte Grund weg, steht
+        die Vorschau wieder so da wie vorher."""
+        try:
             tp = getattr(self, "_tile_preview", None)
             if tp is None:
                 return
-            if reiner_laser and not self._vorschau_auto_zu:
+            soll = (getattr(self, "_vorschau_grund_laser", False)
+                    or self._matrix_platz_knapp())
+            if soll and not self._vorschau_auto_zu:
                 self._vorschau_vorher = tp.is_collapsed()
                 self._vorschau_auto_zu = True
                 tp.set_collapsed(True)          # ohne Signal: nichts gemerkt
-            elif not reiner_laser and self._vorschau_auto_zu:
+            elif not soll and self._vorschau_auto_zu:
                 self._vorschau_auto_zu = False
                 tp.set_collapsed(self._vorschau_vorher)
         except RuntimeError:
             pass
+
+    def resizeEvent(self, event):  # noqa: N802 (Qt-Name)
+        super().resizeEvent(event)
+        self._vorschau_auto_anwenden()          # UI-139: Hoehe geaendert
 
     @staticmethod
     def _ist_laser(fx) -> bool:

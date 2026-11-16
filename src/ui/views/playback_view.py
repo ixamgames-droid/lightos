@@ -18,6 +18,21 @@ from src.ui import dialog_hilfe
 
 CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
+#: UI-139 (Klick-Test 16.11.2026, Fund 4): Masse am Finger (Touch-Modus).
+#: Mit der Maus bleiben Page-Knoepfe, Executor-Tasten und Zahnrad wie bisher.
+PAGE_KNOPF_TOUCH = (48, 44)
+EXEC_TASTE_TOUCH = 44
+ZAHNRAD_TOUCH = 32
+
+
+def touch_aktiv() -> bool:
+    """Touch-Modus des Hauptfensters (``--touch``)."""
+    try:
+        from src.ui.touch_keyboard import is_touch_mode
+        return bool(is_touch_mode())
+    except Exception:
+        return False
+
 
 class PlaybackView(QWidget):
     # Engine meldet Page-Wechsel ggf. aus einem Worker-Thread (MIDI-RX). Das
@@ -95,12 +110,26 @@ class PlaybackView(QWidget):
         page_row.setSpacing(2)
         page_row.addWidget(QLabel("Page:"))
         self._page_buttons: list[QPushButton] = []
+        touch = touch_aktiv()
         for i in range(10):
             btn = QPushButton(str(i + 1))
-            btn.setFixedSize(34, 26)
             btn.setCheckable(True)
+            # UI-139 (Klick-Test, Fund 4): eigener schmaler Innenabstand — mit
+            # dem Innenabstand des Themes (im Touch-Modus 14 px je Seite) blieb
+            # von „10“ nur „(“. Am Finger 48 × 44 px; die Hoehe steht im
+            # eigenen Stil, sonst schlaegt sie das Fenster-Stylesheet.
+            if touch:
+                btn.setFixedSize(*PAGE_KNOPF_TOUCH)
+                mass = (f"padding:0; font-size:14px; "
+                        f"min-height:{PAGE_KNOPF_TOUCH[1] - 2}px;")
+            else:
+                btn.setFixedSize(34, 26)
+                # Nachbesserung: oben/unten der Theme-Abstand (4 px) — so
+                # bleiben die Knoepfe mit der Maus 32 px hoch wie bisher.
+                mass = "padding:4px 2px;"
             btn.setStyleSheet(
-                "QPushButton { background:#2a3a4a; color:#ddd; border:1px solid #4a5a6a; }"
+                "QPushButton { background:#2a3a4a; color:#ddd; border:1px solid #4a5a6a; "
+                f"{mass} }}"
                 "QPushButton:hover { background:#3a4a5a; }"
                 "QPushButton:checked { background:#ffd700; color:#000; font-weight:bold; }"
             )
@@ -195,8 +224,10 @@ class PlaybackView(QWidget):
         self._table.verticalHeader().hide()
         hdr = self._table.horizontalHeader()
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        for c in [0, 2, 3, 4, 5, 6]:
+        for c in [0, 2, 3, 4, 5]:
             hdr.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        # UI-139: „Kurve“ misst ``_kurven_spalte_anpassen`` an der Auswahl selbst.
+        hdr.setSectionResizeMode(6, QHeaderView.ResizeMode.Interactive)
         self._table.itemChanged.connect(self._on_cue_edited)
         lv.addWidget(self._table)
 
@@ -454,20 +485,73 @@ class PlaybackView(QWidget):
                                "„—“ = aus.")
             self._table.setItem(row, 7, tc_item)
         self._table.blockSignals(False)
+        self._kurven_spalte_anpassen()
         # Zeilen wurden neu aufgebaut -> Highlight im naechsten Tick neu zeichnen.
         self._last_hl_idx = None
+
+    def _kurven_spalte_anpassen(self) -> None:
+        """UI-139 (Fund 4): Spalte „Kurve“ so breit und jede Zeile so hoch wie
+        die Auswahl darin — gemessen NACH dem Polieren (Touch-Schrift 14 px).
+        Vorher schnitt die Spalte den Namen ab, und die Auswahl ragte im
+        Touch-Modus ueber ihre Zeile."""
+        t = self._table
+        breite, hoehe = 0, 0
+        for row in range(t.rowCount()):
+            cb = t.cellWidget(row, 6)
+            if cb is None:
+                continue
+            cb.ensurePolished()
+            sh = cb.sizeHint()
+            breite = max(breite, sh.width())
+            hoehe = max(hoehe, sh.height())
+        if not breite:
+            # Leere Cueliste: so breit wie die Ueberschrift (wie vorher
+            # ResizeToContents) statt der 100-px-Vorgabe.
+            hdr = t.horizontalHeader()
+            hdr.resizeSection(6, hdr.sectionSizeFromContents(6).width())
+            return
+        # Die Zelle legt die Auswahl in ihre Textflaeche — im Touch-Modus
+        # zieht der Zellen-Innenabstand des Stylesheets davon noch etwas ab.
+        rand = 0
+        try:
+            from PySide6.QtCore import QRect
+            from PySide6.QtWidgets import QStyle, QStyleOptionViewItem
+            opt = QStyleOptionViewItem()
+            t.initViewItemOption(opt)
+            opt.rect = QRect(0, 0, breite, hoehe)
+            opt.index = t.model().index(0, 6)
+            innen = t.style().subElementRect(
+                QStyle.SubElement.SE_ItemViewItemText, opt, t)
+            rand = max(0, breite - innen.width())
+        except Exception:
+            rand = 0
+        hdr = t.horizontalHeader()
+        kopf = hdr.sectionSizeFromContents(6).width()
+        hdr.resizeSection(6, max(breite + rand, kopf))
+        for row in range(t.rowCount()):
+            if t.rowHeight(row) < hoehe:
+                t.setRowHeight(row, hoehe)
 
     def _make_curve_combo(self, cue) -> QComboBox:
         """F-5: Combo zur Wahl des Fade-Verlaufs einer Cue.
         Aenderung schreibt direkt in cue.fade_curve (wird mit der Show gespeichert)."""
         combo = QComboBox()
-        for name in fade_curve.CURVE_NAMES:
-            combo.addItem(fade_curve.CURVE_LABELS[name], name)
+        # UI-139 (Fund 4): Kurzname in der engen Spalte („S-Kurve“ statt
+        # „S-Kurve (Standarc“), der lange Name als Tooltip.
+        for i, name in enumerate(fade_curve.CURVE_NAMES):
+            combo.addItem(fade_curve.kurzname(name), name)
+            combo.setItemData(i, fade_curve.CURVE_LABELS[name],
+                              Qt.ItemDataRole.ToolTipRole)
         cur = getattr(cue, "fade_curve", "scurve")
         try:
             combo.setCurrentIndex(fade_curve.CURVE_NAMES.index(cur))
         except ValueError:
             combo.setCurrentIndex(0)
+        combo.setToolTip(fade_curve.CURVE_LABELS.get(
+            combo.currentData(), "") + " — Verlauf des Überblendens")
+        combo.currentIndexChanged.connect(
+            lambda _i, cb=combo: cb.setToolTip(fade_curve.CURVE_LABELS.get(
+                cb.currentData(), "") + " — Verlauf des Überblendens"))
         # currentData() erst NACH setCurrentIndex verbinden -> kein Spurious-Fire.
         combo.currentIndexChanged.connect(
             lambda _i, c=cue, cb=combo: setattr(c, "fade_curve", cb.currentData())
@@ -861,12 +945,15 @@ class ExecutorWidget(QWidget):
     def mindestbreite(self) -> int:
         """UI-98: kleinste Breite (aus fontMetrics), bei der die drei Tasten
         und „— Leer —“ in der Auswahl ungekürzt bleiben."""
+        touch = touch_aktiv()
         f = QFont(self._fn_buttons[0].font())
-        f.setPixelSize(10)
+        f.setPixelSize(13 if touch else 10)
         f.setBold(True)
         fm = QFontMetrics(f)
         taste = max(fm.horizontalAdvance(t) for t in self.BTN_LABELS.values()) \
             + self.TASTEN_RAND
+        if touch:
+            taste = max(taste, EXEC_TASTE_TOUCH)     # UI-139: am Finger 44 px
         sp = max(0, self._btn_row.spacing())
         tasten = 3 * taste + 2 * sp
         auswahl = fm.horizontalAdvance(self._combo.itemText(0)) + self.AUSWAHL_RAND
@@ -886,9 +973,17 @@ class ExecutorWidget(QWidget):
         self._lbl.setStyleSheet("font-size: 11px; color: #aaa;")
         head.addWidget(self._lbl, 1)
         self._btn_cfg = QPushButton("⚙")
-        self._btn_cfg.setFixedSize(18, 18)
         self._btn_cfg.setToolTip("Executor konfigurieren (Label, Fader-Funktion, Tasten)")
-        self._btn_cfg.setStyleSheet("font-size: 10px; padding: 0; border: none;")
+        if touch_aktiv():
+            # UI-139 (Fund 4): am Finger 32 px (vorher 18 × 38 px, das
+            # Fenster-Stylesheet zog nur die Hoehe hoch).
+            self._btn_cfg.setFixedSize(ZAHNRAD_TOUCH, ZAHNRAD_TOUCH)
+            self._btn_cfg.setStyleSheet(
+                f"QPushButton {{ font-size: 16px; padding: 0; border: none; "
+                f"min-height: {ZAHNRAD_TOUCH}px; }}")
+        else:
+            self._btn_cfg.setFixedSize(18, 18)
+            self._btn_cfg.setStyleSheet("font-size: 10px; padding: 0; border: none;")
         self._btn_cfg.clicked.connect(self._open_config)
         head.addWidget(self._btn_cfg)
         layout.addLayout(head)
@@ -924,7 +1019,7 @@ class ExecutorWidget(QWidget):
         self._fn_buttons: list[QPushButton] = []
         for i in range(3):
             b = QPushButton()
-            b.setFixedHeight(22)
+            b.setFixedHeight(EXEC_TASTE_TOUCH if touch_aktiv() else 22)
             # UI-98: Tasten duerfen bis auf ihre Schriftbreite schrumpfen;
             # die Untergrenze stellt ExecutorWidget.mindestbreite() sicher.
             b.setMinimumWidth(0)
@@ -966,6 +1061,11 @@ class ExecutorWidget(QWidget):
             # UI-98: schmaler Innenabstand (dark.qss: 10 px) — sonst passten
             # drei Tasten bei 1000×640 nicht in einen Executor.
             style = "font-size: 10px; padding: 2px 3px;"
+            if touch_aktiv():
+                # UI-139 (Fund 4): am Finger 44 × 44 px; Hoehe im eigenen Stil,
+                # sonst schlaegt sie das Fenster-Stylesheet (38 px).
+                style = (f"font-size: 13px; padding: 0 3px; "
+                         f"min-height: {EXEC_TASTE_TOUCH - 2}px;")
             if fn == "go":
                 # UI-64d: Grün bleibt das GO-Erkennungszeichen, die Schrift
                 # aber weiß + fett — vorher #00ff00 auf #006600 (10px, dünn)

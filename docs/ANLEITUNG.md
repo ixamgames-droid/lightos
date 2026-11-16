@@ -124,11 +124,15 @@ Was im Programmer „an" ist, ist die Quelle für Szenen/Snapshots.
 
 ### 4.1 Geräte auswählen
 - **Geräte-Liste (links):** anklicken; Mehrfachauswahl mit `Strg`/`Shift`.
-  Schnellbuttons **Alle** / **Keine**.
+  Schnellbuttons **Alle** / **Keine**. Am Touchscreen (`--touch`) gibt es daneben den
+  Knopf **Mehrfach**: Eingeschaltet („Mehrfach ✓“) schaltet jeder Tipp genau eine Zeile
+  um, die übrigen bleiben gewählt; ausgeschaltet gilt wieder die normale Auswahl (die
+  bisherige bleibt stehen). Mit der Maus ist er nicht sichtbar.
 - **Gruppen-Auswahl (NEU, direkt unter der Geräte-Liste):**
   - **Einfacher Klick** auf eine Gruppe → wählt **genau diese Gruppe** aus.
   - **Doppelklick** auf eine Gruppe → **addiert** sie zur Auswahl
-    (mehrere Gruppen kombinieren).
+    (mehrere Gruppen kombinieren). Am Touchscreen schaltest du dafür **＋ Addieren** ein:
+    Dann addiert schon ein Tipp.
   - Hinter dem Namen steht die Geräteanzahl, z. B. `Moving Heads  (6)`.
   - Die Auswahl-Reihenfolge folgt der **Raster-Reihenfolge** der Gruppe –
     wichtig für das **Fächer-Werkzeug** und Lauflichter.
@@ -239,7 +243,7 @@ stehen in [EFFEKTE.md](EFFEKTE.md).
   keine Cueliste auf einem Executor, schaltet GO trotzdem weiter, es kommt aber
   kein Licht — die Statusleiste bzw. Kommandozeile warnt dann. `go 2` trifft immer
   Executor 2. „Cue aufnehmen“ (`R`) nimmt dagegen in die gewählte (sonst erste) Liste auf.
-- **Playback → Show Manager:** Funktionslisten/Shows organisieren.
+- **Playback → Show Manager:** Funktionslisten/Shows organisieren. In der Zeitleiste zoomst du mit **−** / **+** (Anzeige daneben, 100 % = 50 Pixel je Sekunde), **Strg+Mausrad** oder am Touchscreen mit zwei Fingern. Einen Block wählst du an und entfernst ihn mit dem Knopf **Block löschen**, mit **Entf** oder im Kontextmenü (Rechtsklick bzw. langes Drücken). Versehentlich gelöscht? **Bearbeiten → Rückgängig** (**Strg+Z**) holt ihn zurück.
 - **Playback → Kurven:** Dimmer-/Fade-Kurven verwalten (Linear, Ease In, Ease Out,
   S-Kurve, Snap) sowie eigene, frei gezeichnete Kurven und Kanälen zuweisen.
 
