@@ -236,6 +236,17 @@ CURVE_LABELS = {
     "ease_out": "Ease Out",
     "snap": "Snap",
 }
+#: UI-139 (Klick-Test 16.11.2026, Fund 4): kurze Namen fuer enge Spalten (die
+#: Cueliste). Der lange Name steht dort im Tooltip. Fehlt ein Eintrag, gilt
+#: der Name aus ``CURVE_LABELS``.
+CURVE_KURZ = {
+    "scurve": "S-Kurve",
+}
+
+
+def kurzname(name: str) -> str:
+    """Kurzer Anzeigename eines Fade-Verlaufs (fuer enge Spalten)."""
+    return CURVE_KURZ.get(name) or CURVE_LABELS.get(name, name)
 
 
 def eval_named(name: str, t: float) -> float:

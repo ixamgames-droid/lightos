@@ -1,11 +1,13 @@
 """Matrix View — GUI for LED grid effects (RGB/RGBW/Dimmer/Shutter)."""
 from __future__ import annotations
 from src.ui.touch_keyboard import touch_hoehe, touch_schrift  # UI-119 (C-14)
+from src.ui.touch_keyboard import is_touch_mode  # UI-139
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QListWidget, QListWidgetItem, QPushButton, QGroupBox,
                                 QFormLayout, QDoubleSpinBox, QSpinBox,
                                 QComboBox, QLineEdit, QLabel, QScrollArea,
-                                QColorDialog, QFrame, QSlider, QCheckBox, QDialog)
+                                QColorDialog, QFrame, QSlider, QCheckBox, QDialog,
+                                QGridLayout)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
 from src.core.engine.rgb_matrix import (RgbMatrixInstance, RgbAlgorithm, MatrixStyle,
@@ -34,6 +36,9 @@ from src.ui.head_cell_colors import (
 # color_order/color_interval ziehen mit color_cycle in die Farben-Gruppe um, damit
 # alle Farb-Sequenz-Steuerungen beieinander stehen (statt verstreut im Bewegungs-
 # Block). engineseitig (list_params/VC) bleiben sie unveraendert verfuegbar.
+#: UI-139 (Klick-Test 16.11.2026, Fund 6): Listen-Knoepfe am Finger.
+MATRIX_KNOPF_TOUCH = 44
+
 _PROMOTED_PARAM_KEYS = frozenset({"color_cycle", "dimmer_cycle",
                                   "color_order", "color_interval",
                                   # ENG-37: Schrittweite des Lauflichts — festes
@@ -927,17 +932,37 @@ class RgbMatrixView(QWidget):
         self._list.currentRowChanged.connect(self._select)
         ll.addWidget(self._list)
 
-        for label, cb in [("+ Neu", self._add), ("Löschen", self._delete),
-                          ("▶ Start", self._start), ("■ Stop", self._stop)]:
-            btn = QPushButton(label)
-            btn.setFixedHeight(touch_hoehe(26))
-            btn.setStyleSheet(touch_schrift("""
+        # UI-139 (Klick-Test 16.11.2026, Fund 6): am Finger stehen die vier
+        # Knoepfe 2 x 2 (44 px hoch, Hoehe im eigenen Stil — sonst machte das
+        # Fenster-Stylesheet sie 52 px hoch und sie lagen bei 1280 x 800
+        # uebereinander). Mit der Maus wie bisher untereinander.
+        touch = is_touch_mode()
+        knopf_qss = """
                 QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; }
                 QPushButton:hover { background:#30363d; }
-            """))
+            """
+        if touch:
+            knopf_qss += ("QPushButton { padding: 0 6px; "
+                          f"min-height: {MATRIX_KNOPF_TOUCH - 2}px; }}")
+        knopf_raster = QGridLayout()
+        knopf_raster.setContentsMargins(0, 0, 0, 0)
+        knopf_raster.setSpacing(4)
+        for i, (label, cb) in enumerate([("+ Neu", self._add), ("Löschen", self._delete),
+                                         ("▶ Start", self._start), ("■ Stop", self._stop)]):
+            btn = QPushButton(label)
+            btn.setFixedHeight(MATRIX_KNOPF_TOUCH if touch else touch_hoehe(26))
+            btn.setStyleSheet(touch_schrift(knopf_qss))
             btn.clicked.connect(cb)
-            ll.addWidget(btn)
+            if touch:
+                knopf_raster.addWidget(btn, i // 2, i % 2)
+            else:
+                knopf_raster.addWidget(btn, i, 0)
+        ll.addLayout(knopf_raster)
+        # Die Liste darf schrumpfen (Qt-Vorgabe ~126 px) — so passt die
+        # Spalte bei 1280 x 800 (Touch) und 1366 x 768 (Maus) ohne dass die
+        # Knoepfe sich ueberlappen.
+        self._list.setMinimumHeight(60)
 
         left.setMaximumWidth(200)
         splitter.addWidget(left)
@@ -1349,7 +1374,6 @@ class RgbMatrixView(QWidget):
         fm_.addRow("Stärke:", self._modify_strength_spin)
         # ENG-40: Kanalwahl „Wirkt auf" — feste Felder, nur im Stil RGB/RGBW
         # sichtbar. Vorgabe: die Modify-Farbe bestimmt die Kanaele (ENG-38).
-        from PySide6.QtWidgets import QGridLayout
         self._modify_kanal_box = QWidget()
         _kg = QGridLayout(self._modify_kanal_box)
         _kg.setContentsMargins(0, 0, 0, 0)

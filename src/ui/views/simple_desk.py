@@ -93,6 +93,26 @@ def channel_function_abbrev(attr: str, name: str = "") -> str:
     return n[:3] if n else ""
 
 
+def _touch() -> bool:
+    try:
+        from src.ui.touch_keyboard import is_touch_mode
+        return bool(is_touch_mode())
+    except Exception:
+        return False
+
+
+#: UI-139 (Klick-Test 16.11.2026, Fund 5): Masse am Finger. Mit der Maus
+#: bleibt der Streifen 36 x 124 px mit 12-px-Griff.
+FADER_W_TOUCH = 48
+GRIFF_TOUCH = 36
+SCHRIFT_TOUCH = 11
+
+
+def fader_breite() -> int:
+    """Breite eines Kanalstreifens fuer die aktuelle Bedienart."""
+    return FADER_W_TOUCH if _touch() else _FADER_W
+
+
 class ChannelFader(QWidget):
     """Single vertical fader for one DMX channel."""
     def __init__(self, channel: int, parent=None):
@@ -101,7 +121,16 @@ class ChannelFader(QWidget):
         self._value = 0
         self._tint_color: QColor | None = None
         self._attr_text = ""
-        self.setFixedSize(36, 124)
+        touch = _touch()
+        if touch:
+            # UI-139 (Fund 5): breiter Streifen, Hoehe waechst mit dem Platz
+            # (vorher fest 124 px, darunter blieb die Flaeche leer).
+            self.setFixedWidth(FADER_W_TOUCH)
+            self.setMinimumHeight(124)
+            self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+        else:
+            self.setFixedSize(_FADER_W, 124)
+        self._schrift = SCHRIFT_TOUCH if touch else 7
         self.setToolTip(f"CH {channel}")
 
         layout = QVBoxLayout(self)
@@ -110,30 +139,41 @@ class ChannelFader(QWidget):
 
         self._val_lbl = QLabel("0")
         self._val_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._val_lbl.setStyleSheet("color:#8b949e; font-size:8px;")
+        self._val_lbl.setStyleSheet(
+            f"color:#8b949e; font-size:{SCHRIFT_TOUCH if touch else 8}px;")
         layout.addWidget(self._val_lbl)
 
         self._slider = QSlider(Qt.Orientation.Vertical)
         self._slider.setRange(0, 255)
         self._slider.setValue(0)
-        self._slider.setStyleSheet("""
-            QSlider::groove:vertical { background:#21262d; width:8px; border-radius:4px; }
-            QSlider::handle:vertical { background:#58a6ff; height:12px; width:12px;
-                                       margin:-2px -2px; border-radius:6px; }
-            QSlider::sub-page:vertical { background:#1f6feb; border-radius:4px; }
-        """)
+        if touch:
+            g = GRIFF_TOUCH
+            self._slider.setStyleSheet(f"""
+                QSlider:vertical {{ min-width:{g + 4}px; }}
+                QSlider::groove:vertical {{ background:#21262d; width:10px; border-radius:5px; }}
+                QSlider::handle:vertical {{ background:#58a6ff; height:{g}px; width:{g}px;
+                                           margin:0 -{(g - 10) // 2}px; border-radius:{g // 2}px; }}
+                QSlider::sub-page:vertical {{ background:#1f6feb; border-radius:5px; }}
+            """)
+        else:
+            self._slider.setStyleSheet("""
+                QSlider::groove:vertical { background:#21262d; width:8px; border-radius:4px; }
+                QSlider::handle:vertical { background:#58a6ff; height:12px; width:12px;
+                                           margin:-2px -2px; border-radius:6px; }
+                QSlider::sub-page:vertical { background:#1f6feb; border-radius:4px; }
+            """)
         self._slider.valueChanged.connect(self._on_change)
-        layout.addWidget(self._slider)
+        layout.addWidget(self._slider, 1)
 
         # SD-01: kleines Funktions-Kürzel (z. B. 'R'/'Dim'); voller Name im Tooltip.
         self._attr_lbl = QLabel("")
         self._attr_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._attr_lbl.setStyleSheet("color:#adbac7; font-size:7px;")
+        self._attr_lbl.setStyleSheet(f"color:#adbac7; font-size:{self._schrift}px;")
         layout.addWidget(self._attr_lbl)
 
         self._ch_lbl = QLabel(str(channel))
         self._ch_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._ch_lbl.setStyleSheet("color:#484f58; font-size:7px;")
+        self._ch_lbl.setStyleSheet(f"color:#484f58; font-size:{self._schrift}px;")
         layout.addWidget(self._ch_lbl)
 
     def _on_change(self, val: int):
@@ -169,13 +209,14 @@ class ChannelFader(QWidget):
         self._tint_color = color
         if color is None:
             self.setStyleSheet("")
-            self._ch_lbl.setStyleSheet("color:#484f58; font-size:7px;")
+            self._ch_lbl.setStyleSheet(f"color:#484f58; font-size:{self._schrift}px;")
             return
         r, g, b = color.red(), color.green(), color.blue()
         self.setStyleSheet(
             f"ChannelFader {{ background: rgba({r},{g},{b},38); border-radius:4px; }}")
         self._ch_lbl.setStyleSheet(
-            f"color:#fff; font-size:7px; background: rgba({r},{g},{b},190); border-radius:2px;")
+            f"color:#fff; font-size:{self._schrift}px; "
+            f"background: rgba({r},{g},{b},190); border-radius:2px;")
 
     def flash(self):
         """Kurzes Aufblinken (Klick in Übersicht/Header-Band → Fader hervorheben)."""
@@ -195,7 +236,8 @@ class ChannelFader(QWidget):
 
 # ── Fixture-Header-Band (zeigt Zusammengehörigkeit über den Fadern) ───────────
 
-# Geometrie MUSS exakt zur Fader-Reihe passen (ChannelFader 36px breit,
+# Geometrie MUSS exakt zur Fader-Reihe passen (ChannelFader 36px breit, im
+# Touch-Modus 48 px — ``fader_breite()``, UI-139;
 # QHBoxLayout-Spacing 2px, linker Rand 4px) — sonst sitzen die Balken schief.
 _FADER_W       = 36
 _FADER_SPACING = 2
@@ -215,7 +257,8 @@ class FixtureHeaderBand(QWidget):
         # (start, count, QColor, label)
         self._spans: list[tuple[int, int, QColor, str]] = []
         self.setFixedHeight(26)
-        self._row_width = _FADER_MARGIN * 2 + 512 * _FADER_W + 511 * _FADER_SPACING
+        w = fader_breite()                  # UI-139: im Touch-Modus breiter
+        self._row_width = _FADER_MARGIN * 2 + 512 * w + 511 * _FADER_SPACING
         self.setFixedWidth(self._row_width)
         self.setMouseTracking(True)
 
@@ -226,13 +269,13 @@ class FixtureHeaderBand(QWidget):
     @staticmethod
     def _x_for(channel: int) -> int:
         """Linke Kante der Fader-Spalte für DMX-Kanal (1-basiert)."""
-        return _FADER_MARGIN + (channel - 1) * _FADER_STRIDE
+        return _FADER_MARGIN + (channel - 1) * (fader_breite() + _FADER_SPACING)
 
     def _fixture_at(self, x: int):
         for span in self._spans:
             start, count = span[0], span[1]
             x0 = self._x_for(start)
-            x1 = self._x_for(start + count - 1) + _FADER_W
+            x1 = self._x_for(start + count - 1) + fader_breite()
             if x0 <= x <= x1:
                 return span
         return None
@@ -268,7 +311,7 @@ class FixtureHeaderBand(QWidget):
         h = self.height()
         for start, count, color, label in self._spans:
             x0 = self._x_for(start)
-            x1 = self._x_for(start + count - 1) + _FADER_W
+            x1 = self._x_for(start + count - 1) + fader_breite()
             w = x1 - x0
             rect = QRectF(x0 + 0.5, 3.5, w - 1, h - 7)
             fill = QColor(color)
@@ -798,8 +841,12 @@ class SimpleDeskView(QWidget):
             f.value_changed = lambda val, c=ch: self._on_fader_change(c, val)
             grid.addWidget(f)
             self._faders.append(f)
-        outer.addWidget(fader_row, 0, Qt.AlignmentFlag.AlignLeft)
-        outer.addStretch(1)
+        if _touch():
+            # UI-139 (Fund 5): die Fader fuellen die Hoehe (statt leerer Flaeche)
+            outer.addWidget(fader_row, 1, Qt.AlignmentFlag.AlignLeft)
+        else:
+            outer.addWidget(fader_row, 0, Qt.AlignmentFlag.AlignLeft)
+            outer.addStretch(1)
 
         scroll.setWidget(fader_widget)
         fader_v.addWidget(scroll)
