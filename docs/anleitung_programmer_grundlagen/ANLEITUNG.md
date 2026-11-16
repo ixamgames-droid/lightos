@@ -73,14 +73,18 @@ die Erklärung. Welche Gesten wirken, schaltest du unter **Ansicht → Touch-Ges
 
 - **In der Liste** klickst du ein Gerät an. Mit **Strg** kommen weitere dazu, mit
   **Umschalt** ein ganzer Bereich. Geräte mit mehreren Köpfen haben einen Pfeil:
-  Aufgeklappt kannst du einzelne Köpfe wählen.
+  Aufgeklappt kannst du einzelne Köpfe wählen. Am Touchscreen (`--touch`) gibt es neben
+  **Alle** / **Keine** den Knopf **Mehrfach**: Eingeschaltet („Mehrfach ✓“) schaltet jeder
+  Tipp genau eine Zeile um, die übrigen bleiben gewählt.
 - **Gruppe anklicken (1)**: Die Auswahl wird durch die Geräte der Gruppe ersetzt (2),
   in der Reihenfolge der Gruppe. Gleichzeitig springt der Programmer auf den
   Reiter **Matrix** (3) und zeigt die Matrizen dieser Gruppe. Für Farbe oder
   Helligkeit klickst du danach auf **Color** bzw. **Intensity**.
 - **Gruppe doppelt anklicken**: Die Geräte der Gruppe kommen *zusätzlich* zur
-  bisherigen Auswahl dazu. Der Hinweis unter der Liste sagt dasselbe: „Klick = Gruppe
-  wählen · Doppelklick = zur Auswahl addieren“.
+  bisherigen Auswahl dazu. Am Finger ohne Doppelklick schaltest du **＋ Addieren** neben
+  dem Suchfeld der Gruppen ein: Dann fügt jeder Tipp auf eine Gruppe deren Geräte zur
+  Auswahl hinzu, statt sie zu ersetzen. Der Hinweis unter der Liste sagt dasselbe:
+  „Tippen = Gruppe wählen · „＋ Addieren“ an (oder Doppelklick) = zur Auswahl addieren“.
 
 Die Reihenfolge der Auswahl ist später wichtig, zum Beispiel beim Fächer (Schritt 10).
 

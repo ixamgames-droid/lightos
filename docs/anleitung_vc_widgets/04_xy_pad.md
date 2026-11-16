@@ -26,6 +26,7 @@ Die Bedienung im Betrieb hängt vom Modus ab. Ein Linksklick/Ziehen direkt am Ra
 - **Klick ins Feld** setzt Pan/Tilt sofort auf die geklickte Stelle — die Geräte springen dorthin.
 - **Ziehen** fährt Pan/Tilt kontinuierlich mit der Maus mit (Live-Bewegung).
 - Der Punkt und die `P:`/`T:`-Prozentanzeige folgen der Bewegung.
+- Mit der Option **Relativ** (siehe Einstellungen) springt der Punkt beim Aufsetzen nicht: Ziehen verschiebt ihn ab seiner aktuellen Lage, und zwar nur halb so schnell wie der Finger — praktisch für Feinbedienung am Touchscreen.
 
 **Modus „Feld"** (`[Feld]`):
 - **Aufziehen eines Rechtecks** (drücken, ziehen, loslassen) markiert einen Bereich. Beim Loslassen wird daraus **Zentrum** (`x_offset`/`y_offset`) und **Größe** (`width`/`height`) des Ziel-Effekts gesetzt — der Effekt fährt seine Figur (z. B. eine Acht) genau in diesem Feld ab.
@@ -62,6 +63,7 @@ Doppelklick auf das Pad (im Bearbeiten-Modus) öffnet den Dialog „XY Pad Einst
 | **Pan-Attribut** | Programmer-Attribut für die horizontale Achse. | Freitext, Standard `pan` (leer → `pan`) |
 | **Tilt-Attribut** | Programmer-Attribut für die vertikale Achse. | Freitext, Standard `tilt` (leer → `tilt`) |
 | **Auflösung** | 16-bit-Modus: schreibt zusätzlich die Fine-Kanäle `pan_fine`/`tilt_fine` für ruckelfreie Bewegung. Geräte ohne Fine-Kanal ignorieren den Extra-Wert. | Checkbox „16-bit (Fine-Kanäle pan_fine/tilt_fine)"; aus = klassisch 8-bit |
+| **Bedienung** | Nur im Positions-Modus: der Haken „Relativ (Punkt springt nicht, folgt halb so schnell)“ schaltet die relative Bedienung ein. | Checkbox; aus (Standard) = der Punkt springt zur berührten Stelle |
 | **Fixture-IDs (Position)** | Feste Ziel-Fixtures im Positions-Modus. Leer = aktuelle Auswahl, sonst alle gepatchten. | Komma-getrennte Zahlen (z. B. `1, 2, 3, 4, 5, 6`) |
 | **EFX-ID (Feld-Modus)** | Ziel-Effekt-ID für Feld-/Pfad-Modus per Zahl. | Zahl; leer = aktiver Effekt |
 | **Steuert** | Ziel-Effekt für Feld-/Pfad-Modus per Dropdown wählen statt ID tippen. Hat Vorrang vor „EFX-ID". | Aufklappbare Liste, ein Effekt; leer = aktiver Effekt |

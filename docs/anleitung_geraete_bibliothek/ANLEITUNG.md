@@ -64,6 +64,8 @@ Wechsle in **Patchen → Patch** und klicke auf **+ Gerät hinzufügen**.
 4. **Modus:** — das Kanal-Layout. Dieses Gerät kennt 4, 6 und 8 Kanäle. Der Modus muss
    zu der Einstellung am Gerät passen (im Gerätemenü meist „4CH“, „6CH“ …).
 
+**Ohne Suche:** Der Baum links ist beim Öffnen **zugeklappt** und zeigt nur die Hersteller. Ein Tipp oder Klick auf einen Hersteller klappt ihn auf und wieder zu (das Dreieck davor tut dasselbe); erst die Zeile eines Geräts wählt es. Am Touchscreen scrollt Wischen nur, es wählt nichts. Sobald du in **Suche:** etwas eintippst, ersetzt eine flache Trefferliste den Baum — dort gibt es nichts aufzuklappen.
+
 Danach geht es weiter wie bei jedem Gerät: Universum, DMX-Adresse, **Hinzufügen**.
 
 **Ältere QLC+-Importe.** Hast du früher die QLC+-Bibliothek geladen und gibt es dasselbe
