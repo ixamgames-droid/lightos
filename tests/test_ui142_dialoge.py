@@ -301,3 +301,61 @@ def test_audio_server_details_im_tooltip(env, monkeypatch):
     _tick(v, clock, 10.0)
     assert "pactl" not in v._lbl_problem.toolTip()
     assert v._lbl_problem.toolTip() == "Was los ist."
+
+
+# ── Nachbesserung nach Pruefung ─────────────────────────────────────────────
+
+def test_mvr_sammelwahl_import_ist_ein_rueckgaengig_schritt(tmp_path, bib, state):
+    """„Alle auf freie Adresse“ → Importieren: die neuen Geraete liegen hinter
+    dem belegten Bereich, die alten bleiben, und EIN Rueckgaengig nimmt alles
+    zurueck."""
+    from src.core.undo import get_undo_stack
+    D, dlg = _dialog(tmp_path, state, bib)
+    vorher = _bild(state)
+    dlg.knopf_alle_frei.click()
+    dlg._importieren()
+    assert dlg.ergebnis is not None and not dlg.ergebnis.zurueckgenommen
+    assert dlg.ergebnis.geraete == 4
+    nachher = _bild(state)
+    assert [x for x in nachher if x in vorher] == vorher
+    neu = [f for f in state.get_patched_fixtures()
+           if (f.fid, f.label, f.universe, f.address) not in vorher]
+    belegt = sorted((f.universe, f.address, f.address + f.channel_count - 1)
+                    for f in state.get_patched_fixtures())
+    for (u1, _a1, e1), (u2, a2, _e2) in zip(belegt, belegt[1:]):
+        assert u1 != u2 or e1 < a2          # nichts ueberlappt
+    assert len(neu) == 4
+    assert get_undo_stack().undo()
+    assert _bild(state) == vorher
+
+
+def test_sequenz_editor_spricht_deutsch_und_laedt_richtung():
+    """Nachbarfall: der Sequenz-Editor hatte dieselben englischen Felder
+    („Order:/Dir:/Speed:“). Die Richtung wird ueber den Enum-Wert gewaehlt,
+    nicht ueber den angezeigten Text."""
+    from src.core.engine.function import Direction, RunOrder
+    from src.core.engine.sequence import Sequence
+    from src.ui.views.sequence_editor import SequenceEditor
+    seq = Sequence(name="UI142")
+    seq.direction = Direction.Backward
+    seq.run_order = RunOrder.PingPong
+    ed = SequenceEditor(seq)
+    texte = [lb.text() for lb in ed.findChildren(QLabel)]
+    for alt in ("Order:", "Dir:", "Speed:"):
+        assert alt not in texte
+    for neu in ("Ablauf:", "Richtung:", "Geschwindigkeit:"):
+        assert neu in texte
+    assert ed._cb_dir.currentData() == Direction.Backward
+    assert ed._cb_dir.currentText() == "Rückwärts"
+    assert ed._cb_order.currentData() == RunOrder.PingPong
+    assert seq.direction == Direction.Backward
+
+
+def test_anleitungsbild_sucht_neue_chaser_beschriftung():
+    """Das Bild-Skript markiert die Zeile ueber ihre Beschriftung — mit dem
+    alten Wortlaut fand es sie nicht mehr."""
+    import pathlib
+    wurzel = pathlib.Path(__file__).resolve().parent.parent
+    quelle = (wurzel / "tools" / "anleitungsbilder" / "szenen_buehnen_effekte.py"
+              ).read_text(encoding="utf-8")
+    assert '"Run Order:"' not in quelle and '_zeile_dlg(dlg, "Ablauf:")' in quelle

@@ -234,7 +234,7 @@ Ein **Doppelklick** auf einen Eintrag schaltet ihn an/aus.
 |------|----------|
 | Ein EFX schneller/langsamer | `Geschwindigkeit (Hz)` im EFX-Editor |
 | Eine RGB Matrix schneller/langsamer | `Geschwindigkeit` im Matrix-Editor |
-| Ein Chaser frei schneller/langsamer | Trigger = Timer, **Speed (x)** ziehen |
+| Ein Chaser frei schneller/langsamer | Trigger = Timer, **Geschwindigkeit (x)** ziehen |
 | Effekt **im Takt der Musik** | Chaser Trigger = Beat + **Beats/Step**, dann BPM regeln |
 | Globales Tempo setzen | **TAP** / Klick auf **BPM** / **BPM → Erkennung** |
 | Globale Helligkeit | **GM**-Fader oben |

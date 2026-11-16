@@ -618,7 +618,7 @@ def szene_aus_programmer(ui, name, *, bild_fn=None):
 
 
 def chaser_bauen(ui, *, bild_fn=None):
-    """Assistent → „+ Chaser": Name, Run Order Loop, Tempo-Bus frei, beide
+    """Assistent → „+ Chaser": Name, Ablauf Loop, Tempo-Bus frei, beide
     Szenen übernehmen, Fade In 4 s, Schließen."""
     from PySide6.QtWidgets import QDoubleSpinBox
     reiter(ui, "Assistent")
@@ -635,7 +635,7 @@ def chaser_bauen(ui, *, bild_fn=None):
         _combo_daten(ed._tempo_bus_combo, FREI)
         ui.pump(0.2)
         if bild_fn is not None:
-            # Bild 16 zeigt NUR Schritte 1-3 (Name, Run Order, Tempo-Bus) —
+            # Bild 16 zeigt NUR Schritte 1-3 (Name, Ablauf, Tempo-Bus) —
             # aufgenommen, bevor Schritte und Fade-Zeiten (Schritt 4) gesetzt sind.
             dlg.resize(940, 830)
             ui.pump(0.3)
@@ -1033,7 +1033,7 @@ def _v13(ui):
         if teil == "tempo":
             return dialog_bild(ui, dlg, [
                 (_zeile_dlg(dlg, "Name:"), 1, "rechts"),
-                (_zeile_dlg(dlg, "Run Order:"), 2, "rechts"),
+                (_zeile_dlg(dlg, "Ablauf:"), 2, "rechts"),
                 (_zeile_dlg(dlg, "Tempo-Bus:"), 3, "rechts")], anpassen=False)
         return dialog_bild(ui, dlg, [
             (_sicht_dlg(dlg, ed._table), 4, "rechts"),
@@ -1346,7 +1346,7 @@ SZENEN = [
     Szene("15_laser_kanaele", sektion="Programmer", vorher=_v13, dialog=_b13,
           titel="Programmer → Szene: Kanäle auswählen"),
     Szene("16_laser_chaser", sektion="Programmer", dialog=_b14,
-          titel="Chaser „Mein Laser langsam“: Name, Run Order Loop, Tempo-Bus frei"),
+          titel="Chaser „Mein Laser langsam“: Name, Ablauf Loop, Tempo-Bus frei"),
     Szene("17_laser_schritte", sektion="Programmer", dialog=_b14b, nachher=_n14,
           titel="Chaser: zwei Szenen übernommen, Fade In 4 s, Schließen"),
     _gif("18_laser_3d", "GIF: Laser an, Chaser „Mein Laser langsam“ schwenkt die Strahlen",
