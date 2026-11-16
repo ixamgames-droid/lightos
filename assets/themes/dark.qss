@@ -268,18 +268,22 @@ QPushButton#goBtn:hover {
         stop:0 #22aa22, stop:1 #165a16);
 }
 
-/* Blackout button */
+/* Blackout button (auch STOP ALL). UI-137: weisse, fette Schrift in 13 px
+   (Kontrast >= 4,5:1) — vorher rote Schrift auf Dunkelrot in 11 px. Der
+   Grund bleibt im Ruhezustand dunkel, damit der AKTIVE Zustand (helles Rot,
+   weisser Rand) weiter auf einen Blick zu unterscheiden ist. */
 QPushButton#blackoutBtn {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
         stop:0 #7a1a1a, stop:1 #4f0f0f);
     border-color: #3a0a0a;
     font-weight: bold;
-    font-size: 11px;
-    padding: 2px 9px;
-    color: #ff4444;
+    font-size: 13px;
+    padding: 2px 5px;
+    color: #ffffff;
 }
 QPushButton#blackoutBtn:checked {
-    background: #cc0000;
+    background: #e00000;
+    border-color: #ffffff;
     color: #ffffff;
 }
 
@@ -606,11 +610,15 @@ QCheckBox {
     background: transparent;
 }
 
+/* UI-140: AUS = leerer Rahmen (dunkles Feld, heller Rand), AN = blau gefuellt
+   mit weissem Haken. Das Haken-Bild (assets/icons/haken.svg) haengt
+   src/ui/haken_stil.py mit absolutem Pfad an — ein relativer url() hier
+   wuerde gegen das Arbeitsverzeichnis aufgeloest. */
 QCheckBox::indicator {
     width: 14px;
     height: 14px;
-    background: #555555;
-    border: 1px solid #161616;
+    background: #1a1a1a;
+    border: 1px solid #b0b0b0;
     border-radius: 2px;
 }
 
@@ -620,7 +628,55 @@ QCheckBox::indicator:hover {
 
 QCheckBox::indicator:checked {
     background: #0978FF;
-    border-color: #044089;
+    border-color: #66aaff;
+}
+
+/* Nachbesserung UI-140: TEILWEISE (Tri-State, z. B. „Pan invertieren" bei
+   gemischter Auswahl) — dunkelblau mit weissem Strich (Bild aus haken_stil.py),
+   weder leer wie AUS noch hell wie AN. */
+QCheckBox::indicator:indeterminate {
+    background: #0a3d7a;
+    border-color: #66aaff;
+}
+
+QCheckBox::indicator:disabled {
+    background: #2a2a2a;
+    border-color: #555555;
+}
+
+QCheckBox::indicator:checked:disabled {
+    background: #3a4f6a;
+    border-color: #555555;
+}
+
+/* UI-140: ankreuzbare Menue-Eintraege zeigen auch AUS ein leeres Kaestchen. */
+QMenu::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    left: 6px;
+}
+
+QMenu::indicator:non-exclusive:unchecked {
+    background: #1a1a1a;
+    border: 1px solid #b0b0b0;
+}
+
+QMenu::indicator:non-exclusive:checked {
+    background: #0978FF;
+    border: 1px solid #66aaff;
+}
+
+QMenu::indicator:exclusive:unchecked {
+    background: #1a1a1a;
+    border: 1px solid #b0b0b0;
+    border-radius: 7px;
+}
+
+QMenu::indicator:exclusive:checked {
+    background: #0978FF;
+    border: 3px solid #1a1a1a;
+    border-radius: 7px;
 }
 
 QRadioButton {

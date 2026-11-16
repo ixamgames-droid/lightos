@@ -28,8 +28,13 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
 ![Hauptfenster einer leeren Show](img/01_hauptfenster.png)
 
 1. **Menüleiste** — `Datei`, `Bearbeiten`, `Ansicht`, `Show`, `Programmer`, `Datenbank`,
-   `Ausgabe`, `Visualizer`, `Command`, `Hilfe`. Hier liegen Speichern und Öffnen
-   (Schritt 7) und die Ausgabe-Einstellungen. Unter `Hilfe` findest du diese
+   `Ausgabe`, `Visualizer`, `Befehl`, `Hilfe`. Hier liegen Speichern und Öffnen
+   (Schritt 7) und die Ausgabe-Einstellungen. `Befehl` → **Befehlszeile fokussieren**
+   (Kürzel `:` oder `F12`) springt in die Befehlszeile unten. Ankreuzbare Einträge
+   zeigen ihren Zustand als Kästchen: blau mit weißem Haken = an, leerer Rahmen = aus,
+   weißer Strich = teilweise (z. B. bei gemischter Geräteauswahl).
+   **Ausgabe → Simulations-Hinweis „MOCK“** blendet nur „MOCK“ in der Statusleiste ein
+   und öffnet den 3D-Visualizer — der DMX-Ausgang läuft dabei weiter. Unter `Hilfe` findest du diese
    Anleitung wieder (**Erste Schritte**; alle weiteren unter **Anleitungen öffnen**), dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und
    **Datenordner öffnen** / **Show-Ordner öffnen**.
 2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2.

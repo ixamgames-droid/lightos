@@ -667,8 +667,27 @@ state.music_autoshow = {
 # ════════════════════════════════════════════════════════════════════════════
 #  9) VIRTUELLE KONSOLE — 6 Zweck-Baenke + universelle Kopfzeile (APC 8x8)
 # ════════════════════════════════════════════════════════════════════════════
-PAD, GAP, X0, Y0 = 56, 6, 16, 150
+PAD, GAP, X0, Y0 = 56, 6, 16, 172
 STEP = PAD + GAP
+
+
+# UI-138 (Klick-Test Fund 3): Beschriftungen bekamen fest 18 px Hoehe und
+# standen 16 px ueber der Pad-Reihe — also AUF der Reihe darueber (Abstand nur
+# 6 px). Zweizeilige Texte liefen ueber Tasten und Banner. Jetzt: Hoehe aus
+# Text und Breite (Schrift des VCLabel), und zwischen den Pad-Reihen liegt eine
+# eigene Beschriftungsspur. Die Selbstpruefung unten meldet jede Ueberlappung.
+def _label_hoehe(text, ww, font_size=10):
+    from PySide6.QtCore import QRect as _QR, Qt as _Qt
+    from PySide6.QtGui import QFont as _QF, QFontMetrics as _QFM
+    fm = _QFM(_QF("Segoe UI", font_size))
+    br = fm.boundingRect(_QR(0, 0, max(1, ww - 4), 10000),
+                         int(_Qt.AlignmentFlag.AlignCenter | _Qt.TextFlag.TextWordWrap), text)
+    return max(18, br.height() + 4)
+
+
+LBL_SPUR = _label_hoehe("Hg", 200) + 2       # Spur fuer eine Zeile Reihen-Beschriftung
+ROW_STEP = STEP + LBL_SPUR
+UNTEN = Y0 + 5 * ROW_STEP + PAD + GAP          # unter der letzten (6.) Pad-Reihe
 RX = 470
 widgets = []
 BANK_ALL = -1
@@ -681,7 +700,7 @@ def note_rc(r, c):
 
 
 def pad_xy(r, c):
-    return X0 + c * STEP, Y0 + r * STEP
+    return X0 + c * STEP, Y0 + r * ROW_STEP
 
 
 def _add(w, x, y, ww, hh, bank):
@@ -818,16 +837,22 @@ def song_info(x, y, bank, ww=200, hh=58, caption="Aktuelles Lied"):
     _add(VCSongInfo(caption), x, y, ww, hh, bank)
 
 
-def label(text, x, y, ww, bank, hh=18):
+def label(text, x, y, ww, bank, hh=None, *, ueber=None):
+    """Textlabel; Hoehe aus dem Text. ``ueber`` = Oberkante dessen, worueber
+    das Label steht (es endet dann 2 px darueber)."""
+    hh = _label_hoehe(text, ww) if hh is None else hh
+    if ueber is not None:
+        y = ueber - hh - 2
     _add(VCLabel(text), x, y, ww, hh, bank)
 
 
 # ── Universelle Kopfzeile (alle Baenke, y<140) ───────────────────────────────
 HZ1, HZ2 = 8, 40
-action_btn("Programmer leeren", ButtonAction.CLEAR, X0, HZ1, BANK_ALL, "#4a3a10", ww=92, note=100)
-action_btn("Effekt-Stop", ButtonAction.STOP_EFFECTS, X0 + 98, HZ1, BANK_ALL, "#4a1010", ww=92, note=101)
-action_btn("BLACKOUT", ButtonAction.BLACKOUT, X0 + 196, HZ1, BANK_ALL, "#2a0000", ww=92, note=102)
-action_btn("Licht An", ButtonAction.FUNCTION_TOGGLE, X0 + 294, HZ1, BANK_ALL, "#2a4a2a", ww=92,
+# UI-138: „Programmer leeren" passt einzeilig erst ab ~120 px (26 px hoch = eine Zeile).
+action_btn("Programmer leeren", ButtonAction.CLEAR, X0, HZ1, BANK_ALL, "#4a3a10", ww=120, note=100)
+action_btn("Effekt-Stop", ButtonAction.STOP_EFFECTS, X0 + 126, HZ1, BANK_ALL, "#4a1010", ww=92, note=101)
+action_btn("BLACKOUT", ButtonAction.BLACKOUT, X0 + 224, HZ1, BANK_ALL, "#2a0000", ww=92, note=102)
+action_btn("Licht An", ButtonAction.FUNCTION_TOGGLE, X0 + 322, HZ1, BANK_ALL, "#2a4a2a", ww=92,
            function_ids=voll_all_ids, note=103, bg="hot_white")
 action_btn("Tap", ButtonAction.TAP, X0, HZ2, BANK_ALL, "#103a3a", ww=70, note=104)
 action_btn("Musik-BPM", ButtonAction.AUDIO_BPM, X0 + 76, HZ2, BANK_ALL, "#103a4a", ww=92, note=105)
@@ -842,7 +867,7 @@ song_info(RX + 274, HZ2, BANK_ALL, ww=210, hh=64)
 label("MEGA ARENA 2026 — Farbe · Dimmer · Bewegung · Strobe · Laser+Nebel · Hardstyle. "
       "Effekte folgen der MASTER-BPM (Musik/Tap) mit eigenem Multiplikator (¼…4×). "
       "Kategorien layern. Licht An = sofort hell. 4 Trassen: Front/Back + Seiten ins Publikum.",
-      X0, 124, 940, BANK_ALL)
+      X0, 108, 940, BANK_ALL)
 
 CA, CB = RX, RX + 162
 
@@ -863,10 +888,10 @@ for i, nm in enumerate(("rot", "gruen", "blau", "gelb", "weiss", "rosa")):
 fx_btn(mh_farbwechsel, 4, 0, B_COLOR, "#5a1f6a", "col_mh", note=note_rc(4, 0), bg="color_wheel")
 for i, fn in enumerate(spider_color):
     fx_btn(fn, 5, i, B_COLOR, ACC[i], "col_spider", note=note_rc(5, i))
-label("PAR", X0, Y0 - 16, 60, B_COLOR); label("LED", X0, pad_xy(1, 0)[1] - 16, 60, B_COLOR)
-label("PAR-Farben", X0, pad_xy(2, 0)[1] - 16, 120, B_COLOR)
-label("MH-Farbe", X0, pad_xy(3, 0)[1] - 16, 90, B_COLOR)
-label("Spider", X0, pad_xy(5, 0)[1] - 16, 60, B_COLOR)
+label("PAR", X0, 0, 60, B_COLOR, ueber=Y0); label("LED", X0, 0, 60, B_COLOR, ueber=pad_xy(1, 0)[1])
+label("PAR-Farben", X0, 0, 120, B_COLOR, ueber=pad_xy(2, 0)[1])
+label("MH-Farbe", X0, 0, 90, B_COLOR, ueber=pad_xy(3, 0)[1])
+label("Spider", X0, 0, 60, B_COLOR, ueber=pad_xy(5, 0)[1])
 speed_dial("PAR ×", CA, Y0, B_COLOR, par_color)
 speed_dial("LED ×", CA, Y0 + 150, B_COLOR, led_color)
 speed_dial("Spider ×", CA, Y0 + 300, B_COLOR, spider_color)
@@ -874,43 +899,43 @@ eff_colors("PAR Farben", CB, Y0, B_COLOR, "col_par")
 eff_colors("Spider Farben", CB, Y0 + 74, B_COLOR, "col_spider")
 effect_editor_box("Editor: aktiver PAR-Farbeffekt", CB, Y0 + 150, B_COLOR, par_color[2].id)
 label("BANK 1 FARBE — R0 PAR · R1 LED · R2 PAR-Farben · R3 MH-Farbe · R4 MH-Wechsel · R5 Spider. "
-      "Nur RGB (Helligkeit von Bank Dimmer / Licht An).", X0, Y0 + 6 * STEP, 440, B_COLOR)
+      "Nur RGB (Helligkeit von Bank Dimmer / Licht An).", X0, UNTEN, 440, B_COLOR)
 
 # ── BANK 1 — DIMMER & GOBO ───────────────────────────────────────────────────
 for gi, (lbl, effs, slot) in enumerate([("PAR", par_dim, "dim_par"), ("LED", led_dim, "dim_led"),
                                         ("MH", mh_dim, "dim_mh"), ("Spider", spider_dim, "dim_spider")]):
     for i, fn in enumerate(effs):
         fx_btn(fn, gi, i, B_DIM, "#1f3a6a", slot, note=note_rc(gi, i))
-    label(lbl, X0, pad_xy(gi, 0)[1] - 16, 60, B_DIM)
+    label(lbl, X0, 0, 60, B_DIM, ueber=pad_xy(gi, 0)[1])
     speed_dial(f"{lbl} ×", CA, Y0 + (gi % 3) * 150, B_DIM, effs) if gi < 3 else None
 for i, nm in enumerate(("offen", "g1", "g3", "g5", "g7")):
     fx_btn(mh_gobo[nm], 4, i, B_DIM, "#5a3a1f", "gobo_mh", note=note_rc(4, i), bg="gobo_spin" if i == 1 else None)
 fx_btn(gobo_wechsel, 4, 5, B_DIM, "#7a6500", "gobo_mh", note=note_rc(4, 5), bg="gobo_spin")
-label("MH-Gobo", X0, pad_xy(4, 0)[1] - 16, 90, B_DIM)
+label("MH-Gobo", X0, 0, 90, B_DIM, ueber=pad_xy(4, 0)[1])
 effect_editor_box("Editor: aktive PAR-Dimmer-Matrix", CB, Y0 + 300, B_DIM, par_dim[1].id)
 label("BANK 2 DIMMER & GOBO — R0-3 Dimmer (Voll/Lauflicht/Blink/Aufbau) je Gruppe (nur Dimmer). "
-      "R4 MH-Gobos. Rechts: Speed × + Editor.", X0, Y0 + 6 * STEP, 440, B_DIM)
+      "R4 MH-Gobos. Rechts: Speed × + Editor.", X0, UNTEN, 440, B_DIM)
 
 # ── BANK 2 — BEWEGUNG ────────────────────────────────────────────────────────
 SHP = ["#1f3a6a", "#1f4a6a", "#1f5a6a", "#3a1f6a", "#6a1f4a", "#2a6a2a"]
 for i, fn in enumerate(MH_SHAPES):
     fx_btn(fn, i // 3, i % 3, B_MOVE, SHP[i], "mv_mh", note=note_rc(i // 3, i % 3),
            bg="beam_sweep" if i == 0 else None)
-label("MH-Form (Buehne + Publikum)", X0, Y0 - 16, 220, B_MOVE)
+label("MH-Form (Buehne + Publikum)", X0, 0, 220, B_MOVE, ueber=Y0)
 fx_btn(crowd_sweep, 2, 0, B_MOVE, "#8a5a00", "mv_crowd", note=note_rc(2, 0), bg="beam_sweep")
-label("Publikums-Sweep (Seiten-MH)", X0, pad_xy(2, 0)[1] - 16, 220, B_MOVE)
+label("Publikums-Sweep (Seiten-MH)", X0, 0, 220, B_MOVE, ueber=pad_xy(2, 0)[1])
 for i, fn in enumerate(SP_MOVES):
     fx_btn(fn, 3 + i // 3, i % 3, B_MOVE, "#1f5a5a", "mv_sp", note=note_rc(3 + i // 3, i % 3),
            bg="sparkle" if i == 0 else None)
 for i, sc in enumerate((sp_out, sp_in)):
     fx_btn(sc, 4, 3 + i, B_MOVE, "#2a4a4a", "mv_sp", note=note_rc(4, 3 + i))
-label("Spider-Tilt (kein Pan!) + Posen", X0, pad_xy(3, 0)[1] - 16, 240, B_MOVE)
+label("Spider-Tilt (kein Pan!) + Posen", X0, 0, 240, B_MOVE, ueber=pad_xy(3, 0)[1])
 xy_pad("MH Bereich (Box aufziehen)", CA, Y0, B_MOVE, all_mh, "area", efx_function_id=mh_circle.id)
 speed_dial("MH ×", CA, Y0 + 188, B_MOVE, MH_SHAPES + [crowd_sweep], factors=MH_FACTORS, active=MH_MULT)
 speed_dial("Spider ×", CA + 162, Y0 + 188, B_MOVE, SP_MULT_FX,
            factors=SP_FACTORS, active=SP_MULT)
 label("BANK 3 BEWEGUNG — R0-1 MH-Formen · R2 Publikums-Sweep (Seiten) · R3-4 Spider-Tilt + Posen. "
-      "Rechts: XY-Bereich + Speeds.", X0, Y0 + 6 * STEP, 440, B_MOVE)
+      "Rechts: XY-Bereich + Speeds.", X0, UNTEN, 440, B_MOVE)
 
 # ── BANK 3 — STROBE / BLINDER ────────────────────────────────────────────────
 SNAMES_BG = ["strobe", "strobe", "strobe", "strobe"]
@@ -920,19 +945,19 @@ for i, fn in enumerate(STROBES):
     fx_btn(fn, 1, i, B_STROBE, "#7a2222", "strobe", note=note_rc(1, i))
 pad_action("All-White Blinder", ButtonAction.ALL_WHITE, 3, 0, B_STROBE, "#888888",
            function_id=all_white.id, note=note_rc(3, 0), bg="hot_white")
-label("R0 Strobe HALTEN · R1 Strobe TOGGLE · R3 All-White-Blinder (Publikum, halten)",
-      X0, Y0 - 16, 420, B_STROBE)
+label("R0 Strobe HALTEN · R1 TOGGLE · R3 Blinder (halten)",
+      X0, 0, 420, B_STROBE, ueber=Y0)
 speed_dial("Strobe-Rate ×", CA, Y0, B_STROBE, STROBES)
 effect_editor_box("Editor: Strobe Alle", CB, Y0, B_STROBE, strobe_all.id, ww=224, hh=190)
 label("BANK 4 STROBE — R0 halten · R1 toggeln (Alle/PAR/LED/MH) · R3 All-White-Blinder. "
-      "Rechts: Rate + Editor.", X0, Y0 + 6 * STEP, 440, B_STROBE)
+      "Rechts: Rate + Editor.", X0, UNTEN, 440, B_STROBE)
 
 # ── BANK 4 — LASER & NEBEL ───────────────────────────────────────────────────
 fx_btn(laser_pattern, 0, 0, B_LASER, "#6a1f6a", "laser", note=note_rc(0, 0), bg="beam_sweep")
 fx_btn(laser_beams, 0, 1, B_LASER, "#8a1f8a", "laser", note=note_rc(0, 1), bg="beam_sweep")
 fx_btn(laser_chase, 0, 2, B_LASER, "#7a2a7a", "laser", note=note_rc(0, 2))
 pad_action("Laser AUS", ButtonAction.FUNCTION_TOGGLE, 0, 3, B_LASER, "#333333", function_id=laser_off.id)
-label("LASER-MUSTER (Bank/Fächer/Wechsel/Aus)", X0, Y0 - 16, 320, B_LASER)
+label("LASER-MUSTER (Bank/Fächer/Wechsel/Aus)", X0, 0, 320, B_LASER, ueber=Y0)
 action_btn("⚡ Laser ARM", ButtonAction.LASER_ARM, X0, pad_xy(2, 0)[1], B_LASER, "#1f5a1f", ww=150, hh=48, note=note_rc(2, 0))
 action_btn("■ Laser NOT-AUS", ButtonAction.LASER_ESTOP, X0 + 158, pad_xy(2, 0)[1], B_LASER, "#7a0000", ww=170, hh=48, note=note_rc(2, 1))
 label("LASER-SAFETY: erst ARM, dann Muster. NOT-AUS = harter Latch (alle Laser auf 0).",
@@ -940,12 +965,12 @@ label("LASER-SAFETY: erst ARM, dann Muster. NOT-AUS = harter Latch (alle Laser a
 fx_btn(fog_blast, 4, 0, B_LASER, "#3a5a5a", "nebel", note=note_rc(4, 0), bg="vu_meter")
 fx_btn(fog_haze, 4, 1, B_LASER, "#2a4a4a", "nebel", note=note_rc(4, 1))
 pad_action("Nebel Aus", ButtonAction.FUNCTION_TOGGLE, 4, 2, B_LASER, "#222222", function_id=fog_off.id)
-label("NEBEL (Boden vor dem Publikum): Stoß / Haze / Aus", X0, pad_xy(4, 0)[1] - 16, 360, B_LASER)
+label("NEBEL (Boden vor dem Publikum): Stoß / Haze / Aus", X0, 0, 360, B_LASER, ueber=pad_xy(4, 0)[1])
 c_laser = VCColor("Laser Farbe (Programmer)")
 c_laser.target = ColorTarget.PROGRAMMER
-_add(c_laser, CA, Y0, 220, 180, B_LASER)
+_add(c_laser, CA, Y0, 180, 150, B_LASER)
 label("BANK 5 LASER & NEBEL — R0 Laser-Muster · ARM/NOT-AUS-Safety · R4 Nebel. Rechts: Farbe.",
-      X0, Y0 + 6 * STEP, 440, B_LASER)
+      X0, UNTEN, 440, B_LASER)
 
 # ── BANK 5 — HARDSTYLE / AUTO / MASTER ───────────────────────────────────────
 bpm_display("MASTER", CA, Y0, B_HARD, tempo_bus_id="", ww=150, hh=82)
@@ -963,7 +988,7 @@ b_rwrw.function_id = blink_rwrw.id; b_rwrw.edit_slot = "blink"; b_rwrw._bg_color
 b_rwrw.midi_type, b_rwrw.midi_ch, b_rwrw.midi_data1 = "note_on", 0, note_rc(0, 1)
 _add(b_rwrw, *pad_xy(0, 1), PAD, PAD, B_HARD)
 fx_btn(dim_blink, 0, 2, B_HARD, "#5a1f1f", "blink2", note=note_rc(0, 2), bg="pulse")
-label("BEAT-BLINK (Farbe pro Beat) + Dimmer-Blink", X0, Y0 - 16, 320, B_HARD)
+label("BEAT-BLINK (Farbe pro Beat) + Dimmer-Blink", X0, 0, 320, B_HARD, ueber=Y0)
 eff_colors("RRRW Farben (umfärbbar)", X0, pad_xy(1, 0)[1], B_HARD, "blink", ww=300, hh=84)
 # Auto-Show + Licht An
 pad_action("AUTO-SHOW", ButtonAction.FUNCTION_TOGGLE, 3, 0, B_HARD, "#b8860b",
@@ -972,7 +997,7 @@ pad_action("Licht An", ButtonAction.FUNCTION_TOGGLE, 3, 1, B_HARD, "#2a4a2a",
            function_ids=voll_all_ids, note=note_rc(3, 1), bg="hot_white")
 pad_action("Nebel-Haze", ButtonAction.FUNCTION_TOGGLE, 3, 2, B_HARD, "#2a4a4a",
            function_id=fog_haze.id, note=note_rc(3, 2))
-label("AUTO-SHOW (Loop) · Licht An · Nebel", X0, pad_xy(3, 0)[1] - 16, 320, B_HARD)
+label("AUTO-SHOW (Loop) · Licht An · Nebel", X0, 0, 320, B_HARD, ueber=pad_xy(3, 0)[1])
 song_info(X0, pad_xy(4, 0)[1], B_HARD, ww=300, hh=64)
 # Speeds + Master-Dimmer
 speed_dial("Farbe ×", CA, Y0 + 190, B_HARD, par_color + led_color + spider_color)
@@ -985,7 +1010,7 @@ master_fader("LED", MFX + 108, Y0, B_HARD, SliderMode.GROUP_DIMMER, group="LED B
 master_fader("PAR", MFX + 162, Y0, B_HARD, SliderMode.GROUP_DIMMER, group="Alle PAR", midi_cc=55)
 master_fader("GRAND", MFX + 216, Y0, B_HARD, SliderMode.GRANDMASTER, midi_cc=56)
 label("BANK 6 HARDSTYLE — BPM/Tap · Beat-Blink RRRW/RWRW + Dimmer-Blink · AUTO-SHOW · "
-      "Speeds · 5 Master-Dimmer (Spider/MH/LED/PAR/GRAND).", X0, Y0 + 6 * STEP, 440, B_HARD)
+      "Speeds · 5 Master-Dimmer (Spider/MH/LED/PAR/GRAND).", X0, UNTEN, 440, B_HARD)
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1213,6 +1238,27 @@ for bk in range(6):
             assert not _ov(layer[a], layer[b2]), (
                 f"Overlap Bank {bk}: {layer[a]['type']}@{_rect(layer[a])} vs "
                 f"{layer[b2]['type']}@{_rect(layer[b2])}")
+
+# UI-138: auch Textlabels duerfen nichts ueberdecken (weder Tasten noch andere
+# Labels/Banner), und ihr Text muss in ihre Hoehe passen.
+_ueberlappt = []
+for bk in range(6):
+    layer = [w for w in vc if w.get("bank") in (bk, -1)]
+    for i, lb in enumerate(layer):
+        if lb["type"] != "VCLabel":
+            continue
+        for j, w in enumerate(layer):
+            if j == i or (w["type"] == "VCLabel" and j < i):   # Label-Paare nur einmal
+                continue
+            if _ov(lb, w):
+                _ueberlappt.append(f"Bank {bk}: Label {lb.get('caption', '')[:30]!r}@{_rect(lb)} "
+                                   f"vs {w['type']} {w.get('caption', '')[:30]!r}@{_rect(w)}")
+assert not _ueberlappt, "Label-Ueberlappung:\n" + "\n".join(sorted(set(_ueberlappt)))
+_zu_flach = [(w.get("caption", "")[:40], w.get("h"), _label_hoehe(w.get("caption", ""), w.get("w", 0),
+                                                                 w.get("font_size", 10)))
+             for w in vc if w["type"] == "VCLabel"
+             and w.get("h", 0) < _label_hoehe(w.get("caption", ""), w.get("w", 0), w.get("font_size", 10))]
+assert not _zu_flach, f"Label-Text passt nicht in die Hoehe: {_zu_flach}"
 
 # ── Render-Sanity: gelayerte Effekte -> echtes, SICH BEWEGENDES DMX ──────────
 get_bpm_manager().request_bpm(150.0, "diag")
