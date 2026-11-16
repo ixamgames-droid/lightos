@@ -4,6 +4,9 @@ Laufen zwei Dinge gleichzeitig auf derselben Lampe, muss LightOS entscheiden, we
 am Ende gesendet wird. Diese Anleitung zeigt die ganze Reihenfolge von unten nach oben und
 wie du die Reihenfolge deiner **Effekte** selbst festlegst: über fünf benannte **Stufen**.
 
+**Was du danach kannst:** Sehen, welcher Effekt auf einer Lampe gewinnt, und die Stufe
+eines Effekts selbst festlegen.
+
 Du brauchst dafür keine besondere Show — jede Show mit ein paar Effekten genügt.
 
 ## 1. Die Reihenfolge in einem Bild
@@ -87,7 +90,7 @@ der Effekte darunter und rechnet deshalb absichtlich direkt nach der Stufe „Ef
    - die Zeile in eine andere Stufe **ziehen**,
    - **▲ Stufe höher** / **▼ Stufe tiefer**,
    - im Feld **Auswahl in Stufe** die Stufe wählen,
-   - Rechtsklick → **In Stufe „…“**.
+   - Rechtsklick → **In Stufe „…“** (am Touchscreen: die Zeile lange drücken).
 
    ![GIF: „Blinder“ ist in der Stufe Effekte ausgewählt (1); zweimal „▲ Stufe höher“ (2) schiebt ihn über Akzente nach „Strobe & Blinder“](img/03_stufe_aendern.gif)
 

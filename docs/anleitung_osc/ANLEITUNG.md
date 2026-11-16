@@ -6,6 +6,9 @@ sondern auch **beliebige Adressen**, die du selbst zuordnest — so passt LightO
 was ein Pult, TouchOSC oder ein anderes Programm ohnehin sendet. Umgekehrt meldet
 LightOS auf Wunsch Fader, Cue-Stand, Grand Master und Blackout an ein OSC-Ziel zurück.
 
+**Was du danach kannst:** Ein Bedienelement an Pult oder Tablet einer Funktion in LightOS
+zuordnen (auch per Lernen) und Zustände an das Gerät zurückmelden.
+
 Ort: Menü **Ausgabe** → **OSC-Zuordnungen & Rückmeldung…**. Der OSC-Eingang selbst
 bleibt wie bisher ein eigener Schalter: Menü **Ausgabe** → **OSC-Server (Port 7770)**.
 
