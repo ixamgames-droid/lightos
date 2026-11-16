@@ -13,6 +13,9 @@
 > shows the dialog *Ausgabe konfigurieren* (configure output), the two monitors for
 > checking, and the warnings in the status bar. The red numbers in the pictures match the
 > numbered points in the text.
+>
+> **What you will be able to do afterwards:** give a universe an output, check that DMX
+> really goes out, and read a warning in the status bar correctly.
 
 ## What you need
 

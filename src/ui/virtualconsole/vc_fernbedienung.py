@@ -384,6 +384,19 @@ def _ziel_fehlt(widget) -> list[str]:
     return raus
 
 
+def _live_editiert(widget) -> bool:
+    """UI-129: zeigt das Widget das Sternchen „live bearbeitet"? Nur Tasten
+    und Fader mit genau einer eigenen Funktion; Cue-Listen nie. Liest den
+    Zwischenstand aus ``effect_live`` (der Takt fragt zehnmal je Sekunde)."""
+    frage = getattr(widget, "live_stern_sichtbar", None)
+    if frage is None:
+        return False
+    try:
+        return bool(frage())
+    except Exception:
+        return False
+
+
 #: WEB-13: Takt, wenn das Pult keinen nennt; Grenzen gegen Unsinn (0 = Freeze).
 STANDARD_BPM = 120
 _BPM_GRENZEN = (30, 300)
@@ -486,6 +499,8 @@ def beschreibe(widget) -> dict | None:
         "laser": bool(laser_inhalt(widget)),
         "gesperrt": None,
         "ziel_fehlt": _ziel_fehlt(widget),
+        # UI-129: eigene Funktion live bearbeitet -> Sternchen an der Kachel.
+        "live_editiert": _live_editiert(widget),
     }
     if d["laser"]:
         from src.core.laser import fern_freigabe as _ff

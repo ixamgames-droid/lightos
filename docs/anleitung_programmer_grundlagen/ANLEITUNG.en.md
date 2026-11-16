@@ -48,7 +48,7 @@ described in [Szenen, Snaps & Cue-Listen](../anleitung_szenen_cues/ANLEITUNG.md)
 ![Programmer without a selection](img/01_ueberblick.png)
 
 Click **Programmer** in the section bar at the top, then the tab **Attribute**
-(attributes). The window has three columns:
+(attributes). The lists are on the left, the tabs in the middle, the library on the right. The numbers match the markers in the picture:
 
 1. **Geräte** (fixtures): all patched fixtures, `[001] PAR 1` and so on.
 2. **Alle** (all): selects all fixtures in the list.
@@ -70,6 +70,9 @@ Above it is the toolbar with **Hervorheben** (highlight), **Abdunkeln** (dim oth
 **Layout: Zonen** switches to the classic layout (the button then reads
 **Layout: Klassisch**). **?** starts the help mode: the next click on a button shows its
 explanation instead of triggering it. **Esc** ends it.
+
+On a touchscreen (started with `--touch`), a long press on a button also shows the
+explanation. Which gestures are active is set under **Ansicht → Touch-Gesten…** (View menu).
 
 ## 2. Selecting fixtures: list and groups
 

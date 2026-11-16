@@ -212,6 +212,7 @@ class VCSlider(VCWidget):
         self.invert: bool = False
         self.range_min: int = 0       # 0–255
         self.range_max: int = 255     # 0–255
+        self._live_stern_rect = None   # UI-129: zuletzt gemaltes Live-Sternchen
         self.resize(60, 200)
         # Zuweisbarer Submaster: jeder Fader ist ein eigener Submaster-Slot (eindeutig
         # pro Widget, id(self)). Wird der Fader geloescht, muss sein Slot im
@@ -723,7 +724,33 @@ class VCSlider(VCWidget):
                 return True
         except Exception:
             pass
+        # UI-129: Tooltip-Zusatz „live bearbeitet", solange das Sternchen steht.
+        try:
+            from src.ui.widgets.live_stern import zeige_live_stern_tooltip
+            if zeige_live_stern_tooltip(self, e):
+                return True
+        except Exception:
+            pass
         return super().event(e)
+
+    # ── UI-129: Sternchen „Effekt live bearbeitet" ───────────────────────────
+    def live_stern_fid(self):
+        """Die EINE fest gebundene Funktion dieses Faders — oder None.
+
+        Nur die Effekt-Modi (Helligkeit/Tempo/Parameter) mit genau einem festen
+        Ziel. Ein Fader ohne feste Funktion (Edit-Slot bzw. „aktiver Effekt")
+        wirkt auf das aktuelle Ziel und zeigt nichts; ein Gruppen-Fader
+        (mehrere Effekte) ebenso nicht."""
+        if self.mode not in (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
+                             SliderMode.EFFECT_PARAM):
+            return None
+        fids = self._all_target_fids()
+        return fids[0] if len(fids) == 1 else None
+
+    def live_stern_sichtbar(self) -> bool:
+        """Zeigt dieser Fader gerade das Sternchen? (ohne Malen pruefbar)"""
+        from src.ui.widgets.live_stern import ist_live_editiert_fid
+        return ist_live_editiert_fid(self.live_stern_fid())
 
     def _autostart_targets(self):
         """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
@@ -1065,6 +1092,26 @@ class VCSlider(VCWidget):
         # MIDI-Bindung-Indikator oben rechts (cyan dot)
         if self.midi_cc >= 0:
             p.fillRect(self.width() - 8, 0, 8, 8, QColor("#00aaff"))
+
+        # UI-129: Sternchen in einer freien oberen Ecke, wenn der gebundene
+        # Effekt live bearbeitet ist. Oben links sitzt ggf. das Leitplanken-
+        # Zeichen, oben rechts der MIDI-Punkt, mittig der Prozentwert.
+        self._live_stern_rect = None
+        if self.live_stern_sichtbar():
+            from src.ui.widgets.live_stern import (STERN_D, waehle_stern_rect,
+                                                   zeichne_live_stern)
+            d = STERN_D
+            w = self.width()
+            wert_b = 26                       # Breite „100%" in 7 pt, grosszuegig
+            belegt = [QRect(w // 2 - wert_b // 2, 2, wert_b, 14)]
+            if self.invert or self.range_min > 0 or self.range_max < 255:
+                belegt.append(QRect(2, 0, 12, 12))
+            if self.midi_cc >= 0:
+                belegt.append(QRect(w - 8, 0, 8, 8))
+            kandidaten = [QRect(2, 2, d, d), QRect(w - 2 - d, 2, d, d),
+                          QRect(2, 17, d, d), QRect(w - 2 - d, 17, d, d)]
+            self._live_stern_rect = waehle_stern_rect(kandidaten, belegt)
+            zeichne_live_stern(p, self._live_stern_rect)
         p.end()
 
     # ── Properties ───────────────────────────────────────────────────────────

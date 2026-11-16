@@ -146,8 +146,8 @@ sich nicht belegen).
    sie über denselben Weg wie einen Druck, deshalb sieht man es am Pult genauso.
    Die aktive Taste noch einmal antippen schaltet sie aus; dann ist **keine** an.
    Eine Kachel kann nur in **einer** Handy-Gruppe sein (im Dialog steht sie dann
-   mit „schon in …" und lässt sich nicht anhaken). Bearbeiten, „Aus Handy-Gruppe
-   nehmen" und „Auflösen" stehen im Rechtsklick-Menü der Kachel. **BLACKOUT,
+   mit „schon in …" und lässt sich nicht anhaken). Im Rechtsklick-Menü der Kachel stehen
+   „Handy-Gruppe … bearbeiten…", „Aus Handy-Gruppe … nehmen" und „Handy-Gruppe … auflösen". **BLACKOUT,
    Laser-NOT-AUS, „Alles stoppen" und „Laser scharf/unscharf"** gehören nie in
    eine Handy-Gruppe; Fader und Cuelisten auch nicht. Die Gruppe gilt nur für
    Tipps vom Handy — am Pult selbst ändert sich nichts. In der Vorschau tragen
@@ -193,7 +193,7 @@ Farbwechsel, läuft ein Verlauf mit den Effektfarben durch die Kachel. Strobe,
 Chaser und Effekte, die an einem Tempo-Bus hängen, lassen die Kachel **im Takt
 blinken**; klein unten rechts steht die BPM-Zahl. Das Pult schickt dafür nur
 die Farben und den Takt — die Bewegung rechnet das Handy selbst. Ist die Taste
-aus, steht die Kachel still. Oben im Kopf schaltet **„✦ Anim."** die
+aus, steht die Kachel still. Oben im Kopf schaltet **„✦ Anim. an/aus"** die
 Animationen am Handy **aus und an** (Vorgabe: an; das Handy merkt sich die
 Wahl). Hat das Handy in seinen Einstellungen **„Bewegung reduzieren"** an,
 bleiben die Animationen ebenfalls aus. BLACKOUT, NOT-AUS, gesperrte
