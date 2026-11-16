@@ -8,6 +8,11 @@
 > **Das alles geht heute schon.** Es ist nur schwer zu finden: die Aktionen stecken im
 > **Rechtsklick-Menü** des Rasters und in zwei **Knopf-Menüs** links neben dem Raster.
 > Beide Wege stehen hier — sie führen zum selben Ergebnis.
+>
+> **Was du danach kannst:** ein Mehrkopf-Gerät als Raster aus einzeln färbbaren Köpfen
+> legen, es als **ein** Element neben andere Geräte setzen, es wieder in Köpfe zerlegen
+> und mehrere Matrizen zu einer Fläche zusammenlegen. Ein **Raster** ist dabei das
+> Zellengitter im Gruppen-Editor; jede Zelle steht für ein Gerät oder einen Kopf.
 
 **Lesehilfe:** Beschriftungen, die du wirklich anklickst, stehen in deutschen
 Anführungszeichen — wörtlich so, wie sie in der Oberfläche stehen. Enthält ein Menüpunkt
@@ -291,6 +296,9 @@ Knopf — dort allerdings nur in der hinterlegten Form, die freie Spaltenwahl
 ---
 
 ## 4. Weg B — die Knöpfe links (über die Baum-Auswahl)
+
+*Am Touchscreen (Start mit `--touch`) ist das der bequemere Weg: Er braucht kein Ziehen.
+Auch **„Bearbeiten…"** ändert Mitglieder und Reihenfolge ohne Drag&Drop.*
 
 Links im Baum das Gerät **anklicken**, dann **„Köpfe einzeln → Raster ▾"**:
 

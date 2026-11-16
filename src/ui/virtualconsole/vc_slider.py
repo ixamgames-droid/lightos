@@ -142,6 +142,12 @@ class VCSlider(VCWidget):
         # ``laser_twist`` (vor LAS-28 trugen alle vier Flips ``laser_twist``).
         # Ein neues Attribut im Einstellungsdialog leert die Liste.
         self.programmer_attr_zusatz: list[str] = []
+        # CDX-75: nur Kopf 0 des Attributs steuern. Der Basis-Schluessel
+        # (``attr``) spiegelt sich in der Mehrkopf-Aufloesung auf jeden Kopf
+        # ohne eigenen Wert; mit dieser Markierung verankert der Fader die
+        # anderen Koepfe vorher (wie der Getrennt-Modus, UI-06). Setzt nur die
+        # Lade-Migration (``laser_twist#1`` -> ``laser_twist_y``, LAS-47).
+        self.programmer_nur_kopf0: bool = False
         # FDR-01: Reichweite im PROGRAMMER-Modus — "all" = alle gepatchten Fixtures,
         # "selected" = nur die aktuelle Programmer-Auswahl, "group" = eine FESTE
         # Fixture-Gruppe (programmer_group), unabhaengig von der Live-Auswahl
@@ -206,6 +212,7 @@ class VCSlider(VCWidget):
         self.invert: bool = False
         self.range_min: int = 0       # 0–255
         self.range_max: int = 255     # 0–255
+        self._live_stern_rect = None   # UI-129: zuletzt gemaltes Live-Sternchen
         self.resize(60, 200)
         # Zuweisbarer Submaster: jeder Fader ist ein eigener Submaster-Slot (eindeutig
         # pro Widget, id(self)). Wird der Fader geloescht, muss sein Slot im
@@ -310,6 +317,31 @@ class VCSlider(VCWidget):
         if lo > hi:                       # vertauschte Grenzen tolerieren
             lo, hi = hi, lo
         return max(0, min(255, int(round(lo + ratio * (hi - lo)))))
+
+    @staticmethod
+    def _andere_koepfe_verankern(state, fid, attr: str) -> None:
+        """CDX-75: vor dem Schreiben des Basis-Schluessels ``attr`` jeden
+        weiteren Kopf (``attr#N``) ohne eigenen Wert auf seinen JETZT
+        wirksamen Wert setzen (Basis-Wert, sonst Kanal-Default) — dieselbe
+        Regel wie ``ProgrammerView._seed_separate_head`` (UI-06). Danach
+        trifft der Fader nur Kopf 0. Best-effort: ein Fehler laesst alles,
+        wie es war."""
+        try:
+            from src.core.app_state import channel_occurrence_keys
+            chans = state._channels_for_fid(fid)
+            if not chans:
+                return
+            prog = state.programmer.get(fid, {})
+            for ch, key in channel_occurrence_keys(chans):
+                if ch.attribute != attr or key == attr or key in prog:
+                    continue
+                base = prog.get(attr)
+                if base is None:
+                    base = int(getattr(ch, "default_value", 0) or 0)
+                state.set_programmer_value(fid, key, base)
+                prog = state.programmer.get(fid, {})
+        except Exception:
+            pass
 
     def _programmer_mapped(self, v) -> int:
         """0..255-Faderwert auf das Teilband [programmer_min, programmer_max]
@@ -420,6 +452,8 @@ class VCSlider(VCWidget):
                 attrs = [attr] + [a for a in self.programmer_attr_zusatz
                                   if a and a != attr]
                 for fid in fids:
+                    if self.programmer_nur_kopf0:
+                        self._andere_koepfe_verankern(state, fid, attr)
                     for _a in attrs:
                         state.set_programmer_value(fid, _a, pv)
             except Exception:
@@ -690,7 +724,33 @@ class VCSlider(VCWidget):
                 return True
         except Exception:
             pass
+        # UI-129: Tooltip-Zusatz „live bearbeitet", solange das Sternchen steht.
+        try:
+            from src.ui.widgets.live_stern import zeige_live_stern_tooltip
+            if zeige_live_stern_tooltip(self, e):
+                return True
+        except Exception:
+            pass
         return super().event(e)
+
+    # ── UI-129: Sternchen „Effekt live bearbeitet" ───────────────────────────
+    def live_stern_fid(self):
+        """Die EINE fest gebundene Funktion dieses Faders — oder None.
+
+        Nur die Effekt-Modi (Helligkeit/Tempo/Parameter) mit genau einem festen
+        Ziel. Ein Fader ohne feste Funktion (Edit-Slot bzw. „aktiver Effekt")
+        wirkt auf das aktuelle Ziel und zeigt nichts; ein Gruppen-Fader
+        (mehrere Effekte) ebenso nicht."""
+        if self.mode not in (SliderMode.EFFECT_INTENSITY, SliderMode.EFFECT_SPEED,
+                             SliderMode.EFFECT_PARAM):
+            return None
+        fids = self._all_target_fids()
+        return fids[0] if len(fids) == 1 else None
+
+    def live_stern_sichtbar(self) -> bool:
+        """Zeigt dieser Fader gerade das Sternchen? (ohne Malen pruefbar)"""
+        from src.ui.widgets.live_stern import ist_live_editiert_fid
+        return ist_live_editiert_fid(self.live_stern_fid())
 
     def _autostart_targets(self):
         """Nur wenn ``effect_autostart`` aktiv ist: der Fader steuert zusaetzlich
@@ -1032,6 +1092,26 @@ class VCSlider(VCWidget):
         # MIDI-Bindung-Indikator oben rechts (cyan dot)
         if self.midi_cc >= 0:
             p.fillRect(self.width() - 8, 0, 8, 8, QColor("#00aaff"))
+
+        # UI-129: Sternchen in einer freien oberen Ecke, wenn der gebundene
+        # Effekt live bearbeitet ist. Oben links sitzt ggf. das Leitplanken-
+        # Zeichen, oben rechts der MIDI-Punkt, mittig der Prozentwert.
+        self._live_stern_rect = None
+        if self.live_stern_sichtbar():
+            from src.ui.widgets.live_stern import (STERN_D, waehle_stern_rect,
+                                                   zeichne_live_stern)
+            d = STERN_D
+            w = self.width()
+            wert_b = 26                       # Breite „100%" in 7 pt, grosszuegig
+            belegt = [QRect(w // 2 - wert_b // 2, 2, wert_b, 14)]
+            if self.invert or self.range_min > 0 or self.range_max < 255:
+                belegt.append(QRect(2, 0, 12, 12))
+            if self.midi_cc >= 0:
+                belegt.append(QRect(w - 8, 0, 8, 8))
+            kandidaten = [QRect(2, 2, d, d), QRect(w - 2 - d, 2, d, d),
+                          QRect(2, 17, d, d), QRect(w - 2 - d, 17, d, d)]
+            self._live_stern_rect = waehle_stern_rect(kandidaten, belegt)
+            zeichne_live_stern(p, self._live_stern_rect)
         p.end()
 
     # ── Properties ───────────────────────────────────────────────────────────
@@ -1449,6 +1529,7 @@ class VCSlider(VCWidget):
                 self.programmer_attr = _pa_text or self.programmer_attr
             if self.programmer_attr != _pa_alt:
                 self.programmer_attr_zusatz = []     # LAS-47
+                self.programmer_nur_kopf0 = False    # CDX-75
             self.programmer_min = prog_min_spin.value()
             self.programmer_max = prog_max_spin.value()
             self.feature_attr = feature_attr_cb.currentData() or "Intensity"   # F-26b
@@ -1534,6 +1615,9 @@ class VCSlider(VCWidget):
         if self.programmer_attr_zusatz:
             # LAS-47: nur wenn belegt (Datei sonst unveraendert).
             d["programmer_attr_zusatz"] = list(self.programmer_attr_zusatz)
+        if self.programmer_nur_kopf0:
+            # CDX-75: nur wenn gesetzt (Datei sonst unveraendert).
+            d["programmer_attr_nur_kopf0"] = True
         d["programmer_scope"] = self.programmer_scope
         d["programmer_min"] = self.programmer_min
         d["programmer_max"] = self.programmer_max
@@ -1591,6 +1675,7 @@ class VCSlider(VCWidget):
         self.programmer_attr_zusatz = (
             [str(a) for a in _pz if isinstance(a, str) and a]
             if isinstance(_pz, list) else [])
+        self.programmer_nur_kopf0 = d.get("programmer_attr_nur_kopf0") is True
         self.programmer_scope = d.get("programmer_scope", "all")
         self.programmer_min = int(d.get("programmer_min", 0))
         self.programmer_max = int(d.get("programmer_max", 255))

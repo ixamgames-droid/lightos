@@ -6,9 +6,9 @@ In dieser Anleitung lernst du, wie du eine EFX-Bewegungsfigur (Kreis) für die M
 
 1. Öffne den **Programmer**, wähle die Gruppe **"MH"**, wechsle auf den Tab **"EFX"** und klicke auf **"+ Neu"**.
 2. Wähle als Algorithmus **"Circle"** (Kreis) und vergib den Namen **"MH Circle"**.
-3. Öffne das **"Große Fenster"** und stelle im Abschnitt **"Sichtbarkeit & Sonstiges"** ein:
+3. Öffne mit **⤢ Großes Fenster** den ganzen EFX-Editor in einem eigenen Fenster und stelle im Abschnitt **"Sichtbarkeit & Sonstiges"** ein:
    - **"Dimmer/Shutter mit öffnen"** anhaken (`open_beam`) – sonst bleiben die Moving Heads dunkel.
-   - Unter **"Verhältnis der Geräte"**: **"Gegenläufig: jedes 2. Gerät entgegengesetzt"** aktivieren, damit das Bild symmetrisch wirkt.
+   - Unter **"Verhältnis der Geräte zueinander"** das Häkchen bei **"Gegenläufig"** (**"jedes 2. Gerät entgegengesetzt"**) setzen, damit das Bild symmetrisch wirkt.
 4. Klicke auf **Start**.
 
 ## Bewegung verifizieren

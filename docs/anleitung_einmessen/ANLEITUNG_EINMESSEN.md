@@ -10,6 +10,9 @@ Das **Einmessen** gleicht das am echten Aufbau aus. Es funktioniert für jede
 Aufstellung: stehend auf dem Boden, hängend an der Traverse oder seitlich montiert,
 an jeder Stelle im Raum.
 
+**Was du danach kannst:** einen Moving Head am echten Aufbau so korrigieren, dass ⌖ Zielen
+in der Halle genau trifft, und den wahren Standort des Kopfes von LightOS berechnen lassen.
+
 ## Wo
 
 Visualizer → oben **Modus: Bauen** → rechts Reiter **Fixtures** → ganz unten die Gruppe

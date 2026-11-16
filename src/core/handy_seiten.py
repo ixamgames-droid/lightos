@@ -49,6 +49,7 @@ Laser-NOT-AUS, STOP ALL, Laser scharf), entscheidet die Konsole
 from __future__ import annotations
 
 import copy
+import math
 import re
 
 VERSION = 1
@@ -104,7 +105,9 @@ def _ganzzahl(wert, standard=None):
         return standard
     if isinstance(wert, int):
         return wert
-    if isinstance(wert, float) and wert == int(wert):
+    # WEB-15: NaN/Infinity (Python-json liest sie) erst ausschliessen —
+    # ``int(nan)`` wirft, und ``normalisiere`` verwarf dann ALLE Seiten.
+    if isinstance(wert, float) and math.isfinite(wert) and wert.is_integer():
         return int(wert)
     return standard
 
