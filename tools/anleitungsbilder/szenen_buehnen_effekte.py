@@ -992,11 +992,29 @@ def _b10(ui):
     body = m._editor_body
     m._editor_scroll.verticalScrollBar().setValue(0)
     ui.pump(0.2)
-    return _bild(ui, [(gruppe_rechteck(ui, G_STROBE), 1, "rechts"),
-                      (_zeile(ui, body, "Algorithmus:").united(_zeile(ui, body, "Stil:")),
-                       2, "rechts"),
-                      (_win_rect(ui, knopf(m, "💾 Speichern")), 3, "links"),
-                      (_win_rect(ui, knopf(m, "▶ Start")), 4, "rechts")])
+    # Die Vorschau blitzt. Fuers Bild einen HELLEN Moment abwarten und die
+    # Vorschau dort anhalten — sonst zeigt das Bild zufaellig die dunkle
+    # Phase, und ein Leser sieht keinen Strobe (so beim Lauf vom 17.11.2026).
+    vorschau = m._preview
+    hell = False
+    for _ in range(80):                                   # hoechstens rund 4 s
+        ui.pump(0.05)
+        b = vorschau.grab().toImage()
+        y = b.height() // 2
+        if max(b.pixelColor(x, y).lightness()
+               for x in range(4, b.width() - 4, max(1, b.width() // 24))) > 120:
+            hell = True
+            break
+    if hell:
+        vorschau._timer.stop()
+    try:
+        return _bild(ui, [(gruppe_rechteck(ui, G_STROBE), 1, "rechts"),
+                          (_zeile(ui, body, "Algorithmus:").united(_zeile(ui, body, "Stil:")),
+                           2, "rechts"),
+                          (_win_rect(ui, knopf(m, "💾 Speichern")), 3, "links"),
+                          (_win_rect(ui, knopf(m, "▶ Start")), 4, "rechts")])
+    finally:
+        vorschau._timer.start(50)
 
 
 def _n10(ui):

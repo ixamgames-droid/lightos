@@ -1,7 +1,7 @@
 {
   "anleitung": "dimmermatrix",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py dimmermatrix'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "e6761084976939234e6cd39a316b5670"
+      "md5": "2d23a734454771ed0bcfb32db6680e66"
     },
     {
       "datei": "04_modify_an.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "5a9d3bdb6e5558982aef5802fa277ec3"
+      "md5": "fbe41335517257599e2e6270048080c2"
     },
     {
       "datei": "05_lampen_addieren.png",
@@ -37,7 +37,7 @@
         369
       ],
       "marken": [],
-      "md5": "672b434ab9e5d96d934168ba133a7baa"
+      "md5": "c3d85957d59e79297b9fffccd82792ce"
     },
     {
       "datei": "06_lampen_abziehen_abdunkeln.png",
@@ -48,7 +48,7 @@
         369
       ],
       "marken": [],
-      "md5": "8454dfb987ef8aae028be1590d144906"
+      "md5": "dac3dc293a876df4f1f3047d75bc2898"
     },
     {
       "datei": "07_vc_taste_fader.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "5224581946e3815078cff2e064babd8d"
+      "md5": "01265089c5fde8ba8373cb2464816b90"
     },
     {
       "datei": "08_taste_an_aus.gif",
@@ -77,7 +77,7 @@
         [],
         []
       ],
-      "md5": "a3f232725eed4391a583da98e8a7a936",
+      "md5": "b1e8ac23a15bf464ef481cb8a0973619",
       "frames": 6,
       "dauern_ms": [
         1000,
@@ -97,7 +97,7 @@
         900
       ],
       "marken": [],
-      "md5": "671551481823b872d546712e5e245a01"
+      "md5": "d56741b179ed92b219840ba4229f40de"
     },
     {
       "datei": "10_zweierbloecke.gif",
@@ -113,7 +113,7 @@
         [],
         []
       ],
-      "md5": "0b33a17403769a93902487c91cb3ba0a",
+      "md5": "84beb9b19722389a3167cbfa094267db",
       "frames": 4,
       "dauern_ms": [
         900,
@@ -131,7 +131,7 @@
         776
       ],
       "marken": [],
-      "md5": "4d6ee7f1188952e6c5b79ae4e81c8ebb"
+      "md5": "3b62a12452d3cbedeb11b3f93a869159"
     },
     {
       "datei": "12_farbe_lampen.png",
@@ -142,7 +142,7 @@
         369
       ],
       "marken": [],
-      "md5": "98359317e6bdd28f6844453791278b80"
+      "md5": "c13ef9bd3d0ec5d32c69c278bbf3a7a2"
     },
     {
       "datei": "13_wirkt_auf.png",
@@ -153,7 +153,7 @@
         265
       ],
       "marken": [],
-      "md5": "4f5a74046943dbd066293b17426a5d6a"
+      "md5": "e3977ff6f1ce7447c945349c50342fc7"
     },
     {
       "datei": "14_chaser_modify.png",
@@ -164,7 +164,7 @@
         900
       ],
       "marken": [],
-      "md5": "b9d25944c59b32a1ebdcebdd81887278"
+      "md5": "05a32a7b6221414fe32b26d4b1812e93"
     }
   ]
 }
