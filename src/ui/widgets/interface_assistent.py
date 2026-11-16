@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from src.core.dmx import interfaces, testsignal
 from src.ui.widgets.flow_layout import FlowLayout
+from src.ui.abbau import abbau_still
 
 DOKU_REL = "anleitung_ausgabe_einrichten/INTERFACES.md"
 
@@ -744,6 +745,7 @@ class InterfaceAssistent(QDialog):
         self._alle_tests_stoppen()
         super().done(r)
 
+    @abbau_still
     def closeEvent(self, e):
         self._alle_tests_stoppen()
         super().closeEvent(e)

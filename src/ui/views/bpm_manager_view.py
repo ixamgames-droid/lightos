@@ -66,6 +66,7 @@ from src.ui.bpm_tap_helper import get_tap_helper
 from src.ui.weak_slots import weak_slot
 from src.ui.widgets.collapsible_section import CollapsibleSection
 from src.ui.widgets.level_meter_widget import LevelMeterWidget
+from src.ui.abbau import abbau_still
 
 try:
     from src.core.audio.beat_detector import get_beat_detector
@@ -1291,11 +1292,13 @@ class BpmManagerView(QWidget):
         self._refresh_monitor()
         super().showEvent(e)
 
+    @abbau_still
     def hideEvent(self, e):
         self.flush_pending_save()
         self._poll.stop()
         super().hideEvent(e)
 
+    @abbau_still
     def closeEvent(self, e):
         self.flush_pending_save()
         super().closeEvent(e)

@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QDoubleSpinBox, QFrame, QGridLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QSizePolicy, QSpinBox, QVBoxLayout, QWidget,
 )
+from src.ui.abbau import abbau_still
 
 try:
     from shiboken6 import isValid as _gueltig
@@ -184,6 +185,7 @@ class _PopupBasis(QFrame):
             self._abbrechen_intern()
         self.close()
 
+    @abbau_still
     def hideEvent(self, ev):                 # noqa: N802 (Qt) — Tipp daneben
         if not self._erledigt:
             self._erledigt = True

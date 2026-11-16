@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QScrollArea,
 from PySide6.QtCore import Qt, QTimer, Signal, QRectF
 from PySide6.QtGui import QColor, QPainter, QFont, QBrush, QPen, QFontMetrics
 from src.ui.weak_slots import weak_slot
+from src.ui.abbau import abbau_still
 
 # ── Farb-Konstanten (Dark-Theme) ──────────────────────────────────────────────
 _C_BG        = "#0d1117"
@@ -1126,6 +1127,7 @@ class SimpleDeskView(QWidget):
         self._sync_from_output()
         self._rebuild_overview()
 
+    @abbau_still
     def hideEvent(self, ev):
         super().hideEvent(ev)
         if hasattr(self, "_sync_timer"):

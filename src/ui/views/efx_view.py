@@ -15,6 +15,7 @@ from src.ui.weak_slots import weak_slot, weak_slot_fwd
 from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.widgets.flow_layout import FlowLayout
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still
 
 # Richtungs-Anzeige: Enum-Wert (forward/backward/bounce) -> deutsches Label.
 # NUR fuer die Anzeige (Vorschau-Statuszeile) — der gespeicherte Wert bleibt
@@ -1058,6 +1059,7 @@ class EfxView(QWidget):
             except RuntimeError:
                 pass
 
+    @abbau_still
     def hideEvent(self, event):
         # Beim Wegschalten/Layout-Wechsel (View wird unsichtbar/zerstoert) den
         # ungespeicherten Live-Entwurf verwerfen — Entwuerfe sind fluechtig.

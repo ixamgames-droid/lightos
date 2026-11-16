@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
     QVBoxLayout, QWidget,
 )
+from src.ui.abbau import abbau_still
 
 try:                                             # Gueltigkeit eines Qt-Objekts
     from shiboken6 import isValid as _qt_gueltig
@@ -888,6 +889,7 @@ class MitschnittDialog(QDialog):
         self._abbauen()
         super().done(ergebnis)
 
+    @abbau_still
     def closeEvent(self, ev):
         self._abbauen()
         super().closeEvent(ev)

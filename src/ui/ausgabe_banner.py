@@ -43,6 +43,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
+from src.ui.abbau import abbau_still
 
 ART_KEIN = ""
 ART_STOERUNG = "stoerung"
@@ -703,6 +704,7 @@ class AusgabeBanner(_FolgtAnsicht, QLabel):
         super().focusInEvent(ev)
         self.update()
 
+    @abbau_still
     def focusOutEvent(self, ev):  # noqa: N802 (Qt-Name)
         super().focusOutEvent(ev)
         self.update()

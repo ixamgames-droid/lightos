@@ -19,6 +19,7 @@ from src.core.osc.osc_zuordnung import (
     Zuordnung,
 )
 from src.ui.widgets.tabellen_spalten import combo_breite, lineedit_breite, spalte_fest
+from src.ui.abbau import abbau_still
 
 ZIELE_TEXT = [
     (oz.ZIEL_FADER, "Executor-Fader"),
@@ -182,6 +183,7 @@ class OscEinstellungenDialog(QDialog):
         spalte_fest(self.tabelle, SP_BEREICH, combo_breite(self.tabelle, BEREICHE_TEXT))
         spalte_fest(self.tabelle, SP_FKT, lineedit_breite(self.tabelle, FKT_PLATZHALTER))
 
+    @abbau_still
     def changeEvent(self, ev):
         super().changeEvent(ev)
         if (ev.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange)

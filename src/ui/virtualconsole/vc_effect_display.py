@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox
 from PySide6.QtCore import Qt, QRect, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont, QPen
 from .vc_widget import VCWidget
+from src.ui.abbau import abbau_still
 
 
 class VCEffectDisplay(VCWidget):
@@ -49,6 +50,7 @@ class VCEffectDisplay(VCWidget):
         super().showEvent(event)
         self._timer.start()
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._timer.stop()

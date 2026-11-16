@@ -15,6 +15,7 @@ from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
 from src.ui.weak_slots import weak_slot
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still
 
 CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
@@ -850,6 +851,7 @@ class PlaybackView(QWidget):
         if not self._tick.isActive():
             self._tick.start(50)
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._tick.stop()
@@ -931,6 +933,7 @@ class ExecutorWidget(QWidget):
         super().showEvent(event)
         self._breite_setzen()
 
+    @abbau_still
     def changeEvent(self, event):  # noqa: N802 (Qt-Name)
         super().changeEvent(event)
         if event.type() in (QEvent.Type.StyleChange, QEvent.Type.FontChange):

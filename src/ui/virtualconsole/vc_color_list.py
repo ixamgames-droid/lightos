@@ -17,6 +17,7 @@ from PySide6.QtWidgets import QDialog, QFormLayout, QLineEdit, QDialogButtonBox,
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from .vc_widget import VCWidget
+from src.ui.abbau import abbau_still
 
 
 class VCColorList(VCWidget):
@@ -63,6 +64,7 @@ class VCColorList(VCWidget):
 
     # Effizienz: Timer nur laufen lassen, wenn das Widget sichtbar ist
     # (verdeckte Bank/Tab → keine unnötigen Repaints).
+    @abbau_still
     def hideEvent(self, event):
         self._timer.stop()
         super().hideEvent(event)

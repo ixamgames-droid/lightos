@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt, QItemSelectionModel
 from PySide6.QtWidgets import QAbstractItemView, QPushButton
+from src.ui.abbau import abbau_still_filter
 
 #: Mindesthoehe am Finger (Richtwert des Touch-Audits, wie die Qt-Knoepfe mit --touch)
 TOUCH_HOEHE = 44
@@ -79,6 +80,7 @@ class MehrfachKnopf(QPushButton):
             except RuntimeError:
                 pass        # Liste schon zerstoert (Neuaufbau der Ansicht)
 
+    @abbau_still_filter
     def eventFilter(self, obj, ev) -> bool:              # noqa: N802 (Qt)
         """Rechts-Druck (auch der nachgereichte lange Druck am Finger) auf
         eine nicht gewaehlte Zeile: diese Zeile allein waehlen — wie Qt es

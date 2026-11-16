@@ -7,6 +7,7 @@ import re
 import uuid
 from src.ui.ziehen_scrollen import ist_touch
 from src.ui.virtualconsole.vc_style import touch_aktiv, tz
+from src.ui.abbau import abbau_still
 
 # ── WEB-08: feste Kennung je VC-Widget ───────────────────────────────────────
 #
@@ -640,6 +641,7 @@ class VCWidget(QFrame):
             self._handle_mode_changed()
             self.update()
 
+    @abbau_still
     def leaveEvent(self, event):
         if self._big_handles and not self._dragging and not self._resizing:
             self._big_handles = False
