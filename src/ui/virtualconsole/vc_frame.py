@@ -181,6 +181,11 @@ class VCFrame(VCWidget):
         for child in self.findChildren(
                 VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly):
             child.setVisible(self._child_visible(child))
+        # UI-132: wie beim Bankwechsel — ein gewaehltes Kind der verlassenen
+        # Seite verliert die Auswahl, der Inspector loest sich davon.
+        cv = self._canvas()
+        if cv is not None and hasattr(cv, "_auswahl_unsichtbare_loesen"):
+            cv._auswahl_unsichtbare_loesen()
         self.update()
 
     def add_child_to_page(self, widget: VCWidget, page: int = 0):

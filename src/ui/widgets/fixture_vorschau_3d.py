@@ -192,14 +192,33 @@ def geraet_payload(d: VorschauDaten) -> dict:
     }
 
 
+def kopf_zahl(d: VorschauDaten) -> int:
+    """Kopf-/Pixelzahl wie ``geraet_payload["nHeads"]`` (0 = Einzelkopf)."""
+    if render_modell(d) not in _MEHRFACH_MODELLE:
+        return 0
+    return [(a or "") for a in (d.attribute or ())].count("color_r")
+
+
 def licht_payload(farbe=(255, 255, 255), *, zoom: int | None = None,
-                  gobo: str | None = None) -> dict:
+                  gobo: str | None = None, n_heads: int = 0,
+                  mit_weiss: bool = False) -> dict:
     """Eintrag fuer ``applyDmx``: volles Licht in ``farbe``; ``zoom`` und
     ``gobo`` nur, wenn das Geraet sie hat (``None`` = Feld fehlt, wie im
-    Betrieb bei einem Geraet ohne den Kanal)."""
+    Betrieb bei einem Geraet ohne den Kanal).
+
+    CDX-75: bei ``n_heads >= 2`` (PAR-/Mover-Bar, Spider, Matrix, Pixel-Kopf)
+    traegt der Eintrag ein ``heads``-Array mit derselben Farbe je Kopf — wie
+    ``_build_fixture_payload`` im Betrieb. Ohne das faerbt der Renderer nur
+    Kopf 0. ``cw`` (eigener Weiss-Kanal je Kopf, Matrix-Weissband/Spider) ist
+    der Weiss-Anteil der Farbe, aber nur bei ``mit_weiss``."""
     r, g, b = (int(max(0, min(255, c))) for c in farbe)
     d = {"fid": VORSCHAU_FID, "intensity": 255, "r": r, "g": g, "b": b,
          "pan": 128, "tilt": 128}
+    if n_heads >= 2:
+        cw = min(r, g, b) if mit_weiss else 0
+        d["heads"] = [{"r": r, "g": g, "b": b, "cr": r, "cg": g, "cb": b,
+                       "cw": cw, "pan": 128, "tilt": 128}
+                      for _ in range(int(n_heads))]
     if zoom is not None:
         d["zoom"] = int(max(0, min(255, zoom)))
     if gobo is not None:
@@ -514,7 +533,9 @@ class FixtureVorschau3D(QFrame):
         farbe = self.cb_farbe.currentData() or (255, 255, 255)
         zoom = self.sld_zoom.value() if hat_zoom_spanne(d) else None
         gobo = (self.cb_gobo.currentData() or "") if self._gobos else None
-        payload = licht_payload(farbe, zoom=zoom, gobo=gobo)
+        payload = licht_payload(
+            farbe, zoom=zoom, gobo=gobo, n_heads=kopf_zahl(d),
+            mit_weiss="color_w" in (d.attribute or ()))
         self.letzter_licht_payload = payload
         if not self._bereit:
             return

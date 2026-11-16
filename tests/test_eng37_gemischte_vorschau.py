@@ -145,6 +145,21 @@ def _vorschau(m, st):
     return v
 
 
+def _vorschau_und_bild(m, st):
+    """QA-119: ERST die Vorschau bauen, DANN das Bild rendern.
+
+    Das Grundbild gilt nur ``GRUNDBILD_MAX_ALTER`` (0,5 s) nach dem Rendern.
+    Andersherum lag dazwischen der erste Import von ``rgb_matrix_view`` und das
+    erste Widget des Prozesses - im vollen Windows-Gate unter Last mehr als
+    0,5 s, und der erste Fall der Datei sah „keine gemischte Vorschau“
+    (3 von 3 Gates rot, allein gruen; unter CPU-Last allein 6 von 6 rot). Die
+    Vorschau liest das Grundbild erst beim Abfragen, also gleich danach."""
+    v = _vorschau(m, st)
+    st.grundbild_anfordern()
+    st._render_frame(DT)
+    return v
+
+
 def _ausgang_dimmer(st):
     roh = st.universes[1].get_all()
     return [roh[_adr(i) - 1] for i in range(N)]
@@ -167,14 +182,12 @@ def test_vorschau_zeigt_was_am_ausgang_herauskommt(rig, mode, staerke):
     unten = _matrix("unten", intensity_min=P40, intensity_max=P40)
     mod = _lauflicht(mode, staerke)
     st = _zustand(unten, mod)
-    st.grundbild_anfordern()
-    st._render_frame(DT)
+    v = _vorschau_und_bild(mod, st)
     ausgang = _ausgang_dimmer(st)
-    # Gemischt heisst: Lampen ausserhalb des Laeufers stehen auf dem Grundbild.
-    assert ausgang.count(P40) == N - 2
-    assert len(set(ausgang)) == 2
-    v = _vorschau(mod, st)
     try:
+        # Gemischt heisst: Lampen ausserhalb des Laeufers stehen auf dem Grundbild.
+        assert ausgang.count(P40) == N - 2
+        assert len(set(ausgang)) == 2
         zellen = v.gemischte_zellen()
         assert zellen is not None, "keine gemischte Vorschau"
         assert [z[0] for z in zellen] == ausgang
@@ -189,10 +202,8 @@ def test_farb_modify_vorschau_gleich_ausgang(rig, mode):
     unten = _matrix("unten", style=MatrixStyle.RGB, color1=(0, 0, 200))
     mod = _lauflicht(mode, 100, style=MatrixStyle.RGB, color1=(255, 0, 255))
     st = _zustand(unten, mod)
-    st.grundbild_anfordern()
-    st._render_frame(DT)
+    v = _vorschau_und_bild(mod, st)
     ausgang = _ausgang_farbe(st)
-    v = _vorschau(mod, st)
     try:
         zellen = v.gemischte_zellen()
         assert zellen is not None
@@ -208,10 +219,8 @@ def test_vorschau_malt_das_ergebnis(rig):
     unten = _matrix("unten", intensity_min=P40, intensity_max=P40)
     mod = _lauflicht("add")
     st = _zustand(unten, mod)
-    st.grundbild_anfordern()
-    st._render_frame(DT)
+    v = _vorschau_und_bild(mod, st)
     ausgang = _ausgang_dimmer(st)
-    v = _vorschau(mod, st)
     try:
         v._grid = mod.preview_pixels()
         v._misch = v.gemischte_zellen()
@@ -233,15 +242,48 @@ def test_umschalter_nur_modify(rig):
     unten = _matrix("unten", intensity_min=P40, intensity_max=P40)
     mod = _lauflicht("add")
     st = _zustand(unten, mod)
-    st.grundbild_anfordern()
-    st._render_frame(DT)
-    v = _vorschau(mod, st)
+    v = _vorschau_und_bild(mod, st)
     try:
         assert v.gemischte_zellen() is not None
         v.set_gemischt(False)
         assert v.gemischte_zellen() is None
         v.set_gemischt(True)
         assert v.gemischte_zellen() is not None
+    finally:
+        v.deleteLater()
+
+
+def test_langsamer_vorschau_aufbau_verdirbt_das_grundbild_nicht(rig, monkeypatch):
+    """QA-119: der Gate-Fehler ohne CPU-Last nachgestellt - der Aufbau der
+    Vorschau dauert hier laenger als ``GRUNDBILD_MAX_ALTER`` (wie der erste
+    Import von rgb_matrix_view im vollen Windows-Gate).
+
+    Alte Reihenfolge (rendern, dann bauen): das Grundbild ist verfallen.
+    ``_vorschau_und_bild`` (bauen, dann rendern): die Vorschau mischt."""
+    import time
+    from src.ui.views.rgb_matrix_view import MatrixPreview
+    echt = MatrixPreview.__init__
+
+    def _langsam(self, *a, **k):
+        echt(self, *a, **k)
+        time.sleep(AppState.GRUNDBILD_MAX_ALTER + 0.1)
+    monkeypatch.setattr(MatrixPreview, "__init__", _langsam)
+
+    unten = _matrix("unten", intensity_min=P40, intensity_max=P40)
+    mod = _lauflicht("add")
+    st = _zustand(unten, mod)
+    st.grundbild_anfordern()
+    st._render_frame(DT)
+    alt = _vorschau(mod, st)
+    try:
+        assert alt.gemischte_zellen() is None, "Gegenprobe: alte Reihenfolge verliert das Grundbild"
+    finally:
+        alt.deleteLater()
+
+    st = _zustand(unten, mod)
+    v = _vorschau_und_bild(mod, st)
+    try:
+        assert v.gemischte_zellen() is not None, "keine gemischte Vorschau"
     finally:
         v.deleteLater()
 
