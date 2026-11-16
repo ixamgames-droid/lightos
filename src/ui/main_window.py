@@ -1309,7 +1309,9 @@ class MainWindow(QMainWindow):
         # UI-137: Breite aus Schrift + Polsterung ableiten (Theme/Touch-QSS
         # liegen schon an). Fest 48 px schnitt „TAP“ im Touch-Modus ab.
         self._btn_tap.ensurePolished()
-        self._btn_tap.setFixedWidth(max(48, self._btn_tap.sizeHint().width()))
+        from src.ui.touch_keyboard import is_touch_mode as _touch
+        self._btn_tap.setFixedWidth(
+            max(48, self._btn_tap.sizeHint().width()) if _touch() else 48)
         self._btn_tap.setToolTip("TAP: einmal = Beat auf „jetzt“ setzen, 4× im Takt = Tempo setzen")
         self._btn_tap.clicked.connect(self._on_tap_tempo)
         bar_layout.addWidget(self._btn_tap)
@@ -1464,7 +1466,7 @@ class MainWindow(QMainWindow):
         # UI-120 (A-17): unten in der Leiste — Abstand zum LASER NOT-AUS darueber
         bar_layout.addWidget(btn_stop, 0, Qt.AlignmentFlag.AlignBottom)
         self._btn_stop_all = btn_stop
-        bar_layout.addSpacing(8)     # UI-137: STOP ALL und BLACKOUT getrennt
+        bar_layout.addSpacing(6)     # UI-137: STOP ALL und BLACKOUT getrennt
 
         btn_blackout = QPushButton("BLACKOUT")
         btn_blackout.setObjectName("blackoutBtn")
