@@ -401,7 +401,7 @@ def test_sperrzonen_bleiben_nur_anzeige_beschriftet(monkeypatch):
     for w in (v._sperrzonen_abzeichen, v._btn_sperrzonen_planen,
               v._btn_sperrzonen_details):
         assert "Kein Laserschutz" in w.toolTip(), w.objectName()
-    assert "schaltet nicht ab" in v._sperrzonen_abzeichen.text()
+    assert "schaltet den Laser nicht ab" in v._sperrzonen_abzeichen.text()
 
 
 # ── Nachtrag Sicherheits-Gegenpruefung (LAS-44) ─────────────────────────────
