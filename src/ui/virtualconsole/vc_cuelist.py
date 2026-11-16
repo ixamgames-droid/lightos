@@ -256,8 +256,16 @@ class VCCueList(VCWidget):
         self._refresh()
         if getattr(self, "_sig", None) != sig_vorher:
             return
-        if self._bestaetige_sprung(text.strip()):
-            self._gehe_zu(float(nummer))
+        if not self._bestaetige_sprung(text.strip()):
+            return
+        # CDX-72 (Pruefung): die Rueckfrage ist modal — waehrenddessen kann die
+        # Seite (Pult, Web) wechseln. Dann gilt die bestaetigte Zeile nicht fuer
+        # den neuen Stapel, auch wenn es dort dieselbe Nummer gibt.
+        ex = self._executor()
+        if ex is None or ex.stack is None or self._cue_signatur(ex.stack) != sig_vorher:
+            self._refresh()
+            return
+        self._gehe_zu(float(nummer))
 
     def _bestaetige_sprung(self, text: str) -> bool:
         """Rueckfrage vor dem Live-Sprung (Standard: Nein)."""

@@ -790,12 +790,25 @@ class VCSlider(VCWidget):
 
     def _beruehrung_uebernehmen(self) -> None:
         canvas = self._find_canvas()
+        # CDX-72 (Pruefung): auch ohne Beruehrungssensor — hat die Hand den
+        # Pult-Fader eben noch geschoben (Eingabe ging an den Fader der vorigen
+        # Bank), wartet der Motor die Hand-Ruhe ab wie nach eigener Eingabe.
+        vor = getattr(canvas, "motor_hand_vor", None)
+        if callable(vor):
+            try:
+                from src.core.midi.midi_mapper import MOTOR_HAND_RUHE_S
+                seit = vor(int(self.midi_ch))
+                if seit is not None and seit < MOTOR_HAND_RUHE_S:
+                    self._motor.hand_gesehen(seit)
+            except Exception:
+                pass
         fn = getattr(canvas, "motor_beruehrt", None)
         if not callable(fn):
             return
         try:
             from src.core.midi.midi_mapper import mackie_touch_note
-            if fn(mackie_touch_note(self.midi_ch)):
+            note = mackie_touch_note(self.midi_ch)
+            if note is not None and fn(note):
                 self._motor.beruehrung(True)
         except Exception:
             pass

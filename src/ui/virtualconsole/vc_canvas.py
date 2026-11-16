@@ -210,6 +210,9 @@ class VCCanvas(QWidget):
         self._led_spiegel = None
         # CDX-72: Beruehrungs-Note -> Zeitpunkt (Motorfader, bankunabhaengig).
         self._motor_beruehrt: dict[int, float] = {}
+        # CDX-72 (Pruefung): Pitchbend-Kanal -> letzte Fader-Eingabe, fuer
+        # Motorfader OHNE Beruehrungssensor (Hand schiebt beim Bankwechsel).
+        self._motor_hand: dict[int, float] = {}
         self._led_timer = QTimer(self)
         self._led_timer.setInterval(150)
         self._led_timer.timeout.connect(self._led_abgleich)
@@ -598,6 +601,11 @@ class VCCanvas(QWidget):
         die Sperre an den Fader der neuen Bank weiter (``motor_beruehrt``)."""
         try:
             from src.core.midi.midi_mapper import TOUCH_KANAL
+            if msg.msg_type == "pitchbend":
+                hand = getattr(self, "_motor_hand", None)
+                if hand is not None:
+                    hand[int(msg.channel)] = time.monotonic()
+                return
             if msg.msg_type not in ("note_on", "note_off") or msg.channel != TOUCH_KANAL:
                 return
             note = int(msg.data1)
@@ -610,6 +618,14 @@ class VCCanvas(QWidget):
             gemerkt[note] = time.monotonic()
         else:
             gemerkt.pop(note, None)
+
+    def motor_hand_vor(self, kanal: int) -> float | None:
+        """CDX-72 (Pruefung): vor wie vielen Sekunden kam zuletzt eine
+        Fader-Eingabe (Pitchbend) auf diesem Kanal — egal an welche Bank.
+        ``None`` = noch nie. Ein Fader ohne Beruehrungssensor erkennt die Hand
+        nur so; der Fader der neuen Bank wartet dann wie nach eigener Eingabe."""
+        ts = (getattr(self, "_motor_hand", None) or {}).get(int(kanal))
+        return None if ts is None else max(0.0, time.monotonic() - ts)
 
     def motor_beruehrt(self, note: int) -> bool:
         """Haelt gerade eine Hand den Pult-Fader mit dieser Beruehrungs-Note?
