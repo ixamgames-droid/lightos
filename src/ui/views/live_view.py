@@ -1445,10 +1445,14 @@ class StageCanvas(QWidget):
         auf dem Dimmer ist die halbe Periode dunkel - der Nachlauf reicht
         deshalb mindestens eine Periode weit (``freq_hz``), sonst spraenge der
         Takt bei langsamen Effekten je Periode hin und her."""
+        jetzt = self._uhr()
+        bis = getattr(self, "_strobe_bis", None)
+        if bis is None or not 0.0 <= bis - jetzt <= self.STROBE_NACHLAUF_MAX_S:
+            self._strobe_takt_merk = None       # UI-135: ein neuer Strobe rechnet neu
         halt = self.STROBE_NACHLAUF_S
         if freq_hz > 0.0:
             halt = max(halt, min(1.0 / freq_hz, self.STROBE_NACHLAUF_MAX_S))
-        self._strobe_bis = self._uhr() + halt
+        self._strobe_bis = jetzt + halt
 
     def _3d_fenster_sichtbar(self) -> bool:
         """Gemerkt fuer DREID_PRUEF_S. Gefragt wird je blinkendem Geraet und
@@ -1482,14 +1486,56 @@ class StageCanvas(QWidget):
             return False
         return not self._3d_fenster_sichtbar()
 
+    # ── UI-135: im Strobe-Takt IST der Zeitgeber der Budget-Abstand ──────────
+    # Befund (B am echten Bildschirm, 15.11.2026): Strobe 1x gleichmaessig,
+    # 2x/4x unregelmaessig. Geblitzt wird in ganzen Takt-Bildern (VIZ-104) -
+    # die Bilder selbst kamen aber ungleichmaessig: der Zeitgeber feuerte fest
+    # alle STROBE_TAKT_MS, und das Budget liess nur jedes zweite oder dritte
+    # Feuern zeichnen. Gemessen (16.11., Windows x64, 250 %, 68 blinkende
+    # Geraete): Bildabstaende rund 63 und 125 ms im Wechsel (der grobe
+    # Windows-Zeitgeber rastet auf 15,6 ms), Blitzabstand bei 3 Bildern je
+    # Blitz 239-315 ms. Jetzt stellt sich der Zeitgeber selbst auf den
+    # Budget-Abstand (Zeichenzeit / STROBE_UI_ANTEIL, mindestens
+    # STROBE_TAKT_MS), als GENAUER Zeitgeber, und jedes Feuern zeichnet. Die
+    # Hysterese haelt den Takt bei kleinen Schwankungen der Zeichenzeit fest -
+    # sonst spraenge die Blitzperiode (ganze Bilder aus Bildrate / Frequenz).
+    STROBE_TAKT_HYSTERESE = 0.15
+
+    def _strobe_takt_roh(self) -> int:
+        """Budget-Abstand in ms aus der gemessenen Zeichenzeit, ohne Hysterese."""
+        zeit, anteil = self._zeichenzeit_s(), self.STROBE_UI_ANTEIL
+        if zeit <= 0.0 or anteil <= 0:
+            return self.STROBE_TAKT_MS
+        roh = int(math.ceil(zeit * 1000.0 / anteil - 1e-9))
+        return max(self.STROBE_TAKT_MS, min(roh, int(self.MAX_BILD_ABSTAND_S * 1000)))
+
+    def _strobe_takt_nachfuehren(self) -> None:
+        """Einmal je Feuern: den gemerkten Strobe-Takt nur bei deutlicher
+        Aenderung der Zeichenzeit neu setzen."""
+        if not self._strobe_takt_aktiv():
+            self._strobe_takt_merk = None
+            return
+        roh = self._strobe_takt_roh()
+        merk = getattr(self, "_strobe_takt_merk", None)
+        if merk is None or abs(roh - merk) > merk * self.STROBE_TAKT_HYSTERESE:
+            self._strobe_takt_merk = roh
+
     def _takt_ms(self) -> int:
-        return self.STROBE_TAKT_MS if self._strobe_takt_aktiv() else self.RENDER_INTERVAL_MS
+        if not self._strobe_takt_aktiv():
+            self._strobe_takt_merk = None
+            return self.RENDER_INTERVAL_MS
+        merk = getattr(self, "_strobe_takt_merk", None)
+        if merk is None:
+            merk = self._strobe_takt_merk = self._strobe_takt_roh()
+        return merk
 
     def _ui_anteil(self) -> float:
         return self.STROBE_UI_ANTEIL if self._strobe_takt_aktiv() else self.MAX_UI_ANTEIL
 
     def _bild_abstand_s(self) -> float:
         """Mindestabstand zweier Takt-Bilder; 0 = volle Rate (jeder Takt)."""
+        if self._strobe_takt_aktiv():
+            return 0.0          # UI-135: der Zeitgeber haelt das Budget selbst
         anteil = self._ui_anteil()
         if anteil <= 0:
             return 0.0
@@ -1515,10 +1561,21 @@ class StageCanvas(QWidget):
         # Nach einer Pause kein Guthaben ansparen: ab jetzt zaehlen.
         self._naechstes_bild = max(self._naechstes_bild, jetzt - halb) + abstand
 
-    def _zeitgeber_auf(self, takt_ms: int) -> None:
+    def _zeitgeber_auf(self, takt_ms: int, genau: bool = False) -> None:
+        """Abstand und Art des Zeitgebers. ``genau`` (UI-135, im Strobe-Takt):
+        der grobe Zeitgeber rastet unter Windows auf 15,6 ms - aus 50 ms
+        wurden 62,5, aus 100 ms 109. Fuer gleichmaessige Blitze muss der
+        Bildabstand stimmen; ausserhalb des Strobe-Takts bleibt er grob."""
         try:
-            if self._update_timer.interval() != takt_ms:
-                self._update_timer.setInterval(takt_ms)
+            t = self._update_timer
+            art = Qt.TimerType.PreciseTimer if genau else Qt.TimerType.CoarseTimer
+            if t.timerType() != art:
+                t.setTimerType(art)
+                if t.isActive():
+                    t.start(takt_ms)        # die Art gilt erst ab dem naechsten Start
+                    return
+            if t.interval() != takt_ms:
+                t.setInterval(takt_ms)
         except (RuntimeError, AttributeError):
             pass
 
@@ -1528,6 +1585,10 @@ class StageCanvas(QWidget):
             # Strobe-Takt feuern (der wird sonst erst nach einem Bild umgestellt).
             self._zeitgeber_auf(self.RENDER_INTERVAL_MS)
             return
+        # UI-135: Zeitgeber ZUERST auf den Takt der Lage - auch wenn dieses
+        # Feuern gleich nichts zeichnet (nichts animiert, Signatur gleich).
+        self._strobe_takt_nachfuehren()
+        self._zeitgeber_auf(self._takt_ms(), genau=self._strobe_takt_aktiv())
         jetzt = self._uhr()
         if not self._bild_im_budget(jetzt):
             return      # Signatur bleibt stehen -> Aenderung kommt im naechsten
@@ -1547,8 +1608,6 @@ class StageCanvas(QWidget):
         # zeigen den Stand des laufenden Takt-Bildes noch einmal.
         self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
         self.update()
-        # UI-130: Zeitgeber auf den Takt der Lage (Strobe sichtbar oder nicht)
-        self._zeitgeber_auf(self._takt_ms())
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
     # Raster (gepunktete, geglaettete Linien), Buehne und Publikum aendern sich

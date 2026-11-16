@@ -549,8 +549,9 @@ Frequenz blitzen gemeinsam.
   Oberfläche. Bei hoher Bildschirmskalierung und vielen Geräten sind das etwa
   7–8 Bilder je Sekunde, also höchstens gut zwei Blitze. Solange ein Gerät
   sichtbar blinkt — es muss dabei auch leuchten — und kein 3D-Fenster offen
-  ist, zeichnet sie schneller (alle 50 ms, höchstens ein Drittel der
-  Rechenzeit). Gemessen bei 250 % und 68 blinkenden Geräten waren das rund 11
+  ist, zeichnet sie schneller und in festem Abstand (höchstens ein Drittel der
+  Rechenzeit, frühestens alle 50 ms) — so kommen die Blitze gleichmäßig.
+  Gemessen bei 250 % und 68 blinkenden Geräten waren das rund 11
   statt 8 Bilder je Sekunde; die Bedienung reagierte dabei gleich schnell. Bei
   Blackout oder Dimmer auf null bleibt sie beim ruhigeren Takt. Ebenso bei
   offenem 3D-Fenster — das zeigt den Strobe dann selbst.

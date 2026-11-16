@@ -131,13 +131,17 @@ class StrobeTaktTest(unittest.TestCase):
             self.assertEqual(n[0], 2, "nach DREID_PRUEF_S wird wieder gesucht")
 
     def test_budget_haelt_den_anteil_unter_der_vorgabe(self):
-        """Bei 34 ms je Bild (gemessen, 250 %): Abstand = 34 / 0,33 = 103 ms."""
+        """Bei 34 ms je Bild (gemessen, 250 %): Abstand = 34 / 0,33 = 103,03 ->
+        104 ms. Seit UI-135 ist das der Takt des Zeitgebers selbst (jedes
+        Feuern zeichnet), nicht mehr ein Budget ueber einem 50-ms-Raster."""
         c = self.c
         c._zeichenzeiten.extend([0.034] * 5)
         self._blinkt()
-        abstand = c._bild_abstand_s()
-        self.assertAlmostEqual(abstand, 0.034 / c.STROBE_UI_ANTEIL, places=4)
+        abstand = c._takt_ms() / 1000.0
+        self.assertAlmostEqual(abstand, 0.034 / c.STROBE_UI_ANTEIL, delta=0.001)
+        self.assertLessEqual(0.034 / abstand, c.STROBE_UI_ANTEIL)
         self.assertLess(0.034 / abstand, 0.5)
+        self.assertEqual(c._bild_abstand_s(), 0.0)
         self.assertAlmostEqual(c._strobe_bildrate(), 1.0 / abstand, places=4)
         # ohne Strobe wie bisher: 34 / 0,25 = 136 ms
         self.zeit[0] += c.STROBE_NACHLAUF_S + 1.0
