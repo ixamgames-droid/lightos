@@ -18,13 +18,15 @@ Handy-Konsole auszuschalten soll auch waehrend der Show ein Griff sein.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import (QEvent, QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer,
+                            Signal)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QLinearGradient, QPainter, QPen
 from PySide6.QtWidgets import (QColorDialog, QDialog, QDialogButtonBox, QGridLayout,
                                QHBoxLayout, QInputDialog, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMenu,
                                QMessageBox, QPushButton, QScrollArea, QSizePolicy,
-                               QTabBar, QToolButton, QVBoxLayout, QWidget)
+                               QStyle, QStyleOptionViewItem, QTabBar, QToolButton,
+                               QVBoxLayout, QWidget)
 
 from src.core import handy_seiten as hs
 
@@ -225,8 +227,14 @@ class HandyGruppeDialog(QDialog):
         self.liste.setMinimumHeight(180)
         gewaehlt = set(gewaehlt or ())
         for kennung, text, grund in kandidaten:
-            it = QListWidgetItem(text + (f"  — {grund}" if grund else ""))
+            # UI-143: in der Zeile nur Name · Seite + kurzes Kennzeichen; der
+            # volle Grund steht unter der Liste (Antippen) und im Tooltip
+            marke = self.kennzeichen(grund)
+            it = QListWidgetItem(text + (f"  — {marke}" if marke else ""))
             it.setData(Qt.ItemDataRole.UserRole, kennung)
+            it.setData(self._ROLLE_NAME, text)
+            it.setData(self._ROLLE_MARKE, marke)
+            it.setData(self._ROLLE_GRUND, grund or "")
             it.setSizeHint(QSize(0, TREFFER))
             if grund:
                 it.setFlags(Qt.ItemFlag.ItemIsSelectable)      # sichtbar, nicht waehlbar
@@ -238,6 +246,20 @@ class HandyGruppeDialog(QDialog):
                                  else Qt.CheckState.Unchecked)
             self.liste.addItem(it)
         lay.addWidget(self.liste, 1)
+        # UI-143: voller Sperrgrund, sobald eine gesperrte Zeile angetippt wird
+        # (gesperrte Zeilen sind nicht aktiv — der Druck wird am Viewport
+        # gelesen, an der Liste aendert er nichts)
+        self.grund_hinweis = QLabel()
+        self.grund_hinweis.setObjectName("handy_gruppe_grund")
+        self.grund_hinweis.setWordWrap(True)
+        self.grund_hinweis.setStyleSheet(
+            "color:#f2cc60; background:#2b2410; border:1px solid #5c4a14; "
+            "border-radius:4px; padding:4px 6px;")
+        self.grund_hinweis.hide()
+        lay.addWidget(self.grund_hinweis)
+        self.liste.viewport().installEventFilter(self)
+        self.liste.currentItemChanged.connect(lambda it, _alt: self.grund_zeigen(it))
+        self.liste.itemClicked.connect(self.grund_zeigen)
         hinweis = QLabel(
             "Am Handy ist von diesen Tasten immer höchstens eine an: tippst du eine "
             "an, gehen die anderen aus (auch am Pult sichtbar). Nochmal antippen = "
@@ -253,6 +275,97 @@ class HandyGruppeDialog(QDialog):
         leiste.accepted.connect(self.accept)
         leiste.rejected.connect(self.reject)
         lay.addWidget(leiste)
+
+    _ROLLE_NAME = Qt.ItemDataRole.UserRole + 1
+    _ROLLE_MARKE = Qt.ItemDataRole.UserRole + 2
+    _ROLLE_GRUND = Qt.ItemDataRole.UserRole + 3
+
+    @staticmethod
+    def kennzeichen(grund) -> str:
+        """UI-143: kurzes Kennzeichen fuer die Zeile — „schon in „X““ bleibt
+        (kurz und nuetzlich), alles andere heisst „gesperrt“."""
+        if not grund:
+            return ""
+        return grund if grund.startswith("schon in") else "gesperrt"
+
+    def grund_zeigen(self, item) -> None:
+        """Vollen Sperrgrund von ``item`` unter der Liste zeigen (oder das Feld
+        verbergen, wenn ``item`` waehlbar ist)."""
+        grund = item.data(self._ROLLE_GRUND) if item is not None else ""
+        if grund:
+            name = item.data(self._ROLLE_NAME) or ""
+            self.grund_hinweis.setText(f"{name}: {grund}" if name else grund)
+            self.grund_hinweis.show()
+            # umbrechender Text: Qt vergroessert das Fenster dafuer nicht von
+            # selbst (Hoehe-fuer-Breite) — nur hoeher, nie breiter
+            lay = self.layout()
+            if lay is not None and lay.hasHeightForWidth():
+                h = lay.totalHeightForWidth(self.width())
+                if h > self.height():
+                    self.resize(self.width(), h)
+        else:
+            self.grund_hinweis.hide()
+
+    def eventFilter(self, obj, ev):                      # noqa: N802 (Qt)
+        try:
+            if (obj is self.liste.viewport()
+                    and ev.type() in (QEvent.Type.MouseButtonPress,
+                                      QEvent.Type.MouseButtonRelease)):
+                it = self.liste.itemAt(ev.position().toPoint())
+                if it is not None and it.data(self._ROLLE_GRUND):
+                    self.grund_zeigen(it)
+            elif obj is self.liste.viewport() and ev.type() == QEvent.Type.Resize:
+                self._zeilen_einpassen()
+        except RuntimeError:
+            pass
+        return False
+
+    def showEvent(self, event):                          # noqa: N802 (Qt)
+        super().showEvent(event)
+        self._zeilen_einpassen()
+
+    def textbreite(self, item) -> float:
+        """Breite, die der Text der Zeile ``item`` in der Liste hat (px)."""
+        opt = QStyleOptionViewItem()
+        opt.initFrom(self.liste)
+        opt.rect = QRect(0, 0, self.liste.viewport().width(), TREFFER)
+        opt.font = self.liste.font()
+        opt.fontMetrics = QFontMetrics(opt.font)
+        opt.features |= (QStyleOptionViewItem.ViewItemFeature.HasDisplay
+                         | QStyleOptionViewItem.ViewItemFeature.HasCheckIndicator)
+        opt.text = item.text()
+        r = self.liste.style().subElementRect(
+            QStyle.SubElement.SE_ItemViewItemText, opt, self.liste)
+        # Qt laesst links/rechts je einen Textrand frei
+        rand = self.liste.style().pixelMetric(
+            QStyle.PixelMetric.PM_FocusFrameHMargin, None, self.liste) + 1
+        return max(0, r.width() - 2 * rand)
+
+    def _zeilen_einpassen(self) -> None:
+        """UI-143: gesperrte Zeilen so kuerzen, dass das Kennzeichen immer zu
+        sehen ist — gekuerzt wird der Name, nie „— gesperrt“."""
+        try:
+            fm = QFontMetrics(self.liste.font())
+            for i in range(self.liste.count()):
+                it = self.liste.item(i)
+                marke = it.data(self._ROLLE_MARKE)
+                if not marke:
+                    continue
+                name = it.data(self._ROLLE_NAME) or ""
+                hinten = f"  — {marke}"
+                it.setText(name + hinten)
+                frei = self.textbreite(it)
+                if fm.horizontalAdvance(name + hinten) <= frei:
+                    continue
+                platz = frei - fm.horizontalAdvance(hinten)
+                if platz >= fm.horizontalAdvance("Wwww…"):
+                    it.setText(fm.elidedText(name, Qt.TextElideMode.ElideRight, int(platz))
+                               + hinten)
+                else:
+                    it.setText(fm.elidedText(f"— {marke}", Qt.TextElideMode.ElideRight,
+                                             int(frei)))
+        except RuntimeError:
+            pass
 
     def setze_auswahl(self, kennungen) -> None:
         ziel = set(kennungen or ())
