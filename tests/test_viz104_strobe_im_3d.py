@@ -614,7 +614,7 @@ class LiveView2dBlinktImBildtaktTest(unittest.TestCase):
                             _strobe_bild=0, _bild_abstand_s=lambda: abstand_s,
                             # UI-130: hier der Grundtakt (kein Strobe-Takt)
                             _takt_ms=lambda: LV.StageCanvas.RENDER_INTERVAL_MS,
-                            _strobe_gesehen=lambda: None)
+                            _strobe_gesehen=lambda *_a: None)
         c._strobe_bildrate = lambda: LV.StageCanvas._strobe_bildrate(c)
         c._blink_an = lambda hz, r=False: LV.StageCanvas._blink_an(c, hz, r)
         return LV, c

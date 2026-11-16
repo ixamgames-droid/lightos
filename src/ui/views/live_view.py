@@ -1427,10 +1427,28 @@ class StageCanvas(QWidget):
     STROBE_TAKT_MS = 50
     STROBE_UI_ANTEIL = 0.33
     STROBE_NACHLAUF_S = 1.0         # so lange nach dem letzten blinkenden Geraet
+    STROBE_NACHLAUF_MAX_S = 5.0     # Deckel fuer langsame Blink-Effekte, s. u.
     DREID_PRUEF_S = 0.25            # so lange gilt die Antwort "3D-Fenster offen?"
 
-    def _strobe_gesehen(self) -> None:
-        self._strobe_zuletzt = self._uhr()
+    @staticmethod
+    def _leuchtet(color: QColor, intensity: int) -> bool:
+        """Zeichnet dieses Bild das Geraet hell? Massgeblich ist, was die
+        Ansicht zeigt (Display-Frame: nach Blackout, Grand Master, NOT-AUS):
+        Helligkeit 0 oder Farbe Schwarz (Geraet ohne Dimmer) ist dunkel."""
+        return intensity > 0 and (color.red() > 0 or color.green() > 0
+                                  or color.blue() > 0)
+
+    def _strobe_gesehen(self, freq_hz: float = 0.0) -> None:
+        """Ein Geraet blinkt in diesem Bild UND leuchtet sichtbar. Nur dann
+        lohnt der schnellere Takt: ein Strobe-Wert bei Helligkeit 0 (Blackout,
+        geparkter Strobe-Kanal) zeigt nichts und zaehlt nicht. Ein Blink-Effekt
+        auf dem Dimmer ist die halbe Periode dunkel - der Nachlauf reicht
+        deshalb mindestens eine Periode weit (``freq_hz``), sonst spraenge der
+        Takt bei langsamen Effekten je Periode hin und her."""
+        halt = self.STROBE_NACHLAUF_S
+        if freq_hz > 0.0:
+            halt = max(halt, min(1.0 / freq_hz, self.STROBE_NACHLAUF_MAX_S))
+        self._strobe_bis = self._uhr() + halt
 
     def _3d_fenster_sichtbar(self) -> bool:
         """Gemerkt fuer DREID_PRUEF_S. Gefragt wird je blinkendem Geraet und
@@ -1458,8 +1476,9 @@ class StageCanvas(QWidget):
         return False
 
     def _strobe_takt_aktiv(self) -> bool:
-        zuletzt = getattr(self, "_strobe_zuletzt", None)
-        if zuletzt is None or self._uhr() - zuletzt > self.STROBE_NACHLAUF_S:
+        bis = getattr(self, "_strobe_bis", None)
+        # Untergrenze: eine zurueckgestellte Uhr haelt den Takt nicht fest.
+        if bis is None or not 0.0 <= bis - self._uhr() <= self.STROBE_NACHLAUF_MAX_S:
             return False
         return not self._3d_fenster_sichtbar()
 
@@ -1496,8 +1515,18 @@ class StageCanvas(QWidget):
         # Nach einer Pause kein Guthaben ansparen: ab jetzt zaehlen.
         self._naechstes_bild = max(self._naechstes_bild, jetzt - halb) + abstand
 
+    def _zeitgeber_auf(self, takt_ms: int) -> None:
+        try:
+            if self._update_timer.interval() != takt_ms:
+                self._update_timer.setInterval(takt_ms)
+        except (RuntimeError, AttributeError):
+            pass
+
     def _on_render_tick(self) -> None:
         if not self._darf_zeichnen():
+            # UI-130: verdeckt/minimiert zeichnet nichts - dann auch nicht im
+            # Strobe-Takt feuern (der wird sonst erst nach einem Bild umgestellt).
+            self._zeitgeber_auf(self.RENDER_INTERVAL_MS)
             return
         jetzt = self._uhr()
         if not self._bild_im_budget(jetzt):
@@ -1519,12 +1548,7 @@ class StageCanvas(QWidget):
         self._strobe_bild = getattr(self, "_strobe_bild", 0) + 1
         self.update()
         # UI-130: Zeitgeber auf den Takt der Lage (Strobe sichtbar oder nicht)
-        try:
-            takt = self._takt_ms()
-            if self._update_timer.interval() != takt:
-                self._update_timer.setInterval(takt)
-        except (RuntimeError, AttributeError):
-            pass
+        self._zeitgeber_auf(self._takt_ms())
 
     # ── VIZ-70: statischer Hintergrund als Pixmap ────────────────────────────
     # Raster (gepunktete, geglaettete Linien), Buehne und Publikum aendern sich
@@ -2063,9 +2087,11 @@ class StageCanvas(QWidget):
         return {"namen": namen, "square": square, "prog": prog}
 
     def _get_strobe_info(self, fid: int, fixture, running=None,
-                         vorab: dict | None = None) -> tuple[float, bool]:
+                         vorab: dict | None = None,
+                         leuchtet: bool = True) -> tuple[float, bool]:
         """Gibt (freq_hz, is_currently_on) zurück. freq_hz=0 → kein Blinken.
-        ``vorab`` (VIZ-70): Ergebnis von ``_effekt_vorab`` fuer dieses Bild."""
+        ``vorab`` (VIZ-70): Ergebnis von ``_effekt_vorab`` fuer dieses Bild.
+        ``leuchtet`` (UI-130): das Geraet ist in diesem Bild sichtbar hell."""
         freq_hz = 0.0
 
         # 1. Shutter/Strobe-DMX-Kanal auslesen
@@ -2104,7 +2130,8 @@ class StageCanvas(QWidget):
 
         if freq_hz == 0.0:
             return 0.0, True
-        self._strobe_gesehen()          # UI-130: schnellerer Takt
+        if leuchtet:
+            self._strobe_gesehen(freq_hz)   # UI-130: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     def _get_active_effects(self, fid: int, strobe_hz: float = 0.0,
@@ -2450,7 +2477,8 @@ class StageCanvas(QWidget):
         except Exception:
             return QColor(60, 60, 60), 0
 
-    def _strobe_aus_steckbrief(self, sb: dict, lese, vorab) -> tuple[float, bool]:
+    def _strobe_aus_steckbrief(self, sb: dict, lese, vorab,
+                               leuchtet: bool = True) -> tuple[float, bool]:
         """Wie :meth:`_get_strobe_info` mit ``vorab``, aus dem Steckbrief;
         ``_strobe_hz`` je Kanal und Wert gemerkt."""
         freq_hz = 0.0
@@ -2469,7 +2497,8 @@ class StageCanvas(QWidget):
             freq_hz = vorab["square"].get(sb["fp"][0], 0.0)
         if freq_hz == 0.0:
             return 0.0, True
-        self._strobe_gesehen()          # UI-130: schnellerer Takt
+        if leuchtet:
+            self._strobe_gesehen(freq_hz)   # UI-130: schnellerer Takt
         return freq_hz, self._blink_an(freq_hz, rechteck)
 
     # ── VIZ-104: Blinken im Bildtakt ─────────────────────────────────────────
@@ -2699,7 +2728,8 @@ class StageCanvas(QWidget):
                     tilt = _pt.get("tilt", 128) + (_pt.get("tilt_fine", 0) or 0) / 256.0
             except Exception:
                 pass
-            strobe_hz, blink_on = self._strobe_aus_steckbrief(sb, lese, vorab)
+            strobe_hz, blink_on = self._strobe_aus_steckbrief(
+                sb, lese, vorab, self._leuchtet(color, intensity))
             effects = self._get_active_effects(fixture.fid, strobe_hz, running, vorab)
             if effects or strobe_hz != 0.0:
                 animiert = True
