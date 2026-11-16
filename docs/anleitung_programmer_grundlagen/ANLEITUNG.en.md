@@ -80,14 +80,19 @@ explanation. Which gestures are active is set under **Ansicht → Touch-Gesten�
 
 - **In the list** you click a fixture. With **Strg** (Ctrl) you add more, with
   **Umschalt** (Shift) a whole range. Fixtures with several heads have an arrow: expanded,
-  you can select individual heads.
+  you can select individual heads. On a touchscreen (`--touch`) there is a **Mehrfach**
+  (multi-select) button next to **Alle** / **Keine**: switched on („Mehrfach ✓"), each tap
+  toggles exactly one row and the others stay selected.
 - **Clicking a group (1)**: the selection is replaced by the fixtures of the group (2), in
   the group's order. At the same time the Programmer jumps to the **Matrix** tab (3) and
   shows the matrices of that group. For colour or brightness, click **Color** or
   **Intensity** afterwards.
 - **Double-clicking a group**: the fixtures of the group are added to the existing
-  selection. The hint below the list says the same: „Klick = Gruppe wählen · Doppelklick
-  = zur Auswahl addieren“ (click = select group · double-click = add to selection).
+  selection. Without a double-click, e.g. on a finger, switch on **＋ Addieren** (add) next
+  to the groups' search field: then every tap on a group adds its fixtures to the
+  selection instead of replacing it. The hint below the list says the same:
+  „Tippen = Gruppe wählen · „＋ Addieren“ an (oder Doppelklick) = zur Auswahl addieren“
+  (tap = select group · „＋ Addieren“ on (or double-click) = add to selection).
 
 The order of the selection matters later, for example for the fan (step 10).
 

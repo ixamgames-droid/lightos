@@ -102,6 +102,31 @@ class Show(Function):
         except Exception:
             pass
 
+    def block_kind_beenden(self, sf: ShowFunction) -> bool:
+        """CDX-75: Vor dem Entfernen eines Blocks dessen laufendes Kind stoppen.
+
+        Nach dem Entfernen erfasst ihn weder ``write`` (Stop am Blockende) noch
+        ``_on_stop`` — das Kind bliebe als laufend markiert, ohne dass jemand
+        es rendert. Nur bei laufender Show und nur, wenn kein ANDERER noch
+        aktiver Block dasselbe Kind spielt. ``True`` = Kind gestoppt."""
+        if not (self._running and sf._started and not sf._stopped):
+            return False
+        sf._stopped = True
+        for track in self.tracks:
+            for andere in track.show_functions:
+                if (andere is not sf and andere.function_id == sf.function_id
+                        and andere._started and not andere._stopped):
+                    return False
+        try:
+            from .function_manager import get_function_manager
+            child = get_function_manager().get(sf.function_id)
+        except Exception:
+            return False
+        if child is None:
+            return False
+        child.stop()
+        return True
+
     # ── write ─────────────────────────────────────────────────────────────────
 
     def write(self, universes: dict[int, "Universe"],

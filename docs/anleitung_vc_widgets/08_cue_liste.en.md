@@ -8,7 +8,7 @@
 
 ## What it is for & what it controls
 
-The cue list is bound to **one executor** (a place in the playback's executor bar, with its cuestack). It shows the cues of this slot as a list and highlights the cue that is currently running. With the three transport buttons at the bottom edge you step through the list during operation — forward, back or stop.
+The cue list is bound to **one executor** (a place in the playback's executor bar, with its cuestack). It shows the cues of this slot as a list and highlights the cue that is currently running. With the three transport buttons at the bottom edge you step through the list during operation — forward, back or stop; a double-tap on a line jumps straight to that cue after a confirmation.
 
 The element continuously mirrors the slot's state: it polls the executor about **5 times per second** (every 200 ms), picks up changes to the cue list automatically and marks the currently active cue. So you are always controlling the same cuestack that the playback itself uses — the widget is a remote control for it.
 
@@ -27,7 +27,7 @@ From top to bottom, the element consists of three parts:
 | GO | `GO ►` (highlighted, blue/green) | Starts or jumps to the **next** cue (sends `go` to the executor slot). The main button, clearly set apart. |
 | STOP | `■` | **Stops** the slot's playback (sends `stop` to the executor slot). |
 
-**How to use it:** during operation (Bearbeiten (edit) OFF), clicks on the buttons act immediately on the bound slot. The list itself only displays the current cue; clicking a line does not trigger a jump — switching happens exclusively via the three transport buttons.
+**How to use it:** during operation (Bearbeiten (edit) OFF), clicks on the buttons act immediately on the bound slot. A single click or tap on a line does not trigger a jump. A **double-click or double-tap** on a line, however, jumps straight to that cue — LightOS first asks "Live zu dieser Cue springen?" (jump live to this cue; the default answer is **No**, so an accidental double-tap does nothing). With the touch lock active nothing happens. Otherwise you switch via the three transport buttons.
 
 **In edit mode** the list and all three buttons are disabled (no accidental triggering); the widget can then only be moved/resized. A double-click opens the settings (see the overview in [README.en.md](README.en.md)).
 

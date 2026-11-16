@@ -733,6 +733,11 @@ class MainWindow(QMainWindow):
         # LAS-31: fester Laser-NOT-AUS oben rechts (im Kiosk eigener Streifen).
         self._build_laser_notaus()
 
+        # UI-136: im Touch-Modus einmal pruefen, ob System-Gesten die Finger
+        # vor LightOS abfangen (nur lesen; Hinweis wegklickbar, Kiosk: Statuszeile).
+        if touch:
+            QTimer.singleShot(1500, self, self._system_gesten_pruefen)
+
         # Kiosk-Modus: Menubar + Statusbar ausblenden, direkt zur Virtual Console
         if kiosk:
             self.menuBar().hide()
@@ -2013,6 +2018,15 @@ class MainWindow(QMainWindow):
         except RuntimeError:        # Ansicht schon abgebaut
             return None
 
+    def _vc_leds_abschalten(self) -> None:
+        """CDX-72: beim Beenden die Pult-LEDs der VC loeschen (vor close_all)."""
+        try:
+            canvas = self._vc_zeichenflaeche()
+            if canvas is not None:
+                canvas.led_abschalten()
+        except Exception as e:
+            print(f"[MainWindow] VC-LEDs beim Beenden: {e}")
+
     def _vc_verlauf(self):
         """Zeichenflaeche der Virtual Console, wenn sie die sichtbare Seite
         dieses Fensters ist — sonst None. Die Zeichenflaeche nimmt keinen
@@ -2402,6 +2416,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"Drei-Finger-Tippen: {text}", 2500)
         except Exception:
             pass
+
+    def _system_gesten_pruefen(self) -> None:
+        """UI-136: Hinweis auf aktive System-Gesten (s. ``system_gesten``)."""
+        try:
+            from src.ui import system_gesten
+            system_gesten.beim_start(self, bool(self._kiosk_mode))
+        except Exception as e:
+            print(f"[main_window] System-Gesten pruefen: {e}")
 
     def _open_gesten_dialog(self) -> None:
         from src.ui.widgets.gesten_dialog import GestenDialog
@@ -4337,6 +4359,10 @@ class MainWindow(QMainWindow):
             pass
         if self._state.playback_engine:
             self._state.playback_engine.stop()
+        # CDX-72: Pult-LEDs der VC ausschalten, solange der Ausgang noch offen
+        # ist — die Canvas baut sich erst nach close_all() ab, dann gingen die
+        # Note-Offs ins Leere und die LEDs blieben bis zum naechsten Start an.
+        self._vc_leds_abschalten()
         from src.core.midi.midi_manager import get_midi_manager
         get_midi_manager().close_all()
         try:
