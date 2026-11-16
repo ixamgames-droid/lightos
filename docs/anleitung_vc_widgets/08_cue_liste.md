@@ -27,6 +27,10 @@ Das Element besteht von oben nach unten aus drei Teilen:
 
 **Bedienung:** Im Betrieb (Bearbeiten AUS) wirken Klicks auf die Knöpfe sofort auf den gebundenen Slot. Die Liste selbst dient nur der Anzeige des aktuellen Cues; das Anklicken einer Zeile löst keinen Sprung aus — geschaltet wird ausschließlich über die drei Transport-Knöpfe.
 
+Ein **Doppeltipp** (Doppelklick) auf eine Cue springt nach einer Rückfrage (Standard „Nein“) live dorthin.
+
+**Nach einem Seitenwechsel** zeigt die Liste sofort die Cues der neuen Seite, auch wenn beide Seiten gleich viele Cues haben (ebenso nach Umbenennen oder Umnummerieren). Ein Doppeltipp auf einen Eintrag, der noch von der alten Seite stammte, springt nicht und fragt nicht nach; die Liste baut sich neu auf. Gibt es die Nummer auf der aktuellen Seite nicht, passiert nichts.
+
 **Im Bearbeiten-Modus** sind Liste und alle drei Knöpfe deaktiviert (kein versehentliches Auslösen), das Widget lässt sich dann nur verschieben/skalieren. Doppelklick öffnet die Einstellungen (siehe Übersicht in der [README.md](README.md)).
 
 ## Einstellungen
