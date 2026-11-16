@@ -17,21 +17,24 @@ import os
 MENUE_INDIKATOR_TOUCH = 22
 
 
-def haken_url() -> str:
+def haken_url(name: str = "haken.svg") -> str:
     try:
         from src.core.paths import programm_datei
-        pfad = programm_datei("assets", "icons", "haken.svg")
+        pfad = programm_datei("assets", "icons", name)
     except Exception:
         pfad = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))), "assets", "icons", "haken.svg")
+            os.path.abspath(__file__)))), "assets", "icons", name)
     return os.path.abspath(pfad).replace("\\", "/")
 
 
 def haken_qss(touch: bool = False) -> str:
     """Regeln, die das Hauptfenster hinter ``dark.qss`` anhaengt."""
     h = haken_url()
+    # Nachbesserung UI-140: TEILWEISE (Tri-State) bekommt einen Strich.
+    strich = haken_url("strich.svg")
     qss = (
         f"QCheckBox::indicator:checked {{ image: url({h}); }}\n"
+        f"QCheckBox::indicator:indeterminate {{ image: url({strich}); }}\n"
         f"QMenu::indicator:non-exclusive:checked {{ image: url({h}); }}\n"
     )
     if touch:

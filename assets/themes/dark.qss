@@ -631,6 +631,14 @@ QCheckBox::indicator:checked {
     border-color: #66aaff;
 }
 
+/* Nachbesserung UI-140: TEILWEISE (Tri-State, z. B. „Pan invertieren" bei
+   gemischter Auswahl) — dunkelblau mit weissem Strich (Bild aus haken_stil.py),
+   weder leer wie AUS noch hell wie AN. */
+QCheckBox::indicator:indeterminate {
+    background: #0a3d7a;
+    border-color: #66aaff;
+}
+
 QCheckBox::indicator:disabled {
     background: #2a2a2a;
     border-color: #555555;

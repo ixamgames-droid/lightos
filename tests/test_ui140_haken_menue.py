@@ -274,3 +274,36 @@ class HauptfensterMenueTest(unittest.TestCase):
         from src.ui.haken_stil import haken_url
         self.assertTrue(os.path.isfile(haken_url()))
         self.assertTrue(os.path.isabs(haken_url()))
+
+
+class TeilweiseTest(unittest.TestCase):
+    """Nachbesserung nach Pruefung: TEILWEISE (Tri-State, „Pan invertieren"
+    bei gemischter Auswahl) sah aus wie AUS — jetzt eigener Strich."""
+
+    def tearDown(self):
+        destroy_all_top_level_widgets(QApplication.instance())
+
+    def _pruefe(self, touch: bool):
+        from PySide6.QtCore import Qt
+        w = _fenster(touch)
+        lay = QVBoxLayout(w)
+        teil, aus = QCheckBox("Pan invertieren"), QCheckBox("Tilt invertieren")
+        teil.setTristate(True)
+        teil.setCheckState(Qt.CheckState.PartiallyChecked)
+        lay.addWidget(teil)
+        lay.addWidget(aus)
+        w.resize(320, 160)
+        w.show()
+        self.assertTrue(_warte(lambda: w.isVisible()))
+        QApplication.processEvents()
+        px_t = _pixel(teil.grab().toImage(), _indikator(teil))
+        px_a = _pixel(aus.grab().toImage(), _indikator(aus))
+        self.assertGreater(sum(_weiss(c) for c in px_t), 4, "TEILWEISE ohne Strich")
+        self.assertEqual(sum(_weiss(c) for c in px_a), 0)
+        self.assertNotEqual([c.rgb() for c in px_t], [c.rgb() for c in px_a])
+
+    def test_maus(self):
+        self._pruefe(False)
+
+    def test_touch(self):
+        self._pruefe(True)

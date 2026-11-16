@@ -31,7 +31,8 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    `Ausgabe`, `Visualizer`, `Befehl`, `Hilfe`. Hier liegen Speichern und Öffnen
    (Schritt 7) und die Ausgabe-Einstellungen. `Befehl` → **Befehlszeile fokussieren**
    (Kürzel `:` oder `F12`) springt in die Befehlszeile unten. Ankreuzbare Einträge
-   zeigen ihren Zustand als Kästchen: blau mit weißem Haken = an, leerer Rahmen = aus.
+   zeigen ihren Zustand als Kästchen: blau mit weißem Haken = an, leerer Rahmen = aus,
+   weißer Strich = teilweise (z. B. bei gemischter Geräteauswahl).
    **Ausgabe → Simulations-Hinweis „MOCK“** blendet nur „MOCK“ in der Statusleiste ein
    und öffnet den 3D-Visualizer — der DMX-Ausgang läuft dabei weiter. Unter `Hilfe` findest du diese
    Anleitung wieder (**Erste Schritte**; alle weiteren unter **Anleitungen öffnen**), dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und

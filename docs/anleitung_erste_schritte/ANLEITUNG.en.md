@@ -36,7 +36,7 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    `Hilfe` (Help). Saving and opening (step 7) and the output settings live here.
    `Befehl` → **Befehlszeile fokussieren** (shortcut `:` or `F12`) jumps into the command
    line at the bottom. Checkable entries show their state as a box: blue with a white tick
-   = on, empty frame = off. **Ausgabe → Simulations-Hinweis „MOCK“** only shows “MOCK” in
+   = on, empty frame = off, white dash = partly (e.g. mixed fixture selection). **Ausgabe → Simulations-Hinweis „MOCK“** only shows “MOCK” in
    the status bar and opens the 3D visualizer — DMX output keeps running.
    `Hilfe` brings you back to this guide (**Erste Schritte**; all others under **Anleitungen öffnen**) and also offers **Tastenkürzel…** (all
    keyboard shortcuts at a glance) and **Datenordner öffnen** / **Show-Ordner öffnen**
