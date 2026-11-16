@@ -195,3 +195,35 @@ def test_rueckfrage_typ():
     box = vcv._alle_loeschen_box(None, 2)
     assert isinstance(box, QMessageBox)
     box.deleteLater()
+
+
+# Nachbesserung nach Pruefung: die Reiternamen wie vor UI-137 (gemessen am
+# Stand vor UI-137). TAP polierte ohne Eltern mit dem Stil-Minimum (80 px) und
+# kuerzte im Touch-Modus „Bühne“ zu „Büh…“ (1280 px) und „Patchen“ zu „Patch“
+# (1440 px).
+_NAMEN_VORHER = {
+    (False, 1280): ["Bühne", "Patch", "Prog", "VC", "Desk", "Play", "E/A", "BPM"],
+    (False, 1366): ["Bühne", "Patchen", "Prog", "VC", "Desk", "Playback", "E/A", "BPM"],
+    (False, 1440): ["Bühne", "Patchen", "Programmer", "Virtual Console", "Simple Desk",
+                    "Playback", "E/A", "BPM"],
+    (True, 1280): ["Bühne", "Patch", "Prog", "VC", "Desk", "Play", "E/A", "BPM"],
+    (True, 1366): ["Bühne", "Patch", "Prog", "VC", "Desk", "Play", "E/A", "BPM"],
+    (True, 1440): ["Bühne", "Patchen", "Prog", "VC", "Desk", "Play", "E/A", "BPM"],
+}
+
+
+@pytest.mark.parametrize("touch", [False, True])
+def test_reiternamen_wie_vorher_und_tap_schmal(touch):
+    w = _fenster(touch)
+    try:
+        assert w._btn_tap.width() == 48
+        for breite in (1280, 1366, 1440):
+            w.resize(breite, 900)
+            for _ in range(10):
+                QApplication.processEvents()
+            namen = [b.text() for b in w._section_btns]
+            assert namen == _NAMEN_VORHER[(touch, breite)], (breite, namen)
+    finally:
+        w.hide()
+        w.deleteLater()
+        QApplication.processEvents()

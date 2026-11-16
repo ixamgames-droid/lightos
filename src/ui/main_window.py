@@ -1205,7 +1205,10 @@ class MainWindow(QMainWindow):
         self._section_bar.setFixedHeight(
             self._KOPF_H_TOUCH if _touch else self._KOPF_H)
         bar_layout = QHBoxLayout(self._section_bar)
-        bar_layout.setContentsMargins(4, 0, 4, 2)
+        # Nachbesserung UI-137: Touch links 2 statt 4 px — der 6-px-Abstand
+        # zwischen STOP ALL und BLACKOUT kostete bei 1440 px 2 px zu viel,
+        # „Patchen“ wurde zu „Patch“. Rechts (BLACKOUT) bleibt alles gleich.
+        bar_layout.setContentsMargins(2 if _touch else 4, 0, 4, 2)
         bar_layout.setSpacing(0)
 
         self._btn_group = QButtonGroup(self)
@@ -1316,13 +1319,18 @@ class MainWindow(QMainWindow):
         bar_layout.addWidget(gm_group)
 
         # Tap-Tempo + BPM (klickbares Label)
-        self._btn_tap = QPushButton("TAP")
+        # Nachbesserung UI-137: mit dem Fenster als Eltern bauen — die Leiste
+        # haengt hier noch nicht am Fenster, ohne Eltern polierte der Knopf ohne
+        # Theme/Touch-QSS (sizeHint = Stil-Minimum 80 px). TAP wurde dadurch im
+        # Touch-Modus 80 px breit und kuerzte die Reiternamen („Büh…“ bei
+        # 1280 px). ``addWidget`` unten haengt ihn in die Leiste um.
+        self._btn_tap = QPushButton("TAP", self)
         self._btn_tap.setObjectName("tapBtn")    # UI-120: Touch-Hoehe im QSS
         # UI-120: mit --touch 44 px wie STOP ALL (vorher 52 px, unten abgeschnitten)
         self._btn_tap.setFixedHeight(
             self._KOPF_KNOPF_TOUCH if getattr(self, "_touch_mode", False) else 26)
         # UI-137: Breite aus Schrift + Polsterung ableiten (Theme/Touch-QSS
-        # liegen schon an). Fest 48 px schnitt „TAP“ im Touch-Modus ab.
+        # liegen ueber das Fenster an). Fest 48 px schnitt „TAP“ im Touch-Modus ab.
         self._btn_tap.ensurePolished()
         from src.ui.touch_keyboard import is_touch_mode as _touch
         self._btn_tap.setFixedWidth(
