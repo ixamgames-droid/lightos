@@ -585,6 +585,45 @@ def test_dialog_vorschau_wahl_und_importieren(tmp_path, bib, state, monkeypatch)
     assert "3 Geräte angelegt" in D.meldung_nach_import(dlg.ergebnis)
 
 
+def test_ui143_status_ganz_lesbar_und_grund_unter_der_tabelle(tmp_path, bib, state):
+    """UI-143 (B1): bei 1200 px Dialogbreite blieben der Statusspalte 64 px —
+    „wird angele“. Jetzt passt jedes Leitwort, ohne waagerechten Rollbalken,
+    und der ganze Text steht nach dem Antippen unter der Tabelle."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    _vorhandenes(state, bib, adresse=5)
+    pfad, _ = _beispiel(tmp_path)
+    dlg = D.MvrImportDialog(state, L.lies_mvr(pfad), bib, "rig.mvr")
+    dlg.show()
+    _app.processEvents()
+    try:
+        t = dlg.tabelle
+        assert dlg.width() <= 1200
+        fm = t.fontMetrics()
+        breit = t.columnWidth(D.S_STATUS)
+        for wort in D.STATUS_LEITWORTE:
+            assert fm.horizontalAdvance(wort) + 12 <= breit, wort
+        gesamt = sum(t.columnWidth(s) for s in range(t.columnCount()))
+        assert gesamt <= t.viewport().width(), (gesamt, t.viewport().width())
+        assert not t.horizontalScrollBar().isVisible()
+        assert t.columnWidth(D.S_PROFIL) >= 200
+        # Antippen (echter Klick auf die Zelle) zeigt den ganzen Status
+        assert dlg.zeilen_hinweis.text() == D.HINWEIS_ZEILE_ANTIPPEN
+        QTest.mouseClick(t.viewport(), Qt.MouseButton.LeftButton,
+                         pos=t.visualItemRect(t.item(0, D.S_STATUS)).center())
+        e = dlg.plan.eintraege[0]
+        assert "übersprungen" in e.status_text
+        assert e.status_text in dlg.zeilen_hinweis.text()
+        assert e.name in dlg.zeilen_hinweis.text()
+        # eine Wahl aendert den Status -> die Zeile unten zieht nach
+        cb = dlg._konflikt_auswahl[0]
+        cb.setCurrentIndex(cb.findData(I.FREIE_ADRESSE))
+        assert dlg.plan.eintraege[0].status_text in dlg.zeilen_hinweis.text()
+        assert "übersprungen" not in dlg.zeilen_hinweis.text()
+    finally:
+        dlg.close()
+
+
 def test_importieren_starten_mit_boeser_datei_meldet_und_aendert_nichts(tmp_path, bib, state, monkeypatch):
     _vorhandenes(state, bib)
     vorher = _bild(state)

@@ -55,6 +55,11 @@ KEIN_KONFLIKT = "—"
 
 _FARBE = {I.ANLEGBAR: "#3fb950", I.OFFEN: "#d29922", I.UEBERSPRUNGEN: "#f85149"}
 
+# UI-143 (B1): die Leitworte des Status (``Eintrag.status_text`` beginnt mit
+# einem davon) — die Spalte ist so breit, dass jedes ganz zu lesen ist.
+STATUS_LEITWORTE = ("wird angelegt", "wird übersprungen", "offen", "Status")
+HINWEIS_ZEILE_ANTIPPEN = ("Zeile antippen: der ganze Status (Grund, Hinweise) "
+                          "steht dann hier.")
 TIPP_IMPORTIEREN = ("Legt alle Geräte an, bei denen „wird angelegt“ steht, und "
                     "setzt ihre Position und Drehung im 3D. Unbekannte Typen "
                     "werden als neue Profile in der Bibliothek angelegt. "
@@ -148,7 +153,15 @@ class MvrImportDialog(QDialog):
         kopfzeile = self.tabelle.horizontalHeader()
         for s in range(len(SPALTEN)):
             kopfzeile.setSectionResizeMode(s, QHeaderView.ResizeMode.Interactive)
-        kopfzeile.setStretchLastSection(True)
+        # UI-143 (B1): frueher standen hier 1100 px feste Breiten, fuer die
+        # letzte Spalte „Status“ blieben bei 1200 px Dialogbreite 64 px —
+        # „wird angele“. Jetzt hat der Status eine eigene Breite, in die sein
+        # Leitwort sicher passt, und „Profil“ nimmt, was uebrig ist (waechst
+        # mit dem Fenster). Breiter als 1200 px darf der Dialog nicht werden
+        # (Full-HD bei 150 % = 1280 px).
+        kopfzeile.setStretchLastSection(False)
+        kopfzeile.setSectionResizeMode(S_PROFIL, QHeaderView.ResizeMode.Stretch)
+        kopfzeile.setMinimumSectionSize(48)
         for e in self.plan.eintraege:
             r = e.index
             if e.art in (I.NICHT_ZUGEORDNET, I.GEWAEHLT):
@@ -159,11 +172,22 @@ class MvrImportDialog(QDialog):
             # zeigt das Feld „—“ und ist gesperrt.
             self._konflikt_auswahl[r] = self._baue_konflikt_auswahl(r)
             self.tabelle.setCellWidget(r, S_KONFLIKT, self._konflikt_auswahl[r])
-        for s, breite in ((S_NAME, 160), (S_EBENE, 110), (S_TYP, 200),
-                          (S_PROFIL, 280), (S_ADRESSE, 70), (S_KONFLIKT, 150),
-                          (S_POS, 130)):
+        for s, breite in ((S_NAME, 150), (S_EBENE, 96), (S_TYP, 190),
+                          (S_ADRESSE, 64), (S_KONFLIKT, 144), (S_POS, 124),
+                          (S_STATUS, self._status_breite())):
             self.tabelle.setColumnWidth(s, breite)
         layout.addWidget(self.tabelle, 1)
+
+        # UI-143 (B1): der ganze Statustext (Grund des Ueberspringens, Hinweise)
+        # passt in keine Spalte und stand nur im Tooltip — am Finger nicht
+        # erreichbar. Antippen einer Zeile zeigt ihn hier ausgeschrieben.
+        self.zeilen_hinweis = QLabel(HINWEIS_ZEILE_ANTIPPEN)
+        self.zeilen_hinweis.setWordWrap(True)
+        self.zeilen_hinweis.setTextFormat(Qt.TextFormat.PlainText)
+        self.zeilen_hinweis.setStyleSheet("color: #9aa4af;")
+        layout.addWidget(self.zeilen_hinweis)
+        self._hinweis_zeile = -1
+        self.tabelle.cellClicked.connect(lambda r, _s: self._zeige_zeile(r))
 
         self.zusammenfassung = QLabel()
         self.zusammenfassung.setWordWrap(True)
@@ -242,6 +266,21 @@ class MvrImportDialog(QDialog):
         if farbe:
             item.setForeground(QColor(farbe))
 
+    def _status_breite(self) -> int:
+        """Breite der Statusspalte: das laengste Leitwort plus Rand (UI-143)."""
+        fm = self.tabelle.fontMetrics()
+        return max(fm.horizontalAdvance(w) for w in STATUS_LEITWORTE) + 28
+
+    def _zeige_zeile(self, r: int):
+        """Voller Statustext der angetippten Zeile unter der Tabelle (UI-143)."""
+        if not 0 <= r < len(self.plan.eintraege):
+            self._hinweis_zeile = -1
+            self.zeilen_hinweis.setText(HINWEIS_ZEILE_ANTIPPEN)
+            return
+        e = self.plan.eintraege[r]
+        self._hinweis_zeile = r
+        self.zeilen_hinweis.setText(f"Zeile {r + 1} · {e.name}: {e.status_text}")
+
     def _zeigen(self):
         for e in self.plan.eintraege:
             r = e.index
@@ -266,6 +305,7 @@ class MvrImportDialog(QDialog):
                         f"Drehung {rx:.1f}° / {ry:.1f}° / {rz:.1f}°")
             self._setze(r, S_STATUS, e.status_text, farbe=_FARBE.get(e.status, ""))
         self.zusammenfassung.setText(self.plan.zaehlerzeile() + ".")
+        self._zeige_zeile(self._hinweis_zeile)   # nach einer Wahl neu rechnen
         geht = bool(self.plan.anlegbare())
         self.knopf_importieren.setEnabled(geht)
         self.knopf_importieren.setToolTip(TIPP_IMPORTIEREN if geht else TIPP_IMPORTIEREN_AUS)
