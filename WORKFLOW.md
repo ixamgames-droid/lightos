@@ -118,6 +118,15 @@ Was fehlt, woran man es merkt, wann es erledigt ist.
   `done (<Datum>, PR #N)` (Nummer aus dem Merge-Betreff oder `--pr N`). Ein
   `review`-Fragment ohne PR-Nummer bleibt liegen; ein zweiter Lauf aendert
   nichts.
+- **Testdatei nach der Item-ID benennen = Spur (QA-64):** `tests/test_<id klein,
+  ohne Bindestrich>_*.py`, z. B. `UI-137` -> `test_ui137_*.py`, `FM-14b` ->
+  `test_fm14b_*.py`. Steht so eine Datei im Baum, gilt die Arbeit als gelandet:
+  `tests/test_qa64_implizite_spur.py` wird rot, wenn das Item (Zeile plus
+  Fragment) dann noch auf `todo` steht — sonst wuerde es erneut angeboten.
+  Ein Befund, der nur als `todo` abgelegt wird, bekommt deshalb **keine**
+  ID-Testdatei; ist sie Absicht (z. B. ein vorbereitender Test), traegt das
+  Item `<!-- spur: keine -->` in der Zeile bzw. im Fragment-Freitext. Bericht:
+  `./venv/bin/python tools/backlog_status_drift.py --nur-implizit`.
 - **Das Dashboard** liest weiter nur `BACKLOG.md` — sein Stand ist so frisch
   wie der letzte Sammel-Lauf.
 - **Uebergang:** offene PRs, die `BACKLOG.md` noch direkt aendern, bleiben
