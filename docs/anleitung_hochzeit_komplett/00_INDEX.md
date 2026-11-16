@@ -9,6 +9,10 @@
 
 ![Regenbogen-Matrix über die ganze Frontreihe](img/00_hero_rainbow.png)
 
+**Was du danach kannst:** die Hochzeits-Demoshow laden, ihre 6 Bänke (Seiten der Virtual
+Console, also deiner Bedienoberfläche aus Knöpfen und Fadern) durchblättern und mit den
+Mini-Anleitungen unten Farbe, Bewegung, Tempo und Abläufe Schritt für Schritt ausprobieren.
+
 ---
 
 ## Laden & loslegen
@@ -17,7 +21,11 @@
   `./venv/bin/python tools/build_hochzeit_komplett.py` baut sie selbstprüfend neu. **Voraussetzung:** das
   lokal importierte Spider-Profil **„Speider“** (U-King, 14ch) — es gehört nicht zu den eingebauten
   Geräten; fehlt es, bricht der Generator mit „Profil 'Speider' fehlt“ ab.)
-- Die **6 Bänke** liegen auf der **Virtual Console** (`Strg+4`). Blättern: **`Strg+Bild↓` / `Strg+Bild↑`**.
+- Die **6 Bänke** liegen auf der **Virtual Console** (`Strg+4`). Blättern: **`Strg+Bild↓` / `Strg+Bild↑`**
+  (Menü **Show → Nächste Page / Vorherige Page**) oder die Pfeile **◀ / ▶** neben dem Etikett
+  „Bank 1“ in der VC-Werkzeugleiste. Am Touchscreen (Start mit `--touch`) blätterst du auch mit
+  **zwei Fingern waagerecht** über freie Fläche; **Ansicht → Touch-Gesten…** schaltet einzelne
+  Gesten ab. Im Bearbeiten-Modus öffnest du das Kontextmenü einer Kachel statt per Rechtsklick durch **langes Drücken**.
   Mit **APC mini**: **SCENE-Tasten = Bank 1–6**.
 
 ## Das Rig (14 Fixtures, 137 DMX-Kanäle, Universum 1)

@@ -2,6 +2,9 @@
 
 Diese Anleitung baut Schritt für Schritt eine komplette **Test-Show** auf und zeigt, wie du deine Effekte über die virtuelle Konsole startest und im **Live-Edit-Widget** live feintunst — auf **drei Seiten** (Farbe, Dimmer, Tempo).
 
+**Was du danach kannst:** eine eigene Test-Show von Grund auf bauen und ihre Effekte auf der
+virtuellen Konsole (VC) starten und live feintunen.
+
 Am Ende hast du:
 
 - **11 Effekte** — 6 Farb-Matrixeffekte, 3 Dimmer-Matrixeffekte, 2 Chaser
@@ -28,7 +31,7 @@ Für diese Show: **8× CLUB-MIX3 19x10W RGBW** (die Matrix-/Dimmer-Effekte laufe
 
 ### Farb-Matrixeffekte
 
-Tab **Programmer → Attribute**. Links die PARs auswählen (auf das erste klicken, mit **Shift** auf das letzte). Dann den Attribut-Tab **Matrix** öffnen und **+ Neu**. Rechts einstellen:
+Tab **Programmer**. Links die PARs auswählen (auf das erste klicken, mit **Shift** auf das letzte). Dann den Reiter **Matrix** öffnen und **+ Neu** klicken. Rechts einstellen:
 
 - **Name** (z. B. „Farbe Rainbow")
 - **Algorithmus** (Rainbow, Chase, Wave, Fill, Gradient, Random …) — am schnellsten: Dropdown anklicken, Namen tippen, Enter
@@ -44,7 +47,7 @@ Genau gleich, aber **Stil: Dimmer** (die Vorschau wird weiß/grau statt farbig).
 
 ### Chaser
 
-Rechts in der Bibliothek **Chase +**. Im Chase-Editor Name setzen, unten unter **Funktionen zum Chase hinzufügen** die gewünschten Effekte auswählen und **In Chase übernehmen** — sie werden zu Schritten. Fenster schließen = gespeichert. So entstehen „Chaser Farben" (durch die Farbeffekte) und „Chaser Dimmer" (durch die Dimmer-Effekte).
+Im Programmer den Reiter **Assistent** öffnen und **+ Chaser** klicken. Im Chaser-Editor Name setzen, unten unter **Funktionen zum Chase hinzufügen** die gewünschten Effekte auswählen und **↳ In Chase übernehmen** — sie werden zu Schritten. Fenster schließen = gespeichert. So entstehen „Chaser Farben" (durch die Farbeffekte) und „Chaser Dimmer" (durch die Dimmer-Effekte).
 
 ---
 
@@ -53,6 +56,8 @@ Rechts in der Bibliothek **Chase +**. Im Chase-Editor Name setzen, unten unter *
 Tab **Virtual Console → Bearbeiten**. Rechts steht die **Bibliothek** mit allen Effekten.
 
 **Start-Buttons:** einen Effekt aus der Bibliothek auf die Fläche ziehen → im Dialog „Effekt einrichten" ist **An/Aus (Toggle)** schon gewählt → **Erstellen**. Das ergibt einen Button, der den Effekt startet/stoppt.
+
+**Mehrere Elemente auf einmal:** Im Bearbeiten-Modus mit **Strg** oder **Shift** weitere Elemente anklicken oder mit der Maus einen Rahmen um sie aufziehen. Am Touchscreen: einen Finger auf einem Element liegen lassen und mit einem zweiten weitere antippen (**Ansicht → Touch-Gesten…**). Das Rechtsklick-Menü bietet dann Ausrichten und **Auswahl löschen** für alle.
 
 **Live-Edit-Widget:** in der Werkzeugleiste **Live-Edit** klicken → das Panel erscheint auf der Fläche (verschiebbar/skalierbar wie jedes VC-Widget). Dann die Effekte aus der Bibliothek **in das Panel ziehen** — oben blätterst du mit Dropdown / – / + durch die zugewiesenen Effekte.
 

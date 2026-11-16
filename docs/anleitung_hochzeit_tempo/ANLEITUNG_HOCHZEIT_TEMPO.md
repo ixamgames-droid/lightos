@@ -1,5 +1,7 @@
 # Hochzeit-Show: Farbwechsel und Dimmer taktgleich starten
 
+**Was du danach kannst:** Du stellst die Geschwindigkeit jeder Effektgruppe einzeln ein, und alle Gruppen bleiben trotzdem im Takt. „Taktgleich" heißt: Alle starten ihre Zyklen auf demselben Taktschlag.
+
 Diese Anleitung gilt für `shows/hochzeit.lshow`. Die drei Effektgruppen bleiben
 unterschiedlich schnell einstellbar, beginnen ihre Zyklen aber auf demselben Taktschlag.
 
@@ -26,7 +28,8 @@ stellen, ohne dass sie aus dem Takt fällt.
 
 ## 1. Tempo einer Gruppe ändern
 
-1. **Virtuelle Konsole** öffnen (Bearbeiten **aus** — zum Bedienen).
+1. **Virtuelle Konsole** öffnen (Bearbeiten **aus** — zum Bedienen). Am Touch-Bildschirm
+   (Start mit `--touch`) tippst du die Faktor-Felder einfach an.
 2. Am gewünschten Controller im **Tempo**-Gitter den Faktor wählen:
    **¼ · ½ · 1× · 2× · 4×** (⟲ = zurück auf 1×).
 
@@ -57,14 +60,15 @@ Standard ist **Sound** (folgt der Musik). Brauchst du ein **festes** Tempo:
 Wirkt etwas verrutscht (z. B. nach manuellem Umstellen):
 - Am betroffenen Controller **[ SYNC jetzt ]** drücken → die ganze Gruppe springt
   gemeinsam auf die Eins.
-- Alternativ im **BPM-Tab (Strg+8)** das Panel **„Effekte je Bus"** öffnen und dort pro
-  Bus **[ Sync jetzt ]** drücken bzw. die **„Taktgleich"**-Häkchen prüfen.
+- Alternativ im **BPM-Tab (Strg+8)** den Unter-Reiter **„Tempo-Buses"** öffnen, dort das Feld
+  **„Effekte je Bus — taktgleich"** suchen und pro Bus **[ Sync jetzt ]** drücken bzw. die
+  **„Taktgleich"**-Häkchen prüfen.
 
 ## Wenn etwas nicht synchron läuft
 
 1. **Regler reagieren nicht?** → **Bearbeiten-Modus aus.**
 2. Steht der Controller auf dem richtigen **Bus** (A/B/C) und der Effekt **gelistet**
    (Klick auf die Effekt-Zeile)?
-3. Im **BPM-Tab → „Effekte je Bus"**: hängt der Effekt am erwarteten Bus, ist das
+3. Im **BPM-Tab → „Tempo-Buses" → „Effekte je Bus — taktgleich"**: hängt der Effekt am erwarteten Bus, ist das
    **„Taktgleich"**-Häkchen an, stimmt der **Faktor**?
 4. **[ SYNC jetzt ]** drücken.

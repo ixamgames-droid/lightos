@@ -66,7 +66,8 @@ Verbindung ein.
 
 Tab **Universen**. Die Tabelle hat die Spalten **#** · **Name** · **Ausgang** ·
 **Patch (Port/IP)** · **Ext. Universum** (optional: die externe Art-Net/sACN-Universumsnummer,
-leer = Standard, siehe unten). Pro Zeile ein Universum:
+leer = Standard, siehe unten) · **Dongle** (bei Enttec die gemerkte Seriennummer des
+USB-Interfaces, trägt LightOS selbst ein). Pro Zeile ein Universum:
 
 1. Zeile 1 → **#** `1`, **Name** z. B. *Bühne*, **Ausgang** = `Enttec`,
    **Patch** = dein COM-Port, z. B. `COM3`.
@@ -77,7 +78,9 @@ leer = Standard, siehe unten). Pro Zeile ein Universum:
    **und** wendet sie **sofort ohne Neustart** an (Bestätigung mit dem Pfad).
 
 Die **Ausgang**-Spalte ist ein Auswahlfeld mit `Aus / Enttec / uDMX / sACN /
-ArtNet`. Bedeutung der **Patch**-Spalte je Typ:
+ArtNet`. Merkt sich eine Enttec-Zeile den falschen
+Dongle (z. B. nach einem Tausch), wähle die Zeile und klick **Dongle neu zuordnen** — nach dem
+nächsten **Speichern** lernt das Universum den Dongle, der am eingetragenen Port steckt. Bedeutung der **Patch**-Spalte je Typ:
 
 - **Enttec** → COM-Port (z. B. `COM3`).
 - **ArtNet** → Ziel-IP oder Broadcast (leer = `255.255.255.255`). Hat der PC mehrere

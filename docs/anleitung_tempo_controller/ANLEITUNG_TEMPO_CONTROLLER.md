@@ -8,6 +8,12 @@
 > Die SpeedDials bleiben für manuelle Fein-/Sonderkontrolle erhalten — siehe
 > [Wann SpeedDial, wann Controller?](#wann-speeddial-wann-controller).
 
+**Was du danach kannst:** ein Effekt-Tempo für eine ganze Gruppe an einer Stelle
+einstellen — Bus wählen, Takt-Quelle wählen, Faktor setzen, Effekte draufziehen.
+
+*Fachwörter:* Ein **Bus** ist ein gemeinsamer Takt, dem mehrere Effekte folgen. Die **BPM**
+sind die Schläge pro Minute. Der **Faktor** sagt, wie schnell die Effekte relativ zum Bus laufen.
+
 ---
 
 ## Das Panel auf einen Blick
@@ -39,6 +45,11 @@ laufen bei Faktor **×2** also mit **256** — du siehst sofort Ergebnis und Ver
 4. **Bus** oben wählen, **Quelle** und **Tempo** einstellen.
 5. **Effekte draufziehen** (aus der Bibliothek) → sie folgen dem Bus taktgleich.
 
+> 💡 **Touchscreen:** Alles lässt sich mit dem Finger antippen. Ist in der Virtual Console
+> **🔒 Touch-Lock** eingeschaltet (Knopf zeigt dann **🔒 Gesperrt**), reagiert das Widget im
+> Spielbetrieb weder auf Finger noch auf Maus noch auf das Mausrad. Das Mausrad fehlt am
+> Touchscreen — die feste BPM stellst du dort im Dialog ein (**Feste BPM**, siehe unten).
+
 > ⚠️ **Wichtig:** Im **Bearbeiten-Modus** verschiebt/selektiert ein Klick das Widget.
 > Zum **Bedienen** (Quelle/Faktor/Bus klicken) den Bearbeiten-Modus **ausschalten**.
 
@@ -59,7 +70,7 @@ Tempo-Controller (je einer pro Bus).
 |---|---|
 | **Sound** | Der Bus **folgt der Musik** (der audio-/global erkannten Haupt-BPM). Standard. |
 | **Tap** | Du gibst den Takt per **Antippen** vor (mehrmals im Beat klicken). |
-| **Fix 128** | **Feste BPM.** Mit dem **Mausrad** über dem Widget fein justierbar (im Run-Modus). |
+| **Fix 128** | **Feste BPM.** Mit dem **Mausrad** über dem Widget fein justierbar (im Run-Modus, 1 BPM je Rastung, 20–600). Ohne Mausrad: Rechtsklick → **Einstellungen…** → **Feste BPM**. |
 
 > „Sound" für einen eigenen Bus (A–D) hängt ihn intern als **Sub** an die Haupt-BPM —
 > er läuft also exakt zur Musik, bleibt aber ein eigener Bus, den du jederzeit auf
@@ -80,8 +91,9 @@ oder nutz pro Effekt einen SpeedDial.
 - **Koppeln:** Effekt aus der **Bibliothek** auf das Widget **ziehen** → er wird dem Bus
   **taktgleich** zugewiesen und läuft sofort mit. (Grüner Rahmen beim Ziehen = gültiges Ziel.)
 - **Einzeln verwalten:** **Klick auf die Effekt-Zeile** → Menü mit **„✕ <Effekt> entfernen"**
-  pro Effekt + **„＋ hinzufügen / Parameter…"**.
-- **Was pro Effekt gesteuert wird:** im **＋/Eigenschaften**-Dialog je Effekt wählbar —
+  pro Effekt + **„＋ Effekte hinzufügen / Parameter…"**.
+- **Was pro Effekt gesteuert wird:** im Dialog **Tempo-Bus-Controller** (Menüpunkt „＋ Effekte
+  hinzufügen / Parameter…" oder Rechtsklick → **Einstellungen…**) je Effekt wählbar —
   Standard ist **Tempo** (der Faktor steuert die Geschwindigkeit), optional ein anderer
   Parameter (z. B. Helligkeit). Steht dann als `[parameter]` hinter dem Namen.
 
