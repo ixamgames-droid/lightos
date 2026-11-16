@@ -79,9 +79,9 @@ Visualizer als separates Fenster.
 | **Show** | Cue aufnehmen (R) · Nächste/Vorherige Page |
 | **Programmer** | Highlight (H) · Lowlight (Shift+H) · Programmer leeren (Esc) · Kopieren/Einfügen · Snapshot aufnehmen |
 | **Datenbank** | Fixtures importieren (XML) · Neues Fixture-Profil |
-| **Ausgabe** | Konfigurieren · Channel-Modifier · Mock Mode · Web-Interface (:5000) · OSC (:7770) · OS2L (:1234) · Input-Profile |
+| **Ausgabe** | Konfigurieren · Channel-Modifier · Simulations-Hinweis „MOCK“ (DMX läuft weiter) · Web-Interface (:5000) · OSC (:7770) · OS2L (:1234) · Input-Profile |
 | **Visualizer** | 3D-Visualizer öffnen/schließen |
-| **Command** | Command-Line fokussieren (`:` / F12) |
+| **Befehl** | Befehlszeile fokussieren (`:` / F12, ein Eintrag) |
 | **Hilfe** | Erste Schritte · Anleitungen öffnen · Tastenkürzel… (Liste aus den vorhandenen Aktionen, `ui/hilfe.py`) · Datenordner öffnen · Show-Ordner öffnen · Diagnosepaket speichern… · Über LightOS (Version, Build-Art, Datenordner, Doku-Link) |
 
 ---

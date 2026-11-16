@@ -610,11 +610,15 @@ QCheckBox {
     background: transparent;
 }
 
+/* UI-140: AUS = leerer Rahmen (dunkles Feld, heller Rand), AN = blau gefuellt
+   mit weissem Haken. Das Haken-Bild (assets/icons/haken.svg) haengt
+   src/ui/haken_stil.py mit absolutem Pfad an — ein relativer url() hier
+   wuerde gegen das Arbeitsverzeichnis aufgeloest. */
 QCheckBox::indicator {
     width: 14px;
     height: 14px;
-    background: #555555;
-    border: 1px solid #161616;
+    background: #1a1a1a;
+    border: 1px solid #b0b0b0;
     border-radius: 2px;
 }
 
@@ -624,7 +628,47 @@ QCheckBox::indicator:hover {
 
 QCheckBox::indicator:checked {
     background: #0978FF;
-    border-color: #044089;
+    border-color: #66aaff;
+}
+
+QCheckBox::indicator:disabled {
+    background: #2a2a2a;
+    border-color: #555555;
+}
+
+QCheckBox::indicator:checked:disabled {
+    background: #3a4f6a;
+    border-color: #555555;
+}
+
+/* UI-140: ankreuzbare Menue-Eintraege zeigen auch AUS ein leeres Kaestchen. */
+QMenu::indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    left: 6px;
+}
+
+QMenu::indicator:non-exclusive:unchecked {
+    background: #1a1a1a;
+    border: 1px solid #b0b0b0;
+}
+
+QMenu::indicator:non-exclusive:checked {
+    background: #0978FF;
+    border: 1px solid #66aaff;
+}
+
+QMenu::indicator:exclusive:unchecked {
+    background: #1a1a1a;
+    border: 1px solid #b0b0b0;
+    border-radius: 7px;
+}
+
+QMenu::indicator:exclusive:checked {
+    background: #0978FF;
+    border: 3px solid #1a1a1a;
+    border-radius: 7px;
 }
 
 QRadioButton {

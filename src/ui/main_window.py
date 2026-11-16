@@ -844,6 +844,12 @@ class MainWindow(QMainWindow):
         if os.path.exists(theme_path):
             with open(theme_path, "r", encoding="utf-8") as f:
                 qss = f.read()
+        # UI-140: weisser Haken im AN-Zustand (absoluter Pfad, darum nicht in dark.qss)
+        try:
+            from src.ui.haken_stil import haken_qss
+            qss += "\n" + haken_qss(bool(getattr(self, "_touch_mode", False)))
+        except Exception as e:
+            print(f"[main_window] ERROR: Haken-QSS: {e}")
         # Touch-Mode: Buttons + Slider + Items vergroessern via Override
         if getattr(self, "_touch_mode", False):
             qss += "\n/* Touch-Mode Override */\n"
@@ -1009,6 +1015,7 @@ class MainWindow(QMainWindow):
 
         # Programmer-Hotkeys (T0.2)
         pm = mb.addMenu("&Programmer")
+        pm.setToolTipsVisible(True)   # UI-140: „Farbe macht automatisch hell“
         a = pm.addAction("Highlight (selektierte Fixtures voll an)")
         a.setShortcut("H")
         a.triggered.connect(self._global_highlight)
@@ -1057,6 +1064,7 @@ class MainWindow(QMainWindow):
 
         # Ausgabe
         om = mb.addMenu("&Ausgabe")
+        om.setToolTipsVisible(True)   # UI-140: Erklaerungen der Schalter
         om.addAction("Konfigurieren...").triggered.connect(self._open_output_config)
         om.addAction("Channel-Modifier...").triggered.connect(self._open_channel_modifiers)
         om.addAction("Interface einrichten…").triggered.connect(
@@ -1071,8 +1079,14 @@ class MainWindow(QMainWindow):
         self._act_interface_hinweis.triggered.connect(
             self._interface_hinweis_schalten)
         om.addSeparator()
-        self._act_mock = om.addAction("Mock Mode AN/AUS")
+        # UI-140: vorher „Mock Mode AN/AUS“. Der Schalter zeigt nur „MOCK“ in
+        # der Statusleiste und oeffnet den 3D-Visualizer; der DMX-Ausgang laeuft
+        # weiter. „kein DMX-Ausgang“ im Namen waere deshalb falsch (Laser!).
+        self._act_mock = om.addAction("Simulations-Hinweis „MOCK“")
         self._act_mock.setCheckable(True)
+        self._act_mock.setToolTip(
+            "Zeigt „MOCK“ in der Statusleiste und öffnet den 3D-Visualizer.\n"
+            "Der DMX-Ausgang läuft dabei unverändert weiter.")
         self._act_mock.triggered.connect(self._toggle_mock)
         om.addSeparator()
         self._act_web = om.addAction("Web-Interface (Port 5000)")
@@ -1104,13 +1118,13 @@ class MainWindow(QMainWindow):
         vm.addAction("Visualizer schließen").triggered.connect(self._close_visualizer)
 
         # Command-Line (T1.1)
-        cm = mb.addMenu("&Command")
-        a = cm.addAction("Command-Line fokussieren")
-        a.setShortcut(":")
-        a.triggered.connect(self._focus_command_line)
-        a2 = cm.addAction("Command-Line fokussieren (F12)")
-        a2.setShortcut("F12")
-        a2.triggered.connect(self._focus_command_line)
+        # UI-140: ein Eintrag mit beiden Kuerzeln statt zwei gleicher Eintraege.
+        # „Be&fehl“: das B traegt schon „&Bearbeiten“.
+        cm = mb.addMenu("Be&fehl")
+        self._act_befehlszeile = cm.addAction("Befehlszeile fokussieren")
+        self._act_befehlszeile.setShortcuts([QKeySequence(":"), QKeySequence("F12")])
+        self._act_befehlszeile.setToolTip("Kürzel: „:“ oder F12")
+        self._act_befehlszeile.triggered.connect(self._focus_command_line)
 
         # Hilfe
         hm = mb.addMenu("&Hilfe")
