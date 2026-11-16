@@ -412,7 +412,7 @@ class VCEncoder(VCWidget):
         mode_cb.setCurrentText(self.midi_mode)
         form.addRow("MIDI-Modus:", mode_cb)
 
-        form.addRow(QLabel("── MIDI CC Bindung (oder Rechtsklick → Teach) ──"))
+        form.addRow(QLabel("── MIDI CC Bindung (oder Rechtsklick → MIDI Lernen) ──"))
         cc_sb = QSpinBox()
         cc_sb.setRange(-1, 127)
         cc_sb.setValue(self.midi_cc)

@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt
 from src.core.app_state import get_state, get_channels_for_patched, resolve_attr_channels
 from src.core.engine.scene import Scene
 from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufe_zeile
+from src.ui import dialog_hilfe
 
 
 class SceneEditor(QWidget):
@@ -200,9 +201,10 @@ class SceneEditor(QWidget):
         from PySide6.QtWidgets import QDialog
         dlg = CurveEditorDialog(self._scene.fade_in_curve,
                                 title="Fade-In-Kurve", parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
-            self._scene.fade_in_curve = dlg.result_curve
-            self._curve_thumb.set_curve(dlg.result_curve)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+                self._scene.fade_in_curve = dlg.result_curve
+                self._curve_thumb.set_curve(dlg.result_curve)
 
     def _rebuild_table(self):
         """Build a row per fixture, a column per channel."""

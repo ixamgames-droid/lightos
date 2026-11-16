@@ -63,7 +63,7 @@ Only the binding is saved (effect IDs, parameter keys, step size, MIDI) — not 
 
 The encoder supports **MIDI teach** (CC only), no key assignment.
 
-- **Assign**: right-click (in edit mode) → „MIDI Teach…", then move the desired CC on your controller. Alternatively, enter the CC number and channel directly in the settings dialog.
+- **Assign**: right-click (in edit mode) → „MIDI Lernen…", then move the desired CC on your controller. Alternatively, enter the CC number and channel directly in the settings dialog.
 - **Relativ** (default, for hardware encoders without an end stop): the controller sends steps around the center 64 — values 1–63 turn up, 65–127 turn down, 0/64 = no movement. Each step adjusts by the configured step size.
 - **Relativ (Mackie)** (MIDI-18, for the V-Pots of a Mackie Control desk such as X-Touch or MCU): bit 6 is the direction, the rest the step count — 1–63 turn up, 65–127 turn down by (value − 64) steps. With „Relativ“ a slow left turn (65) would jump far up there.
 - **Absolut** (for pots/faders): the CC value 0–127 is mapped linearly onto the parameter's value range — the encoder then jumps to the absolute position.

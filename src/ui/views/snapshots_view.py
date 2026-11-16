@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QMenu, QInputDialog, QMessageBox, QFileDialog, QDialog, QSplitter,
     QListWidget, QListWidgetItem, QDialogButtonBox
 )
+from src.ui import dialog_hilfe
 
 try:
     from src.core.app_state import get_state
@@ -382,13 +383,14 @@ class SnapshotsView(QWidget):
                 # gewaehlter Gruppen mit im Snapshot ("Color speichert Dimmer mit").
                 # FM-51 Scheibe B: Schluessel-Scope (Koepfe, Weiss-Segmente).
                 chan_dlg = ChannelSelectDialog(vals, self, **_scope(state))
-                if chan_dlg.exec() != QDialog.DialogCode.Accepted:
-                    return
-                vals = chan_dlg.filter_programmer(vals)
-                if not vals:
-                    QMessageBox.information(self, "Snapshot",
-                        "Keine Kanäle ausgewählt - Snapshot nicht gespeichert.")
-                    return
+                with dialog_hilfe.offen(chan_dlg):
+                    if chan_dlg.exec() != QDialog.DialogCode.Accepted:
+                        return
+                    vals = chan_dlg.filter_programmer(vals)
+                    if not vals:
+                        QMessageBox.information(self, "Snapshot",
+                            "Keine Kanäle ausgewählt - Snapshot nicht gespeichert.")
+                        return
             except Exception as e:
                 print(f"[snapshots] channel select error: {e}")
 
@@ -424,10 +426,11 @@ class SnapshotsView(QWidget):
         if snap.is_empty():
             return
         dlg = SnapshotIgnoreDialog(snap, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            snap.ignored = dlg.get_ignored()
-            self._buttons[index].refresh()
-            self._save_to_disk()
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                snap.ignored = dlg.get_ignored()
+                self._buttons[index].refresh()
+                self._save_to_disk()
 
     def rename(self, index: int):
         snap = self._snapshots[index]

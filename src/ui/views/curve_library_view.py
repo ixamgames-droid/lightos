@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
 from src.core.engine.curve_library import get_curve_library
 from src.ui.widgets.curve_editor import CurveEditorDialog, CurveThumbnail
 from src.ui.weak_slots import weak_slot
+from src.ui import dialog_hilfe
 
 
 class CurveLibraryView(QWidget):
@@ -137,25 +138,27 @@ class CurveLibraryView(QWidget):
 
     def _on_new(self):
         dlg = CurveEditorDialog(None, "Neue Fade-Kurve", self)
-        if dlg.exec() and dlg.result_curve is not None:
-            cur = dlg.result_curve
-            name, ok = QInputDialog.getText(self, "Kurve speichern", "Name:",
-                                            text=cur.name or "Kurve")
-            if ok and name.strip():
-                cur.name = name.strip()
-                self._do_add(cur)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() and dlg.result_curve is not None:
+                cur = dlg.result_curve
+                name, ok = QInputDialog.getText(self, "Kurve speichern", "Name:",
+                                                text=cur.name or "Kurve")
+                if ok and name.strip():
+                    cur.name = name.strip()
+                    self._do_add(cur)
 
     def _on_edit(self):
         c = self._selected_curve()
         if c is None:
             return
         dlg = CurveEditorDialog(c, f"Kurve: {c.name}", self)
-        if dlg.exec() and dlg.result_curve is not None:
-            res = dlg.result_curve
-            # Preset bearbeiten -> als neue User-Kurve ablegen; User -> ersetzen.
-            res.name = (get_curve_library()._unique_name(c.name)
-                        if self._is_preset(c.name) else c.name)
-            self._do_add(res)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() and dlg.result_curve is not None:
+                res = dlg.result_curve
+                # Preset bearbeiten -> als neue User-Kurve ablegen; User -> ersetzen.
+                res.name = (get_curve_library()._unique_name(c.name)
+                            if self._is_preset(c.name) else c.name)
+                self._do_add(res)
 
     def _on_duplicate(self):
         c = self._selected_curve()
