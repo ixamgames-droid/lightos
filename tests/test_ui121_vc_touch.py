@@ -27,6 +27,7 @@ _app = QApplication.instance() or QApplication([])
 _DEV = QTest.createTouchDevice()
 
 from _qt_lifecycle import destroy_all_top_level_widgets              # noqa: E402
+from _doppeltipp import DruckUhr                                     # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -522,29 +523,36 @@ def test_pruefung_cueliste_echter_doppeltipp_fragt_nach():
     gefragt = []
     c._bestaetige_sprung = lambda text: gefragt.append(text) or False
     vp = c._cue_list.viewport()
-    # Grosszuegiges Doppelklick-Fenster (langsame CI). Qt zaehlt Klicks
-    # paarweise, auch ueber fruehere Tests hinweg — darum zuerst auf Zeile 1
-    # tippen, bis dort ein Doppeltipp erkannt ist: danach ist der naechste
-    # Tipp sicher ein einzelner.
+    # Qt zaehlt Klicks paarweise, auch ueber fruehere Tests hinweg: mit 1 ms
+    # Fenster beginnt der erste Tipp sicher ein neues Paar (Qt verlangt
+    # 0 < Abstand < Fenster), danach grosszuegiges Fenster fuer langsame CI.
+    # QA-123: vor dem zweiten Tipp auf einen groesseren Zeitstempel warten —
+    # gleiche Millisekunde ist fuer Qt kein Doppelklick (frueher verdeckte
+    # das eine Wiederholschleife).
     hints = QApplication.styleHints()
     alt = hints.mouseDoubleClickInterval()
-    hints.setMouseDoubleClickInterval(5000)
+    uhr = DruckUhr()
     try:
         erste = c._cue_list.visualItemRect(c._cue_list.item(0)).center()
-        for _ in range(3):
-            _tipp(vp, erste)
-            if gefragt:
-                break
-        assert gefragt and "Cue 1" in gefragt[0]
+        hints.setMouseDoubleClickInterval(1)
+        _tipp(vp, erste)
+        assert gefragt == [], "ein einzelner Tipp fragt nie"
+        hints.setMouseDoubleClickInterval(5000)
+        uhr.naechster_zeitstempel()
+        _tipp(vp, erste)
+        assert uhr.doppelklicks == 1, "Qt hat den Doppeltipp erkannt"
+        assert len(gefragt) == 1 and "Cue 1" in gefragt[0]
         gefragt.clear()
         mitte = c._cue_list.visualItemRect(c._cue_list.item(4)).center()
-        _tipp(vp, mitte)      # weit weg vom letzten Druck: sicher ein Einzeltipp
+        uhr.naechster_zeitstempel()
+        _tipp(vp, mitte)      # nach einem Doppelklick beginnt ein neues Paar
+        assert uhr.doppelklicks == 1
         assert gefragt == [], "ein einzelner Tipp fragt nie"
-        for _ in range(3):    # langsame CI: notfalls neues Tipp-Paar
-            _tipp(vp, mitte)
-            if gefragt:
-                break
+        uhr.naechster_zeitstempel()
+        _tipp(vp, mitte)
+        assert uhr.doppelklicks == 2, "Qt hat den zweiten Doppeltipp erkannt"
     finally:
         hints.setMouseDoubleClickInterval(alt)
+        uhr.entfernen()
     assert len(gefragt) == 1 and "Cue 5" in gefragt[0]
     assert ex.stack.gesprungen == [], "Nein = kein Sprung"
