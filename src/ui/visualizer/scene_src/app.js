@@ -59,7 +59,7 @@ import { applyDmx } from './bridge/dmx_apply.js';                  // VIZ-71
 import { dmxCacheInfo, resetDmxCache } from './fixtures/dmx_cache.js';           // VIZ-71
 import { removeFixture as _removeFixtureForTouch, syncSpotShadowBudget,
          beamFalloffTexture, shadowBudgetInfo } from './fixtures/fixtures.js';  // VIZ-15
-import { tickStrobe, strobeInfo, strobeStats, setStrobeUhr } from './fixtures/fixtures.js';   // VIZ-104
+import { tickStrobe, strobeInfo, strobeStats, setStrobeUhr, setStrobeMessUhr } from './fixtures/fixtures.js';   // VIZ-104
 import { updateLabelZoomVisibility } from './fixtures/labels.js';  // VIZ-14: Fixture-Label Zoom-Gate
 import {
   startRenderLoop, requestRender, registerLiveAnimation, renderStats, renderTick,
@@ -355,6 +355,7 @@ window.__lightos = {
   laserInfo,
   // VIZ-104: Strobe-Zustand je Geraet, Kosten-Zaehler, Takt von Hand, Test-Uhr.
   strobeInfo, strobeStats, __strobeTick: tickStrobe, __strobeUhr: setStrobeUhr,
+  __strobeMessUhr: setStrobeMessUhr,   // VIZ-104 3D-Takt: Bildfolgen mit langen Bildern
   // VIZ-79 (Review H1): derselbe Fixture-Pick wie Klick/Hover/Zug.
   __pickFixture: pickFixture,
   // VIZ-15 Boden-Pools: die Groessen-Rechnung ist rein (Abstand + Zoom-Winkel
