@@ -18,6 +18,7 @@ from src.ui.weak_slots import weak_slot
 from src.ui.widgets.stufe_auswahl import StufeAuswahl
 from src.ui.widgets.mehrfach_knopf import MehrfachKnopf
 from src.core.engine.stufen import modify_unter
+from src.ui import dialog_hilfe
 
 # ENG-37-A: Die Engine sperrt Modify-Effekte als Chaser-Schritt (gibt nichts
 # aus, auch tief in einer Sammlung/Show — chaser._render_child_target). Der
@@ -478,10 +479,11 @@ class ChaserEditor(QWidget):
         step = self._chaser.steps[row]
         dlg = CurveEditorDialog(step.fade_in_curve,
                                 title=f"Fade-Kurve – Schritt {row + 1}", parent=self)
-        if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
-            step.fade_in_curve = dlg.result_curve
-            self._rebuild_table()
-            self._table.selectRow(row)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.result_curve:
+                step.fade_in_curve = dlg.result_curve
+                self._rebuild_table()
+                self._table.selectRow(row)
 
     def _on_note_changed(self, item):
         """Schreibt die editierte Notiz-Zelle (Spalte 6) in den Step zurueck."""
@@ -502,14 +504,15 @@ class ChaserEditor(QWidget):
 
     def _add_step(self):
         dlg = FunctionSelectorDialog(self, exclude_id=getattr(self._chaser, "id", None))
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        fid = dlg.selected_id
-        if fid is None:
-            return
-        step = ChaserStep(function_id=fid, fade_in=0.0, hold=1.0, fade_out=0.0)
-        self._chaser.steps.append(step)
-        self._rebuild_table()
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            fid = dlg.selected_id
+            if fid is None:
+                return
+            step = ChaserStep(function_id=fid, fade_in=0.0, hold=1.0, fade_out=0.0)
+            self._chaser.steps.append(step)
+            self._rebuild_table()
 
     def _remove_step(self):
         row = self._table.currentRow()

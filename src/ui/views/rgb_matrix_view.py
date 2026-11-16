@@ -27,6 +27,7 @@ from src.ui.widgets.stufe_auswahl import StufeAuswahl, stufen_melder
 from src.ui.head_cell_colors import (
     fixture_cell_color, head_count_suffix, head_counts,
 )
+from src.ui import dialog_hilfe
 
 
 # UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
@@ -2782,18 +2783,19 @@ class RgbMatrixView(QWidget):
                 "ein einzonisches Gerät ergäbe ein 1×1-Raster.")
             return
         dlg = PanelGridDialog(cands, self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        cols, rows, fixture_grid, head_grid = dlg.result_grid()
-        if not fixture_grid:
-            self._grid_label.setText("Raster leer — nichts übernommen.")
-            return
-        cand = dlg.candidate()
-        belegt = sum(1 for f in fixture_grid if f is not None)
-        name = cand.label if cand is not None else ""
-        self._apply_panel_grid(
-            cols, rows, fixture_grid, head_grid,
-            f"{rows}×{cols} = {belegt} Zonen aus »{name}«")
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            cols, rows, fixture_grid, head_grid = dlg.result_grid()
+            if not fixture_grid:
+                self._grid_label.setText("Raster leer — nichts übernommen.")
+                return
+            cand = dlg.candidate()
+            belegt = sum(1 for f in fixture_grid if f is not None)
+            name = cand.label if cand is not None else ""
+            self._apply_panel_grid(
+                cols, rows, fixture_grid, head_grid,
+                f"{rows}×{cols} = {belegt} Zonen aus »{name}«")
 
     def _pattern_wizard(self):
         """FM-22 (2): Muster-Assistent -> Szenen + Chaser mit harten Kanten."""
@@ -2807,16 +2809,17 @@ class RgbMatrixView(QWidget):
         dlg = PatternWizardDialog(m.cols, m.rows,
                                   default_name=f"{m.name} Lauflicht",
                                   parent=self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        res = dlg.result()
-        ch, szenen = build_pattern_chaser(
-            self._fm, m, dlg.frames(), name=res.name, color=res.color,
-            hold=res.hold)
-        if ch is None:
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            res = dlg.result()
+            ch, szenen = build_pattern_chaser(
+                self._fm, m, dlg.frames(), name=res.name, color=res.color,
+                hold=res.hold)
+            if ch is None:
+                self._grid_label.setText(
+                    "Kein Schritt erzeugt — im Raster steht kein gepatchtes Gerät.")
+                return
+            self._notify_change()
             self._grid_label.setText(
-                "Kein Schritt erzeugt — im Raster steht kein gepatchtes Gerät.")
-            return
-        self._notify_change()
-        self._grid_label.setText(
-            f"Chaser »{ch.name}« mit {len(szenen)} Schritten angelegt.")
+                f"Chaser »{ch.name}« mit {len(szenen)} Schritten angelegt.")

@@ -56,4 +56,4 @@ Without a binding, the area shows the hint **„Effekt zuweisen (Drag)"** and no
 - **Green square = running:** If it is missing, the bound effect is not running. The preview still moves because it keeps a stopped draft turning by itself — that is only a preview animation, not the real live output.
 - **Dotted boxes:** Grey dotted fields in the grid are **gaps in the grid** (unoccupied matrix cells), not "black" pixels.
 - **Bank/visibility saves CPU:** If the tile is on an inactive bank or covered, the preview pauses automatically. So feel free to add live previews — invisible ones cost no computing time.
-- **MIDI/keyboard:** The effect display supports **no** MIDI or key assignment (it cannot be operated). „MIDI Teach…" / „Taste zuweisen…" (assign key…) have no function for this element.
+- **MIDI/keyboard:** The effect display supports **no** MIDI or key assignment (it cannot be operated). „MIDI Lernen…" / „Taste zuweisen…" (assign key…) have no function for this element.

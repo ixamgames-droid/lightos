@@ -542,6 +542,13 @@ dabei mitgeschrieben) und `tests/test_tool19_werkzeuge_ohne_ausgang.py`.
 - Bei Architektur-Aenderungen: `README.md` oder `INSTALL.md` synchron halten
 - Nutzer-sichtbare Aenderung: CHANGELOG-Fragment unter `changelog.d/` (nicht `CHANGELOG.md` direkt)
 - Neues Item oder neuer Status: BACKLOG-Fragment unter `backlog.d/` (nicht `BACKLOG.md` direkt)
+- Modale Dialoge (STAB-41): nie `SomeDialog(self).exec()` bzw. `dlg.exec()` ohne
+  Freigabe — sonst bleibt der Dialog als Kind des Fensters liegen (nativer Absturz
+  beim n-ten Dialog). Stattdessen `dialog_hilfe.ausfuehren(dlg)`; wenn danach noch
+  Werte aus dem Dialog gelesen werden, `with dialog_hilfe.offen(dlg):` um `exec()`
+  und das Lesen (`src/ui/dialog_hilfe.py`). Der Waechter
+  `tests/test_stab41_dialoge_freigeben.py` prueft `main_window.py` und `views/`.
+  `QMessageBox`/`QInputDialog`/`QFileDialog`-Statics brauchen das nicht.
 
 ## Plattform-Kompatibilitaet
 

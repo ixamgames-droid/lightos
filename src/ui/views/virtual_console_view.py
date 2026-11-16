@@ -11,6 +11,35 @@ from src.ui.virtualconsole.vc_inspector_panel import VCInspectorPanel
 from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.weak_slots import weak_slot
 from src.ui.virtualconsole.vc_style import touch_aktiv, tz
+from src.ui import dialog_hilfe
+
+
+# UI-138 (Klick-Test Fund 4): die Leistenknoepfe hatten per eigenem Stylesheet
+# 10 px Schrift — auch im Touch-Modus, wo sie 44 px hoch sind. Dort winzig und
+# grau. Touch: 12 px, Maus unveraendert 10 px (11 px bleibt 11 px). 13 px
+# (Vorschlag des Klick-Tests) schob die Spielbetrieb-Leiste bei 1280 px in eine
+# zweite Zeile — und eine Bedienleiste, die live umbricht, verschiebt die Konsole.
+TB_SCHRIFT_MAUS = 10
+TB_SCHRIFT_TOUCH = 12
+# Seitenrand im Touch-Modus: 6 statt 8 px, damit die groessere Schrift die
+# Spielbetrieb-Leiste bei 1280 px nicht in eine zweite Zeile schiebt.
+TB_RAND_TOUCH = 6
+
+
+def _tb_schrift() -> int:
+    """Schriftgroesse (px) der VC-Werkzeugleiste: Touch 12, Maus 10."""
+    return TB_SCHRIFT_TOUCH if touch_aktiv() else TB_SCHRIFT_MAUS
+
+
+def _tb_css(css: str) -> str:
+    """Stylesheet eines Leistenknopfs mit der Leistenschrift (nur im Touch-
+    Modus geaendert — mit der Maus bleibt der Text Zeichen fuer Zeichen gleich)."""
+    if not touch_aktiv():
+        return css
+    px = _tb_schrift()
+    return (css.replace("font-size:10px", f"font-size:{px}px")
+               .replace("font-size:11px", f"font-size:{px}px")
+               .replace("padding:0 8px", f"padding:0 {TB_RAND_TOUCH}px"))
 
 
 class GrowingScrollArea(QScrollArea):
@@ -141,6 +170,33 @@ class _FesteHoehe(QObject):
 #  VirtualConsoleView
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _alle_loeschen_box(parent, anzahl: int) -> QMessageBox:
+    """UI-137: Rueckfrage vor „Alle löschen“ — Vorgabe und Escape „Abbrechen“,
+    im Touch-Modus Knoepfe >= 44 px hoch. Nicht ausgefuehrt (fuer Tests)."""
+    box = QMessageBox(parent)
+    box.setIcon(QMessageBox.Icon.Warning)
+    box.setWindowTitle("Alle löschen")
+    box.setText(f"Alle {anzahl} Elemente der Virtuellen Konsole löschen?")
+    box.setInformativeText("Mit Strg+Z lässt sich das rückgängig machen.")
+    loeschen = box.addButton("Löschen", QMessageBox.ButtonRole.DestructiveRole)
+    abbrechen = box.addButton("Abbrechen", QMessageBox.ButtonRole.RejectRole)
+    if touch_aktiv():
+        for k in (loeschen, abbrechen):
+            k.setMinimumHeight(44)
+    box.setDefaultButton(abbrechen)
+    box.setEscapeButton(abbrechen)
+    box._ui137_loeschen = loeschen
+    return box
+
+
+def _frage_alle_loeschen(parent, anzahl: int) -> bool:
+    """True nur, wenn ausdruecklich „Löschen“ gewaehlt wurde."""
+    box = _alle_loeschen_box(parent, anzahl)
+    with dialog_hilfe.offen(box):
+        box.exec()
+        return box.clickedButton() is box._ui137_loeschen
+
+
 class VirtualConsoleView(QWidget):
     """Full Virtual Console tab: Toolbar + Canvas + Snapshot-Sidebar."""
 
@@ -200,13 +256,16 @@ class VirtualConsoleView(QWidget):
         self._btn_edit = QPushButton("Bearbeiten")
         self._btn_edit.setCheckable(True)
         self._btn_edit.setChecked(False)
-        self._btn_edit.setFixedSize(tz(90), max(28, self._tb_hoehe()))
-        self._btn_edit.setStyleSheet("""
+        # UI-138: im Touch-Modus 96 statt tz(90)=117 px — der Platz geht an die
+        # groessere Leistenschrift (die Leiste bleibt bei 1280 px einzeilig).
+        self._btn_edit.setFixedSize(96 if touch_aktiv() else tz(90),
+                                    max(28, self._tb_hoehe()))
+        self._btn_edit.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#e6edf3; border:1px solid #30363d;
                           border-radius:3px; font-size:11px; }
             QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_edit.toggled.connect(self._toggle_edit)
         tb_layout.addWidget(self._btn_edit)
         if self._kiosk:
@@ -221,13 +280,13 @@ class VirtualConsoleView(QWidget):
             "Snap auf Grid — Widgets rasten beim Verschieben und Skalieren\n"
             "am Raster ein (Grid-Größe: 8 px)"
         )
-        self._btn_snap.setStyleSheet("""
+        self._btn_snap.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
             QPushButton:hover:!disabled { background:#30363d; color:#e6edf3; }
             QPushButton:disabled { color:#484f58; border-color:#21262d; }
-        """)
+        """))
         self._btn_snap.setProperty("edit_only", True)
         self._btn_snap.setVisible(False)
         self._btn_snap.toggled.connect(self._toggle_snap)
@@ -256,12 +315,12 @@ class VirtualConsoleView(QWidget):
         for label, wtype in widget_buttons:
             btn = QPushButton(label)
             btn.setFixedHeight(self._tb_hoehe())
-            btn.setStyleSheet("""
+            btn.setStyleSheet(_tb_css("""
                 QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
                               border-radius:3px; font-size:10px; padding:0 8px; }
                 QPushButton:hover { background:#30363d; color:#e6edf3; }
                 QPushButton:disabled { color:#484f58; }
-            """)
+            """))
             btn.clicked.connect(weak_slot(self._add_widget, wtype))
             btn.setProperty("add_btn", True)
             btn.setProperty("edit_only", True)
@@ -302,13 +361,13 @@ class VirtualConsoleView(QWidget):
         # wie UI-116): jeder Tipp nimmt ein Widget dazu/heraus — die Maus hat
         # Strg/Umschalt-Klick und den Auswahlrahmen. „Ausrichten" wirkt auf
         # die Auswahl (ab zwei Elementen).
-        _knopf_stil = """
+        _knopf_stil = _tb_css("""
             QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
             QPushButton:hover:!disabled { background:#30363d; color:#e6edf3; }
             QPushButton:disabled { color:#484f58; }
-        """
+        """)
         self._btn_mehrfach = QPushButton("Mehrfach")
         self._btn_mehrfach.setObjectName("vc_mehrfach")
         self._btn_mehrfach.setCheckable(True)
@@ -338,6 +397,11 @@ class VirtualConsoleView(QWidget):
         self._btn_ausrichten.setProperty("edit_only", True)
         self._btn_ausrichten.setVisible(False)
         self._btn_ausrichten.clicked.connect(self._ausrichten_zeigen)
+        # UI-138: der Zaehler „3 gewählt" steht HIER (feste Stelle, verdeckt
+        # nichts) statt auf der Flaeche. Breite fuer den laengsten Text fest
+        # vorhalten, sonst bricht die Leiste beim Waehlen anders um (VCB-47).
+        self._breite_festhalten(self._btn_ausrichten,
+                                ("Ausrichten ▾", self._ausrichten_text(88)))
         tb_layout.addWidget(self._btn_ausrichten)
 
         # UI-93: eigene Kuerzel nur fuer den Betrieb OHNE Hauptfenster. Im
@@ -359,12 +423,12 @@ class VirtualConsoleView(QWidget):
             "MIDI-Patch-Modus: Zuerst einen VC-Button anklicken,\n"
             "dann die gewünschte MIDI-Taste drücken."
         )
-        self._btn_midi_learn.setStyleSheet("""
+        self._btn_midi_learn.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#ff8800; border:1px solid #ff8800;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#ff8800; color:#000; font-weight:bold; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_midi_learn.toggled.connect(self._toggle_midi_learn)
         self._breite_festhalten(self._btn_midi_learn, (self._btn_midi_learn.text(),))
         tb_layout.addWidget(self._btn_midi_learn)
@@ -381,12 +445,12 @@ class VirtualConsoleView(QWidget):
             "APC Mini LED-Feedback aktivieren/deaktivieren\n"
             "Grün = aktiv, Grün blinkend = gestoppt, Rot = Flash, Gelb = aktuelle Page"
         )
-        self._btn_apc_leds.setStyleSheet("""
+        self._btn_apc_leds.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#00cc66; border:1px solid #00cc66;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#00cc66; color:#000; font-weight:bold; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_apc_leds.toggled.connect(self._toggle_apc_leds)
         self._breite_festhalten(self._btn_apc_leds, (self._btn_apc_leds.text(),))
         tb_layout.addWidget(self._btn_apc_leds)
@@ -399,12 +463,12 @@ class VirtualConsoleView(QWidget):
             "Display-only: Touchscreen/Maus steuert nicht mehr (nur Anzeige).\n"
             "APC mini / MIDI steuern weiterhin. Schützt vor versehentlichem Antippen."
         )
-        self._btn_touch_lock.setStyleSheet("""
+        self._btn_touch_lock.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#ffb000; border:1px solid #ffb000;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#ffb000; color:#000; font-weight:bold; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_touch_lock.toggled.connect(self._toggle_touch_lock)
         self._breite_festhalten(self._btn_touch_lock, ("🔒 Touch-Lock", "🔒 Gesperrt"))
         tb_layout.addWidget(self._btn_touch_lock)
@@ -421,12 +485,12 @@ class VirtualConsoleView(QWidget):
             "erst, wenn er den aktuellen VC-Wert einmal durchfahren hat.\n"
             "Ein gelber Pfeil zeigt, wohin der Fader bewegt werden muss."
         )
-        self._btn_pickup.setStyleSheet("""
+        self._btn_pickup.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#ffb000; border:1px solid #ffb000;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#ffb000; color:#000; font-weight:bold; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_pickup.toggled.connect(self._toggle_soft_takeover)
         self._breite_festhalten(self._btn_pickup, ("🎚 Pickup", "🎚 Pickup AN"))
         tb_layout.addWidget(self._btn_pickup)
@@ -456,11 +520,11 @@ class VirtualConsoleView(QWidget):
         self._lbl_bank.setFixedWidth(72 if touch_aktiv() else 54)
         self._lbl_bank.setFixedHeight(_bank_h)
         self._lbl_bank.setToolTip("Bank waehlen (Pad-/Widget-Seite)")
-        self._lbl_bank.setStyleSheet(
+        self._lbl_bank.setStyleSheet(_tb_css(
             "QPushButton { color:#58a6ff; font-size:11px; font-weight:bold;"
             " background:transparent; border:none; padding:0; }"
             "QPushButton:hover { color:#e6edf3; }"
-        )
+        ))
         self._lbl_bank.clicked.connect(weak_slot(self._bank_menue))
         tb_layout.addWidget(self._lbl_bank)
 
@@ -475,21 +539,24 @@ class VirtualConsoleView(QWidget):
         self._btn_popout = QPushButton("⧉ Popout")
         self._btn_popout.setFixedHeight(self._tb_hoehe())
         self._btn_popout.setToolTip("Virtual Console in eigenem Fenster öffnen")
-        self._btn_popout.setStyleSheet("""
+        self._btn_popout.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#8b949e; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:hover { background:#30363d; color:#e6edf3; }
-        """)
+        """))
         self._btn_popout.clicked.connect(self._popout_canvas)
         tb_layout.addWidget(self._btn_popout)
 
         btn_clear = QPushButton("Alle löschen")
         btn_clear.setFixedHeight(self._tb_hoehe())
-        btn_clear.setStyleSheet("""
+        btn_clear.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#f85149; border:1px solid #30363d;
-                          border-radius:3px; font-size:10px; padding:0 8px; }
+                          border-radius:3px; font-size:10px; padding:0 8px;
+                          margin:0 10px; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
+        # UI-137: „margin:0 10px“ setzt den Knopf von den Nachbarn ab (die
+        # FlowLayout-Leiste kennt kein addSpacing); verschwindet mit ihm.
         btn_clear.clicked.connect(self._clear_all)
         btn_clear.setProperty("edit_only", True)
         btn_clear.setVisible(False)
@@ -499,22 +566,22 @@ class VirtualConsoleView(QWidget):
         btn_save.setFixedHeight(self._tb_hoehe())
         btn_save.setToolTip("Nur dieses VC-Layout als separate JSON-Datei exportieren "
                             "(unabhängig vom Show-Speichern unter Datei → Speichern).")
-        btn_save.setStyleSheet("""
+        btn_save.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#3fb950; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         btn_save.clicked.connect(self._save)
         tb_layout.addWidget(btn_save)
 
         btn_load = QPushButton("Canvas importieren…")
         btn_load.setFixedHeight(self._tb_hoehe())
         btn_load.setToolTip("Ein zuvor exportiertes VC-Layout (JSON) in dieses Canvas laden.")
-        btn_load.setStyleSheet("""
+        btn_load.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#58a6ff; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         btn_load.clicked.connect(self._load)
         tb_layout.addWidget(btn_load)
         if self._kiosk:
@@ -535,12 +602,12 @@ class VirtualConsoleView(QWidget):
         self._btn_inspector.setFixedHeight(self._tb_hoehe())
         self._btn_inspector.setProperty("edit_only", True)
         self._btn_inspector.setVisible(False)
-        self._btn_inspector.setStyleSheet("""
+        self._btn_inspector.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#58d68d; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#0d4f8b; color:#58d68d; border-color:#1f6feb; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_inspector.toggled.connect(self._toggle_inspector)
         tb_layout.addWidget(self._btn_inspector)
 
@@ -558,12 +625,12 @@ class VirtualConsoleView(QWidget):
             "Seitenleiste „Handy-Konsole“: hier baust du, was am Handy zu sehen "
             "ist.\nElemente im Bearbeiten-Modus hineinziehen oder per Rechtsklick "
             "→ „Auf Handy-Konsole legen“.")
-        self._btn_handy.setStyleSheet("""
+        self._btn_handy.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#7ee787; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#12351d; color:#7ee787; border-color:#2ea043; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_handy.toggled.connect(self._toggle_handy_leiste)
         tb_layout.addWidget(self._btn_handy)
         if self._kiosk:
@@ -708,12 +775,12 @@ class VirtualConsoleView(QWidget):
         self._btn_sidebar.setCheckable(True)
         self._btn_sidebar.setChecked(True)
         self._btn_sidebar.setFixedHeight(self._tb_hoehe())
-        self._btn_sidebar.setStyleSheet("""
+        self._btn_sidebar.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#ffd700; border:1px solid #30363d;
                           border-radius:3px; font-size:10px; padding:0 8px; }
             QPushButton:checked { background:#2a3344; color:#ffd700; }
             QPushButton:hover { background:#30363d; }
-        """)
+        """))
         self._btn_sidebar.toggled.connect(self._toggle_sidebar)
         self._breite_festhalten(self._btn_sidebar, ("◀ Bibliothek", "▶ Bibliothek"))
         tb_layout.addWidget(self._btn_sidebar)
@@ -972,6 +1039,7 @@ class VirtualConsoleView(QWidget):
         if not enabled:
             self._btn_mehrfach.setChecked(False)
             self._btn_ausrichten.setEnabled(False)
+            self._btn_ausrichten.setText(self._ausrichten_text(0))
         # Inspector-Panel folgt dem Edit-Modus; beim Verlassen Auswahl loesen.
         if self._inspector is not None:
             if enabled:
@@ -1244,9 +1312,15 @@ class VirtualConsoleView(QWidget):
         der Inspector zeigt mehrere als Mehrfachauswahl."""
         n = len(widgets)
         self._btn_ausrichten.setEnabled(self._edit_mode and n > 1)
+        self._btn_ausrichten.setText(self._ausrichten_text(n))
         if (n > 1 and self._inspector is not None and self._edit_mode
                 and self._btn_inspector.isChecked()):
             self._inspector.bind_mehrfach(widgets, self._canvas)
+
+    @staticmethod
+    def _ausrichten_text(n: int) -> str:
+        """UI-138: Beschriftung von „Ausrichten" mit dem Auswahl-Zaehler."""
+        return f"Ausrichten · {n} gewählt ▾" if n > 1 else "Ausrichten ▾"
 
     def ausrichten_menue(self):
         """Das Menue des Knopfs „Ausrichten" (gebaut, nicht gezeigt)."""
@@ -1322,8 +1396,22 @@ class VirtualConsoleView(QWidget):
             self._canvas.redo()
 
     def _clear_all(self):
-        if self._edit_mode:
-            self._canvas._clear()
+        """„Alle löschen“ (Bearbeiten-Leiste). UI-137: erst Rueckfrage, dann
+        ein Rueckgaengig-Stand (Strg+Z holt alles zurueck). ``_clear`` selbst
+        bleibt ohne Undo — es wird auch vom Laden/Undo benutzt."""
+        if not self._edit_mode:
+            return
+        from src.ui.virtualconsole.vc_widget import VCWidget
+        canvas = self._canvas
+        anzahl = len(canvas.findChildren(
+            VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly))
+        if anzahl == 0:
+            return
+        if not _frage_alle_loeschen(self if isinstance(self, QWidget) else None,
+                                    anzahl):
+            return
+        canvas._push_undo()
+        canvas._clear()
 
     # ── WEB-10: Handy-Konsole ────────────────────────────────────────────────
 
