@@ -1714,6 +1714,16 @@ def einrichten(app: QApplication | None = None) -> ZiehenScrollen | None:
     return f
 
 
+def finger_haelt(regler) -> bool:
+    """WEB-16: liegt gerade ein Finger auf diesem Regler, dessen Druck (UI-113)
+    noch zurueckgehalten wird? Dann gilt der Regler als gehalten, obwohl Qt
+    noch kein ``isSliderDown`` meldet — wer ihn von aussen nachzieht, laesst
+    ihn in Ruhe (sonst laege der nachgereichte Druck neben dem Griff)."""
+    app = QApplication.instance()
+    f = getattr(app, "_ui110_ziehen_scrollen", None) if app is not None else None
+    return f is not None and regler is not None and getattr(f, "_regler_w", None) is regler
+
+
 class FingerHalten:
     """UI-115: eigene Flaeche — am Finger zieht ein Zug erst nach langem Druck.
 

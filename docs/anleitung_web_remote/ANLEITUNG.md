@@ -418,7 +418,7 @@ schon verbundene Geräte.
 | **◀◀ BACK** | einen Cue zurück (GO-Zielliste) |
 | **■ STOP** | GO-Zielliste anhalten |
 | **Blackout** | schaltet die gesamte Ausgabe dunkel; erneutes Tippen hebt den Blackout auf — nur, wenn dieses Gerät ihn gesetzt hat |
-| **Fader Ex 1–10** | Pegel der Executor-Fader der aktuellen Page (0–100 %); beim Öffnen stehen sie auf dem echten Stand |
+| **Fader Ex 1–10** | Pegel der Executor-Fader der aktuellen Page (0–100 %); beim Öffnen stehen sie auf dem echten Stand. Der Regler in **Playback → Executor-Leiste** am PC zieht sofort mit — außer, jemand hält ihn dort gerade fest; dann gilt nach dem Loslassen dessen Wert |
 
 **Welche Cueliste trifft GO / BACK / STOP?** Dieselbe wie die Leertaste am Pult:
 
