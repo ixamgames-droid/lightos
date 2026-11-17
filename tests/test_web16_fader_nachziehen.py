@@ -252,6 +252,45 @@ class GehaltenTest(_Basis):
         self.assertEqual(self.schreibzugriffe(), 1)
 
 
+class PageWechselTest(_Basis):
+    """Nach einem Page-Wechsel zeigt der Regler den Pegel der NEUEN Seite —
+    auch wenn der Griff waehrend des Wechsels gehalten wird; das Loslassen
+    ueberschreibt den Pegel der neuen Seite nicht."""
+
+    def _ex2(self, wert):
+        ex2 = self.pe.get_executor(1, page=1)
+        self.addCleanup(setattr, ex2, "fader_value", ex2.fader_value)
+        ex2.fader_value = wert
+        return ex2
+
+    def test_page_wechsel_zeigt_neue_seite(self):
+        ex2 = self._ex2(0.33)
+        self.von_aussen(0.8)
+        self.view._executor_fader_nachziehen()
+        self.assertEqual(self.fader.value(), 80)
+        self.pe.set_page(1)
+        self.assertTrue(_warte_auf(lambda: self.fader.value() == 33, 2000),
+                        f"Regler steht auf {self.fader.value()}")
+        self.assertAlmostEqual(ex2.fader_value, 0.33)
+        self.pe.set_page(0)
+        self.assertTrue(_warte_auf(lambda: self.fader.value() == 80, 2000))
+        self.assertEqual(self.schreibzugriffe(), 0)
+        self.assertAlmostEqual(self.ex.fader_value, 0.8)
+
+    def test_gehalten_ueber_page_wechsel(self):
+        ex2 = self._ex2(0.33)
+        p = self.griff()
+        QTest.mousePress(self.fader, Qt.MouseButton.LeftButton,
+                         Qt.KeyboardModifier.NoModifier, p)
+        self.pe.set_page(1)
+        QTest.qWait(150)
+        QTest.mouseRelease(self.fader, Qt.MouseButton.LeftButton,
+                           Qt.KeyboardModifier.NoModifier, p)
+        self.assertAlmostEqual(ex2.fader_value, 0.33)
+        self.assertTrue(_warte_auf(lambda: self.fader.value() == 33, 2000))
+        self.assertAlmostEqual(self.ex.fader_value, 1.0)
+
+
 try:
     import flask  # noqa: F401
     import flask_socketio  # noqa: F401
