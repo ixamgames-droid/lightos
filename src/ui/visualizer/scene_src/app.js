@@ -78,6 +78,7 @@ import { tickBewegungGlaettung, bewegungGlaettungAktiv, setGlattUhr } from './fi
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
 import { ausbrennInfo, ausbrennDaempfung, ausbrennSchutz, patchAusbrennShader } from './fixtures/ausbrennen.js';  // VIZ-91
+import { syncStrahlSchatten, strahlOptikInfo, strahlOptikSchalter, patchStrahlOptik } from './fixtures/strahl_optik.js';  // VIZ-15 Schritt 2
 import { patchLichtTon } from './fixtures/lichtfarbe.js';          // VIZ-93
 import { updateParBarDmx } from './fixtures/builders.js';           // VIZ-93 (Test-Seam)
 import { strahlHelligkeit } from './scene/spot_pool.js';           // VIZ-93 (Test-Seam)
@@ -194,6 +195,9 @@ function renderFrame() {
   // VIZ-72: im Ansehen-Modus feste Umgebung je Material als ein Koerper.
   syncUmgebung();
   noteShadowPass(prepareShadowMap());
+  // VIZ-BEAM-OCCLUSION Teil 3: Koerper je Kegel fuer den Volumen-Schatten —
+  // NACH prepareShadowMap (Weltmatrizen aktuell). Auf Niedrig/Hoch ein No-Op.
+  syncStrahlSchatten(fixtures, stageObjects);
   scene.autoUpdate = false;
   try {
     renderer.render(scene, view.activeCam);
@@ -377,6 +381,9 @@ window.__lightos = {
   // (Spitze = v 1) und an CanvasTexture.flipY. Beides gemessen, beides im
   // Test festgenagelt — sonst waere der Kegel still falschherum verlaufen.
   beamFalloffTexture,
+  // VIZ-15 Schritt 2 / VIZ-BEAM-OCCLUSION Teil 3: Kegelrand + Volumen-Schatten.
+  strahlOptikInfo, __strahlOptikSchalter: strahlOptikSchalter,
+  __patchStrahlOptik: patchStrahlOptik,
   // A3D-07: Test-Seam — belegt, dass disposeObj die Light-Shadow-Map freigibt.
   disposeObj,
   // A3D-08 / Klick-Entdock-Guard: Test-Seam fuer die Dock-Entscheidung am
@@ -418,7 +425,9 @@ window.__lightos = {
         const u = gl.getActiveUniform(p.program, i);
         if (u && /^sampler/i.test(typName(gl, u.type))) sampler += u.size;
       }
-      return { name: p.name, sampler, quelle: gl.getShaderSource(p.fragmentShader) || '' };
+      // VIZ-15: `ok` = Programm gelinkt (Shader-Fehler sonst nur im Konsolen-Log).
+      return { name: p.name, sampler, quelle: gl.getShaderSource(p.fragmentShader) || '',
+               ok: gl.getProgramParameter(p.program, gl.LINK_STATUS) === true };
     });
   },
   renderInfo: () => {

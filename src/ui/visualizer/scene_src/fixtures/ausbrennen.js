@@ -39,6 +39,7 @@
 
 import { requestRender } from '../scene/render_loop.js';
 import { lichtTonAnwenden, srgbKanal } from './lichtfarbe.js';   // VIZ-93
+import { strahlOptikAnwenden } from './strahl_optik.js';         // VIZ-15 Schritt 2
 // Zirkulaer mit builders.js (das ausbrennNachfuehren holt) — unbedenklich,
 // beide Seiten lesen die Importe nur in Funktionsruempfen.
 import { beamsSichtbar, fleckSichtbar } from './builders.js';
@@ -98,7 +99,11 @@ export function patchAusbrennShader(fs) {
 // onBeforeCompile.toString() in den Programmschluessel.
 // VIZ-93: danach das farbtonerhaltende Tone-Mapping der Lichtmaterialien
 // (lichtfarbe.js) — die Daempfung steht davor, der Anker bleibt dafuer stehen.
+// VIZ-15 Schritt 2 / VIZ-BEAM-OCCLUSION Teil 3: Kegelrand und Volumen-
+// Schatten (strahl_optik.js) zuerst — auf Stufe Niedrig ein No-Op. `this` ist
+// das Material (three ruft den Hook als Methode).
 function kegelAusbrennHook(shader) {
+  strahlOptikAnwenden(shader, this);
   const fs = patchAusbrennShader(shader.fragmentShader);
   if (fs !== null) {
     shader.fragmentShader = fs;

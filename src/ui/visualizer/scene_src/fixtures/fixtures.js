@@ -37,8 +37,12 @@ import {
 import { hellMerken, hellSchnell, hellSetzen } from './strobe_hell.js';   // VIZ-104
 import { kegelDaempfen, fleckDaempfen, ausbrennMelden, ausbrennAbmelden } from './ausbrennen.js';   // VIZ-91
 import { lichtfarbe, lichtMaterialienMarkieren } from './lichtfarbe.js';   // VIZ-93
+import { strahlOptikEinstellen } from './strahl_optik.js';   // VIZ-15 Schritt 2
 
 initSpotPool(fixtures);
+// VIZ-15 Schritt 2 / VIZ-BEAM-OCCLUSION Teil 3: Stufe einmal vor dem ersten
+// Kompilieren festlegen (strahl_optik.js; Niedrig = Kegel-Shader unveraendert).
+strahlOptikEinstellen(tierSettings);
 
 // fixtureMeshes: Raycast-Cache, kein geteilter Modul-State laut Design-
 // Dokument "Kern-Gotcha" (ehem. stage_scene.html:1026).

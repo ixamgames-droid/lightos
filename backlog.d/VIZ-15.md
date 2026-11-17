@@ -1,0 +1,7 @@
+ID: VIZ-15
+Status: review
+Status-Notiz: Beam-Shader Schritt 2 (weicher Kegelrand/Fresnel) gebaut, hinter der Qualitaetsstufe (ab Hoch; Niedrig unveraendert). Bloom bewusst nicht gebaut (PR #565), glTF durch VIZ-66 ueberholt, Bildbeleg Falloff -> DOC-73.
+
+**Schritt 2 erledigt (17.11.2026, Entscheidung des Projektinhabers: jetzt bauen, hinter dem Stufen-Schalter statt auf bessere Hardware zu warten):** neues Modul `scene_src/fixtures/strahl_optik.js`, eingehaengt im Kegel-Hook `kegelAusbrennHook` (ausbrennen.js) VOR dem Ausbrennschutz. Der Kegel blendet mit abs(N·V) (Mantel-Normale gegen Blickrichtung) aus — fuer einen Kreisquerschnitt genau der Anteil der Weglaenge durch das Lichtvolumen: Mitte voll, Silhouette dunkel. Blickwinkelabhaengig: mit abs(A·V)^4 (A = Kegelachse) geht der Faktor laengs in den Strahl geschaut wieder gegen 1, sonst verschwaende der Kegel von unten gesehen. Stufen-Tabelle `quality_tiers.js`: neues Feld `kegelKante` (low false, high/max true). **Auf Niedrig patcht das Modul nichts** — Vertex-Shader bit-gleich, Fragment-Shader genau der bisherige (Test vergleicht den Quelltext). Laufzeit-Schalter nur als geteilte Uniform (`__strahlOptikSchalter`, Diagnose/Test), kein Shader-Neubau.
+
+**Belege:** `tests/test_viz15_kegel_kante_schatten_scene.py` (echte QWebEngine, Pixel-Probe Seitenansicht: Rand/Mitte 1,00 -> 0,75, Mitte unveraendert). 5 Mutationen geprueft (Rand aus, Patch aus, Stufe ignoriert, Schatten aus, Zuteilung aus), alle rot. Vorher/Nachher-Bilder lokal (nicht im Repo).
