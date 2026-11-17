@@ -470,11 +470,11 @@ der Live View gleichermaßen; nach dem Umstellen lädt die Szene einmal neu.
 Unter der Auswahl steht, welche Stufe gerade **aktiv** ist (bei „Automatisch" das
 Ergebnis der Erkennung).
 
-| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Gobo-Muster | Beim Drehen der Kamera |
-|---|---|---|---|---|---|---|
-| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 4 hellste | 4, einfach | flacher Fleck | immer kurz gröber |
-| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8 hellste | 8, weich | projiziert (echte Lichter) | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
-| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16 hellste | 16, weich | projiziert (echte Lichter) | nie gröber |
+| Stufe | Lichtupdates | Bildschärfe (Pixeldichte) | Echte Lichter | Schlagschatten | Gobo-Muster | Lichtkegel | Beim Drehen der Kamera |
+|---|---|---|---|---|---|---|---|
+| **Niedrig** | 15 pro Sekunde | höchstens 1,25-fach | 4 hellste | 4, einfach | flacher Fleck | wie bisher (harter Rand) | immer kurz gröber |
+| **Hoch** (Standard) | 30 pro Sekunde | höchstens 2-fach | 8 hellste | 8, weich | projiziert (echte Lichter) | weicher Rand | gröber nur, wenn die Grafikkarte nicht nachkommt (sie verpasst regelmäßig Bilder gegenüber dem Bildschirmtakt) |
+| **Maximal** | 44 pro Sekunde | volle Bildschirmdichte | 16 hellste | 16, weich | projiziert (echte Lichter) | weicher Rand + Schatten im Strahl (8 hellste Kegel) | nie gröber |
 
 **Echte Lichter** heißt: so viele Strahlen beleuchten höchstens gleichzeitig die
 Umgebung (siehe [Was bei großen Rigs anders aussieht](#was-bei-großen-rigs-anders-aussieht)).
@@ -505,6 +505,17 @@ Kegel, Bodenflecken und Linsen zeigen alle Geräte auf jeder Stufe.
   Kamera-Ansicht (Oben, Vorne, …) zählt nicht als Fahrt.
 - **Maximal** nur auf einer starken Desktop-Grafikkarte wählen. Ruckelt die
   Ansicht, zurück auf **Hoch**.
+- **Weicher Kegelrand (ab Hoch):** ein Lichtkegel ist in der Mitte am
+  hellsten und läuft zu seinem Rand hin weich aus, wie ein Strahl im Dunst.
+  Schaut man von unten oder oben längs in den Strahl, bleibt er hell. Auf
+  **Niedrig** sieht der Kegel genau aus wie bisher.
+- **Schatten im Strahl (nur Maximal):** steht ein Bühnenkörper (Podest, Box,
+  Traverse, Wand) nur teilweise im Kegel, ist der Strahl dahinter dunkel —
+  der Körper schneidet einen Schatten in den sichtbaren Lichtkegel. Das gilt
+  für die **8 hellsten** Kegel und je Kegel für die **4 nächsten** Körper;
+  Mehrkopf-Geräte (Bars, Spider) bleiben ohne. Trifft die Strahl-Mitte einen
+  Körper, endet der Kegel wie bisher dort. Nur Darstellung — an der
+  DMX-Ausgabe ändert sich nichts.
 
 ## Strobe im 3D (Tab „Einstellungen" → „Render-Qualität")
 
