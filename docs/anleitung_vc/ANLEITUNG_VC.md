@@ -258,6 +258,34 @@ Platz gemerkt, und das Fenster bleibt dort, auch wenn der Bildschirm zurückkomm
 ersten guten Sekunde nach dem Wegfall zählt eine Bewegung noch nicht als deine – in dieser
 Zeit räumt das Betriebssystem die Fenster um.
 
+### Eine einzelne Bank lösen (eigenes Fenster)
+
+Statt der ganzen Konsole kannst du auch **eine Bank** in ein eigenes Fenster legen, zum
+Beispiel deine Effekt-Bank auf den Touch-Bildschirm unten: Bank oben wählen, das
+Bank-Etikett (**Bank 1** zwischen ◀ und ▶) antippen und **⇲ Bank … lösen (eigenes Fenster)**
+wählen. Alle Elemente dieser Bank (auch Kästen samt Inhalt)
+wandern in das neue Fenster; Elemente auf „Alle Banks" bleiben im Hauptfenster. Oben
+blätterst du danach ganz normal weiter – das gelöste Fenster bleibt stehen und zeigt immer
+seine Bank. Steht oben gerade die gelöste Bank, steht dort ein kurzer Hinweis statt der
+Elemente.
+
+**Zurück:** **⇱ Andocken** im gelösten Fenster, das Fenster schließen oder – wenn oben die
+gelöste Bank gewählt ist – **⇱ Bank … andocken** im Bank-Menü. Die Elemente liegen
+danach wieder genau dort, wo sie vorher waren.
+
+- **Jede Bank merkt sich ihre eigene Lage** (Bildschirm, Platz, Größe, maximiert), genau wie
+  das Popout, aber getrennt davon. Ohne Gemerktes öffnet sie bei zwei Bildschirmen maximiert
+  auf dem Bildschirm ohne Hauptfenster.
+- **Das APC mini** bedient weiter die Bank, die **oben** gewählt ist – auch wenn deren
+  Elemente gerade im gelösten Fenster liegen. Am Finger bedienst du das gelöste Fenster
+  direkt.
+- **Bearbeiten:** Beim Einschalten von **Bearbeiten** kommen gelöste Bänke vorläufig zurück
+  ins Hauptfenster (bearbeitet wird dort); beim Ausschalten gehen sie wieder an ihren Platz.
+- Welche Bank gelöst ist und wo ihr Fenster liegt, ist eine Einstellung **dieses Rechners**,
+  nicht der Show – dieselbe Show auf dem Laptop mit einem Bildschirm sieht aus wie immer.
+  Nach einem Neustart sind alle Bänke wieder angedockt; beim nächsten Lösen kommt das Fenster
+  an seinen gemerkten Platz.
+
 ## 5. APC mini anbinden
 
 Es gibt **zwei Wege**, ein VC-Widget auf eine APC-mini-Taste/-Fader zu legen:

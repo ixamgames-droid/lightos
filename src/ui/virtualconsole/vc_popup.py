@@ -92,8 +92,12 @@ def alle_popups(canvas) -> list:
     if canvas is None:
         return []
     try:
-        kinder = canvas.findChildren(
-            VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
+        if hasattr(canvas, "oberste_widgets"):
+            # VCB-45: auch Felder im Fenster einer geloesten Bank
+            kinder = canvas.oberste_widgets()
+        else:
+            kinder = canvas.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
     except RuntimeError:
         return []
     return [k for k in kinder if ist_popup_feld(k)]

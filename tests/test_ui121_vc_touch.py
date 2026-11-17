@@ -438,7 +438,8 @@ def test_b05_bank_knopf_am_finger_und_etikett_waehlt_bank():
     assert v._canvas.active_bank == 1
     _tipp(v._lbl_bank, v._lbl_bank.rect().center())
     menue = v._bank_menue_offen
-    acts = menue.actions()
+    # VCB-45: unter den zehn Banken steht zusaetzlich „Bank … loesen".
+    acts = [a for a in menue.actions() if a.isCheckable()]
     assert len(acts) == 10 and acts[1].isChecked()
     acts[6].trigger()
     assert v._canvas.active_bank == 6

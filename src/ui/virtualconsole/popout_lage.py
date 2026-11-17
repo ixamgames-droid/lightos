@@ -305,6 +305,51 @@ def speichere_gemerkt(wert: dict) -> None:
         print(f"[VC] Popout-Lage nicht gespeichert: {e}")
 
 
+# ── VCB-45 Schritt 2: jede Bank hat ihre eigene Lage ────────────────────────
+#
+# Unter ``vc_bank_lagen`` liegt je geloester Bank (Schluessel = Bank-Nummer
+# 0..9 als Text) ein Eintrag im selben Format wie ``vc_popout_lage``. Das ist
+# Arbeitsplatz-Einstellung (welcher Bildschirm wo steht), kein Show-Inhalt.
+
+BANK_PREF_SCHLUESSEL = "vc_bank_lagen"
+
+
+def _bank_lagen() -> dict:
+    try:
+        from src.ui.views.programmer_view import _load_prefs
+        wert = (_load_prefs() or {}).get(BANK_PREF_SCHLUESSEL)
+    except Exception:
+        return {}
+    return dict(wert) if isinstance(wert, dict) else {}
+
+
+def lade_bank_lage(bank: int):
+    return _bank_lagen().get(str(int(bank)))
+
+
+def speichere_bank_lage(bank: int, wert: dict) -> None:
+    try:
+        from src.ui.views.programmer_view import _save_prefs
+        alle = _bank_lagen()
+        alle[str(int(bank))] = wert
+        _save_prefs({BANK_PREF_SCHLUESSEL: alle})
+    except Exception as e:
+        print(f"[VC] Lage von Bank {int(bank) + 1} nicht gespeichert: {e}")
+
+
+class BankAblage:
+    """Ablage eines ``LageMerker`` fuer das Fenster einer geloesten Bank."""
+
+    def __init__(self, bank: int):
+        self.bank = int(bank)
+
+    def lade(self):
+        return lade_bank_lage(self.bank)
+
+    def speichere(self, wert: dict) -> None:
+        speichere_bank_lage(self.bank, wert)
+
+
 # ── Kleber zu Qt ─────────────────────────────────────────────────────────────
 
 def lies_bildschirme():
@@ -425,8 +470,11 @@ class LageMerker(QObject):
       Platz zurueckgebracht; bis es dort angekommen ist, wird nichts gemerkt.
     """
 
-    def __init__(self, fenster, lage: Lage, haupt=None):
+    def __init__(self, fenster, lage: Lage, haupt=None, ablage=None):
         super().__init__(fenster)
+        # VCB-45 Schritt 2: ``ablage`` (lade/speichere) fuer eine eigene
+        # Lage, z. B. je geloester Bank. Ohne Ablage: das Popout (wie bisher).
+        self._ablage = ablage
         r = lage.rechteck
         # Lage im Normalzustand; bei maximiert/Vollbild bleibt sie stehen.
         self._normal = r
@@ -503,6 +551,8 @@ class LageMerker(QObject):
         return f
 
     def _gemerkt(self):
+        if self._ablage is not None:
+            return self._zuletzt or self._ablage.lade()
         return self._zuletzt or lade_gemerkt()
 
     def _haupt_index(self, paare) -> int:
@@ -766,10 +816,13 @@ class LageMerker(QObject):
         if wert == self._zuletzt:
             return
         self._zuletzt = wert
-        speichere_gemerkt(wert)
+        if self._ablage is not None:
+            self._ablage.speichere(wert)
+        else:
+            speichere_gemerkt(wert)
 
 
-def baue_merker(fenster, lage: Lage, haupt=None):
+def baue_merker(fenster, lage: Lage, haupt=None, ablage=None):
     """``haupt``: ein Widget des Hauptfensters — bestimmt, auf welchen
-    Bildschirm das Popout ausweicht."""
-    return LageMerker(fenster, lage, haupt)
+    Bildschirm das Popout ausweicht. ``ablage``: s. :class:`BankAblage`."""
+    return LageMerker(fenster, lage, haupt, ablage)

@@ -119,6 +119,7 @@ class VCCanvas(QWidget):
     function_assign_done = Signal()     # Funktions-Assign abgeschlossen
     snap_assign_done = Signal()         # Bibliothek-Snap-Assign abgeschlossen
     bank_changed = Signal(int)          # aktive Bank (0-basiert) gewechselt
+    geloeste_baenke_geaendert = Signal()  # VCB-45: Bank geloest/angedockt
     widget_selected = Signal(object)    # VC-Widget gewaehlt (None = Auswahl aufgehoben) -> Inspector-Panel
     auswahl_geaendert = Signal(list)    # UI-126: alle gewaehlten Widgets (Mehrfachauswahl)
     handy_seiten_changed = Signal()     # WEB-09: Handy-Seiten geaendert (Editor/Seitenleiste)
@@ -136,6 +137,12 @@ class VCCanvas(QWidget):
         self._kiosk = False
         self._snap_to_grid = False
         self._active_bank = 0
+        # VCB-45 Schritt 3: geloeste Baenke (Bank -> BankFenster). Die Fenster
+        # haengen als Qt-Fenster an der Flaeche (bleiben im Objektbaum), s.
+        # vc_bank_fenster.py. Arbeitsplatz-Zustand, nicht Teil der Show.
+        self._geloeste_baenke: dict = {}
+        # Beim Wechsel in den Bearbeiten-Modus vorlaeufig angedockte Baenke.
+        self._bearbeiten_angedockt: list[int] = []
         # Undo/Redo: Snapshot-Verlauf der VC-Layouts (Hinzufuegen/Loeschen/…).
         self._undo_stack: list[dict] = []
         self._redo_stack: list[dict] = []
@@ -517,11 +524,167 @@ class VCCanvas(QWidget):
         Pop-up-Feld (VCB-48) — offen. MIDI/Hotkey fragen weiter nur
         :meth:`on_active_bank`: Kinder eines geschlossenen Pop-ups bleiben
         ausloesbar und behalten ihren Zustand (wie Elemente anderer Seiten)."""
-        if not self.on_active_bank(w):
+        if not self.bank_sichtbar(w):
             return False
         if getattr(w, "_popup", False):
             return bool(getattr(w, "_popup_offen", False))
         return True
+
+    # ── VCB-45 Schritt 2/3: Bank loesen / andocken ───────────────────────────
+
+    def in_geloester_bank(self, w) -> bool:
+        """True, wenn ``w`` im Fenster einer geloesten Bank liegt."""
+        from .vc_bank_fenster import BankFlaeche
+        obj = w
+        while obj is not None and obj is not self:
+            if isinstance(obj, BankFlaeche):
+                return True
+            obj = obj.parent()
+        return False
+
+    def bank_sichtbar(self, w) -> bool:
+        """Bank-Anteil der Sichtbarkeit: Widgets einer geloesten Bank sind
+        immer sichtbar (oben weiterblaettern laesst das Fenster stehen), alle
+        anderen nach :meth:`on_active_bank`. MIDI/Tastenkuerzel fragen
+        weiter nur :meth:`on_active_bank` — das Pult bedient die oben
+        gewaehlte Seite."""
+        if self.in_geloester_bank(w):
+            return True
+        return self.on_active_bank(w)
+
+    def oberste_widgets(self) -> list:
+        """Die obersten VC-Widgets: direkt auf der Flaeche UND direkt in den
+        Fenstern geloester Baenke. Ersetzt ``FindDirectChildrenOnly`` ueberall,
+        wo die ganze Konsole gemeint ist (Speichern, Leeren, Sichtbarkeit)."""
+        try:
+            liste = list(self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly))
+        except RuntimeError:
+            return []
+        for b in sorted(self._geloeste_baenke):
+            liste.extend(self._geloeste_baenke[b].widgets())
+        return liste
+
+    def geloeste_baenke(self) -> list[int]:
+        return sorted(self._geloeste_baenke)
+
+    def bank_fenster(self, bank: int):
+        return self._geloeste_baenke.get(int(bank))
+
+    def bank_loesen(self, bank: int, haupt=None):
+        """Bank ``bank`` (0..9) als eigenes Fenster loesen und zeigen. Nur im
+        Spielbetrieb (beim Bearbeiten liegt alles auf der Flaeche). Ist die
+        Bank schon geloest, wird ihr Fenster nach vorn geholt. Gibt das
+        Fenster zurueck oder None."""
+        bank = int(bank)
+        if not 0 <= bank <= 9 or self._edit_mode:
+            return None
+        fenster = self._geloeste_baenke.get(bank)
+        if fenster is not None:
+            fenster.show()
+            fenster.raise_()
+            return fenster
+        from .vc_bank_fenster import BankFenster, zeige
+        fenster = BankFenster(self, bank)
+        self._geloeste_baenke[bank] = fenster
+        self._in_bank_fenster_verschieben(bank)
+        zeige(fenster, haupt if haupt is not None else self)
+        self._apply_bank_visibility()
+        self.update()
+        self.geloeste_baenke_geaendert.emit()
+        return fenster
+
+    def _in_bank_fenster_verschieben(self, bank: int) -> None:
+        """Oberste Widgets der Bank von der Flaeche ins Fenster umhaengen
+        (gleiche Koordinaten — beim Andocken liegen sie wieder genau da)."""
+        fenster = self._geloeste_baenke.get(int(bank))
+        if fenster is None:
+            return
+        reihenfolge = getattr(fenster, "_reihenfolge", None)
+        alle = list(self.findChildren(
+            VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly))
+        bekannt = {id(w) for w in (reihenfolge or []) if _lebt(w)}
+        if reihenfolge is None or any(
+                getattr(w, "bank", -1) == int(bank) and id(w) not in bekannt
+                for w in alle):
+            # Erstes Loesen oder neu geladene Widgets (Laden/Undo/Vorlage):
+            # die Stapel-Reihenfolge der Flaeche JETZT ist die zum Andocken.
+            fenster._reihenfolge = list(alle) + [
+                w for w in fenster.widgets() if w not in alle]
+        for w in alle:
+            if getattr(w, "bank", -1) != int(bank):
+                continue
+            pos = w.pos()
+            w.setParent(fenster.flaeche)
+            w.move(pos)
+            w.setVisible(self.soll_sichtbar(w))
+            if hasattr(w, "_apply_bank_visibility"):
+                w._apply_bank_visibility()
+        fenster.flaeche.groesse_anpassen()
+
+    def _geloeste_neu_befuellen(self) -> None:
+        """Nach Laden/Undo/Vorlage: Widgets geloester Baenke, die (neu) auf
+        der Flaeche liegen, ins jeweilige Fenster bringen."""
+        for b in list(self._geloeste_baenke):
+            self._in_bank_fenster_verschieben(b)
+
+    def bank_andocken(self, bank: int, merken: bool = True) -> bool:
+        """Geloeste Bank zurueck auf die Flaeche legen und ihr Fenster
+        schliessen. Die Stapel-Reihenfolge von vor dem Loesen kommt wieder."""
+        fenster = self._geloeste_baenke.pop(int(bank), None)
+        if fenster is None:
+            return False
+        try:
+            widgets = fenster.widgets()
+        except RuntimeError:
+            widgets = []
+        for w in widgets:
+            pos = w.pos()
+            w.setParent(self)
+            w.move(pos)
+        reihenfolge = [w for w in (getattr(fenster, "_reihenfolge", None) or [])
+                       if _lebt(w)]
+        rang = {id(w): i for i, w in enumerate(reihenfolge)}
+        try:
+            jetzt = list(self.findChildren(
+                VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly))
+        except RuntimeError:
+            jetzt = []
+        if widgets and reihenfolge:
+            ende = len(rang)
+            for _i, w in sorted(enumerate(jetzt),
+                                key=lambda iw: (rang.get(id(iw[1]), ende), iw[0])):
+                w.raise_()
+        for w in widgets:
+            w.setVisible(self.soll_sichtbar(w))
+            if hasattr(w, "_apply_bank_visibility"):
+                w._apply_bank_visibility()
+        fenster._andocken_laeuft = True
+        if merken:
+            try:
+                if fenster._lage_merker is not None:
+                    fenster._lage_merker.sichern()
+            except Exception as e:
+                print(f"[VC] Lage von Bank {int(bank) + 1} nicht gemerkt: {e}")
+        try:
+            fenster.hide()
+            fenster.deleteLater()
+        except RuntimeError:
+            pass
+        self._update_content_extent()
+        self._apply_bank_visibility()
+        if self._edit_mode:
+            for w in widgets:
+                w.set_edit_mode(True)
+        self.update()
+        self.geloeste_baenke_geaendert.emit()
+        return True
+
+    def alle_baenke_andocken(self) -> list[int]:
+        baenke = self.geloeste_baenke()
+        for b in baenke:
+            self.bank_andocken(b)
+        return baenke
 
     def popups_nach_oben(self) -> None:
         """VCB-48: offene Pop-up-Felder liegen ueber allen anderen Elementen —
@@ -553,9 +716,7 @@ class VCCanvas(QWidget):
         return True
 
     def _apply_bank_visibility(self):
-        for child in self.findChildren(
-            VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly
-        ):
+        for child in self.oberste_widgets():   # VCB-45: auch geloeste Baenke
             child.setVisible(self.soll_sichtbar(child))
             # Frames haben eigene (Seiten x Bank)-Sichtbarkeit fuer ihre Kinder —
             # sonst blieben Bank-Pins verschachtelter Widgets unbeachtet.
@@ -873,9 +1034,17 @@ class VCCanvas(QWidget):
     def set_edit_mode(self, enabled: bool):
         if self._kiosk and enabled:
             enabled = False     # UI-96: im Kiosk nie Bearbeiten-Modus
+        # VCB-45: Bearbeitet wird auf der Flaeche — geloeste Baenke kommen
+        # dafuer vorlaeufig zurueck und gehen danach wieder an ihren Platz.
+        if enabled and not self._edit_mode and self._geloeste_baenke:
+            self._bearbeiten_angedockt = self.alle_baenke_andocken()
         self._edit_mode = enabled
         for child in self.findChildren(VCWidget):
             child.set_edit_mode(enabled)
+        if not enabled and self._bearbeiten_angedockt:
+            baenke, self._bearbeiten_angedockt = self._bearbeiten_angedockt, []
+            for b in baenke:
+                self.bank_loesen(b)
         if not enabled:
             self._on_widget_selected(None)   # Inspector leeren, wenn Edit-Modus aus
         self._handy_abzeichen_aktualisieren()   # WEB-10: Abzeichen nur beim Bearbeiten
@@ -2731,8 +2900,7 @@ class VCCanvas(QWidget):
             print(f"[VCCanvas] ERROR: Handy-Seiten nach Loeschen: {e}")
 
     def _clear(self):
-        for child in self.findChildren(VCWidget,
-                                       options=Qt.FindChildOption.FindDirectChildrenOnly):
+        for child in self.oberste_widgets():    # VCB-45: auch geloeste Baenke
             self._gehaltene_loslassen(child)        # WEB-12
             self._snap_ansprueche_abmelden(child)
             child.setParent(None)
@@ -3392,8 +3560,8 @@ class VCCanvas(QWidget):
         # liegen, schreibt der Frame selbst in seinem to_dict (verschachtelt) — ohne
         # FindDirectChildrenOnly wuerden Frame-Kinder doppelt (einmal hier flach,
         # einmal im Frame) gespeichert.
-        for child in self.findChildren(VCWidget,
-                                       options=Qt.FindChildOption.FindDirectChildrenOnly):
+        # VCB-45: Widgets geloester Baenke gehoeren genauso zur Show.
+        for child in self.oberste_widgets():
             widgets.append(child.to_dict())
         d = {"widgets": widgets}
         # WEB-09: Handy-Seiten nur schreiben, wenn es welche gibt — eine Show
@@ -3430,6 +3598,8 @@ class VCCanvas(QWidget):
                     self._uebersprungen.append(f"{wtype or '(ohne Typ)'}: {e}")
         finally:
             self._laedt_layout = False
+        # VCB-45: Widgets einer geloesten Bank gleich wieder in ihr Fenster.
+        self._geloeste_neu_befuellen()
         # WEB-08: eine von Hand zusammenkopierte Layout-Datei kann dieselbe
         # Kennung zweimal tragen — einmal pruefen, wenn alles steht.
         self._kennungen_reparieren()
@@ -3605,6 +3775,7 @@ class VCCanvas(QWidget):
             self._laedt_layout = _prev_laedt
         self._kennungen_reparieren()
         belegung_geaendert()
+        self._geloeste_neu_befuellen()       # VCB-45: Seite liegt evtl. geloest
         self._apply_bank_visibility()
         self._update_content_extent()
         self.led_rueckmeldung_pruefen()
@@ -3642,6 +3813,14 @@ class VCCanvas(QWidget):
                 p.drawLine(x, 0, x, self.height())
             for y in range(0, self.height(), g):
                 p.drawLine(0, y, self.width(), y)
+
+        # VCB-45: die gezeigte Bank liegt in einem eigenen Fenster
+        if self._active_bank in getattr(self, "_geloeste_baenke", {}):
+            p.setPen(QColor("#8b949e"))
+            p.drawText(self.rect().adjusted(8, 28, -8, 0),
+                       Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+                       f"Bank {self._active_bank + 1} ist gelöst und liegt "
+                       f"in einem eigenen Fenster.")
 
         # Hinweis wenn MIDI-Learn oder Snapshot-Assign aktiv
         mode = getattr(self, "_awaiting_button_click_for", None)

@@ -1738,6 +1738,8 @@ class VCButton(VCWidget):
         if f is None or not f.popup_offen():
             return False
         cv = self._find_canvas()
+        if cv is not None and hasattr(cv, "bank_sichtbar"):
+            return bool(cv.bank_sichtbar(f))   # VCB-45: geloeste Bank sichtbar
         if cv is not None and hasattr(cv, "on_active_bank"):
             return bool(cv.on_active_bank(f))
         return True
@@ -1753,8 +1755,11 @@ class VCButton(VCWidget):
             vc_popup.hinweis(self, vc_popup.HINWEIS_ZIEL_FEHLT)
             return
         cv = self._find_canvas()
-        if (cv is not None and hasattr(cv, "on_active_bank")
-                and not cv.on_active_bank(f)):
+        # VCB-45: ein Feld im Fenster einer geloesten Bank ist sichtbar und
+        # darf umgeschaltet werden, auch wenn oben eine andere Seite steht.
+        sichtbar = getattr(cv, "bank_sichtbar", None) or getattr(
+            cv, "on_active_bank", None)
+        if sichtbar is not None and not sichtbar(f):
             # Feld liegt auf einer anderen Bank: nichts unsichtbar umschalten.
             vc_popup.hinweis(self, vc_popup.HINWEIS_FELD_ANDERE_BANK)
             return
