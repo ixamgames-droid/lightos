@@ -15,6 +15,7 @@ from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
 from src.ui.weak_slots import weak_slot
 from src.ui import dialog_hilfe
+from src.ui.ziehen_scrollen import finger_haelt
 
 CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
@@ -54,6 +55,9 @@ class PlaybackView(QWidget):
         # Tick-Timer für Cue-Positionsanzeige
         self._tick = QTimer(self)
         self._tick.timeout.connect(self._update_cue_highlight)
+        # WEB-16: im selben Takt die Executor-Fader nachziehen, wenn der Pegel
+        # von aussen (Web/OSC/MIDI/VC) kam — kein eigener Timer.
+        self._tick.timeout.connect(self._executor_fader_nachziehen)
         self._tick.start(50)
 
         # Zentraler StateSync
@@ -73,6 +77,13 @@ class PlaybackView(QWidget):
             self._refresh_executors()
         except Exception as e:
             print(f"[playback_view] sync_refresh error: {e}")
+
+    def _executor_fader_nachziehen(self):
+        """WEB-16: Regler der Executor-Leiste auf den Engine-Pegel ziehen
+        (nur Anzeige, kein Rueckschreiben; Details in
+        ``ExecutorWidget.fader_nachziehen``)."""
+        for w in getattr(self, "_executors_widgets", ()):
+            w.fader_nachziehen()
 
     def _refresh_executors(self):
         for w in getattr(self, "_executors_widgets", []):
@@ -1009,6 +1020,7 @@ class ExecutorWidget(QWidget):
         self._fader.setValue(100)
         self._fader.setFixedHeight(50)
         self._fader.valueChanged.connect(self._fader_changed)
+        self._fader.sliderReleased.connect(self._fader_losgelassen)
         layout.addWidget(self._fader, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # 3 frei konfigurierbare Tasten (einheitlich pressed/released, damit
@@ -1105,6 +1117,55 @@ class ExecutorWidget(QWidget):
         else:
             self._fader.setValue(int(round(ex.fader_value * 100)))
         self._fader.blockSignals(False)
+
+    #: WEB-16: Toleranz beim Nachziehen — knapp ein Reglerschritt (1 %),
+    #: damit Rundungsunterschiede (z. B. 0,505) den Griff nicht zittern lassen.
+    NACHZIEH_TOLERANZ = 1.0 - 1e-6
+
+    def fader_nachziehen(self) -> bool:
+        """WEB-16: Pegel, der von AUSSEN in den Executor kam (Web, OSC, MIDI,
+        VC-Playback-Fader), im Regler zeigen.
+
+        * Nur Anzeige: Signale blockiert -> ``_fader_changed`` laeuft nicht,
+          nichts geht zurueck in die Engine oder an Web/OSC/MIDI.
+        * Haelt der Bediener den Griff (Maus oder Finger), bleibt er unberuehrt.
+        * Nur setzen, wenn der Unterschied mindestens einen Reglerschritt
+          betraegt (kein Flackern, kein Leerlauf-Aufwand).
+        * Crossfade-Fader ruhen auf 0 und zeigen keinen Pegel — unberuehrt.
+
+        Gibt ``True`` zurueck, wenn der Regler bewegt wurde."""
+        if self._fader.isSliderDown() or finger_haelt(self._fader):
+            return False
+        pe = self._state.playback_engine
+        if not pe:
+            return False
+        try:
+            ex = pe.get_executor(self._slot)
+            if ex.fader_function == "crossfade":
+                return False
+            soll = float(ex.fader_value) * 100.0
+        except (IndexError, TypeError, ValueError, AttributeError):
+            return False
+        if abs(soll - self._fader.value()) < self.NACHZIEH_TOLERANZ:
+            return False
+        self._fader.blockSignals(True)
+        try:
+            self._fader.setValue(int(round(soll)))
+        finally:
+            self._fader.blockSignals(False)
+        return True
+
+    def _fader_losgelassen(self):
+        """WEB-16: nach dem Loslassen gilt der Wert des Bedieners — auch wenn
+        waehrend des Haltens ein Pegel von aussen kam (der Griff wurde dann
+        nicht nachgezogen). Sonst stuende die Engine anders als der Regler und
+        der naechste Takt zoege den Griff weg."""
+        ex = self._executor()
+        if not ex or ex.fader_function == "crossfade":
+            return
+        wert = self._fader.value() / 100.0
+        if abs(float(ex.fader_value) - wert) >= 1e-9:
+            ex.fader_value = wert
 
     def _assign_stack(self, idx: int):
         ex = self._executor()
