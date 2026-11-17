@@ -182,6 +182,7 @@ class VCSlider(VCWidget):
         self._value: int = 0          # 0–255
         self._drag_y: int | None = None
         self._drag_start_val: int = 0
+        self._pegel_bei_druck: int | None = None   # VCB-50
         self._bg_color = QColor("#1a1a2e")
         self._fg_color = QColor("#ffffff")
         # MIDI CC binding
@@ -290,6 +291,85 @@ class VCSlider(VCWidget):
         if self.invert:
             ratio = 1.0 - ratio
         return max(0, min(255, int(round(ratio * 255))))
+
+    # ── VCB-50: Pegel von aussen nachziehen (nur Modus „Playback (Executor)“) ──
+    #: Toleranz in Ausgabe-Stufen (0..255): ein Reglerschritt. Rundung aus
+    #: Web/OSC/MIDI (z. B. 0,505) bewegt den Griff nicht.
+    NACHZIEH_TOLERANZ = 1
+
+    def _engine_pegel(self) -> int | None:
+        """Pegel des zugeordneten Executors (0..255) — derselbe Executor, den
+        ``_apply`` schreibt (``playback_engine.executors[playback_slot]``, also
+        die aktuelle Seite). ``None`` = anderer Modus, kein Slot, nicht lesbar."""
+        if self.mode != SliderMode.PLAYBACK or self.playback_slot is None:
+            return None
+        try:
+            from src.core.app_state import get_state
+            executors = get_state().playback_engine.executors
+            slot = int(self.playback_slot)
+            if not 0 <= slot < len(executors):
+                return None
+            fv = float(executors[slot].fader_value)
+        except Exception:
+            return None
+        if fv != fv:                      # NaN
+            return None
+        return max(0, min(255, int(round(fv * 255))))
+
+    def gehalten(self) -> bool:
+        """Haelt der Bediener den Griff (Maus oder Finger)? Am VC-Fader kommt
+        auch der Finger als Mausdruck an (``_drag_y``); ``finger_haelt`` deckt
+        zusaetzlich einen von ziehen_scrollen zurueckgehaltenen Druck ab."""
+        if self._drag_y is not None:
+            return True
+        try:
+            from src.ui.ziehen_scrollen import finger_haelt
+            return bool(finger_haelt(self))
+        except Exception:
+            return False
+
+    def pegel_nachziehen(self, nachfuehren: bool = True) -> bool:
+        """VCB-50: einen Pegel, der von AUSSEN in den Executor kam (Web/Socket,
+        OSC, MIDI-Mapping, Executor-Leiste, anderer VC-Fader), am Griff zeigen.
+
+        * Nur Modus PLAYBACK; im Bearbeiten-Modus nichts; gehalten (Maus/Finger)
+          nichts — danach gilt der Bedienerwert (``mouseReleaseEvent``).
+        * Nur Anzeige: KEIN ``_apply`` -> 0 Schreibzugriffe in die Engine, kein
+          Echo an Web/OSC.
+        * Invert/Bereich: ``_value_for_output`` rechnet den Engine-Pegel auf die
+          Griffstellung zurueck; ausserhalb des Bereichs steht der Griff am
+          Anschlag (geklemmt) — danach wird nichts mehr gesetzt (kein Flattern).
+        * Toleranz ein Reglerschritt, gesetzt wird nur bei Aenderung.
+        * ``nachfuehren``: Motorfader fahren dem neuen Wert nach (der Bericht
+          der Motorfahrt gilt per ``MotorFader.eingang`` als Echo, nicht als
+          Eingabe — kein Ping-Pong); ohne Motor, aber mit MIDI-Bindung und
+          Soft-Takeover wird der Fader armiert, damit der Pult-Fader erst beim
+          Durchfahren des neuen Werts uebernimmt (kein Sprung). ``False`` nutzt
+          der Bankwechsel, der beides danach selbst macht (``arm_pickup``).
+
+        ``True`` = Griff bewegt."""
+        if self.mode != SliderMode.PLAYBACK or self.playback_slot is None:
+            return False                  # andere Modi bleiben unveraendert
+        if getattr(self, "_edit_mode", False) or self.gehalten():
+            return False
+        if not self._motor_auf_aktiver_bank():
+            return False
+        out = self._engine_pegel()
+        if out is None:
+            return False
+        if abs(self._effective_value() - out) <= self.NACHZIEH_TOLERANZ:
+            return False
+        roh = self._value_for_output(out)
+        if roh == self._value:
+            return False                  # geklemmt: steht schon am Anschlag
+        self._value = roh
+        if nachfuehren:
+            if VCSlider.soft_takeover and self.midi_cc is not None and self.midi_cc >= 0:
+                self._pickup_armed = True
+                self._last_cc = None
+            self._motor_folgen()          # Motor faehrt mit; sendet er, faellt Pickup weg
+        self.update()
+        return True
 
     def _on_grand_master_pushed(self, gm: float):
         """Externe grand_master-Aenderung (Header-Fader, MIDI, anderer VC-Fader) ->
@@ -1029,6 +1109,9 @@ class VCSlider(VCWidget):
         if event.button() == Qt.MouseButton.LeftButton:
             self._drag_y = event.position().toPoint().y()
             self._drag_start_val = self._value
+            # VCB-50: Engine-Pegel beim Druck merken — kommt waehrend des
+            # Haltens einer von aussen, gilt nach dem Loslassen der Bedienerwert.
+            self._pegel_bei_druck = self._engine_pegel()
         event.accept()
 
     def mouseMoveEvent(self, event):
@@ -1050,8 +1133,25 @@ class VCSlider(VCWidget):
         if self._edit_mode:
             super().mouseReleaseEvent(event)
             return
+        war_gehalten = self._drag_y is not None
         self._drag_y = None
+        if war_gehalten:
+            self._bedienerwert_nach_halten()
         event.accept()
+
+    def _bedienerwert_nach_halten(self) -> None:
+        """VCB-50: kam waehrend des Haltens ein Pegel von aussen (der Griff wurde
+        dann nicht nachgezogen), gilt nach dem Loslassen der Wert des Bedieners —
+        sonst stuende die Engine anders als der Griff und der naechste Takt zoege
+        ihn weg. Ohne Aenderung von aussen wird nichts geschrieben (ein blosser
+        Klick aendert die Engine nicht)."""
+        vorher = getattr(self, "_pegel_bei_druck", None)
+        self._pegel_bei_druck = None
+        jetzt = self._engine_pegel()
+        if jetzt is None or vorher is None or jetzt == vorher:
+            return
+        if abs(self._effective_value() - jetzt) > self.NACHZIEH_TOLERANZ:
+            self._apply()
 
     def wheelEvent(self, event):
         if self._edit_mode:

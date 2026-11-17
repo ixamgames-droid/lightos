@@ -38,10 +38,11 @@ Die weiteren Aussagen:
 * **Positivkontrolle** — „zeilenweise" (Default, Bestands-Shows) fuehrt zu Kopf
   12. Ohne sie wuerde auch ein Fehler durchgehen, der die Reihenfolge IMMER
   umdreht.
-* **Die ehrliche Grenze** — die beim Patchen automatisch angelegte Gruppe
-  („… · Köpfe") ist eine 1×N-Reihe in DMX-Reihenfolge und ignoriert die Wahl.
-  Genau das behauptet der Hinweis im Dialog, und genau das wird hier
-  nachgemessen, statt es zu glauben.
+* **Die Auto-Gruppe** — seit FM-21 (a) bekommt ein Panel mit hinterlegter
+  Rasterform beim Patchen gleich das 12×4-Raster nach Nummerierung und Montage
+  (vorher: eine 1×N-Reihe, die die Wahl ignorierte). Eine spaetere Aenderung
+  baut sie nur nach Rueckfrage neu — nie still. Das wird hier nachgemessen;
+  Ja/Nein/Undo misst ``test_fm21_auto_gruppe_neu.py``.
 * **Der Hinweis wird an der Stelle gemessen, an die er schickt** — in der
   Auto-Gruppe stehen KOPF-Zellen, dort bietet das Kontextmenue „als Block…"
   gar nicht an. Ein Hinweis, der einen Menuepunkt nennt, den es dort nicht
@@ -152,6 +153,14 @@ class _StummeMeldung:
         return 1
 
 
+class _NeinZumNeuaufbau(_StummeMeldung):
+    """Rueckfrage „Auto-Gruppe neu aufbauen?“ mit „Nein“ beantworten."""
+
+    @staticmethod
+    def question(*_a, **_kw):
+        return _StummeMeldung.StandardButton.No
+
+
 class _Basis(unittest.TestCase):
     def setUp(self):
         from src.core.app_state import get_state
@@ -227,14 +236,19 @@ class _Basis(unittest.TestCase):
 
         pv = PV.PatchView()
         self.addCleanup(pv.deleteLater)
-        echt = PV.PatchFixtureEditDialog
+        echt, echt_box = PV.PatchFixtureEditDialog, PV.QMessageBox
         PV.PatchFixtureEditDialog = _DialogMitWahl
+        # FM-21 (a): nach der Aenderung fragt LightOS, ob die Auto-Gruppe neu
+        # aufgebaut werden soll. Diese Datei misst den Weg ueber „als Block…“
+        # — sie antwortet „Nein“ (die Vorgabe), die Auto-Gruppe bleibt.
+        # Ja/Nein selbst misst tests/test_fm21_auto_gruppe_neu.py.
+        PV.QMessageBox = _NeinZumNeuaufbau
         try:
             zeile = next(r for r in range(pv._table.rowCount())
                          if pv._fid_at_row(r) == fid)
             pv._on_double_click(pv._table.model().index(zeile, 0))
         finally:
-            PV.PatchFixtureEditDialog = echt
+            PV.PatchFixtureEditDialog, PV.QMessageBox = echt, echt_box
 
     def _block_gruppe(self, fx) -> int:
         """„als Block…" ueber den ECHTEN Weg: Kontextmenue der Zelle bauen, den
@@ -408,28 +422,34 @@ class KetteVomDialogBisZumDmxTest(_Basis):
                          "links aussen sitzt der letzte Kopf der Zeile")
 
 
-class AutoKopfgruppeIstDieEhrlicheGrenzeTest(_Basis):
-    """Was der neue Hinweis im Dialog behauptet, wird hier nachgemessen."""
+class AutoKopfgruppeFolgtDerRasterformTest(_Basis):
+    """Was der Hinweis im Dialog behauptet, wird hier nachgemessen.
 
-    def test_auto_gruppe_bleibt_eine_reihe_in_dmx_folge(self):
+    ★ Bis FM-21 (a) stand hier „die Auto-Gruppe bleibt eine 1xN-Reihe in
+    DMX-Folge“. Seit der Entscheidung vom 17.11.2026 bekommt ein Panel mit
+    hinterlegter Rasterform gleich 12 x 4 nach Nummerierung und Montage — und
+    eine spaetere Aenderung baut die Gruppe nur nach Rueckfrage neu, nie still
+    (``update_fixture`` allein laesst sie stehen)."""
+
+    def test_auto_gruppe_ist_das_raster_und_aendert_sich_nicht_still(self):
         from src.core.database.models import FixtureGroup
         fx = self._patch_panel()
-        self._im_dialog_waehlen(fx.fid, "mirrored")
+        self._im_dialog_waehlen(fx.fid, "mirrored")     # Rueckfrage: Nein
         fx = self._frisch()
         self.state.update_fixture(fx.fid, element_rotation=90)
         gid = self.state.find_head_matrix_group(fx.fid, dedicated=True)
         self.assertIsNotNone(gid, "beim Patchen entstand keine Kopf-Gruppe")
         with self.state._session() as s:
             g = s.get(FixtureGroup, gid)
-            self.assertEqual((g.cols, g.rows), (self._kopfzahl(fx), 1),
-                             "die Auto-Gruppe ist keine 1×N-Reihe mehr — dann "
-                             "ist der Hinweis im Patch-Dialog falsch")
+            self.assertEqual((g.cols, g.rows), (SPALTEN, 4),
+                             "die Auto-Gruppe ist nicht das hinterlegte 12x4-"
+                             "Raster — dann ist der Hinweis im Dialog falsch")
             pos = json.loads(g.positions_json or "{}")
-        self.assertEqual(pos.get("0,0"), f"{fx.fid}:0",
-                         "die Auto-Gruppe folgt nicht mehr der DMX-Reihenfolge "
-                         "— dann ist der Hinweis im Patch-Dialog falsch")
-        self.assertEqual(pos.get(f"{self._kopfzahl(fx) - 1},0"),
-                         f"{fx.fid}:{self._kopfzahl(fx) - 1}")
+        # Zeilenweise wie beim Patchen — weder „Gespiegelt“ (mit Nein
+        # beantwortet) noch die Drehung (ohne Oberflaeche) haben sie still
+        # umgebaut.
+        self.assertEqual(pos.get("0,0"), f"{fx.fid}:0")
+        self.assertEqual(pos.get(f"0,{ZEILE}"), f"{fx.fid}:{KOPF_ZEILENWEISE}")
 
 
 class DialogNenntDenWegTest(_Basis):

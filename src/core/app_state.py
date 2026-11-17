@@ -1264,7 +1264,12 @@ class AppState:
         werden (FM-16 Vision). Idempotent: existiert bereits eine Gruppe, die diesen
         ``fid`` pro-Kopf adressiert, wird deren id zurueckgegeben (kein Duplikat bei
         Re-Patch). Rueckgabe: neue/bestehende Gruppen-id, oder ``None`` wenn kein
-        Multi-Head oder keine Show-DB."""
+        Multi-Head oder keine Show-DB.
+
+        FM-21: das Raster kommt aus ``head_matrix_layout`` — bei hinterlegter
+        Rasterform ``rows x cols`` ueber ``place_element``. Eine VORHANDENE
+        Gruppe aendert diese Funktion nie (Idempotenz); dafuer gibt es
+        :meth:`auto_kopfgruppe_neu_aufbauen`, nur nach Rueckfrage."""
         eng = getattr(self, "_show_engine", None)
         if eng is None:
             return None
@@ -1321,6 +1326,157 @@ class AppState:
             except Exception:
                 pass
         return gid
+
+    # ── FM-21: die Auto-Kopf-Gruppe nach einer Geraeteaenderung neu aufbauen ──
+    #
+    # Entscheidung 17.11.2026: aendert sich NACH dem Patchen Nummerierung,
+    # Montage oder Geometrie, wird die vorhandene Auto-Gruppe neu aufgebaut —
+    # aber nur mit Rueckfrage (der Bediener kann sie laengst umgebaut haben).
+    # Die Rueckfrage sitzt in der Oberflaeche; hier stehen nur die reine
+    # Abfrage („wuerde sie sich aendern?") und der Neuaufbau selbst. Beim
+    # LADEN einer Show laeuft keins von beiden: alte 1xN-Gruppen bleiben.
+
+    def kopfgruppe_soll(self, fixture) -> dict | None:
+        """Das Raster, das ``create_head_matrix_group`` fuer ``fixture`` JETZT
+        anlegen wuerde: ``{"cols", "rows", "positions"}`` (``positions`` mit
+        Schluesseln ``"c,r"`` und Werten ``"fid:kopf"``) — oder ``None``
+        (kein Mehrkopf-Geraet, Fehler). Rein lesend."""
+        try:
+            n = int(color_head_count(fixture))
+            fid = int(getattr(fixture, "fid"))
+        except Exception as e:
+            debug_swallow("app_state.kopfgruppe_soll", e)
+            return None
+        if n < 2:
+            return None
+        cols, rows, plaetze, _ring = head_matrix_layout(fixture, n)
+        return {"cols": int(cols), "rows": int(rows),
+                "positions": {f"{c},{r}": f"{fid}:{h}"
+                              for h, (c, r) in plaetze.items()}}
+
+    @staticmethod
+    def _raster_gleich(a: dict | None, b: dict | None) -> bool:
+        """Zwei Raster ``{"cols","rows","positions"}`` gleich? Zellwerte als
+        Text verglichen (der Gruppen-Editor schreibt ``int``, die Automatik
+        ``str``)."""
+        if a is None or b is None:
+            return False
+        norm = (lambda p: {str(k): str(v) for k, v in (p or {}).items()})
+        return (int(a.get("cols") or 0) == int(b.get("cols") or 0)
+                and int(a.get("rows") or 0) == int(b.get("rows") or 0)
+                and norm(a.get("positions")) == norm(b.get("positions")))
+
+    def _gruppen_raster(self, gid: int) -> dict | None:
+        import json as _json
+        from src.core.database.models import FixtureGroup as _FG
+        with self._session() as s:
+            g = s.get(_FG, int(gid))
+            if g is None:
+                return None
+            try:
+                pos = _json.loads(g.positions_json or "{}")
+            except Exception:
+                pos = {}
+            return {"cols": int(g.cols or 0), "rows": int(g.rows or 0),
+                    "positions": pos if isinstance(pos, dict) else {},
+                    "name": g.name or ""}
+
+    def auto_kopfgruppe_abweichung(self, fid, alt_soll: dict | None = None):
+        """FM-21, rein lesend: wuerde ein Neuaufbau die Auto-Gruppe von ``fid``
+        veraendern?
+
+        ``alt_soll`` = :meth:`kopfgruppe_soll` VOR der Feldaenderung. Gefragt
+        wird nur, wenn sich das Soll-Raster durch die Aenderung WIRKLICH
+        verschoben hat — eine bloße Umbenennung darf eine vom Bediener
+        umgebaute Gruppe nicht zur Rueckfrage machen. Ohne ``alt_soll`` (der
+        Knopf „Wiederherstellen") zaehlt allein, ob Gruppe und Soll abweichen.
+
+        Rueckgabe ``None`` = nichts zu tun (keine Auto-Gruppe, kein Soll,
+        Soll unveraendert oder Gruppe entspricht schon dem neuen Soll); sonst
+        ``{"gid", "name", "unveraendert"}`` — ``unveraendert`` heisst: die
+        Gruppe ist noch genau die alte Automatik (bisheriges Soll oder die
+        1xN-Reihe aus Shows vor FM-21), der Bediener hat sie nicht umgebaut."""
+        try:
+            fid_i = int(fid)
+        except (TypeError, ValueError):
+            return None
+        fx = next((f for f in self._patch_cache if f.fid == fid_i), None)
+        if fx is None:
+            return None
+        neu = self.kopfgruppe_soll(fx)
+        if neu is None:
+            return None
+        if alt_soll is not None and self._raster_gleich(alt_soll, neu):
+            return None
+        gid = self.find_head_matrix_group(fid_i, dedicated=True)
+        if gid is None:
+            return None
+        try:
+            ist = self._gruppen_raster(gid)
+        except Exception as e:
+            debug_swallow("app_state.auto_kopfgruppe_abweichung", e)
+            return None
+        if ist is None or self._raster_gleich(ist, neu):
+            return None
+        n = len(neu["positions"])
+        reihe = {"cols": n, "rows": 1,
+                 "positions": {f"{h},0": f"{fid_i}:{h}" for h in range(n)}}
+        unveraendert = (self._raster_gleich(ist, alt_soll)
+                        or self._raster_gleich(ist, reihe))
+        return {"gid": int(gid), "name": ist["name"],
+                "unveraendert": bool(unveraendert)}
+
+    def _gruppen_raster_setzen(self, gid: int, raster: dict) -> bool:
+        import json as _json
+        from src.core.database.models import FixtureGroup as _FG
+        with self._session() as s:
+            g = s.get(_FG, int(gid))
+            if g is None:
+                return False
+            g.cols = int(raster["cols"])
+            g.rows = int(raster["rows"])
+            g.positions_json = _json.dumps(raster["positions"])
+            s.commit()
+        try:
+            self.notify_groups_changed()
+        except Exception as e:
+            debug_swallow("app_state._gruppen_raster_setzen.notify", e)
+        return True
+
+    def auto_kopfgruppe_neu_aufbauen(self, fid, undoable: bool = True) -> bool:
+        """FM-21: die Auto-Gruppe von ``fid`` auf das jetzige Soll-Raster
+        setzen. Name, Ordner und id bleiben (Verweise auf die Gruppe bleiben
+        gueltig); nur Spalten, Zeilen und Zellen werden ersetzt. Ein eigener
+        Rueckgaengig-Schritt — der Aufrufer legt ihn mit der Feldaenderung in
+        EINE ``UndoStack.gruppe``. Rueckgabe: ob etwas geaendert wurde."""
+        try:
+            fid_i = int(fid)
+        except (TypeError, ValueError):
+            return False
+        fx = next((f for f in self._patch_cache if f.fid == fid_i), None)
+        if fx is None:
+            return False
+        neu = self.kopfgruppe_soll(fx)
+        gid = self.find_head_matrix_group(fid_i, dedicated=True)
+        if neu is None or gid is None:
+            return False
+        try:
+            vorher = self._gruppen_raster(gid)
+            if vorher is None or self._raster_gleich(vorher, neu):
+                return False
+            self._gruppen_raster_setzen(gid, neu)
+        except Exception as e:
+            debug_swallow("app_state.auto_kopfgruppe_neu_aufbauen", e)
+            return False
+        if undoable:
+            alt = {k: vorher[k] for k in ("cols", "rows", "positions")}
+            self._push_undo(
+                label=f"Kopf-Gruppe „{vorher.get('name', '')}“ neu aufgebaut",
+                do=lambda: None,
+                undo=lambda g=gid, r=alt: self._gruppen_raster_setzen(g, r),
+                redo=lambda g=gid, r=dict(neu): self._gruppen_raster_setzen(g, r),
+            )
+        return True
 
     @staticmethod
     def _raster_signatur(positions: dict) -> frozenset:
@@ -8357,6 +8513,10 @@ def head_matrix_layout(fixture, n_heads: int) -> tuple:
     **Gewoehnliches Mehrkopf-Geraet** (Spider, Mover-Bar, Hydrabeam): 1xN in
     DMX-Reihenfolge, Kopf 0 inbegriffen — Bestandsverhalten, unveraendert.
 
+    **Panel mit hinterlegter Rasterform** (FM-21, ``grid_rows x grid_cols ==
+    Kopfzahl``): das Rechteck ueber ``place_element`` — Nummerierung und
+    Montage-Drehung/-Spiegelung wirken also schon in der Auto-Gruppe.
+
     **Pixel-Kopf**: das RING-Raster aus ``core.pixel_order.waben_raster``
     (Zeile = Ring, Spalte = Winkel), gebaut ueber die PIXEL — Kopf h traegt
     Pixel h, also Wabenindex h-1. Ohne Ausnahme: auch ein Pixel-Kopf mit nur
@@ -8380,7 +8540,48 @@ def head_matrix_layout(fixture, n_heads: int) -> tuple:
         from .pixel_order import waben_raster
         cols, rows, plaetze = waben_raster(n - 1)
         return cols, rows, {i + 1: plaetze[i] for i in sorted(plaetze)}, True
+    # FM-21 (a), Entscheidung 17.11.2026: kennt das Profil die Rasterform
+    # (``grid_rows``/``grid_cols``) und passt sie GENAU zur Kopfzahl, liegt die
+    # Auto-Gruppe gleich als Rechteck — ueber ``place_element``, also mit der
+    # Nummerierung des Geraets (``pixel_order``) UND seiner Montage
+    # (``element_rotation``/``element_flip``). Dieselbe Rechnung wie „als
+    # Block…" im Gruppen-Editor, keine zweite Fassung.
+    #
+    # ★ Ohne (passende) Form bleibt es 1xN in DMX-Reihenfolge, OHNE
+    # ``place_element``: „Gespiegelt" drehte sonst die Reihe um und 90° machte
+    # aus 1xN ein Nx1 — eine Form, die niemand hinterlegt hat (FM-21-Befund 1).
+    form = kopf_rasterform(fixture, n)
+    if form is not None:
+        from .pixel_order import place_element
+        rows, cols = form
+        order = getattr(fixture, "pixel_order", "rowwise") or "rowwise"
+        drehung = getattr(fixture, "element_rotation", 0) or 0
+        flip = bool(getattr(fixture, "element_flip", False))
+        plaetze: dict = {}
+        eff_rows, eff_cols = rows, cols
+        for h in range(n):
+            r, c, eff_rows, eff_cols = place_element(h, cols, rows, order,
+                                                     drehung, flip)
+            plaetze[h] = (c, r)
+        return eff_cols, eff_rows, plaetze, False
     return n, 1, {i: (i, 0) for i in range(n)}, False
+
+
+def kopf_rasterform(fixture, n_heads: int):
+    """FM-21: hinterlegte Rasterform ``(rows, cols)`` der Farbkoepfe — oder
+    ``None``, wenn nichts hinterlegt ist oder sie nicht GENAU zur Kopfzahl
+    passt (dieselbe Regel wie ``FixtureGroupView._hinterlegte_form``: ein
+    Panel als falsches Rechteck abzulegen saehe richtig aus und waere es
+    nicht)."""
+    try:
+        rows, cols = panel_grid_for(fixture)
+        rows, cols = int(rows or 0), int(cols or 0)
+    except Exception:
+        return None
+    n = int(n_heads or 0)
+    if rows < 1 or cols < 1 or n < 2 or rows * cols != n:
+        return None
+    return rows, cols
 
 
 def tilt_head_count(fixture) -> int:

@@ -95,7 +95,10 @@ for (let i = 1; i <= 10; i++) {
     <div class="fader-col">
       <label>Ex ${i}</label>
       <input type="range" min="0" max="255" value="255" orient="vertical"
-             id="fader${i}" oninput="setFader(${i}, this.value)" />
+             id="fader${i}" oninput="setFader(${i}, this.value)"
+             onpointerdown="faderHalten(${i}, true)" onpointerup="faderHalten(${i}, false)"
+             onpointercancel="faderHalten(${i}, false)" ontouchstart="faderHalten(${i}, true)"
+             ontouchend="faderHalten(${i}, false)" ontouchcancel="faderHalten(${i}, false)" />
       <span class="fader-val" id="fv${i}">100%</span>
     </div>`;
 }
@@ -129,7 +132,26 @@ function toggleBlackout() {
   log('Blackout: ' + (blackout ? 'AN' : 'AUS'));
 }
 
+// VCB-50: welcher Fader gerade gehalten wird bzw. eben bewegt wurde — den
+// zieht die Abfrage nicht nach (sonst rueckte er unter dem Finger weg oder
+// sprang kurz auf den noch alten Stand zurueck, bevor der eigene Wert ankam).
+const gehalten = {};
+const zuletztBewegt = {};
+const FRISCH_MS = 1500;
+
+function faderHalten(slot, an) {
+  if (an) { gehalten[slot] = true; } else { delete gehalten[slot]; }
+  zuletztBewegt[slot] = Date.now();
+}
+
+// Maus ausserhalb des Faders losgelassen: dort kommt kein pointerup an
+// (am Finger faengt der Regler den Zeiger selbst, das Loslassen kommt an).
+document.addEventListener('mouseup', () => {
+  Object.keys(gehalten).forEach(slot => faderHalten(Number(slot), false));
+});
+
 function setFader(slot, raw) {
+  zuletztBewegt[slot] = Date.now();
   const level = raw / 255;
   socket.emit('fader', {slot, level});
   const pct = Math.round(level * 100);
@@ -137,18 +159,49 @@ function setFader(slot, raw) {
   if (el) el.textContent = pct + '%';
 }
 
-// Initial status
-fetch('/api/status').then(r => r.json()).then(d => {
-  document.getElementById('status').textContent =
-    `Verbunden · ${d.fixtures} Geräte · ${d.universes.length} Universes`;
-  // Fader auf den ECHTEN Executor-Zustand setzen (nicht hart auf 100% lassen).
-  (d.executors || []).forEach((level, i) => {
+// Fader auf den ECHTEN Executor-Zustand setzen (nicht hart auf 100% lassen).
+// VCB-50: dasselbe regelmaessig ueber den vorhandenen Statusweg, damit ein Pegel
+// von aussen (Pult, OSC, MIDI, ein zweiter Browser) hier erscheint. Nur Anzeige:
+// ``fader.value`` zu setzen loest kein ``input`` aus, es wird also NICHTS
+// gesendet (kein Ping-Pong zwischen zwei Browsern). Gehaltene und eben bewegte
+// Fader bleiben, wie sie sind; gesetzt wird nur bei Aenderung.
+function faderNachziehen(executors) {
+  (executors || []).forEach((level, i) => {
     const slot = i + 1;
+    if (gehalten[slot]) return;
+    if (Date.now() - (zuletztBewegt[slot] || 0) < FRISCH_MS) return;
+    if (typeof level !== 'number' || !isFinite(level)) return;
+    const soll = Math.round(level * 255);
     const fader = document.getElementById('fader' + slot);
-    if (fader) fader.value = Math.round(level * 255);
+    if (fader && Number(fader.value) !== soll) fader.value = soll;
     const el = document.getElementById('fv' + slot);
-    if (el) el.textContent = Math.round(level * 100) + '%';
+    const text = Math.round(level * 100) + '%';
+    if (el && el.textContent !== text) el.textContent = text;
   });
+}
+
+let erstAbfrage = true;
+let abfrageLaeuft = false;
+function statusHolen() {
+  if (abfrageLaeuft) return;
+  abfrageLaeuft = true;
+  fetch('/api/status').then(r => r.json()).then(d => {
+    if (erstAbfrage) {
+      erstAbfrage = false;
+      document.getElementById('status').textContent =
+        `Verbunden · ${d.fixtures} Geräte · ${d.universes.length} Universes`;
+    }
+    faderNachziehen(d.executors);
+  }).catch(() => { /* naechster Takt versucht es wieder */ })
+    .finally(() => { abfrageLaeuft = false; });
+}
+
+// Initial status, danach sparsam einmal je Sekunde — nur bei sichtbarer Seite.
+const ABFRAGE_MS = 1000;
+statusHolen();
+setInterval(() => { if (!document.hidden) statusHolen(); }, ABFRAGE_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) statusHolen();
 });
 </script>
 </body>
