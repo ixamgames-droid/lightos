@@ -35,6 +35,7 @@
 import * as THREE from '../three/three.js';
 import { fixtures, settings, view, beamsOff } from '../state.js';
 import { geteilteGeometrie } from '../scene/geteilte_geometrie.js';   // VIZ-66
+import { lichtfarbe } from './lichtfarbe.js';   // VIZ-93
 
 // 25 m reichen von einer Rueckwand-Traverse ueber Buehne und Publikum; 1,5 cm
 // Radius sind auf ~20 m Kameraabstand etwa ein bis zwei Pixel breit (WebGL-
@@ -174,7 +175,9 @@ export function buildLaserRig(group, fensterZ) {
                 // LAS-27: Palette EINMAL je Rig (eigene Objekte — niemand
                 // ausserhalb kann sie umfaerben), dazu Weiss fuer den Mantel.
                 bunt: false, kegelBunt: false, kegelId: '',
-                bunte: LASER_BUNT_PALETTE.map(h => new THREE.Color(h)),
+                // VIZ-93: Palette ist sRGB (gemessene Geraetefarben) -> linear
+                // wie jede andere Geraetefarbe (lichtfarbe.js).
+                bunte: LASER_BUNT_PALETTE.map(h => new THREE.Color(h).convertSRGBToLinear()),
                 weiss: new THREE.Color(1, 1, 1) };
   poseLaser(rig, 0);
   return { rig, laserBeams };
@@ -297,7 +300,7 @@ function setzeFarbe(rig, farbe) {
   if (!ok) { rig.farbe = null; rig.state.farbe = ''; return; }
   const r = zahl(farbe[0], 0, 255, 255), g = zahl(farbe[1], 0, 255, 255),
         b = zahl(farbe[2], 0, 255, 255);
-  rig.farbeObj.setRGB(r / 255, g / 255, b / 255);
+  lichtfarbe(r, g, b, rig.farbeObj);   // VIZ-93: Profilfarbe ist sRGB -> linear
   rig.farbe = rig.farbeObj;
   rig.state.farbe = `${r},${g},${b}`;
 }

@@ -362,8 +362,14 @@ class TopDownPolishTest(unittest.TestCase):
         }])
         self._emit_until_true(
             lambda: _dmx_push(self._view, other_on),
-            "window.__lightos.fixtures['16'].lamp.material.emissive.getHex() "
-            "=== 0x2878ff", timeout_s=8.0)
+            # VIZ-93: Material-/Lichtfarben sind linear (DMX ist sRGB) —
+            # zurueckgerechnet muss es wieder die DMX-Farbe sein; das Icon
+            # bleibt im sRGB-Mass (darunter).
+            # (r128-getHex schneidet ab statt zu runden -> je Kanal runden.)
+            "(function(){ const c = window.__lightos.fixtures['16'].lamp.material"
+            ".emissive.clone().convertLinearToSRGB(); return [c.r, c.g, c.b]"
+            ".map(v => Math.round(v * 255)).join() === '40,120,255'; })()",
+            timeout_s=8.0)
         self.assertEqual(
             self._eval("window.__lightos.fixtures['16'].icon.userData.body"
                        ".material.color.getHex()"),
