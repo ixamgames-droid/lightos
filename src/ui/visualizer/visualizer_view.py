@@ -40,6 +40,7 @@ from src.ui.visualizer.visualizer_window import (
 )
 from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot_fwd
+from src.ui.abbau import abbau_still
 
 
 class Visualizer3DView(QWidget):
@@ -555,6 +556,7 @@ class VisualizerPopoutWindow(QMainWindow):
         except Exception:
             pass
 
+    @abbau_still
     def closeEvent(self, event):
         # Deterministischer Teil des Teardowns; idempotent gegen doppelte
         # Zustellung (Fenster-X UND Owner-seitiges close()). Die eigentliche

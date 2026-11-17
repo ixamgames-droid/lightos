@@ -37,6 +37,7 @@ from src.ui import dialog_hilfe
 from src.ui.weak_slots import weak_slot
 from src.ui import undo_kuerzel
 from src.ui import leertaste_fokus
+from src.ui.abbau import abbau_still
 
 
 # Recent files storage
@@ -4325,6 +4326,7 @@ class MainWindow(QMainWindow):
 
     # ── Close ─────────────────────────────────────────────────────────────────
 
+    @abbau_still
     def closeEvent(self, event):
         # Visualizer ZUERST anfragen: sein "Buehne speichern?"-Dialog (VIZ-10)
         # kann abbrechen — dann muss der App-Exit stoppen, BEVOR Output/

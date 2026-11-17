@@ -25,6 +25,7 @@ from src.ui.ziehen_scrollen import FingerHalten   # UI-115
 from src.core.audio import offline_timeline as OT
 from src.core.audio import analysis_engines as AE
 from src.core.audio import genre_presets as GP
+from src.ui.abbau import abbau_still
 
 
 # ── BPM-Kurven- + Beatgrid-Plot ───────────────────────────────────────────────
@@ -894,6 +895,7 @@ class BpmGeneratorView(QWidget):
         except Exception:
             pass
 
+    @abbau_still
     def hideEvent(self, e):
         self._preview_stop()
         if self._batch_on:

@@ -65,6 +65,7 @@ from src.core.undo import get_undo_stack
 from src.core import crash_logging as _cl
 from src.ui.visualizer.visualizer_service import get_visualizer_service, VisualizerTarget
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.abbau import abbau_still
 
 HTML_PATH = os.path.join(os.path.dirname(__file__), "stage_scene.html")
 
@@ -6524,6 +6525,7 @@ class VisualizerWindow(QMainWindow):
         if view is not None:
             push_bildschirm_hz(view, screen)
 
+    @abbau_still
     def hideEvent(self, event):
         # Nur versteckt (nicht geschlossen): Target auf inaktiv setzen -> spart
         # CPU (die eingebettete 3D-View gated genauso via on_shown/on_hidden).
@@ -6574,6 +6576,7 @@ class VisualizerWindow(QMainWindow):
         sonst nie mehr beenden liesse (Review-Blocker)."""
         return self._confirm_close_with_unsaved_stage()
 
+    @abbau_still
     def closeEvent(self, event):
         """VIZ-12 Schritt 4 (Dauerfenster): fragt bei ungespeicherten
         Buehnen-Aenderungen nach (VOR dem Verstecken — siehe

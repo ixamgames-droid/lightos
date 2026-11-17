@@ -15,6 +15,7 @@ from src.core.engine.cue import Cue
 from src.core.engine import fade_curve
 from src.ui.weak_slots import weak_slot
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still, abbau_still_filter
 
 CUE_COLS = ["Nr.", "Label", "Fade In", "Fade Out", "Delay", "Follow", "Kurve", "Timecode"]
 
@@ -441,6 +442,7 @@ class PlaybackView(QWidget):
             if self._current_stack is removed:
                 self._current_stack = None
 
+    @abbau_still_filter
     def eventFilter(self, obj, event):
         # UI-24b: den Leerzustand-Hinweis auf die Viewport-Größe zentrieren.
         if (getattr(self, "_table_empty", None) is not None
@@ -850,6 +852,7 @@ class PlaybackView(QWidget):
         if not self._tick.isActive():
             self._tick.start(50)
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._tick.stop()
@@ -931,6 +934,7 @@ class ExecutorWidget(QWidget):
         super().showEvent(event)
         self._breite_setzen()
 
+    @abbau_still
     def changeEvent(self, event):  # noqa: N802 (Qt-Name)
         super().changeEvent(event)
         if event.type() in (QEvent.Type.StyleChange, QEvent.Type.FontChange):

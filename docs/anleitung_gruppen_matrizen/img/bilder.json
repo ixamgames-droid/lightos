@@ -1,7 +1,7 @@
 {
   "anleitung": "gruppen_matrizen",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py gruppen_matrizen'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "6e73f9d337810d26d6e46cd4afb07cbb"
+      "md5": "058d91d29f00c9c48a275869cc0d60ec"
     },
     {
       "datei": "02_rechtsklick_aufteilen.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "608b9b9ef278d4711ecead00767c9d7a"
+      "md5": "a80ca9e9d8967d460b878ff6c116347b"
     },
     {
       "datei": "03_koepfe_als_zeile.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "38a91f7e37257b0713d35b37731d1822"
+      "md5": "db61885195d23fa878a190e10e89b164"
     },
     {
       "datei": "04_leiste_zwischen_par.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "84e9deefbd16eb03c2be1025705a9d52"
+      "md5": "71d29c3b029cea3f06ff3829a36d4817"
     },
     {
       "datei": "05_matrizen_zusammenlegen.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "ad2590974f0e1ff98024e311453680a9"
+      "md5": "2979b2681b25f0c68e6c6924fafe2449"
     }
   ]
 }

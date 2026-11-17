@@ -40,6 +40,7 @@ from src.core.laser import sperrzonen_merker as M
 from src.core.laser.sperrzonen import LaserFeld, Sperrzone
 from src.ui.visualizer import sperrzonen_ui as UI
 from src.ui.visualizer.sperrzonen_ui import _spin, melde_aenderung
+from src.ui.abbau import abbau_still
 
 #: Raster zum Einrasten (Meter) und beim Drehen (Grad).
 RASTER_M = 0.25
@@ -1590,11 +1591,13 @@ class SperrzonenPlaner(QDialog):
         if self._assistent is not None:
             self._assistent_schliessen(abbrechen=True)
 
+    @abbau_still
     def closeEvent(self, ev):  # noqa: N802 (Qt-API)
         # Schliessen mitten im Einmessen = Abbruch = Laser aus.
         self._assistent_schliessen(abbrechen=True)
         super().closeEvent(ev)
 
+    @abbau_still
     def hideEvent(self, ev):  # noqa: N802 (Qt-API)
         # Esc ruft ``reject()`` und versteckt den Dialog OHNE ``closeEvent``;
         # auch das ist ein Abbruch. Nur das Minimieren durch den Fenster-

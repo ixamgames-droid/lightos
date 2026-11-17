@@ -23,6 +23,7 @@ from src.core.midi.midi_mapper import (
 )
 from src.core.app_state import get_state
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still
 try:
     from src.core.timecode.mtc_reader import get_mtc_reader
 except Exception:
@@ -113,6 +114,7 @@ class MidiView(QWidget):
         self._port_refresh_timer.timeout.connect(self._refresh_ports)
         self._port_refresh_timer.start(2000)
 
+    @abbau_still
     def closeEvent(self, event):
         """Keine MIDI-/MTC-Callbacks in eine bereits geschlossene Qt-View lassen."""
         timer = getattr(self, "_port_refresh_timer", None)

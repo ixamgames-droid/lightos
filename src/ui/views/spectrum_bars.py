@@ -11,6 +11,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QWidget
 from PySide6.QtCore import QTimer, QRectF
 from PySide6.QtGui import QPainter, QColor, QLinearGradient
+from src.ui.abbau import abbau_still
 
 try:
     from src.core.audio.beat_detector import get_beat_detector
@@ -38,6 +39,7 @@ class SpectrumBars(QWidget):
             self._timer.start()
         super().showEvent(e)
 
+    @abbau_still
     def hideEvent(self, e):
         self._timer.stop()
         super().hideEvent(e)

@@ -58,6 +58,7 @@ from src.ui.widgets.fixture_editor import (KEIN_SEGMENT,
                                            frage_vorschlag_ueberschreiben,
                                            leerzelle_hintergrund,
                                            segment_auswahl)
+from src.ui.abbau import abbau_still
 
 
 # Attribute, die fuer eine 16-bit-Aufloesung (coarse + Fine-Kanal) sinnvoll
@@ -2691,6 +2692,7 @@ class FixtureGeneratorDialog(QDialog):
         self._live.shutdown()
         super().reject()
 
+    @abbau_still
     def closeEvent(self, e):
         self._live.shutdown()
         super().closeEvent(e)

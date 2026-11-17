@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from src.ui.weak_slots import weak_slot, weak_slot_fwd
+from src.ui.abbau import abbau_still
 
 
 class TempoBusView(QWidget):
@@ -596,6 +597,7 @@ class TempoBusView(QWidget):
         self._refresh_effects_panel()
         super().showEvent(e)
 
+    @abbau_still
     def hideEvent(self, e):
         self._poll.stop()
         super().hideEvent(e)

@@ -1,7 +1,7 @@
 {
   "anleitung": "prioritaeten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py prioritaeten'.",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "b840440af2d4131738ab6e7b9895cc6b"
+      "md5": "f19a941ae3962a0db206eb24fb167501"
     },
     {
       "datei": "03_stufe_aendern.gif",
@@ -58,7 +58,7 @@
         900
       ],
       "marken": [],
-      "md5": "f38c13db62bc57884d763f6d66d44f83"
+      "md5": "895172919207affb755afc0eb2752c0f"
     },
     {
       "datei": "05_stufe_szene.png",
@@ -69,7 +69,7 @@
         900
       ],
       "marken": [],
-      "md5": "be664660b6fdb5ccf6b27b4d2cbe4261"
+      "md5": "806d2716a6513dd2a5f0f0105c804156"
     },
     {
       "datei": "06_eigene_zahl.png",
@@ -80,7 +80,7 @@
         900
       ],
       "marken": [],
-      "md5": "33afb66553b4b4748a6f7a71d4625557"
+      "md5": "ffe60bc1f47455f0cbc92c331824a52b"
     },
     {
       "datei": "07_snap_haken.png",
@@ -91,7 +91,7 @@
         900
       ],
       "marken": [],
-      "md5": "ff51ca16f05d748a3f575b42a9a2c1a4"
+      "md5": "712913a8d0912f6319b68f1fb9067ef8"
     },
     {
       "datei": "08_blinder_gegen_lauflicht.png",
@@ -102,7 +102,7 @@
         369
       ],
       "marken": [],
-      "md5": "e97d93a1986a2e15a89bf12db9629841"
+      "md5": "eaf79cc0f1f57aa6f23d9c98d1f29b82"
     },
     {
       "datei": "09_ueberschneidung.png",
@@ -113,7 +113,7 @@
         900
       ],
       "marken": [],
-      "md5": "94ecff361c3b387fadbe3b79e200bc64"
+      "md5": "8fc4491633539cb607e471b70a133e66"
     },
     {
       "datei": "10_verdeckt.png",
@@ -124,7 +124,7 @@
         900
       ],
       "marken": [],
-      "md5": "59d0a28aeae9106f8d08cb0e4e925871"
+      "md5": "db50ad569159367625bdbeb4f30c0958"
     }
   ]
 }

@@ -52,6 +52,7 @@ from src.ui.widgets.laser_tab_bausteine import (
     MusterGalerie, SprechRegler, bedien_hoehe, farbe_als_qt, lage_text,
     nebentext, trefferflaechen_anheben, ueberschrift)
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still
 
 # Nicht-``laser_*``-Attribute, die auf einem Laser-Fixture zur Laser-Steuerung
 # gehören (Musterauswahl = gobo_wheel, Rotation = gobo_rotation usw.).
@@ -1041,6 +1042,7 @@ class LaserView(QWidget):
         if takt is not None:
             takt.start()
 
+    @abbau_still
     def hideEvent(self, event):  # noqa: N802 (Qt-API)
         super().hideEvent(event)
         takt = getattr(self, "_zustand_takt", None)
