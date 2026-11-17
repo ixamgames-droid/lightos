@@ -477,6 +477,13 @@ class VCCanvas(QWidget):
         from .vc_slider import VCSlider
         for w in self.findChildren(VCSlider):
             try:
+                # VCB-50: ein Playback-Fader zeigt zuerst den Pegel des Executors
+                # der NEUEN Seite (nur Anzeige); Pickup/Motor danach wie bisher.
+                if not self._edit_mode:
+                    w.pegel_nachziehen(nachfuehren=False)
+            except Exception:
+                pass
+            try:
                 w.arm_pickup()
             except Exception:
                 pass
