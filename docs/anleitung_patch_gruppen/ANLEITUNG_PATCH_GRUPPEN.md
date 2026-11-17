@@ -45,6 +45,12 @@ Hilfen:
   **Bearbeiten…** (oder Doppelklick auf eine Zeile; am Touchscreen: Zeile lange drücken) öffnet
   *Gerät bearbeiten* (Label, Modus, Universum, DMX-Adresse, bei Movern auch Pan/Tilt invertieren/tauschen,
   bei Lasern die Laser-Ausrichtung — siehe unten).
+  Mehrkopf-Geräte bekommen beim Patchen ihre Kopf-Gruppe *Label* · Köpfe — ein Panel mit
+  hinterlegter Rasterform gleich als Rechteck (z. B. 12 × 4) nach Pixel-Reihenfolge und
+  Montage, alle anderen als eine Zeile. Stellst du bei einem Panel Pixel-Reihenfolge oder
+  Montage nachträglich um, fragt LightOS beim Speichern, ob diese Gruppe neu aufgebaut werden
+  soll (**Nein** ist vorgewählt; Strg+Z nimmt Änderung und Neuaufbau zusammen zurück).
+  Details: [Gruppen und Matrizen](../anleitung_gruppen_matrizen/ANLEITUNG_GRUPPEN_MATRIZEN.md).
 - Die Leiste **„Belegte DMX-Kanäle — Universum:"** unten (mit der Universum-Auswahl direkt daneben)
   zeigt pro Universum als farbige Blöcke, welche Kanäle belegt sind. **Adresskonflikte** erkennst du
   direkt in der **Tabelle**: betroffene Zeilen werden rot eingefärbt und die FID mit **⚠** markiert.

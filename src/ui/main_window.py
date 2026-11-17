@@ -37,7 +37,7 @@ from src.ui import dialog_hilfe
 from src.ui.weak_slots import weak_slot
 from src.ui import undo_kuerzel
 from src.ui import leertaste_fokus
-from src.ui.abbau import abbau_still
+from src.ui.abbau import abbau_still, abbau_still_filter
 
 
 # Recent files storage
@@ -581,6 +581,9 @@ class _KioskNotausMeldung(QLabel):
         self.lege_an = lambda: None
         self.hide()
 
+    # STAB-42 (Nachtrag): beobachtet den Ansichtsstapel; im Abbau (leeres
+    # Woerterbuch, ``lege_an`` schon weg) still ``False``. Gesund unveraendert.
+    @abbau_still_filter
     def eventFilter(self, obj, ev):  # noqa: N802 (Qt-Name)
         if ev.type() in (QEvent.Type.Resize, QEvent.Type.Move,
                          QEvent.Type.Show):
