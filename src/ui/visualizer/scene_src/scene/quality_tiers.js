@@ -19,6 +19,13 @@
 // Auf Niedrig aus: dort bleibt es beim flachen Bodenmuster, und die
 // beleuchteten Shader sind unveraendert.
 //
+// VIZ-15 Schritt 2: `kegelKante` — weicher, blickwinkelabhaengiger Kegelrand
+// (Fresnel, fixtures/strahl_optik.js). Auf Niedrig aus: der Kegel-Shader
+// bleibt dort Zeichen fuer Zeichen der von vorher.
+// VIZ-BEAM-OCCLUSION Teil 3: `strahlSchatten` = hoechstens so viele Kegel
+// bekommen einen Volumen-Schatten (ein Koerper im Kegel verdunkelt den
+// sichtbaren Strahl dahinter). 0 = aus; standardmaessig nur auf Maximal.
+//
 // `pushHz` liest JS nicht selbst — den Takt setzt Python
 // (src/ui/visualizer/quality_tiers.py, PUSH_HZ). Er steht hier, damit die
 // Tabelle vollstaendig an einer Stelle lesbar ist;
@@ -31,15 +38,18 @@ export const TIER_PROFILES = Object.freeze({
   low: Object.freeze({
     pushHz: 15, pixelRatioCap: 1.25, shadowCap: 8, realLights: 4, softShadows: false,
     dynamicResolution: 'always', goboProjektion: false,
+    kegelKante: false, strahlSchatten: 0,
   }),
   high: Object.freeze({
     pushHz: 30, pixelRatioCap: 2, shadowCap: 8, realLights: 8, softShadows: true,
     dynamicResolution: 'slow', goboProjektion: true,
+    kegelKante: true, strahlSchatten: 0,
   }),
   max: Object.freeze({
     // pixelRatioCap null = kein Deckel, volle devicePixelRatio.
     pushHz: 44, pixelRatioCap: null, shadowCap: 16, realLights: 16, softShadows: true,
     dynamicResolution: 'never', goboProjektion: true,
+    kegelKante: true, strahlSchatten: 8,
   }),
 });
 
