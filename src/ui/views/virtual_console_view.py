@@ -699,6 +699,8 @@ class VirtualConsoleView(QWidget):
         self._canvas.set_kiosk(self._kiosk)
         self._canvas.midi_learn_done.connect(self._on_midi_learn_done)
         self._canvas.bank_changed.connect(self._on_bank_changed)
+        self._canvas.geloeste_baenke_geaendert.connect(
+            weak_slot(self._bank_loesen_knopf_auffrischen))
         self._canvas.widget_selected.connect(self._on_canvas_widget_selected)
         self._canvas.auswahl_geaendert.connect(self._on_canvas_auswahl)   # UI-126
         self._on_bank_changed(self._canvas.active_bank)
@@ -1164,6 +1166,14 @@ class VirtualConsoleView(QWidget):
             act.setCheckable(True)
             act.setChecked(b == aktiv)
             act.triggered.connect(weak_slot(self._set_bank, b))
+        # VCB-45 Schritt 3: die gezeigte Bank als eigenes Fenster loesen bzw.
+        # wieder andocken. Bewusst im Bank-Menue statt als eigener Knopf: die
+        # Spielbetrieb-Leiste bleibt bei 1280 px einzeilig (UI-138).
+        menue.addSeparator()
+        self._bank_loesen_aktion = menue.addAction(self._bank_loesen_text())
+        self._bank_loesen_aktion.setEnabled(not self._edit_mode)
+        self._bank_loesen_aktion.triggered.connect(
+            weak_slot(self._bank_loesen_umschalten))
         self._bank_menue_offen = menue          # fuer Tests greifbar
         menue.popup(self._lbl_bank.mapToGlobal(self._lbl_bank.rect().bottomLeft()))
 
@@ -1185,6 +1195,42 @@ class VirtualConsoleView(QWidget):
 
     def _on_bank_changed(self, b: int):
         self._lbl_bank.setText(f"Bank {int(b) + 1}")
+        self._bank_loesen_knopf_auffrischen()   # VCB-45: Marke „geloest"
+
+    # ── VCB-45: Bank loesen / andocken ────────────────────────────────────────
+
+    def _bank_loesen_text(self) -> str:
+        if not self._canvas_alive():
+            return ""
+        b = self._canvas.active_bank
+        if self._canvas.bank_fenster(b) is not None:
+            return f"⇱ Bank {b + 1} andocken"
+        return f"⇲ Bank {b + 1} lösen (eigenes Fenster)"
+
+    def _bank_loesen_knopf_auffrischen(self, *_):
+        """Tooltip des Bank-Etiketts nennt, ob die gezeigte Bank geloest ist
+        (der Text bleibt — das Etikett hat eine feste Breite)."""
+        if not self._canvas_alive():
+            return
+        b = self._canvas.active_bank
+        if self._canvas.bank_fenster(b) is not None:
+            self._lbl_bank.setToolTip(
+                f"Bank {b + 1} ist gelöst (eigenes Fenster). Antippen: Bank "
+                "wählen oder andocken")
+        else:
+            self._lbl_bank.setToolTip(
+                "Bank waehlen (Pad-/Widget-Seite) oder als eigenes Fenster lösen")
+
+    def _bank_loesen_umschalten(self, *_):
+        if not self._canvas_alive():
+            return
+        cv = self._canvas
+        b = cv.active_bank
+        if cv.bank_fenster(b) is not None:
+            cv.bank_andocken(b)
+        else:
+            cv.bank_loesen(b, haupt=self)
+        self._bank_loesen_knopf_auffrischen()
 
     # ── Popout ────────────────────────────────────────────────────────────────
 

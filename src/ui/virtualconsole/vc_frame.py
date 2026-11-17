@@ -159,7 +159,13 @@ class VCFrame(VCWidget):
         unbeachtet (Canvas._apply_bank_visibility iteriert nur direkte Kinder)."""
         on_page = (child.property("vc_page") or 0) == self._current_page
         cv = self._canvas()
-        on_bank = cv.on_active_bank(child) if cv is not None else True
+        if cv is None:
+            on_bank = True
+        elif hasattr(cv, "bank_sichtbar"):
+            # VCB-45: im Fenster einer geloesten Bank immer sichtbar
+            on_bank = cv.bank_sichtbar(child)
+        else:
+            on_bank = cv.on_active_bank(child)
         return on_page and on_bank
 
     def _apply_bank_visibility(self):
