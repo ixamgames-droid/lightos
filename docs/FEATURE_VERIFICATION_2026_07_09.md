@@ -136,6 +136,71 @@ Run/Stop eines Minimal-Scripts sind abgedeckt (`tests/test_script_editor.py`).
 - **OUT-03** (bestehend): Art-Net „Startuniversum"-Feld nutzbar machen (externe
   Universe-Nummer statt fix `univ_num-1`) — bewusst zurückgestellt.
 
+## 6. Live-Durchlauf 17.11.2026 (Linux, echter Fenster-Server, echte Eingaben)
+
+Rest von QA-LIVE: Effect-Layer-Editor und Web-Remote-/Web-Server-Lifecycle. Die
+echte App lief in einem abgeschotteten X-Server (1600×900, Fenstermanager metacity)
+im Probelauf (Wegwerf-Datenordner, Ausgabe gesperrt — Titel „PROBELAUF“, Banner
+„Probenmodus — es wird kein DMX gesendet“). Bedient wurde mit echten Maus- und
+Tastatur-Ereignissen (XTEST), jeder Schritt mit Bildschirmfoto davor und danach.
+Testshow: `tools/build_demo_rgb_par.py` (4 RGB-PAR, 3 Kanäle, Adressen 1/4/7/10,
+Cueliste „Demo-Show“ mit 4 Cues) in eine Wegwerf-Datei; für Teil A wurde ihr per
+Skript ein leerer Layered-Effekt „QA Layer“ (Geräte 1–4) hinzugefügt, weil die
+Oberfläche keinen leeren Layered-Effekt anlegen kann (Befund FM-79). Web-Zugriff nur
+über `127.0.0.1` (curl mit Cookie-Datei als Client). Die Fotos liegen lokal, nicht im
+Repo.
+
+### A. Effect-Layer-Editor (18 Schritte)
+
+| # | Getan | Erwartet | Gesehen | Urteil |
+|---|---|---|---|---|
+| 1 | Prog → Snapshots → Bibliothek: „QA Layer“ doppelt angeklickt | Effekt startet (Bibliothek: Doppelklick = Start) | Kontextmenü bietet danach „Stop“ an | ok |
+| 2 | Rechtsklick → „Bearbeiten…“ | Editor-Dialog öffnet | Dialog „Bearbeiten: QA Layer“, Target intensity, Base 0,50, Geräte 1,2,3,4, keine Layer | ok |
+| 3 | Jede angebotene Layer-Art über die Auswahl + „Layer hinzufügen“ angelegt (12 Arten; PhaseOffset wird bewusst nicht mehr angeboten, BH-PHASEOFF) | 12 Einträge in der Liste | Constant, Sin, Cos, Triangle, Saw, Square, Random, Ramp, Multiply, Add, Clamp, Map (Map einmal doppelt durch den letzten Klick) | ok |
+| 4 | „⤢ Großes Fenster“ (Popout 1) | eigenes Fenster mit demselben Inhalt | Fenster „Effekt-Layer-Editor“ 760×863, alle Layer sichtbar | ok |
+| 5 | Doppeltes Map markiert → „Löschen“ | Eintrag verschwindet | 12 Einträge, Map einmal | ok |
+| 6 | Clamp markiert → Eigenschaften | nur Min/Max (Grenzen-Typ) | Min 0,00 / Max 1,00 | ok |
+| 7 | Clamp: Max = 0,3, dann Min = 0,8 (Min > Max) | Grenzen bleiben widerspruchsfrei | Max wird auf 0,80 nachgezogen (Min 0,80 / Max 0,80) | ok |
+| 8 | Clamp: Max = 0,9, Min = 0,1 | Werte bleiben stehen | 0,10 / 0,90 | ok |
+| 9 | Clamp → „Runter“ | Clamp unter Map, Auswahl wandert mit | Reihenfolge … Add, Map, Clamp; Clamp markiert, Werte unverändert | ok |
+| 10 | Clamp → „Hoch“ | Clamp wieder über Map | … Add, Clamp, Map | ok |
+| 11 | Neun Layer nacheinander markiert und gelöscht | Rest Sin, Multiply, Clamp | genau diese drei, in dieser Reihenfolge | ok |
+| 12 | Sin: Amplitude 0,5, Frequenz 0,25 Hz, Phase je Gerät 1,57 | Felder übernehmen | Werte stehen nach Tab | ok |
+| 13 | „Play“, Popout schließen (Andocken 1), Dialog zu, E/A → DMX Monitor | Ausgabe-Werte im Monitor | Target „intensity“: alle Kanäle 0 — die Test-PAR haben keinen Dimmerkanal (siehe Nebenbefund FM-79) | Hinweis |
+| 14 | Popout 2: Base Value 0,6 → Fenster schließen; Popout 3: Multiply markiert | Änderung überlebt Andocken/Abdocken | Base 0,60 nach erneutem Popout, Multiply zeigt Faktor 1,00 | ok |
+| 15 | Target auf color_r, Dialog zu, DMX Monitor zweimal fotografiert | Rot-Kanäle laufen phasenversetzt zwischen 0,1 und 0,9 | Kanäle 1/4/7/10: 35/201/229/104, kurz darauf 218/229/88/43; Grün/Blau 0; nie über 229 (= 0,9) | ok |
+| 16 | Editor erneut, Popout 4, „Stop“, andocken, schließen, DMX Monitor | alle Kanäle 0 | Kanäle 1–12 alle 0 | ok |
+| 17 | Datei → Speichern | Datei wird geschrieben | Show-Datei enthält „QA Layer“: target color_r, base 0,6, Sin(0,5/0,25 Hz/Phase je Gerät 1,57), Multiply(1,0), Clamp(0,1–0,9) | ok |
+| 18 | Datei → Zuletzt verwendet → Show neu laden, Editor öffnen | Effekt unverändert | Target color_r, Base 0,60, Sin/Multiply/Clamp, Clamp 0,10/0,90; Kontextmenü „Start“ (nach dem Laden gestoppt) | ok |
+
+### B. Web-Remote / Web-Server-Lifecycle (16 Schritte)
+
+| # | Getan | Erwartet | Gesehen | Urteil |
+|---|---|---|---|---|
+| 1 | Ausgabe → „Web-Interface (Port 5000)“ | Server startet, Dialog | Dialog „Web-Interface läuft — nur dieser PC (127.0.0.1:5000)“, Statuszeile „Web: :5000 OK“, Port lauscht nur auf 127.0.0.1 | ok |
+| 2 | Dialog → Erweitert → „Feste Fernbedienung“ an | fester Link mit Schlüssel | Link `http://127.0.0.1:5000/?k=…` erscheint | ok |
+| 3 | Client 1 ruft den Link auf, dann `/api/status` | Seite 200, Status-JSON | 200; 1 Cueliste (4 Cues), 4 Geräte, Executor-Fader 1,0 | ok |
+| 4 | Client 1: GO | quittiert, Cue 1 aktiv | `{"ok":true,"licht":true,"liste":"Demo-Show"}`; Playback: Cue 1.0 aktiv | ok |
+| 5 | Client 1: GO | Cue 2 | „Cue 2.0 — Warm White“ aktiv, nächste 3.0 | ok |
+| 6 | Client 1: BACK | Cue 1 | „Cue 1.0 — Blackout“ aktiv | ok |
+| 7 | Client 1: Blackout an; leerer Körper | an; leer abgewiesen | `{"blackout":true}`, BLACKOUT-Knopf rot; leerer Körper → `anfrage_ungueltig` (nichts geändert) | ok |
+| 8 | Client 1: Blackout aus | aus | `{"blackout":false}`, Knopf wieder normal | ok |
+| 9 | Client 2 ohne Schlüssel: STOP | abgewiesen | 403 Forbidden | ok |
+| 10 | Client 2 mit Schlüssel: STOP | quittiert, Liste gestoppt | `ok:true`, keine Cue-Zeile mehr markiert | ok |
+| 11 | Client 1: Executor 1 Fader 0,5 | Engine 0,5, Pult zeigt 50 % | `/api/status` meldet 0,5 — der Fader in der Executor-Leiste bleibt sichtbar auf 100 % (auch nach 2 s) | **Befund WEB-16** |
+| 12 | `/konsole` abrufen | Seite antwortet | 200 | ok |
+| 13 | Menü: Web-Interface aus | Port zu, Client bekommt Fehler | „Web: aus“, Port frei, Client: Verbindung abgelehnt | ok |
+| 14 | Fremdes Programm belegt 127.0.0.1:5000, Menü: Web-Interface an | verständliche Meldung, App läuft weiter | „Port 5000 ist belegt — … Das Web-Interface wurde NICHT gestartet; LightOS laeuft weiter …“, „Web: aus“ | ok |
+| 15 | Blocker beendet, erneut einschalten; alter Client; Link neu öffnen | wieder erreichbar | „Web: :5000 OK“; alter Sitzungs-Cookie 403 (neuer Sitzungsschlüssel je Start, gewollt), nach erneutem Link-Aufruf GO ok; nach Show-Wechsel antwortet `/api/status` weiter | ok |
+| 16 | Datei → Beenden bei laufendem Server | Prozess endet, Port frei | kein Prozess mehr, Port 5000 nicht mehr belegt, Client: Verbindung abgelehnt | ok |
+
+**Folgebefunde (eigene Items):** WEB-16 (Executor-Fader aus dem Web wird im Pult nicht
+nachgezogen), FM-79 (leerer Layered-Effekt in der Oberfläche nicht anlegbar;
+Nebenbefund Target „intensity“ auf Geräten ohne Dimmerkanal bleibt stumm).
+**Randnotiz Testumgebung:** Der zweite Aufruf von „Show öffnen“ zeichnete im
+abgeschotteten X-Server keinen Inhalt (leerer Rahmen, Eingaben kamen an); ein Fehler
+der App ist das nicht nachweislich — neu geladen wurde über „Zuletzt verwendet“.
+
 ---
 *Erzeugt im vollautonomen Loop-Modus. Methodik: automatisierte Smoke-Tests +
 Multi-Agent-Inventar (22 Agenten) + adversariale Bug-Verifikation (6 Agenten). Alle
