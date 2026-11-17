@@ -45,6 +45,37 @@ def grenzen_muessen_geordnet_sein(layer_type) -> bool:
     return layer_type in _GRENZEN_TYPEN
 
 
+def ziel_ohne_kanal(effect) -> str | None:
+    """FM-79: Hat KEINES der Geraete des Effekts einen Kanal fuer das Ziel?
+
+    Liefert das Ziel-Attribut (fuer den Hinweis), wenn mindestens ein Geraet
+    des Effekts gepatcht ist, aber keines davon einen Kanal fuer eines der
+    Ziel-Attribute hat — der Effekt wirkt dann nicht. Sonst ``None`` (auch,
+    wenn nichts nachschlagbar ist: lieber kein Hinweis als ein falscher).
+    Nur Anzeige: die Engine und die Kopplung Farbe/Dimmer bleiben unberuehrt.
+    """
+    try:
+        fids = [int(f) for f in (getattr(effect, "fixture_ids", None) or [])]
+        if not fids:
+            return None
+        ziele = set(effect.ziel_attribute())
+        from src.core.app_state import get_state, get_channels_for_patched
+        patch = {int(f.fid): f for f in get_state().get_patched_fixtures()}
+        gefunden = False
+        for fid in fids:
+            fx = patch.get(fid)
+            if fx is None:
+                continue
+            gefunden = True
+            for ch in get_channels_for_patched(fx) or ():
+                if getattr(ch, "attribute", None) in ziele:
+                    return None
+        return effect.target_attribute if gefunden else None
+    except Exception as exc:
+        print(f"[EffectLayerEditor] Kanal-Pruefung fehlgeschlagen: {exc}")
+        return None
+
+
 class EffectLayerEditor(QWidget):
     def __init__(self, effect: LayeredEffect, parent=None):
         super().__init__(parent)
@@ -55,6 +86,7 @@ class EffectLayerEditor(QWidget):
         # Aufruf steht bewusst nur dort und nicht zusaetzlich hier: eine zweite
         # Stelle wuerde die erste ungeprueft lassen.
         self._refresh()
+        self._update_ziel_hinweis()
 
     def _setup_ui(self):
         # --- top-level layout on self: header + outer scroll + placeholder ---
@@ -116,6 +148,17 @@ class EffectLayerEditor(QWidget):
         top.addRow("Fixture-IDs (komma):", self._fixtures_edit)
 
         layout.addWidget(grund)
+
+        # FM-79: Hinweis, wenn KEIN Geraet des Effekts einen Kanal fuer das
+        # Ziel hat (z. B. „intensity" auf RGB-Geraeten ohne Dimmer). Nur
+        # Anzeige — keine Kopplung Farbe/Dimmer.
+        self._ziel_hinweis = QLabel()
+        self._ziel_hinweis.setWordWrap(True)
+        self._ziel_hinweis.setStyleSheet(
+            "QLabel{color:#ffb454;background:#2b2211;border:1px solid #6b4f1d;"
+            "border-radius:3px;padding:4px 6px;}")
+        self._ziel_hinweis.setVisible(False)
+        layout.addWidget(self._ziel_hinweis)
 
         # Layer-Liste + Add
         add_row = QHBoxLayout()
@@ -276,6 +319,16 @@ class EffectLayerEditor(QWidget):
         if t != getattr(self._effect, "target_attribute", None):
             setattr(self._effect, "zusatz_ziele", [])
         setattr(self._effect, "target_attribute", t)
+        self._update_ziel_hinweis()
+
+    def _update_ziel_hinweis(self):
+        """FM-79: Hinweis zeigen/verbergen (s. :func:`ziel_ohne_kanal`)."""
+        ziel = ziel_ohne_kanal(self._effect)
+        if ziel:
+            self._ziel_hinweis.setText(
+                f"Keines der Geräte hat einen Kanal für „{ziel}“ — "
+                "der Effekt wirkt so nicht.")
+        self._ziel_hinweis.setVisible(bool(ziel))
 
     def _on_base_value_changed(self, v):
         setattr(self._effect, "base_value", v)
@@ -342,6 +395,7 @@ class EffectLayerEditor(QWidget):
                 except ValueError:
                     continue
         self._effect.fixture_ids = ids
+        self._update_ziel_hinweis()
 
     def _refresh(self):
         self._list.clear()

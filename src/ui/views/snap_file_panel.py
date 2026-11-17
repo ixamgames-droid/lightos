@@ -690,6 +690,14 @@ class SnapFilePanel(QWidget):
         b_chase.setToolTip("Aus mehreren selektierten Snaps eine Sequence/Chase erzeugen")
         b_chase.clicked.connect(self._create_chase_from_selection)
 
+        # FM-79: leeren Layered-Effekt fuer die gewaehlten Geraete anlegen —
+        # die alte Funktionsansicht mit „+ Layered Effekt" ist nicht mehr
+        # eingehaengt, ohne diesen Knopf ging es nur per Skript.
+        b_layer = QPushButton("Layer +")
+        b_layer.setToolTip("Leeren Layered-Effekt für die im Programmer "
+                           "gewählten Geräte anlegen und im Editor öffnen")
+        b_layer.clicked.connect(self._new_layered_effect)
+
         b_del = QPushButton("Löschen")
         b_del.setStyleSheet("color: #ff6666;")
         b_del.clicked.connect(self._delete_selected)
@@ -705,7 +713,8 @@ class SnapFilePanel(QWidget):
         # ragte unten 4 px aus der Leiste. „↻“ war auf 24 px Breite gezwungen,
         # hinter 2×10 px Innenabstand blieb vom Zeichen nur ein „:“.
         # Jetzt: Mindestmaße aus der Schrift, Wunschgröße bestimmt das Theme.
-        self._leisten_knoepfe = [b_save, b_folder, b_apply, b_chase, b_del, b_ref]
+        self._leisten_knoepfe = [b_save, b_folder, b_apply, b_chase, b_layer,
+                                 b_del, b_ref]
         for btn in self._leisten_knoepfe:
             _knopf_mindestmass(btn, symbol=btn is b_ref)
             tb.addWidget(btn)
@@ -1123,6 +1132,43 @@ class SnapFilePanel(QWidget):
             pass
         self._refresh_tree()
 
+    def _new_layered_effect(self):
+        """FM-79: leeren Layered-Effekt fuer die im Programmer gewaehlten Geraete
+        anlegen (Ziel wie die Engine es vorgibt, ``new_layered_effect``) und im
+        Editor oeffnen — wie „Bearbeiten". Ohne Auswahl: Hinweis, nichts
+        angelegt (ein Effekt ohne Geraete wirkt nicht)."""
+        titel = "Layered-Effekt anlegen"
+        fids: list[int] = []
+        try:
+            if get_state is not None:
+                fids = [int(f) for f in get_state().auswahl_ziel_fids()]
+        except Exception as e:
+            print(f"[snap_file_panel] Auswahl nicht lesbar: {e}")
+        if not fids:
+            QMessageBox.information(
+                self, titel,
+                "Keine Geräte gewählt — erst im Programmer Geräte wählen, "
+                "dann „Layer +“.")
+            return
+        fm = self._fm()
+        if fm is None:
+            return
+        try:
+            effekt = fm.new_layered_effect()
+        except Exception as e:
+            QMessageBox.warning(self, titel, f"Konnte keinen Layered-Effekt anlegen: {e}")
+            return
+        effekt.fixture_ids = fids
+        try:   # in den aktuellen Ziel-Ordner legen (wie „Chase +")
+            folder = self._target_folder()
+            if folder:
+                effekt.folder = folder
+        except Exception:
+            pass
+        self._emit_function_changed()
+        self._refresh_tree()
+        self._edit_function(int(effekt.id))
+
     def _create_chase_from_selection(self):
         snap_ids = self._selected_snap_ids()
         if len(snap_ids) < 2:
@@ -1418,12 +1464,16 @@ class SnapFilePanel(QWidget):
             menu.addAction("Löschen").triggered.connect(self._delete_selected)
         elif kind == "folder":
             menu.addAction("Unterordner erstellen").triggered.connect(self._new_folder)
+            menu.addAction("Layered-Effekt anlegen").triggered.connect(
+                self._new_layered_effect)
             menu.addAction("Umbenennen...").triggered.connect(self._rename_selected)
             menu.addSeparator()
             menu.addAction("Ordner löschen").triggered.connect(self._delete_selected)
         else:
             menu.addAction("Snap speichern").triggered.connect(self._save_snap)
             menu.addAction("Ordner erstellen").triggered.connect(self._new_folder)
+            menu.addAction("Layered-Effekt anlegen").triggered.connect(
+                self._new_layered_effect)
         if not menu.isEmpty():
             menu.exec(QCursor.pos())
 
