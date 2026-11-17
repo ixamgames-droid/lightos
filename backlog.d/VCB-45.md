@@ -10,4 +10,4 @@ Status-Notiz: Schritte 1-4 geliefert, Schritt 5 (optional) und Rig-Sichtpruefung
 
 **Schritt 4 geliefert (2026-11-17):** Das APC folgt der Seitentaste ohne neuen Code — die Seitentaste waehlt die Executor-Seite, und das Pult bedient genau die Widgets dieser Bank, auch wenn sie gerade im geloesten Fenster liegen (Test `test_apc_folgt_der_seitentaste_auch_fuer_die_geloeste_bank`). Am Finger bedient man das geloeste Fenster direkt, unabhaengig von der Seite oben.
 
-**Rest:** Schritt 5 (frei blaettern im geloesten Fenster, optional) nicht gebaut. Nach einem Neustart sind alle Baenke wieder angedockt (die Lage je Bank bleibt gemerkt). Sichtpruefung am echten Rig mit zwei Bildschirmen steht fuer Schritt 1 und 3 aus.
+**Rest:** Schritt 5 (frei blaettern im geloesten Fenster, optional) nicht gebaut. Nach einem Neustart sind alle Baenke wieder angedockt (die Lage je Bank bleibt gemerkt) — so gewollt, Entscheidung des Betreibers vom 17.11.2026: nach dem Start alles angedockt wie bisher. Sichtpruefung am echten Rig mit zwei Bildschirmen steht fuer Schritt 1 und 3 aus.
