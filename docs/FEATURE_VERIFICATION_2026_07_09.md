@@ -142,7 +142,8 @@ Rest von QA-LIVE: Effect-Layer-Editor und Web-Remote-/Web-Server-Lifecycle. Die
 echte App lief in einem abgeschotteten X-Server (1600×900, Fenstermanager metacity)
 im Probelauf (Wegwerf-Datenordner, Ausgabe gesperrt — Titel „PROBELAUF“, Banner
 „Probenmodus — es wird kein DMX gesendet“). Bedient wurde mit echten Maus- und
-Tastatur-Ereignissen (XTEST), jeder Schritt mit Bildschirmfoto davor und danach.
+Tastatur-Ereignissen (XTEST), jeder Schritt mit mindestens einem Bildschirmfoto des
+Ergebnisses.
 Testshow: `tools/build_demo_rgb_par.py` (4 RGB-PAR, 3 Kanäle, Adressen 1/4/7/10,
 Cueliste „Demo-Show“ mit 4 Cues) in eine Wegwerf-Datei; für Teil A wurde ihr per
 Skript ein leerer Layered-Effekt „QA Layer“ (Geräte 1–4) hinzugefügt, weil die
@@ -200,6 +201,13 @@ Nebenbefund Target „intensity“ auf Geräten ohne Dimmerkanal bleibt stumm).
 **Randnotiz Testumgebung:** Der zweite Aufruf von „Show öffnen“ zeichnete im
 abgeschotteten X-Server keinen Inhalt (leerer Rahmen, Eingaben kamen an); ein Fehler
 der App ist das nicht nachweislich — neu geladen wurde über „Zuletzt verwendet“.
+**Gegenprobe (zweite, unabhängige Sitzung, gleicher abgeschotteter X-Server):** A2/A4,
+A7–A10, A13–A16 mit der gespeicherten Show wiederholt — gespeicherter Stand (color_r,
+Base 0,60, Sin/Multiply/Clamp 0,10–0,90) kommt zurück, Min > Max zieht Max nach,
+Hoch/Runter und Andocken behalten den Stand, Rot-Kanäle 157/25/148/229 (Paare 1/3 und
+2/4 ergänzen sich zu 2 × Base, Clamp-Grenzen 25 und 229), nach Stop alle 0. B1–B4,
+B7, B9, B11, B13 und B16 wiederholt — gleiche Antworten; WEB-16 nachgestellt
+(`/api/status` 0,5, Regler bleibt oben).
 
 ---
 *Erzeugt im vollautonomen Loop-Modus. Methodik: automatisierte Smoke-Tests +
