@@ -596,8 +596,14 @@ class VCCanvas(QWidget):
         reihenfolge = getattr(fenster, "_reihenfolge", None)
         alle = list(self.findChildren(
             VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly))
-        if reihenfolge is None:
-            fenster._reihenfolge = list(alle)
+        bekannt = {id(w) for w in (reihenfolge or []) if _lebt(w)}
+        if reihenfolge is None or any(
+                getattr(w, "bank", -1) == int(bank) and id(w) not in bekannt
+                for w in alle):
+            # Erstes Loesen oder neu geladene Widgets (Laden/Undo/Vorlage):
+            # die Stapel-Reihenfolge der Flaeche JETZT ist die zum Andocken.
+            fenster._reihenfolge = list(alle) + [
+                w for w in fenster.widgets() if w not in alle]
         for w in alle:
             if getattr(w, "bank", -1) != int(bank):
                 continue

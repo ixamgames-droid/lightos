@@ -367,6 +367,62 @@ def test_andocken_knopf_am_finger(prefs, zwei_bildschirme):
     assert w["B"].parent() is cv
 
 
+_ALT_SHOW = {"widgets": [
+    {"type": "VCButton", "x": 30, "y": 40, "w": 72, "h": 72, "caption": "B1a", "bank": 1},
+    {"type": "VCButton", "x": 130, "y": 40, "w": 72, "h": 72, "caption": "B0", "bank": 0},
+    {"type": "VCButton", "x": 230, "y": 40, "w": 72, "h": 72, "caption": "Alle", "bank": -1},
+    {"type": "VCButton", "x": 330, "y": 40, "w": 72, "h": 72, "caption": "B1b", "bank": 1},
+]}
+
+
+def test_laden_bei_geloester_bank_dann_andocken_haelt_die_reihenfolge(
+        prefs, zwei_bildschirme):
+    """Pruefung: Show bei geloester Bank (neu) laden, dann andocken — die
+    Elemente stehen in der Reihenfolge der Datei (Speichern + Stapel)."""
+    v, w = _konsole()
+    cv = v._canvas
+    cv.bank_loesen(1, haupt=v)
+    v.from_dict(_ALT_SHOW)
+    _app.processEvents()
+    assert [x.caption for x in cv.bank_fenster(1).widgets()] == ["B1a", "B1b"]
+    cv.bank_andocken(1)
+    assert [d["caption"] for d in v.to_dict()["widgets"]] == [
+        d["caption"] for d in _ALT_SHOW["widgets"]]
+
+
+def test_popup_taste_im_geloesten_fenster_schaltet_ihr_feld(
+        prefs, zwei_bildschirme):
+    """Pruefung: Pop-up-Feld (VCB-48) und seine Taste liegen auf der
+    geloesten Bank, oben steht eine andere Seite — die Taste im Fenster
+    oeffnet und schliesst das Feld trotzdem."""
+    v, _w = _konsole()
+    cv = v._canvas
+    v.from_dict({"widgets": [
+        {"type": "VCFrame", "x": 30, "y": 200, "w": 300, "h": 200, "bank": 1,
+         "popup": True, "popup_id": "pf1", "caption": "Feld"},
+        {"type": "VCButton", "x": 30, "y": 40, "w": 72, "h": 72,
+         "caption": "Auf", "bank": 1, "action": "PopupToggle",
+         "popup_target": "pf1"},
+    ]})
+    from src.ui.virtualconsole.vc_button import VCButton
+    from src.ui.virtualconsole.vc_frame import VCFrame
+    taste = [x for x in cv.findChildren(VCButton) if x.caption == "Auf"][0]
+    feld = [x for x in cv.findChildren(VCFrame)
+            if getattr(x, "popup_id", "") == "pf1"][0]
+    assert feld._popup
+    v._set_bank(1)
+    cv.bank_loesen(1, haupt=v)
+    v._set_bank(0)
+    vorher = feld.popup_offen()
+    taste._popup_umschalten()
+    _app.processEvents()
+    assert feld.popup_offen() != vorher
+    assert feld.isVisible() == feld.popup_offen()
+    assert taste.popup_offen() == feld.popup_offen()
+    taste._popup_umschalten()
+    assert feld.popup_offen() == vorher
+
+
 def test_anleitung_nennt_bank_loesen():
     text = open(_ANLEITUNG, encoding="utf-8").read()
     assert "lösen (eigenes Fenster)" in text
