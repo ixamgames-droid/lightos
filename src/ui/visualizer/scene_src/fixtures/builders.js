@@ -21,6 +21,7 @@ import { buildLaserRig, applyLaser, noteLaserAnimation, LASER_BEAM_OPACITY, lase
 import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUSION
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
 import { ausbrennNachfuehren } from './ausbrennen.js';         // VIZ-91
+import { lichtfarbe } from './lichtfarbe.js';                  // VIZ-93
 
 // EIN gehaltener Raycaster statt einer Neuanlage pro Fixture und Frame —
 // derselbe Haushalt wie beim Andocken (stage/docking.js).
@@ -1685,7 +1686,7 @@ export function updateParBarDmx(f, dmx) {
     const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
     const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
     const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
-    const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
+    const col = lichtfarbe(hr, hg, hb);   // VIZ-93: sRGB -> linear
     const bright = intNorm;   // gemeinsamer Master-Dimmer
     if (ph.lens && ph.lens.material) {
       ph.lens.material.color = col;
@@ -1718,7 +1719,7 @@ export function updateMoverBarDmx(f, dmx) {
     const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
     const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
     const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
-    const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
+    const col = lichtfarbe(hr, hg, hb);   // VIZ-93: sRGB -> linear
     const bright = intNorm;
     const hp = (h.pan == null) ? pan : h.pan;    // pro-Kopf-Pan (FM-2)
     const ht = (h.tilt == null) ? tilt : h.tilt; // pro-Kopf-Tilt
@@ -1755,7 +1756,7 @@ export function updateMatrixPanelDmx(f, dmx) {
     const hr = (h.r != null) ? h.r : (i === 0 ? r : 0);
     const hg = (h.g != null) ? h.g : (i === 0 ? g : 0);
     const hb = (h.b != null) ? h.b : (i === 0 ? b : 0);
-    const col = new THREE.Color(hr / 255, hg / 255, hb / 255);
+    const col = lichtfarbe(hr, hg, hb);   // VIZ-93: sRGB -> linear
     if (px.mesh && px.mesh.material) {
       px.mesh.material.color = col;
       px.mesh.material.emissive = col;
@@ -1776,8 +1777,8 @@ export function updateMatrixPanelDmx(f, dmx) {
   for (let j = 0; j < ws.length; j++) {
     const seg = ws[j];
     if (!seg.mesh || !seg.mesh.material) continue;
-    const v = ((hs[j] || {}).cw || 0) / 255;
-    const wcol = new THREE.Color(v, v, v);
+    const v = (hs[j] || {}).cw || 0;
+    const wcol = lichtfarbe(v, v, v);   // VIZ-93: sRGB -> linear
     seg.mesh.material.color = wcol;
     seg.mesh.material.emissive = wcol;
     seg.mesh.material.emissiveIntensity = intNorm * 1.6;   // derselbe Master-Dimmer
@@ -1831,8 +1832,7 @@ export function updatePixelHeadDmx(f, dmx) {
     // zurueckzufallen: ein Ring, der die Hauptfarbe spiegelt, behauptet
     // Pixel-Werte, die es nicht gibt.
     const h = hs[i + basis] || {};
-    const col = new THREE.Color((h.r || 0) / 255, (h.g || 0) / 255,
-                                (h.b || 0) / 255);
+    const col = lichtfarbe(h.r, h.g, h.b);   // VIZ-93: sRGB -> linear
     if (seg.mesh && seg.mesh.material) {
       seg.mesh.material.color = col;
       seg.mesh.material.emissive = col;
@@ -1977,6 +1977,9 @@ function _glattSchritt(f, jetzt) {
 // Helfer alle Single-Head-Typen identisch zum alten Durchlauf.
 function applyGenericColor(f, dmx) {
   const { color, intNorm } = dmx;
+  // VIZ-93: Materialien und Lichter bekommen die LINEARE Farbe (DMX ist sRGB,
+  // lichtfarbe.js); `color` bleibt das sRGB-Mass fuer `lum` und das Icon.
+  const licht = dmx.licht || lichtfarbe(dmx.r, dmx.g, dmx.b);
   // A3D-25/A3D-28: Sichtbarkeit an der EFFEKTIVEN Leuchtdichte messen, nicht am
   // Dimmer allein. Ein Fixture mit offenem Dimmer, aber Farbe 0/0/0 (RGB-
   // Blackout ohne Dimmer-Blackout) lieferte intNorm=1 -> SpotLight blieb
@@ -1988,7 +1991,7 @@ function applyGenericColor(f, dmx) {
   // bleibt an `lum` — nur die Anteile verschieben sich, Farbe bleibt Farbe.
   const gobo = !!f.goboAktiv;
   if (f.beam) {
-    f.beam.material.color = color;
+    f.beam.material.color = licht;
     // Mit Gobo angehoben, aber nie ueber 1 (Deckkraft ist ein Anteil). Die
     // Kappung sitzt am FAKTOR, nicht am Produkt: sonst laege die Deckkraft
     // schon ab ~65 % Dimmer auf 1 und ein Fade darueber kaeme nicht mehr an.
@@ -1998,7 +2001,7 @@ function applyGenericColor(f, dmx) {
     f.beam.visible = beamsSichtbar(f, lum);
   }
   if (f.spot) {
-    f.spot.color = color;
+    f.spot.color = licht;
     // VIZ-69: dunkel = intensity 0, NICHT visible=false. In three.js r128
     // gehoeren die Zahl der sichtbaren SpotLights und der sichtbaren
     // Schatten-Spots zum Programmschluessel JEDES beleuchteten Materials —
@@ -2017,17 +2020,17 @@ function applyGenericColor(f, dmx) {
     f.spot.intensity = lum > 0.01 ? intNorm * 3.0 * goboLicht : 0;
   }
   if (f.floorSpot) {
-    f.floorSpot.material.color = color;
+    f.floorSpot.material.color = licht;
     f.floorSpot.material.opacity = Math.max(0.0, intNorm * 0.55 * (gobo ? GOBO_FLECK : 1));
     f._fleckHell = lum;              // VIZ-98: applyFloorAim schaltet damit um
     f.floorSpot.visible = fleckSichtbar(f, lum);
   }
   if (f.lens && f.lens.material) {
-    f.lens.material.emissive = color;
+    f.lens.material.emissive = licht;
     f.lens.material.emissiveIntensity = intNorm * 1.5;
   }
   if (f.lamp && f.lamp.material) {
-    f.lamp.material.emissive = color;
+    f.lamp.material.emissive = licht;
     f.lamp.material.emissiveIntensity = intNorm * 1.5;
   }
   // Laser-Faecher: jede Linie folgt DMX-Farbe + Intensitaet (statt fix gruen/an)
@@ -2039,8 +2042,8 @@ function applyGenericColor(f, dmx) {
     const laserVis = beamsSichtbar(f, lum);
     // VIZ-95: Farbton aus den Farb-Bereichen des Profils (falls da) — die
     // Helligkeit (Deckkraft, Sichtbarkeit) bleibt an intNorm/lum oben.
-    const laserCol = laserFarbe(f, color);
-    if (laserCol !== color && f.lamp && f.lamp.material) f.lamp.material.emissive = laserCol;
+    const laserCol = laserFarbe(f, licht);
+    if (laserCol !== licht && f.lamp && f.lamp.material) f.lamp.material.emissive = laserCol;
     for (const bm of f.laserBeams) {
       if (!bm.material) continue;
       // LAS-27: bei „bunt" je Strahl eine feste Palettenfarbe.

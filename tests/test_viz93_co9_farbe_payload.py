@@ -21,6 +21,10 @@ die ueberlappenden Kegel/Flecken im 8-Bit-Bildpuffer und klemmen (s. Modulkopf
 ``fixtures/ausbrennen.js``). Das ist kein CO9-Fehler und wird nicht still an
 einem Geraet geaendert — dieser Test haelt fest, dass der Farbweg bis zum
 Payload satt bleibt (ein Regress hier waere ein echter Profil-/Mischfehler).
+
+Stand VIZ-93 (01.11.): die Szenen-Ursache ist behoben (fixtures/lichtfarbe.js:
+sRGB -> linear + farbtonerhaltendes Tone-Mapping der Lichtmaterialien),
+belegt in ``test_viz93_farbraum_scene.py``; obige Beschreibung ist der Befund.
 """
 import json
 import os

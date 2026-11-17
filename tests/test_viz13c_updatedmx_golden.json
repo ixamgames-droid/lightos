@@ -3,12 +3,12 @@
   "20": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 0,
@@ -26,7 +26,7 @@
    "laser": null,
    "lastPanRad": null,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "moverHeads": null,
@@ -42,7 +42,7 @@
    },
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "par",
@@ -51,12 +51,12 @@
   "21": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 4.7029,
@@ -74,7 +74,7 @@
    "laser": null,
    "lastPanRad": 2.6507,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "moverHeads": null,
@@ -94,7 +94,7 @@
    },
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "moving_head",
@@ -103,12 +103,12 @@
   "22": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 6.0966,
@@ -126,13 +126,13 @@
    "laser": null,
    "lastPanRad": 1.7671,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "scanner",
@@ -151,11 +151,11 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "laser": {
-    "hex0": 13132850,
+    "hex0": 9641992,
     "n": 34,
     "op0": 0,
     "vis0": false
@@ -171,12 +171,12 @@
   "24": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 8,
@@ -191,7 +191,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "laser": null,
@@ -200,7 +200,7 @@
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "led_bar",
@@ -209,12 +209,12 @@
   "25": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 10,
@@ -229,7 +229,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "laser": null,
@@ -238,7 +238,7 @@
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "dimmer",
@@ -247,12 +247,12 @@
   "26": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 12,
@@ -267,7 +267,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "laser": null,
@@ -276,7 +276,7 @@
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "strobe",
@@ -295,7 +295,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "laser": null,
@@ -320,7 +320,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "laser": null,
@@ -385,12 +385,12 @@
      "lensHex": 255
     },
     {
-     "beamHex": 7897740,
+     "beamHex": 3094594,
      "beamOp": 0,
      "beamVis": false,
-     "emHex": 7897740,
+     "emHex": 3094594,
      "emInt": 0,
-     "lensHex": 7897740
+     "lensHex": 3094594
     }
    ],
    "spot": null,
@@ -455,13 +455,13 @@
      "yokeRotY": 0.7854
     },
     {
-     "beamHex": 13158400,
+     "beamHex": 9671424,
      "beamOp": 0,
      "beamVis": false,
-     "emHex": 13158400,
+     "emHex": 9671424,
      "emInt": 0,
      "headRotX": 0.8836,
-     "lensHex": 13158400,
+     "lensHex": 9671424,
      "yokeRotY": 2.3562
     }
    ],
@@ -568,12 +568,12 @@
   "32": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0,
     "vis": false,
     "x": 24,
@@ -591,13 +591,13 @@
    "laser": null,
    "lastPanRad": null,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 0
    },
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 0
    },
    "type": "kaffeemaschine",
@@ -648,12 +648,12 @@
      "lensHex": 16711680
     },
     {
-     "beamHex": 16744448,
+     "beamHex": 16725760,
      "beamOp": 0,
      "beamVis": false,
-     "emHex": 16744448,
+     "emHex": 16725760,
      "emInt": 0,
-     "lensHex": 16744448
+     "lensHex": 16725760
     },
     {
      "beamHex": 16776960,
@@ -688,12 +688,12 @@
      "lensHex": 255
     },
     {
-     "beamHex": 8388863,
+     "beamHex": 3604735,
      "beamOp": 0,
      "beamVis": false,
-     "emHex": 8388863,
+     "emHex": 3604735,
      "emInt": 0,
-     "lensHex": 8388863
+     "lensHex": 3604735
     },
     {
      "beamHex": 16711935,
@@ -713,12 +713,12 @@
   "20": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.6,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.3882,
     "vis": true,
     "x": 0,
@@ -736,7 +736,7 @@
    "laser": null,
    "lastPanRad": null,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "moverHeads": null,
@@ -752,7 +752,7 @@
    },
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "par",
@@ -761,12 +761,12 @@
   "21": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.2757,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.4659,
     "vis": true,
     "x": 4.7029,
@@ -784,7 +784,7 @@
    "laser": null,
    "lastPanRad": 2.6507,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "moverHeads": null,
@@ -804,7 +804,7 @@
    },
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "moving_head",
@@ -813,12 +813,12 @@
   "22": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.6,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.3882,
     "vis": true,
     "x": 6.0966,
@@ -836,13 +836,13 @@
    "laser": null,
    "lastPanRad": 1.7671,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "scanner",
@@ -861,11 +861,11 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "laser": {
-    "hex0": 13132850,
+    "hex0": 9641992,
     "n": 34,
     "op0": 0.6353,
     "vis0": true
@@ -881,12 +881,12 @@
   "24": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.6,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.3882,
     "vis": true,
     "x": 8,
@@ -901,7 +901,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "laser": null,
@@ -910,7 +910,7 @@
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "led_bar",
@@ -919,12 +919,12 @@
   "25": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.6,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.3882,
     "vis": true,
     "x": 10,
@@ -939,7 +939,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "laser": null,
@@ -948,7 +948,7 @@
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "dimmer",
@@ -957,12 +957,12 @@
   "26": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.6,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.3882,
     "vis": true,
     "x": 12,
@@ -977,7 +977,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "laser": null,
@@ -986,7 +986,7 @@
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "strobe",
@@ -1005,7 +1005,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "laser": null,
@@ -1030,7 +1030,7 @@
     "yaw": 0
    },
    "lamp": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "laser": null,
@@ -1095,12 +1095,12 @@
      "lensHex": 255
     },
     {
-     "beamHex": 7897740,
+     "beamHex": 3094594,
      "beamOp": 0.6,
      "beamVis": true,
-     "emHex": 7897740,
+     "emHex": 3094594,
      "emInt": 1.3412,
-     "lensHex": 7897740
+     "lensHex": 3094594
     }
    ],
    "spot": null,
@@ -1165,13 +1165,13 @@
      "yokeRotY": 0.7854
     },
     {
-     "beamHex": 13158400,
+     "beamHex": 9671424,
      "beamOp": 0.6,
      "beamVis": true,
-     "emHex": 13158400,
+     "emHex": 9671424,
      "emInt": 1.3412,
      "headRotX": 0.8836,
-     "lensHex": 13158400,
+     "lensHex": 9671424,
      "yokeRotY": 2.3562
     }
    ],
@@ -1278,12 +1278,12 @@
   "32": {
    "bars": null,
    "beam": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.6,
     "vis": true
    },
    "floorSpot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "op": 0.3882,
     "vis": true,
     "x": 24,
@@ -1301,13 +1301,13 @@
    "laser": null,
    "lastPanRad": null,
    "lens": {
-    "emHex": 13132850,
+    "emHex": 9641992,
     "emInt": 1.0588
    },
    "moverHeads": null,
    "parHeads": null,
    "spot": {
-    "hex": 13132850,
+    "hex": 9641992,
     "inten": 2.1176
    },
    "type": "kaffeemaschine",
@@ -1358,12 +1358,12 @@
      "lensHex": 16711680
     },
     {
-     "beamHex": 16744448,
+     "beamHex": 16725760,
      "beamOp": 0.6,
      "beamVis": true,
-     "emHex": 16744448,
+     "emHex": 16725760,
      "emInt": 1.3412,
-     "lensHex": 16744448
+     "lensHex": 16725760
     },
     {
      "beamHex": 16776960,
@@ -1398,12 +1398,12 @@
      "lensHex": 255
     },
     {
-     "beamHex": 8388863,
+     "beamHex": 3604735,
      "beamOp": 0.6,
      "beamVis": true,
-     "emHex": 8388863,
+     "emHex": 3604735,
      "emInt": 1.3412,
-     "lensHex": 8388863
+     "lensHex": 3604735
     },
     {
      "beamHex": 16711935,
