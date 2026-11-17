@@ -75,7 +75,7 @@ A double-click (in edit mode) opens the „Fader Einstellungen" (fader settings)
 | Mode | Effect |
 |---|---|
 | **DMX-Kanal (Level)** | Writes the value directly to a fixed DMX channel in the selected universe (0–255). The universe is created automatically if needed. |
-| **Playback (Executor)** | Sets the fader value (0–100 %) of a playback executor. The slot number is the executor index. |
+| **Playback (Executor)** | Sets the fader value (0–100 %) of a playback executor. The slot number is the executor index. If the level is changed from elsewhere (remote, OSC, MIDI, executor bar), the fader follows within about half a second – display only, nothing is sent back, and not while you hold it or edit the console (VCB-50). |
 | **Submaster** | Sets an output submaster (0–100 %) – multiplicative, combines cleanly with the grand master and group dimmer. Each fader has its **own** submaster slot; two submaster faders on the same fixtures therefore multiply instead of overwriting each other. Which fixtures (or heads) it acts on is set by the *Reichweite*. |
 | **Grand Master** | Controls the global overall brightness of the entire output (0–100 %). |
 | **Programmer-Attribut** | Sets a programmer attribute (default `intensity`) on the affected fixtures. Which fixtures: see *Reichweite*. |

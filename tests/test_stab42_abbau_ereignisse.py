@@ -79,9 +79,6 @@ FILTER_AUSNAHMEN = {
         "keine Instanz-Attribute (wie HandyAbzeichen)",
     ("views/virtual_console_view.py", "_FesteHoehe"):
         "kein __init__, nur Klassenattribut (wie HandyAbzeichen)",
-    ("main_window.py", "_KioskNotausMeldung"):
-        "LAS-41 NOT-AUS-Anzeige (Sicherheit, nicht anfassen); reagiert nur "
-        "auf Resize/Move/Show des Stapels",
 }
 
 
@@ -543,4 +540,64 @@ def test_auswahlmarke_filter_im_abbau_waehrend_grab(app, capfd):
     assert befund.get("uebergangen", 0) >= 1, befund
     assert "AttributeError" not in fehler, fehler
     m.deleteLater()
+    _loeschungen_zustellen()
+
+
+# ── 5. Nachtrag: Kiosk-NOT-AUS-Anzeige (LAS-41) traegt den Filter-Schutz ─────
+
+def _kiosk_meldung_mit_stapel(app):
+    from src.ui.main_window import _KioskNotausMeldung
+    eltern = QWidget()
+    eltern.resize(300, 200)
+    stapel = QWidget(eltern)
+    stapel.resize(200, 100)
+    lbl = _KioskNotausMeldung(eltern)
+    aufrufe = []
+    lbl.lege_an = lambda: aufrufe.append(1)
+    stapel.installEventFilter(lbl)
+    return eltern, stapel, lbl, aufrufe
+
+
+def test_kiosk_notaus_filter_gesund_unveraendert(app):
+    """Gesundes Objekt: Resize, Move und Show des Stapels rufen ``lege_an``
+    wie vorher, andere Ereignisse nicht; der Filter verbraucht nie etwas."""
+    eltern, stapel, lbl, aufrufe = _kiosk_meldung_mit_stapel(app)
+    assert not im_abbau(lbl)
+    vorher = abbau.uebergangen
+    for typ in (QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show):
+        n = len(aufrufe)
+        assert lbl.eventFilter(stapel, QEvent(typ)) is False
+        assert len(aufrufe) == n + 1, typ
+    n = len(aufrufe)
+    assert lbl.eventFilter(stapel, QEvent(QEvent.Type.Hide)) is False
+    assert len(aufrufe) == n
+    # Echt ueber Qt zugestellt: Groesse/Lage aendern
+    eltern.show()
+    app.processEvents()
+    n = len(aufrufe)
+    stapel.resize(220, 110)
+    stapel.move(5, 7)
+    app.processEvents()
+    assert len(aufrufe) >= n + 2
+    assert abbau.uebergangen == vorher
+    eltern.deleteLater()
+    _loeschungen_zustellen()
+
+
+def test_kiosk_notaus_filter_geleert_keine_ausnahme(app):
+    """Geleertes Objekt (Abbau): kein AttributeError, Ergebnis ``False``,
+    das Ereignis wird gezaehlt uebergangen."""
+    eltern, stapel, lbl, _aufrufe = _kiosk_meldung_mit_stapel(app)
+    stapel.removeEventFilter(lbl)
+    gemerkt = dict(vars(lbl))
+    vars(lbl).clear()
+    try:
+        assert im_abbau(lbl)
+        vorher = abbau.uebergangen
+        for typ in (QEvent.Type.Resize, QEvent.Type.Move, QEvent.Type.Show):
+            assert lbl.eventFilter(stapel, QEvent(typ)) is False
+        assert abbau.uebergangen == vorher + 3
+    finally:
+        vars(lbl).update(gemerkt)
+    eltern.deleteLater()
     _loeschungen_zustellen()
