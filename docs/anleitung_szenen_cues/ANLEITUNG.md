@@ -57,6 +57,9 @@ Sektion **Programmer**, Reiter **Attribute**: Gruppe **Alle PAR** wählen, im Re
 2. **Ordner +** legt vorher einen Ordner an. Ein neuer Snap landet in dem Ordner, der
    in der Bibliothek gerade markiert ist.
 
+**Layer +** legt einen leeren Layered-Effekt für die gerade gewählten Geräte an und
+öffnet gleich seinen Editor (ohne gewählte Geräte kommt nur ein Hinweis).
+
 ## 2. Kanäle auswählen und den Snap benennen
 
 ![Welche Kanäle sollen gespeichert werden?](img/02_kanaele.png)
