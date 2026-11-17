@@ -425,7 +425,9 @@ window.__lightos = {
         const u = gl.getActiveUniform(p.program, i);
         if (u && /^sampler/i.test(typName(gl, u.type))) sampler += u.size;
       }
-      return { name: p.name, sampler, quelle: gl.getShaderSource(p.fragmentShader) || '' };
+      // VIZ-15: `ok` = Programm gelinkt (Shader-Fehler sonst nur im Konsolen-Log).
+      return { name: p.name, sampler, quelle: gl.getShaderSource(p.fragmentShader) || '',
+               ok: gl.getProgramParameter(p.program, gl.LINK_STATUS) === true };
     });
   },
   renderInfo: () => {

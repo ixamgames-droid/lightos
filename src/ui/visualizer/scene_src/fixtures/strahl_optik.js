@@ -96,7 +96,9 @@ function _fKopf(kante, schatten) {
     z.push(
       'uniform float lightosKante;',
       'float lightosKantenFaktor() {',
-      '\tvec3 v = normalize( vLightosV );',
+      // Ortho-Kamera (2D-Ansicht): Blickrichtung ueberall die Kamera-Achse,
+      // sonst kippte der Rand mit dem Abstand zur Bildmitte (und beim Pan).
+      '\tvec3 v = isOrthographic ? vec3( 0.0, 0.0, 1.0 ) : normalize( vLightosV );',
       '\tfloat ndv = abs( dot( normalize( vLightosN ), v ) );',
       '\tfloat ax = abs( dot( normalize( vLightosA ), v ) );',
       // |N·V| ist (fuer einen Kreisquerschnitt) genau der Anteil der Weglaenge
@@ -256,9 +258,12 @@ export function syncStrahlSchatten(fixtures, stageObjects) {
   for (const fid in fixtures) {
     const f = fixtures[fid];
     const cone = f && f.beam;
-    const u = cone && cone.material && cone.material.userData
-      && cone.material.userData.lightosSchatten;
-    if (!u) continue;
+    if (!(cone && cone.material)) continue;
+    // Uniforms schon VOR dem ersten Kompilieren anlegen: three ruft den Hook
+    // (strahlOptikAnwenden) erst im render() — ohne das bekam ein Kegel, der
+    // zum ersten Mal sichtbar wird, im ersten Bild n = 0 und blieb bei
+    // ruhender Szene (Render auf Anforderung) ohne Schatten.
+    const u = _schattenUniforms(cone.material);
     u.n.value = 0;
     if (_hell(cone) > 0 && _sichtbar(cone)) kegel.push(cone);
   }

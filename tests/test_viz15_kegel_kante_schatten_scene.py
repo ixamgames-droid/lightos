@@ -241,9 +241,9 @@ class MaximalTest(_Bild):
         self._platte()
         self._push(_payload(_FID))
         _pump(0.3)
-        # Zwei Bilder: das erste nach dem DMX-Schritt ordnet Kegel/Koerper erst ein.
-        for _ in range(2):
-            self._eval("(function(){const L=window.__lightos; L.requestRender(); L.__renderTick(); return 1;})()")
+        # EIN Bild genuegt (Render auf Anforderung: ein zweites kommt bei
+        # ruhender Szene nicht) — die Uniforms entstehen vor dem Kompilieren.
+        self._eval("(function(){const L=window.__lightos; L.requestRender(); L.__renderTick(); return 1;})()")
         r = json.loads(self._eval(
             "(function(){const L=window.__lightos,f=L.fixtures['%d'];"
             "const u=f.beam.material.userData.lightosSchatten;"
@@ -277,6 +277,27 @@ class MaximalTest(_Bild):
                         f"Strahl hinter der Platte nicht dunkler: {ohne} -> {mit}")
         self.assertGreater(mit["freie_seite"], 0.85 * ohne["freie_seite"],
                            f"freie Seite darf nicht dunkler werden: {ohne} -> {mit}")
+
+    def test_kegel_programm_linkt_auch_in_2d(self):
+        """Pruefung 17.11.: der gepatchte Kegel-Shader muss in 3D UND in der
+        2D-Ansicht (Ortho-Kamera, Blickrichtung = Kamera-Achse) linken."""
+        self._load_and_wait()
+        self._platte()
+        self._push(_payload(_FID))
+        _pump(0.3)
+        for modus in ("3D", "2D"):
+            r = json.loads(self._eval(
+                "(function(m){const L=window.__lightos; L.setViewMode(m);"
+                " L.requestRender(); L.__renderTick();"
+                " const p=L.__programmInfo().filter(x=>x.quelle.indexOf('lightosKantenFaktor')>=0);"
+                " return JSON.stringify({n:p.length, ok:p.map(x=>x.ok),"
+                " ortho:p.map(x=>x.quelle.indexOf('isOrthographic ?')>=0),"
+                " schatten:p.map(x=>x.quelle.indexOf('lightosSchatten()')>=0)});})('%s')" % modus))
+            if r["n"] == 0:
+                raise unittest.SkipTest("kein GL-Kontext offscreen")
+            self.assertTrue(all(r["ok"]), (modus, r))
+            self.assertTrue(all(r["ortho"]) and all(r["schatten"]), (modus, r))
+
 
 _MESS_FIDS = [_FID + 100 + i for i in range(8)]
 
