@@ -36,6 +36,7 @@ import {
 } from './strobe.js';   // VIZ-104
 import { hellMerken, hellSchnell, hellSetzen } from './strobe_hell.js';   // VIZ-104
 import { kegelDaempfen, fleckDaempfen, ausbrennMelden, ausbrennAbmelden } from './ausbrennen.js';   // VIZ-91
+import { lichtfarbe, lichtMaterialienMarkieren } from './lichtfarbe.js';   // VIZ-93
 
 initSpotPool(fixtures);
 
@@ -394,6 +395,9 @@ export function addFixture(data) {
   root.add(model.group);
 
   const color = new THREE.Color((data.r||0)/255, (data.g||0)/255, (data.b||0)/255);
+  // VIZ-93: Materialien/Lichter bekommen die Farbe linear (DMX ist sRGB);
+  // `color` bleibt fuer die Helligkeits-Schwellen im sRGB-Mass.
+  const licht = lichtfarbe(data.r, data.g, data.b);
   const intensity = (data.intensity||0) / 255;
 
   let beam = null, spot = null, spotTarget = null, floorSpot = null;
@@ -460,10 +464,10 @@ export function addFixture(data) {
     const _pk = profilKegel(data);
     const beamAngle = _pk ? _pk.basisHalb
       : (rtype === 'led_bar' ? Math.PI/14 : Math.PI/10);
-    beam = createBeamCone(color, intensity, beamAngle, beamLength);
+    beam = createBeamCone(licht, intensity, beamAngle, beamLength);
     headHost.add(beam);
 
-    spot = new THREE.SpotLight(color, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
+    spot = new THREE.SpotLight(licht, intensity * 3.0, 25, beamAngle * 1.2, 0.6, 1.0);
     // VIZ-72: der Geraete-Spot ist nur noch PARAMETER-Traeger (Farbe,
     // Intensitaet, Winkel, Halbschatten, Ziel) und haengt NICHT in der Szene.
     // Echtes Licht geben die Lichter des Spot-Pools (scene/spot_pool.js), die
@@ -485,7 +489,7 @@ export function addFixture(data) {
     scene.add(spotTarget);
     spot.target = spotTarget;
 
-    floorSpot = createFloorSpot(color, intensity, 1.2);
+    floorSpot = createFloorSpot(licht, intensity, 1.2);
     // Wie beim SpotLight: dunkle Boden-Discs gar nicht erst zeichnen.
     floorSpot.visible = settings.showFloorSpots && intensity > 0.01;
     scene.add(floorSpot);
@@ -584,6 +588,9 @@ export function addFixture(data) {
     tiltZero: (data.tiltZero != null) ? data.tiltZero : 128,
     data: { ...data },
   };
+  // VIZ-93: Laserstrahlen bekommen das farbtonerhaltende Tone-Mapping
+  // (vor dem ersten Kompilieren — onBeforeCompile; Kegel/Flecken s. ausbrennen.js).
+  lichtMaterialienMarkieren(fixtures[fid]);
 
   // (Label-Sichtbarkeit setzt der Per-Frame-Zoom-Gate in app.js#perFrameUpdate im
   // ersten gerenderten Frame — updateFixture unten dirtyt, perFrame laeuft davor.)
@@ -670,6 +677,9 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   const f = fixtures[fid];
   if (!f) return;
   const color = new THREE.Color(r/255, g/255, b/255);
+  // VIZ-93: `color` = sRGB-Mass (Schwellen, Icon, Strobe-Merker), `licht` =
+  // dieselbe Farbe linear fuer Materialien und Lichter (lichtfarbe.js).
+  const licht = lichtfarbe(r, g, b);
   const intNorm = intensity / 255;
   const skipBeam = ohneZielrechnung();
   // VIZ-13 3c Teil 2: gebuendelter DMX-Kontext fuer die updateDmx-Handler —
@@ -678,7 +688,7 @@ export function updateFixture(fid, r, g, b, intensity, pan, tilt, heads, extra) 
   // WICHTIG: `color` ist EINE geteilte THREE.Color-Instanz pro Update-Aufruf;
   // die Handler WEISEN sie den Materialien ZU (kein .copy()) — exakt die
   // Instanz-Sharing-Semantik des Monolithen.
-  const dmx = { r, g, b, intensity, pan, tilt, heads, color, intNorm, skipBeam };
+  const dmx = { r, g, b, intensity, pan, tilt, heads, color, licht, intNorm, skipBeam };
   if (extra) {
     if (extra.laser) dmx.laser = extra.laser;   // VIZ-79
     // VIZ-80: ohne Allokation — nur Schluessel auf das ohnehin gebaute Objekt.

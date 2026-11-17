@@ -69,6 +69,7 @@ import { requestRender } from './render_loop.js';
 // Motive und Kegelrand aus gobo_textures.js.
 import { goboTexture, GOBO_STILE, GOBO_RAND, GROESSE as GOBO_KACHEL_PX, syncGoboUnterScheiben } from '../fixtures/gobo_textures.js';
 import { ausbrennNachfuehren } from '../fixtures/ausbrennen.js';   // VIZ-91
+import { srgbKanal } from '../fixtures/lichtfarbe.js';   // VIZ-93
 import {
   installGoboProjektion, baueGoboAtlas, goboProjektionAktiv, goboKachel, goboLichtWinkel,
   goboDrehung, setzeGoboLicht, loescheGoboLicht, GOBO_HALBSCHATTEN, GOBO_MAX_LICHTER,
@@ -321,7 +322,8 @@ export function strahlHelligkeit(f) {
   if (!s || !s.visible || !(s.intensity > 0)) return 0;
   if (f.group && !f.group.visible) return 0;
   const c = s.color;
-  return s.intensity * Math.max(c.r, c.g, c.b);
+  // VIZ-93: s.color ist linear (lichtfarbe.js) — Rangfolge im sRGB-Mass wie vorher.
+  return s.intensity * srgbKanal(Math.max(c.r, c.g, c.b));
 }
 
 const _kand = [];

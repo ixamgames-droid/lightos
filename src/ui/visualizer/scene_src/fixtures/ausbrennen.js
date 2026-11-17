@@ -38,6 +38,7 @@
 "use strict";
 
 import { requestRender } from '../scene/render_loop.js';
+import { lichtTonAnwenden, srgbKanal } from './lichtfarbe.js';   // VIZ-93
 // Zirkulaer mit builders.js (das ausbrennNachfuehren holt) — unbedenklich,
 // beide Seiten lesen die Importe nur in Funktionsruempfen.
 import { beamsSichtbar, fleckSichtbar } from './builders.js';
@@ -95,18 +96,24 @@ export function patchAusbrennShader(fs) {
 
 // Zwei GETRENNTE Funktionen (nicht eine Fabrik): three nimmt
 // onBeforeCompile.toString() in den Programmschluessel.
+// VIZ-93: danach das farbtonerhaltende Tone-Mapping der Lichtmaterialien
+// (lichtfarbe.js) — die Daempfung steht davor, der Anker bleibt dafuer stehen.
 function kegelAusbrennHook(shader) {
   const fs = patchAusbrennShader(shader.fragmentShader);
-  if (fs === null) return;
-  shader.fragmentShader = fs;
-  shader.uniforms.lightosAusbrennen = _kegel;
+  if (fs !== null) {
+    shader.fragmentShader = fs;
+    shader.uniforms.lightosAusbrennen = _kegel;
+  }
+  lichtTonAnwenden(shader);
 }
 
 function fleckAusbrennHook(shader) {
   const fs = patchAusbrennShader(shader.fragmentShader);
-  if (fs === null) return;
-  shader.fragmentShader = fs;
-  shader.uniforms.lightosAusbrennen = _fleck;
+  if (fs !== null) {
+    shader.fragmentShader = fs;
+    shader.uniforms.lightosAusbrennen = _fleck;
+  }
+  lichtTonAnwenden(shader);
 }
 
 export function kegelDaempfen(mat) { if (mat) mat.onBeforeCompile = kegelAusbrennHook; }
@@ -116,7 +123,9 @@ function _anteil(m, voll) {
   const mat = m && m.material;
   if (!mat || !(mat.opacity > 0)) return 0;
   const c = mat.color;
-  const farbe = c ? Math.max(c.r, c.g, c.b) : 1;
+  // VIZ-93: Materialfarbe ist linear (lichtfarbe.js) — die Last bleibt im
+  // sRGB-Mass von vorher (hellster Kanal zurueckgerechnet).
+  const farbe = c ? srgbKanal(Math.max(c.r, c.g, c.b)) : 1;
   return Math.min(1, mat.opacity / voll) * Math.min(1, Math.max(0, farbe));
 }
 

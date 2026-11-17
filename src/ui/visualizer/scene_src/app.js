@@ -78,6 +78,9 @@ import { tickBewegungGlaettung, bewegungGlaettungAktiv, setGlattUhr } from './fi
 import { laserAnimationAktiv, tickLaserAnimation, laserInfo } from './fixtures/laser.js';   // VIZ-79
 import { floorPoolScale, poolFalloffTexture } from './fixtures/floor_pool.js';  // VIZ-15
 import { ausbrennInfo, ausbrennDaempfung, ausbrennSchutz, patchAusbrennShader } from './fixtures/ausbrennen.js';  // VIZ-91
+import { patchLichtTon } from './fixtures/lichtfarbe.js';          // VIZ-93
+import { updateParBarDmx } from './fixtures/builders.js';           // VIZ-93 (Test-Seam)
+import { strahlHelligkeit } from './scene/spot_pool.js';           // VIZ-93 (Test-Seam)
 
 // ── Spaet-Bindungen verdrahten (Design-Dokument "Kern-Gotcha") ─────────────
 // interaction/tools.js hat wireFixturesLateBindings({updateOutlines}) bereits
@@ -366,6 +369,9 @@ window.__lightos = {
   // VIZ-91: Ausbrennschutz — Lasten/Faktoren, reine Kurve, Shader-Patch.
   ausbrennInfo, ausbrennDaempfung, __ausbrennSchutz: ausbrennSchutz,
   __patchAusbrennShader: patchAusbrennShader,
+  // VIZ-93: Farbtonerhaltendes Tone-Mapping der Lichtmaterialien + Seams.
+  __patchLichtTon: patchLichtTon, __updateParBarDmx: updateParBarDmx,
+  __strahlHelligkeit: strahlHelligkeit,
   // VIZ-15 Laengs-Falloff im Kegel: derselbe Gruenkanal-Fallstrick, und
   // zusaetzlich haengt die RICHTUNG an der UV-Orientierung von ConeGeometry
   // (Spitze = v 1) und an CanvasTexture.flipY. Beides gemessen, beides im
