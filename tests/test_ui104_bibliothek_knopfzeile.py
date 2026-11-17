@@ -36,7 +36,7 @@ from PySide6.QtWidgets import QApplication, QPushButton, QWidget
 
 KLEIN = (1000, 480)
 GROSS = (1440, 740)
-_LEISTE = ("Speichern", "Ordner +", "Anwenden", "Chase +", "Löschen", "↻")
+_LEISTE = ("Speichern", "Ordner +", "Anwenden", "Chase +", "Layer +", "Löschen", "↻")
 
 
 def _app() -> QApplication:
@@ -217,9 +217,9 @@ def test_flowlayout_mindesthoehe_folgt_umbruch():
     wirt.show()
     app.processEvents()
     fl.setGeometry(QRect(0, 0, 90, 400))
-    # Sechs Zeilen à 30 px + 5×4 px Abstand.
-    assert fl.heightForWidth(90) == 200
-    assert fl.minimumSize().height() >= 200, fl.minimumSize()
+    # Sieben Zeilen à 30 px + 6×4 px Abstand (FM-79: „Layer +“ dazu).
+    assert fl.heightForWidth(90) == 234
+    assert fl.minimumSize().height() >= 234, fl.minimumSize()
     wirt.close()
 
 
@@ -237,5 +237,7 @@ def test_touch_snapshots_bibliothek_zwei_knoepfe_je_zeile(snapshots_view):
         app.processEvents()
     knoepfe = _knoepfe(snapshots_view._snap_file_panel)
     zeilen = {b.y() for b in knoepfe.values()}
-    assert len(zeilen) <= 3, sorted(zeilen)
+    # FM-79: sieben Knöpfe (mit „Layer +“), zwei je Zeile -> höchstens vier
+    # Zeilen; bei Knopfbreite wären es sieben.
+    assert len(zeilen) <= 4, sorted(zeilen)
     wirt.close()

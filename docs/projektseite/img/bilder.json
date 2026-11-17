@@ -1,7 +1,7 @@
 {
   "anleitung": "projektseite",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py projektseite'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "fa910787b52b74d14fbf8668d40b72ad"
+      "md5": "de679ed4f9a9d105bb7d53a7f1ff98c9"
     },
     {
       "datei": "02_patch.png",
@@ -35,7 +35,7 @@
           "beschriftung": "Adressen automatisch vergeben"
         }
       ],
-      "md5": "2e68cf0b58336355d746e5ba4b79004d"
+      "md5": "e6c4af0b766ab26d8f7ef3a9630293a5"
     },
     {
       "datei": "03_programmer.png",
@@ -59,7 +59,7 @@
           "beschriftung": "Bibliothek"
         }
       ],
-      "md5": "c7fdfc88c78f4917580c0377724286d8"
+      "md5": "2487c4eb71667708c1df1363c623b2ba"
     },
     {
       "datei": "04_vc.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "936a7984ed96292816f73aa43054ec82"
+      "md5": "9eba8c565598322cea2e434d88f54de8"
     },
     {
       "datei": "05_playback.png",
@@ -81,7 +81,7 @@
         900
       ],
       "marken": [],
-      "md5": "383c222b8725b7a828e0331cfe1a7d6b"
+      "md5": "d9e854b590baaa5933a780ed72900382"
     },
     {
       "datei": "06_bpm.png",
@@ -92,7 +92,7 @@
         900
       ],
       "marken": [],
-      "md5": "c5af7318f4c5d4f47b780ab441bb941c"
+      "md5": "e26de7cf4bfdcb8f4b18566122ca83bf"
     },
     {
       "datei": "07_buehne.png",
@@ -103,7 +103,7 @@
         900
       ],
       "marken": [],
-      "md5": "670d5f32af58ccda509a836c1816ece0"
+      "md5": "35c85bb20d5c9a0c7dcc1e5680bd8a0b"
     }
   ]
 }

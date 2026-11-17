@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (QComboBox, QDialog, QHBoxLayout, QLabel, QLayout,
 
 from src.web import handy_verbindung as hv
 from src.web import qr_code
+from src.ui.abbau import abbau_still
 
 RUHEZONE = 4            # Module; die Norm verlangt mindestens vier
 KANTE_GROSS = 300       # Pixel, im Dialog und in der Vergroesserung
@@ -199,6 +200,7 @@ class HandyQrFeld(QWidget):
             self._takt.start()
         self.aktualisiere()
 
+    @abbau_still
     def hideEvent(self, event):
         if not self._klein:
             self._takt.stop()

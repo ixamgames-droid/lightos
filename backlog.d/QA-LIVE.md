@@ -1,0 +1,5 @@
+ID: QA-LIVE
+Status: review
+Status-Notiz: Rest live durchgeklickt (17.11.2026, Linux, echter Fenster-Server, echte Eingaben) — Effect-Layer-Editor 18 Schritte, Web-Remote-Lifecycle 16 Schritte; Folgebefunde WEB-16 und FM-79 als eigene Items
+
+**Live-Durchlauf 17.11.2026:** Effect-Layer-Editor (alle 12 angebotenen Layer-Arten angelegt, Parameter geaendert, Hoch/Runter, Loeschen, Clamp Min groesser Max wird nachgezogen, Play/Stop mit Blick in den DMX-Monitor, Popout viermal auf/zu mit erhaltenem Stand, Speichern und Neuladen mit unveraendertem Effekt) und Web-Remote-Lifecycle (Server aus der App an/aus/wieder an, GO/BACK/STOP/Blackout per Client quittiert und im Pult sichtbar, zweiter Client, Port belegt mit klarer Meldung, Show-Wechsel, App beenden gibt den Port frei) ohne unbenutzbar machenden Befund. Tabellen: docs/FEATURE_VERIFICATION_2026_07_09.md Abschnitt 6. **Folgebefunde:** WEB-16 (Executor-Fader aus dem Web wird im Pult nicht nachgezogen), FM-79 (leerer Layered-Effekt in der Oberflaeche nicht anlegbar).

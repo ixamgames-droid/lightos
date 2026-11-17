@@ -18,6 +18,7 @@ from PySide6.QtWidgets import QDialog, QFormLayout, QSpinBox, QDialogButtonBox, 
 from PySide6.QtCore import Qt, QRect, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QFont
 from .vc_widget import VCWidget
+from src.ui.abbau import abbau_still
 
 
 # Kurze, kompakte Quelle/Modus-Labels fuer die schmale VC-Anzeige (vgl. die
@@ -116,6 +117,7 @@ class VCBpmDisplay(VCWidget):
         except Exception:
             pass
 
+    @abbau_still
     def closeEvent(self, event):
         self._teardown()
         super().closeEvent(event)

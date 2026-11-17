@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QProgressBar,
                                QPushButton, QRadioButton, QVBoxLayout)
 
 from src.core.database import bibliothek_download as BD
+from src.ui.abbau import abbau_still
 
 #: UI-74: Linkfarbe fuer das dunkle Theme — dieselbe wie die Links im
 #: BPM-Manager. Ohne sie zeichnete Qt den Link in der Palettenfarbe
@@ -211,6 +212,7 @@ class BibliothekDownloadDialog(QDialog):
         self._nicht_jetzt_merken()       # beim Erststart wie „Nicht jetzt“ (Review #866)
         super().reject()
 
+    @abbau_still
     def closeEvent(self, ev):
         if self.laeuft():
             self._stopp.set()

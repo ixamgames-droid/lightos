@@ -12,6 +12,7 @@ from src.ui.widgets.flow_layout import FlowLayout
 from src.ui.weak_slots import weak_slot
 from src.ui.virtualconsole.vc_style import touch_aktiv, tz
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still
 
 
 # UI-138 (Klick-Test Fund 4): die Leistenknoepfe hatten per eigenem Stylesheet
@@ -831,6 +832,7 @@ class VirtualConsoleView(QWidget):
                 self._last_function_catalog_signature = sig
             sidebar.refresh()
 
+    @abbau_still
     def closeEvent(self, event):
         """Beim Schliessen den 400-ms-Statusticker stoppen.
 

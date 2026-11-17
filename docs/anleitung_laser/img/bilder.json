@@ -1,7 +1,7 @@
 {
   "anleitung": "laser",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py laser'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "25485c2f0428e1e1f5d7d156f93111d8"
+      "md5": "5447acbea9d3547c1aea03fccddc79b4"
     },
     {
       "datei": "02_statische_muster.png",
@@ -54,7 +54,7 @@
         [],
         []
       ],
-      "md5": "02513f650761c387208f409324cf77f0",
+      "md5": "edd455f83be74ceaf6ea9528e645da73",
       "frames": 5,
       "dauern_ms": [
         1600,

@@ -1,7 +1,7 @@
 {
   "anleitung": "bpm_manager",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py bpm_manager'.",
@@ -15,7 +15,7 @@
         364
       ],
       "marken": [],
-      "md5": "d151f74ef2e5563a5f04337e7fb61239"
+      "md5": "66851072effaf4d0d1c356338693948e"
     },
     {
       "datei": "02_quelle_aus_ablauf.gif",
@@ -29,7 +29,7 @@
         [],
         []
       ],
-      "md5": "01695f8fec0212c75a33163a8e3832ae",
+      "md5": "323bb5055533bc364eed8cb3b244fed2",
       "frames": 2,
       "dauern_ms": [
         1800,

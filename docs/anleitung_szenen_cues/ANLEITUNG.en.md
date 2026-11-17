@@ -61,6 +61,9 @@ tab the quick select **Rot** (red), and in the **Intensity** tab drag the **Dimm
 2. **Ordner +** (folder +) creates a folder first. A new snap lands in the folder that is
    currently marked in the library.
 
+**Layer +** creates an empty layered effect for the currently selected fixtures and opens
+its editor right away (without selected fixtures you only get a hint).
+
 ## 2. Choose channels and name the snap
 
 ![Which channels should be saved?](img/02_kanaele.png)

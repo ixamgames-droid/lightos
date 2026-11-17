@@ -60,6 +60,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
 
 from .vc_style import touch_aktiv
 from .vc_widget import VCWidget
+from src.ui.abbau import abbau_still
 
 _GELB = QColor("#e3b341")
 # UI-136: nach einer Freigabe steht so lange „freigegeben" an der Marke
@@ -689,10 +690,12 @@ class VCRaumPad(VCWidget):
             self.set_position_lock(not self.position_lock)
         event.accept()
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         self._halten_abbrechen()      # verdeckt: das Loslassen kommt nie an
 
+    @abbau_still
     def changeEvent(self, event):
         super().changeEvent(event)
         if (event.type() == QEvent.Type.ActivationChange
