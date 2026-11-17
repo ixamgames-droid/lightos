@@ -25,6 +25,7 @@ from __future__ import annotations
 from PySide6.QtCore import QRect, Qt
 from PySide6.QtWidgets import QToolButton
 from .vc_frame import VCFrame
+from src.ui.abbau import abbau_still
 
 
 class VCEffectEditor(VCFrame):
@@ -364,6 +365,7 @@ class VCEffectEditor(VCFrame):
 
     # ── CPU: Vorschau-Timer an Sichtbarkeit koppeln (off-bank -> Timer aus) ─────
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         if self._preview is not None:

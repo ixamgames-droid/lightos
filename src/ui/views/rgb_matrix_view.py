@@ -28,6 +28,7 @@ from src.ui.head_cell_colors import (
     fixture_cell_color, head_count_suffix, head_counts,
 )
 from src.ui import dialog_hilfe
+from src.ui.abbau import abbau_still
 
 
 # UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
@@ -899,6 +900,7 @@ class RgbMatrixView(QWidget):
             except RuntimeError:
                 pass
 
+    @abbau_still
     def hideEvent(self, event):
         # UI-91: Wer den Reiter verlaesst, hat die frisch angelegte Matrix
         # fertig gebunden — beim Wiederkommen folgt sie nicht mehr von selbst.

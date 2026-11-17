@@ -15,6 +15,7 @@ from PySide6.QtGui import (QPainter, QColor, QFont, QPen, QPainterPath,
 from .vc_widget import VCWidget
 from .vc_style import paint_button_surface, RADIUS as VC_RADIUS
 from src.core.show import vc_assets   # VC-IMG: Button-Hintergrundbild/GIF-Assets
+from src.ui.abbau import abbau_still
 
 _SNAPSHOTS_FILE = os.path.join(app_data_dir(), "snapshots.json")
 
@@ -1526,6 +1527,7 @@ class VCButton(VCWidget):
         """VCB-11: eigenen gezielten Blackout freigeben (no-op wenn keiner)."""
         _clear_target_blackout_slot(id(self))
 
+    @abbau_still
     def hideEvent(self, event):
         super().hideEvent(event)
         # VCB-11: BEWUSST keine Teil-Blackout-Freigabe hier. hideEvent kommt auch,

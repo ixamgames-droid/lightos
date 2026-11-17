@@ -308,7 +308,9 @@ def _bild_hauptfenster(ui):
     menues.translate(mb.mapTo(w, menues.topLeft()) - menues.topLeft())
     status = vereinigung([rechteck(w, x) for x in (w._lbl_enttec, w._lbl_fixtures)])
     return bild(ui, kreise=[
-        (menues, 1, "rechts"),
+        # fester Versatz: rechts neben der Menueleiste (die Suche legte den
+        # Kreis sonst auf „Hilfe“, seit das Menue „Befehl“ schmaler ist)
+        (menues, 1, (menues.width() // 2 + 26, 0)),
         (rechteck(w, w._tab_container), 2, "rechts"),
         (rechteck(w, w._slider_gm.parentWidget()), 3, "unten"),
         (rechteck(w, knopf(w, "TAP")), 4, "unten"),

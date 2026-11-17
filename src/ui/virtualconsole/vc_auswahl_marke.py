@@ -35,6 +35,7 @@ from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QWidget
 
 from src.ui.virtualconsole.vc_style import touch_aktiv
+from src.ui.abbau import abbau_still_filter
 
 AKZENT = QColor("#ffb000")          # Bernstein: weder Drop-Gruen/-Rot noch Edit-Blau
 KONTUR = QColor("#0d1117")
@@ -144,6 +145,7 @@ class AuswahlMarke(QWidget):
                 x.installEventFilter(self)
         self._beobachtet = neu
 
+    @abbau_still_filter
     def eventFilter(self, obj, ev):                      # noqa: N802 (Qt)
         t = ev.type()
         if obj is self._canvas:

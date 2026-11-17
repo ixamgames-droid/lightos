@@ -1,7 +1,7 @@
 {
   "anleitung": "externe_pulte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py externe_pulte'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "05caf2b6b53db69196b71cb0359eb77e"
+      "md5": "b53e0d8b6b682dee60bd0e71d5548d07"
     }
   ]
 }

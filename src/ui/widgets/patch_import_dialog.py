@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 
 from src.core import patch_tabelle as T
 from src.ui.widgets import dialog_groesse
+from src.ui.abbau import abbau_still_filter
 
 TITEL = "Patch aus Tabelle importieren"
 DATEI_FILTER = "Tabellen (*.csv *.txt *.tsv);;Alle Dateien (*)"
@@ -435,6 +436,7 @@ class PatchImportDialog(QDialog):
         super().showEvent(event)
         self._zeilenhoehen()
 
+    @abbau_still_filter
     def eventFilter(self, objekt, event):
         # Auf die Groesse der TABELLE hoeren, nicht auf die des Dialogs: erst
         # wenn das Layout sie gesetzt hat, stimmt die Breite, aus der gerechnet

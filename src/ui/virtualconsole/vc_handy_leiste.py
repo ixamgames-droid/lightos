@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (QColorDialog, QDialog, QDialogButtonBox, QGridLay
                                QVBoxLayout, QWidget)
 
 from src.core import handy_seiten as hs
+from src.ui.abbau import abbau_still, abbau_still_filter
 
 #: Kleinste Trefferflaeche fuer Finger (Knoepfe, Reiter, Kacheln).
 TREFFER = 36
@@ -306,6 +307,7 @@ class HandyGruppeDialog(QDialog):
         else:
             self.grund_hinweis.hide()
 
+    @abbau_still_filter
     def eventFilter(self, obj, ev):                      # noqa: N802 (Qt)
         try:
             if (obj is self.liste.viewport()
@@ -1475,6 +1477,7 @@ class HandyKonsolenLeiste(QWidget):
         self.aktualisiere()
         self._verbindung_zeigen()
 
+    @abbau_still
     def hideEvent(self, event):
         self._takt.stop()
         self.raster.zeige_fremd(None)

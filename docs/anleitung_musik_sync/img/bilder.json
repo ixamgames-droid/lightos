@@ -1,7 +1,7 @@
 {
   "anleitung": "musik_sync",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "3a9e7ca3",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py musik_sync'.",
@@ -15,7 +15,7 @@
         900
       ],
       "marken": [],
-      "md5": "b33d9f183f14415b6520a871186b13cc"
+      "md5": "b964c2dc7dce173bf876b758266bbc3f"
     },
     {
       "datei": "02_autoshow_fuer_lied.png",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "a905183cf573276132f67dab50d1f3b9"
+      "md5": "5d008b79fa5b80355e4a172889dee0cd"
     },
     {
       "datei": "03_play_vc.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "2251139a9f2d3f0f4fcb1b9452c2a414"
+      "md5": "3aec33118f7bf0ce202236a10b449b9a"
     },
     {
       "datei": "04_bpm_quelle.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "e07ef742fb8a304dcffc702b2d55d08a"
+      "md5": "abb1aed5ce49f1ca529b4399676c2d3e"
     },
     {
       "datei": "05_takt_hinweis.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "003dbac45a2a25cc11c3df997102ec57"
+      "md5": "14415c69e8d027f44daf9152b7762464"
     }
   ]
 }

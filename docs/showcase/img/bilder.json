@@ -1,7 +1,7 @@
 {
   "anleitung": "showcase",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "58884624",
+  "stand": "62a8aa7f",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py showcase'.",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "e7265a3b8cda8c6edb32c21d40b3a172"
+      "md5": "a18f4e56e9b2e2a356203d1bdbcd6ac5"
     },
     {
       "datei": "club_03_groove.png",
@@ -133,7 +133,7 @@
         900
       ],
       "marken": [],
-      "md5": "3779f7537e3490e389b346b50834afe5"
+      "md5": "8cb43f6ab9e3567d5d486f29c868c6b3"
     },
     {
       "datei": "theater_03_rede.png",
