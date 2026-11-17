@@ -73,7 +73,7 @@ Doppelklick (im Bearbeiten-Modus) öffnet den Dialog „Fader Einstellungen". De
 | Modus | Wirkung |
 |---|---|
 | **DMX-Kanal (Level)** | Schreibt den Wert direkt auf einen festen DMX-Kanal im gewählten Universum (0–255). Das Universum wird bei Bedarf automatisch angelegt. |
-| **Playback (Executor)** | Setzt den Fader-Wert (0–100 %) eines Playback-Executors. Die Slot-Nummer ist der Executor-Index. |
+| **Playback (Executor)** | Setzt den Fader-Wert (0–100 %) eines Playback-Executors. Die Slot-Nummer ist der Executor-Index. Ändert jemand den Pegel von außen (Fernbedienung, OSC, MIDI, Executor-Leiste), zieht der Fader ihn binnen einer knappen halben Sekunde nach – nur als Anzeige, ohne etwas zurückzuschicken, und nicht, solange du ihn hältst oder die Konsole bearbeitest (VCB-50). |
 | **Submaster** | Setzt einen Output-Submaster (0–100 %) – multiplikativ, kombiniert sich sauber mit Grand Master und Gruppen-Dimmer. Jeder Fader hat seinen **eigenen** Submaster-Slot; zwei Submaster-Fader auf denselben Geräten multiplizieren sich also, statt sich zu überschreiben. Auf welche Geräte (oder Köpfe) er wirkt, legt die *Reichweite* fest. |
 | **Grand Master** | Steuert die globale Gesamthelligkeit der gesamten Ausgabe (0–100 %). |
 | **Programmer-Attribut** | Setzt ein Programmer-Attribut (Standard `intensity`) auf den betroffenen Fixtures. Welche Fixtures: siehe *Reichweite*. |

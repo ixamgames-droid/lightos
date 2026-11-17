@@ -425,6 +425,17 @@ class PatchFixtureEditDialog(QDialog):
         # ("Pixel Flip"). Nur fuer Matrix-Panels: bei allem anderen gibt es keine
         # Pixel-Reihenfolge, ein Feld dort waere eine Behauptung.
         self._combo_pixel_order = None
+        # FM-21 (a): kennt das Profil die Rasterform (passend zur Kopfzahl),
+        # legt LightOS die Auto-Gruppe gleich als Rechteck mit Nummerierung und
+        # Montage an — dann sagen Hinweis und Tooltip das statt „bleibt 1xN“.
+        try:
+            from src.core.app_state import kopf_rasterform
+            _form = kopf_rasterform(self._fixture, _heads)
+        except Exception:
+            _form = None
+        _form_bekannt = _form is not None
+        _hat_auto = str(getattr(self._fixture, "head_mode", "auto")
+                        or "auto") != "single"
         if (getattr(self._fixture, "fixture_type", "") or "") == "matrix":
             self._combo_pixel_order = QComboBox()
             for _key in PIXEL_ORDERS:
@@ -448,12 +459,24 @@ class PatchFixtureEditDialog(QDialog):
                 # schritt hier drin und der ganze Absatz nur bei >= 2 Koepfen: bei
                 # einem Kopf gaebe es weder das Menue noch das Raster, der Satz
                 # waere eine Behauptung ueber etwas, das dieses Geraet nicht hat.
-                _tip += (
-                    "\n\nAm GERAET wirkt die Wahl erst ueber ein Raster, das mit\n"
-                    "ihr gebaut wurde: das Geraet als GANZES in eine Rasterzelle,\n"
-                    "dann Rechtsklick → „aufteilen …“ → „als Block…“. Sonst laeuft\n"
-                    "ein horizontales Lauflicht dort weiter im Zickzack, obwohl die\n"
-                    "3D-Vorschau bereits umspringt.")
+                if _form_bekannt:
+                    # FM-21 (a): mit hinterlegter Rasterform baut LightOS die
+                    # Auto-Gruppe selbst mit dieser Wahl — und fragt beim
+                    # Speichern, ob eine vorhandene neu aufgebaut werden soll.
+                    _tip += (
+                        "\n\nAm GERAET wirkt die Wahl ueber das Raster der Gruppe,\n"
+                        "die der Matrix-Effekt benutzt. Die automatische Gruppe\n"
+                        "„… · Köpfe“ wird damit gebaut; nach einer Aenderung fragt\n"
+                        "LightOS beim Speichern, ob sie neu aufgebaut werden soll.\n"
+                        "Fuer eigene Gruppen: das Geraet als GANZES in eine\n"
+                        "Rasterzelle, dann Rechtsklick → „aufteilen …“ → „als Block…“.")
+                else:
+                    _tip += (
+                        "\n\nAm GERAET wirkt die Wahl erst ueber ein Raster, das mit\n"
+                        "ihr gebaut wurde: das Geraet als GANZES in eine Rasterzelle,\n"
+                        "dann Rechtsklick → „aufteilen …“ → „als Block…“. Sonst laeuft\n"
+                        "ein horizontales Lauflicht dort weiter im Zickzack, obwohl die\n"
+                        "3D-Vorschau bereits umspringt.")
             self._combo_pixel_order.setToolTip(_tip)
             form.addRow("Pixel-Reihenfolge:", self._combo_pixel_order)
 
@@ -532,15 +555,36 @@ class PatchFixtureEditDialog(QDialog):
             # Dinge, die es nicht gibt. Darum `_heads >= 2`: das ist genau die
             # Schwelle, ab der `_build_cell_menu` das Aufteilen anbietet.
             if _heads >= 2:
-                _hinweis = QLabel(
-                    "Wirkt in der 3D-Vorschau — und am Gerät erst über ein "
-                    "Raster, das damit gebaut wurde: Tab „Fixture-Gruppen“, das "
-                    "Gerät als GANZES auf eine Rasterzelle ziehen (in der beim "
-                    "Patchen angelegten Gruppe „… · Köpfe“ steht in jeder Zelle "
-                    "nur EIN Kopf — dort erst Rechtsklick → „… zu einer Zelle "
-                    "zusammenfassen“), dann Rechtsklick auf diese Zelle → "
-                    "„aufteilen …“ → „als Block…“. Die Gruppe „… · Köpfe“ selbst "
-                    "bleibt EINE Reihe und ändert sich dadurch nicht.")
+                # FM-21 (a): drei ehrliche Fassungen. Mit hinterlegter
+                # Rasterform folgt die Auto-Gruppe der Wahl selbst; ohne Form
+                # bleibt sie EINE Reihe; bei „Als EINE Lampe“ gibt es keine
+                # Auto-Gruppe — dann wird sie auch nicht erwaehnt.
+                _weg = ("Tab „Fixture-Gruppen“, das Gerät als GANZES auf eine "
+                        "Rasterzelle ziehen{zwischen}, dann Rechtsklick auf "
+                        "diese Zelle → „aufteilen …“ → „als Block…“.")
+                _zwischen = (" (in der beim Patchen angelegten Gruppe „… · Köpfe“ "
+                             "steht in jeder Zelle nur EIN Kopf — dort erst "
+                             "Rechtsklick → „… zu einer Zelle zusammenfassen“)")
+                if not _hat_auto:
+                    _text = ("Wirkt in der 3D-Vorschau — und am Gerät erst über "
+                             "ein Raster, das damit gebaut wurde: "
+                             + _weg.format(zwischen=""))
+                elif _form_bekannt:
+                    _text = (
+                        "Wirkt in der 3D-Vorschau und in der beim Patchen "
+                        f"angelegten Gruppe „… · Köpfe“: LightOS legt sie als "
+                        f"{_form[0]} × {_form[1]}-Raster nach Pixel-Reihenfolge "
+                        "und Montage an und fragt nach einer Änderung beim "
+                        "Speichern, ob sie neu aufgebaut werden soll. Für ein "
+                        "eigenes Raster: " + _weg.format(zwischen=_zwischen))
+                else:
+                    _text = ("Wirkt in der 3D-Vorschau — und am Gerät erst über "
+                             "ein Raster, das damit gebaut wurde: "
+                             + _weg.format(zwischen=_zwischen)
+                             + " Die Gruppe „… · Köpfe“ selbst bleibt EINE Reihe "
+                             "(für dieses Gerät ist keine Rasterform hinterlegt) "
+                             "und ändert sich dadurch nicht.")
+                _hinweis = QLabel(_text)
                 _hinweis.setWordWrap(True)
                 _hinweis.setStyleSheet("color:#8b949e;")
                 form.addRow("", _hinweis)
@@ -569,9 +613,11 @@ class PatchFixtureEditDialog(QDialog):
             _btn_restore.setToolTip(
                 "Legt die Pro-Kopf-Matrix-Gruppe für dieses Gerät (wieder) an.\n"
                 "Wirkt SOFORT (unabhängig von „Speichern\"/„Abbrechen\" unten).\n"
-                "Idempotent und nicht-destruktiv: existiert bereits eine Gruppe,\n"
-                "die diese Köpfe adressiert, bleibt sie unverändert — es entsteht\n"
-                "kein Duplikat.")
+                "Idempotent: existiert bereits eine Gruppe, die diese Köpfe\n"
+                "adressiert, entsteht kein Duplikat. Weicht die automatische\n"
+                "Gruppe vom Raster ab, das LightOS heute anlegen würde (gespeicherte\n"
+                "Pixel-Reihenfolge/Montage/Rasterform), fragt LightOS, ob sie neu\n"
+                "aufgebaut werden soll — „Nein\" lässt sie unverändert.")
             _btn_restore.clicked.connect(self._restore_head_group)
             _row.addWidget(self._lbl_head_group, 1)
             _row.addWidget(_btn_restore)
@@ -776,7 +822,50 @@ class PatchFixtureEditDialog(QDialog):
             state.create_head_matrix_group(bound if bound is not None else self._fixture)
         except Exception as e:
             print(f"[patch] Kopf-Matrix-Gruppe wiederherstellen: {e}")
+        # FM-21: steht die Auto-Gruppe schon da, aber in einem anderen Raster
+        # als die Automatik heute baute (alte 1xN-Gruppe, Rasterform erst im
+        # Profil nachgetragen), hier dieselbe Rueckfrage wie nach dem Speichern.
+        if fid is not None:
+            auto_kopfgruppe_nachfragen(self, state, fid)
         self._update_head_group_status()
+
+
+def auto_kopfgruppe_frage(name: str, unveraendert: bool) -> str:
+    """FM-21: Text der Rueckfrage. Wurde die Gruppe nicht umgebaut, reicht die
+    kurze Fassung; sonst wird gesagt, was verloren geht."""
+    text = f"Die automatische Gruppe „{name}“ neu aufbauen?"
+    if unveraendert:
+        return (text + "\n\nSie wird nach der neuen Pixel-Reihenfolge, "
+                "Montage bzw. Rasterform angeordnet.")
+    return text + " Eigene Änderungen an dieser Gruppe gehen dabei verloren."
+
+
+def auto_kopfgruppe_nachfragen(parent, state, fid, alt_soll=None) -> bool:
+    """FM-21 (Entscheidung 17.11.2026): weicht die Auto-Gruppe „… · Köpfe“
+    nach einer Aenderung von Nummerierung, Montage oder Rasterform vom neu
+    berechneten Raster ab, FRAGEN — „Nein“ ist vorgewaehlt und laesst alles,
+    wie es ist. Bei „Ja“ baut der Kern das Raster neu (eigener
+    Rueckgaengig-Schritt; der Aufrufer fasst ihn mit der Feldaenderung
+    zusammen). Rueckgabe: ob neu aufgebaut wurde."""
+    try:
+        befund = state.auto_kopfgruppe_abweichung(fid, alt_soll)
+    except Exception as e:
+        print(f"[patch] Auto-Gruppe pruefen: {e}")
+        return False
+    if not befund:
+        return False
+    antwort = QMessageBox.question(
+        parent, "Automatische Gruppe neu aufbauen?",
+        auto_kopfgruppe_frage(befund.get("name", ""), befund.get("unveraendert", False)),
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        QMessageBox.StandardButton.No)
+    if antwort != QMessageBox.StandardButton.Yes:
+        return False
+    try:
+        return bool(state.auto_kopfgruppe_neu_aufbauen(fid))
+    except Exception as e:
+        print(f"[patch] Auto-Gruppe neu aufbauen: {e}")
+        return False
 
 
 class PatchView(QWidget):
@@ -1178,18 +1267,35 @@ class PatchView(QWidget):
         dlg = PatchFixtureEditDialog(self._state, fixture, self)
         with dialog_hilfe.offen(dlg):
             if dlg.exec() and dlg.result_updates:
-                self._state.update_fixture(fixture.fid, **dlg.result_updates)
-                # FM-HEADLAYOUT: Modus „Köpfe einzeln" -> Kopf-Matrix-Gruppe NACH dem
-                # Persistieren aus dem FRISCHEN Patch-Objekt anlegen (Label/Modus/
-                # Kanalzahl sind dann aktuell; idempotent, nicht-destruktiv).
-                if getattr(dlg, "wants_head_group", False):
-                    fresh = next((f for f in self._state.get_patched_fixtures()
-                                  if f.fid == fid), None)
-                    if fresh is not None:
-                        try:
-                            self._state.create_head_matrix_group(fresh)
-                        except Exception as e:
-                            print(f"[patch] Kopf-Matrix-Gruppe anlegen: {e}")
+                # FM-21: das Soll-Raster der Auto-Gruppe VOR der Aenderung —
+                # nur so laesst sich danach sagen, ob die Aenderung es
+                # verschoben hat und ob die Gruppe noch die alte Automatik ist.
+                try:
+                    alt_soll = self._state.kopfgruppe_soll(fixture)
+                except Exception:
+                    alt_soll = None
+                # Feldaenderung und ggf. Neuaufbau = EIN Rueckgaengig-Schritt.
+                try:
+                    from src.core.undo import get_undo_stack
+                    schritt = get_undo_stack().gruppe(
+                        f"Fixture ~{getattr(fixture, 'label', '')}")
+                except Exception:
+                    schritt = nullcontext()
+                with schritt:
+                    self._state.update_fixture(fixture.fid, **dlg.result_updates)
+                    # FM-HEADLAYOUT: Modus „Köpfe einzeln" -> Kopf-Matrix-Gruppe NACH dem
+                    # Persistieren aus dem FRISCHEN Patch-Objekt anlegen (Label/Modus/
+                    # Kanalzahl sind dann aktuell; idempotent, nicht-destruktiv).
+                    if getattr(dlg, "wants_head_group", False):
+                        fresh = next((f for f in self._state.get_patched_fixtures()
+                                      if f.fid == fid), None)
+                        if fresh is not None:
+                            try:
+                                self._state.create_head_matrix_group(fresh)
+                            except Exception as e:
+                                print(f"[patch] Kopf-Matrix-Gruppe anlegen: {e}")
+                    if alt_soll is not None:
+                        auto_kopfgruppe_nachfragen(self, self._state, fid, alt_soll)
 
     def _profil_id_an_zeile(self, row: int) -> int | None:
         """UI-74: Profil-ID des gepatchten Geraets in Zeile ``row``."""

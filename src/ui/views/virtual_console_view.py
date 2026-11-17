@@ -672,6 +672,9 @@ class VirtualConsoleView(QWidget):
         self._active_fx_timer = QTimer(self)
         self._active_fx_timer.setInterval(400)
         self._active_fx_timer.timeout.connect(self._update_active_fx)
+        # VCB-50: im selben Statustakt die VC-Fader im Modus „Playback
+        # (Executor)" auf einen Pegel von aussen ziehen — kein eigener Timer.
+        self._active_fx_timer.timeout.connect(self._vc_pegel_nachziehen)
         self._active_fx_timer.start()
 
         # ── Splitter: Canvas links, Sidebar rechts ────────────────────────────
@@ -1008,6 +1011,27 @@ class VirtualConsoleView(QWidget):
         btn.setMinimumWidth(breite + 2)
 
     # ── Edit mode ────────────────────────────────────────────────────────────
+
+    def _vc_pegel_nachziehen(self):
+        """VCB-50: VC-Fader im Modus PLAYBACK zeigen einen Executor-Pegel, der
+        von aussen kam (Web/OSC/MIDI/Executor-Leiste). Nur Anzeige, Details in
+        ``VCSlider.pegel_nachziehen``; im Bearbeiten-Modus nichts."""
+        if not self._canvas_alive():
+            return
+        canvas = self._canvas
+        if getattr(canvas, "_edit_mode", False):
+            return
+        try:
+            from src.ui.virtualconsole.vc_slider import SliderMode, VCSlider
+            fader = canvas.findChildren(VCSlider)
+        except RuntimeError:
+            return
+        for w in fader:
+            try:
+                if w.mode == SliderMode.PLAYBACK:
+                    w.pegel_nachziehen()
+            except Exception as e:
+                print(f"[VC] Pegel nachziehen: {type(e).__name__}: {e}")
 
     def _canvas_alive(self) -> bool:
         """True, wenn das C++-Objekt des Canvas noch existiert (gegen

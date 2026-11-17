@@ -18,7 +18,7 @@ nachgezogen werden muss.
 Drei Aussagen der Anleitung haengen an dieser Pruefung:
 
 1. **Beschriftungen** — jedes „…"-Zitat muss in der Oberflaeche vorkommen.
-2. **Zahlen** — „48 einzeln färbbare Zonen", „1 Zeile × 48 Zellen" und
+2. **Zahlen** — „48 einzeln färbbare Zonen", „4 Zeilen × 12 Zellen" und
    „12 Spalten × 4 Zeilen" werden am realen Ergebnis nachgemessen.
 3. **Namen** — Ordner der Auto-Gruppe und der zusammengelegten Gruppe, sowie der
    Namenszusatz der Auto-Gruppe, kommen aus der DB und muessen im Text stehen.
@@ -65,7 +65,10 @@ _ZITAT = re.compile("„([^„\"\n]+)\"")
 # ist. Als Konstanten, damit Pruefung und Parser-Test dasselbe Muster benutzen —
 # baut ein Test seine eigene Kopie, misst er am Ende nur sich selbst (QA-52).
 MUSTER_ZONEN = r"\*\*(\d+) einzeln färbbare Zonen\*\*"
-MUSTER_AUTO_RASTER = r"\*\*(\d+) Zeile × (\d+) Zellen\*\*"
+# FM-21 (a): seit 17.11.2026 ist die Auto-Gruppe eines Panels mit
+# hinterlegter Rasterform ein Rechteck („4 Zeilen × 12 Zellen“), vorher
+# „1 Zeile × 48 Zellen“ — das Muster nimmt beide Schreibweisen.
+MUSTER_AUTO_RASTER = r"\*\*(\d+) Zeilen? × (\d+) Zellen\*\*"
 MUSTER_PHYSISCH = r"\*\*(\d+) Spalten × (\d+) Reihen\*\*"
 MUSTER_EINGABE = r"Für den Balken \*\*(\d+)\*\* eintragen"
 MUSTER_BLOCK = r"Ergebnis: \*\*(\d+) Spalten × (\d+) Zeilen\*\*"
@@ -503,7 +506,12 @@ class AnleitungGegenOberflaecheTest(unittest.TestCase):
         self.assertTrue(quellen.issubset(set(self._gruppen_ids())),
                         "die Quellgruppen sind verschwunden — die Anleitung "
                         "sagt, sie bleiben erhalten")
-        self.assertEqual(rows, 2, "gestapelt wird untereinander (1+1 Zeile)")
+        # Gestapelt wird untereinander: die Auto-Gruppe (seit FM-21 (a) 4
+        # Zeilen) plus die einzeilige PAR-Gruppe.
+        _gid, _name, _cols, auto_rows, _folder = self._auto_gruppe()
+        self.assertEqual(auto_rows, 4)
+        self.assertEqual(rows, auto_rows + 1,
+                         "gestapelt wird untereinander (4 + 1 Zeilen)")
 
     def test_abgebrochener_dialog_legt_nichts_an(self):
         """Gegenprobe zum Test darueber: ohne Auswahl darf nichts entstehen —

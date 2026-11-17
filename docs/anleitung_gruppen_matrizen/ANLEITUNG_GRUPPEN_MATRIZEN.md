@@ -55,19 +55,36 @@ der Show-Datei):
 
 * **Name:** *Geräte-Label* + ` · Köpfe` — im Beispiel `LED-Balken · Köpfe`
 * **Ordner:** `Multi-Head`
-* **Raster:** **1 Zeile × 48 Zellen** — jede Zelle ist **ein Kopf**, nicht das Gerät.
+* **Raster:** **4 Zeilen × 12 Zellen** — jede Zelle ist **ein Kopf**, nicht das Gerät.
 
 ```
-Automatische Kopf-Gruppe (1 × 48):
+Automatische Kopf-Gruppe des Balkens (12 Spalten × 4 Zeilen, zeilenweise gezählt):
 ┌────┬────┬────┬─────────────────────────────┬────┐
-│ K1 │ K2 │ K3 │  …                          │K48 │
+│ K1 │ K2 │ K3 │  …                          │K12 │
+├────┼────┼────┼─────────────────────────────┼────┤
+│K13 │K14 │K15 │  …                          │K24 │
+├────┼────┼────┼─────────────────────────────┼────┤
+│ …  │    │    │                             │    │
+├────┼────┼────┼─────────────────────────────┼────┤
+│K37 │K38 │K39 │  …                          │K48 │
 └────┴────┴────┴─────────────────────────────┴────┘
 ```
 
-★ **Warum das für ein Panel noch nicht reicht:** Matrix-Effekte lesen das Raster als
-*Fläche*. Ein 1×48-Streifen ist eine Linie — jeder Flächeneffekt läuft darauf als
-Lauflicht in einer Reihe. Für den Balken willst du 12 × 4. Genau das machen die
-Abschnitte 3 und 4.
+Die Form kommt aus dem Fixture-Profil (Feld *Pixel-Raster:*, beim ZQ06121 4×12). Wie die
+Köpfe darin liegen, bestimmen die Angaben **„Pixel-Reihenfolge:"** und
+**„Montage-Drehung:"** aus dem Dialog *Gerät bearbeiten* (siehe unten) — dieselbe Rechnung
+wie bei „als Block…". Ein Panel, das in Schlangenlinien zählt oder hochkant hängt, liegt
+damit schon in der Auto-Gruppe richtig.
+
+★ **Ohne hinterlegte Form** (Spider, Mover-Bar, Hydrabeam oder ein Panel, dessen Profil
+keine Rasterform trägt) bleibt es bei **einer Zeile** mit einer Zelle je Kopf in
+DMX-Reihenfolge. Matrix-Effekte lesen das Raster als *Fläche* — auf einem Streifen läuft
+jeder Flächeneffekt als Lauflicht in einer Reihe. Ein Rechteck legst du dann selbst, wie
+in den Abschnitten 3 und 4 beschrieben.
+
+★ **Ältere Shows** behalten ihre Gruppen, wie sie gespeichert sind — auch eine
+Auto-Gruppe, die noch als eine Zeile entstanden ist. Beim Öffnen wird nichts umgebaut
+und nichts gefragt.
 
 ### Ausnahme: Pixel-Köpfe (LED-Ring) bekommen gleich ein Ring-Raster
 
@@ -178,12 +195,25 @@ Bei **Panels** (Gerätetyp Matrix) kommen drei Angaben zur Geometrie dazu:
 * **„Montage-Drehung:"** — 0° / 90° / 180° / 270°, und
   **„Waagerecht gespiegelt montiert"**. Das ist eine Aussage über die **Montage**.
 
-★ **Ehrlich dazu, damit du nicht darauf wartest:** Diese drei Angaben wirken **nicht**
-auf die automatische Kopf-Gruppe — die entsteht immer als 1×N, egal was hier steht. Sie
-wirken, sobald die Köpfe als **Rechteck** ins Raster gelegt werden — über „als Block…" oder
-„wie im Gerät hinterlegt", per Rechtsklick wie per Knopf (Abschnitte 3 und 4) — und in der
-3D-Vorschau. Wer sie
-umstellt und nur die Auto-Gruppe ansieht, sieht deshalb keinen Unterschied.
+Diese drei Angaben wirken in der 3D-Vorschau, überall dort, wo die Köpfe als
+**Rechteck** ins Raster gelegt werden — über „als Block…" oder „wie im Gerät
+hinterlegt", per Rechtsklick wie per Knopf (Abschnitte 3 und 4) — und in der
+automatischen Kopf-Gruppe, sofern das Profil eine Rasterform kennt.
+
+**Nachträglich geändert?** Stellst du Pixel-Reihenfolge oder Montage um, nachdem das Gerät
+gepatcht ist, fragt LightOS beim Speichern: *Die automatische Gruppe „Balken · Köpfe“ neu
+aufbauen?* — **Nein ist vorgewählt**.
+
+* **Nein:** Die Gruppe bleibt genau, wie sie ist; nur die Angabe am Gerät ändert sich.
+* **Ja:** Die Gruppe wird nach der neuen Angabe neu angeordnet (Name, Ordner und
+  Mitglieder bleiben). Hast du die Gruppe selbst umgebaut, sagt die Frage dazu, dass
+  diese eigenen Änderungen dabei verloren gehen.
+* **Strg+Z** nimmt beides in **einem** Schritt zurück — die Angabe am Gerät und das
+  Raster der Gruppe.
+
+Dieselbe Frage stellt der Knopf „Wiederherstellen", wenn die vorhandene Auto-Gruppe vom
+heutigen Raster abweicht — etwa bei einer älteren Show mit einzeiliger Auto-Gruppe oder
+wenn die Rasterform erst später im Profil eingetragen wurde.
 
 ---
 
@@ -281,7 +311,8 @@ Dabei gilt:
 * Beim Rechteck — „als Block…" oder „wie im Gerät hinterlegt", per Rechtsklick wie per
   Knopf — wirken **„Pixel-Reihenfolge:"** und **„Montage-Drehung:"** aus Abschnitt 1: ein
   Panel, das ab Werk in Schlangenlinien zählt oder hochkant hängt, landet ohne Handarbeit
-  richtig im Raster. „als Zeile", „als Spalte" und die Auto-Gruppe ignorieren sie.
+  richtig im Raster. Für die Auto-Gruppe gilt dasselbe, sobald das Profil eine
+  Rasterform kennt (Abschnitt 1); „als Zeile" und „als Spalte" ignorieren sie.
 * Eine Zelle, in der schon ein **anderes** Gerät steht, wird **nicht** überschrieben —
   der betroffene Kopf weicht auf die nächste freie Zelle aus. Ist das Raster voll,
   bleibt der Rest ungesetzt und LightOS sagt, wie viele Elemente untergekommen sind.
@@ -431,7 +462,8 @@ ein Effekt dann als Fläche läuft.
 
 ---
 
-**Kurz:** Gerät patchen → LightOS legt *Label* ` · Köpfe` als 1×N an → Tab
+**Kurz:** Gerät patchen → LightOS legt *Label* ` · Köpfe` an (mit hinterlegter Form
+gleich als Rechteck, z. B. 12 × 4, sonst als eine Zeile) → für eine eigene Gruppe Tab
 **Fixture-Gruppen** → Gerät als **eine** Zelle ins Raster ziehen → **Rechtsklick** →
 „aufteilen (48 Elemente)" → „als Block…" → 12 Spalten → **12 × 4** → „Speichern".
 Zurück per Rechtsklick → „zu einer Zelle zusammenfassen". Beides geht auch links über
