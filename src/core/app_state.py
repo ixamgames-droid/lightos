@@ -5630,7 +5630,7 @@ class AppState:
         if _zeichen_ebene.EBENEN.aktiv():
             try:
                 _zeichen_ebene.EBENEN.anwenden(scratch, fix_index,
-                                               nutzt_dmx=fixture_uses_dmx)
+                                               fixture_uses_dmx=fixture_uses_dmx)
             except Exception as exc:
                 print(f"[AppState] render zeichen-ebene error: {exc}")
 

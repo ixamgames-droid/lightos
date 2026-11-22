@@ -82,7 +82,7 @@ class ZeichenEbenen:
         with self._lock:
             return self._ebenen.get(besitzer)
 
-    def anwenden(self, scratch: dict, fix_index: dict, nutzt_dmx=None) -> None:
+    def anwenden(self, scratch: dict, fix_index: dict, fixture_uses_dmx=None) -> None:
         """Alle Ebenen in die Scratch-Universen mischen (Reihenfolge: Einfuege-
         Reihenfolge der Besitzer). ``fix_index``: ``{fid: (fixture, kanaele)}``
         wie im Renderer."""
@@ -96,7 +96,7 @@ class ZeichenEbenen:
                 if not entry:
                     continue
                 fx, chans = entry
-                if nutzt_dmx is not None and not nutzt_dmx(fx):
+                if fixture_uses_dmx is not None and not fixture_uses_dmx(fx):   # QA-78 Adressregel
                     continue
                 su = scratch.get(fx.universe)
                 if su is None:
