@@ -321,6 +321,7 @@ def test_doppeltippen_schaltet_nur_einmal(ansicht, monkeypatch):
 def test_zwei_getrennte_druecke_schalten_an_und_aus(ansicht, monkeypatch):
     log = _zaehlen(monkeypatch)
     v = ansicht
+    monkeypatch.setattr(type(v), "APC_SPERRE_S", 0.0)
     hints = QApplication.styleHints()
     alt = hints.mouseDoubleClickInterval()
     hints.setMouseDoubleClickInterval(1)
@@ -333,6 +334,30 @@ def test_zwei_getrennte_druecke_schalten_an_und_aus(ansicht, monkeypatch):
         QTest.mouseClick(k, Qt.MouseButton.LeftButton)
         assert log == ["an", "aus"]
         assert not k.isChecked() and v._apc_feedback is None
+    finally:
+        hints.setMouseDoubleClickInterval(alt)
+
+
+def test_zweites_umschalten_0_7_s_nach_einem_fingertipp_wird_ignoriert(ansicht, monkeypatch):
+    """Geraeteprobe 22.11.2026 (echter Touchscreen, X11): EIN Fingertipp ergab
+    aus → an mit 0,6–0,8 s Abstand — laenger als das Doppelklick-Fenster.
+    Das zweite Umschalten innerhalb APC_SPERRE_S muss verworfen werden."""
+    log = _zaehlen(monkeypatch)
+    v = ansicht
+    hints = QApplication.styleHints()
+    alt = hints.mouseDoubleClickInterval()
+    hints.setMouseDoubleClickInterval(400)
+    try:
+        k = v._btn_apc_leds
+        QTest.mouseClick(k, Qt.MouseButton.LeftButton)
+        assert log == ["an"]
+        v._apc_letzter_wechsel = time.monotonic() - 0.7   # 0,7 s spaeter
+        QTest.mouseClick(k, Qt.MouseButton.LeftButton)
+        assert log == ["an"], log
+        assert k.isChecked() and v._apc_feedback is not None
+        v._apc_letzter_wechsel = time.monotonic() - 1.5   # bewusster zweiter Druck
+        QTest.mouseClick(k, Qt.MouseButton.LeftButton)
+        assert log == ["an", "aus"], log
     finally:
         hints.setMouseDoubleClickInterval(alt)
 

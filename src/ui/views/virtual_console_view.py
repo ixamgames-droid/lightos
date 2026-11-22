@@ -1189,6 +1189,8 @@ class VirtualConsoleView(QWidget):
         finally:
             self._btn_apc_leds.blockSignals(alt)
 
+    APC_SPERRE_S = 1.2   # MIDI-19: Mindestabstand zweier Umschaltungen von „APC LEDs“
+
     def _toggle_apc_leds(self, checked: bool):
         if not self._apc_auto_wechsel:
             # MIDI-19 (2): ein Druck = genau ein Umschalten. Am Geraet kam auf
@@ -1201,7 +1203,12 @@ class VirtualConsoleView(QWidget):
             import time
             from PySide6.QtWidgets import QApplication
             jetzt = time.monotonic()
-            fenster = QApplication.styleHints().mouseDoubleClickInterval() / 1000.0
+            # Am echten Touchscreen (Linux/X11, 22.11.2026) kam das zweite
+            # Umschalten eines EINZIGEN Fingertipps 0,6–0,8 s spaeter — laenger
+            # als das Doppelklick-Fenster, mit der Maus nie. Deshalb gilt
+            # mindestens APC_SPERRE_S.
+            fenster = max(QApplication.styleHints().mouseDoubleClickInterval() / 1000.0,
+                          self.APC_SPERRE_S)
             letzter = self._apc_letzter_wechsel
             if letzter is not None and (jetzt - letzter) < fenster:
                 self._apc_knopf_still(not checked)
