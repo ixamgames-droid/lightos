@@ -68,8 +68,17 @@ Toolbar **„APC LEDs"** einschalten → die Pads spiegeln den Zustand zurück:
 - Farb-Kachel-Pad zeigt die **echte Farbe** (mk2: pulst, wenn die Farbe im Programmer aktiv ist).
 - **TAP-Pad** blinkt (mk2) im **Beat** mit (weiß), AUTO/MANUAL-Pad zeigt den Modus.
 
+- **Seitentasten** (Scene-Tasten rechts): die Taste der **aktiven Seite leuchtet** (Original gelb,
+  mk2 grün — mk2: Note 112–119, Einzel-LED an/aus laut Akai-Protokoll).
+
 Original-APC: Grün/Rot/Gelb + Blink. mk2: volle RGB-Farben + Ripple-/Beat-Animationen. Der passende
 Modus wird am Port-Namen automatisch gewählt.
+
+**APC mini mk2: LEDs starten von selbst.** Ist ein APC mini mk2 angesteckt, schaltet LightOS
+„APC LEDs“ beim Start ein — und auch, wenn du das Gerät später einsteckst. Ziehst du es ab, geht
+der Knopf aus und beim Wiedereinstecken wieder an. Schaltest du „APC LEDs“ selbst aus, bleibt es
+bis zum nächsten Programmstart aus. Ein Druck auf den Knopf schaltet genau einmal um; ein
+Doppeltippen zählt als ein Druck.
 
 ## 6. Soft-Takeover (Fader-Pickup)
 

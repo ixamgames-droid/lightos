@@ -144,6 +144,39 @@ class SnapshotSidebar(QWidget):
         self.refresh()
 
 
+def _apc_mk2_port(outs) -> str | None:
+    """MIDI-19: erster Ausgang eines APC mini mk2 (``None`` = keiner)."""
+    for p in outs or ():
+        if "apc mini mk2" in str(p).lower():
+            return str(p)
+    return None
+
+
+def _apc_auto_erlaubt() -> bool:
+    """MIDI-19: Auto-Start der APC-LEDs nur in der echten App (STAB-39) —
+    bewusst nicht ``echte_ausgabe_erlaubt``: die Testsuite gibt die Ausgabe
+    frei (Schein-Ausgaenge), soll aber nie von selbst ein angestecktes Pult
+    ansprechen. Der Knopf bleibt davon unberuehrt.
+
+    Nachbesserung MIDI-19: Eine aus einer Agent-Shell gestartete App (STAB-39:
+    ``CLAUDECODE=1`` -> keine echte App) mit bewusst freigegebener Ausgabe
+    (``LIGHTOS_ECHTE_AUSGABE=1`` je Befehl, z. B. fuer Robins Gegenprobe am
+    Geraet) soll sich wie die echte App verhalten — sonst bliebe genau bei der
+    Gegenprobe der Auto-Start aus. Unter pytest gilt die Freigabe nicht
+    (conftest setzt sie fuer die Schein-Ausgaenge); Muster lizenz.testlauf."""
+    try:
+        import os
+        import sys
+        from src.core.paths import ist_echte_app, echte_ausgabe_erlaubt
+        if ist_echte_app():
+            return True
+        unter_pytest = ("pytest" in sys.modules
+                        or "PYTEST_CURRENT_TEST" in os.environ)
+        return bool(echte_ausgabe_erlaubt()) and not unter_pytest
+    except Exception:
+        return False
+
+
 class _FesteHoehe(QObject):
     """QA-120: haelt die feste Hoehe von Knoepfen gegen ein Fenster-Stylesheet.
 
@@ -226,6 +259,13 @@ class VirtualConsoleView(QWidget):
         self._popout_window = None
         self._pop_scroll = None
         self._apc_feedback = None
+        # MIDI-19: Zustand des „APC LEDs"-Knopfs. ``_apc_nutzer_aus`` = Robin
+        # hat die LEDs bewusst ausgeschaltet (dann kein Auto-Start mehr);
+        # ``_apc_auto_wechsel`` = der Knopf wird gerade vom Programm gestellt
+        # (Auto-Start/Geraet weg/Fehlschlag), nicht von einem Druck.
+        self._apc_nutzer_aus = False
+        self._apc_auto_wechsel = False
+        self._apc_letzter_wechsel: float | None = None
         self._inspector = None
         # UXT-06: laufende Nummer für das Staffeln (Kaskade) neuer Toolbar-Widgets,
         # damit ein zweiter Klick nicht deckungsgleich auf dem ersten landet.
@@ -445,7 +485,9 @@ class VirtualConsoleView(QWidget):
         self._btn_apc_leds.setFixedHeight(self._tb_hoehe())
         self._btn_apc_leds.setToolTip(
             "APC Mini LED-Feedback aktivieren/deaktivieren\n"
-            "Grün = aktiv, Grün blinkend = gestoppt, Rot = Flash, Gelb = aktuelle Page"
+            "Grün = aktiv, Grün blinkend = gestoppt, Rot = Flash, Gelb = aktuelle Page\n"
+            "APC mini mk2: startet von selbst, sobald es erkannt ist; die Seitentaste\n"
+            "der aktiven Seite leuchtet"
         )
         self._btn_apc_leds.setStyleSheet(_tb_css("""
             QPushButton { background:#21262d; color:#00cc66; border:1px solid #00cc66;
@@ -1130,32 +1172,119 @@ class VirtualConsoleView(QWidget):
         except Exception as e:
             print(f"[VC] soft-takeover error: {e}")
 
+    def _apc_knopf_setzen(self, an: bool) -> None:
+        """Knopf vom Programm aus stellen — mit Signal (startet/stoppt), aber
+        ohne Prell-Sperre und ohne als Robins Entscheidung zu zaehlen."""
+        alt = self._apc_auto_wechsel
+        self._apc_auto_wechsel = True
+        try:
+            self._btn_apc_leds.setChecked(bool(an))
+        finally:
+            self._apc_auto_wechsel = alt
+
+    def _apc_knopf_still(self, an: bool) -> None:
+        """Knopf-Anzeige korrigieren, ohne den Slot erneut auszuloesen."""
+        alt = self._btn_apc_leds.blockSignals(True)
+        try:
+            self._btn_apc_leds.setChecked(bool(an))
+        finally:
+            self._btn_apc_leds.blockSignals(alt)
+
+    APC_SPERRE_S = 1.2   # MIDI-19: Mindestabstand zweier Umschaltungen von „APC LEDs“
+
     def _toggle_apc_leds(self, checked: bool):
+        if not self._apc_auto_wechsel:
+            # MIDI-19 (2): ein Druck = genau ein Umschalten. Am Geraet kam auf
+            # einen Druck an → aus → an (Log: gestartet, 0,12 s spaeter
+            # geschlossen, 0,6 s spaeter wieder gestartet). Ein zweites
+            # Umschalten innerhalb des Doppelklick-Fensters ist dasselbe
+            # Antippen (Doppeltippen/Prellen am Finger kommt beim Knopf als
+            # Doppelklick an, und QPushButton schaltet darauf ein zweites Mal
+            # um) — es wird verworfen und der Knopf zurueckgestellt.
+            import time
+            from PySide6.QtWidgets import QApplication
+            jetzt = time.monotonic()
+            # Am echten Touchscreen (Linux/X11, 22.11.2026) kam das zweite
+            # Umschalten eines EINZIGEN Fingertipps 0,6–0,8 s spaeter — laenger
+            # als das Doppelklick-Fenster, mit der Maus nie. Deshalb gilt
+            # mindestens APC_SPERRE_S.
+            fenster = max(QApplication.styleHints().mouseDoubleClickInterval() / 1000.0,
+                          self.APC_SPERRE_S)
+            letzter = self._apc_letzter_wechsel
+            if letzter is not None and (jetzt - letzter) < fenster:
+                self._apc_knopf_still(not checked)
+                print("[VC] APC LEDs: zweites Umschalten im Doppelklick-Fenster ignoriert.")
+                return
+            self._apc_letzter_wechsel = jetzt
+            self._apc_nutzer_aus = not checked
         if checked:
+            if self._apc_feedback is not None:
+                return          # laeuft schon — nicht ein zweites Mal oeffnen
             try:
                 from src.core.app_state import get_state
                 from src.core.midi.midi_manager import get_midi_manager
                 outs = get_midi_manager().list_outputs()
-                is_mk2 = any("mk2" in p.lower() for p in outs)
-                if is_mk2:
-                    # mk2 nutzt RGB + spiegelt die VC-Button-Zustaende
+                mk2 = _apc_mk2_port(outs)
+                if mk2 is not None:
+                    # mk2 nutzt RGB + spiegelt die VC-Button-Zustaende.
+                    # MIDI-19: nur „APC mini mk2" zaehlt — „APC Key 25 mk2" oder
+                    # „APC40 mkII" sind andere Geraete (frueher reichte „mk2").
                     from src.core.midi.apc_mk2_feedback import ApcMk2Feedback
-                    self._apc_feedback = ApcMk2Feedback(self._canvas)
+                    self._apc_feedback = ApcMk2Feedback(self._canvas,
+                                                        port_hint="APC mini mk2")
                 else:
                     from src.core.midi.apc_mini_feedback import APCMiniFeedback
                     self._apc_feedback = APCMiniFeedback()
                 if self._apc_feedback.is_connected:
                     self._apc_feedback.attach(get_state())
                 else:
-                    self._btn_apc_leds.setChecked(False)
                     self._apc_feedback = None
+                    self._apc_knopf_still(False)
             except Exception as e:
                 print(f"[VC] APC LEDs Fehler: {e}")
-                self._btn_apc_leds.setChecked(False)
+                self._apc_feedback = None
+                self._apc_knopf_still(False)
         else:
             if self._apc_feedback:
                 self._apc_feedback.close()
                 self._apc_feedback = None
+
+    def apc_leds_automatisch(self) -> None:
+        """MIDI-19 (1): LED-Rueckmeldung fuer ein erkanntes APC mini mk2 von
+        selbst starten — beim Start und nach spaeterem Einstecken.
+
+        Ruft das Hauptfenster aus seinem MIDI-Auto-Connect (800 ms nach dem
+        Start, dann alle 4 s). Vorher oeffnete nur der Knopf „APC LEDs" den
+        Ausgang; der Auto-Connect oeffnete allein die EINGAENGE — daher im Log
+        „MIDI Ausgang: -" und dunkle LEDs, obwohl der APC verbunden war.
+
+        Regeln: kein Auto-Start, wenn Robin die LEDs bewusst ausgeschaltet hat;
+        verschwindet das Geraet, endet das Feedback (Knopf aus, nicht als
+        Robins Entscheidung), damit es beim Wiedereinstecken neu anlaeuft.
+        Nur in der echten App (STAB-39: Tests/Probelaeufe senden nichts).
+        """
+        if not _apc_auto_erlaubt():
+            return
+        try:
+            from src.core.midi.midi_manager import get_midi_manager
+            outs = get_midi_manager().list_outputs()
+        except Exception as e:
+            print(f"[VC] APC LEDs automatisch: {e}")
+            return
+        port = _apc_mk2_port(outs)
+        fb = self._apc_feedback
+        if fb is None:
+            if port is not None and not self._apc_nutzer_aus:
+                print(f"[VC] APC mini mk2 erkannt ({port}) — LED-Feedback startet.")
+                self._apc_knopf_setzen(True)
+            return
+        try:
+            from src.core.midi.apc_mk2_feedback import ApcMk2Feedback
+        except Exception:
+            return
+        if port is None and isinstance(fb, ApcMk2Feedback):
+            print("[VC] APC mini mk2 nicht mehr da — LED-Feedback beendet.")
+            self._apc_knopf_setzen(False)
 
     # ── Bank/Page ──────────────────────────────────────────────────────────────
 
