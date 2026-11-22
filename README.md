@@ -555,7 +555,10 @@ Beispiel-Adressen in Anleitungen stammen aus `192.0.2.x`.
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml): Linux fährt die volle Suite
 segmentiert, Windows x64 einen Smoke-Test, Windows-ARM64 die volle Suite mit x64-Python
 (beobachtend). [`.github/workflows/windows-setup.yml`](.github/workflows/windows-setup.yml)
-baut `LightOS-Setup.exe` (PyInstaller + Inno Setup) samt Rauchtest der installierten exe.
+baut `LightOS-Setup.exe` (PyInstaller + Inno Setup) samt Rauchtest der installierten exe;
+[`.github/workflows/linux-paket.yml`](.github/workflows/linux-paket.yml) baut das
+Linux-Paket `lightos_<Version>_amd64.deb` (Vorabversion, noch kein Release) samt Rauchtest
+in einem frischen Ubuntu-Container.
 
 ### Projektstruktur
 

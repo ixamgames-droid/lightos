@@ -1,0 +1,149 @@
+name: Linux-Paket
+
+# XPLAT-62: baut lightos_<version>_amd64.deb (PyInstaller onedir +
+# packaging/linux/baue_deb.py) und legt es als Workflow-Artefakt ab. Bewusst
+# KEIN Release-Publish (wie windows-setup.yml): ob und wann ein Paket
+# veroeffentlicht wird, entscheidet der Projektinhaber.
+#
+# Ablauf: Systempakete -> Abhaengigkeiten -> Demo-Shows (DEMO-8) -> Build-Info
+# (STAB-33) -> PyInstaller (packaging/linux/LightOS.spec) -> Rauchtest des
+# gepackten Programms (--selbsttest, offscreen) -> .deb bauen -> Paket ansehen
+# (dpkg-deb --info/--contents) -> in einem FRISCHEN Ubuntu-Container
+# installieren, Selbsttest, entfernen -> Artefakt.
+#
+# Gebaut wird auf ubuntu-22.04: die glibc des Bau-Rechners ist die
+# Untergrenze fuer die Zielsysteme (Mint 21/22, Ubuntu 22.04/24.04, Debian 12).
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    branches: ["**"]
+    paths:
+      - "packaging/linux/**"
+      - ".github/workflows/linux-paket.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deb:
+    name: lightos.deb bauen
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12 einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Bau-Rechner: Compiler + ALSA-Header fuer python-rtmidi, Qt-Laufzeit
+      # fuer den Rauchtest (wie ci.yml).
+      - name: Systempakete
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential libasound2-dev libpulse0 libusb-1.0-0 \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libxcb-cursor0 \
+            libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 \
+            libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xkb1 \
+            libdbus-1-3 libfontconfig1 libnss3 libnspr4 libxdamage1 \
+            libxrandr2 libxcomposite1 libxcursor1 libxi6 libxtst6 libgbm1 \
+            libdrm2 libxshmfence1 fonts-dejavu
+
+      - name: Abhaengigkeiten + PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install "pyinstaller>=6.10"
+          # uDMX (CYL-6602): requirements.txt nennt pyusb nur fuer Windows —
+          # im Linux-Paket muss es mit, libusb kommt aus dem System (Depends).
+          python -m pip install "pyusb>=1.2.1"
+
+      # Version aus dem Repo: APP_VERSION in main.py ist die einzige Quelle.
+      - name: Version ermitteln
+        id: version
+        run: |
+          v=$(python -c "import sys; sys.path.insert(0, 'packaging/linux'); import baue_deb; print(baue_deb.app_version())")
+          test -n "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "LightOS-Version: $v"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$v" ]; then
+            echo "::warning::Tag $GITHUB_REF_NAME passt nicht zu APP_VERSION $v"
+          fi
+
+      - name: Demo-Shows erzeugen
+        run: python packaging/demo_shows.py
+
+      - name: Build-Info schreiben (Commit ins Bundle)
+        run: python packaging/windows/build_info.py
+
+      - name: PyInstaller-Build (onedir)
+        run: python -m PyInstaller --noconfirm --clean packaging/linux/LightOS.spec
+
+      - name: Rauchtest gepacktes Programm (--selbsttest)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          bericht="$RUNNER_TEMP/selbsttest_dist.txt"
+          set +e
+          dist/LightOS/LightOS --selbsttest "$bericht"
+          rc=$?
+          set -e
+          cat "$bericht" 2>/dev/null || echo "kein Bericht geschrieben"
+          test "$rc" -eq 0
+
+      - name: .deb bauen
+        run: python packaging/linux/baue_deb.py --programm dist/LightOS --ausgabe dist/deb
+
+      - name: Paket ansehen
+        run: |
+          deb=dist/deb/lightos_${{ steps.version.outputs.version }}_amd64.deb
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" | grep -v "/opt/lightos/_internal/" || true
+
+      # Ende-zu-Ende in einem FRISCHEN System: zeigt, ob die Depends-Liste in
+      # DEBIAN/control reicht (der Bau-Rechner hat viel mehr installiert).
+      - name: Rauchtest frischer Ubuntu-Container (installieren, starten, entfernen)
+        run: |
+          docker run --rm -v "$PWD/dist/deb:/deb:ro" ubuntu:24.04 bash -euxc '
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y /deb/lightos_${{ steps.version.outputs.version }}_amd64.deb
+            test -x /usr/bin/lightos
+            test -f /usr/lib/udev/rules.d/60-lightos-udmx.rules
+            test -f /usr/share/applications/lightos.desktop
+            QT_QPA_PLATFORM=offscreen lightos --selbsttest /tmp/selbsttest.txt || {
+              cat /tmp/selbsttest.txt || true
+              echo "Fehlende Systembibliotheken (Kandidaten fuer Depends):"
+              find /opt/lightos -name "*.so*" -type f -exec ldd {} + 2>/dev/null | grep "not found" | sort -u || true
+              exit 1
+            }
+            cat /tmp/selbsttest.txt
+            apt-get remove -y lightos
+            test ! -e /opt/lightos/LightOS
+            test ! -e /usr/bin/lightos
+          '
+
+      - name: Artefakt lightos.deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: lightos-deb-${{ steps.version.outputs.version }}
+          path: dist/deb/*.deb
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Berichte bei Fehler
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-paket-berichte
+          path: |
+            ${{ runner.temp }}/selbsttest_*.txt
+            build/LightOS/warn-LightOS.txt
+          if-no-files-found: ignore

@@ -3,7 +3,8 @@
 Deutsche Schritt-für-Schritt-Anleitungen mit Bildern, nach Themen sortiert. Wer neu ist,
 fängt bei **[Einstieg](#einstieg)** an und arbeitet die ersten vier Anleitungen der Reihe
 nach durch. **Installiert** wird LightOS laut [INSTALL.md](../INSTALL.md) — auf Windows auch
-über das Setup `LightOS-Setup.exe` (Vorabversion, siehe [README](../README.md#installation-und-start)).
+über das Setup `LightOS-Setup.exe` (Vorabversion, siehe [README](../README.md#installation-und-start)),
+auf Mint/Ubuntu/Debian über das .deb-Paket (Vorabversion, siehe [INSTALL.md](../INSTALL.md#2b-deb-paket-vorabversion-mintubuntudebian-x64)).
 
 **Zur Show jeder Anleitung** steht in der Zeile darunter, woher du sie bekommst:
 

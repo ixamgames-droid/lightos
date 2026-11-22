@@ -271,6 +271,34 @@ venv/bin/python main.py
 aber Windows-spezifische Desktop-Verknuepfungen — auf Linux ist der manuelle venv-Weg
 oben der verlaessliche.
 
+### 2b) .deb-Paket (Vorabversion, Mint/Ubuntu/Debian x64)
+
+Fuer Linux Mint, Ubuntu und Debian (x86_64) entsteht im Aufbau ein **.deb-Paket**
+`lightos_<Version>_amd64.deb`, das LightOS samt eigener Python-Laufzeit, Qt und
+3D-Visualizer installiert — ohne venv und ohne die Systempakete aus Schritt 1.
+
+- **Noch kein Release.** Das Paket baut der GitHub-Workflow
+  [„Linux-Paket“](.github/workflows/linux-paket.yml) (von Hand oder bei einem
+  Versions-Tag); es liegt nur als **Artefakt** an einem Workflow-Lauf (30 Tage). Ein
+  Test auf einem frischen Mint steht noch aus.
+- **Installieren:** `sudo apt install ./lightos_<Version>_amd64.deb` (oder Doppelklick
+  im Dateimanager). Danach steht **LightOS** im Startmenue, auf der Kommandozeile
+  heisst der Befehl `lightos`.
+- **Was das Paket ablegt:** das Programm unter `/opt/lightos`, den Starter
+  `/usr/bin/lightos`, den Startmenue-Eintrag mit Symbol, die udev-Regel fuer
+  uDMX-Adapter (`/usr/lib/udev/rules.d/60-lightos-udmx.rules`, wird beim Installieren
+  neu geladen) und die Lizenztexte unter `/usr/share/doc/lightos`.
+- **Einmalig von Hand:** Benutzerkonten aendert das Paket nicht. Fuer Interfaces mit
+  seriellem Port (Enttec/FTDI) die Gruppe `dialout`, fuer uDMX `plugdev`:
+  `sudo usermod -aG dialout,plugdev "$USER"`, danach ab- und wieder anmelden.
+- **Entfernen:** `sudo apt remove lightos`. Shows und Einstellungen in
+  `~/.local/share/LightOS` bleiben erhalten.
+
+Selbst bauen (Linux x64, im Repo mit installierten `requirements.txt` und
+`pyinstaller`): `python packaging/demo_shows.py`, `python packaging/windows/build_info.py`,
+`python -m PyInstaller --noconfirm --clean packaging/linux/LightOS.spec`, dann
+`python packaging/linux/baue_deb.py` → `dist/deb/`.
+
 ### 3) Plattform-Hinweise (bereits im Code beruecksichtigt)
 
 | Thema | Verhalten auf Linux |
@@ -340,7 +368,8 @@ ist (Punkt 3). Beides sind Bibliotheken, keine Treiber; ihre Lizenzen stehen in
   installiert beides mit.
 
 **2. Linux: Zugriffsrecht per udev-Regel.** Ohne sie darf nur root den Adapter
-ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Die Regeldatei liegt im Repo:
+ansprechen; LightOS meldet dann „Kein Zugriffsrecht“. Das .deb-Paket (Vorabversion,
+Abschnitt 2b) installiert die Regel selbst; sonst liegt die Regeldatei im Repo:
 
 ```bash
 sudo cp packaging/linux/60-lightos-udmx.rules /etc/udev/rules.d/
