@@ -131,6 +131,8 @@ class DebAusKuenstlichemOrdner(unittest.TestCase):
         self.assertEqual(e["Type"], "Application")
         self.assertEqual(e["Name"], "LightOS")
         self.assertEqual(e["Exec"].split()[0], "lightos")
+        # main.py kennt keine Positionsargumente: kein %F/%f/%U im Exec.
+        self.assertNotIn("%", e["Exec"])
         self.assertEqual(e["Icon"], "lightos")
         self.assertEqual(e["Terminal"], "false")
         self.assertTrue(e["Categories"].endswith(";"))

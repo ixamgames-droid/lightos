@@ -115,7 +115,12 @@ jobs:
             test -x /usr/bin/lightos
             test -f /usr/lib/udev/rules.d/60-lightos-udmx.rules
             test -f /usr/share/applications/lightos.desktop
-            QT_QPA_PLATFORM=offscreen lightos --selbsttest /tmp/selbsttest.txt || { cat /tmp/selbsttest.txt; exit 1; }
+            QT_QPA_PLATFORM=offscreen lightos --selbsttest /tmp/selbsttest.txt || {
+              cat /tmp/selbsttest.txt || true
+              echo "Fehlende Systembibliotheken (Kandidaten fuer Depends):"
+              find /opt/lightos -name "*.so*" -type f -exec ldd {} + 2>/dev/null | grep "not found" | sort -u || true
+              exit 1
+            }
             cat /tmp/selbsttest.txt
             apt-get remove -y lightos
             test ! -e /opt/lightos/LightOS

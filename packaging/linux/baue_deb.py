@@ -82,12 +82,15 @@ STARTER = """#!/bin/sh
 exec /opt/lightos/LightOS "$@"
 """
 
+#: ``Exec`` bewusst ohne Feldcode (%F/%f): main.py nimmt keine Positions-
+#: argumente an — eine auf den Starter gezogene Datei liesse argparse sonst mit
+#: Fehler beenden, ohne dass ein Fenster erscheint.
 DESKTOP = """[Desktop Entry]
 Type=Application
 Name=LightOS
 GenericName=DMX-Lichtsteuerung
 Comment=DMX-Lichtsteuerung fuer Buehne und Veranstaltung
-Exec=lightos %F
+Exec=lightos
 Icon=lightos
 Terminal=false
 Categories=AudioVideo;Video;
