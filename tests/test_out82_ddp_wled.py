@@ -318,3 +318,43 @@ def test_ddp_verteilung_matrix():
     assert sum(x["pixel"] for x in v) == 400
     text = wled.ddp_hinweis(a, 3)
     assert "192.0.2.50" in text and "Offset 480" in text
+
+
+# ── Nachbesserung nach Pruefung ─────────────────────────────────────────────
+
+def test_teile_ueberschreiben_sich_nicht_unabhaengig_von_reihenfolge(
+        ausgabe_frei, empfaenger, monkeypatch):
+    """Offset 480 (ganze Matrix-Zeilen): die unbenutzten Kanaele 481..512 von
+    Universum 1 duerfen den Anfang von Universum 2 nicht schwaerzen — auch
+    wenn Universum 2 vor Universum 1 angelegt wurde."""
+    from src.core.dmx.output_manager import OutputManager
+    monkeypatch.setattr(ddp, "DDP_PORT", empfaenger.port)
+    om = OutputManager()
+    for u in (2, 1):
+        om.add_universe(u)
+    om.add_ddp(1, "127.0.0.1", offset=0)
+    om.add_ddp(2, "127.0.0.1", offset=480)
+    try:
+        om.universes[1].set_range(1, bytes([10]) * 480)
+        om.universes[2].set_range(1, bytes([20]) * 480)
+        om._send_all()
+        daten = b"".join(p["daten"] for p in empfaenger.pakete())
+        assert daten[:480] == bytes([10]) * 480
+        assert daten[480:960] == bytes([20]) * 480
+    finally:
+        om.remove_output(1)
+        om.remove_output(2)
+
+
+def test_json_info_stummes_geraet_zeitgrenze():
+    """Geraet nimmt die Verbindung an, antwortet aber nie -> Zeitgrenze."""
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    s.listen(5)
+    port = s.getsockname()[1]
+    try:
+        t0 = time.monotonic()
+        assert wled.wled_info("127.0.0.1", port=port, zeitgrenze_s=0.5) is None
+        assert time.monotonic() - t0 < 2.0
+    finally:
+        s.close()

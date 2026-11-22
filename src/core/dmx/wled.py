@@ -31,7 +31,10 @@ def wled_info(ip: str, port: int = 80, zeitgrenze_s: float = INFO_ZEITGRENZE_S) 
     kein WLED, Zeitgrenze ueberschritten)."""
     url = f"http://{ip}:{int(port)}/json/info"
     try:
-        with urllib.request.urlopen(url, timeout=zeitgrenze_s) as antwort:
+        # Ohne Proxy: ein Geraet im eigenen Netz, ein gesetztes http_proxy
+        # wuerde die Anfrage sonst nach aussen umleiten.
+        oeffner = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with oeffner.open(url, timeout=zeitgrenze_s) as antwort:
             daten = json.loads(antwort.read(65536).decode("utf-8", errors="replace"))
     except Exception:
         return None

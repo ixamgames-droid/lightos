@@ -94,6 +94,7 @@ class DDPStrom:
         self._sequenz = 0
         self._lock = threading.Lock()
         self._nutzer = 0
+        self._teile: list = []      # offene DDPTeil (fuer die Teil-Grenzen)
         self._sock = None
         if not self._stumm:
             self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -148,15 +149,34 @@ class DDPTeil:
         self.offset = int(offset)
         self.target_ip = strom.target_ip
         strom._nutzer += 1
+        strom._teile.append(self)
         self._zu = False
 
+    def grenze(self) -> int | None:
+        """Offset des naechsten offenen Teils dahinter im selben Strom (oder
+        ``None``). Ein Universum ist 512 Byte lang; liegt der naechste Teil
+        naeher (z. B. Offset 480 bei ganzen Matrix-Zeilen), darf dieses
+        Universum ihn nicht mit seinen unbenutzten Kanaelen ueberschreiben —
+        sonst haengt das Bild von der Reihenfolge der Universen ab und ein
+        Schlussbild fuer EIN Universum schwaerzt den Anfang des naechsten."""
+        hinter = [t.offset for t in list(self.strom._teile)
+                  if t is not self and not t._zu and t.offset > self.offset]
+        return min(hinter) if hinter else None
+
     def send_dmx(self, data: bytes) -> None:
+        g = self.grenze()
+        if g is not None:
+            data = bytes(data)[:g - self.offset]
         self.strom.setze(self.offset, data)
 
     def close(self) -> None:
         if self._zu:
             return
         self._zu = True
+        try:
+            self.strom._teile.remove(self)
+        except ValueError:
+            pass
         self.strom._nutzer -= 1
         if self.strom._nutzer <= 0:
             self.strom.close()
