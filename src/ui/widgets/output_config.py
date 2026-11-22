@@ -2302,12 +2302,21 @@ class OutputConfigDialog(QDialog):
             z = vorher
             if geraet and geraet.get("name"):
                 self._univ_table.item(z, 1).setText(str(geraet["name"]))
+        war_ddp = self._univ_typ(z) == "DDP"
         combo = self._univ_table.cellWidget(z, 2)
         if combo is not None:
             i = combo.findData("DDP")
             if i >= 0:
                 combo.setCurrentIndex(i)
         self._univ_table.setItem(z, 3, QTableWidgetItem(ip))
+        if not war_ddp:
+            # Pruef-Fund: die Spalte hiess vorher z. B. Art-Net-Universum 3 —
+            # bei DDP ist sie der BYTE-Offset; ein stehengebliebenes „3“
+            # verschoebe jedes Pixel um eine Farbe. Ein einzelnes WLED
+            # beginnt bei 0 (mehrere Teile: „Matrix verteilen…“).
+            ext = QTableWidgetItem("0")
+            ext.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._univ_table.setItem(z, 4, ext)
         self._lbl_wled_status.setText(
             f"{ip} in Zeile {z + 1} eingetragen — „Speichern“ übernimmt.")
 

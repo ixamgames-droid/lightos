@@ -533,3 +533,20 @@ def test_touch_knoepfe_44px(dialog, monkeypatch):
     assert all(b.minimumHeight() >= 44 for b in d.findChildren(
         __import__("PySide6.QtWidgets", fromlist=["QPushButton"]).QPushButton))
     d.deleteLater()
+
+
+def test_wled_eintragen_setzt_alten_artnet_wert_auf_offset_null(dialog):
+    """Pruef-Fund: Spalte 4 war das Art-Net-Universum (3). Bei DDP ist sie der
+    Byte-Offset — ein stehengebliebenes „3“ verschoebe jedes Pixel."""
+    from PySide6.QtWidgets import QTableWidgetItem
+    t = dialog._univ_table
+    combo = t.cellWidget(0, 2)
+    combo.setCurrentIndex(combo.findData("ArtNet"))
+    t.setItem(0, 4, QTableWidgetItem("3"))
+    t.selectRow(0)
+    dialog._wled_eintragen("192.0.2.50", {"name": "Panel"})
+    assert _zeile(dialog, 0) == ("DDP", "192.0.2.50", "0")
+    # War die Zeile schon DDP (z. B. Teil 2 mit Offset 480), bleibt der Offset.
+    t.setItem(0, 4, QTableWidgetItem("480"))
+    dialog._wled_eintragen("192.0.2.51")
+    assert _zeile(dialog, 0) == ("DDP", "192.0.2.51", "480")
