@@ -1171,7 +1171,9 @@ assert not missing_w, f"Widget-Typen fehlen: {sorted(missing_w)}"
 
 mats = [f for f in fm.all() if isinstance(f, RgbMatrixInstance)]
 algos_present = {m.algorithm for m in mats}
-missing_a = set(RgbAlgorithm) - algos_present
+# FM-81: „Bild/Video“ braucht eine Mediendatei neben der Show — die
+# Beispielshow liefert keine mit, deshalb hier bewusst ausgenommen.
+missing_a = set(RgbAlgorithm) - algos_present - {RgbAlgorithm.MEDIA}
 assert not missing_a, f"Matrix-Algorithmen fehlen: {[a.name for a in missing_a]}"
 styles_present = {m.style for m in mats}
 missing_s = set(MatrixStyle) - styles_present
