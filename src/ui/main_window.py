@@ -1065,6 +1065,9 @@ class MainWindow(QMainWindow):
         # „Neu", ein Tippfehler im eigenen Profil war nicht mehr zu beheben.
         dbm.addAction("Fixture-Profil bearbeiten...").triggered.connect(
             self._open_profil_auswahl)
+        # FM-80: eigene LED-Matrix gefuehrt anlegen.
+        dbm.addAction("LED-Matrix-Assistent...").triggered.connect(
+            self._open_matrix_assistent)
 
         # Ausgabe
         om = mb.addMenu("&Ausgabe")
@@ -3376,6 +3379,13 @@ class MainWindow(QMainWindow):
             dialog_hilfe.ausfuehren(FixtureEditorDialog(self))
         except Exception as e:
             QMessageBox.warning(self, "Fixture-Editor", str(e))
+
+    def _open_matrix_assistent(self):
+        try:
+            from src.ui.widgets.led_matrix_assistent import LedMatrixAssistent
+            dialog_hilfe.ausfuehren(LedMatrixAssistent(self))
+        except Exception as e:
+            QMessageBox.warning(self, "LED-Matrix-Assistent", str(e))
 
     def _open_profil_auswahl(self):
         try:

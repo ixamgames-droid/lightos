@@ -205,6 +205,52 @@ betroffenen Geräte und fragt vorher nach.
 So nimmst du ein Profil auf einen anderen Rechner mit oder gibst es weiter. Ein
 exportiertes Profil trägt als Herkunft „eigenes Profil“ und `geprueft: false`.
 
+### Eine LED-Matrix mit dem Assistenten anlegen
+
+Für eine eigene LED-Matrix (Panel, Vorhang, Pixel-Leiste …) musst du keine hundert
+Kanäle von Hand eintragen. Öffne **Patchen → Patch → LED-Matrix…** (oder
+**Datenbank → LED-Matrix-Assistent...**) und gib an:
+
+- **Hersteller**, **Modell** und die **Bauform** (Panel/Kachel, LED-Vorhang,
+  Pixel-Leiste/Stab, Ring, Säule/Zylinder). Die Bauform steht im Profil und ist für
+  die 3D-Ansicht gedacht; bis die eigenen 3D-Formen kommen, erscheint jede Matrix als
+  Panel.
+- **Breite** und **Höhe** in Pixeln (z. B. 20 × 40) und die **Fläche** in cm
+  (z. B. 30 × 50). Daraus zeigt der Assistent den **Pixelabstand** (hier 15 × 12,5 mm).
+- **Kanalformat je Pixel** — RGB, GRB, BGR, RGBW oder GRBW, so wie dein
+  Pixel-Controller es erwartet — und auf Wunsch **Master-Dimmer vorn** und
+  **Strobe vorn**. Der Master startet auf 0: Farbe allein macht die Matrix nicht
+  hell.
+- **Verdrahtung** (zeilenweise oder Schlangenlinie) und wo das **erste Pixel** sitzt
+  (oben/unten, links/rechts).
+- **Zeilen je Universum** — normalerweise „so viele wie passen“.
+
+Rechts zeigt die **Vorschau** das Raster mit der Nummer jedes Pixels (so zählt der
+Controller) und färbt jedes Universum anders ein; das erste Pixel ist gelb.
+
+**Mehr als 512 Kanäle:** Ein Gerät belegt in LightOS genau ein Universum. Darum teilt
+der Assistent eine große Matrix in Streifen aus **ganzen Zeilen** — ein Pixel wird nie
+über eine Universumsgrenze geteilt. Ein 20 × 40-Panel in RGB (2400 Kanäle) wird so zu
+fünf Teilen à 8 Zeilen (480 Kanäle, 160 Pixel je Universum). Jeder Teil ist ein Modus
+des Profils und wird beim Patchen ein eigenes Gerät. Stelle am Pixel-Controller
+dieselbe Zahl Pixel je Universum ein, die der Assistent nennt. Master und Strobe
+stehen am Anfang **jedes** Teils.
+
+Mit **Gleich patchen ab Universum** (nur aus dem Patch heraus) legt **In Bibliothek
+speichern** das Profil an und patcht alle Teile: Teil 1 in das gewählte Universum,
+Teil 2 in das nächste und so weiter, jeweils ab Adresse 1. Pixel-Reihenfolge und
+Montage der Teile setzt der Assistent passend zu Verdrahtung und Startecke. Jeder Teil
+bekommt seine Kopf-Gruppe als Raster, und zusätzlich entsteht eine Gruppe
+**„… · Matrix“** über die ganze Fläche — darauf laufen Matrix-Effekte über alle Pixel.
+Ist ein Universum schon belegt, patcht der Assistent nichts und sagt, wo es klemmt.
+
+**Später ändern:** **Datenbank → Fixture-Profil bearbeiten...**, das Profil wählen und
+**Im Matrix-Assistenten…** drücken. **Profil aktualisieren** ändert dasselbe Profil;
+sind Teile davon gepatcht und ändern sich Modi oder Kanalzahlen, nennt der Assistent
+die betroffenen Geräte vorher. Änderst du das Profil dagegen im Fixture-Editor oder
+-Generator, bleibt die Bauform, aber der Assistent bietet das Profil nicht mehr an —
+er würde deine Handänderungen sonst überschreiben.
+
 ---
 
 ## 4. Mehrere Dimmer und Weiß-Segmente
