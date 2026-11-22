@@ -572,3 +572,108 @@ def create_db(path: str):
     create_all_idempotent(engine)
     migrate_show_db(engine)
     return engine
+
+
+# ── FM-20: Gruppe in Gruppe — die EINE Aufloesung fuer ORM-Gruppen ───────────
+def gruppen_lader(session):
+    """``lade(uid) -> (cols, rows, positions)`` fuer ``group_cells.aufloesen``;
+    je Lader zwischengespeichert (eine Aufloesung fragt jede uid hoechstens
+    einmal ab)."""
+    import json as _json
+    from sqlalchemy import select as _select
+    cache: dict = {}
+
+    def lade(uid):
+        if uid in cache:
+            return cache[uid]
+        g = session.execute(_select(FixtureGroup).where(
+            FixtureGroup.uid == uid)).scalars().first()
+        wert = None
+        if g is not None:
+            try:
+                pos = _json.loads(g.positions_json or "{}")
+            except (TypeError, ValueError):
+                pos = {}
+            wert = (g.cols, g.rows, pos if isinstance(pos, dict) else {})
+        cache[uid] = wert
+        return wert
+    return lade
+
+
+def aufgeloeste_positionen(group, session=None) -> dict:
+    """``positions_json`` einer Gruppe mit aufgeloesten Untergruppen-Bloecken.
+
+    Jeder LESER, der wissen will, welche Geraete/Koepfe eine Gruppe faehrt,
+    nimmt diese Funktion statt ``json.loads(g.positions_json)``. Editoren, die
+    das Raster zurueckschreiben, lesen weiter roh (sonst wuerde der Verweis beim
+    Speichern zu Einzelzellen plattgedrueckt). Ohne Verweise identisch zu
+    ``json.loads`` (Bestand unveraendert); ohne Session bleiben Verweise
+    unaufgeloest und fallen bei den Parsern still weg."""
+    import json as _json
+    from sqlalchemy.orm import object_session
+    from ..group_cells import aufloesen, hat_gruppen_verweise
+    try:
+        pos = _json.loads(getattr(group, "positions_json", None) or "{}")
+    except (TypeError, ValueError):
+        return {}
+    if not isinstance(pos, dict):
+        return {}
+    if not hat_gruppen_verweise(pos):
+        return pos
+    s = session if session is not None else object_session(group)
+    if s is None:
+        return pos
+    return aufloesen(pos, gruppen_lader(s), eigene_uid=getattr(group, "uid", None))
+
+
+def aufgeloestes_raster(group, session=None) -> tuple:
+    """``(cols, rows, positions)`` einer Gruppe in aufgeloester Form.
+
+    Das gespeicherte ``cols``/``rows`` der Obergruppe kennt nur die Ankerzellen.
+    Waechst eine Untergruppe spaeter (oder dreht man den Block), ragt ihr Block
+    ueber das Raster hinaus — die Matrix-Engine verwirft Zellen ausserhalb von
+    ``cols x rows`` still, Programmer/VC zaehlen sie aber mit. Hier waechst das
+    Raster deshalb auf die aufgeloesten Zellen mit (nie kleiner als gespeichert).
+    Ohne Verweise identisch zu ``(g.cols, g.rows, json.loads(...))``."""
+    from ..group_cells import GRUPPEN_PRAEFIX as GRUPPEN_PRAEFIX_TEXT
+    cols = max(1, int(getattr(group, "cols", 1) or 1))
+    rows = max(1, int(getattr(group, "rows", 1) or 1))
+    pos = aufgeloeste_positionen(group, session)
+    if GRUPPEN_PRAEFIX_TEXT not in str(getattr(group, "positions_json", "") or ""):
+        return cols, rows, pos              # Bestand: byte-gleich wie bisher
+    for key in pos:
+        try:
+            c_s, r_s = str(key).split(",")
+            c, r = int(c_s), int(r_s)
+        except (TypeError, ValueError):
+            continue
+        if c >= 0 and r >= 0:
+            cols, rows = max(cols, c + 1), max(rows, r + 1)
+    return cols, rows, pos
+
+
+def verweise_einbetten(session, uid) -> int:
+    """Vor dem Loeschen der Gruppe ``uid``: jede Obergruppe, die sie als Block
+    traegt, bekommt deren Zellen als Einzelzellen (andere Verweise bleiben).
+    Rueckgabe: Zahl der geaenderten Obergruppen. Kein Commit."""
+    import json as _json
+    from sqlalchemy import select as _select
+    from ..group_cells import GRUPPEN_PRAEFIX, aufloesen
+    if not uid:
+        return 0
+    lade = gruppen_lader(session)
+    n = 0
+    for g in session.execute(_select(FixtureGroup).where(
+            FixtureGroup.positions_json.contains(GRUPPEN_PRAEFIX + str(uid)))
+    ).scalars().all():
+        if g.uid == uid:
+            continue
+        try:
+            pos = _json.loads(g.positions_json or "{}")
+        except (TypeError, ValueError):
+            continue
+        neu = aufloesen(pos, lade, eigene_uid=g.uid, nur_uid=str(uid))
+        if neu != pos:
+            g.positions_json = _json.dumps(neu)
+            n += 1
+    return n

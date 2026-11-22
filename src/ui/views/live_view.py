@@ -4594,7 +4594,8 @@ class LiveView(QWidget):
                     # Anzahl GERAETE (Basis-fids) — Kopf-Matrix-Zellen "fid:head"
                     # zaehlen als EIN Geraet, nicht als N Zellen (FM16E-HEADCOUNT).
                     try:
-                        pos = _json.loads(g.positions_json or "{}")
+                        from src.core.database.models import aufgeloeste_positionen
+                        pos = aufgeloeste_positionen(g)   # FM-20
                         n = len(base_fids_in_grid_order(pos))
                     except Exception:
                         n = 0
@@ -4776,6 +4777,11 @@ class LiveView(QWidget):
             from src.core.database.models import FixtureGroup as _FG
             from sqlalchemy import delete as _delete
             with _Session(eng) as s:
+                # FM-20: Obergruppen behalten die Geraete dieses Blocks.
+                from src.core.database.models import verweise_einbetten
+                _alt = s.get(_FG, gid)
+                if _alt is not None:
+                    verweise_einbetten(s, _alt.uid)
                 s.execute(_delete(_FG).where(_FG.id == gid))
                 s.commit()
         except Exception as e:
@@ -4813,7 +4819,8 @@ class LiveView(QWidget):
                 if g is None:
                     return
                 try:
-                    pos = _json.loads(g.positions_json or "{}")
+                    from src.core.database.models import aufgeloeste_positionen
+                    pos = aufgeloeste_positionen(g, s)   # FM-20
                 except Exception:
                     pos = {}
                 # FM16E-HEADCOUNT: Basis-fids in Rasterreihenfolge (eine Quelle

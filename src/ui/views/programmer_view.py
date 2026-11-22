@@ -1314,7 +1314,8 @@ class ProgrammerView(QWidget):
         Ganzes/Kopf darin stehen — dieselbe Regel wie
         ``AppState.select_group_by_name``."""
         try:
-            pos = json.loads(group.positions_json or "{}")
+            from src.core.database.models import aufgeloeste_positionen
+            pos = aufgeloeste_positionen(group)   # FM-20: Bloecke aufloesen
         except Exception:
             return []
         from src.core.group_cells import zellen_in_grid_order
@@ -1338,7 +1339,8 @@ class ProgrammerView(QWidget):
         Reihenfolge, wie die Geräte auf dem Raster platziert wurden.
         """
         try:
-            pos = json.loads(group.positions_json or "{}")
+            from src.core.database.models import aufgeloeste_positionen
+            pos = aufgeloeste_positionen(group)   # FM-20: Bloecke aufloesen
         except Exception:
             return []
         # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" -> Basis-fid (eine Parse-Quelle

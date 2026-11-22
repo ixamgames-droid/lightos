@@ -423,11 +423,40 @@ mit der Liste „Gruppen wählen (von oben nach unten gestapelt):".
 Typischer Fall: zwei Mehrkopf-Geräte mit je 1×4 Köpfen ergeben eine 4×2-Matrix, über die
 ein Effekt dann als Fläche läuft.
 
-> **Grenze, damit du sie nicht erst am Rig entdeckst:** Für eine *zusammengelegte* Gruppe
-> gibt es kein Zurück auf die Einzelgruppen — beim Zusammenlegen wird nicht mitgeschrieben,
-> woher welche Zeile stammt. Rückrechenbar ist nur das Aufteilen/Zusammenfassen **pro
-> Gerät** aus den Abschnitten 3–5. Die Quellgruppen stehen aber noch da; im Zweifel
-> arbeitest du weiter mit ihnen.
+* **„als Blöcke einsetzen (Herkunft bleibt, Änderungen wirken nach)"** (Haken unter der
+  Liste): Statt die Zellen zu kopieren, steht jede gewählte Gruppe als **Block** im
+  Ergebnis (siehe Abschnitt 6a). Damit bleibt sichtbar, woher jede Zeile kommt, und
+  „Block in Einzelzellen aufteilen" führt jederzeit zurück. Ohne Haken wird wie bisher
+  kopiert. Die Regel, dass ein Gerät nur einmal im Raster steht, gilt bei Blöcken nicht über Blockgrenzen.
+
+> **Grenze, damit du sie nicht erst am Rig entdeckst:** Eine *ohne* Haken zusammengelegte
+> Gruppe merkt sich nicht, woher welche Zeile stammt. Rückrechenbar ist dort nur das
+> Aufteilen/Zusammenfassen **pro Gerät** aus den Abschnitten 3–5. Die Quellgruppen stehen
+> aber noch da; im Zweifel arbeitest du weiter mit ihnen.
+
+## 6a. Eine Gruppe als Block in eine andere Gruppe setzen
+
+Für den Fall, dass ein fertig angeordnetes Panel-Raster als **ein** Element neben die PARs soll — auch
+wenn das Panel aus **mehreren** Geräten besteht:
+
+1. Die größere Gruppe öffnen, **Rechtsklick auf eine freie Zelle** → **„Gruppe als Block
+   einsetzen"** → die gewünschte Gruppe wählen. Die Zelle ist die **linke obere Ecke**
+   des Blocks; das Raster wächst bei Bedarf mit.
+2. Der Block erscheint als gestrichelt umrandete Fläche mit dem Zeichen ▣ vor dem Gruppennamen. Ziehen an der
+   Ecke verschiebt ihn als Einheit; Rechtsklick darauf bietet **„Block drehen (90° im
+   Uhrzeigersinn)"**, **„Block in Einzelzellen aufteilen"** und **„Block entfernen"**.
+3. **Speichern** nicht vergessen.
+
+Gut zu wissen:
+
+* Gespeichert wird nur der **Verweis**. Änderst du später die eingesetzte Gruppe, wirkt
+  das sofort in der großen Gruppe nach — in Programmer, Matrix, EFX, virtueller Konsole
+  und Bühnenansicht. **Umbenennen** bricht den Verweis nicht.
+* **Löschst** du die eingesetzte Gruppe, werden ihre Zellen vorher als Einzelzellen in jede
+  große Gruppe übernommen — dort verschwindet kein Gerät.
+* Eine Gruppe kann sich nicht selbst enthalten, auch nicht über Umwege; solche Gruppen
+  stehen gar nicht erst im Menü.
+* Steht an einer Stelle des Blocks schon eine eigene Zelle, gewinnt die eigene Zelle.
 
 ---
 
