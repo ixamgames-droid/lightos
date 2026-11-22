@@ -836,6 +836,16 @@ class MainWindow(QMainWindow):
             new = set(getattr(mm, "_inputs", {}).keys()) - before
             if new:
                 print(f"[main_window] MIDI auto-connect: {sorted(new)}")
+            # MIDI-19: ein erkanntes APC mini mk2 bekommt seine LED-Rueckmeldung
+            # von selbst (auch nach spaeterem Einstecken) — bisher oeffnete nur
+            # der Knopf „APC LEDs" den Ausgang.
+            vc = getattr(self, "_vc_view", None)
+            auto = getattr(vc, "apc_leds_automatisch", None)
+            if callable(auto):
+                try:
+                    auto()
+                except Exception as e:
+                    print(f"[main_window] APC LEDs automatisch: {e}")
         except Exception as e:
             print(f"[main_window] MIDI auto-connect error: {e}")
 
