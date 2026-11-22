@@ -113,6 +113,7 @@ which you can switch off under **Ansicht → Touch-Gesten…** (View → touch g
 | 22 | **Tempo-Controller** (`VCTempoBusController`) | bus, source, factor, effect assignment and sync on one tile | [22_tempo_controller.en.md](22_tempo_controller.en.md) |
 | 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | fader workspace for SEVERAL effects, with tick-box selection | [23_live_edit.en.md](23_live_edit.en.md) |
 | 24 | **Raum-Pad** (room pad, `VCRaumPad`) | top view or unfolded room (floor + walls): tap a point, every assigned moving head aims at it; on/off and position lock | [24_raum_pad.en.md](24_raum_pad.en.md) |
+| 25 | **Pixelraster** (pixel grid, `VCPixelraster`) | paint live onto an LED matrix/head group: brush, eraser, fill, clear, resolution 1×1/2×2/4×4, store/recall drawings; own layer with level above running effects | [25_pixelraster.en.md](25_pixelraster.en.md) |
 
 ## Large editors (reachable from the VC)
 

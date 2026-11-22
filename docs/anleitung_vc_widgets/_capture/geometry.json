@@ -243,6 +243,17 @@
       "wy": 724,
       "ww": 260,
       "wh": 170
+    },
+    "VCPixelraster": {
+      "title": "Pixelraster (VCPixelraster)",
+      "x": 314,
+      "y": 700,
+      "w": 260,
+      "h": 194,
+      "wx": 314,
+      "wy": 724,
+      "ww": 260,
+      "wh": 170
     }
   }
 }
