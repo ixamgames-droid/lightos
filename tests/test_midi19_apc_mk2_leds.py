@@ -359,3 +359,24 @@ def test_fingertipp_schaltet_genau_einmal(ansicht, monkeypatch):
         assert k.isChecked()
     finally:
         hints.setMouseDoubleClickInterval(alt)
+
+
+# ── Nachbesserung nach Pruefung: Gegenprobe aus einer Agent-Shell ─────────────
+
+def test_auto_start_auch_bei_bewusst_freigegebener_ausgabe(monkeypatch):
+    """Aus einer Agent-Shell gestartet (STAB-39: keine echte App), aber mit
+    ``LIGHTOS_ECHTE_AUSGABE=1`` fuer die Gegenprobe am Geraet: der Auto-Start
+    muss greifen. Unter pytest dagegen nie (conftest gibt die Ausgabe frei)."""
+    import sys
+    from src.ui.views import virtual_console_view as vcv
+    monkeypatch.delenv("LIGHTOS_ECHTE_APP", raising=False)
+    monkeypatch.setenv("LIGHTOS_ECHTE_AUSGABE", "1")
+    monkeypatch.setattr(sys, "frozen", False, raising=False)
+    assert vcv._apc_auto_erlaubt() is False, "unter pytest kein Auto-Start"
+    monkeypatch.delitem(sys.modules, "pytest")
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    assert vcv._apc_auto_erlaubt() is True, "freigegebene Ausgabe = wie echte App"
+    monkeypatch.delenv("LIGHTOS_ECHTE_AUSGABE")
+    assert vcv._apc_auto_erlaubt() is False, "ohne Freigabe kein Auto-Start"
+    monkeypatch.setenv("LIGHTOS_ECHTE_APP", "1")
+    assert vcv._apc_auto_erlaubt() is True

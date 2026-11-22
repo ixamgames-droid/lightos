@@ -156,10 +156,23 @@ def _apc_auto_erlaubt() -> bool:
     """MIDI-19: Auto-Start der APC-LEDs nur in der echten App (STAB-39) —
     bewusst nicht ``echte_ausgabe_erlaubt``: die Testsuite gibt die Ausgabe
     frei (Schein-Ausgaenge), soll aber nie von selbst ein angestecktes Pult
-    ansprechen. Der Knopf bleibt davon unberuehrt."""
+    ansprechen. Der Knopf bleibt davon unberuehrt.
+
+    Nachbesserung MIDI-19: Eine aus einer Agent-Shell gestartete App (STAB-39:
+    ``CLAUDECODE=1`` -> keine echte App) mit bewusst freigegebener Ausgabe
+    (``LIGHTOS_ECHTE_AUSGABE=1`` je Befehl, z. B. fuer Robins Gegenprobe am
+    Geraet) soll sich wie die echte App verhalten — sonst bliebe genau bei der
+    Gegenprobe der Auto-Start aus. Unter pytest gilt die Freigabe nicht
+    (conftest setzt sie fuer die Schein-Ausgaenge); Muster lizenz.testlauf."""
     try:
-        from src.core.paths import ist_echte_app
-        return bool(ist_echte_app())
+        import os
+        import sys
+        from src.core.paths import ist_echte_app, echte_ausgabe_erlaubt
+        if ist_echte_app():
+            return True
+        unter_pytest = ("pytest" in sys.modules
+                        or "PYTEST_CURRENT_TEST" in os.environ)
+        return bool(echte_ausgabe_erlaubt()) and not unter_pytest
     except Exception:
         return False
 
