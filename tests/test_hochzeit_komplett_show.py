@@ -92,7 +92,7 @@ def test_rig_dichte(show):
 def test_alle_18_matrix_algorithmen(show):
     _, fm = show
     algos = {m.algorithm for m in fm.all() if isinstance(m, RgbMatrixInstance)}
-    assert set(RgbAlgorithm).issubset(algos), [a.name for a in set(RgbAlgorithm) - algos]
+    assert (set(RgbAlgorithm) - {RgbAlgorithm.MEDIA}).issubset(algos), [a.name for a in set(RgbAlgorithm) - algos - {RgbAlgorithm.MEDIA}]  # FM-81: Medien brauchen eine Datei
 
 
 def test_alle_4_matrix_styles(show):

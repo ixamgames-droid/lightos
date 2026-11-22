@@ -3209,6 +3209,13 @@ class AppState:
                 elif output == "sACN":
                     self.output_manager.add_sacn(num, patch or None,
                                                  out_universe=out_u)
+                elif output == "DDP" and patch:
+                    # OUT-82: ``patch`` = Ziel-IP (z. B. WLED), Spalte
+                    # „Ext. Universum“ = Byte-Offset im DDP-Strom (leer =
+                    # hinter dem vorigen Universum derselben IP).
+                    add_ddp = getattr(self.output_manager, "add_ddp", None)
+                    if callable(add_ddp):
+                        add_ddp(num, patch, offset=out_u)
             except Exception as e:
                 print(f"[app_state] apply_output_config: Universe {num} "
                       f"({output}) fehlgeschlagen: {e}")
@@ -6924,6 +6931,9 @@ def _ausgabe_nachfolger(output: str, patch: str, out_u):
         return ("artnet", patch or "255.255.255.255", out_u)
     if output == "sACN":
         return ("sacn", patch or "", out_u)
+    if output == "DDP" and str(patch or "").strip():
+        # OUT-82: ``out_u`` ist hier der Byte-Offset im DDP-Strom.
+        return ("ddp", str(patch).strip(), out_u)
     return None
 
 

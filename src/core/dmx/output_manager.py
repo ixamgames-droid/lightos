@@ -8,6 +8,7 @@ from .universe import Universe
 from .enttec_pro import EnttecPro, _port_key
 from .artnet import ArtNetSender
 from .sacn import SACNSender
+from .ddp import DDPStrom, DDPTeil
 
 
 def _gleicher_enttec_port(a, b) -> bool:
@@ -346,6 +347,9 @@ class OutputManager:
         # Slot (Widget-ID), damit sich mehrere Submaster nicht ueberschreiben.
         self._submasters: dict = {}
         self._sacn_outputs: dict[int, SACNSender] = {}  # universe → sender
+        # OUT-82: DDP (z. B. WLED). universe → DDPTeil; Universen mit derselben
+        # Ziel-IP teilen sich EINEN DDPStrom (ein Bild, ein Push).
+        self._ddp_outputs: dict[int, DDPTeil] = {}
         # OUT-03: pro internem Universum eine optionale, explizit konfigurierte
         # EXTERNE Universe-Nummer fuer Art-Net/sACN. Fehlt ein Eintrag, gilt der
         # abwaertskompatible Default (Art-Net = num-1, sACN = num). {internal:int
@@ -861,6 +865,19 @@ class OutputManager:
             reg = self._udmx_outputs = {}
         return reg
 
+    def _ddp_tabelle(self) -> dict:
+        """OUT-82: DDP-Tabelle (Lazy-Init fuer per ``__new__`` gebaute Manager)."""
+        reg = getattr(self, "_ddp_outputs", None)
+        if reg is None:
+            reg = self._ddp_outputs = {}
+        return reg
+
+    @staticmethod
+    def _weg_ddp(dev):
+        """OUT-82: ein DDP-Teil ist ein eigener Weg — Ziel-IP plus Offset."""
+        return ("ddp", str(getattr(dev, "target_ip", "") or ""),
+                int(getattr(dev, "offset", 0) or 0))
+
     @staticmethod
     def _weg_netz(protokoll: str, univ_num: int, ext):
         """Art-Net ``n-1`` und sACN ``n`` sind fuer LightOS dasselbe Universum
@@ -896,6 +913,9 @@ class OutputManager:
             wege.append(self._weg_netz("artnet", univ_num, ext))
         if dict(getattr(self, "_sacn_outputs", None) or {}).get(univ_num) is not None:
             wege.append(self._weg_netz("sacn", univ_num, ext))
+        ddp = dict(getattr(self, "_ddp_outputs", None) or {}).get(univ_num)
+        if ddp is not None:
+            wege.append(self._weg_ddp(ddp))          # OUT-82
         return wege
 
     def _estop_wege_nachfuehren(self):
@@ -999,7 +1019,8 @@ class OutputManager:
         """
         return any(universe in reg for reg in
                    (self._enttec_outputs, self._artnet_outputs,
-                    self._sacn_outputs, self._udmx_tabelle()))
+                    self._sacn_outputs, self._udmx_tabelle(),
+                    self._ddp_tabelle()))
 
     # ── OUT-51: Sendefehler buchen und auslesen ──────────────────────────────
 
@@ -1122,7 +1143,8 @@ class OutputManager:
         gruppen = (("Enttec", dict(self._enttec_outputs)),
                    ("Art-Net", dict(self._artnet_outputs)),
                    ("sACN", dict(self._sacn_outputs)),
-                   ("uDMX", dict(self._udmx_tabelle())))
+                   ("uDMX", dict(self._udmx_tabelle())),
+                   ("DDP", dict(self._ddp_tabelle())))
         paare = [(weg, u, dev) for weg, reg in gruppen
                  for u, dev in sorted(reg.items())]
         anhaltend = {(p["weg"], p["universum"]): p for p in self.sende_probleme()}
@@ -1548,7 +1570,7 @@ class OutputManager:
         (``""`` = der einzige vorhandene)."""
         if name in ("enttec", "udmx"):
             return str(getattr(dev, "port", "") or "")
-        if name == "artnet":
+        if name in ("artnet", "ddp"):
             return str(getattr(dev, "target_ip", "") or "")
         return str(getattr(dev, "_target_ip", None) or "")
 
@@ -1598,7 +1620,7 @@ class OutputManager:
         Attrappe ohne die Methode bleibt beim bisherigen Verhalten. Die Ansage
         gilt fuer genau EIN ``remove_output`` dieses Universums.
         """
-        if name not in ("enttec", "udmx", "artnet", "sacn"):
+        if name not in ("enttec", "udmx", "artnet", "sacn", "ddp"):
             raise ValueError(f"unbekannter Adaptertyp: {name!r}")
         ansagen = dict(getattr(self, "_nachfolger", None) or {})
         ansagen[int(universe)] = (name, str(ziel or ""), out_universe)
@@ -1619,6 +1641,10 @@ class OutputManager:
         if name != n_name or self._ziel_von(name, dev) != self._ziel_wie_gesendet(
                 name, n_ziel):
             return False
+        if name == "ddp":
+            # OUT-82: Offset statt Netz-Universum; ohne angesagten Offset
+            # (automatisch) gilt der Teil als derselbe.
+            return n_ext is None or int(n_ext) == int(getattr(dev, "offset", 0) or 0)
         return (self._netz_universum(name, universe, ext)
                 == self._netz_universum(name, universe, n_ext))
 
@@ -1843,8 +1869,40 @@ class OutputManager:
         self._estop_wege_nachfuehren()       # OUT-64
         self._entfernte_wege_vergessen(universe)
 
+    def add_ddp(self, universe: int, target_ip: str, offset=None):
+        """OUT-82: Universum als Teil eines DDP-Stroms an ``target_ip``.
+
+        Alle Universen mit derselben Ziel-IP teilen sich EINEN Strom; jedes
+        legt sein Bild ab ``offset`` (Byte im Empfaenger-Puffer) ab. Ohne
+        Offset: hinter dem letzten schon eingerichteten Teil derselben IP
+        (Universum-Laenge 512). Fuer eine Matrix mit ganzen Zeilen je
+        Universum den Offset aus ``wled.ddp_verteilung`` eintragen."""
+        ip = str(target_ip or "").strip()
+        if not ip:
+            raise ValueError("DDP braucht eine Ziel-IP")
+        reg = self._ddp_tabelle()
+        strom = None
+        ende = 0
+        for u, teil in reg.items():
+            if u != universe and teil.target_ip == ip and not teil._zu:
+                strom = teil.strom
+                ende = max(ende, teil.offset + 512)
+        if offset is None:
+            offset = ende
+        offset = int(offset)
+        if offset < 0:
+            raise ValueError(f"DDP-Offset negativ: {offset}")
+        if strom is None:
+            strom = DDPStrom(ip)
+        self._swap_device(reg, universe, DDPTeil(strom, offset), name="ddp",
+                          out_universe=offset)
+        # Der DDP-Offset ist KEINE externe Universe-Nummer — nichts merken.
+        self._set_out_universe(universe, None)
+        self._estop_wege_nachfuehren()       # OUT-64
+        self._entfernte_wege_vergessen(universe)
+
     #: NET-12: Registry-Name -> Registry-Attribut, fuer ``remove_output(ausser=…)``.
-    _REGISTRY_NAMEN = ("enttec", "artnet", "sacn", "udmx")
+    _REGISTRY_NAMEN = ("enttec", "artnet", "sacn", "udmx", "ddp")
 
     def remove_output(self, universe: int, ausser: str | None = None,
                       schlussbild: bool = False):
@@ -1898,7 +1956,8 @@ class OutputManager:
         registries = {"enttec": self._enttec_outputs,
                       "artnet": self._artnet_outputs,
                       "sacn": self._sacn_outputs,
-                      "udmx": self._udmx_tabelle()}
+                      "udmx": self._udmx_tabelle(),
+                      "ddp": self._ddp_tabelle()}
         if ausser is not None and ausser not in registries:
             raise ValueError(f"unbekannter Adaptertyp: {ausser!r}")
         # OUT-64 (Restluecke a): die Wege VOR dem Entfernen merken. Faellt der
@@ -1980,6 +2039,11 @@ class OutputManager:
                     # OUT-68: der Sender legt das Bild nur ab und schickt beim
                     # Schliessen (gleich danach) das zuletzt abgelegte noch einmal.
                     dev.send_dmx(self._bild_fuer_weg(data, self._weg_udmx()))
+                elif name == "ddp":
+                    # OUT-82: Teil in den Strom legen und sofort schicken —
+                    # der Ausgabe-Thread sieht diesen Teil nicht mehr.
+                    dev.send_dmx(self._bild_fuer_weg(data, self._weg_ddp(dev)))
+                    dev.strom.senden()
                 elif name == "artnet":
                     dev.send_dmx(
                         ext if ext is not None else universe - 1,
@@ -2084,7 +2148,8 @@ class OutputManager:
         # Thread ist sicher beendet -> kein gleichzeitiges write() mehr moeglich.
         with self._io_lock:
             for registry in (self._enttec_outputs, self._artnet_outputs,
-                             self._sacn_outputs, self._udmx_tabelle()):
+                             self._sacn_outputs, self._udmx_tabelle(),
+                             self._ddp_tabelle()):
                 for dev in registry.values():
                     try:
                         dev.close()
@@ -2098,7 +2163,8 @@ class OutputManager:
 
     def _hat_ausgaenge(self) -> bool:
         return bool(self._enttec_outputs or self._artnet_outputs
-                    or self._sacn_outputs or self._udmx_tabelle())
+                    or self._sacn_outputs or self._udmx_tabelle()
+                    or self._ddp_tabelle())
 
     def _sende_schlussbild(self):
         """OUT-71: EIN Blackout-Bild an alle Ausgaenge, dann die seriellen
@@ -2330,6 +2396,7 @@ class OutputManager:
         # Ladens aus. Das Schlussbild traegt sie immer.
         verwaist_masken = ((getattr(self, "_laser_aus_verwaist", None) or {})
                            if (lade is None or schlussbild) else {})
+        ddp_faellig: dict = {}       # OUT-82: id(strom) -> (strom, Universum)
         for univ_num, universe in list(self.universes.items()):
             # Im Freeze den festgehaltenen Stand senden statt des (u. U. direkt
             # beschriebenen) Live-Universums. Ein Universum, das es beim
@@ -2478,6 +2545,7 @@ class OutputManager:
                 udmx = (getattr(self, "_udmx_outputs", None) or {}).get(univ_num)
                 artnet = self._artnet_outputs.get(univ_num)
                 sacn = self._sacn_outputs.get(univ_num)
+                ddp = self._ddp_tabelle().get(univ_num)       # OUT-82
                 # OUT-03: konfigurierte externe Universe-Nummer (falls gesetzt),
                 # sonst abwaertskompatibler Default (Art-Net num-1, sACN num).
                 ext = self._out_universe.get(univ_num)
@@ -2541,7 +2609,28 @@ class OutputManager:
                         self._buche_fehler("sACN", univ_num, exc)
                     else:
                         self._buche_erfolg("sACN", univ_num)
+                if ddp is not None:
+                    # OUT-82: nur in den Strom legen — gesendet wird nach der
+                    # Schleife EINMAL je Ziel, Push im letzten Paket.
+                    try:
+                        bild = self._weg_nullen(data, wege.get(
+                            self._weg_ddp(ddp)) if wege else None)
+                        gesendet.append(("DDP", str(ddp.target_ip), bild))
+                        ddp.send_dmx(bild)
+                        ddp_faellig[id(ddp.strom)] = (ddp.strom, univ_num)
+                    except Exception as exc:
+                        self._buche_fehler("DDP", univ_num, exc)
                 merk = getattr(self, "_weg_gesendet", None)
                 if merk is None:                 # Manager per __new__ gebaut
                     merk = self._weg_gesendet = {}
                 merk[univ_num] = tuple(gesendet)
+        # OUT-82: jeder DDP-Strom geht als EIN Bild hinaus (alle Universen
+        # derselben Ziel-IP, Push im letzten Paket).
+        for strom, univ_num in ddp_faellig.values():
+            try:
+                with self._io_lock:
+                    strom.senden()
+            except Exception as exc:
+                self._buche_fehler("DDP", univ_num, exc)
+            else:
+                self._buche_erfolg("DDP", univ_num)

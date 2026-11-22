@@ -49,6 +49,9 @@ OPTION_LABELS_BY_KEY = {
     "loop_mode": {"reverse": "Rückwärts leeren"},
     # ENG-37: Betriebsart eines Modify-Effekts.
     "modify_mode": {"add": "Addieren", "sub": "Abziehen", "dim": "Abdunkeln"},
+    # FM-81: Medien-Ebene der Matrix.
+    "media_fit": {"fit": "Einpassen", "fill": "Füllen", "stretch": "Strecken"},
+    "media_rotation": {"0": "0°", "90": "90°", "180": "180°", "270": "270°"},
 }
 
 
