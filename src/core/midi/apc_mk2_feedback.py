@@ -12,6 +12,7 @@ Kanal-Modi (0x90 + n):
 
 Dieses Modul spiegelt den Zustand der VC-Buttons (geteachte MIDI-Note) auf die
 8x8-Pads: belegt = gedimmtes Blau, aktiv = Grün, gerade gedrueckt = Rot.
+MIDI-19: dazu leuchtet die Scene-Taste (rechts) der aktiven Seite.
 """
 from __future__ import annotations
 
@@ -42,6 +43,23 @@ VIOLET  = 53
 MAGENTA = 57
 
 PAD_MIN, PAD_MAX = 0, 63   # 8x8-Grid
+
+# ── MIDI-19: Einzel-LED-Tasten (Track unten, Scene rechts) ────────────────────
+# Quelle: Akai „APC mini mk2 Communication Protocol" (v1.0), Abschnitt
+# Track-/Scene-Buttons — im Repo gespiegelt in
+# data/controller_library/akai_apc_mini_mk2.json (``controls``/``led_feedback``)
+# und ui/virtualconsole/controller_templates.py (``apc_mini_mk2``):
+#   Track-Tasten unten  = Note 0x64..0x6B (100..107), rote Einzel-LED
+#   Scene-Tasten rechts = Note 0x70..0x77 (112..119), gruene Einzel-LED
+#   LED-Zustand per Note-On auf Kanal 1 (0x90), Velocity 0 = aus, 1 = an,
+#   2 = blinkend (keine Palette, kein Helligkeits-Kanal wie bei den Pads).
+# Das alte APC mini (apc_mini_feedback.py) hat die Seitentasten auf 82..89 und
+# zeigt die aktive Seite gelb; der mk2-Treiber kannte die Seitentasten bisher
+# gar nicht — deshalb blieb die Taste der aktiven Seite dunkel.
+TRACK_BTNS = list(range(0x64, 0x6C))    # 100..107
+SCENE_BTNS = list(range(0x70, 0x78))    # 112..119 = Seite 1..8
+KNOPF_STATUS = 0x90                     # Note-On, Kanal 1
+LED_AUS, LED_AN, LED_BLINK = 0, 1, 2
 
 # Repraesentative RGB-Werte der bekannten Paletten-Indizes — fuer das
 # Faerben von VCColor-Pads in ihrer tatsaechlichen Farbe (nearest match).
@@ -213,9 +231,47 @@ class ApcMk2Feedback:
         except Exception:
             return False
 
+    def set_knopf_led(self, note: int, wert: int) -> None:
+        """MIDI-19: Einzel-LED einer Track-/Scene-Taste (0 aus, 1 an, 2 blink).
+
+        Gleicher Diff-Cache wie die Pads (Noten 100+ kollidieren nicht mit
+        0..63) und dieselbe Regel: erst senden, dann merken."""
+        if note not in SCENE_BTNS and note not in TRACK_BTNS:
+            return
+        val = (KNOPF_STATUS, wert)
+        if self._cache.get(note) == val:
+            return
+        if self._send([KNOPF_STATUS, note & 0x7F, wert & 0x7F]):
+            self._cache[note] = val
+
     def clear_all(self):
         for n in range(64):
             self.set_pad(n, OFF, FULL)
+        for n in SCENE_BTNS:
+            self.set_knopf_led(n, LED_AUS)
+
+    def aktive_seite(self) -> int | None:
+        """MIDI-19: 0-basierte aktive Seite — die Seitentasten wechseln die
+        Executor-Seite (``page_select``), an der die VC-Bank haengt. Ohne
+        Playback-Engine die Bank der Konsole."""
+        try:
+            from src.core.app_state import get_state
+            pe = getattr(get_state(), "playback_engine", None)
+            if pe is not None:
+                return int(pe.current_page)
+        except Exception:
+            pass
+        bank = getattr(self._canvas, "active_bank", None)
+        try:
+            return int(bank()) if callable(bank) else int(bank)
+        except (TypeError, ValueError):
+            return None
+
+    def _seiten_leds(self) -> None:
+        """MIDI-19: Scene-Taste der aktiven Seite an, die anderen aus."""
+        seite = self.aktive_seite()
+        for i, note in enumerate(SCENE_BTNS):
+            self.set_knopf_led(note, LED_AN if i == seite else LED_AUS)
 
     # ── Lifecycle (kompatibel zu APCMiniFeedback) ──────────────────────────────
 
@@ -236,6 +292,9 @@ class ApcMk2Feedback:
         self._timer.setInterval(interval_ms)
         self._timer.timeout.connect(self._update)
         self._timer.start()
+        # MIDI-19: sofort einen Frame zeichnen — sonst stehen die LEDs bis zum
+        # ersten Timer-Tick (70 ms) auf dem eben gesendeten „alles aus".
+        self._update()
         print("[ApcMk2] LED-Feedback gestartet.")
 
     def _on_bpm_beat(self, idx: int):
@@ -283,7 +342,10 @@ class ApcMk2Feedback:
     # ── Update-Loop (UI-Thread via QTimer) ─────────────────────────────────────
 
     def _update(self):
-        if self._out is None or self._canvas is None:
+        if self._out is None:
+            return
+        if self._canvas is None:
+            self._seiten_leds()
             return
         import time
         try:
@@ -311,6 +373,7 @@ class ApcMk2Feedback:
             for n in range(64):
                 mode, color = desired.get(n, (FULL, OFF))
                 self.set_pad(n, color, mode)
+            self._seiten_leds()
         except Exception as e:
             print(f"[ApcMk2] Update-Fehler: {e}")
 

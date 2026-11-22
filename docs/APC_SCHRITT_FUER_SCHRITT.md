@@ -42,6 +42,8 @@ mini**. Jeder Abschnitt ist ein konkreter Ablauf zum Mitmachen.
 4. **APC mini anschließen** (USB, kein Treiber nötig). **E/A → MIDI**:
    APC mini muss als Eingang aktiv sein.
 5. **Virtual Console** öffnen → oben **„APC LEDs"** einschalten → die Pads leuchten.
+   Beim **APC mini mk2** ist „APC LEDs“ schon an — LightOS schaltet es ein, sobald es das
+   Gerät erkennt.
 6. **Seiten wechseln:** Mit den **Scene‑Tasten rechts** am APC (mk2: Notes 112–119)
    blätterst du durch die 6 Seiten — gleichzeitig auf dem APC (LED) und im VC.
 
