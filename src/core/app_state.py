@@ -1599,7 +1599,8 @@ class AppState:
         merged = drop_whole_cells_with_heads(merged)
         return max_cols, max(1, total_rows), merged
 
-    def merge_head_matrix_groups(self, gids, name=None, *, emit: bool = True):
+    def merge_head_matrix_groups(self, gids, name=None, *, emit: bool = True,
+                                  als_bloecke: bool = False):
         """FM-16e (Kopf-Matrizen ZUSAMMENLEGEN, David-Wunsch 2026-07-18): fasst
         mehrere (Kopf-)Matrix-Gruppen zu EINER groesseren Matrix zusammen — die N
         Raster werden in ``gids``-Reihenfolge untereinander gestapelt (Zeilen),
@@ -1619,7 +1620,15 @@ class AppState:
         Alt-Show-Gruppe beide Formen schon selbst mit, faellt die Ganz-Zelle
         ebenso — auch wenn die zweite Gruppe voellig unbeteiligt ist. Das ist
         gewollt (die Regel gilt dem Ergebnis) und stand vorher enger im Text,
-        als der Code sie umsetzt; gefunden in der Gegenpruefung."""
+        als der Code sie umsetzt; gefunden in der Gegenpruefung.
+
+        FM-20 ``als_bloecke=True``: statt die Zellen zu KOPIEREN, steht jede
+        Quellgruppe als Verweis-Block (``"g:<uid>"``) an ihrem Zeilen-Offset im
+        Ergebnis. Das ist die Provenienz: woher jede Zeile kommt, steht im Raster
+        selbst, „Block aufteilen" ist reines Aufloesen, und eine spaetere
+        Aenderung der Quellgruppe wirkt im Ergebnis nach. Die FM-32/37-Bereinigung
+        (ein Geraet nur in einer Form/Zelle) gilt hier NICHT ueber Blockgrenzen;
+        Standard bleibt das Kopieren."""
         eng = getattr(self, "_show_engine", None)
         if eng is None:
             return None
@@ -1635,12 +1644,14 @@ class AppState:
                     _select(_FG).where(_FG.id.in_(gids))).scalars().all()}
                 grids: list[tuple[int, int, dict]] = []
                 names: list[str] = []
+                uids: list[str] = []
                 for gid in gids:                      # Reihenfolge = Stapel-Reihenfolge
                     g = by_id.get(gid)
                     if g is None:
                         continue
                     try:
-                        pos_raw = _json.loads(g.positions_json or "{}")
+                        from src.core.database.models import aufgeloeste_positionen  # FM-20
+                        pos_raw = aufgeloeste_positionen(g, s)
                     except Exception:
                         pos_raw = {}
                     positions: dict = {}
@@ -1652,10 +1663,21 @@ class AppState:
                             continue
                     grids.append((int(g.cols or 1), int(g.rows or 1), positions))
                     names.append(g.name or "")
+                    uids.append(g.uid or "")
                 if len(grids) < 2:
                     return None
-                cols, rows, merged = self._stack_group_grids(grids)
-                merged_json = _json.dumps({f"{c},{r}": v for (c, r), v in merged.items()})
+                if als_bloecke and all(uids):
+                    from .group_cells import gruppen_verweis
+                    cols = max(c for c, _r, _p in grids)
+                    rows, bloecke = 0, {}
+                    for (_c, r_n, _p), u in zip(grids, uids):
+                        bloecke[f"0,{rows}"] = gruppen_verweis(u)
+                        rows += r_n
+                    merged_json = _json.dumps(bloecke)
+                else:
+                    cols, rows, merged = self._stack_group_grids(grids)
+                    merged_json = _json.dumps(
+                        {f"{c},{r}": v for (c, r), v in merged.items()})
                 label = name or (" + ".join(n for n in names if n)[:60] or "Matrix")
                 ng = _FG(name=label, cols=cols, rows=rows,
                          positions_json=merged_json, folder="Matrizen")
@@ -4435,7 +4457,8 @@ class AppState:
                     return None, {}
                 # Attribute NOCH IN der Session lesen (nach dem Schliessen kann eine
                 # expire_on_commit-Session sie nicht mehr nachladen).
-                return g.id, (json.loads(g.positions_json or "{}") or {})
+                from .database.models import aufgeloeste_positionen  # FM-20
+                return g.id, (aufgeloeste_positionen(g, s) or {})
         except Exception:
             return None, {}
 
@@ -4625,7 +4648,8 @@ class AppState:
                     # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" mitzaehlen (eine
                     # Parse-Quelle) — sonst leerer Preset-Browser-Eintrag.
                     try:
-                        _pos = json.loads(g.positions_json or "{}") or {}
+                        from .database.models import aufgeloeste_positionen  # FM-20
+                        _pos = aufgeloeste_positionen(g, s) or {}
                         fids = base_fids_in_grid_order(_pos)
                         # ★★ FM-41: DANEBEN die zweite, groesszuegige Antwort —
                         # "wird hier ueberhaupt erwaehnt". `fids` sagt, was die

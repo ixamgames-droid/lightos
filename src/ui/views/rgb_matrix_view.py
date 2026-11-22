@@ -2636,8 +2636,12 @@ class RgbMatrixView(QWidget):
                         grids_from_positions, weiss_grid_from_positions)
                     with Session(eng) as s:
                         g = s.get(FixtureGroup, gid)
+                        # FM-20: Untergruppen-Bloecke aufloesen, solange die
+                        # Session offen ist.
+                        from src.core.database.models import aufgeloeste_positionen
+                        positions = (aufgeloeste_positionen(g, s)
+                                     if g is not None else {})
                     if g is not None:
-                        positions = json.loads(g.positions_json or "{}")
                         # FM-16: fixture_grid + head_grid parallel (Pro-Kopf-Zellen
                         # "fid:head" tragen einen Kopf-Index; reine fids -> None).
                         grid, head_grid = grids_from_positions(positions, g.cols, g.rows)
