@@ -1,7 +1,7 @@
 ID: OUT-82
 Prioritaet: P2
 Status: teils
-Status-Notiz: DDP-Ausgabe, WLED-Suche und Matrix-Verteilung gebaut; Abnahme am echten WLED offen
+Status-Notiz: DDP-Ausgabe, WLED-Suche und Matrix-Verteilung samt Knoepfen im Ausgabe-Dialog gebaut; Abnahme am echten WLED und KiNET offen
 Titel: Pixel-Ausgabe an LED-Controller: WLED ueber WLAN und gaengige Pixel-Protokolle
 
 **Herkunft:** Wunsch des Betreibers vom 22.11.2026: LED-Matrizen auch ueber WLAN (WLED) und ueber Standardprotokolle namhafter Hersteller ansteuern.
@@ -12,4 +12,6 @@ Titel: Pixel-Ausgabe an LED-Controller: WLED ueber WLAN und gaengige Pixel-Proto
 
 **Geliefert (22.11.2026):** Recherche in docs/PIXEL_CONTROLLER.md (WLED-Doku verlinkt; die DDP-Spezifikationsseite und die Herstellerseiten von Advatek/ENTTEC waren nicht abrufbar, das steht dort). Neue Ausgabe-Art „DDP (WLED)“ im Reiter Universen: alle Universen derselben Ziel-IP gehen als ein DDP-Strom hinaus (Offset je Universum in der Spalte „Ext. Universum“, Pakete bis 1440 Byte, Push nur im letzten), mit Blackout, Grand Master und Laser-NOT-AUS je Ausgabeweg wie Art-Net/sACN, gesperrt im Probelauf (STAB-39). WLED-Suche ohne neue Abhaengigkeit: mDNS-Anfrage nach _wled._tcp, sonst manuelle IP, je Treffer /json/info (Name, LED-Zahl) mit kurzer Zeitgrenze (src/core/dmx/wled.py). Matrix-Verteilung: wled.ddp_verteilung rechnet fuer eine Matrix aus dem LED-Matrix-Assistenten Universum und Offset je Teil; Anleitung „Ausgabe einrichten“ Abschnitt 4b. Art-Net/sACN-Pixelcontroller laufen ueber die vorhandenen Ausgaben (je Universum eine Zeile). Test tests/test_out82_ddp_wled.py.
 
-**Offen:** Abnahme an einem echten WLED-Geraet (Bildsynchronitaet, WLAN-Last); Knopf „WLED suchen“ im Dialog und Assistenten-Seite fuer die Matrix-Verteilung (Funktionen stehen, Oberflaeche fehlt); Schlussbild fuer DDP im Fall eines haengenden Ausgabe-Threads; KiNET nicht umgesetzt.
+**Nachtrag (22.11.2026, abends):** Im Reiter Universen des Ausgabe-Dialogs zwei Knoepfe (src/ui/widgets/wled_auswahl.py, output_config.py). „WLED suchen“ ruft wled.wled_suchen in einem Hilfs-Thread (Muster der uDMX-Suche: Thread kennt nur ein Ergebnis-Dict, Timer holt ab, Gesamt-Zeitgrenze 10 s), zeigt die Treffer (Name, IP, LED-Zahl) zur Auswahl und traegt die IP mit Ausgabe-Art DDP in die markierte Zeile (sonst neue Zeile); eine schon eingetragene IP wird als manuelle Adresse mitgefragt. „Matrix verteilen…“ fasst die gepatchten Teile einer Assistenten-Matrix zu einem Eintrag zusammen (gleiches Profil, Beschriftung „Name Tk“, Start = kleinstes Universum), zeigt die Vorschau aus wled.ddp_hinweis und traegt je Teil DDP, IP und Offset aus wled.ddp_verteilung ein (fehlende Universums-Zeilen werden angelegt). Beides aendert nur die Tabelle, gespeichert wird mit „Speichern“. Statt einer eigenen Assistenten-Seite reicht dieser Knopf: die Verteilung braucht nur Matrix und IP. Dialoge ueber dialog_hilfe.offen, im Touch-Modus 44 px. Tests in tests/test_out82_ddp_wled.py (Suche gemockt, Zeitgrenze, kein Treffer, Verteilung samt Speichern, Abbrechen, Touch).
+
+**Offen:** Abnahme an einem echten WLED-Geraet (Bildsynchronitaet, WLAN-Last, echte mDNS-Antwort); Schlussbild fuer DDP im Fall eines haengenden Ausgabe-Threads; KiNET nicht umgesetzt.

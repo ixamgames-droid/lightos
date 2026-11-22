@@ -310,6 +310,20 @@ großen Matrix wechseln gleichzeitig.
 4. In WLED unter *Sync Interfaces* nichts weiter einstellen: DDP läuft dort
    immer im Modus „Multi RGB“ auf UDP-Port 4048.
 
+**Schneller mit den Knöpfen unter der Tabelle:**
+
+- **WLED suchen** fragt das Netz nach WLED-Geräten (mDNS) und zeigt jedes mit
+  Name, IP und LED-Zahl. Die gewählte IP kommt in die markierte Zeile, die
+  Ausgabe-Art wird „DDP (WLED)“; ohne markierte Zeile entsteht eine neue. Die
+  Suche läuft im Hintergrund und gibt nach höchstens 10 Sekunden auf. Findet
+  sie nichts (Netz ohne Multicast), die IP von Hand in „Patch“ eintragen —
+  beim nächsten „WLED suchen“ wird sie mitgefragt.
+- **Matrix verteilen…** wählt eine gepatchte Matrix aus dem
+  LED-Matrix-Assistenten und eine WLED-IP und trägt je Teil Universum,
+  „DDP (WLED)“, IP und Offset ein (Vorschau im Fenster).
+
+Beides ändert nur die Tabelle — übernommen wird erst mit **Speichern**.
+
 Pixel-Controller mit vielen Universen (Advatek PixLite, ENTTEC Octo, Falcon)
 bekommen ihre Universen wie gewohnt per **Art-Net** oder **sACN**, je
 Universum eine Zeile. Welche Protokolle die Geräte sprechen und woher die
