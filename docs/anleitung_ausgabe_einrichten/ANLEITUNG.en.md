@@ -300,6 +300,34 @@ Tab **sACN (E1.31)**:
 5. **Übernehmen** — sets up the output and saves it; the status reads, for example,
    `Aktiv · Multicast (239.255.0.x) · Universum 1 (gespeichert)`.
 
+## 4b. DDP (WLED) and pixel controllers
+
+For LED matrices and pixel strips on a **WLED** controller (Wi-Fi) there is the
+output type **"DDP (WLED)"**. DDP has no 512-channel limit: all universes with
+the same target IP go out as **one** data stream, and the controller shows the
+frame only once the last packet has arrived — all parts of a large matrix
+change at the same time.
+
+1. In the **Universen** tab choose **DDP (WLED)** for every universe of the
+   matrix and enter the controller's IP as target (e.g. `192.0.2.50`).
+2. For DDP the **Ext. Universum** column holds the **byte offset** of the
+   universe within the stream. Empty = right after the previous universe with
+   the same IP (512 bytes further).
+3. A matrix from the **LED matrix assistant** uses whole rows per universe
+   (e.g. 20 pixels × 8 rows = 480 channels). For the pixels to arrive without
+   gaps, a part's offset is the sum of the channels of all parts before it:
+   0, 480, 960 … Leave out master or strobe channels for WLED — they would sit
+   in the stream and shift the pixels.
+4. Nothing else to set up in WLED: DDP always runs in "Multi RGB" mode on UDP
+   port 4048.
+
+Pixel controllers with many universes (Advatek PixLite, ENTTEC Octo, Falcon)
+get their universes via **Art-Net** or **sACN** as usual, one row per universe.
+Which protocols the devices speak, with sources, is in
+[PIXEL_CONTROLLER.md](../PIXEL_CONTROLLER.md).
+
+In a dry run (app not started via `main.py`) DDP sends nothing either.
+
 ## 5. All universes at once: the Universen tab
 
 Tab **Universen** — here you see and edit all outputs in one table:
