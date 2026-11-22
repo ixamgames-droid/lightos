@@ -190,6 +190,39 @@ def windows_port_belegt(port: str, oeffner=None) -> bool | None:
     return None                                          # unbekannter Fehler
 
 
+def verdaechtige_aus_liste(prozesse, eigene_pid: int) -> list[tuple[int, str]]:
+    """OUT-83: aus ``[(pid, eltern_pid, name)]`` die Python-Verdaechtigen.
+
+    Ausgelassen werden der eigene Prozess **und seine Elternkette**. Gemessen
+    am 22.11.2026 (HW-6, Windows, echter Enttec): ein venv-``python.exe`` ist
+    unter Windows ein kleiner Starter, der den eigentlichen Interpreter als
+    KIND startet und selbst weiterlaeuft. Er hat den Port nie angefasst, stand
+    aber in der Verdachtsliste — der Bediener haette womoeglich die eigene
+    Instanz abgeschossen. Dasselbe gilt fuer ein ``python``-Startskript ueber
+    der App.
+
+    Kinder der eigenen Instanz bleiben bewusst drin: ein eigener Ausgabe-Worker
+    eines anderen Universums kann den Port wirklich halten.
+
+    Die Kette wird mit Merkliste und Obergrenze verfolgt — Windows vergibt
+    PIDs neu, ein ``eltern_pid`` kann also auf einen laengst anderen Prozess
+    zeigen und im ungluecklichsten Fall einen Kreis schliessen. Der Preis
+    dieser Wiederverwendung (ein fremder Python-Prozess mit zufaellig der PID
+    eines toten Vorfahren faellt heraus) ist klein gegen den Nutzen.
+    """
+    eltern = {pid: ppid for pid, ppid, _name in prozesse}
+    ausnehmen = {eigene_pid}
+    pid = eigene_pid
+    for _ in range(64):
+        ppid = eltern.get(pid)
+        if not ppid or ppid in ausnehmen:
+            break
+        ausnehmen.add(ppid)
+        pid = ppid
+    return [(pid, name) for pid, _ppid, name in prozesse
+            if pid not in ausnehmen and name.lower().startswith("python")]
+
+
 def windows_verdaechtige_prozesse(eigene_pid: int | None = None) -> list[tuple[int, str]]:
     """Python-Prozesse dieses Rechners — als VERDACHT, nicht als Feststellung.
 
@@ -203,6 +236,9 @@ def windows_verdaechtige_prozesse(eigene_pid: int | None = None) -> list[tuple[i
     Datei laeuft in einem Pfad, in dem gerade eine Ausgabe starten will).
     Der Preis: der Schnappschuss kennt den Prozess**namen**, nicht die
     Kommandozeile — deshalb steht in der Meldung, wie man sie nachschlaegt.
+
+    OUT-83: die **Elternkette** der eigenen Instanz faellt ebenfalls heraus
+    (s. :func:`verdaechtige_aus_liste`).
     """
     if eigene_pid is None:
         eigene_pid = os.getpid()
@@ -232,32 +268,74 @@ def windows_verdaechtige_prozesse(eigene_pid: int | None = None) -> list[tuple[i
         try:
             eintrag = PROCESSENTRY32W()
             eintrag.dwSize = ctypes.sizeof(PROCESSENTRY32W)
-            gefunden: list[tuple[int, str]] = []
+            prozesse: list[tuple[int, int, str]] = []
             weiter = k32.Process32FirstW(schnapp, ctypes.byref(eintrag))
             while weiter:
-                name = eintrag.szExeFile
-                pid = int(eintrag.th32ProcessID)
-                if pid != eigene_pid and name.lower().startswith("python"):
-                    gefunden.append((pid, name))
+                prozesse.append((int(eintrag.th32ProcessID),
+                                 int(eintrag.th32ParentProcessID),
+                                 str(eintrag.szExeFile)))
                 weiter = k32.Process32NextW(schnapp, ctypes.byref(eintrag))
-            return gefunden
+            return verdaechtige_aus_liste(prozesse, eigene_pid)
         finally:
             k32.CloseHandle(schnapp)
     except Exception:                                    # noqa: BLE001
         return []
 
 
+#: OUT-83: Ports, die beim Anlegen der Ausgabe als belegt erkannt wurden —
+#: ``{port: [(pid, name), ...]}`` (die Verdachtsliste). ``ausgabe_status`` des
+#: OutputManagers liest daraus den Grund fuer das Banner, solange der Ausgang
+#: nicht sendet; sobald er sendet, wird der Eintrag verworfen.
+_BELEGT_GEMELDET: dict[str, list[tuple[int, str]]] = {}
+
+
+def merke_belegt(port: str, verdaechtig) -> None:
+    _BELEGT_GEMELDET[str(port)] = list(verdaechtig or [])
+
+
+def vergiss_belegt(port: str) -> None:
+    _BELEGT_GEMELDET.pop(str(port), None)
+
+
+def belegt_grund(port: str) -> str:
+    """OUT-83: Banner-Grund fuer einen als belegt gemeldeten Port, sonst ``""``.
+
+    ★ Warum es das braucht: ohne diesen Grund zeigte das Banner beim belegten
+    Port „Adapter nicht verbunden (USB-Kabel/Port pruefen)“ — der Bediener
+    suchte am Kabel, obwohl nur ein anderes Programm den Port hielt (HW-6,
+    22.11.2026). Der Text verweist auf die Verdachtsliste im Sitzungs-Log und
+    nennt die ersten PIDs selbst, damit man nicht erst suchen muss.
+    """
+    if str(port) not in _BELEGT_GEMELDET:
+        return ""
+    verdaechtig = _BELEGT_GEMELDET[str(port)]
+    text = "Port von einem anderen Programm belegt"
+    if verdaechtig:
+        pids = ", ".join(f"PID {pid} {name}" for pid, name in verdaechtig[:3])
+        mehr = f" +{len(verdaechtig) - 3}" if len(verdaechtig) > 3 else ""
+        return (f"{text} — Verdacht: {pids}{mehr} "
+                f"(Verdachtsliste im Sitzungs-Log)")
+    return (f"{text} (z. B. QLC+, ein Terminal; Verdachtsliste im "
+            f"Sitzungs-Log)")
+
+
 def _warne_windows(port: str, ausgabe) -> list[tuple[int, str]]:
     """Die Windows-Haelfte von ``warne_wenn_belegt``."""
     belegt = windows_port_belegt(port)
     if belegt is not True:
+        vergiss_belegt(port)
         return []                                        # frei ODER unbekannt
     verdaechtig = windows_verdaechtige_prozesse()
+    merke_belegt(port, verdaechtig)
     print(f"[OutputManager] WARNUNG: {port} ist bereits von einem anderen "
           f"Prozess geoeffnet — Windows vergibt serielle Ports exklusiv.",
           file=ausgabe)
+    # OUT-83: frueher hiess es hier „ohne dass ein Fehler im Bild erscheint“.
+    # Das Banner meldet den Ausfall aber — und seit OUT-83 auch den richtigen
+    # Grund. Die Zeile sagt jetzt, was der Bediener tatsaechlich sieht.
     print("[OutputManager] Die Ausgabe wird deshalb NICHT anlaufen: der Worker "
-          "bleibt abgeschaltet, ohne dass ein Fehler im Bild erscheint.",
+          "bleibt abgeschaltet, bis der Port frei wird; oben im Fenster "
+          "steht das Banner „Port von einem anderen Programm belegt“.",
           file=ausgabe)
     if verdaechtig:
         print(f"[OutputManager] Verdacht (nicht bewiesen — Windows nennt den "

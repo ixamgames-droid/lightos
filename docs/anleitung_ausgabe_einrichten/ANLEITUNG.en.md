@@ -455,6 +455,12 @@ sending again for a few seconds; a click on the text opens the dialog from step 
 kiosk mode). If **no** output is set up at all, a subtle `Probenmodus — es wird kein DMX
 gesendet` (rehearsal mode — no DMX is being sent) is shown there.
 
+On Windows a COM port can only be used by one program. If another one already holds it
+(a second LightOS, QLC+, a leftover of an earlier run), the reason reads
+`Port von einem anderen Programm belegt` (port taken by another program) — with the first
+suspected processes (PID). The full list of suspects is in the session log. Then do not
+check the USB cable but close the other program; output then starts by itself.
+
 The bar lies **on top of** the upper edge of the view currently shown, directly below the
 bar with STOP ALL, BLACKOUT and the grand master (in kiosk mode below the strip with
 the grand master, STOP ALL, BLACKOUT and the laser emergency stop). It does not push anything down: when it appears or disappears, all

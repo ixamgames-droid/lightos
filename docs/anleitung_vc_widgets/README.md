@@ -108,6 +108,7 @@ Antippen) — **MIDI/APC steuert weiter**.
 | 22 | **Tempo-Controller** (`VCTempoBusController`) | Bus, Quelle, Faktor, Effekt-Zuordnung und Sync auf einer Kachel | [22_tempo_controller.md](22_tempo_controller.md) |
 | 23 | **Live-Edit-Panel** (`VCMultiLiveEditor`) | Regler-Arbeitsplatz für MEHRERE Effekte, mit Haken-Auswahl | [23_live_edit.md](23_live_edit.md) |
 | 24 | **Raum-Pad** (`VCRaumPad`) | Draufsicht oder aufgeklappter Raum (Boden + Wände): Punkt antippen, alle zugeordneten Moving Heads zielen darauf; AN/AUS und Position Lock | [24_raum_pad.md](24_raum_pad.md) |
+| 25 | **Pixelraster** (`VCPixelraster`) | Auf eine LED-Matrix/Kopf-Gruppe live malen: Pinsel, Radierer, Füllen, Löschen, Auflösung 1×1/2×2/4×4, Bilder merken/abrufen; eigene Ebene mit Pegel über laufenden Effekten | [25_pixelraster.md](25_pixelraster.md) |
 
 ## Große Editoren (aus der VC erreichbar)
 

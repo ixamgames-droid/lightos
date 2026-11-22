@@ -82,6 +82,7 @@ from src.ui.virtualconsole.vc_effect_editor import VCEffectEditor
 from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
 from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
 from src.ui.virtualconsole.vc_raumpad import VCRaumPad
+from src.ui.virtualconsole.vc_pixelraster import VCPixelraster
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # TOOL-10: LIGHTOS_GEN_OUT lenkt die Show in einen Wegwerf-Ordner um (Test baut
@@ -932,6 +933,14 @@ def raum_pad(caption, x, y, bank, fids, ww=260, hh=240):
     _add(w, x, y, ww, hh, bank)
 
 
+def pixelraster(caption, x, y, bank, gruppe, ww=320, hh=200):
+    """VCB-51: auf das Raster einer Gruppe live malen (eigene Ebene mit Pegel)."""
+    w = VCPixelraster(caption)
+    w.gruppe = gruppe
+    w.pegel = 0.0          # Show-Start: Zeichen-Ebene aus, bis jemand den Pegel zieht
+    _add(w, x, y, ww, hh, bank)
+
+
 def multi_live_editor(caption, x, y, bank, fids, ww=300, hh=240):
     w = VCMultiLiveEditor(caption)
     for fid in fids:
@@ -988,6 +997,7 @@ select_group_btn("Alles", "Alles", note_rc(4, 7), B_COLOR)
 eff_colors("Effekt-Farben (Verlauf)", RX, Y0, B_COLOR, cf_front_grad.id)
 color_list("Farb-Sequenz (Farbwechsel)", RX, Y0 + 94, B_COLOR, cf_front_cycle.id)
 song_info(RX, Y0 + 200, B_COLOR)
+pixelraster("PAR-Reihe malen", RX + 320, Y0, B_COLOR, "PAR-Reihe")
 fader("Master", 0, B_COLOR, SliderMode.EFFECT_INTENSITY, midi_cc=48, value=255)
 fader("Front-Dim", 3, B_COLOR, SliderMode.GROUP_DIMMER, programmer_group="Paarlichter", midi_cc=51, value=255)
 label("BANK 1  FARBEFFEKTE (nur Farbe)  —  R0: Farbe → färbt den LAUFENDEN Effekt um. R1-2: Paarlichter "

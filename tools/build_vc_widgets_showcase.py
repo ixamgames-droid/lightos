@@ -56,6 +56,7 @@ from src.ui.virtualconsole.vc_effect_display import VCEffectDisplay
 from src.ui.virtualconsole.vc_tempo_bus_controller import VCTempoBusController
 from src.ui.virtualconsole.vc_multi_live_editor import VCMultiLiveEditor
 from src.ui.virtualconsole.vc_raumpad import VCRaumPad
+from src.ui.virtualconsole.vc_pixelraster import VCPixelraster
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # DOC-14: LIGHTOS_GEN_OUT / LIGHTOS_GEN_GEO lenken Show und Geometrie um — so
@@ -283,6 +284,10 @@ reihe(le, "VCMultiLiveEditor", "Live-Edit (VCMultiLiveEditor)", 320, 400)
 # Pad zeigt deshalb seinen Leerhinweis (der Platz ist das, was hier zaehlt).
 rp = VCRaumPad("Raum-Pad")
 place(rp, "VCRaumPad", "Raum-Pad (VCRaumPad)", _START_X, 700, 260, 170)
+# VCB-51: Pixelraster rechts neben dem Raum-Pad, aus demselben Grund fest
+# gesetzt. Ohne zugeordnete Gruppe zeigt es seinen Leerhinweis.
+pr = VCPixelraster("Pixelraster")
+place(pr, "VCPixelraster", "Pixelraster (VCPixelraster)", _START_X + 284, 700, 260, 170)
 
 # ── Speichern ────────────────────────────────────────────────────────────────
 state._vc_layout = {"widgets": widgets}
