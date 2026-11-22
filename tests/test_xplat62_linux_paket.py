@@ -79,7 +79,8 @@ class DebAusKuenstlichemOrdner(unittest.TestCase):
         self.assertEqual(self._feld("Architecture"), "amd64")
         self.assertTrue(self._feld("Installed-Size").isdigit())
         dep = self._feld("Depends")
-        for d in ("libc6", "libxcb-cursor0", "libnss3", "libusb-1.0-0"):
+        for d in ("libc6", "libxcb-cursor0", "libnss3", "libusb-1.0-0",
+                  "libwayland-server0"):
             self.assertIn(d, dep)
         # Python und Qt bringt PyInstaller mit — nie als Systemabhaengigkeit.
         self.assertNotRegex(dep, r"python3|libqt6|pyside")
@@ -234,3 +235,11 @@ class Workflow(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_linux_paket_bringt_pyusb_mit():
+    """Erster CI-Lauf: ``usb.core`` fehlte im Paket (pyusb steht in
+    requirements.txt nur fuer Windows) — uDMX ginge im .deb nicht."""
+    with open(os.path.join(_REPO, ".github", "workflows", "linux-paket.yml"),
+              encoding="utf-8") as f:
+        assert "pyusb" in f.read()

@@ -75,6 +75,24 @@ ABHAENGIGKEITEN = (
     "libnss3",
     "libasound2t64 | libasound2",
     "libusb-1.0-0",
+    # Erster echter CI-Lauf (22.11.2026, frischer ubuntu:24.04-Container):
+    # QtWebEngine scheiterte an libwayland-server.so.0; ldd meldete fuer die
+    # Qt-xcb-Plattform und Chromium ausserdem diese Systembibliotheken.
+    "libwayland-server0",
+    "libxcb-icccm4",
+    "libxcb-keysyms1",
+    "libxcb-shape0",
+    "libxkbfile1",
+    "libxcomposite1",
+    "libxdamage1",
+    "libxrandr2",
+    "libxtst6",
+    "libxfixes3",
+    "libxrender1",
+    "libxi6",
+    "libdbus-1-3",
+    "libglib2.0-0t64 | libglib2.0-0",
+    "libpulse0",
 )
 
 STARTER = """#!/bin/sh

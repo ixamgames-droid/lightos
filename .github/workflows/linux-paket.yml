@@ -61,6 +61,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install "pyinstaller>=6.10"
+          # uDMX (CYL-6602): requirements.txt nennt pyusb nur fuer Windows —
+          # im Linux-Paket muss es mit, libusb kommt aus dem System (Depends).
+          python -m pip install "pyusb>=1.2.1"
 
       # Version aus dem Repo: APP_VERSION in main.py ist die einzige Quelle.
       - name: Version ermitteln
