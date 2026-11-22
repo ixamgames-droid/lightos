@@ -3031,6 +3031,186 @@
           ]
         }
       ]
+    },
+    "Bild/Video": {
+      "colors": 0,
+      "has_direction": true,
+      "params": [
+        {
+          "key": "speed",
+          "label": "Geschwindigkeit",
+          "kind": "float",
+          "range": [
+            0.01,
+            20.0
+          ]
+        },
+        {
+          "key": "intensity",
+          "label": "Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "offset",
+          "label": "Versatz",
+          "kind": "float",
+          "range": [
+            0.0,
+            16.0
+          ]
+        },
+        {
+          "key": "intensity_min",
+          "label": "Dimmer min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "intensity_max",
+          "label": "Dimmer max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_min",
+          "label": "Shutter min",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "shutter_max",
+          "label": "Shutter max",
+          "kind": "int",
+          "range": [
+            0,
+            255
+          ]
+        },
+        {
+          "key": "tempo_bus_id",
+          "label": "Tempo-Bus",
+          "kind": "select",
+          "options": [
+            "Global",
+            "",
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        {
+          "key": "tempo_multiplier",
+          "label": "Tempo ×",
+          "kind": "float",
+          "range": [
+            0.0625,
+            16.0
+          ]
+        },
+        {
+          "key": "phase_offset",
+          "label": "Tempo-Versatz (Beats)",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "env_fade_in",
+          "label": "Fade ein (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade_out",
+          "label": "Fade aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "env_fade",
+          "label": "Fade ein+aus (s)",
+          "kind": "float",
+          "range": [
+            0.0,
+            10.0
+          ]
+        },
+        {
+          "key": "direction",
+          "label": "Richtung",
+          "kind": "select",
+          "options": [
+            "forward",
+            "reverse"
+          ]
+        },
+        {
+          "key": "media_fit",
+          "label": "Einpassung",
+          "kind": "select",
+          "options": [
+            "fit",
+            "fill",
+            "stretch"
+          ]
+        },
+        {
+          "key": "media_rotation",
+          "label": "Drehung",
+          "kind": "select",
+          "options": [
+            "0",
+            "90",
+            "180",
+            "270"
+          ]
+        },
+        {
+          "key": "media_brightness",
+          "label": "Bild-Helligkeit",
+          "kind": "float",
+          "range": [
+            0.0,
+            1.0
+          ]
+        },
+        {
+          "key": "media_tempo",
+          "label": "Bild-Tempo",
+          "kind": "float",
+          "range": [
+            0.1,
+            8.0
+          ]
+        },
+        {
+          "key": "media_loop",
+          "label": "Schleife",
+          "kind": "bool"
+        }
+      ]
     }
   },
   "matrix_legacy_algorithms": [

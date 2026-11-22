@@ -69,6 +69,9 @@ class RgbAlgorithm(str, Enum):
     BREATHE    = "Atmen (Puls)"          # ganzes Feld pulsiert in c1 (Sinus)
     FIRE       = "Feuer"                 # flackernder Flammen-Look c1→c2
     RAIN       = "Regen"                 # fallende Tropfen je Spalte
+    # FM-81: Bild/GIF als Quelle — Pixel kommen aus einer vorberechneten
+    # Bildfolge (matrix_media), nicht aus einer Formel.
+    MEDIA      = "Bild/Video"
 
 
 # Migration: alte (Varianten-)Algorithmus-Namen -> (neuer Grundalgorithmus, params).
@@ -588,6 +591,8 @@ class RgbMatrixInstance(Function):
         self._last_tick: float = 0.0
         # Phase 4: Algorithmus-Parameter-Dict
         self.params: dict = {}
+        # FM-81: letzte Meldung der Medien-Ebene (fehlende Datei usw.), fuer den Editor.
+        self.medien_meldung: str = ""
         # Phase 6: Preset-Schnappschuss fuer Live-Overrides. Live-Aenderungen der
         # virtuellen Konsole muten die laufenden Felder; clear_live_override()
         # stellt diesen Schnappschuss wieder her (gespeicherte Werte), ohne dass
@@ -1409,6 +1414,8 @@ class RgbMatrixInstance(Function):
             return self._render_colorfade(p, cols, rows, enabled)
         if algo == RgbAlgorithm.CHECKER:
             return self._render_checker(p, cols, rows, enabled)
+        if algo == RgbAlgorithm.MEDIA:
+            return self._render_media(p, cols, rows)
 
         # ── Texturen / Einzel-Looks: per-Zelle (bewusst eigenstaendig) ────────────
         for row in range(rows):
@@ -1510,6 +1517,33 @@ class RgbMatrixInstance(Function):
                     pixels[idx] = c1 if (even != invert) else c2
 
         return pixels
+
+    def _render_media(self, p: float, cols: int, rows: int) -> list[Color]:
+        """FM-81: ein Bild der vorberechneten Bildfolge (Bild/GIF) zur Phase.
+
+        Der Render-Takt dekodiert NIE: ``matrix_media.bilder`` liefert die
+        fertige Folge oder stoesst das Dekodieren im Hintergrund an (solange
+        bleibt die Matrix dunkel). Medienzeit in Sekunden = Phase / Schritte-pro-s
+        x Tempo-Faktor — im freien Lauf also Echtzeit, unabhaengig vom
+        Schritte-Regler; „Rueckwaerts" spielt (mit Schleife) rueckwaerts.
+        Die Ausgabe sind nur Pixelfarben: ob der Dimmer mitlaeuft, entscheidet
+        wie bei jedem Farb-Effekt allein ``drive_intensity`` (Default aus)."""
+        from . import matrix_media
+        pr = self.params
+        erg = matrix_media.bilder(str(pr.get("media_path", "") or ""), cols, rows,
+                                  str(pr.get("media_fit", "fit")),
+                                  pr.get("media_rotation", "0"))
+        self.medien_meldung = erg.meldung
+        folge = erg.folge
+        if folge is None or not folge.bilder:
+            return [(0, 0, 0)] * (cols * rows)
+        speed = float(self.matrix_speed) or 1.0
+        t = p / speed * max(0.0, float(pr.get("media_tempo", 1.0)))
+        bild = folge.bilder[folge.index_bei(t, bool(pr.get("media_loop", True)))]
+        hell = max(0.0, min(1.0, float(pr.get("media_brightness", 1.0))))
+        if hell >= 1.0:
+            return list(bild)
+        return [(int(r * hell), int(g * hell), int(b * hell)) for r, g, b in bild]
 
     def _render_checker(self, p: float, cols: int, rows: int,
                         enabled: list[Color]) -> list[Color]:

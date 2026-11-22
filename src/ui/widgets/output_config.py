@@ -67,6 +67,9 @@ _UNIVERSE_MIN, _UNIVERSE_MAX = 1, 32
 _EXT_UNIVERSE_BEREICHE: dict[str, tuple[int, int]] = {
     "ArtNet": (0, 32767),    # Art-Net Port-Address, 15 bit
     "sACN": (1, 63999),      # E1.31, 64000..65535 sind reserviert
+    # OUT-82: bei DDP steht in der Spalte der BYTE-OFFSET im DDP-Strom
+    # (32 Bit laut Spezifikation; praktisch begrenzt durch die LED-Zahl).
+    "DDP": (0, 2_000_000),
 }
 
 
@@ -84,12 +87,13 @@ def _ext_universe_bereich(typ) -> tuple[int, int] | None:
 #: Ausgabetypen der Universen-Tabelle — genau die Texte, die in
 #: ``universes.json`` stehen und die ``apply_output_config`` vergleicht.
 #: OUT-68: ``uDMX`` ergaenzt; alle anderen unveraendert an ihrer Stelle.
-AUSGABE_TYPEN = ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet")
+#: OUT-82: ``DDP`` (z. B. WLED) hinten angehaengt.
+AUSGABE_TYPEN = ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet", "DDP")
 
 #: UI-100: ANZEIGE-Texte der Ausgabetypen. Gespeichert und verglichen wird
 #: weiter der Wert aus ``AUSGABE_TYPEN`` (steht als ``userData`` im Combo);
 #: nur „Disabled“ bekommt einen deutschen Text, die anderen sind Eigennamen.
-AUSGABE_TYP_TEXTE = {"Disabled": "Aus"}
+AUSGABE_TYP_TEXTE = {"Disabled": "Aus", "DDP": "DDP (WLED)"}
 
 
 def ausgabe_typ_text(typ: str) -> str:

@@ -385,6 +385,29 @@ ALGO_META: dict[RgbAlgorithm, AlgoMeta] = {
     RgbAlgorithm.BREATHE:      AlgoMeta("Ganzes Feld pulsiert in C1.", False, (), colors=1),
     RgbAlgorithm.FIRE:         AlgoMeta("Flackernder Flammen-Look C1→C2.", False, (), colors=2),
     RgbAlgorithm.RAIN:         AlgoMeta("Fallende Tropfen je Spalte.", True, (_fade(),), colors=1),
+    # FM-81: Bild/GIF auf das Raster. Die Datei selbst (params["media_path"],
+    # relativ zum Medien-Ordner) waehlt der Editor ueber einen eigenen Knopf —
+    # sie ist kein VC-/MIDI-Parameter.
+    RgbAlgorithm.MEDIA:        AlgoMeta(
+        "Bild oder animiertes GIF auf das Raster der Gruppe (einpassen/füllen/"
+        "strecken, Drehung, Helligkeit, Tempo, Schleife).",
+        True,
+        (ParamSpec("media_fit", "Einpassung", "select", "fit",
+                   options=("fit", "fill", "stretch"),
+                   tooltip="Einpassen = ganzes Bild sichtbar (Ränder schwarz), "
+                           "Füllen = Raster voll (Rand wird abgeschnitten), "
+                           "Strecken = verzerrt auf das Raster"),
+         ParamSpec("media_rotation", "Drehung", "select", "0",
+                   options=("0", "90", "180", "270"),
+                   tooltip="Bild im Uhrzeigersinn drehen, bevor es auf das Raster kommt"),
+         ParamSpec("media_brightness", "Bild-Helligkeit", "float", 1.0, 0.0, 1.0, 0.05,
+                   "Helligkeit des Mediums 0..1 (nur die Farbe — der Dimmer "
+                   "läuft nicht automatisch mit)"),
+         ParamSpec("media_tempo", "Bild-Tempo", "float", 1.0, 0.1, 8.0, 0.1,
+                   "Abspieltempo des GIFs (1 = Originaltempo, 2 = doppelt so schnell)"),
+         ParamSpec("media_loop", "Schleife", "bool", True,
+                   tooltip="GIF endlos wiederholen (aus = letztes Bild bleibt stehen)")),
+        colors=0),
 }
 
 

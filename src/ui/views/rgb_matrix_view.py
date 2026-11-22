@@ -1778,8 +1778,93 @@ class RgbMatrixView(QWidget):
                 w.valueChanged.connect(self._param_change)
                 self._param_form.addRow(spec.label + ":", w)
             self._param_widgets[spec.key] = w
+        if algo == RgbAlgorithm.MEDIA:
+            self._medien_zeile_bauen()
         self._param_box.setVisible(True)
         self._apply_schweif_hinweis()
+
+    # ── FM-81: Medium (Bild/GIF) waehlen ────────────────────────────────────
+    def _medien_zeile_bauen(self):
+        """Knopf „Medium wählen …" + Statuszeile fuer die Art „Bild/Video".
+        Die Datei wird in den Medien-Ordner kopiert; die Show speichert nur
+        den relativen Namen (``params["media_path"]``)."""
+        from PySide6.QtWidgets import QPushButton, QLabel, QWidget, QVBoxLayout
+        traeger = QWidget()
+        lay = QVBoxLayout(traeger)
+        lay.setContentsMargins(0, 0, 0, 0)
+        knopf = QPushButton("Medium wählen …")
+        knopf.setToolTip("Bild (PNG/JPG) oder animiertes GIF auf die Matrix legen. "
+                         "Die Datei wird in den Medien-Ordner neben den Show-Daten kopiert.")
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            if is_touch_mode():
+                knopf.setMinimumHeight(44)
+        except Exception:
+            pass
+        knopf.clicked.connect(self._medium_waehlen)
+        status = QLabel()
+        status.setWordWrap(True)
+        lay.addWidget(knopf)
+        lay.addWidget(status)
+        self._medien_knopf = knopf
+        self._medien_status = status
+        self._param_form.addRow("Medium:", traeger)
+        self._medien_status_auffrischen()
+
+    def _medien_status_auffrischen(self):
+        lbl = getattr(self, "_medien_status", None)
+        if lbl is None or self._current is None:
+            return
+        from src.core.engine import matrix_media
+        m = self._current
+        rel = str(m.params.get("media_path", "") or "")
+        erg = matrix_media.bilder(rel, m.cols, m.rows,
+                                  str(m.params.get("media_fit", "fit")),
+                                  m.params.get("media_rotation", "0"))
+        if erg.folge is not None:
+            n = len(erg.folge.bilder)
+            text = f"{rel} — {n} Bild{'er' if n != 1 else ''}"
+        elif erg.laedt:
+            text = f"{rel} — wird geladen …"
+        else:
+            text = erg.meldung
+        try:
+            lbl.setText(text)
+        except RuntimeError:
+            return
+        if erg.laedt:
+            # Das Dekodieren laeuft im Hintergrund: Status nachziehen, bis es
+            # fertig ist. Kontext = Statuszeile — wird sie abgebaut (andere Art,
+            # anderer Effekt), verfaellt der Nachlauf von selbst.
+            try:
+                QTimer.singleShot(150, lbl, self._medien_status_auffrischen)
+            except RuntimeError:
+                pass
+
+    def medium_setzen(self, pfad: str) -> str:
+        """Weist dem aktuellen Matrix-Effekt ein Medium zu (Datei wird in den
+        Medien-Ordner kopiert, Dekodieren startet sofort im Hintergrund).
+        Liefert den gespeicherten relativen Namen."""
+        from src.core.engine import matrix_media
+        if self._current is None or not pfad:
+            return ""
+        rel = matrix_media.import_file(pfad)
+        m = self._current
+        m.params["media_path"] = rel
+        matrix_media.vorbereiten(rel, m.cols, m.rows,
+                                 str(m.params.get("media_fit", "fit")),
+                                 m.params.get("media_rotation", "0"))
+        self._medien_status_auffrischen()
+        self._update_dirty()
+        return rel
+
+    def _medium_waehlen(self):
+        from PySide6.QtWidgets import QFileDialog
+        pfad, _ = QFileDialog.getOpenFileName(
+            self, "Medium für die Matrix wählen", "",
+            "Bilder und GIFs (*.png *.jpg *.jpeg *.gif *.bmp *.webp);;Alle Dateien (*)")
+        if pfad:
+            self.medium_setzen(pfad)
 
     def _apply_runner_step_visibility(self, algo=None):
         """ENG-37: Feld „Schrittweite“ nur beim Lauflicht mit linearer Bewegung
