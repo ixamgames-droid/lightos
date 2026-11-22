@@ -39,6 +39,8 @@ ALLOWED_KEYS = {
     # #5: eigene Keys pro Algorithmus (kein Bleed beim Algo-Wechsel; Engine liest
     # mit Fallback auf den alten geteilten Key): PINWHEEL/RAINBOW/COLORFADE/FILL.
     "segment_count", "hue_spread", "rainbow_movement", "crossfade_hold", "fixture_fade",
+    # FM-81: Medien-Ebene (Bild/GIF) — _render_media
+    "media_fit", "media_rotation", "media_brightness", "media_tempo", "media_loop",
 }
 ALLOWED_KINDS = {"int", "float", "bool", "select", "color", "color_sequence", "action"}
 
