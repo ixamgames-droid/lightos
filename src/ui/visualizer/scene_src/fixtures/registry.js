@@ -14,6 +14,7 @@ import {
   updateSpiderDmx, updateParBarDmx, updateMoverBarDmx, updateMovingHeadDmx, updateGenericDmx,
   updateMatrixPanelDmx, updatePixelHeadDmx,
 } from './builders.js';
+import { buildMatrixForm, matrixFormAktiv } from './matrix_formen.js';   // VIZ-114
 
 const REGISTRY = {
   moving_head: { build: ()  => buildMovingHead(),                   updateDmx: updateMovingHeadDmx },
@@ -28,7 +29,13 @@ const REGISTRY = {
   // FM-13: Pixel-Panel (+ Reihenfolge). VIZ-52: + Montage-Orientierung.
   // VIZ-50a: + hinterlegte Rasterform. VIZ-50b: + Zahl der Weiss-Segmente.
   // CDX-52: + hinterlegte Form der Weiss-Leiste (ohne sie gibt es keine).
-  matrix:      { build: (o) => buildMatrixPanel(o.nHeads, o.pixelOrder, o.elementRotation, o.elementFlip, o.gridCols, o.gridRows, o.nWhites, o.whiteCols, o.whiteRows), updateDmx: updateMatrixPanelDmx },
+  // VIZ-114: mit Bauform/Massen aus dem Profil (`matrixForm`, FM-80) baut
+  // matrix_formen.js das Modell (Vorhang, Leiste, Ring, Saeule, Panel in echter
+  // Groesse); ohne diese Angabe bleibt es das Bestands-Panel, unveraendert.
+  matrix:      { build: (o) => (matrixFormAktiv(o.matrixForm)
+                   ? buildMatrixForm(o.nHeads, o.pixelOrder, o.elementRotation, o.elementFlip, o.gridCols, o.gridRows, o.matrixForm)
+                   : buildMatrixPanel(o.nHeads, o.pixelOrder, o.elementRotation, o.elementFlip, o.gridCols, o.gridRows, o.nWhites, o.whiteCols, o.whiteRows)),
+                 updateDmx: updateMatrixPanelDmx },
   par:         { build: ()  => buildPar(),                          updateDmx: updateGenericDmx },
   led_bar:     { build: ()  => buildLedBar(),                       updateDmx: updateGenericDmx },
   strobe:      { build: ()  => buildStrobe(),                       updateDmx: updateGenericDmx },

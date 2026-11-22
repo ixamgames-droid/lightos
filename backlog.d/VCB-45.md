@@ -1,6 +1,6 @@
 ID: VCB-45
 Status: teils
-Status-Notiz: Schritte 1-4 geliefert, Schritt 5 (optional) und Rig-Sichtpruefung offen
+Status-Notiz: Schritte 1-4 geliefert und am Rig mit zwei Bildschirmen bestaetigt (22.11.2026); offen nur Schritt 5 (frei blaettern, optional)
 
 **Bank im Code (2026-11-17):** Eine Bank ist `VCWidget.bank` (0..9, -1 = auf allen Baenken bzw. vom Kasten geerbt). Die Flaeche zeigt `VCCanvas.active_bank`; die folgt der Executor-Seite der Wiedergabe (`playback_engine.set_page`/`subscribe_page`), also derselben Seite, die die Seitentasten des APC und die Knoepfe ◀/▶ umschalten. MIDI, Tastenkuerzel und die APC-LEDs gehen nur an Widgets der aktiven Bank (`VCCanvas.on_active_bank`).
 
@@ -11,3 +11,6 @@ Status-Notiz: Schritte 1-4 geliefert, Schritt 5 (optional) und Rig-Sichtpruefung
 **Schritt 4 geliefert (2026-11-17):** Das APC folgt der Seitentaste ohne neuen Code — die Seitentaste waehlt die Executor-Seite, und das Pult bedient genau die Widgets dieser Bank, auch wenn sie gerade im geloesten Fenster liegen (Test `test_apc_folgt_der_seitentaste_auch_fuer_die_geloeste_bank`). Am Finger bedient man das geloeste Fenster direkt, unabhaengig von der Seite oben.
 
 **Rest:** Schritt 5 (frei blaettern im geloesten Fenster, optional) nicht gebaut. Nach einem Neustart sind alle Baenke wieder angedockt (die Lage je Bank bleibt gemerkt) — so gewollt, Entscheidung des Betreibers vom 17.11.2026: nach dem Start alles angedockt wie bisher. Sichtpruefung am echten Rig mit zwei Bildschirmen steht fuer Schritt 1 und 3 aus.
+
+
+**Rig-Probe 22.11.2026 (Linux, zwei Bildschirme uebereinander, APC mini mk2, Probelauf):** Bank 1 geloest -> Fenster ging von selbst maximiert auf dem unteren Touch-Bildschirm auf („Bank 1 — geloest“, „Andocken“); oben weitergeblaettert, unten blieb Bank 1 stehen; APC-Pads steuern die oben angezeigte Bank (so gewollt, Entscheidung des Betreibers: der APC folgt der oberen Seite, die geloeste Bank wird per Finger bedient); Andocken stellt Bank 1 an ihrem Platz wieder her. APC-Seitentasten im Probelauf nicht belegt (MIDI-Zuordnungen liegen im echten Datenordner) — dort nicht pruefbar, kein VCB-45-Befund.

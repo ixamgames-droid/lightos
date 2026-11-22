@@ -42,7 +42,8 @@ SZENEN_DATEIEN = ("tests/test_viz14_place_ghost_scene.py",
                   "tests/test_viz14_drag_scene.py",
                   "tests/test_viz14_deselect_scene.py",
                   "tests/test_viz73_top_hud_scene.py",
-                  "tests/test_fm64_vorschau_scene.py")
+                  "tests/test_fm64_vorschau_scene.py",
+                  "tests/test_viz114_matrix_bauformen_scene.py")
 
 
 def _diagnose(err, **rest):

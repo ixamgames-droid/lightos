@@ -174,7 +174,8 @@ class PythonUndJsSindDieselbeRegelTest(unittest.TestCase):
         """3D-Panel und 2D-Top-Down-Icon muessen dieselbe Quelle benutzen —
         zwei Formeln waeren die Drift-Quelle aus der FM16E-Lehre."""
         basis = os.path.dirname(JS_MODUL)
-        for datei in ("builders.js", "topdown_icons.js"):
+        # VIZ-114: die Bauform-Modelle (matrix_formen.js) ebenso.
+        for datei in ("builders.js", "topdown_icons.js", "matrix_formen.js"):
             quelle = open(os.path.join(basis, datei), encoding="utf-8").read()
             # VIZ-52: beide gehen jetzt ueber `placeElement`, das intern
             # `pixelCell` aufruft und die Montage-Orientierung dazunimmt — die
