@@ -245,6 +245,10 @@ Montage der Teile setzt der Assistent passend zu Verdrahtung und Startecke. Jede
 bekommt seine Kopf-Gruppe als Raster, und zusätzlich entsteht eine Gruppe
 **„… · Matrix“** über die ganze Fläche — darauf laufen Matrix-Effekte über alle Pixel.
 Ist ein Universum schon belegt, patcht der Assistent nichts und sagt, wo es klemmt.
+LightOS patcht in die Universen 1 bis 32: Reichen die Teile ab dem gewählten
+Universum darüber hinaus, ist **In Bibliothek speichern** gesperrt, bis ein früheres
+Universum gewählt (oder das Patchen abgewählt) ist. Eine Matrix hat darum höchstens
+32 Teile.
 
 **Später ändern:** **Datenbank → Fixture-Profil bearbeiten...**, das Profil wählen und
 **Im Matrix-Assistenten…** drücken. **Profil aktualisieren** ändert dasselbe Profil;

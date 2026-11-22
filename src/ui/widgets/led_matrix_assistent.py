@@ -262,7 +262,7 @@ class LedMatrixAssistent(QDialog):
         zeile = QHBoxLayout()
         self.chk_patchen = QCheckBox("Gleich patchen ab Universum")
         self.sp_universum = QSpinBox()
-        self.sp_universum.setRange(1, 4096)
+        self.sp_universum.setRange(1, LM.UNIVERSUM_MAX)
         self.sp_universum.setValue(self._freies_universum())
         self.chk_patchen.setChecked(self._state is not None and self._profil_id is None)
         self.chk_patchen.toggled.connect(lambda *_: self._aktualisieren())
@@ -308,7 +308,7 @@ class LedMatrixAssistent(QDialog):
             belegt = {int(f.universe) for f in self._state.get_patched_fixtures()}
         except Exception:
             return 1
-        return (max(belegt) + 1) if belegt else 1
+        return min(LM.UNIVERSUM_MAX, (max(belegt) + 1) if belegt else 1)
 
     # ── Zustand ─────────────────────────────────────────────────────────
     def angaben(self) -> LM.MatrixAngaben:
@@ -333,6 +333,14 @@ class LedMatrixAssistent(QDialog):
         pb, ph = a.pixelabstand_mm()
         self.lbl_abstand.setText(f"{pb:g} × {ph:g} mm" if pb and ph else "—")
         fehler = a.fehler()
+        if (not fehler and self._state is not None
+                and self.chk_patchen.isChecked()):
+            n, u = len(LM.teile(a)), int(self.sp_universum.value())
+            if u + n - 1 > LM.UNIVERSUM_MAX:
+                fehler.append(
+                    f"{n} Universen ab Universum {u} gehen über Universum "
+                    f"{LM.UNIVERSUM_MAX} hinaus — höchstens ab Universum "
+                    f"{max(1, LM.UNIVERSUM_MAX - n + 1)} patchen.")
         self.lbl_fehler.setText("\n".join(fehler))
         self.btn_speichern.setEnabled(not fehler)
         if fehler:

@@ -383,6 +383,44 @@ class PatchTest(_ShowBasis):
             LM.matrix_patchen(self.state, pid, start_universum=5)
         self.assertEqual(len(self.state.get_patched_fixtures()), n)
 
+    def test_nie_ueber_das_letzte_universum(self):
+        """Pruefung: LightOS patcht Universum 1..32 (wie „Geraet hinzufuegen“
+        und die Patch-Tabelle). 5 Teile ab Universum 30 haetten 33 und 34
+        belegt — abgelehnt, und es wird nichts gepatcht."""
+        from src.core.patch_tabelle import UNIVERSUM_MAX
+        self.assertEqual(LM.TEILE_MAX, UNIVERSUM_MAX)
+        _a, pid = self._anlegen(modell="U32", breite_px=20, hoehe_px=40)
+        n = len(self.state.get_patched_fixtures())
+        with self.assertRaisesRegex(ValueError, "Universum 1 bis 32"):
+            LM.matrix_patchen(self.state, pid, start_universum=30)
+        self.assertEqual(len(self.state.get_patched_fixtures()), n)
+        fids = LM.matrix_patchen(self.state, pid, start_universum=28)
+        fx = {f.fid: f for f in self.state.get_patched_fixtures()}
+        self.assertEqual([fx[f].universe for f in fids], [28, 29, 30, 31, 32])
+
+    def test_30x20_rgbw_jeder_pixel_in_gesamt_und_teilgruppe(self):
+        """Eigenes Beispiel der Pruefung: 30x20 RGBW + Master, 3 Zeilen je
+        Teil (ungerade, letzter Teil kuerzer), Schlange von unten rechts.
+        128 Pixel je Universum -> 3 Zeilen = 90 Pixel = 1 + 360 Kanaele; 7
+        Teile, der letzte mit 2 Zeilen (241). Jeder Pixel liegt in Gesamt-
+        und Teil-Gruppe dort, wo die Vorschau (pixel_platz) ihn zeigt."""
+        a, pid = self._anlegen(modell="R30", breite_px=30, hoehe_px=20,
+                               format="RGBW", master=True, verdrahtung="schlange",
+                               startecke="unten_rechts", zeilen_je_teil=3)
+        fids = LM.matrix_patchen(self.state, pid)
+        fx = {f.fid: f for f in self.state.get_patched_fixtures()}
+        self.assertEqual([fx[f].channel_count for f in fids], [361] * 6 + [241])
+        _c, _r, pos = self._gruppen()["R30 · Matrix"]
+        self.assertEqual(len(pos), 600)
+        for t, fid in zip(LM.teile(a), fids):
+            _n, _cols, _rows, tpos = self._gruppe(
+                self.state.find_head_matrix_group(fid, dedicated=True))
+            z0 = LM.teil_anzeige_zeile(a, t)
+            for k in range(t.zeilen * 30):
+                r, c = LM.pixel_platz(a, t.erstes_pixel + k)
+                self.assertEqual(pos[f"{c},{r}"], f"{fid}:{k}")
+                self.assertEqual(tpos[f"{c},{r - z0}"], f"{fid}:{k}")
+
     def test_alt_show_mit_panel_laedt_unveraendert(self):
         """Show ohne irgendein FM-80-Feld (Bestandsformat) laedt wie bisher;
         ihr Panel gilt als Bauform 'panel'."""
@@ -458,6 +496,18 @@ class DialogTest(_ShowBasis):
         from src.core.database.models import FixtureProfile
         with Session(self.eng) as s:
             self.assertEqual(s.get(FixtureProfile, dlg.saved_id).bauform, "vorhang")
+
+    def test_universum_bleibt_im_erlaubten_bereich(self):
+        from src.core.patch_tabelle import UNIVERSUM_MAX
+        dlg = self._dialog(state=self.state)
+        self.assertEqual(dlg.sp_universum.maximum(), UNIVERSUM_MAX)
+        dlg.sp_breite.setValue(20)
+        dlg.sp_hoehe.setValue(40)          # 5 Teile
+        dlg.sp_universum.setValue(30)
+        self.assertFalse(dlg.btn_speichern.isEnabled())
+        self.assertIn("höchstens ab Universum 28", dlg.lbl_fehler.text())
+        dlg.chk_patchen.setChecked(False)  # nur Profil anlegen geht weiter
+        self.assertTrue(dlg.btn_speichern.isEnabled())
 
     def test_bearbeiten_aendert_dasselbe_profil(self):
         import src.ui.widgets.led_matrix_assistent as LMA

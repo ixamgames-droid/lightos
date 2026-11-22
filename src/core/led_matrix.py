@@ -84,7 +84,11 @@ STARTECKE_TEXT = {
 
 #: Obergrenzen der Eingabe (Pixel je Seite, Teile je Matrix).
 PIXEL_MAX = 512
-TEILE_MAX = 64
+#: Hoechstes Universum, das LightOS patcht — dieselbe Grenze wie „Geraet
+#: hinzufuegen“ und die Patch-Tabelle (``patch_tabelle.UNIVERSUM_MAX``). Mehr
+#: Teile als Universen liessen sich nie vollstaendig patchen.
+from src.core.patch_tabelle import UNIVERSUM_MAX                    # noqa: E402
+TEILE_MAX = UNIVERSUM_MAX
 FLAECHE_MAX_CM = 10000.0
 ANGABEN_VERSION = 1
 
@@ -469,6 +473,12 @@ def matrix_patchen(state, profil_id: int, start_universum: int = 1,
         raise ValueError("Im Profil fehlen Modi: " + ", ".join(fehlt))
     u0, adr = int(start_universum), int(adresse)
     probleme = []
+    if u0 < 1 or u0 + len(tl) - 1 > UNIVERSUM_MAX:
+        raise ValueError(
+            f"{len(tl)} Teil(e) ab Universum {u0} reichen bis Universum "
+            f"{u0 + len(tl) - 1} — LightOS patcht Universum 1 bis "
+            f"{UNIVERSUM_MAX}. Höchstens ab Universum "
+            f"{max(1, UNIVERSUM_MAX - len(tl) + 1)} patchen.")
     for t in tl:
         u = u0 + t.index
         if adr + t.kanaele - 1 > DMX_KANAELE:
