@@ -555,11 +555,29 @@ def create_user_profile(payload: dict, *, engine=None,
             payload.get("beam_angle_min"), payload.get("beam_angle_max"))
         # VIZ-111: Laufrichtung des Zoom-Kanals (fehlt = normal, 0 = eng).
         prof.zoom_inverted = bool(payload.get("zoom_inverted", False))
+        _matrix_felder(prof, payload)
         s.add(prof)
         s.flush()
         _modi_schreiben(s, prof, payload)
         s.commit()
         return prof.id
+
+
+def _matrix_felder(prof, payload: dict) -> None:
+    """FM-80: Bauform + Angaben des LED-Matrix-Assistenten aus dem Payload.
+    Fehlen die Schluessel (jedes andere Payload), bleibt es leer = Bestand.
+
+    ★ Beim Ueberschreiben ohne ``bauform`` (Generator/Editor) bleibt die
+    Bauform stehen — sie beschreibt das Geraet, nicht die Kanaele. Die
+    Assistenten-Angaben fallen dann weg: die Kanaele wurden von Hand
+    geaendert, ein erneutes Oeffnen im Assistenten wuerde das still
+    zuruecknehmen."""
+    from src.core.led_matrix import BAUFORMEN, angaben_aus_json
+    if "bauform" in payload or not getattr(prof, "bauform", None):
+        bf = str(payload.get("bauform") or "").strip().lower()
+        prof.bauform = bf if bf in BAUFORMEN else ""
+    text = payload.get("matrix_angaben") or ""
+    prof.matrix_angaben = text if angaben_aus_json(text) is not None else ""
 
 
 class ProfilGeschuetzt(ValueError):
@@ -608,6 +626,7 @@ def update_user_profile(profil_id: int, payload: dict, *, engine=None) -> int:
         prof.beam_angle_min, prof.beam_angle_max = _AW.normalisiere(
             payload.get("beam_angle_min"), payload.get("beam_angle_max"))
         prof.zoom_inverted = bool(payload.get("zoom_inverted", False))
+        _matrix_felder(prof, payload)
         for alt in s.execute(select(FixtureMode).where(
                 FixtureMode.fixture_id == prof.id)).scalars().all():
             s.delete(alt)

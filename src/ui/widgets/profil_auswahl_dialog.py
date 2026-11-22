@@ -279,9 +279,16 @@ class ProfilAuswahlDialog(QDialog):
         self.btn_ansehen.clicked.connect(lambda: self._oeffnen(ANSEHEN))
         self.btn_kopieren = QPushButton("Als eigenes Profil kopieren…")
         self.btn_kopieren.clicked.connect(lambda: self._oeffnen(KOPIEREN))
+        # FM-80: ein Profil des LED-Matrix-Assistenten dort wieder oeffnen.
+        self.btn_matrix = QPushButton("Im Matrix-Assistenten…")
+        self.btn_matrix.setToolTip("Pixel, Fläche, Format oder Verdrahtung "
+                                   "einer mit dem Assistenten angelegten "
+                                   "LED-Matrix ändern.")
+        self.btn_matrix.clicked.connect(lambda: self._matrix_oeffnen())
         schliessen = QPushButton("Schließen")
         schliessen.clicked.connect(self.reject)
-        for b in (self.btn_bearbeiten, self.btn_ansehen, self.btn_kopieren):
+        for b in (self.btn_bearbeiten, self.btn_ansehen, self.btn_kopieren,
+                  self.btn_matrix):
             b.setAutoDefault(False)
             knoepfe.addWidget(b)
         knoepfe.addStretch(1)
@@ -322,6 +329,9 @@ class ProfilAuswahlDialog(QDialog):
         self.btn_bearbeiten.setEnabled(eigen)
         self.btn_ansehen.setEnabled(bool(wahl) and not eigen)
         self.btn_kopieren.setEnabled(bool(wahl))
+        from src.ui.widgets.led_matrix_assistent import ist_matrix_profil
+        self.btn_matrix.setEnabled(bool(wahl) and (wahl[1] or "").lower() == "user"
+                                   and ist_matrix_profil(wahl[0]))
         if not wahl:
             self._hinweis.setText("Kein Profil gefunden.")
         elif wahl[0] in getattr(self, "_abgeloest", {}):
@@ -341,6 +351,18 @@ class ProfilAuswahlDialog(QDialog):
                 "Mitgelieferte Profile werden nicht überschrieben (die nächste "
                 "Bibliotheks-Aktualisierung stellte sie wieder her). Zum Ändern "
                 "als eigenes Profil kopieren.")
+
+    def _matrix_oeffnen(self) -> None:
+        """FM-80: das gewaehlte Assistenten-Profil im Assistenten aendern."""
+        wahl = self.gewaehlt()
+        if not wahl:
+            return
+        from src.ui import dialog_hilfe
+        from src.ui.widgets.led_matrix_assistent import LedMatrixAssistent
+        dlg = LedMatrixAssistent(self, profil_id=wahl[0])
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() and dlg.saved_id is not None:
+                self._laden(self._suche.text())
 
     def _standard(self) -> None:
         wahl = self.gewaehlt()

@@ -921,6 +921,12 @@ class PatchView(QWidget):
             "Fixture Generator: eigenes Geräte-Profil grafisch anlegen "
             "(Modi, Kanäle, Bereiche, Live-Test) und in die Bibliothek speichern.")
         btn_generator.clicked.connect(self._open_generator)
+        # FM-80: eigene LED-Matrix gefuehrt anlegen (und gleich patchen).
+        btn_matrix = QPushButton("LED-Matrix…")
+        btn_matrix.setToolTip(
+            "LED-Matrix-Assistent: Pixel, Fläche, Bauform, Kanalformat und "
+            "Verdrahtung angeben — legt das Profil an und patcht es auf Wunsch.")
+        btn_matrix.clicked.connect(self._open_matrix_assistent)
 
         # UI-ADDRCONFLICT: aus dem Hinweis wird ein Weg. Vorher war die Meldung
         # eine Sackgasse — sie sagte DASS es klemmt, aber nicht welche Geraete
@@ -943,6 +949,7 @@ class PatchView(QWidget):
         toolbar.addWidget(self._import_knopf())   # IMP-1
         toolbar.addWidget(btn_autopatch)
         toolbar.addWidget(btn_generator)
+        toolbar.addWidget(btn_matrix)
         toolbar.addStretch()
         toolbar.addWidget(self._lbl_conflict)
         layout.addLayout(toolbar)
@@ -1155,6 +1162,20 @@ class PatchView(QWidget):
                 if meldung:
                     try:
                         self.window().statusBar().showMessage(meldung, 6000)
+                    except Exception:
+                        pass
+
+    def _open_matrix_assistent(self):
+        """FM-80: LED-Matrix-Assistent mit „gleich patchen“."""
+        from src.ui.widgets.led_matrix_assistent import LedMatrixAssistent
+        dlg = LedMatrixAssistent(self, state=self._state)
+        with dialog_hilfe.offen(dlg):
+            if dlg.exec() and dlg.saved_id is not None:
+                self._refresh_table()
+                if dlg.gespeichert_meldung:
+                    try:
+                        self.window().statusBar().showMessage(
+                            dlg.gespeichert_meldung, 6000)
                     except Exception:
                         pass
 

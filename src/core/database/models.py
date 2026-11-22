@@ -81,6 +81,15 @@ class FixtureProfile(Base):
     # VIZ-111: Zoom-Kanal laeuft umgekehrt („0 = weit, 255 = eng“). False =
     # wie bisher angenommen (0 = eng). Betrifft nur das 3D-Bild.
     zoom_inverted: Mapped[bool] = mapped_column(Boolean, default=False)
+    # FM-80: Bauform einer LED-Matrix (panel/vorhang/leiste/ring/saeule) —
+    # das 3D (VIZ-114) baut daraus sein Modell. "" = keine Angabe = "panel"
+    # (jedes Profil vor FM-80). Lesen nur ueber ``led_matrix.bauform_von``.
+    bauform: Mapped[str] = mapped_column(String(20), default="")
+    # FM-80: Angaben des LED-Matrix-Assistenten als JSON (Pixel B x H, Flaeche
+    # in cm, Kanalformat, Verdrahtung, Startecke, Zeilen je Universum), damit
+    # das Profil spaeter wieder im Assistenten geoeffnet werden kann. Leer =
+    # kein Assistenten-Profil. Aufbau: ``src/core/led_matrix.py``.
+    matrix_angaben: Mapped[str] = mapped_column(Text, default="")
 
     manufacturer: Mapped[Manufacturer] = relationship(back_populates="fixtures")
     modes: Mapped[list[FixtureMode]] = relationship(
@@ -517,6 +526,13 @@ def migrate_fixtures_db(engine) -> None:
             if fcols and "zoom_inverted" not in fcols:
                 conn.execute(text(
                     "ALTER TABLE fixtures ADD COLUMN zoom_inverted BOOLEAN DEFAULT 0"))
+            # FM-80: Bauform + Angaben des LED-Matrix-Assistenten. Dieselbe Falle.
+            if fcols and "bauform" not in fcols:
+                conn.execute(text(
+                    "ALTER TABLE fixtures ADD COLUMN bauform VARCHAR(20) DEFAULT ''"))
+            if fcols and "matrix_angaben" not in fcols:
+                conn.execute(text(
+                    "ALTER TABLE fixtures ADD COLUMN matrix_angaben TEXT DEFAULT ''"))
             # VIZ-50a: physische Rasterform eines Pixel-Panels (0 = nicht
             # hinterlegt -> der Renderer raet wie bisher). Dieselbe Falle wie bei
             # `pixel_order` (PR #514): ohne ALTER TABLE waere jede bestehende
