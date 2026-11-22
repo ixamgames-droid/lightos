@@ -1221,12 +1221,43 @@ def _attrappe(name: str):
     return _merken
 
 
+def _nur_mit_attrappen(echt, name: str, ersatz):
+    """UI-133: ``echt`` laeuft nur, wenn der Test JEDEN Systemzugriff als
+    Attrappe mitgibt (alle Parameter gesetzt). Sonst griffe die Funktion auf
+    ``ctypes.windll`` bzw. ``subprocess`` zu - COM-Toggle, SC_RESTORE oder ein
+    gestartetes TabTip auf dem Desktop des Menschen. Dann wird der Aufruf nur
+    gemerkt (``SYSTEM_TASTATUR_AUFRUFE``) und ``ersatz`` geliefert."""
+    import inspect
+    anzahl = len(inspect.signature(echt).parameters)
+
+    def _geschuetzt(*a, **k):
+        gegeben = list(a) + list(k.values())
+        if len(gegeben) == anzahl and all(x is not None for x in gegeben):
+            return echt(*a, **k)
+        SYSTEM_TASTATUR_AUFRUFE.append(name)
+        return ersatz
+    _geschuetzt.qa118_riegel = True
+    return _geschuetzt
+
+
+# Die Bausteine unter ``_show_windows_osk`` (UI-133) und was sie liefern, wenn
+# ein Test sie ohne Attrappen ruft: "nicht sichtbar", "COM gescheitert",
+# "nichts gestartet".
+_TASTATUR_BAUSTEINE = (("_tip_sichtbar", False), ("_tip_umschalten", False),
+                       ("_tabtip_alter_weg", "nichts"))
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _keine_system_tastatur():
-    """QA-118: ``touch_keyboard`` ruft weder Registry noch TabTip/osk."""
+    """QA-118: ``touch_keyboard`` ruft weder Registry noch TabTip/osk.
+    UI-133: die Bausteine darunter erreichen das System nur mit Attrappen."""
     from src.ui import touch_keyboard as _tk
     _tk._enable_tabtip_autoinvoke = _attrappe("registry")
     _tk._show_windows_osk = _attrappe("system_tastatur")
+    for name, ersatz in _TASTATUR_BAUSTEINE:
+        echt = getattr(_tk, name)
+        if not getattr(echt, "qa118_riegel", False):
+            setattr(_tk, name, _nur_mit_attrappen(echt, name.lstrip("_"), ersatz))
     yield
 
 
