@@ -32,6 +32,7 @@ from PySide6.QtWebEngineCore import (QWebEngineSettings,         # noqa: E402
 from PySide6.QtWebChannel import QWebChannel                     # noqa: E402
 from PySide6.QtCore import QObject, QUrl, Signal, Slot           # noqa: E402
 from _qt_lifecycle import destroy_webengine_view                 # noqa: E402
+import _webgl_gate                                               # noqa: E402  QA-74
 
 from src.core import led_matrix as LM                            # noqa: E402
 
@@ -314,7 +315,19 @@ class _SzeneBasis(unittest.TestCase):
         self.assertIsNotNone(wert, f"kein Wert fuer: {js[:160]}")
         return float(wert)
 
-    def _aufbauen(self, nutzlast, letzte_fid):
+    def _aufbauen(self, nutzlast, letzte_fid, _zweiter_versuch=False):
+        try:
+            self._aufbauen_einmal(nutzlast, letzte_fid)
+        except AssertionError as e:
+            # QA-74: kein WebGL-Kontext unter Last -> EINE Quelle entscheidet
+            # (einmal neu laden, beim zweiten Ausfall SkipTest statt rot).
+            diagnose = _webgl_gate.szenen_diagnose(self._view, _pump, 3.0)
+            if _webgl_gate.nach_szenen_timeout(e, diagnose,
+                                               zweiter_versuch=_zweiter_versuch):
+                self._geladen.clear()
+                return self._aufbauen(nutzlast, letzte_fid, _zweiter_versuch=True)
+
+    def _aufbauen_einmal(self, nutzlast, letzte_fid):
         url = QUrl.fromLocalFile(_HTML_PATH)
         url.setQuery(f"v={int(time.time() * 1000)}&gputier={self.STUFE}")
         self._view.load(url)
@@ -326,6 +339,8 @@ class _SzeneBasis(unittest.TestCase):
         ende = time.monotonic() + _POLL_TIMEOUT_S
         while time.monotonic() < ende and not self._eval("!!window.__lightosAppReady"):
             time.sleep(_POLL_INTERVAL_S)
+        self.assertTrue(self._eval("!!window.__lightosAppReady"),
+                        "Timeout bei '!!window.__lightosAppReady'")
         text = json.dumps(nutzlast)
         ende = time.monotonic() + 2 * _POLL_TIMEOUT_S
         da = False
