@@ -626,6 +626,32 @@ def aufgeloeste_positionen(group, session=None) -> dict:
     return aufloesen(pos, gruppen_lader(s), eigene_uid=getattr(group, "uid", None))
 
 
+def aufgeloestes_raster(group, session=None) -> tuple:
+    """``(cols, rows, positions)`` einer Gruppe in aufgeloester Form.
+
+    Das gespeicherte ``cols``/``rows`` der Obergruppe kennt nur die Ankerzellen.
+    Waechst eine Untergruppe spaeter (oder dreht man den Block), ragt ihr Block
+    ueber das Raster hinaus — die Matrix-Engine verwirft Zellen ausserhalb von
+    ``cols x rows`` still, Programmer/VC zaehlen sie aber mit. Hier waechst das
+    Raster deshalb auf die aufgeloesten Zellen mit (nie kleiner als gespeichert).
+    Ohne Verweise identisch zu ``(g.cols, g.rows, json.loads(...))``."""
+    from ..group_cells import GRUPPEN_PRAEFIX as GRUPPEN_PRAEFIX_TEXT
+    cols = max(1, int(getattr(group, "cols", 1) or 1))
+    rows = max(1, int(getattr(group, "rows", 1) or 1))
+    pos = aufgeloeste_positionen(group, session)
+    if GRUPPEN_PRAEFIX_TEXT not in str(getattr(group, "positions_json", "") or ""):
+        return cols, rows, pos              # Bestand: byte-gleich wie bisher
+    for key in pos:
+        try:
+            c_s, r_s = str(key).split(",")
+            c, r = int(c_s), int(r_s)
+        except (TypeError, ValueError):
+            continue
+        if c >= 0 and r >= 0:
+            cols, rows = max(cols, c + 1), max(rows, r + 1)
+    return cols, rows, pos
+
+
 def verweise_einbetten(session, uid) -> int:
     """Vor dem Loeschen der Gruppe ``uid``: jede Obergruppe, die sie als Block
     traegt, bekommt deren Zellen als Einzelzellen (andere Verweise bleiben).

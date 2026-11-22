@@ -1650,10 +1650,10 @@ class AppState:
                     if g is None:
                         continue
                     try:
-                        from src.core.database.models import aufgeloeste_positionen  # FM-20
-                        pos_raw = aufgeloeste_positionen(g, s)
+                        from src.core.database.models import aufgeloestes_raster  # FM-20
+                        g_cols, g_rows, pos_raw = aufgeloestes_raster(g, s)
                     except Exception:
-                        pos_raw = {}
+                        g_cols, g_rows, pos_raw = int(g.cols or 1), int(g.rows or 1), {}
                     positions: dict = {}
                     for k, v in pos_raw.items():
                         try:
@@ -1661,7 +1661,7 @@ class AppState:
                             positions[(int(c), int(r))] = v
                         except Exception:
                             continue
-                    grids.append((int(g.cols or 1), int(g.rows or 1), positions))
+                    grids.append((g_cols, g_rows, positions))
                     names.append(g.name or "")
                     uids.append(g.uid or "")
                 if len(grids) < 2:

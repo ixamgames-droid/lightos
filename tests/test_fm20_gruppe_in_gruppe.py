@@ -175,6 +175,25 @@ class LeserTest(_MitShow):
             grid, _h = grids_from_positions(aufgeloeste_positionen(g, s), g.cols, g.rows)
         self.assertEqual(grid, [1, 11, 12, 2, None, 13, 14, None])
 
+    def test_wachsende_untergruppe_kommt_in_der_matrix_an(self):
+        # Pruefung: Panel waechst um eine Zeile, die Buehne (4x2) wurde nicht
+        # angepasst. Programmer/VC zaehlen Geraet 15 mit — die Matrix verwarf es
+        # vorher still (Zelle ausserhalb von cols x rows).
+        _setzen(self.state, self.pid, rows=3, positions_json=json.dumps(
+            {"0,0": 11, "1,0": 12, "0,1": 13, "1,1": 14, "0,2": 15}))
+        self.assertIn(15, self.state.group_fids_by_name("Buehne"))
+        from src.ui.views.rgb_matrix_view import RgbMatrixView
+        self.state.set_selected_group_id(self.oid)
+        self.addCleanup(self.state.set_selected_group_id, None)
+        v = RgbMatrixView()
+        raster, _text = v._auswahl_raster()
+        self.assertEqual((raster["cols"], raster["rows"]), (4, 3))
+        self.assertIn(15, raster["fixture_grid"])
+        from src.core.database.models import aufgeloestes_raster
+        with self.state._session() as s:       # ohne Verweis: wie gespeichert
+            p = s.get(FixtureGroup, self.pid)
+            self.assertEqual(aufgeloestes_raster(p, s)[:2], (2, 3))
+
 
 class AltShowTest(_MitShow):
 
@@ -191,6 +210,33 @@ class AltShowTest(_MitShow):
             self.assertEqual(len({g.uid for g in gs}), 2)
             a = [g for g in gs if g.name == "A"][0]
             self.assertEqual(aufgeloeste_positionen(a, s), {"0,0": 1, "1,0": "2:0"})
+
+
+def test_alt_show_db_migration_idempotent_und_verlustfrei():
+    """Pruefung: eine Show-DB OHNE uid-Spalte — zweimal migriert, gleiche uids,
+    Zellen byte-gleich."""
+    import sqlite3
+    from sqlalchemy import create_engine
+    from src.core.database.models import migrate_show_db
+    pfad = os.path.join(tempfile.mkdtemp(), "alt.db")
+    roh = '{"0,0": 1, "1,0": "2:0"}'
+    c = sqlite3.connect(pfad)
+    c.execute("CREATE TABLE fixture_groups (id INTEGER PRIMARY KEY, name VARCHAR, "
+              "cols INT, rows INT, positions_json TEXT)")
+    c.execute("INSERT INTO fixture_groups VALUES (1,'A',2,1,?)", (roh,))
+    c.execute("INSERT INTO fixture_groups VALUES (2,'B',1,1,'{\"0,0\": 3}')")
+    c.commit()
+    c.close()
+    eng = create_engine(f"sqlite:///{pfad}")
+    q = "select id, name, cols, rows, positions_json, uid from fixture_groups order by id"
+    migrate_show_db(eng)
+    erst = sqlite3.connect(pfad).execute(q).fetchall()
+    migrate_show_db(eng)
+    zweit = sqlite3.connect(pfad).execute(q).fetchall()
+    eng.dispose()
+    assert erst == zweit
+    assert erst[0][4] == roh and len({r[5] for r in erst}) == 2
+    assert all(len(r[5]) == 32 for r in erst)
 
 
 class EditorTest(_MitShow):
