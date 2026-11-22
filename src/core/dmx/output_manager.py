@@ -1145,6 +1145,20 @@ class OutputManager:
                         problem_text = str(f() or "")
                     except Exception:
                         problem_text = ""
+            if weg == "Enttec":
+                # OUT-83: hat die Port-Pruefung beim Anlegen den Port als
+                # belegt gemeldet (Windows, exklusiv), nennt das Banner DAS
+                # statt „Adapter nicht verbunden“ — sonst sucht der Bediener
+                # am USB-Kabel. Sendet der Ausgang wieder, ist der Befund alt.
+                try:
+                    from . import port_check as _pc
+                    port = str(getattr(dev, "port", "") or "")
+                    if verbunden is True:
+                        _pc.vergiss_belegt(port)
+                    elif not problem_text and verbunden is False:
+                        problem_text = _pc.belegt_grund(port)
+                except Exception:                        # noqa: BLE001
+                    pass                                 # Anzeige stoert nie
             # OUT-66 (Review 2): Hinweis ohne Ausfall (z. B. „anderer Enttec
             # uebernommen“) — informativ, kein Problem und kein Alarm.
             hinweis = self._enttec_hinweis(dev) if weg == "Enttec" else ""
