@@ -83,6 +83,7 @@ build/
 *.spec
 # XPLAT-47: die gepflegte Spec des Windows-Setups gehoert ins Repo.
 !packaging/windows/LightOS.spec
+!packaging/linux/LightOS.spec
 
 # DEMO-8: Demo-Shows fuer das Setup — beim Bauen erzeugt
 # (packaging/demo_shows.py), nie eingecheckt.

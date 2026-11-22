@@ -1,6 +1,7 @@
 ID: XPLAT-62
 Prioritaet: P2
-Status: todo
+Status: teils
+Status-Notiz: Teil 1 (.deb) gebaut und lokal geprueft; offen: erster Workflow-Lauf, Test auf frischem Mint, AppImage, Release
 Titel: Linux-Installation wie ein normales Programm: .deb-Paket fuer Mint/Ubuntu/Debian, AppImage fuer andere Distributionen
 
 **Herkunft:** Entscheidung des Projektinhabers vom 22.11.2026 (DOC-68: am Ende ein richtiger Installer). Heute gibt es unter Linux nur `install.py` aus dem Quellcode und die udev-Regel `packaging/linux/60-lightos-udmx.rules`.
@@ -8,3 +9,7 @@ Titel: Linux-Installation wie ein normales Programm: .deb-Paket fuer Mint/Ubuntu
 **Ziel:** (1) **.deb-Paket** als Hauptweg fuer Linux Mint, Ubuntu und Debian (der Projektinhaber nutzt Mint): Doppelklick bzw. `apt install ./lightos_<version>.deb`, Eintrag im Startmenue mit Symbol, Programm unter /opt/lightos mit eigener Python-Laufzeit (PyInstaller-Ordner wie unter Windows), udev-Regeln fuer uDMX/Enttec mitinstallieren und den Benutzer auf die Gruppe `dialout` hinweisen, sauber deinstallierbar; Benutzerdaten bleiben in ~/.local/share/LightOS. (2) **AppImage** als Ein-Datei-Weg fuer alle anderen Distributionen (ohne Installation startbar, udev-Hinweis im ersten Start). Flatpak/Snap bewusst nicht: deren Sandbox erschwert den Zugriff auf USB-DMX, serielle Ports und MIDI. (3) Bau beider Pakete im GitHub-Workflow wie das Windows-Setup, Pruefung in einer frischen Mint-/Ubuntu-VM bzw. einem Container (Installieren, Starten, Deinstallieren).
 
 **Erledigt, wenn:** .deb und AppImage aus dem Workflow entstehen, auf einem frischen Mint installiert/gestartet/entfernt werden koennen, USB-DMX ohne Handarbeit (ausser Gruppe dialout) funktioniert, INSTALL.md beide Wege beschreibt.
+
+**Geliefert (22.11.2026, Teil 1):** eigene Linux-Spec `packaging/linux/LightOS.spec` (onedir; teilt `bundle_inhalt.py` und die Lizenzsammlung mit Windows, ohne die nur fuer Windows-Dateien gebauten Pruefungen), `packaging/linux/baue_deb.py` (Programm nach /opt/lightos, Starter /usr/bin/lightos, Startmenue-Eintrag mit Symbol, udev-Regel nach /usr/lib/udev/rules.d, Lizenztexte nach /usr/share/doc/lightos, knappe Depends auf Systembibliotheken, postinst laedt udev neu und weist auf `dialout`/`plugdev` hin, postrm laedt neu, Benutzerdaten bleiben), Workflow `.github/workflows/linux-paket.yml` (von Hand und bei Tags; Bau auf ubuntu-22.04, Selbsttest, Installieren/Starten/Entfernen in einem frischen ubuntu:24.04-Container, nur Artefakt). INSTALL.md Abschnitt 2b. Test `tests/test_xplat62_linux_paket.py` baut aus einem kuenstlichen Programmordner.
+
+**Offen:** (a) der Workflow ist noch nie gelaufen — PyInstaller ist lokal nicht installiert, gebaut und geprueft wurde nur das Paket aus einem kuenstlichen Programmordner; ob die Depends-Liste reicht, zeigt erst der Container-Schritt. (b) Linux-Tabelle fuer die Fremd-Komponenten-Pruefung (die Windows-Pruefung kennt nur .dll-Namen; unter Linux werden die Lizenztexte gesammelt, aber nicht gegen eine Liste erlaubter Komponenten geprueft). (c) Test auf einem frischen Mint (Installieren, Starten, uDMX/Enttec, Entfernen). (d) AppImage (Teil 2) nicht begonnen. (e) kein Release.
