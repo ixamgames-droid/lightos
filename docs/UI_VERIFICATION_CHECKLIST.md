@@ -48,7 +48,7 @@ fehlt zunaechst hier und macht das Gate rot (Schutz gegen Doku-Drift).
 
 Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = mind. ein beschrifteter Text/Tooltip · **Aktion/Signal** = Button/`QAction`/Klassen-`Signal` vorhanden · **Regressionstest** = abdeckende Testdatei · **Doc** = Komponentenseite · **Verifikationspfad** = ausfuehrbarer `pytest`-Testname ODER `manuell`.
 
-**Stand:** 25 no-arg Views (25 headless baubar), 20 VC-Widgets (20 headless baubar).
+**Stand:** 25 no-arg Views (25 headless baubar), 21 VC-Widgets (21 headless baubar).
 
 ### Views (`src/ui/views/*.py`, no-arg `*View`)
 
@@ -97,6 +97,7 @@ Spalten: **headless** = ohne Argumente offscreen baubar · **Tooltip/Label** = m
 | `VCFrame` | `vc_frame.py` | ja | nein | ja | `tests/test_ui_smoke_enumerated.py` | — | `test_every_virtual_console_widget_roundtrips` |
 | `VCLabel` | `vc_label.py` | ja | nein | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/vc/vc_label.md` | `test_every_virtual_console_widget_roundtrips` |
 | `VCMultiLiveEditor` | `vc_multi_live_editor.py` | ja | ja | ja | `tests/test_vc_multi_live_editor.py` | — | `test_every_virtual_console_widget_roundtrips` |
+| `VCPixelraster` | `vc_pixelraster.py` | ja | nein | ja | `tests/test_ui_smoke_enumerated.py` | — | `test_every_virtual_console_widget_roundtrips` |
 | `VCRaumPad` | `vc_raumpad.py` | ja | nein | ja | `tests/test_ui_smoke_enumerated.py` | — | `test_every_virtual_console_widget_roundtrips` |
 | `VCSlider` | `vc_slider.py` | ja | nein | ja | `tests/test_ui_smoke_enumerated.py` | `docs/components/vc/vc_slider.md` | `test_every_virtual_console_widget_roundtrips` |
 | `VCSongInfo` | `vc_song_info.py` | ja | nein | ja | `tests/test_vc_song_info.py` | `docs/components/vc/vc_song_info.md` | `test_every_virtual_console_widget_roundtrips` |
