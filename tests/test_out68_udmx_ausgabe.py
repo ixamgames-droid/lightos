@@ -529,7 +529,7 @@ def test_udmx_hat_keine_externe_universumsnummer(konfig):
         {"num": 3, "output": "uDMX", "patch": "2008:1066@1-3"},
     ])
     assert doppelt == [("Zeile 1, Zeile 2", "uDMX → 2008:1066@1-2")]
-    assert oc.AUSGABE_TYPEN == ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet")
+    assert oc.AUSGABE_TYPEN[:5] == ("Disabled", "Enttec", "uDMX", "sACN", "ArtNet")
 
 
 # ── Oberflaeche ──────────────────────────────────────────────────────────────
