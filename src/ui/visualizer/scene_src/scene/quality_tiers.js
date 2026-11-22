@@ -26,6 +26,10 @@
 // bekommen einen Volumen-Schatten (ein Koerper im Kegel verdunkelt den
 // sichtbaren Strahl dahinter). 0 = aus; standardmaessig nur auf Maximal.
 //
+// VIZ-114: `matrixPunktEcken` = Ecken eines runden LED-Pixels (Vorhang, Ring;
+// fixtures/matrix_formen.js). Alle Pixel eines Matrix-Teils sind EIN
+// InstancedMesh; die Stufe spart nur Dreiecke je Pixel, nie Pixel.
+//
 // `pushHz` liest JS nicht selbst — den Takt setzt Python
 // (src/ui/visualizer/quality_tiers.py, PUSH_HZ). Er steht hier, damit die
 // Tabelle vollstaendig an einer Stelle lesbar ist;
@@ -38,18 +42,18 @@ export const TIER_PROFILES = Object.freeze({
   low: Object.freeze({
     pushHz: 15, pixelRatioCap: 1.25, shadowCap: 8, realLights: 4, softShadows: false,
     dynamicResolution: 'always', goboProjektion: false,
-    kegelKante: false, strahlSchatten: 0,
+    kegelKante: false, strahlSchatten: 0, matrixPunktEcken: 6,
   }),
   high: Object.freeze({
     pushHz: 30, pixelRatioCap: 2, shadowCap: 8, realLights: 8, softShadows: true,
     dynamicResolution: 'slow', goboProjektion: true,
-    kegelKante: true, strahlSchatten: 0,
+    kegelKante: true, strahlSchatten: 0, matrixPunktEcken: 12,
   }),
   max: Object.freeze({
     // pixelRatioCap null = kein Deckel, volle devicePixelRatio.
     pushHz: 44, pixelRatioCap: null, shadowCap: 16, realLights: 16, softShadows: true,
     dynamicResolution: 'never', goboProjektion: true,
-    kegelKante: true, strahlSchatten: 8,
+    kegelKante: true, strahlSchatten: 8, matrixPunktEcken: 16,
   }),
 });
 

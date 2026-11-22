@@ -187,7 +187,7 @@ def geraet_payload(d: VorschauDaten) -> dict:
         "x": 0.0, "y": VORSCHAU_HOEHE, "z": 0.0,
         "rotX": 0, "rotY": 0, "rotZ": 0,
         "panRange": 540, "tiltRange": tilt, "panZero": 128, "tiltZero": 128,
-        "dockedTo": "",
+        "dockedTo": "", "matrixForm": None,   # VIZ-114: Vorschau = Bestandsweg
         "r": 0, "g": 0, "b": 0, "intensity": 0, "pan": 128, "tilt": 128,
     }
 

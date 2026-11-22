@@ -391,7 +391,9 @@ export function addFixture(data) {
                                            gridCols: data.gridCols,
                                            nWhites: data.nWhites,
                                            whiteRows: data.whiteRows,
-                                           whiteCols: data.whiteCols });
+                                           whiteCols: data.whiteCols,
+                                           // VIZ-114: Bauform + Masse aus dem Profil
+                                           matrixForm: data.matrixForm || null });
   const root = new THREE.Group();
   root.position.set(data.x || 0, data.y == null ? 6.5 : data.y, data.z || 0);
   // Multi-Achsen-Ausrichtung (Grad aus Python) gleich beim Erzeugen setzen.
@@ -563,6 +565,9 @@ export function addFixture(data) {
     // Weiss-Segmente. `updateMatrixPanelDmx` faerbt es aus `heads[j].cw`.
     whites: (model.whites && model.whites.length) ? model.whites : null,
     isMatrix: !!model.isMatrix,
+    // VIZ-114: Bauform-Modell — alle Pixel als EIN InstancedMesh
+    // (matrix_formen.js); null beim Bestands-Panel.
+    matrixInstanz: model.matrixInstanz || null,
     // VIZ-15: die eigene fid am Objekt — beamsSichtbar() braucht sie, und die
     // DMX-Handler bekommen sonst nur `f` ohne Bezug zum Schluessel.
     fid: Number(fid),

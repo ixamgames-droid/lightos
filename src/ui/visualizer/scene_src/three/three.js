@@ -65,6 +65,8 @@ export const {
   GridHelper,
   Group,
   HemisphereLight,
+  InstancedBufferAttribute,
+  InstancedMesh,
   LatheGeometry,
   Line,
   LineBasicMaterial,

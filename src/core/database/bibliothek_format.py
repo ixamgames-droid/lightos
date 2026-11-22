@@ -159,6 +159,8 @@ _KOPF_FELDER = {
     "abstrahlwinkel",
     # VIZ-111: Zoom-Kanal laeuft umgekehrt (true = „0 = weit, 255 = eng“).
     "zoom_umgekehrt",
+    # FM-80: Bauform einer LED-Matrix und die Angaben des Matrix-Assistenten.
+    "bauform", "matrix",
 }
 _KOPF_PFLICHT = ("format_version", "hersteller", "modell", "kurzname", "typ",
                  "quelle", "herkunft", "autor", "geprueft", "modi")
@@ -303,6 +305,16 @@ def pruefe(daten, datei: str = "") -> list[str]:
     if _AW.FELD_ZOOM_UMGEKEHRT in daten:                  # VIZ-111
         if not _AW.pruefe_zoom_umgekehrt(daten[_AW.FELD_ZOOM_UMGEKEHRT]):
             out.append(f"{p}{_AW.FELD_ZOOM_UMGEKEHRT}: true oder false erwartet")
+    if "bauform" in daten:                                 # FM-80
+        from src.core.led_matrix import BAUFORMEN
+        if daten["bauform"] not in BAUFORMEN:
+            out.append(f"{p}bauform: unbekannt {daten['bauform']!r} "
+                       f"(erlaubt: {', '.join(BAUFORMEN)})")
+    if "matrix" in daten:                                  # FM-80
+        from src.core.led_matrix import angaben_aus_json
+        m = daten["matrix"]
+        if not isinstance(m, dict) or angaben_aus_json(json.dumps(m)) is None:
+            out.append(f"{p}matrix: Objekt mit den Angaben des Matrix-Assistenten erwartet")
     for f, n in (("notizen", None), ("viz_model", 40)):
         if f in daten and (not isinstance(daten[f], str)
                            or (n and len(daten[f]) > n)):
@@ -660,6 +672,13 @@ def profil_zu_daten(prof, *, quelle: dict | None = None,
         d["abstrahlwinkel"] = aw
     if AW.zoom_umgekehrt_aus_profil(prof):          # VIZ-111
         d[AW.FELD_ZOOM_UMGEKEHRT] = True
+    if getattr(prof, "bauform", ""):                # FM-80
+        d["bauform"] = prof.bauform
+    if getattr(prof, "matrix_angaben", ""):         # FM-80
+        try:
+            d["matrix"] = json.loads(prof.matrix_angaben)
+        except ValueError:
+            pass
     d.update({
         "quelle": dict(quelle or basis["quelle"]),
         "herkunft": dict(herkunft or basis["herkunft"]),
@@ -966,6 +985,11 @@ def _kopf_setzen(prof, daten: dict) -> None:
     prof.beam_angle_min, prof.beam_angle_max = AW.aus_daten(daten.get("abstrahlwinkel"))
     prof.zoom_inverted = AW.zoom_umgekehrt_aus_daten(        # VIZ-111
         daten.get(AW.FELD_ZOOM_UMGEKEHRT))
+    from src.core.led_matrix import BAUFORMEN       # FM-80
+    prof.bauform = daten.get("bauform", "") if daten.get("bauform") in BAUFORMEN else ""
+    m = daten.get("matrix")
+    prof.matrix_angaben = (json.dumps(m, ensure_ascii=False, sort_keys=True)
+                           if isinstance(m, dict) else "")
     prof.provenance = _provenance(daten)
     prof.herkunft = _herkunft_json(daten)
 
@@ -1073,6 +1097,8 @@ def _vergleichsform(prof) -> tuple:
                                           getattr(prof, "beam_angle_max", 0))),
             # VIZ-111: ebenso die Laufrichtung des Zoom-Kanals.
             bool(getattr(prof, "zoom_inverted", False) or False),
+            # FM-80: Bauform und Matrix-Angaben.
+            getattr(prof, "bauform", "") or "", getattr(prof, "matrix_angaben", "") or "",
             tuple((m.name, m.description or "", m.grid_rows or 0, m.grid_cols or 0,
                    m.white_rows or 0, m.white_cols or 0, m.channel_count,
                    tuple((c.channel_number, c.name, c.attribute, c.default_value,
