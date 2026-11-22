@@ -288,6 +288,36 @@ Reiter **sACN (E1.31)**:
 5. **Übernehmen** — richtet den Ausgang ein und speichert ihn; Status zum Beispiel
    `Aktiv · Multicast (239.255.0.x) · Universum 1 (gespeichert)`.
 
+## 4b. DDP (WLED) und Pixel-Controller
+
+Für LED-Matrizen und Pixel-Streifen an einem **WLED**-Controller (WLAN) gibt es
+die Ausgabe-Art **„DDP (WLED)“**. DDP kennt keine 512-Kanal-Grenze: alle
+Universen mit derselben Ziel-IP gehen als **ein** Datenstrom hinaus, und der
+Controller zeigt das Bild erst, wenn das letzte Paket da ist — die Teile einer
+großen Matrix wechseln gleichzeitig.
+
+1. Im Reiter **Universen** für jedes Universum der Matrix die Art
+   **DDP (WLED)** wählen und als Ziel die IP des Controllers eintragen
+   (z. B. `192.0.2.50`).
+2. In die Spalte **Ext. Universum** kommt bei DDP der **Offset in Byte**, ab dem
+   das Universum im Strom liegt. Leer = direkt hinter dem vorigen Universum
+   derselben IP (512 Byte weiter).
+3. Eine Matrix aus dem **LED-Matrix-Assistenten** belegt ganze Zeilen je
+   Universum (z. B. 20 Pixel × 8 Zeilen = 480 Kanäle). Damit die Pixel
+   lückenlos ankommen, ist der Offset eines Teils die Summe der Kanäle aller
+   Teile davor: 0, 480, 960 … Master- oder Strobe-Kanäle für WLED weglassen —
+   sie lägen sonst mit im Strom und verschöben die Pixel.
+4. In WLED unter *Sync Interfaces* nichts weiter einstellen: DDP läuft dort
+   immer im Modus „Multi RGB“ auf UDP-Port 4048.
+
+Pixel-Controller mit vielen Universen (Advatek PixLite, ENTTEC Octo, Falcon)
+bekommen ihre Universen wie gewohnt per **Art-Net** oder **sACN**, je
+Universum eine Zeile. Welche Protokolle die Geräte sprechen und woher die
+Angaben stammen, steht in [PIXEL_CONTROLLER.md](../PIXEL_CONTROLLER.md).
+
+Im Probelauf (App nicht über `main.py` gestartet) geht auch über DDP nichts ins
+Netz.
+
 ## 5. Alle Universen auf einmal: Reiter Universen
 
 Reiter **Universen** — hier siehst und bearbeitest du alle Ausgänge in einer Tabelle:

@@ -53,6 +53,36 @@ unabhängig immer auf alle PAR + Spider.
 
 ---
 
+## 4. Bild oder GIF auf die Matrix (Art „Bild/Video")
+
+Statt eines berechneten Musters kann ein Matrix-Effekt ein **Bild** (PNG/JPG) oder ein
+**animiertes GIF** auf das Raster der Gruppe legen — z. B. ein Logo auf eine LED-Wand.
+
+1. Im **Matrix-Editor** den Effekt wählen und als Art **„Bild/Video"** einstellen.
+2. Unter den Parametern **„Medium wählen …"** antippen und die Datei aussuchen. LightOS
+   kopiert sie in den **Medien-Ordner** neben den Show-Daten (`matrix_media` im
+   Datenordner); die Show merkt sich nur den Dateinamen, das Bild steckt **nicht** in der
+   Show-Datei. Wer die Show auf einen anderen Rechner mitnimmt, kopiert den Ordner mit.
+3. Einstellen:
+   - **Einpassung:** *Einpassen* zeigt das ganze Bild (Rest schwarz), *Füllen* macht das
+     Raster voll und schneidet den Rand ab, *Strecken* verzerrt auf das Raster.
+   - **Drehung:** 0°/90°/180°/270° im Uhrzeigersinn — für hochkant montierte Panels.
+   - **Bild-Helligkeit:** dunkelt nur die Farbe ab. Der Dimmer läuft wie bei jedem
+     Farb-Effekt **nicht** automatisch mit.
+   - **Bild-Tempo:** 1 = Originaltempo des GIFs, 2 = doppelt so schnell. Der
+     Schritte-Regler ändert das Abspieltempo nicht. **Rückwärts** spielt das GIF rückwärts.
+   - **Schleife:** aus = das letzte Bild bleibt stehen.
+
+Das Bild wird beim Zuweisen **im Hintergrund** auf die Rastergröße umgerechnet; die
+DMX-Ausgabe liest danach nur noch fertige Pixel und ruckelt nicht. Bis dahin bleibt die
+Matrix kurz dunkel. Fehlt die Datei, zeigt der Editor **„Medium fehlt: …"** und die Matrix
+bleibt dunkel — nichts stürzt ab. Mischen mit anderen Ebenen geht wie bei jedem
+Matrix-Effekt (Priorität, Modify, Dimmer-Matrix darüber).
+
+**Noch nicht:** Videodateien (MP4 & Co.) — sie werden mit einer Meldung abgelehnt.
+
+---
+
 ## Tipps
 
 - **Layern:** Lege über den Farb-Effekt zusätzlich eine **Dimmer-Matrix** aus Bank 2
