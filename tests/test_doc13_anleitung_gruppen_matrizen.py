@@ -291,6 +291,10 @@ class AnleitungGegenOberflaecheTest(unittest.TestCase):
         gw.positions[(0, 0)] = 2
         texte |= menue_texte(self.view._build_cell_menu(0, 0))
         gw.positions.clear()
+        # FM-20: Menue eines Untergruppen-Blocks.
+        gw.positions[(0, 0)] = "g:fm20probe"
+        texte |= menue_texte(self.view._build_cell_menu(0, 0))
+        gw.positions.clear()
 
         # Block-Dialog: Titel und Frage dem ECHTEN Aufruf abgegriffen.
         gesehen: set[str] = set()

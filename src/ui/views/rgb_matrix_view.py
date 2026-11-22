@@ -2636,16 +2636,22 @@ class RgbMatrixView(QWidget):
                         grids_from_positions, weiss_grid_from_positions)
                     with Session(eng) as s:
                         g = s.get(FixtureGroup, gid)
+                        # FM-20: Untergruppen-Bloecke aufloesen, solange die
+                        # Session offen ist.
+                        # Das Raster waechst mit einem ueberstehenden Block mit
+                        # (sonst verwirft grids_from_positions dessen Zellen).
+                        from src.core.database.models import aufgeloestes_raster
+                        g_cols, g_rows, positions = (
+                            aufgeloestes_raster(g, s) if g is not None else (1, 1, {}))
                     if g is not None:
-                        positions = json.loads(g.positions_json or "{}")
                         # FM-16: fixture_grid + head_grid parallel (Pro-Kopf-Zellen
                         # "fid:head" tragen einen Kopf-Index; reine fids -> None).
-                        grid, head_grid = grids_from_positions(positions, g.cols, g.rows)
+                        grid, head_grid = grids_from_positions(positions, g_cols, g_rows)
                         # ★ FM-41: die Weiss-Zellen kommen als EIGENE Liste
                         # daneben. In `grid` sind sie bewusst Luecken (None) —
                         # so sieht jeder Konsument ohne Achsenkenntnis nichts
                         # statt etwas Falsches (s. `weiss_grid_from_positions`).
-                        weiss_grid = weiss_grid_from_positions(positions, g.cols, g.rows)
+                        weiss_grid = weiss_grid_from_positions(positions, g_cols, g_rows)
                         n = sum(1 for f in grid if f is not None)
                         n_weiss = sum(1 for w in weiss_grid if w is not None)
                         # FM-41: Weiss-Zellen sind in `grid` Luecken — sie hier
@@ -2653,9 +2659,9 @@ class RgbMatrixView(QWidget):
                         # irrefuehrend („da fehlt was", obwohl da etwas steht).
                         luecken = len(grid) - n - n_weiss
                         _weiss_text = f", {n_weiss} Weiß-Segmente" if n_weiss else ""
-                        return (dict(cols=g.cols, rows=g.rows, fixture_grid=grid,
+                        return (dict(cols=g_cols, rows=g_rows, fixture_grid=grid,
                                      head_grid=head_grid, weiss_grid=weiss_grid),
-                                f"{g.rows}×{g.cols} = {n} Fixtures{_weiss_text}, "
+                                f"{g_rows}×{g_cols} = {n} Fixtures{_weiss_text}, "
                                 f"{luecken} Lücken (Gruppe »{g.name}«)")
                 except Exception as e:
                     print(f"[rgb_matrix_view] ERROR: Gruppen-Grid: {e}")

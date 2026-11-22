@@ -892,7 +892,8 @@ class EfxView(QWidget):
             from src.core.database.models import FixtureGroup
             with Session(eng) as s:
                 g = s.get(FixtureGroup, gid)
-                pos = json.loads(g.positions_json or "{}") if g is not None else {}
+                from src.core.database.models import aufgeloeste_positionen  # FM-20
+                pos = aufgeloeste_positionen(g, s) if g is not None else {}
             # FM16E-HEADCOUNT: Kopf-Zellen "fid:head" -> Basis-fid (eine Parse-
             # Quelle) — sonst wirft int("5:2") und die Kopf-Matrix-Gruppe faellt
             # aus dem EFX-Geraete-Zugehoerigkeitsfilter.

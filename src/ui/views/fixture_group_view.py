@@ -26,6 +26,8 @@ from src.ui.widgets import mini_icons as _mini
 from src.ui.widgets.group_edit_dialog import raster_ohne_spalten
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
+from src.core.group_cells import (parse_gruppen_verweis, gruppen_verweis,
+                                   block_ausmass, aufloesen, waere_zyklus)
 
 
 from src.core.group_cells import (          # noqa: E402  (nach den Qt-Importen)
@@ -206,6 +208,9 @@ class FixtureGridWidget(QWidget):
         self.setMouseTracking(True)         # FM-14b: Tooltip ohne Klick
         self._labels: dict[int, str] = {}
         self._models: dict[int, str] = {}   # FM-14b: fid -> Render-Modell
+        # FM-20: uid -> (Name, cols, rows) der Gruppen, die als Block in diesem
+        # Raster stehen koennen (fuer Aufschrift und Flaeche des Blocks).
+        self.bloecke: dict[str, tuple] = {}
 
         # Internal drag state
         self._drag_from: tuple[int, int] | None = None
@@ -238,6 +243,9 @@ class FixtureGridWidget(QWidget):
         Eigene Methode statt einer Zeile im ``paintEvent``: eine GEMALTE
         Aufschrift laesst sich nicht zurueckmessen, eine berechnete schon.
         """
+        uid, _d = parse_gruppen_verweis(wert)
+        if uid is not None:                       # FM-20: Untergruppen-Block
+            return "▣ " + str((self.bloecke.get(uid) or ("fehlt",))[0])
         fid, achse, index = parse_zelle(wert)
         if fid is None:
             return str(wert)
@@ -694,7 +702,27 @@ class FixtureGridWidget(QWidget):
         # `group_cells.referenzierte_fids`.)
         fid_order = referenzierte_fids_in_grid_order(
             {f"{c},{r}": v for (c, r), v in self.positions.items()})
+        # FM-20: Untergruppen-Bloecke zuerst als Flaeche mit Rahmen — direkte
+        # Zellen liegen darueber, wie in der Aufloesung (direkt gewinnt).
         for (c, r), v in self.positions.items():
+            uid, d = parse_gruppen_verweis(v)
+            if uid is None:
+                continue
+            _n, bc0, br0 = self.bloecke.get(uid) or ("fehlt", 1, 1)
+            bc, br = block_ausmass(bc0, br0, d)
+            rect = QRect(int(c * cw) + 2, int(r * ch) + 2,
+                         int(bc * cw) - 4, int(br * ch) - 4)
+            farbe = QColor("#ff8c00") if self._drag_from == (c, r) else QColor(70, 110, 180, 120)
+            p.fillRect(rect, QBrush(farbe))
+            p.setPen(QPen(QColor("#8fb4ff"), 2, Qt.PenStyle.DashLine))
+            p.drawRect(rect)
+            p.setPen(QColor("#ffffff"))
+            p.setFont(font)
+            p.drawText(rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                       " " + self.zell_beschriftung(v) + (f" ({d}°)" if d else ""))
+        for (c, r), v in self.positions.items():
+            if parse_gruppen_verweis(v)[0] is not None:
+                continue
             fid, achse, index = parse_zelle(v)
             head = index if achse == ACHSE_FARBE else None
             x = c * cw
@@ -1447,6 +1475,7 @@ class FixtureGroupView(QWidget):
                     continue
         self._grid_widget.set_grid(g.cols, g.rows)
         self._grid_widget.positions = positions
+        self._bloecke_laden()
         self._grid_widget.update()
         self._highlight_group_members()
 
@@ -1617,6 +1646,11 @@ class FixtureGroupView(QWidget):
             return
         try:
             with s:
+                # FM-20: Obergruppen behalten die Geraete dieses Blocks.
+                from src.core.database.models import verweise_einbetten
+                _alt = s.get(FixtureGroup, self._current_group.id)
+                if _alt is not None:
+                    verweise_einbetten(s, _alt.uid)
                 s.execute(delete(FixtureGroup).where(FixtureGroup.id == self._current_group.id))
                 s.commit()
         except Exception as e:
@@ -1692,6 +1726,11 @@ class FixtureGroupView(QWidget):
             it.setData(Qt.ItemDataRole.UserRole, gid)
             lst.addItem(it)
         lay.addWidget(lst)
+        # FM-20: Herkunft behalten — jede Gruppe steht als Block (Verweis) im
+        # Ergebnis; aus ist das bisherige Kopieren der Zellen.
+        from PySide6.QtWidgets import QCheckBox
+        chk_bloecke = QCheckBox("als Blöcke einsetzen (Herkunft bleibt, Änderungen wirken nach)")
+        lay.addWidget(chk_bloecke)
         bb = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                               | QDialogButtonBox.StandardButton.Cancel)
         bb.accepted.connect(dlg.accept)
@@ -1708,7 +1747,8 @@ class FixtureGroupView(QWidget):
                 QMessageBox.information(self, "Zusammenlegen",
                                         "Mindestens zwei Gruppen wählen.")
                 return
-            new_gid = get_state().merge_head_matrix_groups(gids)
+            new_gid = get_state().merge_head_matrix_groups(
+                gids, als_bloecke=chk_bloecke.isChecked())
             if new_gid is None:
                 QMessageBox.warning(self, "Zusammenlegen", "Zusammenlegen fehlgeschlagen.")
                 return
@@ -1814,9 +1854,23 @@ class FixtureGroupView(QWidget):
         fx = self._fixture_by_fid(fid) if fid is not None else None
 
         menu = QMenu(self)
+        _buid, _bd = parse_gruppen_verweis(wert)
         if wert is not None:
-            act_del = menu.addAction("Zelle entfernen")
+            act_del = menu.addAction("Block entfernen" if _buid else "Zelle entfernen")
             act_del.triggered.connect(lambda: self._cell_menu_remove(col, row))
+        if _buid is not None:
+            # FM-20: der Block als Einheit — drehen und wieder aufteilen.
+            menu.addAction("Block drehen (90° im Uhrzeigersinn)").triggered.connect(
+                lambda: self._block_drehen(col, row))
+            menu.addAction("Block in Einzelzellen aufteilen").triggered.connect(
+                lambda: self._block_aufteilen(col, row))
+        elif wert is None:
+            kandidaten = self._block_kandidaten()
+            if kandidaten:
+                sub = menu.addMenu("Gruppe als Block einsetzen")
+                for uid, name in kandidaten:
+                    sub.addAction(name).triggered.connect(
+                        lambda _c=False, u=uid: self._block_einsetzen(u, col, row))
 
         if fx is not None:
             from src.core.app_state import color_head_count
@@ -1856,6 +1910,101 @@ class FixtureGroupView(QWidget):
                     lambda: self._cell_menu_drop_all(fid))
 
         return None if menu.isEmpty() else menu
+
+    # ── FM-20: Gruppe in Gruppe ──────────────────────────────────────────────
+    def _gruppen_daten(self) -> dict:
+        """uid -> (Name, cols, rows, positions) aller Gruppen mit Kennung."""
+        s = self._session()
+        if s is None:
+            return {}
+        out = {}
+        try:
+            with s:
+                for g in s.execute(select(FixtureGroup)).scalars().all():
+                    if not g.uid:
+                        continue
+                    try:
+                        pos = json.loads(g.positions_json or "{}")
+                    except Exception:
+                        pos = {}
+                    out[g.uid] = (g.name or "", int(g.cols or 1), int(g.rows or 1),
+                                  pos if isinstance(pos, dict) else {})
+        except Exception:
+            return {}
+        return out
+
+    def _bloecke_laden(self, daten: dict | None = None):
+        daten = self._gruppen_daten() if daten is None else daten
+        self._grid_widget.bloecke = {u: (n, c, r) for u, (n, c, r, _p) in daten.items()}
+        self._grid_widget.update()
+
+    def _eigene_uid(self):
+        return getattr(self._current_group, "uid", None) if self._current_group else None
+
+    @staticmethod
+    def _lader(daten: dict):
+        return lambda u: (daten[u][1], daten[u][2], daten[u][3]) if u in daten else None
+
+    def _block_kandidaten(self) -> list:
+        """(uid, Name) aller Gruppen, die hier als Block passen — ohne die
+        eigene und ohne jede, die diese Gruppe (auch mittelbar) enthaelt."""
+        eigen = self._eigene_uid()
+        if not eigen:
+            return []
+        daten = self._gruppen_daten()
+        lade = self._lader(daten)
+        return sorted(((u, d[0]) for u, d in daten.items()
+                       if not waere_zyklus(eigen, u, lade)),
+                      key=lambda t: t[1].lower())
+
+    def _block_raster_anpassen(self, col: int, row: int, uid: str, d: int):
+        _n, bc0, br0 = self._grid_widget.bloecke.get(uid) or ("", 1, 1)
+        bc, br = block_ausmass(bc0, br0, d)
+        if col + bc > self._spin_cols.value():
+            self._spin_cols.setValue(col + bc)
+        if row + br > self._spin_rows.value():
+            self._spin_rows.setValue(row + br)
+
+    def _block_einsetzen(self, uid: str, col: int, row: int) -> bool:
+        daten = self._gruppen_daten()
+        eigen = self._eigene_uid()
+        if uid not in daten or not eigen or waere_zyklus(eigen, uid, self._lader(daten)):
+            return False
+        gw = self._grid_widget
+        self._bloecke_laden(daten)
+        gw.positions[(col, row)] = gruppen_verweis(uid)
+        self._block_raster_anpassen(col, row, uid, 0)
+        gw.update()
+        gw.positions_changed.emit()
+        return True
+
+    def _block_drehen(self, col: int, row: int):
+        gw = self._grid_widget
+        uid, d = parse_gruppen_verweis(gw.positions.get((col, row)))
+        if uid is None:
+            return
+        neu = (d + 90) % 360
+        gw.positions[(col, row)] = gruppen_verweis(uid, neu)
+        self._block_raster_anpassen(col, row, uid, neu)
+        gw.update()
+        gw.positions_changed.emit()
+
+    def _block_aufteilen(self, col: int, row: int):
+        """Block -> Einzelzellen (Stand der Untergruppe JETZT). Belegte Zellen
+        bleiben, wie in der Aufloesung (direkt gewinnt)."""
+        gw = self._grid_widget
+        wert = gw.positions.get((col, row))
+        if parse_gruppen_verweis(wert)[0] is None:
+            return
+        daten = self._gruppen_daten()
+        zellen = aufloesen({f"{col},{row}": wert}, self._lader(daten),
+                           eigene_uid=self._eigene_uid())
+        del gw.positions[(col, row)]
+        for k, v in zellen.items():
+            c, r = (int(x) for x in k.split(","))
+            gw.positions.setdefault((c, r), v)
+        gw.update()
+        gw.positions_changed.emit()
 
     def _cell_menu_remove(self, col: int, row: int):
         gw = self._grid_widget

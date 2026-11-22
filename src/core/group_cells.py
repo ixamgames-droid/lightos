@@ -427,3 +427,154 @@ def cells_in_grid_order(positions: dict) -> list[str]:
         if cell not in out:
             out.append(cell)
     return out
+
+
+# ── FM-20: Gruppe in Gruppe ──────────────────────────────────────────────────
+#
+# Eine dritte Zellart: ``"g:<uid>"`` (optional ``"g:<uid>@90"``) setzt eine
+# ANDERE, fertig angeordnete Gruppe als EINEN Block in dieses Raster. Die Zelle
+# ist der Anker (oben links des gedrehten Blocks); der Block ist so gross wie
+# das Raster der Untergruppe (cols x rows, bei 90/270 getauscht).
+#
+# Warum die ``uid`` (VCB-42) und nicht id/Name: die id vergibt SQLite neu und
+# ``show_file`` legt beim Laden neu an; der Name ist nicht eindeutig und
+# aendert sich beim Umbenennen. Die uid ueberlebt Speichern/Laden, Umbenennen
+# und Verschieben — Umbenennen der Untergruppe bricht den Verweis also nicht.
+#
+# Gespeichert wird NUR der Verweis. Wer Geraete braucht, liest die AUFGELOESTE
+# Form (:func:`aufloesen`, fuer ORM-Gruppen ``models.aufgeloeste_positionen``) —
+# eine Aenderung der Untergruppe wirkt damit sofort in der Obergruppe nach.
+# Ein Leser, der die Aufloesung (noch) nicht kennt, sieht einen unparsbaren
+# Wert und laesst die Zelle fallen (``parse_group_cell`` -> ``(None, None)``):
+# dieselbe sichere Richtung wie bei jeder kaputten Zelle, nie ein falsches
+# Geraet.
+#
+# Regeln der Aufloesung:
+# * direkte Zellen gewinnen gegen Blockzellen an derselben Stelle; zwischen
+#   Bloecken gewinnt der in Raster-Reihenfolge fruehere;
+# * Zyklen (A in B in A, A in A) werden beim Lesen abgeschnitten — der Verweis,
+#   der den Kreis schliessen wuerde, liefert nichts; das Einsetzen verbietet
+#   sie vorher (:func:`waere_zyklus`);
+# * ein Verweis auf eine nicht (mehr) vorhandene uid liefert nichts. Vor dem
+#   LOESCHEN einer Untergruppe bettet ``models.verweise_einbetten`` ihre Zellen
+#   in jede Obergruppe ein, damit dort kein Geraet still verschwindet.
+
+GRUPPEN_PRAEFIX = "g:"
+_ERLAUBTE_DREHUNG = (0, 90, 180, 270)
+
+
+def gruppen_verweis(uid: str, drehung: int = 0) -> str:
+    """Zellwert fuer einen Block der Gruppe ``uid`` (Drehung im Uhrzeigersinn)."""
+    d = int(drehung or 0) % 360
+    if d not in _ERLAUBTE_DREHUNG:
+        d = 0
+    return f"{GRUPPEN_PRAEFIX}{uid}" + (f"@{d}" if d else "")
+
+
+def parse_gruppen_verweis(value) -> tuple:
+    """Zellwert -> ``(uid, drehung)``; ``(None, 0)``, wenn es kein Verweis ist."""
+    if not isinstance(value, str) or not value.startswith(GRUPPEN_PRAEFIX):
+        return None, 0
+    rest = value[len(GRUPPEN_PRAEFIX):]
+    uid, _, d_s = rest.partition("@")
+    uid = uid.strip()
+    if not uid:
+        return None, 0
+    try:
+        d = int(d_s) if d_s else 0
+    except ValueError:
+        return None, 0
+    if d not in _ERLAUBTE_DREHUNG:
+        return None, 0
+    return uid, d
+
+
+def hat_gruppen_verweise(positions) -> bool:
+    return any(parse_gruppen_verweis(v)[0] is not None
+               for v in (positions or {}).values())
+
+
+def block_ausmass(cols: int, rows: int, drehung: int = 0) -> tuple:
+    """``(cols, rows)`` eines Blocks im Obergruppen-Raster (90/270 tauschen)."""
+    c, r = max(1, int(cols or 1)), max(1, int(rows or 1))
+    return (r, c) if int(drehung or 0) % 180 else (c, r)
+
+
+def _schluessel(key):
+    try:
+        c_s, r_s = str(key).split(",")
+        return int(c_s), int(r_s)
+    except (TypeError, ValueError):
+        return None
+
+
+def aufloesen(positions: dict, lade, eigene_uid: str | None = None,
+              nur_uid: str | None = None, _pfad: frozenset = frozenset()) -> dict:
+    """``positions`` mit allen Gruppen-Verweisen zu Einzelzellen aufgeloest.
+
+    ``lade(uid)`` liefert ``(cols, rows, positions_dict)`` der Untergruppe oder
+    ``None``. Ohne Verweise kommt eine unveraenderte Kopie zurueck (Bestand
+    bleibt byte-gleich). ``nur_uid``: nur Verweise auf DIESE Gruppe aufloesen,
+    alle anderen Verweise bleiben stehen (Einbetten vor dem Loeschen)."""
+    quelle = positions if isinstance(positions, dict) else {}
+    if not hat_gruppen_verweise(quelle):
+        return dict(quelle)
+    pfad = _pfad | ({eigene_uid} if eigene_uid else set())
+    out: dict = {}
+    bloecke: list = []
+    for key, value in quelle.items():
+        uid, d = parse_gruppen_verweis(value)
+        if uid is None or (nur_uid is not None and uid != nur_uid):
+            out[key] = value
+            continue
+        pos = _schluessel(key)
+        if pos is not None:
+            bloecke.append((pos[1], pos[0], uid, d))
+    from .pixel_order import rotate_cell
+    for r0, c0, uid, d in sorted(bloecke):
+        if uid in pfad:
+            continue                              # Zyklus: abschneiden
+        try:
+            sub = lade(uid)
+        except Exception:
+            sub = None
+        if not sub:
+            continue                              # Untergruppe fehlt
+        scols, srows, spos = sub
+        scols, srows = max(1, int(scols or 1)), max(1, int(srows or 1))
+        innen = aufloesen(spos, lade, None, None, pfad | {uid})
+        for k, v in sorted(innen.items(), key=lambda kv: (_schluessel(kv[0]) or (0, 0))[::-1]):
+            p = _schluessel(k)
+            if p is None or not (0 <= p[0] < scols and 0 <= p[1] < srows):
+                continue
+            rr, cc, _nr, _nc = rotate_cell(p[1], p[0], srows, scols, d)
+            ziel = f"{c0 + cc},{r0 + rr}"
+            if ziel not in out:
+                out[ziel] = v
+    return out
+
+
+def waere_zyklus(eigene_uid: str, ziel_uid: str, lade) -> bool:
+    """True, wenn ``ziel_uid`` als Block in ``eigene_uid`` einen Kreis bildete
+    (ziel ist die Gruppe selbst oder enthaelt sie, auch mittelbar)."""
+    if not eigene_uid or not ziel_uid:
+        return False
+    gesehen: set = set()
+    offen = [ziel_uid]
+    while offen:
+        u = offen.pop()
+        if u == eigene_uid:
+            return True
+        if u in gesehen:
+            continue
+        gesehen.add(u)
+        try:
+            sub = lade(u)
+        except Exception:
+            sub = None
+        if sub:
+            for v in (sub[2] or {}).values():
+                w, _d = parse_gruppen_verweis(v)
+                if w is not None:
+                    offen.append(w)
+    return False
