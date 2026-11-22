@@ -112,6 +112,18 @@ class BannerTest(_Basis):
         self.assertNotIn("belegt", text)
 
 
+class GewandertTest(_Basis):
+    def test_befund_haengt_am_konfigurierten_port(self):
+        # In-Prozess-EnttecPro: ``port`` kann einem Dongle an eine andere
+        # Nummer gefolgt sein, ``konfig_port`` bleibt der gepruefte Port.
+        _warne(5, [(4711, "python.exe")])
+        dev = _Enttec(verbunden=False)
+        dev.konfig_port = PORT
+        dev.port = "COM9"
+        text = ausgabe_banner(_om(dev).ausgabe_status()).text
+        self.assertIn("von einem anderen Programm belegt", text)
+
+
 class ElternketteTest(unittest.TestCase):
     def test_eigener_starter_und_vorfahren_fallen_heraus(self):
         prozesse = [

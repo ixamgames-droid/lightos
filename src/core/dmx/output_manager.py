@@ -1152,7 +1152,12 @@ class OutputManager:
                 # am USB-Kabel. Sendet der Ausgang wieder, ist der Befund alt.
                 try:
                     from . import port_check as _pc
-                    port = str(getattr(dev, "port", "") or "")
+                    # Schluessel ist der KONFIGURIERTE Port — mit ihm hat
+                    # ``_make_enttec_device`` die Pruefung gerufen. ``port``
+                    # kann beim In-Prozess-EnttecPro einem Dongle an eine
+                    # andere Nummer gefolgt sein (OUT-80/SERIAL-02).
+                    port = str(getattr(dev, "konfig_port", "") or
+                               getattr(dev, "port", "") or "")
                     if verbunden is True:
                         _pc.vergiss_belegt(port)
                     elif not problem_text and verbunden is False:
