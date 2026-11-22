@@ -436,6 +436,12 @@ sendet; ein Klick auf den Text öffnet den Dialog aus Schritt 1 (nicht im Kiosk-
 **gar kein** Ausgang eingerichtet, steht dort dezent `Probenmodus — es wird kein DMX
 gesendet`.
 
+Unter Windows vergibt das System einen COM-Port nur an ein Programm. Hält ihn schon ein
+anderes (ein zweites LightOS, QLC+, ein Rest eines früheren Laufs), lautet der Grund
+`Port von einem anderen Programm belegt` — mit den ersten verdächtigen Prozessen (PID).
+Die vollständige Verdachtsliste steht im Sitzungs-Log. Dann nicht am USB-Kabel suchen,
+sondern das andere Programm beenden; die Ausgabe läuft danach von selbst an.
+
 Der Balken liegt **über** dem oberen Rand der gerade gezeigten Ansicht, direkt unter der
 Leiste mit STOP ALL, BLACKOUT und Grand Master (im Kiosk-Modus unter dem Streifen mit
 Grand Master, STOP ALL, BLACKOUT und Laser-NOT-AUS). Er schiebt nichts nach unten: Erscheint oder verschwindet er, bleiben alle
