@@ -261,6 +261,24 @@ class EditorTest(_Basis):
         rel = v.medium_setzen(quelle)
         self.assertEqual(m.params["media_path"], rel)
         self.assertTrue(_warte(lambda: m._render(0.0) == [R, G, B, W, K, R]))
+        # Pruef-Nachbesserung: die Statuszeile bleibt nicht auf „wird geladen"
+        # stehen, sondern zieht nach, sobald der Hintergrund fertig ist.
+        def _status_fertig():
+            QApplication.processEvents()
+            return "1 Bild" in v._medien_status.text()
+        self.assertTrue(_warte(_status_fertig), v._medien_status.text())
+
+
+class CacheTest(_Basis):
+
+    def test_alte_bildfolgen_werden_verworfen(self):
+        """Pruef-Nachbesserung: jede Drehung/Rastergroesse ist ein eigener
+        Schluessel — der Cache haelt trotzdem hoechstens MAX_CACHE Folgen."""
+        rel = self._png("a.png", BildTest.BILD)
+        for n in range(MM.MAX_CACHE + 4):
+            erg = MM.vorbereiten(rel, 2 + n, 2, "stretch", "0", warten=5.0)
+            self.assertIsNotNone(erg.folge, erg.meldung)
+        self.assertLessEqual(len(MM._cache), MM.MAX_CACHE)
 
 
 if __name__ == "__main__":

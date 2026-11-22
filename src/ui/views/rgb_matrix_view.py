@@ -1831,7 +1831,15 @@ class RgbMatrixView(QWidget):
         try:
             lbl.setText(text)
         except RuntimeError:
-            pass
+            return
+        if erg.laedt:
+            # Das Dekodieren laeuft im Hintergrund: Status nachziehen, bis es
+            # fertig ist. Kontext = Statuszeile — wird sie abgebaut (andere Art,
+            # anderer Effekt), verfaellt der Nachlauf von selbst.
+            try:
+                QTimer.singleShot(150, lbl, self._medien_status_auffrischen)
+            except RuntimeError:
+                pass
 
     def medium_setzen(self, pfad: str) -> str:
         """Weist dem aktuellen Matrix-Effekt ein Medium zu (Datei wird in den

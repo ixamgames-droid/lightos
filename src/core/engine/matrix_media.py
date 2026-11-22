@@ -37,6 +37,10 @@ VIDEO_ENDUNGEN = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".mpg", ".mpe
 MAX_BILDER = 3000
 # Standard-Bildzeit, wenn ein GIF keine (oder 0) Verzoegerung angibt.
 STANDARD_BILDZEIT = 0.1
+# Hoechstzahl gehaltener Bildfolgen. Jede Aenderung an Drehung/Einpassung/
+# Rastergroesse/Datei ergibt einen neuen Schluessel; ohne Deckel blieben alle
+# alten Folgen (bis MAX_BILDER x Raster Pixel je Folge) im Speicher liegen.
+MAX_CACHE = 8
 
 _override_dir: str | None = None
 
@@ -245,6 +249,8 @@ def bilder(rel: str, cols: int, rows: int, fit: str = "fit", rotation=0) -> Erge
     with _lock:
         fertig = _cache.get(key)
         if fertig is not None:
+            # Zuletzt benutzt -> ans Ende, damit der Deckel die alten trifft.
+            _cache[key] = _cache.pop(key)
             return fertig
         t = _threads.get(key)
         if t is None or not t.is_alive():
@@ -263,6 +269,9 @@ def _arbeiter(key, pfad, cols, rows, fit, rotation):
     with _lock:
         _cache[key] = erg
         _threads.pop(key, None)
+        # Aelteste Folgen verwerfen (dict haelt die Einfuegereihenfolge).
+        while len(_cache) > MAX_CACHE:
+            _cache.pop(next(iter(_cache)))
 
 
 def vorbereiten(rel: str, cols: int, rows: int, fit: str = "fit", rotation=0,
