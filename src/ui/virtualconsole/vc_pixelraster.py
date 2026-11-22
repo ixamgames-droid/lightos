@@ -412,6 +412,15 @@ class VCPixelraster(VCWidget):
             return
         # Run-Modus: ein schneller zweiter Tipp ist ein weiterer Malpunkt
         # (kein Eigenschaften-Dialog mitten in der Show).
+        # Ausnahme „Löschen“: ein Doppeltipp (auch ein prellender Finger) darf
+        # die Rueckfrage nicht selbst bestaetigen — der zweite Tipp muss ein
+        # eigener, bewusster Tipp sein (Pruefung VCB-51).
+        if (not self._run_input_blocked()
+                and event.button() == Qt.MouseButton.LeftButton
+                and self._knopf_bei(event.position().toPoint()) == "loeschen"):
+            self._zug = None
+            event.accept()
+            return
         self.mousePressEvent(event)
 
     def _knopf(self, k: str) -> None:

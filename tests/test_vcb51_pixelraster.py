@@ -229,6 +229,21 @@ def test_radierer_und_loeschen_geben_frei(st):
     assert EBENEN.ebene(p.widget_id) is None
 
 
+def test_doppeltipp_auf_loeschen_bestaetigt_nicht(st):
+    """Pruefung: ein Doppeltipp (prellender Finger) darf die Rueckfrage nicht
+    selbst bestaetigen; erst ein eigener zweiter Tipp loescht."""
+    p = _raster()
+    p.malen(0, 0)
+    pos = p.knopf_rechtecke()["loeschen"].center()
+    _maus(p, QEvent.Type.MouseButtonPress, pos)
+    _maus(p, QEvent.Type.MouseButtonRelease, pos)
+    _maus(p, QEvent.Type.MouseButtonDblClick, pos)
+    _maus(p, QEvent.Type.MouseButtonRelease, pos)
+    assert p.pixel == {"0,0": "#ff0000"} and p.loeschen_scharf()
+    _knopf(p, "loeschen")
+    assert p.pixel == {}
+
+
 def test_aufloesung_und_fuellen(st):
     p = _raster()
     p.set_farbe("#0000ff")
