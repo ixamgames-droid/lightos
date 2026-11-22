@@ -211,7 +211,8 @@ tragen einen **gelb gestrichelten Rahmen** mit dem Gruppennamen und **„(nur
 Handy)"**. Liegen die Kacheln einer Gruppe nebeneinander, umschließt sie ein
 gemeinsamer Rahmen; liegt eine fremde Kachel dazwischen, bekommt jede
 Gruppen-Kachel ihren eigenen Rahmen in der Gruppenfarbe und die erste den
-Titel. Die Rahmen liegen nur darüber — die Anordnung der Seite bleibt so, wie du
+Titel. Ist die Kachel schmal, bricht der Titel in ihr auf mehrere Zeilen um,
+statt abgeschnitten zu werden. Die Rahmen liegen nur darüber — die Anordnung der Seite bleibt so, wie du
 sie gebaut hast. Lässt sich die gerade aktive Taste einer Handy-Gruppe vom
 Handy nicht ausschalten (das Pult oder ein anderes Handy hält sie, ihr Laser ist
 gesperrt), lehnt das Handy den Tipp ab: **„Andere Taste der Gruppe ist gehalten
