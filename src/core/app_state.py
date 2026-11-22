@@ -12,6 +12,7 @@ from .database.models import PatchedFixture, create_all_idempotent
 from .database.fixture_db import get_channels
 from .dmx.universe import Universe
 from .engine import wer_gewinnt as _wer_gewinnt
+from .engine import zeichen_ebene as _zeichen_ebene
 from .dmx.output_manager import OutputManager
 from .dmx.enttec_pro import diagnose_port as diagnose_enttec_port
 from .dmx import adapter_zeilen
@@ -4502,6 +4503,28 @@ class AppState:
         """Fids einer Gruppe (Name) in Raster-Reihenfolge; [] wenn unbekannt."""
         return self._group_lookup(name)[1]
 
+    def gruppen_raster(self, name_or_ref):
+        """VCB-51: ``(cols, rows, {"c,r": zellwert})`` einer Gruppe in
+        aufgeloester Form (FM-20: Untergruppen-Bloecke aufgeloest, Raster waechst
+        mit); ``None``, wenn die Gruppe unbekannt ist."""
+        gid_hint, name = (name_or_ref if isinstance(name_or_ref, tuple)
+                          else (None, name_or_ref))
+        try:
+            from sqlalchemy import select
+            from .database.models import FixtureGroup, aufgeloestes_raster
+            with self._session() as s:
+                if gid_hint is not None:
+                    g = s.get(FixtureGroup, gid_hint)
+                else:
+                    g = s.execute(select(FixtureGroup).where(
+                        FixtureGroup.name == name)).scalars().first()
+                if g is None:
+                    return None
+                cols, rows, pos = aufgeloestes_raster(g, s)
+                return int(cols), int(rows), dict(pos or {})
+        except Exception:
+            return None
+
     def group_cells_by_name(self, name_or_ref) -> list[str]:
         """FEINE Zellen einer Gruppe in Raster-Reihenfolge: ``"fid"`` (ganzes
         Geraet) bzw. ``"fid:head"`` (Kopf-Zelle aus Slice 3 „Koepfe einzeln →
@@ -5607,6 +5630,16 @@ class AppState:
                 _modify_anwenden(scratch)
             except Exception as exc:
                 print(f"[AppState] render modify error: {exc}")
+        # 4a²c. VCB-51: Zeichen-Ebenen der VC-Pixelraster — gemalte Farben mit
+        #      eigenem Pegel UEBER dem fertigen Bild (auch ueber laufenden
+        #      Matrix-Effekten, die der Programmer bewusst nicht ueberschreibt),
+        #      VOR Mastern/Blackout/NOT-AUS. Nur Farbkanaele, nie ein Dimmer.
+        if _zeichen_ebene.EBENEN.aktiv():
+            try:
+                _zeichen_ebene.EBENEN.anwenden(scratch, fix_index,
+                                               fixture_uses_dmx=fixture_uses_dmx)
+            except Exception as exc:
+                print(f"[AppState] render zeichen-ebene error: {exc}")
 
         # 4a³. Szenen-Vorschau (QA-LIVE): einmalige UI-Vorschau als Render-Layer.
         # Liegt nach Funktionen/Programmer/impliziter Helligkeit, aber VOR allen

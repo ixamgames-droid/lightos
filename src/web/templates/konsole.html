@@ -134,8 +134,13 @@ body.ruhig .taste.lauf,body.ruhig .taste.takt{animation:none !important}
 .gruppe.handy{border:2px dashed #f2cc60;margin:-6px;border-radius:15px}
 .gruppe.einzeln{margin:-3px}
 .gruppe.handy.einzeln{margin:-5px}
-.gruppe .titel{position:absolute;top:-8px;left:8px;max-width:calc(100% - 16px);font-size:10px;line-height:13px;font-weight:700;
-  padding:0 5px;border-radius:6px;background:#0d1117;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* WEB-17: Der Titel wird nie abgeschnitten. Er bricht innerhalb der Breite
+   SEINES Rahmens um (auch mitten im Wort, falls nötig) und wächst nur in die
+   eigene Kachel hinein – oben angeschlagen nach unten, unten angeschlagen nach
+   oben. So bleibt er unter einer schmalen Einzel-Kachel lesbar und überdeckt
+   trotzdem keine fremde Kachel. */
+.gruppe .titel{position:absolute;top:-8px;left:5px;max-width:calc(100% - 10px);box-sizing:border-box;font-size:10px;line-height:12px;font-weight:700;
+  padding:0 4px;border-radius:6px;background:#0d1117;white-space:normal;overflow:visible;overflow-wrap:anywhere;word-break:break-word}
 .gruppe.einzel .titel{color:#79b8ff}
 .gruppe.handy .titel{color:#f2cc60;top:auto;bottom:-8px}
 

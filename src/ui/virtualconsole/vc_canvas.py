@@ -21,6 +21,7 @@ def _register():
     from .vc_slider   import VCSlider
     from .vc_xypad    import VCXYPad
     from .vc_raumpad  import VCRaumPad
+    from .vc_pixelraster import VCPixelraster
     from .vc_label    import VCLabel
     from .vc_cuelist  import VCCueList
     from .vc_speedial import VCSpeedDial
@@ -42,6 +43,7 @@ def _register():
         "VCSlider":   VCSlider,
         "VCXYPad":    VCXYPad,
         "VCRaumPad":  VCRaumPad,       # UI-127
+        "VCPixelraster": VCPixelraster,  # VCB-51
         "VCLabel":    VCLabel,
         "VCCueList":  VCCueList,
         "VCSpeedDial":VCSpeedDial,
@@ -3172,7 +3174,7 @@ class VCCanvas(QWidget):
 
     #: Bezeichnungen fuer die Begruendung „nicht fernbedienbar".
     _HANDY_TYPNAMEN = {
-        "VCXYPad": "XY-Pad", "VCRaumPad": "Raum-Pad", "VCLabel": "Beschriftung", "VCSpeedDial": "Tempo-Rad",
+        "VCXYPad": "XY-Pad", "VCRaumPad": "Raum-Pad", "VCPixelraster": "Pixelraster", "VCLabel": "Beschriftung", "VCSpeedDial": "Tempo-Rad",
         "VCFrame": "Kasten", "VCColor": "Farbwähler", "VCEncoder": "Drehregler",
         "VCColorList": "Chase-Liste", "VCSongInfo": "Musik-Anzeige",
         "VCBpmDisplay": "BPM-Anzeige", "VCBusSelector": "Tempo-Bus-Wahl",

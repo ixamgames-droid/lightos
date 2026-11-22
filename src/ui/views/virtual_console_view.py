@@ -339,6 +339,7 @@ class VirtualConsoleView(QWidget):
             ("Fader",     "VCSlider"),
             ("XY Pad",    "VCXYPad"),
             ("Raum-Pad",  "VCRaumPad"),    # UI-127
+            ("Pixelraster", "VCPixelraster"),  # VCB-51
             ("Cueliste",  "VCCueList"),
             ("SpeedDial", "VCSpeedDial"),
             ("Encoder",   "VCEncoder"),

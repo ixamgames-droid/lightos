@@ -1892,6 +1892,8 @@ _LIVE_FELDER_LIVE_VIEW_META = ("zoom",)          # Ansicht, wie das Fensterlayou
 #:   VCXYPad             pan, tilt, area          Pad ziehen, Feld markieren, MIDI
 #:   VCRaumPad           ziel, hoehe, flaeche,    Ziel antippen (Boden/Wand),
 #:                       wand_hoehe               Zielhoehe (UI-127)
+#:   VCPixelraster       pegel, farbe, werkzeug,  Werkzeug, Pegel, Abruf
+#:                       aufloesung, abruf_index  (VCB-51; Zeichnung = Inhalt)
 #:   VCTempoBusController source, factor, fixed_bpm  Quelle/Tap, Faktor, Fix-Rad
 #:   VCMultiLiveEditor   joint                    Dropdown „Alle gemeinsam" (VCB-49)
 #: Bewusst NICHT live: VCColor-Farbe (der Doppelklick-Waehler aendert, WAS die
@@ -1907,6 +1909,11 @@ _LIVE_FELDER_VC = {
     "VCSpeedDial": ("bpm", "active_factor", "mult"),
     "VCXYPad": ("pan", "tilt", "area"),
     "VCRaumPad": ("ziel", "hoehe", "flaeche", "wand_hoehe"),
+    # VCB-51: Werkzeug/Farbe/Aufloesung waehlen, Pegel-Regler und Abruf sind
+    # Bedienung im Run-Modus. Die Zeichnung selbst (pixel) und die gemerkten
+    # Bilder sind Inhalt: Malen macht die Show "geaendert" (Rueckfrage beim
+    # Schliessen), damit eine Zeichnung nicht still verloren geht.
+    "VCPixelraster": ("pegel", "farbe", "werkzeug", "aufloesung", "abruf_index"),
     "VCTempoBusController": ("source", "factor", "fixed_bpm"),
     # VCB-49: Wahl „Alle gemeinsam" im Dropdown = Bedienung (wie die Einzel-
     # Auswahl, die gar nicht gespeichert wird); der Haken-Satz joint_checked
@@ -2233,6 +2240,14 @@ def _reset_state(state, *, emit_events: bool = True, blackout_output: bool = Tru
         state.clear_all_target_blackouts()
     except Exception as e:
         print(f"[show_file] reset target blackout error: {e}")
+    # VCB-51: Zeichen-Ebenen der Pixelraster gehoeren zur alten Show (ihre
+    # fids zeigten in der neuen auf fremde Geraete); die neuen Elemente melden
+    # ihre Zeichnung beim Laden selbst wieder an.
+    try:
+        from src.core.engine.zeichen_ebene import EBENEN as _zeichen_ebenen
+        _zeichen_ebenen.leeren()
+    except Exception as e:
+        print(f"[show_file] reset zeichen-ebene error: {e}")
     # VCB-43: ebenso gehaltene globale Blackouts — die Taste, die sie hielt,
     # gibt es nach dem Wechsel nicht mehr. Der Schalter bleibt, wie er ist.
     try:
