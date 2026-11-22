@@ -22,6 +22,7 @@ import { stageObjects } from '../state.js';                   // VIZ-BEAM-OCCLUS
 import { auftreffFlaeche } from './beam_stop.js';             // VIZ-BEAM-OCCLUSION
 import { ausbrennNachfuehren } from './ausbrennen.js';         // VIZ-91
 import { lichtfarbe } from './lichtfarbe.js';                  // VIZ-93
+import { updateMatrixFormDmx } from './matrix_formen.js';      // VIZ-114
 
 // EIN gehaltener Raycaster statt einer Neuanlage pro Fixture und Frame —
 // derselbe Haushalt wie beim Andocken (stage/docking.js).
@@ -1749,6 +1750,13 @@ export function updateMoverBarDmx(f, dmx) {
 export function updateMatrixPanelDmx(f, dmx) {
   if (!f.isMatrix || !f.pixels) return updateGenericDmx(f, dmx);
   const { r, g, b, intNorm } = dmx;
+  // VIZ-114: Bauform-Modell (Instanzen) — dieselbe Kopf-Zuordnung, ein Puffer.
+  if (f.matrixInstanz) {
+    updateMatrixFormDmx(f, dmx, lichtfarbe);
+    tintTopDownIcon(f.icon, { r, g, b }, intNorm, f.lastHeads);
+    syncIconPos(f);
+    return;
+  }
   const hs = f.lastHeads || [];
   for (let i = 0; i < f.pixels.length; i++) {
     const px = f.pixels[i];

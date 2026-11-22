@@ -40,6 +40,7 @@ from src.core.app_state import (
     AppState, abstrahlwinkel_for, zoom_umgekehrt_for, get_state, get_channels_for_patched,
     is_spider_fixture,
     panel_grid_for, pixel_ring_banks_for, viz_model_for, white_grid_for,
+    matrix_form_for,
     weiss_segment_count_for_channels,
 )
 from src.core.database.models import PatchedFixture
@@ -2542,6 +2543,15 @@ class VisualizerBridge(QObject):
             except Exception:
                 grid_rows, grid_cols = (0, 0)
                 white_rows, white_cols = (0, 0)
+        # ★ VIZ-114: Bauform + Masse aus dem Profil (FM-80-Assistent). Ohne
+        # Angaben (jedes Bestandsgeraet) bleibt ``None`` -> JS baut das
+        # Bestands-Panel unveraendert.
+        matrix_form = None
+        if model == "matrix":
+            try:
+                matrix_form = matrix_form_for(f) or None
+            except Exception:                            # noqa: BLE001
+                matrix_form = None
         # ★★★ Die Regel, wann ein Geraet ein eigenes Weiss-BAND hat, steht hier —
         # an der Stelle, die Kanaele UND Geometrie kennt, und nur einmal.
         #
@@ -2610,6 +2620,8 @@ class VisualizerBridge(QObject):
             # dann steht `nWhites` schon auf 0 und es gibt kein Band).
             "whiteRows": white_rows,
             "whiteCols": white_cols,
+            # VIZ-114: Bauform/Pixelabstand/Lage des Teils (None = Bestand).
+            "matrixForm": matrix_form,
             # FM-64: Abstrahlwinkel eng/weit (Grad, voller Winkel; 0 = keine
             # Angabe). Gleich = fest; verschieden = Spanne fuer den Zoom-Kanal.
             "beamAngleMin": beam_min,

@@ -57,6 +57,8 @@ function _stellen(f) {
   } else if (f.isMatrix && f.pixels) {
     f.pixels.forEach((px, i) => e(px.mesh, i));
     (f.whites || []).forEach(w => e(w.mesh, -1));
+    // VIZ-114: Instanz-Modell — EINE Helligkeit fuer alle Pixel.
+    if (f.matrixInstanz) e(f.matrixInstanz.hell, -1);
   } else {
     k(f.beam, -1);
     e(f.lens, -1);

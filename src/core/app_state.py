@@ -6889,6 +6889,8 @@ def clear_channel_cache():
     # ueber denselben Weg invalidiert werden, sonst zeigt das 3D-Panel nach einem
     # Modus-Wechsel die Form des alten Modus.
     _panel_grid_cache.clear()
+    # VIZ-114: Bauform/Masse haengen am selben Profil.
+    _matrix_form_cache.clear()
     # FM-17: die Kopf-Karte haengt an genau diesen Kanal-Listen — zusammen
     # invalidieren, sonst zeigt sie auf Kanaele eines alten Modus (der Schluessel
     # ist die Objekt-Identitaet der gecachten Liste, siehe head_channel_map).
@@ -7268,6 +7270,35 @@ def _mode_raster_for(fixture, feld_rows: str, feld_cols: str) -> tuple:
         return (0, 0)
     _panel_grid_cache[key] = grid
     return grid
+
+
+# VIZ-114: Cache (profile_id, mode_name) -> matrixForm-Dict (led_matrix.viz_form).
+_matrix_form_cache: dict = {}
+
+
+def matrix_form_for(fixture) -> dict:
+    """VIZ-114: Bauform + Masse des Matrix-Profils fuer das 3D-Modell
+    (``led_matrix.viz_form``). ``{}`` = kein Profil/Fehler -> Bestands-Panel.
+    Gecached pro (Profil, Modus); ``clear_channel_cache`` leert mit."""
+    pid = getattr(fixture, "fixture_profile_id", None)
+    if pid is None:
+        return {}
+    key = (pid, getattr(fixture, "mode_name", None))
+    cached = _matrix_form_cache.get(key)
+    if cached is not None:
+        return dict(cached)
+    try:
+        from .database.fixture_db import engine
+        from .database.models import FixtureProfile
+        from . import led_matrix
+        with Session(engine()) as s:
+            prof = s.get(FixtureProfile, pid)
+            val = led_matrix.viz_form(prof, key[1] or "") if prof else {}
+    except Exception:
+        # Wie beim Raster: Fehlerfall nicht einfrieren.
+        return {}
+    _matrix_form_cache[key] = val
+    return dict(val)
 
 
 def panel_grid_for(fixture) -> tuple:

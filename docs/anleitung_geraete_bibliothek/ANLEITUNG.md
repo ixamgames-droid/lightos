@@ -212,9 +212,11 @@ Kanäle von Hand eintragen. Öffne **Patchen → Patch → LED-Matrix…** (oder
 **Datenbank → LED-Matrix-Assistent...**) und gib an:
 
 - **Hersteller**, **Modell** und die **Bauform** (Panel/Kachel, LED-Vorhang,
-  Pixel-Leiste/Stab, Ring, Säule/Zylinder). Die Bauform steht im Profil und ist für
-  die 3D-Ansicht gedacht; bis die eigenen 3D-Formen kommen, erscheint jede Matrix als
-  Panel.
+  Pixel-Leiste/Stab, Ring, Säule/Zylinder). Die Bauform steht im Profil; die
+  3D-Ansicht baut daraus das Modell in echter Größe (siehe
+  [3D-Bühne → LED-Matrizen in ihrer Bauform](../anleitung_3d_visualizer_2026/ANLEITUNG_3D_BUEHNE.md#led-matrizen-in-ihrer-bauform)).
+  Beim **Ring** ist die Breite der Außendurchmesser und die Höhe die Breite des
+  Pixel-Bands, bei der **Säule** die Breite der Durchmesser.
 - **Breite** und **Höhe** in Pixeln (z. B. 20 × 40) und die **Fläche** in cm
   (z. B. 30 × 50). Daraus zeigt der Assistent den **Pixelabstand** (hier 15 × 12,5 mm).
 - **Kanalformat je Pixel** — RGB, GRB, BGR, RGBW oder GRBW, so wie dein

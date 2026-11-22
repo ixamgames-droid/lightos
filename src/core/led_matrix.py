@@ -351,6 +351,45 @@ def masse_von(profil) -> tuple[float, float] | None:
     return float(a.breite_cm), float(a.hoehe_cm)
 
 
+def viz_form(profil, mode_name: str = "") -> dict:
+    """VIZ-114: Bauform und Masse fuer das 3D-Modell eines gepatchten Teils.
+
+    ``bauform`` (immer), ``pitchW``/``pitchH`` (mm, 0 = keine Flaeche),
+    ``breiteM``/``hoeheM`` (Meter), ``spalten``/``zeilen`` der GANZEN Matrix
+    und ``teilZeile`` = oberste Anzeige-Zeile dieses Teils
+    (:func:`teil_anzeige_zeile`, dieselbe Zahl wie :func:`pixel_platz` und die
+    Gesamt-Gruppe). ``geschaetzt`` = keine Flaechenangabe vorhanden.
+
+    Ein Profil ohne Assistenten-Angaben liefert nur die Bauform (Bestand =
+    ``panel``); der Renderer baut dann das Bestands-Panel unveraendert.
+    Nie werfen."""
+    out = {"bauform": bauform_von(profil), "pitchW": 0.0, "pitchH": 0.0,
+           "breiteM": 0.0, "hoeheM": 0.0, "spalten": 0, "zeilen": 0,
+           "teilZeile": 0, "geschaetzt": True}
+    try:
+        a = angaben_von_profil(profil)
+    except Exception:                                    # noqa: BLE001
+        a = None
+    if a is None:
+        return out
+    try:
+        pw, ph = a.pixelabstand_mm()
+        out.update(pitchW=float(pw), pitchH=float(ph),
+                   breiteM=round(float(a.breite_cm or 0) / 100.0, 4),
+                   hoeheM=round(float(a.hoehe_cm or 0) / 100.0, 4),
+                   spalten=int(a.breite_px), zeilen=int(a.hoehe_px),
+                   geschaetzt=not (pw > 0 and ph > 0))
+        tl = teile(a)
+        t = next((t for t in tl if t.name == (mode_name or "")), None)
+        if t is None and len(tl) == 1:
+            t = tl[0]
+        if t is not None:
+            out["teilZeile"] = int(teil_anzeige_zeile(a, t))
+    except Exception:                                    # noqa: BLE001
+        pass
+    return out
+
+
 # ── Lage der Teile: Verdrahtung/Startecke -> Patch-Felder ───────────────────
 
 def teil_lage(a: MatrixAngaben, t: Teil) -> tuple[str, int, bool]:

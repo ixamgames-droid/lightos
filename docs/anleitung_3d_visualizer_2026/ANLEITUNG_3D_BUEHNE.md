@@ -236,6 +236,33 @@ echten Aufbau angleichst, steht in [Moving Heads einmessen](../anleitung_einmess
 Mehrere gewählte Geräte lassen sich über **⬄ Ausrichten** auf eine Linie legen,
 gleichmäßig verteilen oder als Reihe, Raster oder Kreis anordnen.
 
+### LED-Matrizen in ihrer Bauform
+
+Eine Matrix aus dem **LED-Matrix-Assistenten** (Patch → **LED-Matrix…**) steht im 3D in
+der Bauform und Größe aus ihrem Profil — Pixel Breite × Höhe, Fläche in cm, Bauform:
+
+| Bauform | So sieht sie aus | Maße |
+|---|---|---|
+| **Panel / Kachel** | Gehäuse mit quadratischen Pixeln | Breite × Höhe = Fläche, 5 cm tief |
+| **Pixel-Leiste / Stab** | flaches Profil ohne Rand | Breite × Höhe = Fläche, 2,5 cm tief |
+| **LED-Vorhang** | je Pixel-Spalte eine Bahn, Pixel als Punkte, oben eine Schiene | Breite × Höhe = Fläche |
+| **Ring** | Pixel rundum im Uhrzeigersinn ab oben, Zeile 1 außen | Breite = Außendurchmesser, Höhe = Breite des Pixel-Bands |
+| **Säule / Zylinder** | Pixel rundum ab vorne nach rechts, Zeile 1 oben | Breite = Durchmesser, Höhe = Höhe |
+
+- **Nummerierung wie in 2D:** Jedes Pixel sitzt im 3D an derselben Stelle wie in der
+  Vorschau des Assistenten und in der Gruppe **„… · Matrix“** — mit Verdrahtung
+  (Schlangenlinie) und Startecke.
+- **Große Matrizen (mehrere Universen):** Jeder Teil („T1“, „T2“ …) ist ein eigenes
+  Gerät, zeichnet seine Zeilen aber an ihrer Stelle in der **ganzen** Matrix. Setze
+  alle Teile einer Matrix auf **dieselbe Position** (gleiche `X`/`Y`/`Z` und Drehung),
+  dann setzt sich die Matrix von selbst zusammen.
+- **Geräte ohne Assistenten-Angaben** (alle Panels aus der Bibliothek) sehen aus wie
+  bisher. Ein Profil mit Bauform, aber ohne Fläche, bekommt 3 cm Pixelabstand.
+- **Viele Pixel:** Alle Pixel eines Teils werden in einem Rutsch gezeichnet. Ein
+  LED-Vorhang mit 40 × 80 Pixeln (20 Universen) braucht auf **Niedrig** gemessen etwa
+  13 ms je Bild (leere Bühne 8 ms; vorher mit Einzel-Pixeln 57 ms). Auf Niedrig haben
+  runde Pixel weniger Ecken, die Pixelzahl bleibt.
+
 ## Teil C — Kamera
 
 ![Kamera-Menü geöffnet, Ansicht von vorn](img/04_kamera.png)
