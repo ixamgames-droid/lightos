@@ -49,18 +49,21 @@ baut dir dann das passende Bedien-Element praktisch von selbst.
 
 - **Drop auf eine freie Stelle** → es öffnet sich die Karte **„Effekt einrichten"**
   (Fenster). Sie zeigt den Hinweis *„… direkt verknüpfen — es wird kein neuer Effekt erzeugt. Welche Bedienelemente brauchst du?"* und **je Aspekt eine
-  ankreuzbare Zeile** („An/Aus (Toggle)", „Tempo (Geschwindigkeit)", „Helligkeit",
+  ankreuzbare Zeile** („An/Aus (Toggle)", „Tempo (Geschwindigkeit)", „Helligkeit" — je nach
+  Effekt „Dimmer-Pegel" oder bei einer RGB-Matrix „Farb-Pegel (kein Dimmer)" —,
   „Farben ändern…", „Bewegung (XY-Feld)…", „Tempo-Bus zuweisen…",
   „Tempo-Multiplikator (×½ ×2)…" …). „An/Aus (Toggle)" ist vorangekreuzt. Pro Zeile gibt es — wo mehrere Bedien-Typen
   passen — den Knopf **„Widget: … ▸ ändern"**, der die **grafische Widget-Galerie** öffnet
   (Element per Bild wählen statt aus einer Liste). Ein Klick auf **„Erstellen"** legt für jedes Häkchen ein fertig
   verdrahtetes Widget an — alles in **einem** Undo-Schritt. (Selten gebrauchte Parameter
   liegen im **zugeklappten** Bereich **„Mehr Parameter (N)"**; in der Galerie wählst du eine
-  Kachel und bestätigst mit **OK** oder Doppelklick.)
+  Kachel und bestätigst mit **OK** oder Doppelklick. Unter den Zeilen steht außerdem
+  **„Als Effekt-Box gruppieren (verschiebbar, mit Live-Vorschau)"**: angekreuzt landen alle
+  erzeugten Elemente in einem gemeinsamen, verschiebbaren Kasten statt einzeln auf der Canvas.)
 
-  ![Drop-Karte „Effekt einrichten"](img/04_drop_karte.png)
+  ![Drop-Karte „Effekt einrichten"](../anleitung_vc/img/03_drop_karte.png)
 
-  ![Grafische Widget-Galerie](img/05_widget_galerie.png)
+  ![Grafische Widget-Galerie](../anleitung_vc/img/04_widget_galerie.png)
 
 - **Drop auf einen schon belegten Regler** → es erscheint die **Konflikt-Karte**
   „Regler ist schon belegt". Sie sagt dir, was der Regler bereits steuert, und bietet drei
@@ -68,7 +71,7 @@ baut dir dann das passende Bedien-Element praktisch von selbst.
   (beide Effekte am selben Regler, eine Gruppe / ein Tempo) oder **„Neues Widget daneben"**
   (lässt den Regler in Ruhe, legt ein eigenes Element an). Abbrechen lässt alles unverändert.
 
-  ![Konflikt-Karte „Regler ist schon belegt"](img/06_konflikt_karte.png)
+  ![Konflikt-Karte „Regler ist schon belegt"](../anleitung_vc/img/05_konflikt_karte.png)
 
 ### Rechtsklick-Menü (Kontextmenü)
 

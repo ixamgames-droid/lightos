@@ -54,7 +54,7 @@ Sind **nur Spider** ausgewählt, ersetzt der Editor *Form & Geometrie* durch **B
 (Spider)** (Wippe, Welle, Zacken, Flackern, Puls) mit **Schwung (Tilt-Hub)**, **Mitte (Tilt)** und
 **Welle (Versatz)**.
 
-![EFX-Editor (Algorithmus Circle, Pan/Tilt-Hub)](img/01_efx_editor.png)
+![EFX-Editor im Programmer, Reiter EFX: Name, Algorithmus, Breite/Höhe (Pan-/Tilt-Hub), Zentrum](../anleitung_buehnen_show/img_effekte/06_efx_form.png)
 
 > Merke: Im Programmer zeigt die EFX-Liste nur die Effekte der **aktiven Gruppe**; ein
 > gespeicherter Effekt gehört zu der Gruppe, die beim **💾 Speichern** aktiv war. Einen

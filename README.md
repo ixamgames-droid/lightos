@@ -92,6 +92,9 @@ Dieser Pfad führt der Reihe nach durch die wichtigsten Anleitungen. Die Bilder 
 
 Danach nach Thema weiter: **[alle Anleitungen](docs/ANLEITUNGEN.md)**.
 
+Kurz und mit einem GIF je Ablauf: die **[Schritt-für-Schritt-Reihe](docs/ANLEITUNGEN.md#schritt-für-schritt-mit-gif)**
+— 32 kurze Anleitungen von Patch bis Handy-Konsole, auch als Vorlage für eigene Videos.
+
 **Erst einmal nur ansehen?** Das Windows-Setup bringt fünf fertige Demo-Shows mit:
 **Datei → Demo-Show öffnen** (Club-Nacht, Theater/Event, Große Bühnen-Show, Mega Arena,
 Laser- und Gobo-Test). Die Demo öffnet sich als neue, ungespeicherte Show — **Speichern**

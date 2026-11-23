@@ -69,7 +69,7 @@ class GesperrteAusgabe:
         return False
 
     def grund_kurz(self) -> str:
-        return "STAB-39: echte Ausgabe nur aus der App (main.py)"
+        return "Probelauf: echte Ausgabe gesperrt (STAB-39)"
 
     def close(self) -> None:
         return None

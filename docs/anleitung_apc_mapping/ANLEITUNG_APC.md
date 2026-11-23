@@ -40,7 +40,7 @@ Die Bindung wird **mit der Show** gespeichert.
 Im **Bearbeiten**-Modus das Widget **rechtsklicken → „🎹 MIDI Lernen..."**. Es öffnet sich ein Abbild
 der APC mini:
 
-![Lern-Dialog mit APC-Abbild](img/01_midi_teach.png)
+![Lern-Dialog mit APC-Abbild](../anleitung_vc/img/09_midi_teach.png)
 
 - Entweder am Gerät die Taste/den Fader **betätigen** (das Element leuchtet im Bild auf),
 - **oder** das Element im Bild direkt **anklicken** — das funktioniert **auch ohne angeschlossene APC**.

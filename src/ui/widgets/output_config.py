@@ -2023,6 +2023,15 @@ class OutputConfigDialog(QDialog):
             self._lbl_artnet_status.setText("Inaktiv")
             return
         ip = self._edit_artnet_ip.text().strip() or "255.255.255.255"
+        # OUT-85 (1): eine ungueltige Ziel-IP („abc“, „999.1.1“) wurde
+        # angenommen, gespeichert und als „Aktiv (gespeichert)“ gemeldet.
+        # Jetzt abgelehnt, BEVOR eine laufende Ausgabe ersetzt wird.
+        from src.ui.widgets.wled_auswahl import ipv4_gueltig
+        if not ipv4_gueltig(ip):
+            self._lbl_artnet_status.setText(
+                f"Nicht übernommen: „{ip}“ ist keine gültige IP-Adresse. "
+                f"Bitte z. B. 192.0.2.10 eingeben (leer = an alle im Netz).")
+            return
         # OUT-75 (d): eine andere laufende Ausgabe dieses Universums wird ersetzt.
         if not self._ersetzen_bestaetigt(state.output_manager, univ, "Art-Net", ip):
             self._lbl_artnet_status.setText(
@@ -2109,6 +2118,7 @@ class OutputConfigDialog(QDialog):
                 "num0": num0, "sn": enttec_konfig.aus_zeile(r),
                 "patch0": str(r.get("patch") or ""), "vergessen": False})
             self._univ_dongle_zelle(i)
+        self._univ_stand_merken()                          # OUT-85 (2)
 
     # ── OUT-80: Dongle-Seriennummer je Zeile ─────────────────────────────────
 
@@ -2385,21 +2395,78 @@ class OutputConfigDialog(QDialog):
             f"{fertig} von {len(verteilung)} Teil(en) von „{geraet['name']}“ "
             f"auf {ip} eingetragen — „Speichern“ übernimmt.")
 
+    def _univ_belegte_nummern(self) -> set[int]:
+        belegt: set[int] = set()
+        for z in range(self._univ_table.rowCount()):
+            try:
+                belegt.add(int(self._univ_zelle_text(z, 0)))
+            except ValueError:
+                continue
+        return belegt
+
     def _univ_add(self):
         row = self._univ_table.rowCount()
-        if row >= 32:
+        # ★ OUT-84: vorher `row + 1` — nach dem Loeschen von U1 (U2 bleibt)
+        # bekam die neue Zeile wieder die 2, und „Speichern“ ueberschrieb damit
+        # still den DDP-Ausgang auf U2. Jetzt die kleinste freie Nummer.
+        belegt = self._univ_belegte_nummern()
+        frei = next((n for n in range(_UNIVERSE_MIN, _UNIVERSE_MAX + 1)
+                     if n not in belegt), None)
+        if row >= 32 or frei is None:
             QMessageBox.information(self, "Limit", "Maximal 32 Universen.")
             return
         self._univ_table.insertRow(row)
-        self._univ_table.setItem(row, 0, QTableWidgetItem(str(row + 1)))
-        self._univ_table.setItem(row, 1, QTableWidgetItem(f"Universe {row + 1}"))
+        num_item = QTableWidgetItem(str(frei))
+        num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)  # OUT-85 (5a)
+        self._univ_table.setItem(row, 0, num_item)
+        self._univ_table.setItem(row, 1, QTableWidgetItem(f"Universe {frei}"))
         self._univ_table.setCellWidget(row, 2, _ausgabe_typ_combo())
         self._univ_table.setItem(row, 3, QTableWidgetItem(""))
         self._univ_table.setItem(row, 4, QTableWidgetItem(""))
         self._univ_dongle_zelle(row)                       # OUT-80
 
+    @staticmethod
+    def _geraete_je_universum() -> dict[int, int]:
+        """OUT-85 (3): wie viele Geraete auf welchem Universum gepatcht sind."""
+        anzahl: dict[int, int] = {}
+        try:
+            for f in get_state().get_patched_fixtures():
+                try:
+                    u = int(getattr(f, "universe", 0) or 0)
+                except (TypeError, ValueError):
+                    continue
+                anzahl[u] = anzahl.get(u, 0) + 1
+        except Exception as e:
+            print(f"[output_config] Patch nicht lesbar: {e}")
+        return anzahl
+
     def _univ_delete(self):
         rows = sorted({i.row() for i in self._univ_table.selectedIndexes()}, reverse=True)
+        if not rows:
+            return
+        # OUT-85 (3): stehen auf einem der Universen noch Geraete, erst fragen —
+        # vorher war die Zeile sofort weg, und nur die Statusleiste meldete
+        # spaeter „ohne Ausgang“. Voreinstellung „Nein“.
+        anzahl = self._geraete_je_universum()
+        betroffen = []
+        for r in sorted(rows):
+            try:
+                n = int(self._univ_zelle_text(r, 0))
+            except ValueError:
+                continue
+            if anzahl.get(n):
+                betroffen.append(f"U{n}: {anzahl[n]} Gerät(e)")
+        if betroffen:
+            antwort = QMessageBox.question(
+                self, "Universum mit gepatchten Geräten löschen?",
+                "Auf diesem Universum sind noch Geräte gepatcht:\n"
+                + "\n".join(betroffen)
+                + "\n\nNach dem Speichern haben sie keinen Ausgang mehr. "
+                  "Trotzdem löschen?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if antwort != QMessageBox.StandardButton.Yes:
+                return
         for r in rows:
             self._univ_table.removeRow(r)
 
@@ -2449,6 +2516,25 @@ class OutputConfigDialog(QDialog):
                     if ext_item is not None:
                         ext_item.setText(str(wert))   # UI spiegelt den Wert in der Datei
             rows.append(entry)
+        # ★ OUT-84: zwei Zeilen mit derselben Nummer. `apply_output_config`
+        # richtet je Nummer nur EINE Zeile ein — die spaetere ueberschrieb still
+        # die fruehere (gesehen: eine Zeile „Aus“ loeschte den DDP-Ausgang).
+        # Welche gemeint ist, weiss nur der Bediener: nicht speichern, melden.
+        zeilen_je_num: dict[int, list[int]] = {}
+        for z, entry in enumerate(rows):
+            zeilen_je_num.setdefault(entry["num"], []).append(z + 1)
+        doppelt = {n: z for n, z in zeilen_je_num.items() if len(z) > 1}
+        if doppelt:
+            _lst = "; ".join(
+                f"Nummer {n} in Zeile {', '.join(str(x) for x in z)}"
+                for n, z in sorted(doppelt.items()))
+            QMessageBox.warning(
+                self, "Doppelte Universumsnummer — nicht gespeichert",
+                f"Jede Universumsnummer darf nur einmal vorkommen ({_lst}).\n\n"
+                f"Sonst überschreibt eine Zeile die andere, und ein Ausgang "
+                f"geht verloren. Bitte eine Nummer in der Spalte „#“ ändern "
+                f"und erneut speichern. Es wurde nichts geändert.")
+            return False
         if adjusted:
             _lst = ", ".join(f"Zeile {r}: → {n}" for r, n in adjusted)
             QMessageBox.warning(
@@ -2531,7 +2617,7 @@ class OutputConfigDialog(QDialog):
                 f"Die Universen-Konfiguration konnte nicht geschrieben werden:\n"
                 f"{_UNIV_CONFIG_PATH}\n\nDie Aenderungen gelten nur bis zum "
                 f"Beenden. Schreibrechte und freien Speicherplatz pruefen.")
-            return
+            return False
         # OUT-80: gespeichert — „neu zuordnen“ ist erledigt, die Zeilen merken
         # sich ihren jetzigen Stand.
         for z, sn in enumerate(seriennr_je_zeile):
@@ -2542,6 +2628,8 @@ class OutputConfigDialog(QDialog):
                 "num0": rows[z]["num"], "sn": sn,
                 "patch0": rows[z]["patch"], "vergessen": False})
             self._univ_dongle_zelle(z)
+        self._univ_stand_merken()                          # OUT-85 (2)
+        self._lbl_wled_status.setText("")                  # OUT-85 (5d)
         # Sofort anwenden, damit Änderungen ohne Neustart greifen.
         angewandt, fehler = True, ""
         try:
@@ -2550,13 +2638,73 @@ class OutputConfigDialog(QDialog):
             angewandt, fehler = False, str(e)
             print(f"[output_config] apply after save error: {e}")
         if angewandt:
-            QMessageBox.information(self, "Gespeichert", _UNIV_CONFIG_PATH)
+            # OUT-85 (5c): ein Satz statt nur des rohen Dateipfads.
+            QMessageBox.information(
+                self, "Gespeichert",
+                f"{len(rows)} Universum/Universen gespeichert und angewendet."
+                f"\n\nDatei: {_UNIV_CONFIG_PATH}")
         else:
             QMessageBox.warning(
                 self, "Gespeichert, aber nicht angewendet",
                 f"Die Datei wurde geschrieben ({_UNIV_CONFIG_PATH}), das "
                 f"Einrichten der Ausgaenge ist aber gescheitert:\n\n{fehler}\n\n"
                 f"Nach einem Neustart wird es erneut versucht.")
+        return True
+
+    # ── OUT-85 (2): ungespeicherte Universen-Aenderungen beim Schliessen ──────
+
+    def _univ_stand(self) -> tuple:
+        """Was „Speichern“ schreiben wuerde, als vergleichbarer Stand."""
+        stand = []
+        for z in range(self._univ_table.rowCount()):
+            stand.append((self._univ_zelle_text(z, 0), self._univ_zelle_text(z, 1),
+                          self._univ_typ(z), self._univ_zelle_text(z, 3),
+                          self._univ_zelle_text(z, 4),
+                          bool(self._univ_meta(z).get("vergessen"))))
+        return tuple(stand)
+
+    def _univ_stand_merken(self) -> None:
+        self._univ_gespeicherter_stand = self._univ_stand()
+
+    def univ_ungespeichert(self) -> bool:
+        stand = getattr(self, "_univ_gespeicherter_stand", None)
+        return stand is not None and self._univ_stand() != stand
+
+    def _univ_rueckfrage(self) -> str:
+        """``"speichern"``, ``"verwerfen"`` oder ``"zurueck"``. Voreinstellung
+        und Esc = „Zurück“ — ein versehentliches Enter verwirft nichts."""
+        from src.ui.dialog_hilfe import offen
+        from src.ui.widgets.wled_auswahl import touch_groesse
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Universen-Änderungen speichern?")
+        box.setText("Im Reiter „Universen“ gibt es ungespeicherte Änderungen.")
+        box.setInformativeText("Speichern, verwerfen oder zurück zum Dialog?")
+        b_sp = box.addButton("Speichern", QMessageBox.ButtonRole.AcceptRole)
+        b_vw = box.addButton("Verwerfen", QMessageBox.ButtonRole.DestructiveRole)
+        b_zu = box.addButton("Zurück", QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(b_zu)
+        box.setEscapeButton(b_zu)
+        touch_groesse(b_sp, b_vw, b_zu)
+        with offen(box):
+            box.exec()
+            geklickt = box.clickedButton()
+        if geklickt is b_sp:
+            return "speichern"
+        if geklickt is b_vw:
+            return "verwerfen"
+        return "zurueck"
+
+    def done(self, r):  # noqa: N802 — Qt-Name
+        # OUT-85 (2): „Schließen“, Esc und das Fenster-X liefen hier durch und
+        # verwarfen eine neue Zeile samt DDP-IP ohne ein Wort.
+        if self.isVisible() and self.univ_ungespeichert():
+            wahl = self._univ_rueckfrage()
+            if wahl == "zurueck":
+                return
+            if wahl == "speichern" and not self._univ_save():
+                return                  # nicht gespeichert -> offen bleiben
+        super().done(r)
 
     def _apply_sacn(self):
         univ = self._spin_sacn_univ.value()
