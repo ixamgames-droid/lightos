@@ -65,7 +65,7 @@ entfernt, weil nichts sie mehr verlinkt.
 | `anleitung_vc_workflow/img/18_widget_galerie.png` | VC-Workflow | 21.06. | wie Galerie oben | erledigt → `anleitung_vc/img/04_widget_galerie.png` |
 | `tutorial_matrix/img/17_drop_karte.png` | Tutorial Lichtshow | 21.06. | wie Drop-Karte oben; Text zitierte die alte Frage „… was soll dieser Effekt können?" | erledigt → `anleitung_vc/img/03_drop_karte.png`; Zitat auf den heutigen Hinweistext |
 | `anleitung_efx/img/01_efx_editor.png` | EFX, EFFEKTE.md | 21.06. | unscharfer Ausschnitt, abgeschnittene Knöpfe („Nm", „Sta"), alte Optik | erledigt → `anleitung_buehnen_show/img_effekte/06_efx_form.png`; Bildtext angepasst |
-| `anleitung_apc_mapping/img/01_midi_teach.png` | APC-Mapping | 21.06. | alter Hinweistext („einen Fader bewegen"), graue Pads, „Cancel" | erledigt → `anleitung_vc/img/09_midi_teach.png` |
+| `anleitung_apc_mapping/img/01_midi_teach.png` | APC-Mapping | 21.06. | Dialog zu einem Fader (Hinweistext passt sich dem Element an, ist also nicht veraltet), graue Pads, „Cancel", Windows-Titelleiste | erledigt → `anleitung_vc/img/09_midi_teach.png` |
 | `anleitung_speed/panel.png` | Speed | 21.06. | Knopf „Aktualisieren" (seit BPM-08 weg), **keine Auto-Sync-Zeile** | erledigt → **neue Renderer-Szene** `speed/05_tempo_speeds` (`tools/anleitungsbilder/szenen_speed.py`: Bass 128, Drums ½, Lead 2×); Text um Auto-Sync ergänzt |
 | `anleitung_speed/img/04_konflikt_karte.png` | Speed | 21.06. | wie Konflikt-Karte oben | erledigt → `anleitung_vc/img/05_konflikt_karte.png` |
 
