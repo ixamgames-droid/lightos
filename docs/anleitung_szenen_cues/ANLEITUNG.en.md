@@ -168,7 +168,12 @@ Section **Playback**, tab **Playback**.
    selected in the field **Cueliste:** (cue list). **Löschen** (delete) next to it removes
    the selected cue list.
 2. **+ Cue aufnehmen** (record cue) stores the **whole** Programmer as a new cue. It asks
-   for **Cue-Nummer:** (cue number; suggested: last + 1) and **Label:**.
+   for **Cue-Nummer:** (cue number; suggested: last + 1) and **Label:**. **Abbrechen**
+   (cancel) at the label cancels the recording. If the number already exists, LightOS
+   asks: **Cue N ersetzen** (replace: new content, times stay), **Als N.1 einfügen**
+   (insert as the next free number behind it) or **Abbrechen** (cancel, the default).
+   Duplicate numbers no longer happen. The command line (`record cue 2`) also refuses a
+   used number with a message.
 3. **⚡ Quick-Rec** does the same without asking, label „Cue 1“, „Cue 2“ …
 
 This is how you record three colours:
@@ -192,7 +197,10 @@ cue lands in the **first** cue list of the show.
 
 1. **The cue table**: **Nr.** (no.), **Label**, **Fade In** (default 2.0 s),
    **Fade Out**, **Delay**, **Follow**, **Kurve** (curve) and **Timecode**. A double-click on a cell
-   changes the value. Enter a time under **Follow** and the next cue follows by itself.
+   changes the value. Times are seconds, with point or comma (`1,5`); negative or
+   unreadable values are refused and the cell shows the old value again. **Cue löschen**
+   (delete cue) asks first (default No), **Strg+Z** (Ctrl+Z) brings deleted cues back.
+   Enter a time under **Follow** and the next cue follows by itself.
    **Kurve** chooses the shape of the fade. Under **Timecode** you enter a MIDI timecode
    as `HH:MM:SS:FF` (e.g. `00:01:30:00`); when the incoming timecode of a DAW or desk
    reaches this value, the cue list jumps to this cue. „—“ or an empty cell turns it off.

@@ -27,6 +27,46 @@ EXEC_TASTE_TOUCH = 44
 ZAHNRAD_TOUCH = 32
 
 
+#: UI-147 (5): Tabellen-Spalte -> Cue-Feld der Zeiten.
+_ZEIT_FELDER = {2: "fade_in", 3: "fade_out", 4: "delay_in", 5: "follow"}
+_UNGUELTIG = object()
+
+
+def lies_zeit(text: str, leer_erlaubt: bool = False):
+    """UI-147 (5): Zeit aus einer Tabellenzelle — '1,5', '1.5', '1.5s'.
+    Negative, unendliche oder unlesbare Werte -> ``_UNGUELTIG``. Mit
+    ``leer_erlaubt`` (Follow) bedeuten '', '—' und '-' „aus“ (``None``)."""
+    t = (text or "").strip().lower()
+    if t.endswith("s"):
+        t = t[:-1].strip()
+    if leer_erlaubt and t in ("", "—", "-"):
+        return None
+    try:
+        wert = float(t.replace(",", "."))
+    except ValueError:
+        return _UNGUELTIG
+    if wert != wert or wert in (float("inf"), float("-inf")) or wert < 0:
+        return _UNGUELTIG
+    return wert
+
+
+def naechste_freie_cue_nummer(stack, num: float) -> float:
+    """UI-147 (3): ``num`` selbst, wenn frei — sonst die naechste freie Nummer
+    in 0.1-Schritten dahinter (1 belegt -> 1.1), Rueckfall letzte + 1."""
+    belegt = [c.number for c in getattr(stack, "cues", ())]
+
+    def frei(n):
+        return not any(abs(b - n) < 0.001 for b in belegt)
+
+    if frei(num):
+        return num
+    for i in range(1, 10):
+        kandidat = round(num + i * 0.1, 3)
+        if frei(kandidat):
+            return kandidat
+    return round(max(belegt) + 1.0, 3)
+
+
 def touch_aktiv() -> bool:
     """Touch-Modus des Hauptfensters (``--touch``)."""
     try:
@@ -71,8 +111,19 @@ class PlaybackView(QWidget):
         except Exception as e:
             print(f"[playback_view] sync subscribe error: {e}")
 
+    def _page_knoepfe_angleichen(self):
+        """UI-147 (2): Page-Knoepfe auf die Page der Engine setzen. Nach
+        Show-Laden setzt ``PlaybackEngine.from_dict`` die Page neu — ohne das
+        blieb der Knopf der alten Page markiert."""
+        pe = self._state.playback_engine
+        seite = getattr(pe, "current_page", 0) if pe else 0
+        for i, btn in enumerate(getattr(self, "_page_buttons", ())):
+            if btn.isChecked() != (i == seite):
+                btn.setChecked(i == seite)
+
     def _sync_refresh(self):
         try:
+            self._page_knoepfe_angleichen()
             self._refresh_stack_combo()
             self._refresh_table()
             self._refresh_executors()
@@ -574,6 +625,12 @@ class PlaybackView(QWidget):
     # ── Transport ─────────────────────────────────────────────────────────────
 
     def _go(self):
+        if self._current_stack and not self._current_stack.cues:
+            # UI-147 (9): leere Liste -> kein GO, kein Executor belegt.
+            self._zeige_hinweis(
+                f"„{self._current_stack.name}“ hat noch keine Cue — erst "
+                "„+ Cue aufnehmen“", status=True)
+            return
         if self._current_stack and self._sichere_executor():
             self._current_stack.go()
 
@@ -736,11 +793,61 @@ class PlaybackView(QWidget):
         )
         if not ok:
             return
+        num = round(float(num), 3)
+        ersetzen = False
+        if naechste_freie_cue_nummer(self._current_stack, num) != num:
+            # UI-147 (3): Nummer belegt -> fragen statt still eine zweite
+            # Cue mit derselben Nummer anzulegen.
+            wahl = self._frage_doppelte_nummer(num)
+            if wahl is None:
+                return
+            if wahl == "ersetzen":
+                ersetzen = True
+            else:
+                num = naechste_freie_cue_nummer(self._current_stack, num)
         label, ok2 = QInputDialog.getText(self, "Cue aufnehmen", "Label:")
         if not ok2:
-            label = f"Cue {num}"
-        self._state.record_cue(self._current_stack, num, label)
+            # UI-147 (7): „Abbrechen“ bricht die Aufnahme ab (frueher wurde
+            # die Cue trotzdem als „Cue N“ gespeichert).
+            return
+        if not label.strip():
+            label = f"Cue {num:g}"
+        if ersetzen:
+            self._state.ersetze_cue(self._current_stack, num, label)
+        else:
+            self._state.record_cue(self._current_stack, num, label)
         self._refresh_table()
+
+    def _frage_doppelte_nummer(self, num: float):
+        """UI-147 (3): Cue-Nummer schon belegt. Rueckgabe ``"ersetzen"``,
+        ``"einfuegen"`` (naechste freie Nummer) oder ``None`` (abbrechen).
+        Voreinstellung und Esc: Abbrechen."""
+        frei = naechste_freie_cue_nummer(self._current_stack, num)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Cue-Nummer belegt")
+        box.setText(f"Cue {num:g} gibt es in dieser Liste schon.")
+        box.setInformativeText(
+            f"Ersetzen: Cue {num:g} bekommt den Programmer-Inhalt (Zeiten "
+            f"bleiben).\nEinfügen: neue Cue als {frei:g}.")
+        b_ers = box.addButton(f"Cue {num:g} ersetzen",
+                              QMessageBox.ButtonRole.DestructiveRole)
+        b_ein = box.addButton(f"Als {frei:g} einfügen",
+                              QMessageBox.ButtonRole.AcceptRole)
+        b_ab = box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(b_ab)
+        box.setEscapeButton(b_ab)
+        if touch_aktiv():
+            for b in (b_ers, b_ein, b_ab):
+                b.setMinimumHeight(44)
+        with dialog_hilfe.offen(box):
+            box.exec()
+            geklickt = box.clickedButton()
+        if geklickt is b_ers:
+            return "ersetzen"
+        if geklickt is b_ein:
+            return "einfuegen"
+        return None
 
     def _quick_record_cue(self):
         """F-14: dialogfreies Ein-Klick-Record auf die AKTUELLE Cueliste
@@ -757,11 +864,27 @@ class PlaybackView(QWidget):
         rows = {idx.row() for idx in self._table.selectedIndexes()}
         if not self._current_stack or not rows:
             return
-        for row in sorted(rows, reverse=True):
-            if row < len(self._current_stack.cues):
-                cue = self._current_stack.cues[row]
-                self._current_stack.remove_cue(cue.number)
+        stack = self._current_stack
+        cues = [stack.cues[r] for r in sorted(rows) if r < len(stack.cues)]
+        if not cues:
+            return
+        # UI-147 (6): Rueckfrage (Voreinstellung Nein) und Rueckgaengig.
+        if not self._frage_cue_loeschen(cues):
+            return
+        self._state.loesche_cues(stack, cues)
         self._refresh_table()
+
+    def _frage_cue_loeschen(self, cues) -> bool:
+        """UI-147 (6): Rueckfrage vor dem Loeschen, Voreinstellung Nein."""
+        if len(cues) == 1:
+            text = f"Cue {cues[0].number:g} „{cues[0].label}“ löschen?"
+        else:
+            text = f"{len(cues)} Cues löschen?"
+        reply = QMessageBox.question(
+            self, "Cue löschen?", text + "\n(Rückgängig mit Strg+Z)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        return reply == QMessageBox.StandardButton.Yes
 
     def _go_to_selected(self):
         """Direkt zur markierten Cue faden (go_to nutzt den normalen Fade-In)."""
@@ -805,19 +928,42 @@ class PlaybackView(QWidget):
                 return
             if col == 1:
                 cue.label = item.text()
-            elif col == 2:
-                cue.fade_in = float(val)
-            elif col == 3:
-                cue.fade_out = float(val)
-            elif col == 4:
-                cue.delay_in = float(val)
-            elif col == 5:
-                cue.follow = None if val == "—" else float(val)
+                return
         except ValueError:
             pass
+        if col in _ZEIT_FELDER:
+            self._zeit_uebernehmen(item, cue, _ZEIT_FELDER[col])
+
+    def _zeit_uebernehmen(self, item: QTableWidgetItem, cue, feld: str):
+        """UI-147 (5): Zeit-Zelle lesen. Komma-Dezimal ('1,5') gilt, negative
+        oder unlesbare Werte werden abgelehnt (Zelle zeigt wieder den alten
+        Wert, Hinweis in der Statuszeile). Danach steht die Zelle immer im
+        einheitlichen Format '1.5s' (frueher bis zum Neuladen '3')."""
+        alt = getattr(cue, feld, None)
+        neu = lies_zeit(item.text(), leer_erlaubt=(feld == "follow"))
+        if neu is _UNGUELTIG:
+            self._zeige_hinweis(
+                f"„{item.text().strip()}“ ist keine gültige Zeit — Sekunden "
+                "ab 0, z. B. 1,5", status=True)
+        else:
+            setattr(cue, feld, neu)
+        wert = getattr(cue, feld, alt)
+        self._table.blockSignals(True)
+        item.setText(f"{wert:.1f}s" if wert is not None else "—")
+        self._table.blockSignals(False)
+
+    def _aktive_cue_leeren(self):
+        """UI-147 (1) / WEB-18: keine aktive Cue -> Anzeige leer. Frueher blieb
+        der Text der zuletzt aktiven Cue stehen — nach Show-Wechsel (Cue der
+        ALTEN Show) und nach STOP ueber Web/OSC/Kommandozeile."""
+        if self._lbl_current.text() != "—":
+            self._lbl_current.setText("—")
+        if self._lbl_next.text() != "Nächste: —":
+            self._lbl_next.setText("Nächste: —")
 
     def _update_cue_highlight(self):
         if not self._current_stack:
+            self._aktive_cue_leeren()
             return
         idx = self._current_stack.current_index
         cue = self._current_stack.current_cue
@@ -850,9 +996,12 @@ class PlaybackView(QWidget):
                 self._lbl_next.setText(f"Nächste: {nc.number} — {nc.label}")
             else:
                 self._lbl_next.setText("Nächste: Ende")
+        else:
+            self._aktive_cue_leeren()
 
     def _on_state(self, event: str, _data):
         if event in ("stacks_changed", "cue_recorded"):
+            self._page_knoepfe_angleichen()
             self._refresh_stack_combo()
             self._refresh_executors()
 
@@ -1023,6 +1172,12 @@ class ExecutorWidget(QWidget):
         self._fader.setRange(0, 100)
         self._fader.setValue(100)
         self._fader.setFixedHeight(50)
+        # UI-147 (8): bei senkrechten Reglern ist ``sub-page`` in Qt der Teil
+        # OBERHALB des Knopfs — das Theme fuellte ihn blau, der Pegel sah
+        # verkehrt aus. Hier: unten (add-page) blau, oben die Rille.
+        self._fader.setStyleSheet(
+            "QSlider::sub-page:vertical { background: #232323; border-radius: 2px; }"
+            "QSlider::add-page:vertical { background: #0978FF; border-radius: 2px; }")
         self._fader.valueChanged.connect(self._fader_changed)
         self._fader.sliderReleased.connect(self._fader_losgelassen)
         layout.addWidget(self._fader, alignment=Qt.AlignmentFlag.AlignHCenter)

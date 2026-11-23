@@ -158,7 +158,11 @@ Sektion **Playback**, Reiter **Playback**.
 1. **+ Neu** fragt nach dem Namen der Cueliste, hier „Meine Show“. Sie wird im Feld
    **Cueliste:** gewählt. **Löschen** daneben entfernt die gewählte Cueliste.
 2. **+ Cue aufnehmen** speichert den **ganzen** Programmer als neue Cue. Es fragt nach
-   **Cue-Nummer:** (vorgeschlagen: letzte + 1) und **Label:**.
+   **Cue-Nummer:** (vorgeschlagen: letzte + 1) und **Label:**. **Abbrechen** beim Label
+   bricht die Aufnahme ab. Gibt es die Nummer schon, fragt LightOS nach: **Cue N
+   ersetzen** (neuer Inhalt, Zeiten bleiben), **Als N.1 einfügen** (nächste freie Nummer
+   dahinter) oder **Abbrechen** (Voreinstellung). Doppelte Nummern entstehen nicht mehr.
+   Auch die Befehlszeile (`record cue 2`) lehnt eine belegte Nummer mit Meldung ab.
 3. **⚡ Quick-Rec** macht dasselbe ohne Rückfrage, Label „Cue 1“, „Cue 2“ …
 
 So nimmst du drei Farben auf:
@@ -181,7 +185,9 @@ gewählt, landet die Cue in der **ersten** Cueliste der Show.
 
 1. **Die Cue-Tabelle**: **Nr.**, **Label**, **Fade In** (Standard 2,0 s),
    **Fade Out**, **Delay**, **Follow**, **Kurve** und **Timecode**. Ein Doppelklick auf eine Zelle
-   ändert den Wert. Bei **Follow** eine Zeit eintragen, dann folgt die nächste Cue
+   ändert den Wert. Zeiten in Sekunden, mit Punkt oder Komma (`1,5`); negative oder
+   unlesbare Werte lehnt die Zelle ab und zeigt wieder den alten Wert. **Cue löschen**
+   fragt vorher nach (Voreinstellung Nein), **Strg+Z** holt gelöschte Cues zurück. Bei **Follow** eine Zeit eintragen, dann folgt die nächste Cue
    von selbst. **Kurve** wählt den Verlauf der Überblendung. In **Timecode** trägst du
    einen MIDI-Timecode als `HH:MM:SS:FF` ein (z. B. `00:01:30:00`); erreicht der
    eingehende Timecode einer DAW oder eines Pults diesen Wert, springt die Cueliste

@@ -6796,6 +6796,68 @@ class AppState:
         self._emit("cue_stack_changed", None)
         return cue
 
+    def ersetze_cue(self, stack, number: float, label: str = ""):
+        """UI-147 (3): Programmer-Inhalt in die BESTEHENDE Cue ``number``
+        schreiben (Zeiten, Kurve, Follow, Timecode bleiben). Gibt es die
+        Nummer nicht, wird normal aufgenommen. Rueckgaengig: alte Werte."""
+        import copy
+        alt = next((c for c in stack.cues if abs(c.number - number) < 0.001), None)
+        if alt is None:
+            return self.record_cue(stack, number, label)
+        with self._prog_lock:
+            values = {fid: dict(attrs) for fid, attrs in self.programmer.items()}
+        neu = copy.copy(alt)
+        neu.values = values
+        if label:
+            neu.label = label
+        stack.update_cue(neu)
+        self._emit("cue_recorded", (stack, neu))
+        self._emit("cue_stack_changed", None)
+
+        def _tausch(c):
+            if stack in self.cue_stacks:
+                stack.update_cue(c)
+                self._emit("stacks_changed", None)
+                self._emit("cue_stack_changed", None)
+
+        self._push_undo(label=f"Cue {number:g} ersetzt",
+                        do=lambda: None, undo=lambda: _tausch(alt),
+                        redo=lambda: _tausch(neu))
+        return neu
+
+    def loesche_cues(self, stack, cues) -> int:
+        """UI-147 (6): Cues aus einer Cueliste loeschen — mit Rueckgaengig
+        (Strg+Z holt dieselben Cue-Objekte zurueck). Rueckgabe: Anzahl."""
+        weg = [c for c in cues if c in stack.cues]
+        if not weg:
+            return 0
+        for c in weg:
+            stack.remove_cue(c.number)
+
+        def _zurueck():
+            if stack not in self.cue_stacks:
+                return
+            for c in weg:
+                if not any(abs(x.number - c.number) < 0.001 for x in stack.cues):
+                    stack.add_cue(c)
+            self._emit("stacks_changed", None)
+            self._emit("cue_stack_changed", None)
+
+        def _wieder():
+            if stack not in self.cue_stacks:
+                return
+            for c in weg:
+                if c in stack.cues:
+                    stack.remove_cue(c.number)
+            self._emit("stacks_changed", None)
+            self._emit("cue_stack_changed", None)
+
+        name = (f"Cue {weg[0].number:g} gelöscht" if len(weg) == 1
+                else f"{len(weg)} Cues gelöscht")
+        self._push_undo(label=name, do=lambda: None, undo=_zurueck, redo=_wieder)
+        self._emit("cue_stack_changed", None)
+        return len(weg)
+
     def notify_groups_changed(self, data=None):
         """Zentrale Benachrichtigung bei Fixture-Gruppen-Aenderungen (erstellt/
         geaendert/geloescht). Alle gruppen-konsumierenden Views (Programmer,
