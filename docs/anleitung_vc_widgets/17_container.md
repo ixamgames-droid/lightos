@@ -20,7 +20,7 @@ Sichtbar ist ein gefülltes Rechteck (Standard-Hintergrund dunkel, `#161b22`) mi
 
 Wie die Kopfzeile aussieht, hängt von der Seitenanzahl ab:
 
-- **1 Seite** → in der Kopfzeile steht zentriert die **Beschriftung** des Containers (fett).
+- **1 Seite** → in der Kopfzeile steht zentriert die **Beschriftung** des Containers (fett). Ist sie zu lang, bleibt der Anfang sichtbar und das Ende wird mit „…“ gekürzt.
 - **Mehrere Seiten** → die Kopfzeile zeigt nebeneinander **Tabs** mit den Beschriftungen `P1`, `P2`, … Der aktive Tab ist blau hinterlegt (`#0d4f8b`) und hell beschriftet, die übrigen sind grau.
 
 Klickzonen und Gesten:
@@ -31,7 +31,7 @@ Klickzonen und Gesten:
 
 Im **Bearbeiten-Modus** fügst du Inhalte hinzu:
 
-- **Rechtsklick** im Container öffnet das Kontextmenü mit dem Untermenü **„Widget hinzufügen"** (Liste aller VC-Elementtypen außer dem Container selbst — ein Container lässt sich nicht in einen Container legen). Das gewählte Element wird mittig im Inhaltsbereich der **aktuellen Seite** abgelegt.
+- **Rechtsklick** im Container öffnet das Kontextmenü mit dem Untermenü **„Widget hinzufügen"** (Liste aller VC-Elementtypen außer dem Container selbst, mit denselben deutschen Namen wie in der Werkzeugleiste: Fader, Cueliste, Farbe, Effekt-Farben …). Das gewählte Element wird an der **Klickstelle** auf der **aktuellen Seite** abgelegt. Liegt dort schon ein Element, rückt das neue an die nächste freie Stelle im Inhaltsbereich. Auch die Knöpfe der Werkzeugleiste legen neue Elemente nicht mehr über vorhandene.
 - **Snap-in / Snap-out** — ziehst du im Bearbeiten-Modus ein bestehendes Element auf den Container, wird es zum **Kind** des Containers (Snap-in): Es liegt fortan auf der aktuellen Seite und wird gemeinsam mit dem Container verschoben; auch das Löschen wird an den Container übergeben. Ziehst du es wieder heraus, landet es zurück auf der Canvas (Snap-out). Ist der Container leer, zeigt er im Bearbeiten-Modus den Hinweis **„Rechtsklick → Widget hinzufügen"**.
 - **Doppelklick** auf den Container (nicht auf ein Kind) → öffnet die Einstellungen.
 

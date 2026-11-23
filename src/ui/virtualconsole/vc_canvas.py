@@ -65,6 +65,63 @@ def _register():
 _register()
 
 
+#: VCB-52: deutsche Namen fuer die Menues „Hinzufügen" (Flaeche) und „Widget
+#: hinzufügen" (Rahmen) — dieselben Woerter wie die Werkzeugleiste.
+MENUE_NAMEN: dict[str, str] = {
+    "VCButton": "Button", "VCSlider": "Fader", "VCXYPad": "XY Pad",
+    "VCRaumPad": "Raum-Pad", "VCPixelraster": "Pixelraster",
+    "VCLabel": "Label", "VCCueList": "Cueliste", "VCSpeedDial": "SpeedDial",
+    "VCEncoder": "Encoder", "VCStepper": "Schrittzähler", "VCColor": "Farbe",
+    "VCColorList": "Chase-Liste", "VCSongInfo": "Musik", "VCBpmDisplay": "BPM",
+    "VCBusSelector": "Tempo-Bus", "VCTempoBusController": "Tempo-Controller",
+    "VCEffectColors": "Effekt-Farben", "VCFrame": "Frame",
+    "VCEffectEditor": "Effekt-Box", "VCEffectDisplay": "Effekt-Vorschau",
+    "VCMultiLiveEditor": "Live-Edit",
+}
+
+
+def menue_name(wtype: str) -> str:
+    """Anzeigename eines Widget-Typs im Hinzufuegen-Menue (VCB-52)."""
+    return MENUE_NAMEN.get(wtype, wtype.replace("VC", ""))
+
+
+def freie_stelle(eltern, groesse: QSize, wunsch: QPoint, bereich: QRect,
+                 ohne=None, raster: int = 8) -> QPoint:
+    """VCB-52: Stelle fuer ein neues Element der Groesse ``groesse``, die kein
+    sichtbares Geschwister-Element in ``eltern`` ueberdeckt. Ist ``wunsch``
+    frei, bleibt es dort; sonst die naechstgelegene freie Rasterstelle in
+    ``bereich``; ist dort nichts frei, unter allen vorhandenen Elementen."""
+    andere = [o.geometry().adjusted(-2, -2, 2, 2)
+              for o in eltern.findChildren(
+                  VCWidget, options=Qt.FindChildOption.FindDirectChildrenOnly)
+              if o is not ohne and not o.isHidden()]
+
+    def frei(pt: QPoint) -> bool:
+        r = QRect(pt, groesse)
+        return not any(r.intersects(a) for a in andere)
+
+    if frei(wunsch):
+        return wunsch
+    schritt = max(4, raster * 2)
+    best, best_d = None, None
+    y = bereich.top()
+    while y + groesse.height() <= bereich.bottom() + 1:
+        x = bereich.left()
+        while x + groesse.width() <= bereich.right() + 1:
+            pt = QPoint(x, y)
+            if frei(pt):
+                d = (x - wunsch.x()) ** 2 + (y - wunsch.y()) ** 2
+                if best_d is None or d < best_d:
+                    best, best_d = pt, d
+            x += schritt
+        y += schritt
+    if best is not None:
+        return best
+    unten = max((a.bottom() for a in andere), default=bereich.top())
+    y = ((unten + raster) // raster + 1) * raster
+    return QPoint(bereich.left(), y)
+
+
 def _lebt(obj) -> bool:
     """UI-126: lebt das C++-Objekt noch?"""
     try:
@@ -2545,7 +2602,7 @@ class VCCanvas(QWidget):
 
         add_menu = menu.addMenu("Hinzufügen")
         for wtype in WIDGET_REGISTRY:
-            act = add_menu.addAction(wtype.replace("VC", ""))
+            act = add_menu.addAction(menue_name(wtype))     # VCB-52: deutsch
             act.setData((wtype, local_pos))
 
         # VCB-48: Pop-up-Felder sind geschlossen unsichtbar — hier lassen sie
@@ -2620,6 +2677,14 @@ class VCCanvas(QWidget):
         if not self._laedt_layout:
             self.led_rueckmeldung_pruefen()     # MIDI-18
         return w
+
+    def freie_stelle_fuer(self, w, wunsch: QPoint) -> QPoint:
+        """VCB-52: freie Stelle fuer das neue Widget ``w`` im sichtbaren Teil
+        der Flaeche (Raster eingehalten)."""
+        bereich = self.visibleRegion().boundingRect()
+        if bereich.width() < w.width() or bereich.height() < w.height():
+            bereich = QRect(0, 0, max(self.width(), 800), max(self.height(), 600))
+        return freie_stelle(self, w.size(), wunsch, bereich, ohne=w, raster=self.GRID)
 
     def _on_widget_moved(self, _x=0, _y=0):
         self._update_content_extent()

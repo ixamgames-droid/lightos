@@ -36,16 +36,26 @@ neue Matrix gehört zu der Gruppe, die beim **+ Neu** aktiv war, und erscheint n
 Liste. Steht „0 Fixtures", die Gruppe in der Gruppen-Liste **neu anklicken** und **Auswahl übernehmen**
 drücken.
 
+Die Liste zeigt neben den Matrizen der Gruppe auch solche **ohne Gruppenbindung** (mit
+„· ohne Gruppe" markiert, die Kopfzeile nennt dann beide Anzahlen) — sie gehen so nie verloren.
+Wer mit ungespeicherten Änderungen einen **anderen Effekt** in der Liste anklickt, wird gefragt:
+**Speichern**, **Verwerfen** oder **Zurück** (bleibt beim bisherigen Effekt, Entwurf bleibt).
+Bei der Art **Bild/Video** prüft der Editor die gewählte Datei vorher: Videos und unlesbare
+Bilder werden abgelehnt („Nicht übernommen: …"), nicht in den Medien-Ordner kopiert, und das
+bisherige Medium bleibt.
+
 ![Farb-Matrix im Editor (Stil RGB, Chase)](img/01_matrix_rgb.png)
 
 ## 2. Algorithmen (Auswahl)
 
-Im Auswahlfeld (Klappliste) **Algorithmus** stehen u. a.: **Plain** (volle Fläche), **Chase** (Lauflicht),
-**Wipe** (Wisch), **Wave** (Welle), **Gradient** (Farbverlauf), **Rainbow** (Regenbogen),
-**Fill** (Schritt-für-Schritt-Füllen), **Random** (Zufall), **Color Fade** (Crossfade),
-**Strobe**, **Schachbrett**, **Radar**, **Spirale**, **Sine Plasma**, **Windrad**,
-**Atmen (Puls)**, **Feuer** und **Regen**. Die meisten Algorithmen nutzen 1–3 Farben (C1/C2/C3)
-bzw. eine **Color Sequence**; manche (z. B. **Rainbow**) nutzen **keine** Farbfelder und erzeugen
+Im Auswahlfeld (Klappliste) **Algorithmus** stehen u. a.: **Einfarbig** (volle Fläche), **Chase** (Lauflicht),
+**Wischen**, **Welle**, **Farbverlauf**, **Regenbogen**,
+**Füllen** (Schritt für Schritt), **Zufall**, **Farbüberblendung** (Crossfade),
+**Strobe**, **Schachbrett**, **Radar**, **Spirale**, **Plasma (Sinus)**, **Windrad**,
+**Atmen (Puls)**, **Feuer**, **Regen** und **Bild/Video**. (Seit FM-85 deutsch beschriftet; in
+der Show-Datei stehen weiter die alten Schlüssel wie „Plain" oder „Sine Plasma", ältere Shows
+laden unverändert.) Die meisten Algorithmen nutzen 1–3 Farben (C1/C2/C3)
+bzw. eine **Color Sequence**; manche (z. B. **Regenbogen**) nutzen **keine** Farbfelder und erzeugen
 ihre Farben selbst — dort blendet der Editor die Farbauswahl aus.
 
 > **Hinweis:** „Komet" und „Ripple" sind **keine eigenen Algorithmen mehr** — ein Komet ist

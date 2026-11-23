@@ -278,6 +278,11 @@ class VCInspectorPanel(QWidget):
     def _open_modal(self, widget):
         if _is_valid(widget) and hasattr(widget, "_edit_properties"):
             widget._edit_properties()
+            # VCB-52: der Dialog kann die Beschriftung geaendert haben -> Kopf
+            # neu (sonst stand dort weiter der alte Name).
+            if widget is self._widget and _is_valid(widget):
+                cap = getattr(widget, "caption", "") or "—"
+                self._subtitle.setText(f"„{cap}“")
 
     def _on_edit_clicked(self):
         # STAB-09: sender()-Adapter — Ziel-Widget haengt als Attribut am Button.
