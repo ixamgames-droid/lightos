@@ -1556,6 +1556,14 @@ class VirtualConsoleView(QWidget):
         pos = QPoint(max(0, base_x + i * step), max(0, base_y + i * step))
         self._add_cascade += 1
         w = self._canvas._add_widget(wtype, pos)
+        # VCB-52: die Kaskade allein reicht nicht — ein neues Element lag oft
+        # ueber einem vorhandenen. Ueberdeckt es etwas, rueckt es an die
+        # naechste freie Stelle im sichtbaren Bereich.
+        if w is not None:
+            ziel = self._canvas.freie_stelle_fuer(w, w.pos())
+            if ziel != w.pos():
+                w.move(ziel)
+                self._canvas._update_content_extent()
         # Neues Widget auswählen → Inspector bindet, sichtbare Bestätigung.
         if w is not None:
             self._canvas._on_widget_selected(w)

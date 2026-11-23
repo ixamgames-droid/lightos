@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QDialog, QFormLayout, QLineEdit, QCheckBox,
                                 QSpinBox, QDialogButtonBox, QMenu, QSizePolicy)
 from . import vc_popup
 from PySide6.QtCore import Qt, QRect, QPoint
-from PySide6.QtGui import QPainter, QColor, QFont, QPen
+from PySide6.QtGui import QPainter, QColor, QFont, QFontMetrics, QPen
 from .vc_widget import VCWidget
 
 
@@ -240,6 +240,18 @@ class VCFrame(VCWidget):
             cx = cr.x() + max(0, (cr.width() - child.width()) // 2)
             cy = cr.y() + max(0, (cr.height() - child.height()) // 2)
             child.move(cx, cy)
+        # VCB-52: nicht ueber ein vorhandenes Element derselben Seite legen und
+        # im Inhaltsbereich bleiben (Klickstelle am Rand -> hineinschieben).
+        if cr.width() >= child.width() and cr.height() >= child.height():
+            x = min(max(child.x(), cr.left()), cr.right() + 1 - child.width())
+            y = min(max(child.y(), cr.top()), cr.bottom() + 1 - child.height())
+            child.move(x, y)
+            # Elemente anderer Seiten sind ausgeblendet und zaehlen nicht.
+            from src.ui.virtualconsole.vc_canvas import freie_stelle
+            ziel = freie_stelle(self, child.size(), child.pos(), cr, ohne=child,
+                                raster=max(1, int(self._snap_grid or 8)))
+            if ziel.y() + child.height() <= cr.bottom() + 1:
+                child.move(ziel)
         child.setProperty("vc_page", self._current_page)
         child.setVisible(True)
         child.delete_requested.connect(self._on_child_delete_requested)
@@ -270,14 +282,16 @@ class VCFrame(VCWidget):
     # ── Context menu ─────────────────────────────────────────────────────────
 
     def _show_context_menu(self, global_pos: QPoint):
-        from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY
+        from src.ui.virtualconsole.vc_canvas import WIDGET_REGISTRY, menue_name
         menu = QMenu(self)
+        # VCB-52: die Klickstelle merken — das neue Element landet dort.
+        klick = self.mapFromGlobal(global_pos)
 
         add_menu = menu.addMenu("Widget hinzufügen")
         for wtype in WIDGET_REGISTRY:
             if wtype == "VCFrame":
                 continue
-            act = add_menu.addAction(wtype.replace("VC", ""))
+            act = add_menu.addAction(menue_name(wtype))     # VCB-52: deutsch
             act.setData(wtype)
 
         menu.addSeparator()
@@ -307,7 +321,7 @@ class VCFrame(VCWidget):
 
         chosen = menu.exec(global_pos)
         if chosen and chosen.data():
-            self._add_child_widget(chosen.data())
+            self._add_child_widget(chosen.data(), klick)
 
     # ── Mouse ─────────────────────────────────────────────────────────────────
 
@@ -382,7 +396,7 @@ class VCFrame(VCWidget):
                 p.setPen(self._fg_color)
                 p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
                 titel = f"▣ {self.caption}" if self._popup else self.caption
-                p.drawText(header, Qt.AlignmentFlag.AlignCenter, titel)
+                p.drawText(header, Qt.AlignmentFlag.AlignCenter, self.kopf_text(titel))
             else:
                 w = max(40, self.width() // self._page_count)
                 for i in range(self._page_count):
@@ -426,6 +440,15 @@ class VCFrame(VCWidget):
         p.end()
 
     # ── Properties ───────────────────────────────────────────────────────────
+
+    def kopf_text(self, titel: str | None = None) -> str:
+        """VCB-52: Kopfzeilen-Text, bei Platzmangel hinten mit … gekuerzt
+        (vorher mittig an beiden Seiten abgeschnitten)."""
+        if titel is None:
+            titel = f"▣ {self.caption}" if self._popup else self.caption
+        fm = QFontMetrics(QFont("Segoe UI", 8, QFont.Weight.Bold))
+        return fm.elidedText(titel, Qt.TextElideMode.ElideRight,
+                             max(1, self.width() - 8))
 
     def _open_properties(self):
         dlg = QDialog(self)

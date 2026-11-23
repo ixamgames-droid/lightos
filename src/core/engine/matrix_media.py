@@ -66,6 +66,25 @@ def media_dir() -> str:
     return d
 
 
+def pruefen(pfad: str) -> str:
+    """FM-85 (3): Kann ``pfad`` als Medium dienen? Leerer Text = ja, sonst die
+    Meldung. Liest nur das erste Bild (billig) — vor ``import_file`` aufrufen,
+    damit Unbrauchbares gar nicht erst in den Medien-Ordner kopiert wird."""
+    name = os.path.basename(pfad)
+    if not os.path.isfile(pfad):
+        return f"Datei nicht gefunden: {name}"
+    endung = os.path.splitext(pfad)[1].lower()
+    if endung in VIDEO_ENDUNGEN:
+        return ("Video wird noch nicht unterstützt — bitte Bild oder "
+                "animiertes GIF verwenden.")
+    from PySide6.QtGui import QImageReader
+    reader = QImageReader(pfad)
+    img = reader.read()
+    if img.isNull():
+        return f"Medium nicht lesbar: {name} ({reader.errorString()})"
+    return ""
+
+
 def import_file(src: str) -> str:
     """Kopiert ``src`` in den Medien-Ordner (falls nicht schon dort) und liefert
     den RELATIVEN Namen, der in der Show gespeichert wird."""

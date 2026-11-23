@@ -29,11 +29,11 @@ from __future__ import annotations
 
 import time
 
-from PySide6.QtCore import QPoint, QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtCore import QEvent, QPoint, QRect, QRectF, Qt, QTimer
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
                                QFormLayout, QLabel, QLineEdit, QPushButton,
-                               QVBoxLayout, QWidget)
+                               QToolTip, QVBoxLayout, QWidget)
 
 from .vc_style import touch_aktiv
 from .vc_widget import VCWidget
@@ -57,6 +57,20 @@ KNOEPFE = (
     ("merken", "Merken"),
     ("abruf", "Abruf"),
 )
+
+#: VCB-52: Erklaerung je Knopf (Tooltip; die Beschriftung kann gekuerzt sein)
+KNOPF_HILFE = {
+    PINSEL: "Pinsel: Zellen in der gewählten Farbe malen",
+    RADIERER: "Radierer: Zellen wieder durchsichtig machen",
+    FUELLEN: "Füllen: zusammenhängende Fläche gleicher Farbe umfärben",
+    "farbe": "Farbe: Pinselfarbe wählen",
+    "aufloesung": "Auflösung: wie viele Rasterzellen ein Malpunkt fasst",
+    "loeschen": "Löschen: ganze Zeichnung weg (zweimal tippen, innerhalb 3 s)",
+    "merken": "Merken: aktuelle Zeichnung als Bild ablegen",
+    "abruf": "Abruf: gemerkte Bilder der Reihe nach abrufen",
+}
+#: Breitester Text, den ein Knopf zeigen kann (fuer die Spaltenzahl)
+_BREITESTE = tuple(t for _k, t in KNOEPFE) + ("Sicher?", "Abruf 9/9")
 
 
 def _state():
@@ -98,6 +112,11 @@ class VCPixelraster(VCWidget):
         self._raster: tuple[int, int, dict] | None = None   # (cols, rows, pos)
         self._zug: str | None = None                # "malen" / "pegel" / Knopf
         self._loeschen_scharf_bis = 0.0
+        # VCB-52: nach Ablauf faellt 'Sicher?' sichtbar auf 'Löschen' zurueck
+        # (vorher blieb die Anzeige stehen, der Tipp darauf loeschte nicht).
+        self._loeschen_timer = QTimer(self)
+        self._loeschen_timer.setSingleShot(True)
+        self._loeschen_timer.timeout.connect(self._loeschen_entschaerfen)
         self._bg_color = QColor("#0d1117")
         self._fg_color = QColor("#e6edf3")
         self.resize(360, 260)
@@ -274,6 +293,7 @@ class VCPixelraster(VCWidget):
     def alles_loeschen(self) -> None:
         self.pixel = {}
         self._loeschen_scharf_bis = 0.0
+        self._loeschen_timer.stop()
         self._ebene_melden()
         self.update()
 
@@ -339,13 +359,21 @@ class VCPixelraster(VCWidget):
     def _pegel_breite(self) -> int:
         return 44 if touch_aktiv() else 26
 
+    def _knopf_schrift(self) -> QFont:
+        f = QFont(self.font())
+        f.setPixelSize(12 if not touch_aktiv() else 14)
+        return f
+
     def knopf_rechtecke(self) -> dict[str, QRect]:
         """Knopfleiste oben; bricht um, wenn die Breite nicht reicht. Jeder
-        Knopf ist im Touch-Modus mindestens 44 × 44 px gross."""
+        Knopf ist im Touch-Modus mindestens 44 × 44 px gross und (VCB-52)
+        moeglichst so breit, dass seine Beschriftung ganz hineinpasst."""
         m = self._rand()
         breite = max(1, self.width() - 2 * m)
         mindest = self._knopf_min()
-        je_reihe = max(1, min(len(KNOEPFE), breite // (mindest + 2)))
+        fm = QFontMetrics(self._knopf_schrift())
+        text_b = max(fm.horizontalAdvance(t) for t in _BREITESTE) + 8
+        je_reihe = max(1, min(len(KNOEPFE), breite // (max(mindest, text_b) + 2)))
         hoehe = mindest
         kw = breite // je_reihe
         out: dict[str, QRect] = {}
@@ -486,10 +514,13 @@ class VCPixelraster(VCWidget):
             self.aufloesung_weiter()
         elif k == "loeschen":
             jetzt = time.monotonic()
-            if jetzt < self._loeschen_scharf_bis:
+            # VCB-52: was angezeigt wird, gilt — 'Sicher?' steht genau so lange,
+            # wie der Zeitgeber laeuft, und nur dann loescht der Tipp.
+            if self.loeschen_scharf():
                 self.alles_loeschen()
             else:
                 self._loeschen_scharf_bis = jetzt + LOESCHEN_SCHARF_S
+                self._loeschen_timer.start(int(LOESCHEN_SCHARF_S * 1000))
                 self.update()
         elif k == "merken":
             self.merken()
@@ -507,7 +538,23 @@ class VCPixelraster(VCWidget):
                 self.set_werkzeug(PINSEL)
 
     def loeschen_scharf(self) -> bool:
-        return time.monotonic() < self._loeschen_scharf_bis
+        """Steht der Knopf auf 'Sicher?'? Massgeblich ist der Zeitgeber, der
+        die Anzeige nach LOESCHEN_SCHARF_S zuruecksetzt (VCB-52)."""
+        return self._loeschen_timer.isActive()
+
+    def _loeschen_entschaerfen(self) -> None:
+        """VCB-52: Ablauf der Scharf-Zeit — Anzeige und Zustand zuruecksetzen."""
+        self._loeschen_scharf_bis = 0.0
+        self.update()
+
+    def event(self, e):
+        # VCB-52: Tooltip je Knopf (volle Erklaerung, auch wenn gekuerzt)
+        if e.type() == QEvent.Type.ToolTip:
+            k = self._knopf_bei(e.pos())
+            if k:
+                QToolTip.showText(e.globalPos(), KNOPF_HILFE.get(k, k), self)
+                return True
+        return super().event(e)
 
     # ── Malen auf den Bildschirm ──────────────────────────────────────────
 
@@ -525,9 +572,9 @@ class VCPixelraster(VCWidget):
         p = QPainter(self)
         try:
             p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-            f = QFont(self.font())
-            f.setPixelSize(12 if not touch_aktiv() else 14)
+            f = self._knopf_schrift()
             p.setFont(f)
+            fm = QFontMetrics(f)
             for k, t in KNOEPFE:
                 q = self.knopf_rechtecke()[k]
                 aktiv = (k == self.werkzeug)
@@ -539,7 +586,11 @@ class VCPixelraster(VCWidget):
                     p.fillRect(q.adjusted(4, 4, -4, -4), self.farbe)
                     continue
                 p.setPen(QColor("#e6edf3"))
-                p.drawText(q, Qt.AlignmentFlag.AlignCenter, self._knopf_text(k, t))
+                # VCB-52: reicht die Breite nicht, hinten mit … kuerzen statt
+                # mittig an beiden Seiten abzuschneiden.
+                text = fm.elidedText(self._knopf_text(k, t),
+                                     Qt.TextElideMode.ElideRight, max(1, q.width() - 4))
+                p.drawText(q, Qt.AlignmentFlag.AlignCenter, text)
             # Raster
             cols, rows, pos = self.raster()
             fl = self.malflaeche()

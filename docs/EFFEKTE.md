@@ -133,7 +133,9 @@ beliebiger Länge statt fixem C1/C2/C3, sichtbar gehaltene **Lücken** im Raster
 und **Live-Steuerung** einzelner Parameter über die virtuelle Konsole / MIDI.
 Die Algorithmen sind: **Plain, Chase, Wipe, Wave, Gradient, Rainbow, Fill,
 Random, Color Fade, Strobe, Schachbrett, Radar, Spirale, Sine Plasma, Windrad,
-Atmen (Puls), Feuer, Regen**.
+Atmen (Puls), Feuer, Regen** (gespeicherte Schlüssel). Der Editor zeigt seit FM-85 deutsche
+Namen: Einfarbig, Wischen, Welle, Farbverlauf, Regenbogen, Füllen, Zufall, Farbüberblendung,
+Plasma (Sinus).
 Vollständige Referenz: **[MATRIX_LIVE.md](MATRIX_LIVE.md)**.
 
 ![Farb-Matrix läuft](tutorial_matrix/gif/farb_matrix.gif)
