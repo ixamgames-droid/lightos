@@ -441,3 +441,99 @@ def test_ebene_ohne_qt_mischt_nur_farbe():
     assert u.d[12] == 10, "Dimmer bleibt"
     e.setzen("x", 0.0, {(1, 1): (1, 1, 1)})
     assert not e.aktiv()
+
+
+# ── Nachtrag: Bindung ueber die Kennung, Matrix-Geraet ──────────────────────
+
+def _gruppe(state, name):
+    from sqlalchemy import select
+    with state._session() as s:
+        return s.execute(select(FixtureGroup).where(FixtureGroup.name == name)).scalars().first()
+
+
+def _umbenennen(state, alt, neu):
+    from sqlalchemy import select
+    with state._session() as s:
+        g = s.execute(select(FixtureGroup).where(FixtureGroup.name == alt)).scalars().first()
+        g.name = neu
+        s.commit()
+
+
+def test_umbenennen_loest_die_bindung_nicht(st):
+    p = _raster("Leiste")
+    _umbenennen(st, "Leiste", "Leiste vorn")
+    p.raster_neu_laden()
+    assert p.raster()[:2] == (4, 2)
+    assert p.gruppe == "Leiste vorn", "Anzeige folgt dem neuen Namen"
+    p.malen(1, 0)
+    assert _werte(_dmx(st), _kopf_adr(1)) == (255, 0, 0)
+
+
+def test_gleichnamig_neu_angelegt_ist_eine_andere_gruppe(st):
+    p = _raster("Leiste")
+    with st._session() as s:
+        s.delete(s.get(FixtureGroup, _gruppe(st, "Leiste").id))
+        s.add(FixtureGroup(name="Leiste", cols=1, rows=1,
+                           positions_json=json.dumps({"0,0": 2})))
+        s.commit()
+    p.raster_neu_laden()
+    assert p.raster() == (0, 0, {})
+    assert not p.malen(0, 0)
+
+
+def test_altes_element_mit_namen_wird_beim_laden_migriert(st):
+    uid = _gruppe(st, "Leiste").uid
+    q = VCPixelraster()
+    q.apply_dict({"type": "VCPixelraster", "caption": "Alt", "gruppe": "Leiste",
+                  "pixel": {"0,0": "#00ff00"}, "pegel": 0.3})
+    assert q.gruppe_uid == uid
+    assert q.pegel == 0.3, "Pegel bleibt nach dem Laden"
+    _umbenennen(st, "Leiste", "Umbenannt")
+    q.raster_neu_laden()
+    assert q.zellen_ziele()["0,0"] == (1, 0)
+    d = json.loads(json.dumps(q.to_dict()))
+    assert (d["gruppe_uid"], d["gruppe"]) == (uid, "Umbenannt")
+    assert "geraet_fid" not in d
+    q.vor_entfernen()
+    q.deleteLater()
+
+
+def test_direkt_an_ein_matrix_geraet_binden(st):
+    p = _raster("")
+    auswahl = dict((d, t) for t, d in p.raster_auswahl(st))
+    assert "f:1" in auswahl, "Leiste mit 4 Koepfen ist ein Matrix-Geraet"
+    assert "f:2" not in auswahl, "einkoepfiger PAR ist keins"
+    p.bindung_setzen("f:1")
+    assert p.geraet_fid == 1 and not p.gruppe
+    cols, rows, _pos = p.raster()
+    assert (cols, rows) == (4, 1)
+    p.malen(2, 0)
+    dmx = _dmx(st)
+    assert _werte(dmx, _kopf_adr(2)) == (255, 0, 0)
+    assert dmx[DIMMER[1] - 1] == 0, "Farbe zieht den Dimmer nicht mit"
+    d = json.loads(json.dumps(p.to_dict()))
+    q = VCPixelraster()
+    q.apply_dict(d)
+    assert q.geraet_fid == 1 and q.raster()[:2] == (4, 1)
+    q.vor_entfernen()
+    q.deleteLater()
+    # Geraet weg -> kein Raster, keine Ausgabe
+    p.binden_geraet(99)
+    assert p.raster() == (0, 0, {}) and not p.malen(0, 0)
+
+
+def test_assistenten_matrix_ueber_ihre_gesamtgruppe(st):
+    with st._session() as s:
+        g = FixtureGroup(name="Wand · Matrix", cols=2, rows=2, folder="Multi-Head",
+                         positions_json=json.dumps({"0,0": "1:0", "1,0": "1:1",
+                                                    "0,1": "1:2", "1,1": "1:3"}))
+        s.add(g)
+        s.commit()
+        uid = g.uid
+    p = _raster("")
+    texte = {d: t for t, d in p.raster_auswahl(st)}
+    assert texte[f"g:{uid}"].startswith("Matrix-Gerät: Wand · Matrix")
+    p.bindung_setzen(f"g:{uid}")
+    assert (p.gruppe, p.gruppe_uid) == ("Wand · Matrix", uid)
+    p.malen(0, 1)
+    assert _werte(_dmx(st), _kopf_adr(2)) == (255, 0, 0)

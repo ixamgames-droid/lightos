@@ -358,3 +358,195 @@ def test_json_info_stummes_geraet_zeitgrenze():
         assert time.monotonic() - t0 < 2.0
     finally:
         s.close()
+
+
+# ── Nachtrag 22.11.: Knoepfe „WLED suchen“ / „Matrix verteilen…“ im Dialog ──
+
+@pytest.fixture
+def dialog(monkeypatch, tmp_path):
+    """Ausgabe-Dialog mit Wegwerf-universes.json; Ausgaben sind Attrappen."""
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from src.ui.widgets import output_config as oc
+    monkeypatch.setattr(oc, "_UNIV_CONFIG_PATH", str(tmp_path / "universes.json"))
+    oc._save_universe_config([
+        {"num": 1, "name": "Main", "output": "Disabled", "patch": ""}])
+    from src.core.app_state import get_state
+    state = get_state()
+    om = state.output_manager
+    for name in ("add_enttec", "add_sacn", "add_artnet", "remove_output"):
+        if hasattr(om, name):
+            monkeypatch.setattr(om, name, lambda *a, **k: None)
+    monkeypatch.setattr(state, "apply_output_config", lambda *a, **k: None)
+    monkeypatch.setattr(oc, "QMessageBox", type("MB", (), {
+        "information": staticmethod(lambda *a, **k: None),
+        "warning": staticmethod(lambda *a, **k: None)}))
+    d = oc.OutputConfigDialog()
+    yield d
+    d.close()
+    d.deleteLater()
+    from _qt_lifecycle import destroy_all_top_level_widgets
+    destroy_all_top_level_widgets(QApplication.instance())
+
+
+def _warten_bis(bedingung, zeit_s=5.0):
+    from PySide6.QtWidgets import QApplication
+    ende = time.monotonic() + zeit_s
+    while time.monotonic() < ende:
+        QApplication.processEvents()
+        if bedingung():
+            return True
+        time.sleep(0.01)
+    return bedingung()
+
+
+def _zeile(d, z):
+    from src.ui.widgets import output_config as oc
+    t = d._univ_table
+    return (oc.ausgabe_typ_wert(t.cellWidget(z, 2)), t.item(z, 3).text(),
+            t.item(z, 4).text())
+
+
+def test_wled_suchen_traegt_gewaehlte_ip_ein(dialog, monkeypatch):
+    """Suche gemockt (kein Netz): zwei Treffer, der zweite wird gewaehlt."""
+    from PySide6.QtWidgets import QDialog
+    from src.ui.widgets import wled_auswahl
+    treffer = [{"ip": "192.0.2.50", "name": "Links", "leds": 400},
+               {"ip": "192.0.2.51", "name": "Rechts", "leds": 800}]
+    halt = threading.Event()
+    gesehen = {}
+
+    def suchen(zeit_s=1.5, manuell=None):
+        gesehen["manuell"] = manuell
+        halt.wait(5)
+        return treffer
+    monkeypatch.setattr(wled, "wled_suchen", suchen)
+    gezeigt = []
+
+    def exec_(self):
+        gezeigt.append([self._liste.item(i).text() for i in range(self._liste.count())])
+        self._liste.setCurrentRow(1)
+        return QDialog.DialogCode.Accepted
+    monkeypatch.setattr(wled_auswahl.WledAuswahlDialog, "exec", exec_)
+    dialog._univ_table.selectRow(0)
+    dialog._btn_wled_suchen.click()
+    # Suche laeuft im Hintergrund: der Dialog ist bedienbar, Knopf gesperrt.
+    assert not dialog._btn_wled_suchen.isEnabled()
+    assert dialog._wled_such_thread.is_alive()
+    halt.set()
+    assert _warten_bis(lambda: dialog._btn_wled_suchen.isEnabled())
+    assert gezeigt and "Rechts — 192.0.2.51 — 800 LEDs" in gezeigt[0]
+    assert _zeile(dialog, 0)[:2] == ("DDP", "192.0.2.51")
+
+
+def test_wled_suche_zeitgrenze(dialog, monkeypatch):
+    halt = threading.Event()
+    monkeypatch.setattr(wled, "wled_suchen",
+                        lambda zeit_s=1.5, manuell=None: halt.wait(5) or [])
+    monkeypatch.setattr(dialog, "WLED_ZEITGRENZE_S", 0.2)
+    dialog._btn_wled_suchen.click()
+    try:
+        assert _warten_bis(lambda: dialog._btn_wled_suchen.isEnabled())
+        assert "Zeitgrenze" in dialog._lbl_wled_status.text()
+        assert _zeile(dialog, 0)[0] == "Disabled"
+    finally:
+        halt.set()
+
+
+def test_wled_suche_ohne_treffer(dialog, monkeypatch):
+    monkeypatch.setattr(wled, "wled_suchen", lambda zeit_s=1.5, manuell=None: [])
+    dialog._btn_wled_suchen.click()
+    assert _warten_bis(lambda: dialog._btn_wled_suchen.isEnabled())
+    assert "Kein WLED" in dialog._lbl_wled_status.text()
+
+
+class _Fx:
+    def __init__(self, fid, label, pid, universe):
+        self.fid, self.label, self.fixture_profile_id = fid, label, pid
+        self.universe = universe
+
+
+class _State:
+    def __init__(self, fxs):
+        self._fxs = fxs
+
+    def get_patched_fixtures(self):
+        return list(self._fxs)
+
+
+def test_matrix_geraete_fasst_teile_zusammen():
+    from src.core import led_matrix
+    from src.ui.widgets import wled_auswahl
+    a = led_matrix.MatrixAngaben(breite_px=20, hoehe_px=20, format="RGB")
+    st = _State([_Fx(1, "Wand T1", 7, 3), _Fx(2, "Wand T2", 7, 4),
+                 _Fx(3, "Wand T3", 7, 5), _Fx(4, "PAR", 9, 1)])
+    g = wled_auswahl.matrix_geraete(st, lambda pid: a if pid == 7 else None)
+    assert [(x["name"], x["start"], x["teile"]) for x in g] == [("Wand", 3, 3)]
+
+
+def test_matrix_verteilen_traegt_offsets_ein(dialog, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+    from src.core import led_matrix
+    from src.ui.widgets import wled_auswahl
+    a = led_matrix.MatrixAngaben(breite_px=20, hoehe_px=20, format="RGB")
+    monkeypatch.setattr(wled_auswahl, "matrix_geraete", lambda state: [
+        {"name": "Wand", "angaben": a, "start": 1, "teile": 3}])
+
+    def exec_(self):
+        assert "Offset 480" in self._vorschau.text()
+        self._ip.setText("192.0.2.60")
+        return QDialog.DialogCode.Accepted
+    monkeypatch.setattr(wled_auswahl.MatrixVerteilenDialog, "exec", exec_)
+    dialog._btn_matrix_verteilen.click()
+    t = dialog._univ_table
+    zeilen = {t.item(z, 0).text(): _zeile(dialog, z) for z in range(t.rowCount())}
+    assert zeilen == {"1": ("DDP", "192.0.2.60", "0"),
+                      "2": ("DDP", "192.0.2.60", "480"),
+                      "3": ("DDP", "192.0.2.60", "960")}
+    # Gespeichert wird wie immer erst mit „Speichern“ — und dann korrekt.
+    from src.ui.widgets import output_config as oc
+    dialog._univ_save()
+    gespeichert = {r["num"]: (r["output"], r["patch"], r.get("out_universe"))
+                   for r in oc._load_universe_config()}
+    assert gespeichert[2] == ("DDP", "192.0.2.60", 480)
+
+
+def test_matrix_verteilen_abbrechen_aendert_nichts(dialog, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+    from src.core import led_matrix
+    from src.ui.widgets import wled_auswahl
+    a = led_matrix.MatrixAngaben(breite_px=20, hoehe_px=20, format="RGB")
+    monkeypatch.setattr(wled_auswahl, "matrix_geraete", lambda state: [
+        {"name": "Wand", "angaben": a, "start": 1, "teile": 3}])
+    monkeypatch.setattr(wled_auswahl.MatrixVerteilenDialog, "exec",
+                        lambda self: QDialog.DialogCode.Rejected)
+    dialog._btn_matrix_verteilen.click()
+    assert dialog._univ_table.rowCount() == 1
+    assert _zeile(dialog, 0) == ("Disabled", "", "")
+
+
+def test_touch_knoepfe_44px(dialog, monkeypatch):
+    from src.ui.widgets import wled_auswahl
+    monkeypatch.setattr(wled_auswahl, "_touch", lambda: True)
+    d = wled_auswahl.WledAuswahlDialog(
+        [{"ip": "192.0.2.50", "name": "X", "leds": 10}])
+    assert all(b.minimumHeight() >= 44 for b in d.findChildren(
+        __import__("PySide6.QtWidgets", fromlist=["QPushButton"]).QPushButton))
+    d.deleteLater()
+
+
+def test_wled_eintragen_setzt_alten_artnet_wert_auf_offset_null(dialog):
+    """Pruef-Fund: Spalte 4 war das Art-Net-Universum (3). Bei DDP ist sie der
+    Byte-Offset — ein stehengebliebenes „3“ verschoebe jedes Pixel."""
+    from PySide6.QtWidgets import QTableWidgetItem
+    t = dialog._univ_table
+    combo = t.cellWidget(0, 2)
+    combo.setCurrentIndex(combo.findData("ArtNet"))
+    t.setItem(0, 4, QTableWidgetItem("3"))
+    t.selectRow(0)
+    dialog._wled_eintragen("192.0.2.50", {"name": "Panel"})
+    assert _zeile(dialog, 0) == ("DDP", "192.0.2.50", "0")
+    # War die Zeile schon DDP (z. B. Teil 2 mit Offset 480), bleibt der Offset.
+    t.setItem(0, 4, QTableWidgetItem("480"))
+    dialog._wled_eintragen("192.0.2.51")
+    assert _zeile(dialog, 0) == ("DDP", "192.0.2.51", "480")

@@ -321,6 +321,20 @@ change at the same time.
 4. Nothing else to set up in WLED: DDP always runs in "Multi RGB" mode on UDP
    port 4048.
 
+**Faster with the buttons below the table:**
+
+- **WLED suchen** (find WLED) asks the network for WLED devices (mDNS) and lists
+  each with name, IP and LED count. The chosen IP goes into the selected row and
+  the output type becomes "DDP (WLED)"; without a selected row a new one is
+  added. The search runs in the background and gives up after 10 seconds at
+  most. If it finds nothing (network without multicast), type the IP into
+  "Patch" — the next search asks that address too.
+- **Matrix verteilen…** (distribute matrix) picks a patched matrix from the LED
+  matrix assistant and a WLED IP and fills in universe, "DDP (WLED)", IP and
+  offset for every part (preview in the window).
+
+Both only change the table — nothing is applied until **Speichern** (save).
+
 Pixel controllers with many universes (Advatek PixLite, ENTTEC Octo, Falcon)
 get their universes via **Art-Net** or **sACN** as usual, one row per universe.
 Which protocols the devices speak, with sources, is in

@@ -1270,6 +1270,31 @@ class OutputConfigDialog(QDialog):
         uf_btns.addWidget(self._btn_dongle_neu)
         uf_btns.addStretch(1)
         uf.addLayout(uf_btns)
+        # OUT-82: WLED im Netz suchen (Hintergrund, Zeitgrenze) und eine
+        # Assistenten-Matrix auf DDP-Offsets verteilen. Beides traegt nur in
+        # die Tabelle ein — gespeichert wird wie immer mit „Speichern“.
+        wled_btns = QHBoxLayout()
+        self._btn_wled_suchen = QPushButton("WLED suchen")
+        self._btn_wled_suchen.setToolTip(
+            "Sucht WLED-Geräte im Netz (mDNS) und fragt Name und LED-Zahl ab. "
+            "Die gewählte IP kommt in die markierte Zeile, Ausgang „DDP (WLED)“. "
+            "Steht in der Zeile schon eine IP, wird sie mitgefragt.")
+        self._btn_wled_suchen.clicked.connect(self._wled_suche_starten)
+        self._btn_matrix_verteilen = QPushButton("Matrix verteilen…")
+        self._btn_matrix_verteilen.setToolTip(
+            "Für eine Matrix aus dem LED-Matrix-Assistenten: je Teil Universum, "
+            "Ausgang „DDP (WLED)“, Ziel-IP und Offset eintragen.")
+        self._btn_matrix_verteilen.clicked.connect(self._matrix_verteilen)
+        self._lbl_wled_status = QLabel("")
+        self._lbl_wled_status.setWordWrap(True)
+        from src.ui.widgets import wled_auswahl
+        wled_auswahl.touch_groesse(self._btn_wled_suchen,
+                                   self._btn_matrix_verteilen)
+        wled_btns.addWidget(self._btn_wled_suchen)
+        wled_btns.addWidget(self._btn_matrix_verteilen)
+        wled_btns.addWidget(self._lbl_wled_status, 1)
+        uf.addLayout(wled_btns)
+        self._wled_such_thread = None
         tabs.addTab(univ_tab, "Universen")
         self._univ_load_table()
 
@@ -2172,6 +2197,193 @@ class OutputConfigDialog(QDialog):
             except (TypeError, ValueError):
                 continue
         return meta.get("sn")
+
+    # ── OUT-82: WLED suchen / Matrix verteilen ───────────────────────────────
+
+    #: Gesamt-Zeitgrenze der Suche (mDNS 1,5 s + je Treffer /json/info 1,5 s).
+    WLED_ZEITGRENZE_S = 10.0
+
+    def _univ_markierte_zeile(self) -> int:
+        zeilen = sorted({i.row() for i in self._univ_table.selectedIndexes()})
+        if zeilen:
+            return zeilen[0]
+        z = self._univ_table.currentRow()
+        return z if z >= 0 else -1
+
+    def _univ_zelle_text(self, zeile: int, spalte: int) -> str:
+        item = self._univ_table.item(zeile, spalte)
+        return item.text().strip() if item is not None else ""
+
+    def _wled_suche_starten(self):
+        """Suche im Hilfs-Thread (wie die uDMX-Suche): der Thread bekommt nur
+        ein Ergebnis-Dict, nie ``self``; ein Timer holt ab. Die Oberflaeche
+        bleibt bedienbar; nach ``WLED_ZEITGRENZE_S`` wird nicht mehr gewartet."""
+        import threading
+        import time
+        from src.core.dmx import wled
+        t = self._wled_such_thread
+        if t is not None and t.is_alive():
+            return
+        manuell = []
+        z = self._univ_markierte_zeile()
+        if z >= 0:
+            ip = self._univ_zelle_text(z, 3)
+            if ip and all(c.isdigit() or c == "." for c in ip):
+                manuell.append(ip)
+        ergebnis: dict = {}
+        self._wled_such_ergebnis = ergebnis
+        self._wled_such_ende = time.monotonic() + self.WLED_ZEITGRENZE_S
+        self._btn_wled_suchen.setEnabled(False)
+        self._lbl_wled_status.setText("Suche WLED-Geräte …")
+
+        def lauf(ziel=ergebnis, manuell=manuell):
+            try:
+                ziel["geraete"] = wled.wled_suchen(manuell=manuell)
+            except Exception as e:          # Netz weg o. ae. — nie den Dialog
+                ziel["fehler"] = str(e)
+                ziel["geraete"] = []
+
+        self._wled_such_thread = threading.Thread(
+            target=lauf, name="WledSuche", daemon=True)
+        self._wled_such_thread.start()
+        timer = getattr(self, "_wled_such_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setInterval(100)
+            timer.timeout.connect(self._wled_suche_abholen)
+            self._wled_such_timer = timer
+        timer.start()
+
+    def _wled_suche_abholen(self):
+        import time
+        t = self._wled_such_thread
+        laeuft = t is not None and t.is_alive()
+        if laeuft and time.monotonic() < getattr(self, "_wled_such_ende", 0):
+            return
+        self._wled_such_timer.stop()
+        self._btn_wled_suchen.setEnabled(True)
+        if laeuft:
+            # Der Thread laeuft als Daemon aus; sein spaetes Ergebnis landet
+            # nur im eigenen Dict und wird nicht mehr gezeigt.
+            self._wled_such_thread = None
+            self._lbl_wled_status.setText(
+                "Zeitgrenze erreicht — kein WLED gemeldet. IP von Hand in "
+                "„Patch“ eintragen.")
+            return
+        self._wled_ergebnis_zeigen(
+            list((getattr(self, "_wled_such_ergebnis", None) or {}).get("geraete") or []))
+
+    def _wled_ergebnis_zeigen(self, geraete: list[dict]):
+        if not geraete:
+            self._lbl_wled_status.setText(
+                "Kein WLED gefunden (Multicast gesperrt?) — IP von Hand in "
+                "„Patch“ eintragen und erneut suchen.")
+            return
+        from src.ui.dialog_hilfe import offen
+        from src.ui.widgets.wled_auswahl import WledAuswahlDialog
+        with offen(WledAuswahlDialog(geraete, self)) as dlg:
+            if not dlg.exec():
+                self._lbl_wled_status.setText(f"{len(geraete)} WLED gefunden.")
+                return
+            g = dlg.gewaehlt()
+        if g:
+            self._wled_eintragen(str(g.get("ip") or ""), g)
+
+    def _wled_eintragen(self, ip: str, geraet: dict | None = None):
+        """IP in die markierte Zeile (ohne Markierung: neue Zeile), Ausgang DDP."""
+        if not ip:
+            return
+        z = self._univ_markierte_zeile()
+        if z < 0:
+            vorher = self._univ_table.rowCount()
+            self._univ_add()
+            if self._univ_table.rowCount() == vorher:
+                return
+            z = vorher
+            if geraet and geraet.get("name"):
+                self._univ_table.item(z, 1).setText(str(geraet["name"]))
+        war_ddp = self._univ_typ(z) == "DDP"
+        combo = self._univ_table.cellWidget(z, 2)
+        if combo is not None:
+            i = combo.findData("DDP")
+            if i >= 0:
+                combo.setCurrentIndex(i)
+        self._univ_table.setItem(z, 3, QTableWidgetItem(ip))
+        if not war_ddp:
+            # Pruef-Fund: die Spalte hiess vorher z. B. Art-Net-Universum 3 —
+            # bei DDP ist sie der BYTE-Offset; ein stehengebliebenes „3“
+            # verschoebe jedes Pixel um eine Farbe. Ein einzelnes WLED
+            # beginnt bei 0 (mehrere Teile: „Matrix verteilen…“).
+            ext = QTableWidgetItem("0")
+            ext.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._univ_table.setItem(z, 4, ext)
+        self._lbl_wled_status.setText(
+            f"{ip} in Zeile {z + 1} eingetragen — „Speichern“ übernimmt.")
+
+    def _univ_zeile_fuer(self, num: int) -> int:
+        for z in range(self._univ_table.rowCount()):
+            try:
+                if int(self._univ_zelle_text(z, 0)) == int(num):
+                    return z
+            except ValueError:
+                continue
+        vorher = self._univ_table.rowCount()
+        self._univ_add()
+        if self._univ_table.rowCount() == vorher:
+            return -1
+        self._univ_table.item(vorher, 0).setText(str(num))
+        self._univ_table.item(vorher, 1).setText(f"Universe {num}")
+        return vorher
+
+    def _matrix_verteilen(self):
+        from src.ui.dialog_hilfe import offen
+        from src.ui.widgets import wled_auswahl
+        try:
+            geraete = wled_auswahl.matrix_geraete(get_state())
+        except Exception as e:
+            print(f"[output_config] Matrix-Geraete nicht lesbar: {e}")
+            geraete = []
+        if not geraete:
+            self._lbl_wled_status.setText(
+                "Keine Matrix aus dem LED-Matrix-Assistenten gepatcht.")
+            return
+        z = self._univ_markierte_zeile()
+        ip = self._univ_zelle_text(z, 3) if z >= 0 else ""
+        if not ip:
+            ip = next((self._univ_zelle_text(r, 3)
+                       for r in range(self._univ_table.rowCount())
+                       if self._univ_typ(r) == "DDP"
+                       and self._univ_zelle_text(r, 3)), "")
+        with offen(wled_auswahl.MatrixVerteilenDialog(geraete, ip, self)) as dlg:
+            if not dlg.exec():
+                return
+            g, ip = dlg.gewaehlt(), dlg.ip()
+        if g and ip:
+            self._matrix_eintragen(g, ip)
+
+    def _univ_typ(self, zeile: int) -> str:
+        combo = self._univ_table.cellWidget(zeile, 2)
+        return ausgabe_typ_wert(combo) if combo is not None else ""
+
+    def _matrix_eintragen(self, geraet: dict, ip: str):
+        from src.core.dmx import wled
+        verteilung = wled.ddp_verteilung(geraet["angaben"], int(geraet["start"]))
+        fertig = 0
+        for v in verteilung:
+            z = self._univ_zeile_fuer(int(v["universum"]))
+            if z < 0:
+                break
+            combo = self._univ_table.cellWidget(z, 2)
+            if combo is not None:
+                combo.setCurrentIndex(max(0, combo.findData("DDP")))
+            self._univ_table.setItem(z, 3, QTableWidgetItem(ip))
+            ext = QTableWidgetItem(str(int(v["offset"])))
+            ext.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self._univ_table.setItem(z, 4, ext)
+            fertig += 1
+        self._lbl_wled_status.setText(
+            f"{fertig} von {len(verteilung)} Teil(en) von „{geraet['name']}“ "
+            f"auf {ip} eingetragen — „Speichern“ übernimmt.")
 
     def _univ_add(self):
         row = self._univ_table.rowCount()

@@ -22,7 +22,8 @@ nach den Modify-Effekten und vor Mastern/Blackout. Sie schreibt nur
 
 Bedienen nur im Run-Modus und nicht bei Touch-Sperre; im Bearbeiten-Modus
 verschiebt/skaliert die Maus das Element wie jedes andere. Die Bindung an eine
-Gruppe kommt ueber Eigenschaften (nicht im Kiosk).
+Gruppe (ueber ihre Kennung, Umbenennen loest sie nicht) oder direkt an ein
+Matrix-Geraet kommt ueber Eigenschaften (nicht im Kiosk).
 """
 from __future__ import annotations
 
@@ -84,7 +85,9 @@ class VCPixelraster(VCWidget):
 
     def __init__(self, caption: str = "Pixelraster", parent=None):
         super().__init__(caption, parent)
-        self.gruppe: str = ""                       # Name der Fixture-Gruppe
+        self.gruppe: str = ""                       # Name der Gruppe (Anzeige/Altbestand)
+        self.gruppe_uid: str = ""                   # Kennung der Gruppe (FM-20/VCB-42)
+        self.geraet_fid: int | None = None          # Matrix-Geraet statt Gruppe
         self.pixel: dict[str, str] = {}             # "c,r" -> "#rrggbb"
         self.bilder: list[dict[str, str]] = []      # gemerkte Zeichnungen
         self.abruf_index: int = -1
@@ -101,22 +104,73 @@ class VCPixelraster(VCWidget):
 
     # ── Bindung / Raster ──────────────────────────────────────────────────
 
+    def gebunden(self) -> bool:
+        return bool(self.gruppe or self.gruppe_uid or self.geraet_fid is not None)
+
+    def _gruppe_ref(self, state):
+        """``(gid, name)`` der gebundenen Gruppe oder ``None``.
+
+        Kennung zuerst: sie bleibt beim Umbenennen (VCB-42), und eine
+        geloeschte und gleichnamig neu angelegte Gruppe ist NICHT mehr die
+        gemeinte (VCB-44) — dann gibt es kein Raster statt eines fremden.
+        Ohne Kennung (Element aus der Zeit davor) per Name; die Kennung wird
+        dabei nachgetragen (Migration beim Laden)."""
+        steck = state.gruppen_steckbriefe()
+        if steck is None:
+            return None
+        if self.gruppe_uid:
+            for gid, (name, _ordner, uid) in sorted(steck.items()):
+                if uid and uid == self.gruppe_uid:
+                    self.gruppe = name
+                    return gid, name
+            return None
+        for gid, (name, _ordner, uid) in sorted(steck.items()):
+            if self.gruppe and name == self.gruppe:
+                self.gruppe_uid = uid or ""
+                return gid, name
+        return None
+
+    def _geraet_raster(self, state):
+        """Raster eines einzelnen Matrix-Geraets: seine Kopf-Matrix (FM-21:
+        ``grid_rows x grid_cols`` bzw. 1xN) — dieselbe Rechnung wie seine
+        Auto-Kopf-Gruppe, aber ohne dass es die Gruppe geben muss."""
+        from src.core.app_state import color_head_count, head_matrix_layout
+        fx = next((f for f in state.get_patched_fixtures()
+                   if int(f.fid) == int(self.geraet_fid)), None)
+        if fx is None:
+            return None
+        n = int(color_head_count(fx) or 0)
+        if n <= 1:
+            return 1, 1, {"0,0": int(fx.fid)}
+        cols, rows, plaetze, _ring = head_matrix_layout(fx, n)
+        return int(cols), int(rows), {f"{c},{r}": f"{fx.fid}:{h}"
+                                      for h, (c, r) in plaetze.items()}
+
+    def _raster_lesen(self, state):
+        if self.geraet_fid is not None:
+            return self._geraet_raster(state)
+        if not (self.gruppe or self.gruppe_uid):
+            return None
+        ref = self._gruppe_ref(state)
+        return state.gruppen_raster(ref) if ref is not None else None
+
     def raster_neu_laden(self, state=None) -> None:
-        """Raster der Gruppe (aufgeloest, FM-20) neu lesen und die Ebene neu
-        melden — nach Bindung, Laden oder Aenderung der Gruppe."""
+        """Raster der Bindung (Gruppe aufgeloest, FM-20, oder Matrix-Geraet)
+        neu lesen und die Ebene neu melden — nach Bindung, Laden oder
+        Aenderung der Gruppe."""
         self._raster = None
-        if self.gruppe:
+        if self.gebunden():
             try:
-                self._raster = (state or _state()).gruppen_raster(self.gruppe)
+                self._raster = self._raster_lesen(state or _state())
             except Exception:
                 self._raster = None
         self._ebene_melden()
         self.update()
 
     def raster(self) -> tuple[int, int, dict]:
-        if self._raster is None and self.gruppe:
+        if self._raster is None and self.gebunden():
             try:
-                self._raster = _state().gruppen_raster(self.gruppe)
+                self._raster = self._raster_lesen(_state())
             except Exception:
                 self._raster = None
         return self._raster or (0, 0, {})
@@ -491,8 +545,12 @@ class VCPixelraster(VCWidget):
             fl = self.malflaeche()
             if cols <= 0 or rows <= 0:
                 p.setPen(self._fg_color)
-                text = ("Keine Gruppe zugeordnet –\nBearbeiten → Eigenschaften"
-                        if not self.gruppe else f"Gruppe „{self.gruppe}“ fehlt")
+                if not self.gebunden():
+                    text = "Kein Raster zugeordnet –\nBearbeiten → Eigenschaften"
+                elif self.geraet_fid is not None:
+                    text = f"Gerät {self.geraet_fid} fehlt"
+                else:
+                    text = f"Gruppe „{self.gruppe}“ fehlt"
                 p.drawText(fl, Qt.AlignmentFlag.AlignCenter, text)
             else:
                 s = fl.width() / cols
@@ -541,19 +599,14 @@ class VCPixelraster(VCWidget):
         form.addRow("Beschriftung:", cap)
         gruppe_cb = QComboBox()
         gruppe_cb.setObjectName("pixelraster_gruppe")
-        try:
-            namen = [g.get("name") for g in state.list_fixture_groups() if g.get("name")]
-        except Exception:
-            namen = []
-        gruppe_cb.addItem("— keine —", "")
-        for name in sorted(set(namen) | ({self.gruppe} if self.gruppe else set())):
-            gruppe_cb.addItem(name, name)
-        i = gruppe_cb.findData(self.gruppe)
+        for text, daten in self.raster_auswahl(state):
+            gruppe_cb.addItem(text, daten)
+        i = gruppe_cb.findData(self._bindung_daten())
         gruppe_cb.setCurrentIndex(max(0, i))
-        form.addRow("Gruppe (Raster):", gruppe_cb)
+        form.addRow("Raster aus:", gruppe_cb)
         lay.addLayout(form)
-        lay.addWidget(QLabel("Das Raster kommt aus der Gruppe (Köpfe einzeln, "
-                             "Untergruppen-Blöcke aufgelöst)."))
+        lay.addWidget(QLabel("Gruppe (Köpfe einzeln, Untergruppen-Blöcke "
+                             "aufgelöst) oder ein Matrix-Gerät."))
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok
                                 | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -562,19 +615,95 @@ class VCPixelraster(VCWidget):
         with offen(dlg):
             if dlg.exec() == QDialog.DialogCode.Accepted:
                 self.caption = cap.text() or self.caption
-                self.binden(gruppe_cb.currentData() or "")
+                self.bindung_setzen(gruppe_cb.currentData())
+
+    def _bindung_daten(self):
+        if self.geraet_fid is not None:
+            return f"f:{self.geraet_fid}"
+        if self.gruppe_uid:
+            return f"g:{self.gruppe_uid}"
+        return f"n:{self.gruppe}" if self.gruppe else ""
+
+    def raster_auswahl(self, state) -> list[tuple[str, str]]:
+        """Eintraege fuer „Raster aus“: ``(Text, Daten)`` mit Daten
+        ``"g:<uid>"`` (Gruppe), ``"f:<fid>"`` (Matrix-Geraet) oder ``""``.
+
+        Ein Matrix-Geraet ist jedes Geraet mit mehreren Farbkoepfen (Panel
+        mit Rasterform, Leiste). Eine Assistenten-Matrix ueber mehrere
+        Universen besteht aus mehreren Geraeten (Teilen); als GANZES steht sie
+        ueber ihre Gesamtgruppe „… · Matrix“ in der Liste — sie traegt das
+        fertige Gesamtraster, eine zweite Rechnung dafuer braucht es nicht."""
+        from src.core.app_state import color_head_count
+        out: list[tuple[str, str]] = [("— keine —", "")]
+        try:
+            steck = state.gruppen_steckbriefe() or {}
+        except Exception:
+            steck = {}
+        gruppen = sorted(((n, u) for n, _o, u in steck.values() if n and u),
+                         key=lambda t: t[0].lower())
+        for name, uid in gruppen:
+            if name.endswith(" · Matrix"):
+                out.append((f"Matrix-Gerät: {name} (ganze Matrix)", f"g:{uid}"))
+        try:
+            fixtures = sorted(state.get_patched_fixtures(), key=lambda f: int(f.fid))
+        except Exception:
+            fixtures = []
+        for fx in fixtures:
+            try:
+                n = int(color_head_count(fx) or 0)
+            except Exception:
+                n = 0
+            if n > 1:
+                label = getattr(fx, "label", "") or f"Gerät {fx.fid}"
+                out.append((f"Matrix-Gerät: {label} (#{fx.fid}, {n} Köpfe)",
+                            f"f:{fx.fid}"))
+        for name, uid in gruppen:
+            if not name.endswith(" · Matrix"):
+                out.append((f"Gruppe: {name}", f"g:{uid}"))
+        if self._bindung_daten() and not any(d == self._bindung_daten() for _t, d in out):
+            out.append((f"(fehlt) {self.gruppe or self.geraet_fid}", self._bindung_daten()))
+        return out
+
+    def bindung_setzen(self, daten) -> None:
+        """Bindung aus einem ``raster_auswahl``-Eintrag uebernehmen."""
+        d = str(daten or "")
+        if d.startswith("f:"):
+            try:
+                self.binden_geraet(int(d[2:]))
+                return
+            except ValueError:
+                pass
+        if d.startswith("g:"):
+            self.gruppe, self.gruppe_uid, self.geraet_fid = "", d[2:], None
+            self.raster_neu_laden()
+            return
+        if d.startswith("n:"):
+            d = d[2:]
+        elif d.startswith("f:"):
+            d = ""
+        self.binden(d)
 
     def binden(self, gruppe: str) -> None:
-        """An eine Gruppe binden. Eine andere Gruppe verwirft die Zeichnung
-        nicht — Zellen ausserhalb des neuen Rasters geben nur nichts aus."""
+        """An eine Gruppe (Name) binden; die Kennung wird dabei gemerkt, damit
+        Umbenennen die Bindung nicht loest. Eine andere Gruppe verwirft die
+        Zeichnung nicht — Zellen ausserhalb des neuen Rasters geben nur
+        nichts aus."""
         self.gruppe = str(gruppe or "")
+        self.gruppe_uid = ""
+        self.geraet_fid = None
+        self.raster_neu_laden()
+
+    def binden_geraet(self, fid) -> None:
+        """Direkt an ein Matrix-Geraet binden (Raster = seine Kopf-Matrix)."""
+        self.gruppe, self.gruppe_uid = "", ""
+        self.geraet_fid = int(fid) if fid is not None else None
         self.raster_neu_laden()
 
     def build_inspector_body(self, host=None):
         body = QWidget()
         v = QVBoxLayout(body)
         v.setContentsMargins(0, 6, 0, 0)
-        knopf = QPushButton("Gruppe zuordnen…")
+        knopf = QPushButton("Raster zuordnen…")
         knopf.setObjectName("pixelraster_zuordnen")
         knopf.clicked.connect(self._open_properties)
         v.addWidget(knopf)
@@ -591,6 +720,9 @@ class VCPixelraster(VCWidget):
     def to_dict(self) -> dict:
         d = super().to_dict()
         d["gruppe"] = self.gruppe
+        d["gruppe_uid"] = self.gruppe_uid
+        if self.geraet_fid is not None:
+            d["geraet_fid"] = int(self.geraet_fid)
         d["pixel"] = dict(sorted(self.pixel.items()))
         d["bilder"] = [dict(sorted(b.items())) for b in self.bilder]
         d["abruf_index"] = int(self.abruf_index)
@@ -625,6 +757,15 @@ class VCPixelraster(VCWidget):
             pass
         super().apply_dict(d)
         self.gruppe = str(d.get("gruppe") or "")
+        # Alte Elemente kennen nur den Namen: die Kennung zieht raster_neu_laden
+        # beim ersten Aufloesen nach (Migration beim Laden).
+        from src.core.group_ref import uid_lesbar
+        self.gruppe_uid = uid_lesbar(d.get("gruppe_uid"))
+        try:
+            fid = d.get("geraet_fid")
+            self.geraet_fid = int(fid) if fid is not None and not isinstance(fid, bool) else None
+        except (TypeError, ValueError):
+            self.geraet_fid = None
         self.pixel = self._pixel_sauber(d.get("pixel"))
         roh = d.get("bilder")
         self.bilder = [self._pixel_sauber(b) for b in roh[-MAX_BILDER:]] \

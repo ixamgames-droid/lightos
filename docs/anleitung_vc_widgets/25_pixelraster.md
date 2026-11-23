@@ -33,10 +33,12 @@ Mit **Touch-Lock** ist das Element gesperrt. Im **Bearbeiten-Modus** verschiebt 
 
 ## Einstellungen
 
-Doppelklick im Bearbeiten-Modus öffnet „Pixelraster Einstellungen“ (nicht im Kiosk): **Beschriftung** und **Gruppe (Raster)**. Im **Inspector** öffnet „Gruppe zuordnen…“ denselben Dialog, „Raster neu lesen“ übernimmt spätere Änderungen an der Gruppe. Ein Wechsel der Gruppe verwirft die Zeichnung nicht; Zellen außerhalb des neuen Rasters geben nur nichts aus.
+Doppelklick im Bearbeiten-Modus öffnet „Pixelraster Einstellungen“ (nicht im Kiosk): **Beschriftung** und **Raster aus** — entweder eine **Gruppe** oder ein **Matrix-Gerät**. Als Matrix-Gerät steht jedes Gerät mit mehreren Farbköpfen in der Liste (Panel mit Rasterform, LED-Leiste); sein Raster ist seine Kopf-Matrix, eine Gruppe braucht es dafür nicht. Eine Matrix aus dem Matrix-Assistenten, die über mehrere Universen läuft, steht als Ganzes über ihre Gesamtgruppe („… · Matrix (ganze Matrix)“); ihre Teile einzeln ebenfalls. Im **Inspector** öffnet „Raster zuordnen…“ denselben Dialog, „Raster neu lesen“ übernimmt spätere Änderungen an der Gruppe. Ein Wechsel der Bindung verwirft die Zeichnung nicht; Zellen außerhalb des neuen Rasters geben nur nichts aus.
+
+Die Gruppe wird über ihre feste Kennung gemerkt: **Umbenennen löst die Bindung nicht**, das Element zeigt danach den neuen Namen. Eine gelöschte und unter demselben Namen neu angelegte Gruppe ist eine andere Gruppe — das Element meldet dann „Gruppe … fehlt“. Ältere Shows, deren Pixelraster nur den Gruppennamen kennen, laden weiter; die Kennung wird beim Laden nachgetragen.
 
 ## Speichern
 
-Gespeichert werden beim Element: Gruppe, Zeichnung, gemerkte Bilder, Pegel, Farbe, Werkzeug und Auflösung. Malen gilt als Änderung an der Show (Rückfrage beim Schließen); Werkzeug, Farbe, Auflösung, Pegel und Abruf sind Bedienung. **Achtung:** Eine Show mit Zeichnung und Pegel über 0 gibt die Zeichnung nach dem Laden sofort aus, wie ein Fader seinen gespeicherten Wert. Shows ohne Pixelraster laden unverändert.
+Gespeichert werden beim Element: Gruppe (Name und Kennung) bzw. Matrix-Gerät, Zeichnung, gemerkte Bilder, Pegel, Farbe, Werkzeug und Auflösung. Malen gilt als Änderung an der Show (Rückfrage beim Schließen); Werkzeug, Farbe, Auflösung, Pegel und Abruf sind Bedienung. **Achtung:** Eine Show mit Zeichnung und Pegel über 0 gibt die Zeichnung nach dem Laden sofort aus, wie ein Fader seinen gespeicherten Wert. Shows ohne Pixelraster laden unverändert.
 
-Noch nicht: direkte Bindung an ein einzelnes Matrix-Gerät ohne Gruppe (bis dahin eine Kopf-Gruppe anlegen, z. B. per „Köpfe einzeln → Raster“), Mischart neben „Überblenden“.
+Noch nicht: Bedienung in der Handy-Konsole, Mischart neben „Überblenden“.
