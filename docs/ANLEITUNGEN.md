@@ -30,7 +30,8 @@ Die neuen Anleitungen (Erste Schritte, Ausgabe, Programmer-Grundlagen, Szenen & 
 Geräte-Bibliothek, 3D-Bühne, Große Bühnen-Show, Virtual Console, Gruppen und Matrizen,
 Musik-Sync) zeigen
 die aktuelle Oberfläche; ihre Bilder entstehen aus dem Code ([so geht das](ANLEITUNGSBILDER.md)).
-Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
+Die [Schritt-für-Schritt-Reihe mit GIF](#schritt-für-schritt-mit-gif) zeigt ebenfalls die
+Oberfläche vom November 2026. Ältere Anleitungen zeigen teils eine frühere Oberfläche — etwa „Live View“ statt **Bühne** in
 der Sektionsleiste. Die Abläufe gelten weiter.
 
 **Am Touchscreen oder vom Handy?** Die Bedienung am Finger (Start mit `--touch`, Gesten unter
@@ -52,6 +53,26 @@ Issue stellen ([README → Datenschutz](../README.md#datenschutz-was-privat-blei
 | [Szenen, Snaps & Cue-Listen](anleitung_szenen_cues/ANLEITUNG.md) · [English](anleitung_szenen_cues/ANLEITUNG.en.md) | Programmer-Stand als Snap, Snapshot oder Szene speichern und abrufen, Preset-Browser, Cue-Liste aufnehmen, auf einen Executor legen, mit GO abfahren und aus der Virtual Console auslösen. | Eigene Show mit Geräten und Gruppen; die Bilder zeigen das Übungs-Rig der Programmer-Grundlagen |
 | [Komplettshow von Grund auf](anleitung_komplettshow_2026/ANLEITUNGEN.md) | Acht Kapitel von der neuen Show über Geräte, 3D-Positionen, Gruppen, Farbe, Matrix, Bewegung bis zur Virtual Console. | Die Anleitung baut die Show selbst auf; die fertige Show liegt nicht im Repo |
 | [Lichtshow-Tutorial: Matrix, Chase, Moving-Head-EFX, VC](tutorial_matrix/TUTORIAL_LICHTSHOW.md) | Ein kompletter Durchlauf mit vielen Bildern und GIFs. | Generator `build_tutorial_matrix_show.py` → `Tutorial_Matrix.lshow` |
+
+## Schritt für Schritt mit GIF
+
+Kurze Anleitungen aus einem Klicktest in der echten App (Stand November 2026): je Ablauf ein GIF
+für den Überblick und ein Bild je Schritt mit roter Markierung. Sie eignen sich auch als
+Drehbuch für eigene Erklärvideos. Die Bilder sind im Probelauf entstanden (es geht kein DMX
+hinaus); vertiefende Anleitungen zum selben Thema sind in jeder Anleitung verlinkt.
+
+| Anleitung | Worum geht's | Show |
+|---|---|---|
+| [Patch und Gerätebibliothek](anleitung_patch_bibliothek_schritte/ANLEITUNG.md) | Gerät suchen und patchen, Adresskonflikte finden und lösen, LED-Matrix mit dem Assistenten anlegen und nachträglich ändern (3 Anleitungen). | Keine Show nötig |
+| [Gruppen](anleitung_gruppen_schritte/ANLEITUNG.md) | Gruppe aus der Auswahl auf der Bühne, Mehrkopf-Gerät als Block aufteilen, Gruppe in Gruppe (einsetzen, drehen, aufteilen), Auto-Kopf-Gruppe nach Montage-Drehung (4 Anleitungen). | Eigene Show mit Geräten |
+| [Matrix-Effekte](anleitung_matrix_effekte_schritte/ANLEITUNG.md) | Matrix-Effekt für eine Gruppe anlegen, Bild oder GIF auf die Matrix legen, Meldungen unter „Medium“ verstehen (3 Anleitungen). | Generator `build_hochzeit_komplett.py` → `Hochzeit_Komplett_2026.lshow` |
+| [2D-Bühne und LED-Matrizen](anleitung_buehne_2d_schritte/ANLEITUNG.md) | 2D-Bühne bedienen (Zoom, Auswahl, Verschieben, Einpassen), LED-Matrix als Vorhang oder Ring, Ansicht anpassen (3 Anleitungen). | Eigene Show mit Geräten |
+| [Show-Dateien, Auto-Save, Rückgängig](anleitung_show_dateien_schritte/ANLEITUNG.md) | Speichern unter, Auto-Save und Wiederherstellen, Rückgängig über mehrere Bereiche, fehlende oder kaputte Datei (4 Anleitungen). | Generator `build_hochzeit_komplett.py` |
+| [Programmer, Paletten, Befehlszeile](anleitung_programmer_schritte/ANLEITUNG.md) | Farbe und Helligkeit setzen, Farbpalette aufzeichnen und abrufen, Befehlszeile und Clear-Menü (3 Anleitungen). | Eigene Show mit Geräten |
+| [Virtual Console: Pixelraster, Bank lösen, Pop-up](anleitung_vc_schritte/ANLEITUNG.md) | Pixelraster anlegen und an Lampen binden, darauf malen, Bank als eigenes Fenster, Pop-up-Feld mit eigener Taste (3 Anleitungen). | Generator `build_hochzeit_komplett.py` |
+| [Cuelisten, Playback, Executoren](anleitung_playback_schritte/ANLEITUNG.md) | Cueliste anlegen und Cues aufnehmen, Fade-Zeiten, GO/BACK/STOP, Executor-Leiste, Seiten und Cueliste in der VC (3 Anleitungen). | Generator `build_hochzeit_komplett.py` |
+| [Universen, WLED und Matrix verteilen](anleitung_ausgabe_schritte/ANLEITUNG.md) | Universum für ein WLED-Gerät (DDP), LED-Matrix auf ein WLED verteilen, WLED suchen (3 Anleitungen). | Keine Show nötig |
+| [Web-Fernbedienung und Handy-Konsole](anleitung_web_handy_schritte/ANLEITUNG.md) | Web-Fernbedienung einschalten, Handy-Konsole aus Seiten und Kacheln bauen, Handy-Gruppe anlegen und am Handy bedienen (3 Anleitungen). | Generator `build_hochzeit_komplett.py` |
 
 ## Geräte & Patch
 

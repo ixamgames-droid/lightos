@@ -81,7 +81,7 @@ Vorschau der Bahn. Ein **neuer EFX nimmt die Programmer-Auswahl** (ein
 gespeicherter nur über **Auswahl übernehmen**) — erst die Gruppe
 (z. B. Moving Heads) wählen, dann den EFX.
 
-![EFX-Editor (Algorithmus Circle, Pan/Tilt-Hub)](anleitung_efx/img/01_efx_editor.png)
+![EFX-Editor im Programmer, Reiter EFX: Name, Algorithmus, Breite/Höhe (Pan-/Tilt-Hub), Zentrum](anleitung_buehnen_show/img_effekte/06_efx_form.png)
 
 1. **+ Neu** → EFX anlegen, **Name** vergeben.
 2. **Algorithmus** wählen (Dropdown).

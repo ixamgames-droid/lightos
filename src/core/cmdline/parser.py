@@ -578,6 +578,13 @@ class RecordCueCommand(Command):
             # UI-62: gewaehlte Cueliste des Playbacks (Rueckfall: erste).
             wahl = getattr(state, "aufnahme_cueliste", None)
             stack = (wahl() if callable(wahl) else None) or stacks[0]
+            if any(abs(c.number - float(self.number)) < 0.001
+                   for c in getattr(stack, "cues", ())):
+                # UI-147 (3): keine zweite Cue mit derselben Nummer.
+                return CommandResult(
+                    False, f"Cue {self.number:g} gibt es in „{stack.name}“ "
+                    f"schon — andere Nummer, z. B. 'record cue "
+                    f"{float(self.number) + 0.1:g}'")
             cue = state.record_cue(stack, float(self.number),
                                    f"Cue {self.number}")
             return CommandResult(
@@ -956,7 +963,10 @@ def parse(text: str) -> Command:
 
     # ── Wert-Teil ───────────────────────────────────────────────────────────
     tt = peek()
-    if tt.type == TokenType.OPERATOR and tt.value == "@":
+    # UI-147 (4): 'at' (steht in lexer.KEYWORDS) gilt wie '@' — frueher wurde
+    # '1 thru 5 at 80' still zur reinen Auswahl, der Wert ging verloren.
+    if (tt.type == TokenType.OPERATOR and tt.value == "@") or (
+            tt.type == TokenType.KEYWORD and tt.value == "at"):
         advance()
         nt = peek()
         if nt.type == TokenType.KEYWORD and nt.value in ("full", "ff"):

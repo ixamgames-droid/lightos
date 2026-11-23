@@ -558,3 +558,119 @@ def gesamt_gruppe_anlegen(state, a: MatrixAngaben, fids: list[int],
             return int(g.id)
     except Exception:
         return None
+
+
+# ── Profil aktualisiert: gepatchte Teile nachziehen (FM-82) ─────────────────
+
+def _teile_im_patch(state, profil_id: int, a: MatrixAngaben) -> list[tuple]:
+    """``[(teil, fixture)]`` der gepatchten Geraete dieses Profils, deren
+    Modus ein Teil der Angaben ``a`` ist (Zuordnung ueber den Modusnamen,
+    wie beim Patchen). Geraete mit unbekanntem Modus bleiben aussen vor —
+    die meldet schon ``profil_patch_folgen``."""
+    nach_name = {t.name: t for t in teile(a)}
+    out = []
+    for fx in state.get_patched_fixtures():
+        if getattr(fx, "fixture_profile_id", None) != int(profil_id):
+            continue
+        t = nach_name.get(getattr(fx, "mode_name", "") or "")
+        if t is not None:
+            out.append((t, fx))
+    return out
+
+
+def teile_nachziehen_folgen(state, profil_id: int, a: MatrixAngaben) -> list[str]:
+    """FM-82, rein lesend: Zeilen fuer die Rueckfrage, wenn das Aktualisieren
+    Pixel-Reihenfolge/Montage gepatchter Teile aendert. Leer = nichts."""
+    if state is None:
+        return []
+    try:
+        paare = _teile_im_patch(state, profil_id, a)
+    except Exception:
+        return []
+    anders = [fx for t, fx in paare
+              if teil_lage(a, t) != (fx.pixel_order, int(fx.element_rotation or 0),
+                                     bool(fx.element_flip))]
+    if not anders:
+        return []
+    return [f"{len(anders)} gepatchte(r) Teil(e) übernehmen die neue "
+            "Verdrahtung/Startecke (Pixel-Reihenfolge, Montage); ihre "
+            "Kopf-Gruppen und die Gruppe „… · Matrix“ werden neu aufgebaut — "
+            "eigene Änderungen an diesen Gruppen gehen dabei verloren. "
+            "Im Patch mit Rückgängig als ein Schritt zurücknehmbar."]
+
+
+def _gesamt_gruppe_finden(state, fids: set[int]) -> int | None:
+    """Die Gruppe „… · Matrix“ ueber genau diese Teile: Ordner Multi-Head,
+    Name endet auf „ · Matrix“, jede Zelle nennt eines dieser Geraete."""
+    from sqlalchemy import select
+    from src.core.database.models import FixtureGroup
+    from src.core.group_cells import parse_zelle
+    with state._session() as s:
+        for g in s.execute(select(FixtureGroup)).scalars():
+            if not (g.name or "").endswith(" · Matrix"):
+                continue
+            try:
+                pos = json.loads(g.positions_json or "{}")
+            except Exception:
+                continue
+            if not isinstance(pos, dict) or not pos:
+                continue
+            genannt = {parse_zelle(w)[0] for w in pos.values()}
+            if genannt and genannt <= fids:
+                return int(g.id)
+    return None
+
+
+def teile_nachziehen(state, profil_id: int, a: MatrixAngaben) -> int:
+    """FM-82: nach „Profil aktualisieren“ die gepatchten Teile dieses Profils
+    auf :func:`teil_lage` der neuen Angaben setzen, ihre Auto-Kopf-Gruppen
+    neu aufbauen (FM-21-Weg) und die Gesamt-Gruppe „… · Matrix“ neu rastern.
+    Alles als EIN Rueckgaengig-Schritt. Rueckgabe: Zahl geaenderter Teile."""
+    from contextlib import nullcontext
+    paare = _teile_im_patch(state, profil_id, a)
+    # Nur wenn sich die Lage wirklich aendert (genau das nennt die Rueckfrage
+    # aus teile_nachziehen_folgen): sonst blieben eigene Gruppen-Aenderungen
+    # beim blossen Umbenennen ohne Hinweis auf der Strecke.
+    anders = [(t, fx) for t, fx in paare
+              if teil_lage(a, t) != (fx.pixel_order, int(fx.element_rotation or 0),
+                                     bool(fx.element_flip))]
+    if not anders:
+        return 0
+    sammeln = getattr(state, "patch_sammeln", None) or nullcontext
+    try:
+        from src.core.undo import get_undo_stack
+        schritt = get_undo_stack().gruppe("LED-Matrix: Teile nachgezogen",
+                                          rahmen=sammeln)
+    except Exception:
+        schritt = nullcontext()
+    geaendert = 0
+    with schritt:
+        with sammeln():
+            for t, fx in anders:
+                order, drehung, flip = teil_lage(a, t)
+                if state.update_fixture(fx.fid, pixel_order=order,
+                                        element_rotation=drehung,
+                                        element_flip=flip):
+                    geaendert += 1
+        for _t, fx in anders:
+            try:
+                state.auto_kopfgruppe_neu_aufbauen(fx.fid)
+            except Exception:
+                pass
+        fids = [fx.fid for _t, fx in sorted(paare, key=lambda p: p[0].index)]
+        if len(teile(a)) > 1 and len(fids) == len(teile(a)):
+            gid = _gesamt_gruppe_finden(state, set(fids))
+            neu_pos = gesamt_raster(state, a, fids)
+            if gid is not None and neu_pos:
+                vorher = state._gruppen_raster(gid)
+                neu = {"cols": int(a.breite_px), "rows": int(a.hoehe_px),
+                       "positions": neu_pos}
+                if vorher is not None and not state._raster_gleich(vorher, neu):
+                    state._gruppen_raster_setzen(gid, neu)
+                    alt = {k: vorher[k] for k in ("cols", "rows", "positions")}
+                    state._push_undo(
+                        label=f"Gruppe „{vorher.get('name', '')}“ neu aufgebaut",
+                        do=lambda: None,
+                        undo=lambda g=gid, r=alt: state._gruppen_raster_setzen(g, r),
+                        redo=lambda g=gid, r=neu: state._gruppen_raster_setzen(g, r))
+    return geaendert

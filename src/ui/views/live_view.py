@@ -3423,6 +3423,24 @@ class LiveView(QWidget):
         self._btn_view3d.setChecked(on)
         if on:
             if self._viz3d is None:
+                # VIZ-115: ohne WebGL riss der native Teil die ganze App mit
+                # (Segfault). Vorher per Kindprozess pruefen; „aus" -> 2D bleibt,
+                # verstaendliche Meldung statt Absturz.
+                try:
+                    from src.ui.visualizer.webgl_probe import vor_3d_start
+                    _ent = vor_3d_start()
+                except Exception as e:
+                    print(f"[live_view] WebGL-Probe nicht verfuegbar: {e}")
+                    _ent = None
+                if _ent is not None and not _ent.erlaubt:
+                    self._melde_3d_gesperrt(_ent.meldung)
+                    self._set_view_3d(False)
+                    return
+                if _ent is not None and _ent.meldung:
+                    try:
+                        self._set_status(_ent.meldung, 8.0)
+                    except Exception:
+                        pass
                 try:
                     from src.ui.visualizer.visualizer_view import Visualizer3DView
                     # show_popout_button=True: nur die eingebettete View bietet das
@@ -3461,6 +3479,18 @@ class LiveView(QWidget):
                 self._canvas._reload_positions_safe()
             except Exception:
                 pass
+
+    def _melde_3d_gesperrt(self, text: str) -> None:
+        """VIZ-115: 3D gesperrt -> Statuszeile + Hinweis am 3D-Knopf."""
+        print(f"[live_view] {text}")
+        try:
+            self._set_status(text, 15.0)
+        except Exception:
+            pass
+        try:
+            self._btn_view3d.setToolTip(text)
+        except Exception:
+            pass
 
     # ── VIZ-POPOUT: 3D-Ansicht ausklinken / andocken ────────────────────────
     def _build_popout_banner(self) -> QFrame:

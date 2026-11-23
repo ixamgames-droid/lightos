@@ -253,7 +253,11 @@ Universum gewählt (oder das Patchen abgewählt) ist. Eine Matrix hat darum höc
 **Später ändern:** **Datenbank → Fixture-Profil bearbeiten...**, das Profil wählen und
 **Im Matrix-Assistenten…** drücken. **Profil aktualisieren** ändert dasselbe Profil;
 sind Teile davon gepatcht und ändern sich Modi oder Kanalzahlen, nennt der Assistent
-die betroffenen Geräte vorher. Änderst du das Profil dagegen im Fixture-Editor oder
+die betroffenen Geräte vorher. Änderst du nur **Verdrahtung** oder **Startecke**,
+übernehmen die schon gepatchten Teile nach dem **Ja** die neue Pixel-Reihenfolge und
+Montage, und ihre Kopf-Gruppen sowie die Gruppe „… · Matrix“ werden neu aufgebaut
+(eigene Änderungen an diesen Gruppen gehen dabei verloren). Die Rückfrage sagt das
+vorher; im Patch nimmt ein **Rückgängig** alles in einem Schritt zurück. Änderst du das Profil dagegen im Fixture-Editor oder
 -Generator, bleibt die Bauform, aber der Assistent bietet das Profil nicht mehr an —
 er würde deine Handänderungen sonst überschreiben.
 

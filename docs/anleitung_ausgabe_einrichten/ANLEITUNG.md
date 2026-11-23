@@ -264,6 +264,8 @@ Reiter **Art-Net**:
    andere Universen bleiben unverändert.
 4. **Ziel-IP / Broadcast:** — die Adresse des Nodes (hier `192.0.2.50`) oder
    `255.255.255.255` für alle im Netz. Leer bedeutet ebenfalls `255.255.255.255`.
+   Eine unvollständige oder falsche Adresse (`abc`, `999.1.1`) nimmt **Übernehmen** nicht
+   an; der Status sagt dann *Nicht übernommen: … keine gültige IP-Adresse*.
 5. **Art-Net Startuniversum:** — die Art-Net-Universumsnummer, die der Node erwartet.
    Vorbelegt ist LightOS-Universum minus 1: Universum 2 sendet also auf Art-Net-Universum
    `1`, Universum 1 auf `0`.
@@ -360,13 +362,24 @@ Jede Zeile ist ein Universum: **#** (1–32), **Name** (frei wählbar) und:
    Start den Adapter, der gerade an ihrem Port steckt. Waren die Ports genau dann
    vertauscht, steht in der Spalte **Dongle** die Nummer des anderen Adapters — dann
    **Dongle neu zuordnen** und **Speichern**.
-4. **+ Universum hinzufügen** — neue Zeile (höchstens 32). **Löschen** entfernt die
-   markierten Zeilen aus der Tabelle; wirksam wird das erst mit **Speichern**.
+4. **+ Universum hinzufügen** — neue Zeile (höchstens 32) mit der kleinsten noch freien
+   Nummer: Nach dem Löschen von U1 bekommt die neue Zeile also wieder die 1, nicht eine
+   zweite 2. **Löschen** entfernt die markierten Zeilen aus der Tabelle; wirksam wird das
+   erst mit **Speichern**. Sind auf dem Universum noch Geräte gepatcht, fragt LightOS
+   vorher nach und nennt die Anzahl (Voreinstellung *Nein*).
 5. **Speichern** — schreibt `universes.json` (im LightOS-Datenordner) und wendet die Konfiguration
-   **sofort** an, ohne Neustart. Zur Bestätigung zeigt LightOS den Pfad der Datei.
+   **sofort** an, ohne Neustart. Zur Bestätigung nennt LightOS die Zahl der Universen und den
+   Pfad der Datei.
+
+Wer den Dialog mit ungespeicherten Änderungen in diesem Reiter schließt (**Schließen**,
+Esc oder das Fenster-X), wird gefragt: **Speichern**, **Verwerfen** oder **Zurück**
+(Voreinstellung, auch mit Esc).
 
 Beim Speichern prüft LightOS die Tabelle und meldet sich, wenn
 
+- **eine Nummer doppelt** vorkommt (*Doppelte Universumsnummer — nicht gespeichert*). Dann
+  wird **nichts** gespeichert, sonst überschriebe eine Zeile die andere und ein Ausgang
+  ginge verloren. Eine **#** ändern und erneut speichern.
 - eine **#** außerhalb von 1–32 liegt (*Universumsnummer angepasst*),
 - eine Zahl unter **Ext. Universum** nicht zum Ausgabetyp passt (*Externe Universumsnummer angepasst*),
 - **zwei Zeilen am selben Ziel** landen (*Zwei Universen auf demselben Ziel*). Das führt

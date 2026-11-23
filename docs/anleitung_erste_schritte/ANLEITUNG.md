@@ -69,7 +69,7 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    Console, kein MIDI-Controller, kein Tastenkürzel. Solange er aktiv ist, werden
    Laser-Werte gemerkt, der Laser bleibt dunkel; nach dem Lösen gibt er sofort wieder
    aus, was eingestellt ist.
-7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80`. Beispiele stehen als
+7. **Befehlszeile** — für Tastatur-Befehle wie `1 thru 5 @ 80` (statt `@` geht auch `at`). Beispiele stehen als
    Platzhaltertext im Feld.
 8. **Statusleiste** — links der Zustand des ENTTEC-Adapters (`Enttec: nicht gefunden`,
    solange keiner angeschlossen ist), der Web-Server und die Zahl der Geräte
