@@ -1,6 +1,6 @@
 ID: VCB-52
 Prioritaet: P2
-Status: todo
+Status: review
 Titel: Klicktest-Befunde Virtual Console (6 Punkte, davon 1 mittel)
 
 **Herkunft:** Live-Klicktest 23.11.2026 (echte App im abgeschotteten Fenster-Server, Probelauf), Bereich Virtual Console. Fotos/Protokoll lokal unter berichte/klicktest_2026_11_23/.
@@ -13,3 +13,7 @@ Titel: Klicktest-Befunde Virtual Console (6 Punkte, davon 1 mittel)
 6. **Untermenü 'Widget hinzufügen' englisch, Werkzeugleiste deutsch** (gering). Nachstellen: Bearbeiten an, Rechtsklick in einen Rahmen → Widget hinzufügen Erwartet: Gleiche Namen wie in der Leiste (Fader, Cueliste, Farbe, Effekt-Farben …) Gesehen: Button, Slider, XYPad, CueList, Color, ColorList, SongInfo, EffectColors …
 
 **Erledigt, wenn:** jeder Punkt behoben (mit Test) oder begruendet verworfen ist.
+
+**Geliefert:** Alle 6 Punkte behoben, Tests in tests/test_vcb52_vc_befunde.py (ohne Fix 9 von 11 rot). (1) Pixelraster: Ein Zeitgeber setzt 'Sicher?' nach 3 s sichtbar auf 'Löschen' zurück; massgeblich für den Tipp ist derselbe Zeitgeber, Anzeige und Wirkung stimmen also überein. Weiter zwei Tipps nötig. (2) Werkzeugleiste: Die Spaltenzahl richtet sich nach der breitesten Beschriftung (bricht sonst um), Rest wird hinten mit … gekürzt, Tooltip je Knopf, Touch weiter mindestens 44 px. (3) Rahmen-Kopfzeile kürzt hinten mit …. (4) Inspector frischt den Namen nach dem Einstellungs-Dialog auf. (5) Werkzeugleiste und Rahmen-Menü legen neue Elemente an eine freie Stelle; im Rahmen zählt die Klickstelle. Geladene Shows behalten ihre Lagen. (6) Menüs 'Hinzufügen' (Fläche) und 'Widget hinzufügen' (Rahmen) deutsch wie die Werkzeugleiste.
+
+**Offen:** Nicht im echten Fenster nachgeklickt. Doppelklick-Weg zum Rahmen-Dialog frischt den Inspector nicht eigens auf (nur der Inspector-Knopf). Die freie Stelle wird nur im sichtbaren Bereich gesucht; ist dort nichts frei, landet das Element unter allen vorhandenen.

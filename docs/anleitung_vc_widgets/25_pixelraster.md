@@ -16,7 +16,7 @@ Die Zeichnung ist eine **eigene Ausgabe-Ebene**, nicht der Programmer:
 
 ## So sieht es aus & Bedienung im Betrieb
 
-- **Oben die Knopfleiste:** **Pinsel**, **Radierer**, **Füllen** (das aktive Werkzeug ist blau), **Farbe** (Farbfeld, öffnet den Farbwähler wie bei der Farb-Kachel und schaltet auf Pinsel), **Auflösung** (`1×1` → `2×2` → `4×4`), **Löschen**, **Merken**, **Abruf**.
+- **Oben die Knopfleiste:** **Pinsel**, **Radierer**, **Füllen** (das aktive Werkzeug ist blau), **Farbe** (Farbfeld, öffnet den Farbwähler wie bei der Farb-Kachel und schaltet auf Pinsel), **Auflösung** (`1×1` → `2×2` → `4×4`), **Löschen**, **Merken**, **Abruf**. Ist das Element schmal, bricht die Leiste in eine zweite Reihe um, damit jede Beschriftung lesbar bleibt; reicht es trotzdem nicht, wird hinten mit „…“ gekürzt. Mit der Maus über einem Knopf zeigt ein Hinweis, was er tut.
 - **Mitte das Raster:** belegte Zellen grau, gemalte in ihrer Farbe. Leere Plätze der Gruppe bleiben schwarz.
 - **Rechts der Pegel-Regler** (gelb, Zahl in Prozent): wie stark die Zeichnung über dem Rest liegt. 0 = Zeichnung unsichtbar, nichts geht verloren.
 
@@ -26,7 +26,7 @@ Die Zeichnung ist eine **eigene Ausgabe-Ebene**, nicht der Programmer:
 | **Radierer** | Macht Zellen wieder durchsichtig; dort gilt wieder, was darunter läuft. |
 | **Füllen** | Färbt die zusammenhängende Fläche gleicher Farbe (auch eine leere Fläche). |
 | **Auflösung** | Fasst 2 × 2 bzw. 4 × 4 Zellen zu einem Malpunkt zusammen (Hilfslinien zeigen die Blöcke). Die Zeichnung bleibt in voller Auflösung erhalten, Umschalten verliert nichts. |
-| **Löschen** | Erster Tipp macht den Knopf rot („Sicher?“), ein zweiter Tipp innerhalb von 3 Sekunden löscht die ganze Zeichnung. |
+| **Löschen** | Erster Tipp macht den Knopf rot („Sicher?“), ein zweiter Tipp innerhalb von 3 Sekunden löscht die ganze Zeichnung. Nach Ablauf der 3 Sekunden steht wieder „Löschen“ auf dem Knopf; was angezeigt wird, gilt. |
 | **Merken / Abruf** | Merken legt die aktuelle Zeichnung als Bild beim Element ab (bis zu 12, das älteste fällt heraus). Abruf lädt die gemerkten Bilder der Reihe nach („Abruf 2/3“). |
 
 Mit **Touch-Lock** ist das Element gesperrt. Im **Bearbeiten-Modus** verschiebt und skaliert Ziehen das Element, es malt nichts. **Am Finger** ist das Raster ein Bedienelement wie ein Fader: Wischen malt, die Konsole scrollt nicht. Im Touch-Modus sind alle Knöpfe und der Pegel-Regler mindestens 44 px groß; ist das Element schmal, bricht die Knopfleiste in eine zweite Zeile um.
