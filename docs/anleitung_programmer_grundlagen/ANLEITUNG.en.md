@@ -153,7 +153,9 @@ heads. Here you select **Spot 1** and **Spot 2**. The tab contains:
   be undone via **Bearbeiten → Rückgängig** (Edit → Undo, **Strg+Z**), not with the
   **Rückgängig** button in the Programmer.
 - **Pan/Tilt-Speed:** with the **Speed** fader, if the fixture has such a channel.
-- **Position-Tool (XY-Pad)**: an expandable pad to drag.
+- **Position-Tool (XY-Pad)**: an expandable pad to drag. The dot and the
+  **P:/T:** readout show the current pan/tilt values in the programmer, also
+  after a command line entry or after undo/redo.
 - The **Pan** and **Tilt** faders.
 
 With moving heads in the selection the tabs **Mapping** and **EFX** (movement effects, see
@@ -213,6 +215,12 @@ This helps you find fixtures on stage:
    pan/tilt to the centre (shortcut **H**).
 2. **Abdunkeln** (dim others) dims all *unselected* fixtures to about 30 %
    (shortcut **Umschalt+H**, Shift+H).
+
+   While the cursor is in a text field (for example the command line),
+   letters and the space bar go into the field. **H**, **Shift+H** and the
+   space bar (GO) do nothing there. In the command line **Tab** completes the
+   word you started (`hig` becomes `highlight`, `cl` becomes `clear`) and the
+   cursor stays in the field. **Shift+Tab** leaves the field.
 3. In the **Lampen-Vorschau** the selected wash lights shine white.
 
 Both buttons write real values into the Programmer — not just temporarily. They stay until
