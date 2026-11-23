@@ -38,6 +38,7 @@ dem tatsächlichen Code recherchiert (Fundstellen als `datei:zeile`).
 | `LIGHTOS_WEBENGINE_NO_SANDBOX` | Opt-out der QtWebEngine-Sandbox-Abschaltung auf Linux (XPLAT-01). | nicht gesetzt | `main.py:235` | — |
 | `LIGHTOS_3D_PROBE` | WebGL-Probe im Kindprozess vor der 3D-Ansicht (VIZ-115): `0` schaltet sie ab, `1` erzwingt sie auch außerhalb von Linux/xcb. | Linux mit echtem Fenster-Server: an; offscreen/Windows/macOS: aus | `src/ui/visualizer/webgl_probe.py` | `tests/test_viz115_webgl_probe.py` |
 | `LIGHTOS_3D_ERZWINGEN` | 3D-Ansicht trotz negativer WebGL-Probe laden (auf eigene Gefahr, VIZ-115). | nicht gesetzt | `src/ui/visualizer/webgl_probe.py` | `tests/test_viz115_webgl_probe.py` |
+| `LIGHTOS_3D_SOFTWARE` | Auf Rechnern ohne Grafikbeschleunigung 3D mit Software-Grafik (SwiftShader) laden statt gesperrt lassen — kann abstuerzen (VIZ-115). | nicht gesetzt | `src/ui/visualizer/webgl_probe.py` | `tests/test_viz115_webgl_probe.py` |
 
 `main.py:197` liest `LIGHTOS_WEBENGINE_FLAGS` referenziell im Docstring; die
 tatsächliche Verwendung steht auf Zeile 210.

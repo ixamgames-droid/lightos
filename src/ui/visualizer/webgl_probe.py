@@ -106,7 +106,11 @@ def entscheide(basis: str, software: str | None, env=None) -> Entscheidung:
     env = os.environ if env is None else env
     if basis == "ok":
         return Entscheidung("normal")
-    if software == "ok":
+    # Live-Gegenprobe 23.11.2026 (Xephyr, Mesa-Software): Die Probe meldete
+    # Software-WebGL ok, die volle App stuerzte beim Laden der 3D-Ansicht
+    # trotzdem nativ ab. Software-Grafik deshalb nur auf ausdruecklichen
+    # Wunsch (LIGHTOS_3D_SOFTWARE=1); sonst bleibt 3D aus — lieber 2D als Absturz.
+    if software == "ok" and str(env.get("LIGHTOS_3D_SOFTWARE", "")).strip().lower() in _AN:
         return Entscheidung("software", basis, MELDUNG_SOFTWARE)
     grund = basis
     if str(env.get(_ENV_ERZWINGEN, "")).strip().lower() in _AN:

@@ -61,8 +61,10 @@ def test_bewerte_ok_nogl_absturz_zeit():
 # ── entscheide ─────────────────────────────────────────────────────────────
 def test_entscheide_normal_software_aus():
     assert W.entscheide("ok", None, {}).modus == "normal"
-    e = W.entscheide("nogl", "ok", {})
+    e = W.entscheide("nogl", "ok", {"LIGHTOS_3D_SOFTWARE": "1"})
     assert e.modus == "software" and e.erlaubt and "Software" in e.meldung
+    # ohne ausdruecklichen Wunsch: Software-WebGL reicht nicht (Live-Gegenprobe 23.11.)
+    assert W.entscheide("nogl", "ok", {}).modus == "aus"
     aus = W.entscheide("nogl", "nogl", {})
     assert aus.modus == "aus" and not aus.erlaubt
     assert "2D" in aus.meldung and "WebGL" in aus.meldung
@@ -87,7 +89,8 @@ def test_probe_noetig_schalter():
 def test_pruefen_erst_basis_dann_software():
     flags = []
     run = _attrappe([(0, "LIGHTOS_WEBGL=nogl"), (0, "LIGHTOS_WEBGL=ok")], flags)
-    e = W.pruefen(run, {"QTWEBENGINE_CHROMIUM_FLAGS": "--no-sandbox"})
+    e = W.pruefen(run, {"QTWEBENGINE_CHROMIUM_FLAGS": "--no-sandbox",
+                        "LIGHTOS_3D_SOFTWARE": "1"})
     assert e.modus == "software"
     assert flags[0] == "--no-sandbox"
     assert flags[1].startswith("--no-sandbox") and W.SOFTWARE_FLAGS in flags[1]
@@ -109,7 +112,7 @@ def test_kindprozess_segfault_sperrt_3d():
 def test_vor_3d_start_setzt_software_flags_einmal(monkeypatch):
     monkeypatch.setenv("LIGHTOS_3D_PROBE", "1")
     monkeypatch.setenv("QTWEBENGINE_CHROMIUM_FLAGS", "--no-sandbox")
-    monkeypatch.setattr(W, "pruefen", lambda *a, **k: W.entscheide("nogl", "ok", {}))
+    monkeypatch.setattr(W, "pruefen", lambda *a, **k: W.entscheide("nogl", "ok", {"LIGHTOS_3D_SOFTWARE": "1"}))
     assert W.vor_3d_start().modus == "software"
     assert W.vor_3d_start().modus == "software"
     f = os.environ["QTWEBENGINE_CHROMIUM_FLAGS"]
