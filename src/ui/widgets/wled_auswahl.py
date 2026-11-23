@@ -28,6 +28,18 @@ from PySide6.QtWidgets import (
 TOUCH_MIN_PX = 44
 
 
+def ipv4_gueltig(text) -> bool:
+    """OUT-85 (1): ``True`` nur fuer eine vollstaendige IPv4-Adresse
+    (``192.0.2.10``). ``abc`` oder ``999.1.1`` wurden vorher angenommen,
+    gespeichert und als „aktiv“ gemeldet, obwohl nichts ankam."""
+    import ipaddress
+    try:
+        ipaddress.IPv4Address(str(text or "").strip())
+        return True
+    except (ipaddress.AddressValueError, ValueError):
+        return False
+
+
 def _touch() -> bool:
     try:
         from src.ui.touch_keyboard import is_touch_mode
@@ -174,10 +186,17 @@ class MatrixVerteilenDialog(QDialog):
     def _nachziehen(self, *_):
         from src.core.dmx import wled
         g = self.gewaehlt()
-        ok = g is not None and bool(self.ip())
+        # OUT-85 (1): „Eintragen“ nur mit einer gueltigen IPv4-Adresse.
+        ip_ok = ipv4_gueltig(self.ip())
+        ok = g is not None and ip_ok
         self._knoepfe.button(QDialogButtonBox.StandardButton.Ok).setEnabled(ok)
         if g is None:
             self._vorschau.setText("Keine Matrix aus dem LED-Matrix-Assistenten gepatcht.")
+            return
+        if self.ip() and not ip_ok:
+            self._vorschau.setText(
+                f"„{self.ip()}“ ist keine gültige IP-Adresse — "
+                f"bitte z. B. 192.0.2.50 eingeben.")
             return
         self._vorschau.setText(wled.ddp_hinweis(
             g["angaben"], g["start"], self.ip() or "…"))

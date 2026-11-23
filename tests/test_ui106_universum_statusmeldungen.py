@@ -66,7 +66,7 @@ MODULE = (
 #: Gespeicherte Namen neuer Zeilen (``universes.json``, Feld ``name``) — bleiben.
 ERLAUBT = {
     ("src/ui/widgets/output_config.py", 'f"Universe {num}"'),
-    ("src/ui/widgets/output_config.py", 'f"Universe {row + 1}"'),
+    ("src/ui/widgets/output_config.py", 'f"Universe {frei}"'),
     ("src/ui/widgets/output_config.py", '"Universe"'),
 }
 

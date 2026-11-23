@@ -274,7 +274,9 @@ Tab **Art-Net**:
    other universes stay unchanged.
 4. **Ziel-IP / Broadcast:** (target IP / broadcast) — the address of the node (here
    `192.0.2.50`) or `255.255.255.255` for everyone on the network. Empty also means
-   `255.255.255.255`.
+   `255.255.255.255`. An incomplete or wrong address (`abc`, `999.1.1`) is not accepted by
+   **Übernehmen**; the status then says *Nicht übernommen: … keine gültige IP-Adresse*
+   (not applied: not a valid IP address).
 5. **Art-Net Startuniversum:** (Art-Net start universe) — the Art-Net universe number
    the node expects. It is pre-filled with the LightOS universe minus 1: so Universe 2
    sends on Art-Net universe `1`, Universe 1 on `0`.
@@ -370,15 +372,24 @@ Each row is one universe: **#** (1–32), **Name** (free to choose) and:
    start, the adapter that is plugged into its port at that moment. If the ports were
    swapped just then, the **Dongle** column shows the other adapter's number — use
    **Dongle neu zuordnen** and **Speichern**.
-4. **+ Universum hinzufügen** (add universe) — new row (32 at most). **Löschen** (delete)
-   removes the selected rows from the table; this only takes effect with **Speichern**
-   (save).
+4. **+ Universum hinzufügen** (add universe) — new row (32 at most) with the smallest
+   number still free: after deleting U1 the new row gets 1 again, not a second 2.
+   **Löschen** (delete) removes the selected rows from the table; this only takes effect
+   with **Speichern** (save). If fixtures are still patched to the universe, LightOS asks
+   first and names the count (default *Nein* = no).
 5. **Speichern** — writes `universes.json` (in the LightOS data folder) and applies the configuration
-   **immediately**, without a restart. As confirmation LightOS shows the path of the
-   file.
+   **immediately**, without a restart. As confirmation LightOS names the number of
+   universes and the path of the file.
+
+Closing the dialog with unsaved changes on this tab (**Schließen**, Esc or the window X)
+asks: **Speichern** (save), **Verwerfen** (discard) or **Zurück** (back; the default, also
+with Esc).
 
 When saving, LightOS checks the table and speaks up if
 
+- **a number appears twice** (*Doppelte Universumsnummer — nicht gespeichert* = duplicate
+  universe number, not saved). Then **nothing** is saved, otherwise one row would
+  overwrite the other and an output would be lost. Change a **#** and save again.
 - a **#** is outside 1–32 (*Universumsnummer angepasst* = universe number adjusted),
 - a number under **Ext. Universum** does not fit the output type (*Externe Universumsnummer angepasst*
   = external universe number adjusted),
