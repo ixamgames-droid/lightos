@@ -1,0 +1,15 @@
+ID: VCB-52
+Prioritaet: P2
+Status: todo
+Titel: Klicktest-Befunde Virtual Console (6 Punkte, davon 1 mittel)
+
+**Herkunft:** Live-Klicktest 23.11.2026 (echte App im abgeschotteten Fenster-Server, Probelauf), Bereich Virtual Console. Fotos/Protokoll lokal unter berichte/klicktest_2026_11_23/.
+
+1. **Pixelraster: 'Sicher?' bei Löschen bleibt nach Ablauf der 3 s stehen, Tipp darauf löscht nicht** (mittel). Nachstellen: Run-Modus, Pixelraster mit Zeichnung. 1x auf Löschen tippen (Knopf rot 'Sicher?'). Mehr als 3 s warten (getestet 4 s und 9 s). Knopf zeigt weiter rot 'Sicher?'. Darauf tippen. Ergebnis: die Zeichnung bleibt, der Knopf wird nur neu scharf geschaltet. Erst ein weiterer Tipp löscht. Zweimal nachgestellt. Erwartet: Nach LOESCHEN_SCHARF_S (3 s) springt die Anzeige auf 'Löschen' zurück (Timer/update), oder der Tipp auf ein angezeigtes 'Sicher?' löscht. Gesehen: Anzeige veraltet, weil _loeschen_scharf_bis nur beim Neuzeichnen geprüft wird und kein Timer neu zeichnet (src/ui/virtualconsole/vc_pixelraster.py ~Z.486-510). Die Bedienung widerspricht der Anzeige.
+2. **Pixelraster-Werkzeugleiste: Knopfbeschriftungen abgeschnitten** (gering). Nachstellen: Testshow Hochzeit Komplett, VC Bank 1, Pixelraster 'PAR-Reihe malen' in Standardgröße (ca. 315 px breit) ansehen. Erwartet: Lesbare oder gekürzte Beschriftungen ('Radierer', 'Löschen', 'Merken', 'Abruf 1/1') Gesehen: 'Radiere', 'öschen', 'Merker', 'bruf 1/' – links und rechts abgeschnitten
+3. **Langer Rahmen-Name mittig an beiden Seiten abgeschnitten, nicht mit … gekürzt** (gering). Nachstellen: Bearbeiten an, Frame anlegen, Einstellungen: Beschriftung 'Solo Farben - ein sehr langer Rahmenname zum Testen der Kopfzeile', OK. Erwartet: Anfang sichtbar, Ende mit … gekürzt Gesehen: 'rben - ein sehr langer Rahmenname zum Testen der Ko'
+4. **Inspector zeigt nach Umbenennen im Frame-Dialog weiter den alten Namen** (gering). Nachstellen: Frame anlegen und auswählen, Inspector 'Einstellungen öffnen…', Beschriftung ändern (z. B. 'Extras'), OK. Zweimal nachgestellt. Erwartet: Inspector-Kopf zeigt den neuen Namen Gesehen: Inspector zeigt weiter „Frame“
+5. **Neue Elemente landen immer an derselben Stelle und überdecken vorhandene; 'Widget hinzufügen' im Rahmen ignoriert Klickstelle** (gering). Nachstellen: Bearbeiten an, in der Leiste nacheinander Pixelraster und Frame tippen; bzw. Rechtsklick links unten in einem Rahmen → Widget hinzufügen → Button. Erwartet: Freie Stelle bzw. Element an der Klickstelle Gesehen: Pixelraster und Frame beide bei ca. (585,520) über dem vorhandenen Raster; Button immer mittig im Rahmen, Hinweistext 'Rechtsklick → Widget hinzufügen' scheint dahinter durch
+6. **Untermenü 'Widget hinzufügen' englisch, Werkzeugleiste deutsch** (gering). Nachstellen: Bearbeiten an, Rechtsklick in einen Rahmen → Widget hinzufügen Erwartet: Gleiche Namen wie in der Leiste (Fader, Cueliste, Farbe, Effekt-Farben …) Gesehen: Button, Slider, XYPad, CueList, Color, ColorList, SongInfo, EffectColors …
+
+**Erledigt, wenn:** jeder Punkt behoben (mit Test) oder begruendet verworfen ist.
