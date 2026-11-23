@@ -211,6 +211,44 @@ class BefehlszeileImHauptfenster(unittest.TestCase):
         self.assertEqual(edit.text().lower(), "h ")
         edit.clear()
 
+    def test_feld_ohne_eigenen_anspruch_loest_kein_kuerzel_aus(self):
+        """Die zentrale Regel selbst (ohne sie rot): ein Feld, das den
+        ShortcutOverride nicht selbst annimmt, wird trotzdem geschuetzt."""
+        class _StillesFeld(QLineEdit):
+            def event(self, ev):  # noqa: N802
+                if ev.type() == QEvent.Type.ShortcutOverride:
+                    ev.ignore()
+                    return False
+                return super().event(ev)
+
+        treffer_h = self._kuerzel_zaehler("H")
+        treffer_go = self._kuerzel_zaehler("Space")
+        feld = _StillesFeld(self.win.centralWidget())
+        feld.show()
+        try:
+            feld.setFocus()
+            self.assertTrue(_warte(feld.hasFocus))
+            QTest.keyClick(feld, Qt.Key.Key_H)
+            QTest.keyClick(feld, Qt.Key.Key_Space)
+            QTest.keyClick(feld, Qt.Key.Key_7)
+            self.app.processEvents()
+            self.assertEqual(treffer_h, [])
+            self.assertEqual(treffer_go, [])
+            self.assertEqual(feld.text(), "h 7")
+        finally:
+            feld.deleteLater()
+            self.app.processEvents()
+
+    def test_ausserhalb_eines_textfelds_wirkt_h_weiter(self):
+        treffer = self._kuerzel_zaehler("H")
+        self.win.setFocus()
+        self.app.processEvents()
+        fokus = QApplication.focusWidget() or self.win
+        self.assertFalse(isinstance(fokus, QLineEdit))
+        QTest.keyClick(fokus, Qt.Key.Key_H)
+        self.app.processEvents()
+        self.assertEqual(len(treffer), 1)
+
 
 class XYPadFolgtProgrammer(unittest.TestCase):
 
