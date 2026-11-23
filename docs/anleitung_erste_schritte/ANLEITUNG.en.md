@@ -79,7 +79,7 @@ After starting, LightOS opens in the **Bühne** (stage) section. From top to bot
    the prompt. Nothing else releases it: no slider, no Virtual Console button, no MIDI
    controller, no keyboard shortcut. While it is active, laser values are remembered and
    the laser stays dark; once released, the laser immediately outputs whatever is set.
-7. **Command line** — for keyboard commands such as `1 thru 5 @ 80`. Examples are shown as
+7. **Command line** — for keyboard commands such as `1 thru 5 @ 80` (`at` works instead of `@` as well). Examples are shown as
    placeholder text in the field.
 8. **Status bar** — on the left the state of the ENTTEC adapter
    (`Enttec: nicht gefunden` = not found, as long as none is connected), the web server

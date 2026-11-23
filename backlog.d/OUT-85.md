@@ -1,6 +1,7 @@
 ID: OUT-85
 Prioritaet: P2
-Status: todo
+Status: teils
+Status-Notiz: Punkte 1, 2, 3, 4, 5a, 5c, 5d geliefert (review); 5b und 5e offen
 Titel: Klicktest-Befunde Ausgabe-Dialog (5 Punkte, davon 2 mittel)
 
 **Herkunft:** Live-Klicktest 23.11.2026 (echte App im abgeschotteten Fenster-Server, Probelauf), Bereich Ausgabe-Dialog. Fotos/Protokoll lokal unter berichte/klicktest_2026_11_23/.
@@ -12,3 +13,7 @@ Titel: Klicktest-Befunde Ausgabe-Dialog (5 Punkte, davon 2 mittel)
 5. **Kosmetik im Universen-Reiter** (gering). Nachstellen: a) Neue Zeilen haben die #-Spalte linksbündig, geladene Zeilen zentriert. b) Ein zweizeiliger WLED-Status verschiebt die Knopfreihe um 2 px. c) 'Gespeichert' zeigt nur den rohen Dateipfad. d) Der Hinweis '… „Speichern“ übernimmt' bleibt nach dem Speichern stehen. e) Datenbank > LED-Matrix-Assistent > 'In Bibliothek speichern' schließt ohne jede Rückmeldung und ohne Patch-Angebot. Erwartet: Einheitlich, mit klarer Rückmeldung Gesehen: siehe Fotos
 
 **Erledigt, wenn:** jeder Punkt behoben (mit Test) oder begruendet verworfen ist.
+
+**Geliefert (teils, mit OUT-84):** 1) Art-Net 'Übernehmen' lehnt eine ungültige Ziel-IP ab ('Nicht übernommen: … keine gültige IP-Adresse', nichts gespeichert, laufende Ausgabe bleibt); 'Matrix verteilen' lässt 'Eintragen' nur mit gültiger IPv4 zu und sagt warum. 2) Schließen, Esc und Fenster-X fragen bei ungespeicherten Universen-Änderungen 'Speichern / Verwerfen / Zurück' (Voreinstellung und Esc = Zurück; Speichern scheitert, z. B. doppelte Nummer: Dialog bleibt offen; über dialog_hilfe, Knöpfe im Touch-Modus 44 px). 3) Löschen eines Universums mit gepatchten Geräten fragt mit Anzahl nach (Voreinstellung Nein). 4) Probelauf-Text lautet jetzt 'Probelauf: echte Ausgabe gesperrt (STAB-39)' statt Verweis auf main.py. 5a) neue Zeilen haben die #-Spalte zentriert. 5c) 'Gespeichert' nennt die Zahl der Universen und dann den Pfad. 5d) der Hinweis '… Speichern übernimmt' wird nach dem Speichern geleert. Test: tests/test_out84_universen_dialog.py.
+
+**Offen:** 5b) zweizeiliger WLED-Status verschiebt die Knopfreihe um 2 px; 5e) LED-Matrix-Assistent 'In Bibliothek speichern' ohne Rückmeldung und ohne Patch-Angebot (anderer Dialog, kein Handgriff).

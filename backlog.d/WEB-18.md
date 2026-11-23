@@ -1,6 +1,7 @@
 ID: WEB-18
 Prioritaet: P2
 Status: todo
+Status-Notiz: Punkt 1 (Aktive Cue nach STOP über Web) mit UI-147 behoben; Punkt 2 offen
 Titel: Klicktest-Befunde Web-Fernbedienung (2 Punkte, davon 1 mittel)
 
 **Herkunft:** Live-Klicktest 23.11.2026 (echte App im abgeschotteten Fenster-Server, Probelauf), Bereich Web-Fernbedienung. Fotos/Protokoll lokal unter berichte/klicktest_2026_11_23/.
