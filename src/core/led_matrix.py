@@ -628,7 +628,13 @@ def teile_nachziehen(state, profil_id: int, a: MatrixAngaben) -> int:
     Alles als EIN Rueckgaengig-Schritt. Rueckgabe: Zahl geaenderter Teile."""
     from contextlib import nullcontext
     paare = _teile_im_patch(state, profil_id, a)
-    if not paare:
+    # Nur wenn sich die Lage wirklich aendert (genau das nennt die Rueckfrage
+    # aus teile_nachziehen_folgen): sonst blieben eigene Gruppen-Aenderungen
+    # beim blossen Umbenennen ohne Hinweis auf der Strecke.
+    anders = [(t, fx) for t, fx in paare
+              if teil_lage(a, t) != (fx.pixel_order, int(fx.element_rotation or 0),
+                                     bool(fx.element_flip))]
+    if not anders:
         return 0
     sammeln = getattr(state, "patch_sammeln", None) or nullcontext
     try:
@@ -640,13 +646,13 @@ def teile_nachziehen(state, profil_id: int, a: MatrixAngaben) -> int:
     geaendert = 0
     with schritt:
         with sammeln():
-            for t, fx in paare:
+            for t, fx in anders:
                 order, drehung, flip = teil_lage(a, t)
                 if state.update_fixture(fx.fid, pixel_order=order,
                                         element_rotation=drehung,
                                         element_flip=flip):
                     geaendert += 1
-        for _t, fx in paare:
+        for _t, fx in anders:
             try:
                 state.auto_kopfgruppe_neu_aufbauen(fx.fid)
             except Exception:

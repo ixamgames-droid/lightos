@@ -144,6 +144,27 @@ class KernTest(_Basis):
         self.assertIn("2 gepatchte(r) Teil(e)", zeilen[0])
         self.assertIn("· Matrix", zeilen[0])
 
+    def test_unveraenderte_lage_laesst_eigene_gruppen(self):
+        """Pruef-Fund: ohne Lage-Aenderung (nur umbenannt) meldet die
+        Rueckfrage nichts — dann darf auch keine Gruppe neu gebaut werden."""
+        from src.core.database.models import FixtureGroup
+        from src.core.undo import get_undo_stack
+        gid = self.state.find_head_matrix_group(self.f1, dedicated=True)
+        with self.state._session() as s:
+            g = s.get(FixtureGroup, gid)
+            pos = json.loads(g.positions_json)
+            pos.pop("0,0", None)                 # eigene Aenderung an der Gruppe
+            g.positions_json = json.dumps(pos)
+            s.commit()
+        vorher = self._gruppen()
+        umbenannt = LM.MatrixAngaben(modell="S", breite_px=3, hoehe_px=4,
+                                     zeilen_je_teil=3, hersteller="Anders")
+        self.assertEqual(LM.teile_nachziehen_folgen(
+            self.state, self.pid, umbenannt), [])
+        self.assertEqual(LM.teile_nachziehen(self.state, self.pid, umbenannt), 0)
+        self.assertEqual(self._gruppen(), vorher)
+        self.assertFalse(get_undo_stack().undo(), "kein Rueckgaengig-Schritt")
+
     def test_fremde_geraete_bleiben(self):
         from src.core.database.models import PatchedFixture
         fid = int(self.state.next_fid())
