@@ -42,6 +42,15 @@ def _ueberschreiben_fragen(parent, pid, name, folgen) -> bool:
     return ueberschreiben_fragen(parent, pid, name, folgen)
 
 
+def _state_oder_none():
+    """Der AppState der geladenen Show — ``None``, wenn es keinen gibt."""
+    try:
+        from src.core.app_state import get_state
+        return get_state()
+    except Exception:
+        return None
+
+
 def ist_matrix_profil(profil_id, eng=None) -> bool:
     """True, wenn das Profil vom Assistenten stammt (Angaben gespeichert)."""
     from sqlalchemy.orm import Session
@@ -401,6 +410,11 @@ class LedMatrixAssistent(QDialog):
                     self._profil_id, _gepatchte_geraete(),
                     [(m["name"], m["channel_count"]) for m in payload["modes"]],
                     name_alt=self._name_alt, name_neu=(a.hersteller, a.modell))
+                # FM-82: geaenderte Verdrahtung/Startecke erreicht auch die
+                # schon gepatchten Teile — das sagt dieselbe Rueckfrage.
+                state = self._state if self._state is not None else _state_oder_none()
+                folgen = folgen + LM.teile_nachziehen_folgen(
+                    state, self._profil_id, a)
                 if not _ueberschreiben_fragen(
                         self, self._profil_id, f"{a.hersteller} {a.modell}", folgen):
                     return False
@@ -411,6 +425,16 @@ class LedMatrixAssistent(QDialog):
                 except Exception:
                     pass
                 self.gespeichert_meldung = f"LED-Matrix „{a.modell}“ aktualisiert."
+                if state is not None:
+                    try:
+                        n = LM.teile_nachziehen(state, int(pid), a)
+                    except Exception as e:
+                        n = 0
+                        QMessageBox.warning(
+                            self, TITEL, "Profil gespeichert, aber die gepatchten "
+                            f"Teile nicht nachgezogen:\n{e}")
+                    if n:
+                        self.gespeichert_meldung += f" {n} gepatchte(r) Teil(e) nachgezogen."
             else:
                 pid = fdb.create_user_profile(payload)
                 self.gespeichert_meldung = f"LED-Matrix „{a.modell}“ gespeichert."

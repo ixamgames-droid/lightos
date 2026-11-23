@@ -325,8 +325,8 @@ def _usb_laden():
     # STAB-39: rohes USB nur fuer die echte App (oder mit ausdruecklicher Freigabe).
     from src.core.paths import echte_ausgabe_pruefen
     if not echte_ausgabe_pruefen("uDMX"):
-        raise UdmxFehler(G_PYUSB_FEHLT, "STAB-39: echte Ausgabe nur aus der App "
-                                        "(main.py) — uDMX-Adapter ruhen.")
+        raise UdmxFehler(G_PYUSB_FEHLT, "Probelauf: echte Ausgabe gesperrt "
+                                        "(STAB-39) — uDMX-Adapter ruhen.")
     try:
         import usb.core
         import usb.util

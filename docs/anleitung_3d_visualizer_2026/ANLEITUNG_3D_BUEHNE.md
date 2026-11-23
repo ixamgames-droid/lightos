@@ -32,6 +32,13 @@ entstehen aus dem Code am echten Bildschirm
    eine Lage haben, erscheinen sofort im Raum. Die Statuszeile unten zählt mit:
    „13 Fixture(s) in Szene | 8 Bühnen-Elemente".
 
+> **Rechner ohne Grafikbeschleunigung (VIZ-115):** Beim Start prüft LightOS unter Linux
+> in einem kurzen Testprozess, ob die Grafik WebGL kann. Geht es nur ohne Beschleunigung,
+> öffnet sich die 3D-Ansicht mit Software-Grafik (langsamer, Qualitätsstufe automatisch
+> niedrig) und die Statuszeile sagt das. Geht es gar nicht, bleibt die 2D-Bühne stehen und
+> eine Meldung erklärt den Grund — die App läuft weiter. Schalter für Fachleute:
+> `LIGHTOS_3D_PROBE=0` (keine Prüfung), `LIGHTOS_3D_ERZWINGEN=1` (3D trotzdem laden).
+
 ## Ansehen und Bauen
 
 Der Visualizer hat **zwei Modi**:

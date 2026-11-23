@@ -2680,6 +2680,17 @@ class MainWindow(QMainWindow):
             self._visualizer_window.raise_()
             self._visualizer_window.activateWindow()
             return
+        # VIZ-115: vorab per Kindprozess pruefen, ob WebGL geht — sonst
+        # Meldung statt nativem Absturz der ganzen App.
+        try:
+            from src.ui.visualizer.webgl_probe import vor_3d_start
+            _ent = vor_3d_start()
+        except Exception as e:
+            print(f"[MainWindow] WebGL-Probe nicht verfuegbar: {e}")
+            _ent = None
+        if _ent is not None and not _ent.erlaubt:
+            QMessageBox.information(self, "3D-Ansicht nicht verfügbar", _ent.meldung)
+            return
         try:
             from src.ui.visualizer.visualizer_window import VisualizerWindow
             self._visualizer_window = VisualizerWindow(self)

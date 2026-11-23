@@ -1,7 +1,7 @@
 {
   "anleitung": "erste_schritte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "62a8aa7f",
+  "stand": "2ce7a526",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py erste_schritte'.",

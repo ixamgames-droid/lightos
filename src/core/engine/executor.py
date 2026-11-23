@@ -295,7 +295,23 @@ class PlaybackEngine:
     def from_dict(self, d: dict, cue_stacks: list):
         """Stellt Pages/Executoren wieder her. Setzt vorab ALLE Executoren
         zurueck, damit stale Stack-Referenzen einer zuvor geladenen Show
-        verschwinden (auch bei Legacy-Shows ohne Executor-Daten)."""
+        verschwinden (auch bei Legacy-Shows ohne Executor-Daten).
+
+        UI-147 (2): aendert sich dabei die aktuelle Page, erfahren es die
+        Page-Abonnenten (Page-Knoepfe im Playback, „Page N“ oben) — frueher
+        zeigten sie nach Show-Laden weiter die alte Page."""
+        alt = self.current_page
+        try:
+            self._from_dict(d, cue_stacks)
+        finally:
+            if self.current_page != alt:
+                for cb in list(self._page_callbacks):
+                    try:
+                        cb(self.current_page)
+                    except Exception:
+                        pass
+
+    def _from_dict(self, d: dict, cue_stacks: list):
         for page in self.pages:
             for ex in page:
                 ex.reset()

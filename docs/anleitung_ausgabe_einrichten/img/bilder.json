@@ -1,7 +1,7 @@
 {
   "anleitung": "ausgabe_einrichten",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "62a8aa7f",
+  "stand": "2ce7a526",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py ausgabe_einrichten'.",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "645c27b7fbc6ab8d1167485c507614b5"
+      "md5": "ae3d5f779aff6474eea069f867efad5d"
     },
     {
       "datei": "06_output_monitor.png",

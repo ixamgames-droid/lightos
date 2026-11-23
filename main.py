@@ -976,6 +976,14 @@ def main():
     _install_font_substitutions()
     # UI-64(h): Qt-Standardknoepfe deutsch (Ja/Nein statt Yes/No).
     _install_qt_translator(app)
+    # VIZ-115: WebGL-Faehigkeit im Hintergrund per Kindprozess pruefen (< 1 s),
+    # damit das Oeffnen der 3D-Ansicht ohne GL nicht die ganze App abstuerzen
+    # laesst (Software-Rendering oder Meldung statt Segfault).
+    try:
+        from src.ui.visualizer.webgl_probe import starte_hintergrund as _webgl_probe
+        _webgl_probe()
+    except Exception as _e:
+        print(f"[main] WebGL-Probe nicht verfuegbar: {_e}")
     # UI-110: Listen und Seiten durch Ziehen auf Text/Flaeche scrollen.
     try:
         from src.ui.ziehen_scrollen import einrichten as _ziehen_scrollen
