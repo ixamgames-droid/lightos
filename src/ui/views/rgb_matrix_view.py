@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
                                 QFormLayout, QDoubleSpinBox, QSpinBox,
                                 QComboBox, QLineEdit, QLabel, QScrollArea,
                                 QColorDialog, QFrame, QSlider, QCheckBox, QDialog,
-                                QGridLayout)
+                                QGridLayout, QMessageBox)
 from PySide6.QtCore import Qt, QTimer, QRect, Signal
 from PySide6.QtGui import QPainter, QColor, QFont, QPen, QBrush
 from src.core.engine.rgb_matrix import (RgbMatrixInstance, RgbAlgorithm, MatrixStyle,
@@ -29,6 +29,53 @@ from src.ui.head_cell_colors import (
 )
 from src.ui import dialog_hilfe
 from src.ui.abbau import abbau_still
+
+# FM-85 (4): deutsche Anzeigenamen der Algorithmen. NUR Anzeige — gespeichert
+# wird weiter der Enum-Wert (``RgbAlgorithm.value``), alte Shows laden unveraendert.
+ALGO_ANZEIGE = {
+    RgbAlgorithm.PLAIN: "Einfarbig",
+    RgbAlgorithm.WIPE: "Wischen",
+    RgbAlgorithm.WAVE: "Welle",
+    RgbAlgorithm.GRADIENT: "Farbverlauf",
+    RgbAlgorithm.RAINBOW: "Regenbogen",
+    RgbAlgorithm.FILL: "Füllen",
+    RgbAlgorithm.RANDOM: "Zufall",
+    RgbAlgorithm.COLORFADE: "Farbüberblendung",
+    RgbAlgorithm.SINEPLASMA: "Plasma (Sinus)",
+}
+
+
+def algo_anzeige(algo) -> str:
+    """Anzeigename eines Algorithmus (FM-85)."""
+    try:
+        algo = RgbAlgorithm(algo)
+    except ValueError:
+        return str(algo)
+    return ALGO_ANZEIGE.get(algo, algo.value)
+
+
+class _AlgoCombo(QComboBox):
+    """FM-85 (4): zeigt deutsche Namen, haelt als Daten den gespeicherten
+    Schluessel. ``wert()`` liefert den Schluessel; ``setCurrentText`` nimmt
+    Schluessel ODER Anzeigename (Aufrufer und Tests setzen den Schluessel)."""
+
+    wertGeaendert = Signal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.currentIndexChanged.connect(
+            lambda _i: self.wertGeaendert.emit(self.wert()))
+
+    def wert(self) -> str:
+        d = self.currentData()
+        return d if isinstance(d, str) else self.currentText()
+
+    def setCurrentText(self, text: str) -> None:  # noqa: N802 (Qt-Name)
+        i = self.findData(text)
+        if i < 0:
+            i = self.findText(text)
+        if i >= 0:
+            self.setCurrentIndex(i)
 
 
 # UI-12 / ENG-08 / #6: Parameter, die NICHT mehr dynamisch im "Bewegung &
@@ -811,9 +858,19 @@ class RgbMatrixView(QWidget):
             return
         gname, _ = self._group_context()
         if gname:
+            # FM-85 (2): die Liste zeigt neben den Matrizen DIESER Gruppe auch
+            # ungebundene und verwaiste (damit nie ein Effekt unsichtbar wird).
+            # Der Titel sagt das ehrlich und nennt die Anzahl.
+            vis = self._visible_instances()
+            eigene = sum(1 for m in vis
+                         if (getattr(m, "source_group", None) or None) == gname)
+            fremde = len(vis) - eigene
             txt = f"Matrizen der Gruppe „{gname}“"
-            if not self._visible_instances():
+            if not vis:
                 txt += " — noch keine. „+ Neu“ erstellt eine."
+            elif fremde:
+                txt = (f"Gruppe „{gname}“: {eigene} eigene + {fremde} ohne "
+                       f"Gruppenbindung")
         else:
             txt = "Alle Matrizen (keine Gruppe gewählt)"
         self._group_header.setText(txt)
@@ -858,6 +915,8 @@ class RgbMatrixView(QWidget):
         try:
             vis = self._visible_instances()
             prev_id = self._saved.id if self._saved is not None else None
+            gruppe_jetzt = (self._group_context()[0]
+                            if self._follow_selection else None)
             self._list.blockSignals(True)
             self._list.clear()
             for m in vis:
@@ -869,6 +928,10 @@ class RgbMatrixView(QWidget):
                 sg = getattr(m, "source_group", None) or None
                 if not self._follow_selection and sg:
                     label = f"{m.name}   · {sg}"
+                elif self._follow_selection and sg != gruppe_jetzt and \
+                        gruppe_jetzt is not None:
+                    # FM-85 (2): nicht an diese Gruppe gebunden -> kenntlich.
+                    label = f"{m.name}   · ohne Gruppe"
                 self._list.addItem(label)
             self._list.blockSignals(False)
             if not vis:
@@ -1042,10 +1105,10 @@ class RgbMatrixView(QWidget):
         self._name_edit.textChanged.connect(self._name_change)
         fg.addRow("Name:", self._name_edit)
 
-        self._algo_combo = QComboBox()
+        self._algo_combo = _AlgoCombo()
         for a in RgbAlgorithm:
-            self._algo_combo.addItem(a.value)
-        self._algo_combo.currentTextChanged.connect(self._on_algo_change)
+            self._algo_combo.addItem(algo_anzeige(a), a.value)
+        self._algo_combo.wertGeaendert.connect(self._on_algo_change)
         fg.addRow("Algorithmus:", self._algo_combo)
 
         self._style_combo = QComboBox()
@@ -1599,8 +1662,61 @@ class RgbMatrixView(QWidget):
         # Liste und selektiert automatisch einen Nachbarn (oder leert bei n==0).
         self._fm.remove(vis[row].id)
 
+    def _ist_dirty(self) -> bool:
+        return (self._saved is not None and self._current is not None
+                and self._editor_dict(self._current) != self._editor_dict(self._saved))
+
+    def _frage_ungespeichert(self) -> str:
+        """FM-85 (1): Rueckfrage bei ungespeicherten Aenderungen. Liefert
+        ``"speichern"``, ``"verwerfen"`` oder ``"zurueck"`` (Test-Naht)."""
+        name = self._saved.name if self._saved is not None else ""
+        box = QMessageBox(QMessageBox.Icon.Question, "Ungespeicherte Änderungen",
+                          f"„{name}“ hat ungespeicherte Änderungen.\n"
+                          "Vor dem Wechsel speichern?",
+                          QMessageBox.StandardButton.Save
+                          | QMessageBox.StandardButton.Discard
+                          | QMessageBox.StandardButton.Cancel, self)
+        for knopf, text in ((QMessageBox.StandardButton.Save, "Speichern"),
+                            (QMessageBox.StandardButton.Discard, "Verwerfen"),
+                            (QMessageBox.StandardButton.Cancel, "Zurück")):
+            b = box.button(knopf)
+            if b is not None:
+                b.setText(text)
+        # Sicher vorbelegt: Enter/Esc gehen zurueck, nichts geht verloren.
+        box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+        box.setEscapeButton(QMessageBox.StandardButton.Cancel)
+        with dialog_hilfe.offen(box):
+            box.exec()
+            geklickt = box.standardButton(box.clickedButton())
+        if geklickt == QMessageBox.StandardButton.Save:
+            return "speichern"
+        if geklickt == QMessageBox.StandardButton.Discard:
+            return "verwerfen"
+        return "zurueck"
+
     def _select(self, row: int):
         vis = self._visible_instances()
+        # FM-85 (1): Wechsel auf einen ANDEREN Effekt mit offenem Entwurf ->
+        # erst fragen. Gleiche Matrix (Neuaufbau der Liste) bleibt still.
+        if (0 <= row < len(vis) and self._saved is not None
+                and vis[row].id != self._saved.id and self._ist_dirty()):
+            ziel_id = vis[row].id
+            alt_id = self._saved.id
+            antwort = self._frage_ungespeichert()
+            if antwort == "zurueck":
+                alt = next((i for i, m in enumerate(self._visible_instances())
+                            if m.id == alt_id), -1)
+                self._list.blockSignals(True)
+                self._list.setCurrentRow(alt)
+                self._list.blockSignals(False)
+                return
+            if antwort == "speichern":
+                self._save_edit()   # kann die Liste neu aufbauen (FUNCTION_CHANGED)
+                vis = self._visible_instances()
+                row = next((i for i, m in enumerate(vis) if m.id == ziel_id), -1)
+                if row >= 0 and self._list.currentRow() != row:
+                    self._list.setCurrentRow(row)
+                    return
         if row < 0 or row >= len(vis):
             self._saved = None
             self._current = None
@@ -1627,7 +1743,7 @@ class RgbMatrixView(QWidget):
         # Der Style bestimmt mit, welche Algorithmus-Parameter relevant sind
         # (z. B. Random: Color- vs. Dimmer-Modus) -> Felder neu aufbauen.
         try:
-            algo = RgbAlgorithm(self._algo_combo.currentText())
+            algo = RgbAlgorithm(self._algo_combo.wert())
         except ValueError:
             algo = RgbAlgorithm.PLAIN
         self._rebuild_param_fields(algo)
@@ -1848,6 +1964,17 @@ class RgbMatrixView(QWidget):
         from src.core.engine import matrix_media
         if self._current is None or not pfad:
             return ""
+        # FM-85 (3): erst pruefen, dann kopieren. Unbrauchbares (Video,
+        # kaputtes Bild) landet nicht im Medien-Ordner, das alte Medium bleibt.
+        fehler = matrix_media.pruefen(pfad)
+        if fehler:
+            lbl = getattr(self, "_medien_status", None)
+            if lbl is not None:
+                try:
+                    lbl.setText(f"Nicht übernommen: {fehler}")
+                except RuntimeError:
+                    pass
+            return ""
         rel = matrix_media.import_file(pfad)
         m = self._current
         m.params["media_path"] = rel
@@ -1871,7 +1998,7 @@ class RgbMatrixView(QWidget):
         (normal/Ping-Pong) zeigen. Reines Ein-/Ausblenden eines festen Feldes."""
         if algo is None:
             try:
-                algo = RgbAlgorithm(self._algo_combo.currentText())
+                algo = RgbAlgorithm(self._algo_combo.wert())
             except ValueError:
                 algo = None
         params = self._current.params if self._current is not None else {}
@@ -2090,7 +2217,7 @@ class RgbMatrixView(QWidget):
                 style = MatrixStyle.RGB
         is_color = style in (MatrixStyle.RGB, MatrixStyle.RGBW)
         try:
-            algo = RgbAlgorithm(self._algo_combo.currentText())
+            algo = RgbAlgorithm(self._algo_combo.wert())
         except ValueError:
             algo = RgbAlgorithm.PLAIN
         meta = ALGO_META.get(algo)
@@ -2288,7 +2415,7 @@ class RgbMatrixView(QWidget):
     def _param_change(self):
         if self._current is None or self._loading:
             return
-        self._current.algorithm = RgbAlgorithm(self._algo_combo.currentText())
+        self._current.algorithm = RgbAlgorithm(self._algo_combo.wert())
         try:
             self._current.style = MatrixStyle(self._style_combo.currentText())
         except ValueError:
@@ -2375,7 +2502,7 @@ class RgbMatrixView(QWidget):
         if self._current is None:
             return
         try:
-            algo = RgbAlgorithm(self._algo_combo.currentText())
+            algo = RgbAlgorithm(self._algo_combo.wert())
         except ValueError:
             return
         from src.core.engine.rgb_matrix_meta import visible_specs
