@@ -251,13 +251,14 @@ leere Fläche** der Konsole ziehen – oder **Rechtsklick → „➡ Auf VC‑Ta
 
 **Was beim Ziehen passiert:** Lässt du den Effekt auf einer **leeren** Stelle
 (leeres Canvas/Pad) los, öffnet sich die **Drop‑Karte „Effekt einrichten"**. Sie
-fragt *„… — was soll dieser Effekt können?"* und zeigt je Aspekt eine
+fragt *„… direkt verknüpfen — es wird kein neuer Effekt erzeugt. Welche
+Bedienelemente brauchst du?"* und zeigt je Aspekt eine
 **Ankreuz‑Zeile**. **„An/Aus" (Toggle) ist bereits vorangekreuzt** – ein Klick
 auf **`Erstellen`** liefert also genau das **einfache An/Aus‑Pad**. Setzt du
 weitere Häkchen (z. B. Tempo, Helligkeit, Farbe), entstehen in **einem** Schritt
 mehrere fertig verdrahtete Widgets.
 
-![Drop‑Karte „Effekt einrichten"](img/17_drop_karte.png)
+![Drop‑Karte „Effekt einrichten"](../anleitung_vc/img/03_drop_karte.png)
 
 - **Widget‑Galerie:** Hat ein Aspekt mehrere passende Bedien‑Elemente, steht in
   der Zeile **„Widget: … ▸ ändern"** – ein Klick öffnet die grafische

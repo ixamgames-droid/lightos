@@ -1,7 +1,7 @@
 {
   "anleitung": "buehnen_effekte",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "62a8aa7f",
+  "stand": "2ce7a526",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py buehnen_effekte'.",
@@ -415,7 +415,7 @@
         900
       ],
       "marken": [],
-      "md5": "4ade1916ae92954f74ad4d78de38775a"
+      "md5": "e14f7f7f7e47f3e2a0d7b74b4dd5b1da"
     },
     {
       "datei": "20_vc_seite.png",

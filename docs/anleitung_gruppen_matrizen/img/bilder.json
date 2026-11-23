@@ -1,7 +1,7 @@
 {
   "anleitung": "gruppen_matrizen",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "62a8aa7f",
+  "stand": "2ce7a526",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py gruppen_matrizen'.",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "2979b2681b25f0c68e6c6924fafe2449"
+      "md5": "62ef9f0de32c548ae862900dff1005d6"
     }
   ]
 }

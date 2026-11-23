@@ -92,9 +92,9 @@ verdrahteten Knopfes führt LightOS dann durch den Aufbau:
   (beide Effekte am selben Regler, eine Gruppe/ein Tempo) oder **„Neues Widget daneben"**
   (lässt den Regler in Ruhe, legt ein eigenes Bedien-Element an).
 
-![Drop-Karte „Effekt einrichten"](img/17_drop_karte.png)
+![Drop-Karte „Effekt einrichten"](../anleitung_vc/img/03_drop_karte.png)
 
-![Widget-Galerie](img/18_widget_galerie.png)
+![Widget-Galerie](../anleitung_vc/img/04_widget_galerie.png)
 
 > Der in den folgenden Abschnitten gezeigte Weg über die **Bearbeiten-Toolbar** und das
 > **Doppelklick**-Einstellen bleibt weiterhin gültig — als **manueller Alternativweg**,
@@ -108,7 +108,7 @@ verdrahteten Knopfes führt LightOS dann durch den Aufbau:
    Canvas-Mitte. Bei Bedarf an die gewünschte Stelle **ziehen**.
 2. Die neue Taste **doppelklicken** → Dialog **„Button Einstellungen"**.
 
-![Button-Dialog](img/05_button_dialog.png)
+![Button-Dialog](../anleitung_vc/img/06_button_einstellungen.png)
 
 3. Feld **„Aktion:"** aufklappen und **„Funktion an/aus"** wählen (das ist der
    Umschalter — einmal drücken = an, nochmal = aus).

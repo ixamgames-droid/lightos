@@ -1,7 +1,7 @@
 {
   "anleitung": "vc",
   "werkzeug": "tools/anleitungsbilder.py",
-  "stand": "62a8aa7f",
+  "stand": "2ce7a526",
   "schrift": "Roboto Condensed",
   "qt": "6.11.1",
   "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py vc'.",
@@ -26,7 +26,7 @@
         900
       ],
       "marken": [],
-      "md5": "9d62f67e2de33d7ba391c2a87c60c182"
+      "md5": "b839649c93c782db7c774b314f2f7110"
     },
     {
       "datei": "03_drop_karte.png",
@@ -37,7 +37,7 @@
         900
       ],
       "marken": [],
-      "md5": "ecd5fb50d34e24670e74668b3e49b5fc"
+      "md5": "62de84d5bba63a2b828ae63ceb33765d"
     },
     {
       "datei": "04_widget_galerie.png",
@@ -48,7 +48,7 @@
         900
       ],
       "marken": [],
-      "md5": "18157e51c539a27ac5f2fd6d8be9b567"
+      "md5": "89a966994ad93651d0dae9f4f36649eb"
     },
     {
       "datei": "05_konflikt_karte.png",
@@ -59,7 +59,7 @@
         900
       ],
       "marken": [],
-      "md5": "4dd5284e8fc8223dbd3403e5ef8de043"
+      "md5": "018d94df4f54b99bdc88b29c7e92876e"
     },
     {
       "datei": "06_button_einstellungen.png",
@@ -70,7 +70,7 @@
         900
       ],
       "marken": [],
-      "md5": "ae80e60e6e6e9e9c6bba695a01e6e910"
+      "md5": "5a54e008ff62af5d67dfed17135621ba"
     },
     {
       "datei": "07_taste_aktiv.png",
@@ -103,7 +103,7 @@
         900
       ],
       "marken": [],
-      "md5": "236117d28b368427a1d2002eb13771fe"
+      "md5": "2dbd9a93fcd8a32340e9407eb3858df4"
     },
     {
       "datei": "10_kiosk_streifen.png",
