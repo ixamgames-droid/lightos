@@ -231,6 +231,9 @@ def _kind_main() -> int:                  # pragma: no cover - laeuft im Kindpro
     app = QApplication([sys.argv[0]])
     view = QWebEngineView()
     view.resize(160, 120)
+    # Pruef-Fund: nie ein sichtbares Fenster (Kiosk/Fokus) — die WebGL-
+    # Probe liefert verdeckt dasselbe Ergebnis (in Xephyr nachgemessen).
+    view.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, True)
 
     def _fertig(wert):
         print(f"{MARKE}{wert if wert == 'ok' else 'nogl'}", flush=True)

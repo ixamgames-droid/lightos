@@ -178,3 +178,13 @@ def test_live_view_bleibt_bei_gesperrtem_3d_in_2d(monkeypatch):
     assert s._btn_view2d.isChecked() and not s._btn_view3d.isChecked()
     assert any("3D-Ansicht kann" in m for m in s.status)
     assert "WebGL" in s._btn_view3d.tip
+
+
+def test_kindprozess_zeigt_kein_fenster():
+    """Pruef-Fund: der Probe-Kindprozess darf beim App-Start kein Fenster
+    aufblitzen lassen (Kiosk, Fokus) — verdeckt rendern."""
+    import inspect
+    from src.ui.visualizer import webgl_probe as w
+    quelle = inspect.getsource(w._kind_main)
+    assert "WA_DontShowOnScreen" in quelle
+    assert quelle.index("WA_DontShowOnScreen") < quelle.index("view.show()")
