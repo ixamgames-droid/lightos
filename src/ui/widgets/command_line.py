@@ -1,7 +1,7 @@
 """Command-Line Widget unten in der App (MA-/Avolites-Style)."""
 from __future__ import annotations
 from PySide6.QtWidgets import (QWidget, QHBoxLayout, QLineEdit, QLabel)
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QFont, QKeyEvent
 
 from src.core.cmdline.parser import execute as cmd_execute
@@ -32,6 +32,22 @@ class _CmdEdit(QLineEdit):
         super().__init__(parent)
         self._history: list[str] = []
         self._history_idx: int = 0
+
+    def event(self, ev):  # noqa: N802 (Qt-Name)
+        # UI-146: Qt verbraucht Tab fuer den Fokuswechsel, BEVOR keyPressEvent
+        # laeuft — die Vervollstaendigung kam nie an und der Fokus sprang aus
+        # der Befehlszeile (danach loesten Buchstaben globale Kuerzel aus,
+        # z. B. H = Highlight). Tab bleibt deshalb hier; Umschalt+Tab
+        # verlaesst das Feld weiter wie gewohnt.
+        if (ev.type() == QEvent.Type.KeyPress
+                and ev.key() == Qt.Key.Key_Tab
+                and not (ev.modifiers() & (Qt.KeyboardModifier.ShiftModifier
+                                           | Qt.KeyboardModifier.ControlModifier
+                                           | Qt.KeyboardModifier.AltModifier))):
+            self._complete_current_word()
+            ev.accept()
+            return True
+        return super().event(ev)
 
     def keyPressEvent(self, event: QKeyEvent):
         key = event.key()
@@ -88,7 +104,10 @@ class _CmdEdit(QLineEdit):
         candidates = sorted(k for k in _VERBS if k.startswith(word))
         if not candidates:
             return
-        chosen = candidates[0]
+        # UI-146: ein exakter Kurz-Treffer ('cl') soll zum ausgeschriebenen
+        # Wort ('clear') ergaenzen statt stehen zu bleiben.
+        laenger = [k for k in candidates if k != word]
+        chosen = laenger[0] if laenger else candidates[0]
         new_left = left[:i] + chosen
         self.setText(new_left + right)
         self.setCursorPosition(len(new_left))

@@ -37,6 +37,7 @@ from src.ui import dialog_hilfe
 from src.ui.weak_slots import weak_slot
 from src.ui import undo_kuerzel
 from src.ui import leertaste_fokus
+from src.ui import textfeld_vorrang
 from src.ui.abbau import abbau_still, abbau_still_filter
 
 
@@ -2264,6 +2265,10 @@ class MainWindow(QMainWindow):
         # VC-QShortcut); Qt wertet das als mehrdeutig und loest dann KEINE aus.
         if (ev.type() == QEvent.Type.ShortcutOverride
                 and undo_kuerzel.vorrang(self, ev, self._lokales_undo)):
+            return True
+        # UI-146: Zeichen in ein Textfeld mit Fokus loesen nie ein
+        # Fenster-Kuerzel aus (H = Highlight, Leertaste = GO, ...).
+        if textfeld_vorrang.hat_vorrang(ev):
             return True
         # UI-94: Leertaste an einen per Tabulator fokussierten Knopf statt GO.
         if leertaste_fokus.hat_vorrang(self, ev):
