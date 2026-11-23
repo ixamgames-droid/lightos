@@ -53,17 +53,21 @@ BPM-Anzeige — das entspricht dem „Erscheinungsbild" in QLC+).
 
 Im **BPM**-Tab, Sub-Tab **„Tempo-Buses"**, gibt es das Panel **„Tempo-Speeds & Grand-Master"**:
 
-![Tempo-Speeds & Grand-Master Panel](panel.png)
+![Tempo-Speeds & Grand-Master Panel: Bass (Master 128), Drums (½ → 64), Lead (2× → 256); Drums ist gewählt](img/05_tempo_speeds.png)
 
 - **Grand-Master-Zeile** (oben): **scharf** schalten, **BPM** setzen, **Tap** —
   der Status rechts zeigt `aus` / `scharf`.
+- **Auto-Sync / Jetzt synchronisieren** (Zeile darunter): Auto-Sync hält alle Tempo-Buses
+  taktgleich; „Jetzt synchronisieren“ setzt bei allen Buses einmal den Downbeat neu.
 - **Bus-Tabelle:** zeigt alle Speeds (Default/Sound-BPM zuerst) mit
   **Rolle / Folgt / Faktor / BPM**. Im Bild: `Bass` (Master 128),
-  `Drums` (Sub von Bass, `½` → 64), `Lead` (Sub von Bass, `×2` → 256).
-- **Master anlegen / Löschen** (Name eingeben → „Master anlegen"). Es lassen
+  `Drums` (Sub von Bass, `½` → 64), `Lead` (Sub von Bass, `×2` → 256). Die Busse
+  `A`–`D` gibt es in jeder Show; die Tabelle rollt, wenn mehr Busse da sind.
+- **Master anlegen / Löschen** (Name eingeben → „Master anlegen“, ①). Es lassen
   sich beliebig viele Tap-Master anlegen.
 - **Editor-Zeile:** den gewählten Bus auf **Master/Sub** stellen, den **Master,
-  dem gefolgt wird**, und den **Faktor** wählen → **Übernehmen**.
+  dem gefolgt wird**, und den **Faktor** wählen → **Übernehmen** (②). Im Bild ist `Drums`
+  gewählt: Rolle Sub, folgt Bass, Faktor ½.
 
 So läuft es live im Programm (der Default-Bus folgt hier dem Sound):
 
@@ -88,7 +92,7 @@ Effekte einfach **auf den Speed-Dial ziehen**:
   - **Neues Widget daneben** — lässt den Regler in Ruhe und legt ein eigenes
     Bedien-Element daneben an.
 
-  ![Konflikt-Karte „Regler ist schon belegt"](img/04_konflikt_karte.png)
+  ![Konflikt-Karte „Regler ist schon belegt"](../anleitung_vc/img/05_konflikt_karte.png)
 
 Im Dialog **„Speed Dial Einstellungen"** lässt sich in der **„Steuert"**-Liste je
 gekoppeltem Effekt wählen, **welcher Parameter** gesteuert wird (je Zeile eine

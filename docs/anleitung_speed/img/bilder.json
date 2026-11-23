@@ -1,0 +1,30 @@
+{
+  "anleitung": "speed",
+  "werkzeug": "tools/anleitungsbilder.py",
+  "stand": "2ce7a526",
+  "schrift": "Roboto Condensed",
+  "qt": "6.11.1",
+  "hinweis": "Pixelgleich nur auf demselben Rechner mit demselben Schriftsatz; neu erzeugen mit 'venv/bin/python tools/anleitungsbilder.py speed'.",
+  "bilder": [
+    {
+      "datei": "05_tempo_speeds.png",
+      "szene": "05_tempo_speeds",
+      "titel": "Tempo-Speeds & Grand-Master: Bass (Master 128), Drums (½), Lead (2×)",
+      "groesse": [
+        1560,
+        390
+      ],
+      "marken": [
+        {
+          "nummer": 1,
+          "beschriftung": ""
+        },
+        {
+          "nummer": 2,
+          "beschriftung": ""
+        }
+      ],
+      "md5": "3636abdfcafb762f3061d23cc3ecee53"
+    }
+  ]
+}
