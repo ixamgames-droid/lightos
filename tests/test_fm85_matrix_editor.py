@@ -183,3 +183,50 @@ def test_alte_show_mit_englischem_schluessel_laedt(ansicht):
     v._load_ui(m)
     assert v._algo_combo.currentText() == "Plasma (Sinus)"
     assert v._algo_combo.wert() == "Sine Plasma"
+
+
+# ── Pruefung: Gruppenwechsel mit offenem Entwurf bindet nicht um ──────────────
+
+@pytest.fixture
+def folge(app):
+    from src.core.engine.function_manager import get_function_manager
+    from src.ui.views.rgb_matrix_view import RgbMatrixView
+    fm = get_function_manager()
+    fm.stop_all()
+    vorher = {f.id for f in fm.all()}
+    a = fm.new_rgb_matrix(name="FM85 GA")
+    a.source_group = "GA"
+    b = fm.new_rgb_matrix(name="FM85 GB")
+    b.source_group = "GB"
+    ctx = {"g": "GA"}
+    v = RgbMatrixView(follow_selection=True)
+    v._group_context = lambda: (ctx["g"], {"GA", "GB"})
+    v._rebuild_from_state()
+    assert v._saved is a
+    v._current.color1 = (0, 0, 255)
+    v._update_dirty()
+    yield v, a, ctx
+    v.deleteLater()
+    fm.stop_all()
+    for f in list(fm.all()):
+        if f.id not in vorher:
+            fm.remove(f.id)
+
+
+def test_gruppenwechsel_speichern_behaelt_alte_gruppe(folge):
+    v, a, ctx = folge
+    v._frage_ungespeichert = lambda: "speichern"
+    ctx["g"] = "GB"
+    v._rebuild_from_state()
+    assert tuple(a.color1) == (0, 0, 255)
+    assert a.source_group == "GA"
+
+
+def test_gruppenwechsel_zurueck_dann_speichern_behaelt_alte_gruppe(folge):
+    v, a, ctx = folge
+    v._frage_ungespeichert = lambda: "zurueck"
+    ctx["g"] = "GB"
+    v._rebuild_from_state()
+    assert v._saved is a
+    v._save_edit()
+    assert a.source_group == "GA"

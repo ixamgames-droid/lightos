@@ -2666,7 +2666,12 @@ class RgbMatrixView(QWidget):
         # unter dieser Gruppe. Bindung per Name (stabil ueber Show-Save/Load).
         if self._follow_selection:
             gname, _ = self._group_context()
-            if gname:
+            # FM-85 (Pruefung): nur binden, wenn die Matrix in DIESER Gruppe
+            # ueberhaupt gelistet ist. Nach einem Gruppenwechsel mit offenem
+            # Entwurf (Rueckfrage -> Speichern/Zurueck) gehoert sie weiter zu
+            # ihrer alten Gruppe und darf nicht umgebunden werden.
+            sid = self._saved.id
+            if gname and any(m.id == sid for m in self._visible_instances()):
                 self._saved.source_group = gname
                 self._current.source_group = gname  # Draft synchron (kein dirty)
         # UI-91: gespeichert = fest gebunden, folgt der Auswahl nicht mehr.
