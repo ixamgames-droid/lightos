@@ -148,6 +148,24 @@ def _split_dirs(path: str) -> list[str]:
     return [c for c in d.replace("\\", "/").split("/") if c]
 
 
+#: UI-145: Kennzeichen ungespeicherter Aenderungen vor dem Fenstertitel.
+TITEL_GEAENDERT = "* "
+
+#: UI-145: laengste Beschriftung in „Zuletzt verwendet“ (Zeichen).
+ZULETZT_MAX_ZEICHEN = 60
+
+
+def _mitte_kuerzen(text: str, max_zeichen: int = ZULETZT_MAX_ZEICHEN) -> str:
+    """UI-145: lange Namen in der Mitte mit „…“ kuerzen — Anfang und Endung
+    bleiben lesbar, der volle Pfad steht im Tooltip. Ein Name mit 230
+    Zeichen machte das Untermenue sonst bildschirmbreit."""
+    if len(text) <= max_zeichen:
+        return text
+    vorne = (max_zeichen - 1) // 2
+    hinten = max_zeichen - 1 - vorne
+    return text[:vorne] + "…" + text[-hinten:]
+
+
 def _recent_menu_labels(paths: list[str]) -> list[str]:
     """QOL-02: Menue-Beschriftungen fuer 'Zuletzt verwendet'.
 
@@ -632,11 +650,50 @@ class MainWindow(QMainWindow):
     _emit_marshal_sig = Signal(object)
 
     def setWindowTitle(self, title: str) -> None:  # noqa: N802 (Qt-Name)
-        """STAB-39: haengt den Probelauf-Hinweis an (leer in der echten App)."""
+        """STAB-39: haengt den Probelauf-Hinweis an (leer in der echten App).
+        UI-145: setzt bei ungespeicherten Aenderungen ``* `` davor."""
+        self._titel_basis = title
+        self._titel_anwenden()
+
+    def _titel_anwenden(self) -> None:
+        title = getattr(self, "_titel_basis", "LightOS")
         zusatz = getattr(self, "_probelauf_zusatz", "")
         if zusatz and not title.endswith(zusatz):
             title = title + zusatz
+        # UI-145: Kennzeichen fuer ungespeicherte Aenderungen, wie in anderen
+        # Programmen ein Stern. Titel, die es schon in Worten sagen
+        # („wiederhergestellt (nicht gespeichert)“), bekommen keinen zweiten.
+        if (getattr(self, "_titel_geaendert", False)
+                and "nicht gespeichert" not in title):
+            title = TITEL_GEAENDERT + title
         super().setWindowTitle(title)
+
+    def _titel_markierung_pruefen(self) -> None:
+        """UI-145: Stern im Fenstertitel an ``_has_unsaved_changes`` angleichen.
+        Laeuft kurz nach jedem Rueckgaengig-Schritt, nach Laden/Speichern/Neu
+        und gedrosselt im Hintergrund (Aenderungen ohne Undo-Schritt)."""
+        try:
+            import shiboken6
+            if not shiboken6.isValid(self) or self.isMinimized():
+                return
+            geaendert = bool(self._has_unsaved_changes())
+        except Exception:
+            return
+        if geaendert != getattr(self, "_titel_geaendert", False):
+            self._titel_geaendert = geaendert
+            self._titel_anwenden()
+            try:
+                self.setProperty("ungespeichert", geaendert)
+            except RuntimeError:
+                pass
+
+    def _titel_markierung_spaeter(self) -> None:
+        t = getattr(self, "_titel_timer", None)
+        if t is not None:
+            try:
+                t.start()
+            except RuntimeError:
+                pass
 
     def __init__(self, kiosk: bool = False, touch: bool = False):
         super().__init__()
@@ -689,6 +746,25 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(900, 600)
 
         self._apply_theme()
+        # UI-145: Stern im Titel. Kurz nach einem Undo-Schritt pruefen
+        # (``_titel_timer``), sonst gedrosselt alle 3 s fuer Aenderungen, die
+        # keinen Undo-Schritt anlegen.
+        self._titel_geaendert = False
+        self._titel_timer = QTimer(self)
+        self._titel_timer.setSingleShot(True)
+        self._titel_timer.setInterval(300)
+        self._titel_timer.timeout.connect(self._titel_markierung_pruefen)
+        self._titel_poll = QTimer(self)
+        self._titel_poll.setInterval(3000)
+        self._titel_poll.timeout.connect(self._titel_markierung_pruefen)
+        self._titel_poll.start()
+        # UI-145: Meldungen (Fehler, Warnungen, Rueckfragen) mittig ueber dem
+        # Hauptfenster statt dort, wo der Fenstermanager sie hinlegt.
+        try:
+            from src.ui.dialog_hilfe import meldungen_mittig_halten
+            self._meldungen_mittig = meldungen_mittig_halten(self)
+        except Exception as e:
+            print(f"[main_window] Meldungen mittig: {e}")
         self._setup_menubar()
         self._build_ui()
         self._setup_statusbar()
@@ -2175,6 +2251,9 @@ class MainWindow(QMainWindow):
         import shiboken6
         if not (shiboken6.isValid(self._act_undo) and shiboken6.isValid(self._act_redo)):
             return
+        spaeter = getattr(self, "_titel_markierung_spaeter", None)
+        if spaeter is not None:
+            spaeter()                         # UI-145
         quelle_u, u = self._naechster_verlauf(False)
         quelle_r, r = self._naechster_verlauf(True)
         # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
@@ -2845,7 +2924,7 @@ class MainWindow(QMainWindow):
         self._open_show_path(demo.pfad, demo=demo)
 
     def _open_show_path(self, path: str, wiederherstellung: bool = False,
-                        sicherung=None, demo=None):
+                        sicherung=None, demo=None, beim_start: bool = False):
         """Show laden. ``wiederherstellung``: ``path`` ist die Auto-Save-Datei
         (Absturz-Wiederherstellung beim Start) — siehe unten. ``sicherung``
         (STAB-32): ``path`` ist eine versionierte Sicherung und oeffnet sich
@@ -2905,7 +2984,11 @@ class MainWindow(QMainWindow):
             self._aus_auto_save = False
             self._sicherung_herkunft = None
             self.setWindowTitle(f"LightOS  -  {msg}")
-            self.statusBar().showMessage(msg, 4000)
+            # UI-145: die Lademeldung verdeckt in der Statuszeile kurz die
+            # Anzeigen „Enttec/Web“. Beim Start (``--show``) steht der Name
+            # ohnehin im Titel — gemeldet wird nur nach einem Handgriff.
+            if not beim_start:
+                self.statusBar().showMessage(msg, 4000)
             self._show_stand_merken(nachlaufend=True)   # UI-69: Laden ist keine Aenderung
             _add_recent_file(path)
             self._rebuild_recent_menu()
@@ -2947,7 +3030,16 @@ class MainWindow(QMainWindow):
                     + (f" (und {len(hinweise) - 1} weitere)" if len(hinweise) > 1 else ""),
                     15000)
         else:
-            QMessageBox.warning(self, "Fehler", msg)
+            # UI-145: eine verschwundene Datei fliegt aus „Zuletzt verwendet“.
+            if not os.path.exists(path):
+                key = _canon_path(path)
+                recents = _load_recent_files()
+                rest = [p for p in recents if _canon_path(p) != key]
+                if len(rest) != len(recents):
+                    _save_recent_files(rest)
+                    self._rebuild_recent_menu()
+                    msg += "\n\nDer Eintrag wurde aus „Zuletzt verwendet“ entfernt."
+            QMessageBox.warning(self, "Show nicht geöffnet", msg)
 
     def _rebuild_recent_menu(self):
         if not hasattr(self, "_recent_menu") or self._recent_menu is None:
@@ -2960,7 +3052,7 @@ class MainWindow(QMainWindow):
             return
         labels = _recent_menu_labels(recents)
         for path, short in zip(recents, labels):
-            act = self._recent_menu.addAction(short)
+            act = self._recent_menu.addAction(_mitte_kuerzen(short))
             act.setToolTip(path)  # voller Pfad bleibt im Tooltip
             act.triggered.connect(weak_slot(self._open_show_nach_rueckfrage, path))
         self._recent_menu.addSeparator()
@@ -3157,6 +3249,7 @@ class MainWindow(QMainWindow):
             merke_show_stand(self._state, views)
         except Exception as e:
             print(f"[main_window] show stand merken error: {e}")
+        self._titel_markierung_pruefen()      # UI-145: Stern weg
         if nachlaufend:
             QTimer.singleShot(0, self._show_stand_merken)
 

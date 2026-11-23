@@ -1945,6 +1945,10 @@ class StageCanvas(QWidget):
         except Exception:
             fixtures = []
         if not fixtures:
+            # UI-145: nach „Neue Show" (leerer Patch) blieben hier die Punkte
+            # der alten Show stehen — die Minimap (liest ``_positions``) zeigte
+            # sie weiter, und das Einpassen zoomte auf sie (247 %).
+            self._positions = {}
             return
         self._positions = {}
         # 1) gespeicherte 2D-Positionen

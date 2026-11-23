@@ -2590,6 +2590,41 @@ def read_show_version(path: str | os.PathLike) -> str | None:
         return None
 
 
+OEFFNEN_TIPP_AELTERE_VERSION = (
+    "Tipp: Über Datei → „Ältere Version öffnen…“ lässt sich eine "
+    "automatische Sicherung dieser Show öffnen.")
+
+
+def oeffnen_fehlertext(path, fehler: BaseException) -> str:
+    """UI-145: verstaendliche deutsche Meldung, wenn eine Show-Datei nicht
+    geoeffnet werden kann. Der rohe Ausnahmetext („File is not a zip file“,
+    „Expecting ',' delimiter …“, „[Errno 2] …“) gehoert ins Log, nicht in den
+    Dialog."""
+    name = os.path.basename(os.fspath(path)) or os.fspath(path)
+    if isinstance(fehler, FileNotFoundError):
+        return (f"Die Show-Datei „{name}“ wurde nicht gefunden.\n\n"
+                "Sie wurde vielleicht verschoben, umbenannt oder gelöscht.")
+    if isinstance(fehler, PermissionError):
+        return (f"Kein Zugriff auf die Show-Datei „{name}“.\n\n"
+                "Die Datei ist gesperrt oder es fehlen Leserechte.")
+    if isinstance(fehler, IsADirectoryError):
+        return f"„{name}“ ist ein Ordner, keine Show-Datei."
+    if isinstance(fehler, (zipfile.BadZipFile, KeyError)):
+        return (f"„{name}“ ist keine gültige LightOS-Show "
+                "(kein .lshow-Format) oder die Datei ist beschädigt.\n\n"
+                + OEFFNEN_TIPP_AELTERE_VERSION)
+    if isinstance(fehler, (ValueError, UnicodeDecodeError)):
+        # json.JSONDecodeError ist ein ValueError
+        return (f"Die Show-Datei „{name}“ ist beschädigt — ihr Inhalt ist "
+                "unvollständig oder fehlerhaft.\n\n"
+                + OEFFNEN_TIPP_AELTERE_VERSION)
+    if isinstance(fehler, OSError):
+        return (f"Die Show-Datei „{name}“ konnte nicht gelesen werden.\n\n"
+                "Details stehen im Protokoll.")
+    return (f"Die Show-Datei „{name}“ konnte nicht geöffnet werden.\n\n"
+            + OEFFNEN_TIPP_AELTERE_VERSION)
+
+
 def _load_show_impl(path: str | os.PathLike):
     """Load a .lshow file and replace app state. Returns (ok: bool, msg: str)."""
     from src.core.app_state import get_state
@@ -2622,7 +2657,11 @@ def _load_show_impl(path: str | os.PathLike):
                         _melde_still("show.vc_asset", _e, text=_name)   # STAB-30
         data = json.loads(raw)
     except Exception as e:
-        return False, f"Öffnen fehlgeschlagen: {e}"
+        # UI-145: technische Details nur ins Log, der Bediener bekommt die
+        # Ursache in Worten (nicht gefunden / kein LightOS-Format / beschaedigt).
+        print(f"[show_file] Öffnen fehlgeschlagen ({path}): "
+              f"{type(e).__name__}: {e}")
+        return False, oeffnen_fehlertext(path, e)
 
     # STAB-20: show.json MUSS ein Objekt sein. Gueltiges JSON, das eine Liste/Zahl/
     # String/null ist (korrupte oder fremde Datei), fuehrte sonst beim ersten

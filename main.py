@@ -663,7 +663,7 @@ def _open_show_at_startup(window, pfad: str):
       Sorte halber Zustand kostet spaeter eine Stunde Fehlersuche.
     """
     from PySide6.QtCore import QTimer
-    QTimer.singleShot(0, lambda: window._open_show_path(pfad))
+    QTimer.singleShot(0, lambda: window._open_show_path(pfad, beim_start=True))
 
 
 def _bibliothek_beim_erststart(window, mit_show: bool = False) -> None:
