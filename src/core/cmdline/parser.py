@@ -394,11 +394,17 @@ class SetValueCommand(Command):
                 if self.selection.is_empty() and not _auswahl_leer(state):
                     return CommandResult(False, "Nur Weiß-Segmente gewählt")
                 return CommandResult(False, "Keine Fixtures selektiert")
+            # UI-146: eine Begrenzung nicht still schlucken ('1 @ 300').
+            begrenzt = ""
             if self.value_pct is not None:
                 pct = max(0, min(100, int(self.value_pct)))
+                if pct != int(self.value_pct):
+                    begrenzt = f" (auf {pct} % begrenzt)"
                 val = int(round(pct * 255 / 100))
             else:
                 val = max(0, min(255, int(self.value_raw or 0)))
+                if val != int(self.value_raw or 0):
+                    begrenzt = f" (auf {val} begrenzt)"
             geschrieben = 0
             for fid in fids:
                 # Kein Eintrag = geraeteweit (FM-17: head=None), byte-identisch
@@ -408,7 +414,8 @@ class SetValueCommand(Command):
                     geschrieben += 1
             koepfe = f" ({geschrieben} Koepfe)" if geschrieben != len(fids) else ""
             return CommandResult(True,
-                                 f"{len(fids)}x {self.attribute}={val}{koepfe}")
+                                 f"{len(fids)}x {self.attribute}={val}{koepfe}"
+                                 f"{begrenzt}")
         except Exception as e:
             return CommandResult(False, f"SetValue Fehler: {e}")
 

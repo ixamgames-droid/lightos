@@ -14,7 +14,7 @@ from PySide6.QtCore import Qt, Signal, QPoint
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QMouseEvent
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSlider, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QGroupBox, QSizePolicy, QFrame, QCheckBox
+    QListWidget, QListWidgetItem, QGroupBox, QSizePolicy, QFrame, QCheckBox, QApplication
 )
 
 try:
@@ -324,6 +324,52 @@ class PositionTool(QWidget):
             self._tilt_fine = max(0, min(255, int(tilt_fine)))
         self._sync_controls()
         self._emit()
+
+    def aus_programmer_laden(self) -> bool:
+        """UI-146: Pad, Regler und Anzeige auf die echten Programmer-Werte
+        des ersten Ziels der Auswahl setzen — OHNE etwas zu schreiben (auch
+        im Live-Modus nicht). Vorher stand das Pad immer auf 127/127; beim
+        ersten Anfassen sprang der Kopf vom falschen Ausgangswert los.
+        Liefert True, wenn ein Pan- oder Tilt-Wert gefunden wurde. Waehrend
+        der Nutzer am Pad oder einem Regler zieht, bleibt alles stehen."""
+        if get_state is None:
+            return False
+        try:
+            if (self._pad.underMouse() and QApplication.mouseButtons()
+                    != Qt.MouseButton.NoButton):
+                return False
+            for sl in (self._slider_pan, self._slider_tilt,
+                       self._slider_pan_fine, self._slider_tilt_fine):
+                if sl.isSliderDown():
+                    return False
+            state = get_state()
+            fids = list(state.auswahl_ziel_fids(rueckfall="programmer_oder_alle"))
+        except Exception:
+            return False
+        for fid in fids:
+            try:
+                pan = state.get_programmer_value(fid, "pan")
+                tilt = state.get_programmer_value(fid, "tilt")
+            except Exception:
+                continue
+            if pan is None and tilt is None:
+                continue
+            if pan is not None:
+                self._pan = max(0, min(255, int(pan)))
+            if tilt is not None:
+                self._tilt = max(0, min(255, int(tilt)))
+            try:
+                pf = state.get_programmer_value(fid, "pan_fine")
+                tf = state.get_programmer_value(fid, "tilt_fine")
+            except Exception:
+                pf = tf = None
+            if pf is not None:
+                self._pan_fine = max(0, min(255, int(pf)))
+            if tf is not None:
+                self._tilt_fine = max(0, min(255, int(tf)))
+            self._sync_controls()
+            return True
+        return False
 
     def position(self) -> tuple[int, int, int, int]:
         return (self._pan, self._tilt, self._pan_fine, self._tilt_fine)
