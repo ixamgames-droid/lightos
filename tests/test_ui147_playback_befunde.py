@@ -211,6 +211,21 @@ class DoppelteNummerTest(_Basis):
         self.assertIs(self.liste.cues[1], alt)
         self.assertEqual(alt.values, {1: {"intensity": 100}})
 
+    def test_ersetzen_teilt_keine_delay_tabellen(self):
+        """Pruefung: neue und alte Cue duerfen keine dicts teilen — sonst
+        veraendert ein Bearbeiten der neuen Cue den Rueckgaengig-Stand."""
+        alt = self.liste.cues[1]
+        alt.attr_delays = {1: {"intensity": 0.5}}
+        alt.attr_delays_out = {1: {"intensity": 0.25}}
+        neu = self.state.ersetze_cue(self.liste, 2.0, "Neu")
+        self.assertIsNot(neu.attr_delays, alt.attr_delays)
+        neu.attr_delays[1]["intensity"] = 9.0
+        neu.attr_delays_out[1]["intensity"] = 9.0
+        self.assertTrue(get_undo_stack().undo())
+        self.assertIs(self.liste.cues[1], alt)
+        self.assertEqual(alt.attr_delays, {1: {"intensity": 0.5}})
+        self.assertEqual(alt.attr_delays_out, {1: {"intensity": 0.25}})
+
     def test_rueckfrage_voreinstellung_abbrechen(self):
         gesehen = {}
 

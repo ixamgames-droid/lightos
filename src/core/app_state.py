@@ -6807,6 +6807,11 @@ class AppState:
         with self._prog_lock:
             values = {fid: dict(attrs) for fid, attrs in self.programmer.items()}
         neu = copy.copy(alt)
+        # Pruefung UI-147: eigene Kopien der Delay-Tabellen — sonst teilten
+        # alte und neue Cue dieselben dicts, und ein Bearbeiten der neuen
+        # Cue veraenderte still den Rueckgaengig-Stand.
+        neu.attr_delays = copy.deepcopy(alt.attr_delays)
+        neu.attr_delays_out = copy.deepcopy(alt.attr_delays_out)
         neu.values = values
         if label:
             neu.label = label
