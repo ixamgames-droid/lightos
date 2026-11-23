@@ -220,6 +220,13 @@ INPUT_SOURCE_TIMEOUT_S = 2.5
 _DIM_INTENSITY_ATTRS = frozenset(ATTR_GROUPS["Intensity"]) - frozenset({"shutter", "strobe"})
 
 
+def _geraet_geaendert_text(label) -> str:
+    """UI-145: Rueckgaengig-Text fuer eine Geraete-Aenderung. Frueher stand im
+    Menue „Rückgängig: Fixture ~PAR 6“ — die Tilde verstand niemand."""
+    label = str(label or "").strip()
+    return f"Gerät „{label}“ geändert" if label else "Gerät geändert"
+
+
 def ist_dimmer_attribut(attr) -> bool:
     """Ist ``attr`` ein Dimmer-/Intensitaets-Attribut im Sinne des Renderers
     (ohne Shutter/Strobe, Mehrkopf-Zusatz ``#N`` zaehlt mit)?"""
@@ -1968,7 +1975,7 @@ class AppState:
             before_kw = {k: v for k, v in before.items() if k != "fid"}
             after_kw = {k: v for k, v in after.items() if k != "fid"}
             self._push_undo(
-                label=f"Fixture ~{before.get('label', '')}",
+                label=_geraet_geaendert_text(before.get('label', '')),
                 do=lambda: None,
                 undo=lambda b=before_kw: self.update_fixture(fid, undoable=False, **b),
                 redo=lambda a=after_kw: self.update_fixture(fid, undoable=False, **a),

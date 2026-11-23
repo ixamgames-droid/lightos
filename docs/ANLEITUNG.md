@@ -18,7 +18,10 @@ Den Tiefgang zu Effekten + Geschwindigkeit findest du in
 ## 1. Die Oberfläche im Überblick
 
 Ganz oben liegt eine **Sektions-Leiste** mit 8 Hauptbereichen. Ein Klick (oder
-`Strg+1` … `Strg+8`) wechselt den Bereich. Viele Bereiche haben darunter noch
+`Strg+1` … `Strg+8`) wechselt den Bereich. Ist das Fenster schmal (etwa 1024 oder
+1150 px), werden die Namen erst verkürzt („Prog“, „VC“); was dann nicht mehr lesbar
+passt, steht im Menü **»** am Ende der Leiste. Der gerade offene Bereich bleibt
+immer in der Leiste. Viele Bereiche haben darunter noch
 **Unter-Tabs**:
 
 | # | Sektion | Unter-Tabs |
@@ -287,7 +290,10 @@ Schritt für Schritt:
 ## 9. Speichern & Sichern
 
 - **Strg+S** speichert die Show; **Datei → Speichern unter…** als `.lshow`.
-- **Datei → Zuletzt verwendet** öffnet frühere Shows schnell.
+- **Datei → Zuletzt verwendet** öffnet frühere Shows schnell. Eine verschobene
+  oder gelöschte Datei meldet LightOS als „nicht gefunden“ und nimmt sie aus der Liste.
+- Ein **Stern vorn in der Titelleiste** („* LightOS …“) heißt: es gibt
+  ungespeicherte Änderungen.
 - **Datei → Demo-Show öffnen** lädt eine mitgelieferte Beispiel-Show als neue,
   ungespeicherte Show (Speichern legt deine Kopie an).
 - **Datei → Show prüfen & reparieren…** (`Strg+Shift+R`) prüft die Show und zeigt, was gefunden wurde. Geändert wird dabei nichts; erst der Knopf **Reparieren** im Dialog behebt, was sich automatisch beheben lässt.

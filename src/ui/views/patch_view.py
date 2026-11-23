@@ -16,7 +16,7 @@ from src.core.pixel_order import (ELEMENT_ROTATIONS, PIXEL_ORDERS,
                                   PIXEL_ORDER_LABELS,
                                   normalize_element_rotation,
                                   normalize_pixel_order)
-from src.core.app_state import (get_state, AppState, color_head_count,
+from src.core.app_state import (get_state, AppState, _geraet_geaendert_text, color_head_count,
                                  get_channels_for_patched, viz_model_for)
 from src.core.database import fixture_db as fdb
 from src.core.database.models import PatchedFixture
@@ -1298,8 +1298,8 @@ class PatchView(QWidget):
                 # Feldaenderung und ggf. Neuaufbau = EIN Rueckgaengig-Schritt.
                 try:
                     from src.core.undo import get_undo_stack
-                    schritt = get_undo_stack().gruppe(
-                        f"Fixture ~{getattr(fixture, 'label', '')}")
+                    schritt = get_undo_stack().gruppe(_geraet_geaendert_text(
+                        getattr(fixture, 'label', '')))
                 except Exception:
                     schritt = nullcontext()
                 with schritt:

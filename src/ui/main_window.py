@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QPushButton, QButtonGroup, QStackedWidget, QStatusBar,
     QMessageBox, QFileDialog, QTabWidget, QSizePolicy, QFrame,
-    QMenu, QSlider, QInputDialog,
+    QMenu, QSlider, QInputDialog, QToolButton,
 )
 from PySide6.QtCore import Qt, QEvent, QPoint, QSize, QTimer, Signal
 from PySide6.QtGui import (
@@ -147,6 +147,24 @@ def _split_dirs(path: str) -> list[str]:
     """Ordner-Komponenten eines Pfades ohne Dateiname (Trenner-agnostisch)."""
     d = os.path.dirname(path)
     return [c for c in d.replace("\\", "/").split("/") if c]
+
+
+#: UI-145: Kennzeichen ungespeicherter Aenderungen vor dem Fenstertitel.
+TITEL_GEAENDERT = "* "
+
+#: UI-145: laengste Beschriftung in „Zuletzt verwendet“ (Zeichen).
+ZULETZT_MAX_ZEICHEN = 60
+
+
+def _mitte_kuerzen(text: str, max_zeichen: int = ZULETZT_MAX_ZEICHEN) -> str:
+    """UI-145: lange Namen in der Mitte mit „…“ kuerzen — Anfang und Endung
+    bleiben lesbar, der volle Pfad steht im Tooltip. Ein Name mit 230
+    Zeichen machte das Untermenue sonst bildschirmbreit."""
+    if len(text) <= max_zeichen:
+        return text
+    vorne = (max_zeichen - 1) // 2
+    hinten = max_zeichen - 1 - vorne
+    return text[:vorne] + "…" + text[-hinten:]
 
 
 def _recent_menu_labels(paths: list[str]) -> list[str]:
@@ -414,6 +432,23 @@ def _allocate_tab_widths(full: list[float], avail: float, floor: float) -> list[
     return [min(max(level, floor), f) for f in full]
 
 
+def _verteilen_ab_minimum(full: list[float], need: list[float],
+                          avail: float) -> list[float]:
+    """UI-146: jeder Reiter bekommt mindestens ``need`` (lesbarer Name), der
+    Rest fuellt gleichmaessig bis zur Vollbreite auf. Summe <= ``avail``."""
+    rest = avail - sum(need)
+    if rest <= 0:
+        return list(need)
+    lo, hi = 0.0, max(f - n for f, n in zip(full, need)) if full else 0.0
+    for _ in range(64):
+        mid = (lo + hi) / 2.0
+        if sum(min(mid, f - n) for f, n in zip(full, need)) < rest:
+            lo = mid
+        else:
+            hi = mid
+    return [n + min(lo, f - n) for f, n in zip(full, need)]
+
+
 class _SectionBar(QWidget):
     """Container NUR der Sektions-Tabs (Haupt-Navigation). Nimmt im aeusseren
     Bar-Layout als EIN Element genau den fuer die Tabs uebrigen Platz ein (schrumpft
@@ -425,18 +460,95 @@ class _SectionBar(QWidget):
     """
     _SP = 0  # Innen-Spacing zwischen Tabs (wie die alte bar_layout-Spacing)
 
+    # UI-146: Ueberlaufknopf „»“ (wie Browser-Reiter). Maus schmal, mit
+    # Touch mindestens 44 px breit.
+    _UEBERLAUF_B = 30
+    _UEBERLAUF_B_TOUCH = 48
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._tabs: list = []
         self._reflowing = False
+        self._im_ueberlauf: list = []
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(self._SP)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        # UI-146: bei schmalem Fenster wandern Reiter, deren Name nicht mehr
+        # lesbar hineinpasst, in dieses Menue statt auf „Bü Pa Pr“ zu stauchen.
+        self._ueberlauf = QToolButton(self)
+        self._ueberlauf.setObjectName("sectionOverflowBtn")
+        self._ueberlauf.setText("»")
+        self._ueberlauf.setToolTip("Weitere Bereiche")
+        self._ueberlauf.setAutoRaise(True)
+        self._ueberlauf.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._ueberlauf.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._ueberlauf.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._ueberlauf_menue = QMenu(self._ueberlauf)
+        self._ueberlauf_menue.setObjectName("sectionOverflowMenu")
+        self._ueberlauf_menue.aboutToShow.connect(self._menue_fuellen)
+        self._ueberlauf.setMenu(self._ueberlauf_menue)
+        self._ueberlauf.hide()
+        lay.addWidget(self._ueberlauf)
 
     def add_tab(self, btn) -> None:
         self._tabs.append(btn)
-        self.layout().addWidget(btn)
+        lay = self.layout()
+        lay.insertWidget(lay.indexOf(self._ueberlauf), btn)
+        # Der aktive Reiter bleibt immer sichtbar: nach jedem Wechsel neu
+        # verteilen (auch per Strg+Zahl oder aus dem Ueberlaufmenue).
+        btn.toggled.connect(self._nach_wechsel)
+
+    def _nach_wechsel(self, an: bool) -> None:
+        if an:
+            QTimer.singleShot(0, self._reflow)
+
+    @staticmethod
+    def _touch() -> bool:
+        try:
+            from src.ui.touch_keyboard import is_touch_mode
+            return bool(is_touch_mode())
+        except Exception:
+            return False
+
+    def _ueberlauf_breite(self) -> int:
+        return self._UEBERLAUF_B_TOUCH if self._touch() else self._UEBERLAUF_B
+
+    @staticmethod
+    def _lesbar_breite(b) -> int:
+        """UI-146: kleinste Breite, bei der der Reiter einen ganzen Namen
+        zeigt — den Kurznamen aus UI-122 („Prog“, „VC“) oder, ohne Kurznamen,
+        den vollen Titel. Darunter wuerde gekuerzt („Bü“), dann lieber in den
+        Ueberlauf. Nie unter 44 px (Fingerbreite)."""
+        voll = max(1, b._full_text_size_hint().width())
+        if not b._kurz:
+            return voll
+        fm = b.fontMetrics()
+        chrome = max(voll - fm.horizontalAdvance(b._full_text), 0)
+        # Ohne Farbsymbol (faellt bei Platzmangel weg, s. SectionButton).
+        ohne_symbol = chrome - (b.iconSize().width() + 4)
+        brauchte = ohne_symbol + fm.horizontalAdvance(b._kurz) + 2
+        return min(voll, max(44, brauchte))
+
+    def ueberlauf_reiter(self) -> list:
+        """Reiter, die gerade im Ueberlaufmenue stehen (Reihenfolge der Leiste)."""
+        return list(self._im_ueberlauf)
+
+    def _menue_fuellen(self) -> None:
+        m = self._ueberlauf_menue
+        m.clear()
+        if self._touch():
+            m.setStyleSheet("QMenu::item { min-height: 44px; padding: 4px 24px; }")
+        else:
+            m.setStyleSheet("")
+        for b in self._im_ueberlauf:
+            titel = b._full_text
+            tip = b.toolTip()
+            if tip and tip != titel:
+                titel = f"{titel} ({tip})" if len(tip) > len(titel) else titel
+            act = m.addAction(titel)
+            act.setIcon(b._icon_voll)
+            act.triggered.connect(b.click)
 
     def _full_widths(self) -> list[int]:
         return [max(1, b._full_text_size_hint().width()) for b in self._tabs]
@@ -468,15 +580,58 @@ class _SectionBar(QWidget):
         super().showEvent(event)
         QTimer.singleShot(0, self._reflow)
 
+    def _sichtbare_waehlen(self, tabs: list) -> tuple[list, list]:
+        """UI-146: welche Reiter in der Leiste bleiben. Passen alle mit
+        lesbarem Namen, bleiben alle. Sonst kommt ``»`` dazu, und von links
+        bleiben so viele, wie lesbar passen — der aktive Reiter immer."""
+        need = [self._lesbar_breite(b) for b in tabs]
+        frei = self.width() - self._SP * max(0, len(tabs) - 1)
+        if sum(need) <= frei or len(tabs) <= 1:
+            return tabs, []
+        platz = self.width() - self._ueberlauf_breite()
+        aktiv = next((i for i, b in enumerate(tabs) if b.isChecked()), 0)
+        behalten = {aktiv}
+        summe = need[aktiv]
+        for i in range(len(tabs)):
+            if i == aktiv:
+                continue
+            extra = need[i] + self._SP
+            if summe + extra <= platz:
+                behalten.add(i)
+                summe += extra
+            else:
+                break       # Reihenfolge der Leiste: ab hier alles ins Menue
+        sichtbar = [b for i, b in enumerate(tabs) if i in behalten]
+        ueber = [b for i, b in enumerate(tabs) if i not in behalten]
+        return sichtbar, ueber
+
     def _reflow(self) -> None:
         if self._reflowing or not self._tabs:
             return
-        tabs = [b for b in self._tabs if not b.isHidden()]
+        # UI-146: Reiter im Ueberlauf sind nur hier versteckt — fuer die
+        # Auswahl zaehlen sie mit. Von aussen versteckte bleiben draussen.
+        tabs = [b for b in self._tabs
+                if not b.isHidden() or b in self._im_ueberlauf]
         if not tabs:
             return
         self._reflowing = True
         try:
-            avail = int(self.width() - self._SP * max(0, len(tabs) - 1))
+            tabs, ueber = self._sichtbare_waehlen(tabs)
+            self._im_ueberlauf = ueber
+            for b in tabs:
+                if b.isHidden() and b in self._tabs:
+                    b.show()
+            for b in ueber:
+                b.setFixedWidth(0)      # zaehlt nicht mehr zur Leistenbreite
+                b.hide()
+            ub = 0
+            if ueber:
+                ub = self._ueberlauf_breite()
+                self._ueberlauf.setFixedSize(ub, max(1, self.height()))
+                self._ueberlauf.show()
+            else:
+                self._ueberlauf.hide()
+            avail = int(self.width() - ub - self._SP * max(0, len(tabs) - 1))
             full = [max(1, b._full_text_size_hint().width()) for b in tabs]
             if sum(full) <= avail:
                 # UI-TABFLOOR: `setFixedWidth` haengt `setMinimumWidth(56)` aus —
@@ -488,6 +643,13 @@ class _SectionBar(QWidget):
                 ints = floored if sum(floored) <= avail else list(full)
             else:
                 widths = _allocate_tab_widths(full, avail, float(SectionButton._CLICK_FLOOR_PX))
+                # UI-146: unterschreitet ein Reiter dabei seine lesbare Breite,
+                # obwohl alle lesbar passen, je Reiter vom Lesbar-Minimum aus
+                # verteilen (sonst „De…“ neben breiterem „Patchen“).
+                need = [min(f, self._lesbar_breite(t)) for f, t in zip(full, tabs)]
+                if (sum(need) <= avail
+                        and any(w + 0.5 < n for w, n in zip(widths, need))):
+                    widths = _verteilen_ab_minimum(full, need, avail)
                 # Ganzzahlig OHNE die Summe (== avail) zu ueberschreiten: erst
                 # ABRUNDEN (Summe <= avail), dann den Rest pixelweise an die
                 # groessten Nachkommaanteile verteilen. Ein pro-Tab int(round())
@@ -633,11 +795,50 @@ class MainWindow(QMainWindow):
     _emit_marshal_sig = Signal(object)
 
     def setWindowTitle(self, title: str) -> None:  # noqa: N802 (Qt-Name)
-        """STAB-39: haengt den Probelauf-Hinweis an (leer in der echten App)."""
+        """STAB-39: haengt den Probelauf-Hinweis an (leer in der echten App).
+        UI-145: setzt bei ungespeicherten Aenderungen ``* `` davor."""
+        self._titel_basis = title
+        self._titel_anwenden()
+
+    def _titel_anwenden(self) -> None:
+        title = getattr(self, "_titel_basis", "LightOS")
         zusatz = getattr(self, "_probelauf_zusatz", "")
         if zusatz and not title.endswith(zusatz):
             title = title + zusatz
+        # UI-145: Kennzeichen fuer ungespeicherte Aenderungen, wie in anderen
+        # Programmen ein Stern. Titel, die es schon in Worten sagen
+        # („wiederhergestellt (nicht gespeichert)“), bekommen keinen zweiten.
+        if (getattr(self, "_titel_geaendert", False)
+                and "nicht gespeichert" not in title):
+            title = TITEL_GEAENDERT + title
         super().setWindowTitle(title)
+
+    def _titel_markierung_pruefen(self) -> None:
+        """UI-145: Stern im Fenstertitel an ``_has_unsaved_changes`` angleichen.
+        Laeuft kurz nach jedem Rueckgaengig-Schritt, nach Laden/Speichern/Neu
+        und gedrosselt im Hintergrund (Aenderungen ohne Undo-Schritt)."""
+        try:
+            import shiboken6
+            if not shiboken6.isValid(self) or self.isMinimized():
+                return
+            geaendert = bool(self._has_unsaved_changes())
+        except Exception:
+            return
+        if geaendert != getattr(self, "_titel_geaendert", False):
+            self._titel_geaendert = geaendert
+            self._titel_anwenden()
+            try:
+                self.setProperty("ungespeichert", geaendert)
+            except RuntimeError:
+                pass
+
+    def _titel_markierung_spaeter(self) -> None:
+        t = getattr(self, "_titel_timer", None)
+        if t is not None:
+            try:
+                t.start()
+            except RuntimeError:
+                pass
 
     def __init__(self, kiosk: bool = False, touch: bool = False):
         super().__init__()
@@ -690,6 +891,25 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(900, 600)
 
         self._apply_theme()
+        # UI-145: Stern im Titel. Kurz nach einem Undo-Schritt pruefen
+        # (``_titel_timer``), sonst gedrosselt alle 3 s fuer Aenderungen, die
+        # keinen Undo-Schritt anlegen.
+        self._titel_geaendert = False
+        self._titel_timer = QTimer(self)
+        self._titel_timer.setSingleShot(True)
+        self._titel_timer.setInterval(300)
+        self._titel_timer.timeout.connect(self._titel_markierung_pruefen)
+        self._titel_poll = QTimer(self)
+        self._titel_poll.setInterval(3000)
+        self._titel_poll.timeout.connect(self._titel_markierung_pruefen)
+        self._titel_poll.start()
+        # UI-145: Meldungen (Fehler, Warnungen, Rueckfragen) mittig ueber dem
+        # Hauptfenster statt dort, wo der Fenstermanager sie hinlegt.
+        try:
+            from src.ui.dialog_hilfe import meldungen_mittig_halten
+            self._meldungen_mittig = meldungen_mittig_halten(self)
+        except Exception as e:
+            print(f"[main_window] Meldungen mittig: {e}")
         self._setup_menubar()
         self._build_ui()
         self._setup_statusbar()
@@ -2180,6 +2400,9 @@ class MainWindow(QMainWindow):
         import shiboken6
         if not (shiboken6.isValid(self._act_undo) and shiboken6.isValid(self._act_redo)):
             return
+        spaeter = getattr(self, "_titel_markierung_spaeter", None)
+        if spaeter is not None:
+            spaeter()                         # UI-145
         quelle_u, u = self._naechster_verlauf(False)
         quelle_r, r = self._naechster_verlauf(True)
         # Die Titel tragen fremde Namen (Effekt, Stufe „Strobe & Blinder“):
@@ -2850,7 +3073,7 @@ class MainWindow(QMainWindow):
         self._open_show_path(demo.pfad, demo=demo)
 
     def _open_show_path(self, path: str, wiederherstellung: bool = False,
-                        sicherung=None, demo=None):
+                        sicherung=None, demo=None, beim_start: bool = False):
         """Show laden. ``wiederherstellung``: ``path`` ist die Auto-Save-Datei
         (Absturz-Wiederherstellung beim Start) — siehe unten. ``sicherung``
         (STAB-32): ``path`` ist eine versionierte Sicherung und oeffnet sich
@@ -2910,7 +3133,11 @@ class MainWindow(QMainWindow):
             self._aus_auto_save = False
             self._sicherung_herkunft = None
             self.setWindowTitle(f"LightOS  -  {msg}")
-            self.statusBar().showMessage(msg, 4000)
+            # UI-145: die Lademeldung verdeckt in der Statuszeile kurz die
+            # Anzeigen „Enttec/Web“. Beim Start (``--show``) steht der Name
+            # ohnehin im Titel — gemeldet wird nur nach einem Handgriff.
+            if not beim_start:
+                self.statusBar().showMessage(msg, 4000)
             self._show_stand_merken(nachlaufend=True)   # UI-69: Laden ist keine Aenderung
             _add_recent_file(path)
             self._rebuild_recent_menu()
@@ -2952,7 +3179,16 @@ class MainWindow(QMainWindow):
                     + (f" (und {len(hinweise) - 1} weitere)" if len(hinweise) > 1 else ""),
                     15000)
         else:
-            QMessageBox.warning(self, "Fehler", msg)
+            # UI-145: eine verschwundene Datei fliegt aus „Zuletzt verwendet“.
+            if not os.path.exists(path):
+                key = _canon_path(path)
+                recents = _load_recent_files()
+                rest = [p for p in recents if _canon_path(p) != key]
+                if len(rest) != len(recents):
+                    _save_recent_files(rest)
+                    self._rebuild_recent_menu()
+                    msg += "\n\nDer Eintrag wurde aus „Zuletzt verwendet“ entfernt."
+            QMessageBox.warning(self, "Show nicht geöffnet", msg)
 
     def _rebuild_recent_menu(self):
         if not hasattr(self, "_recent_menu") or self._recent_menu is None:
@@ -2965,7 +3201,7 @@ class MainWindow(QMainWindow):
             return
         labels = _recent_menu_labels(recents)
         for path, short in zip(recents, labels):
-            act = self._recent_menu.addAction(short)
+            act = self._recent_menu.addAction(_mitte_kuerzen(short))
             act.setToolTip(path)  # voller Pfad bleibt im Tooltip
             act.triggered.connect(weak_slot(self._open_show_nach_rueckfrage, path))
         self._recent_menu.addSeparator()
@@ -3162,6 +3398,7 @@ class MainWindow(QMainWindow):
             merke_show_stand(self._state, views)
         except Exception as e:
             print(f"[main_window] show stand merken error: {e}")
+        self._titel_markierung_pruefen()      # UI-145: Stern weg
         if nachlaufend:
             QTimer.singleShot(0, self._show_stand_merken)
 

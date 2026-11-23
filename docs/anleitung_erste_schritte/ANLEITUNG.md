@@ -37,7 +37,9 @@ Nach dem Start öffnet LightOS in der Sektion **Bühne**. Von oben nach unten:
    und öffnet den 3D-Visualizer — der DMX-Ausgang läuft dabei weiter. Unter `Hilfe` findest du diese
    Anleitung wieder (**Erste Schritte**; alle weiteren unter **Anleitungen öffnen**), dazu **Tastenkürzel…** (alle Kürzel auf einen Blick) und
    **Datenordner öffnen** / **Show-Ordner öffnen**.
-2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2.
+2. **Sektionsleiste** — die acht Arbeitsbereiche von LightOS, siehe Schritt 2. Bei
+   schmalem Fenster liegen die Bereiche, die nicht mehr passen, im Menü **»** am Ende
+   der Leiste.
 3. **GM** — der Grand Master. Er regelt die Gesamthelligkeit von 0 bis 100 %.
    Laser ohne Dimmerkanal dimmt er nicht stufenlos, sondern schaltet sie bei 0 % aus —
    aber nur, wenn das Geräteprofil einen Aus-Wert kennt. Sicher aus ist ein Laser

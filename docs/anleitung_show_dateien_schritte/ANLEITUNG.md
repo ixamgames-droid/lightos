@@ -68,7 +68,7 @@ du nur für eine Kopie oder einen neuen Namen.
    das „Label“ und klick auf „Speichern“.
    ![Label ändern](img/a3_s2_label_aendern.png)
 3. **Schau ins Menü „Bearbeiten“.** Hinter „Rückgängig:“ steht, was als Nächstes
-   zurückgenommen wird — hier das geänderte Gerät.
+   zurückgenommen wird — hier „Gerät „…“ geändert“ mit dem alten Namen des Geräts.
    ![Menü Bearbeiten](img/a3_s3_menue_rueckgaengig.png)
 4. **Drück Strg+Z.** Die letzte Änderung (das Label) ist zurück. Unten links steht
    „Rückgängig: …“.
@@ -79,7 +79,8 @@ du nur für eine Kopie oder einen neuen Namen.
 6. **Wiederholen: Strg+Umschalt+Z.** Jeder Druck holt eine Änderung zurück, in der gleichen
    Reihenfolge. Unten steht „Wiederholt: …“.
    ![Wiederholen](img/a3_s6_wiederholen.png)
-7. **Beim Schließen mit ungespeicherten Änderungen** fragt LightOS nach: **„Speichern“** sichert
+7. **Ungespeicherte Änderungen** erkennst du am Stern vorn in der Titelleiste („* LightOS …“).
+   Nach dem Speichern ist er wieder weg. **Beim Schließen mit ungespeicherten Änderungen** fragt LightOS nach: **„Speichern“** sichert
    und beendet, **„Verwerfen“** beendet ohne Sichern, **„Abbrechen“** lässt die App offen.
    ![Frage beim Schließen](img/a3_s7_schliessen_frage.png)
 
@@ -93,11 +94,15 @@ Rückgängig-Liste leer. Du kannst also nicht versehentlich in eine alte Show zu
 ![Ablauf: Fehlerfälle](img/a4_ablauf.gif)
 
 1. **Datei fehlt.** Du klickst in „Datei → Zuletzt verwendet“ auf eine Show, die verschoben oder
-   gelöscht wurde. LightOS meldet, dass das Öffnen fehlgeschlagen ist. Deine aktuelle Show
-   bleibt unverändert offen. Mit „Liste leeren“ räumst du die Liste auf.
+   gelöscht wurde. LightOS meldet „Die Show-Datei … wurde nicht gefunden“ und nimmt den Eintrag
+   aus „Zuletzt verwendet“. Deine aktuelle Show bleibt unverändert offen. Mit „Liste leeren“
+   räumst du die ganze Liste auf. Sehr lange Namen stehen in der Liste in der Mitte gekürzt
+   („…“); der volle Pfad erscheint, wenn du mit der Maus darauf zeigst.
    ![Fehlende Datei](img/a4_s1_fehlende_datei.png)
 2. **Datei kaputt.** Ist eine `.lshow`-Datei beschädigt, leer oder abgeschnitten, meldet LightOS
-   ebenfalls einen Fehler beim Öffnen. Auch hier bleibt die aktuelle Show offen. Versuch dann
+   in Worten, was los ist: „keine gültige LightOS-Show“ (fremde, leere oder zerstörte Datei)
+   oder „beschädigt“ (Inhalt abgeschnitten). Die technischen Einzelheiten stehen nur im
+   Protokoll. Auch hier bleibt die aktuelle Show offen. Versuch dann
    **„Datei → Ältere Version öffnen…“**.
    ![Kaputte Datei](img/a4_s2_kaputte_datei.png)
 3. **Neue Show mit ungespeicherten Änderungen.** Bei **Strg+N** fragt LightOS „Vor dem Leeren
