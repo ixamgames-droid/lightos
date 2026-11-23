@@ -18,7 +18,10 @@ Den Tiefgang zu Effekten + Geschwindigkeit findest du in
 ## 1. Die Oberfläche im Überblick
 
 Ganz oben liegt eine **Sektions-Leiste** mit 8 Hauptbereichen. Ein Klick (oder
-`Strg+1` … `Strg+8`) wechselt den Bereich. Viele Bereiche haben darunter noch
+`Strg+1` … `Strg+8`) wechselt den Bereich. Ist das Fenster schmal (etwa 1024 oder
+1150 px), werden die Namen erst verkürzt („Prog“, „VC“); was dann nicht mehr lesbar
+passt, steht im Menü **»** am Ende der Leiste. Der gerade offene Bereich bleibt
+immer in der Leiste. Viele Bereiche haben darunter noch
 **Unter-Tabs**:
 
 | # | Sektion | Unter-Tabs |
