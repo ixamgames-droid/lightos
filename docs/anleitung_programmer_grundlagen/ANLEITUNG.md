@@ -142,7 +142,9 @@ Moving Heads. Hier wählst du **Spot 1** und **Spot 2**. Im Reiter stehen:
   Programmer. Zurücknehmen lassen sie sich deshalb nur über **Bearbeiten →
   Rückgängig** (**Strg+Z**), nicht mit dem Knopf **Rückgängig** im Programmer.
 - **Pan/Tilt-Speed:** mit dem Regler **Speed**, falls das Gerät so einen Kanal hat.
-- **Position-Tool (XY-Pad)**: ein aufklappbares Pad zum Ziehen.
+- **Position-Tool (XY-Pad)**: ein aufklappbares Pad zum Ziehen. Punkt und
+  Anzeige **P:/T:** zeigen die aktuellen Pan/Tilt-Werte im Programmer, auch
+  nach einem Befehl in der Befehlszeile oder nach Rückgängig/Wiederholen.
 - Die Regler **Pan** und **Tilt**.
 
 Mit Moving Heads in der Auswahl erscheinen außerdem die Reiter **Mapping** und
@@ -200,6 +202,12 @@ Damit findest du Geräte auf der Bühne wieder:
    Pan/Tilt in die Mitte (Tastenkürzel **H**).
 2. **Abdunkeln** dimmt alle *nicht* gewählten Geräte auf etwa 30 %
    (Tastenkürzel **Umschalt+H**).
+
+   Steht der Cursor in einem Eingabefeld (zum Beispiel in der Befehlszeile),
+   gehen Buchstaben und die Leertaste in das Feld. **H**, **Umschalt+H** und
+   die Leertaste (GO) lösen dort nichts aus. In der Befehlszeile ergänzt
+   **Tab** das angefangene Wort (`hig` wird zu `highlight`, `cl` zu `clear`),
+   der Cursor bleibt im Feld. **Umschalt+Tab** verlässt das Feld.
 3. In der **Lampen-Vorschau** leuchten die gewählten Wash-Lampen weiß.
 
 Beide Knöpfe schreiben echte Werte in den Programmer — nicht nur vorübergehend. Die

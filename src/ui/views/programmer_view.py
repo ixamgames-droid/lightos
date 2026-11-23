@@ -260,6 +260,18 @@ class ProgrammerView(QWidget):
                 s._load_current_value()
             except Exception:
                 continue
+        # UI-146: auch das eingebettete XY-Pad folgt dem Programmer
+        # (Befehlszeile, Rueckgaengig/Wiederholen, Paletten ...).
+        try:
+            from src.ui.widgets.position_tool import PositionTool
+            tools = self.findChildren(PositionTool)
+        except RuntimeError:
+            return
+        for pt in tools:
+            try:
+                pt.aus_programmer_laden()
+            except Exception:
+                continue
 
     # ── UI Build ─────────────────────────────────────────────────────────────
 
@@ -2093,6 +2105,8 @@ class ProgrammerView(QWidget):
                     from src.ui.widgets.position_tool import PositionTool
                     pt = PositionTool()
                     pt.set_live(True)   # M3.1: eingebettet wirkt das Pad sofort
+                    # UI-146: mit den echten Pan/Tilt-Werten starten (nur lesen).
+                    pt.aus_programmer_laden()
                     section = CollapsibleSection(
                         "Position-Tool (XY-Pad)", pt, collapsed=True,
                         prefs_key="programmer_position_tool")
@@ -3556,6 +3570,7 @@ class ProgrammerView(QWidget):
             from src.ui.widgets.position_tool import PositionTool
             dlg = _ToolDialog("Position Tool", self)
             pt = PositionTool()
+            pt.aus_programmer_laden()   # UI-146: echte Werte statt 127/127
             dlg.set_content(pt)
             dialog_hilfe.ausfuehren(dlg)
         except Exception as e:
