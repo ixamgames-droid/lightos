@@ -24,8 +24,8 @@
 3. Die neue, leere Liste ist jetzt oben ausgewählt.
    ![Leere Liste](img/a1_03_liste.png)
 4. Stell das Licht ein. Am schnellsten geht das über die Befehlszeile unten. Tippe z. B.
-   `1 thru 5 @ 80` und drück Enter. Das setzt Gerät 1 bis 5 auf 80 %. Ohne @-Taste geht auch
-   `1 thru 5 dim 204` (Rohwert 0–255).
+   `1 thru 5 @ 80` (Gerät 1 bis 5 auf 80 %) oder wie im Bild `1 thru 5 dim 204` (Rohwert
+   0–255) und drück Enter.
    ![Befehl tippen](img/a1_04_befehl.png)
 5. Oben erscheint **Programmer 5**. So siehst du, dass Werte gesetzt sind.
    ![Programmer 5](img/a1_05_programmer.png)
